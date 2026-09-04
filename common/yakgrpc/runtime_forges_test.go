@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/aiforge/browserauthorization"
 	"github.com/yaklang/yaklang/common/aiforge/browsercrypto"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -38,27 +37,6 @@ func TestServerRuntimeForgeRegistrationIsGenericAndServerScoped(t *testing.T) {
 		},
 	)
 	require.ErrorContains(t, err, "bridge is not running")
-	require.True(t, handled)
-	require.Nil(t, preparation)
-
-	result, handled, err = server.runtimeForges.Execute(
-		browserauthorization.ForgeName,
-		context.Background(),
-		[]*ypb.ExecParamItem{
-			{Key: "workspace_id", Value: "authorization-workspace-1"},
-		},
-	)
-	require.ErrorContains(t, err, "workspace service is not running")
-	require.True(t, handled)
-	require.Nil(t, result)
-	preparation, handled, err = server.runtimeForges.PrepareReAct(
-		browserauthorization.ForgeName,
-		context.Background(),
-		[]*ypb.ExecParamItem{
-			{Key: "workspace_id", Value: "authorization-workspace-1"},
-		},
-	)
-	require.ErrorContains(t, err, "workspace service is not running")
 	require.True(t, handled)
 	require.Nil(t, preparation)
 

@@ -154,21 +154,18 @@ type ExtensionBridgeManagerSnapshot struct {
 }
 
 type ExtensionBridgeManager struct {
-	mu                      sync.RWMutex
-	authorizationMu         sync.Mutex
-	authorization           map[string]ExtensionAuthorizationWorkspace
-	authorizationTombstones map[string]extensionAuthorizationWorkspaceTombstone
-	engineInstanceID        string
-	store                   ExtensionBridgeIdentityStore
-	identity                extensionBridgeIdentityState
-	privateKey              *ecdsa.PrivateKey
-	server                  *ExtensionBridgeServer
-	lastError               string
-	pairingOpenUntil        time.Time
-	pending                 map[string]*extensionBridgePendingPairing
-	pairingAttempts         map[string][]time.Time
-	revision                uint64
-	onChange                func(uint64, string)
+	mu               sync.RWMutex
+	engineInstanceID string
+	store            ExtensionBridgeIdentityStore
+	identity         extensionBridgeIdentityState
+	privateKey       *ecdsa.PrivateKey
+	server           *ExtensionBridgeServer
+	lastError        string
+	pairingOpenUntil time.Time
+	pending          map[string]*extensionBridgePendingPairing
+	pairingAttempts  map[string][]time.Time
+	revision         uint64
+	onChange         func(uint64, string)
 }
 
 func NewExtensionBridgeManager(store ExtensionBridgeIdentityStore, onChange func(uint64, string)) (*ExtensionBridgeManager, error) {
@@ -184,15 +181,13 @@ func NewExtensionBridgeManager(store ExtensionBridgeIdentityStore, onChange func
 		return nil, fmt.Errorf("create browser extension engine instance: %w", err)
 	}
 	return &ExtensionBridgeManager{
-		store:                   store,
-		identity:                *state,
-		privateKey:              key,
-		engineInstanceID:        engineInstanceID,
-		authorization:           make(map[string]ExtensionAuthorizationWorkspace),
-		authorizationTombstones: make(map[string]extensionAuthorizationWorkspaceTombstone),
-		pending:                 make(map[string]*extensionBridgePendingPairing),
-		pairingAttempts:         make(map[string][]time.Time),
-		onChange:                onChange,
+		store:            store,
+		identity:         *state,
+		privateKey:       key,
+		engineInstanceID: engineInstanceID,
+		pending:          make(map[string]*extensionBridgePendingPairing),
+		pairingAttempts:  make(map[string][]time.Time),
+		onChange:         onChange,
 	}, nil
 }
 

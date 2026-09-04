@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -26,18 +25,6 @@ const (
 	browserTaskMaxOutput      = 8 << 20
 	browserTaskMaxEvent       = 1 << 20
 )
-
-func browserTaskRequiresConnectedDevice(schema string) bool {
-	switch schema {
-	case "authorization.evidence.inspect",
-		"authorization.evidence.packet",
-		"authorization.evidence.diff",
-		"authorization.evidence.validate":
-		return false
-	default:
-		return true
-	}
-}
 
 type browserTaskEmitter struct {
 	mu         sync.Mutex
@@ -101,18 +88,7 @@ func (s *Server) ExecuteBrowserExtensionTask(req *ypb.BrowserExtensionTaskReques
 	if !json.Valid(req.GetPayload()) {
 		return emitter.send("error", "task payload must be valid JSON", nil)
 	}
-	if schema != "capability.call" &&
-		schema != "yak.script" &&
-		schema != "authorization.workspace.create" &&
-		schema != "authorization.workspace.inspect" &&
-		schema != "authorization.baseline.bind" &&
-		schema != "authorization.logical.bind" &&
-		schema != "authorization.plan.create" &&
-		schema != "authorization.plan.execute" &&
-		schema != "authorization.evidence.inspect" &&
-		schema != "authorization.evidence.packet" &&
-		schema != "authorization.evidence.diff" &&
-		schema != "authorization.evidence.validate" {
+	if schema != "capability.call" && schema != "yak.script" {
 		return emitter.send("error", fmt.Sprintf("unsupported browser extension task schema %q", schema), nil)
 	}
 	paired, connected := false, false
@@ -131,7 +107,7 @@ func (s *Server) ExecuteBrowserExtensionTask(req *ypb.BrowserExtensionTaskReques
 	if !paired {
 		return emitter.send("error", "paired browser extension device not found", nil)
 	}
-	if browserTaskRequiresConnectedDevice(schema) && !connected {
+	if !connected {
 		return emitter.send("error", "browser extension device is not connected", nil)
 	}
 
@@ -163,274 +139,14 @@ func (s *Server) ExecuteBrowserExtensionTask(req *ypb.BrowserExtensionTaskReques
 		err = s.executeBrowserCapabilityTask(ctx, req.GetPayload(), emitter)
 	case "yak.script":
 		err = s.executeBrowserYakTask(ctx, req.GetPayload(), emitter)
-	case "authorization.workspace.create":
-		err = s.executeBrowserAuthorizationWorkspaceCreate(ctx, req.GetPayload(), emitter)
-	case "authorization.workspace.inspect":
-		err = s.executeBrowserAuthorizationWorkspaceInspect(ctx, req.GetPayload(), emitter)
-	case "authorization.baseline.bind":
-		err = s.executeBrowserAuthorizationBaselineBind(ctx, req.GetPayload(), emitter)
-	case "authorization.logical.bind":
-		err = s.executeBrowserAuthorizationLogicalBind(ctx, req.GetPayload(), emitter)
-	case "authorization.plan.create":
-		err = s.executeBrowserAuthorizationPlanCreate(ctx, req.GetPayload(), emitter)
-	case "authorization.plan.execute":
-		err = s.executeBrowserAuthorizationPlanExecute(ctx, req.GetPayload(), emitter)
-	case "authorization.evidence.inspect":
-		err = s.executeBrowserAuthorizationEvidenceInspect(ctx, req.GetPayload(), emitter)
-	case "authorization.evidence.packet":
-		err = s.executeBrowserAuthorizationEvidencePacket(ctx, req.GetPayload(), emitter)
-	case "authorization.evidence.diff":
-		err = s.executeBrowserAuthorizationEvidenceDiff(ctx, req.GetPayload(), emitter)
-	case "authorization.evidence.validate":
-		err = s.executeBrowserAuthorizationEvidenceValidate(ctx, req.GetPayload(), emitter)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return emitter.send(browserTaskContextEvent(ctx), ctx.Err().Error(), nil)
 		}
-		var lifecycle *browser.ExtensionAuthorizationWorkspaceLifecycleError
-		if errors.As(err, &lifecycle) {
-			data, _ := json.Marshal(lifecycle)
-			return emitter.send("error", lifecycle.Error(), data)
-		}
 		return emitter.send("error", err.Error(), nil)
 	}
 	return emitter.send("completed", "task completed", nil)
-}
-
-func (s *Server) authorizationEvidenceWorkspaceForTask(
-	ctx context.Context,
-	workspaceID string,
-	emitter *browserTaskEmitter,
-) error {
-	workspace, err := s.browserBridge.GetExtensionAuthorizationWorkspace(
-		ctx,
-		workspaceID,
-		false,
-	)
-	if err != nil {
-		return err
-	}
-	if workspace.Left.DeviceID != emitter.deviceID {
-		return errors.New("authorization workspace does not belong to the task device")
-	}
-	return nil
-}
-
-func (s *Server) executeBrowserAuthorizationEvidenceInspect(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationEvidenceInspectInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.evidence.inspect payload: %w", err)
-	}
-	if err := s.authorizationEvidenceWorkspaceForTask(ctx, input.WorkspaceID, emitter); err != nil {
-		return err
-	}
-	bundle, err := s.browserBridge.InspectExtensionAuthorizationEvidence(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(bundle)
-	if err != nil {
-		return fmt.Errorf("encode authorization evidence bundle: %w", err)
-	}
-	return emitter.send("result", "authorization.evidence.inspect", result)
-}
-
-func (s *Server) executeBrowserAuthorizationEvidencePacket(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationEvidencePacketInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.evidence.packet payload: %w", err)
-	}
-	if err := s.authorizationEvidenceWorkspaceForTask(ctx, input.WorkspaceID, emitter); err != nil {
-		return err
-	}
-	packet, err := s.browserBridge.ReadExtensionAuthorizationEvidencePacket(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(packet)
-	if err != nil {
-		return fmt.Errorf("encode authorization evidence packet: %w", err)
-	}
-	return emitter.send("result", "authorization.evidence.packet", result)
-}
-
-func (s *Server) executeBrowserAuthorizationEvidenceDiff(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationEvidenceDiffInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.evidence.diff payload: %w", err)
-	}
-	if err := s.authorizationEvidenceWorkspaceForTask(ctx, input.WorkspaceID, emitter); err != nil {
-		return err
-	}
-	diff, err := s.browserBridge.DiffExtensionAuthorizationEvidence(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(diff)
-	if err != nil {
-		return fmt.Errorf("encode authorization evidence diff: %w", err)
-	}
-	return emitter.send("result", "authorization.evidence.diff", result)
-}
-
-func (s *Server) executeBrowserAuthorizationEvidenceValidate(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationEvidenceValidationInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.evidence.validate payload: %w", err)
-	}
-	if err := s.authorizationEvidenceWorkspaceForTask(ctx, input.WorkspaceID, emitter); err != nil {
-		return err
-	}
-	validation, err := s.browserBridge.ValidateExtensionAuthorizationEvidence(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(validation)
-	if err != nil {
-		return fmt.Errorf("encode authorization evidence validation: %w", err)
-	}
-	return emitter.send("result", "authorization.evidence.validate", result)
-}
-
-func (s *Server) executeBrowserAuthorizationLogicalBind(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationLogicalBindingInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.logical.bind payload: %w", err)
-	}
-	workspace, err := s.browserBridge.GetExtensionAuthorizationWorkspace(
-		ctx,
-		input.WorkspaceID,
-		false,
-	)
-	if err != nil {
-		return err
-	}
-	if workspace.Left.DeviceID != emitter.deviceID {
-		return errors.New("authorization workspace does not belong to the task device")
-	}
-	workspace, err = s.browserBridge.BindExtensionAuthorizationLogicalRequests(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(workspace)
-	if err != nil {
-		return fmt.Errorf("encode authorization workspace: %w", err)
-	}
-	return emitter.send("result", "authorization.logical.bind", result)
-}
-
-func (s *Server) executeBrowserAuthorizationPlanExecute(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationExecutionInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.plan.execute payload: %w", err)
-	}
-	workspace, err := s.browserBridge.GetExtensionAuthorizationWorkspace(
-		ctx,
-		input.WorkspaceID,
-		false,
-	)
-	if err != nil {
-		return err
-	}
-	if workspace.Left.DeviceID != emitter.deviceID {
-		return errors.New("authorization workspace does not belong to the task device")
-	}
-	workspace, err = s.browserBridge.ExecuteExtensionAuthorizationPlan(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(workspace)
-	if err != nil {
-		return fmt.Errorf("encode authorization workspace: %w", err)
-	}
-	return emitter.send("result", "authorization.plan.execute", result)
-}
-
-func (s *Server) executeBrowserAuthorizationPlanCreate(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationPlanInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.plan.create payload: %w", err)
-	}
-	workspace, err := s.browserBridge.GetExtensionAuthorizationWorkspace(
-		ctx,
-		input.WorkspaceID,
-		false,
-	)
-	if err != nil {
-		return err
-	}
-	if workspace.Left.DeviceID != emitter.deviceID {
-		return errors.New("authorization workspace does not belong to the task device")
-	}
-	workspace, err = s.browserBridge.CreateExtensionAuthorizationPlan(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(workspace)
-	if err != nil {
-		return fmt.Errorf("encode authorization workspace: %w", err)
-	}
-	return emitter.send("result", "authorization.plan.create", result)
-}
-
-func (s *Server) executeBrowserAuthorizationBaselineBind(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationBaselineInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.baseline.bind payload: %w", err)
-	}
-	workspace, err := s.browserBridge.GetExtensionAuthorizationWorkspace(
-		ctx,
-		input.WorkspaceID,
-		false,
-	)
-	if err != nil {
-		return err
-	}
-	if workspace.Left.DeviceID != emitter.deviceID {
-		return errors.New("authorization workspace does not belong to the task device")
-	}
-	workspace, err = s.browserBridge.BindExtensionAuthorizationBaseline(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(workspace)
-	if err != nil {
-		return fmt.Errorf("encode authorization workspace: %w", err)
-	}
-	return emitter.send("result", "authorization.baseline.bind", result)
 }
 
 func decodeBrowserTaskPayload(payload []byte, output interface{}) error {
@@ -443,59 +159,6 @@ func decodeBrowserTaskPayload(payload []byte, output interface{}) error {
 		return errors.New("browser task payload contains trailing data")
 	}
 	return nil
-}
-
-func (s *Server) executeBrowserAuthorizationWorkspaceCreate(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input browser.ExtensionAuthorizationWorkspaceInput
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.workspace.create payload: %w", err)
-	}
-	if strings.TrimSpace(input.Left.DeviceID) != emitter.deviceID {
-		return errors.New("authorization workspace left device must match the task device")
-	}
-	workspace, err := s.browserBridge.CreateExtensionAuthorizationWorkspace(ctx, input)
-	if err != nil {
-		return err
-	}
-	result, err := json.Marshal(workspace)
-	if err != nil {
-		return fmt.Errorf("encode authorization workspace: %w", err)
-	}
-	return emitter.send("result", "authorization.workspace.create", result)
-}
-
-func (s *Server) executeBrowserAuthorizationWorkspaceInspect(
-	ctx context.Context,
-	payload []byte,
-	emitter *browserTaskEmitter,
-) error {
-	var input struct {
-		WorkspaceID string `json:"workspaceId"`
-		Revalidate  *bool  `json:"revalidate,omitempty"`
-	}
-	if err := decodeBrowserTaskPayload(payload, &input); err != nil {
-		return fmt.Errorf("decode authorization.workspace.inspect payload: %w", err)
-	}
-	revalidate := true
-	if input.Revalidate != nil {
-		revalidate = *input.Revalidate
-	}
-	workspace, err := s.browserBridge.GetExtensionAuthorizationWorkspace(ctx, input.WorkspaceID, revalidate)
-	if err != nil {
-		return err
-	}
-	if workspace.Left.DeviceID != emitter.deviceID {
-		return errors.New("authorization workspace does not belong to the task device")
-	}
-	result, err := json.Marshal(workspace)
-	if err != nil {
-		return fmt.Errorf("encode authorization workspace: %w", err)
-	}
-	return emitter.send("result", "authorization.workspace.inspect", result)
 }
 
 func (s *Server) executeBrowserCapabilityTask(ctx context.Context, payload []byte, emitter *browserTaskEmitter) error {
