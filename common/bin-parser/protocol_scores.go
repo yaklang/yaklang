@@ -111,7 +111,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("DHCP", "application-layer/dhcp.yaml", 20, 8, 20, 20, 10, "L3",
 		"TestDHCPGopacketDiscover; TestDHCPOfferYourIP; TestDHCPFailPaths (bad op/cookie/trunc)", ""),
 	card("HTTP", "application-layer/http.yaml", 20, 25, 20, 20, 10, "L1",
-		"TestBaseProtocol http request; TestTLSClientHelloJA3AndHTTPWPAD; TestHTTPFailPaths", ""),
+		"TestBaseProtocol http request; http/post Content-Length foo=bar; http/chunked RFC 9112 hello; TestHTTPFailPaths", ""),
 	card("HTTP/2", "application-layer/http2.yaml", 20, 20, 20, 20, 10, "L2",
 		"TestHTTP2RFC9113SettingsTwoParams; TestHTTP2PrefaceFrameAndEdges; TestHTTP2SettingsPingGoaway", "HEADERS payload"),
 	card("WebSocket", "application-layer/websocket.yaml", 25, 20, 20, 20, 10, "L2",

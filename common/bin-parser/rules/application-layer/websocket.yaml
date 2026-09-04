@@ -6,6 +6,9 @@ Package:
       this.ProcessSubNode("RSV")
       this.ProcessSubNode("Opcode")
       op = getNodeResult("Opcode").Value
+      if getNodeResult("RSV").Value != 0 {
+        panic("websocket: RSV must be 0")
+      }
       if op > 0x0a || (op >= 3 && op <= 7) {
         panic("websocket: reserved opcode")
       }
