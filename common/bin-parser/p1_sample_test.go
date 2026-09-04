@@ -2478,6 +2478,46 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 1099, 1099, raw))
 		require.Equal(t, uint64(0xaced), uintVal(t, mustChild(t, eth, "IP", "TCP", "RMI", "Message").Child("Ser Magic")))
 	})
+
+	t.Run("llc/stp", func(t *testing.T) {
+		// IEEE 802.2 UI (Control 0x03) DSAP/SSAP 0x42 + 802.1D TCN. Wireshark llc.dsap / stp.type.
+		raw := []byte{0x42, 0x42, 0x03, 0x00, 0x00, 0x00, 0x80}
+		n := parseRule(t, raw, "llc", "LLC")
+		require.Equal(t, uint64(0x42), uintVal(t, n.Child("DSAP")))
+		require.Equal(t, uint64(0x03), uintVal(t, n.Child("Control")))
+		require.Nil(t, n.Child("Control Extended"))
+		require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, n, "STP").Child("BPDU Type")))
+		eth := parseEthernet(t, ethernet8023([]byte{0x01, 0x80, 0xc2, 0x00, 0x00, 0x00}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, raw))
+		require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, eth, "LLC", "STP").Child("BPDU Type")))
+	})
+
+	t.Run("llc/snap", func(t *testing.T) {
+		// RFC 1042 SNAP UI OUI 00:00:00 PID 0x0806 ARP request. Wireshark snap.oui / arp.opcode.
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append([]byte{0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00, 0x08, 0x06}, arp...)
+		n := parseRule(t, raw, "llc", "LLC")
+		require.Equal(t, uint64(0xaa), uintVal(t, n.Child("DSAP")))
+		snap := mustChild(t, n, "SNAP")
+		require.Equal(t, []byte{0x00, 0x00, 0x00}, bytesVal(t, snap.Child("OUI")))
+		require.Equal(t, uint64(0x0806), uintVal(t, snap.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, snap, "ARP").Child("Opcode")))
+		eth := parseEthernet(t, ethernet8023([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, raw))
+		require.Equal(t, uint64(0x0806), uintVal(t, mustChild(t, eth, "LLC", "SNAP").Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "LLC", "SNAP", "ARP").Child("Opcode")))
+	})
+
+	t.Run("llc/xid", func(t *testing.T) {
+		// IEEE 802.2 §5.4.1.1.1 XID command Control 0xAF, Format 0x81, Type-1 LLC, window 127.
+		// Wireshark llc.control / llc.xid.
+		raw := []byte{0x00, 0x00, 0xaf, 0x81, 0x01, 0x7f}
+		n := parseRule(t, raw, "llc", "LLC")
+		require.Equal(t, uint64(0xaf), uintVal(t, n.Child("Control")))
+		require.Equal(t, uint64(0x81), uintVal(t, n.Child("XID Format")))
+		require.Equal(t, uint64(0x01), uintVal(t, n.Child("XID Types")))
+		require.Equal(t, uint64(0x7f), uintVal(t, n.Child("XID Window")))
+		eth := parseEthernet(t, ethernet8023([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, raw))
+		require.Equal(t, uint64(0x81), uintVal(t, mustChild(t, eth, "LLC").Child("XID Format")))
+	})
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {

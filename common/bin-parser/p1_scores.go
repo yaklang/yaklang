@@ -3,12 +3,12 @@ package bin_parser
 // P1Scorecards records delivery scores for every P1 roadmap name.
 // Aliases share the target card via AliasOf; TestP1ScorecardsCovered expands them.
 var P1Scorecards = []ProtocolScorecard{
-	p1card("Ethernet 802.2", "llc.yaml", 15, 25, 16, 20, 10, "L1",
-		"TestP1STP8023AndPPPFamily LLC+STP; TestP1FailPaths llc", ""),
-	p1card("Ethernet 802.3", "llc.yaml", 15, 25, 16, 20, 10, "L1",
-		"TestP1STP8023AndPPPFamily 802.3 length + LLC; TestP1FailPaths llc", ""),
-	p1card("Ethernet SNAP", "llc.yaml", 15, 25, 16, 20, 10, "L1",
-		"TestP1PPPoEQinQLoopbackCDP SNAP+CDP; TestP1FailPaths llc", ""),
+	p1card("Ethernet 802.2", "llc.yaml", 20, 25, 20, 20, 10, "L1",
+		"llc/stp IEEE 802.2 UI DSAP 0x42 + 802.1D TCN; llc/xid IEEE 802.2 XID Format 0x81; TestP1FailPaths llc", ""),
+	p1card("Ethernet 802.3", "llc.yaml", 20, 25, 20, 20, 10, "L1",
+		"llc/stp 802.3 length + LLC STP TCN; llc/snap SNAP CDP OUI 00:00:0c; TestP1FailPaths llc", ""),
+	p1card("Ethernet SNAP", "llc.yaml", 20, 25, 20, 20, 10, "L1",
+		"llc/snap RFC 1042 SNAP OUI 00:00:00 PID 0x0806 ARP; llc/stp UI Control 0x03; TestP1FailPaths llc", ""),
 	p1card("IEEE 802.1ad QinQ", "ieee_802_1ad.yaml", 20, 25, 20, 20, 10, "L2",
 		"qinq/s-tag PCP=5 DEI=1 VID=100; qinq/c-tag S-VID 100 C-VID 200 ARP; TestP1FailPaths ieee_802_1ad", ""),
 	p1card("PPP", "ppp.yaml", 25, 25, 20, 20, 10, "L2",
