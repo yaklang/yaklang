@@ -2,6 +2,7 @@ package bin_parser
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -766,5 +767,28 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, raw, "application-layer.tns", "TNS")
 		require.Equal(t, uint64(0), uintVal(t, n.Child("Data Flag")))
 		require.Equal(t, "AB", strVal(t, n.Child("Octets")))
+	})
+
+	t.Run("smb2/tree-connect", func(t *testing.T) {
+		path := utf16LE(`\\srv\share`)
+		tcBody := make([]byte, 8+len(path))
+		binary.LittleEndian.PutUint16(tcBody[0:], 9)
+		binary.LittleEndian.PutUint16(tcBody[4:], 72)
+		binary.LittleEndian.PutUint16(tcBody[6:], uint16(len(path)))
+		copy(tcBody[8:], path)
+		require.Equal(t, `\\srv\share`, strings.ReplaceAll(strVal(t, mustChild(t, parseRule(t, append(smb2SyncHeader(3, 0, 4), tcBody...), "application-layer.smb2", "SMB2"), "Tree Connect Request").Child("Path")), "\x00", ""))
+	})
+	t.Run("smb2/read", func(t *testing.T) {
+		rr := make([]byte, 16+8)
+		binary.LittleEndian.PutUint16(rr[0:], 17)
+		rr[2] = 80
+		binary.LittleEndian.PutUint32(rr[4:], 8)
+		copy(rr[16:], []byte("abcdefgh"))
+		require.Equal(t, "abcdefgh", strVal(t, mustChild(t, parseRule(t, append(smb2SyncHeader(8, 1, 6), rr...), "application-layer.smb2", "SMB2"), "Read Response").Child("Octets")))
+	})
+	t.Run("smb/tree-connect", func(t *testing.T) {
+		tc := mustChild(t, parseRule(t, smb1TreeConnectAndX(`\\srv\share`, "A:"), "application-layer.smb", "SMB"), "TreeConnectAndX")
+		require.Equal(t, `\\srv\share`, strVal(t, tc.Child("Path")))
+		require.Equal(t, "A:", strVal(t, tc.Child("Service")))
 	})
 }
