@@ -2999,6 +2999,39 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "wds1", joinUint8(t, n.Child("Next Protocol Data")))
 	})
 
+	t.Run("ieee_802_11/ack", func(t *testing.T) {
+		// IEEE 802.11-2016 Table 9-1 Control ACK (type 1 subtype 13): RA only, no Addr2/Seq.
+		// Wireshark wlan.fc.type_subtype / wlan.ra. 10-byte MAC header.
+		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		raw := append([]byte{0xd4, 0x00, 0x00, 0x00}, ra...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x00d4), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, ra, bytesVal(t, n.Child("Addr1")))
+		require.Nil(t, n.Child("Addr2"))
+		require.Nil(t, n.Child("Seq"))
+		require.Nil(t, n.Child("Next Protocol Data"))
+	})
+
+	t.Run("ieee_802_11/htc", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.2.4.1.10: QoS Data Order=1 includes HT Control after QoS Control.
+		// Wireshark wlan.fc.order / wlan.htc.
+		addr1 := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		addr2 := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		addr3 := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+		raw := make([]byte, 0, 34)
+		raw = append(raw, 0x88, 0x80, 0x00, 0x00)
+		raw = append(raw, addr1...)
+		raw = append(raw, addr2...)
+		raw = append(raw, addr3...)
+		raw = append(raw, 0x00, 0x00, 0x06, 0x00, 0x78, 0x56, 0x34, 0x12)
+		raw = append(raw, []byte("htc1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x8088), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, uint64(6), uintVal(t, n.Child("QoS Control"))&0xf)
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("HT Control")))
+		require.Equal(t, "htc1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
 		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
