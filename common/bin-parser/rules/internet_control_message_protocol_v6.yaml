@@ -21,6 +21,12 @@ Package:
             this.ProcessByType("Echo Request")
           case 129:
             this.ProcessByType("Echo Reply")
+          case 130:
+            this.ProcessByType("Multicast Listener Query")
+          case 131:
+            this.ProcessByType("Multicast Listener Report")
+          case 132:
+            this.ProcessByType("Multicast Listener Done")
           case 133:
             this.ProcessByType("Router Solicitation")
           case 134:
@@ -29,6 +35,8 @@ Package:
             this.ProcessByType("Neighbor Solicitation")
           case 136:
             this.ProcessByType("Neighbor Advertisement")
+          case 137:
+            this.ProcessByType("Redirect")
           default:
             return
         }
@@ -281,3 +289,46 @@ Parameter Problem:
     }
   Pointer: uint32
   Original Datagram: string
+Multicast Listener Query:
+  Maximum Response Delay: uint16
+  Reserved: uint16
+  Multicast Address: raw,16
+Multicast Listener Report:
+  Maximum Response Delay: uint16
+  Reserved: uint16
+  Multicast Address: raw,16
+Multicast Listener Done:
+  Maximum Response Delay: uint16
+  Reserved: uint16
+  Multicast Address: raw,16
+Redirect:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Target Address")
+    this.ProcessSubNode("Destination Address")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Reserved: raw,4
+  Target Address: raw,16
+  Destination Address: raw,16
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
