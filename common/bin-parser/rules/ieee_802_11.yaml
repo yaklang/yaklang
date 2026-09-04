@@ -31,6 +31,17 @@ Package:
         this.ProcessSubNode("Addr2")
         if subtype == 8 {
           this.ProcessSubNode("BAR Control")
+          barc = getNodeResult("BAR Control").Value
+          mtid = (barc >> 1) & 1
+          if mtid == 1 {
+            this.ProcessSubNode("BAR TID Info")
+            res, op = this.TryProcessByType("PeekByte")
+            op.Recovery()
+            if op.OK {
+              this.ProcessByType("Next Protocol Data")
+            }
+            return
+          }
           this.ProcessSubNode("Starting Sequence Control")
           res, op = this.TryProcessByType("PeekByte")
           op.Recovery()
@@ -42,8 +53,20 @@ Package:
         if subtype == 9 {
           this.ProcessSubNode("BA Control")
           bac = getNodeResult("BA Control").Value
-          this.ProcessSubNode("Starting Sequence Control")
+          mtid = (bac >> 1) & 1
           compressed = (bac >> 2) & 1
+          if mtid == 1 {
+            if compressed == 1 {
+              this.ProcessSubNode("BA TID Info")
+            }
+            res, op = this.TryProcessByType("PeekByte")
+            op.Recovery()
+            if op.OK {
+              this.ProcessByType("Next Protocol Data")
+            }
+            return
+          }
+          this.ProcessSubNode("Starting Sequence Control")
           if compressed == 1 {
             this.ProcessSubNode("BA Bitmap")
           }
@@ -99,6 +122,34 @@ Package:
     BA Control: uint16
     Starting Sequence Control: uint16
     BA Bitmap: raw,8
+    BAR TID Info:
+      list: true
+      Record: BARTIDRecord
+      operator: |
+        for {
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          ele.Process()
+        }
+    BA TID Info:
+      list: true
+      Record: BATIDRecord
+      operator: |
+        for {
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          ele.Process()
+        }
   RSN:
     operator: |
       this.ProcessSubNode("Element ID")
@@ -145,3 +196,10 @@ Next Protocol Data:
       ele.Process()
     }
 PeekByte: uint8
+BARTIDRecord:
+  Per TID Info: uint16
+  Starting Sequence Control: uint16
+BATIDRecord:
+  Per TID Info: uint16
+  Starting Sequence Control: uint16
+  BA Bitmap: raw,8

@@ -3080,6 +3080,62 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Nil(t, n.Child("Next Protocol Data"))
 	})
 
+	t.Run("ieee_802_11/mtid-ba", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.3.1.8 Figure 9-28/9-31 Multi-TID Compressed BlockAck.
+		// BA Control Multi-TID+Compressed, TID_INFO=1 (two TIDs). Wireshark wlan.ba.control.multitid.
+		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		ta := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		bm0 := []byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+		bm6 := []byte{0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+		raw := make([]byte, 0, 42)
+		raw = append(raw, 0x94, 0x00, 0x00, 0x00)
+		raw = append(raw, ra...)
+		raw = append(raw, ta...)
+		raw = append(raw, 0x06, 0x10)
+		raw = append(raw, 0x00, 0x00, 0x00, 0x01)
+		raw = append(raw, bm0...)
+		raw = append(raw, 0x00, 0x60, 0x00, 0x02)
+		raw = append(raw, bm6...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0094), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, uint64(0x1006), uintVal(t, n.Child("BA Control")))
+		require.Equal(t, uint64(1), (uintVal(t, n.Child("BA Control"))>>1)&1)
+		tids := n.Child("BA TID Info").Children()
+		require.Equal(t, 2, len(tids))
+		require.Equal(t, uint64(0), uintVal(t, tids[0].Child("Per TID Info"))>>12)
+		require.Equal(t, uint64(0x0100), uintVal(t, tids[0].Child("Starting Sequence Control")))
+		require.Equal(t, bm0, bytesVal(t, tids[0].Child("BA Bitmap")))
+		require.Equal(t, uint64(6), uintVal(t, tids[1].Child("Per TID Info"))>>12)
+		require.Equal(t, uint64(0x0200), uintVal(t, tids[1].Child("Starting Sequence Control")))
+		require.Equal(t, bm6, bytesVal(t, tids[1].Child("BA Bitmap")))
+		require.Nil(t, n.Child("Starting Sequence Control"))
+		require.Nil(t, n.Child("BA Bitmap"))
+	})
+
+	t.Run("ieee_802_11/mtid-bar", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.3.1.7 Multi-TID Compressed BlockAckReq: Per TID Info + SSC, no bitmap.
+		// Wireshark wlan.bar.control.multitid.
+		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		ta := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		raw := make([]byte, 0, 26)
+		raw = append(raw, 0x84, 0x00, 0x00, 0x00)
+		raw = append(raw, ra...)
+		raw = append(raw, ta...)
+		raw = append(raw, 0x06, 0x10)
+		raw = append(raw, 0x00, 0x00, 0x00, 0x01, 0x00, 0x60, 0x00, 0x02)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0084), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, uint64(0x1006), uintVal(t, n.Child("BAR Control")))
+		tids := n.Child("BAR TID Info").Children()
+		require.Equal(t, 2, len(tids))
+		require.Equal(t, uint64(0), uintVal(t, tids[0].Child("Per TID Info"))>>12)
+		require.Equal(t, uint64(0x0100), uintVal(t, tids[0].Child("Starting Sequence Control")))
+		require.Equal(t, uint64(6), uintVal(t, tids[1].Child("Per TID Info"))>>12)
+		require.Equal(t, uint64(0x0200), uintVal(t, tids[1].Child("Starting Sequence Control")))
+		require.Nil(t, n.Child("Starting Sequence Control"))
+		require.Nil(t, n.Child("BA Bitmap"))
+	})
+
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
 		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
