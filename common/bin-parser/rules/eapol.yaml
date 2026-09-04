@@ -84,6 +84,11 @@ EAPPacket:
         this.ProcessSubNode("Expanded")
         return
       }
+      if t == 13 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("EAP-TLS").SetMaxLength(dlen)
+        this.ProcessSubNode("EAP-TLS")
+        return
+      }
     }
     return
   Code: uint8
@@ -133,6 +138,21 @@ EAPPacket:
     Vendor-Id: raw,3
     Vendor Type: uint32
     Vendor Data: string
+  EAP-TLS:
+    operator: |
+      this.ProcessSubNode("Flags")
+      flags = getNodeResult("Flags").Value
+      if (flags & 0x80) != 0 {
+        this.ProcessSubNode("TLS Message Length")
+      }
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Fragment").SetMaxLength(rest)
+        this.ProcessSubNode("Fragment")
+      }
+    Flags: uint8
+    TLS Message Length: uint32
+    Fragment: raw
 EAPOLKey:
   operator: |
     this.ProcessSubNode("Descriptor Type")
