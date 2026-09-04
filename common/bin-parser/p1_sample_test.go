@@ -2352,6 +2352,45 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "ARP").Child("Opcode")))
 		require.Equal(t, mac, bytesVal(t, mustChild(t, n, "ARP").Child("Sender MAC address")))
 	})
+
+	t.Run("igmp/v1-report", func(t *testing.T) {
+		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
+		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
+		n := parseRule(t, raw, "igmp", "IGMP")
+		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
+		require.Equal(t, []byte{224, 0, 1, 60}, bytesVal(t, n.Child("Group Address")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 2, raw))
+		require.Equal(t, uint64(0x12), uintVal(t, mustChild(t, eth, "IP", "IGMP").Child("Type")))
+		require.Equal(t, []byte{224, 0, 1, 60}, bytesVal(t, mustChild(t, eth, "IP", "IGMP").Child("Group Address")))
+	})
+
+	t.Run("igmp/v3-query", func(t *testing.T) {
+		// RFC 3376 §4.1 Membership Query with one source. Wireshark igmp.type / igmp.maddr.
+		raw := []byte{0x11, 0x64, 0x00, 0x00, 239, 1, 1, 1, 0x02, 0x7d, 0x00, 0x01, 192, 0, 2, 1}
+		n := parseRule(t, raw, "igmp", "IGMP")
+		require.Equal(t, uint64(0x11), uintVal(t, n.Child("Type")))
+		require.Equal(t, []byte{239, 1, 1, 1}, bytesVal(t, n.Child("Group Address")))
+		require.Equal(t, uint64(2), uintVal(t, n.Child("SQRV")))
+		require.Equal(t, uint64(125), uintVal(t, n.Child("QQIC")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Number of Sources")))
+		require.Equal(t, []byte{192, 0, 2, 1}, bytesVal(t, n.Child("Sources").Children()[0]))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 2, raw))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "IGMP").Child("Number of Sources")))
+		require.Equal(t, []byte{192, 0, 2, 1}, bytesVal(t, mustChild(t, eth, "IP", "IGMP").Child("Sources").Children()[0]))
+	})
+
+	t.Run("igmp/v3-report", func(t *testing.T) {
+		// RFC 3376 §4.2 Membership Report: one MODE_IS_EXCLUDE record for 239.1.1.1.
+		raw := []byte{0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00, 239, 1, 1, 1}
+		n := parseRule(t, raw, "igmp", "IGMP")
+		require.Equal(t, uint64(0x22), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Number of Group Records")))
+		rec := n.Child("Records").Children()[0]
+		require.Equal(t, uint64(2), uintVal(t, rec.Child("Record Type")))
+		require.Equal(t, []byte{239, 1, 1, 1}, bytesVal(t, rec.Child("Multicast Address")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 2, raw))
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "IGMP").Child("Records").Children()[0].Child("Record Type")))
+	})
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
