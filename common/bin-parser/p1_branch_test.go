@@ -311,6 +311,19 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, parseRule(t, fr, "amqp", "AMQP").Child("Type")))
 	})
 
+	t.Run("kafka/metadata", func(t *testing.T) {
+		kf := mustHex(t, "000000170003000000000001000474657374000000010003666f6f")
+		n := parseRule(t, kf, "kafka", "Kafka")
+		require.Equal(t, "test", strVal(t, n.Child("Client ID")))
+		require.Equal(t, "foo", strVal(t, n.Child("Topics").Children()[0].Child("Name")))
+	})
+	t.Run("kafka/apiversions", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "0000000a0012000000000000ffff"), "kafka", "Kafka")
+		require.Equal(t, int64(18), intVal(t, n.Child("API Key")))
+		require.Equal(t, int64(-1), intVal(t, n.Child("Client ID Len")))
+		require.Nil(t, n.Child("Client ID"))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))

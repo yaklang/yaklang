@@ -261,8 +261,18 @@ func TestP1TCPApplications(t *testing.T) {
 	k := parseRule(t, kf, "kafka", "Kafka")
 	require.Equal(t, int64(10), intVal(t, k.Child("Length")))
 	require.Equal(t, int64(18), intVal(t, k.Child("API Key")))
+	require.Equal(t, int64(-1), intVal(t, k.Child("Client ID Len")))
+	require.Nil(t, k.Child("Client ID"))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 9092, 9092, kf))
 	require.Equal(t, int64(18), intVal(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("API Key")))
+
+	// Metadata v0: Client ID "test", one topic "foo" over TCP/9092.
+	km := mustHex(t, "000000170003000000000001000474657374000000010003666f6f")
+	md := parseRule(t, km, "kafka", "Kafka")
+	require.Equal(t, "test", strVal(t, md.Child("Client ID")))
+	require.Equal(t, "foo", strVal(t, md.Child("Topics").Children()[0].Child("Name")))
+	eth = parseEthernet(t, ipv4TCPFrame(t, 9092, 9092, km))
+	require.Equal(t, "test", strVal(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("Client ID")))
 
 	t.Run("jsonrpc/request", func(t *testing.T) {
 		jr := []byte("{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}")
