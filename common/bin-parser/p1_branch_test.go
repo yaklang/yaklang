@@ -10,13 +10,18 @@ import (
 
 func TestP1BranchRows(t *testing.T) {
 	t.Run("ieee_802_1ad/arp", func(t *testing.T) {
-		q := parseRule(t, append([]byte{0x00, 0x64, 0x08, 0x06}, []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}...), "ieee_802_1ad", "QinQ")
+		q := parseRule(t, append([]byte{0xb0, 0x64, 0x08, 0x06}, []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}...), "ieee_802_1ad", "QinQ")
+		require.Equal(t, uint64(5), uintVal(t, q.Child("PCP")))
+		require.Equal(t, uint64(1), uintVal(t, q.Child("DEI")))
+		require.Equal(t, uint64(100), vlanVID(t, q))
 		require.Equal(t, uint64(0x0806), uintVal(t, q.Child("Type")))
 	})
 	t.Run("ieee_802_1ad/vlan", func(t *testing.T) {
 		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
-		q := parseRule(t, append([]byte{0x00, 0x64, 0x81, 0x00, 0x00, 0x01, 0x08, 0x06}, arp...), "ieee_802_1ad", "QinQ")
+		q := parseRule(t, append([]byte{0x00, 0x64, 0x81, 0x00, 0x60, 0xc8, 0x08, 0x06}, arp...), "ieee_802_1ad", "QinQ")
 		require.Equal(t, uint64(0x8100), uintVal(t, q.Child("Type")))
+		require.Equal(t, uint64(3), uintVal(t, mustChild(t, q, "CTag").Child("PCP")))
+		require.Equal(t, uint64(200), vlanVID(t, mustChild(t, q, "CTag")))
 	})
 
 	t.Run("stun/binding-req", func(t *testing.T) {
