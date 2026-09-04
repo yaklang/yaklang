@@ -249,6 +249,7 @@ func TestP1PPPoEQinQLoopbackCDP(t *testing.T) {
 	p := mustChild(t, parseEthernet(t, eth), "PPPoEDiscovery")
 	require.Equal(t, uint64(0x11), uintVal(t, p.Child("VersionType")))
 	require.Equal(t, uint64(0x09), uintVal(t, p.Child("Code")))
+	require.Equal(t, uint64(0), uintVal(t, p.Child("Payload").Child("Tags").Children()[0].Child("Type")))
 
 	// QinQ 0x88a8 + inner 802.1Q + ARP
 	qinq := make([]byte, 14+4+4+28)

@@ -17,8 +17,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Ethernet SNAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `llc.yaml` |
 | IEEE 802.1ad QinQ | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `ieee_802_1ad.yaml` |
 | PPP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ppp.yaml` |
-| PPPoE Discovery | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `pppoe.yaml` |
-| PPPoE Session | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `pppoe.yaml` |
+| PPPoE Discovery | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `pppoe.yaml` |
+| PPPoE Session | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `pppoe.yaml` |
 | LCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `link_control_protocol.yaml` |
 | PAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `password_authentication_protocol.yaml` |
 | CHAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `challenge_handshake_authentication_protocol.yaml` |
