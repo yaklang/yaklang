@@ -494,6 +494,19 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(4), uintVal(t, hdr.Child("MsgFlags")))
 	})
 
+	t.Run("ldap/bind", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "3033020101602e020103041f"+
+			"7569643d616b61726173756c752c64633d6578616d706c652c64633d636f6d"+
+			"800870617373776f7264"), "application-layer.ldap", "LDAPMessage")
+		br := mustChild(t, n, "Body", "ProtocolOp", "BindRequest")
+		require.Equal(t, "uid=akarasulu,dc=example,dc=com", strVal(t, br.Child("Name")))
+		require.Equal(t, "password", strVal(t, br.Child("Auth")))
+	})
+	t.Run("ldap/unbind", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "30050201014200"), "application-layer.ldap", "LDAPMessage")
+		require.Equal(t, uint64(0x42), uintVal(t, mustChild(t, n, "Body").Child("ProtocolOp Tag")))
+	})
+
 	t.Run("dcerpc/bind", func(t *testing.T) {
 		n := parseRule(t, append(dcerpcHeader(11, 28, 1), make([]byte, 12)...), "application-layer.dcerpc", "DCERPC")
 		require.Equal(t, uint64(11), uintVal(t, n.Child("PType")))
