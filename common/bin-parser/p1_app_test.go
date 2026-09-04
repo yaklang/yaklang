@@ -396,7 +396,7 @@ func TestP1TCPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4TCPFrame(t, 4011, 4011, ps))
 	require.Equal(t, "testing", strVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Str")))
 
-	zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
+	zb := zabbixPacket(0x01, []byte("{}"), true)
 	z := parseRule(t, zb, "zabbix", "Zabbix")
 	require.Equal(t, "ZBXD", string(bytesVal(t, z.Child("Magic"))))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 10050, 10050, zb))

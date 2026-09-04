@@ -8,13 +8,24 @@ Package:
         panic("zabbix: magic must be ZBXD")
       }
       this.ProcessSubNode("Flags")
+      proto = getNodeResult("Flags/Protocol").Value
+      if proto != 1 {
+        panic("zabbix: protocol bit must be set")
+      }
       this.ProcessSubNode("Length")
-      l = getNodeResult("Length").Value
-      if l > 0 && l < 1048576 {
-        this.GetSubNode("JSON").SetMaxLength(l)
+      zlen = getNodeResult("Length").Value
+      this.ProcessSubNode("Reserved")
+      if zlen > 0 && zlen < 1048576 {
+        this.GetSubNode("JSON").SetMaxLength(zlen)
         this.ProcessSubNode("JSON")
       }
+      return
     Magic: raw,4
-    Flags: uint8
+    Flags:
+      Unused: uint8,5bit
+      Large: uint8,1bit
+      Compression: uint8,1bit
+      Protocol: uint8,1bit
     Length: uint32
+    Reserved: uint32
     JSON: string
