@@ -110,8 +110,28 @@ AMQPTable:
           }
           return
         }
+        if k == 0x73 {
+          this.ProcessSubNode("Short Len")
+          sn = getNodeResult("Short Len").Value
+          if sn > 0 && sn < 256 {
+            this.GetSubNode("Short").SetMaxLength(sn)
+            this.ProcessSubNode("Short")
+          }
+          return
+        }
         if k == 0x74 {
           this.ProcessSubNode("Bool")
+          return
+        }
+        if k == 0x49 {
+          this.ProcessSubNode("Long")
+          return
+        }
+        if k == 0x54 {
+          this.ProcessSubNode("Timestamp")
+          return
+        }
+        if k == 0x56 {
           return
         }
         if k == 0x46 {
@@ -127,7 +147,11 @@ AMQPTable:
       Kind: uint8
       Str Len: uint32
       Str: string
+      Short Len: uint8
+      Short: string
       Bool: uint8
+      Long: int32
+      Timestamp: uint64
     operator: |
       for {
         ele = this.NewElement()

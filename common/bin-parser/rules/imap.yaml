@@ -12,8 +12,13 @@ Package:
       if !known {
         this.ProcessSubNode("Item")
         item = string(getNodeResult("Item").Value)
-        if !(item.HasPrefix("FETCH") || item.HasPrefix("EXPUNGE") || item.HasPrefix("EXISTS")) {
-          panic("imap: unknown command")
+        if item.HasPrefix("FETCH") {
+          this.ProcessSubNode("Open")
+          this.ProcessSubNode("Attrs")
+        } else {
+          if !(item.HasPrefix("EXPUNGE") || item.HasPrefix("EXISTS")) {
+            panic("imap: unknown command")
+          }
         }
       }
       this.ProcessSubNode("Arg")
@@ -28,6 +33,37 @@ Package:
     Tag: "del: ;type:string"
     Command: "del: ;type:string"
     Item: "del: ;type:string"
+    Open: uint8
+    Attrs:
+      list: true
+      Attr:
+        operator: |
+          this.ProcessSubNode("Name")
+          n = string(getNodeResult("Name").Value)
+          setCtx("fetch_name", n)
+          if n.HasPrefix("FLAGS") {
+            this.ProcessSubNode("Flags")
+            return
+          }
+          if n.HasPrefix("RFC822.SIZE") {
+            this.ProcessSubNode("Size")
+            return
+          }
+        Name: "del: ;type:string"
+        Flags: "del: ;type:string"
+        Size: "del:);type:string"
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 3 {
+            break
+          }
+          ele.Process()
+          n = string(getCtx("fetch_name"))
+          if n.HasPrefix("RFC822.SIZE") {
+            break
+          }
+        }
     Arg: "del:\r;type:string"
     LF: uint8
 IMAPExtra:

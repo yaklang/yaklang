@@ -66,9 +66,16 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "*", strVal(t, im.Child("Tag")))
 		require.Equal(t, "12", strVal(t, im.Child("Command")))
 		require.Equal(t, "FETCH", strVal(t, im.Child("Item")))
-		require.Equal(t, "(FLAGS (\\Seen) RFC822.SIZE 448)", strVal(t, im.Child("Arg")))
+		attrs := im.Child("Attrs").Children()
+		require.GreaterOrEqual(t, len(attrs), 2)
+		require.Equal(t, "FLAGS", strVal(t, attrs[0].Child("Name")))
+		require.Equal(t, "(\\Seen)", strVal(t, attrs[0].Child("Flags")))
+		require.Equal(t, "RFC822.SIZE", strVal(t, attrs[1].Child("Name")))
+		require.Equal(t, "448", strVal(t, attrs[1].Child("Size")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 143, 143, fetch))
-		require.Equal(t, "FETCH", strVal(t, mustChild(t, eth, "IP", "TCP", "IMAP").Child("Item")))
+		ethAttrs := mustChild(t, eth, "IP", "TCP", "IMAP").Child("Attrs").Children()
+		require.Equal(t, "FLAGS", strVal(t, ethAttrs[0].Child("Name")))
+		require.Equal(t, "448", strVal(t, ethAttrs[1].Child("Size")))
 	})
 
 	t.Run("imap/flags-extra", func(t *testing.T) {
@@ -175,6 +182,23 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "publisher_confirms", strVal(t, mustChild(t, eth, "IP", "TCP", "AMQP", "Properties", "AMQPTable", "Entries").Children()[1].Child("AMQPTable").Child("Entries").Children()[0].Child("Name")))
 	})
 
+	t.Run("amqp/field-types", func(t *testing.T) {
+		// AMQP 0-9-1 §4.2.4 field-value: S longstr, s shortstr, I long, T timestamp, V void.
+		frame := mustHex(t, "01000000000065000a000a0009000000490770726f6475637453000000085261626269744d5108706c6174666f726d73054c696e75780b6368616e6e656c2d6d617849000007ff036e6f77540000000000000001046e6f6e655600000005504c41494e00000005656e5f5553ce")
+		am := parseRule(t, frame, "amqp", "AMQP")
+		ent := mustChild(t, am, "Properties", "AMQPTable", "Entries").Children()
+		require.GreaterOrEqual(t, len(ent), 5)
+		require.Equal(t, "platform", strVal(t, ent[1].Child("Name")))
+		require.Equal(t, "Linux", strVal(t, ent[1].Child("Short")))
+		require.Equal(t, "channel-max", strVal(t, ent[2].Child("Name")))
+		require.Equal(t, int64(2047), intVal(t, ent[2].Child("Long")))
+		require.Equal(t, "now", strVal(t, ent[3].Child("Name")))
+		require.Equal(t, uint64(1), uintVal(t, ent[3].Child("Timestamp")))
+		require.Equal(t, "none", strVal(t, ent[4].Child("Name")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5672, 5672, frame))
+		require.Equal(t, "Linux", strVal(t, mustChild(t, eth, "IP", "TCP", "AMQP", "Properties", "AMQPTable", "Entries").Children()[1].Child("Short")))
+	})
+
 	t.Run("thrift/i32-field", func(t *testing.T) {
 		// Binary protocol: version 0x80010001, empty name, seq 1, field type i32 id 1 value 7, STOP
 		th := mustHex(t, "8001000100000000000000010800010000000700")
@@ -273,6 +297,15 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, br.Child("Role")))
 	})
 
+	t.Run("fastcgi/params", func(t *testing.T) {
+		// FastCGI PARAMS (type 4) name/value SCRIPT_NAME=/
+		fc := mustHex(t, "01040001000e00000b015343524950545f4e414d452f")
+		n := parseEthernet(t, ipv4TCPFrame(t, 9000, 9000, fc))
+		pair := mustChild(t, n, "IP", "TCP", "FastCGI", "Params").Children()[0]
+		require.Equal(t, "SCRIPT_NAME", strVal(t, pair.Child("Name")))
+		require.Equal(t, "/", strVal(t, pair.Child("Value")))
+	})
+
 	t.Run("zabbix/json", func(t *testing.T) {
 		zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
 		z := parseRule(t, zb, "zabbix", "Zabbix")
@@ -313,5 +346,28 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Major")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 8088, 8088, nr))
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "NetRemoting").Child("Major")))
+	})
+
+	t.Run("net-remoting/nrbf", func(t *testing.T) {
+		// MS-NRBF SerializedStreamHeader after .NET TCP preamble (ContentLength 17).
+		nr := mustHex(t, "2e4e4554000100000000000000110001000000ffffffff0100000000000000")
+		n := parseRule(t, nr, "net_remoting", "NetRemoting")
+		require.Equal(t, uint64(17), uintVal(t, n.Child("Content Length")))
+		ser := mustChild(t, n, "Serialized")
+		require.Equal(t, uint64(0), uintVal(t, ser.Child("Record Type")))
+		require.Equal(t, int64(1), intVal(t, ser.Child("Root Id")))
+		require.Equal(t, int64(1), intVal(t, ser.Child("Format Major")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 8088, 8088, nr))
+		require.Equal(t, int64(1), intVal(t, mustChild(t, eth, "IP", "TCP", "NetRemoting", "Serialized").Child("Root Id")))
+	})
+
+	t.Run("nbt-dg/names", func(t *testing.T) {
+		// RFC 1002 Direct Unique Datagram: SOURCE / *SMBSERVER + user data "hi"
+		nb := mustHex(t, "100000010a000001008a00220000534f55524345202020202020202020202a534d425345525645522020202020206869")
+		n := parseEthernet(t, ipv4UDPBytes(t, 138, 138, nb))
+		dg := mustChild(t, n, "IP", "UDP", "NBTDG", "Datagram")
+		require.Equal(t, "SOURCE", strings.TrimSpace(strVal(t, dg.Child("Source Name"))))
+		require.Equal(t, "*SMBSERVER", strings.TrimSpace(strVal(t, dg.Child("Dest Name"))))
+		require.Equal(t, "hi", strVal(t, dg.Child("User Data")))
 	})
 }
