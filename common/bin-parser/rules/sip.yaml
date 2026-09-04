@@ -28,39 +28,6 @@ Package:
         Reason: "del:\r\n;type:string"
       Headers: SIPHeaders
       Body: SIPBody
-  SDP:
-    Lines:
-      list: true
-      Line: SDPLine
-      operator: |
-        for {
-          if this.Length() > 0 {
-            avail = this.GetMaxLength() - this.Length()
-            if avail < 3 || avail > 1048576 {
-              break
-            }
-          }
-          ele = this.NewElement()
-          if ele.GetMaxLength() == 0 {
-            break
-          }
-          ele.Process()
-        }
-SDPLine:
-  operator: |
-    this.ProcessSubNode("Type")
-    this.ProcessSubNode("Eq")
-    if getNodeResult("Eq").Value != 0x3d {
-      panic("sdp: expected =")
-    }
-    typ = getNodeResult("Type").Value
-    if typ != 0x76 && typ != 0x6f && typ != 0x73 && typ != 0x69 && typ != 0x75 && typ != 0x65 && typ != 0x70 && typ != 0x63 && typ != 0x62 && typ != 0x74 && typ != 0x72 && typ != 0x7a && typ != 0x6b && typ != 0x61 && typ != 0x6d {
-      panic("sdp: unknown line type")
-    }
-    this.ProcessSubNode("Value")
-  Type: uint8
-  Eq: uint8
-  Value: "del:\r\n;type:string"
 FirstWorld: "del: ;type:string"
 SIPBody:
   operator: |

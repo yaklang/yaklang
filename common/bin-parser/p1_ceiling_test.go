@@ -13,9 +13,17 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/rules"
 )
 
-var leftoverRawRe = regexp.MustCompile(`(?m)^\s+(Body|Rest|Payload|Ciphertext|Stub|MsgGlobal|Section|Optional|TPDU|Query|Schema): raw\s*$`)
+// Unbounded leftover blob: "Name: raw" with no ",N" length. Spec-opaque leftovers
+// (ICV/Ciphertext/Stub/TPDU/…) may stay raw only when OpaqueRaw names that field.
+var leftoverRawRe = regexp.MustCompile(`(?m)^\s+([A-Za-z][^:\n]{0,40}): raw\s*$`)
 var namedScalarRe = regexp.MustCompile(`(?m)^\s+[A-Za-z][^:\n]{0,40}:\s*(uint\d+|int\d+|string|raw,\d+|"del:)`)
-var typeArmRe = regexp.MustCompile(`(?i)(if |switch ).{0,160}(Type|typ|Command|cmd|Opcode|Kind|Code|Prefix|Status|Tag|Magic|Version|op ==|op ==)`)
+var typeArmRe = regexp.MustCompile(`ProcessByType\(|ProcessSubNode\("(OPEN|OP_QUERY|OP_MSG|Command|C1|Handshake|AuthenStart|ASF|Int|Endpoint|Headers|BININT1|Version|Protocol|Values|Pairs|Frames|Acks|Topics|Client ID|Integer|Request|Response|Line|Prefix|Value|AuthenStart|ASF)"\)`)
+
+var specOpaqueLeftover = map[string]bool{
+	"ICV": true, "Ciphertext": true, "Stub": true, "TPDU": true,
+	"RDATA": true, "Key Data": true, "Fragment": true, "Authentication": true,
+	"Random": true, "NDR": true, "MsgGlobal": true, "Value": true,
+}
 
 func ruleKey(ruleFile string) string {
 	k := strings.TrimSuffix(ruleFile, ".yaml")
@@ -69,39 +77,50 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 	text := string(b)
 	leftovers := leftoverRawRe.FindAllStringSubmatch(text, -1)
 	opaque := strings.ToLower(opaqueRaw)
+	incomplete := false
 	leftoverOK := true
 	for _, m := range leftovers {
-		if opaque == "" || !strings.Contains(opaque, strings.ToLower(m[1])) {
-			leftoverOK = false
-			break
+		name := strings.TrimSpace(m[1])
+		if name == "type" || name == "endian" || name == "parser" {
+			continue
 		}
+		if specOpaqueLeftover[name] && opaque != "" && strings.Contains(opaque, strings.ToLower(name)) {
+			continue
+		}
+		leftoverOK = false
+		incomplete = true
 	}
-	hasList := strings.Contains(text, "list: true") && (strings.Contains(text, "NewElement") || strings.Contains(text, "for {"))
+	hasList := strings.Contains(text, "list: true") && (strings.Contains(text, "ele.Process()") || strings.Contains(text, "NewElement().Process()") || strings.Contains(text, "n = this.NewElement().Process()"))
 	named := len(namedScalarRe.FindAllString(text, -1))
-	hasArms := typeArmRe.MatchString(text) || strings.Contains(text, "if ") || strings.Contains(text, "switch ")
+	hasArms := typeArmRe.MatchString(text) || (strings.Contains(text, "if ") && strings.Contains(text, "ProcessSubNode("))
 
+	// PROTOCOL_DELIVERY 3.1:
+	// leftover blob without list/TLV → 8; type/command arms with named PDUs → 15; list/TLV → 20.
 	if hasList {
-		if leftoverOK {
+		if leftoverOK && !incomplete {
 			return 25
 		}
 		return 20
 	}
-	if leftoverOK && named >= 2 && hasArms {
-		if named >= 5 || hasList {
-			return 25
+	if incomplete {
+		if hasArms && named >= 2 {
+			return 15
 		}
-		return 20
+		if named >= 2 {
+			return 8
+		}
+		return 0
 	}
-	if leftoverOK && named >= 3 {
-		return 20
+	if leftoverOK && named >= 4 && hasArms {
+		return 25
 	}
-	if hasArms && named >= 1 {
+	if hasArms && named >= 2 {
 		return 15
 	}
 	if named >= 2 {
 		return 8
 	}
-	if named >= 1 && leftoverOK {
+	if named >= 1 {
 		return 8
 	}
 	return 0
@@ -109,17 +128,28 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 
 func testsCeiling(ruleFile string, hasEth bool, portDispatched bool) int {
 	n := failCount(ruleFile)
-	stacked := hasEth || !portDispatched
+	text := mustReadRule(ruleFile)
+	hasBranch := typeArmRe.MatchString(text) || strings.Contains(text, "ele.Process()") || (strings.Contains(text, "if ") && strings.Contains(text, "ProcessSubNode("))
 	switch {
 	case n < 1:
 		return 0
 	case n < 3:
 		return 6
-	case stacked:
+	case hasEth && hasBranch:
 		return 20
+	case hasEth || !portDispatched:
+		return 16
 	default:
 		return 12
 	}
+}
+
+func mustReadRule(ruleFile string) string {
+	b, err := rules.RuleFS.ReadFile(ruleFile)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func trafficCeiling(sample string, hasEth bool) int {

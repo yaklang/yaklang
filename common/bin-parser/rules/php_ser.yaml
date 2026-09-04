@@ -3,17 +3,32 @@ Package:
     operator: |
       this.ProcessSubNode("Kind")
       k = getNodeResult("Kind").Value
-      if k != 0x61 && k != 0x4f && k != 0x73 && k != 0x69 && k != 0x62 && k != 0x4e && k != 0x64 && k != 0x43 {
+      if k == 0x69 {
+        this.ProcessSubNode("Colon")
+        this.ProcessSubNode("Int")
+        this.ProcessSubNode("End")
+        if getNodeResult("End").Value != 0x3b {
+          panic("php_ser: expected semicolon")
+        }
+        return
+      }
+      if k == 0x4e {
+        this.ProcessSubNode("End")
+        return
+      }
+      if k == 0x62 {
+        this.ProcessSubNode("Colon")
+        this.ProcessSubNode("Int")
+        this.ProcessSubNode("End")
+        return
+      }
+      if k != 0x61 && k != 0x4f && k != 0x73 && k != 0x64 && k != 0x43 {
         panic("php_ser: unknown type")
       }
       this.ProcessSubNode("Colon")
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Body").SetMaxLength(rest)
-          this.ProcessSubNode("Body")
-        }
-      }
+      this.ProcessSubNode("Body")
     Kind: uint8
     Colon: uint8
-    Body: raw
+    Int: string,1
+    End: uint8
+    Body: raw,0

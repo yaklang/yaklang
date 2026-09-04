@@ -11,12 +11,38 @@ Package:
       this.ProcessSubNode("API Version")
       this.ProcessSubNode("Correlation ID")
       rest = l - 8
-      if rest > 0 {
-        this.GetSubNode("Body").SetMaxLength(rest)
-        this.ProcessSubNode("Body")
+      if rest >= 2 && rest < 1048576 {
+        this.ProcessSubNode("Client ID Len")
+        n = getNodeResult("Client ID Len").Value
+        if n > 0 && n < 512 {
+          this.GetSubNode("Client ID").SetMaxLength(n)
+          this.ProcessSubNode("Client ID")
+        }
+      }
+      if this.Length() < this.GetMaxLength() {
+        left = this.GetMaxLength() - this.Length()
+        if left >= 2 && left < 1048576 {
+          this.GetSubNode("Topics").SetMaxLength(left)
+          this.ProcessSubNode("Topics")
+        }
       }
     Length: int32
     API Key: int16
     API Version: int16
     Correlation ID: int32
-    Body: raw
+    Client ID Len: int16
+    Client ID: raw
+    Topics:
+      list: true
+      Topic: KafkaTopic
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          ele.Process()
+        }
+KafkaTopic:
+  Name Len: int16
+  Name: raw

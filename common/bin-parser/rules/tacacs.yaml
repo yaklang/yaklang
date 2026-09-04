@@ -18,7 +18,11 @@ Package:
       this.ProcessSubNode("Session ID")
       this.ProcessSubNode("Length")
       l = getNodeResult("Length").Value
-      if l > 0 {
+      if typ == 1 && l >= 8 {
+        this.ProcessSubNode("AuthenStart")
+        return
+      }
+      if l > 0 && l < 1048576 {
         this.GetSubNode("Body").SetMaxLength(l)
         this.ProcessSubNode("Body")
       }
@@ -28,4 +32,13 @@ Package:
     Flags: uint8
     Session ID: uint32
     Length: uint32
+    AuthenStart:
+      Action: uint8
+      Priv Lvl: uint8
+      Authen Type: uint8
+      Service: uint8
+      User Len: uint8
+      Port Len: uint8
+      RemAddr Len: uint8
+      Data Len: uint8
     Body: raw
