@@ -365,6 +365,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, bytesVal(t, n.Child("SCID")))
 	})
 
+	t.Run("ospf/hello", func(t *testing.T) {
+		h := mustChild(t, parseRule(t, mustHex(t, "0201002cc0a8aa0800000001273b00000000000000000000ffffff00000a020100000028c0a8aa0800000000"), "ospf", "OSPF"), "OSPFHello")
+		require.Equal(t, uint64(10), uintVal(t, h.Child("Hello Interval")))
+		require.Equal(t, uint64(40), uintVal(t, h.Child("Dead Interval")))
+	})
+	t.Run("ospf/dbd", func(t *testing.T) {
+		d := mustChild(t, parseRule(t, mustHex(t, "02020020c0a800010000000000000000000000000000000005dc020700000001"), "ospf", "OSPF"), "OSPFDBDesc")
+		require.Equal(t, uint64(1500), uintVal(t, d.Child("Interface MTU")))
+		require.Equal(t, uint64(0x07), uintVal(t, d.Child("Flags")))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))
