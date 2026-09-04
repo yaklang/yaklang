@@ -31,7 +31,12 @@ Package:
           this.ProcessByType("EAPOLASFAlert")
           return
         }
-        this.NewUnknownNode().Process()
+        res, op = this.TryProcessByType("PeekByte")
+        op.Recovery()
+        if op.OK {
+          this.ProcessByType("Next Protocol Data")
+        }
+        return
 EAPPacket:
   operator: |
     this.ProcessSubNode("Code")
@@ -85,3 +90,18 @@ EAPOLKey:
 EAPOLASFAlert:
   Vendor ID: uint32
   Vendor Type: uint32
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8
