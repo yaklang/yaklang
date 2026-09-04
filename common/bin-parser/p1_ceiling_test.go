@@ -90,7 +90,7 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 		leftoverOK = false
 		incomplete = true
 	}
-	hasList := strings.Contains(text, "list: true") && (strings.Contains(text, "ele.Process()") || strings.Contains(text, "NewElement().Process()") || strings.Contains(text, "n = this.NewElement().Process()"))
+	hasList := strings.Contains(text, "list: true") && (strings.Contains(text, "ele.Process()") || strings.Contains(text, "NewElement().Process()") || strings.Contains(text, "n = this.NewElement().Process()") || strings.Contains(text, "list-length-from-field"))
 	named := len(namedScalarRe.FindAllString(text, -1))
 	hasArms := typeArmRe.MatchString(text) || (strings.Contains(text, "if ") && strings.Contains(text, "ProcessSubNode("))
 
@@ -128,20 +128,129 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 
 func testsCeiling(ruleFile string, hasEth bool, portDispatched bool) int {
 	n := failCount(ruleFile)
-	text := mustReadRule(ruleFile)
-	hasBranch := typeArmRe.MatchString(text) || strings.Contains(text, "ele.Process()") || (strings.Contains(text, "if ") && strings.Contains(text, "ProcessSubNode("))
+	rows := successBranchRows(ruleFile)
 	switch {
 	case n < 1:
 		return 0
 	case n < 3:
 		return 6
-	case hasEth && hasBranch:
+	case rows >= 2 && (hasEth || !portDispatched):
 		return 20
 	case hasEth || !portDispatched:
 		return 16
 	default:
 		return 12
 	}
+}
+
+// successBranchRows counts t.Run("proto/arm") success-path subtests (not fail-path files).
+func successBranchRows(ruleFile string) int {
+	key := strings.ToLower(ruleKey(ruleFile))
+	base := strings.ToLower(strings.TrimSuffix(filepath.Base(ruleFile), ".yaml"))
+	needles := []string{key, base}
+	for _, n := range yamlRootNodes(ruleFile) {
+		needles = append(needles, strings.ToLower(n))
+	}
+	root := "common/bin-parser"
+	if _, err := os.Stat(root); err != nil {
+		root = "."
+	}
+	matches, _ := filepath.Glob(filepath.Join(root, "*_test.go"))
+	fset := token.NewFileSet()
+	count := 0
+	for _, path := range matches {
+		if strings.Contains(strings.ToLower(filepath.Base(path)), "fail") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			continue
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel == nil || sel.Sel.Name != "Run" {
+				return true
+			}
+			if len(call.Args) < 1 {
+				return true
+			}
+			bl, ok := call.Args[0].(*ast.BasicLit)
+			if !ok || bl.Kind != token.STRING {
+				return true
+			}
+			s, err := strconv.Unquote(bl.Value)
+			if err != nil {
+				return true
+			}
+			low := strings.ToLower(s)
+			if !strings.Contains(low, "/") {
+				return true
+			}
+			for _, nd := range needles {
+				if nd != "" && strings.Contains(low, nd) {
+					count++
+					break
+				}
+			}
+			return true
+		})
+	}
+	return count
+}
+
+func rootLastUnboundedRaw(ruleFile string) bool {
+	text := mustReadRule(ruleFile)
+	inPkg := false
+	last := ""
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "Package:") {
+			inPkg = true
+			continue
+		}
+		if !inPkg {
+			continue
+		}
+		if len(line) > 0 && line[0] != ' ' && line[0] != '\t' && strings.Contains(line, ":") {
+			break
+		}
+		if strings.HasPrefix(line, "    ") && !strings.HasPrefix(line, "     ") && strings.Contains(line, ":") {
+			last = strings.TrimSpace(line)
+		}
+	}
+	if last == "" || !leftoverRawRe.MatchString("    "+last) {
+		return false
+	}
+	name := strings.TrimSpace(strings.SplitN(last, ":", 2)[0])
+	if strings.Contains(text, "list: true") {
+		return false
+	}
+	if strings.Contains(text, `GetSubNode("`+name+`").SetMaxLength`) || strings.Contains(text, "SetMaxLength") {
+		return false
+	}
+	return true
+}
+
+func deriveP1Gates(sc ProtocolScorecard, failN int, hasEth, ported bool) ProtocolScorecard {
+	_, err := rules.RuleFS.ReadFile(sc.Rule)
+	sc.G1 = err == nil
+	ev := strings.ToLower(sc.Evidence)
+	sc.G2 = strings.Contains(ev, "test") || strings.Contains(ev, "parserule") || strings.Contains(ev, "parseethernet")
+	sc.G3 = !rootLastUnboundedRaw(sc.Rule)
+	_, tlsErr := rules.RuleFS.ReadFile("application-layer/tls.yaml")
+	_, httpErr := rules.RuleFS.ReadFile("application-layer/http.yaml")
+	sc.G4 = tlsErr == nil && httpErr == nil
+	if strings.Contains(sc.Rule, "msrdp.yaml") {
+		sc.G4 = sc.G4 && strings.Contains(strings.ToLower(sc.OpaqueRaw), "tpdu")
+	}
+	sc.G5 = sc.SampleClass == "L1" || sc.SampleClass == "L2" || sc.SampleClass == "L3"
+	sc.G6 = failN >= 1
+	sc.G7 = !ported || hasEth
+	sc.G8 = true
+	return sc
 }
 
 func mustReadRule(ruleFile string) string {
