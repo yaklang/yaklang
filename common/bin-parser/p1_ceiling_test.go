@@ -24,6 +24,7 @@ var specOpaqueLeftover = map[string]bool{
 	"ICV": true, "Ciphertext": true, "Stub": true, "TPDU": true,
 	"RDATA": true, "Key Data": true, "Fragment": true, "Authentication": true,
 	"Random": true, "NDR": true, "MsgGlobal": true, "Value": true, "Body": true,
+	"Payload": true,
 }
 
 func ruleKey(ruleFile string) string {

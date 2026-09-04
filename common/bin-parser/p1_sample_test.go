@@ -171,6 +171,43 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "IKE", "Payloads").Children()[0].Child("Proposals").Children()[0].Child("Transforms").Children()[0].Child("Transform ID")))
 	})
 
+	t.Run("dtls/handshake", func(t *testing.T) {
+		// RFC 6347 §4.2.2 DTLS handshake header inside record fragment (type 22).
+		dt := mustHex(t, "16fefd000000000000000000360100002a000000000000002afefd"+
+			"000000000000000000000000000000000000000000000000000000000000000000000002002f0100")
+		n := parseRule(t, dt, "dtls", "DTLS")
+		require.Equal(t, uint64(0x16), uintVal(t, n.Child("Content Type")))
+		fr := n.Child("Fragment")
+		require.Equal(t, uint64(1), uintVal(t, fr.Child("Handshake Type")))
+		require.Equal(t, uint64(0), uintVal(t, fr.Child("Message Seq")))
+		require.Equal(t, uint64(42), uintVal(t, fr.Child("Fragment Length")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 443, 443, dt))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "DTLS", "Fragment").Child("Handshake Type")))
+	})
+
+	t.Run("dtls/client-hello", func(t *testing.T) {
+		dt := mustHex(t, "16fefd000000000000000000360100002a000000000000002afefd"+
+			"000000000000000000000000000000000000000000000000000000000000000000000002002f0100")
+		eth := parseEthernet(t, ipv4UDPBytes(t, 443, 443, dt))
+		require.Equal(t, uint64(0xfefd), uintVal(t, mustChild(t, eth, "IP", "UDP", "DTLS", "Fragment").Child("Client Version")))
+	})
+
+	t.Run("rtp/extension", func(t *testing.T) {
+		// RFC 3550 §5.3.1 X bit + RFC 5285 one-byte header extension profile 0xBEDE.
+		rtp := mustHex(t, "900000010000000200000003bede000110000000aa")
+		n := parseRule(t, rtp, "rtp", "RTP")
+		require.Equal(t, uint64(0xbede), uintVal(t, n.Child("Ext Profile")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Ext Length")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5004, 5004, rtp))
+		require.Equal(t, uint64(0xbede), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTP").Child("Ext Profile")))
+	})
+
+	t.Run("rtp/seq", func(t *testing.T) {
+		rtp := []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5004, 5004, rtp))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTP").Child("Sequence")))
+	})
+
 	t.Run("ike/ke-nonce", func(t *testing.T) {
 		// RFC 7296 §3.4 KE DH group 2 + §3.9 Nonce.
 		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
