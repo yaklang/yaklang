@@ -107,6 +107,19 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(6), uintVal(t, mustChild(t, parseRule(t, pp, "internet_control_message_protocol_v6", "ICMPV6"), "Parameter Problem").Child("Pointer")))
 		require.Equal(t, uint64(6), uintVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, pp)), "IPv6", "ICMPv6", "Parameter Problem").Child("Pointer")))
 	})
+	t.Run("internet_control_message_protocol_v6/mld-query", func(t *testing.T) {
+		unspec := make([]byte, 16)
+		q := append([]byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, unspec...)
+		require.Equal(t, uint64(10000), uintVal(t, mustChild(t, parseRule(t, q, "internet_control_message_protocol_v6", "ICMPV6"), "Multicast Listener Query").Child("Maximum Response Delay")))
+		require.Equal(t, unspec, bytesVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, q)), "IPv6", "ICMPv6", "Multicast Listener Query").Child("Multicast Address")))
+	})
+	t.Run("internet_control_message_protocol_v6/redirect", func(t *testing.T) {
+		target := []byte{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
+		dest := []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
+		rd := append(append([]byte{0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, target...), dest...)
+		require.Equal(t, target, bytesVal(t, mustChild(t, parseRule(t, rd, "internet_control_message_protocol_v6", "ICMPV6"), "Redirect").Child("Target Address")))
+		require.Equal(t, dest, bytesVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, rd)), "IPv6", "ICMPv6", "Redirect").Child("Destination Address")))
+	})
 	t.Run("internet_control_message_protocol_v6/ra-opt", func(t *testing.T) {
 		require.Equal(t, uint64(64), uintVal(t, mustChild(t, parseEthernet(t, []byte{
 			0x33, 0x33, 0x00, 0x00, 0x00, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,

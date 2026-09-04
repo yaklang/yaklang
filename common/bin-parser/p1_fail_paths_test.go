@@ -21,6 +21,7 @@ var p1FailCases = []p1FailCase{
 		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, []byte{0x80, 0x00}, "trunc-hdr"},
 		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, []byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x05}, "trunc-ptb"},
 		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, []byte{0x04, 0x01, 0x00, 0x00, 0x00, 0x06}, "trunc-param"},
+		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, []byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, "trunc-mld"},
 		{"vxlan", []string{"VXLAN"}, nil, "empty"},
 		{"vxlan", []string{"VXLAN"}, []byte{0x00}, "trunc"},
 		{"vxlan", []string{"VXLAN"}, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, "no-i-flag"},
