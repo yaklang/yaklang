@@ -1844,6 +1844,45 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, raw))
 		require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, eth, "IP", "GRE").Child("Key")))
 	})
+
+	t.Run("qinq/s-tag", func(t *testing.T) {
+		// IEEE 802.1ad S-TAG: PCP=5 DEI=1 VID=100, EtherType ARP.
+		// Wireshark ieee8021ad.priority / ieee8021ad.dei / ieee8021ad.id.
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		qinq := parseRule(t, append([]byte{0xb0, 0x64, 0x08, 0x06}, arp...), "ieee_802_1ad", "QinQ")
+		require.Equal(t, uint64(5), uintVal(t, qinq.Child("PCP")))
+		require.Equal(t, uint64(1), uintVal(t, qinq.Child("DEI")))
+		require.Equal(t, uint64(100), vlanVID(t, qinq))
+		require.Equal(t, uint64(0x0806), uintVal(t, qinq.Child("Type")))
+		frame := make([]byte, 14+4+len(arp))
+		copy(frame[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+		copy(frame[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+		binary.BigEndian.PutUint16(frame[12:14], 0x88a8)
+		copy(frame[14:], append([]byte{0xb0, 0x64, 0x08, 0x06}, arp...))
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(5), uintVal(t, mustChild(t, eth, "QinQ").Child("PCP")))
+		require.Equal(t, uint64(100), vlanVID(t, mustChild(t, eth, "QinQ")))
+	})
+
+	t.Run("qinq/c-tag", func(t *testing.T) {
+		// IEEE 802.1ad: outer S-VID 100, inner C-TAG PCP=3 VID=200 + ARP.
+		// Wireshark ieee8021ad.id / ieee8021ad.cvid / vlan.id.
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append([]byte{0x00, 0x64, 0x81, 0x00, 0x60, 0xc8, 0x08, 0x06}, arp...)
+		q := parseRule(t, raw, "ieee_802_1ad", "QinQ")
+		require.Equal(t, uint64(100), vlanVID(t, q))
+		ctag := mustChild(t, q, "CTag")
+		require.Equal(t, uint64(3), uintVal(t, ctag.Child("PCP")))
+		require.Equal(t, uint64(200), vlanVID(t, ctag))
+		require.Equal(t, uint64(0x0806), uintVal(t, ctag.Child("Type")))
+		frame := make([]byte, 14+len(raw))
+		copy(frame[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+		copy(frame[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+		binary.BigEndian.PutUint16(frame[12:14], 0x88a8)
+		copy(frame[14:], raw)
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(200), vlanVID(t, mustChild(t, eth, "QinQ", "CTag")))
+	})
 }
 
 func tnsConnectPacket(cdata []byte) []byte {
