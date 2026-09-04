@@ -13,12 +13,33 @@ Package:
       this.ProcessSubNode("Addr2")
       this.ProcessSubNode("Addr3")
       this.ProcessSubNode("Seq")
+      tods = (fc >> 8) & 1
+      fromds = (fc >> 9) & 1
+      if tods == 1 {
+        if fromds == 1 {
+          this.ProcessSubNode("Addr4")
+        }
+      }
+      subtype = (fc >> 4) & 0xf
+      if typ == 2 {
+        if subtype >= 8 {
+          this.ProcessSubNode("QoS Control")
+        }
+      }
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if op.OK {
+        this.ProcessByType("Next Protocol Data")
+      }
+      return
     Frame Control: uint16
     Duration: uint16
     Addr1: raw,6
     Addr2: raw,6
     Addr3: raw,6
     Seq: uint16
+    Addr4: raw,6
+    QoS Control: uint16
   RSN:
     operator: |
       this.ProcessSubNode("Element ID")
@@ -50,3 +71,18 @@ Package:
       list: true
       list-length-from-field: "../AKM Count"
       AKM: raw,4
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8
