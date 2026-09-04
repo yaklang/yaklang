@@ -97,6 +97,16 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1280), uintVal(t, mustChild(t, parseRule(t, ptb, "internet_control_message_protocol_v6", "ICMPV6"), "Packet Too Big").Child("MTU")))
 		require.Equal(t, uint64(1280), uintVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, ptb)), "IPv6", "ICMPv6", "Packet Too Big").Child("MTU")))
 	})
+	t.Run("internet_control_message_protocol_v6/time-exceeded", func(t *testing.T) {
+		te := append([]byte{0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, []byte{0x60, 0x00, 0x00, 0x00}...)
+		require.Equal(t, uint64(3), uintVal(t, parseRule(t, te, "internet_control_message_protocol_v6", "ICMPV6").Child("Type")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, te)), "IPv6", "ICMPv6", "Time Exceeded").Child("Unused")))
+	})
+	t.Run("internet_control_message_protocol_v6/param-problem", func(t *testing.T) {
+		pp := append([]byte{0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06}, []byte{0x60, 0x00, 0x00, 0x00}...)
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, parseRule(t, pp, "internet_control_message_protocol_v6", "ICMPV6"), "Parameter Problem").Child("Pointer")))
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, pp)), "IPv6", "ICMPv6", "Parameter Problem").Child("Pointer")))
+	})
 	t.Run("internet_control_message_protocol_v6/ra-opt", func(t *testing.T) {
 		require.Equal(t, uint64(64), uintVal(t, mustChild(t, parseEthernet(t, []byte{
 			0x33, 0x33, 0x00, 0x00, 0x00, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,

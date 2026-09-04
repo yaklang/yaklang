@@ -13,6 +13,10 @@ Package:
             this.ProcessByType("Destination Unreachable")
           case 2:
             this.ProcessByType("Packet Too Big")
+          case 3:
+            this.ProcessByType("Time Exceeded")
+          case 4:
+            this.ProcessByType("Parameter Problem")
           case 128:
             this.ProcessByType("Echo Request")
           case 129:
@@ -250,4 +254,30 @@ Packet Too Big:
       this.ProcessSubNode("Original Datagram")
     }
   MTU: uint32
+  Original Datagram: string
+Time Exceeded:
+  operator: |
+    this.ProcessSubNode("Unused")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Unused: uint32
+  Original Datagram: string
+Parameter Problem:
+  operator: |
+    this.ProcessSubNode("Pointer")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Pointer: uint32
   Original Datagram: string
