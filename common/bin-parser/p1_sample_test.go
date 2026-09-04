@@ -1155,4 +1155,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		}()...), raw...)))
 		require.Equal(t, []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x02}, bytesVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Session Setup Request", "SPNEGO", "Token", "SPNEGOInit").Child("MechOID")))
 	})
+
+	t.Run("kerberos/as-req", func(t *testing.T) {
+		// RFC 4120 §5.4.1 KDC-REQ: pvno [1] INTEGER 5, msg-type [2] INTEGER 10 (AS-REQ).
+		// Wireshark kerberos.pvno / kerberos.msg_type; APPLICATION 10 (0x6a).
+		raw := mustHex(t, "6a0c300aa103020105a20302010a")
+		n := parseRule(t, raw, "application-layer.kerberos", "Kerberos")
+		require.Equal(t, uint64(0x6a), uintVal(t, n.Child("Application Tag")))
+		req := mustChild(t, n, "Body", "KerberosASReq")
+		require.Equal(t, uint64(5), uintVal(t, req.Child("Pvno")))
+		require.Equal(t, uint64(10), uintVal(t, req.Child("MsgType")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 88, 88, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "Kerberos", "Body", "KerberosASReq")
+		require.Equal(t, uint64(5), uintVal(t, wired.Child("Pvno")))
+		require.Equal(t, uint64(10), uintVal(t, wired.Child("MsgType")))
+	})
+
+	t.Run("kerberos/as-rep", func(t *testing.T) {
+		// RFC 4120 §5.4.2 KDC-REP: pvno [0] INTEGER 5, msg-type [1] INTEGER 11 (AS-REP).
+		raw := mustHex(t, "6b0c300aa003020105a10302010b")
+		n := parseRule(t, raw, "application-layer.kerberos", "Kerberos")
+		rep := mustChild(t, n, "Body", "KerberosASRep")
+		require.Equal(t, uint64(5), uintVal(t, rep.Child("Pvno")))
+		require.Equal(t, uint64(11), uintVal(t, rep.Child("MsgType")))
+		pdu := make([]byte, 4+len(raw))
+		binary.BigEndian.PutUint32(pdu, uint32(len(raw)))
+		copy(pdu[4:], raw)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 88, pdu))
+		wired := mustChild(t, eth, "IP", "TCP", "KerberosTCP", "Record", "Body", "KerberosASRep")
+		require.Equal(t, uint64(5), uintVal(t, wired.Child("Pvno")))
+		require.Equal(t, uint64(11), uintVal(t, wired.Child("MsgType")))
+	})
 }
