@@ -29,6 +29,21 @@ Package:
           return
         }
         this.ProcessSubNode("Addr2")
+        if subtype == 9 {
+          this.ProcessSubNode("BA Control")
+          bac = getNodeResult("BA Control").Value
+          this.ProcessSubNode("Starting Sequence Control")
+          compressed = (bac >> 2) & 1
+          if compressed == 1 {
+            this.ProcessSubNode("BA Bitmap")
+          }
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
         res, op = this.TryProcessByType("PeekByte")
         op.Recovery()
         if op.OK {
@@ -70,6 +85,9 @@ Package:
     Addr4: raw,6
     QoS Control: uint16
     HT Control: uint32
+    BA Control: uint16
+    Starting Sequence Control: uint16
+    BA Bitmap: raw,8
   RSN:
     operator: |
       this.ProcessSubNode("Element ID")
