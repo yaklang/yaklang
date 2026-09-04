@@ -363,6 +363,52 @@ func TestVLANIPv4ARPInner(t *testing.T) {
 	require.NotNil(t, q.Child("ARP"))
 }
 
+func TestVLANPayloadTypeArms(t *testing.T) {
+	dot1q := func(innerType layers.EthernetType, payload gopacket.SerializableLayer) []byte {
+		t.Helper()
+		return serializeLayers(t,
+			&layers.Ethernet{SrcMAC: net.HardwareAddr{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, DstMAC: net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, EthernetType: layers.EthernetTypeDot1Q},
+			&layers.Dot1Q{VLANIdentifier: 42, Type: innerType},
+			payload,
+		)
+	}
+
+	t.Run("ipv4", func(t *testing.T) {
+		ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolICMPv4, SrcIP: net.IP{10, 0, 0, 1}, DstIP: net.IP{10, 0, 0, 2}}
+		icmp := &layers.ICMPv4{TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0)}
+		q := mustChild(t, parseEthernet(t, serializeLayers(t,
+			&layers.Ethernet{SrcMAC: net.HardwareAddr{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, DstMAC: net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, EthernetType: layers.EthernetTypeDot1Q},
+			&layers.Dot1Q{VLANIdentifier: 42, Type: layers.EthernetTypeIPv4},
+			ip, icmp,
+		)), "VLAN")
+		require.Equal(t, uint64(0x0800), uintVal(t, q.Child("Type")))
+		require.Equal(t, uint64(4), uintVal(t, mustChild(t, q, "IP", "Version")))
+	})
+
+	t.Run("ipv6", func(t *testing.T) {
+		inner6, err := codec.DecodeHex("6000000000203afffe8000000000000000237c9bf9dd7b2dff0200000000000000000001ffa35b7887000c5200000000fe8000000000000014ae6f6a11a35b780101f84d8991af52")
+		require.NoError(t, err)
+		q := mustChild(t, parseEthernet(t, dot1q(layers.EthernetTypeIPv6, gopacket.Payload(inner6))), "VLAN")
+		require.Equal(t, uint64(0x86dd), uintVal(t, q.Child("Type")))
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, q, "IPv6", "Version")))
+	})
+
+	t.Run("eapol", func(t *testing.T) {
+		q := mustChild(t, parseEthernet(t, dot1q(layers.EthernetTypeEAPOL, gopacket.Payload([]byte{0x01, 0x01, 0x00, 0x00}))), "VLAN")
+		require.Equal(t, uint64(0x888e), uintVal(t, q.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, q, "EAPOL", "Packet Type")))
+	})
+
+	t.Run("default-unknown", func(t *testing.T) {
+		q := mustChild(t, parseEthernet(t, dot1q(0x88b5, gopacket.Payload([]byte{0xde, 0xad, 0xbe, 0xef}))), "VLAN")
+		require.Equal(t, uint64(0x88b5), uintVal(t, q.Child("Type")))
+		require.Nil(t, q.Child("IP"))
+		require.Nil(t, q.Child("IPv6"))
+		require.Nil(t, q.Child("ARP"))
+		require.Nil(t, q.Child("EAPOL"))
+	})
+}
+
 func TestSSHIdentification(t *testing.T) {
 	payload := []byte("SSH-2.0-OpenSSH_8.9\r\n")
 	ssh := parseRule(t, payload, "application-layer.ssh", "SSH")
