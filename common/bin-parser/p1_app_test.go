@@ -437,8 +437,9 @@ func TestP1TCPApplications(t *testing.T) {
 	salt := []byte{0x00, 0x00, 0x00, 0x04, 'p', 'i', 'n', 'g'}
 	sa := parseRule(t, salt, "salt", "Salt")
 	require.Equal(t, uint64(4), uintVal(t, sa.Child("Frames").Children()[0].Child("Length")))
+	require.Equal(t, "ping", strVal(t, sa.Child("Frames").Children()[0].Child("Command")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 4505, 4505, salt))
-	require.Equal(t, []byte("ping"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "Salt", "Frames").Children()[0].Child("Payload")))
+	require.Equal(t, "ping", strVal(t, mustChild(t, eth, "IP", "TCP", "Salt", "Frames").Children()[0].Child("Command")))
 
 	nr := make([]byte, 14)
 	copy(nr[0:4], []byte(".NET"))

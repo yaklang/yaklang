@@ -156,6 +156,6 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "RTMP", Layer: "L7", RuleFile: "rtmp.yaml", Status: statusNew, SampleFrom: "C0 version 3"},
 	{Name: "FTP-DATA", Layer: "L7", RuleFile: "ftp_data.yaml", Status: statusNew, SampleFrom: "TCP/20 payload"},
 	{Name: "Jenkins remoting", Layer: "L7", RuleFile: "jenkins.yaml", Status: statusNew, SampleFrom: "Protocol:HTTP11"},
-	{Name: "SaltStack", Layer: "L7", RuleFile: "salt.yaml", Status: statusNew, SampleFrom: "ZeroMQ length frame"},
+	{Name: "SaltStack", Layer: "L7", RuleFile: "salt.yaml", Status: statusNew, SampleFrom: "ZMTP greeting NULL + ping frame"},
 	{Name: ".NET Remoting", Layer: "L7", RuleFile: "net_remoting.yaml", Status: statusNew, SampleFrom: ".NET preamble"},
 }
