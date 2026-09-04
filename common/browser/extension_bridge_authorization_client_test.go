@@ -75,3 +75,21 @@ func TestExtensionAuthorizationClientSlotKeepsRemoteDevice(t *testing.T) {
 	_, err = extensionAuthorizationClientSlot(workspace, "unknown")
 	require.Error(t, err)
 }
+
+func TestAuthorizationContextBoundaryAllowsNormalLoginChanges(t *testing.T) {
+	slot := ExtensionAuthorizationIdentitySlot{
+		DeviceID: "device-a", InstallationID: "installation-a", IsolationContextID: "profile-a",
+		CookieStoreID: "store-a", Origin: "http://localhost:8080", GrantID: "grant-a",
+		Target:      ExtensionAuthorizationTarget{TabID: 7, FrameID: 0, DocumentID: "login-document"},
+		Fingerprint: "before-login",
+	}
+	context := extensionAuthorizationContextBase{
+		DeviceID: "device-a", InstallationID: "installation-a", IsolationContextID: "profile-a",
+		CookieStoreID: "store-a", Origin: "http://localhost:8080", GrantID: "grant-a",
+		Target:      ExtensionAuthorizationTarget{TabID: 7, FrameID: 0, DocumentID: "account-document"},
+		Fingerprint: "after-login",
+	}
+	require.True(t, authorizationContextBoundaryMatches(slot, context))
+	context.Origin = "http://other.example"
+	require.False(t, authorizationContextBoundaryMatches(slot, context))
+}
