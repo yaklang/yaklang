@@ -356,6 +356,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x65), uintVal(t, id.Child("Qos")))
 	})
 
+	t.Run("quic/initial", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "c000000001088394c8f03e51570800"), "application-layer.quic", "QUIC")
+		require.Equal(t, []byte{0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08}, bytesVal(t, n.Child("DCID")))
+	})
+	t.Run("quic/server-initial", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "cf000000010008f067a5502a4262b500"), "application-layer.quic", "QUIC")
+		require.Equal(t, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, bytesVal(t, n.Child("SCID")))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))
