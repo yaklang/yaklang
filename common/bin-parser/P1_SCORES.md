@@ -50,7 +50,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | OSPF | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `ospf.yaml` |
 | BGP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `bgp.yaml` |
 | RIP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rip.yaml` |
-| EIGRP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `eigrp.yaml` |
+| EIGRP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `eigrp.yaml` |
 | VRRP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `vrrp.yaml` |
 | HSRP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `hsrp.yaml` |
 | SCTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `sctp.yaml` |
