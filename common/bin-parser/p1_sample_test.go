@@ -63,6 +63,13 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
 	})
 
+	t.Run("ftp_data/stream", func(t *testing.T) {
+		// RFC 959 §3.4.1 STREAM mode (default): no block header, TCP payload is the file.
+		fd := []byte("README.txt contents")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 20, 20, fd))
+		require.Equal(t, "README.txt contents", strVal(t, mustChild(t, eth, "IP", "TCP", "FTPData").Child("File Data")))
+	})
+
 	t.Run("ftp_data/eor", func(t *testing.T) {
 		// RFC 959 §3.4.2: bit 128 EOR, not EOF. TCP/20 bounds the block.
 		fd := []byte{0x80, 0x00, 0x0a, 'f', 'i', 'l', 'e', '-', 'b', 'y', 't', 'e', 's'}
@@ -70,7 +77,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		blk := mustChild(t, eth, "IP", "TCP", "FTPData", "Blocks").Children()[0]
 		require.Equal(t, uint64(0x80), uintVal(t, blk.Child("Descriptor")))
 		require.Equal(t, uint64(10), uintVal(t, blk.Child("Byte Count")))
-		require.Equal(t, []byte("file-bytes"), bytesVal(t, blk.Child("Data")))
+		require.Equal(t, "file-bytes", strVal(t, blk.Child("File Data")))
 	})
 
 	t.Run("ftp_data/eof", func(t *testing.T) {
@@ -78,7 +85,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 20, 20, fd))
 		blk := mustChild(t, eth, "IP", "TCP", "FTPData", "Blocks").Children()[0]
 		require.Equal(t, uint64(0x40), uintVal(t, blk.Child("Descriptor")))
-		require.Equal(t, []byte("end"), bytesVal(t, blk.Child("Data")))
+		require.Equal(t, "end", strVal(t, blk.Child("File Data")))
 	})
 
 	t.Run("tftp/wireshark", func(t *testing.T) {

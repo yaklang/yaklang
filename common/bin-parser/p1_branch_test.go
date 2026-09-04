@@ -64,6 +64,9 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(7), uintVal(t, n.Child("Message Type")))
 		require.Equal(t, uint64(3600), uintVal(t, n.Child("Options").Children()[2].Child("T1")))
 	})
+	t.Run("ftp_data/stream", func(t *testing.T) {
+		require.Equal(t, "abc", strVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 20, 20, []byte("abc"))), "IP", "TCP", "FTPData").Child("File Data")))
+	})
 	t.Run("ftp_data/eor", func(t *testing.T) {
 		blk := mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 20, 20, []byte{0x80, 0x00, 0x03, 'a', 'b', 'c'})), "IP", "TCP", "FTPData", "Blocks").Children()[0]
 		require.Equal(t, uint64(0x80), uintVal(t, blk.Child("Descriptor")))
