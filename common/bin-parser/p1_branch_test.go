@@ -704,4 +704,19 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(7), uintVal(t, pub.Child("Packet ID")))
 		require.Equal(t, "hello", strVal(t, pub.Child("Message")))
 	})
+
+	t.Run("http/post", func(t *testing.T) {
+		req := mustChild(t, parseRule(t, []byte("POST /submit HTTP/1.1\r\nHost: origin.example\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\n\r\nfoo=bar"), "application-layer.http", "HTTP"), "HTTP Request")
+		require.Equal(t, "POST", strVal(t, req.Child("Method")))
+		require.Equal(t, "foo=bar", strVal(t, mustChild(t, req, "Body").Child("Octets")))
+	})
+	t.Run("http/chunked", func(t *testing.T) {
+		chunks := mustChild(t, parseRule(t, []byte("POST / HTTP/1.1\r\nHost: example.tld\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n"), "application-layer.http", "HTTP"), "HTTP Request", "Body", "DataChunks").Children()
+		require.Equal(t, "hello", strVal(t, chunks[0].Child("Octets")))
+	})
+	t.Run("http/ok", func(t *testing.T) {
+		resp := mustChild(t, parseRule(t, []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\nhello"), "application-layer.http", "HTTP"), "HTTP Response")
+		require.Equal(t, "200", strVal(t, resp.Child("Status")))
+		require.Equal(t, "hello", strVal(t, mustChild(t, resp, "Body").Child("Octets")))
+	})
 }

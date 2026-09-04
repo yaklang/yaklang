@@ -601,7 +601,7 @@ var httpRequestExpect = `Ethernet:
             Item: 'Upgrade: websocket'
             Item: ""
           Body:
-            Data: 2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b
+            Octets: !!binary KsycyBnlHM9Eve5vTib0X2MDimz934alUKb/m10fh1s=
 `
 var icmpExpect = `Ethernet:
   Destination: 3066d026811b

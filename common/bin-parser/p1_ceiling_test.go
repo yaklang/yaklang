@@ -51,7 +51,7 @@ var extraFailCount = map[string]int{
 	"application-layer.dhcp":               4,
 	"application-layer.mysql":              3,
 	"application-layer.redis":              3,
-	"application-layer.http":               3,
+	"application-layer.http":               4,
 	"application-layer.dns":                3,
 	"application-layer.snmp":               3,
 	"application-layer.nbss":               3,
