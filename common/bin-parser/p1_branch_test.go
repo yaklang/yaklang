@@ -1341,4 +1341,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("Key")))
 		require.Nil(t, n.Child("Call ID"))
 	})
+	t.Run("gre/eth-bridging", func(t *testing.T) {
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		dst := []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee}
+		src := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		inner := append(append(append(dst, src...), 0x08, 0x06), arp...)
+		raw := append([]byte{0x00, 0x00, 0x65, 0x58}, inner...)
+		n := parseRule(t, raw, "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0x6558), uintVal(t, n.Child("Protocol Type")))
+		require.Equal(t, dst, bytesVal(t, mustChild(t, n, "Payload", "Ethernet").Child("Destination")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, ipv4ProtoFrame(t, 0x2f, raw)), "IP", "GRE", "Payload", "Ethernet", "ARP").Child("Opcode")))
+	})
 }
