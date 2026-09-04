@@ -1258,6 +1258,33 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(13), uintVal(t, wired[1]))
 	})
 
+	t.Run("eap/otp", func(t *testing.T) {
+		// RFC 3748 §5.5 OTP Type-Data is the RFC 2289 challenge "otp-md5 499 ke1234".
+		// Wireshark eap.type=5 / eap.otp. EtherType 0x888e.
+		ch := []byte("otp-md5 499 ke1234")
+		eapLen := byte(5 + len(ch))
+		eap := append([]byte{0x01, 0x00, 0x00, eapLen, 0x01, 0x01, 0x00, eapLen, 0x05}, ch...)
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(5), uintVal(t, pkt.Child("Type")))
+		require.Equal(t, "otp-md5 499 ke1234", strVal(t, pkt.Child("OTP")))
+		require.Nil(t, pkt.Child("Identity"))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		require.Equal(t, "otp-md5 499 ke1234", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("OTP")))
+	})
+
+	t.Run("eap/gtc", func(t *testing.T) {
+		// RFC 3748 §5.6 GTC Request Type-Data is a displayable token-card challenge.
+		// Wireshark eap.type=6 / eap.gtc. EtherType 0x888e.
+		msg := []byte("Enter PIN")
+		eapLen := byte(5 + len(msg))
+		eap := append([]byte{0x01, 0x00, 0x00, eapLen, 0x01, 0x01, 0x00, eapLen, 0x06}, msg...)
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(6), uintVal(t, pkt.Child("Type")))
+		require.Equal(t, "Enter PIN", strVal(t, pkt.Child("GTC")))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		require.Equal(t, "Enter PIN", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("GTC")))
+	})
+
 	t.Run("eapol/mka", func(t *testing.T) {
 		// IEEE 802.1X-2010 Table 11-3 Packet Type 5 EAPOL-MKA. Wireshark eapol.type.
 		// No MKA dissector: Body Length-bounded leftover is Next Protocol Data, not Unknown raw.

@@ -69,6 +69,16 @@ EAPPacket:
         this.ProcessSubNode("MD5-Challenge")
         return
       }
+      if t == 5 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("OTP").SetMaxLength(dlen)
+        this.ProcessSubNode("OTP")
+        return
+      }
+      if t == 6 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("GTC").SetMaxLength(dlen)
+        this.ProcessSubNode("GTC")
+        return
+      }
     }
     return
   Code: uint8
@@ -77,6 +87,8 @@ EAPPacket:
   Type: uint8
   Identity: string
   Notification: string
+  OTP: string
+  GTC: string
   Nak:
     operator: |
       for {
