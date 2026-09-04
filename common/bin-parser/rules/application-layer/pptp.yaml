@@ -75,6 +75,10 @@ Package:
           this.ProcessByType("Incoming Call Req")
           return
         }
+        if type == 10 {
+          this.ProcessByType("Incoming Call Reply")
+          return
+        }
         if type == 15 {
           this.ProcessByType("Set Link Info")
           return
@@ -163,6 +167,16 @@ Incoming Call Req:
     DialedNumber: string,64
     DialingNumber: string,64
     Subaddress: string,64
+
+Incoming Call Reply:
+    CallId: uint16
+    PeerCallId: uint16
+    ResultCode: uint8
+    ErrorCode: uint8
+    Reserved1: uint16
+    RecvWindowSize: uint16
+    ProcessingDelay: uint16
+    Reserved2: uint32
 
 Set Link Info:
     PeerCallId: uint16

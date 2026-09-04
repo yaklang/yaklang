@@ -1477,6 +1477,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.True(t, strings.HasPrefix(strVal(t, wired.Child("DialedNumber")), "5551212"))
 	})
 
+	t.Run("pptp/icrp", func(t *testing.T) {
+		// RFC 2637 §2.10 Incoming-Call-Reply (control type 10), 28-byte message.
+		// CallId 1, PeerCallId 1, Result Code 1 = Connect, Recv Window 64.
+		// Wireshark pptp.call_id / pptp.peer_call_id / pptp.result. TCP/1723.
+		pptp := make([]byte, 28)
+		binary.BigEndian.PutUint16(pptp[0:], 28)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 10)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint16(pptp[14:], 1)
+		pptp[16] = 1
+		binary.BigEndian.PutUint16(pptp[20:], 64)
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(10), uintVal(t, n.Child("ControlMessageType")))
+		icrp := mustChild(t, n, "Incoming Call Reply")
+		require.Equal(t, uint64(1), uintVal(t, icrp.Child("CallId")))
+		require.Equal(t, uint64(1), uintVal(t, icrp.Child("PeerCallId")))
+		require.Equal(t, uint64(1), uintVal(t, icrp.Child("ResultCode")))
+		require.Equal(t, uint64(64), uintVal(t, icrp.Child("RecvWindowSize")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Incoming Call Reply")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("CallId")))
+		require.Equal(t, uint64(64), uintVal(t, wired.Child("RecvWindowSize")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
