@@ -400,6 +400,40 @@ func TestYoungCrashLeaseMaturesAndIsReclaimedBeforeAllocation(t *testing.T) {
 	}
 }
 
+func TestOversizedLeaseCannotPoisonActiveReservations(t *testing.T) {
+	m, id, refs := manifestFixture("hello")
+	m.Resources[0].Filename = strings.Repeat("x", maxMetadataBytes)
+	refs[0].Filename = m.Resources[0].Filename
+	if err := Seal(m); err != nil {
+		t.Fatal(err)
+	}
+	r := resolverFixture(t, nil)
+	rejected, err := r.Prepare(context.Background(), m, id, refs, downloadFixture(t, "hello"), nil)
+	if rejected != nil {
+		defer rejected.Cleanup()
+	}
+	requireCode(t, err, "input_metadata_invalid")
+	entries, err := os.ReadDir(r.config.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "workspace-") {
+			t.Fatal("published a lease that reclamation cannot read")
+		}
+	}
+	staging, err := os.ReadDir(filepath.Join(r.config.Root, ".staging"))
+	if err != nil || len(staging) != 0 {
+		t.Fatalf("failed allocation left staging data: %v %v", staging, err)
+	}
+	m, id, refs = manifestFixture("hello")
+	w, err := r.Prepare(context.Background(), m, id, refs, downloadFixture(t, "hello"), nil)
+	if err != nil {
+		t.Fatalf("rejected metadata poisoned later allocation: %v", err)
+	}
+	defer w.Cleanup()
+}
+
 func TestIncompleteStagingCannotPoisonActiveReservations(t *testing.T) {
 	m, id, refs := manifestFixture("hello")
 	r := resolverFixture(t, nil)

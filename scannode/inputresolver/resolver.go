@@ -338,7 +338,7 @@ func (r *Resolver) allocate(w *Workspace, bytes uint64) error {
 	}()
 	metadata := lease{Version: leaseVersion, Directory: filepath.Base(dir), CreatedAt: time.Now().UTC(), ReservedBytes: needed, Manifest: w.manifest}
 	raw, err := json.Marshal(metadata)
-	if err != nil {
+	if err != nil || len(raw) > maxMetadataBytes {
 		return fail("input_metadata_invalid", "")
 	}
 	metaFile, err := openBeneath(dir, ".lease.json", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
