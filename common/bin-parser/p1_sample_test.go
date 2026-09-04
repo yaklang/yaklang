@@ -1399,6 +1399,43 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0xffffffff), uintVal(t, wired.Child("Recv Accm")))
 	})
 
+	t.Run("pptp/echo-reply", func(t *testing.T) {
+		// RFC 2637 §2.6 Echo-Reply (control type 6), 20-byte message.
+		// Identifier 1 matches Echo-Request; Result Code 1 = OK. Wireshark pptp.result. TCP/1723.
+		pptp := make([]byte, 20)
+		binary.BigEndian.PutUint16(pptp[0:], 20)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 6)
+		binary.BigEndian.PutUint32(pptp[12:], 1)
+		pptp[16] = 1
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(6), uintVal(t, n.Child("ControlMessageType")))
+		rep := mustChild(t, n, "Echo Reply")
+		require.Equal(t, uint64(1), uintVal(t, rep.Child("Identifier")))
+		require.Equal(t, uint64(1), uintVal(t, rep.Child("ResultCode")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Echo Reply")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("Identifier")))
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("ResultCode")))
+	})
+
+	t.Run("pptp/stop-req", func(t *testing.T) {
+		// RFC 2637 §2.3 Stop-Control-Connection-Request (control type 3), 16-byte message.
+		// Reason 1 = None (normal stop). Wireshark pptp.reason. TCP/1723.
+		pptp := make([]byte, 16)
+		binary.BigEndian.PutUint16(pptp[0:], 16)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 3)
+		pptp[12] = 1
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("ControlMessageType")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Stop Control Conn Req").Child("Reason")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP", "Stop Control Conn Req").Child("Reason")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}

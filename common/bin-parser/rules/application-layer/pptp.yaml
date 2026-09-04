@@ -59,6 +59,14 @@ Package:
           this.ProcessByType("Echo Request")
           return
         }
+        if type == 6 {
+          this.ProcessByType("Echo Reply")
+          return
+        }
+        if type == 3 {
+          this.ProcessByType("Stop Control Conn Req")
+          return
+        }
         if type == 15 {
           this.ProcessByType("Set Link Info")
           return
@@ -120,6 +128,17 @@ Outgoing Call Reply:
 
 Echo Request:
     Identifier: uint32
+
+Echo Reply:
+    Identifier: uint32
+    ResultCode: uint8
+    ErrorCode: uint8
+    Reserved1: uint16
+
+Stop Control Conn Req:
+    Reason: uint8
+    Reserved1: uint8
+    Reserved2: uint16
 
 Set Link Info:
     PeerCallId: uint16
