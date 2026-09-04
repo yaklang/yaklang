@@ -2,31 +2,61 @@ endian: big
 Package:
   OpenVPN:
     operator: |
-      this.ProcessSubNode("OpcodeKey")
-      op = getNodeResult("OpcodeKey").Value >> 3
+      this.ProcessSubNode("Opcode")
+      this.ProcessSubNode("Key ID")
+      op = getNodeResult("Opcode").Value
       if op < 1 || op > 11 {
         panic("openvpn: unknown opcode")
+      }
+      if op == 6 {
+        if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 {
+            this.GetSubNode("Payload").SetMaxLength(rest)
+            this.ProcessSubNode("Payload")
+          }
+        }
+        return
+      }
+      if op == 9 {
+        this.ProcessSubNode("Peer ID")
+        if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 {
+            this.GetSubNode("Payload").SetMaxLength(rest)
+            this.ProcessSubNode("Payload")
+          }
+        }
+        return
       }
       this.ProcessSubNode("Session ID")
       this.ProcessSubNode("Ack Count")
       n = getNodeResult("Ack Count").Value
       if n > 0 && n < 32 {
-        this.GetSubNode("Acks").SetMaxLength(n * 4)
         this.ProcessSubNode("Acks")
+        this.ProcessSubNode("Remote Session ID")
+      }
+      if op == 5 {
+        return
       }
       this.ProcessSubNode("Packet ID")
-    OpcodeKey: uint8
+      if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 {
+          this.GetSubNode("Payload").SetMaxLength(rest)
+          this.ProcessSubNode("Payload")
+        }
+      }
+      return
+    Opcode: uint8,5bit
+    Key ID: uint8,3bit
     Session ID: raw,8
     Ack Count: uint8
     Acks:
       list: true
+      list-length-from-field: "../Ack Count"
       Ack: uint32
-      operator: |
-        for {
-          ele = this.NewElement()
-          if ele.GetMaxLength() < 4 {
-            break
-          }
-          ele.Process()
-        }
+    Remote Session ID: raw,8
     Packet ID: uint32
+    Peer ID: uint32,24bit
+    Payload: raw

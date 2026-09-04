@@ -125,14 +125,15 @@ func TestP1UDPApplications(t *testing.T) {
 	natt := parseEthernet(t, ipv4UDPBytes(t, 4500, 4500, ike))
 	require.Equal(t, uint64(0x22), uintVal(t, mustChild(t, natt, "IP", "UDP", "NATT").Child("Exchange Type")))
 
-	// OpenVPN P_CONTROL_HARD_RESET_CLIENT_V2 (opcode 7 << 3)
+	// OpenVPN P_CONTROL_HARD_RESET_CLIENT_V2 (opcode 7 << 3). Wireshark openvpn.opcode.
 	openvpn := mustHex(t, "3801020304050607080000000001")
 	ov := parseRule(t, openvpn, "openvpn", "OpenVPN")
-	require.Equal(t, uint64(0x38), uintVal(t, ov.Child("OpcodeKey")))
+	require.Equal(t, uint64(7), uintVal(t, ov.Child("Opcode")))
+	require.Equal(t, uint64(0), uintVal(t, ov.Child("Key ID")))
 	require.Equal(t, uint64(0), uintVal(t, ov.Child("Ack Count")))
 	require.Equal(t, uint64(1), uintVal(t, ov.Child("Packet ID")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, openvpn))
-	require.Equal(t, uint64(0x38), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("OpcodeKey")))
+	require.Equal(t, uint64(7), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Opcode")))
 
 	// WireGuard handshake initiation: type 1, 148 bytes (whitepaper §5.4.2)
 	wg := mustHex(t, "0100000001000000"+

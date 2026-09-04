@@ -2518,6 +2518,49 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ethernet8023([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, raw))
 		require.Equal(t, uint64(0x81), uintVal(t, mustChild(t, eth, "LLC").Child("XID Format")))
 	})
+
+	t.Run("openvpn/hard-reset", func(t *testing.T) {
+		// OpenVPN P_CONTROL_HARD_RESET_CLIENT_V2: opcode 7, key 0, session, ack 0, packet-id 1.
+		// Wireshark openvpn.opcode / openvpn.sessionid. UDP/1194.
+		raw := mustHex(t, "3801020304050607080000000001")
+		n := parseRule(t, raw, "openvpn", "OpenVPN")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Key ID")))
+		require.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8}, bytesVal(t, n.Child("Session ID")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Ack Count")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Packet ID")))
+		require.Nil(t, n.Child("Peer ID"))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, raw))
+		require.Equal(t, uint64(7), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Opcode")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Packet ID")))
+	})
+
+	t.Run("openvpn/data-v2", func(t *testing.T) {
+		// OpenVPN P_DATA_V2 (opcode 9): peer-id then encrypted payload. Wireshark openvpn.peerid. UDP/1194.
+		raw := []byte{0x48, 0x00, 0x00, 0x01, 0xde, 0xad, 0xbe, 0xef}
+		n := parseRule(t, raw, "openvpn", "OpenVPN")
+		require.Equal(t, uint64(9), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Key ID")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Peer ID")))
+		require.Nil(t, n.Child("Session ID"))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, raw))
+		require.Equal(t, uint64(9), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Opcode")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Peer ID")))
+		require.Equal(t, []byte{0xde, 0xad, 0xbe, 0xef}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Payload")))
+	})
+
+	t.Run("openvpn/ack", func(t *testing.T) {
+		// OpenVPN P_ACK_V1 (opcode 5): one ACK packet-id + remote session. Wireshark openvpn.mpid_arraylength.
+		raw := mustHex(t, "28010203040506070801000000010807060504030201")
+		n := parseRule(t, raw, "openvpn", "OpenVPN")
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Ack Count")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Acks").Children()[0]))
+		require.Equal(t, []byte{8, 7, 6, 5, 4, 3, 2, 1}, bytesVal(t, n.Child("Remote Session ID")))
+		require.Nil(t, n.Child("Packet ID"))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, raw))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Ack Count")))
+	})
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
