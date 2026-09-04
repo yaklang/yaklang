@@ -755,6 +755,14 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, "port-001", strVal(t, n.Child("TLVs").Children()[1].Child("Port ID")))
 		require.Equal(t, uint64(20), uintVal(t, n.Child("TLVs").Children()[2].Child("TTL")))
 	})
+	t.Run("pppoe/padi", func(t *testing.T) {
+		n := parseRule(t, rfcPPPoEPADI(t), "pppoe", "PPPoE")
+		require.Equal(t, "isp", strVal(t, n.Child("Payload").Child("Tags").Children()[0].Child("Service-Name")))
+	})
+	t.Run("pppoe/pado", func(t *testing.T) {
+		n := parseRule(t, rfcPPPoEPADO(t), "pppoe", "PPPoE")
+		require.Equal(t, "BRAS1", strVal(t, n.Child("Payload").Child("Tags").Children()[1].Child("AC-Name")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
