@@ -877,11 +877,6 @@ func (t *ToolCaller) resetReasonForReview() {
 // CallToolWithExistedParams; review resets the state before recursing so it may
 // run once more.
 func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.InvokeParams) {
-	if t != nil && t.config != nil {
-		if skipper, ok := t.config.(interface{ ShouldSkipToolCallReasonGeneration() bool }); ok && skipper.ShouldSkipToolCallReasonGeneration() {
-			return
-		}
-	}
 	if func() bool {
 		t.m.Lock()
 		defer t.m.Unlock()

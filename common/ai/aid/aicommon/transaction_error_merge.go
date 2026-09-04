@@ -23,21 +23,6 @@ func mergePostHandlerAndCallbackError(postHandlerErr, callbackErr error) error {
 	return utils.Errorf("post handler: %v; ai callback: %v", postHandlerErr, callbackErr)
 }
 
-// isTransportCausedEmptyResponse reports whether a zero-output response carries
-// an async callback infrastructure error (SetError by AIChatToAICallbackType).
-// Transport failures (TLS handshake, dial errors, gateway outages) frequently
-// surface this way: the empty stream then fails action resolution, and that
-// parse symptom must not be counted against the tighter format-retry budget.
-func isTransportCausedEmptyResponse(callbackErr error, rsp *AIResponse) bool {
-	if callbackErr == nil || rsp == nil {
-		return false
-	}
-	if rsp.GetTotalOutputBytes() != 0 {
-		return false
-	}
-	return isAICallbackInfrastructureError(callbackErr)
-}
-
 func isAICallbackInfrastructureError(err error) bool {
 	if err == nil {
 		return false
@@ -57,9 +42,6 @@ func isAICallbackInfrastructureError(err error) bool {
 		"connection refused",
 		"connection reset",
 		"no such host",
-		"dial tcp",
-		"connectex",
-		"连接失败",
 		"tls:",
 		"http 5",
 		"http 4",

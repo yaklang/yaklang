@@ -693,11 +693,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		opt(r)
 	}
 
-	// 自动注入价值评估埋点 (默认开启). 该钩子在每轮结束
+	// 自动注入价值评估埋点 (默认开启, 暂无关闭开关). 该钩子在每轮结束
 	// (iteration_end) 与整循环结束 (loop_end) 组装 ValueFeedbackRecord 并经
 	// aicommon 注册缝交给 aive; 全程非阻塞 + recover, 不影响主循环.
-	// 禁用走 config 级开关 (cfg.DisableValueFeedback, 经 SubmitValueFeedback
-	// 汇聚点门控并自动传播到任意深度子 invoker), 不再提供 loop 级开关.
 	// 关键词: 价值评估埋点注入, onPostIteration, SubmitValueFeedback
 	r.onPostIteration = append(r.onPostIteration, buildValueFeedbackPostIteration())
 
@@ -709,14 +707,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Config-level functioncall mode enable (e.g. production via WithEnableFunctionCallMode)
 	if config.GetConfigBool("EnableFunctionCallMode") {
 		r.functionCallMode = true
-	}
-
-	// Config-level periodic verification disable (mirrors DisablePerception above):
-	// a config entry set via aicommon.WithDisablePeriodicVerification propagates to
-	// every loop built from this config — including sub-loops that don't take
-	// per-loop options (e.g. fast_context loops forked by code-audit category scans).
-	if config.GetConfigBool("DisablePeriodicVerification") {
-		r.DisablePeriodicVerification = true
 	}
 
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)

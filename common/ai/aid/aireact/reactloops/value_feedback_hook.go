@@ -43,23 +43,13 @@ func buildValueFeedbackPostIteration() func(loop *ReActLoop, iteration int, task
 // submitValueFeedbackRecord 在 loop_end 始终提交, 在 iteration_end 仅当本轮执行了
 // 工具 (高价值客观信号) 时才提交, 减弱逐轮提交带来的低价值噪声与额外开销.
 func (r *ReActLoop) submitValueFeedbackRecord(iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
-	if !isDone && !r.iterationExecutedTool(iteration) {
+	if isDone {
+		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerLoopEnd, task, iteration)
 		return
 	}
-	trigger := aicommon.ValueFeedbackTriggerIterationEnd
-	if isDone {
-		trigger = aicommon.ValueFeedbackTriggerLoopEnd
+	if r.iterationExecutedTool(iteration) {
+		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerIterationEnd, task, iteration)
 	}
-	r.submitValueFeedbackWithTrigger(trigger, task, iteration)
-}
-
-// valueFeedbackDisabled reports whether value-feedback submission is gated off
-// at the config level (aicommon.WithDisableValueFeedbackSubmission). Checking it
-// before assembly keeps disabled loops from paying the per-iteration
-// TimelineDump projection; SubmitValueFeedback would gate at the sink anyway,
-// so semantics are unchanged.
-func valueFeedbackDisabled(cfg *aicommon.Config) bool {
-	return cfg != nil && cfg.DisableValueFeedback
 }
 
 // iterationExecutedTool 判断指定迭代是否真正执行了工具。ToolName / ToolNames /
@@ -97,9 +87,6 @@ func (r *ReActLoop) submitValueFeedbackSignal(trigger string) {
 func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon.AIStatefulTask, iteration int) {
 	cfg, ok := r.config.(*aicommon.Config)
 	if !ok || cfg == nil {
-		return
-	}
-	if valueFeedbackDisabled(cfg) {
 		return
 	}
 

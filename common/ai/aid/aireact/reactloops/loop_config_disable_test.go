@@ -36,43 +36,6 @@ func minimalNewReActLoopOptions() []ReActLoopOption {
 	}
 }
 
-// TestNewReActLoop_ConfigLevelDisablePeriodicVerification 验证 config entry
-// "DisablePeriodicVerification" 在 NewReActLoop 时生效（仿 DisablePerception 模式），
-// 使不带 per-loop 选项构建的子 loop（如 fast_context）也关闭周期验证。
-func TestNewReActLoop_ConfigLevelDisablePeriodicVerification(t *testing.T) {
-	registerStubRequireToolAction(t)
-	invoker := mock.NewMockInvoker(context.Background())
-	cfg := aicommon.NewConfig(context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithDisallowMCPServers(true),
-		aicommon.WithDisablePeriodicVerification(true),
-	)
-	invoker.SetConfig(cfg)
-
-	loop, err := NewReActLoop("config_level_periodic_verification_loop", invoker, minimalNewReActLoopOptions()...)
-	require.NoError(t, err)
-	require.NotNil(t, loop)
-	require.True(t, loop.DisablePeriodicVerification,
-		"config entry DisablePeriodicVerification must disable periodic verification on the loop")
-}
-
-// TestNewReActLoop_ConfigLevelDisablePeriodicVerification_DefaultOff 验证默认
-// 不关闭（不改变非审计场景的全局默认行为）。
-func TestNewReActLoop_ConfigLevelDisablePeriodicVerification_DefaultOff(t *testing.T) {
-	registerStubRequireToolAction(t)
-	invoker := mock.NewMockInvoker(context.Background())
-	cfg := aicommon.NewConfig(context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithDisallowMCPServers(true),
-	)
-	invoker.SetConfig(cfg)
-
-	loop, err := NewReActLoop("config_level_periodic_verification_loop", invoker, minimalNewReActLoopOptions()...)
-	require.NoError(t, err)
-	require.NotNil(t, loop)
-	require.False(t, loop.DisablePeriodicVerification)
-}
-
 // TestExecuteSubAgents_AppliesExtraLoopOpts 验证 SubAgentOptions.ExtraLoopOpts
 // 不再是死参数：在 loop 构建后、执行前被应用。
 func TestExecuteSubAgents_AppliesExtraLoopOpts(t *testing.T) {
@@ -114,7 +77,7 @@ func TestExecuteSubAgents_AppliesExtraLoopOpts(t *testing.T) {
 		Goal:       "extra loop opts",
 		LoopName:   testLoopName,
 	}}, SubAgentOptions{
-		TimelineMode: SubAgentTimelineClean,
+		TimelineMode:  SubAgentTimelineClean,
 		ExtraLoopOpts: []ReActLoopOption{WithDisablePeriodicVerification(true)},
 	})
 	require.Len(t, results, 1)

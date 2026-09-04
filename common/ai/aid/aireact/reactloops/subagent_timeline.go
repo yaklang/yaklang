@@ -165,7 +165,7 @@ func buildSubAgentRuntime(
 	}
 	subTask.SetEmitter(taskEmitter)
 
-	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter, opts)
+	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter)
 	if err != nil {
 		jobCancel()
 		return nil, nil, nil, utils.Wrap(err, "create sub react invoker failed")
@@ -213,7 +213,6 @@ func buildSubAgentInvoker(
 	handle *TimelineHandle,
 	taskCtx context.Context,
 	taskEmitter *aicommon.Emitter,
-	opts SubAgentOptions,
 ) (aicommon.AITaskInvokeRuntime, error) {
 	baseOpts := aicommon.ConvertConfigToOptions(parentCfg)
 	baseOpts = append(baseOpts,
@@ -229,9 +228,6 @@ func buildSubAgentInvoker(
 	// / increase iteration，使子 Agent 契约自文档化，且在 ConvertConfigToOptions
 	// 传播逻辑变化时不会静默回退。
 	baseOpts = append(baseOpts, buildSubAgentStrategyOptions()...)
-	if len(opts.ExtraConfigOpts) > 0 {
-		baseOpts = append(baseOpts, opts.ExtraConfigOpts...)
-	}
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(taskCtx, baseOpts...)
 	if err != nil {
@@ -386,7 +382,7 @@ func PrepareForkedSubAgent(
 	taskEmitter := BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
 	subTask.SetEmitter(taskEmitter)
 
-	childInvoker, err := buildSubAgentInvoker(parentCfg, &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, subTask.GetContext(), taskEmitter, SubAgentOptions{})
+	childInvoker, err := buildSubAgentInvoker(parentCfg, &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, subTask.GetContext(), taskEmitter)
 	if err != nil {
 		jobCancel()
 		return nil, nil, nil, nil, err

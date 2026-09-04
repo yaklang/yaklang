@@ -298,7 +298,22 @@ func (s *ScanState) AllDone() bool {
 const phase2ReactiveDataTpl = `## 当前扫描进度
 <|SCAN_PROGRESS_{{ .Nonce }}|>
 **漏洞类别**: {{ .CategoryName }} ({{ .CategoryID }})
-> 稳定上下文（类别侧重点 / Sink 提示 / 路径规则）已在 frozen-block；此处仅保留随轮次变化的进度。
+**技术栈**: {{ .TechStack }}
+**入口点摘要**: {{ .EntryPoints }}
+
+{{ if .LanguageFocus }}
+### 语言画像与本类侧重点
+{{ .LanguageFocus }}
+{{ end }}
+
+{{ if .HasSelectionFocus }}
+**[优先] 用户选中片段**（必须先覆盖文件 {{ .FocusFilePath }}）:
+{{ .Selection }}
+{{ else if .HasOpenFileFocus }}
+**[优先] 前端打开文件**: {{ .FocusFilePath }}
+{{ end }}
+
+> [路径规则] 所有文件路径参数必须使用用户指定的项目绝对路径，禁止使用相对路径。
 
 {{ if .PrevFindingsSummary }}
 ### 前序类别已发现的 Findings（仅供参考，避免重复提交）
@@ -317,7 +332,7 @@ const phase2ReactiveDataTpl = `## 当前扫描进度
 
 {{ if .IsSearchPhase }}
 ### 阶段A：关键词搜索
-目标：根据 frozen-block 中的 Sink 语义提示发现候选文件。
+目标：根据 **Sink 语义提示** 发现候选文件。
 
 **阶段A read_file 限制**：仅抽查，必须 offset + lines（≤80）；禁止全文件读。
 
@@ -351,6 +366,8 @@ const phase2ReactiveDataTpl = `## 当前扫描进度
 （尚未 lock 任何文件）
 {{ end }}
 
+**Sink 语义提示**（根据实际技术栈自主选择合适的 grep 关键词，示例仅供参考）:
+{{ .SinkHints }}
 {{ else }}
 ### 阶段B：逐文件审计
 进度：{{ .AuditDone }}/{{ .AuditTotal }}（剩余 {{ .AuditRemaining }}）
@@ -373,52 +390,6 @@ const phase2ReactiveDataTpl = `## 当前扫描进度
 **全局 findings 数**: {{ .FindingsCount }}
 <|SCAN_PROGRESS_END_{{ .Nonce }}|>
 `
-
-// buildPhase2FrozenPartition hoists category-stable context into frozen-block so
-// the per-turn reactive/dynamic section stays smaller (aicache friendly).
-func buildPhase2FrozenPartition(state *model.AuditState, category model.VulnCategory) aicommon.FrozenBlockPartition {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("## Phase2 类别稳定上下文\n**类别**: %s (%s)\n", category.Name, category.ID))
-	if state != nil && state.TechStack != "" {
-		b.WriteString(fmt.Sprintf("**技术栈**: %s\n", state.TechStack))
-	}
-	if state != nil && state.EntryPoints != "" {
-		b.WriteString(fmt.Sprintf("**入口点摘要**: %s\n", state.EntryPoints))
-	}
-	techStack := ""
-	if state != nil {
-		techStack = state.TechStack
-	}
-	if focus := model.LanguageFocusForCategory(techStack, category.ID); focus != "" {
-		b.WriteString("\n### 语言画像与本类侧重点\n")
-		b.WriteString(focus)
-		b.WriteString("\n")
-	}
-	if hints := category.RenderSinkHints(); hints != "" {
-		b.WriteString("\n### Sink 语义提示\n")
-		b.WriteString(hints)
-		b.WriteString("\n")
-	}
-	b.WriteString("\n### 路径规则\n所有文件路径必须使用绝对路径：grep 用 path，read_file 用 file，find_file 用 dir。\n")
-	if state != nil {
-		vars := reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection())
-		if v, ok := vars["HasSelectionFocus"].(bool); ok && v {
-			b.WriteString("\n### 优先：用户选中片段\n")
-			if sel, ok := vars["Selection"].(string); ok {
-				b.WriteString(sel)
-				b.WriteString("\n")
-			}
-		} else if v, ok := vars["HasOpenFileFocus"].(bool); ok && v {
-			b.WriteString(fmt.Sprintf("\n### 优先：打开文件\n%s\n", vars["FocusFilePath"]))
-		}
-	}
-	return aicommon.FrozenBlockPartition{
-		ID:      "code-audit-phase2-" + category.ID,
-		Title:   "Code Audit Phase2 Category Context",
-		Content: b.String(),
-		Order:   200,
-	}
-}
 
 // buildSingleCategoryScanLoop 构建针对单一漏洞类别的扫描 Loop（两阶段：discovery → 逐文件审计）。
 //
@@ -450,8 +421,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 	}
 	preset = append(preset, auditopts.LoopAuxiliaryOpts()...)
 	preset = append(preset,
-		reactloops.WithFrozenBlockPartitions(buildPhase2FrozenPartition(state, category)),
-
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			vars := map[string]any{
 				"Nonce":       nonce,
@@ -531,10 +500,14 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			}
 			pendingDiscoveryList, discoveryGateWarning := formatPendingDiscoveryForReactive(scan)
 			discoveryQualityWarning := FormatDiscoveryQualityWarningForReactive(category, scan)
-			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, map[string]any{
+			reactiveVars := map[string]any{
 				"Nonce":                   nonce,
 				"CategoryID":              category.ID,
 				"CategoryName":            category.Name,
+				"TechStack":               state.TechStack,
+				"EntryPoints":             state.EntryPoints,
+				"LanguageFocus":           model.LanguageFocusForCategory(state.TechStack, category.ID),
+				"SinkHints":               category.RenderSinkHints(),
 				"ReconOutline":            state.GetReconOutline(),
 				"ReconFileHint":           reconFileHint,
 				"PrevFindingsSummary":     buildPrevFindingsSummary(state, category.ID),
@@ -554,7 +527,11 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				"FeedbackMessages":        feedbacker.String(),
 				"FindingsCount":           state.GetFindingCount(),
 				"PhaseASpotReads":         scan.PhaseASpotReadCount(),
-			})
+			}
+			for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
+				reactiveVars[k] = v
+			}
+			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, reactiveVars)
 			return reactivePrompt, err
 		}),
 
@@ -900,21 +877,21 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 					return
 				}
 
-			scanCompleted = true
-			coverageSummary := action.GetString("coverage_summary")
-			coverageSpill, _ := reactloops.SpillLongContent(loop, "scan_coverage_"+category.ID, coverageSummary)
+				scanCompleted = true
+				coverageSummary := action.GetString("coverage_summary")
+				coverageSpill, _ := reactloops.SpillLongContent(loop, "scan_coverage_"+category.ID, coverageSummary)
 
-			auditedFiles, targetFiles := scan.Progress()
-			obs := &model.ScanObservation{
-				CategoryID:      category.ID,
-				CategoryName:    category.Name,
-				StopReason:      "files_all_audited",
-				CoverageSummary: coverageSummary,
-				Status:          model.ScanStatusCompleted,
-				AuditedFiles:    auditedFiles,
-				TargetFiles:     targetFiles,
-			}
-			state.AddScanObservation(obs)
+				auditedFiles, targetFiles := scan.Progress()
+				obs := &model.ScanObservation{
+					CategoryID:      category.ID,
+					CategoryName:    category.Name,
+					StopReason:      "files_all_audited",
+					CoverageSummary: coverageSummary,
+					Status:          model.ScanStatusCompleted,
+					AuditedFiles:    auditedFiles,
+					TargetFiles:     targetFiles,
+				}
+				state.AddScanObservation(obs)
 
 				catFindingCount := 0
 				for _, finding := range state.GetFindings() {
