@@ -87,6 +87,10 @@ Package:
           this.ProcessByType("Call Clear Req")
           return
         }
+        if type == 13 {
+          this.ProcessByType("Call Disconnect Notify")
+          return
+        }
         if type == 15 {
           this.ProcessByType("Set Link Info")
           return
@@ -197,6 +201,14 @@ Incoming Call Connected:
 Call Clear Req:
     CallId: uint16
     Reserved1: uint16
+
+Call Disconnect Notify:
+    CallId: uint16
+    Reserved1: uint16
+    ResultCode: uint8
+    ErrorCode: uint8
+    CauseCode: uint16
+    Call Statistics: string,128
 
 Set Link Info:
     PeerCallId: uint16

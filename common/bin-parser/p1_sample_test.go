@@ -1545,6 +1545,27 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP", "Call Clear Req").Child("CallId")))
 	})
 
+	t.Run("pptp/cdn", func(t *testing.T) {
+		// RFC 2637 §2.13 Call-Disconnect-Notify (control type 13), 148-byte message.
+		// CallId 1, Result Code 1 = Lost Carrier. Wireshark pptp.call_id / pptp.result. TCP/1723.
+		pptp := make([]byte, 148)
+		binary.BigEndian.PutUint16(pptp[0:], 148)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 13)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		pptp[16] = 1
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(13), uintVal(t, n.Child("ControlMessageType")))
+		cdn := mustChild(t, n, "Call Disconnect Notify")
+		require.Equal(t, uint64(1), uintVal(t, cdn.Child("CallId")))
+		require.Equal(t, uint64(1), uintVal(t, cdn.Child("ResultCode")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Call Disconnect Notify")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("CallId")))
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("ResultCode")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
