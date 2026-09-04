@@ -510,6 +510,34 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "ping6", strVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Echo Request").Child("Echo Data")))
 	})
 
+	t.Run("icmpv6/dest-unreach", func(t *testing.T) {
+		// RFC 4443 §3.1 Destination Unreachable Type 1 Code 4 Port Unreachable.
+		// Unused 32 bits then as much of the invoking packet as possible.
+		invoking := []byte{0x60, 0x00, 0x00, 0x00}
+		du := append([]byte{0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, invoking...)
+		n := parseRule(t, du, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(4), uintVal(t, n.Child("Code")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, n, "Destination Unreachable").Child("Unused")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, du))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Destination Unreachable")
+		require.Equal(t, uint64(0), uintVal(t, wired.Child("Unused")))
+		require.Equal(t, invoking, bytesVal(t, wired.Child("Original Datagram")))
+	})
+
+	t.Run("icmpv6/packet-too-big", func(t *testing.T) {
+		// RFC 4443 §3.2 Packet Too Big Type 2 Code 0, MTU 1280 (IPv6 minimum).
+		invoking := []byte{0x60, 0x00, 0x00, 0x00}
+		ptb := append([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00}, invoking...)
+		n := parseRule(t, ptb, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1280), uintVal(t, mustChild(t, n, "Packet Too Big").Child("MTU")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, ptb))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Packet Too Big")
+		require.Equal(t, uint64(1280), uintVal(t, wired.Child("MTU")))
+		require.Equal(t, invoking, bytesVal(t, wired.Child("Original Datagram")))
+	})
+
 	t.Run("icmpv6/ra-opt", func(t *testing.T) {
 		// gopacket layers/icmp6msg_test.go Router Advertisement: SLLA + MTU 1500 + Prefix 2001:db8:0:1::/64.
 		ra := []byte{
