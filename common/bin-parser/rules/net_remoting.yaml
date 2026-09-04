@@ -21,4 +21,4 @@ Package:
     Minor: uint16
     Operation Type: uint16
     Content Length: uint32
-    Content: raw
+    Content: string

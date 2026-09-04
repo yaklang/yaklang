@@ -17,19 +17,117 @@ Package:
         this.ProcessSubNode("OPEN")
         return
       }
-      rest = l - 19
-      if rest > 0 && rest < 1048576 {
-        this.GetSubNode("Body").SetMaxLength(rest)
-        this.ProcessSubNode("Body")
+      if typ == 3 {
+        this.ProcessSubNode("NOTIFICATION")
+        return
+      }
+      if typ == 2 {
+        this.ProcessSubNode("UPDATE")
+        return
       }
     Marker: raw,16
     Length: uint16
     Type: uint8
     OPEN:
+      operator: |
+        this.ProcessSubNode("Version")
+        if getNodeResult("Version").Value != 4 {
+          panic("bgp: OPEN version must be 4")
+        }
+        this.ProcessSubNode("My AS")
+        this.ProcessSubNode("Hold Time")
+        this.ProcessSubNode("BGP Identifier")
+        this.ProcessSubNode("Optional Length")
+        ol = getNodeResult("Optional Length").Value
+        if ol > 0 && ol < 1048576 {
+          this.GetSubNode("Params").SetMaxLength(ol)
+          this.ProcessSubNode("Params")
+        }
       Version: uint8
       My AS: uint16
       Hold Time: uint16
       BGP Identifier: raw,4
       Optional Length: uint8
-      Optional: raw
-    Body: raw
+      Params:
+        list: true
+        Param: BGPParam
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 2 {
+              break
+            }
+            ele.Process()
+          }
+    NOTIFICATION:
+      operator: |
+        this.ProcessSubNode("Error Code")
+        this.ProcessSubNode("Error Subcode")
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Data").SetMaxLength(rest)
+          this.ProcessSubNode("Data")
+        }
+      Error Code: uint8
+      Error Subcode: uint8
+      Data: string
+    UPDATE:
+      operator: |
+        this.ProcessSubNode("Withdrawn Length")
+        wl = getNodeResult("Withdrawn Length").Value
+        if wl > 0 && wl < 1048576 {
+          this.GetSubNode("Withdrawn").SetMaxLength(wl)
+          this.ProcessSubNode("Withdrawn")
+        }
+        this.ProcessSubNode("Path Attr Length")
+        pl = getNodeResult("Path Attr Length").Value
+        if pl > 0 && pl < 1048576 {
+          this.GetSubNode("Path Attributes").SetMaxLength(pl)
+          this.ProcessSubNode("Path Attributes")
+        }
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("NLRI").SetMaxLength(rest)
+          this.ProcessSubNode("NLRI")
+        }
+      Withdrawn Length: uint16
+      Withdrawn: string
+      Path Attr Length: uint16
+      Path Attributes:
+        list: true
+        Attr: BGPAttr
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 3 {
+              break
+            }
+            ele.Process()
+          }
+      NLRI: string
+BGPParam:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Value").SetMaxLength(n)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint8
+  Length: uint8
+  Value: string
+BGPAttr:
+  operator: |
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Value").SetMaxLength(n)
+      this.ProcessSubNode("Value")
+    }
+  Flags: uint8
+  Type: uint8
+  Length: uint8
+  Value: string

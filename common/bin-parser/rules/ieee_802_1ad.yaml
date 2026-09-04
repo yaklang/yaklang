@@ -1,7 +1,9 @@
 endian: big
 Package:
   QinQ:
-    TCI: uint16
+    PCP: uint8,3bit
+    DEI: uint8,1bit
+    VID: uint16,12bit
     Type: uint16
     Payload:
       unpack: true

@@ -46,10 +46,10 @@ func TestP1BranchRows(t *testing.T) {
 	})
 
 	t.Run("loopback/other", func(t *testing.T) {
-		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{0x00, 0x01}, "loopback", "Loopback").Child("Protocol")))
+		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{0x00, 0x01}, "loopback", "Loopback").Child("Function")))
 	})
 	t.Run("loopback/custom", func(t *testing.T) {
-		require.Equal(t, uint64(0x0002), uintVal(t, parseRule(t, []byte{0x00, 0x02}, "loopback", "Loopback").Child("Protocol")))
+		require.Equal(t, uint64(0x0002), uintVal(t, parseRule(t, []byte{0x00, 0x02}, "loopback", "Loopback").Child("Function")))
 	})
 
 	t.Run("l2tp/flags", func(t *testing.T) {
@@ -248,9 +248,9 @@ func TestP1BranchRows(t *testing.T) {
 	})
 
 	t.Run("rsync/v31", func(t *testing.T) {
-		require.Equal(t, "31.0", strVal(t, parseRule(t, []byte("@RSYNCD: 31.0\n"), "rsync", "Rsync").Child("Version")))
+		require.Equal(t, "31", strVal(t, parseRule(t, []byte("@RSYNCD: 31.0\n"), "rsync", "Rsync").Child("Major")))
 	})
 	t.Run("rsync/v30", func(t *testing.T) {
-		require.Equal(t, "30.0", strVal(t, parseRule(t, []byte("@RSYNCD: 30.0\n"), "rsync", "Rsync").Child("Version")))
+		require.Equal(t, "30", strVal(t, parseRule(t, []byte("@RSYNCD: 30.0\n"), "rsync", "Rsync").Child("Major")))
 	})
 }

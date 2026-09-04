@@ -29,4 +29,4 @@ Package:
         }
       Time: uint32
       Zero: uint32
-      Random: raw
+      Random: string

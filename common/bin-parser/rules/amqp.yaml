@@ -40,5 +40,5 @@ Package:
     Revision: uint8
     Channel: uint16
     Length: uint32
-    Payload: raw
+    Payload: string
     Frame End: uint8

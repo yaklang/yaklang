@@ -2,8 +2,14 @@ endian: big
 Package:
   Loopback:
     operator: |
-      this.ProcessSubNode("Protocol")
-      p = getNodeResult("Protocol").Value
+      this.ProcessSubNode("Function")
+      p = getNodeResult("Function").Value
+      if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 2 {
+          this.ProcessSubNode("Receipt")
+        }
+      }
       if p == 0x0800 {
         this.ProcessByType("IP")
         return
@@ -12,8 +18,10 @@ Package:
         this.ProcessByType("IPv6")
         return
       }
-    Protocol: uint16
-    Padding: raw,0
-    FCS: raw,0
+      return
+    Function: uint16
+    Receipt: uint16
+    Ident: uint16
+    Data: string
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"

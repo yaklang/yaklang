@@ -14,10 +14,12 @@ Package:
       }
       if op == 3 {
         this.ProcessSubNode("Block")
-        rest = this.GetRemainingSpace()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Data").SetMaxLength(rest)
-          this.ProcessSubNode("Data")
+        if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 {
+            this.GetSubNode("File Data").SetMaxLength(rest)
+            this.ProcessSubNode("File Data")
+          }
         }
         return
       }
@@ -35,6 +37,6 @@ Package:
     Filename: "del:\x00;type:string"
     Mode: "del:\x00;type:string"
     Block: uint16
-    Data: raw
+    File Data: string
     Error Code: uint16
     Error Message: "del:\x00;type:string"
