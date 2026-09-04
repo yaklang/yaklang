@@ -1924,6 +1924,47 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(8), uintVal(t, wired.Child("Skip Count")))
 		require.Equal(t, []byte{0xaa, 0x00, 0x04, 0x00, 0x1d, 0x04}, bytesVal(t, wired.Child("Functions").Children()[0].Child("Forward").Child("Forwarding Address")))
 	})
+
+	t.Run("stp/config", func(t *testing.T) {
+		// IEEE 802.1D Config BPDU; Wireshark stp.root.prio / stp.root.ext / stp.root.hw.
+		// Root Priority 32768 (nibble 8), system ID ext 1, MAC aa:bb:cc:00:01:00.
+		raw := stpConfigBPDU()
+		n := parseRule(t, raw, "stp", "STP")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Protocol ID")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("BPDU Type")))
+		cfg := mustChild(t, n, "Config")
+		require.Equal(t, uint64(8), uintVal(t, cfg.Child("Root Priority")))
+		require.Equal(t, uint64(32768), uintVal(t, cfg.Child("Root Priority"))<<12)
+		require.Equal(t, uint64(1), uintVal(t, cfg.Child("Root Ext High"))<<8|uintVal(t, cfg.Child("Root Ext Low")))
+		require.Equal(t, []byte{0xaa, 0xbb, 0xcc, 0x00, 0x01, 0x00}, bytesVal(t, cfg.Child("Root MAC")))
+		require.Equal(t, uint64(0), uintVal(t, cfg.Child("Root Path Cost")))
+		llc := append([]byte{0x42, 0x42, 0x03}, raw...)
+		eth := parseEthernet(t, ethernet8023([]byte{0x01, 0x80, 0xc2, 0x00, 0x00, 0x00}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, llc))
+		require.Equal(t, uint64(32768), uintVal(t, mustChild(t, eth, "LLC", "STP", "Config").Child("Root Priority"))<<12)
+		require.Equal(t, []byte{0xaa, 0xbb, 0xcc, 0x00, 0x01, 0x00}, bytesVal(t, mustChild(t, eth, "LLC", "STP", "Config").Child("Root MAC")))
+	})
+
+	t.Run("stp/tcn", func(t *testing.T) {
+		// IEEE 802.1D Topology Change Notification: Protocol ID, Version, Type=0x80. No Config body.
+		raw := []byte{0x00, 0x00, 0x00, 0x80}
+		n := parseRule(t, raw, "stp", "STP")
+		require.Equal(t, uint64(0x80), uintVal(t, n.Child("BPDU Type")))
+		require.Nil(t, n.Child("Config"))
+		llc := append([]byte{0x42, 0x42, 0x03}, raw...)
+		eth := parseEthernet(t, ethernet8023([]byte{0x01, 0x80, 0xc2, 0x00, 0x00, 0x00}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, llc))
+		require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, eth, "LLC", "STP").Child("BPDU Type")))
+		require.Nil(t, mustChild(t, eth, "LLC", "STP").Child("Config"))
+	})
+}
+
+func stpConfigBPDU() []byte {
+	// gopacket layers/stp_test.go 35-octet IEEE 802.1D Config BPDU.
+	return []byte{
+		0x00, 0x00, 0x00, 0x00, 0x01, 0x80, 0x01, 0xaa, 0xbb, 0xcc,
+		0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x01, 0xaa,
+		0xbb, 0xcc, 0x00, 0x01, 0x00, 0x80, 0x01, 0x00, 0x00, 0x14,
+		0x00, 0x02, 0x00, 0x0f, 0x00,
+	}
 }
 
 func tnsConnectPacket(cdata []byte) []byte {

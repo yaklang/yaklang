@@ -24,8 +24,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | CHAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `challenge_handshake_authentication_protocol.yaml` |
 | EAPOL | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `eapol.yaml` |
 | EAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `eapol.yaml` |
-| STP | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `stp.yaml` |
-| RSTP | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | alias of STP |
+| STP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `stp.yaml` |
+| RSTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of STP |
 | LLDP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `lldp.yaml` |
 | CDP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `cdp.yaml` |
 | Loopback | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `loopback.yaml` |
