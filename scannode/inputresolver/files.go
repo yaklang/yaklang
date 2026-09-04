@@ -6,11 +6,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -140,6 +142,11 @@ func (w *Workspace) Read(ctx context.Context, name string, offset, limit int64) 
 		return nil, err
 	}
 	defer file.Close()
+	// Align an arbitrary byte offset forward; never expose a partial leading rune.
+	offset, err = alignInputUTF8ReadOffset(file, offset, int64(resource.SizeBytes))
+	if err != nil {
+		return nil, fail("input_read_failed", resource.ResourceId)
+	}
 	if _, err := file.Seek(offset, io.SeekStart); err != nil {
 		return nil, fail("input_read_failed", resource.ResourceId)
 	}
@@ -156,6 +163,9 @@ func (w *Workspace) Read(ctx context.Context, name string, offset, limit int64) 
 	// bytes and return next_offset so callers can continue without losing data.
 	for i := 0; i < 3 && !utf8.Valid(content) && len(content) > 0; i++ {
 		content = content[:len(content)-1]
+	}
+	if len(content) == 0 && readBytes > 0 {
+		return nil, fail("input_range_invalid", resource.ResourceId)
 	}
 	if !utf8.Valid(content) || bytes.IndexByte(content, 0) >= 0 {
 		return nil, fail("input_text_required", resource.ResourceId)
@@ -180,15 +190,16 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 	if err != nil {
 		return nil, err
 	}
-	if query == "" || len(query) > 1024 || strings.ContainsRune(query, '\x00') || strings.ContainsRune(query, '\n') {
+	if query == "" || !utf8.ValidString(query) || len(query) > 1024 || strings.ContainsRune(query, '\x00') || strings.ContainsRune(query, '\n') {
 		return nil, fail("input_query_invalid", "")
 	}
 	if limit <= 0 || limit > MaxSearchResults {
 		limit = MaxSearchResults
 	}
-	needle := query
+	match := inputSearchMatcher(query, caseSensitive)
+	overlap := len(query) - 1
 	if !caseSensitive {
-		needle = strings.ToLower(needle)
+		overlap = utf8.RuneCountInString(query)*utf8.UTFMax + utf8.UTFMax
 	}
 	results := make([]map[string]any, 0)
 	var total int64
@@ -223,11 +234,19 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 				previous := scanned
 				scanned += int64(len(fragment))
 				text := tail + string(fragment)
-				searchText := text
-				if !caseSensitive {
-					searchText = strings.ToLower(searchText)
-				}
-				if index := strings.Index(searchText, needle); index >= 0 {
+				// The overlap can contain an already reported match. Skip those
+				// while preserving the original (not lowercased) byte positions.
+				searchFrom := 0
+				for searchFrom < len(text) {
+					span := match(text[searchFrom:])
+					if span == nil {
+						break
+					}
+					index, matchEnd := searchFrom+span[0], searchFrom+span[1]
+					if matchEnd <= len(tail) {
+						searchFrom = matchEnd
+						continue
+					}
 					offset := previous - int64(len(tail)) + int64(index)
 					end := index + 512
 					if end > len(text) {
@@ -239,9 +258,10 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 						truncated = uint64(scanned) < resource.SizeBytes
 						return nil
 					}
+					break
 				}
 				if readErr == bufio.ErrBufferFull {
-					keep := len(query) - 1
+					keep := overlap
 					if keep > len(text) {
 						keep = len(text)
 					}
@@ -299,3 +319,56 @@ func (w *Workspace) WriteOutput(ctx context.Context, name, content string) (map[
 func (w *Workspace) RootForDiagnostics() string { return filepath.Clean(w.root) }
 
 func (w *Workspace) String() string { return fmt.Sprintf("input workspace %s", w.manifest.WorkspaceId) }
+
+func alignInputUTF8ReadOffset(input *os.File, requestedOffset, fileSize int64) (int64, error) {
+	if requestedOffset == 0 || requestedOffset == fileSize {
+		return requestedOffset, nil
+	}
+	probeSize := int64(utf8.UTFMax)
+	if remaining := fileSize - requestedOffset; remaining < probeSize {
+		probeSize = remaining
+	}
+	probe := make([]byte, probeSize)
+	readBytes, err := input.ReadAt(probe, requestedOffset)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return 0, err
+	}
+	for skip := 0; skip < readBytes; skip++ {
+		if probe[skip]&0xc0 != 0x80 {
+			return requestedOffset + int64(skip), nil
+		}
+	}
+	return requestedOffset + int64(readBytes), nil
+}
+
+// ASCII folding is the fast path for large logs. Unicode folding must search
+// the original text because lowercasing can change UTF-8 byte lengths.
+func inputSearchMatcher(query string, caseSensitive bool) func(string) []int {
+	literal := func(text, needle string) []int {
+		index := strings.Index(text, needle)
+		if index < 0 {
+			return nil
+		}
+		return []int{index, index + len(needle)}
+	}
+	if caseSensitive {
+		return func(text string) []int { return literal(text, query) }
+	}
+	folded := strings.ToLower(query)
+	matcher := regexp.MustCompile("(?i:" + regexp.QuoteMeta(query) + ")")
+	ascii := func(text string) bool {
+		for i := 0; i < len(text); i++ {
+			if text[i] >= utf8.RuneSelf {
+				return false
+			}
+		}
+		return true
+	}
+	queryASCII := ascii(query)
+	return func(text string) []int {
+		if queryASCII && ascii(text) {
+			return literal(strings.ToLower(text), folded)
+		}
+		return matcher.FindStringIndex(text)
+	}
+}

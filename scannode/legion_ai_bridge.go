@@ -130,6 +130,8 @@ type aiSessionBinding struct {
 	Attachments                []aiSessionAttachmentRef
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
+	PlatformAPIBaseURL         string
+	NodeSessionID              string
 	HTTPClient                 *http.Client
 	LegionResultRuntime        aicommon.LegionResultRuntime
 	ExecutionMode              string
@@ -154,6 +156,8 @@ type aiSessionCredentialRef struct {
 }
 
 type aiSessionRuntimeBindOptions struct {
+	// PreparationContext belongs to the transport consumer, not an installed runtime.
+	PreparationContext  context.Context
 	InputResolver       *inputresolver.Resolver
 	PlatformBearerToken string
 	PlatformAPIBaseURL  string
@@ -324,6 +328,21 @@ func (m *aiSessionRuntimeManager) Bind(
 		return ref, err
 	}
 	ctx, cancel := context.WithCancel(parent)
+	stopPreparation := func() {}
+	if options.PreparationContext != nil {
+		cancelled := make(chan struct{})
+		stop := context.AfterFunc(options.PreparationContext, func() { cancel(); close(cancelled) })
+		var once sync.Once
+		stopPreparation = func() {
+			once.Do(func() {
+				if !stop() {
+					<-cancelled
+				}
+			})
+		}
+		defer stopPreparation()
+	}
+
 	installed := false
 	defer func() {
 		if !installed {
@@ -540,6 +559,8 @@ func (m *aiSessionRuntimeManager) Bind(
 		Attachments:                legacyAISessionAttachmentRefs(command),
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
+		PlatformAPIBaseURL:         strings.TrimSpace(options.PlatformAPIBaseURL),
+		NodeSessionID:              strings.TrimSpace(options.NodeSessionID),
 		HTTPClient:                 options.HTTPClient,
 		LegionResultRuntime:        focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
@@ -562,6 +583,19 @@ func (m *aiSessionRuntimeManager) Bind(
 		}
 		return ref, err
 	}
+	// Completing preparation detaches transport lifetime from the installed engine.
+	// If transport shutdown won the race, wait for cancellation and retire this handle.
+	stopPreparation()
+	if options.PreparationContext != nil && options.PreparationContext.Err() != nil {
+		cancel()
+		if handle != nil {
+			handle.Close("command consumer stopped during bind")
+		}
+		_ = codeWorkspace.Cleanup()
+		m.clearBindReservation(ref.SessionID, ref.CommandID)
+		return ref, options.PreparationContext.Err()
+	}
+
 	if handle != nil {
 		if inputWorkspace != nil {
 			runtime.handle = &inputWorkspaceRuntimeHandle{handle: handle, workspace: inputWorkspace}
@@ -939,6 +973,18 @@ func (m *aiSessionRuntimeManager) Cancel(
 	}
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
+		// Cancel can overtake a queued asynchronous Bind before it reserves its epoch.
+		if tombstone, known := m.terminalTombstones[ref.SessionID]; known {
+			if tombstone.epoch > ref.BindEpoch {
+				return cancelledAISessionRuntime{ref: ref}, errAISessionBindFenced
+			}
+			if tombstone.epoch == ref.BindEpoch {
+				// Preserve the first terminal command so a redelivered Close can
+				// still acknowledge completion after an intervening Cancel.
+				return cancelledAISessionRuntime{ref: ref, reason: reason}, nil
+			}
+		}
+		m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{commandID: ref.CommandID, kind: "cancel", epoch: ref.BindEpoch})
 		return cancelledAISessionRuntime{ref: ref, reason: reason}, nil
 	}
 	if session.ref.OwnerUserID != ref.OwnerUserID {
@@ -1031,7 +1077,13 @@ func (m *aiSessionRuntimeManager) Close(
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
 		tombstone, known := m.terminalTombstones[ref.SessionID]
-		acknowledge := !known || (tombstone.kind == "close" && tombstone.commandID == ref.CommandID)
+		if known && tombstone.epoch > ref.BindEpoch {
+			return closedAISessionRuntime{ref: ref}, errAISessionBindFenced
+		}
+		acknowledge := !known || tombstone.epoch < ref.BindEpoch || (tombstone.kind == "close" && tombstone.commandID == ref.CommandID)
+		if !known || tombstone.epoch < ref.BindEpoch {
+			m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{commandID: ref.CommandID, kind: "close", epoch: ref.BindEpoch})
+		}
 		return closedAISessionRuntime{
 			ref:             ref,
 			reason:          reason,
@@ -1251,6 +1303,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		&command,
 		b.ensureAIPublisher(),
 		aiSessionRuntimeBindOptions{
+			PreparationContext:  ctx,
 			PlatformBearerToken: session.SessionToken,
 			PlatformAPIBaseURL:  b.agent.resolvePlatformAPIBaseURL(),
 			NodeSessionID:       session.SessionID,
@@ -1258,6 +1311,11 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 			ResultSink:          resultSink,
 		},
 	)
+	// Losing this transport is recoverable; do not publish a terminal bind failure.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	if err != nil {
 		if errors.Is(err, errAISessionBindRetry) {
 			// A terminal publication is still settling, or the original bind
