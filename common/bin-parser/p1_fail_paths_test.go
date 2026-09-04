@@ -229,7 +229,7 @@ var p1FailCases = []p1FailCase{
 		{"challenge_handshake_authentication_protocol", []string{"CHAP"}, []byte{0x01, 0, 0, 34}, "trunc-len"},
 		{"link_control_protocol", []string{"LCP"}, nil, "empty"},
 		{"link_control_protocol", []string{"LCP"}, []byte{0x01}, "trunc"},
-		{"link_control_protocol", []string{"LCP"}, []byte{0x01, 0, 0, 4}, "trunc-info"},
+		{"link_control_protocol", []string{"LCP"}, []byte{0x00, 0, 0, 4}, "bad-code"},
 		{"ppp", []string{"PPP"}, nil, "empty"},
 		{"ppp", []string{"PPP"}, []byte{0xff}, "trunc"},
 		{"ppp", []string{"PPP"}, []byte{0xff, 0x03}, "trunc-proto"},
