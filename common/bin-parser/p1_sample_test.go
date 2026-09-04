@@ -1121,9 +1121,55 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("jdwp/command-set", func(t *testing.T) {
+		// JPDA VirtualMachine/Version (set 1, cmd 1), 11-byte header. Wireshark jdwp.commandset. TCP/5005.
 		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000001000101")...)
+		n := parseRule(t, jd, "jdwp", "JDWP")
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Command").Child("Command Set")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Command").Child("Command")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 5005, 5005, jd))
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "JDWP", "Command").Child("Command Set")))
+	})
+
+	t.Run("jdwp/createstring", func(t *testing.T) {
+		// JPDA VirtualMachine/CreateString (set 1, cmd 11): UTF-8 length-prefixed "hello".
+		// Wireshark jdwp.command / jdwp.length. TCP/5005.
+		jd := append([]byte("JDWP-Handshake"), mustHex(t, "000000140000000200010b0000000568656c6c6f")...)
+		n := parseRule(t, jd, "jdwp", "JDWP")
+		cmd := mustChild(t, n, "Command")
+		require.Equal(t, uint64(20), uintVal(t, cmd.Child("Length")))
+		require.Equal(t, uint64(1), uintVal(t, cmd.Child("Command Set")))
+		require.Equal(t, uint64(11), uintVal(t, cmd.Child("Command")))
+		require.Equal(t, uint64(5), uintVal(t, cmd.Child("String Length")))
+		require.Equal(t, "hello", strVal(t, cmd.Child("String")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5005, 5005, jd))
+		require.Equal(t, "hello", strVal(t, mustChild(t, eth, "IP", "TCP", "JDWP", "Command").Child("String")))
+	})
+
+	t.Run("jdwp/event-set", func(t *testing.T) {
+		// JPDA EventRequest/Set (set 15, cmd 1): CLASS_PREPARE, suspend all, 0 modifiers.
+		// Wireshark jdwp.commandset. TCP/5005.
+		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000001100000003000f01080200000000")...)
+		n := parseRule(t, jd, "jdwp", "JDWP")
+		cmd := mustChild(t, n, "Command")
+		require.Equal(t, uint64(15), uintVal(t, cmd.Child("Command Set")))
+		require.Equal(t, uint64(1), uintVal(t, cmd.Child("Command")))
+		require.Equal(t, uint64(8), uintVal(t, cmd.Child("Event Kind")))
+		require.Equal(t, uint64(2), uintVal(t, cmd.Child("Suspend Policy")))
+		require.Equal(t, uint64(0), uintVal(t, cmd.Child("Modifiers")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5005, 5005, jd))
+		require.Equal(t, uint64(8), uintVal(t, mustChild(t, eth, "IP", "TCP", "JDWP", "Command").Child("Event Kind")))
+	})
+
+	t.Run("jdwp/reply", func(t *testing.T) {
+		// JPDA reply header: flags 0x80, error code 0. Wireshark jdwp.errorcode.
+		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000001800000")...)
+		n := parseRule(t, jd, "jdwp", "JDWP")
+		cmd := mustChild(t, n, "Command")
+		require.Equal(t, uint64(0x80), uintVal(t, cmd.Child("Flags")))
+		require.Equal(t, uint64(0), uintVal(t, cmd.Child("Error Code")))
+		require.Nil(t, cmd.Child("Command Set"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5005, 5005, jd))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IP", "TCP", "JDWP", "Command").Child("Error Code")))
 	})
 
 	t.Run("net-remoting/preamble", func(t *testing.T) {

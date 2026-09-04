@@ -588,6 +588,14 @@ func TestP1BranchRows(t *testing.T) {
 		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000002000107")...)
 		require.Equal(t, uint64(7), uintVal(t, mustChild(t, parseRule(t, jd, "jdwp", "JDWP"), "Command").Child("Command")))
 	})
+	t.Run("jdwp/createstring", func(t *testing.T) {
+		jd := append([]byte("JDWP-Handshake"), mustHex(t, "000000140000000200010b0000000568656c6c6f")...)
+		require.Equal(t, "hello", strVal(t, mustChild(t, parseRule(t, jd, "jdwp", "JDWP"), "Command").Child("String")))
+	})
+	t.Run("jdwp/reply", func(t *testing.T) {
+		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000001800000")...)
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, parseRule(t, jd, "jdwp", "JDWP"), "Command").Child("Error Code")))
+	})
 
 	t.Run("fastcgi/begin", func(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{1, 1, 0, 1, 0, 0, 0, 0}, "fastcgi", "FastCGI").Child("Type")))
