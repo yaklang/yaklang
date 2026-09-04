@@ -15,7 +15,7 @@
 | IPv6 | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `internet_protocol_version_6.yaml` |
 | ICMP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `internet_control_message_protocol.yaml` |
 | ICMPv6 | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `internet_control_message_protocol_v6.yaml` |
-| TCP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `transmission_control_protocol.yaml` |
+| TCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `transmission_control_protocol.yaml` |
 | UDP | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `user_datagram_protocol.yaml` |
 | QUIC | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/quic.yaml` |
 | NetBIOS | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/nbss.yaml` |

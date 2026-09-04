@@ -544,7 +544,8 @@ var tlsExpect = `Ethernet:
         Option:
           Kind: 8
           Length: 10
-          Data: 858e40e3c784a921
+          TS Val: 2240692451
+          TS Echo Reply: 3347360033
       TLS:
         Record Layer:
           ContentType: 23
@@ -586,7 +587,8 @@ var httpRequestExpect = `Ethernet:
         Option:
           Kind: 8
           Length: 10
-          Data: 929a15075619e69f
+          TS Val: 2459571463
+          TS Echo Reply: 1444538015
       HTTP:
         HTTP Request:
           Method: GET

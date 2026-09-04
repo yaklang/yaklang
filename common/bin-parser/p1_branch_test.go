@@ -787,6 +787,15 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, []byte{0x06, 0x08, 0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, "application-layer.ber", "BER Element")
 		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, n.Child("OBJECT IDENTIFIER")))
 	})
+	t.Run("tcp/mss", func(t *testing.T) {
+		n := parseRule(t, gopacketTCPSYMSS()[34:62], "transmission_control_protocol", "TCP")
+		require.Equal(t, uint64(8192), uintVal(t, n.Child("Options").Children()[0].Child("MSS")))
+	})
+	t.Run("tcp/timestamp", func(t *testing.T) {
+		n := parseRule(t, rfcTCPTimestamp(), "transmission_control_protocol", "TCP")
+		opts := n.Child("Options").Children()
+		require.Equal(t, uint64(2), uintVal(t, opts[len(opts)-1].Child("TS Val")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
