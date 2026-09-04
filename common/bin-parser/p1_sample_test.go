@@ -1594,4 +1594,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4UDPBytes(t, 5355, 5355, ans))
 		require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, mustChild(t, mustChild(t, eth, "IP", "UDP", "LLMNR", "Answers").Children()[0], "NBNSA").Child("Address")))
 	})
+
+	t.Run("mqtt/publish", func(t *testing.T) {
+		// MQTT 3.1.1 §3.3 PUBLISH QoS0: Topic Name then application Message.
+		// Wireshark mqtt.topic / mqtt.msg (sensor/temp, 23.5).
+		raw := append([]byte{0x30, 0x11, 0x00, 0x0b}, []byte("sensor/temp23.5")...)
+		n := parseRule(t, raw, "application-layer.mqtt", "MQTT")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Packet Type")))
+		pub := mustChild(t, n, "Payload", "Publish")
+		require.Equal(t, "sensor/temp", strVal(t, pub.Child("Topic")))
+		require.Equal(t, "23.5", strVal(t, pub.Child("Message")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1883, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "MQTT", "Payload", "Publish")
+		require.Equal(t, "sensor/temp", strVal(t, wired.Child("Topic")))
+		require.Equal(t, "23.5", strVal(t, wired.Child("Message")))
+	})
+
+	t.Run("mqtt/qos1", func(t *testing.T) {
+		// MQTT 3.1.1 §3.3.2-2: Packet Identifier present only when QoS > 0.
+		raw := append([]byte{0x32, 0x0a, 0x00, 0x01, 'a', 0x00, 0x07}, []byte("hello")...)
+		pub := mustChild(t, parseRule(t, raw, "application-layer.mqtt", "MQTT"), "Payload", "Publish")
+		require.Equal(t, "a", strVal(t, pub.Child("Topic")))
+		require.Equal(t, uint64(7), uintVal(t, pub.Child("Packet ID")))
+		require.Equal(t, "hello", strVal(t, pub.Child("Message")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1883, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "MQTT", "Payload", "Publish")
+		require.Equal(t, uint64(7), uintVal(t, wired.Child("Packet ID")))
+		require.Equal(t, "hello", strVal(t, wired.Child("Message")))
+	})
 }
