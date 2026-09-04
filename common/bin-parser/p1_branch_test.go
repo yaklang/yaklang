@@ -376,6 +376,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x07), uintVal(t, d.Child("Flags")))
 	})
 
+	t.Run("salt/zmtp", func(t *testing.T) {
+		g := make([]byte, 64)
+		g[0], g[9], g[10] = 0xff, 0x7f, 3
+		copy(g[12:16], []byte("NULL"))
+		require.Equal(t, uint64(3), uintVal(t, mustChild(t, parseRule(t, g, "salt", "Salt"), "SaltGreeting").Child("Major")))
+	})
+	t.Run("salt/ping", func(t *testing.T) {
+		fr := parseRule(t, []byte{0x00, 0x00, 0x00, 0x04, 'p', 'i', 'n', 'g'}, "salt", "Salt").Child("Frames").Children()[0]
+		require.Equal(t, "ping", strVal(t, fr.Child("Command")))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))
