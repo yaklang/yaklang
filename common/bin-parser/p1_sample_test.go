@@ -1529,6 +1529,22 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(64000), uintVal(t, wired.Child("ConnectSpeed")))
 	})
 
+	t.Run("pptp/ccrq", func(t *testing.T) {
+		// RFC 2637 §2.12 Call-Clear-Request (control type 12), 16-byte message.
+		// Call ID assigned by the PNS. Wireshark pptp.call_id / pptp.control_message_type. TCP/1723.
+		pptp := make([]byte, 16)
+		binary.BigEndian.PutUint16(pptp[0:], 16)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 12)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(12), uintVal(t, n.Child("ControlMessageType")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Call Clear Req").Child("CallId")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP", "Call Clear Req").Child("CallId")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
