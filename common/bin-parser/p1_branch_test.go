@@ -518,4 +518,13 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(4), uintVal(t, ack.Child("Sec Addr Len")))
 		require.Equal(t, uint64(0), uintVal(t, mustChild(t, ack, "DCERPCResults").Child("Ack Result")))
 	})
+
+	t.Run("spnego/ntlm", func(t *testing.T) {
+		init := mustChild(t, parseRule(t, mustHex(t, "601c06062b0601050502a0123010a00e300c060a2b06010401823702020a"), "application-layer.spnego", "SPNEGO"), "Token", "SPNEGOInit")
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x02, 0x0a}, bytesVal(t, init.Child("MechOID")))
+	})
+	t.Run("spnego/krb5", func(t *testing.T) {
+		init := mustChild(t, parseRule(t, mustHex(t, "601b06062b0601050502a011300fa00d300b06092a864886f712010202"), "application-layer.spnego", "SPNEGO"), "Token", "SPNEGOInit")
+		require.Equal(t, []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x02}, bytesVal(t, init.Child("MechOID")))
+	})
 }
