@@ -12,7 +12,7 @@ Package:
       this.ProcessSubNode("Operation Type")
       this.ProcessSubNode("Content Length")
       l = getNodeResult("Content Length").Value
-      if l > 0 && l < 1048576 {
+      if l >= 17 && l < 1048576 {
         this.GetSubNode("Serialized").SetMaxLength(l)
         this.ProcessSubNode("Serialized")
       }
@@ -21,4 +21,16 @@ Package:
     Minor: uint16
     Operation Type: uint16
     Content Length: uint32
-    Serialized: string
+    Serialized:
+      endian: little
+      operator: |
+        this.ProcessSubNode("Record Type")
+        this.ProcessSubNode("Root Id")
+        this.ProcessSubNode("Header Id")
+        this.ProcessSubNode("Format Major")
+        this.ProcessSubNode("Format Minor")
+      Record Type: uint8
+      Root Id: int32
+      Header Id: int32
+      Format Major: int32
+      Format Minor: int32

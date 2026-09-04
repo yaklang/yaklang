@@ -13,9 +13,9 @@ Package:
       this.ProcessSubNode("Source Port")
       this.ProcessSubNode("Length")
       this.ProcessSubNode("Packet Offset")
-      if this.Length() < this.GetMaxLength() {
+      if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
         rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
+        if rest >= 32 {
           this.GetSubNode("Datagram").SetMaxLength(rest)
           this.ProcessSubNode("Datagram")
         }
@@ -27,4 +27,17 @@ Package:
     Source Port: uint16
     Length: uint16
     Packet Offset: uint16
-    Datagram: string
+    Datagram:
+      operator: |
+        this.ProcessSubNode("Source Name")
+        this.ProcessSubNode("Dest Name")
+        if this.GetMaxLength() > this.Length() {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 && rest < 1048576 {
+            this.GetSubNode("User Data").SetMaxLength(rest)
+            this.ProcessSubNode("User Data")
+          }
+        }
+      Source Name: string,16
+      Dest Name: string,16
+      User Data: string
