@@ -2391,6 +2391,93 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4ProtoFrame(t, 2, raw))
 		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "IGMP").Child("Records").Children()[0].Child("Record Type")))
 	})
+
+	t.Run("mpls/bottom", func(t *testing.T) {
+		// RFC 3032 one-label stack, Bottom=1, then IPv4. Wireshark mpls.label / mpls.bottom.
+		raw := []byte{0x00, 0x01, 0x31, 0xfe, 0x45, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, 0x00, 0x00, 10, 0, 0, 1, 10, 0, 0, 2, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01}
+		n := parseRule(t, raw, "mpls", "MPLS")
+		lab := n.Child("Labels").Children()[0]
+		require.Equal(t, uint64(1), uintVal(t, lab.Child("Bottom")))
+		require.Equal(t, uint64(0xfe), uintVal(t, lab.Child("TTL")))
+		require.Equal(t, uint64(4), uintVal(t, mustChild(t, n, "IP").Child("Version")))
+		frame := make([]byte, 14+len(raw))
+		copy(frame[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+		copy(frame[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+		binary.BigEndian.PutUint16(frame[12:14], 0x8847)
+		copy(frame[14:], raw)
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "MPLS").Child("Labels").Children()[0].Child("Bottom")))
+	})
+
+	t.Run("mpls/stack", func(t *testing.T) {
+		// RFC 3032 two-label stack: first Bottom=0, second Bottom=1. Wireshark mpls.label.
+		raw := []byte{0x00, 0x01, 0x10, 0xfe, 0x00, 0x01, 0x31, 0xfe, 0x45, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, 0x00, 0x00, 10, 0, 0, 1, 10, 0, 0, 2, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01}
+		n := parseRule(t, raw, "mpls", "MPLS")
+		labs := n.Child("Labels").Children()
+		require.GreaterOrEqual(t, len(labs), 2)
+		require.Equal(t, uint64(0), uintVal(t, labs[0].Child("Bottom")))
+		require.Equal(t, uint64(1), uintVal(t, labs[1].Child("Bottom")))
+		frame := make([]byte, 14+len(raw))
+		copy(frame[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+		copy(frame[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+		binary.BigEndian.PutUint16(frame[12:14], 0x8847)
+		copy(frame[14:], raw)
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "MPLS").Child("Labels").Children()[1].Child("Bottom")))
+	})
+
+	t.Run("vxlan/vni", func(t *testing.T) {
+		// RFC 7348 §5: I-flag set, VNI 255, inner Ethernet IPv4. Wireshark vxlan.vni / vxlan.flags.i.
+		innerMAC := []byte{0x00, 0x30, 0x88, 0x01, 0x00, 0x02, 0x00, 0x16, 0x3e, 0x37, 0xf6, 0x04}
+		ip := []byte{0x45, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, 0x00, 0x00, 10, 0, 0, 1, 10, 0, 0, 2, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01}
+		raw := append(append([]byte{0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00}, innerMAC...), append([]byte{0x08, 0x00}, ip...)...)
+		n := parseRule(t, raw, "vxlan", "VXLAN")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("I")))
+		require.Equal(t, uint64(255), uintVal(t, n.Child("VNI")))
+		inner := mustChild(t, n, "Inner")
+		require.Equal(t, uint64(0x0800), uintVal(t, inner.Child("Type")))
+		require.Equal(t, uint64(4), uintVal(t, mustChild(t, inner, "IP").Child("Version")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 4789, 4789, raw))
+		require.Equal(t, uint64(255), uintVal(t, mustChild(t, eth, "IP", "UDP", "VXLAN").Child("VNI")))
+		require.Equal(t, uint64(4), uintVal(t, mustChild(t, eth, "IP", "UDP", "VXLAN", "Inner", "IP").Child("Version")))
+	})
+
+	t.Run("vxlan/arp", func(t *testing.T) {
+		// RFC 7348 inner Ethernet ARP request Opcode 1. Wireshark vxlan / arp.opcode. UDP/4789.
+		innerMAC := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append(append([]byte{0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00}, innerMAC...), append([]byte{0x08, 0x06}, arp...)...)
+		n := parseRule(t, raw, "vxlan", "VXLAN")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("I")))
+		require.Equal(t, uint64(10), uintVal(t, n.Child("VNI")))
+		require.Equal(t, uint64(0x0806), uintVal(t, mustChild(t, n, "Inner").Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Inner", "ARP").Child("Opcode")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 4789, 4789, raw))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "VXLAN", "Inner", "ARP").Child("Opcode")))
+	})
+
+	t.Run("rmi/ping", func(t *testing.T) {
+		// Java RMI spec §10.2 Ping = 0x52 after StreamProtocol 0x4b. Wireshark rmi.outputstream.message. TCP/1099.
+		raw := []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b, 0x52}
+		n := parseRule(t, raw, "rmi", "RMI")
+		require.Equal(t, "JRMI", string(bytesVal(t, n.Child("Magic"))))
+		require.Equal(t, uint64(0x4b), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, uint64(0x52), uintVal(t, mustChild(t, n, "Message").Child("Type")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1099, 1099, raw))
+		require.Equal(t, uint64(0x52), uintVal(t, mustChild(t, eth, "IP", "TCP", "RMI", "Message").Child("Type")))
+	})
+
+	t.Run("rmi/call", func(t *testing.T) {
+		// Java RMI spec §10.2 Call = 0x50 then Java serialization STREAM_MAGIC 0xaced. Wireshark rmi.ser.magic. TCP/1099.
+		raw := []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b, 0x50, 0xac, 0xed, 0x00, 0x05}
+		n := parseRule(t, raw, "rmi", "RMI")
+		msg := mustChild(t, n, "Message")
+		require.Equal(t, uint64(0x50), uintVal(t, msg.Child("Type")))
+		require.Equal(t, uint64(0xaced), uintVal(t, msg.Child("Ser Magic")))
+		require.Equal(t, uint64(5), uintVal(t, msg.Child("Ser Version")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1099, 1099, raw))
+		require.Equal(t, uint64(0xaced), uintVal(t, mustChild(t, eth, "IP", "TCP", "RMI", "Message").Child("Ser Magic")))
+	})
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
