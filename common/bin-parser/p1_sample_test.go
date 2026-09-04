@@ -1727,4 +1727,43 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		wired := mustChild(t, eth, "IP", "TCP", "TLS", "Record Layer", "TLSClientHello", "ClientHello", "Extensions").Children()
 		require.Equal(t, "example.com", strVal(t, mustChild(t, wired[0], "SNI").Child("Host Name")))
 	})
+
+	t.Run("tns/connect", func(t *testing.T) {
+		// Oracle TNS CONNECT; Wireshark tns.connect_data / tns.connect_data_length.
+		// Connect descriptor SERVICE_NAME=ORCL (Oracle Net / tnsnames.ora).
+		cdata := []byte("(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=ORCL)))")
+		pkt := tnsConnectPacket(cdata)
+		n := parseRule(t, pkt, "application-layer.tns", "TNS")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(len(cdata)), uintVal(t, mustChild(t, n, "Connect").Child("Connect Data Length")))
+		require.Equal(t, string(cdata), strVal(t, mustChild(t, n, "Connect").Child("Connect Data")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1521, pkt))
+		require.Equal(t, string(cdata), strVal(t, mustChild(t, eth, "IP", "TCP", "TNS", "Connect").Child("Connect Data")))
+	})
+
+	t.Run("tns/data", func(t *testing.T) {
+		// TNS DATA (type 6): 2-byte Data Flag then payload. Wireshark tns.data_flag.
+		raw := make([]byte, 12)
+		binary.BigEndian.PutUint16(raw[0:], 12)
+		raw[4] = 6
+		copy(raw[10:], []byte("AB"))
+		n := parseRule(t, raw, "application-layer.tns", "TNS")
+		require.Equal(t, uint64(6), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Data Flag")))
+		require.Equal(t, "AB", strVal(t, n.Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1521, raw))
+		require.Equal(t, "AB", strVal(t, mustChild(t, eth, "IP", "TCP", "TNS").Child("Octets")))
+	})
+}
+
+func tnsConnectPacket(cdata []byte) []byte {
+	pkt := make([]byte, 8+26+len(cdata))
+	binary.BigEndian.PutUint16(pkt[0:], uint16(len(pkt)))
+	pkt[4] = 1
+	binary.BigEndian.PutUint16(pkt[8:], 0x0134)
+	binary.BigEndian.PutUint16(pkt[10:], 0x0134)
+	binary.BigEndian.PutUint16(pkt[24:], uint16(len(cdata)))
+	binary.BigEndian.PutUint16(pkt[26:], 34)
+	copy(pkt[34:], cdata)
+	return pkt
 }
