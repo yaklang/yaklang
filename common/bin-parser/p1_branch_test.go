@@ -100,6 +100,7 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("challenge_handshake_authentication_protocol/response", func(t *testing.T) {
 		ch := parseRule(t, mustHex(t, "02030022105c36e2c2ee83c339e9799344e9ec85d348695065722e6174742e6e6574"), "challenge_handshake_authentication_protocol", "CHAP")
 		require.Equal(t, uint64(2), uintVal(t, ch.Child("Code")))
+		require.Equal(t, "HiPer.att.net", strVal(t, mustChild(t, ch, "CHAPResponse").Child("Name")))
 	})
 
 	t.Run("eapol/eap", func(t *testing.T) {

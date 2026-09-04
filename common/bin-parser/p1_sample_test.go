@@ -679,11 +679,28 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("chap/rfc1994", func(t *testing.T) {
+		// RFC 1994 §4.1 Challenge: Value-Size 16, Name HiPer.att.net.
+		// Wireshark chap.code / chap.name. PPP protocol 0xc223.
 		chap := mustHex(t, "01030022105c36e2c2ee83c339e9799344e9ec85d348695065722e6174742e6e6574")
 		ch := parseRule(t, chap, "challenge_handshake_authentication_protocol", "CHAP")
 		require.Equal(t, uint64(1), uintVal(t, ch.Child("Code")))
 		require.Equal(t, uint64(16), uintVal(t, mustChild(t, ch, "Data").Child("Value Size")))
 		require.Equal(t, "HiPer.att.net", strVal(t, mustChild(t, ch, "Data").Child("Name")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, append([]byte{0x30, 0x81, 0x88, 0x0b, 0x00, 0x26, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0xc2, 0x23}, chap...)))
+		wired := mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "CHAP")
+		require.Equal(t, "HiPer.att.net", strVal(t, mustChild(t, wired, "Data").Child("Name")))
+		require.Equal(t, uint64(16), uintVal(t, mustChild(t, wired, "Data").Child("Value Size")))
+	})
+
+	t.Run("chap/response", func(t *testing.T) {
+		// RFC 1994 §4.2 Response: same Value-Size/Name layout, Code=2.
+		chap := mustHex(t, "02030022105c36e2c2ee83c339e9799344e9ec85d348695065722e6174742e6e6574")
+		ch := parseRule(t, chap, "challenge_handshake_authentication_protocol", "CHAP")
+		require.Equal(t, uint64(2), uintVal(t, ch.Child("Code")))
+		require.Equal(t, uint64(16), uintVal(t, mustChild(t, ch, "CHAPResponse").Child("Value Size")))
+		require.Equal(t, "HiPer.att.net", strVal(t, mustChild(t, ch, "CHAPResponse").Child("Name")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, append([]byte{0x30, 0x81, 0x88, 0x0b, 0x00, 0x26, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0xc2, 0x23}, chap...)))
+		require.Equal(t, "HiPer.att.net", strVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "CHAP", "CHAPResponse").Child("Name")))
 	})
 
 	t.Run("tacacs/rfc8907", func(t *testing.T) {
