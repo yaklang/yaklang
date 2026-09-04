@@ -63,13 +63,17 @@ func TestMySQLQueryCommand(t *testing.T) {
 	pkt := parseRule(t, raw, "application-layer.mysql", "MySQLPacket")
 	payload := mustChild(t, pkt, "Payload")
 	require.Equal(t, uint64(0x03), uintVal(t, payload.Child("First")))
-	require.Equal(t, []byte("SELECT 1"), bytesVal(t, payload.Child("Query")))
+	require.Equal(t, "SELECT 1", strVal(t, payload.Child("Query")))
 }
 
 func TestMySQLERRPacket(t *testing.T) {
-	// ERR: 0xff, error code 1045 (0x0415 LE), rest
+	// ERR: 0xff, error code 1045 (0x0415 LE), SQLSTATE 28000, "Access denied"
+	// https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html
 	raw := mysqlPacket(1, []byte{0xff, 0x15, 0x04, '#', '2', '8', '0', '0', '0', 'A', 'c', 'c', 'e', 's', 's', ' ', 'd', 'e', 'n', 'i', 'e', 'd'})
 	pkt := parseRule(t, raw, "application-layer.mysql", "MySQLPacket")
-	errp := mustChild(t, pkt, "Payload", "ERR")
+	errp := mustChild(t, pkt, "Payload", "MySQLERR")
 	require.Equal(t, uint64(1045), uintVal(t, errp.Child("Error Code")))
+	require.Equal(t, uint64('#'), uintVal(t, errp.Child("SQL State Marker")))
+	require.Equal(t, "28000", strVal(t, errp.Child("SQL State")))
+	require.Equal(t, "Access denied", strVal(t, errp.Child("Error Message")))
 }

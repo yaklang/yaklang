@@ -12,16 +12,20 @@ Package:
     Payload:
       operator: |
         first = this.ProcessSubNode("First").Value
+        rem = 0
+        if this.GetMaxLength() > this.Length() {
+          rem = this.GetMaxLength() - this.Length()
+        }
         if first == 0x0a {
           this.ProcessSubNode("Handshake")
           return
         }
-        if first == 0x00 {
-          this.ProcessSubNode("OK")
+        if first == 0x00 && rem >= 6 && rem < 1048576 {
+          this.ProcessByType("MySQLOK")
           return
         }
-        if first == 0xff {
-          this.ProcessSubNode("ERR")
+        if first == 0xff && rem >= 8 && rem < 1048576 {
+          this.ProcessByType("MySQLERR")
           return
         }
         if first == 0xfe {
@@ -31,15 +35,21 @@ Package:
         if first == 0x01 {
           return
         }
-        if first == 0x03 {
+        if first == 0x03 && rem > 0 && rem < 1048576 {
+          this.GetSubNode("Query").SetMaxLength(rem)
           this.ProcessSubNode("Query")
           return
         }
-        if first == 0x02 {
+        if first == 0x02 && rem > 0 && rem < 1048576 {
+          this.GetSubNode("Schema").SetMaxLength(rem)
           this.ProcessSubNode("Schema")
           return
         }
-        this.ProcessSubNode("Rest")
+        if rem > 0 && rem < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rem)
+          this.ProcessSubNode("Octets")
+        }
+        return
       First: uint8
       Handshake:
         operator: |
@@ -71,16 +81,48 @@ Package:
         Capability High: uint16
         Auth Plugin Data Len: uint8
         Reserved: raw,10
-        Auth Plugin Data 2: raw
+        Auth Plugin Data 2: string
         Auth Plugin Name: "del:\0;type:string"
-      OK:
-        Rest: raw
-      ERR:
-        Error Code: uint16
-        Rest: raw
       EOF:
         Warnings: uint16
         Status Flags: uint16
-      Query: raw
-      Schema: raw
-      Rest: raw
+      Query: string
+      Schema: string
+      Octets: string
+MySQLOK:
+  operator: |
+    this.ProcessSubNode("Affected Rows")
+    this.ProcessSubNode("Last Insert ID")
+    this.ProcessSubNode("Status Flags")
+    this.ProcessSubNode("Warnings")
+    if this.GetMaxLength() > this.Length() {
+      rem = this.GetMaxLength() - this.Length()
+      if rem > 0 && rem < 1048576 {
+        this.GetSubNode("Info").SetMaxLength(rem)
+        this.ProcessSubNode("Info")
+      }
+    }
+    return
+  Affected Rows: uint8
+  Last Insert ID: uint8
+  Status Flags: uint16
+  Warnings: uint16
+  Info: string
+MySQLERR:
+  operator: |
+    this.ProcessSubNode("Error Code")
+    this.ProcessSubNode("SQL State Marker")
+    this.GetSubNode("SQL State").SetMaxLength(5)
+    this.ProcessSubNode("SQL State")
+    if this.GetMaxLength() > this.Length() {
+      rem = this.GetMaxLength() - this.Length()
+      if rem > 0 && rem < 1048576 {
+        this.GetSubNode("Error Message").SetMaxLength(rem)
+        this.ProcessSubNode("Error Message")
+      }
+    }
+    return
+  Error Code: uint16
+  SQL State Marker: uint8
+  SQL State: string
+  Error Message: string
