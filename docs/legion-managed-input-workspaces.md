@@ -79,8 +79,13 @@ cancel/close/completion cleans only the workspace instance owned by that Bind.
 
 `list_files`, `read_file`, `search_file` and `write_output` are scoped adapters.
 They expose logical paths, bounded content and immutable file metadata.
-`read_file` supplies `next_offset` for paging; search streams long lines without
-loading the whole file. Output writes accept a new flat filename in `outputs/`
+`read_file` supplies `next_offset` for paging. An arbitrary byte offset inside a
+UTF-8 character advances to the next complete character and reports the actual
+start offset. A page too small to contain a character fails instead of returning
+an empty, non-progressing cursor. Search streams long lines without loading the
+whole file; case-insensitive Unicode matching retains original source byte
+positions and enough overlap across buffer boundaries. Output writes accept a
+new flat filename in `outputs/`
 and cannot modify an input or overwrite an existing output.
 
 The finite tool manager also rejects guessed tool names and database/MCP
@@ -89,6 +94,15 @@ agent actions, hotpatches, sync commands and extra per-message host file refs.
 Server-signed Focus actions and ordinary tool calls remain available; those
 tool calls resolve only to the finite scoped tool objects. This is an Agent
 capability boundary, not an OS sandbox for arbitrary trusted Yak scripts.
+
+The command consumer dispatches at most four concurrent Bind operations. A
+busy worker pool delays excess Bind messages without blocking control commands.
+While preparing, each worker renews its JetStream acknowledgement at one third
+of the consumer's effective AckWait (including the first backoff entry), capped
+at ten seconds. Consumer shutdown cancels unfinished preparation and leaves the
+message unsettled for recovery; it does not emit a terminal session failure
+or cancel an already installed runtime. Cancel and Close may arrive before a
+worker reserves a Bind, so their terminal epoch fences are recorded immediately.
 
 Pending Bind reservations carry cancellation and identity. A higher epoch
 cancels an older preparation; duplicate pending deliveries retry instead of
@@ -107,6 +121,15 @@ and manifest IDs. Model-visible workspace info omits private runtime roots and
 server actor identifiers. Successful preparation, a file access and a final
 report are distinct evidence; none alone proves exhaustive analysis.
 
+## Ordinary session attachment compatibility
+
+The legacy small-text attachment path also rebuilds download routes from the
+configured platform origin and the current NodeSession, rejects redirects and
+requires a managed attachment ID. This applies to Bind and appended context;
+command-provided URLs are not authority. Its existing 64 KiB inline limit remains,
+with UTF-8 boundary-safe truncation. Managed workspace inputs bypass this inline
+path entirely.
+
 ## Verification boundary
 
 Focused tests exercise typed manifest admission, log and unrelated synthetic
@@ -117,3 +140,15 @@ Real product T2 still requires exact committed Legion/Yaklang sources, a
 configured provider, a real Task entry, persisted preparation/access/result
 events, and a streamed input of at least 1 GiB with measured RSS and late-file
 evidence. No unit fixture substitutes for that runtime evidence.
+
+On Linux, the opt-in `TestResilienceManagedInputJetStream*` suite enters the
+production consumer through a real JetStream broker and streams input over
+HTTP. Use a dedicated test broker: it creates the Legion command/event streams
+with file storage and unique per-test consumers. The runtime driver records
+engine construction, so this suite proves transport/lifecycle behavior, not
+Provider-backed analysis.
+
+```sh
+LEGION_TEST_NATS_URL=nats://127.0.0.1:<task-port> \
+  go test -race ./scannode -run '^TestResilienceManagedInputJetStream' -count=1
+```

@@ -21,7 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools/dicts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 type Server struct {

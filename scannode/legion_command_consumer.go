@@ -13,6 +13,8 @@ import (
 )
 
 const commandPollInterval = time.Second
+const maxConcurrentAISessionBinds = 4
+const maxAISessionBindAckInterval = 10 * time.Second
 
 type messageDispositionKind uint8
 
@@ -94,10 +96,12 @@ func (s *unsupportedCommandWarnState) warn(subject string) {
 }
 
 type commandConsumer struct {
-	sessionID string
-	cancel    context.CancelFunc
-	conn      *nats.Conn
-	sub       *nats.Subscription
+	sessionID       string
+	cancel          context.CancelFunc
+	conn            *nats.Conn
+	sub             *nats.Subscription
+	bindSlots       chan struct{}
+	bindAckInterval time.Duration
 }
 
 func (b *legionJobBridge) Run(ctx context.Context) {
@@ -255,12 +259,21 @@ func (b *legionJobBridge) startConsumer(
 		return nil, fmt.Errorf("pull subscribe commands: %w", err)
 	}
 
+	info, err := subscription.ConsumerInfo()
+	if err != nil {
+		_ = subscription.Unsubscribe()
+		conn.Close()
+		return nil, fmt.Errorf("read command acknowledgement policy: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(parent)
 	consumer := &commandConsumer{
-		sessionID: sessionID,
-		cancel:    cancel,
-		conn:      conn,
-		sub:       subscription,
+		sessionID:       sessionID,
+		cancel:          cancel,
+		conn:            conn,
+		sub:             subscription,
+		bindSlots:       make(chan struct{}, maxConcurrentAISessionBinds),
+		bindAckInterval: aiSessionBindAckInterval(info.Config),
 	}
 	go b.consumeLoop(ctx, consumer)
 	log.Infof("started legion command consumer: node_id=%s session_id=%s", currentNodeID, sessionID)
@@ -316,14 +329,83 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			continue
 		}
 		for _, message := range messages {
-			disposition, err := b.handleMessageWithDisposition(ctx, consumer.sessionID, message)
-			if err != nil {
-				log.Errorf("handle legion command failed: %v", err)
+			if ctx.Err() != nil {
+				return
 			}
-			if err := applyMessageDisposition(message, disposition); err != nil {
-				log.Errorf("apply legion command disposition failed: %v", err)
+			if strings.HasSuffix(message.Subject, "."+legionCommandAISessionBind) {
+				// Keep control commands flowing while a Bind prepares potentially large inputs.
+				select {
+				case consumer.bindSlots <- struct{}{}:
+					go b.handleAsyncAISessionBind(ctx, consumer, message)
+				default:
+					if err := message.NakWithDelay(time.Second); err != nil {
+						log.Errorf("delay ai session bind while workers are busy: %v", err)
+					}
+				}
+				continue
+			}
+			b.handleConsumerMessage(ctx, consumer.sessionID, message)
+		}
+	}
+}
+
+func aiSessionBindAckInterval(config nats.ConsumerConfig) time.Duration {
+	wait := config.AckWait
+	// JetStream's first backoff entry overrides AckWait when backoff is configured.
+	if len(config.BackOff) > 0 {
+		wait = config.BackOff[0]
+	}
+	if wait <= 0 {
+		return maxAISessionBindAckInterval
+	}
+	interval := wait / 3
+	if interval <= 0 {
+		interval = time.Nanosecond
+	}
+	return min(interval, maxAISessionBindAckInterval)
+}
+
+func (b *legionJobBridge) handleAsyncAISessionBind(ctx context.Context, consumer *commandConsumer, message *nats.Msg) {
+	defer func() { <-consumer.bindSlots }()
+	done, stopped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(consumer.bindAckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case <-ticker.C:
+				if err := message.InProgress(); err != nil && ctx.Err() == nil {
+					log.Errorf("extend ai session bind acknowledgement: %v", err)
+				}
 			}
 		}
+	}()
+	disposition, err := b.handleMessageWithDisposition(ctx, consumer.sessionID, message)
+	close(done)
+	<-stopped
+	if ctx.Err() != nil {
+		return
+	} // Leave unsettled work available to the next consumer.
+	if err != nil {
+		log.Errorf("handle legion command failed: %v", err)
+	}
+	if err := applyMessageDisposition(message, disposition); err != nil {
+		log.Errorf("apply legion command disposition failed: %v", err)
+	}
+}
+
+func (b *legionJobBridge) handleConsumerMessage(ctx context.Context, sessionID string, message *nats.Msg) {
+	disposition, err := b.handleMessageWithDisposition(ctx, sessionID, message)
+	if err != nil {
+		log.Errorf("handle legion command failed: %v", err)
+	}
+	if err := applyMessageDisposition(message, disposition); err != nil {
+		log.Errorf("apply legion command disposition failed: %v", err)
 	}
 }
 
