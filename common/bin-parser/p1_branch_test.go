@@ -640,6 +640,40 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Minor")))
 	})
 
+	t.Run("mpls/bottom", func(t *testing.T) {
+		raw := []byte{0x00, 0x01, 0x31, 0xfe}
+		n := parseRule(t, raw, "mpls", "MPLS")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Labels").Children()[0].Child("Bottom")))
+	})
+	t.Run("mpls/stack", func(t *testing.T) {
+		raw := []byte{0x00, 0x01, 0x10, 0xfe, 0x00, 0x01, 0x31, 0xfe}
+		labs := parseRule(t, raw, "mpls", "MPLS").Child("Labels").Children()
+		require.Equal(t, uint64(0), uintVal(t, labs[0].Child("Bottom")))
+		require.Equal(t, uint64(1), uintVal(t, labs[1].Child("Bottom")))
+	})
+	t.Run("vxlan/vni", func(t *testing.T) {
+		innerMAC := []byte{0x00, 0x30, 0x88, 0x01, 0x00, 0x02, 0x00, 0x16, 0x3e, 0x37, 0xf6, 0x04}
+		ip := []byte{0x45, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x40, 0x01, 0x00, 0x00, 10, 0, 0, 1, 10, 0, 0, 2, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01}
+		raw := append(append([]byte{0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00}, innerMAC...), append([]byte{0x08, 0x00}, ip...)...)
+		n := parseRule(t, raw, "vxlan", "VXLAN")
+		require.Equal(t, uint64(255), uintVal(t, n.Child("VNI")))
+	})
+	t.Run("vxlan/arp", func(t *testing.T) {
+		innerMAC := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append(append([]byte{0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00}, innerMAC...), append([]byte{0x08, 0x06}, arp...)...)
+		n := parseRule(t, raw, "vxlan", "VXLAN")
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Inner", "ARP").Child("Opcode")))
+	})
+	t.Run("rmi/ping", func(t *testing.T) {
+		n := parseRule(t, []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b, 0x52}, "rmi", "RMI")
+		require.Equal(t, uint64(0x52), uintVal(t, mustChild(t, n, "Message").Child("Type")))
+	})
+	t.Run("rmi/call", func(t *testing.T) {
+		n := parseRule(t, []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4c, 0x50, 0xac, 0xed, 0x00, 0x05}, "rmi", "RMI")
+		require.Equal(t, uint64(0x4c), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, uint64(0xaced), uintVal(t, mustChild(t, n, "Message").Child("Ser Magic")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))

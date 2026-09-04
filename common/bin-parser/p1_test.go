@@ -94,9 +94,11 @@ func TestP1LinkGopacketFrames(t *testing.T) {
 	}
 	eth := parseEthernet(t, vxlan)
 	v := mustChild(t, eth, "IP", "UDP", "VXLAN")
-	require.Equal(t, uint64(0x08), uintVal(t, v.Child("Flags")))
+	require.Equal(t, uint64(1), uintVal(t, v.Child("I")))
 	require.Equal(t, uint64(255), uintVal(t, v.Child("VNI")))
-	require.Equal(t, uint64(0x0800), uintVal(t, mustChild(t, v, "Inner").Child("Type")))
+	inner := mustChild(t, v, "Inner")
+	require.Equal(t, uint64(0x0800), uintVal(t, inner.Child("Type")))
+	require.Equal(t, uint64(4), uintVal(t, mustChild(t, inner, "IP").Child("Version")))
 
 	// gopacket layers/igmp_test.go IGMPv1 membership report
 	igmp := []byte{
@@ -142,9 +144,11 @@ func TestP1LinkGopacketFrames(t *testing.T) {
 		0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
 		0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
 	}
-	m := mustChild(t, parseEthernet(t, mpls), "MPLS", "MPLSLabel")
-	require.Equal(t, uint64(0), uintVal(t, m.Child("Bottom")))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, m, "MPLSLabel").Child("Bottom")))
+	m := mustChild(t, parseEthernet(t, mpls), "MPLS")
+	labs := m.Child("Labels").Children()
+	require.GreaterOrEqual(t, len(labs), 2)
+	require.Equal(t, uint64(0), uintVal(t, labs[0].Child("Bottom")))
+	require.Equal(t, uint64(1), uintVal(t, labs[1].Child("Bottom")))
 
 	// gopacket layers/lldp_test.go Siemens switch
 	lldp := []byte{

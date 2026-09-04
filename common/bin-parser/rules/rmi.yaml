@@ -13,11 +13,58 @@ Package:
       if p != 0x4b && p != 0x4c && p != 0x4d {
         panic("rmi: unknown protocol")
       }
-      if p == 0x4c {
-        this.ProcessSubNode("Endpoint")
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        if p == 0x4c {
+          panic("rmi: SingleOpProtocol requires a Message")
+        }
         return
       }
+      first = res.Value
+      op.Recovery()
+      if first == 0x50 || first == 0x51 || first == 0x52 || first == 0x54 {
+        this.ProcessSubNode("Message")
+      }
+      return
     Magic: raw,4
     Version: uint16
     Protocol: uint8
-    Endpoint: "del:\n;type:string"
+    Message: RMIMessage
+RMIMessage:
+  operator: |
+    this.ProcessSubNode("Type")
+    typ = getNodeResult("Type").Value
+    if typ == 0x52 {
+      return
+    }
+    if typ == 0x54 {
+      this.ProcessSubNode("UID Unique")
+      this.ProcessSubNode("UID Time")
+      this.ProcessSubNode("UID Count")
+      return
+    }
+    if typ == 0x50 || typ == 0x51 {
+      this.ProcessSubNode("Ser Magic")
+      if getNodeResult("Ser Magic").Value != 0xaced {
+        panic("rmi: expected serialization magic")
+      }
+      this.ProcessSubNode("Ser Version")
+      if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 {
+          this.GetSubNode("Stub").SetMaxLength(rest)
+          this.ProcessSubNode("Stub")
+        }
+      }
+      return
+    }
+    panic("rmi: unknown message type")
+  Type: uint8
+  UID Unique: uint32
+  UID Time: uint64
+  UID Count: uint16
+  Ser Magic: uint16
+  Ser Version: uint16
+  Stub: raw
+PeekByte: uint8

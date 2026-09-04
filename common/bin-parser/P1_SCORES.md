@@ -38,8 +38,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | GRE | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `generic_routing_encapsulation.yaml` |
 | IPsec AH | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `ipsec.yaml` |
 | IPsec ESP | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `ipsec.yaml` |
-| MPLS | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `mpls.yaml` |
-| VXLAN | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `vxlan.yaml` |
+| MPLS | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `mpls.yaml` |
+| VXLAN | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `vxlan.yaml` |
 | L2TP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `l2tp.yaml` |
 | PPTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/pptp.yaml` |
 | OpenVPN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `openvpn.yaml` |
@@ -102,8 +102,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | ONC RPC | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `onc_rpc.yaml` |
 | IIOP/GIOP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/iiop.yaml` |
 | T3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/t3.yaml` |
-| RMI/JRMP | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `rmi.yaml` |
-| JNDI | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |
+| RMI/JRMP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `rmi.yaml` |
+| JNDI | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of RMI/JRMP |
 | BER | B | 85 | 20 | 15 | 20 | 20 | 10 | L2 | `application-layer/ber.yaml` |
 | SNMPv3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/snmp.yaml` |
 | Syslog | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `syslog.yaml` |
@@ -126,8 +126,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | TPKT | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/msrdp.yaml` |
 | BitTorrent | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `bittorrent.yaml` |
 | MinIO/S3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
-| RMI | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |
-| JMX | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |
+| RMI | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of RMI/JRMP |
+| JMX | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of RMI/JRMP |
 | JDWP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `jdwp.yaml` |
 | FastCGI | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `fastcgi.yaml` |
 | IIOP Locate | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of IIOP/GIOP |
