@@ -52,6 +52,23 @@ func ipv6ICMPBytes(t *testing.T, payload []byte) []byte {
 	return serializeLayers(t, eth, ip, gopacket.Payload(payload))
 }
 
+func ipv6ProtoFrame(t *testing.T, next layers.IPProtocol, payload []byte) []byte {
+	t.Helper()
+	eth := &layers.Ethernet{
+		SrcMAC:       []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55},
+		DstMAC:       []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee},
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+	ip := &layers.IPv6{
+		Version:    6,
+		HopLimit:   64,
+		NextHeader: next,
+		SrcIP:      net.ParseIP("2001:db8::1"),
+		DstIP:      net.ParseIP("2001:db8::2"),
+	}
+	return serializeLayers(t, eth, ip, gopacket.Payload(payload))
+}
+
 func ipv4ProtoFrame(t *testing.T, proto layers.IPProtocol, payload []byte) []byte {
 	t.Helper()
 	eth := &layers.Ethernet{

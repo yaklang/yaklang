@@ -158,22 +158,43 @@ Package:
                 }
 Option:
     operator: |
-        n = this.ProcessSubNode("Kind").Value
-        switch n {
-        case 0:
-            break
-        case 1:
-            break
-        default:
-            this.ProcessSubNode("Length")
-            if this.GetSubNode("Data").GetRemainingSpace() != 0 {
-                this.ProcessSubNode("Data")
-            }    
+        this.ProcessSubNode("Kind")
+        k = getNodeResult("Kind").Value
+        if k == 0 {
+          return
         }
+        if k == 1 {
+          return
+        }
+        this.ProcessSubNode("Length")
+        if k == 2 {
+          this.ProcessSubNode("MSS")
+          return
+        }
+        if k == 3 {
+          this.ProcessSubNode("Shift Count")
+          return
+        }
+        if k == 4 {
+          return
+        }
+        if k == 8 {
+          this.ProcessSubNode("TS Val")
+          this.ProcessSubNode("TS Echo Reply")
+          return
+        }
+        if this.GetSubNode("Option Data").GetRemainingSpace() != 0 {
+          this.ProcessSubNode("Option Data")
+        }
+        return
     length-from-field: Length
     Kind: uint8
     Length: uint8
-    Data: raw
+    MSS: uint16
+    Shift Count: uint8
+    TS Val: uint32
+    TS Echo Reply: uint32
+    Option Data: string
 TLS: "import:application-layer/tls.yaml;node:Transport Layer Security"
 HTTP: "import:application-layer/http.yaml;node:HTTP"
 SSH: "import:application-layer/ssh.yaml;node:SSH"

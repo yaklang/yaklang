@@ -21,11 +21,11 @@ Package:
           case 58:
             node = this.NewSubNode("ICMPv6")
           default:
-            node = this.NewUnknownNode()
+            node = this.NewSubNode("Next Protocol Data")
         }
         node.SetMaxLength(getNodeResult("@Internet Protocol Version 6/Payload Length").Value)
         node.Process()
 TCP: "import:transmission_control_protocol.yaml;node:TCP"
 UDP: "import:user_datagram_protocol.yaml;node:UDP"
 ICMPv6: "import:internet_control_message_protocol_v6.yaml;node:ICMPV6"
-Unknown: raw
+Next Protocol Data: string
