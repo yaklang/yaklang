@@ -430,6 +430,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "Call Disconnect Notify").Child("ResultCode")))
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "Call Disconnect Notify").Child("CallId")))
 	})
+	t.Run("pptp/wan-error", func(t *testing.T) {
+		pptp := make([]byte, 40)
+		binary.BigEndian.PutUint16(pptp[0:], 40)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 14)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint32(pptp[16:], 1)
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "WAN Error Notify").Child("CRC Errors")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "WAN Error Notify").Child("PeerCallId")))
+	})
 	t.Run("pptp/set-link-info", func(t *testing.T) {
 		pptp := make([]byte, 24)
 		binary.BigEndian.PutUint16(pptp[0:], 24)
