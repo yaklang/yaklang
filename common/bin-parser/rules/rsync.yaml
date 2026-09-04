@@ -1,0 +1,9 @@
+Package:
+  Rsync:
+    operator: |
+      this.ProcessSubNode("Banner")
+      s = string(getNodeResult("Banner").Value)
+      if !s.HasPrefix("@RSYNCD:") {
+        panic("rsync: expected @RSYNCD banner")
+      }
+    Banner: "del:\n;type:string"

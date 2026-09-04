@@ -1,0 +1,30 @@
+endian: big
+Package:
+  LinuxSLL:
+    operator: |
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("ARPHRD")
+      this.ProcessSubNode("Link-layer Address Length")
+      this.ProcessSubNode("Link-layer Address")
+      this.ProcessSubNode("Protocol")
+      p = getNodeResult("Protocol").Value
+      if p == 0x0800 {
+        this.ProcessByType("IP")
+        return
+      }
+      if p == 0x86dd {
+        this.ProcessByType("IPv6")
+        return
+      }
+      if p == 0x0806 {
+        this.ProcessByType("ARP")
+        return
+      }
+    Packet Type: uint16
+    ARPHRD: uint16
+    Link-layer Address Length: uint16
+    Link-layer Address: raw,8
+    Protocol: uint16
+IP: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"

@@ -1,0 +1,24 @@
+endian: big
+Package:
+  BGP:
+    operator: |
+      this.ProcessSubNode("Marker")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 19 {
+        panic("bgp: length smaller than 19")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 5 {
+        panic("bgp: unknown type")
+      }
+      rest = l - 19
+      if rest > 0 {
+        this.GetSubNode("Body").SetMaxLength(rest)
+        this.ProcessSubNode("Body")
+      }
+    Marker: raw,16
+    Length: uint16
+    Type: uint8
+    Body: raw

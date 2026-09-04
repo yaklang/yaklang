@@ -1,0 +1,13 @@
+Package:
+  FTPData:
+    operator: |
+      rest = this.GetRemainingSpace()
+      if rest == 0 {
+        panic("ftp-data: empty payload")
+      }
+      if rest >= 1048576 {
+        panic("ftp-data: unbounded")
+      }
+      this.GetSubNode("Data").SetMaxLength(rest)
+      this.ProcessSubNode("Data")
+    Data: raw

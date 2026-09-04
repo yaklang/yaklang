@@ -8,6 +8,11 @@ Package:
       unpack: true
       operator: |
         type = getNodeResult("@Ethernet/Type").Value
+        if type < 0x0600 {
+          this.SetMaxLength(type)
+          this.ProcessByType("LLC")
+          return
+        }
         switch type {
           case 0x0800:
             this.ProcessByType("IP")
@@ -17,8 +22,20 @@ Package:
             this.ProcessByType("ARP")
           case 0x8100:
             this.ProcessByType("VLAN")
+          case 0x88a8:
+            this.ProcessByType("QinQ")
           case 0x888e:
             this.ProcessByType("EAPOL")
+          case 0x8863:
+            this.ProcessByType("PPPoEDiscovery")
+          case 0x8864:
+            this.ProcessByType("PPPoESession")
+          case 0x8847:
+            this.ProcessByType("MPLS")
+          case 0x88cc:
+            this.ProcessByType("LLDP")
+          case 0x9000:
+            this.ProcessByType("Loopback")
           default:
             this.NewUnknownNode()
         }
@@ -26,5 +43,12 @@ IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 VLAN: "import:ieee_802_1q.yaml;node:IEEE 802.1Q"
+QinQ: "import:ieee_802_1ad.yaml;node:QinQ"
 EAPOL: "import:eapol.yaml;node:EAPOL"
+LLC: "import:llc.yaml;node:LLC"
+PPPoEDiscovery: "import:pppoe.yaml;node:PPPoE"
+PPPoESession: "import:pppoe.yaml;node:PPPoE"
+MPLS: "import:mpls.yaml;node:MPLS"
+LLDP: "import:lldp.yaml;node:LLDP"
+Loopback: "import:loopback.yaml;node:Loopback"
 Unknown: raw

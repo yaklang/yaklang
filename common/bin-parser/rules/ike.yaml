@@ -1,0 +1,64 @@
+endian: big
+Package:
+  IKE:
+    operator: |
+      this.ProcessSubNode("Initiator SPI")
+      this.ProcessSubNode("Responder SPI")
+      this.ProcessSubNode("Next Payload")
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      major = ver >> 4
+      if major != 1 && major != 2 {
+        panic("ike: version major must be 1 or 2")
+      }
+      this.ProcessSubNode("Exchange Type")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Message ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 28 {
+        panic("ike: length smaller than header")
+      }
+      if l > 28 {
+        rest = l - 28
+        if rest < 1048576 {
+          this.GetSubNode("Payloads").SetMaxLength(rest)
+          this.ProcessSubNode("Payloads")
+        }
+      }
+    Initiator SPI: raw,8
+    Responder SPI: raw,8
+    Next Payload: uint8
+    Version: uint8
+    Exchange Type: uint8
+    Flags: uint8
+    Message ID: uint32
+    Length: uint32
+    Payloads:
+      list: true
+      Payload: IKEPayload
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+        }
+IKEPayload:
+  operator: |
+    this.ProcessSubNode("Next Payload")
+    this.ProcessSubNode("Critical")
+    this.ProcessSubNode("Payload Length")
+    l = getNodeResult("Payload Length").Value
+    if l < 4 {
+      panic("ike: payload length smaller than 4")
+    }
+    if l > 4 {
+      this.GetSubNode("Data").SetMaxLength(l - 4)
+      this.ProcessSubNode("Data")
+    }
+  Next Payload: uint8
+  Critical: uint8
+  Payload Length: uint16
+  Data: raw

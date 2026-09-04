@@ -1,0 +1,9 @@
+Package:
+  VNC:
+    operator: |
+      this.ProcessSubNode("Protocol")
+      p = string(getNodeResult("Protocol").Value)
+      if !p.HasPrefix("RFB ") {
+        panic("vnc: expected RFB banner")
+      }
+    Protocol: "del:\n;type:string"

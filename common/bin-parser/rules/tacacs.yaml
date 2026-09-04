@@ -1,0 +1,31 @@
+endian: big
+Package:
+  TACACS:
+    operator: |
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      major = ver >> 4
+      if major != 12 {
+        panic("tacacs: major version must be 12")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 3 {
+        panic("tacacs: type must be 1-3")
+      }
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Session ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0 {
+        this.GetSubNode("Body").SetMaxLength(l)
+        this.ProcessSubNode("Body")
+      }
+    Version: uint8
+    Type: uint8
+    Sequence: uint8
+    Flags: uint8
+    Session ID: uint32
+    Length: uint32
+    Body: raw

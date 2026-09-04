@@ -1,0 +1,26 @@
+endian: big
+Package:
+  RIP:
+    operator: |
+      this.ProcessSubNode("Command")
+      cmd = getNodeResult("Command").Value
+      if cmd < 1 || cmd > 5 {
+        panic("rip: unknown command")
+      }
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v != 1 && v != 2 {
+        panic("rip: version must be 1 or 2")
+      }
+      this.ProcessSubNode("Unused")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Entries").SetMaxLength(rest)
+          this.ProcessSubNode("Entries")
+        }
+      }
+    Command: uint8
+    Version: uint8
+    Unused: uint16
+    Entries: raw

@@ -8,7 +8,7 @@
 
 ## 1. 怎么用
 
-每个协议单独开一张计分卡（见第 8 节模板），填完再改 `protocol_roadmap.go` / `protocol_catalog.go`。P0 已填结果见 [P0_SCORES.md](P0_SCORES.md) 与 `protocol_scores.go`。
+每个协议单独开一张计分卡（见第 8 节模板），填完再改 `protocol_roadmap.go` / `protocol_catalog.go`。P0 已填结果见 [P0_SCORES.md](P0_SCORES.md) 与 `protocol_scores.go`。P1 已填结果见 [P1_SCORES.md](P1_SCORES.md) 与 `p1_scores.go`。
 
 流程：
 

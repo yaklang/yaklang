@@ -1,0 +1,77 @@
+endian: big
+Package:
+  RTP:
+    operator: |
+      this.ProcessSubNode("VersionPXPCC")
+      vpc = getNodeResult("VersionPXPCC").Value
+      ver = vpc >> 6
+      if ver != 2 {
+        panic("rtp: version must be 2")
+      }
+      cc = vpc & 0x0f
+      this.ProcessSubNode("MarkerPayload")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Timestamp")
+      this.ProcessSubNode("SSRC")
+      n = vpc & 0x0f
+      if n > 0 {
+        this.ProcessSubNode("CSRCs")
+      }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Payload").SetMaxLength(rest)
+          this.ProcessSubNode("Payload")
+        }
+      }
+    VersionPXPCC: uint8
+    MarkerPayload: uint8
+    Sequence: uint16
+    Timestamp: uint32
+    SSRC: uint32
+    CSRCs:
+      list: true
+      CSRC: uint32
+      operator: |
+        vpc = getNodeResult("../VersionPXPCC").Value
+        n = vpc & 0x0f
+        i = 0
+        for {
+          if i >= n {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+          i = i + 1
+        }
+    Payload: raw
+  RTCP:
+    operator: |
+      this.ProcessSubNode("VersionPCount")
+      vpc = getNodeResult("VersionPCount").Value
+      ver = vpc >> 6
+      if ver != 2 {
+        panic("rtcp: version must be 2")
+      }
+      this.ProcessSubNode("Packet Type")
+      pt = getNodeResult("Packet Type").Value
+      if pt < 200 || pt > 204 {
+        panic("rtcp: unexpected packet type")
+      }
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("SSRC")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Body").SetMaxLength(rest)
+          this.ProcessSubNode("Body")
+        }
+      }
+    VersionPCount: uint8
+    Packet Type: uint8
+    Length: uint16
+    SSRC: uint32
+    Body: raw

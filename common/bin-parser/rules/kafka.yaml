@@ -1,0 +1,22 @@
+endian: big
+Package:
+  Kafka:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 8 {
+        panic("kafka: length smaller than 8")
+      }
+      this.ProcessSubNode("API Key")
+      this.ProcessSubNode("API Version")
+      this.ProcessSubNode("Correlation ID")
+      rest = l - 8
+      if rest > 0 {
+        this.GetSubNode("Body").SetMaxLength(rest)
+        this.ProcessSubNode("Body")
+      }
+    Length: int32
+    API Key: int16
+    API Version: int16
+    Correlation ID: int32
+    Body: raw

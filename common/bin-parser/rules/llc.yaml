@@ -1,0 +1,37 @@
+endian: big
+Package:
+  LLC:
+    operator: |
+      this.ProcessSubNode("DSAP")
+      this.ProcessSubNode("SSAP")
+      this.ProcessSubNode("Control")
+      dsap = getNodeResult("DSAP").Value
+      if dsap == 0x42 {
+        this.ProcessByType("STP")
+        return
+      }
+      if dsap == 0xaa {
+        this.ProcessByType("SNAP")
+        return
+      }
+    DSAP: uint8
+    SSAP: uint8
+    Control: uint8
+SNAP:
+  operator: |
+    this.ProcessSubNode("OUI")
+    this.ProcessSubNode("Type")
+    typ = getNodeResult("Type").Value
+    if typ == 0x0800 {
+      this.ProcessByType("IP")
+      return
+    }
+    if typ == 0x2000 {
+      this.ProcessByType("CDP")
+      return
+    }
+  OUI: raw,3
+  Type: uint16
+STP: "import:stp.yaml;node:STP"
+CDP: "import:cdp.yaml;node:CDP"
+IP: "import:internet_protocol.yaml;node:Internet Protocol"

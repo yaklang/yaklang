@@ -1,0 +1,24 @@
+endian: little
+Package:
+  Pickle:
+    operator: |
+      this.ProcessSubNode("Opcode")
+      op = getNodeResult("Opcode").Value
+      if op != 0x80 {
+        panic("pickle: expected PROTO opcode")
+      }
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v < 2 || v > 5 {
+        panic("pickle: protocol version 2-5")
+      }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Body").SetMaxLength(rest)
+          this.ProcessSubNode("Body")
+        }
+      }
+    Opcode: uint8
+    Version: uint8
+    Body: raw

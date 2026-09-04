@@ -1,0 +1,22 @@
+endian: big
+Package:
+  RMI:
+    operator: |
+      this.ProcessSubNode("Magic")
+      mag = string(getNodeResult("Magic").Value)
+      if mag != "JRMI" {
+        panic("rmi: magic must be JRMI")
+      }
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Protocol")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Body").SetMaxLength(rest)
+          this.ProcessSubNode("Body")
+        }
+      }
+    Magic: raw,4
+    Version: uint16
+    Protocol: uint8
+    Body: raw

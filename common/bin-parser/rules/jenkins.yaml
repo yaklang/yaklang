@@ -1,0 +1,9 @@
+Package:
+  Jenkins:
+    operator: |
+      this.ProcessSubNode("Line")
+      s = string(getNodeResult("Line").Value)
+      if !(s.HasPrefix("Protocol:") || s.HasPrefix("<===[JENKINS")) {
+        panic("jenkins: expected remoting protocol line")
+      }
+    Line: "del:\n;type:string"

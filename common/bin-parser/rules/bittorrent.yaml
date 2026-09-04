@@ -1,0 +1,22 @@
+endian: big
+Package:
+  BitTorrent:
+    operator: |
+      this.ProcessSubNode("Pstrlen")
+      n = getNodeResult("Pstrlen").Value
+      if n != 19 {
+        panic("bittorrent: pstrlen must be 19")
+      }
+      this.ProcessSubNode("Pstr")
+      p = string(getNodeResult("Pstr").Value)
+      if p != "BitTorrent protocol" {
+        panic("bittorrent: protocol string mismatch")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Info Hash")
+      this.ProcessSubNode("Peer ID")
+    Pstrlen: uint8
+    Pstr: raw,19
+    Reserved: raw,8
+    Info Hash: raw,20
+    Peer ID: raw,20
