@@ -1136,6 +1136,30 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "anonymous", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("Identity")))
 	})
 
+	t.Run("eapol/mka", func(t *testing.T) {
+		// IEEE 802.1X-2010 Table 11-3 Packet Type 5 EAPOL-MKA. Wireshark eapol.type.
+		// No MKA dissector: Body Length-bounded leftover is Next Protocol Data, not Unknown raw.
+		raw := []byte{0x03, 0x05, 0x00, 0x04, 'm', 'k', 'a', '1'}
+		n := parseRule(t, raw, "eapol", "EAPOL")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Protocol Version")))
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(4), uintVal(t, n.Child("Body Length")))
+		require.Equal(t, "mka1", joinUint8(t, n.Child("Next Protocol Data")))
+		eth := parseEthernet(t, eapolEthernetFrame(t, raw))
+		require.Equal(t, uint64(5), uintVal(t, mustChild(t, eth, "EAPOL").Child("Packet Type")))
+		require.Equal(t, "mka1", joinUint8(t, mustChild(t, eth, "EAPOL").Child("Next Protocol Data")))
+	})
+
+	t.Run("eapol/announcement", func(t *testing.T) {
+		// IEEE 802.1X-2010 Table 11-3 Packet Type 6 EAPOL-Announcement. EtherType 0x888e.
+		raw := []byte{0x03, 0x06, 0x00, 0x03, 'a', 'n', 'n'}
+		n := parseRule(t, raw, "eapol", "EAPOL")
+		require.Equal(t, uint64(6), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, "ann", joinUint8(t, n.Child("Next Protocol Data")))
+		eth := parseEthernet(t, eapolEthernetFrame(t, raw))
+		require.Equal(t, "ann", joinUint8(t, mustChild(t, eth, "EAPOL").Child("Next Protocol Data")))
+	})
+
 	t.Run("jdwp/command-set", func(t *testing.T) {
 		// JPDA VirtualMachine/Version (set 1, cmd 1), 11-byte header. Wireshark jdwp.commandset. TCP/5005.
 		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000001000101")...)
