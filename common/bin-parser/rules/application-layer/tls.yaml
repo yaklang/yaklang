@@ -39,7 +39,3 @@ Handshake Protocol:
   Version: uint16
   Random: raw,32
   Session ID Length: uint8
-  Cipher Suites: raw
-  Compression Methods: raw
-  Extensions Length: uint16
-  Extensions: raw

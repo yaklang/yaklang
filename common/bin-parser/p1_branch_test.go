@@ -736,4 +736,21 @@ func TestP1BranchRows(t *testing.T) {
 		raw := append([]byte{0x00, 0x00, 0x0b, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, []byte("bye")...)
 		require.Equal(t, "bye", strVal(t, parseRule(t, raw, "application-layer.http2", "HTTP2").Child("Octets")))
 	})
+
+	t.Run("tls/suites", func(t *testing.T) {
+		hello := append([]byte{0x03, 0x03}, make([]byte, 32)...)
+		hello = append(hello, 0, 0x00, 0x04, 0x00, 0x2f, 0x00, 0x35, 0x01, 0x00)
+		hs := append([]byte{0x01, 0x00, 0x00, byte(len(hello))}, hello...)
+		suites := mustChild(t, parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello"), "ClientHello", "Cipher Suites").Children()
+		require.Equal(t, uint64(0x002f), uintVal(t, suites[0].Child("Suite")))
+		require.Equal(t, uint64(0x0035), uintVal(t, suites[1].Child("Suite")))
+	})
+	t.Run("tls/sni", func(t *testing.T) {
+		body := append([]byte{0x03, 0x03}, make([]byte, 32)...)
+		body = append(body, 0x00, 0x00, 0x04, 0x00, 0x2f, 0x00, 0x35, 0x01, 0x00)
+		body = append(body, append([]byte{0x00, 0x14, 0x00, 0x00, 0x00, 0x10, 0x00, 0x0e, 0x00, 0x00, 0x0b}, []byte("example.com")...)...)
+		hs := append([]byte{0x01, 0x00, 0x00, byte(len(body))}, body...)
+		exts := mustChild(t, parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello"), "ClientHello", "Extensions").Children()
+		require.Equal(t, "example.com", strVal(t, mustChild(t, exts[0], "SNI").Child("Host Name")))
+	})
 }
