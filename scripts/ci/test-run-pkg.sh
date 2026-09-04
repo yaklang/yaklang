@@ -79,7 +79,12 @@ run_package() {
     echo "===== go test $pkg ${args[*]} (cwd: $pkg_dir) ====="
     # Run from the package directory like the compiled-binary runner did, so tests
     # that resolve testdata or fixtures through relative paths behave identically.
-    if (cd "$pkg_dir" && go test . "${args[@]}") 2>&1 | tee -a "$log"; then
+    (cd "$pkg_dir" && go test . "${args[@]}") >"$log" 2>&1
+    local code=$?
+    # Keep the Actions log small: yak script suites print enormous traces, which is
+    # why the compiled-binary runner wrapped its output in a grep filter.
+    grep -aE '^(=== RUN|--- (PASS|FAIL|SKIP)|ok |FAIL( |$)|panic:|.*test timed out)' "$log" | tail -60
+    if (( code == 0 )); then
       echo "PASS: $pkg"
       rc=0
       break
