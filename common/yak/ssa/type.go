@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -441,7 +442,10 @@ const (
 )
 
 type baseType struct {
-	id           int64
+	// id is read by every IR marshal of a shared type and assigned lazily by
+	// typeStore.remember, so it must never be a plain field: persist workers run
+	// concurrently over the same *FunctionType and friends.
+	id           atomic.Int64
 	method       map[string]*Function
 	methodGetter func() map[string]*Function
 	methodOnce   sync.Once
@@ -449,16 +453,31 @@ type baseType struct {
 }
 
 func NewBaseType() *baseType {
-	return &baseType{
-		id: -1,
-	}
+	b := new(baseType)
+	b.id.Store(-1)
+	return b
 }
 
 func (b *baseType) SetId(id int64) {
-	b.id = id
+	b.id.Store(id)
 }
 func (b *baseType) GetId() int64 {
-	return b.id
+	return b.id.Load()
+}
+
+// claimIdIfUnset assigns candidate only when this type has no id yet, and
+// reports whether the caller won. Losing the race returns the winner's id so a
+// type shared by several persist workers can never end up with two ids.
+func (b *baseType) claimIdIfUnset(candidate int64) (int64, bool) {
+	for {
+		current := b.id.Load()
+		if current > 0 {
+			return current, false
+		}
+		if b.id.CompareAndSwap(current, candidate) {
+			return candidate, true
+		}
+	}
 }
 
 func (b *baseType) SetMethodGetter(f func() map[string]*Function) {
