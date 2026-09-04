@@ -282,6 +282,34 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x07), uintVal(t, mustChild(t, eth, "IP", "OSPF", "OSPFDBDesc").Child("Flags")))
 	})
 
+	t.Run("salt/zmtp", func(t *testing.T) {
+		// ZeroMQ RFC 23 / Wireshark packet-zmtp.c greeting: 0xff…0x7f, version 3.0, mechanism NULL.
+		g := make([]byte, 64)
+		g[0] = 0xff
+		g[9] = 0x7f
+		g[10] = 3
+		copy(g[12:16], []byte("NULL"))
+		n := parseRule(t, g, "salt", "Salt")
+		gr := mustChild(t, n, "SaltGreeting")
+		require.Equal(t, uint64(0xff), uintVal(t, gr.Child("Signature")))
+		require.Equal(t, uint64(3), uintVal(t, gr.Child("Major")))
+		require.Equal(t, uint64(0), uintVal(t, gr.Child("Minor")))
+		require.True(t, strings.HasPrefix(strVal(t, gr.Child("Mechanism")), "NULL"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 4505, 4505, g))
+		require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "Salt", "SaltGreeting").Child("Major")))
+	})
+
+	t.Run("salt/ping", func(t *testing.T) {
+		// Salt ZeroMQ transport TCP/4505: uint32 length + command "ping" (salt.transport.zeromq).
+		ping := []byte{0x00, 0x00, 0x00, 0x04, 'p', 'i', 'n', 'g'}
+		n := parseRule(t, ping, "salt", "Salt")
+		fr := n.Child("Frames").Children()[0]
+		require.Equal(t, uint64(4), uintVal(t, fr.Child("Length")))
+		require.Equal(t, "ping", strVal(t, fr.Child("Command")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 4505, 4505, ping))
+		require.Equal(t, "ping", strVal(t, mustChild(t, eth, "IP", "TCP", "Salt", "Frames").Children()[0].Child("Command")))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"

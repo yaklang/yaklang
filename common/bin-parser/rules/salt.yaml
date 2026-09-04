@@ -2,6 +2,12 @@ endian: big
 Package:
   Salt:
     operator: |
+      res, op = this.TryProcessByType("SaltGreeting")
+      if op.OK {
+        op.Save()
+        return
+      }
+      op.Recovery()
       this.ProcessSubNode("Frames")
     Frames:
       list: true
@@ -15,7 +21,11 @@ Package:
             }
             break
           }
+          prev = this.Length()
           ele.Process()
+          if this.Length() <= prev {
+            break
+          }
           if this.GetMaxLength() >= 1048576 {
             break
           }
@@ -23,6 +33,33 @@ Package:
             break
           }
         }
+SaltGreeting:
+  operator: |
+    this.ProcessSubNode("Signature")
+    if getNodeResult("Signature").Value != 0xff {
+      panic("salt: not ZMTP greeting")
+    }
+    this.ProcessSubNode("Revision")
+    this.ProcessSubNode("Signature End")
+    if getNodeResult("Signature End").Value != 0x7f {
+      panic("salt: ZMTP signature end must be 0x7f")
+    }
+    this.ProcessSubNode("Major")
+    if getNodeResult("Major").Value != 3 {
+      panic("salt: ZMTP major must be 3")
+    }
+    this.ProcessSubNode("Minor")
+    this.ProcessSubNode("Mechanism")
+    this.ProcessSubNode("As Server")
+    this.ProcessSubNode("Filler")
+  Signature: uint8
+  Revision: raw,8
+  Signature End: uint8
+  Major: uint8
+  Minor: uint8
+  Mechanism: string,20
+  As Server: uint8
+  Filler: raw,31
 SaltFrame:
   operator: |
     this.ProcessSubNode("Length")
@@ -30,7 +67,7 @@ SaltFrame:
     if l == 0 || l > 65535 {
       panic("salt: invalid zeromq frame length")
     }
-    this.GetSubNode("Payload").SetMaxLength(l)
-    this.ProcessSubNode("Payload")
+    this.GetSubNode("Command").SetMaxLength(l)
+    this.ProcessSubNode("Command")
   Length: uint32
-  Payload: raw
+  Command: string
