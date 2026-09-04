@@ -2863,6 +2863,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(20), uintVal(t, ch.Child("Message Type")))
 		require.Equal(t, "connect", strVal(t, mustChild(t, ch, "AMF0").Child("Command Name")))
 	})
+
+	t.Run("ethernet/next-type", func(t *testing.T) {
+		// IEEE Std 802-2014 Table C-1 Local Experimental EtherType 1 (0x88B5).
+		// Unrecognized EtherType leftover is named Next Protocol Data, not Unknown raw.
+		frame := append([]byte{
+			0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+			0x88, 0xb5,
+		}, []byte("exp1")...)
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(0x88b5), uintVal(t, eth.Child("Type")))
+		require.Equal(t, "exp1", joinUint8(t, eth.Child("Next Protocol Data")))
+	})
+
+	t.Run("ethernet/ptp", func(t *testing.T) {
+		// IEEE 1588 PTP EtherType 0x88F7 (Wireshark SampleCaptures/ptp.pcap).
+		// No PTP dissector: payload is Next Protocol Data, not Unknown raw.
+		frame := append([]byte{
+			0x01, 0x1b, 0x19, 0x00, 0x00, 0x00,
+			0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+			0x88, 0xf7,
+		}, []byte("sync")...)
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(0x88f7), uintVal(t, eth.Child("Type")))
+		require.Equal(t, "sync", joinUint8(t, eth.Child("Next Protocol Data")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
