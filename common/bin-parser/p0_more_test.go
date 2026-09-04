@@ -38,7 +38,7 @@ func TestSPNEGOAndEdges(t *testing.T) {
 	tok := mustChild(t, s, "Token")
 	require.Equal(t, uint64(0xa0), uintVal(t, tok.Child("NegTag")))
 	require.Equal(t, uint64(2), uintVal(t, tok.Child("NegLength")))
-	require.Equal(t, []byte{0x04, 0x00}, bytesVal(t, tok.Child("NegToken")))
+	require.Equal(t, []byte{0x04, 0x00}, bytesVal(t, tok.Child("Octets")))
 
 	ntlmOID := []byte{0x60, 0x0c, 0x06, 0x0a, 0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x02, 0x0a}
 	n := parseRule(t, ntlmOID, "application-layer.spnego", "SPNEGO")
