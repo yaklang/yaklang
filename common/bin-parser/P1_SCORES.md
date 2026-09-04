@@ -66,7 +66,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | UPnP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | HTTP/3 | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/quic.yaml` |
 | SSL | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of TLS |
-| DTLS | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `dtls.yaml` |
+| DTLS | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `dtls.yaml` |
 | gRPC | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | alias of HTTP/2 |
 | SOAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | JSON-RPC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `jsonrpc.yaml` |
@@ -110,8 +110,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | IPMI | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `ipmi.yaml` |
 | SIP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `sip.yaml` |
 | SDP | A | 96 | 25 | 25 | 16 | 20 | 10 | L2 | `sdp.yaml` |
-| RTP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rtp.yaml` |
-| RTCP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rtp.yaml` |
+| RTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
+| RTCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
 | RTSP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rtsp.yaml` |
 | WebRTC | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of STUN |
 | STUN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `stun.yaml` |
