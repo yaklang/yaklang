@@ -636,7 +636,9 @@ func (c *Config) parseProjectWithFSUnits(
 
 	p := NewProgram(prog, c)
 	SaveConfig(c, p)
-	SetProgramCache(p)
+	if !c.disableProgramCache {
+		SetProgramCache(p)
+	}
 	return p, nil
 }
 

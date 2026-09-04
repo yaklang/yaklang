@@ -1389,6 +1389,11 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 // in recorder.Track (see the OpNativeCall case). On failure it pushes an empty
 // Values (preserving the original closure's behavior) and returns the error.
 func (s *SFFrame) execNativeCall(i *SFI) (Values, error) {
+	if s.config != nil && s.config.nativeCallGuard != nil {
+		if err := s.config.nativeCallGuard(i.UnaryStr); err != nil {
+			return nil, utils.Wrap(CriticalError, err.Error())
+		}
+	}
 	s.debugSubLog(">> pop")
 	value := s.stack.Pop()
 	if value == nil {

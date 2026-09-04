@@ -30,6 +30,7 @@ import (
 const (
 	legionCodeWorkspaceKindGit             = "git"
 	legionCodeWorkspaceKindUploadedArchive = "uploaded_archive"
+	legionCodeWorkspaceKindInlineSources   = "inline_sources"
 	legionCodeWorkspaceArchiveLocator      = "managed-source"
 
 	legionCodeArchiveMaxFiles         = 20_000
@@ -78,6 +79,16 @@ type legionCodeWorkspaceSpec struct {
 	MaxSearchResults int                       `json:"max_search_results"`
 	Auth             *legionCodeWorkspaceAuth  `json:"auth,omitempty"`
 	Proxy            *legionCodeWorkspaceProxy `json:"proxy,omitempty"`
+	// InlineFiles is bound by Legion, never supplied by the model or replay
+	// context. On Git/archive workspaces it contains optional user samples only.
+	InlineFiles                           map[string]string `json:"inline_files,omitempty"`
+	SyntaxFlowMode                        string            `json:"syntaxflow_mode,omitempty"`
+	SyntaxFlowOriginalRule                string            `json:"syntaxflow_original_rule,omitempty"`
+	SyntaxFlowOriginalRuleSHA256          string            `json:"syntaxflow_original_rule_sha256,omitempty"`
+	SyntaxFlowLanguage                    string            `json:"syntaxflow_language,omitempty"`
+	SyntaxFlowOriginalSamplePath          string            `json:"syntaxflow_original_sample_path,omitempty"`
+	SyntaxFlowOriginalSampleSHA256        string            `json:"syntaxflow_original_sample_sha256,omitempty"`
+	SyntaxFlowRequireOriginalReproduction bool              `json:"syntaxflow_require_original_reproduction,omitempty"`
 }
 
 type legionCodeWorkspaceMaterializeOptions struct {
@@ -97,6 +108,8 @@ type legionCodeWorkspaceRuntime struct {
 	cleanup        func() error
 	cleanupOnce    sync.Once
 	cleanupErr     error
+	inlineFiles    map[string]string
+	originalRule   string
 }
 
 type legionCodeWorkspaceRuntimeHandle struct {
@@ -149,6 +162,7 @@ func prepareLegionCodeWorkspace(
 		return nil, cloneBytes(runtimeOptionSnapshotJSON), nil
 	}
 	spec := *runtimeOptions.SourceWorkspace
+	spec.InlineFiles = cloneLegionInlineFiles(spec.InlineFiles)
 	if spec.Auth != nil {
 		auth := *spec.Auth
 		spec.Auth = &auth
@@ -165,9 +179,7 @@ func prepareLegionCodeWorkspace(
 	if err != nil {
 		return nil, nil, err
 	}
-	publicSpec := spec
-	publicSpec.Auth = nil
-	publicSpec.Proxy = nil
+	publicSpec := publicLegionCodeWorkspaceSpec(spec)
 	runtimeOptions.SourceWorkspace = &publicSpec
 	sanitized, err := json.Marshal(runtimeOptions)
 	if err != nil {
@@ -187,16 +199,35 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 	spec.Branch = strings.TrimSpace(spec.Branch)
 	spec.Subpath = strings.TrimSpace(spec.Subpath)
 	spec.PayloadID = strings.TrimSpace(spec.PayloadID)
+	spec.SyntaxFlowMode = strings.TrimSpace(spec.SyntaxFlowMode)
+	spec.SyntaxFlowOriginalRuleSHA256 = strings.ToLower(strings.TrimSpace(spec.SyntaxFlowOriginalRuleSHA256))
+	spec.SyntaxFlowLanguage = strings.TrimSpace(spec.SyntaxFlowLanguage)
+	spec.SyntaxFlowOriginalSamplePath = strings.TrimSpace(spec.SyntaxFlowOriginalSamplePath)
+	spec.SyntaxFlowOriginalSampleSHA256 = strings.ToLower(strings.TrimSpace(spec.SyntaxFlowOriginalSampleSHA256))
 	spec.ExpectedRevision = strings.TrimSpace(spec.ExpectedRevision)
 	spec.ExpectedSHA256 = strings.ToLower(strings.TrimSpace(spec.ExpectedSHA256))
+	if spec.SyntaxFlowLanguage != "" {
+		language, err := normalizeLegionSyntaxFlowLanguage(spec.SyntaxFlowLanguage)
+		if err != nil {
+			return fmt.Errorf("source_workspace syntaxflow_language is invalid")
+		}
+		spec.SyntaxFlowLanguage = language.String()
+	}
+	if spec.SyntaxFlowOriginalSamplePath != "" {
+		path, err := cleanLegionRuleSourcePath(spec.SyntaxFlowOriginalSamplePath)
+		if err != nil {
+			return fmt.Errorf("source_workspace syntaxflow_original_sample_path is invalid")
+		}
+		spec.SyntaxFlowOriginalSamplePath = path
+	}
 	switch {
 	case spec.WorkspaceID == "":
 		return fmt.Errorf("source_workspace workspace_id is required")
 	case !legionCodeWorkspaceIDPattern.MatchString(spec.WorkspaceID):
 		return fmt.Errorf("source_workspace workspace_id is invalid")
-	case spec.Kind != legionCodeWorkspaceKindGit && spec.Kind != legionCodeWorkspaceKindUploadedArchive:
+	case spec.Kind != legionCodeWorkspaceKindGit && spec.Kind != legionCodeWorkspaceKindUploadedArchive && spec.Kind != legionCodeWorkspaceKindInlineSources:
 		return fmt.Errorf("source_workspace kind %q is unsupported", spec.Kind)
-	case spec.Locator == "":
+	case spec.Locator == "" && spec.Kind != legionCodeWorkspaceKindInlineSources:
 		return fmt.Errorf("source_workspace locator is required")
 	case !spec.ReadOnly:
 		return fmt.Errorf("source_workspace must be read_only")
@@ -204,9 +235,48 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 		return fmt.Errorf("source_workspace expected_sha256 is invalid")
 	case spec.Kind == legionCodeWorkspaceKindUploadedArchive && !managedSourcePayloadIDPattern.MatchString(spec.PayloadID):
 		return fmt.Errorf("source_workspace payload_id is invalid")
+	case spec.SyntaxFlowMode != "" && spec.SyntaxFlowMode != "create" && spec.SyntaxFlowMode != "improve":
+		return fmt.Errorf("source_workspace syntaxflow_mode is invalid")
+	case spec.SyntaxFlowMode != "" && spec.SyntaxFlowLanguage == "":
+		return fmt.Errorf("source_workspace syntaxflow_language is required")
+	case spec.SyntaxFlowOriginalRuleSHA256 != "" && (len(spec.SyntaxFlowOriginalRuleSHA256) != sha256.Size*2 || !isLowerHex(spec.SyntaxFlowOriginalRuleSHA256)):
+		return fmt.Errorf("source_workspace syntaxflow_original_rule_sha256 is invalid")
+	case spec.SyntaxFlowOriginalSampleSHA256 != "" && (len(spec.SyntaxFlowOriginalSampleSHA256) != sha256.Size*2 || !isLowerHex(spec.SyntaxFlowOriginalSampleSHA256)):
+		return fmt.Errorf("source_workspace syntaxflow_original_sample_sha256 is invalid")
+	case (spec.SyntaxFlowOriginalSamplePath == "") != (spec.SyntaxFlowOriginalSampleSHA256 == ""):
+		return fmt.Errorf("source_workspace original sample path and hash must be pinned together")
+	case spec.SyntaxFlowOriginalRuleSHA256 != "" && spec.SyntaxFlowOriginalRule == "":
+		return fmt.Errorf("source_workspace syntaxflow original rule bytes are missing")
+	case spec.SyntaxFlowOriginalRule != "" && (!utf8.ValidString(spec.SyntaxFlowOriginalRule) || strings.ContainsRune(spec.SyntaxFlowOriginalRule, 0) || len(spec.SyntaxFlowOriginalRule) > legionSyntaxFlowMaxRuleBytes):
+		return fmt.Errorf("source_workspace syntaxflow_original_rule is invalid")
+	case spec.SyntaxFlowOriginalRule != "" && legionRuleHash(spec.SyntaxFlowOriginalRule) != spec.SyntaxFlowOriginalRuleSHA256:
+		return fmt.Errorf("source_workspace syntaxflow original rule hash mismatch")
+	case spec.SyntaxFlowRequireOriginalReproduction && (spec.SyntaxFlowMode != "improve" || spec.SyntaxFlowOriginalRule == "" || spec.SyntaxFlowOriginalSamplePath == ""):
+		return fmt.Errorf("source_workspace original rule reproduction pin is invalid")
 	}
 	if err := normalizeLegionCodeWorkspaceLocator(spec); err != nil {
 		return err
+	}
+	if err := validateLegionInlineFiles(spec.InlineFiles, true); err != nil {
+		return fmt.Errorf("source_workspace inline_files: %w", err)
+	}
+	if spec.SyntaxFlowOriginalSamplePath != "" {
+		content, exists := spec.InlineFiles[spec.SyntaxFlowOriginalSamplePath]
+		if !exists || legionInlineSourceDigest(map[string]string{spec.SyntaxFlowOriginalSamplePath: content}) != spec.SyntaxFlowOriginalSampleSHA256 {
+			return fmt.Errorf("source_workspace original sample does not match bound inline files")
+		}
+	}
+	if spec.Kind == legionCodeWorkspaceKindInlineSources {
+		if spec.Branch != "" || spec.Subpath != "" || spec.PayloadID != "" || spec.Auth != nil || spec.Proxy != nil || spec.SizeBytes != 0 {
+			return fmt.Errorf("source_workspace inline_sources must not contain another source target or credentials")
+		}
+		digest := legionInlineSourceDigest(spec.InlineFiles)
+		if spec.ExpectedSHA256 != "" && spec.ExpectedSHA256 != digest {
+			return fmt.Errorf("source_workspace inline_sources sha256 mismatch")
+		}
+		if spec.ExpectedRevision != "" && spec.ExpectedRevision != digest {
+			return fmt.Errorf("source_workspace inline_sources revision mismatch")
+		}
 	}
 	if spec.Subpath != "" {
 		if _, err := cleanLegionCodeRelativePath(spec.Subpath, false); err != nil {
@@ -227,6 +297,11 @@ func normalizeLegionCodeWorkspaceLocator(spec *legionCodeWorkspaceSpec) error {
 		return fmt.Errorf("source_workspace is required")
 	}
 	switch spec.Kind {
+	case legionCodeWorkspaceKindInlineSources:
+		if spec.Locator != "" {
+			return fmt.Errorf("source_workspace inline_sources locator must be empty")
+		}
+		return nil
 	case legionCodeWorkspaceKindGit:
 		locator, err := normalizeLegionCodeGitLocator(spec.Locator)
 		if err != nil {
@@ -311,6 +386,8 @@ func materializeLegionCodeWorkspace(
 	options legionCodeWorkspaceMaterializeOptions,
 ) (*legionCodeWorkspaceRuntime, error) {
 	switch spec.Kind {
+	case legionCodeWorkspaceKindInlineSources:
+		return materializeLegionInlineWorkspace(ctx, spec)
 	case legionCodeWorkspaceKindGit:
 		return materializeLegionCodeGitWorkspace(ctx, spec)
 	case legionCodeWorkspaceKindUploadedArchive:
@@ -342,6 +419,10 @@ func materializeLegionCodeGitWorkspace(
 	opts := []yakgit.Option{
 		yakgit.WithContext(ctx),
 		yakgit.WithRecuriveSubmodule(false),
+		yakgit.WithVerifyTLS(true),
+		yakgit.WithDepth(1),
+		yakgit.WithSingleBranch(true),
+		yakgit.WithNoFetchTags(true),
 	}
 	if spec.Branch != "" {
 		opts = append(opts, yakgit.WithBranch(spec.Branch))
@@ -389,6 +470,11 @@ func materializeLegionCodeGitWorkspace(
 	if err := cloneLegionCodeGitWorkspace(spec.Locator, local, opts...); err != nil {
 		return nil, ssagitworkdir.WrapCloneError(ctx, local, err)
 	}
+	if spec.ExpectedRevision != "" {
+		if err := restoreLegionCodeGitRevision(ctx, local, spec.ExpectedRevision, opts...); err != nil {
+			return nil, err
+		}
+	}
 	lockedRevision := strings.ToLower(strings.TrimSpace(yakgit.GetHeadHash(local)))
 	if lockedRevision == "" {
 		return nil, fmt.Errorf("source_workspace git clone has no HEAD revision")
@@ -413,6 +499,8 @@ func materializeLegionCodeGitWorkspace(
 	}
 	return &legionCodeWorkspaceRuntime{
 		spec:           publicLegionCodeWorkspaceSpec(spec),
+		inlineFiles:    cloneLegionInlineFiles(spec.InlineFiles),
+		originalRule:   spec.SyntaxFlowOriginalRule,
 		root:           root,
 		lockedRevision: lockedRevision,
 		sha256:         digest,
@@ -468,6 +556,8 @@ func materializeLegionCodeArchiveWorkspace(
 	}
 	return &legionCodeWorkspaceRuntime{
 		spec:           publicLegionCodeWorkspaceSpec(spec),
+		inlineFiles:    cloneLegionInlineFiles(spec.InlineFiles),
+		originalRule:   spec.SyntaxFlowOriginalRule,
 		root:           root,
 		lockedRevision: strings.TrimSpace(spec.ExpectedRevision),
 		sha256:         archiveSHA256,
@@ -624,24 +714,34 @@ func (w *legionCodeWorkspaceRuntime) info() map[string]any {
 	if w == nil {
 		return nil
 	}
+	workspaceInfo := map[string]any{
+		"workspace_id":                      w.spec.WorkspaceID,
+		"kind":                              w.spec.Kind,
+		"locator":                           w.spec.Locator,
+		"branch":                            w.spec.Branch,
+		"subpath":                           w.spec.Subpath,
+		"payload_id":                        w.spec.PayloadID,
+		"expected_revision":                 w.spec.ExpectedRevision,
+		"expected_sha256":                   w.spec.ExpectedSHA256,
+		"read_only":                         true,
+		"max_read_bytes":                    w.spec.MaxReadBytes,
+		"max_search_results":                w.spec.MaxSearchResults,
+		"syntaxflow_mode":                   w.spec.SyntaxFlowMode,
+		"syntaxflow_original_rule_sha256":   w.spec.SyntaxFlowOriginalRuleSHA256,
+		"syntaxflow_language":               w.spec.SyntaxFlowLanguage,
+		"syntaxflow_original_sample_path":   w.spec.SyntaxFlowOriginalSamplePath,
+		"syntaxflow_original_sample_sha256": w.spec.SyntaxFlowOriginalSampleSHA256,
+		"syntaxflow_require_original_reproduction": w.spec.SyntaxFlowRequireOriginalReproduction,
+	}
+	if w.originalRule != "" {
+		workspaceInfo["syntaxflow_original_rule"] = w.originalRule
+	}
 	return map[string]any{
-		"source_workspace": map[string]any{
-			"workspace_id":       w.spec.WorkspaceID,
-			"kind":               w.spec.Kind,
-			"locator":            w.spec.Locator,
-			"branch":             w.spec.Branch,
-			"subpath":            w.spec.Subpath,
-			"payload_id":         w.spec.PayloadID,
-			"expected_revision":  w.spec.ExpectedRevision,
-			"expected_sha256":    w.spec.ExpectedSHA256,
-			"read_only":          true,
-			"max_read_bytes":     w.spec.MaxReadBytes,
-			"max_search_results": w.spec.MaxSearchResults,
-		},
-		"locked_revision": w.lockedRevision,
-		"sha256":          w.sha256,
-		"files":           w.files,
-		"bytes":           w.bytes,
+		"source_workspace": workspaceInfo,
+		"locked_revision":  w.lockedRevision,
+		"sha256":           w.sha256,
+		"files":            w.files,
+		"bytes":            w.bytes,
 	}
 }
 
@@ -1068,6 +1168,8 @@ func validateLegionCodeProxyURL(raw string) error {
 func publicLegionCodeWorkspaceSpec(spec legionCodeWorkspaceSpec) legionCodeWorkspaceSpec {
 	spec.Auth = nil
 	spec.Proxy = nil
+	spec.InlineFiles = nil
+	spec.SyntaxFlowOriginalRule = ""
 	return spec
 }
 
@@ -1089,8 +1191,8 @@ func validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw []byte) error {
 		return fmt.Errorf("context source_workspace was not present at bind")
 	case received == nil:
 		return fmt.Errorf("context source_workspace pin is missing")
-	case received.Auth != nil || received.Proxy != nil:
-		return fmt.Errorf("context source_workspace must not contain auth or proxy")
+	case received.Auth != nil || received.Proxy != nil || received.InlineFiles != nil || received.SyntaxFlowOriginalRule != "":
+		return fmt.Errorf("context source_workspace must not contain auth, proxy, inline_files, or original rule bytes")
 	}
 	boundLocator := *bound
 	boundLocator.Kind = strings.ToLower(strings.TrimSpace(boundLocator.Kind))
@@ -1104,10 +1206,32 @@ func validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw []byte) error {
 	if err := normalizeLegionCodeWorkspaceLocator(&receivedLocator); err != nil {
 		return fmt.Errorf("context source_workspace locator is invalid: %w", err)
 	}
+	boundLanguage := strings.TrimSpace(bound.SyntaxFlowLanguage)
+	receivedLanguage := strings.TrimSpace(received.SyntaxFlowLanguage)
+	if boundLanguage != "" {
+		language, err := normalizeLegionSyntaxFlowLanguage(boundLanguage)
+		if err != nil {
+			return fmt.Errorf("bind source_workspace syntaxflow_language is invalid")
+		}
+		boundLanguage = language.String()
+	}
+	if receivedLanguage != "" {
+		language, err := normalizeLegionSyntaxFlowLanguage(receivedLanguage)
+		if err != nil {
+			return fmt.Errorf("context source_workspace syntaxflow_language is invalid")
+		}
+		receivedLanguage = language.String()
+	}
 	if strings.TrimSpace(bound.WorkspaceID) != strings.TrimSpace(received.WorkspaceID) ||
 		strings.ToLower(strings.TrimSpace(bound.Kind)) != strings.ToLower(strings.TrimSpace(received.Kind)) ||
 		strings.TrimSpace(bound.ExpectedRevision) != strings.TrimSpace(received.ExpectedRevision) ||
-		strings.ToLower(strings.TrimSpace(bound.ExpectedSHA256)) != strings.ToLower(strings.TrimSpace(received.ExpectedSHA256)) {
+		strings.ToLower(strings.TrimSpace(bound.ExpectedSHA256)) != strings.ToLower(strings.TrimSpace(received.ExpectedSHA256)) ||
+		strings.TrimSpace(bound.SyntaxFlowMode) != strings.TrimSpace(received.SyntaxFlowMode) ||
+		strings.ToLower(strings.TrimSpace(bound.SyntaxFlowOriginalRuleSHA256)) != strings.ToLower(strings.TrimSpace(received.SyntaxFlowOriginalRuleSHA256)) ||
+		boundLanguage != receivedLanguage ||
+		strings.TrimSpace(bound.SyntaxFlowOriginalSamplePath) != strings.TrimSpace(received.SyntaxFlowOriginalSamplePath) ||
+		strings.ToLower(strings.TrimSpace(bound.SyntaxFlowOriginalSampleSHA256)) != strings.ToLower(strings.TrimSpace(received.SyntaxFlowOriginalSampleSHA256)) ||
+		bound.SyntaxFlowRequireOriginalReproduction != received.SyntaxFlowRequireOriginalReproduction {
 		return fmt.Errorf("context source_workspace pin does not match bind snapshot")
 	}
 	return nil

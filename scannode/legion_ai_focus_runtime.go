@@ -78,9 +78,19 @@ type legionServerFocusRuntime struct {
 	authorizedFocusReleaseID string
 	activeFocusReleaseID     string
 	activeExecutionContract  *legionFocusExecutionContract
+	activeFocusContext       context.Context
+	activeFocusCancel        context.CancelFunc
+	activeFocusGeneration    uint64
 
-	mu           sync.Mutex
-	requestCount int
+	mu               sync.Mutex
+	requestCount     int
+	ruleMu           sync.Mutex
+	ruleCallCount    int
+	ruleDebugHistory []legionSyntaxFlowDebugResult
+	// Zero uses the immutable server defaults; nonzero values are used only
+	// by local deterministic cancellation/budget tests, never model input.
+	ruleDebugTimeout time.Duration
+	ruleWorkLimit    int64
 }
 
 func newLegionServerFocusRuntime(
@@ -197,10 +207,18 @@ func (r *legionServerFocusRuntime) Execute(
 			return nil, fmt.Errorf("source workspace is unavailable")
 		}
 		return r.workspace.search(params)
+	case serverFocusCapabilityOriginalSampleRead:
+		return r.readSyntaxFlowOriginalSample(params)
 	case serverFocusCapabilitySubmitFindingV1:
 		return r.submitFindingV1(capability, params)
 	case serverFocusCapabilitySubmitReportV1:
 		return r.submitReportV1(capability, params)
+	case serverFocusCapabilityRuleCheck:
+		return r.checkSyntaxFlowRule(params)
+	case serverFocusCapabilityRuleDebug:
+		return r.debugSyntaxFlowRule(params)
+	case serverFocusCapabilityRuleCandidate:
+		return r.submitSyntaxFlowRuleCandidate(params)
 	case serverFocusCapabilityTaskStage:
 		return r.publishTaskStage(params)
 	default:
@@ -235,6 +253,14 @@ func (r *legionServerFocusRuntime) activateFocusTurn(releaseID string, contracts
 	}
 	r.activeFocusReleaseID = releaseID
 	r.activeExecutionContract = contract
+	r.activeFocusGeneration++
+	parentContext := r.ctx
+	if parentContext == nil {
+		parentContext = context.Background()
+	}
+	r.activeFocusContext, r.activeFocusCancel = context.WithCancel(parentContext)
+	r.ruleCallCount = 0
+	r.ruleDebugHistory = nil
 	return nil
 }
 
@@ -245,8 +271,15 @@ func (r *legionServerFocusRuntime) deactivateFocusTurn(releaseID string) {
 	r.mu.Lock()
 	cleanup := false
 	if r.activeFocusReleaseID == strings.TrimSpace(releaseID) {
+		if r.activeFocusCancel != nil {
+			r.activeFocusCancel()
+		}
 		r.activeFocusReleaseID = ""
 		r.activeExecutionContract = nil
+		r.activeFocusContext = nil
+		r.activeFocusCancel = nil
+		r.ruleCallCount = 0
+		r.ruleDebugHistory = nil
 		cleanup = true
 	}
 	r.mu.Unlock()

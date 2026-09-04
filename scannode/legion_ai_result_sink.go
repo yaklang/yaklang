@@ -78,6 +78,9 @@ type aiFocusCodeAuditReport struct {
 	Title             string          `json:"title"`
 	Markdown          string          `json:"markdown"`
 	StructuredSummary json.RawMessage `json:"structured_summary"`
+	// A private integrity marker is set only by result.rule_candidate.v1.
+	// It is never deserialized from model parameters or transmitted.
+	validatedRuleCandidateSHA256 string
 }
 
 type aiFocusResultSink interface {
@@ -143,6 +146,7 @@ type legionAIFocusResultSink struct {
 	riskIDs                map[string]struct{}
 	targets                map[string]struct{}
 	requiredResultKinds    map[string]struct{}
+	ruleCandidateAllowed   bool
 	publishedResultKinds   map[string]struct{}
 	codeWorkspaceLockedRev string
 	codeWorkspaceSHA256    string
@@ -532,6 +536,11 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 	report aiFocusCodeAuditReport,
 ) (aiFocusResultReceipt, error) {
 	kind = strings.TrimSpace(kind)
+	if kind == legionSyntaxFlowRuleCandidateKind {
+		if err := s.validateRuleCandidateReport(report); err != nil {
+			return aiFocusResultReceipt{}, err
+		}
+	}
 	report.WorkspaceID = strings.TrimSpace(report.WorkspaceID)
 	report.Title = strings.TrimSpace(report.Title)
 	if report.Title == "" {
@@ -606,6 +615,7 @@ func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFoc
 		return nil
 	}
 	s.requiredResultKinds = required
+	_, s.ruleCandidateAllowed = contract.resultForCapability(serverFocusCapabilityRuleCandidate)
 	return nil
 }
 

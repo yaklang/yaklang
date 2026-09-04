@@ -12,7 +12,7 @@ import (
 // save to Profile SSAProgram
 func SaveConfig(c *Config, prog *Program) {
 	if c.databaseKind == ssa.ProgramCacheMemory || c.EnableCache {
-		if c.GetProgramName() != "" {
+		if c.GetProgramName() != "" && !c.disableProgramCache {
 			log.Errorf("Compile program cache to memory: %s", c.GetProgramName())
 			SetProgramCache(prog)
 		}

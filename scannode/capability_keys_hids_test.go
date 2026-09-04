@@ -20,6 +20,9 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
 	}
+	if legionSyntaxFlowRuntimeAvailable() {
+		want = append(want, capabilityKeyAISyntaxFlowRuleV1)
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}
@@ -43,8 +46,11 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
-		"extra.capability",
 	}
+	if legionSyntaxFlowRuntimeAvailable() {
+		want = append(want, capabilityKeyAISyntaxFlowRuleV1)
+	}
+	want = append(want, "extra.capability")
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}

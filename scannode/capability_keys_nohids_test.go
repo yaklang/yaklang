@@ -19,6 +19,9 @@ func TestNormalizeScanNodeCapabilityKeysDefaultsToNonHIDSBuildSurface(t *testing
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
 	}
+	if legionSyntaxFlowRuntimeAvailable() {
+		want = append(want, capabilityKeyAISyntaxFlowRuleV1)
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}
@@ -41,8 +44,11 @@ func TestNormalizeScanNodeCapabilityKeysKeepsExplicitExtrasWithoutDuplicates(t *
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
-		"extra.capability",
 	}
+	if legionSyntaxFlowRuntimeAvailable() {
+		want = append(want, capabilityKeyAISyntaxFlowRuleV1)
+	}
+	want = append(want, "extra.capability")
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}
@@ -52,11 +58,11 @@ func TestNormalizeScanNodeCapabilityKeysHidesCodeWorkspaceInStatefulRollbackMode
 	t.Parallel()
 
 	got := normalizeScanNodeCapabilityKeysForRuntime(
-		[]string{capabilityKeyAICodeWorkspaceV1, "extra.capability"},
+		[]string{capabilityKeyAICodeWorkspaceV1, capabilityKeyAISyntaxFlowRuleV1, "extra.capability"},
 		aiSessionRuntimeModeStateful,
 	)
 	for _, key := range got {
-		if key == capabilityKeyAICodeWorkspaceV1 {
+		if key == capabilityKeyAICodeWorkspaceV1 || key == capabilityKeyAISyntaxFlowRuleV1 {
 			t.Fatalf("stateful rollback mode advertised unsupported capability: %#v", got)
 		}
 	}

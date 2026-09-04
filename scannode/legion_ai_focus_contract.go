@@ -103,8 +103,16 @@ func parseLegionFocusExecutionContract(raw string) (*legionFocusExecutionContrac
 		if _, exists := contract.resultByCap[result.Capability]; exists {
 			return nil, fmt.Errorf("Focus execution capability %q maps multiple result contracts", result.Capability)
 		}
+		if (result.Capability == serverFocusCapabilityRuleCandidate) != (result.Kind == legionSyntaxFlowRuleCandidateKind) {
+			return nil, fmt.Errorf("SyntaxFlow rule candidates require the dedicated result.rule_candidate.v1 contract and ai_syntaxflow_rule_v1 kind")
+		}
 		seenResults[result.Key] = struct{}{}
 		contract.resultByCap[result.Capability] = *result
+	}
+	if contract.allowsCapability(serverFocusCapabilityRuleCandidate) {
+		if _, ok := contract.resultByCap[serverFocusCapabilityRuleCandidate]; !ok {
+			return nil, fmt.Errorf("result.rule_candidate.v1 requires an immutable result contract")
+		}
 	}
 	canonicalView := contract
 	canonicalView.stageSet = nil

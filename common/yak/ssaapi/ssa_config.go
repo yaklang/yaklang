@@ -45,6 +45,7 @@ type Config struct {
 	// other build ssaconfig.Options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
+	disableProgramCache        bool
 	// for hash
 	externInfo string
 	// process ctx
@@ -297,6 +298,12 @@ var WithProgramName = ssaconfig.WithProgramNames
 var WithSetProgramName = ssaconfig.WithSetProgramName
 
 var WithMemory = ssaconfig.WithCompileMemoryCompile
+
+// WithDisableProgramCache keeps task-private project IR out of the global
+// program-name cache. It is independent of persistent versus memory compile.
+var WithDisableProgramCache = ssaconfig.SetOption("ssa_compile/disable_program_cache", func(c *Config, disabled bool) {
+	c.disableProgramCache = disabled
+})
 
 var WithConcurrency = ssaconfig.WithCompileConcurrency
 
