@@ -1,0 +1,38 @@
+endian: big
+Package:
+  DHCPv6:
+    operator: |
+      this.ProcessSubNode("Message Type")
+      mt = getNodeResult("Message Type").Value
+      if mt < 1 || mt > 13 {
+        panic("dhcpv6: unknown message type")
+      }
+      this.ProcessSubNode("Transaction ID")
+      if this.Length() < this.GetMaxLength() && this.GetMaxLength() - this.Length() < 1048576 {
+        this.ProcessSubNode("Options")
+      }
+    Message Type: uint8
+    Transaction ID: raw,3
+    Options:
+      list: true
+      Option: DHCPv6Option
+      operator: |
+        for {
+          if this.GetRemainingSpace() < 4 || this.GetRemainingSpace() > 1048576 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+        }
+DHCPv6Option:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l > 0 {
+      this.GetSubNode("Data").SetMaxLength(l)
+      this.ProcessSubNode("Data")
+    }
+  Code: uint16
+  Length: uint16
+  Data: raw

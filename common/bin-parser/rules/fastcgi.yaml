@@ -1,0 +1,35 @@
+endian: big
+Package:
+  FastCGI:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("fastcgi: version must be 1")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 11 {
+        panic("fastcgi: unknown type")
+      }
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Content Length")
+      this.ProcessSubNode("Padding Length")
+      this.ProcessSubNode("Reserved")
+      cl = getNodeResult("Content Length").Value
+      if cl > 0 {
+        this.GetSubNode("Content").SetMaxLength(cl)
+        this.ProcessSubNode("Content")
+      }
+      pad = getNodeResult("Padding Length").Value
+      if pad > 0 {
+        this.GetSubNode("Padding").SetMaxLength(pad)
+        this.ProcessSubNode("Padding")
+      }
+    Version: uint8
+    Type: uint8
+    Request ID: uint16
+    Content Length: uint16
+    Padding Length: uint8
+    Reserved: uint8
+    Content: raw
+    Padding: raw

@@ -1,0 +1,9 @@
+Package:
+  JDWP:
+    operator: |
+      this.ProcessSubNode("Handshake")
+      s = string(getNodeResult("Handshake").Value)
+      if s != "JDWP-Handshake" {
+        panic("jdwp: handshake mismatch")
+      }
+    Handshake: raw,14

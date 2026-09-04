@@ -1,0 +1,54 @@
+endian: big
+Package:
+  EIGRP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 2 {
+        panic("eigrp: version must be 2")
+      }
+      this.ProcessSubNode("Opcode")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Ack")
+      this.ProcessSubNode("AS Number")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 4 && rest < 1048576 {
+          this.GetSubNode("TLVs").SetMaxLength(rest)
+          this.ProcessSubNode("TLVs")
+        }
+      }
+    Version: uint8
+    Opcode: uint8
+    Checksum: uint16
+    Flags: uint32
+    Sequence: uint32
+    Ack: uint32
+    AS Number: uint32
+    TLVs:
+      list: true
+      TLV: EIGRPTLV
+      operator: |
+        for {
+          if this.GetRemainingSpace() < 4 || this.GetRemainingSpace() > 1048576 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+        }
+EIGRPTLV:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l < 4 {
+      panic("eigrp: tlv length smaller than 4")
+    }
+    if l > 4 {
+      this.GetSubNode("Value").SetMaxLength(l - 4)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint16
+  Length: uint16
+  Value: raw

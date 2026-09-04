@@ -1,0 +1,12 @@
+Package:
+  Syslog:
+    operator: |
+      this.ProcessSubNode("Line")
+      line = string(getNodeResult("Line").Value)
+      if len(line) < 3 {
+        panic("syslog: line too short")
+      }
+      if line[0] != 0x3c {
+        panic("syslog: expected PRI bracket")
+      }
+    Line: "del:\n;type:string"

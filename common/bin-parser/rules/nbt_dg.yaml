@@ -1,0 +1,30 @@
+endian: big
+Package:
+  NBTDG:
+    operator: |
+      this.ProcessSubNode("Message Type")
+      mt = getNodeResult("Message Type").Value
+      if mt < 0x10 || mt > 0x16 {
+        panic("nbtdg: unknown message type")
+      }
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Datagram ID")
+      this.ProcessSubNode("Source IP")
+      this.ProcessSubNode("Source Port")
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Packet Offset")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Data").SetMaxLength(rest)
+          this.ProcessSubNode("Data")
+        }
+      }
+    Message Type: uint8
+    Flags: uint8
+    Datagram ID: uint16
+    Source IP: raw,4
+    Source Port: uint16
+    Length: uint16
+    Packet Offset: uint16
+    Data: raw

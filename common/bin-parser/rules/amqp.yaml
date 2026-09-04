@@ -1,0 +1,44 @@
+endian: big
+Package:
+  AMQP:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ == 0x41 {
+        this.ProcessSubNode("MQ")
+        this.ProcessSubNode("QP")
+        this.ProcessSubNode("Id")
+        this.ProcessSubNode("Major")
+        this.ProcessSubNode("Minor")
+        this.ProcessSubNode("Revision")
+        proto = string(getNodeResult("MQ").Value) + string(getNodeResult("QP").Value)
+        if proto != "MQP" {
+          panic("amqp: protocol header magic")
+        }
+        return
+      }
+      if typ != 1 && typ != 2 && typ != 3 && typ != 8 {
+        panic("amqp: unknown frame type")
+      }
+      this.ProcessSubNode("Channel")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0 {
+        this.GetSubNode("Payload").SetMaxLength(l)
+        this.ProcessSubNode("Payload")
+      }
+      this.ProcessSubNode("Frame End")
+      if getNodeResult("Frame End").Value != 0xce {
+        panic("amqp: frame end must be 0xce")
+      }
+    Type: uint8
+    MQ: raw,1
+    QP: raw,2
+    Id: uint8
+    Major: uint8
+    Minor: uint8
+    Revision: uint8
+    Channel: uint16
+    Length: uint32
+    Payload: raw
+    Frame End: uint8

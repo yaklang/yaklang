@@ -1,3 +1,24 @@
+endian: big
+T3:
+  operator: |
+    this.ProcessSubNode("Total Length")
+    l = getNodeResult("Total Length").Value
+    if l < 19 {
+      panic("t3: length too small")
+    }
+    this.ProcessSubNode("Cmd")
+    this.ProcessSubNode("Qos")
+    this.ProcessSubNode("Flags")
+    rest = l - 7
+    if rest > 0 {
+      this.GetSubNode("Body").SetMaxLength(rest)
+      this.ProcessSubNode("Body")
+    }
+  Total Length: uint32
+  Cmd: uint8
+  Qos: uint8
+  Flags: uint8
+  Body: raw
 Package:
   operator: |
     this.GetSubNode("Total Length").Process()

@@ -1,0 +1,31 @@
+endian: big
+Package:
+  Thrift:
+    operator: |
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      if (ver & 0xffff0000) != 0x80010000 {
+        panic("thrift: binary protocol version")
+      }
+      this.ProcessSubNode("Name Length")
+      n = getNodeResult("Name Length").Value
+      if n > 256 {
+        panic("thrift: name too long")
+      }
+      if n > 0 {
+        this.GetSubNode("Name").SetMaxLength(n)
+        this.ProcessSubNode("Name")
+      }
+      this.ProcessSubNode("Seq ID")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Fields").SetMaxLength(rest)
+          this.ProcessSubNode("Fields")
+        }
+      }
+    Version: uint32
+    Name Length: uint32
+    Name: raw
+    Seq ID: uint32
+    Fields: raw

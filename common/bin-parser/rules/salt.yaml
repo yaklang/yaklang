@@ -1,0 +1,13 @@
+endian: big
+Package:
+  Salt:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l == 0 || l > 65535 {
+        panic("salt: invalid zeromq frame length")
+      }
+      this.GetSubNode("Payload").SetMaxLength(l)
+      this.ProcessSubNode("Payload")
+    Length: uint32
+    Payload: raw

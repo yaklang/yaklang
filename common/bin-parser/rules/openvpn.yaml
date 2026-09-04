@@ -1,0 +1,22 @@
+endian: big
+Package:
+  OpenVPN:
+    operator: |
+      this.ProcessSubNode("OpcodeKey")
+      op = getNodeResult("OpcodeKey").Value >> 3
+      if op < 1 || op > 11 {
+        panic("openvpn: unknown opcode")
+      }
+      this.ProcessSubNode("Session ID")
+      this.ProcessSubNode("Packet ID")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Payload").SetMaxLength(rest)
+          this.ProcessSubNode("Payload")
+        }
+      }
+    OpcodeKey: uint8
+    Session ID: raw,8
+    Packet ID: uint32
+    Payload: raw

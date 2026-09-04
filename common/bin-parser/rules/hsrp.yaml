@@ -1,0 +1,31 @@
+endian: big
+Package:
+  HSRP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 0 {
+        panic("hsrp: version must be 0")
+      }
+      this.ProcessSubNode("Op Code")
+      op = getNodeResult("Op Code").Value
+      if op > 2 {
+        panic("hsrp: unknown opcode")
+      }
+      this.ProcessSubNode("State")
+      this.ProcessSubNode("Hellotime")
+      this.ProcessSubNode("Holdtime")
+      this.ProcessSubNode("Priority")
+      this.ProcessSubNode("Group")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Authentication")
+      this.ProcessSubNode("Virtual IP")
+    Version: uint8
+    Op Code: uint8
+    State: uint8
+    Hellotime: uint8
+    Holdtime: uint8
+    Priority: uint8
+    Group: uint8
+    Reserved: uint8
+    Authentication: raw,8
+    Virtual IP: raw,4

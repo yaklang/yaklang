@@ -1,0 +1,50 @@
+endian: big
+Package:
+  SCTP:
+    operator: |
+      this.ProcessSubNode("Source Port")
+      this.ProcessSubNode("Destination Port")
+      this.ProcessSubNode("Verification Tag")
+      this.ProcessSubNode("Checksum")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 4 && rest < 1048576 {
+          this.GetSubNode("Chunks").SetMaxLength(rest)
+          this.ProcessSubNode("Chunks")
+        }
+      }
+    Source Port: uint16
+    Destination Port: uint16
+    Verification Tag: uint32
+    Checksum: uint32
+    Chunks:
+      list: true
+      Chunk: SCTPChunk
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+        }
+SCTPChunk:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l < 4 {
+      panic("sctp: chunk length smaller than 4")
+    }
+    if l > 4 {
+      this.GetSubNode("Value").SetMaxLength(l - 4)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint8
+  Flags: uint8
+  Length: uint16
+  Value: raw

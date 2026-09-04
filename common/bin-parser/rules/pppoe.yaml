@@ -1,0 +1,56 @@
+endian: big
+Package:
+  PPPoE:
+    operator: |
+      this.ProcessSubNode("VersionType")
+      vt = getNodeResult("VersionType").Value
+      if (vt >> 4) != 1 {
+        panic("pppoe: version must be 1")
+      }
+      this.ProcessSubNode("Code")
+      this.ProcessSubNode("Session ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0 {
+        this.GetSubNode("Payload").SetMaxLength(l)
+        this.ProcessSubNode("Payload")
+      }
+    VersionType: uint8
+    Code: uint8
+    Session ID: uint16
+    Length: uint16
+    Payload:
+      operator: |
+        code = getNodeResult("../Code").Value
+        if code == 0 {
+          this.ProcessByType("PPP")
+          return
+        }
+        this.ProcessSubNode("Tags")
+      Tags:
+        list: true
+        Tag: PPPoETag
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 4 {
+              break
+            }
+            ele.Process()
+            if ele.GetSubNode("Type").Result().Value == 0 {
+              break
+            }
+          }
+PPP: "import:ppp.yaml;node:PPP"
+PPPoETag:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l > 0 {
+      this.GetSubNode("Value").SetMaxLength(l)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint16
+  Length: uint16
+  Value: raw

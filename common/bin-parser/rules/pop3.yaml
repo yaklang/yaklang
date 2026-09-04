@@ -1,0 +1,11 @@
+Package:
+  POP3:
+    operator: |
+      this.ProcessSubNode("Status")
+      st = string(getNodeResult("Status").Value)
+      if !(st.HasPrefix("+OK") || st.HasPrefix("-ERR") || st.HasPrefix("USER") || st.HasPrefix("PASS") || st.HasPrefix("STAT") || st.HasPrefix("LIST") || st.HasPrefix("RETR") || st.HasPrefix("DELE") || st.HasPrefix("NOOP") || st.HasPrefix("RSET") || st.HasPrefix("QUIT") || st.HasPrefix("UIDL") || st.HasPrefix("APOP") || st.HasPrefix("CAPA") || st.HasPrefix("AUTH") || st.HasPrefix("STLS") || st.HasPrefix("TOP")) {
+        panic("pop3: unknown status or command")
+      }
+      this.ProcessSubNode("Rest")
+    Status: "del: ;type:string"
+    Rest: "del:\r\n;type:string"

@@ -1,0 +1,20 @@
+endian: little
+Package:
+  Zabbix:
+    operator: |
+      this.ProcessSubNode("Magic")
+      mag = string(getNodeResult("Magic").Value)
+      if mag != "ZBXD" {
+        panic("zabbix: magic must be ZBXD")
+      }
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0 {
+        this.GetSubNode("Data").SetMaxLength(l)
+        this.ProcessSubNode("Data")
+      }
+    Magic: raw,4
+    Flags: uint8
+    Length: uint32
+    Data: raw

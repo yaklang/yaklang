@@ -1,0 +1,22 @@
+endian: big
+Package:
+  Hessian:
+    operator: |
+      this.ProcessSubNode("Magic")
+      mag = getNodeResult("Magic").Value
+      if mag != 0x48 && mag != 0x43 && mag != 0x63 && mag != 0x72 {
+        panic("hessian: unexpected magic")
+      }
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Body").SetMaxLength(rest)
+          this.ProcessSubNode("Body")
+        }
+      }
+    Magic: uint8
+    Major: uint8
+    Minor: uint8
+    Body: raw

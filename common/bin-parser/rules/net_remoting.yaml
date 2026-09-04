@@ -1,0 +1,24 @@
+endian: big
+Package:
+  NetRemoting:
+    operator: |
+      this.ProcessSubNode("Preamble")
+      p = string(getNodeResult("Preamble").Value)
+      if p != ".NET" {
+        panic("net-remoting: preamble must be .NET")
+      }
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
+      this.ProcessSubNode("Operation Type")
+      this.ProcessSubNode("Content Length")
+      l = getNodeResult("Content Length").Value
+      if l > 0 {
+        this.GetSubNode("Content").SetMaxLength(l)
+        this.ProcessSubNode("Content")
+      }
+    Preamble: raw,4
+    Major: uint16
+    Minor: uint16
+    Operation Type: uint16
+    Content Length: uint32
+    Content: raw

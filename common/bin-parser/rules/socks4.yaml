@@ -1,0 +1,21 @@
+endian: big
+Package:
+  SOCKS4:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 4 {
+        panic("socks4: version must be 4")
+      }
+      this.ProcessSubNode("Command")
+      cmd = getNodeResult("Command").Value
+      if cmd != 1 && cmd != 2 && cmd != 90 && cmd != 91 && cmd != 92 && cmd != 93 {
+        panic("socks4: unknown command")
+      }
+      this.ProcessSubNode("Port")
+      this.ProcessSubNode("IP")
+      this.ProcessSubNode("UserID")
+    Version: uint8
+    Command: uint8
+    Port: uint16
+    IP: raw,4
+    UserID: "del:\x00;type:string"

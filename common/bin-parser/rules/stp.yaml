@@ -1,0 +1,31 @@
+endian: big
+Package:
+  STP:
+    operator: |
+      this.ProcessSubNode("Protocol ID")
+      if getNodeResult("Protocol ID").Value != 0 {
+        panic("stp: protocol id must be 0")
+      }
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("BPDU Type")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Root ID")
+      this.ProcessSubNode("Root Path Cost")
+      this.ProcessSubNode("Bridge ID")
+      this.ProcessSubNode("Port ID")
+      this.ProcessSubNode("Message Age")
+      this.ProcessSubNode("Max Age")
+      this.ProcessSubNode("Hello Time")
+      this.ProcessSubNode("Forward Delay")
+    Protocol ID: uint16
+    Version: uint8
+    BPDU Type: uint8
+    Flags: uint8
+    Root ID: raw,8
+    Root Path Cost: uint32
+    Bridge ID: raw,8
+    Port ID: uint16
+    Message Age: uint16
+    Max Age: uint16
+    Hello Time: uint16
+    Forward Delay: uint16

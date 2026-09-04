@@ -1,0 +1,27 @@
+Package:
+  Telnet:
+    operator: |
+      res,op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      first = res.Value
+      if first == 0xff {
+        this.ProcessSubNode("IAC")
+        return
+      }
+      this.ProcessSubNode("Data")
+    IAC:
+      operator: |
+        this.ProcessSubNode("IACByte")
+        if getNodeResult("IACByte").Value != 0xff {
+          panic("telnet: expected IAC")
+        }
+        this.ProcessSubNode("Command")
+        cmd = getNodeResult("Command").Value
+        if cmd == 251 || cmd == 252 || cmd == 253 || cmd == 254 {
+          this.ProcessSubNode("Option")
+        }
+      IACByte: uint8
+      Command: uint8
+      Option: uint8
+    Data: "del:\r\n;type:string"
+PeekByte: uint8

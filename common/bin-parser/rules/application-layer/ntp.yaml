@@ -1,6 +1,28 @@
 endian: big
 Package:
   NTP:
+    operator: |
+      this.ProcessSubNode("Leap Indicator")
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v > 4 {
+        panic("ntp: version must be 0-4")
+      }
+      this.ProcessSubNode("Mode")
+      m = getNodeResult("Mode").Value
+      if m > 7 {
+        panic("ntp: mode must be 0-7")
+      }
+      this.ProcessSubNode("Stratum")
+      this.ProcessSubNode("Poll")
+      this.ProcessSubNode("Precision")
+      this.ProcessSubNode("Root Delay")
+      this.ProcessSubNode("Root Dispersion")
+      this.ProcessSubNode("Reference ID")
+      this.ProcessSubNode("Reference Timestamp")
+      this.ProcessSubNode("Origin Timestamp")
+      this.ProcessSubNode("Receive Timestamp")
+      this.ProcessSubNode("Transmit Timestamp")
     Leap Indicator: uint8,2bit
     Version: uint8,3bit
     Mode: uint8,3bit

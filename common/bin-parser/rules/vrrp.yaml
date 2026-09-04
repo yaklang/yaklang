@@ -1,0 +1,33 @@
+endian: big
+Package:
+  VRRP:
+    operator: |
+      this.ProcessSubNode("VersionType")
+      vt = getNodeResult("VersionType").Value
+      ver = vt >> 4
+      typ = vt & 0x0f
+      if ver != 2 && ver != 3 {
+        panic("vrrp: version must be 2 or 3")
+      }
+      if typ != 1 {
+        panic("vrrp: type must be 1 (advertisement)")
+      }
+      this.ProcessSubNode("VRID")
+      this.ProcessSubNode("Priority")
+      this.ProcessSubNode("Count IP")
+      this.ProcessSubNode("Auth Type")
+      this.ProcessSubNode("Advert Int")
+      this.ProcessSubNode("Checksum")
+      n = getNodeResult("Count IP").Value
+      this.ProcessSubNode("Addresses")
+    VersionType: uint8
+    VRID: uint8
+    Priority: uint8
+    Count IP: uint8
+    Auth Type: uint8
+    Advert Int: uint8
+    Checksum: uint16
+    Addresses:
+      list: true
+      list-length-from-field: "../Count IP"
+      Address: raw,4

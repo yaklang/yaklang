@@ -1,0 +1,16 @@
+endian: big
+Package:
+  IGMP:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ != 0x11 && typ != 0x12 && typ != 0x16 && typ != 0x17 && typ != 0x22 {
+        panic("igmp: unknown type")
+      }
+      this.ProcessSubNode("Max Resp Time")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Group Address")
+    Type: uint8
+    Max Resp Time: uint8
+    Checksum: uint16
+    Group Address: raw,4
