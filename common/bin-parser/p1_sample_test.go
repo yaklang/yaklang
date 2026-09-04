@@ -135,6 +135,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Nil(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("Client ID"))
 	})
 
+	t.Run("protobuf/varint", func(t *testing.T) {
+		// protobuf.dev encoding: int32 field 1 = 150 is 08 96 01 (Wireshark packet-protobuf.c tag/varint).
+		pb := mustHex(t, "08 96 01")
+		n := parseRule(t, pb, "protobuf", "Protobuf")
+		f := n.Child("Fields").Children()[0]
+		require.Equal(t, uint64(0x08), uintVal(t, f.Child("Tag")))
+		require.Equal(t, uint64(0x96), uintVal(t, f.Child("Varint")))
+		require.Equal(t, uint64(0x01), uintVal(t, f.Child("Varint2")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 4011, 4011, pb))
+		ef := mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0]
+		require.Equal(t, uint64(0x96), uintVal(t, ef.Child("Varint")))
+		require.Equal(t, uint64(0x01), uintVal(t, ef.Child("Varint2")))
+	})
+
+	t.Run("protobuf/string", func(t *testing.T) {
+		// protobuf.dev encoding: string field 2 = "testing" is 12 07 74 65 73 74 69 6e 67.
+		pb := append([]byte{0x12, 0x07}, []byte("testing")...)
+		n := parseRule(t, pb, "protobuf", "Protobuf")
+		f := n.Child("Fields").Children()[0]
+		require.Equal(t, uint64(0x12), uintVal(t, f.Child("Tag")))
+		require.Equal(t, uint64(7), uintVal(t, f.Child("Len")))
+		require.Equal(t, "testing", strVal(t, f.Child("Str")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 4011, 4011, pb))
+		require.Equal(t, "testing", strVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Str")))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"

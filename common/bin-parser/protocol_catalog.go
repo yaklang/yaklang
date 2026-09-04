@@ -148,7 +148,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "Python pickle", Layer: "L7", RuleFile: "pickle.yaml", Status: statusNew, SampleFrom: "PROTO 2"},
 	{Name: "RMI/JRMP", Layer: "L7", RuleFile: "rmi.yaml", Status: statusNew, SampleFrom: "JRMI"},
 	{Name: "Thrift", Layer: "L7", RuleFile: "thrift.yaml", Status: statusNew, SampleFrom: "binary protocol"},
-	{Name: "Protobuf", Layer: "L7", RuleFile: "protobuf.yaml", Status: statusNew, SampleFrom: "tag/wire"},
+	{Name: "Protobuf", Layer: "L7", RuleFile: "protobuf.yaml", Status: statusNew, SampleFrom: "encoding field1=150 + string testing"},
 	{Name: "Zabbix agent", Layer: "L7", RuleFile: "zabbix.yaml", Status: statusNew, SampleFrom: "ZBXD"},
 	{Name: "Hessian2", Layer: "L7", RuleFile: "hessian.yaml", Status: statusNew, SampleFrom: "H 2.0"},
 	{Name: "Rsync daemon", Layer: "L7", RuleFile: "rsync.yaml", Status: statusNew, SampleFrom: "@RSYNCD"},

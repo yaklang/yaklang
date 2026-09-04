@@ -372,8 +372,17 @@ func TestP1TCPApplications(t *testing.T) {
 	p := parseRule(t, pb, "protobuf", "Protobuf")
 	require.True(t, p.Child("Fields").IsList())
 	require.Equal(t, uint64(0x08), uintVal(t, p.Child("Fields").Children()[0].Child("Tag")))
+	require.Equal(t, uint64(1), uintVal(t, p.Child("Fields").Children()[0].Child("Varint")))
+	require.Nil(t, p.Child("Fields").Children()[0].Child("Varint2"))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 4011, 4011, pb))
 	require.Equal(t, uint64(0x08), uintVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Tag")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Varint")))
+
+	ps := append([]byte{0x12, 0x07}, []byte("testing")...)
+	pst := parseRule(t, ps, "protobuf", "Protobuf")
+	require.Equal(t, "testing", strVal(t, pst.Child("Fields").Children()[0].Child("Str")))
+	eth = parseEthernet(t, ipv4TCPFrame(t, 4011, 4011, ps))
+	require.Equal(t, "testing", strVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Str")))
 
 	zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
 	z := parseRule(t, zb, "zabbix", "Zabbix")

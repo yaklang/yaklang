@@ -97,7 +97,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Kafka | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `kafka.yaml` |
 | RabbitMQ | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of AMQP |
 | Thrift | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `thrift.yaml` |
-| Protobuf | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `protobuf.yaml` |
+| Protobuf | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `protobuf.yaml` |
 | JSON-RPC 2.0 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of JSON-RPC |
 | ONC RPC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `onc_rpc.yaml` |
 | IIOP/GIOP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/iiop.yaml` |
