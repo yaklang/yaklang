@@ -791,4 +791,18 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, `\\srv\share`, strVal(t, tc.Child("Path")))
 		require.Equal(t, "A:", strVal(t, tc.Child("Service")))
 	})
+
+	t.Run("gre/rfc2784", func(t *testing.T) {
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		n := parseRule(t, append([]byte{0x00, 0x00, 0x08, 0x06}, arp...), "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0x0806), uintVal(t, n.Child("Protocol Type")))
+		require.Nil(t, n.Child("Call ID"))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Payload", "ARP").Child("Opcode")))
+	})
+	t.Run("gre/key", func(t *testing.T) {
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		n := parseRule(t, append([]byte{0x20, 0x00, 0x08, 0x06, 0x12, 0x34, 0x56, 0x78}, arp...), "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("Key")))
+		require.Nil(t, n.Child("Call ID"))
+	})
 }
