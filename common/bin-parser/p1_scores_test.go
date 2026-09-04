@@ -1,6 +1,7 @@
 package bin_parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,7 @@ func TestP1ScorecardsCovered(t *testing.T) {
 	testsDim := map[int]bool{0: true, 6: true, 12: true, 16: true, 20: true}
 	branchDim := map[int]bool{0: true, 8: true, 14: true, 20: true}
 	stackDim := map[int]bool{0: true, 4: true, 7: true, 10: true}
+	childNames := p1MustChildNames()
 
 	var leftover []string
 	for _, item := range ProtocolRoadmap {
@@ -37,6 +39,28 @@ func TestP1ScorecardsCovered(t *testing.T) {
 			require.LessOrEqual(t, sc.Traffic, 8, "P1 %q L3 gopacket serialize traffic must be <= 8", item.Name)
 		}
 		require.Contains(t, []string{"A", "B", "C", "D", "F"}, sc.Grade())
+
+		schCap := schemaCeiling(sc.Rule, sc.OpaqueRaw)
+		eth := hasEthernetMustChild(sc, childNames)
+		ported := strings.Contains(sc.Evidence, "TCP/") || strings.Contains(sc.Evidence, "UDP/")
+		tCap := testsCeiling(sc.Rule, eth, ported)
+		trCap := trafficCeiling(sc.SampleClass, eth)
+		if sc.Schema > schCap {
+			t.Errorf("P1 %q schema %d exceeds ceiling %d for %s leftover=%q", item.Name, sc.Schema, schCap, sc.Rule, sc.OpaqueRaw)
+		}
+		if sc.Tests > tCap {
+			t.Errorf("P1 %q tests %d exceeds ceiling %d (failCount=%d eth=%v)", item.Name, sc.Tests, tCap, failCount(sc.Rule), eth)
+		}
+		if sc.Traffic > trCap {
+			t.Errorf("P1 %q traffic %d exceeds ceiling %d (sample=%s eth=%v)", item.Name, sc.Traffic, trCap, sc.SampleClass, eth)
+		}
+		if failCount(sc.Rule) < 1 {
+			t.Errorf("P1 %q G6 fail: no parseMustFail for %s", item.Name, sc.Rule)
+		}
+		if sc.Traffic == 25 && !eth {
+			t.Errorf("P1 %q G7/Traffic 25 but no parseEthernet mustChild for %s", item.Name, sc.Rule)
+		}
+
 		if item.Status == stDone {
 			if sc.SampleClass == "L4" {
 				t.Errorf("P1 %q is done but SampleClass L4 (G5 requires L1/L2/L3)", item.Name)

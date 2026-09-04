@@ -7,3 +7,5 @@
 别名与主规则共用同一张卡（见 `AliasOf`）。样本来源包括 gopacket 测试帧、RFC 完整 PDU，以及 Ethernet+IP+L4 整帧断言。
 
 G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gopacket serialize 的 Traffic ≤ 8。
+
+`TestP1ScorecardsCovered` 用 YAML/`p1FailCases`/mustChild 扫描卡死 Schema/Tests/Traffic 上限：声称分不得高于 `schemaCeiling` / `testsCeiling` / `trafficCeiling`。

@@ -39,11 +39,13 @@ func TestSOCKS5FailPaths(t *testing.T) {
 func TestHTTPFailPaths(t *testing.T) {
 	parseMustFail(t, nil, "application-layer.http", "HTTP")
 	parseMustFail(t, []byte{'G'}, "application-layer.http", "HTTP")
+	parseMustFail(t, []byte("GET /"), "application-layer.http", "HTTP")
 }
 
 func TestDNSFailPaths(t *testing.T) {
 	parseMustFail(t, nil, "application-layer.dns", "DNS")
 	parseMustFail(t, []byte{0x00, 0x01, 0x01, 0x00}, "application-layer.dns", "DNS")
+	parseMustFail(t, []byte{0x00}, "application-layer.dns", "DNS")
 }
 
 func TestSNMPFailPaths(t *testing.T) {
