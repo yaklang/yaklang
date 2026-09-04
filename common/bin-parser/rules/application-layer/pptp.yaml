@@ -47,6 +47,14 @@ Package:
           this.ProcessByType("Start Control Conn Reply")
           return
         }
+        if type == 7 {
+          this.ProcessByType("Outgoing Call Req")
+          return
+        }
+        if type == 8 {
+          this.ProcessByType("Outgoing Call Reply")
+          return
+        }
       ProtocolVersion: uint16
       Reserved2: uint16
       FramingCapabilities: uint32
