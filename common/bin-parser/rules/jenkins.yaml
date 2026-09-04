@@ -1,9 +1,11 @@
 Package:
   Jenkins:
     operator: |
-      this.ProcessSubNode("Line")
-      s = string(getNodeResult("Line").Value)
-      if !(s.HasPrefix("Protocol:") || s.HasPrefix("<===[JENKINS")) {
-        panic("jenkins: expected remoting protocol line")
+      this.ProcessSubNode("Prefix")
+      p = string(getNodeResult("Prefix").Value)
+      if p != "Protocol:" {
+        panic("jenkins: expected Protocol key")
       }
-    Line: "del:\n;type:string"
+      this.ProcessSubNode("Value")
+    Prefix: string,9
+    Value: "del:\n;type:string"

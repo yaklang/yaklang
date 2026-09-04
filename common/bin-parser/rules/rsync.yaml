@@ -1,9 +1,13 @@
 Package:
   Rsync:
     operator: |
-      this.ProcessSubNode("Banner")
-      s = string(getNodeResult("Banner").Value)
-      if !s.HasPrefix("@RSYNCD:") {
+      this.ProcessSubNode("Magic")
+      mag = string(getNodeResult("Magic").Value)
+      if mag != "@RSYNCD:" {
         panic("rsync: expected @RSYNCD banner")
       }
-    Banner: "del:\n;type:string"
+      this.ProcessSubNode("Space")
+      this.ProcessSubNode("Version")
+    Magic: string,8
+    Space: uint8
+    Version: "del:\n;type:string"

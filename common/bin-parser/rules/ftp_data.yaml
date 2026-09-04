@@ -1,13 +1,31 @@
 Package:
   FTPData:
-    operator: |
-      rest = this.GetRemainingSpace()
-      if rest == 0 {
-        panic("ftp-data: empty payload")
-      }
-      if rest >= 1048576 {
-        panic("ftp-data: unbounded")
-      }
-      this.GetSubNode("Data").SetMaxLength(rest)
-      this.ProcessSubNode("Data")
-    Data: raw
+    Records:
+      list: true
+      Record: FTPRecord
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            panic("ftp-data: empty payload")
+          }
+          ele.Process()
+          if this.GetMaxLength() > 0 && this.Length() >= this.GetMaxLength() {
+            break
+          }
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+        }
+FTPRecord:
+  operator: |
+    rest = this.GetMaxLength()
+    if rest == 0 {
+      panic("ftp-data: empty record")
+    }
+    if rest > 1048576 {
+      panic("ftp-data: unbounded")
+    }
+    this.GetSubNode("Data").SetMaxLength(rest)
+    this.ProcessSubNode("Data")
+  Data: raw

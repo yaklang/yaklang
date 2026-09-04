@@ -1,9 +1,20 @@
 Package:
   VNC:
     operator: |
-      this.ProcessSubNode("Protocol")
-      p = string(getNodeResult("Protocol").Value)
-      if !p.HasPrefix("RFB ") {
+      this.ProcessSubNode("Magic")
+      mag = string(getNodeResult("Magic").Value)
+      if mag != "RFB " {
         panic("vnc: expected RFB banner")
       }
-    Protocol: "del:\n;type:string"
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Dot")
+      if getNodeResult("Dot").Value != 0x2e {
+        panic("vnc: expected version dot")
+      }
+      this.ProcessSubNode("Minor")
+      this.ProcessSubNode("LF")
+    Magic: string,4
+    Major: string,3
+    Dot: uint8
+    Minor: string,3
+    LF: uint8

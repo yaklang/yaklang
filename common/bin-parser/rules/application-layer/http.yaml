@@ -31,9 +31,11 @@ Body:
       this.ProcessSubNode("DataChunks")
     }else{
       l = getCtx("body_length")
-      if l > 0 {
-        this.GetSubNode("Data").SetMaxLength(l)
-        this.ProcessSubNode("Data")
+      if l {
+        if l > 0 {
+          this.GetSubNode("Data").SetMaxLength(l)
+          this.ProcessSubNode("Data")
+        }
       }
     }
   Data: raw

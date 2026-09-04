@@ -18,6 +18,10 @@ Package:
       this.ProcessSubNode("Checksum")
       this.ProcessSubNode("AuType")
       this.ProcessSubNode("Authentication")
+      if typ == 1 {
+        this.ProcessSubNode("Hello")
+        return
+      }
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
         if rest > 0 && rest < 1048576 {
@@ -33,4 +37,41 @@ Package:
     Checksum: uint16
     AuType: uint16
     Authentication: raw,8
+    Hello:
+      operator: |
+        this.ProcessSubNode("Network Mask")
+        this.ProcessSubNode("Hello Interval")
+        this.ProcessSubNode("Options")
+        this.ProcessSubNode("Priority")
+        this.ProcessSubNode("Dead Interval")
+        this.ProcessSubNode("Designated Router")
+        this.ProcessSubNode("Backup Designated Router")
+        if this.Length() < this.GetMaxLength() {
+          rest = this.GetMaxLength() - this.Length()
+          if rest >= 4 && rest < 1048576 {
+            this.GetSubNode("Neighbors").SetMaxLength(rest)
+            this.ProcessSubNode("Neighbors")
+          }
+        }
+      Network Mask: raw,4
+      Hello Interval: uint16
+      Options: uint8
+      Priority: uint8
+      Dead Interval: uint32
+      Designated Router: raw,4
+      Backup Designated Router: raw,4
+      Neighbors:
+        list: true
+        Neighbor: raw,4
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() == 0 {
+              break
+            }
+            if ele.GetMaxLength() < 4 {
+              break
+            }
+            ele.Process()
+          }
     Body: raw
