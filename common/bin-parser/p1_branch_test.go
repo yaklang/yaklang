@@ -771,6 +771,14 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, radiusAccessRequestFrame[42:], "application-layer.radius", "RADIUS")
 		require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, n.Child("Attributes").Children()[2].Child("NAS-IP-Address")))
 	})
+	t.Run("ntlm/challenge", func(t *testing.T) {
+		n := parseRule(t, ntlmsspChallengeTarget("DOMAIN"), "application-layer.ntlm", "NTLMSSP")
+		require.Equal(t, utf16LE("DOMAIN"), bytesVal(t, n.Child("Target Name")))
+	})
+	t.Run("ntlm/authenticate", func(t *testing.T) {
+		n := parseRule(t, ntlmsspAuthUser("CORP", "Admin"), "application-layer.ntlm", "NTLMSSP")
+		require.Equal(t, utf16LE("Admin"), bytesVal(t, n.Child("User Name")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
