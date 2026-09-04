@@ -17,6 +17,16 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x8100), uintVal(t, q.Child("Type")))
 	})
 
+	t.Run("stun/binding-req", func(t *testing.T) {
+		stun := mustHex(t, "000100582112a442b7e7a701bc34d686fa87dfae802200105354554e207465737420636c69656e74002400046e0001ff80290008932ff9b151263b36000600096576746a3a68367659202020000800149aeaa70cbfd8cb56781ef2b5b2d3f249c1b571a280280004e57a3bcf")
+		n := parseRule(t, stun, "stun", "STUN")
+		require.Equal(t, "STUN test client", strVal(t, n.Child("Attributes").Children()[0].Child("Software")))
+	})
+	t.Run("stun/binding-success", func(t *testing.T) {
+		succ := mustHex(t, "0101000c2112a442b7e7a701bc34d686fa87dfae002000080001a147e112a643")
+		n := parseRule(t, succ, "stun", "STUN")
+		require.Equal(t, uint64(0xa147), uintVal(t, n.Child("Attributes").Children()[0].Child("X-Port")))
+	})
 	t.Run("sip/invite", func(t *testing.T) {
 		sdp := "v=0\r\no=- 0 0 IN IP4 10.0.0.1\r\n"
 		inv := "INVITE sip:bob@example.com SIP/2.0\r\nContent-Type: application/sdp\r\nContent-Length: 30\r\n\r\n" + sdp

@@ -114,7 +114,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | RTCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
 | RTSP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rtsp.yaml` |
 | WebRTC | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of STUN |
-| STUN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `stun.yaml` |
+| STUN | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `stun.yaml` |
 | TURN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of STUN |
 | RTMP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtmp.yaml` |
 | WKSSVC | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |

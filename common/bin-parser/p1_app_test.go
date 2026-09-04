@@ -55,8 +55,10 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, uint64(0x58), uintVal(t, st.Child("Length")))
 	require.Equal(t, uint64(0x2112a442), uintVal(t, st.Child("Magic Cookie")))
 	require.Equal(t, uint64(0x8022), uintVal(t, st.Child("Attributes").Children()[0].Child("Type")))
+	require.Equal(t, "STUN test client", strVal(t, st.Child("Attributes").Children()[0].Child("Software")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 3478, 3478, stun))
 	require.Equal(t, uint64(0x2112a442), uintVal(t, mustChild(t, eth, "IP", "UDP", "STUN").Child("Magic Cookie")))
+	require.Equal(t, "STUN test client", strVal(t, mustChild(t, eth, "IP", "UDP", "STUN").Child("Attributes").Children()[0].Child("Software")))
 
 	// RFC 3261 SIP REGISTER first line (gopacket sip_test.go style)
 	sip := []byte("REGISTER sip:sip.provider.com SIP/2.0\r\nVia: SIP/2.0/UDP 10.0.0.1\r\nContent-Length: 0\r\n\r\n")

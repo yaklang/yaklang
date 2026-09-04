@@ -63,6 +63,41 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
 	})
 
+	t.Run("stun/binding-req", func(t *testing.T) {
+		// RFC 5769 §2.1 Binding Request: SOFTWARE, PRIORITY, USERNAME "evtj:h6vY".
+		stun := mustHex(t, ""+
+			"00010058 2112a442 b7e7a701 bc34d686 fa87dfae "+
+			"80220010 5354554e 20746573 7420636c 69656e74 "+
+			"00240004 6e0001ff 80290008 932ff9b1 51263b36 "+
+			"00060009 6576746a 3a683676 59202020 "+
+			"00080014 9aeaa70c bfd8cb56 781ef2b5 b2d3f249 c1b571a2 "+
+			"80280004 e57a3bcf")
+		n := parseRule(t, stun, "stun", "STUN")
+		attrs := n.Child("Attributes").Children()
+		require.Equal(t, "STUN test client", strVal(t, attrs[0].Child("Software")))
+		require.Equal(t, uint64(0x6e0001ff), uintVal(t, attrs[1].Child("Priority")))
+		require.Equal(t, "evtj:h6vY", strVal(t, attrs[3].Child("Username")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 3478, 3478, stun))
+		require.Equal(t, "STUN test client", strVal(t, mustChild(t, eth, "IP", "UDP", "STUN").Child("Attributes").Children()[0].Child("Software")))
+		require.Equal(t, "evtj:h6vY", strVal(t, mustChild(t, eth, "IP", "UDP", "STUN").Child("Attributes").Children()[3].Child("Username")))
+	})
+
+	t.Run("stun/binding-success", func(t *testing.T) {
+		// RFC 5769 §2.2 XOR-MAPPED-ADDRESS: 192.0.2.1:32853 (X-Port 0xa147, X-Address e112a643).
+		succ := mustHex(t, "0101000c2112a442b7e7a701bc34d686fa87dfae002000080001a147e112a643")
+		n := parseRule(t, succ, "stun", "STUN")
+		require.Equal(t, uint64(0x0101), uintVal(t, n.Child("Message Type")))
+		xa := n.Child("Attributes").Children()[0]
+		require.Equal(t, uint64(0x0020), uintVal(t, xa.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, xa.Child("Family")))
+		require.Equal(t, uint64(0xa147), uintVal(t, xa.Child("X-Port")))
+		require.Equal(t, []byte{0xe1, 0x12, 0xa6, 0x43}, bytesVal(t, xa.Child("X-Address")))
+		port := uint16(0xa147) ^ 0x2112
+		require.Equal(t, uint16(32853), port)
+		eth := parseEthernet(t, ipv4UDPBytes(t, 3478, 3478, succ))
+		require.Equal(t, uint64(0xa147), uintVal(t, mustChild(t, eth, "IP", "UDP", "STUN").Child("Attributes").Children()[0].Child("X-Port")))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"
