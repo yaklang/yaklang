@@ -118,6 +118,16 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, ep.Child("Packet Type")))
 	})
 
+	t.Run("stp/config", func(t *testing.T) {
+		n := parseRule(t, stpConfigBPDU(), "stp", "STP")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("BPDU Type")))
+		require.Equal(t, uint64(8), uintVal(t, mustChild(t, n, "Config").Child("Root Priority")))
+	})
+	t.Run("stp/tcn", func(t *testing.T) {
+		n := parseRule(t, []byte{0x00, 0x00, 0x00, 0x80}, "stp", "STP")
+		require.Equal(t, uint64(0x80), uintVal(t, n.Child("BPDU Type")))
+		require.Nil(t, n.Child("Config"))
+	})
 	t.Run("loopback/other", func(t *testing.T) {
 		n := parseRule(t, []byte{0x00, 0x00, 0x01, 0x00, 0x01, 0x00}, "loopback", "Loopback")
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Functions").Children()[0].Child("Function")))

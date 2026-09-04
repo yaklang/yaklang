@@ -8,24 +8,53 @@ Package:
       }
       this.ProcessSubNode("Version")
       this.ProcessSubNode("BPDU Type")
-      this.ProcessSubNode("Flags")
-      this.ProcessSubNode("Root ID")
-      this.ProcessSubNode("Root Path Cost")
-      this.ProcessSubNode("Bridge ID")
-      this.ProcessSubNode("Port ID")
-      this.ProcessSubNode("Message Age")
-      this.ProcessSubNode("Max Age")
-      this.ProcessSubNode("Hello Time")
-      this.ProcessSubNode("Forward Delay")
+      btype = getNodeResult("BPDU Type").Value
+      if btype == 0x80 {
+        return
+      }
+      if btype == 0x00 || btype == 0x02 {
+        this.ProcessSubNode("Config")
+        return
+      }
+      panic("stp: unknown bpdu type")
     Protocol ID: uint16
     Version: uint8
     BPDU Type: uint8
-    Flags: uint8
-    Root ID: raw,8
-    Root Path Cost: uint32
-    Bridge ID: raw,8
-    Port ID: uint16
-    Message Age: uint16
-    Max Age: uint16
-    Hello Time: uint16
-    Forward Delay: uint16
+    Config:
+      operator: |
+        this.ProcessSubNode("Flags")
+        this.ProcessSubNode("Root Priority")
+        this.ProcessSubNode("Root Ext High")
+        this.ProcessSubNode("Root Ext Low")
+        this.ProcessSubNode("Root MAC")
+        this.ProcessSubNode("Root Path Cost")
+        this.ProcessSubNode("Bridge Priority")
+        this.ProcessSubNode("Bridge Ext High")
+        this.ProcessSubNode("Bridge Ext Low")
+        this.ProcessSubNode("Bridge MAC")
+        this.ProcessSubNode("Port ID")
+        this.ProcessSubNode("Message Age")
+        this.ProcessSubNode("Max Age")
+        this.ProcessSubNode("Hello Time")
+        this.ProcessSubNode("Forward Delay")
+        btype = getNodeResult("../BPDU Type").Value
+        if btype == 0x02 {
+          this.ProcessSubNode("Version 1 Length")
+        }
+        return
+      Flags: uint8
+      Root Priority: uint8,4bit
+      Root Ext High: uint8,4bit
+      Root Ext Low: uint8
+      Root MAC: raw,6
+      Root Path Cost: uint32
+      Bridge Priority: uint8,4bit
+      Bridge Ext High: uint8,4bit
+      Bridge Ext Low: uint8
+      Bridge MAC: raw,6
+      Port ID: uint16
+      Message Age: uint16
+      Max Age: uint16
+      Hello Time: uint16
+      Forward Delay: uint16
+      Version 1 Length: uint8
