@@ -252,25 +252,11 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 				inherited = parent.Destructor
 			}
 		}
-		// Constructors and destructors are not ordinary inherited overloads. If
-		// the child declared its own magic method, RegisterMagicMethod would
-		// replace child.Constructor/Destructor with the parent's value even
-		// though the child's MagicMethod entry remains present. Inspect the
-		// effective slot rather than MagicMethod directly: some frontends seed
-		// the map with an Undefined placeholder and RegisterMagicMethod keeps
-		// that placeholder there while updating Constructor/Destructor.
-		var own Value
-		switch name {
-		case Constructor:
-			own = c.Constructor
-		case Destructor:
-			own = c.Destructor
-		default:
-			own = c.MagicMethod[name]
-		}
-		if _, concrete := ToFunction(own); concrete {
-			continue
-		}
+		// Keep the historical generic-Blueprint contract: inherited magic
+		// methods become the child's effective constructor/destructor, while
+		// RegisterMagicMethod links them to any child-local map entry. Several
+		// weak-language frontends rely on that conservative call-side-effect
+		// model. Signature-aware frontends can use relation-only inheritance.
 		c.RegisterMagicMethod(name, inherited)
 	}
 	for name, values := range parent.NormalMember {
