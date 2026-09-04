@@ -21,6 +21,7 @@ Package:
         this.GetSubNode("Attributes").SetMaxLength(l - 20)
         this.ProcessSubNode("Attributes")
       }
+      return
     Code: uint8
     Identifier: uint8
     Length: uint16
@@ -30,27 +31,81 @@ Package:
       Attribute: RADIUSAttribute
       operator: |
         for {
-          if this.GetRemainingSpace() == 0 {
+          if this.GetMaxLength() < 2 {
             break
           }
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
           ele = this.NewElement()
-          if ele.GetMaxLength() == 0 {
+          if ele.GetMaxLength() < 2 {
             break
           }
+          prev = this.Length()
           ele.Process()
+          if this.Length() <= prev {
+            break
+          }
         }
 RADIUSAttribute:
   operator: |
     this.ProcessSubNode("Type")
     this.ProcessSubNode("Length")
+    t = getNodeResult("Type").Value
     al = getNodeResult("Length").Value
     if al < 2 {
       panic("radius: attribute length smaller than 2")
     }
-    if al > 2 {
-      this.GetSubNode("Value").SetMaxLength(al - 2)
-      this.ProcessSubNode("Value")
+    dlen = al - 2
+    if t == 1 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("User-Name").SetMaxLength(dlen)
+        this.ProcessSubNode("User-Name")
+      }
+      return
     }
+    if t == 2 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("User-Password").SetMaxLength(dlen)
+        this.ProcessSubNode("User-Password")
+      }
+      return
+    }
+    if t == 4 {
+      if dlen != 4 {
+        panic("radius: NAS-IP-Address length must be 4")
+      }
+      this.ProcessSubNode("NAS-IP-Address")
+      return
+    }
+    if t == 5 {
+      if dlen != 4 {
+        panic("radius: NAS-Port length must be 4")
+      }
+      this.ProcessSubNode("NAS-Port")
+      return
+    }
+    if t == 80 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Message-Authenticator").SetMaxLength(dlen)
+        this.ProcessSubNode("Message-Authenticator")
+      }
+      return
+    }
+    if dlen > 0 && dlen < 1048576 {
+      this.GetSubNode("Attribute Data").SetMaxLength(dlen)
+      this.ProcessSubNode("Attribute Data")
+    }
+    return
   Type: uint8
   Length: uint8
-  Value: raw
+  User-Name: string
+  User-Password: string
+  NAS-IP-Address: raw,4
+  NAS-Port: uint32
+  Message-Authenticator: string
+  Attribute Data: string
+PeekByte: uint8

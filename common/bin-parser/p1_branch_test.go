@@ -763,6 +763,14 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, rfcPPPoEPADO(t), "pppoe", "PPPoE")
 		require.Equal(t, "BRAS1", strVal(t, n.Child("Payload").Child("Tags").Children()[1].Child("AC-Name")))
 	})
+	t.Run("radius/user-name", func(t *testing.T) {
+		n := parseRule(t, radiusAccessRequestFrame[42:], "application-layer.radius", "RADIUS")
+		require.Equal(t, "Admin", strVal(t, n.Child("Attributes").Children()[0].Child("User-Name")))
+	})
+	t.Run("radius/nas-ip", func(t *testing.T) {
+		n := parseRule(t, radiusAccessRequestFrame[42:], "application-layer.radius", "RADIUS")
+		require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, n.Child("Attributes").Children()[2].Child("NAS-IP-Address")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))

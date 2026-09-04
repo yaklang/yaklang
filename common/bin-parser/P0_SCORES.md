@@ -40,7 +40,7 @@
 | NTLM | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
 | NTLMSSP | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
 | SPNEGO | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/spnego.yaml` |
-| RADIUS | A | 96 | 25 | 25 | 16 | 20 | 10 | L1 | `application-layer/radius.yaml` |
+| RADIUS | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `application-layer/radius.yaml` |
 | SOCKS5 | B | 86 | 20 | 20 | 16 | 20 | 10 | L2 | `application-layer/socks5.yaml` |
 | SSH | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/ssh.yaml` |
 | RDP | B | 86 | 20 | 20 | 16 | 20 | 10 | L1 | `application-layer/msrdp.yaml` |
