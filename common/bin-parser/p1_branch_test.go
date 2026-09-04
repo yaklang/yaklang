@@ -34,6 +34,20 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, succ, "stun", "STUN")
 		require.Equal(t, uint64(0xa147), uintVal(t, n.Child("Attributes").Children()[0].Child("X-Port")))
 	})
+	t.Run("sdp/origin", func(t *testing.T) {
+		n := parseRule(t, []byte("v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"), "sdp", "SDP")
+		require.Equal(t, "alice", strVal(t, n.Child("Username")))
+		require.Equal(t, "pc33.atlanta.example.com", strVal(t, n.Child("Address")))
+	})
+	t.Run("sdp/media", func(t *testing.T) {
+		raw := []byte("v=0\r\no=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\r\ns=SDP Seminar\r\nm=audio 49170 RTP/AVP 0\r\n")
+		n := parseRule(t, raw, "sdp", "SDP")
+		lines := n.Child("Lines").Children()
+		require.GreaterOrEqual(t, len(lines), 2)
+		require.Equal(t, "SDP Seminar", strVal(t, lines[0].Child("Session Name")))
+		require.Equal(t, "audio", strVal(t, lines[1].Child("Media")))
+		require.Equal(t, "49170", strVal(t, lines[1].Child("Port")))
+	})
 	t.Run("sip/invite", func(t *testing.T) {
 		sdp := "v=0\r\no=- 0 0 IN IP4 10.0.0.1\r\n"
 		inv := "INVITE sip:bob@example.com SIP/2.0\r\nContent-Type: application/sdp\r\nContent-Length: 30\r\n\r\n" + sdp
