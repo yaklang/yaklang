@@ -124,7 +124,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | LLMNR-MDNS collision | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of LLMNR |
 | WPAD | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | TPKT | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/msrdp.yaml` |
-| BitTorrent | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `bittorrent.yaml` |
+| BitTorrent | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `bittorrent.yaml` |
 | MinIO/S3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | RMI | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |
 | JMX | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |

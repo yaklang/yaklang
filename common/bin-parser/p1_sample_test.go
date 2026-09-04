@@ -2147,6 +2147,60 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "49170", strVal(t, wired[3].Child("Port")))
 		require.Equal(t, "SDP Seminar", strVal(t, wired[0].Child("Session Name")))
 	})
+
+	t.Run("bittorrent/handshake", func(t *testing.T) {
+		// BEP 3 handshake: pstrlen 19, "BitTorrent protocol", info_hash, peer_id.
+		// Wireshark bittorrent.protocol / bittorrent.info_hash / bittorrent.peer_id. TCP/6881.
+		raw := btHandshake()
+		n := parseRule(t, raw, "bittorrent", "BitTorrent")
+		require.Equal(t, uint64(19), uintVal(t, n.Child("Pstrlen")))
+		require.Equal(t, "BitTorrent protocol", string(bytesVal(t, n.Child("Pstr"))))
+		require.Equal(t, []byte("0123456789abcdefghij"), bytesVal(t, n.Child("Info Hash")))
+		require.Equal(t, []byte("-UT2210-abcdefghijkl"), bytesVal(t, n.Child("Peer ID")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 6881, 6881, raw))
+		require.Equal(t, []byte("-UT2210-abcdefghijkl"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "BitTorrent").Child("Peer ID")))
+		require.Equal(t, []byte("0123456789abcdefghij"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "BitTorrent").Child("Info Hash")))
+	})
+
+	t.Run("bittorrent/have", func(t *testing.T) {
+		// BEP 3 have: length 5, id 4, piece index 7. Wireshark bittorrent.msg.id / bittorrent.piece.index.
+		raw := append(btHandshake(), 0, 0, 0, 5, 4, 0, 0, 0, 7)
+		n := parseRule(t, raw, "bittorrent", "BitTorrent")
+		msg := n.Child("Messages").Children()[0]
+		require.Equal(t, uint64(5), uintVal(t, msg.Child("Length")))
+		require.Equal(t, uint64(4), uintVal(t, msg.Child("Message ID")))
+		require.Equal(t, uint64(7), uintVal(t, msg.Child("Piece Index")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 6881, 6881, raw))
+		require.Equal(t, uint64(7), uintVal(t, mustChild(t, eth, "IP", "TCP", "BitTorrent").Child("Messages").Children()[0].Child("Piece Index")))
+	})
+
+	t.Run("bittorrent/request", func(t *testing.T) {
+		// BEP 3 request: length 13, id 6, index 1, begin 0, length 16384.
+		req := make([]byte, 17)
+		binary.BigEndian.PutUint32(req[0:], 13)
+		req[4] = 6
+		binary.BigEndian.PutUint32(req[5:], 1)
+		binary.BigEndian.PutUint32(req[9:], 0)
+		binary.BigEndian.PutUint32(req[13:], 16384)
+		raw := append(btHandshake(), req...)
+		n := parseRule(t, raw, "bittorrent", "BitTorrent")
+		msg := n.Child("Messages").Children()[0]
+		require.Equal(t, uint64(6), uintVal(t, msg.Child("Message ID")))
+		require.Equal(t, uint64(1), uintVal(t, msg.Child("Index")))
+		require.Equal(t, uint64(0), uintVal(t, msg.Child("Begin")))
+		require.Equal(t, uint64(16384), uintVal(t, msg.Child("Block Length")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 6881, 6881, raw))
+		require.Equal(t, uint64(16384), uintVal(t, mustChild(t, eth, "IP", "TCP", "BitTorrent").Child("Messages").Children()[0].Child("Block Length")))
+	})
+}
+
+func btHandshake() []byte {
+	b := make([]byte, 68)
+	b[0] = 19
+	copy(b[1:], []byte("BitTorrent protocol"))
+	copy(b[28:], []byte("0123456789abcdefghij"))
+	copy(b[48:], []byte("-UT2210-abcdefghijkl"))
+	return b
 }
 
 func vncServerInit() []byte {
