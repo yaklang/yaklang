@@ -9,7 +9,7 @@
 | 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Ethernet II | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `ethernet.yaml` |
-| IEEE 802.1Q | B | 75 | 20 | 15 | 16 | 14 | 10 | L3 | `ieee_802_1q.yaml` |
+| IEEE 802.1Q | B | 78 | 20 | 8 | 20 | 20 | 10 | L3 | `ieee_802_1q.yaml` |
 | ARP | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `address_resolution_protocol.yaml` |
 | IPv4 | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `internet_protocol.yaml` |
 | IPv6 | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `internet_protocol_version_6.yaml` |
@@ -23,7 +23,7 @@
 | NBT SS | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/nbss.yaml` |
 | DNS | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/dns.yaml` |
 | NBNS | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/nbns.yaml` |
-| DHCP | B | 81 | 20 | 15 | 16 | 20 | 10 | L3 | `application-layer/dhcp.yaml` |
+| DHCP | B | 78 | 20 | 8 | 20 | 20 | 10 | L3 | `application-layer/dhcp.yaml` |
 | HTTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
 | HTTP/2 | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | `application-layer/http2.yaml` |
 | WebSocket | B | 86 | 20 | 20 | 16 | 20 | 10 | L2 | `application-layer/websocket.yaml` |
@@ -76,7 +76,7 @@
 | NBT-NS poison | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/nbns.yaml` |
 | WPAD proxy | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
 
-67 个 P0：A 10 / B 57，最低 75（B）。证据字段见 `protocol_scores.go` 的 `Evidence`。
+67 个 P0：A 10 / B 57，最低 75（B）。IEEE 802.1Q / DHCP 为 L3 样本，流量维按标准记 8 分，靠失败路径把测试/分支拉到 20 以保持 B。证据见 `protocol_scores.go` 的 `Evidence`；G6 失败路径在 `p0_fail_paths_test.go`。
 
 ## 本轮扩展的非 P0
 
