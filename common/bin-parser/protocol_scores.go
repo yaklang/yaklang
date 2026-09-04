@@ -79,7 +79,7 @@ func alias(name, of string) ProtocolScorecard {
 // Aliases share the target card via AliasOf; the test expands them.
 var P0Scorecards = []ProtocolScorecard{
 	card("Ethernet II", "ethernet.yaml", 20, 25, 20, 20, 10, "L1",
-		"ethernet/next-type IEEE 802 0x88B5 Next Protocol Data; ethernet/ptp IEEE 1588 0x88F7; TestEthernetIPARPTruncated", ""),
+		"ethernet/next-type IEEE 802 0x88B5 Next Protocol Data; ethernet/ptp IEEE 1588-2008 Sync Sequence ID 1 EtherType 0x88F7; TestEthernetIPARPTruncated", ""),
 	card("IEEE 802.1Q", "ieee_802_1q.yaml", 20, 8, 20, 20, 10, "L3",
 		"TestVLANIPv4ARPInner ARP; TestVLANPayloadTypeArms IP/IPv6/EAPOL/default; TestVLANFailPaths", ""),
 	card("ARP", "address_resolution_protocol.yaml", 20, 25, 16, 14, 10, "L1",

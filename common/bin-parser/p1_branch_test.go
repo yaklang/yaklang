@@ -9,6 +9,22 @@ import (
 )
 
 func TestP1BranchRows(t *testing.T) {
+	t.Run("ptp/sync", func(t *testing.T) {
+		clock := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}
+		ptp := ptpV2Sync(t, 1, clock, 123456789)
+		n := parseRule(t, ptp, "ptp", "PTP")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Message Type"))&0xf)
+		require.Equal(t, uint64(123456789), uintVal(t, mustChild(t, n, "Origin Timestamp").Child("Nanoseconds")))
+		frame := append([]byte{0x01, 0x1b, 0x19, 0x00, 0x00, 0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x88, 0xf7}, ptp...)
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, frame), "PTP").Child("Sequence ID")))
+	})
+	t.Run("ptp/follow-up", func(t *testing.T) {
+		clock := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}
+		ptp := ptpV2FollowUp(t, 7, clock, 987654321)
+		n := parseRule(t, ptp, "ptp", "PTP")
+		require.Equal(t, uint64(8), uintVal(t, n.Child("Message Type"))&0xf)
+		require.Equal(t, uint64(987654321), uintVal(t, mustChild(t, n, "Precise Origin Timestamp").Child("Nanoseconds")))
+	})
 	t.Run("ieee_802_11/qos", func(t *testing.T) {
 		raw := append([]byte{0x88, 0x00, 0x00, 0x00}, make([]byte, 20)...)
 		raw = append(raw, 0x06, 0x00)
