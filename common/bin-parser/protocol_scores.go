@@ -158,7 +158,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("MSSQL TDS", "application-layer/tds.yaml", 20, 15, 16, 20, 10, "L2",
 		"TestTDSPreloginLoginBatchAndEdges [MS-TDS] 2.2.1", "BATCH payload"),
 	card("Oracle TNS", "application-layer/tns.yaml", 20, 15, 16, 20, 10, "L2",
-		"TestTNSConnectAndEdges; TestTNSConnectSNMPVarbindX224AndDCERPCStub", ""),
+		"tns/connect SERVICE_NAME=ORCL; tns/data Data Flag+Octets; TestTNSConnectAndEdges", ""),
 	card("Redis", "application-layer/redis.yaml", 20, 15, 16, 20, 10, "L2",
 		"TestRedisPING RESP *1 $4 PING; TestRedisFailPaths", ""),
 	card("MQTT", "application-layer/mqtt.yaml", 20, 20, 16, 20, 10, "L2",
