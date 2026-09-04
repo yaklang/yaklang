@@ -79,6 +79,10 @@ Package:
           this.ProcessByType("Incoming Call Reply")
           return
         }
+        if type == 11 {
+          this.ProcessByType("Incoming Call Connected")
+          return
+        }
         if type == 15 {
           this.ProcessByType("Set Link Info")
           return
@@ -177,6 +181,14 @@ Incoming Call Reply:
     RecvWindowSize: uint16
     ProcessingDelay: uint16
     Reserved2: uint32
+
+Incoming Call Connected:
+    PeerCallId: uint16
+    Reserved1: uint16
+    ConnectSpeed: uint32
+    RecvWindowSize: uint16
+    ProcessingDelay: uint16
+    FramingType: uint32
 
 Set Link Info:
     PeerCallId: uint16

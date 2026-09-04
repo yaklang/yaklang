@@ -1503,6 +1503,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(64), uintVal(t, wired.Child("RecvWindowSize")))
 	})
 
+	t.Run("pptp/icc", func(t *testing.T) {
+		// RFC 2637 §2.11 Incoming-Call-Connected (control type 11), 28-byte message.
+		// PeerCallId 1, Connect Speed 64000, Recv Window 64, Framing Type 1 (Async).
+		// Wireshark pptp.peer_call_id / pptp.connect_speed / pptp.framing_type. TCP/1723.
+		pptp := make([]byte, 28)
+		binary.BigEndian.PutUint16(pptp[0:], 28)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 11)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint32(pptp[16:], 64000)
+		binary.BigEndian.PutUint16(pptp[20:], 64)
+		binary.BigEndian.PutUint32(pptp[24:], 1)
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(11), uintVal(t, n.Child("ControlMessageType")))
+		icc := mustChild(t, n, "Incoming Call Connected")
+		require.Equal(t, uint64(1), uintVal(t, icc.Child("PeerCallId")))
+		require.Equal(t, uint64(64000), uintVal(t, icc.Child("ConnectSpeed")))
+		require.Equal(t, uint64(64), uintVal(t, icc.Child("RecvWindowSize")))
+		require.Equal(t, uint64(1), uintVal(t, icc.Child("FramingType")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Incoming Call Connected")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("PeerCallId")))
+		require.Equal(t, uint64(64000), uintVal(t, wired.Child("ConnectSpeed")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
