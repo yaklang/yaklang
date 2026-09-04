@@ -379,6 +379,42 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "WireGuard", "WGResponse").Child("Receiver")))
 	})
 
+	t.Run("wireguard/cookie", func(t *testing.T) {
+		// wireguard.com/protocol packet_cookie_reply 64 bytes; Wireshark wg.cookie.nonce.
+		// Type 3, Receiver=1, Nonce 24, Encrypted Cookie AEAD_LEN(16)=32.
+		wg := make([]byte, 64)
+		wg[0] = 3
+		wg[4] = 1
+		copy(wg[8:12], []byte("nonc"))
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		ck := mustChild(t, n, "WGCookie")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, ck.Child("Receiver")))
+		require.Equal(t, 24, len(bytesVal(t, ck.Child("Nonce"))))
+		require.Equal(t, 32, len(bytesVal(t, ck.Child("Encrypted Cookie"))))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 51820, 51820, wg))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "WireGuard", "WGCookie").Child("Receiver")))
+	})
+
+	t.Run("wireguard/transport", func(t *testing.T) {
+		// wireguard.com/protocol transport; Wireshark wg.counter / wg.encrypted_packet.
+		// Type 4, Receiver=1, Counter=7, 16-byte AEAD ciphertext. UDP/51820.
+		wg := make([]byte, 4+4+8+16)
+		wg[0] = 4
+		wg[4] = 1
+		wg[8] = 7
+		copy(wg[16:], []byte("ciphertext123456"))
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		tr := mustChild(t, n, "WGTransport")
+		require.Equal(t, uint64(4), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, tr.Child("Receiver")))
+		require.Equal(t, uint64(7), uintVal(t, tr.Child("Counter")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 51820, 51820, wg))
+		wired := mustChild(t, eth, "IP", "UDP", "WireGuard", "WGTransport")
+		require.Equal(t, uint64(7), uintVal(t, wired.Child("Counter")))
+		require.Equal(t, []byte("ciphertext123456"), bytesVal(t, wired.Child("Ciphertext")))
+	})
+
 	t.Run("salt/zmtp", func(t *testing.T) {
 		// ZeroMQ RFC 23 / Wireshark packet-zmtp.c greeting: 0xff…0x7f, version 3.0, mechanism NULL.
 		g := make([]byte, 64)

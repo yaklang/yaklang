@@ -34,6 +34,7 @@ var p1FailCases = []p1FailCase{
 		{"wireguard", []string{"WireGuard"}, nil, "empty"},
 		{"wireguard", []string{"WireGuard"}, []byte{0x09, 0, 0, 0}, "bad-type"},
 		{"wireguard", []string{"WireGuard"}, []byte{0x01}, "trunc"},
+		{"wireguard", []string{"WireGuard"}, []byte{0x03, 0, 0, 0}, "trunc-cookie"},
 		{"ospf", []string{"OSPF"}, nil, "empty"},
 		{"ospf", []string{"OSPF"}, []byte{0x01}, "bad-ver"},
 		{"ospf", []string{"OSPF"}, []byte{0x02, 0x09}, "bad-type"},
