@@ -43,6 +43,7 @@ func TestAllASPFrontFixtures(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, found, "no embed asp fixtures found")
+	require.GreaterOrEqual(t, len(listASPFixtures(t)), aspMinFixtureCount)
 }
 
 func TestASPScriptletAndEcho(t *testing.T) {
