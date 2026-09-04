@@ -481,4 +481,16 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("rsync/v30", func(t *testing.T) {
 		require.Equal(t, "30", strVal(t, parseRule(t, []byte("@RSYNCD: 30.0\n"), "rsync", "Rsync").Child("Major")))
 	})
+
+	t.Run("snmp/get", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "302602010004067075626c6963a019020101020100020100300e300c06082b060102010101000500"), "application-layer.snmp", "SNMP")
+		require.Equal(t, []byte("public"), bytesVal(t, n.Child("Community")))
+		require.Equal(t, []byte{1}, bytesVal(t, mustChild(t, n, "PDU Body", "Request ID")))
+	})
+	t.Run("snmpv3/header", func(t *testing.T) {
+		hdr := mustChild(t, parseRule(t, mustHex(t, "3013020103300e020101020300ffe3040104020103"), "application-layer.snmp", "SNMPv3"), "SNMPHeaderData")
+		require.Equal(t, uint64(1), uintVal(t, hdr.Child("MsgID")))
+		require.Equal(t, uint64(65507), uintVal(t, hdr.Child("MsgMaxSize")))
+		require.Equal(t, uint64(4), uintVal(t, hdr.Child("MsgFlags")))
+	})
 }

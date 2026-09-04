@@ -1014,4 +1014,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "*SMBSERVER", strings.TrimSpace(strVal(t, dg.Child("Dest Name"))))
 		require.Equal(t, "hi", strVal(t, dg.Child("User Data")))
 	})
+
+	t.Run("snmp/get", func(t *testing.T) {
+		// RFC 1157 GetRequest, community "public", sysDescr.0 (1.3.6.1.2.1.1.1.0).
+		raw := mustHex(t, "302602010004067075626c6963a019020101020100020100300e300c06082b060102010101000500")
+		n := parseRule(t, raw, "application-layer.snmp", "SNMP")
+		require.Equal(t, []byte("public"), bytesVal(t, n.Child("Community")))
+		require.Equal(t, uint64(0xa0), uintVal(t, n.Child("PDU Tag")))
+		require.Equal(t, []byte{1}, bytesVal(t, mustChild(t, n, "PDU Body", "Request ID")))
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, mustChild(t, n, "PDU Body", "Variable Bindings", "Bindings", "OID")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 161, 161, raw))
+		require.Equal(t, []byte("public"), bytesVal(t, mustChild(t, eth, "IP", "UDP", "SNMP").Child("Community")))
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "SNMP", "PDU Body", "Variable Bindings", "Bindings", "OID")))
+	})
+
+	t.Run("snmpv3/header", func(t *testing.T) {
+		// RFC 3412 §6 HeaderData: msgID=1, msgMaxSize=65507, msgFlags=0x04, securityModel=3 (USM).
+		raw := mustHex(t, "3013020103300e020101020300ffe3040104020103")
+		n := parseRule(t, raw, "application-layer.snmp", "SNMPv3")
+		require.Equal(t, []byte{0x03}, bytesVal(t, n.Child("Version")))
+		hdr := mustChild(t, n, "SNMPHeaderData")
+		require.Equal(t, uint64(1), uintVal(t, hdr.Child("MsgID")))
+		require.Equal(t, uint64(65507), uintVal(t, hdr.Child("MsgMaxSize")))
+		require.Equal(t, uint64(4), uintVal(t, hdr.Child("MsgFlags")))
+		require.Equal(t, uint64(3), uintVal(t, hdr.Child("Security Model")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 161, 161, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "SNMPv3", "SNMPHeaderData")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("MsgID")))
+		require.Equal(t, uint64(65507), uintVal(t, wired.Child("MsgMaxSize")))
+		require.Equal(t, uint64(4), uintVal(t, wired.Child("MsgFlags")))
+		require.Equal(t, uint64(3), uintVal(t, wired.Child("Security Model")))
+	})
 }
