@@ -2498,6 +2498,29 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "exp1", joinUint8(t, mustChild(t, eth, "IP", "GRE", "Payload").Child("Next Protocol Data")))
 	})
 
+	t.Run("gre/eth-bridging", func(t *testing.T) {
+		// RFC 1701 / IANA EtherType 0x6558 Transparent Ethernet Bridging.
+		// gopacket EthernetTypeTransparentEthernetBridging. Inner Ethernet II + ARP.
+		// Wireshark gre.proto / eth.type / arp.opcode. IP proto 47. Do not import ethernet.yaml.
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		dst := []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee}
+		src := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		inner := append(append(append(dst, src...), 0x08, 0x06), arp...)
+		raw := append([]byte{0x00, 0x00, 0x65, 0x58}, inner...)
+		n := parseRule(t, raw, "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0x6558), uintVal(t, n.Child("Protocol Type")))
+		ethin := mustChild(t, n, "Payload", "Ethernet")
+		require.Equal(t, dst, bytesVal(t, ethin.Child("Destination")))
+		require.Equal(t, src, bytesVal(t, ethin.Child("Source")))
+		require.Equal(t, uint64(0x0806), uintVal(t, ethin.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, ethin, "ARP").Child("Opcode")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, raw))
+		wired := mustChild(t, eth, "IP", "GRE", "Payload", "Ethernet")
+		require.Equal(t, dst, bytesVal(t, wired.Child("Destination")))
+		require.Equal(t, uint64(0x0806), uintVal(t, wired.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, wired, "ARP").Child("Opcode")))
+	})
+
 	t.Run("qinq/s-tag", func(t *testing.T) {
 		// IEEE 802.1ad S-TAG: PCP=5 DEI=1 VID=100, EtherType ARP.
 		// Wireshark ieee8021ad.priority / ieee8021ad.dei / ieee8021ad.id.
