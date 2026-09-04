@@ -12,7 +12,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("IEEE 802.1ad QinQ", "ieee_802_1ad.yaml", 20, 25, 20, 20, 10, "L2",
 		"qinq/s-tag PCP=5 DEI=1 VID=100; qinq/c-tag S-VID 100 C-VID 200 ARP; TestP1FailPaths ieee_802_1ad", ""),
 	p1card("PPP", "ppp.yaml", 25, 25, 20, 20, 10, "L2",
-		"TestP1STP8023AndPPPFamily GRE/PPP; TestPPPMessage; TestP1FailPaths ppp", ""),
+		"ppp/next-type RFC 1144 VJ 0x002d Next Protocol Data; ppp/ipv6 RFC 5072 0x0057 Version 6 GRE 0x880B; TestP1FailPaths ppp", ""),
 	p1card("PPPoE Discovery", "pppoe.yaml", 25, 25, 20, 20, 10, "L2",
 		"pppoe/padi RFC 2516 Service-Name isp EtherType 0x8863; pppoe/pado AC-Name BRAS1 Host-Uniq; TestP1FailPaths pppoe", ""),
 	p1card("PPPoE Session", "pppoe.yaml", 25, 25, 20, 20, 10, "L2",
