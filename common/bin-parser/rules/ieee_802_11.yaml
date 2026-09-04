@@ -10,6 +10,32 @@ Package:
       if typ > 2 {
         panic("dot11: reserved type")
       }
+      subtype = (fc >> 4) & 0xf
+      if typ == 1 {
+        if subtype == 12 {
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
+        if subtype == 13 {
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
+        this.ProcessSubNode("Addr2")
+        res, op = this.TryProcessByType("PeekByte")
+        op.Recovery()
+        if op.OK {
+          this.ProcessByType("Next Protocol Data")
+        }
+        return
+      }
       this.ProcessSubNode("Addr2")
       this.ProcessSubNode("Addr3")
       this.ProcessSubNode("Seq")
@@ -20,10 +46,13 @@ Package:
           this.ProcessSubNode("Addr4")
         }
       }
-      subtype = (fc >> 4) & 0xf
       if typ == 2 {
         if subtype >= 8 {
           this.ProcessSubNode("QoS Control")
+          order = (fc >> 15) & 1
+          if order == 1 {
+            this.ProcessSubNode("HT Control")
+          }
         }
       }
       res, op = this.TryProcessByType("PeekByte")
@@ -40,6 +69,7 @@ Package:
     Seq: uint16
     Addr4: raw,6
     QoS Control: uint16
+    HT Control: uint32
   RSN:
     operator: |
       this.ProcessSubNode("Element ID")
