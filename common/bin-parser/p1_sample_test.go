@@ -1284,6 +1284,45 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.True(t, strings.HasPrefix(strVal(t, wired.Child("PhoneNumber")), "5551212"))
 	})
 
+	t.Run("pptp/echo", func(t *testing.T) {
+		// RFC 2637 §2.5 Echo-Request (control type 5), 16-byte message, Identifier 1.
+		// Wireshark pptp.control_message_type / pptp.identifier. TCP/1723.
+		pptp := make([]byte, 16)
+		binary.BigEndian.PutUint16(pptp[0:], 16)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 5)
+		binary.BigEndian.PutUint32(pptp[12:], 1)
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(5), uintVal(t, n.Child("ControlMessageType")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Echo Request").Child("Identifier")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP", "Echo Request").Child("Identifier")))
+	})
+
+	t.Run("pptp/set-link-info", func(t *testing.T) {
+		// RFC 2637 §2.15 Set-Link-Info (control type 15), 24-byte message.
+		// Peer's Call ID 1; Send/Recv ACCM 0xFFFFFFFF (RFC default until this message).
+		// Wireshark pptp.peer_call_id / pptp.send_accm / pptp.recv_accm. TCP/1723.
+		pptp := make([]byte, 24)
+		binary.BigEndian.PutUint16(pptp[0:], 24)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 15)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint32(pptp[16:], 0xffffffff)
+		binary.BigEndian.PutUint32(pptp[20:], 0xffffffff)
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(15), uintVal(t, n.Child("ControlMessageType")))
+		sli := mustChild(t, n, "Set Link Info")
+		require.Equal(t, uint64(1), uintVal(t, sli.Child("PeerCallId")))
+		require.Equal(t, uint64(0xffffffff), uintVal(t, sli.Child("Send Accm")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Set Link Info")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("PeerCallId")))
+		require.Equal(t, uint64(0xffffffff), uintVal(t, wired.Child("Recv Accm")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
