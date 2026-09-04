@@ -10,14 +10,10 @@ Package:
       if op == 1 || op == 2 {
         this.ProcessSubNode("Filename")
         this.ProcessSubNode("Mode")
-        for {
-          res, op2 = this.TryProcessByType("TFTPOption")
-          if op2.OK {
-            op2.Save()
-          } else {
-            op2.Recovery()
-            break
-          }
+        res, op2 = this.TryProcessByType("TFTPOption")
+        op2.Recovery()
+        if op2.OK {
+          this.ProcessSubNode("Options")
         }
         return
       }
@@ -42,14 +38,10 @@ Package:
         return
       }
       if op == 6 {
-        for {
-          res, op2 = this.TryProcessByType("TFTPOption")
-          if op2.OK {
-            op2.Save()
-          } else {
-            op2.Recovery()
-            break
-          }
+        res, op2 = this.TryProcessByType("TFTPOption")
+        op2.Recovery()
+        if op2.OK {
+          this.ProcessSubNode("Options")
         }
         return
       }
@@ -60,6 +52,20 @@ Package:
     File Data: string
     Error Code: uint16
     Error Message: "del:\x00;type:string"
+    Options:
+      list: true
+      Option: TFTPOption
+      operator: |
+        for {
+          res, op = this.TryProcessByType("TFTPOption")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          ele.Process()
+        }
 TFTPOption:
   operator: |
     this.ProcessSubNode("Name")

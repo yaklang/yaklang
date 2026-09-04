@@ -421,13 +421,13 @@ func TestP1BranchRows(t *testing.T) {
 	})
 	t.Run("tftp/blksize", func(t *testing.T) {
 		raw := append([]byte{0x00, 0x01}, []byte("foo\x00octet\x00blksize\x00512\x00")...)
-		opt := mustChild(t, parseRule(t, raw, "tftp", "TFTP"), "TFTPOption")
+		opt := parseRule(t, raw, "tftp", "TFTP").Child("Options").Children()[0]
 		require.Equal(t, "blksize", strVal(t, opt.Child("Name")))
 		require.Equal(t, "512", strVal(t, opt.Child("Value")))
 	})
 	t.Run("tftp/oack", func(t *testing.T) {
 		raw := append([]byte{0x00, 0x06}, []byte("tsize\x001234\x00")...)
-		require.Equal(t, "tsize", strVal(t, mustChild(t, parseRule(t, raw, "tftp", "TFTP"), "TFTPOption").Child("Name")))
+		require.Equal(t, "tsize", strVal(t, parseRule(t, raw, "tftp", "TFTP").Child("Options").Children()[0].Child("Name")))
 	})
 
 	t.Run("onc_rpc/call", func(t *testing.T) {
