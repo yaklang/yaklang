@@ -63,6 +63,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
 	})
 
+	t.Run("lcp/rfc1661", func(t *testing.T) {
+		// RFC 1661 §5.1/§6.2/§6.4 Configure-Request: PAP 0xc023 + Magic-Number 0x0f3f117c.
+		lcp := mustHex(t, "0101000e0304c02305060f3f117c")
+		n := parseRule(t, lcp, "link_control_protocol", "LCP")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Code")))
+		opts := n.Child("Options").Children()
+		require.Equal(t, uint64(3), uintVal(t, opts[0].Child("Type")))
+		require.Equal(t, uint64(0xc023), uintVal(t, opts[0].Child("Auth Protocol")))
+		require.Equal(t, uint64(5), uintVal(t, opts[1].Child("Type")))
+		require.Equal(t, uint64(0x0f3f117c), uintVal(t, opts[1].Child("Magic Number")))
+		gre := mustHex(t, "3081880b0012000100000001ffffffffff03c021"+
+			"0101000e0304c02305060f3f117c")
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, gre))
+		l := mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "LCP")
+		require.Equal(t, uint64(0xc023), uintVal(t, l.Child("Options").Children()[0].Child("Auth Protocol")))
+		require.Equal(t, uint64(0x0f3f117c), uintVal(t, l.Child("Options").Children()[1].Child("Magic Number")))
+	})
+
+	t.Run("lcp/echo", func(t *testing.T) {
+		// RFC 1661 §5.8 Echo-Request: Magic-Number 0x12345678, no extra data.
+		echo := []byte{0x09, 0x01, 0x00, 0x08, 0x12, 0x34, 0x56, 0x78}
+		n := parseRule(t, echo, "link_control_protocol", "LCP")
+		require.Equal(t, uint64(9), uintVal(t, n.Child("Code")))
+		require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, n, "Echo").Child("Magic Number")))
+		gre := append(mustHex(t, "3081880b000c000100000001ffffffffff03c021"), echo...)
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, gre))
+		require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "LCP", "Echo").Child("Magic Number")))
+	})
+
 	t.Run("ftp_data/stream", func(t *testing.T) {
 		// RFC 959 §3.4.1 STREAM mode (default): no block header, TCP payload is the file.
 		fd := []byte("README.txt contents")

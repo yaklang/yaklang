@@ -1,50 +1,174 @@
 endian: big
 Package:
   LCP:
+    operator: |
+      this.ProcessSubNode("Code")
+      code = getNodeResult("Code").Value
+      if code < 1 || code > 11 {
+        panic("lcp: unknown code")
+      }
+      this.ProcessSubNode("Identifier")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 4 {
+        panic("lcp: length smaller than 4")
+      }
+      if l > 4 && l < 1048576 {
+        this.GetSubNode("Info").SetMaxLength(l-4)
+        this.ProcessSubNode("Info")
+      }
     Code: uint8
     Identifier: uint8
     Length: uint16
-    length-from-field: "Length"
     Info:
+      unpack: true
       operator: |
-        type = getNodeResult("@LCP/Code").Value
-        switch type {
-          case 0x01,0x02,0x03,0x04:
-              this.ProcessByType("Options")
-          case 0x05,0x06:
-              this.ProcessByType("Data")
-          case 0x07:
-              this.ProcessByType("CodeReject")
-          case 0x08:
-              this.ProcessByType("ProtocolReject")
-          case 0x09,0x0a:
-              this.ProcessByType("Echo")
+        code = getNodeResult("@LCP/Code").Value
+        if code == 1 || code == 2 || code == 3 || code == 4 {
+          this.ProcessByType("Options")
+          return
         }
-
-Data: raw
-
+        if code == 5 || code == 6 {
+          this.ProcessByType("Terminate")
+          return
+        }
+        if code == 7 {
+          this.ProcessByType("CodeReject")
+          return
+        }
+        if code == 8 {
+          this.ProcessByType("ProtocolReject")
+          return
+        }
+        if code == 9 || code == 10 || code == 11 {
+          this.ProcessByType("Echo")
+          return
+        }
 Options:
   list: true
-  Option:
-    Type: uint8
-    Length: uint8
-    length-from-field: "Length"
-    Data: raw
+  Option: LCPOption
   operator: |
     for {
       ele = this.NewElement()
-      if ele.GetMaxLength() < 2 {
+      if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
         break
       }
+      prev = this.Length()
       ele.Process()
+      if this.Length() <= prev {
+        break
+      }
     }
-
-CodeReject: raw
-
-ProtocolReject:
-  Rejected Protocol: uint16
-  Rejected Information: raw
-
-Echo:
+LCPOption:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    t = getNodeResult("Type").Value
+    if n < 2 {
+      panic("lcp: option length smaller than 2")
+    }
+    if t == 1 {
+      if n != 4 {
+        panic("lcp: MRU length must be 4")
+      }
+      this.ProcessSubNode("MRU")
+      return
+    }
+    if t == 2 {
+      if n != 6 {
+        panic("lcp: ACCM length must be 6")
+      }
+      this.ProcessSubNode("ACCM")
+      return
+    }
+    if t == 3 {
+      if n < 4 {
+        panic("lcp: auth-protocol length must be >= 4")
+      }
+      this.ProcessSubNode("Auth Protocol")
+      rest = n - 4
+      if rest == 1 {
+        this.ProcessSubNode("Algorithm")
+      }
+      if rest > 1 && rest < 256 {
+        this.GetSubNode("Auth Data").SetMaxLength(rest)
+        this.ProcessSubNode("Auth Data")
+      }
+      return
+    }
+    if t == 5 {
+      if n != 6 {
+        panic("lcp: magic-number length must be 6")
+      }
+      this.ProcessSubNode("Magic Number")
+      return
+    }
+    if t == 7 || t == 8 {
+      if n != 2 {
+        panic("lcp: compression option length must be 2")
+      }
+      return
+    }
+    rest = n - 2
+    if rest > 0 && rest < 256 {
+      this.GetSubNode("Octets").SetMaxLength(rest)
+      this.ProcessSubNode("Octets")
+    }
+  Type: uint8
+  Length: uint8
+  MRU: uint16
+  ACCM: uint32
+  Auth Protocol: uint16
+  Algorithm: uint8
+  Auth Data: string
   Magic Number: uint32
-  Data: raw
+  Octets: string
+Terminate:
+  operator: |
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Reason").SetMaxLength(rest)
+      this.ProcessSubNode("Reason")
+    }
+  Reason: string
+CodeReject:
+  operator: |
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Rejected Packet").SetMaxLength(rest)
+      this.ProcessSubNode("Rejected Packet")
+    }
+  Rejected Packet: string
+ProtocolReject:
+  operator: |
+    this.ProcessSubNode("Rejected Protocol")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Rejected Information").SetMaxLength(rest)
+      this.ProcessSubNode("Rejected Information")
+    }
+  Rejected Protocol: uint16
+  Rejected Information: string
+Echo:
+  operator: |
+    this.ProcessSubNode("Magic Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
+  Magic Number: uint32
+  Echo Data: string
