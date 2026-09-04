@@ -37,8 +37,8 @@
 | CIFS | B | 85 | 20 | 15 | 20 | 20 | 10 | L2 | alias of SMB |
 | LDAP | B | 80 | 20 | 20 | 16 | 14 | 10 | L2 | `application-layer/ldap.yaml` |
 | Kerberos | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/kerberos.yaml` |
-| NTLM | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
-| NTLMSSP | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
+| NTLM | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
+| NTLMSSP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
 | SPNEGO | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/spnego.yaml` |
 | RADIUS | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `application-layer/radius.yaml` |
 | SOCKS5 | B | 86 | 20 | 20 | 16 | 20 | 10 | L2 | `application-layer/socks5.yaml` |
@@ -70,7 +70,7 @@
 | Java serialization | B | 80 | 20 | 20 | 16 | 14 | 10 | L2 | `application-layer/java_ser.yaml` |
 | Kerberos PAC | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/kerberos.yaml` |
 | AS-REP / TGS | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | alias of Kerberos |
-| NTLM v1/v2 | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | alias of NTLMSSP |
+| NTLM v1/v2 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of NTLMSSP |
 | NetNTLMv2 | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/ntlm.yaml` |
 | LLMNR poison | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/nbns.yaml` |
 | NBT-NS poison | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/nbns.yaml` |

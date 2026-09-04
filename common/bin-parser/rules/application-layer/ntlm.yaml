@@ -19,6 +19,17 @@ Package:
         this.ProcessSubNode("ServerChallenge")
         this.ProcessSubNode("Reserved")
         this.ProcessSubNode("TargetInfoFields")
+        tlen = getNodeResult("TargetNameFields/Length").Value
+        toff = getNodeResult("TargetNameFields/BufferOffset").Value
+        cur = this.Length()
+        if tlen > 0 && tlen < 1048576 && toff >= cur {
+          if toff > cur {
+            this.GetSubNode("Pad").SetMaxLength(toff - cur)
+            this.ProcessSubNode("Pad")
+          }
+          this.GetSubNode("Target Name").SetMaxLength(tlen)
+          this.ProcessSubNode("Target Name")
+        }
         return
       }
       if t == 3 {
@@ -29,6 +40,28 @@ Package:
         this.ProcessSubNode("WorkstationFields")
         this.ProcessSubNode("EncryptedRandomSessionKeyFields")
         this.ProcessSubNode("NegotiateFlags")
+        dlen = getNodeResult("DomainNameFields/Length").Value
+        doff = getNodeResult("DomainNameFields/BufferOffset").Value
+        ulen = getNodeResult("UserNameFields/Length").Value
+        uoff = getNodeResult("UserNameFields/BufferOffset").Value
+        cur = this.Length()
+        if dlen > 0 && dlen < 1048576 && doff >= cur {
+          if doff > cur {
+            this.GetSubNode("Pad").SetMaxLength(doff - cur)
+            this.ProcessSubNode("Pad")
+          }
+          this.GetSubNode("Domain Name").SetMaxLength(dlen)
+          this.ProcessSubNode("Domain Name")
+          cur = this.Length()
+        }
+        if ulen > 0 && ulen < 1048576 && uoff >= cur {
+          if uoff > cur {
+            this.GetSubNode("Pad2").SetMaxLength(uoff - cur)
+            this.ProcessSubNode("Pad2")
+          }
+          this.GetSubNode("User Name").SetMaxLength(ulen)
+          this.ProcessSubNode("User Name")
+        }
         return
       }
       panic("ntlmssp: MessageType must be 1, 2 or 3")
@@ -69,6 +102,11 @@ Package:
       Length: uint16
       MaxLength: uint16
       BufferOffset: uint32
+    Target Name: string
+    Domain Name: string
+    User Name: string
+    Pad: string
+    Pad2: string
   NetNTLMv2:
     operator: |
       this.ProcessSubNode("NTProofStr")
