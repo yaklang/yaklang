@@ -91,6 +91,10 @@ Package:
           this.ProcessByType("Call Disconnect Notify")
           return
         }
+        if type == 14 {
+          this.ProcessByType("WAN Error Notify")
+          return
+        }
         if type == 15 {
           this.ProcessByType("Set Link Info")
           return
@@ -209,6 +213,16 @@ Call Disconnect Notify:
     ErrorCode: uint8
     CauseCode: uint16
     Call Statistics: string,128
+
+WAN Error Notify:
+    PeerCallId: uint16
+    Reserved1: uint16
+    CRC Errors: uint32
+    Framing Errors: uint32
+    Hardware Overruns: uint32
+    Buffer Overruns: uint32
+    Timeout Errors: uint32
+    Alignment Errors: uint32
 
 Set Link Info:
     PeerCallId: uint16

@@ -1566,6 +1566,27 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, wired.Child("ResultCode")))
 	})
 
+	t.Run("pptp/wan-error", func(t *testing.T) {
+		// RFC 2637 §2.14 WAN-Error-Notify (control type 14), 40-byte message.
+		// Peer Call ID 1, CRC Errors 1. Wireshark pptp.peer_call_id / pptp.crc_errors. TCP/1723.
+		pptp := make([]byte, 40)
+		binary.BigEndian.PutUint16(pptp[0:], 40)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 14)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint32(pptp[16:], 1)
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(14), uintVal(t, n.Child("ControlMessageType")))
+		wan := mustChild(t, n, "WAN Error Notify")
+		require.Equal(t, uint64(1), uintVal(t, wan.Child("PeerCallId")))
+		require.Equal(t, uint64(1), uintVal(t, wan.Child("CRC Errors")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "WAN Error Notify")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("PeerCallId")))
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("CRC Errors")))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
