@@ -8,8 +8,19 @@ Package:
         panic("dhcpv6: unknown message type")
       }
       this.ProcessSubNode("Transaction ID")
-      if this.Length() < this.GetMaxLength() && this.GetMaxLength() - this.Length() < 1048576 {
+      rest = 0
+      if this.GetMaxLength() > this.Length() {
+        rest = this.GetMaxLength() - this.Length()
+      }
+      if rest >= 4 && rest < 1048576 {
+        this.GetSubNode("Options").SetMaxLength(rest)
         this.ProcessSubNode("Options")
+      } else if rest >= 4 {
+        res, op = this.TryProcessByType("DHCPv6Option")
+        if op.OK {
+          op.Recovery()
+          this.ProcessSubNode("Options")
+        }
       }
     Message Type: uint8
     Transaction ID: raw,3
@@ -17,22 +28,125 @@ Package:
       list: true
       Option: DHCPv6Option
       operator: |
+        bounded = this.GetMaxLength() > 0 && this.GetMaxLength() < 1048576
         for {
-          if this.GetRemainingSpace() < 4 || this.GetRemainingSpace() > 1048576 {
-            break
+          if bounded {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 4 {
+              break
+            }
+            prev = this.Length()
+            ele.Process()
+            if this.Length() <= prev {
+              break
+            }
+          } else {
+            prev = this.Length()
+            res, op = this.TryProcessByType("DHCPv6Option")
+            if !op.OK {
+              op.Recovery()
+              break
+            }
+            op.Save()
+            if this.Length() <= prev {
+              break
+            }
           }
-          ele = this.NewElement()
-          ele.Process()
         }
 DHCPv6Option:
   operator: |
     this.ProcessSubNode("Code")
     this.ProcessSubNode("Length")
     l = getNodeResult("Length").Value
-    if l > 0 {
-      this.GetSubNode("Data").SetMaxLength(l)
-      this.ProcessSubNode("Data")
+    code = getNodeResult("Code").Value
+    if l > 65535 {
+      panic("dhcpv6: option length too large")
     }
+    if code == 8 {
+      if l != 2 {
+        panic("dhcpv6: elapsed-time length must be 2")
+      }
+      this.ProcessSubNode("Elapsed Time")
+      return
+    }
+    if code == 7 {
+      if l != 1 {
+        panic("dhcpv6: preference length must be 1")
+      }
+      this.ProcessSubNode("Preference")
+      return
+    }
+    if code == 14 {
+      if l != 0 {
+        panic("dhcpv6: rapid-commit must be empty")
+      }
+      return
+    }
+    if code == 1 || code == 2 {
+      if l != 10 {
+        panic("dhcpv6: DUID-LL length must be 10")
+      }
+      this.ProcessSubNode("DUID Type")
+      this.ProcessSubNode("Hardware Type")
+      this.ProcessSubNode("Link Layer")
+      return
+    }
+    if code == 3 {
+      if l < 12 {
+        panic("dhcpv6: IA_NA too short")
+      }
+      this.ProcessSubNode("IAID")
+      this.ProcessSubNode("T1")
+      this.ProcessSubNode("T2")
+      if l >= 40 {
+        this.ProcessSubNode("IAAddr Code")
+        this.ProcessSubNode("IAAddr Length")
+        this.ProcessSubNode("Address")
+        this.ProcessSubNode("Preferred")
+        this.ProcessSubNode("Valid")
+      }
+      return
+    }
+    if code == 5 {
+      if l < 24 {
+        panic("dhcpv6: IAADDR too short")
+      }
+      this.ProcessSubNode("Address")
+      this.ProcessSubNode("Preferred")
+      this.ProcessSubNode("Valid")
+      return
+    }
+    if code == 6 {
+      if l < 4 {
+        panic("dhcpv6: ORO too short")
+      }
+      this.ProcessSubNode("ORO1")
+      this.ProcessSubNode("ORO2")
+      return
+    }
+    if code == 23 {
+      if l < 16 {
+        panic("dhcpv6: DNS servers too short")
+      }
+      this.ProcessSubNode("DNS Address")
+      return
+    }
+    panic("dhcpv6: unsupported option")
   Code: uint16
   Length: uint16
-  Data: raw
+  Elapsed Time: uint16
+  Preference: uint8
+  DUID Type: uint16
+  Hardware Type: uint16
+  Link Layer: raw,6
+  IAID: uint32
+  T1: uint32
+  T2: uint32
+  IAAddr Code: uint16
+  IAAddr Length: uint16
+  Address: raw,16
+  Preferred: uint32
+  Valid: uint32
+  ORO1: uint16
+  ORO2: uint16
+  DNS Address: raw,16

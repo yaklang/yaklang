@@ -8,6 +8,61 @@ import (
 )
 
 func TestP1WiresharkAndRFCSamples(t *testing.T) {
+	t.Run("dhcpv6/solicit", func(t *testing.T) {
+		// RFC 8415 §18.2.1 Solicit: CLIENTID DUID-LL, ELAPSED_TIME 0, IA_NA, ORO DNS/DOMAIN.
+		sol := mustHex(t, ""+
+			"01 000001 "+
+			"0001 000a 0003 0001 000000000001 "+
+			"0008 0002 0000 "+
+			"0003 000c 00000001 00000000 00000000 "+
+			"0006 0004 0017 0018")
+		n := parseRule(t, sol, "dhcpv6", "DHCPv6")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Message Type")))
+		opts := n.Child("Options").Children()
+		require.GreaterOrEqual(t, len(opts), 4)
+		require.Equal(t, uint64(1), uintVal(t, opts[0].Child("Code")))
+		require.Equal(t, uint64(3), uintVal(t, opts[0].Child("DUID Type")))
+		require.Equal(t, uint64(1), uintVal(t, opts[0].Child("Hardware Type")))
+		require.Equal(t, []byte{0, 0, 0, 0, 0, 1}, bytesVal(t, opts[0].Child("Link Layer")))
+		require.Equal(t, uint64(8), uintVal(t, opts[1].Child("Code")))
+		require.Equal(t, uint64(0), uintVal(t, opts[1].Child("Elapsed Time")))
+		require.Equal(t, uint64(1), uintVal(t, opts[2].Child("IAID")))
+		require.Equal(t, uint64(23), uintVal(t, opts[3].Child("ORO1")))
+		require.Equal(t, uint64(24), uintVal(t, opts[3].Child("ORO2")))
+		eth := parseEthernet(t, ipv6UDPBytes(t, 546, 547, sol))
+		v6 := mustChild(t, eth, "IPv6", "UDP", "DHCPv6")
+		require.Equal(t, uint64(0), uintVal(t, v6.Child("Options").Children()[1].Child("Elapsed Time")))
+		require.Equal(t, uint64(1), uintVal(t, v6.Child("Options").Children()[2].Child("IAID")))
+	})
+
+	t.Run("dhcpv6/reply", func(t *testing.T) {
+		// RFC 8415 §21.4/21.6/21.19 Reply: SERVERID, IA_NA+IAADDR 2001:db8::1, DNS 2001:db8::53.
+		rep := mustHex(t, ""+
+			"07 000001 "+
+			"0001 000a 0003 0001 000000000001 "+
+			"0002 000a 0003 0001 000000000002 "+
+			"0003 0028 00000001 00000e10 00001518 "+
+			"0005 0018 20010db8000000000000000000000001 00000e10 00001c20 "+
+			"0017 0010 20010db8000000000000000000000053")
+		n := parseRule(t, rep, "dhcpv6", "DHCPv6")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Message Type")))
+		opts := n.Child("Options").Children()
+		require.Equal(t, uint64(2), uintVal(t, opts[1].Child("Code")))
+		require.Equal(t, []byte{0, 0, 0, 0, 0, 2}, bytesVal(t, opts[1].Child("Link Layer")))
+		iana := opts[2]
+		require.Equal(t, uint64(3600), uintVal(t, iana.Child("T1")))
+		require.Equal(t, uint64(5400), uintVal(t, iana.Child("T2")))
+		require.Equal(t, uint64(5), uintVal(t, iana.Child("IAAddr Code")))
+		require.Equal(t, []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, bytesVal(t, iana.Child("Address")))
+		require.Equal(t, uint64(3600), uintVal(t, iana.Child("Preferred")))
+		require.Equal(t, uint64(7200), uintVal(t, iana.Child("Valid")))
+		require.Equal(t, []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x53}, bytesVal(t, opts[3].Child("DNS Address")))
+		eth := parseEthernet(t, ipv6UDPBytes(t, 547, 546, rep))
+		v6 := mustChild(t, eth, "IPv6", "UDP", "DHCPv6")
+		require.Equal(t, uint64(7), uintVal(t, v6.Child("Message Type")))
+		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
+	})
+
 	t.Run("ftp_data/eor", func(t *testing.T) {
 		// RFC 959 §3.4.2: bit 128 EOR, not EOF. TCP/20 bounds the block.
 		fd := []byte{0x80, 0x00, 0x0a, 'f', 'i', 'l', 'e', '-', 'b', 'y', 't', 'e', 's'}
