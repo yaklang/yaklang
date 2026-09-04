@@ -717,6 +717,27 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTP").Child("Sequence")))
 	})
 
+	t.Run("websocket/text", func(t *testing.T) {
+		// RFC 6455 §5.7 unmasked text: 0x81 0x05 "Hello" (PROTOCOL_DELIVERY L2 sample).
+		ws := []byte{0x81, 0x05, 'H', 'e', 'l', 'l', 'o'}
+		n := parseRule(t, ws, "application-layer.websocket", "WebSocket")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("FIN")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, "Hello", strVal(t, n.Child("Text")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 8080, ws))
+		require.Equal(t, "Hello", strVal(t, mustChild(t, eth, "IP", "TCP", "WebSocket").Child("Text")))
+	})
+
+	t.Run("websocket/close", func(t *testing.T) {
+		// RFC 6455 §5.5.1 / §7.4.1 unmasked Close status 1000 (normal closure).
+		ws := []byte{0x88, 0x02, 0x03, 0xe8}
+		n := parseRule(t, ws, "application-layer.websocket", "WebSocket")
+		require.Equal(t, uint64(8), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(1000), uintVal(t, n.Child("Close Code")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 8080, ws))
+		require.Equal(t, uint64(1000), uintVal(t, mustChild(t, eth, "IP", "TCP", "WebSocket").Child("Close Code")))
+	})
+
 	t.Run("ike/ke-nonce", func(t *testing.T) {
 		// RFC 7296 §3.4 KE DH group 2 + §3.9 Nonce.
 		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
