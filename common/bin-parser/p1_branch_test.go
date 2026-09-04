@@ -55,6 +55,8 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("l2tp/flags", func(t *testing.T) {
 		l := parseRule(t, mustHex(t, "02020014000100020000ff03002d"), "l2tp", "L2TP")
 		require.Equal(t, uint64(0x0014), uintVal(t, l.Child("Tunnel ID")))
+		require.Equal(t, uint64(2), uintVal(t, l.Child("Offset Size")))
+		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, l, "PPP").Child("Protocol")))
 	})
 	t.Run("l2tp/session", func(t *testing.T) {
 		l := parseRule(t, mustHex(t, "02020014000400020000ff03002d"), "l2tp", "L2TP")
