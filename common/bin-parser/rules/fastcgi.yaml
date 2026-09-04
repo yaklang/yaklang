@@ -46,6 +46,21 @@ Package:
           ele.Process()
         }
 FastCGIPair:
+  operator: |
+    this.ProcessSubNode("Name Len")
+    this.ProcessSubNode("Value Len")
+    nl = getNodeResult("Name Len").Value
+    vl = getNodeResult("Value Len").Value
+    if nl > 0 && nl < 256 {
+      this.GetSubNode("Name").SetMaxLength(nl)
+      this.ProcessSubNode("Name")
+    }
+    if vl > 0 && vl < 256 {
+      this.GetSubNode("Value").SetMaxLength(vl)
+      this.ProcessSubNode("Value")
+    }
   Name Len: uint8
   Value Len: uint8
+  Name: string
+  Value: string
 
