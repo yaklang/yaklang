@@ -37,7 +37,12 @@ Package:
           case 0x9000:
             this.ProcessByType("Loopback")
           default:
-            this.NewUnknownNode()
+            res, op = this.TryProcessByType("PeekByte")
+            op.Recovery()
+            if op.OK {
+              this.ProcessByType("Next Protocol Data")
+            }
+            return
         }
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
@@ -51,4 +56,18 @@ PPPoESession: "import:pppoe.yaml;node:PPPoE"
 MPLS: "import:mpls.yaml;node:MPLS"
 LLDP: "import:lldp.yaml;node:LLDP"
 Loopback: "import:loopback.yaml;node:Loopback"
-Unknown: raw
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8
