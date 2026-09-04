@@ -9,27 +9,40 @@ Package:
       }
       this.ProcessSubNode("Reserved")
       if typ == 1 {
-        this.ProcessSubNode("Sender")
-        this.ProcessSubNode("Ephemeral")
-        this.ProcessSubNode("Static")
-        this.ProcessSubNode("Timestamp")
-        this.ProcessSubNode("MAC1")
-        this.ProcessSubNode("MAC2")
+        this.ProcessByType("WGInit")
         return
       }
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Body").SetMaxLength(rest)
-          this.ProcessSubNode("Body")
-        }
+      if typ == 2 {
+        this.ProcessByType("WGResponse")
+        return
       }
     Type: uint8
     Reserved: raw,3
-    Sender: uint32
-    Ephemeral: raw,32
-    Static: raw,48
-    Timestamp: raw,28
-    MAC1: raw,16
-    MAC2: raw,16
-    Body: raw
+WGInit:
+  operator: |
+    this.ProcessSubNode("Sender")
+    this.ProcessSubNode("Ephemeral")
+    this.ProcessSubNode("Static")
+    this.ProcessSubNode("Timestamp")
+    this.ProcessSubNode("MAC1")
+    this.ProcessSubNode("MAC2")
+  Sender: uint32
+  Ephemeral: raw,32
+  Static: raw,48
+  Timestamp: raw,28
+  MAC1: raw,16
+  MAC2: raw,16
+WGResponse:
+  operator: |
+    this.ProcessSubNode("Sender")
+    this.ProcessSubNode("Receiver")
+    this.ProcessSubNode("Ephemeral")
+    this.ProcessSubNode("Encrypted Empty")
+    this.ProcessSubNode("MAC1")
+    this.ProcessSubNode("MAC2")
+  Sender: uint32
+  Receiver: uint32
+  Ephemeral: raw,32
+  Encrypted Empty: raw,16
+  MAC1: raw,16
+  MAC2: raw,16
