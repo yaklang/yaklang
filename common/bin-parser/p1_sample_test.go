@@ -538,6 +538,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, invoking, bytesVal(t, wired.Child("Original Datagram")))
 	})
 
+	t.Run("icmpv6/time-exceeded", func(t *testing.T) {
+		// RFC 4443 §3.3 Time Exceeded Type 3 Code 0 hop limit exceeded in transit.
+		invoking := []byte{0x60, 0x00, 0x00, 0x00}
+		te := append([]byte{0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, invoking...)
+		n := parseRule(t, te, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Code")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, n, "Time Exceeded").Child("Unused")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, te))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Time Exceeded")
+		require.Equal(t, uint64(0), uintVal(t, wired.Child("Unused")))
+		require.Equal(t, invoking, bytesVal(t, wired.Child("Original Datagram")))
+	})
+
+	t.Run("icmpv6/param-problem", func(t *testing.T) {
+		// RFC 4443 §3.4 Parameter Problem Type 4 Code 1 unrecognized Next Header.
+		// Pointer 6 is the IPv6 Next Header octet (RFC 8200 §3).
+		invoking := []byte{0x60, 0x00, 0x00, 0x00}
+		pp := append([]byte{0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06}, invoking...)
+		n := parseRule(t, pp, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(4), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Code")))
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, n, "Parameter Problem").Child("Pointer")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, pp))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Parameter Problem")
+		require.Equal(t, uint64(6), uintVal(t, wired.Child("Pointer")))
+		require.Equal(t, invoking, bytesVal(t, wired.Child("Original Datagram")))
+	})
+
 	t.Run("icmpv6/ra-opt", func(t *testing.T) {
 		// gopacket layers/icmp6msg_test.go Router Advertisement: SLLA + MTU 1500 + Prefix 2001:db8:0:1::/64.
 		ra := []byte{
