@@ -383,6 +383,19 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "Incoming Call Req").Child("CallId")))
 		require.True(t, strings.HasPrefix(strVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "Incoming Call Req").Child("DialedNumber")), "5551212"))
 	})
+	t.Run("pptp/icrp", func(t *testing.T) {
+		pptp := make([]byte, 28)
+		binary.BigEndian.PutUint16(pptp[0:], 28)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 10)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint16(pptp[14:], 1)
+		pptp[16] = 1
+		binary.BigEndian.PutUint16(pptp[20:], 64)
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "Incoming Call Reply").Child("ResultCode")))
+		require.Equal(t, uint64(64), uintVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "Incoming Call Reply").Child("RecvWindowSize")))
+	})
 	t.Run("pptp/set-link-info", func(t *testing.T) {
 		pptp := make([]byte, 24)
 		binary.BigEndian.PutUint16(pptp[0:], 24)
