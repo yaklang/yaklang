@@ -118,6 +118,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, ep.Child("Packet Type")))
 	})
 
+	t.Run("socks4/connect", func(t *testing.T) {
+		n := parseRule(t, []byte{0x04, 0x01, 0x00, 0x50, 10, 0, 0, 1, 'u', 0}, "socks4", "SOCKS4")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Command")))
+		require.Equal(t, "u", strVal(t, n.Child("UserID")))
+	})
+	t.Run("socks4/reply", func(t *testing.T) {
+		n := parseRule(t, []byte{0x00, 0x5a, 0x00, 0x50, 10, 0, 0, 1}, "socks4", "SOCKS4")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(90), uintVal(t, n.Child("Command")))
+		require.Nil(t, n.Child("UserID"))
+	})
 	t.Run("stp/config", func(t *testing.T) {
 		n := parseRule(t, stpConfigBPDU(), "stp", "STP")
 		require.Equal(t, uint64(0), uintVal(t, n.Child("BPDU Type")))
