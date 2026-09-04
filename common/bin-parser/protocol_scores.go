@@ -52,9 +52,11 @@ func (s ProtocolScorecard) Grade() string {
 }
 
 func card(name, rule string, schema, traffic, tests, branches, stack int, sample, evidence, opaque string) ProtocolScorecard {
+	// G5 requires L1/L2/L3; L4-only handmade PDUs fail the gate (Total 0).
+	g5 := sample == "L1" || sample == "L2" || sample == "L3"
 	return ProtocolScorecard{
 		Name: name, Rule: rule,
-		G1: true, G2: true, G3: true, G4: true, G5: true, G6: true, G7: true, G8: true,
+		G1: true, G2: true, G3: true, G4: true, G5: g5, G6: true, G7: true, G8: true,
 		Schema: schema, Traffic: traffic, Tests: tests, Branches: branches, Stack: stack,
 		SampleClass: sample, Evidence: evidence, OpaqueRaw: opaque,
 	}

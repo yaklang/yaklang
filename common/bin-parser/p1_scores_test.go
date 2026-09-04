@@ -27,10 +27,20 @@ func TestP1ScorecardsCovered(t *testing.T) {
 		require.True(t, testsDim[sc.Tests], "%s tests %d", item.Name, sc.Tests)
 		require.True(t, branchDim[sc.Branches], "%s branches %d", item.Name, sc.Branches)
 		require.True(t, stackDim[sc.Stack], "%s stack %d", item.Name, sc.Stack)
-		require.NotEmpty(t, sc.SampleClass, "%s missing sample class", item.Name)
+		require.Contains(t, []string{"L1", "L2", "L3", "L4"}, sc.SampleClass, "%s sample class", item.Name)
 		require.NotEmpty(t, sc.Evidence, "%s missing evidence", item.Name)
+		if sc.SampleClass == "L4" {
+			require.False(t, sc.G5, "P1 %q SampleClass L4 must fail G5", item.Name)
+			require.LessOrEqual(t, sc.Traffic, 8, "P1 %q L4 traffic must be <= 8", item.Name)
+		}
+		if sc.SampleClass == "L3" {
+			require.LessOrEqual(t, sc.Traffic, 8, "P1 %q L3 gopacket serialize traffic must be <= 8", item.Name)
+		}
 		require.Contains(t, []string{"A", "B", "C", "D", "F"}, sc.Grade())
 		if item.Status == stDone {
+			if sc.SampleClass == "L4" {
+				t.Errorf("P1 %q is done but SampleClass L4 (G5 requires L1/L2/L3)", item.Name)
+			}
 			if sc.Grade() != "A" {
 				t.Errorf("P1 %q is done but grade %s total %d (need A)", item.Name, sc.Grade(), sc.Total())
 			}

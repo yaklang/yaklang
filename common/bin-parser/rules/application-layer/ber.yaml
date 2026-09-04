@@ -1,21 +1,22 @@
 Package:
   BER Element:
     operator: |
-      type = this.ProcessSubNode("Type").Value
-      l = this.ProcessSubNode("Length").Value
-      if l.Value == 0{
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l == 0 {
         return
       }
-      var nextNode
-      if type.Child("Constructed").Value {
-        this.GetSubNode("Children").SetMaxLength(l.Value)
+      typ = getNodeResult("Type")
+      if typ.Child("Constructed").Value {
+        this.GetSubNode("Children").SetMaxLength(l)
         this.ProcessSubNode("Children")
       }else{
-        if type.Child("Tag").Value == 2 && type.Child("Class").Value == 0{
-            this.GetSubNode("Integer").SetMaxLength(l.Value)
+        if typ.Child("Tag").Value == 2 && typ.Child("Class").Value == 0{
+            this.GetSubNode("Integer").SetMaxLength(l)
             this.ProcessSubNode("Integer")
         }else{
-            this.GetSubNode("Value").SetMaxLength(l.Value)
+            this.GetSubNode("Value").SetMaxLength(l)
             this.ProcessSubNode("Value")
         }
       }
@@ -97,7 +98,15 @@ Package:
           }
         }
     Value: raw
-    Integer: uint32
+    Integer:
+      type: raw
+      out: |
+        b = data.Value
+        res = 0
+        for _, x = range b {
+          res = (res << 8) + x
+        }
+        return res
     OCTET STRING: string
     NULL: raw,0
     OBJECT IDENTIFIER: string
