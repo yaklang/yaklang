@@ -1222,4 +1222,39 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(2), uintVal(t, wired.Child("Method")))
 		require.Equal(t, "/", strVal(t, wired.Child("URI")))
 	})
+
+	t.Run("tds/prelogin", func(t *testing.T) {
+		// [MS-TDS] 2.2.6.5 PRELOGIN VERSION token 0 + terminator 0xff, then UL_VERSION 12.0.
+		// Wireshark packet-tds.c TDS7_PRELOGIN_OPTION_VERSION / tds.prelogin.
+		raw := tdsPacket(18, 1, mustHex(t, "0000060006ff0c0000000000"))
+		n := parseRule(t, raw, "application-layer.tds", "TDS")
+		require.Equal(t, uint64(18), uintVal(t, n.Child("Type")))
+		toks := n.Child("Prelogin")
+		require.True(t, toks.IsList())
+		require.Equal(t, uint64(0), uintVal(t, toks.Children()[0].Child("Type")))
+		require.Equal(t, uint64(0xff), uintVal(t, toks.Children()[len(toks.Children())-1].Child("Type")))
+		ver := mustChild(t, n, "TDSVersionData")
+		require.Equal(t, uint64(12), uintVal(t, ver.Child("Version Major")))
+		require.Equal(t, uint64(0), uintVal(t, ver.Child("Version Minor")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1433, raw))
+		require.Equal(t, uint64(12), uintVal(t, mustChild(t, eth, "IP", "TCP", "TDS", "TDSVersionData").Child("Version Major")))
+	})
+
+	t.Run("tds/login7", func(t *testing.T) {
+		// [MS-TDS] 2.2.6.4 LOGIN7: Length, TDSVersion 7.4 (0x74000004), PacketSize 4096,
+		// ibHostName + UTF-16LE "host". Wireshark tds.version / hostname.
+		payload := mustHex(t, "6600000004000074001000000000000000000000000000000000000000000000000000005e00040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000068006f0073007400")
+		raw := tdsPacket(16, 1, payload)
+		n := parseRule(t, raw, "application-layer.tds", "TDS")
+		require.Equal(t, uint64(16), uintVal(t, n.Child("Type")))
+		lg := mustChild(t, n, "TDSLogin7")
+		require.Equal(t, uint64(102), uintVal(t, lg.Child("Login Length")))
+		require.Equal(t, uint64(0x74000004), uintVal(t, lg.Child("TDS Version")))
+		require.Equal(t, uint64(4096), uintVal(t, lg.Child("Packet Size")))
+		require.Equal(t, "host", strings.ReplaceAll(strVal(t, lg.Child("HostName")), "\x00", ""))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1433, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "TDS", "TDSLogin7")
+		require.Equal(t, uint64(0x74000004), uintVal(t, wired.Child("TDS Version")))
+		require.Equal(t, "host", strings.ReplaceAll(strVal(t, wired.Child("HostName")), "\x00", ""))
+	})
 }

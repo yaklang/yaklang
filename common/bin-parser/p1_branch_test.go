@@ -549,4 +549,14 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(2), uintVal(t, fwd.Child("Method")))
 		require.Equal(t, "/", strVal(t, fwd.Child("URI")))
 	})
+
+	t.Run("tds/prelogin", func(t *testing.T) {
+		n := parseRule(t, tdsPacket(18, 1, mustHex(t, "0000060006ff0c0000000000")), "application-layer.tds", "TDS")
+		require.Equal(t, uint64(12), uintVal(t, mustChild(t, n, "TDSVersionData").Child("Version Major")))
+	})
+	t.Run("tds/login7", func(t *testing.T) {
+		lg := mustChild(t, parseRule(t, tdsPacket(16, 1, mustHex(t, "6600000004000074001000000000000000000000000000000000000000000000000000005e00040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000068006f0073007400")), "application-layer.tds", "TDS"), "TDSLogin7")
+		require.Equal(t, uint64(0x74000004), uintVal(t, lg.Child("TDS Version")))
+		require.Equal(t, uint64(4), uintVal(t, lg.Child("HostName Chars")))
+	})
 }
