@@ -2604,6 +2604,39 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4ProtoFrame(t, 132, raw))
 		require.Equal(t, uint64(0x43232544), uintVal(t, mustChild(t, eth, "IP", "SCTP").Child("Chunks").Children()[0].Child("Initiate Tag")))
 	})
+
+	t.Run("eigrp/hello", func(t *testing.T) {
+		// Wireshark SampleCaptures/EIGRP_Neighbors.cap Hello: AS 100, Parameters K1=1 K3=1 Hold 15s. RFC 7868 §6.2 / eigrp.par.k1.
+		raw := mustHex(t, "0205ee68000000000000000000000000000000640001000c010001000000000f000400080c040102")
+		n := parseRule(t, raw, "eigrp", "EIGRP")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(100), uintVal(t, n.Child("AS Number")))
+		tlvs := n.Child("TLVs").Children()
+		require.GreaterOrEqual(t, len(tlvs), 2)
+		require.Equal(t, uint64(1), uintVal(t, tlvs[0].Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, tlvs[0].Child("K1")))
+		require.Equal(t, uint64(0), uintVal(t, tlvs[0].Child("K2")))
+		require.Equal(t, uint64(1), uintVal(t, tlvs[0].Child("K3")))
+		require.Equal(t, uint64(15), uintVal(t, tlvs[0].Child("Hold Time")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 88, raw))
+		require.Equal(t, uint64(100), uintVal(t, mustChild(t, eth, "IP", "EIGRP").Child("AS Number")))
+		require.Equal(t, uint64(15), uintVal(t, mustChild(t, eth, "IP", "EIGRP").Child("TLVs").Children()[0].Child("Hold Time")))
+	})
+
+	t.Run("eigrp/swver", func(t *testing.T) {
+		// Same EIGRP_Neighbors.cap Hello Software Version TLV: IOS 12.4, EIGRP 1.2. Wireshark eigrp.release_version.
+		raw := mustHex(t, "0205ee68000000000000000000000000000000640001000c010001000000000f000400080c040102")
+		n := parseRule(t, raw, "eigrp", "EIGRP")
+		sw := n.Child("TLVs").Children()[1]
+		require.Equal(t, uint64(4), uintVal(t, sw.Child("Type")))
+		require.Equal(t, uint64(12), uintVal(t, sw.Child("IOS Major")))
+		require.Equal(t, uint64(4), uintVal(t, sw.Child("IOS Minor")))
+		require.Equal(t, uint64(1), uintVal(t, sw.Child("EIGRP Major")))
+		require.Equal(t, uint64(2), uintVal(t, sw.Child("EIGRP Minor")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 88, raw))
+		require.Equal(t, uint64(12), uintVal(t, mustChild(t, eth, "IP", "EIGRP").Child("TLVs").Children()[1].Child("IOS Major")))
+	})
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {

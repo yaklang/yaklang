@@ -7,48 +7,100 @@ Package:
         panic("eigrp: version must be 2")
       }
       this.ProcessSubNode("Opcode")
+      op = getNodeResult("Opcode").Value
+      if op > 11 {
+        panic("eigrp: unknown opcode")
+      }
       this.ProcessSubNode("Checksum")
       this.ProcessSubNode("Flags")
       this.ProcessSubNode("Sequence")
       this.ProcessSubNode("Ack")
+      this.ProcessSubNode("Virtual Router ID")
       this.ProcessSubNode("AS Number")
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest >= 4 && rest < 1048576 {
-          this.GetSubNode("TLVs").SetMaxLength(rest)
-          this.ProcessSubNode("TLVs")
-        }
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        return
       }
+      op.Recovery()
+      this.ProcessSubNode("TLVs")
+      return
     Version: uint8
     Opcode: uint8
     Checksum: uint16
     Flags: uint32
     Sequence: uint32
     Ack: uint32
-    AS Number: uint32
+    Virtual Router ID: uint16
+    AS Number: uint16
     TLVs:
       list: true
       TLV: EIGRPTLV
       operator: |
         for {
-          if this.GetRemainingSpace() < 4 || this.GetRemainingSpace() > 1048576 {
+          if this.GetMaxLength() < 4 {
             break
           }
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
           ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          prev = this.Length()
           ele.Process()
+          if this.Length() <= prev {
+            break
+          }
         }
 EIGRPTLV:
   operator: |
     this.ProcessSubNode("Type")
     this.ProcessSubNode("Length")
+    t = getNodeResult("Type").Value
     l = getNodeResult("Length").Value
     if l < 4 {
       panic("eigrp: tlv length smaller than 4")
     }
-    if l > 4 {
-      this.GetSubNode("Value").SetMaxLength(l - 4)
-      this.ProcessSubNode("Value")
+    if t == 1 {
+      this.ProcessSubNode("K1")
+      this.ProcessSubNode("K2")
+      this.ProcessSubNode("K3")
+      this.ProcessSubNode("K4")
+      this.ProcessSubNode("K5")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Hold Time")
+      return
     }
+    if t == 4 {
+      this.ProcessSubNode("IOS Major")
+      this.ProcessSubNode("IOS Minor")
+      this.ProcessSubNode("EIGRP Major")
+      this.ProcessSubNode("EIGRP Minor")
+      return
+    }
+    dlen = l - 4
+    if dlen > 0 && dlen < 1048576 {
+      this.GetSubNode("TLV Data").SetMaxLength(dlen)
+      this.ProcessSubNode("TLV Data")
+    }
+    return
   Type: uint16
   Length: uint16
-  Value: raw
+  K1: uint8
+  K2: uint8
+  K3: uint8
+  K4: uint8
+  K5: uint8
+  Reserved: uint8
+  Hold Time: uint16
+  IOS Major: uint8
+  IOS Minor: uint8
+  EIGRP Major: uint8
+  EIGRP Minor: uint8
+  TLV Data: string
+PeekByte: uint8
