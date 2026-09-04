@@ -108,7 +108,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | SNMPv3 | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/snmp.yaml` |
 | Syslog | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `syslog.yaml` |
 | IPMI | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `ipmi.yaml` |
-| SIP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `sip.yaml` |
+| SIP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `sip.yaml` |
 | SDP | A | 96 | 25 | 25 | 16 | 20 | 10 | L2 | `sdp.yaml` |
 | RTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
 | RTCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
