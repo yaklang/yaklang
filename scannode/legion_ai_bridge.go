@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
+	"github.com/yaklang/yaklang/scannode/inputresolver"
 )
 
 // selectAISessionRuntimeDriver picks the AI runtime driver based on the
@@ -120,6 +121,7 @@ type aiSessionRuntimeFocusTurnReporter interface {
 }
 
 type aiSessionBinding struct {
+	InputWorkspace             *inputresolver.Workspace
 	Ref                        aiSessionCommandRef
 	ProjectID                  string
 	Title                      string
@@ -128,6 +130,8 @@ type aiSessionBinding struct {
 	Attachments                []aiSessionAttachmentRef
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
+	PlatformAPIBaseURL         string
+	NodeSessionID              string
 	HTTPClient                 *http.Client
 	LegionResultRuntime        aicommon.LegionResultRuntime
 	ExecutionMode              string
@@ -152,6 +156,9 @@ type aiSessionCredentialRef struct {
 }
 
 type aiSessionRuntimeBindOptions struct {
+	// PreparationContext belongs to the transport consumer, not an installed runtime.
+	PreparationContext  context.Context
+	InputResolver       *inputresolver.Resolver
 	PlatformBearerToken string
 	PlatformAPIBaseURL  string
 	NodeSessionID       string
@@ -232,6 +239,8 @@ type closedAISessionRuntime struct {
 }
 
 type aiSessionRuntimeManager struct {
+	inputResolver      *inputresolver.Resolver
+	inputResolverError error
 	mu                 sync.Mutex
 	sessions           map[string]*aiSessionRuntime
 	bindings           map[string]aiSessionBindReservation
@@ -241,8 +250,11 @@ type aiSessionRuntimeManager struct {
 }
 
 type aiSessionBindReservation struct {
-	commandID string
-	epoch     uint64
+	ref        aiSessionCommandRef
+	cancel     context.CancelFunc
+	resultSink *aiSessionResultSinkProxy
+	commandID  string
+	epoch      uint64
 }
 
 type aiSessionTerminalTombstone struct {
@@ -277,6 +289,7 @@ type aiSessionRuntime struct {
 	terminalPublishFailed  bool
 	executionMode          string
 	codeWorkspace          *legionCodeWorkspaceRuntime
+	inputWorkspace         *inputresolver.Workspace
 }
 
 type processedAISessionInput struct {
@@ -289,7 +302,9 @@ func newAISessionRuntimeManager(driver aiSessionRuntimeDriver) *aiSessionRuntime
 	if driver == nil {
 		driver = noopAISessionRuntimeDriver{}
 	}
+	resolver, resolverErr := getDefaultInputResolver()
 	return &aiSessionRuntimeManager{
+		inputResolver: resolver, inputResolverError: resolverErr,
 		sessions:           make(map[string]*aiSessionRuntime),
 		bindings:           make(map[string]aiSessionBindReservation),
 		terminalTombstones: make(map[string]aiSessionTerminalTombstone),
@@ -309,12 +324,45 @@ func (m *aiSessionRuntimeManager) Bind(
 	options aiSessionRuntimeBindOptions,
 ) (aiSessionCommandRef, error) {
 	ref := aiSessionRefFromBindCommand(command)
+	if err := validateInputWorkspaceBind(command); err != nil {
+		return ref, err
+	}
+	ctx, cancel := context.WithCancel(parent)
+	stopPreparation := func() {}
+	if options.PreparationContext != nil {
+		cancelled := make(chan struct{})
+		stop := context.AfterFunc(options.PreparationContext, func() { cancel(); close(cancelled) })
+		var once sync.Once
+		stopPreparation = func() {
+			once.Do(func() {
+				if !stop() {
+					<-cancelled
+				}
+			})
+		}
+		defer stopPreparation()
+	}
+
+	installed := false
+	defer func() {
+		if !installed {
+			cancel()
+		}
+	}()
 	bindIssuedAt, bindIssuedAtValid := aiSessionBindIssuedAt(command)
 	bindEpoch := command.GetBindEpoch()
 
 	m.mu.Lock()
 	var replaced *aiSessionRuntime
 	if pending, ok := m.bindings[ref.SessionID]; ok {
+		if pending.ref.OwnerUserID != "" && pending.ref.OwnerUserID != ref.OwnerUserID {
+			m.mu.Unlock()
+			return ref, fmt.Errorf("ai session owner mismatch")
+		}
+		if pending.commandID == ref.CommandID {
+			m.mu.Unlock()
+			return ref, errAISessionBindRetry
+		}
 		if bindEpoch == 0 || bindEpoch <= pending.epoch {
 			m.mu.Unlock()
 			return ref, fmt.Errorf(
@@ -343,6 +391,10 @@ func (m *aiSessionRuntimeManager) Bind(
 		terminalPublishFailed := existing.terminalPublishFailed
 		existing.mu.Unlock()
 		if existing.bindCommandID == ref.CommandID {
+			if existing.inputWorkspace != nil && existing.inputWorkspace.ManifestID() != command.GetInputManifest().GetManifestId() {
+				m.mu.Unlock()
+				return ref, &inputresolver.Error{Code: "input_identity_mismatch"}
+			}
 			if terminalCommandID != "" || terminalPublishFailed {
 				m.mu.Unlock()
 				return ref, fmt.Errorf(
@@ -380,10 +432,45 @@ func (m *aiSessionRuntimeManager) Bind(
 		}
 		replaced = existing
 	}
-	m.bindings[ref.SessionID] = aiSessionBindReservation{commandID: ref.CommandID, epoch: bindEpoch}
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.cancel != nil {
+		pending.cancel()
+	}
+	m.bindings[ref.SessionID] = aiSessionBindReservation{commandID: ref.CommandID, epoch: bindEpoch, ref: ref, cancel: cancel, resultSink: newAISessionResultSinkProxy(options.ResultSink)}
 	m.mu.Unlock()
 
-	ctx, cancel := context.WithCancel(parent)
+	inputEvents := &inputWorkspaceEmitter{manager: m, ref: ref, publisher: publisher, ctx: ctx}
+	var inputWorkspace *inputresolver.Workspace
+	defer func() {
+		if !installed && inputWorkspace != nil {
+			_ = inputWorkspace.Cleanup()
+		}
+	}()
+	if command.GetInputManifest() != nil {
+		resolver := options.InputResolver
+		if resolver == nil {
+			resolver = m.inputResolver
+		}
+		if resolver == nil {
+			m.clearBindReservation(ref.SessionID, ref.CommandID)
+			return ref, fmt.Errorf("managed input resolver unavailable: %w", m.inputResolverError)
+		}
+		identity, _ := inputBindingIdentity(command)
+		var prepareErr error
+		inputWorkspace, prepareErr = resolver.Prepare(ctx, command.GetInputManifest(), identity, command.GetAttachments(), inputresolver.DownloadOptions{
+			APIBaseURL: options.PlatformAPIBaseURL, NodeSessionID: options.NodeSessionID, BearerToken: options.PlatformBearerToken, HTTPClient: options.HTTPClient,
+		}, inputEvents.Emit)
+		if prepareErr != nil {
+			m.mu.Lock()
+			pending, ok := m.bindings[ref.SessionID]
+			superseded := !ok || pending.commandID != ref.CommandID
+			m.mu.Unlock()
+			m.clearBindReservation(ref.SessionID, ref.CommandID)
+			if superseded {
+				return ref, errAISessionBindFenced
+			}
+			return ref, prepareErr
+		}
+	}
 	codeWorkspace, publicRuntimeOptions, err := prepareLegionCodeWorkspace(
 		ctx,
 		command.GetRuntimeOptionSnapshotJson(),
@@ -444,7 +531,12 @@ func (m *aiSessionRuntimeManager) Bind(
 		inFlightInputCommands:  make(map[string]struct{}),
 		executionMode:          strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		codeWorkspace:          codeWorkspace,
+		inputWorkspace:         inputWorkspace,
+		seq:                    inputEvents.seq,
 	}
+	m.mu.Lock()
+	inputEvents.runtime = runtime
+	m.mu.Unlock()
 	runtime.handle = noopAISessionRuntimeHandle{}
 	managedEmitter := &managedAISessionRuntimeEmitter{
 		ctx:       ctx,
@@ -454,17 +546,21 @@ func (m *aiSessionRuntimeManager) Bind(
 	}
 	if serverRuntime, ok := focusRuntime.(*legionServerFocusRuntime); ok {
 		serverRuntime.emitEvent = managedEmitter.Emit
+		serverRuntime.inputWorkspace = inputWorkspace
 		serverRuntime.authorizedFocusReleaseID = strings.TrimSpace(command.GetResultContext().GetFocusReleaseId())
 	}
 	handle, err := m.driver.Bind(ctx, aiSessionBinding{
+		InputWorkspace:             inputWorkspace,
 		Ref:                        ref,
 		ProjectID:                  runtime.projectID,
 		Title:                      runtime.title,
 		ProviderPolicySnapshotJSON: cloneBytes(command.GetProviderPolicySnapshotJson()),
 		RuntimeOptionSnapshotJSON:  publicRuntimeOptions,
-		Attachments:                cloneAISessionAttachmentRefs(command.GetAttachments()),
+		Attachments:                legacyAISessionAttachmentRefs(command),
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
+		PlatformAPIBaseURL:         strings.TrimSpace(options.PlatformAPIBaseURL),
+		NodeSessionID:              strings.TrimSpace(options.NodeSessionID),
 		HTTPClient:                 options.HTTPClient,
 		LegionResultRuntime:        focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
@@ -477,11 +573,33 @@ func (m *aiSessionRuntimeManager) Bind(
 			handle.Close("runtime bind failed")
 		}
 		_ = codeWorkspace.Cleanup()
+		m.mu.Lock()
+		pending, ok := m.bindings[ref.SessionID]
+		superseded := !ok || pending.commandID != ref.CommandID
+		m.mu.Unlock()
 		m.clearBindReservation(ref.SessionID, ref.CommandID)
+		if superseded {
+			return ref, errAISessionBindFenced
+		}
 		return ref, err
 	}
+	// Completing preparation detaches transport lifetime from the installed engine.
+	// If transport shutdown won the race, wait for cancellation and retire this handle.
+	stopPreparation()
+	if options.PreparationContext != nil && options.PreparationContext.Err() != nil {
+		cancel()
+		if handle != nil {
+			handle.Close("command consumer stopped during bind")
+		}
+		_ = codeWorkspace.Cleanup()
+		m.clearBindReservation(ref.SessionID, ref.CommandID)
+		return ref, options.PreparationContext.Err()
+	}
+
 	if handle != nil {
-		if codeWorkspace != nil {
+		if inputWorkspace != nil {
+			runtime.handle = &inputWorkspaceRuntimeHandle{handle: handle, workspace: inputWorkspace}
+		} else if codeWorkspace != nil {
 			runtime.handle = &legionCodeWorkspaceRuntimeHandle{handle: handle, workspace: codeWorkspace}
 		} else {
 			runtime.handle = handle
@@ -508,7 +626,9 @@ func (m *aiSessionRuntimeManager) Bind(
 		terminalCommandID := replaced.terminalCommandID
 		terminalKind := replaced.terminalKind
 		if terminalCommandID == "" {
-			runtime.seq = replaced.seq
+			if replaced.seq > runtime.seq {
+				runtime.seq = replaced.seq
+			}
 			runtime.processedInputCommands = cloneProcessedAISessionInputs(replaced.processedInputCommands)
 			runtime.processedInputOrder = append([]string(nil), replaced.processedInputOrder...)
 			runtime.inFlightInputCommands = cloneAISessionCommandSet(replaced.inFlightInputCommands)
@@ -537,6 +657,7 @@ func (m *aiSessionRuntimeManager) Bind(
 	runtime.retired = false
 	runtime.mu.Unlock()
 	m.sessions[ref.SessionID] = runtime
+	installed = true
 	m.deleteTerminalTombstoneLocked(ref.SessionID)
 	delete(m.bindings, ref.SessionID)
 	m.mu.Unlock()
@@ -822,8 +943,48 @@ func (m *aiSessionRuntimeManager) Cancel(
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch > ref.BindEpoch {
+		return cancelledAISessionRuntime{ref: ref}, errAISessionBindFenced
+	}
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch == ref.BindEpoch {
+		if pending.ref.OwnerUserID != ref.OwnerUserID || (ref.RunID != "" && ref.RunID != pending.ref.RunID) {
+			return cancelledAISessionRuntime{ref: ref}, fmt.Errorf("ai session pending identity mismatch")
+		}
+		if pending.cancel != nil {
+			pending.cancel()
+		}
+		if old := m.sessions[ref.SessionID]; old != nil && old.bindEpoch <= ref.BindEpoch {
+			old.mu.Lock()
+			old.retired = true
+			if old.cancel != nil {
+				old.cancel()
+			}
+			old.mu.Unlock()
+			delete(m.sessions, ref.SessionID)
+			go func() {
+				if old.handle != nil {
+					old.handle.Close("pending binding cancelled")
+				}
+			}()
+		}
+		delete(m.bindings, ref.SessionID)
+		m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{commandID: ref.CommandID, kind: "cancel", epoch: ref.BindEpoch})
+		return cancelledAISessionRuntime{ref: ref, reason: reason, resultSink: pending.resultSink}, nil
+	}
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
+		// Cancel can overtake a queued asynchronous Bind before it reserves its epoch.
+		if tombstone, known := m.terminalTombstones[ref.SessionID]; known {
+			if tombstone.epoch > ref.BindEpoch {
+				return cancelledAISessionRuntime{ref: ref}, errAISessionBindFenced
+			}
+			if tombstone.epoch == ref.BindEpoch {
+				// Preserve the first terminal command so a redelivered Close can
+				// still acknowledge completion after an intervening Cancel.
+				return cancelledAISessionRuntime{ref: ref, reason: reason}, nil
+			}
+		}
+		m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{commandID: ref.CommandID, kind: "cancel", epoch: ref.BindEpoch})
 		return cancelledAISessionRuntime{ref: ref, reason: reason}, nil
 	}
 	if session.ref.OwnerUserID != ref.OwnerUserID {
@@ -885,10 +1046,44 @@ func (m *aiSessionRuntimeManager) Close(
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch > ref.BindEpoch {
+		return closedAISessionRuntime{ref: ref}, errAISessionBindFenced
+	}
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch == ref.BindEpoch {
+		if pending.ref.OwnerUserID != ref.OwnerUserID || (ref.RunID != "" && ref.RunID != pending.ref.RunID) {
+			return closedAISessionRuntime{ref: ref}, fmt.Errorf("ai session pending identity mismatch")
+		}
+		if pending.cancel != nil {
+			pending.cancel()
+		}
+		if old := m.sessions[ref.SessionID]; old != nil && old.bindEpoch <= ref.BindEpoch {
+			old.mu.Lock()
+			old.retired = true
+			if old.cancel != nil {
+				old.cancel()
+			}
+			old.mu.Unlock()
+			delete(m.sessions, ref.SessionID)
+			go func() {
+				if old.handle != nil {
+					old.handle.Close("pending binding cancelled")
+				}
+			}()
+		}
+		delete(m.bindings, ref.SessionID)
+		m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{commandID: ref.CommandID, kind: "close", epoch: ref.BindEpoch})
+		return closedAISessionRuntime{ref: ref, reason: reason, resultSink: pending.resultSink, acknowledge: true}, nil
+	}
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
 		tombstone, known := m.terminalTombstones[ref.SessionID]
-		acknowledge := !known || (tombstone.kind == "close" && tombstone.commandID == ref.CommandID)
+		if known && tombstone.epoch > ref.BindEpoch {
+			return closedAISessionRuntime{ref: ref}, errAISessionBindFenced
+		}
+		acknowledge := !known || tombstone.epoch < ref.BindEpoch || (tombstone.kind == "close" && tombstone.commandID == ref.CommandID)
+		if !known || tombstone.epoch < ref.BindEpoch {
+			m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{commandID: ref.CommandID, kind: "close", epoch: ref.BindEpoch})
+		}
 		return closedAISessionRuntime{
 			ref:             ref,
 			reason:          reason,
@@ -1001,9 +1196,10 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 		session.cancel()
 	}
 	workspace := session.codeWorkspace
+	inputs := session.inputWorkspace
 	session.mu.Unlock()
 	m.mu.Unlock()
-	return workspace.Cleanup()
+	return errors.Join(workspace.Cleanup(), inputs.Cleanup())
 }
 
 func (m *aiSessionRuntimeManager) RetireAfterBindFailure(ref aiSessionCommandRef) {
@@ -1098,11 +1294,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 	}
 
 	session, _ := b.agent.node.GetSessionState()
-	resultSink, err := newLegionAIFocusResultSink(
-		b.publisher,
-		command.GetMetadata().GetCommandId(),
-		command.GetResultContext(),
-	)
+	resultSink, err := newLegionAIFocusResultSinkForBind(b.publisher, &command)
 	if err != nil {
 		return b.publishAISessionCommandFailure(ctx, ref, "invalid_ai_focus_result_context", err)
 	}
@@ -1111,6 +1303,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		&command,
 		b.ensureAIPublisher(),
 		aiSessionRuntimeBindOptions{
+			PreparationContext:  ctx,
 			PlatformBearerToken: session.SessionToken,
 			PlatformAPIBaseURL:  b.agent.resolvePlatformAPIBaseURL(),
 			NodeSessionID:       session.SessionID,
@@ -1118,6 +1311,11 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 			ResultSink:          resultSink,
 		},
 	)
+	// Losing this transport is recoverable; do not publish a terminal bind failure.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	if err != nil {
 		if errors.Is(err, errAISessionBindRetry) {
 			// A terminal publication is still settling, or the original bind
@@ -1148,7 +1346,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 			}
 			failureErr = fmt.Errorf("source workspace materialization failed")
 		}
-		if publishErr := b.publishAISessionCommandFailure(ctx, ref, "ai_session_bind_failed", failureErr); publishErr != nil {
+		if publishErr := b.publishAISessionCommandFailure(ctx, ref, inputFailureCode(err), failureErr); publishErr != nil {
 			return publishErr
 		}
 		b.ensureAIRuntime().RetireAfterBindFailure(ref)
@@ -1268,6 +1466,9 @@ func (b *legionJobBridge) handleAISessionCancel(ctx context.Context, raw []byte)
 
 	cancelled, err := b.ensureAIRuntime().Cancel(&command)
 	if err != nil {
+		if errors.Is(err, errAISessionBindFenced) {
+			return nil
+		}
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_cancel_failed", err)
 	}
 	if cancelled.applyHandle && cancelled.handle != nil {
@@ -1295,6 +1496,9 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 
 	closed, err := b.ensureAIRuntime().Close(&command)
 	if err != nil {
+		if errors.Is(err, errAISessionBindFenced) {
+			return nil
+		}
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_close_failed", err)
 	}
 	if closed.alreadyTerminal && !closed.acknowledge {
@@ -1439,6 +1643,9 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 			return fmt.Errorf("ai session run_id must match focus result focus_run_id")
 		}
 	}
+	if err := validateInputWorkspaceBind(command); err != nil {
+		return err
+	}
 	runtimeOptions, err := decodeYakRuntimeOptions(command.GetRuntimeOptionSnapshotJson(), true)
 	if err != nil {
 		return fmt.Errorf("invalid ai session runtime options: %w", err)
@@ -1459,7 +1666,7 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 		if err != nil || target.String() != expectedTarget {
 			return fmt.Errorf("source_workspace target_url must equal %s", expectedTarget)
 		}
-	} else if command.GetResultContext() != nil {
+	} else if command.GetResultContext() != nil && command.GetInputManifest() == nil {
 		target, targetErr := normalizeServerFocusURL(command.GetResultContext().GetTargetUrl())
 		if targetErr == nil && strings.EqualFold(target.Hostname(), "workspace.invalid") {
 			return fmt.Errorf("workspace.invalid target requires source_workspace")

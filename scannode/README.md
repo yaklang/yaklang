@@ -1,5 +1,8 @@
 # scannode
 
+Managed AI execution inputs, resource admission, storage and scoped file access
+are documented in [Managed input workspaces](../docs/legion-managed-input-workspaces.md).
+
 ## Legion HIDS
 
 - Linux HIDS packaging, host-readiness checks, desired spec validation, and degraded-host behavior are documented in `../docs/legion-linux-hids-readiness.md`.

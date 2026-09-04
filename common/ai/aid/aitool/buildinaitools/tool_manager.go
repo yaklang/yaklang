@@ -43,6 +43,8 @@ type RecentToolCacheMutation struct {
 
 // AiToolManager 是工具管理器的默认实现
 type AiToolManager struct {
+	// onlyTools is an explicit authority boundary; nil preserves ordinary lookup.
+	onlyTools             map[string]*aitool.Tool
 	toolsGetter           func() []*aitool.Tool
 	toolEnabled           map[string]bool // 记录工具是否开启
 	enableSearchTool      bool            // 是否开启工具搜索 (legacy)
@@ -173,6 +175,22 @@ func WithDisallowMCPServers(disallow bool) ToolManagerOption {
 	}
 }
 
+// WithOnlyTools restricts inventory and lookup to exact runtime-owned tool objects.
+// No database, MCP, dynamic tool or later extension can expand this authority.
+func WithOnlyTools(tools ...*aitool.Tool) ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.onlyTools = make(map[string]*aitool.Tool, len(tools))
+		for _, tool := range tools {
+			if tool != nil {
+				m.onlyTools[tool.Name] = tool
+			}
+		}
+		m.enableSearchTool = false
+		m.enableForgeSearchTool = false
+		m.disallowMCPServers = true
+	}
+}
+
 func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
 	manager := &AiToolManager{
 		toolsGetter:           getter,
@@ -223,6 +241,14 @@ func NewToolManager(options ...ToolManagerOption) *AiToolManager {
 }
 
 func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
+	if m.onlyTools != nil {
+		var result []*aitool.Tool
+		for _, tool := range m.onlyTools {
+			result = append(result, tool)
+		}
+		sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+		return result
+	}
 	if m.toolsGetter == nil {
 		return []*aitool.Tool{}
 	}
@@ -243,6 +269,9 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 
 // GetEnableTools 获取所有可用的工具
 func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
+	if m.onlyTools != nil {
+		return m.safeToolsGetter(), nil
+	}
 
 	var enabledTools []*aitool.Tool
 	for _, tool := range m.safeToolsGetter() {
@@ -310,6 +339,12 @@ func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
 
 // GetToolByName 通过工具名获取特定工具
 func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
+	if m.onlyTools != nil {
+		if tool, ok := m.onlyTools[name]; ok {
+			return tool, nil
+		}
+		return nil, fmt.Errorf("tool %q is outside the runtime capability set", name)
+	}
 	tools, err := m.GetEnableTools()
 	if err != nil {
 		return nil, err
@@ -361,6 +396,9 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 
 // SearchTools 通过字符串搜索相关工具
 func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool, error) {
+	if m.onlyTools != nil {
+		return nil, fmt.Errorf("dynamic tool discovery is disabled for this runtime")
+	}
 	if !m.enableSearchTool {
 		return nil, fmt.Errorf("工具搜索功能已被禁用")
 	}

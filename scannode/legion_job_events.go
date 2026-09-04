@@ -23,10 +23,21 @@ import (
 )
 
 type jobExecutionRef struct {
-	CommandID string
-	JobID     string
-	SubtaskID string
-	AttemptID string
+	// EventNamespace opts managed input attempts into transport-scoped NATS
+	// deduplication. Ordinary scan and conversation event identities stay stable.
+	EventNamespace string
+	CommandID      string
+	JobID          string
+	SubtaskID      string
+	AttemptID      string
+}
+
+func (ref jobExecutionRef) scopedEventID(eventID string) string {
+	if ref.EventNamespace == "" {
+		return eventID
+	}
+	name := "legion-job-bind\x00" + ref.EventNamespace + "\x00" + eventID
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
 }
 
 type jobEventPublisher struct {
@@ -358,6 +369,9 @@ func (p *jobEventPublisher) publish(
 		return err
 	}
 
+	// The same Attempt may rebind after an old transport event was fenced.
+	// Keep retries idempotent inside one Bind without suppressing the new Bind.
+	eventID = ref.scopedEventID(eventID)
 	subject := jobEventSubject(session.EventSubjectPrefix, eventType)
 	metadata := &nodev1.EventMetadata{
 		EventId:       eventID,

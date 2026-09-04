@@ -370,6 +370,8 @@ func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection
 			},
 		},
 		PlatformBearerToken: "node-session-token",
+		PlatformAPIBaseURL:  server.URL,
+		NodeSessionID:       "node-session-ai",
 		HTTPClient:          server.Client(),
 	}, noopAISessionRuntimeEmitter{})
 	if err != nil {
