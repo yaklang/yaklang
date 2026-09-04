@@ -374,6 +374,16 @@ func dnsLikeQuery(name string) []byte {
 	return append(buf, tmp...)
 }
 
+// RFC 1002 first-level encoded "*" NBSTAT query (bettercap packets/nbns.go NBNSRequest).
+func nbnsStarStatQuery() []byte {
+	buf := []byte{0x82, 0x28, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 32, 'C', 'K'}
+	for i := 0; i < 30; i++ {
+		buf = append(buf, 'A')
+	}
+	buf = append(buf, 0, 0x00, 0x21, 0x00, 0x01)
+	return buf
+}
+
 func TestNBNSLLMNRAndEdges(t *testing.T) {
 	q := dnsLikeQuery("TEST")
 	n := parseRule(t, q, "application-layer.nbns", "NBNS")
@@ -382,6 +392,7 @@ func TestNBNSLLMNRAndEdges(t *testing.T) {
 	qs := n.Child("Questions")
 	require.True(t, qs.IsList())
 	require.Equal(t, uint64(1), uintVal(t, qs.Children()[0].Child("Type")))
+	require.Equal(t, "TEST", strVal(t, qs.Children()[0].Child("Name").Children()[0].Child("Text")))
 
 	l := parseRule(t, q, "application-layer.nbns", "LLMNR")
 	require.Equal(t, uint64(0x1234), uintVal(t, mustChild(t, l, "Header", "ID")))

@@ -1479,4 +1479,41 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		wired := mustChild(t, eth, "IP", "UDP", "MDNS", "Answers").Children()[0]
 		require.Equal(t, []byte{0x34, 0x12, 0xec, 0x15}, bytesVal(t, mustChild(t, wired, "DNSA").Child("Address")))
 	})
+
+	t.Run("nbns/stat", func(t *testing.T) {
+		// RFC 1002 NBSTAT query for "*" (first-level encoded CK + 30 A's).
+		// bettercap packets/nbns.go NBNSRequest; Wireshark nbns.name / nbns.type=NBSTAT.
+		raw := nbnsStarStatQuery()
+		n := parseRule(t, raw, "application-layer.nbns", "NBNS")
+		q := n.Child("Questions").Children()[0]
+		require.Equal(t, uint64(0x21), uintVal(t, q.Child("Type")))
+		require.Equal(t, "CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", strVal(t, q.Child("Name").Children()[0].Child("Text")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 137, 137, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "NBNS", "Questions").Children()[0]
+		require.Equal(t, uint64(0x21), uintVal(t, wired.Child("Type")))
+		require.Equal(t, "CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", strVal(t, wired.Child("Name").Children()[0].Child("Text")))
+	})
+
+	t.Run("llmnr/a", func(t *testing.T) {
+		// RFC 4795 LLMNR is DNS-shaped; A RDATA 10.0.0.9. Wireshark llmnr / dns.a.
+		q := dnsLikeQuery("TEST")
+		ans := make([]byte, len(q)+20)
+		copy(ans, q)
+		binary.BigEndian.PutUint16(ans[2:], 0x8400)
+		binary.BigEndian.PutUint16(ans[6:], 1)
+		off := len(q)
+		ans[off] = 4
+		copy(ans[off+1:], []byte("TEST"))
+		ans[off+5] = 0
+		binary.BigEndian.PutUint16(ans[off+6:], 1)
+		binary.BigEndian.PutUint16(ans[off+8:], 1)
+		binary.BigEndian.PutUint32(ans[off+10:], 60)
+		binary.BigEndian.PutUint16(ans[off+14:], 4)
+		copy(ans[off+16:], []byte{10, 0, 0, 9})
+		n := parseRule(t, ans, "application-layer.nbns", "LLMNR")
+		require.Equal(t, "TEST", strVal(t, n.Child("Questions").Children()[0].Child("Name").Children()[0].Child("Text")))
+		require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, mustChild(t, n.Child("Answers").Children()[0], "NBNSA").Child("Address")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5355, 5355, ans))
+		require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, mustChild(t, mustChild(t, eth, "IP", "UDP", "LLMNR", "Answers").Children()[0], "NBNSA").Child("Address")))
+	})
 }

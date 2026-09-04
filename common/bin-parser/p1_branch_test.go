@@ -1,6 +1,7 @@
 package bin_parser
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -644,5 +645,28 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("mdns/a", func(t *testing.T) {
 		n := parseRule(t, mustHex(t, "bc35818000010002000000000b636c6f7564636f6e666967096a6574627261696e7303636f6d0000010001c00c000100010000001300043412ec15c00c00010001000000130004364dbb13"), "application-layer.dns", "DNS")
 		require.Equal(t, []byte{0x34, 0x12, 0xec, 0x15}, bytesVal(t, mustChild(t, n.Child("Answers").Children()[0], "DNSA").Child("Address")))
+	})
+
+	t.Run("nbns/stat", func(t *testing.T) {
+		q := parseRule(t, nbnsStarStatQuery(), "application-layer.nbns", "NBNS").Child("Questions").Children()[0]
+		require.Equal(t, uint64(0x21), uintVal(t, q.Child("Type")))
+		require.Equal(t, "CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", strVal(t, q.Child("Name").Children()[0].Child("Text")))
+	})
+	t.Run("llmnr/a", func(t *testing.T) {
+		q := dnsLikeQuery("TEST")
+		ans := make([]byte, len(q)+20)
+		copy(ans, q)
+		binary.BigEndian.PutUint16(ans[2:], 0x8400)
+		binary.BigEndian.PutUint16(ans[6:], 1)
+		off := len(q)
+		ans[off] = 4
+		copy(ans[off+1:], []byte("TEST"))
+		ans[off+5] = 0
+		binary.BigEndian.PutUint16(ans[off+6:], 1)
+		binary.BigEndian.PutUint16(ans[off+8:], 1)
+		binary.BigEndian.PutUint32(ans[off+10:], 60)
+		binary.BigEndian.PutUint16(ans[off+14:], 4)
+		copy(ans[off+16:], []byte{10, 0, 0, 9})
+		require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, mustChild(t, parseRule(t, ans, "application-layer.nbns", "LLMNR").Child("Answers").Children()[0], "NBNSA").Child("Address")))
 	})
 }
