@@ -67,6 +67,14 @@ Package:
           this.ProcessByType("Stop Control Conn Req")
           return
         }
+        if type == 4 {
+          this.ProcessByType("Stop Control Conn Reply")
+          return
+        }
+        if type == 9 {
+          this.ProcessByType("Incoming Call Req")
+          return
+        }
         if type == 15 {
           this.ProcessByType("Set Link Info")
           return
@@ -139,6 +147,22 @@ Stop Control Conn Req:
     Reason: uint8
     Reserved1: uint8
     Reserved2: uint16
+
+Stop Control Conn Reply:
+    ResultCode: uint8
+    ErrorCode: uint8
+    Reserved1: uint16
+
+Incoming Call Req:
+    CallId: uint16
+    CallSerialNumber: uint16
+    BearerType: uint32
+    PhysicalChannelId: uint32
+    DialedNumberLength: uint16
+    DialingNumberLength: uint16
+    DialedNumber: string,64
+    DialingNumber: string,64
+    Subaddress: string,64
 
 Set Link Info:
     PeerCallId: uint16

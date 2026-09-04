@@ -1436,6 +1436,47 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP", "Stop Control Conn Req").Child("Reason")))
 	})
 
+	t.Run("pptp/stop-reply", func(t *testing.T) {
+		// RFC 2637 §2.4 Stop-Control-Connection-Reply (control type 4), 16-byte message.
+		// Result Code 1 = OK. Wireshark pptp.result. TCP/1723.
+		pptp := make([]byte, 16)
+		binary.BigEndian.PutUint16(pptp[0:], 16)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 4)
+		pptp[12] = 1
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(4), uintVal(t, n.Child("ControlMessageType")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Stop Control Conn Reply").Child("ResultCode")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP", "Stop Control Conn Reply").Child("ResultCode")))
+	})
+
+	t.Run("pptp/icrq", func(t *testing.T) {
+		// RFC 2637 §2.9 Incoming-Call-Request (control type 9), 220-byte message.
+		// CallId 1, Dialed Number "5551212". Wireshark pptp.call_id / pptp.dialed_number. TCP/1723.
+		pptp := make([]byte, 220)
+		binary.BigEndian.PutUint16(pptp[0:], 220)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 9)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint16(pptp[14:], 2)
+		binary.BigEndian.PutUint32(pptp[16:], 1)
+		binary.BigEndian.PutUint16(pptp[24:], 7)
+		copy(pptp[28:], []byte("5551212"))
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(9), uintVal(t, n.Child("ControlMessageType")))
+		icrq := mustChild(t, n, "Incoming Call Req")
+		require.Equal(t, uint64(1), uintVal(t, icrq.Child("CallId")))
+		require.Equal(t, uint64(7), uintVal(t, icrq.Child("DialedNumberLength")))
+		require.True(t, strings.HasPrefix(strVal(t, icrq.Child("DialedNumber")), "5551212"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Incoming Call Req")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("CallId")))
+		require.True(t, strings.HasPrefix(strVal(t, wired.Child("DialedNumber")), "5551212"))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
