@@ -17,6 +17,18 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x8100), uintVal(t, q.Child("Type")))
 	})
 
+	t.Run("sip/invite", func(t *testing.T) {
+		sdp := "v=0\r\no=- 0 0 IN IP4 10.0.0.1\r\n"
+		inv := "INVITE sip:bob@example.com SIP/2.0\r\nContent-Type: application/sdp\r\nContent-Length: 30\r\n\r\n" + sdp
+		n := parseRule(t, []byte(inv), "sip", "SIP")
+		require.Equal(t, "INVITE", strVal(t, mustChild(t, n, "SIP Request").Child("Method")))
+		require.Equal(t, uint64('v'), uintVal(t, mustChild(t, n, "SIP Request", "Body", "SDPSession").Child("Type")))
+	})
+	t.Run("sip/200", func(t *testing.T) {
+		ok := "SIP/2.0 200 OK\r\nContent-Length: 0\r\n\r\n"
+		n := parseRule(t, []byte(ok), "sip", "SIP")
+		require.Equal(t, "200", strVal(t, mustChild(t, n, "SIP Response").Child("Status")))
+	})
 	t.Run("internet_control_message_protocol/echo", func(t *testing.T) {
 		echo := append([]byte{0x08, 0x00, 0x00, 0x00, 0x12, 0x34, 0x00, 0x01}, []byte("abcd")...)
 		require.Equal(t, uint64(0x1234), uintVal(t, mustChild(t, parseRule(t, echo, "internet_control_message_protocol", "ICMP"), "ICMP Echo").Child("Identifier")))

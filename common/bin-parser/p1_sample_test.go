@@ -63,6 +63,42 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
 	})
 
+	t.Run("sip/invite", func(t *testing.T) {
+		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
+		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"
+		inv := "INVITE sip:bob@biloxi.example.com SIP/2.0\r\n" +
+			"Via: SIP/2.0/UDP pc33.atlanta.example.com;branch=z9hG4bK776asdhds\r\n" +
+			"From: Alice <sip:alice@atlanta.example.com>;tag=1928301774\r\n" +
+			"To: Bob <sip:bob@biloxi.example.com>\r\n" +
+			"Call-ID: a84b4c76e66710@pc33.atlanta.example.com\r\n" +
+			"CSeq: 314159 INVITE\r\n" +
+			"Content-Type: application/sdp\r\n" +
+			"Content-Length: 68\r\n" +
+			"\r\n" + sdp
+		n := parseRule(t, []byte(inv), "sip", "SIP")
+		req := mustChild(t, n, "SIP Request")
+		require.Equal(t, "INVITE", strVal(t, req.Child("Method")))
+		require.Equal(t, "sip:bob@biloxi.example.com", strVal(t, req.Child("URI")))
+		sdpn := mustChild(t, req, "Body", "SDPSession")
+		require.Equal(t, uint64('v'), uintVal(t, sdpn.Child("Type")))
+		require.Equal(t, "0", strVal(t, sdpn.Child("Value")))
+		require.Equal(t, uint64('o'), uintVal(t, sdpn.Child("Origin Type")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5060, 5060, []byte(inv)))
+		require.Equal(t, "INVITE", strVal(t, mustChild(t, eth, "IP", "UDP", "SIP", "SIP Request").Child("Method")))
+		require.Equal(t, uint64('o'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SIP", "SIP Request", "Body", "SDPSession").Child("Origin Type")))
+	})
+
+	t.Run("sip/200", func(t *testing.T) {
+		ok := "SIP/2.0 200 OK\r\nVia: SIP/2.0/UDP 10.0.0.1\r\nCall-ID: a84b4c76e66710@pc33.atlanta.example.com\r\nCSeq: 314159 INVITE\r\nContent-Length: 0\r\n\r\n"
+		n := parseRule(t, []byte(ok), "sip", "SIP")
+		resp := mustChild(t, n, "SIP Response")
+		require.Equal(t, "SIP/2.0", strVal(t, resp.Child("Version")))
+		require.Equal(t, "200", strVal(t, resp.Child("Status")))
+		require.Equal(t, "OK", strVal(t, resp.Child("Reason")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5060, 5060, []byte(ok)))
+		require.Equal(t, "200", strVal(t, mustChild(t, eth, "IP", "UDP", "SIP", "SIP Response").Child("Status")))
+	})
+
 	t.Run("icmp/echo", func(t *testing.T) {
 		// RFC 792 Echo: Type 8 Identifier/Sequence + Data (gopacket layers.ICMPv4TypeEchoRequest).
 		echo := append([]byte{0x08, 0x00, 0x00, 0x00, 0x12, 0x34, 0x00, 0x01}, []byte("abcdefghijklmnop")...)
