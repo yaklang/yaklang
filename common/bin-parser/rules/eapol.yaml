@@ -79,6 +79,11 @@ EAPPacket:
         this.ProcessSubNode("GTC")
         return
       }
+      if t == 254 && dlen > 6 && dlen < 1048576 {
+        this.GetSubNode("Expanded").SetMaxLength(dlen)
+        this.ProcessSubNode("Expanded")
+        return
+      }
     }
     return
   Code: uint8
@@ -116,6 +121,18 @@ EAPPacket:
     Value Size: uint8
     Value: string
     Name: string
+  Expanded:
+    operator: |
+      this.ProcessSubNode("Vendor-Id")
+      this.ProcessSubNode("Vendor Type")
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Vendor Data").SetMaxLength(rest)
+        this.ProcessSubNode("Vendor Data")
+      }
+    Vendor-Id: raw,3
+    Vendor Type: uint32
+    Vendor Data: string
 EAPOLKey:
   operator: |
     this.ProcessSubNode("Descriptor Type")

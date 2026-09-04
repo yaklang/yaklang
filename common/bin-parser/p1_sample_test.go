@@ -1285,6 +1285,22 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "Enter PIN", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("GTC")))
 	})
 
+	t.Run("eap/expanded", func(t *testing.T) {
+		// RFC 3748 §5.7 Expanded Type 254: Vendor-Id 311 (Microsoft), Vendor-Type 25 PEAP.
+		// Wireshark eap.ext.vendor_id / eap.ext.vendor_type. EtherType 0x888e.
+		eap := []byte{0x01, 0x00, 0x00, 0x0c, 0x01, 0x01, 0x00, 0x0c, 0xfe, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x19}
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(254), uintVal(t, pkt.Child("Type")))
+		ex := mustChild(t, pkt, "Expanded")
+		require.Equal(t, []byte{0x00, 0x00, 0x37}, bytesVal(t, ex.Child("Vendor-Id")))
+		require.Equal(t, uint64(25), uintVal(t, ex.Child("Vendor Type")))
+		require.Nil(t, pkt.Child("Identity"))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		wired := mustChild(t, eth, "EAPOL", "EAPPacket", "Expanded")
+		require.Equal(t, []byte{0x00, 0x00, 0x37}, bytesVal(t, wired.Child("Vendor-Id")))
+		require.Equal(t, uint64(25), uintVal(t, wired.Child("Vendor Type")))
+	})
+
 	t.Run("eapol/mka", func(t *testing.T) {
 		// IEEE 802.1X-2010 Table 11-3 Packet Type 5 EAPOL-MKA. Wireshark eapol.type.
 		// No MKA dissector: Body Length-bounded leftover is Next Protocol Data, not Unknown raw.
