@@ -34,7 +34,6 @@ var csharpSpecOnlyUnreachable = []string{
 // The coverage test fails if one of these starts being visited (remove it) or if a
 // new reachable alt is neither visited nor listed here.
 var csharpATNUnenteredAlts = []string{
-	"deconstruction_element#1",
 	"delegate_creation_expression#1",
 	"delegate_type#1",
 	"designation#1",

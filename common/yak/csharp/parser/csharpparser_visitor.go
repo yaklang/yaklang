@@ -751,6 +751,9 @@ type CSharpParserVisitor interface {
 	// Visit a parse tree produced by CSharpParser#compilation_unit.
 	VisitCompilation_unit(ctx *Compilation_unitContext) interface{}
 
+	// Visit a parse tree produced by CSharpParser#global_statement.
+	VisitGlobal_statement(ctx *Global_statementContext) interface{}
+
 	// Visit a parse tree produced by CSharpParser#namespace_declaration.
 	VisitNamespace_declaration(ctx *Namespace_declarationContext) interface{}
 

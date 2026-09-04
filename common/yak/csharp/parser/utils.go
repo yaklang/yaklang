@@ -3,7 +3,9 @@ package csharpparser
 import "github.com/yaklang/antlr/v4"
 
 func GetCSharpParserSerializedATN() []int32 {
-	csharpparserParserInit()
+	// Use the generated sync.Once wrapper. Calling the raw initializer races
+	// when project parsing creates multiple AST workers concurrently.
+	CSharpParserInit()
 	return CSharpParserParserStaticData.serializedATN
 }
 

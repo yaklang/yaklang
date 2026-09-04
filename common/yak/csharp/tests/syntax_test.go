@@ -98,3 +98,23 @@ namespace Demo.App {
 `
 	validateSource(t, "namespace.cs", src)
 }
+
+func TestCSharpFileFiltersAreCaseInsensitive(t *testing.T) {
+	builder, ok := csharp2ssa.CreateBuilder().(*csharp2ssa.SSABuilder)
+	require.True(t, ok)
+	defer builder.Clearup()
+
+	for _, path := range []string{"Demo.cs", "Demo.CS", "Demo.Cs"} {
+		require.True(t, builder.FilterParseAST(path), path)
+		require.True(t, builder.FilterFile(path), path)
+	}
+	for _, path := range []string{
+		"Demo.CS", "Page.ASPX", "Control.ASCX", "Handler.ASHX",
+		"Service.ASMX", "WEB.CONFIG", "View.CSHTML",
+	} {
+		require.True(t, builder.FilterPreHandlerFile(path), path)
+	}
+	require.False(t, builder.FilterParseAST("Page.ASPX"))
+	require.False(t, builder.FilterFile("Page.ASPX"))
+	require.False(t, builder.FilterPreHandlerFile("Demo.java"))
+}

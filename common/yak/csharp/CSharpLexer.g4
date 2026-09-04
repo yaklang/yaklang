@@ -123,6 +123,7 @@ KW_GROUP : 'group' ;
 KW_IF : 'if' ;
 KW_IMPLICIT : 'implicit' ;
 KW_IN : 'in' ;
+KW_INIT : 'init' ;
 KW_INT : 'int' ;
 KW_INTERFACE : 'interface' ;
 KW_INTERNAL : 'internal' ;
@@ -718,4 +719,3 @@ mode DIRECTIVE_TEXT;
 TEXT          : Input_Character+                 -> channel(DIRECTIVE) ;
 TEXT_NEW_LINE : ( New_Line_Character | '\u000D\u000A' )
                   -> channel(DIRECTIVE), type(DIRECTIVE_NEW_LINE), mode(DEFAULT_MODE) ;
-
