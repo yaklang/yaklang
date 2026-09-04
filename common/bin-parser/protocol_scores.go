@@ -113,7 +113,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("HTTP", "application-layer/http.yaml", 20, 25, 20, 20, 10, "L1",
 		"TestBaseProtocol http request; http/post Content-Length foo=bar; http/chunked RFC 9112 hello; TestHTTPFailPaths", ""),
 	card("HTTP/2", "application-layer/http2.yaml", 20, 20, 20, 20, 10, "L2",
-		"TestHTTP2RFC9113SettingsTwoParams; TestHTTP2PrefaceFrameAndEdges; TestHTTP2SettingsPingGoaway", "HEADERS payload"),
+		"TestHTTP2RFC9113SettingsTwoParams; http2/data hello; http2/rst PROTOCOL_ERROR; http2/goaway debug bye", ""),
 	card("WebSocket", "application-layer/websocket.yaml", 25, 20, 20, 20, 10, "L2",
 		"TestWebSocketRFC6455UnmaskedHello RFC 6455 §5.7 Hello Text; TestP1WiresharkAndRFCSamples close 1000 Ethernet+TCP/8080", ""),
 	card("TLS", "application-layer/tls.yaml", 20, 25, 20, 20, 10, "L1",

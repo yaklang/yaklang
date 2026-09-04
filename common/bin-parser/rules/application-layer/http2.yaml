@@ -26,12 +26,56 @@ Package:
       this.ProcessSubNode("Flags")
       this.ProcessSubNode("R")
       this.ProcessSubNode("Stream Identifier")
-      if typ == 4 && l > 0 {
-        if l % 6 != 0 {
-          panic("http2: SETTINGS payload not multiple of 6")
+      if typ == 0 {
+        if l > 0 && l < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(l)
+          this.ProcessSubNode("Octets")
         }
-        this.GetSubNode("Settings").SetMaxLength(l)
-        this.ProcessSubNode("Settings")
+        return
+      }
+      if typ == 1 || typ == 9 {
+        if l > 0 && l < 1048576 {
+          this.GetSubNode("Header Block").SetMaxLength(l)
+          this.ProcessSubNode("Header Block")
+        }
+        return
+      }
+      if typ == 2 {
+        if l != 5 {
+          panic("http2: PRIORITY payload must be 5")
+        }
+        this.ProcessSubNode("Exclusive")
+        this.ProcessSubNode("Stream Dependency")
+        this.ProcessSubNode("Weight")
+        return
+      }
+      if typ == 3 {
+        if l != 4 {
+          panic("http2: RST_STREAM payload must be 4")
+        }
+        this.ProcessSubNode("Error Code")
+        return
+      }
+      if typ == 4 {
+        if l > 0 {
+          if l % 6 != 0 {
+            panic("http2: SETTINGS payload not multiple of 6")
+          }
+          this.GetSubNode("Settings").SetMaxLength(l)
+          this.ProcessSubNode("Settings")
+        }
+        return
+      }
+      if typ == 5 {
+        if l < 4 {
+          panic("http2: PUSH_PROMISE too small")
+        }
+        this.ProcessSubNode("Promised R")
+        this.ProcessSubNode("Promised Stream ID")
+        if l > 4 && l < 1048576 {
+          this.GetSubNode("Header Block").SetMaxLength(l - 4)
+          this.ProcessSubNode("Header Block")
+        }
         return
       }
       if typ == 6 {
@@ -47,9 +91,9 @@ Package:
         }
         this.ProcessSubNode("Last Stream ID")
         this.ProcessSubNode("Error Code")
-        if l > 8 {
-          this.GetSubNode("Debug Data").SetMaxLength(l - 8)
-          this.ProcessSubNode("Debug Data")
+        if l > 8 && l < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(l - 8)
+          this.ProcessSubNode("Octets")
         }
         return
       }
@@ -60,10 +104,11 @@ Package:
         this.ProcessSubNode("Window Size Increment")
         return
       }
-      if l > 0 {
-        this.GetSubNode("Payload").SetMaxLength(l)
-        this.ProcessSubNode("Payload")
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Octets").SetMaxLength(l)
+        this.ProcessSubNode("Octets")
       }
+      return
     Length: uint32,24bit
     Type: uint8
     Flags: uint8
@@ -86,9 +131,14 @@ Package:
     Ping: raw,8
     Last Stream ID: uint32
     Error Code: uint32
-    Debug Data: raw
     Window Size Increment: uint32
-    Payload: raw
+    Exclusive: uint8,1bit
+    Stream Dependency: uint32,31bit
+    Weight: uint8
+    Promised R: uint8,1bit
+    Promised Stream ID: uint32,31bit
+    Header Block: string
+    Octets: string
 HTTP2Setting:
   Identifier: uint16
   Value: uint32
