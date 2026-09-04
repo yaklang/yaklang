@@ -118,6 +118,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, ep.Child("Packet Type")))
 	})
 
+	t.Run("syslog/bsd", func(t *testing.T) {
+		n := parseRule(t, []byte("<13>Sep  4 12:00:00 host sshd: ok\n"), "syslog", "Syslog")
+		require.Equal(t, "13", strVal(t, n.Child("PRI")))
+		require.Equal(t, "host", strVal(t, n.Child("Hostname")))
+	})
+	t.Run("syslog/rfc5424", func(t *testing.T) {
+		raw := []byte("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8\n")
+		n := parseRule(t, raw, "syslog", "Syslog")
+		require.Equal(t, "1", strVal(t, n.Child("Version")))
+		require.Equal(t, "ID47", strVal(t, n.Child("MsgID")))
+	})
 	t.Run("vnc/version", func(t *testing.T) {
 		n := parseRule(t, []byte("RFB 003.008\n"), "vnc", "VNC")
 		require.Equal(t, "003", strVal(t, n.Child("Major")))

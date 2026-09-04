@@ -2076,6 +2076,36 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(16), uintVal(t, n.Child("Red Shift")))
 		require.Equal(t, "x11", strVal(t, n.Child("Name")))
 	})
+
+	t.Run("syslog/bsd", func(t *testing.T) {
+		// RFC 3164 §4.1: <PRI>TIMESTAMP HOSTNAME MSG. Wireshark syslog.facility / syslog.hostname. UDP/514.
+		raw := []byte("<13>Sep  4 12:00:00 host sshd: ok\n")
+		n := parseRule(t, raw, "syslog", "Syslog")
+		require.Equal(t, "13", strVal(t, n.Child("PRI")))
+		require.Equal(t, "Sep  4 12:00:00", strVal(t, n.Child("Timestamp")))
+		require.Equal(t, "host", strVal(t, n.Child("Hostname")))
+		require.Equal(t, "sshd: ok", strVal(t, n.Child("Message")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 12345, 514, raw))
+		require.Equal(t, "13", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("PRI")))
+		require.Equal(t, "host", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("Hostname")))
+	})
+
+	t.Run("syslog/rfc5424", func(t *testing.T) {
+		// RFC 5424 §6.5 example 1. Wireshark syslog.version / syslog.msgid / syslog.procid. UDP/514.
+		raw := []byte("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8\n")
+		n := parseRule(t, raw, "syslog", "Syslog")
+		require.Equal(t, "34", strVal(t, n.Child("PRI")))
+		require.Equal(t, "1", strVal(t, n.Child("Version")))
+		require.Equal(t, "2003-10-11T22:14:15.003Z", strVal(t, n.Child("Timestamp")))
+		require.Equal(t, "mymachine.example.com", strVal(t, n.Child("Hostname")))
+		require.Equal(t, "su", strVal(t, n.Child("App Name")))
+		require.Equal(t, "-", strVal(t, n.Child("ProcID")))
+		require.Equal(t, "ID47", strVal(t, n.Child("MsgID")))
+		require.Equal(t, "-", strVal(t, n.Child("Structured Data")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 12345, 514, raw))
+		require.Equal(t, "ID47", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("MsgID")))
+		require.Equal(t, "1", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("Version")))
+	})
 }
 
 func vncServerInit() []byte {
