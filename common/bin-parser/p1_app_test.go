@@ -29,6 +29,7 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, "13", strVal(t, s.Child("PRI")))
 	require.Equal(t, "Sep  4 12:00:00", strVal(t, s.Child("Timestamp")))
 	require.Equal(t, "host", strVal(t, s.Child("Hostname")))
+	require.Equal(t, "sshd: ok", strVal(t, s.Child("Message")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 12345, 514, sys))
 	require.Equal(t, "13", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("PRI")))
 	require.Equal(t, "Sep  4 12:00:00", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("Timestamp")))
