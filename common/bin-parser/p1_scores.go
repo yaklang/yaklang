@@ -48,7 +48,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("IGMP", "igmp.yaml", 20, 25, 20, 20, 10, "L1",
 		"igmp/v1-report 224.0.1.60; igmp/v3-query RFC 3376 source 192.0.2.1; igmp/v3-report MODE_IS_EXCLUDE Ethernet+IP proto 2; TestP1FailPaths igmp", ""),
 	p1card("GRE", "generic_routing_encapsulation.yaml", 20, 25, 20, 20, 10, "L2",
-		"gre/next-type IEEE 802 0x88B5 Next Protocol Data; gre/rfc2784 ARP; gre/key RFC 2890 0x12345678 IP proto 47; TestP1FailPaths GRE", ""),
+		"gre/eth-bridging RFC 1701 0x6558 inner Ethernet ARP Opcode 1; gre/next-type 0x88B5 Next Protocol Data; TestP1FailPaths trunc-eth", ""),
 	p1card("IPsec AH", "ipsec.yaml", 15, 25, 16, 20, 10, "L1",
 		"TestP1MiscAndAliases gopacket testPacketIPSecAHTransport Ethernet+IPv4+AH SPI 0x101; TestP1FailPaths AH", "ICV Ciphertext"),
 	p1card("IPsec ESP", "ipsec.yaml", 15, 25, 16, 20, 10, "L2",

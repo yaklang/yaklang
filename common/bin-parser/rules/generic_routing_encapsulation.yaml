@@ -63,6 +63,10 @@ Package:
           this.ProcessByType("PPP")
           return
         }
+        if proto == 0x6558 {
+          this.ProcessByType("Ethernet")
+          return
+        }
         res, op = this.TryProcessByType("PeekByte")
         op.Recovery()
         if op.OK {
@@ -74,6 +78,36 @@ IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 PPP: "import:ppp.yaml;node:PPP"
 EAPOL: "import:eapol.yaml;node:EAPOL"
+Ethernet:
+  Destination: raw,6
+  Source: raw,6
+  Type: uint16
+  Payload:
+    unpack: true
+    operator: |
+      etype = getNodeResult("../Type").Value
+      if etype == 0x0806 {
+        this.ProcessByType("ARP")
+        return
+      }
+      if etype == 0x0800 {
+        this.ProcessByType("IP")
+        return
+      }
+      if etype == 0x86dd {
+        this.ProcessByType("IPv6")
+        return
+      }
+      if etype == 0x888e {
+        this.ProcessByType("EAPOL")
+        return
+      }
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if op.OK {
+        this.ProcessByType("Next Protocol Data")
+      }
+      return
 Next Protocol Data:
   list: true
   Octet: uint8
