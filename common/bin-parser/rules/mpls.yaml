@@ -2,20 +2,43 @@ endian: big
 Package:
   MPLS:
     operator: |
-      this.ProcessByType("MPLSLabel")
+      this.ProcessSubNode("Labels")
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        return
+      }
+      first = res.Value
+      op.Recovery()
+      ver = first >> 4
+      if ver == 4 {
+        this.ProcessByType("IP")
+      }
+      return
+    Labels:
+      list: true
+      Label: MPLSLabel
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+          if ele.GetSubNode("Bottom").Result().Value == 1 {
+            break
+          }
+        }
 MPLSLabel:
   operator: |
     this.ProcessSubNode("Label")
     this.ProcessSubNode("Exp")
     this.ProcessSubNode("Bottom")
     this.ProcessSubNode("TTL")
-    if getNodeResult("Bottom").Value == 0 {
-      this.ProcessByType("MPLSLabel")
-      return
-    }
-    this.ProcessByType("IP")
+    return
   Label: uint32,20bit
   Exp: uint8,3bit
   Bottom: uint8,1bit
   TTL: uint8
+PeekByte: uint8
 IP: "import:internet_protocol.yaml;node:Internet Protocol"

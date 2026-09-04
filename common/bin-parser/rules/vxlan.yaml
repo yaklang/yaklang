@@ -2,20 +2,69 @@ endian: big
 Package:
   VXLAN:
     operator: |
-      this.ProcessSubNode("Flags")
-      flags = getNodeResult("Flags").Value
-      if (flags & 0x08) == 0 {
+      this.ProcessSubNode("Reserved High")
+      this.ProcessSubNode("I")
+      this.ProcessSubNode("Reserved Low")
+      if getNodeResult("I").Value != 1 {
         panic("vxlan: I-flag must be set")
       }
       this.ProcessSubNode("Reserved")
       this.ProcessSubNode("VNI")
       this.ProcessSubNode("Reserved2")
       this.ProcessSubNode("Inner")
-    Flags: uint8
+      return
+    Reserved High: uint8,4bit
+    I: uint8,1bit
+    Reserved Low: uint8,3bit
     Reserved: raw,3
     VNI: uint32,24bit
     Reserved2: uint8
     Inner:
+      operator: |
+        this.ProcessSubNode("Destination")
+        this.ProcessSubNode("Source")
+        this.ProcessSubNode("Type")
+        typ = getNodeResult("Type").Value
+        if typ == 0x0800 {
+          this.ProcessByType("IP")
+          return
+        }
+        if typ == 0x0806 {
+          this.ProcessByType("ARP")
+          return
+        }
+        return
       Destination: raw,6
       Source: raw,6
       Type: uint16
+IP:
+  operator: |
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("IHL")
+    this.ProcessSubNode("TOS")
+    this.ProcessSubNode("Total Length")
+    this.ProcessSubNode("Identification")
+    this.ProcessSubNode("FlagsFrag")
+    this.ProcessSubNode("TTL")
+    this.ProcessSubNode("Protocol")
+    this.ProcessSubNode("Checksum")
+    this.ProcessSubNode("Source")
+    this.ProcessSubNode("Destination")
+    proto = getNodeResult("Protocol").Value
+    if proto == 1 {
+      this.ProcessByType("ICMP")
+    }
+    return
+  Version: uint8,4bit
+  IHL: uint8,4bit
+  TOS: uint8
+  Total Length: uint16
+  Identification: uint16
+  FlagsFrag: uint16
+  TTL: uint8
+  Protocol: uint8
+  Checksum: uint16
+  Source: raw,4
+  Destination: raw,4
+ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+ICMP: "import:internet_control_message_protocol.yaml;node:ICMP"
