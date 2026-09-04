@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "CORS allows all origins"
+	type: config
+	level: medium
+	rule_id: "spring.cors.wildcard"
+	alert_min: 1
+)
+
+${*.properties}.pattern_regex(/(?im)^[ \t]*spring\.web\.cors\.allowed-origins[ \t]*=[ \t]*["']?[^"'\n]*\*/) as $props
+${*.yml}.pattern_regex(/(?i)allowed-origins:\s*["']?\*/) as $yml
+${*.yaml}.pattern_regex(/(?i)allowed-origins:\s*["']?\*/) as $yaml
+${*.xml}.pattern_regex(/(?i)allowed-origins:\s*["']?\*/) as $xml
+$props + $yml + $yaml + $xml as $hit
+alert $hit for {
+	level: "medium",
+	title: "CORS allows all origins",
+	message: "CORS allowed-origins contains a wildcard",
+}
