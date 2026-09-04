@@ -363,6 +363,21 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(2), uintVal(t, resp.Child("Sender")))
 		require.Equal(t, uint64(1), uintVal(t, resp.Child("Receiver")))
 	})
+	t.Run("wireguard/cookie", func(t *testing.T) {
+		wg := make([]byte, 64)
+		wg[0] = 3
+		wg[4] = 1
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "WGCookie").Child("Receiver")))
+	})
+	t.Run("wireguard/transport", func(t *testing.T) {
+		wg := make([]byte, 4+4+8+16)
+		wg[0] = 4
+		wg[4] = 1
+		wg[8] = 7
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		require.Equal(t, uint64(7), uintVal(t, mustChild(t, n, "WGTransport").Child("Counter")))
+	})
 
 	t.Run("bgp/keepalive", func(t *testing.T) {
 		bgp := mustHex(t, "ffffffffffffffffffffffffffffffff001304")

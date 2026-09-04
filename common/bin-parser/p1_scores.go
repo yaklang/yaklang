@@ -64,7 +64,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("OpenVPN", "openvpn.yaml", 25, 25, 20, 20, 10, "L2",
 		"openvpn/hard-reset P_CONTROL_HARD_RESET_CLIENT_V2 Opcode 7 Packet ID 1; openvpn/data-v2 P_DATA_V2 Peer ID 1 UDP/1194; TestP1FailPaths openvpn", "Payload"),
 	p1card("WireGuard", "wireguard.yaml", 20, 25, 20, 20, 10, "L2",
-		"TestP1WiresharkAndRFCSamples handshake initiation Sender + response Receiver Ethernet+UDP/51820; TestP1FailPaths wireguard", ""),
+		"wireguard/cookie type 3 Receiver=1 Nonce 24 Encrypted Cookie 32; wireguard/transport type 4 Counter=7 Ciphertext UDP/51820; TestP1FailPaths wireguard", "Ciphertext"),
 	p1card("IKEv1", "ike.yaml", 25, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 7296 SA PRF HMAC_SHA1 + KE group 2 + Nonce Ethernet+UDP/500; TestP1FailPaths ike", ""),
 	p1card("IKEv2", "ike.yaml", 25, 25, 20, 20, 10, "L2",
