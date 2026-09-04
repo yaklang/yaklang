@@ -251,6 +251,37 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "QUIC").Child("SCID")))
 	})
 
+	t.Run("ospf/hello", func(t *testing.T) {
+		// gopacket layers/ospf_test.go OSPFv2 Hello: mask 255.255.255.0, interval 10, dead 40, DR 192.168.170.8.
+		hello := mustHex(t, "0201002cc0a8aa0800000001273b00000000000000000000ffffff00000a020100000028c0a8aa0800000000")
+		n := parseRule(t, hello, "ospf", "OSPF")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Type")))
+		h := mustChild(t, n, "OSPFHello")
+		require.Equal(t, []byte{0xff, 0xff, 0xff, 0x00}, bytesVal(t, h.Child("Network Mask")))
+		require.Equal(t, uint64(10), uintVal(t, h.Child("Hello Interval")))
+		require.Equal(t, uint64(1), uintVal(t, h.Child("Priority")))
+		require.Equal(t, uint64(40), uintVal(t, h.Child("Dead Interval")))
+		require.Equal(t, []byte{0xc0, 0xa8, 0xaa, 0x08}, bytesVal(t, h.Child("Designated Router")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 89, hello))
+		require.Equal(t, uint64(10), uintVal(t, mustChild(t, eth, "IP", "OSPF", "OSPFHello").Child("Hello Interval")))
+	})
+
+	t.Run("ospf/dbd", func(t *testing.T) {
+		// RFC 2328 §A.3.3 Database Description: MTU 1500, Options E, Flags I|M|MS (ExStart), DD sequence 1.
+		dbd := mustHex(t, "02020020c0a800010000000000000000000000000000000005dc020700000001")
+		n := parseRule(t, dbd, "ospf", "OSPF")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Type")))
+		d := mustChild(t, n, "OSPFDBDesc")
+		require.Equal(t, uint64(1500), uintVal(t, d.Child("Interface MTU")))
+		require.Equal(t, uint64(0x02), uintVal(t, d.Child("Options")))
+		require.Equal(t, uint64(0x07), uintVal(t, d.Child("Flags")))
+		require.Equal(t, uint64(1), uintVal(t, d.Child("DD Sequence")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 89, dbd))
+		require.Equal(t, uint64(1500), uintVal(t, mustChild(t, eth, "IP", "OSPF", "OSPFDBDesc").Child("Interface MTU")))
+		require.Equal(t, uint64(0x07), uintVal(t, mustChild(t, eth, "IP", "OSPF", "OSPFDBDesc").Child("Flags")))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"
