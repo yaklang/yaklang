@@ -60,6 +60,7 @@ POP3Stat:
   Octets: "del:\r;type:string"
 POP3Extra:
   list: true
+  Line: POP3Scan
   operator: |
     for {
       res, op = this.TryProcessByType("PeekByte")
@@ -70,7 +71,14 @@ POP3Extra:
       first = res.Value
       op.Recovery()
       if first >= 48 && first <= 57 {
-        this.ProcessByType("POP3Scan")
+        res2, op2 = this.TryProcessByType("POP3Scan")
+        if !op2.OK {
+          op2.Recovery()
+          break
+        }
+        op2.Recovery()
+        ele = this.NewElement()
+        ele.Process()
       } else {
         this.ProcessByType("POP3Line")
       }
