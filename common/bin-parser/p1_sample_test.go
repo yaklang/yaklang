@@ -567,6 +567,62 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, invoking, bytesVal(t, wired.Child("Original Datagram")))
 	})
 
+	t.Run("icmpv6/mld-query", func(t *testing.T) {
+		// RFC 2710 §3 Multicast Listener Query Type 130 General Query.
+		// Maximum Response Delay 10000 ms (RFC 2710 §7.2 default); Multicast Address :: .
+		// Wireshark icmpv6.mld.mrc / icmpv6.mld.multicast_address.
+		unspec := make([]byte, 16)
+		q := append([]byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, unspec...)
+		n := parseRule(t, q, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(130), uintVal(t, n.Child("Type")))
+		query := mustChild(t, n, "Multicast Listener Query")
+		require.Equal(t, uint64(10000), uintVal(t, query.Child("Maximum Response Delay")))
+		require.Equal(t, unspec, bytesVal(t, query.Child("Multicast Address")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, q))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Query")
+		require.Equal(t, uint64(10000), uintVal(t, wired.Child("Maximum Response Delay")))
+		require.Equal(t, unspec, bytesVal(t, wired.Child("Multicast Address")))
+	})
+
+	t.Run("icmpv6/mld-report", func(t *testing.T) {
+		// RFC 2710 §3 Multicast Listener Report Type 131; Delay 0; group ff02::1.
+		ff02ones := []byte{0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
+		r := append([]byte{0x83, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, ff02ones...)
+		n := parseRule(t, r, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(131), uintVal(t, n.Child("Type")))
+		require.Equal(t, ff02ones, bytesVal(t, mustChild(t, n, "Multicast Listener Report").Child("Multicast Address")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, r))
+		require.Equal(t, ff02ones, bytesVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Report").Child("Multicast Address")))
+	})
+
+	t.Run("icmpv6/mld-done", func(t *testing.T) {
+		// RFC 2710 §3 Multicast Listener Done Type 132; Delay 0; group ff02::1.
+		ff02ones := []byte{0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
+		d := append([]byte{0x84, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, ff02ones...)
+		n := parseRule(t, d, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(132), uintVal(t, n.Child("Type")))
+		require.Equal(t, ff02ones, bytesVal(t, mustChild(t, n, "Multicast Listener Done").Child("Multicast Address")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, d))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Done").Child("Maximum Response Delay")))
+	})
+
+	t.Run("icmpv6/redirect", func(t *testing.T) {
+		// RFC 4861 §4.5 Redirect Type 137: Target fe80::1, Destination 2001:db8::1.
+		// Wireshark icmpv6.nd.target_address / icmpv6.nd.redirect.dest. Ethernet+IPv6.
+		target := []byte{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
+		dest := []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
+		rd := append(append([]byte{0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, target...), dest...)
+		n := parseRule(t, rd, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(137), uintVal(t, n.Child("Type")))
+		redir := mustChild(t, n, "Redirect")
+		require.Equal(t, target, bytesVal(t, redir.Child("Target Address")))
+		require.Equal(t, dest, bytesVal(t, redir.Child("Destination Address")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, rd))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Redirect")
+		require.Equal(t, target, bytesVal(t, wired.Child("Target Address")))
+		require.Equal(t, dest, bytesVal(t, wired.Child("Destination Address")))
+	})
+
 	t.Run("icmpv6/ra-opt", func(t *testing.T) {
 		// gopacket layers/icmp6msg_test.go Router Advertisement: SLLA + MTU 1500 + Prefix 2001:db8:0:1::/64.
 		ra := []byte{
