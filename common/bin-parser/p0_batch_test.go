@@ -177,12 +177,17 @@ func TestPostgreSQLStartupSSLQueryAndEdges(t *testing.T) {
 	copy(st[8:], params)
 	startup := parseRule(t, st, "application-layer.postgresql", "Startup")
 	require.Equal(t, uint64(196608), uintVal(t, startup.Child("Protocol")))
-	require.Equal(t, params, bytesVal(t, startup.Child("Parameters")))
+	pairs := startup.Child("Parameters").Children()
+	require.GreaterOrEqual(t, len(pairs), 2)
+	require.Equal(t, "user", strVal(t, pairs[0].Child("Name")))
+	require.Equal(t, "postgres", strVal(t, pairs[0].Child("Value")))
+	require.Equal(t, "database", strVal(t, pairs[1].Child("Name")))
+	require.Equal(t, "test", strVal(t, pairs[1].Child("Value")))
 
 	q := pgTyped('Q', append([]byte("SELECT 1"), 0))
 	msg := parseRule(t, q, "application-layer.postgresql", "PostgreSQL")
 	require.Equal(t, uint64('Q'), uintVal(t, msg.Child("First")))
-	require.Equal(t, append([]byte("SELECT 1"), 0), bytesVal(t, mustChild(t, msg, "Payload", "Query")))
+	require.Equal(t, "SELECT 1", strVal(t, mustChild(t, msg, "Payload", "PostgreSQLQuery").Child("SQL")))
 
 	authOK := pgTyped('R', []byte{0, 0, 0, 0})
 	r := parseRule(t, authOK, "application-layer.postgresql", "PostgreSQL")
@@ -192,6 +197,11 @@ func TestPostgreSQLStartupSSLQueryAndEdges(t *testing.T) {
 	errp := pgTyped('E', []byte("SERROR\x00C42601\x00Msyntax\x00\x00"))
 	e := parseRule(t, errp, "application-layer.postgresql", "PostgreSQL")
 	require.Equal(t, uint64('E'), uintVal(t, e.Child("First")))
+	fields := mustChild(t, e, "Payload", "PostgreSQLError").Children()
+	require.GreaterOrEqual(t, len(fields), 3)
+	require.Equal(t, "ERROR", strVal(t, fields[0].Child("Severity")))
+	require.Equal(t, "42601", strVal(t, fields[1].Child("SQLState")))
+	require.Equal(t, "syntax", strVal(t, fields[2].Child("Message")))
 
 	ready := pgTyped('Z', []byte{'I'})
 	z := parseRule(t, ready, "application-layer.postgresql", "PostgreSQL")
@@ -212,6 +222,7 @@ func TestPostgreSQLStartupSSLQueryAndEdges(t *testing.T) {
 
 	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 5432, q))
 	require.Equal(t, uint64('Q'), uintVal(t, mustChild(t, eth, "IP", "TCP", "PostgreSQL", "First")))
+	require.Equal(t, "SELECT 1", strVal(t, mustChild(t, eth, "IP", "TCP", "PostgreSQL", "Payload", "PostgreSQLQuery").Child("SQL")))
 
 	ethSSL := parseEthernet(t, ipv4TCPFrame(t, 50000, 5432, ssl))
 	require.Equal(t, uint64(80877103), uintVal(t, mustChild(t, ethSSL, "IP", "TCP", "PGSSLRequest", "Code")))
@@ -229,7 +240,7 @@ func TestPostgreSQLStartupSSLQueryAndEdges(t *testing.T) {
 	pwd := pgTyped('p', append([]byte("secret"), 0))
 	pp := parseRule(t, pwd, "application-layer.postgresql", "PostgreSQL")
 	require.Equal(t, uint64('p'), uintVal(t, pp.Child("First")))
-	require.Equal(t, append([]byte("secret"), 0), bytesVal(t, mustChild(t, pp, "Payload", "Data")))
+	require.Equal(t, "secret\x00", strVal(t, mustChild(t, pp, "Payload").Child("Octets")))
 
 	copyData := pgTyped('d', []byte{1, 2, 3})
 	d := parseRule(t, copyData, "application-layer.postgresql", "PostgreSQL")
