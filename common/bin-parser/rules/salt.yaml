@@ -11,3 +11,14 @@ Package:
       this.ProcessSubNode("Payload")
     Length: uint32
     Payload: raw
+    Frames:
+      list: true
+      Frame: raw,0
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          break
+        }

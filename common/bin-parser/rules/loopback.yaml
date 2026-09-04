@@ -13,5 +13,7 @@ Package:
         return
       }
     Protocol: uint16
+    Padding: raw,0
+    FCS: raw,0
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"

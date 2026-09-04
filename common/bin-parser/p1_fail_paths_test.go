@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-func TestP1FailPaths(t *testing.T) {
-	type failCase struct {
-		rule string
-		keys []string
-		data []byte
-		name string
-	}
-	cases := []failCase{
+type p1FailCase struct {
+	rule string
+	keys []string
+	data []byte
+	name string
+}
+
+var p1FailCases = []p1FailCase{
 		{"vxlan", []string{"VXLAN"}, nil, "empty"},
 		{"vxlan", []string{"VXLAN"}, []byte{0x00}, "trunc"},
 		{"vxlan", []string{"VXLAN"}, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, "no-i-flag"},
@@ -245,8 +245,10 @@ func TestP1FailPaths(t *testing.T) {
 		{"application-layer.snmp", []string{"SNMPv3"}, nil, "empty"},
 		{"application-layer.snmp", []string{"SNMPv3"}, []byte{0x31, 0x03, 0x02, 0x01, 0x03}, "bad-seq"},
 		{"application-layer.snmp", []string{"SNMPv3"}, []byte{0x30, 0x03, 0x02, 0x01, 0x01}, "bad-ver"},
-	}
-	for i, tc := range cases {
+}
+
+func TestP1FailPaths(t *testing.T) {
+	for i, tc := range p1FailCases {
 		t.Run(fmt.Sprintf("%s/%s/%s/%d", tc.rule, tc.keys[0], tc.name, i), func(t *testing.T) {
 			parseMustFail(t, tc.data, tc.rule, tc.keys...)
 		})
