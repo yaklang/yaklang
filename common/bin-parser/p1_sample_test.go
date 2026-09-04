@@ -3057,6 +3057,29 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Nil(t, n.Child("Next Protocol Data"))
 	})
 
+	t.Run("ieee_802_11/bar", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.3.1.7 Compressed BlockAckReq (type 1 subtype 8).
+		// BAR Control TID 6 + Compressed Bitmap, Starting Seq 16; no BA Bitmap.
+		// Wireshark wlan.bar.control / wlan.bar.ssc.
+		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		ta := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		raw := make([]byte, 0, 20)
+		raw = append(raw, 0x84, 0x00, 0x00, 0x00)
+		raw = append(raw, ra...)
+		raw = append(raw, ta...)
+		raw = append(raw, 0x04, 0x60, 0x00, 0x01)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0084), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, ra, bytesVal(t, n.Child("Addr1")))
+		require.Equal(t, ta, bytesVal(t, n.Child("Addr2")))
+		require.Equal(t, uint64(0x6004), uintVal(t, n.Child("BAR Control")))
+		require.Equal(t, uint64(6), uintVal(t, n.Child("BAR Control"))>>12)
+		require.Equal(t, uint64(0x0100), uintVal(t, n.Child("Starting Sequence Control")))
+		require.Nil(t, n.Child("BA Bitmap"))
+		require.Nil(t, n.Child("Seq"))
+		require.Nil(t, n.Child("Next Protocol Data"))
+	})
+
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
 		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
