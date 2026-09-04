@@ -76,6 +76,7 @@ Package:
           if n > 0 {
             this.ProcessSubNode("Contexts")
           }
+          return
         Max Xmit Frag: uint16
         Max Recv Frag: uint16
         Assoc Group: uint32
@@ -146,12 +147,48 @@ Package:
             this.GetSubNode("Sec Addr").SetMaxLength(sl)
             this.ProcessSubNode("Sec Addr")
           }
+          if this.GetMaxLength() > this.Length() {
+            rest = this.GetMaxLength() - this.Length()
+            if rest > 0 && rest < 1048576 {
+              used = this.Length()
+              pad = (4 - (used % 4)) % 4
+              if pad > 0 && pad <= rest {
+                this.GetSubNode("Pad").SetMaxLength(pad)
+                this.ProcessSubNode("Pad")
+              }
+              if this.GetMaxLength() > this.Length() {
+                r2 = this.GetMaxLength() - this.Length()
+                if r2 >= 4 && r2 < 1048576 {
+                  this.ProcessByType("DCERPCResults")
+                }
+              }
+            }
+          }
+          return
         Max Xmit Frag: uint16
         Max Recv Frag: uint16
         Assoc Group: uint32
         Sec Addr Len: uint16
-        Sec Addr: raw
+        Sec Addr: string
+        Pad: string
       BindNak:
         operator: |
           this.ProcessSubNode("Reject Reason")
         Reject Reason: uint16
+DCERPCResults:
+  operator: |
+    this.ProcessSubNode("Num Results")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Reserved2")
+    this.ProcessSubNode("Ack Result")
+    this.ProcessSubNode("Ack Reason")
+    this.ProcessSubNode("Transfer Syntax")
+    this.ProcessSubNode("Transfer Version")
+    return
+  Num Results: uint8
+  Reserved: uint8
+  Reserved2: uint16
+  Ack Result: uint16
+  Ack Reason: uint16
+  Transfer Syntax: raw,16
+  Transfer Version: uint32

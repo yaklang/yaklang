@@ -493,4 +493,16 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(65507), uintVal(t, hdr.Child("MsgMaxSize")))
 		require.Equal(t, uint64(4), uintVal(t, hdr.Child("MsgFlags")))
 	})
+
+	t.Run("dcerpc/bind", func(t *testing.T) {
+		n := parseRule(t, append(dcerpcHeader(11, 28, 1), make([]byte, 12)...), "application-layer.dcerpc", "DCERPC")
+		require.Equal(t, uint64(11), uintVal(t, n.Child("PType")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, n, "PDU", "Bind").Child("Num Ctx Items")))
+	})
+	t.Run("dcerpc/bind-ack", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "05000c03100000003c00000001000000d016d0160100000004003133350000000100000000000000045d888aeb1cc9119fe808002b10486002000000"), "application-layer.dcerpc", "DCERPC")
+		ack := mustChild(t, n, "PDU", "BindAck")
+		require.Equal(t, uint64(4), uintVal(t, ack.Child("Sec Addr Len")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, ack, "DCERPCResults").Child("Ack Result")))
+	})
 }
