@@ -94,7 +94,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Memcached | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `memcached.yaml` |
 | Elasticsearch | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | AMQP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `amqp.yaml` |
-| Kafka | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `kafka.yaml` |
+| Kafka | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `kafka.yaml` |
 | RabbitMQ | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of AMQP |
 | Thrift | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `thrift.yaml` |
 | Protobuf | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `protobuf.yaml` |
