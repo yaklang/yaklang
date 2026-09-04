@@ -368,9 +368,10 @@ func TestP1TCPApplications(t *testing.T) {
 	rs := []byte("@RSYNCD: 31.0\n")
 	ry := parseRule(t, rs, "rsync", "Rsync")
 	require.Equal(t, "@RSYNCD:", strVal(t, ry.Child("Magic")))
-	require.Equal(t, "31.0", strVal(t, ry.Child("Version")))
+	require.Equal(t, "31", strVal(t, ry.Child("Major")))
+	require.Equal(t, "0", strVal(t, ry.Child("Minor")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 873, 873, rs))
-	require.Equal(t, "31.0", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Version")))
+	require.Equal(t, "31", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Major")))
 
 	rtsp := []byte("OPTIONS rtsp://cam/stream RTSP/1.0\r\nCSeq: 1\r\n\r\n")
 	rt := parseRule(t, rtsp, "rtsp", "RTSP")

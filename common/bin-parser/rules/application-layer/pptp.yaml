@@ -56,7 +56,7 @@ Package:
       FirmwareRevision: uint16
       Hostname: string,64
       Vendor: string,64
-      Raw: raw
+      Raw: string
 
 Start Control Conn Req:
     ProtocolVersion: uint16

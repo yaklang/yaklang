@@ -31,5 +31,5 @@ Package:
     Content Length: uint16
     Padding Length: uint8
     Reserved: uint8
-    Content: raw
-    Padding: raw
+    Content: string
+    Padding: string

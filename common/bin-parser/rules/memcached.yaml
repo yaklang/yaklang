@@ -40,6 +40,6 @@ Package:
     Total Body: uint32
     Opaque: uint32
     CAS: raw,8
-    Extras: raw
-    Key: raw
-    Value: raw
+    Extras: string
+    Key: string
+    Value: string

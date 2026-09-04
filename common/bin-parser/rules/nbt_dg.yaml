@@ -27,4 +27,4 @@ Package:
     Source Port: uint16
     Length: uint16
     Packet Offset: uint16
-    Data: raw
+    Data: string

@@ -7,7 +7,9 @@ Package:
         panic("rsync: expected @RSYNCD banner")
       }
       this.ProcessSubNode("Space")
-      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
     Magic: string,8
     Space: uint8
-    Version: "del:\n;type:string"
+    Major: "del:.;type:string"
+    Minor: "del:\n;type:string"

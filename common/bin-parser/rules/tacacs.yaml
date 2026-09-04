@@ -20,11 +20,27 @@ Package:
       l = getNodeResult("Length").Value
       if typ == 1 && l >= 8 {
         this.ProcessSubNode("AuthenStart")
+        ul = getNodeResult("User Len").Value
+        pl = getNodeResult("Port Len").Value
+        rl = getNodeResult("RemAddr Len").Value
+        dl = getNodeResult("Data Len").Value
+        if ul > 0 && ul < 512 {
+          this.GetSubNode("User").SetMaxLength(ul)
+          this.ProcessSubNode("User")
+        }
+        if pl > 0 && pl < 512 {
+          this.GetSubNode("Port").SetMaxLength(pl)
+          this.ProcessSubNode("Port")
+        }
+        if rl > 0 && rl < 512 {
+          this.GetSubNode("RemAddr").SetMaxLength(rl)
+          this.ProcessSubNode("RemAddr")
+        }
+        if dl > 0 && dl < 512 {
+          this.GetSubNode("Data").SetMaxLength(dl)
+          this.ProcessSubNode("Data")
+        }
         return
-      }
-      if l > 0 && l < 1048576 {
-        this.GetSubNode("Body").SetMaxLength(l)
-        this.ProcessSubNode("Body")
       }
     Version: uint8
     Type: uint8
@@ -33,6 +49,7 @@ Package:
     Session ID: uint32
     Length: uint32
     AuthenStart:
+      unpack: true
       Action: uint8
       Priv Lvl: uint8
       Authen Type: uint8
@@ -41,4 +58,7 @@ Package:
       Port Len: uint8
       RemAddr Len: uint8
       Data Len: uint8
-    Body: raw
+    User: string
+    Port: string
+    RemAddr: string
+    Data: string

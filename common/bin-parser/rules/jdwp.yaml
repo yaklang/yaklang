@@ -35,4 +35,4 @@ Package:
       Flags: uint8
       Command Set: uint8
       Command: uint8
-      Data: raw
+      Data: string

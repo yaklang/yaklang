@@ -24,4 +24,4 @@ IP: "import:internet_protocol.yaml;node:Internet Protocol"
 PAP: "import:password_authentication_protocol.yaml;node:PAP"
 CHAP: "import:challenge_handshake_authentication_protocol.yaml;node:CHAP"
 LCP: "import:link_control_protocol.yaml;node:LCP"
-Unknown: raw
+Unknown: string
