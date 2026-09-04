@@ -202,6 +202,7 @@ func TestP1TCPApplications(t *testing.T) {
 	pop := []byte("+OK ready\r\n")
 	po := parseRule(t, pop, "pop3", "POP3")
 	require.Equal(t, "+OK", strVal(t, po.Child("Status")))
+	require.Equal(t, "ready", strVal(t, po.Child("Arg")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 110, 110, pop))
 	require.Equal(t, "+OK", strVal(t, mustChild(t, eth, "IP", "TCP", "POP3").Child("Status")))
 
@@ -228,6 +229,10 @@ func TestP1TCPApplications(t *testing.T) {
 	require.Equal(t, uint64(2004), uintVal(t, mg.Child("Op Code")))
 	require.Equal(t, uint64(54), uintVal(t, mg.Child("Message Length")))
 	require.Equal(t, "admin.$cmd", strVal(t, mustChild(t, mg, "OP_QUERY").Child("Collection")))
+	qel := mustChild(t, mg, "OP_QUERY", "Query", "Elements").Children()
+	require.GreaterOrEqual(t, len(qel), 1)
+	require.Equal(t, "ping", strVal(t, qel[0].Child("Name")))
+	require.Equal(t, uint64(1), uintVal(t, qel[0].Child("Int32")))
 
 	mc := make([]byte, 24)
 	mc[0] = 0x80

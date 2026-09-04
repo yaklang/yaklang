@@ -17,9 +17,9 @@ Package:
         this.ProcessSubNode("Name")
       }
       this.ProcessSubNode("Seq ID")
-      if this.Length() < this.GetMaxLength() {
+      if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
         rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
+        if rest >= 1 {
           this.GetSubNode("Fields").SetMaxLength(rest)
           this.ProcessSubNode("Fields")
         }
@@ -28,4 +28,32 @@ Package:
     Name Length: uint32
     Name: string
     Seq ID: uint32
-    Fields: string
+    Fields:
+      list: true
+      Field: ThriftField
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 1 {
+            break
+          }
+          ele.Process()
+          if getCtx("thrift_stop") == 1 {
+            break
+          }
+        }
+ThriftField:
+  operator: |
+    this.ProcessSubNode("Type")
+    t = getNodeResult("Type").Value
+    if t == 0 {
+      setCtx("thrift_stop", 1)
+      return
+    }
+    this.ProcessSubNode("Field ID")
+    if t == 8 || t == 10 || t == 4 || t == 6 || t == 3 {
+      this.ProcessSubNode("I32")
+    }
+  Type: uint8
+  Field ID: uint16
+  I32: uint32

@@ -22,6 +22,6 @@ Package:
     Function: uint16
     Receipt: uint16
     Ident: uint16
-    Data: string
+    Bytes: string
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"

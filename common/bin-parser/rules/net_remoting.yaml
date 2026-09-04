@@ -12,13 +12,13 @@ Package:
       this.ProcessSubNode("Operation Type")
       this.ProcessSubNode("Content Length")
       l = getNodeResult("Content Length").Value
-      if l > 0 {
-        this.GetSubNode("Content").SetMaxLength(l)
-        this.ProcessSubNode("Content")
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Serialized").SetMaxLength(l)
+        this.ProcessSubNode("Serialized")
       }
     Preamble: raw,4
     Major: uint16
     Minor: uint16
     Operation Type: uint16
     Content Length: uint32
-    Content: string
+    Serialized: string

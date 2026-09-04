@@ -37,8 +37,8 @@ Package:
           this.ProcessSubNode("RemAddr")
         }
         if dl > 0 && dl < 512 {
-          this.GetSubNode("Data").SetMaxLength(dl)
-          this.ProcessSubNode("Data")
+          this.GetSubNode("Token").SetMaxLength(dl)
+          this.ProcessSubNode("Token")
         }
         return
       }
@@ -61,4 +61,4 @@ Package:
     User: string
     Port: string
     RemAddr: string
-    Data: string
+    Token: string

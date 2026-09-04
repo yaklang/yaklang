@@ -5,12 +5,7 @@ Package:
       this.ProcessSubNode("Type")
       typ = getNodeResult("Type").Value
       if typ == 0x41 {
-        this.ProcessSubNode("MQ")
-        this.ProcessSubNode("QP")
-        this.ProcessSubNode("Id")
-        this.ProcessSubNode("Major")
-        this.ProcessSubNode("Minor")
-        this.ProcessSubNode("Revision")
+        this.ProcessSubNode("Protocol")
         proto = string(getNodeResult("MQ").Value) + string(getNodeResult("QP").Value)
         if proto != "MQP" {
           panic("amqp: protocol header magic")
@@ -23,22 +18,31 @@ Package:
       this.ProcessSubNode("Channel")
       this.ProcessSubNode("Length")
       l = getNodeResult("Length").Value
-      if l > 0 {
-        this.GetSubNode("Payload").SetMaxLength(l)
-        this.ProcessSubNode("Payload")
+      if typ == 1 && l >= 4 {
+        this.ProcessSubNode("Class ID")
+        this.ProcessSubNode("Method ID")
+        if l >= 6 {
+          this.ProcessSubNode("Version Major")
+          this.ProcessSubNode("Version Minor")
+        }
       }
       this.ProcessSubNode("Frame End")
       if getNodeResult("Frame End").Value != 0xce {
         panic("amqp: frame end must be 0xce")
       }
     Type: uint8
-    MQ: raw,1
-    QP: raw,2
-    Id: uint8
-    Major: uint8
-    Minor: uint8
-    Revision: uint8
+    Protocol:
+      unpack: true
+      MQ: raw,1
+      QP: raw,2
+      Id: uint8
+      Major: uint8
+      Minor: uint8
+      Revision: uint8
     Channel: uint16
     Length: uint32
-    Payload: string
+    Class ID: uint16
+    Method ID: uint16
+    Version Major: uint8
+    Version Minor: uint8
     Frame End: uint8

@@ -43,10 +43,9 @@ Package:
           this.ProcessSubNode("Vendor")
           return
         }
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Raw").SetMaxLength(rest)
-          this.ProcessSubNode("Raw")
+        if type == 2 {
+          this.ProcessByType("Start Control Conn Reply")
+          return
         }
       ProtocolVersion: uint16
       Reserved2: uint16
@@ -56,7 +55,6 @@ Package:
       FirmwareRevision: uint16
       Hostname: string,64
       Vendor: string,64
-      Raw: string
 
 Start Control Conn Req:
     ProtocolVersion: uint16

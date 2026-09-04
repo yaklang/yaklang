@@ -19,23 +19,141 @@ Package:
         this.ProcessSubNode("OP_MSG")
         return
       }
-      rest = l - 16
-      if rest > 0 && rest < 1048576 {
-        this.GetSubNode("Body").SetMaxLength(rest)
-        this.ProcessSubNode("Body")
-      }
     Message Length: uint32
     Request ID: uint32
     Response To: uint32
     Op Code: uint32
     OP_QUERY:
+      operator: |
+        this.ProcessSubNode("Flags")
+        this.ProcessSubNode("Collection")
+        this.ProcessSubNode("Skip")
+        this.ProcessSubNode("Return")
+        this.ProcessSubNode("Query")
       Flags: uint32
       Collection: "del:\x00;type:string"
       Skip: uint32
       Return: uint32
-      Query: raw,0
+      Query:
+        operator: |
+          this.ProcessSubNode("Size")
+          sz = getNodeResult("Size").Value
+          if sz < 5 {
+            panic("bson: document too small")
+          }
+          body = sz - 4
+          if body > 0 && body < 1048576 {
+            this.GetSubNode("Elements").SetMaxLength(body)
+            this.ProcessSubNode("Elements")
+          }
+        Size: uint32
+        Elements:
+          list: true
+          Element:
+            operator: |
+              this.ProcessSubNode("Type")
+              t = getNodeResult("Type").Value
+              if t == 0 {
+                setCtx("bson_eoo", 1)
+                return
+              }
+              this.ProcessSubNode("Name")
+              if t == 0x10 {
+                this.ProcessSubNode("Int32")
+                return
+              }
+              if t == 0x02 {
+                this.ProcessSubNode("StrLen")
+                sl = getNodeResult("StrLen").Value
+                if sl > 0 && sl < 1048576 {
+                  this.GetSubNode("Str").SetMaxLength(sl)
+                  this.ProcessSubNode("Str")
+                }
+                return
+              }
+              if t == 0x08 {
+                this.ProcessSubNode("Bool")
+                return
+              }
+            Type: uint8
+            Name: "del:\x00;type:string"
+            Int32: uint32
+            StrLen: uint32
+            Str: string
+            Bool: uint8
+          operator: |
+            for {
+              ele = this.NewElement()
+              if ele.GetMaxLength() < 2 {
+                break
+              }
+              ele.Process()
+              if getCtx("bson_eoo") == 1 {
+                break
+              }
+            }
     OP_MSG:
+      operator: |
+        this.ProcessSubNode("Flag Bits")
+        this.ProcessSubNode("Section Kind")
+        this.ProcessSubNode("Document")
       Flag Bits: uint32
       Section Kind: uint8
-      Section: string
-    Body: string
+      Document:
+        operator: |
+          this.ProcessSubNode("Size")
+          sz = getNodeResult("Size").Value
+          if sz < 5 {
+            panic("bson: document too small")
+          }
+          body = sz - 4
+          if body > 0 && body < 1048576 {
+            this.GetSubNode("Elements").SetMaxLength(body)
+            this.ProcessSubNode("Elements")
+          }
+        Size: uint32
+        Elements:
+          list: true
+          Element:
+            operator: |
+              this.ProcessSubNode("Type")
+              t = getNodeResult("Type").Value
+              if t == 0 {
+                setCtx("bson_eoo", 1)
+                return
+              }
+              this.ProcessSubNode("Name")
+              if t == 0x10 {
+                this.ProcessSubNode("Int32")
+                return
+              }
+              if t == 0x02 {
+                this.ProcessSubNode("StrLen")
+                sl = getNodeResult("StrLen").Value
+                if sl > 0 && sl < 1048576 {
+                  this.GetSubNode("Str").SetMaxLength(sl)
+                  this.ProcessSubNode("Str")
+                }
+                return
+              }
+              if t == 0x08 {
+                this.ProcessSubNode("Bool")
+                return
+              }
+            Type: uint8
+            Name: "del:\x00;type:string"
+            Int32: uint32
+            StrLen: uint32
+            Str: string
+            Bool: uint8
+          operator: |
+            for {
+              ele = this.NewElement()
+              if ele.GetMaxLength() < 2 {
+                break
+              }
+              ele.Process()
+              if getCtx("bson_eoo") == 1 {
+                break
+              }
+            }

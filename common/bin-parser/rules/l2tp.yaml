@@ -13,7 +13,8 @@ Package:
       this.ProcessSubNode("Session ID")
       this.ProcessSubNode("Ns")
       this.ProcessSubNode("Nr")
-      if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+      tbit = flags >> 15
+      if tbit == 1 && this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
         rest = this.GetMaxLength() - this.Length()
         if rest >= 6 {
           this.GetSubNode("AVPs").SetMaxLength(rest)
