@@ -26,7 +26,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("EAPOL", "eapol.yaml", 20, 25, 20, 20, 10, "L1",
 		"eapol/mka IEEE 802.1X-2010 type 5 Next Protocol Data; eapol/announcement type 6; TestEAPOLKeyFromWPAInductionCapture; TestP1FailPaths eapol", "Key Data bounded"),
 	p1card("EAP", "eapol.yaml", 20, 25, 20, 20, 10, "L2",
-		"eap/expanded RFC 3748 Type 254 Vendor-Id 311 PEAP 25; eap/identity Length>5 anonymous; TestP1FailPaths eapol", "Key Data"),
+		"eap/tls-start RFC 5216 Type 13 Flags Start 0x20; eap/tls-length L-bit TLS Message Length 5; TestP1FailPaths trunc-tls", "Key Data Fragment"),
 	p1card("STP", "stp.yaml", 20, 25, 20, 20, 10, "L1",
 		"stp/config Root Priority 32768 MAC aa:bb:cc:00:01:00; stp/tcn type 0x80 no Config; TestP1FailPaths stp", ""),
 	alias("RSTP", "STP"),

@@ -1690,6 +1690,43 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(25), uintVal(t, wired.Child("Vendor Type")))
 	})
 
+	t.Run("eap/tls-start", func(t *testing.T) {
+		// RFC 5216 §3.1 EAP-Request/TLS Start: Type 13, Flags S=1 (0x20), no TLS Message Length.
+		// Wireshark eap.type=13 / eap.tls.flags.start. EtherType 0x888e.
+		eap := []byte{0x01, 0x00, 0x00, 0x06, 0x01, 0x01, 0x00, 0x06, 0x0d, 0x20}
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(13), uintVal(t, pkt.Child("Type")))
+		tls := mustChild(t, pkt, "EAP-TLS")
+		require.Equal(t, uint64(0x20), uintVal(t, tls.Child("Flags")))
+		require.Equal(t, uint64(1), (uintVal(t, tls.Child("Flags"))>>5)&1)
+		require.Nil(t, tls.Child("TLS Message Length"))
+		require.Nil(t, tls.Child("Fragment"))
+		require.Nil(t, pkt.Child("Identity"))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		wired := mustChild(t, eth, "EAPOL", "EAPPacket", "EAP-TLS")
+		require.Equal(t, uint64(0x20), uintVal(t, wired.Child("Flags")))
+		require.Nil(t, wired.Child("TLS Message Length"))
+	})
+
+	t.Run("eap/tls-length", func(t *testing.T) {
+		// RFC 5216 §3.1 L-bit: Flags 0x80, four-octet TLS Message Length, then TLS Data.
+		// Wireshark eap.tls.flags.len_included / eap.tls.len / eap.tls.fragment. Do not parse TLS.
+		frag := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee}
+		eap := append([]byte{0x01, 0x00, 0x00, 0x0f, 0x01, 0x01, 0x00, 0x0f, 0x0d, 0x80, 0x00, 0x00, 0x00, 0x05}, frag...)
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(13), uintVal(t, pkt.Child("Type")))
+		tls := mustChild(t, pkt, "EAP-TLS")
+		require.Equal(t, uint64(0x80), uintVal(t, tls.Child("Flags")))
+		require.Equal(t, uint64(1), uintVal(t, tls.Child("Flags"))>>7)
+		require.Equal(t, uint64(5), uintVal(t, tls.Child("TLS Message Length")))
+		require.Equal(t, frag, bytesVal(t, tls.Child("Fragment")))
+		require.Nil(t, pkt.Child("Identity"))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		wired := mustChild(t, eth, "EAPOL", "EAPPacket", "EAP-TLS")
+		require.Equal(t, uint64(5), uintVal(t, wired.Child("TLS Message Length")))
+		require.Equal(t, frag, bytesVal(t, wired.Child("Fragment")))
+	})
+
 	t.Run("eapol/mka", func(t *testing.T) {
 		// IEEE 802.1X-2010 Table 11-3 Packet Type 5 EAPOL-MKA. Wireshark eapol.type.
 		// No MKA dissector: Body Length-bounded leftover is Next Protocol Data, not Unknown raw.

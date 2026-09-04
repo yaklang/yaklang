@@ -88,6 +88,18 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, bm, bytesVal(t, n.Child("Block Ack Bitmap")))
 		require.Nil(t, n.Child("BA Bitmap"))
 	})
+	t.Run("eap/tls-start", func(t *testing.T) {
+		eap := []byte{0x01, 0x00, 0x00, 0x06, 0x01, 0x01, 0x00, 0x06, 0x0d, 0x20}
+		tls := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket", "EAP-TLS")
+		require.Equal(t, uint64(0x20), uintVal(t, tls.Child("Flags")))
+		require.Nil(t, tls.Child("TLS Message Length"))
+	})
+	t.Run("eap/tls-length", func(t *testing.T) {
+		eap := append([]byte{0x01, 0x00, 0x00, 0x0f, 0x01, 0x01, 0x00, 0x0f, 0x0d, 0x80, 0x00, 0x00, 0x00, 0x05}, []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee}...)
+		tls := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket", "EAP-TLS")
+		require.Equal(t, uint64(5), uintVal(t, tls.Child("TLS Message Length")))
+		require.Equal(t, []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee}, bytesVal(t, tls.Child("Fragment")))
+	})
 	t.Run("ieee_802_1ad/arp", func(t *testing.T) {
 		q := parseRule(t, append([]byte{0xb0, 0x64, 0x08, 0x06}, []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}...), "ieee_802_1ad", "QinQ")
 		require.Equal(t, uint64(5), uintVal(t, q.Child("PCP")))
