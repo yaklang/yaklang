@@ -24,16 +24,24 @@ fi
 mkdir -p "$TEST_LOG_DIR"
 
 list_test_pkgs() {
-  # Fail loudly: an empty or erroring package listing must never look like
-  # "no tests to run, therefore all passed".
-  local pattern="$1" out
-  if ! out=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' "$pattern" 2>&1); then
-    # Diagnostics go to stderr only: stdout of this function is the package list.
-    printf '::error::go list failed for %s\n' "$pattern" >&2
-    printf '%s\n' "$out" >&2
+  # stdout is the package list. `go list` prints download/progress text on stderr,
+  # so the streams must stay separate and the list is additionally filtered by the
+  # module path prefix: a stray line masquerading as a package would otherwise be
+  # reported as a passing "test".
+  local pattern="$1" out errfile
+  errfile="$(mktemp)"
+  if ! out=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' "$pattern" 2>"$errfile"); then
+    printf '::error::go list failed for %s
+' "$pattern"
+    [[ -s "$errfile" ]] && cat "$errfile"
+    rm -f "$errfile"
     return 1
   fi
-  printf '%s\n' "$out" | grep -v '^$' || true
+  [[ -s "$errfile" ]] && cat "$errfile" >&2
+  rm -f "$errfile"
+  printf '%s
+' "$out" | grep -E '^github\.com/yaklang/yaklang/' || true
+  return 0
 }
 
 needs_race() {
