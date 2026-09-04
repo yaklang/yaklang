@@ -44,7 +44,7 @@ var P1Scorecards = []ProtocolScorecard{
 		"TestP1MiscAndAliases RSN IE; TestP1FailPaths RSN", ""),
 	alias("IEEE 802.1X", "EAPOL"),
 	p1card("ICMPv6 NDP", "internet_control_message_protocol_v6.yaml", 25, 25, 20, 20, 10, "L1",
-		"icmpv6/mld-query RFC 2710 Type 130 MRC 10000 ::; icmpv6/redirect RFC 4861 Target fe80::1 Dest 2001:db8::1; TestP1FailPaths trunc-mld", ""),
+		"icmpv6/mldv2-report RFC 3810 Type 143 MODE_IS_EXCLUDE ff02::1:ff00:1; icmpv6/mld-query RFC 2710 MRC 10000; TestP1FailPaths trunc-mldv2", ""),
 	p1card("IGMP", "igmp.yaml", 20, 25, 20, 20, 10, "L1",
 		"igmp/v1-report 224.0.1.60; igmp/v3-query RFC 3376 source 192.0.2.1; igmp/v3-report MODE_IS_EXCLUDE Ethernet+IP proto 2; TestP1FailPaths igmp", ""),
 	p1card("GRE", "generic_routing_encapsulation.yaml", 20, 25, 20, 20, 10, "L2",
