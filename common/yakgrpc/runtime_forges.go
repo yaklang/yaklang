@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/aiforge/browserauthorization"
 	"github.com/yaklang/yaklang/common/aiforge/browsercrypto"
 	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -47,141 +46,15 @@ func (b serverBrowserExtensionBridge) CapabilityCatalog(
 	return nil, false
 }
 
-type serverBrowserAuthorizationService struct {
-	server *Server
-}
-
-func (s serverBrowserAuthorizationService) Available() bool {
-	return s.server != nil && s.server.browserBridge != nil
-}
-
-func (s serverBrowserAuthorizationService) InspectWorkspace(
-	ctx context.Context,
-	workspaceID string,
-	revalidate bool,
-) (browser.ExtensionAuthorizationWorkspace, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationWorkspace{}, errors.New("browser extension bridge is not running")
-	}
-	return s.server.browserBridge.GetExtensionAuthorizationWorkspace(
-		ctx,
-		workspaceID,
-		revalidate,
-	)
-}
-
-func (s serverBrowserAuthorizationService) ExecutePlan(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationExecutionInput,
-) (browser.ExtensionAuthorizationWorkspace, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationWorkspace{}, errors.New("browser extension bridge is not running")
-	}
-	return s.server.browserBridge.ExecuteExtensionAuthorizationPlan(ctx, input)
-}
-
-func (s serverBrowserAuthorizationService) InspectEvidence(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationEvidenceInspectInput,
-) (browser.ExtensionAuthorizationEvidenceBundle, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationEvidenceBundle{}, errors.New(
-			"browser extension bridge is not running",
-		)
-	}
-	return s.server.browserBridge.InspectExtensionAuthorizationEvidence(ctx, input)
-}
-
-func (s serverBrowserAuthorizationService) ReadEvidencePacket(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationEvidencePacketInput,
-) (browser.ExtensionAuthorizationEvidencePacket, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationEvidencePacket{}, errors.New(
-			"browser extension bridge is not running",
-		)
-	}
-	return s.server.browserBridge.ReadExtensionAuthorizationEvidencePacket(ctx, input)
-}
-
-func (s serverBrowserAuthorizationService) DiffEvidence(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationEvidenceDiffInput,
-) (browser.ExtensionAuthorizationEvidenceDiff, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationEvidenceDiff{}, errors.New(
-			"browser extension bridge is not running",
-		)
-	}
-	return s.server.browserBridge.DiffExtensionAuthorizationEvidence(ctx, input)
-}
-
-func (s serverBrowserAuthorizationService) ValidateEvidence(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationEvidenceValidationInput,
-) (browser.ExtensionAuthorizationEvidenceValidation, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationEvidenceValidation{}, errors.New(
-			"browser extension bridge is not running",
-		)
-	}
-	return s.server.browserBridge.ValidateExtensionAuthorizationEvidence(ctx, input)
-}
-
-func (s serverBrowserAuthorizationService) BindLogicalRequests(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationLogicalBindingInput,
-) (browser.ExtensionAuthorizationWorkspace, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationWorkspace{}, errors.New("browser extension bridge is not running")
-	}
-	return s.server.browserBridge.BindExtensionAuthorizationLogicalRequests(ctx, input)
-}
-
-func (s serverBrowserAuthorizationService) ListTransformProfiles(
-	ctx context.Context,
-	workspaceID string,
-) (browser.ExtensionAuthorizationTransformProfileCandidates, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationTransformProfileCandidates{}, errors.New(
-			"browser extension bridge is not running",
-		)
-	}
-	return s.server.browserBridge.ListExtensionAuthorizationTransformProfiles(
-		ctx,
-		workspaceID,
-	)
-}
-
-func (s serverBrowserAuthorizationService) CreatePlan(
-	ctx context.Context,
-	input browser.ExtensionAuthorizationPlanInput,
-) (browser.ExtensionAuthorizationWorkspace, error) {
-	if !s.Available() {
-		return browser.ExtensionAuthorizationWorkspace{}, errors.New("browser extension bridge is not running")
-	}
-	return s.server.browserBridge.CreateExtensionAuthorizationPlan(ctx, input)
-}
-
 func (s *Server) registerRuntimeForges() error {
 	if s == nil || s.runtimeForges == nil {
 		return errors.New("runtime forge registry is not initialized")
 	}
 	cryptoRunner := browsercrypto.NewRunner(serverBrowserExtensionBridge{server: s})
-	if err := s.runtimeForges.RegisterWithReAct(
+	return s.runtimeForges.RegisterWithReAct(
 		browsercrypto.ForgeName,
 		cryptoRunner.Execute,
 		cryptoRunner.PrepareReAct,
-	); err != nil {
-		return err
-	}
-	authorizationRunner := browserauthorization.NewRunner(
-		serverBrowserAuthorizationService{server: s},
-	)
-	return s.runtimeForges.RegisterWithReAct(
-		browserauthorization.ForgeName,
-		authorizationRunner.Execute,
-		authorizationRunner.PrepareReAct,
 	)
 }
 
