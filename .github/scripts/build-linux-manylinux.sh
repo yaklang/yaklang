@@ -44,7 +44,7 @@ export CGO_ENABLED=1
 export GOMODCACHE=/gomodcache
 export GOPATH=/tmp/gopath
 GO_VER_STR="$(go version)"
-args=(go build)
+args=(go build -trimpath)
 if [ -n "${BUILD_TAGS}" ]; then
   args+=(-tags "${BUILD_TAGS}")
 fi
