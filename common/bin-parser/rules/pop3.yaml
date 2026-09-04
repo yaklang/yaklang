@@ -6,7 +6,25 @@ Package:
       if !(st.HasPrefix("+OK") || st.HasPrefix("-ERR") || st.HasPrefix("USER") || st.HasPrefix("PASS") || st.HasPrefix("STAT") || st.HasPrefix("LIST") || st.HasPrefix("RETR") || st.HasPrefix("DELE") || st.HasPrefix("NOOP") || st.HasPrefix("RSET") || st.HasPrefix("QUIT") || st.HasPrefix("UIDL") || st.HasPrefix("APOP") || st.HasPrefix("CAPA") || st.HasPrefix("AUTH") || st.HasPrefix("STLS") || st.HasPrefix("TOP")) {
         panic("pop3: unknown status or command")
       }
-      this.ProcessSubNode("Arg")
+      if st.HasPrefix("+OK") {
+        res, op = this.TryProcessByType("PeekByte")
+        op.Recovery()
+        first = res.Value
+        if first >= 48 && first <= 57 {
+          res, op = this.TryProcessByType("PeekStatPrefix")
+          op.Recovery()
+          nxt = getCtx("pop3_nxt")
+          if nxt >= 48 && nxt <= 57 {
+            this.ProcessByType("POP3Stat")
+          } else {
+            this.ProcessSubNode("Arg")
+          }
+        } else {
+          this.ProcessSubNode("Arg")
+        }
+      } else {
+        this.ProcessSubNode("Arg")
+      }
       this.ProcessSubNode("LF")
       res, op = this.TryProcessByType("POP3Extra")
       if op.OK {
@@ -18,17 +36,58 @@ Package:
     Status: "del: ;type:string"
     Arg: "del:\r;type:string"
     LF: uint8
+PeekByte: uint8
+PeekStatPrefix:
+  operator: |
+    this.ProcessSubNode("Head")
+    this.ProcessSubNode("Next")
+    setCtx("pop3_nxt", getNodeResult("Next").Value)
+  Head: "del: ;type:string"
+  Next: uint8
+POP3Stat:
+  operator: |
+    this.ProcessSubNode("Messages")
+    m = string(getNodeResult("Messages").Value)
+    if !(m >= "0" && m < ":") {
+      panic("pop3: not stat message count")
+    }
+    this.ProcessSubNode("Octets")
+    o = string(getNodeResult("Octets").Value)
+    if !(o >= "0" && o < ":") {
+      panic("pop3: not stat octet count")
+    }
+  Messages: "del: ;type:string"
+  Octets: "del:\r;type:string"
 POP3Extra:
   list: true
   operator: |
     for {
-      res, op = this.TryProcessByType("POP3Line")
-      if op.OK {
-        op.Save()
-      } else {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
         op.Recovery()
         break
       }
+      first = res.Value
+      op.Recovery()
+      if first >= 48 && first <= 57 {
+        this.ProcessByType("POP3Scan")
+      } else {
+        this.ProcessByType("POP3Line")
+      }
     }
+POP3Scan:
+  operator: |
+    this.ProcessSubNode("Number")
+    n = string(getNodeResult("Number").Value)
+    if !(n >= "0" && n < ":") {
+      panic("pop3: not list scan number")
+    }
+    this.ProcessSubNode("Size")
+    s = string(getNodeResult("Size").Value)
+    if !(s >= "0" && s < ":") {
+      panic("pop3: not list scan size")
+    }
+  Number: "del: ;type:string"
+  Size: "del:\r\n;type:string"
 POP3Line:
   Text: "del:\r\n;type:string"
