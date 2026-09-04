@@ -472,17 +472,13 @@ func TestRedisPING(t *testing.T) {
 	redis := redisRoot(t, parseRule(t, payload, "application-layer.redis", "Redis"))
 	require.Equal(t, uint64('*'), uintVal(t, redis.Child("Prefix")))
 	require.Equal(t, "1", strVal(t, mustChild(t, redis, "Array", "Count")))
-	elements := mustChild(t, redis, "Array", "Elements")
-	require.True(t, elements.IsList())
-	require.Len(t, elements.Children(), 1)
-	bulk := elements.Children()[0]
-	require.Equal(t, uint64('$'), uintVal(t, bulk.Child("Prefix")))
-	require.Equal(t, []byte("PING"), bytesVal(t, mustChild(t, bulk, "Bulk", "Data")))
+	cmd := mustChild(t, redis, "Array", "RedisCommand")
+	require.Equal(t, uint64('$'), uintVal(t, cmd.Child("Prefix")))
+	require.Equal(t, "PING", strVal(t, cmd.Child("Command")))
 
 	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 6379, payload))
 	wired := redisRoot(t, mustChild(t, eth, "IP", "TCP", "Redis"))
-	elem := mustChild(t, wired, "Array", "Elements").Children()[0]
-	require.Equal(t, []byte("PING"), bytesVal(t, mustChild(t, elem, "Bulk", "Data")))
+	require.Equal(t, "PING", strVal(t, mustChild(t, wired, "Array", "RedisCommand").Child("Command")))
 }
 
 func TestMQTTConnectAndConnack(t *testing.T) {

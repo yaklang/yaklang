@@ -601,4 +601,14 @@ func TestP1BranchRows(t *testing.T) {
 		okp := mustChild(t, parseRule(t, mysqlPacket(1, []byte{0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00}), "application-layer.mysql", "MySQLPacket"), "Payload", "MySQLOK")
 		require.Equal(t, uint64(2), uintVal(t, okp.Child("Status Flags")))
 	})
+
+	t.Run("redis/ping", func(t *testing.T) {
+		n := redisRoot(t, parseRule(t, []byte("*1\r\n$4\r\nPING\r\n"), "application-layer.redis", "Redis"))
+		require.Equal(t, "PING", strVal(t, mustChild(t, n, "Array", "RedisCommand").Child("Command")))
+	})
+	t.Run("redis/get", func(t *testing.T) {
+		n := redisRoot(t, parseRule(t, []byte("*2\r\n$3\r\nGET\r\n$5\r\nmykey\r\n"), "application-layer.redis", "Redis"))
+		require.Equal(t, "GET", strVal(t, mustChild(t, n, "Array", "RedisCommand").Child("Command")))
+		require.Equal(t, "mykey", strVal(t, mustChild(t, mustChild(t, n, "Array", "Arguments").Children()[0], "Bulk").Child("Bulk")))
+	})
 }
