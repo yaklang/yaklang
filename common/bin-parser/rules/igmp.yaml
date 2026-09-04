@@ -9,8 +9,64 @@ Package:
       }
       this.ProcessSubNode("Max Resp Time")
       this.ProcessSubNode("Checksum")
+      if typ == 0x22 {
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("Number of Group Records")
+        nrec = getNodeResult("Number of Group Records").Value
+        if nrec > 0 && nrec < 256 {
+          this.ProcessSubNode("Records")
+        }
+        return
+      }
       this.ProcessSubNode("Group Address")
+      if typ == 0x11 {
+        res, op = this.TryProcessSubNode("SQRV")
+        if op.OK {
+          op.Save()
+          this.ProcessSubNode("QQIC")
+          this.ProcessSubNode("Number of Sources")
+          nsrc = getNodeResult("Number of Sources").Value
+          if nsrc > 0 && nsrc < 64 {
+            this.ProcessSubNode("Sources")
+          }
+        } else {
+          op.Recovery()
+        }
+      }
+      return
     Type: uint8
     Max Resp Time: uint8
     Checksum: uint16
     Group Address: raw,4
+    SQRV: uint8
+    QQIC: uint8
+    Number of Sources: uint16
+    Sources:
+      list: true
+      list-length-from-field: "../Number of Sources"
+      Source Address: raw,4
+    Reserved: uint16
+    Number of Group Records: uint16
+    Records:
+      list: true
+      list-length-from-field: "../Number of Group Records"
+      Record: IGMPGroupRecord
+IGMPGroupRecord:
+  operator: |
+    this.ProcessSubNode("Record Type")
+    this.ProcessSubNode("Aux Data Len")
+    this.ProcessSubNode("Number of Sources")
+    this.ProcessSubNode("Multicast Address")
+    nsrc = getNodeResult("Number of Sources").Value
+    if nsrc > 0 && nsrc < 64 {
+      this.ProcessSubNode("Sources")
+    }
+    return
+  Record Type: uint8
+  Aux Data Len: uint8
+  Number of Sources: uint16
+  Multicast Address: raw,4
+  Sources:
+    list: true
+    list-length-from-field: "../Number of Sources"
+    Source Address: raw,4

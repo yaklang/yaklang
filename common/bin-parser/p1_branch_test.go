@@ -640,6 +640,16 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Minor")))
 	})
 
+	t.Run("igmp/v1-report", func(t *testing.T) {
+		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
+		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
+	})
+	t.Run("igmp/v3-query", func(t *testing.T) {
+		raw := []byte{0x11, 0x64, 0x00, 0x00, 239, 1, 1, 1, 0x02, 0x7d, 0x00, 0x01, 192, 0, 2, 1}
+		n := parseRule(t, raw, "igmp", "IGMP")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Number of Sources")))
+		require.Equal(t, []byte{192, 0, 2, 1}, bytesVal(t, n.Child("Sources").Children()[0]))
+	})
 	t.Run("rsync/v31", func(t *testing.T) {
 		require.Equal(t, "31", strVal(t, parseRule(t, []byte("@RSYNCD: 31.0\n"), "rsync", "Rsync").Child("Major")))
 	})
