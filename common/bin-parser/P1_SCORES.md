@@ -75,7 +75,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | IMAP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `imap.yaml` |
 | FTP-DATA | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `ftp_data.yaml` |
 | TFTP | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `tftp.yaml` |
-| SFTP | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `application-layer/ssh.yaml` |
+| SFTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ssh.yaml` |
 | NFS | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `onc_rpc.yaml` |
 | RPC | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of NFS |
 | Portmap/Rpcbind | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of NFS |
