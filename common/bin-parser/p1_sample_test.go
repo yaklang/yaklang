@@ -1186,4 +1186,40 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(5), uintVal(t, wired.Child("Pvno")))
 		require.Equal(t, uint64(11), uintVal(t, wired.Child("MsgType")))
 	})
+
+	t.Run("ajp/cping", func(t *testing.T) {
+		// Apache AJP13 / Wireshark packet-ajp13.c MTYPE_CPING: magic 0x1234, length 1, code 10.
+		raw := mustHex(t, "123400010a")
+		n := parseRule(t, raw, "application-layer.ajp", "AJP")
+		require.Equal(t, uint64(0x1234), uintVal(t, n.Child("Magic")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Length")))
+		require.Equal(t, uint64(0x0a), uintVal(t, n.Child("Code")))
+		require.Nil(t, n.Child("AJPForward"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 8009, raw))
+		require.Equal(t, uint64(0x0a), uintVal(t, mustChild(t, eth, "IP", "TCP", "AJP").Child("Code")))
+		pong := mustHex(t, "4142000109")
+		g := parseRule(t, pong, "application-layer.ajp", "AJP")
+		require.Equal(t, uint64(0x4142), uintVal(t, g.Child("Magic")))
+		require.Equal(t, uint64(0x09), uintVal(t, g.Child("Code")))
+	})
+
+	t.Run("ajp/forward", func(t *testing.T) {
+		// Apache AJP13 FORWARD_REQUEST: method GET(2), protocol HTTP/1.1, uri /,
+		// remote 127.0.0.1, server localhost:80, 0 headers, terminator 0xff.
+		// Wireshark ajp13.method / ajp13.uri.
+		raw := mustHex(t, "1234003202020008485454502f312e310000012f0000093132372e302e302e310000000000096c6f63616c686f7374000050000000ff")
+		n := parseRule(t, raw, "application-layer.ajp", "AJP")
+		require.Equal(t, uint64(0x02), uintVal(t, n.Child("Code")))
+		fwd := mustChild(t, n, "AJPForward")
+		require.Equal(t, uint64(2), uintVal(t, fwd.Child("Method")))
+		require.Equal(t, "HTTP/1.1", strVal(t, fwd.Child("Protocol")))
+		require.Equal(t, "/", strVal(t, fwd.Child("URI")))
+		require.Equal(t, "127.0.0.1", strVal(t, fwd.Child("RemoteAddr")))
+		require.Equal(t, "localhost", strVal(t, fwd.Child("ServerName")))
+		require.Equal(t, uint64(80), uintVal(t, fwd.Child("ServerPort")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 8009, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "AJP", "AJPForward")
+		require.Equal(t, uint64(2), uintVal(t, wired.Child("Method")))
+		require.Equal(t, "/", strVal(t, wired.Child("URI")))
+	})
 }

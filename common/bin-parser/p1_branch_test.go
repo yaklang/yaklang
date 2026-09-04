@@ -538,4 +538,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(5), uintVal(t, rep.Child("Pvno")))
 		require.Equal(t, uint64(11), uintVal(t, rep.Child("MsgType")))
 	})
+
+	t.Run("ajp/cping", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "123400010a"), "application-layer.ajp", "AJP")
+		require.Equal(t, uint64(0x0a), uintVal(t, n.Child("Code")))
+		require.Nil(t, n.Child("AJPForward"))
+	})
+	t.Run("ajp/forward", func(t *testing.T) {
+		fwd := mustChild(t, parseRule(t, mustHex(t, "1234003202020008485454502f312e310000012f0000093132372e302e302e310000000000096c6f63616c686f7374000050000000ff"), "application-layer.ajp", "AJP"), "AJPForward")
+		require.Equal(t, uint64(2), uintVal(t, fwd.Child("Method")))
+		require.Equal(t, "/", strVal(t, fwd.Child("URI")))
+	})
 }
