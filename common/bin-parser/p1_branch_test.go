@@ -120,6 +120,12 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, target, bytesVal(t, mustChild(t, parseRule(t, rd, "internet_control_message_protocol_v6", "ICMPV6"), "Redirect").Child("Target Address")))
 		require.Equal(t, dest, bytesVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, rd)), "IPv6", "ICMPv6", "Redirect").Child("Destination Address")))
 	})
+	t.Run("internet_control_message_protocol_v6/mldv2-report", func(t *testing.T) {
+		group := []byte{0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0xff, 0, 0, 0x01}
+		r := append([]byte{0x8f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00}, group...)
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, parseRule(t, r, "internet_control_message_protocol_v6", "ICMPV6"), "Multicast Listener Report v2").Child("Records").Children()[0].Child("Record Type")))
+		require.Equal(t, group, bytesVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, r)), "IPv6", "ICMPv6", "Multicast Listener Report v2").Child("Records").Children()[0].Child("Multicast Address")))
+	})
 	t.Run("internet_control_message_protocol_v6/ra-opt", func(t *testing.T) {
 		require.Equal(t, uint64(64), uintVal(t, mustChild(t, parseEthernet(t, []byte{
 			0x33, 0x33, 0x00, 0x00, 0x00, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,

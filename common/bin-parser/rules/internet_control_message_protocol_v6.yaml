@@ -37,6 +37,8 @@ Package:
             this.ProcessByType("Neighbor Advertisement")
           case 137:
             this.ProcessByType("Redirect")
+          case 143:
+            this.ProcessByType("Multicast Listener Report v2")
           default:
             return
         }
@@ -332,3 +334,37 @@ Redirect:
           break
         }
       }
+Multicast Listener Report v2:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Number of Mcast Address Records")
+    nrec = getNodeResult("Number of Mcast Address Records").Value
+    if nrec > 0 && nrec < 256 {
+      this.ProcessSubNode("Records")
+    }
+    return
+  Reserved: uint16
+  Number of Mcast Address Records: uint16
+  Records:
+    list: true
+    list-length-from-field: "../Number of Mcast Address Records"
+    Record: MLDAddressRecord
+MLDAddressRecord:
+  operator: |
+    this.ProcessSubNode("Record Type")
+    this.ProcessSubNode("Aux Data Len")
+    this.ProcessSubNode("Number of Sources")
+    this.ProcessSubNode("Multicast Address")
+    nsrc = getNodeResult("Number of Sources").Value
+    if nsrc > 0 && nsrc < 64 {
+      this.ProcessSubNode("Sources")
+    }
+    return
+  Record Type: uint8
+  Aux Data Len: uint8
+  Number of Sources: uint16
+  Multicast Address: raw,16
+  Sources:
+    list: true
+    list-length-from-field: "../Number of Sources"
+    Source Address: raw,16
