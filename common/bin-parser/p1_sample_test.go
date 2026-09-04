@@ -63,6 +63,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
 	})
 
+	t.Run("pap/request", func(t *testing.T) {
+		// RFC 1334 §2.2.1 Authenticate-Request: Peer-ID "ixia", Password "ixia".
+		pap := []byte{0x01, 0x00, 0x00, 0x0e, 0x04, 'i', 'x', 'i', 'a', 0x04, 'i', 'x', 'i', 'a'}
+		n := parseRule(t, pap, "password_authentication_protocol", "PAP")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Code")))
+		req := mustChild(t, n, "Request")
+		require.Equal(t, "ixia", strVal(t, req.Child("Peer ID")))
+		require.Equal(t, "ixia", strVal(t, req.Child("Password")))
+		gre := append(mustHex(t, "3081880b0012000100000001ffffffffff03c023"), pap...)
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, gre))
+		r := mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "PAP", "Request")
+		require.Equal(t, "ixia", strVal(t, r.Child("Peer ID")))
+		require.Equal(t, "ixia", strVal(t, r.Child("Password")))
+	})
+
+	t.Run("pap/ack", func(t *testing.T) {
+		// RFC 1334 §2.2.2 Authenticate-Ack: Msg-Length 2, Message "OK".
+		ack := []byte{0x02, 0x00, 0x00, 0x07, 0x02, 'O', 'K'}
+		n := parseRule(t, ack, "password_authentication_protocol", "PAP")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Code")))
+		require.Equal(t, "OK", strVal(t, mustChild(t, n, "Response").Child("Message")))
+		gre := append(mustHex(t, "3081880b000b000100000001ffffffffff03c023"), ack...)
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, gre))
+		require.Equal(t, "OK", strVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "PAP", "Response").Child("Message")))
+	})
+
 	t.Run("lcp/rfc1661", func(t *testing.T) {
 		// RFC 1661 §5.1/§6.2/§6.4 Configure-Request: PAP 0xc023 + Magic-Number 0x0f3f117c.
 		lcp := mustHex(t, "0101000e0304c02305060f3f117c")
