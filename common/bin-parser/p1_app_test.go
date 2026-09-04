@@ -466,8 +466,18 @@ func TestP1TCPApplications(t *testing.T) {
 	t3 := make([]byte, 19)
 	binary.BigEndian.PutUint32(t3[0:], 19)
 	t3[4] = 1
+	t3[5] = 0x65
 	eth = parseEthernet(t, ipv4TCPFrame(t, 7001, 7001, t3))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "T3").Child("Cmd")))
+	id := mustChild(t, eth, "IP", "TCP", "T3", "T3Identify")
+	require.Equal(t, uint64(1), uintVal(t, id.Child("Cmd")))
+	require.Equal(t, uint64(0x65), uintVal(t, id.Child("Qos")))
+	require.Equal(t, int64(0), intVal(t, id.Child("ResponseId")))
+
+	t3hello := []byte("t3 12.2.1\nAS:255\nHL:19\nMS:10000000\n\n")
+	t3h := parseRule(t, t3hello, "application-layer.t3", "T3")
+	require.Equal(t, "12.2.1", strVal(t, mustChild(t, t3h, "T3Hello").Child("Version")))
+	eth = parseEthernet(t, ipv4TCPFrame(t, 7001, 7001, t3hello))
+	require.Equal(t, "19", strVal(t, mustChild(t, eth, "IP", "TCP", "T3", "T3Hello").Child("HL")))
 
 	pptp := make([]byte, 156)
 	binary.BigEndian.PutUint16(pptp[0:], 156)

@@ -343,6 +343,19 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(6), uintVal(t, mustChild(t, n, "GIOPRequest").Child("Op Len")))
 	})
 
+	t.Run("t3/hello", func(t *testing.T) {
+		h := mustChild(t, parseRule(t, []byte("t3 12.2.1\nAS:255\nHL:19\nMS:10000000\n\n"), "application-layer.t3", "T3"), "T3Hello")
+		require.Equal(t, "12.2.1", strVal(t, h.Child("Version")))
+		require.Equal(t, "255", strVal(t, h.Child("AS")))
+	})
+	t.Run("t3/identify", func(t *testing.T) {
+		pkt := make([]byte, 19)
+		pkt[3], pkt[4], pkt[5] = 19, 1, 0x65
+		id := mustChild(t, parseRule(t, pkt, "application-layer.t3", "T3"), "T3Identify")
+		require.Equal(t, uint64(1), uintVal(t, id.Child("Cmd")))
+		require.Equal(t, uint64(0x65), uintVal(t, id.Child("Qos")))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))
