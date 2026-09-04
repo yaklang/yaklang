@@ -2759,6 +2759,29 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		r := mustChild(t, eth, "IP", "UDP", "RADIUS")
 		require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, r.Child("Attributes").Children()[2].Child("NAS-IP-Address")))
 	})
+
+	t.Run("ntlm/challenge", func(t *testing.T) {
+		// [MS-NLMP] 2.2.1.2 CHALLENGE_MESSAGE TargetName UTF-16LE "DOMAIN" at BufferOffset 48.
+		raw := ntlmsspChallengeTarget("DOMAIN")
+		n := parseRule(t, raw, "application-layer.ntlm", "NTLMSSP")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("MessageType")))
+		require.Equal(t, utf16LE("DOMAIN"), bytesVal(t, n.Child("Target Name")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, smb2SessionNTLM(raw)))
+		require.Equal(t, utf16LE("DOMAIN"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Session Setup Request", "NTLMSSP").Child("Target Name")))
+	})
+
+	t.Run("ntlm/authenticate", func(t *testing.T) {
+		// [MS-NLMP] 2.2.1.3 AUTHENTICATE_MESSAGE DomainName "CORP" + UserName "Admin" UTF-16LE. TCP/445.
+		raw := ntlmsspAuthUser("CORP", "Admin")
+		n := parseRule(t, raw, "application-layer.ntlm", "NTLMSSP")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("MessageType")))
+		require.Equal(t, utf16LE("CORP"), bytesVal(t, n.Child("Domain Name")))
+		require.Equal(t, utf16LE("Admin"), bytesVal(t, n.Child("User Name")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, smb2SessionNTLM(raw)))
+		wired := mustChild(t, eth, "IP", "TCP", "SMB2", "Session Setup Request", "NTLMSSP")
+		require.Equal(t, utf16LE("Admin"), bytesVal(t, wired.Child("User Name")))
+		require.Equal(t, utf16LE("CORP"), bytesVal(t, wired.Child("Domain Name")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
@@ -2821,6 +2844,54 @@ func pppoeSessionFrame(t *testing.T, pdu []byte) []byte {
 	binary.BigEndian.PutUint16(eth[12:14], 0x8864)
 	copy(eth[14:], pdu)
 	return eth
+}
+
+func ntlmsspChallengeTarget(domain string) []byte {
+	name := utf16LE(domain)
+	buf := make([]byte, 48+len(name))
+	copy(buf[:8], []byte("NTLMSSP\x00"))
+	binary.LittleEndian.PutUint32(buf[8:], 2)
+	binary.LittleEndian.PutUint16(buf[12:], uint16(len(name)))
+	binary.LittleEndian.PutUint16(buf[14:], uint16(len(name)))
+	binary.LittleEndian.PutUint32(buf[16:], 48)
+	binary.LittleEndian.PutUint32(buf[20:], 0xe2088205)
+	copy(buf[24:32], []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	binary.LittleEndian.PutUint32(buf[44:], uint32(48+len(name)))
+	copy(buf[48:], name)
+	return buf
+}
+
+func ntlmsspAuthUser(domain, user string) []byte {
+	d := utf16LE(domain)
+	u := utf16LE(user)
+	off := uint32(64)
+	buf := make([]byte, 64+len(d)+len(u))
+	copy(buf[:8], []byte("NTLMSSP\x00"))
+	binary.LittleEndian.PutUint32(buf[8:], 3)
+	binary.LittleEndian.PutUint32(buf[16:], off)
+	binary.LittleEndian.PutUint32(buf[24:], off)
+	binary.LittleEndian.PutUint16(buf[28:], uint16(len(d)))
+	binary.LittleEndian.PutUint16(buf[30:], uint16(len(d)))
+	binary.LittleEndian.PutUint32(buf[32:], off)
+	binary.LittleEndian.PutUint16(buf[36:], uint16(len(u)))
+	binary.LittleEndian.PutUint16(buf[38:], uint16(len(u)))
+	binary.LittleEndian.PutUint32(buf[40:], off+uint32(len(d)))
+	binary.LittleEndian.PutUint32(buf[48:], off+uint32(len(d)+len(u)))
+	binary.LittleEndian.PutUint32(buf[56:], off+uint32(len(d)+len(u)))
+	binary.LittleEndian.PutUint32(buf[60:], 0x00008201)
+	copy(buf[64:], d)
+	copy(buf[64+len(d):], u)
+	return buf
+}
+
+func smb2SessionNTLM(ntlm []byte) []byte {
+	body := make([]byte, 24)
+	binary.LittleEndian.PutUint16(body[0:], 25)
+	body[3] = 1
+	binary.LittleEndian.PutUint16(body[12:], 88)
+	binary.LittleEndian.PutUint16(body[14:], uint16(len(ntlm)))
+	raw := append(smb2SyncHeader(1, 0, 2), body...)
+	return append(raw, ntlm...)
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
