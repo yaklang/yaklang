@@ -104,7 +104,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | T3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/t3.yaml` |
 | RMI/JRMP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `rmi.yaml` |
 | JNDI | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of RMI/JRMP |
-| BER | B | 85 | 20 | 15 | 20 | 20 | 10 | L2 | `application-layer/ber.yaml` |
+| BER | A | 90 | 25 | 15 | 20 | 20 | 10 | L2 | `application-layer/ber.yaml` |
 | SNMPv3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/snmp.yaml` |
 | Syslog | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `syslog.yaml` |
 | IPMI | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `ipmi.yaml` |

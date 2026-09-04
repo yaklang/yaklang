@@ -779,6 +779,14 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, ntlmsspAuthUser("CORP", "Admin"), "application-layer.ntlm", "NTLMSSP")
 		require.Equal(t, utf16LE("Admin"), bytesVal(t, n.Child("User Name")))
 	})
+	t.Run("ber/integer", func(t *testing.T) {
+		n := parseRule(t, []byte{0x02, 0x01, 0x05}, "application-layer.ber", "BER Element")
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Integer")))
+	})
+	t.Run("ber/oid", func(t *testing.T) {
+		n := parseRule(t, []byte{0x06, 0x08, 0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, "application-layer.ber", "BER Element")
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, n.Child("OBJECT IDENTIFIER")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
