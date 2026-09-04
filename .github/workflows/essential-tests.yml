@@ -262,8 +262,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
@@ -306,7 +307,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
 
   scannode-focused:
     name: Test ScanNode Focused
@@ -344,8 +345,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
@@ -392,8 +394,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
@@ -440,8 +443,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
@@ -518,8 +522,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
@@ -788,8 +793,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ matrix.cache_tag || 'any' }}-${{ github.sha }}-${{ github.run_id }}
           restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ matrix.cache_tag || 'any' }}-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
@@ -838,7 +844,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ github.sha }}-${{ github.run_id }}-${{ matrix.cache_tag }}
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ matrix.cache_tag }}-${{ github.sha }}-${{ github.run_id }}
 
       - name: Generate safe artifact name
         if: failure()
