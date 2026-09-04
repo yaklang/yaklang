@@ -65,12 +65,12 @@ Package:
         this.ProcessSubNode("Error Subcode")
         rest = this.GetMaxLength() - this.Length()
         if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Data").SetMaxLength(rest)
-          this.ProcessSubNode("Data")
+          this.GetSubNode("Diag").SetMaxLength(rest)
+          this.ProcessSubNode("Diag")
         }
       Error Code: uint8
       Error Subcode: uint8
-      Data: string
+      Diag: string
     UPDATE:
       operator: |
         this.ProcessSubNode("Withdrawn Length")

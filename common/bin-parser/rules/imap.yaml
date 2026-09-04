@@ -11,8 +11,21 @@ Package:
       if !(cmd.HasPrefix("OK") || cmd.HasPrefix("NO") || cmd.HasPrefix("BAD") || cmd.HasPrefix("BYE") || cmd.HasPrefix("PREAUTH") || cmd.HasPrefix("CAPABILITY") || cmd.HasPrefix("LOGIN") || cmd.HasPrefix("LOGOUT") || cmd.HasPrefix("SELECT") || cmd.HasPrefix("EXAMINE") || cmd.HasPrefix("CREATE") || cmd.HasPrefix("DELETE") || cmd.HasPrefix("RENAME") || cmd.HasPrefix("SUBSCRIBE") || cmd.HasPrefix("UNSUBSCRIBE") || cmd.HasPrefix("LIST") || cmd.HasPrefix("LSUB") || cmd.HasPrefix("STATUS") || cmd.HasPrefix("APPEND") || cmd.HasPrefix("CHECK") || cmd.HasPrefix("CLOSE") || cmd.HasPrefix("EXPUNGE") || cmd.HasPrefix("SEARCH") || cmd.HasPrefix("FETCH") || cmd.HasPrefix("STORE") || cmd.HasPrefix("COPY") || cmd.HasPrefix("UID") || cmd.HasPrefix("NOOP") || cmd.HasPrefix("STARTTLS") || cmd.HasPrefix("AUTHENTICATE") || cmd.HasPrefix("IDLE") || cmd.HasPrefix("FLAGS") || cmd.HasPrefix("EXISTS") || cmd.HasPrefix("RECENT")) {
         panic("imap: unknown command")
       }
-      this.ProcessSubNode("Rest")
+      this.ProcessSubNode("Arg")
+      this.ProcessSubNode("LF")
       return
     Tag: "del: ;type:string"
     Command: "del: ;type:string"
-    Rest: "del:\r\n;type:string"
+    Arg: "del:\r;type:string"
+    LF: uint8
+    Extra:
+      list: true
+      Line: "del:\r\n;type:string"
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 3 {
+            break
+          }
+          ele.Process()
+        }

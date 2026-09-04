@@ -33,10 +33,18 @@ Package:
         }
         this.NewUnknownNode().Process()
 EAPPacket:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Length")
+    el = getNodeResult("Length").Value
+    if el >= 5 {
+      this.ProcessSubNode("Type")
+    }
   Code: uint8
   Identifier: uint8
   Length: uint16
-  Data: string
+  Type: uint8
 EAPOLKey:
   operator: |
     this.ProcessSubNode("Descriptor Type")
@@ -66,4 +74,5 @@ EAPOLKey:
   Key Data Length: uint16
   Key Data: raw
 EAPOLASFAlert:
-  Data: string
+  Vendor ID: uint32
+  Vendor Type: uint32

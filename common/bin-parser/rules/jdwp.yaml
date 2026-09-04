@@ -25,14 +25,8 @@ Package:
         this.ProcessSubNode("Flags")
         this.ProcessSubNode("Command Set")
         this.ProcessSubNode("Command")
-        rest = l - 11
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Data").SetMaxLength(rest)
-          this.ProcessSubNode("Data")
-        }
       Length: uint32
       Id: uint32
       Flags: uint8
       Command Set: uint8
       Command: uint8
-      Data: string

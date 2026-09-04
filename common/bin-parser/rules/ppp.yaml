@@ -17,6 +17,8 @@ Package:
                this.ProcessByType("PAP")
             case 0xc223:
                this.ProcessByType("CHAP")
+            case 0x8021:
+               this.ProcessByType("IPCP")
             default:
                this.NewUnknownNode()
          }
@@ -24,4 +26,38 @@ IP: "import:internet_protocol.yaml;node:Internet Protocol"
 PAP: "import:password_authentication_protocol.yaml;node:PAP"
 CHAP: "import:challenge_handshake_authentication_protocol.yaml;node:CHAP"
 LCP: "import:link_control_protocol.yaml;node:LCP"
-Unknown: string
+IPCP:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l > 4 && l < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(l-4)
+      this.ProcessSubNode("Options")
+    }
+  Code: uint8
+  Identifier: uint8
+  Length: uint16
+  Options:
+    list: true
+    Option:
+      operator: |
+        this.ProcessSubNode("Type")
+        this.ProcessSubNode("Length")
+        n = getNodeResult("Length").Value
+        if n > 2 && n < 256 {
+          this.GetSubNode("Value").SetMaxLength(n-2)
+          this.ProcessSubNode("Value")
+        }
+      Type: uint8
+      Length: uint8
+      Value: string
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        ele.Process()
+      }
