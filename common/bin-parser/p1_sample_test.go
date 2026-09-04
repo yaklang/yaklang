@@ -150,9 +150,11 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		n := parseRule(t, l2, "l2tp", "L2TP")
 		require.Equal(t, uint64(0x0014), uintVal(t, n.Child("Tunnel ID")))
 		require.NotEqual(t, uint64(1), uintVal(t, n.Child("Tunnel ID")))
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Offset Size")))
 		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, n, "PPP").Child("Protocol")))
 		eth := parseEthernet(t, ipv4UDPBytes(t, 1701, 1701, l2))
 		require.Equal(t, uint64(0x0014), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Tunnel ID")))
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Offset Size")))
 		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP", "PPP").Child("Protocol")))
 	})
 
