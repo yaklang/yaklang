@@ -66,9 +66,14 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, "REGISTER", strVal(t, mustChild(t, eth, "IP", "UDP", "SIP", "SIP Request").Child("Method")))
 
 	sdp := []byte("v=0\r\no=- 0 0 IN IP4 10.0.0.1\r\n")
-	sd := parseRule(t, sdp, "sip", "SDP")
-	require.True(t, sd.Child("Lines").IsList())
-	require.Equal(t, uint64('v'), uintVal(t, sd.Child("Lines").Children()[0].Child("Type")))
+	sd := parseRule(t, sdp, "sdp", "SDP")
+	require.Equal(t, uint64('v'), uintVal(t, sd.Child("Type")))
+	require.Equal(t, "0", strVal(t, sd.Child("Value")))
+	require.Equal(t, uint64('o'), uintVal(t, sd.Child("Origin Type")))
+	eth = parseEthernet(t, ipv4UDPBytes(t, 5006, 5006, sdp))
+	require.Equal(t, uint64('v'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Type")))
+	require.Equal(t, uint64('o'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Origin Type")))
+
 
 	// RFC 3550 RTP v2
 	rtp := []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}
@@ -103,9 +108,10 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, uint64(0x22), uintVal(t, mustChild(t, natt, "IP", "UDP", "NATT").Child("Exchange Type")))
 
 	// OpenVPN P_CONTROL_HARD_RESET_CLIENT_V2 (opcode 7 << 3)
-	openvpn := mustHex(t, "38010203040506070800000001")
+	openvpn := mustHex(t, "3801020304050607080000000001")
 	ov := parseRule(t, openvpn, "openvpn", "OpenVPN")
 	require.Equal(t, uint64(0x38), uintVal(t, ov.Child("OpcodeKey")))
+	require.Equal(t, uint64(0), uintVal(t, ov.Child("Ack Count")))
 	require.Equal(t, uint64(1), uintVal(t, ov.Child("Packet ID")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, openvpn))
 	require.Equal(t, uint64(0x38), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("OpcodeKey")))
@@ -237,19 +243,19 @@ func TestP1TCPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4TCPFrame(t, 5672, 5672, amqp))
 	require.Equal(t, uint64(9), uintVal(t, mustChild(t, eth, "IP", "TCP", "AMQP").Child("Minor")))
 
-	kf := make([]byte, 12)
-	binary.BigEndian.PutUint32(kf[0:], 8)
+	// ApiVersions v0: length 10, api 18, ver 0, corr 0, null client id
+	kf := mustHex(t, "0000000a0012000000000000ffff")
 	k := parseRule(t, kf, "kafka", "Kafka")
-	require.Equal(t, int64(8), intVal(t, k.Child("Length")))
+	require.Equal(t, int64(10), intVal(t, k.Child("Length")))
+	require.Equal(t, int64(18), intVal(t, k.Child("API Key")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 9092, 9092, kf))
-	require.Equal(t, int64(0), intVal(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("API Key")))
+	require.Equal(t, int64(18), intVal(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("API Key")))
 
 	jr := []byte("{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}\n")
 	j := parseRule(t, jr, "jsonrpc", "JSONRPC")
-	require.Contains(t, strVal(t, j.Child("Body")), "jsonrpc")
-	require.Contains(t, strVal(t, j.Child("Body")), "ping")
+	require.Contains(t, strVal(t, j.Child("Line")), "method")
 	eth = parseEthernet(t, ipv4TCPFrame(t, 40002, 8545, jr))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Body")), "ping")
+	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Line")), "ping")
 
 	tac := make([]byte, 12)
 	tac[0] = 0xc0
@@ -293,18 +299,21 @@ func TestP1TCPApplications(t *testing.T) {
 	php := []byte("i:1;")
 	ph := parseRule(t, php, "php_ser", "PHPSer")
 	require.Equal(t, uint64('i'), uintVal(t, ph.Child("Kind")))
+	require.Equal(t, "1", strVal(t, ph.Child("Int")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 40001, 7777, php))
 	require.Equal(t, uint64('i'), uintVal(t, mustChild(t, eth, "IP", "TCP", "PHPSer").Child("Kind")))
 
 	pk := []byte{0x80, 0x02, 0x4b, 0x01, 0x2e}
 	pi := parseRule(t, pk, "pickle", "Pickle")
-	require.Equal(t, uint64(0x80), uintVal(t, pi.Child("PROTO")))
-	require.Equal(t, uint64(2), uintVal(t, pi.Child("Version")))
-	require.Equal(t, uint64(0x4b), uintVal(t, pi.Child("BININT1")))
-	require.Equal(t, uint64(1), uintVal(t, pi.Child("Value")))
-	require.Equal(t, uint64(0x2e), uintVal(t, pi.Child("STOP")))
+	ops := pi.Child("Ops").Children()
+	require.GreaterOrEqual(t, len(ops), 3)
+	require.Equal(t, uint64(0x80), uintVal(t, ops[0].Child("Opcode")))
+	require.Equal(t, uint64(2), uintVal(t, ops[0].Child("Version")))
+	require.Equal(t, uint64(0x4b), uintVal(t, ops[1].Child("Opcode")))
+	require.Equal(t, uint64(1), uintVal(t, ops[1].Child("BININT1")))
+	require.Equal(t, uint64(0x2e), uintVal(t, ops[2].Child("Opcode")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 11312, 11312, pk))
-	require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, eth, "IP", "TCP", "Pickle").Child("PROTO")))
+	require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, eth, "IP", "TCP", "Pickle", "Ops").Children()[0].Child("Opcode")))
 
 	rmi := []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b}
 	rm := parseRule(t, rmi, "rmi", "RMI")
@@ -332,11 +341,12 @@ func TestP1TCPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4TCPFrame(t, 10050, 10050, zb))
 	require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "TCP", "Zabbix").Child("Length")))
 
-	hs := []byte{'H', 0x02, 0x00, 0x00}
+	hs := []byte{'H', 0x02, 0x00, 'N'}
 	he := parseRule(t, hs, "hessian", "Hessian")
 	require.Equal(t, uint64('H'), uintVal(t, he.Child("Magic")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 8089, 8089, hs))
 	require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "TCP", "Hessian").Child("Major")))
+	require.Equal(t, uint64('N'), uintVal(t, mustChild(t, eth, "IP", "TCP", "Hessian", "Values").Children()[0].Child("Tag")))
 
 	rs := []byte("@RSYNCD: 31.0\n")
 	ry := parseRule(t, rs, "rsync", "Rsync")
@@ -376,9 +386,9 @@ func TestP1TCPApplications(t *testing.T) {
 
 	salt := []byte{0x00, 0x00, 0x00, 0x04, 'p', 'i', 'n', 'g'}
 	sa := parseRule(t, salt, "salt", "Salt")
-	require.Equal(t, uint64(4), uintVal(t, sa.Child("Length")))
+	require.Equal(t, uint64(4), uintVal(t, sa.Child("Frames").Children()[0].Child("Length")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 4505, 4505, salt))
-	require.Equal(t, []byte("ping"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "Salt").Child("Payload")))
+	require.Equal(t, []byte("ping"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "Salt", "Frames").Children()[0].Child("Payload")))
 
 	nr := make([]byte, 14)
 	copy(nr[0:4], []byte(".NET"))
@@ -500,6 +510,7 @@ func TestP1MiscAndAliases(t *testing.T) {
 	require.Equal(t, uint64(2), uintVal(t, mustChild(t, berInt, "Type").Child("Tag")))
 	require.Equal(t, uint64(0), uintVal(t, mustChild(t, berInt, "Type").Child("Class")))
 	require.Equal(t, uint64(5), uintVal(t, berInt.Child("Integer")))
+
 
 	eap := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
 	// EAPOL version 1, type EAP-Packet, body length 5, EAP request identity

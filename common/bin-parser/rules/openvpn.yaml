@@ -8,15 +8,25 @@ Package:
         panic("openvpn: unknown opcode")
       }
       this.ProcessSubNode("Session ID")
-      this.ProcessSubNode("Packet ID")
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Payload").SetMaxLength(rest)
-          this.ProcessSubNode("Payload")
-        }
+      this.ProcessSubNode("Ack Count")
+      n = getNodeResult("Ack Count").Value
+      if n > 0 && n < 32 {
+        this.GetSubNode("Acks").SetMaxLength(n * 4)
+        this.ProcessSubNode("Acks")
       }
+      this.ProcessSubNode("Packet ID")
     OpcodeKey: uint8
     Session ID: raw,8
+    Ack Count: uint8
+    Acks:
+      list: true
+      Ack: uint32
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+        }
     Packet ID: uint32
-    Payload: raw

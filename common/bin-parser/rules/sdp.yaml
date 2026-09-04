@@ -1,0 +1,25 @@
+Package:
+  SDP:
+    operator: |
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Eq")
+      if getNodeResult("Eq").Value != 0x3d {
+        panic("sdp: expected =")
+      }
+      typ = getNodeResult("Type").Value
+      if typ != 0x76 && typ != 0x6f && typ != 0x73 && typ != 0x69 && typ != 0x75 && typ != 0x65 && typ != 0x70 && typ != 0x63 && typ != 0x62 && typ != 0x74 && typ != 0x72 && typ != 0x7a && typ != 0x6b && typ != 0x61 && typ != 0x6d {
+        panic("sdp: unknown line type")
+      }
+      this.ProcessSubNode("Value")
+      this.ProcessSubNode("Origin Type")
+      this.ProcessSubNode("Origin Eq")
+      if getNodeResult("Origin Eq").Value != 0x3d {
+        panic("sdp: expected =")
+      }
+      this.ProcessSubNode("Origin")
+    Type: uint8
+    Eq: uint8
+    Value: "del:\r\n;type:string"
+    Origin Type: uint8
+    Origin Eq: uint8
+    Origin: "del:\r\n;type:string"

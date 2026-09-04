@@ -5,13 +5,17 @@ Package:
       if getNodeResult("Brace").Value != 0x7b {
         panic("jsonrpc: expected object")
       }
-      this.ProcessSubNode("Body")
-      s = string(getNodeResult("Body").Value)
-      if !s.HasPrefix("\"jsonrpc\":\"") {
+      this.ProcessSubNode("Line")
+      s = string(getNodeResult("Line").Value)
+      if !s.Contains("\"jsonrpc\":") {
         panic("jsonrpc: expected jsonrpc key")
       }
-      if !s.HasPrefix("\"jsonrpc\":\"2.0\",\"method\"") && !s.HasPrefix("\"jsonrpc\":\"1.0\",\"method\"") {
-        panic("jsonrpc: expected method key")
+      if s.Contains("\"method\":") {
+        return
       }
+      if s.Contains("\"result\":") || s.Contains("\"error\":") {
+        return
+      }
+      panic("jsonrpc: expected method or result")
     Brace: uint8
-    Body: "del:\n;type:string"
+    Line: "del:\n;type:string"

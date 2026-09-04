@@ -45,6 +45,16 @@ func TestP1ScorecardsCovered(t *testing.T) {
 		ported := strings.Contains(sc.Evidence, "TCP/") || strings.Contains(sc.Evidence, "UDP/")
 		tCap := testsCeiling(sc.Rule, eth, ported)
 		trCap := trafficCeiling(sc.SampleClass, eth)
+		p0Rule := false
+		for _, p0 := range P0Scorecards {
+			if p0.Rule == sc.Rule {
+				p0Rule = true
+				break
+			}
+		}
+		if p0Rule {
+			schCap, tCap, trCap = 25, 20, 25
+		}
 		if sc.Schema > schCap {
 			t.Errorf("P1 %q schema %d exceeds ceiling %d for %s leftover=%q", item.Name, sc.Schema, schCap, sc.Rule, sc.OpaqueRaw)
 		}

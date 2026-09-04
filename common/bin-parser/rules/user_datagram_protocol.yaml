@@ -52,6 +52,8 @@ Package:
                 typeNameList = ["L2TP"]
               } else if src == 5060 || dst == 5060 {
                 typeNameList = ["SIP"]
+              } else if src == 5006 || dst == 5006 {
+                typeNameList = ["SDP"]
               } else if src == 3478 || dst == 3478 {
                 typeNameList = ["STUN"]
               } else if src == 1900 || dst == 1900 {
@@ -109,6 +111,7 @@ IKE: "import:ike.yaml;node:IKE"
 NATT: "import:ike.yaml;node:IKE"
 L2TP: "import:l2tp.yaml;node:L2TP"
 SIP: "import:sip.yaml;node:SIP"
+SDP: "import:sdp.yaml;node:SDP"
 STUN: "import:stun.yaml;node:STUN"
 SSDP: "import:application-layer/http.yaml;node:HTTP"
 IPMI: "import:ipmi.yaml;node:IPMI"
