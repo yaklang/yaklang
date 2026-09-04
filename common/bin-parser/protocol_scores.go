@@ -70,7 +70,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("Ethernet II", "ethernet.yaml", 20, 25, 16, 20, 10, "L1",
 		"TestBaseProtocol arp/http; TestEthernetIPARPTruncated; TestEAPOLKeyFromWPAInductionCapture", ""),
 	card("IEEE 802.1Q", "ieee_802_1q.yaml", 20, 8, 20, 20, 10, "L3",
-		"TestVLANIPv4ARPInner (gopacket serialize); TestVLANFailPaths; TestEthernetIPARPTruncated", ""),
+		"TestVLANIPv4ARPInner ARP; TestVLANPayloadTypeArms IP/IPv6/EAPOL/default; TestVLANFailPaths", ""),
 	card("ARP", "address_resolution_protocol.yaml", 20, 25, 16, 14, 10, "L1",
 		"TestBaseProtocol arp; TestVLANIPv4ARPInner", ""),
 	card("IPv4", "internet_protocol.yaml", 20, 25, 16, 14, 10, "L1",
