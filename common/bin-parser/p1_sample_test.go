@@ -8,6 +8,24 @@ import (
 )
 
 func TestP1WiresharkAndRFCSamples(t *testing.T) {
+	t.Run("ftp_data/eor", func(t *testing.T) {
+		// RFC 959 §3.4.2: bit 128 EOR, not EOF. TCP/20 bounds the block.
+		fd := []byte{0x80, 0x00, 0x0a, 'f', 'i', 'l', 'e', '-', 'b', 'y', 't', 'e', 's'}
+		eth := parseEthernet(t, ipv4TCPFrame(t, 20, 20, fd))
+		blk := mustChild(t, eth, "IP", "TCP", "FTPData", "Blocks").Children()[0]
+		require.Equal(t, uint64(0x80), uintVal(t, blk.Child("Descriptor")))
+		require.Equal(t, uint64(10), uintVal(t, blk.Child("Byte Count")))
+		require.Equal(t, []byte("file-bytes"), bytesVal(t, blk.Child("Data")))
+	})
+
+	t.Run("ftp_data/eof", func(t *testing.T) {
+		fd := []byte{0x40, 0x00, 0x03, 'e', 'n', 'd'}
+		eth := parseEthernet(t, ipv4TCPFrame(t, 20, 20, fd))
+		blk := mustChild(t, eth, "IP", "TCP", "FTPData", "Blocks").Children()[0]
+		require.Equal(t, uint64(0x40), uintVal(t, blk.Child("Descriptor")))
+		require.Equal(t, []byte("end"), bytesVal(t, blk.Child("Data")))
+	})
+
 	t.Run("tftp/wireshark", func(t *testing.T) {
 		// Wireshark test/captures/tftp.pcap packet 1: Token Ring SNAP IPv4 UDP/69
 		// RRQ filename C:\IBMTCPIP\lccm.1 mode octet (RFC 1350).

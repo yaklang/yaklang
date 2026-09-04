@@ -8,12 +8,12 @@ import (
 )
 
 func TestP1UDPApplications(t *testing.T) {
-	// RFC 8415 DHCPv6 Solicit type 1, xid, empty options
+	// RFC 8415 DHCPv6 Solicit type 1, xid, empty options (header only).
 	dhcpv6 := []byte{0x01, 0x00, 0x00, 0x01}
 	d := parseRule(t, dhcpv6, "dhcpv6", "DHCPv6")
 	require.Equal(t, uint64(1), uintVal(t, d.Child("Message Type")))
-	eth := parseEthernet(t, ipv4UDPBytes(t, 546, 547, dhcpv6))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "DHCPv6").Child("Message Type")))
+	eth := parseEthernet(t, ipv6UDPBytes(t, 546, 547, dhcpv6))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IPv6", "UDP", "DHCPv6").Child("Message Type")))
 
 	// RFC 1350 TFTP RRQ
 	rrq := append([]byte{0x00, 0x01}, []byte("file\x00octet\x00")...)
@@ -398,7 +398,7 @@ func TestP1TCPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4TCPFrame(t, 1935, 1935, rtmp))
 	require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "RTMP").Child("Version")))
 
-	// RFC 959 §3.4.2 block mode: Descriptor EOF 0x80, Byte Count 10, Data
+	// RFC 959 §3.4.2 block mode: Descriptor EOR 0x80 (not EOF 0x40), Byte Count 10, Data
 	fd := []byte{0x80, 0x00, 0x0a, 'f', 'i', 'l', 'e', '-', 'b', 'y', 't', 'e', 's'}
 	eth = parseEthernet(t, ipv4TCPFrame(t, 20, 20, fd))
 	blk := mustChild(t, eth, "IP", "TCP", "FTPData", "Blocks").Children()[0]
