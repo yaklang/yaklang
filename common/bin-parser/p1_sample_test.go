@@ -1117,4 +1117,42 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "135", strings.TrimRight(strVal(t, wired.Child("Sec Addr")), "\x00"))
 		require.Equal(t, uint64(0), uintVal(t, mustChild(t, wired, "DCERPCResults").Child("Ack Result")))
 	})
+
+	t.Run("spnego/ntlm", func(t *testing.T) {
+		// RFC 4178 §4.2 NegTokenInit thisMech 1.3.6.1.5.5.2; Wireshark spnego.mech.oid.
+		// First mechTypes: NLMP 1.3.6.1.4.1.311.2.2.10 ([MS-SPNG] 4).
+		raw := mustHex(t, "601c06062b0601050502a0123010a00e300c060a2b06010401823702020a")
+		n := parseRule(t, raw, "application-layer.spnego", "SPNEGO")
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x05, 0x05, 0x02}, bytesVal(t, n.Child("OID")))
+		init := mustChild(t, n, "Token", "SPNEGOInit")
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x02, 0x0a}, bytesVal(t, init.Child("MechOID")))
+		body := make([]byte, 24)
+		binary.LittleEndian.PutUint16(body[0:], 25)
+		body[3] = 1
+		binary.LittleEndian.PutUint16(body[12:], 88)
+		binary.LittleEndian.PutUint16(body[14:], uint16(len(raw)))
+		smb := append(smb2SyncHeader(1, 0, 3), body...)
+		smb = append(smb, raw...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, smb))
+		wired := mustChild(t, eth, "IP", "TCP", "SMB2", "Session Setup Request", "SPNEGO", "Token", "SPNEGOInit")
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x02, 0x0a}, bytesVal(t, wired.Child("MechOID")))
+	})
+
+	t.Run("spnego/krb5", func(t *testing.T) {
+		// RFC 4178 mechTypes Kerberos V5 1.2.840.113554.1.2.2 (Wireshark spnego.negTokenInit).
+		raw := mustHex(t, "601b06062b0601050502a011300fa00d300b06092a864886f712010202")
+		n := parseRule(t, raw, "application-layer.spnego", "SPNEGO")
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x05, 0x05, 0x02}, bytesVal(t, n.Child("OID")))
+		init := mustChild(t, n, "Token", "SPNEGOInit")
+		require.Equal(t, []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x02}, bytesVal(t, init.Child("MechOID")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, append(append(smb2SyncHeader(1, 0, 4), func() []byte {
+			body := make([]byte, 24)
+			binary.LittleEndian.PutUint16(body[0:], 25)
+			body[3] = 1
+			binary.LittleEndian.PutUint16(body[12:], 88)
+			binary.LittleEndian.PutUint16(body[14:], uint16(len(raw)))
+			return body
+		}()...), raw...)))
+		require.Equal(t, []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x02}, bytesVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Session Setup Request", "SPNEGO", "Token", "SPNEGOInit").Child("MechOID")))
+	})
 }
