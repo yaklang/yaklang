@@ -1322,4 +1322,44 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x74000004), uintVal(t, wired.Child("TDS Version")))
 		require.Equal(t, "host", strings.ReplaceAll(strVal(t, wired.Child("HostName")), "\x00", ""))
 	})
+
+	t.Run("mysql/query", func(t *testing.T) {
+		// MySQL COM_QUERY (0x03) "SELECT 1".
+		// https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query.html
+		// Wireshark mysql.query.
+		raw := mysqlPacket(0, append([]byte{0x03}, []byte("SELECT 1")...))
+		n := parseRule(t, raw, "application-layer.mysql", "MySQLPacket")
+		require.Equal(t, uint64(0x03), uintVal(t, mustChild(t, n, "Payload").Child("First")))
+		require.Equal(t, "SELECT 1", strVal(t, mustChild(t, n, "Payload").Child("Query")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 3306, raw))
+		require.Equal(t, "SELECT 1", strVal(t, mustChild(t, eth, "IP", "TCP", "MySQL", "Payload").Child("Query")))
+	})
+
+	t.Run("mysql/err", func(t *testing.T) {
+		// MySQL ERR packet: Error Code 1045, SQLSTATE 28000, "Access denied".
+		// https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_err_packet.html
+		// Wireshark mysql.error_code / mysql.sqlstate.
+		raw := mysqlPacket(1, []byte{0xff, 0x15, 0x04, '#', '2', '8', '0', '0', '0', 'A', 'c', 'c', 'e', 's', 's', ' ', 'd', 'e', 'n', 'i', 'e', 'd'})
+		errp := mustChild(t, parseRule(t, raw, "application-layer.mysql", "MySQLPacket"), "Payload", "MySQLERR")
+		require.Equal(t, uint64(1045), uintVal(t, errp.Child("Error Code")))
+		require.Equal(t, "28000", strVal(t, errp.Child("SQL State")))
+		require.Equal(t, "Access denied", strVal(t, errp.Child("Error Message")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 3306, 50000, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "MySQL", "Payload", "MySQLERR")
+		require.Equal(t, uint64(1045), uintVal(t, wired.Child("Error Code")))
+		require.Equal(t, "28000", strVal(t, wired.Child("SQL State")))
+	})
+
+	t.Run("mysql/ok", func(t *testing.T) {
+		// MySQL OK packet after COM_QUERY: affected_rows=0, last_insert_id=0,
+		// SERVER_STATUS_AUTOCOMMIT=0x0002, warnings=0.
+		// https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_ok_packet.html
+		raw := mysqlPacket(1, []byte{0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00})
+		okp := mustChild(t, parseRule(t, raw, "application-layer.mysql", "MySQLPacket"), "Payload", "MySQLOK")
+		require.Equal(t, uint64(0), uintVal(t, okp.Child("Affected Rows")))
+		require.Equal(t, uint64(0), uintVal(t, okp.Child("Last Insert ID")))
+		require.Equal(t, uint64(2), uintVal(t, okp.Child("Status Flags")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 3306, 50000, raw))
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "TCP", "MySQL", "Payload", "MySQLOK").Child("Status Flags")))
+	})
 }
