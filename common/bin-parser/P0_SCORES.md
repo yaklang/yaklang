@@ -26,7 +26,7 @@
 | DHCP | B | 78 | 20 | 8 | 20 | 20 | 10 | L3 | `application-layer/dhcp.yaml` |
 | HTTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
 | HTTP/2 | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | `application-layer/http2.yaml` |
-| WebSocket | B | 86 | 20 | 20 | 16 | 20 | 10 | L2 | `application-layer/websocket.yaml` |
+| WebSocket | A | 95 | 25 | 20 | 20 | 20 | 10 | L2 | `application-layer/websocket.yaml` |
 | TLS | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/tls.yaml` |
 | JA3/JA4 | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `application-layer/tls_hello.yaml` |
 | SMTP | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/smtp.yaml` |

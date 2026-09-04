@@ -150,7 +150,7 @@ func TestWebSocketRFC6455UnmaskedHello(t *testing.T) {
 	w := parseRule(t, raw, "application-layer.websocket", "WebSocket")
 	require.Equal(t, uint64(1), uintVal(t, w.Child("FIN")))
 	require.Equal(t, uint64(1), uintVal(t, w.Child("Opcode")))
-	require.Equal(t, []byte("Hello"), bytesVal(t, w.Child("Payload")))
+	require.Equal(t, "Hello", strVal(t, w.Child("Text")))
 }
 
 func TestHTTP2RFC9113SettingsTwoParams(t *testing.T) {
