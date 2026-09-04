@@ -52,6 +52,18 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x0002), uintVal(t, parseRule(t, []byte{0x00, 0x02}, "loopback", "Loopback").Child("Function")))
 	})
 
+	t.Run("dhcpv6/solicit", func(t *testing.T) {
+		sol := mustHex(t, "010000010001000a000300010000000000010008000200000003000c0000000100000000000000000006000400170018")
+		n := parseRule(t, sol, "dhcpv6", "DHCPv6")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Message Type")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Options").Children()[1].Child("Elapsed Time")))
+	})
+	t.Run("dhcpv6/reply", func(t *testing.T) {
+		rep := mustHex(t, "070000010001000a000300010000000000010002000a00030001000000000002000300280000000100000e10000015180005001820010db800000000000000000000000100000e1000001c200017001020010db8000000000000000000000053")
+		n := parseRule(t, rep, "dhcpv6", "DHCPv6")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Message Type")))
+		require.Equal(t, uint64(3600), uintVal(t, n.Child("Options").Children()[2].Child("T1")))
+	})
 	t.Run("ftp_data/eor", func(t *testing.T) {
 		blk := mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 20, 20, []byte{0x80, 0x00, 0x03, 'a', 'b', 'c'})), "IP", "TCP", "FTPData", "Blocks").Children()[0]
 		require.Equal(t, uint64(0x80), uintVal(t, blk.Child("Descriptor")))
