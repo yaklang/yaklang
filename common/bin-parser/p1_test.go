@@ -283,4 +283,5 @@ func TestP1PPPoEQinQLoopbackCDP(t *testing.T) {
 	cf := ethernet8023([]byte{0x01, 0x00, 0x0c, 0xcc, 0xcc, 0xcc}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, snap)
 	c := mustChild(t, parseEthernet(t, cf), "LLC", "SNAP", "CDP")
 	require.Equal(t, uint64(2), uintVal(t, c.Child("Version")))
+	require.Equal(t, "sw1", strVal(t, c.Child("TLVs").Children()[0].Child("Device ID")))
 }
