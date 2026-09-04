@@ -729,6 +729,8 @@ var startGRPCServerCommand = cli.Command{
 				return err
 			}
 		}
+		s.StartAIReActScheduler()
+		defer s.StopAIReActScheduler()
 
 		actualAddress := lis.Addr().String()
 		log.Infof("yak grpc listener ready on: %s", actualAddress)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +113,16 @@ type AIStatefulTask interface {
 	GetUUID() string
 	GetUserInputUUID() string
 	SetUserInputUUID(uuid string)
+	GetInputSource() string
+	SetInputSource(source string)
+	GetScheduleUUID() string
+	SetScheduleUUID(string)
+	GetScheduleName() string
+	SetScheduleName(string)
+	GetScheduledAt() string
+	SetScheduledAt(string)
+	GetScheduleTrigger() string
+	SetScheduleTrigger(string)
 
 	GetFocusMode() string
 	SetFocusMode(mode string)
@@ -131,17 +142,18 @@ type AIStatefulTask interface {
 type AIStatefulTaskBase struct {
 	*Emitter
 
-	id        string
-	name      string
-	userInput string
-	result    string
-	ctx       context.Context
-	cancel    context.CancelFunc
-	taskMutex *sync.Mutex
-	statusMu  sync.RWMutex
-	status    AITaskState
-	createdAt time.Time
-	asyncMode bool
+	id              string
+	name            string
+	userInput       string
+	originUserInput string
+	result          string
+	ctx             context.Context
+	cancel          context.CancelFunc
+	taskMutex       *sync.Mutex
+	statusMu        sync.RWMutex
+	status          AITaskState
+	createdAt       time.Time
+	asyncMode       bool
 
 	summary       string
 	statusSummary string
@@ -151,9 +163,14 @@ type AIStatefulTaskBase struct {
 	reActLoop         ReActLoopIF
 	db                *gorm.DB
 
-	uuid          string
-	userInputUUID string
-	attachedDatas []*AttachedResource
+	uuid            string
+	userInputUUID   string
+	inputSource     string
+	scheduleUUID    string
+	scheduleName    string
+	scheduledAt     string
+	scheduleTrigger string
+	attachedDatas   []*AttachedResource
 
 	focusMode         string
 	semanticLabel     string
@@ -266,6 +283,72 @@ func (s *AIStatefulTaskBase) SetUserInputUUID(uuid string) {
 		return
 	}
 	s.userInputUUID = uuid
+}
+
+func (s *AIStatefulTaskBase) GetInputSource() string {
+	if s == nil {
+		return ""
+	}
+	return s.inputSource
+}
+
+func (s *AIStatefulTaskBase) SetInputSource(source string) {
+	if s == nil {
+		return
+	}
+	s.inputSource = strings.TrimSpace(source)
+}
+
+func (s *AIStatefulTaskBase) GetScheduleUUID() string {
+	if s == nil {
+		return ""
+	}
+	return s.scheduleUUID
+}
+
+func (s *AIStatefulTaskBase) SetScheduleUUID(value string) {
+	if s != nil {
+		s.scheduleUUID = strings.TrimSpace(value)
+	}
+}
+
+func (s *AIStatefulTaskBase) GetScheduleName() string {
+	if s == nil {
+		return ""
+	}
+	return s.scheduleName
+}
+
+func (s *AIStatefulTaskBase) SetScheduleName(value string) {
+	if s != nil {
+		s.scheduleName = strings.TrimSpace(value)
+	}
+}
+
+func (s *AIStatefulTaskBase) GetScheduledAt() string {
+	if s == nil {
+		return ""
+	}
+	return s.scheduledAt
+}
+
+func (s *AIStatefulTaskBase) SetScheduledAt(value string) {
+	if s != nil {
+		s.scheduledAt = strings.TrimSpace(value)
+	}
+}
+
+func (s *AIStatefulTaskBase) GetScheduleTrigger() string {
+	if s == nil {
+		return ""
+	}
+	return s.scheduleTrigger
+}
+
+func (s *AIStatefulTaskBase) SetScheduleTrigger(value string) {
+	if s != nil {
+		s.scheduleTrigger = strings.TrimSpace(value)
+	}
 }
 
 func (s *AIStatefulTaskBase) GetDB() *gorm.DB {
@@ -572,11 +655,11 @@ func isFinishedTaskStatus(status AITaskState) bool {
 }
 
 func (s *AIStatefulTaskBase) GetOriginUserInput() string {
-	return s.userInput
+	return s.originUserInput
 }
 
 func (s *AIStatefulTaskBase) GetUserInput() string {
-	return s.GetOriginUserInput()
+	return s.userInput
 }
 
 func (s *AIStatefulTaskBase) SetUserInput(s2 string) {
@@ -811,6 +894,7 @@ func newStatefulTaskBase(taskId string, userInput string, opts ...StatefulTaskBa
 	base := &AIStatefulTaskBase{
 		id:                taskId,
 		userInput:         userInput,
+		originUserInput:   userInput,
 		taskMutex:         &sync.Mutex{},
 		status:            AITaskState_Created,
 		createdAt:         time.Now(),

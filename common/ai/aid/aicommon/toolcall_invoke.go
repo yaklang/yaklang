@@ -430,6 +430,7 @@ func (a *ToolCaller) invoke(
 	)
 	runtimeCfg := &aitool.ToolRuntimeConfig{
 		RuntimeID:             a.callToolId,
+		ProjectDatabase:       a.config.GetDB(),
 		BrowserSessionTracker: browserTracker,
 		FeedBacker: func(result *ypb.ExecResult) error {
 			// 处理 risk 消息
@@ -459,6 +460,16 @@ func (a *ToolCaller) invoke(
 			e.EmitYakitExecResult(result)
 			return nil
 		},
+	}
+	if sessionProvider, ok := a.config.(interface{ GetPersistentSessionID() string }); ok {
+		runtimeCfg.PersistentSessionID = sessionProvider.GetPersistentSessionID()
+	}
+	if statefulTask, ok := a.task.(AIStatefulTask); ok && statefulTask != nil {
+		runtimeCfg.CurrentTaskUserInput = statefulTask.GetOriginUserInput()
+	} else if a.invokeRuntime != nil {
+		if currentTask := a.invokeRuntime.GetCurrentTask(); currentTask != nil {
+			runtimeCfg.CurrentTaskUserInput = currentTask.GetOriginUserInput()
+		}
 	}
 	// When the runtime is bound to a server-authorized target (Focus release or
 	// conversation-audit session), route tool-emitted risks to the platform

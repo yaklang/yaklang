@@ -113,6 +113,7 @@ require (
 	github.com/steambap/captcha v1.4.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
+	github.com/teambition/rrule-go v1.8.2
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
