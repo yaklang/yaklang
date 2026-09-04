@@ -53,6 +53,7 @@ func (s ProtocolScorecard) Grade() string {
 
 func card(name, rule string, schema, traffic, tests, branches, stack int, sample, evidence, opaque string) ProtocolScorecard {
 	// G5 requires L1/L2/L3; L4-only handmade PDUs fail the gate (Total 0).
+	// P0 cards keep G1–G4/G6–G8 true at construction (P0 tests do not re-derive).
 	g5 := sample == "L1" || sample == "L2" || sample == "L3"
 	return ProtocolScorecard{
 		Name: name, Rule: rule,
@@ -60,6 +61,14 @@ func card(name, rule string, schema, traffic, tests, branches, stack int, sample
 		Schema: schema, Traffic: traffic, Tests: tests, Branches: branches, Stack: stack,
 		SampleClass: sample, Evidence: evidence, OpaqueRaw: opaque,
 	}
+}
+
+// p1card records dimensions only. G1–G4/G6–G8 stay false until TestP1ScorecardsCovered
+// fills them from rule file / fail paths / ethernet / catalog evidence.
+func p1card(name, rule string, schema, traffic, tests, branches, stack int, sample, evidence, opaque string) ProtocolScorecard {
+	s := card(name, rule, schema, traffic, tests, branches, stack, sample, evidence, opaque)
+	s.G1, s.G2, s.G3, s.G4, s.G6, s.G7, s.G8 = false, false, false, false, false, false, false
+	return s
 }
 
 func alias(name, of string) ProtocolScorecard {

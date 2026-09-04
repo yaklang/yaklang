@@ -7,6 +7,23 @@ Package:
         panic("jenkins: expected Protocol key")
       }
       this.ProcessSubNode("Value")
+      if this.GetMaxLength() > 0 && this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 2 && rest < 1048576 {
+          this.GetSubNode("Extra").SetMaxLength(rest)
+          this.ProcessSubNode("Extra")
+        }
+      }
     Prefix: string,9
     Value: "del:\n;type:string"
-    Session: "del:\n;type:string"
+    Extra:
+      list: true
+      Line: "del:\n;type:string"
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          ele.Process()
+        }

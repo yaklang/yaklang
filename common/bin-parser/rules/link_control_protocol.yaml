@@ -30,6 +30,14 @@ Options:
     Length: uint8
     length-from-field: "Length"
     Data: raw
+  operator: |
+    for {
+      ele = this.NewElement()
+      if ele.GetMaxLength() < 2 {
+        break
+      }
+      ele.Process()
+    }
 
 CodeReject: raw
 

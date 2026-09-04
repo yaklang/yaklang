@@ -43,6 +43,7 @@ func TestP1ScorecardsCovered(t *testing.T) {
 		schCap := schemaCeiling(sc.Rule, sc.OpaqueRaw)
 		eth := hasEthernetMustChild(sc, childNames)
 		ported := strings.Contains(sc.Evidence, "TCP/") || strings.Contains(sc.Evidence, "UDP/")
+		failN := failCount(sc.Rule)
 		tCap := testsCeiling(sc.Rule, eth, ported)
 		trCap := trafficCeiling(sc.SampleClass, eth)
 		p0Rule := false
@@ -55,16 +56,23 @@ func TestP1ScorecardsCovered(t *testing.T) {
 		if p0Rule {
 			schCap, tCap, trCap = 25, 20, 25
 		}
+		if sc.G6 && failN < 1 {
+			t.Errorf("P1 %q claimed G6 but no parseMustFail for %s", item.Name, sc.Rule)
+		}
+		if sc.G7 && ported && !eth {
+			t.Errorf("P1 %q claimed G7 without ethernet mustChild for %s", item.Name, sc.Rule)
+		}
+		sc = deriveP1Gates(sc, failN, eth, ported)
 		if sc.Schema > schCap {
 			t.Errorf("P1 %q schema %d exceeds ceiling %d for %s leftover=%q", item.Name, sc.Schema, schCap, sc.Rule, sc.OpaqueRaw)
 		}
 		if sc.Tests > tCap {
-			t.Errorf("P1 %q tests %d exceeds ceiling %d (failCount=%d eth=%v)", item.Name, sc.Tests, tCap, failCount(sc.Rule), eth)
+			t.Errorf("P1 %q tests %d exceeds ceiling %d (failCount=%d eth=%v rows=%d)", item.Name, sc.Tests, tCap, failN, eth, successBranchRows(sc.Rule))
 		}
 		if sc.Traffic > trCap {
 			t.Errorf("P1 %q traffic %d exceeds ceiling %d (sample=%s eth=%v)", item.Name, sc.Traffic, trCap, sc.SampleClass, eth)
 		}
-		if failCount(sc.Rule) < 1 {
+		if !sc.G6 {
 			t.Errorf("P1 %q G6 fail: no parseMustFail for %s", item.Name, sc.Rule)
 		}
 		if sc.Traffic == 25 && !eth {
@@ -76,10 +84,10 @@ func TestP1ScorecardsCovered(t *testing.T) {
 				t.Errorf("P1 %q is done but SampleClass L4 (G5 requires L1/L2/L3)", item.Name)
 			}
 			if sc.Grade() != "A" {
-				t.Errorf("P1 %q is done but grade %s total %d (need A)", item.Name, sc.Grade(), sc.Total())
+				t.Errorf("P1 %q is done but grade %s total %d (need A) gates G1=%v G6=%v G7=%v", item.Name, sc.Grade(), sc.Total(), sc.G1, sc.G6, sc.G7)
 			}
 			if !sc.GatesOK() {
-				t.Errorf("P1 %q is done but a hard gate failed", item.Name)
+				t.Errorf("P1 %q is done but a hard gate failed G1=%v G2=%v G3=%v G4=%v G5=%v G6=%v G7=%v G8=%v", item.Name, sc.G1, sc.G2, sc.G3, sc.G4, sc.G5, sc.G6, sc.G7, sc.G8)
 			}
 			if sc.Total() < 90 {
 				t.Errorf("P1 %q total %d < 90", item.Name, sc.Total())
@@ -95,6 +103,19 @@ func TestP1ScorecardsCovered(t *testing.T) {
 	for name, n := range seen {
 		require.Equal(t, 1, n, "duplicate scorecard name %s", name)
 	}
+}
+
+func TestP1DerivedGatesRejectFake(t *testing.T) {
+	fake := p1card("NoSuchProto", "no-such.yaml", 25, 25, 20, 20, 10, "L2", "handmade", "")
+	require.False(t, fake.G1)
+	require.False(t, fake.G6)
+	require.False(t, fake.GatesOK())
+	require.Equal(t, "F", fake.Grade())
+	derived := deriveP1Gates(fake, 0, false, true)
+	require.False(t, derived.G1)
+	require.False(t, derived.G6)
+	require.False(t, derived.G7)
+	require.Equal(t, "F", derived.Grade())
 }
 
 func TestP1RoadmapCovered(t *testing.T) {

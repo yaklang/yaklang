@@ -251,11 +251,28 @@ func TestP1TCPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4TCPFrame(t, 9092, 9092, kf))
 	require.Equal(t, int64(18), intVal(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("API Key")))
 
-	jr := []byte("{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}\n")
-	j := parseRule(t, jr, "jsonrpc", "JSONRPC")
-	require.Contains(t, strVal(t, j.Child("Line")), "method")
-	eth = parseEthernet(t, ipv4TCPFrame(t, 40002, 8545, jr))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Line")), "ping")
+	t.Run("jsonrpc/request", func(t *testing.T) {
+		jr := []byte("{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}")
+		j := parseRule(t, jr, "jsonrpc", "JSONRPC")
+		pairs := j.Child("Pairs").Children()
+		require.GreaterOrEqual(t, len(pairs), 2)
+		require.Equal(t, "jsonrpc", strVal(t, pairs[0].Child("Key")))
+		require.Equal(t, "2.0", strVal(t, pairs[0].Child("StrVal")))
+		require.Equal(t, "method", strVal(t, pairs[1].Child("Key")))
+		require.Equal(t, "ping", strVal(t, pairs[1].Child("StrVal")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 40002, 8545, jr))
+		ethPairs := mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Pairs").Children()
+		require.Equal(t, "ping", strVal(t, ethPairs[1].Child("StrVal")))
+	})
+	t.Run("jsonrpc/result", func(t *testing.T) {
+		jr := []byte("{\"jsonrpc\":\"2.0\",\"result\":\"pong\",\"id\":1}")
+		j := parseRule(t, jr, "jsonrpc", "JSONRPC")
+		pairs := j.Child("Pairs").Children()
+		require.Equal(t, "result", strVal(t, pairs[1].Child("Key")))
+		require.Equal(t, "pong", strVal(t, pairs[1].Child("StrVal")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 40002, 8545, jr))
+		require.Equal(t, "result", strVal(t, mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Pairs").Children()[1].Child("Key")))
+	})
 
 	tac := make([]byte, 12)
 	tac[0] = 0xc0
@@ -429,28 +446,43 @@ func TestP1TCPApplications(t *testing.T) {
 }
 
 func TestP1MiscAndAliases(t *testing.T) {
-	sll := make([]byte, 16)
-	binary.BigEndian.PutUint16(sll[0:], 0)
-	binary.BigEndian.PutUint16(sll[2:], 1)
-	binary.BigEndian.PutUint16(sll[4:], 6)
-	binary.BigEndian.PutUint16(sll[14:], 0x0001)
-	sl := parseRule(t, sll, "linux_sll", "LinuxSLL")
-	require.Equal(t, uint64(1), uintVal(t, sl.Child("Protocol")))
+	t.Run("linux_sll/host", func(t *testing.T) {
+		sll := make([]byte, 16)
+		binary.BigEndian.PutUint16(sll[0:], 0)
+		binary.BigEndian.PutUint16(sll[2:], 1)
+		binary.BigEndian.PutUint16(sll[4:], 6)
+		binary.BigEndian.PutUint16(sll[14:], 0x0001)
+		sl := parseRule(t, sll, "linux_sll", "LinuxSLL")
+		require.Equal(t, uint64(0), uintVal(t, sl.Child("Packet Type")))
+		require.Equal(t, uint64(1), uintVal(t, sl.Child("Protocol")))
+	})
+	t.Run("linux_sll/outgoing", func(t *testing.T) {
+		sll := make([]byte, 16)
+		binary.BigEndian.PutUint16(sll[0:], 4)
+		binary.BigEndian.PutUint16(sll[2:], 1)
+		binary.BigEndian.PutUint16(sll[4:], 6)
+		binary.BigEndian.PutUint16(sll[14:], 0x0001)
+		sl := parseRule(t, sll, "linux_sll", "LinuxSLL")
+		require.Equal(t, uint64(4), uintVal(t, sl.Child("Packet Type")))
+	})
 
-	dot11 := make([]byte, 24)
-	binary.LittleEndian.PutUint16(dot11[0:], 0x0008) // data subtype
-	d11 := parseRule(t, dot11, "ieee_802_11", "Dot11")
-	require.Equal(t, uint64(0x0008), uintVal(t, d11.Child("Frame Control")))
-
-	rsn := make([]byte, 2+2+4+2+4+2+4)
-	rsn[0] = 48
-	rsn[1] = 18
-	binary.LittleEndian.PutUint16(rsn[2:], 1)
-	binary.LittleEndian.PutUint16(rsn[8:], 1)
-	binary.LittleEndian.PutUint16(rsn[14:], 1)
-	rs := parseRule(t, rsn, "ieee_802_11", "RSN")
-	require.Equal(t, uint64(48), uintVal(t, rs.Child("Element ID")))
-	require.Equal(t, uint64(1), uintVal(t, rs.Child("Version")))
+	t.Run("ieee_802_11/dot11", func(t *testing.T) {
+		dot11 := make([]byte, 24)
+		binary.LittleEndian.PutUint16(dot11[0:], 0x0008) // data subtype
+		d11 := parseRule(t, dot11, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0008), uintVal(t, d11.Child("Frame Control")))
+	})
+	t.Run("ieee_802_11/rsn", func(t *testing.T) {
+		rsn := make([]byte, 2+2+4+2+4+2+4)
+		rsn[0] = 48
+		rsn[1] = 18
+		binary.LittleEndian.PutUint16(rsn[2:], 1)
+		binary.LittleEndian.PutUint16(rsn[8:], 1)
+		binary.LittleEndian.PutUint16(rsn[14:], 1)
+		rs := parseRule(t, rsn, "ieee_802_11", "RSN")
+		require.Equal(t, uint64(48), uintVal(t, rs.Child("Element ID")))
+		require.Equal(t, uint64(1), uintVal(t, rs.Child("Version")))
+	})
 
 	sctp := make([]byte, 16)
 	binary.BigEndian.PutUint16(sctp[0:], 1234)
@@ -505,11 +537,16 @@ func TestP1MiscAndAliases(t *testing.T) {
 	eth = parseEthernet(t, ipv4UDPBytes(t, 161, 161, snmpv3))
 	require.Equal(t, []byte{0x03}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "SNMPv3").Child("Version")))
 
-	parseMustFail(t, nil, "application-layer.ber", "BER Element")
-	berInt := parseRule(t, []byte{0x02, 0x01, 0x05}, "application-layer.ber", "BER Element")
-	require.Equal(t, uint64(2), uintVal(t, mustChild(t, berInt, "Type").Child("Tag")))
-	require.Equal(t, uint64(0), uintVal(t, mustChild(t, berInt, "Type").Child("Class")))
-	require.Equal(t, uint64(5), uintVal(t, berInt.Child("Integer")))
+	t.Run("ber/integer", func(t *testing.T) {
+		berInt := parseRule(t, []byte{0x02, 0x01, 0x05}, "application-layer.ber", "BER Element")
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, berInt, "Type").Child("Tag")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, berInt, "Type").Child("Class")))
+		require.Equal(t, uint64(5), uintVal(t, berInt.Child("Integer")))
+	})
+	t.Run("ber/null", func(t *testing.T) {
+		berNull := parseRule(t, []byte{0x05, 0x00}, "application-layer.ber", "BER Element")
+		require.Equal(t, uint64(5), uintVal(t, mustChild(t, berNull, "Type").Child("Tag")))
+	})
 
 
 	eap := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
