@@ -14,8 +14,8 @@ import (
 )
 
 func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacadesHTTPRequest) (*ypb.RegisterFacadesHTTPResponse, error) {
-	if s.reverseServer == nil {
-		return nil, utils.Error("reverse server is nil! your yaklang facades cannot be found in system.")
+	if err := s.ensureReverseServer(); err != nil {
+		return nil, utils.Wrap(err, "start reverse server failed")
 	}
 
 	host := s.reverseServer.Host
