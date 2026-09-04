@@ -509,21 +509,13 @@ func TestP1TCPApplications(t *testing.T) {
 
 func TestP1MiscAndAliases(t *testing.T) {
 	t.Run("linux_sll/host", func(t *testing.T) {
-		sll := make([]byte, 16)
-		binary.BigEndian.PutUint16(sll[0:], 0)
-		binary.BigEndian.PutUint16(sll[2:], 1)
-		binary.BigEndian.PutUint16(sll[4:], 6)
-		binary.BigEndian.PutUint16(sll[14:], 0x0001)
+		sll := linuxSLL(0, 1, 6, []byte{0, 0, 0, 0, 0, 0}, 0x0001)
 		sl := parseRule(t, sll, "linux_sll", "LinuxSLL")
 		require.Equal(t, uint64(0), uintVal(t, sl.Child("Packet Type")))
 		require.Equal(t, uint64(1), uintVal(t, sl.Child("Protocol")))
 	})
 	t.Run("linux_sll/outgoing", func(t *testing.T) {
-		sll := make([]byte, 16)
-		binary.BigEndian.PutUint16(sll[0:], 4)
-		binary.BigEndian.PutUint16(sll[2:], 1)
-		binary.BigEndian.PutUint16(sll[4:], 6)
-		binary.BigEndian.PutUint16(sll[14:], 0x0001)
+		sll := linuxSLL(4, 1, 6, []byte{0, 0, 0, 0, 0, 0}, 0x0001)
 		sl := parseRule(t, sll, "linux_sll", "LinuxSLL")
 		require.Equal(t, uint64(4), uintVal(t, sl.Child("Packet Type")))
 	})

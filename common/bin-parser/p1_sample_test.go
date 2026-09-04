@@ -2320,6 +2320,48 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 873, 873, raw))
 		require.Equal(t, "OK", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Status")))
 	})
+
+	t.Run("linux_sll/ipv4", func(t *testing.T) {
+		// LINKTYPE_LINUX_SLL (tcpdump): HOST, ARPHRD_ETHER, MAC, Ethertype IPv4.
+		// Wireshark sll.pkttype / sll.src.eth / sll.etype. Payload IPv4 Version 4.
+		mac := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		ip := []byte{
+			0x45, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00,
+			0x40, 0x01, 0x00, 0x00, 10, 0, 0, 1, 10, 0, 0, 2,
+			0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01,
+		}
+		raw := append(linuxSLL(0, 1, 6, mac, 0x0800), ip...)
+		n := parseRule(t, raw, "linux_sll", "LinuxSLL")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("ARPHRD")))
+		require.Equal(t, uint64(6), uintVal(t, n.Child("Address Length")))
+		require.Equal(t, mac, bytesVal(t, n.Child("Source MAC")))
+		require.Equal(t, uint64(0x0800), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, uint64(4), uintVal(t, mustChild(t, n, "IP").Child("Version")))
+		require.Equal(t, []byte{10, 0, 0, 1}, bytesVal(t, mustChild(t, n, "IP").Child("Source")))
+	})
+
+	t.Run("linux_sll/arp", func(t *testing.T) {
+		// SLL outgoing + ARP request. Wireshark sll.pkttype=4 / arp.opcode.
+		mac := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append(linuxSLL(4, 1, 6, mac, 0x0806), arp...)
+		n := parseRule(t, raw, "linux_sll", "LinuxSLL")
+		require.Equal(t, uint64(4), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(0x0806), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "ARP").Child("Opcode")))
+		require.Equal(t, mac, bytesVal(t, mustChild(t, n, "ARP").Child("Sender MAC address")))
+	})
+}
+
+func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
+	b := make([]byte, 16)
+	binary.BigEndian.PutUint16(b[0:], pktType)
+	binary.BigEndian.PutUint16(b[2:], arphrd)
+	binary.BigEndian.PutUint16(b[4:], halen)
+	copy(b[6:], mac)
+	binary.BigEndian.PutUint16(b[14:], proto)
+	return b
 }
 
 func zabbixPacket(flags uint8, json []byte, reserved bool) []byte {
