@@ -162,7 +162,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("Redis", "application-layer/redis.yaml", 20, 15, 16, 20, 10, "L2",
 		"TestRedisPING RESP *1 $4 PING; TestRedisFailPaths", ""),
 	card("MQTT", "application-layer/mqtt.yaml", 20, 20, 16, 20, 10, "L2",
-		"TestMQTTConnectAndConnack; TestMQTTConnectTwoByteRemainingLength; TestMQTTPublishSubscribePing", ""),
+		"TestMQTTConnectAndConnack; TestMQTTPublishSubscribePing; mqtt/publish Topic+Message; mqtt/qos1 Packet ID", ""),
 	card("DCE/RPC", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
 		"TestDCERPCBindRequestAndEdges [MS-RPCE] 2.2.2.6; TestTNSConnectSNMPVarbindX224AndDCERPCStub", "NDR stub"),
 	alias("MSRPC", "DCE/RPC"),

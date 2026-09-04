@@ -693,4 +693,15 @@ func TestP1BranchRows(t *testing.T) {
 		copy(ans[off+16:], []byte{10, 0, 0, 9})
 		require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, mustChild(t, parseRule(t, ans, "application-layer.nbns", "LLMNR").Child("Answers").Children()[0], "NBNSA").Child("Address")))
 	})
+
+	t.Run("mqtt/publish", func(t *testing.T) {
+		pub := mustChild(t, parseRule(t, append([]byte{0x30, 0x11, 0x00, 0x0b}, []byte("sensor/temp23.5")...), "application-layer.mqtt", "MQTT"), "Payload", "Publish")
+		require.Equal(t, "sensor/temp", strVal(t, pub.Child("Topic")))
+		require.Equal(t, "23.5", strVal(t, pub.Child("Message")))
+	})
+	t.Run("mqtt/qos1", func(t *testing.T) {
+		pub := mustChild(t, parseRule(t, append([]byte{0x32, 0x0a, 0x00, 0x01, 'a', 0x00, 0x07}, []byte("hello")...), "application-layer.mqtt", "MQTT"), "Payload", "Publish")
+		require.Equal(t, uint64(7), uintVal(t, pub.Child("Packet ID")))
+		require.Equal(t, "hello", strVal(t, pub.Child("Message")))
+	})
 }
