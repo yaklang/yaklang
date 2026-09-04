@@ -153,7 +153,10 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			if req.IsToolCallArgumentsStreamEnabled() {
 				optList = append(optList, aispec.WithToolCallArgumentsStreamHandler(func(reader io.Reader) {
 					isStream = true
-					resp.EmitOutputStream(reader)
+					// 对流式 arguments 做轻量清洗: 去掉所有换行(\n/\r)和制表符(\t)。
+					// 逐块过滤, 不缓存整个流, 保持字节顺序, 不影响下游 ExtractActionFromStream 解析。
+					// 关键词: tool_call arguments 流式清洗, utils.BytesStripReader
+					resp.EmitOutputStream(utils.NewBytesStripReader(reader, '\n', '\r', '\t'))
 				}))
 			}
 			output, err := cb(
@@ -171,6 +174,8 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 		return resp, nil
 	}
 }
+
+// stripWhitespaceReader 已下移到 common/utils.BytesStripReader（通用流式字节剔除过滤器）。
 
 type ProxyAICaller struct {
 	proxyFunc func(request *AIRequest) *AIRequest
