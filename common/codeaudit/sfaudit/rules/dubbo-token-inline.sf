@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Dubbo token configured inline"
+	type: config
+	level: medium
+	rule_id: "dubbo.token.inline"
+	alert_min: 1
+)
+
+${*.properties}.pattern_regex(/(?im)^[ \t]*dubbo\.protocol\.token[ \t]*[=:][ \t]*\S+/) as $props
+${*.yml}.pattern_regex(/(?im)^[ \t]*dubbo\.protocol\.token[ \t]*[=:][ \t]*\S+/) as $yml
+${*.yaml}.pattern_regex(/(?im)^[ \t]*dubbo\.protocol\.token[ \t]*[=:][ \t]*\S+/) as $yaml
+${*.xml}.pattern_regex(/(?i)dubbo\.protocol\.token[ \t]*[=:][ \t]*\S+/) as $xml
+$props + $yml + $yaml + $xml as $hit
+alert $hit for {
+	level: "medium",
+	title: "Dubbo token configured inline",
+	message: "dubbo.protocol.token is configured inline",
+}

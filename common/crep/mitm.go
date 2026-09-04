@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -418,7 +419,7 @@ func (m *MITMServer) applyProxyConfig() {
 	if len(m.proxyRouteMap) > 0 {
 		routeCopy = make(map[string][]string, len(m.proxyRouteMap))
 		for pattern, proxies := range m.proxyRouteMap {
-			if len(proxies) == 0 {
+			if len(proxies) == 0 && !strings.HasPrefix(strings.TrimSpace(pattern), "!") {
 				continue
 			}
 			routeCopy[pattern] = append([]string(nil), proxies...)

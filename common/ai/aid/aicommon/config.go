@@ -364,6 +364,7 @@ type Config struct {
 	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
+	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -705,6 +706,7 @@ func newConfig(ctx context.Context) *Config {
 		GoalMinIterations:                  DefaultGoalMinIterations,
 		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
+		EnableFunctionCallMode:            true, // 默认开启原生 functioncall 模式
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
@@ -738,6 +740,12 @@ func newConfig(ctx context.Context) *Config {
 		config.Emitter.SetStreamNodeIdI18nProvider(
 			config.buildStreamNodeIdI18nProvider(),
 		)
+	}
+
+	// Sync EnableFunctionCallMode to KeyValueConfig so that NewReActLoop can
+	// read it via config.GetConfigBool("EnableFunctionCallMode").
+	if config.EnableFunctionCallMode {
+		config.SetConfig("EnableFunctionCallMode", true)
 	}
 
 	return config
@@ -2628,6 +2636,23 @@ func WithDisablePerception(disable bool) ConfigOption {
 	}
 }
 
+// WithEnableFunctionCallMode enables native functioncall (tool_calls) mode for
+// ReAct loops created from this config. When enabled, each ReAct loop iteration
+// uses a single "execute_action" tool whose arguments are a complete action
+// protocol JSON, instead of the text-based @action JSON parsing.
+func WithEnableFunctionCallMode(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EnableFunctionCallMode = enable
+		c.m.Unlock()
+		c.SetConfig("EnableFunctionCallMode", enable)
+		return nil
+	}
+}
+
 // WithDisableSessionTitleGeneration disables the automatic session title generation in ReAct
 func WithDisableSessionTitleGeneration(disable bool) ConfigOption {
 	return func(c *Config) error {
@@ -4351,6 +4376,11 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Propagate perception disable flag so sub-loops inherit the setting.
 	if i.DisablePerception {
 		opts = append(opts, WithDisablePerception(true))
+	}
+
+	// Propagate functioncall mode flag so sub-loops inherit the setting.
+	if i.EnableFunctionCallMode {
+		opts = append(opts, WithEnableFunctionCallMode(true))
 	}
 
 	// once init config flag

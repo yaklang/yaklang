@@ -447,13 +447,8 @@ func (p *Proxy) selectProxiesForHost(host string) []string {
 	}
 	normalized := strings.ToLower(strings.TrimSpace(host))
 	if normalized != "" {
-		if _, ok := p.proxyBypassExact[normalized]; ok {
+		if p.isDownstreamProxyBypassedForHost(normalized) {
 			return nil
-		}
-		for _, route := range p.proxyBypassWildcardRoutes {
-			if route.matcher != nil && route.matcher.Match(normalized) {
-				return nil
-			}
 		}
 
 		if proxies, ok := p.proxyExactRoutes[normalized]; ok && len(proxies) > 0 {
@@ -469,6 +464,25 @@ func (p *Proxy) selectProxiesForHost(host string) []string {
 		return p.proxyUrlStrings
 	}
 	return nil
+}
+
+func (p *Proxy) isDownstreamProxyBypassedForHost(host string) bool {
+	if p == nil {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(host))
+	if normalized == "" {
+		return false
+	}
+	if _, ok := p.proxyBypassExact[normalized]; ok {
+		return true
+	}
+	for _, route := range p.proxyBypassWildcardRoutes {
+		if route.matcher != nil && route.matcher.Match(normalized) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Proxy) SetFindProcessName(b bool) {

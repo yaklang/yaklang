@@ -351,13 +351,17 @@ func readDataPDU(r io.Reader) (*DataPDU, error) {
 		s := &SaveSessionInfo{}
 		s.Unpack(r)
 		d = s
+	case PDUTYPE2_UPDATE, PDUTYPE2_POINTER, PDUTYPE2_PLAY_SOUND,
+		PDUTYPE2_SET_KEYBOARD_INDICATORS, PDUTYPE2_STATUS_INFO_PDU:
+		d = &skippedDataPDU{t: header.PDUType2, raw: skipShareDataPayload(r, header)}
 	default:
-		err = errors.New(fmt.Sprintf("Unknown data pdu type2 0x%02x", header.PDUType2))
-		glog.Error(err)
-		return nil, err
+		d = &skippedDataPDU{t: header.PDUType2, raw: skipShareDataPayload(r, header)}
 	}
 
-	if header.PDUType2 != PDUTYPE2_SAVE_SESSION_INFO {
+	switch d.(type) {
+	case *SaveSessionInfo, *skippedDataPDU:
+		// payload already consumed
+	default:
 		err = struc.Unpack(r, d)
 		if err != nil {
 			glog.Error("read data pdu error", err)
@@ -375,6 +379,22 @@ func readDataPDU(r io.Reader) (*DataPDU, error) {
 
 type DataPDUData interface {
 	Type2() uint8
+}
+
+type skippedDataPDU struct {
+	t   uint8
+	raw []byte
+}
+
+func (s *skippedDataPDU) Type2() uint8 { return s.t }
+
+func skipShareDataPayload(r io.Reader, header *ShareDataHeader) []byte {
+	_ = header
+	if br, ok := r.(*bytes.Reader); ok {
+		b, _ := core.ReadBytes(br.Len(), r)
+		return b
+	}
+	return nil
 }
 
 type SynchronizeDataPDU struct {
@@ -420,6 +440,24 @@ type ErrorInfoDataPDU struct {
 
 func (*ErrorInfoDataPDU) Type2() uint8 {
 	return PDUTYPE2_SET_ERROR_INFO_PDU
+}
+
+const (
+	errInfoLogonFailure                   = 0x00000009
+	errInfoServerInsufficientPrivileges   = 0x0000000A
+	errInfoServerFreshCredentialsRequired = 0x0000000B
+)
+
+func (e *ErrorInfoDataPDU) IsLogonFailure() bool {
+	if e == nil {
+		return false
+	}
+	switch e.ErrorInfo {
+	case errInfoLogonFailure, errInfoServerInsufficientPrivileges, errInfoServerFreshCredentialsRequired:
+		return true
+	default:
+		return e.ErrorInfo != 0
+	}
 }
 
 type FontMapDataPDU struct {
@@ -544,6 +582,20 @@ func (s *SaveSessionInfo) Unpack(r io.Reader) (err error) {
 
 func (*SaveSessionInfo) Type2() uint8 {
 	return PDUTYPE2_SAVE_SESSION_INFO
+}
+
+// AuthOK reports whether Save Session Info means a successful logon.
+// LOGON / LOGON_LONG / PLAINNOTIFY are success; EXTENDED_INFO with
+// LOGONERRORS is a credential failure ([MS-RDPBCGR] 2.2.10.1).
+func (s *SaveSessionInfo) AuthOK() bool {
+	switch s.InfoType {
+	case INFOTYPE_LOGON, INFOTYPE_LOGON_LONG, INFOTYPE_LOGON_PLAINNOTIFY:
+		return true
+	case INFOTYPE_LOGON_EXTENDED_INFO:
+		return s.FieldsPresent&LOGON_EX_LOGONERRORS == 0
+	default:
+		return false
+	}
 }
 
 type PersistKeyPDU struct {
@@ -719,12 +771,19 @@ func NewPDU(userId uint16, message PDUMessage) *PDU {
 
 func readPDU(r io.Reader) (*PDU, error) {
 	pdu := &PDU{}
-	var err error
 	header := &ShareControlHeader{}
-	err = struc.Unpack(r, header)
+	err := struc.Unpack(r, header)
 	if err != nil {
 		return nil, err
 	}
+	if header.TotalLength < 6 {
+		return nil, fmt.Errorf("rdp pdu too short: %d", header.TotalLength)
+	}
+	payload, err := core.ReadBytes(int(header.TotalLength)-6, r)
+	if err != nil {
+		return nil, err
+	}
+	pr := bytes.NewReader(payload)
 
 	pdu.ShareCtrlHeader = header
 
@@ -732,16 +791,16 @@ func readPDU(r io.Reader) (*PDU, error) {
 	switch pdu.ShareCtrlHeader.PDUType {
 	case PDUTYPE_DEMANDACTIVEPDU:
 		glog.Debug("PDUTYPE_DEMANDACTIVEPDU")
-		d, err = readDemandActivePDU(r)
+		d, err = readDemandActivePDU(pr)
 	case PDUTYPE_DATAPDU:
 		glog.Debug("PDUTYPE_DATAPDU")
-		d, err = readDataPDU(r)
+		d, err = readDataPDU(pr)
 	case PDUTYPE_CONFIRMACTIVEPDU:
 		glog.Debug("PDUTYPE_CONFIRMACTIVEPDU")
-		d, err = readConfirmActivePDU(r)
+		d, err = readConfirmActivePDU(pr)
 	case PDUTYPE_DEACTIVATEALLPDU:
 		glog.Debug("PDUTYPE_DEACTIVATEALLPDU")
-		d, err = readDeactiveAllPDU(r)
+		d, err = readDeactiveAllPDU(pr)
 	default:
 		glog.Errorf("PDU invalid pdu type: 0x%02x", pdu.ShareCtrlHeader.PDUType)
 	}

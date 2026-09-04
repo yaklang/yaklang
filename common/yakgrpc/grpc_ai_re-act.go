@@ -1,4 +1,4 @@
-﻿package yakgrpc
+package yakgrpc
 
 import (
 	"context"
@@ -198,6 +198,12 @@ func resolveAISessionStartParams(db *gorm.DB, sessionID string, request *ypb.AIS
 }
 
 func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
+	return s.startAIReActWithOptions(stream, true)
+}
+
+// startAIReActWithOptions keeps production behavior unchanged while allowing
+// lifecycle tests to replace external AI dependencies.
+func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, loadBuiltinTools bool, additionalOptions ...aicommon.ConfigOption) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
 		log.Errorf("recv re-act first config msg failed: %v", err)
@@ -284,6 +290,43 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
 	}
 
+	// A scheduled run reserves its target session at the trigger boundary. A
+	// user turn arriving in the narrow interval before that run publishes its
+	// ReAct instance waits and attaches, so it cannot steal initialization and
+	// make the scheduled occurrence execute late behind it.
+	_, isScheduledStream := stream.(*inProcessAIReActStream)
+	if !isScheduledStream {
+		for {
+			manager := s.currentAIReActScheduler()
+			if manager == nil || !manager.isSessionReserved(persistentSession) {
+				break
+			}
+			if runningReAct, ok := aireact.GetRunningSession(persistentSession); ok {
+				return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
+			}
+			select {
+			case <-baseCtx.Done():
+				return nil
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}
+
+	releaseSessionStart, ownsSessionStart := aireact.TryBeginSessionStart(persistentSession)
+	if !ownsSessionStart {
+		runningReAct, err := aireact.WaitRunningSession(persistentSession, time.Minute)
+		if err != nil {
+			return err
+		}
+		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
+	}
+	sessionStartHeld := true
+	defer func() {
+		if sessionStartHeld {
+			releaseSessionStart()
+		}
+	}()
+
 	resolvedStartParams, err := resolveAISessionStartParams(
 		s.GetProjectDatabase(),
 		persistentSession,
@@ -319,13 +362,17 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}),
 		aicommon.WithEventInputChanx(inputEvent),
 		aicommon.WithContext(baseCtx),
-		aireact.WithBuiltinTools(),
+	}
+	if loadBuiltinTools {
+		configOptions = append(configOptions, aireact.WithBuiltinTools())
+	}
+	configOptions = append(configOptions,
 		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 		aicommon.WithPersistentSessionId(persistentSession),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
 		aicommon.WithEnableDispatchSubReactAgent(true), // 仅仅允许顶层 ReAct 分发子 ReAct Agent，子 Agent 仍然可以使用原始的 AI 回调。
-	}
+	)
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
@@ -333,12 +380,15 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if aiconfig.IsTieredAIConfig() {
 		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}
+	configOptions = append(configOptions, additionalOptions...)
 
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {
 		log.Errorf("create re-act failed: %v", err)
 		return utils.Errorf("create re-act instance failed: %v", err)
 	}
+	releaseSessionStart()
+	sessionStartHeld = false
 
 	reAct.GetConfig().SetConfig("MustProcessAttachedData", true)
 

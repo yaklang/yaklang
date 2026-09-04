@@ -2,12 +2,46 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
+
+type concurrentWriteDetector struct {
+	active     atomic.Int32
+	overlapped atomic.Bool
+	mu         sync.Mutex
+	buffer     bytes.Buffer
+}
+
+func (w *concurrentWriteDetector) Write(p []byte) (int, error) {
+	if w.active.Add(1) > 1 {
+		w.overlapped.Store(true)
+	}
+	defer w.active.Add(-1)
+
+	// Keep the write window open long enough for unsynchronized callers to
+	// overlap deterministically.
+	time.Sleep(time.Millisecond)
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buffer.Write(p)
+}
+
+func (w *concurrentWriteDetector) Bytes() []byte {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return bytes.Clone(w.buffer.Bytes())
+}
 
 func TestStdioServer(t *testing.T) {
 	t.Run("Can instantiate", func(t *testing.T) {
@@ -108,6 +142,53 @@ func TestStdioServer(t *testing.T) {
 		// Check for server errors
 		if err := <-serverErrCh; err != nil {
 			t.Errorf("unexpected server error: %v", err)
+		}
+	})
+
+	t.Run("Serializes concurrent responses and notifications", func(t *testing.T) {
+		stdioServer := NewStdioServer(NewMCPServer("test", "1.0.0"))
+		writer := &concurrentWriteDetector{}
+
+		const messageCount = 64
+		var wg sync.WaitGroup
+		errs := make(chan error, messageCount)
+		for i := 0; i < messageCount; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				err := stdioServer.writeResponse(mcp.JSONRPCResponse{
+					JSONRPC: mcp.JSONRPC_VERSION,
+					ID:      id,
+					Result:  map[string]int{"id": id},
+				}, writer)
+				if err != nil {
+					errs <- err
+				}
+			}(i)
+		}
+		wg.Wait()
+		close(errs)
+
+		for err := range errs {
+			t.Fatalf("write response: %v", err)
+		}
+		if writer.overlapped.Load() {
+			t.Fatal("stdio writer was used concurrently")
+		}
+
+		scanner := bufio.NewScanner(bytes.NewReader(writer.Bytes()))
+		lines := 0
+		for scanner.Scan() {
+			if !json.Valid(scanner.Bytes()) {
+				t.Fatalf("invalid JSON-RPC frame: %q", scanner.Bytes())
+			}
+			lines++
+		}
+		if err := scanner.Err(); err != nil {
+			t.Fatalf("scan responses: %v", err)
+		}
+		if lines != messageCount {
+			t.Fatalf("got %d response frames, want %d", lines, messageCount)
 		}
 	})
 }

@@ -28,6 +28,7 @@ type StreamableHTTPMCPClient struct {
 	initialized     bool
 	protocolVersion string
 	sessionID       string
+	stateMu         sync.RWMutex
 
 	notifications []func(mcp.JSONRPCNotification)
 	notifyMu      sync.RWMutex
@@ -80,12 +81,39 @@ func (c *StreamableHTTPMCPClient) applyHeaders(req *http.Request) {
 	for key, value := range c.headers {
 		req.Header.Set(key, value)
 	}
-	if c.sessionID != "" {
-		req.Header.Set(mcp.HeaderSessionID, c.sessionID)
+
+	state := c.snapshotState()
+	if state.sessionID != "" {
+		req.Header.Set(mcp.HeaderSessionID, state.sessionID)
 	}
-	if c.protocolVersion != "" {
-		req.Header.Set(mcp.HeaderProtocolVersion, c.protocolVersion)
+	if state.protocolVersion != "" {
+		req.Header.Set(mcp.HeaderProtocolVersion, state.protocolVersion)
 	}
+}
+
+type streamableHTTPClientState struct {
+	initialized     bool
+	protocolVersion string
+	sessionID       string
+}
+
+func (c *StreamableHTTPMCPClient) snapshotState() streamableHTTPClientState {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+
+	return streamableHTTPClientState{
+		initialized:     c.initialized,
+		protocolVersion: c.protocolVersion,
+		sessionID:       c.sessionID,
+	}
+}
+
+func (c *StreamableHTTPMCPClient) markInitialized(protocolVersion string) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	c.protocolVersion = protocolVersion
+	c.initialized = true
 }
 
 func (c *StreamableHTTPMCPClient) sendRequest(
@@ -93,7 +121,7 @@ func (c *StreamableHTTPMCPClient) sendRequest(
 	method string,
 	params interface{},
 ) (*json.RawMessage, error) {
-	if !c.initialized && method != "initialize" {
+	if !c.snapshotState().initialized && method != "initialize" {
 		return nil, fmt.Errorf("client not initialized")
 	}
 
@@ -239,8 +267,7 @@ func (c *StreamableHTTPMCPClient) Initialize(
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	c.protocolVersion = result.ProtocolVersion
-	c.initialized = true
+	c.markInitialized(result.ProtocolVersion)
 
 	if err := c.sendNotification(ctx, "notifications/initialized", nil); err != nil {
 		return nil, fmt.Errorf("failed to send initialized notification: %w", err)
@@ -427,7 +454,7 @@ func (c *StreamableHTTPMCPClient) Close() error {
 		cancel()
 	}
 
-	if c.sessionID != "" {
+	if c.snapshotState().sessionID != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -451,10 +478,12 @@ func (c *StreamableHTTPMCPClient) Close() error {
 }
 
 func (c *StreamableHTTPMCPClient) ensureEventStream() {
+	state := c.snapshotState()
+
 	c.streamMu.Lock()
 	defer c.streamMu.Unlock()
 
-	if c.sessionID == "" || c.eventStreamCancel != nil {
+	if state.sessionID == "" || c.eventStreamCancel != nil {
 		return
 	}
 
@@ -572,13 +601,17 @@ func (c *StreamableHTTPMCPClient) dispatchSSEPayload(payload json.RawMessage) {
 }
 
 func (c *StreamableHTTPMCPClient) updateSessionFromHeaders(header http.Header) {
-	if sessionID := header.Get(mcp.HeaderSessionID); sessionID != "" {
-		c.sessionID = sessionID
+	sessionID := header.Get(mcp.HeaderSessionID)
+	if sessionID == "" {
+		sessionID = header.Get(mcp.LegacyHeaderSessionID)
+	}
+	if sessionID == "" {
 		return
 	}
-	if sessionID := header.Get(mcp.LegacyHeaderSessionID); sessionID != "" {
-		c.sessionID = sessionID
-	}
+
+	c.stateMu.Lock()
+	c.sessionID = sessionID
+	c.stateMu.Unlock()
 }
 
 func decodeJSONRPCResponseBody(reader io.Reader) (*json.RawMessage, error) {

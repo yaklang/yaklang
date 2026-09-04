@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -204,10 +205,14 @@ func (s *MCPServer) ServeHTTPCompat(addr, baseURL string) (err error) {
 }
 
 func (s *MCPServer) ServeStdio() (err error) {
+	return s.ServeStdioWithIO(os.Stdin, os.Stdout)
+}
+
+func (s *MCPServer) ServeStdioWithIO(stdin io.Reader, stdout io.Writer) (err error) {
 	if err = s.ensureLocalClient(); err != nil {
 		return err
 	}
-	return server.ServeStdio(s.server)
+	return server.ServeStdioWithIO(s.server, stdin, stdout)
 }
 
 func (s *MCPServer) closeBridgeClients() {

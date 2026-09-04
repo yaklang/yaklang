@@ -97,7 +97,7 @@ type Config struct {
 	// 最大深度，在 preReq 中实现
 	maxDepth int // 5
 
-	// maxBodySize 通过 execReq 实现限制
+	// maxBodySize is enforced by lowhttp while reading the response.
 	maxBodySize int // 10 * 1024 * 1024
 
 	// 通过 preReq 限制
@@ -109,13 +109,15 @@ type Config struct {
 	// 请求最大值限制
 	maxCountOfRequest int // 1000
 
-	// maxCountOfLinks 在 handleReqResult 中限制
-	maxCountOfLinks int // 2000
+	// maxCountOfLinks limits unique non-seed discoveries before callbacks,
+	// scope checks, and scheduling. A non-positive value is unlimited.
+	maxCountOfLinks int // 10000
 
 	//
 	maxRetryTimes int // 3
 
 	startFromParentPath bool     // true
+	exactOrigins        bool     // false: preserve historical automatic www expansion
 	allowMethod         []string // GET / POST
 
 	//
@@ -131,6 +133,9 @@ type Config struct {
 	onRequest  func(req *Req)
 	onLogin    func(req *Req)
 	onUrlFound func(url string)
+	// AI request findings are static evidence. The callback does not authorize
+	// replaying non-GET requests.
+	onAIJSRequestFound func(AIJSRequestFinding)
 
 	extractionRules func(*Req) []interface{}
 	// appended links
@@ -166,9 +171,14 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 	if c.AuthUsername != "" || c.AuthPassword != "" {
 		opts = append(opts, lowhttp.WithUsername(c.AuthUsername), lowhttp.WithPassword(c.AuthPassword))
 	}
-	if c.maxRedirectTimes > 0 {
-		opts = append(opts, lowhttp.WithRedirectTimes(c.maxRedirectTimes))
+	redirectTimes := c.maxRedirectTimes
+	if redirectTimes < 0 {
+		redirectTimes = 0
 	}
+	// lowhttp follows redirects by default. Always write the crawler's value so
+	// WithMaxRedirectTimes(0) really disables redirects instead of accidentally
+	// inheriting lowhttp's default allowance.
+	opts = append(opts, lowhttp.WithRedirectTimes(redirectTimes))
 	opts = append(opts, lowhttp.WithVerifyCertificate(c.verifyCertificate))
 	if c.ctx != nil {
 		opts = append(opts, lowhttp.WithContext(c.ctx))
@@ -178,6 +188,12 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 	}
 	if c.maxRetryTimes > 0 {
 		opts = append(opts, lowhttp.WithRetryTimes(c.maxRetryTimes))
+	}
+	if c.maxBodySize > 0 {
+		// Enforce the documented crawler body limit while the response is read.
+		// Truncating only after lowhttp returned would still allow an oversized
+		// asset to consume unbounded memory before adaptive analysis can slice it.
+		opts = append(opts, lowhttp.WithMaxContentLength(c.maxBodySize))
 	}
 	c._cachedOpts = opts
 	return opts
@@ -189,8 +205,28 @@ func (c *Config) buildLowhttpOpts(https bool, runtimeID string, extra ...lowhttp
 	if runtimeID != "" {
 		opts = append(opts, lowhttp.WithRuntimeId(runtimeID))
 	}
+	// Redirects happen inside lowhttp, before the crawler can inspect the
+	// response body or enqueue another request. Keep this option after every
+	// caller-supplied option, even when the configured redirect count is zero:
+	// an extra option may re-enable redirects, but it must never bypass scope.
+	opts = append(opts, lowhttp.WithRedirectHandler(func(redirectHTTPS bool, requestRaw, _ []byte) bool {
+		return c.shouldFollowRedirect(redirectHTTPS, requestRaw)
+	}))
 	opts = append(opts, lowhttp.WithHttps(https))
 	return opts
+}
+
+func (c *Config) shouldFollowRedirect(redirectHTTPS bool, requestRaw []byte) bool {
+	target, err := lowhttp.ExtractURLFromHTTPRequestRaw(requestRaw, redirectHTTPS)
+	if err != nil || target == nil || !c.CheckShouldBeHandledURL(target) {
+		if target != nil {
+			log.Debugf("crawler blocked out-of-scope redirect to %s", target.Redacted())
+		} else {
+			log.Debugf("crawler blocked redirect with an invalid target: %v", err)
+		}
+		return false
+	}
+	return true
 }
 
 func (c *Config) DoHTTPRequest(https bool, runtimeID string, extra ...lowhttp.LowhttpOpt) (*lowhttp.LowhttpResponse, bool, error) {
@@ -416,11 +452,11 @@ func WithMaxRedirectTimes(maxRedirectTimes int) ConfigOpt {
 // crawler.Start("https://example.com", crawler.domainInclude("*.example.com"))
 // ```
 func WithDomainWhiteList(domain string) ConfigOpt {
-	var pattern string
-	if !strings.HasPrefix(domain, "*") {
-		pattern = "*" + domain
+	pattern := strings.TrimSpace(domain)
+	if !strings.HasPrefix(pattern, "*") {
+		pattern = "*" + pattern
 	}
-	p, err := glob.Compile(pattern)
+	p, err := compileNormalizedHostnameGlob(pattern)
 	if err != nil {
 		log.Errorf("limit domain[%v] failed: %v", domain, err)
 		return func(c *Config) {
@@ -438,6 +474,49 @@ func WithDomainWhiteList(domain string) ConfigOpt {
 	}
 }
 
+type normalizedHostnameGlob struct {
+	matcher glob.Glob
+}
+
+func (g normalizedHostnameGlob) Match(hostname string) bool {
+	if g.matcher == nil {
+		return false
+	}
+	return g.matcher.Match(normalizeHostnameOrPattern(hostname))
+}
+
+func compileNormalizedHostnameGlob(pattern string) (glob.Glob, error) {
+	normalized := normalizeHostnameOrPattern(pattern)
+	if normalized == "" {
+		return nil, utils.Errorf("hostname pattern is empty")
+	}
+	matcher, err := glob.Compile(normalized)
+	if err != nil {
+		return nil, err
+	}
+	return normalizedHostnameGlob{matcher: matcher}, nil
+}
+
+func normalizeHostnameOrPattern(value string) string {
+	return strings.ToLower(strings.TrimSuffix(strings.TrimSpace(value), "."))
+}
+
+// WithDomainWhiteListExactPattern adds exactly the hostname glob supplied by
+// the caller. Unlike the legacy WithDomainWhiteList option, a literal host is
+// not expanded to sibling/subdomain patterns. This is intended for explicit
+// authorization boundaries: callers must write "*.example.com" themselves
+// when subdomains are in scope.
+func WithDomainWhiteListExactPattern(pattern string) ConfigOpt {
+	matcher, err := compileNormalizedHostnameGlob(pattern)
+	if err != nil {
+		log.Errorf("compile exact crawler domain pattern %q failed: %v", pattern, err)
+		return func(*Config) {}
+	}
+	return func(c *Config) {
+		c.allowDomains = append(c.allowDomains, matcher)
+	}
+}
+
 // domainExclude 是一个选项函数，用于指定爬虫时的域名黑名单
 // domain允许使用glob语法，例如*.example.com
 // 参数:
@@ -451,11 +530,11 @@ func WithDomainWhiteList(domain string) ConfigOpt {
 // crawler.Start("https://example.com", crawler.domainExclude("*.baidu.com"))
 // ```
 func WithDomainBlackList(domain string) ConfigOpt {
-	var pattern string
-	if !strings.HasPrefix(domain, "*") {
-		pattern = "*" + domain
+	pattern := normalizeHostnameOrPattern(domain)
+	if !strings.HasPrefix(pattern, "*") {
+		pattern = "*" + pattern
 	}
-	p, err := glob.Compile(pattern)
+	p, err := compileNormalizedHostnameGlob(pattern)
 	if err != nil {
 		log.Errorf("limit domain[%v] failed: %v", domain, err)
 		return func(c *Config) {}
@@ -679,7 +758,8 @@ func WithMaxRequestCount(limit int) ConfigOpt {
 	}
 }
 
-// maxUrls 是一个选项函数，用于指定爬虫时的最大链接数，默认为10000
+// maxUrls 是一个选项函数，用于指定爬虫时的最大唯一新发现 URL 数，默认为10000。
+// 种子 URL 不占用配额；非正数表示不设限。配额在回调、域名范围判断和请求调度之前生效。
 // 参数:
 //   - limit: 最大链接数
 //
@@ -731,6 +811,16 @@ func WithForbiddenFromParent(b bool) ConfigOpt {
 	}
 }
 
+// WithExactOrigins disables the crawler's historical automatic www seed
+// expansion and makes each seed hostname an exact automatic scope entry. It is
+// opt-in so existing callers retain their original behavior. Explicit
+// WithDomainWhiteList options can still authorize additional hosts.
+func WithExactOrigins(enable ...bool) ConfigOpt {
+	return func(c *Config) {
+		c.exactOrigins = len(enable) == 0 || enable[0]
+	}
+}
+
 // header 是一个选项函数，用于指定爬虫时的请求头
 // 参数:
 //   - k: 请求头名称
@@ -761,10 +851,12 @@ func WithHeader(k, v string) ConfigOpt {
 //
 // Example:
 // ```
-// crawler.Start("https://example.com", crawler.urlExtractor(func(req) {
-//     // 自定义规则：从响应体(req.Response() 或 req.ResponseRaw())中提取额外的链接
-//     return re.FindAll(string(req.ResponseRaw()), `https?://[^\s"'<>]+`)
-// }))
+//
+//	crawler.Start("https://example.com", crawler.urlExtractor(func(req) {
+//	    // 自定义规则：从响应体(req.Response() 或 req.ResponseRaw())中提取额外的链接
+//	    return re.FindAll(string(req.ResponseRaw()), `https?://[^\s"'<>]+`)
+//	}))
+//
 // ```
 func WithUrlExtractor(f func(*Req) []interface{}) ConfigOpt {
 	return func(c *Config) {
@@ -816,6 +908,18 @@ func WithOnRequest(f func(req *Req)) ConfigOpt {
 func WithOnUrlFound(f func(string)) ConfigOpt {
 	return func(c *Config) {
 		c.onUrlFound = f
+	}
+}
+
+// WithOnAIJSRequestFound observes request shapes statically recovered from
+// JavaScript. Observation is deliberately separate from crawler scheduling:
+// a POST/PUT/PATCH/DELETE finding is reported but never automatically sent.
+func WithOnAIJSRequestFound(f func(AIJSRequestFinding)) ConfigOpt {
+	return func(c *Config) {
+		c.onAIJSRequestFound = f
+		if c.aiJSExtractConfig != nil {
+			withAIJSRequestFindingSink(f)(c.aiJSExtractConfig)
+		}
 	}
 }
 
@@ -939,5 +1043,11 @@ func WithAIJSExtract(opts ...AIJSExtractOption) ConfigOpt {
 	return func(c *Config) {
 		c.enableAIJSExtract = true
 		c.aiJSExtractConfig = NewAIJSExtractConfig(opts...)
+		if c.onAIJSRequestFound != nil {
+			withAIJSRequestFindingSink(c.onAIJSRequestFound)(c.aiJSExtractConfig)
+		}
+		// One atomic budget is shared by every shallow per-request config copy,
+		// so MaxAIRequests is a crawler-run bound rather than a per-page bound.
+		c.aiJSExtractConfig.runtimeBudget = newAIJSCallBudget(c.aiJSExtractConfig.MaxAIRequests)
 	}
 }

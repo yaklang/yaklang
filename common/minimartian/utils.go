@@ -210,6 +210,53 @@ func IsTlsHandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ error) {
 	return peekable, raw[0] == 0x16, nil
 }
 
+type tunnelPayloadProtocol uint8
+
+const (
+	tunnelPayloadProtocolUnknown tunnelPayloadProtocol = iota
+	tunnelPayloadProtocolHTTP
+	tunnelPayloadProtocolTLS
+)
+
+// detectTunnelPayloadProtocol classifies the payload sent after a proxy or TUN
+// ingress has already resolved its upstream target. It does not consume the
+// first bytes. Unknown is a normal result and should be forwarded opaquely.
+func detectTunnelPayloadProtocol(conn net.Conn) (net.Conn, tunnelPayloadProtocol, error) {
+	peekable, ok := conn.(*utils.BufferedPeekableConn)
+	if !ok {
+		peekable = utils.NewPeekableNetConn(conn)
+	}
+
+	raw, err := peekable.Peek(2)
+	if err != nil {
+		if err == io.EOF {
+			return peekable, tunnelPayloadProtocolUnknown, nil
+		}
+		return nil, tunnelPayloadProtocolUnknown, utils.Errorf("peek tunnel payload protocol failed: %s", err)
+	}
+	// Preserve minimartian's existing TLS/GM-TLS behavior: its handshake
+	// dispatch has historically keyed on the TLS handshake content type (0x16)
+	// rather than requiring the standard TLS 0x03 record version.
+	if len(raw) >= 1 && raw[0] == 0x16 {
+		return peekable, tunnelPayloadProtocolTLS, nil
+	}
+	if !utils.CouldBeHTTPRequestPrefix(raw) {
+		return peekable, tunnelPayloadProtocolUnknown, nil
+	}
+
+	// Eight bytes cover every method prefix currently recognized by tcpmitm.
+	// Peek may legally return fewer bytes; the shared matcher still recognizes
+	// short methods such as GET as soon as their trailing space is present.
+	raw, err = peekable.Peek(8)
+	if err != nil && err != io.EOF {
+		return nil, tunnelPayloadProtocolUnknown, utils.Errorf("peek HTTP tunnel payload protocol failed: %s", err)
+	}
+	if utils.IsHTTPRequestPrefix(raw) {
+		return peekable, tunnelPayloadProtocolHTTP, nil
+	}
+	return peekable, tunnelPayloadProtocolUnknown, nil
+}
+
 func peekTLSVersion(conn net.Conn) (fConn net.Conn, version int, _ error) {
 	peekable, ok := conn.(*utils.BufferedPeekableConn)
 	if !ok {

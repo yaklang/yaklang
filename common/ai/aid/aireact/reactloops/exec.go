@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -339,7 +340,7 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 	return err
 }
 
-func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
+func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	var actionNames = r.GetAllActionNames()
 	// Bind the provider request to the immutable task that owns this
@@ -384,6 +385,37 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if r.useSpeedPriorityAI {
 		aiCallback = r.config.CallSpeedPriorityAI
 	}
+
+	// Build request options common to both modes
+	requestOpts := []aicommon.AIRequestOption{
+		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
+		aicommon.WithAIRequest_Context(activeTaskCtx),
+	}
+
+	// In functioncall mode, inject native tools and tool_call callback.
+	// Tool call arguments are streamed through toolCallArgumentsWriter
+	// (handled in stream.go) and merged into the output stream, so the
+	// postHandler can use the same ExtractActionFromStream path as text mode.
+	// The ToolCallCallback here is only for logging/debugging.
+	if r.functionCallMode {
+		specTools := r.buildFunctionCallTools(operator)
+		if len(specTools) > 0 {
+			requestOpts = append(requestOpts, aicommon.WithAIRequest_ExtraSpecOpts(
+				aispec.WithTools(specTools),
+				aispec.WithToolChoice("auto"),
+				aispec.WithToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+					for _, tc := range toolCalls {
+						log.Debugf("functioncall: tool_call delta: %s", fmtToolCallSummary(tc))
+					}
+				}),
+			))
+			// Enable tool_call arguments streaming so the arguments flow
+			// through resp.EmitOutputStream → GetOutputStreamReader →
+			// ExtractActionFromStream, unifying the action parsing path.
+			requestOpts = append(requestOpts, aicommon.WithAIRequest_EnableToolCallArgumentsStream())
+		}
+	}
+
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -642,8 +674,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			}
 			return nil
 		},
-		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
-		aicommon.WithAIRequest_Context(activeTaskCtx),
+		requestOpts...,
 	)
 	if transactionErr != nil {
 		r.UserStatus(
@@ -1169,7 +1200,7 @@ LOOP:
 
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
-		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
+		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce, operator)
 
 		streamWg.Wait()
 

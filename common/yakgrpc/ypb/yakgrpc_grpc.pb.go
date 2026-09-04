@@ -551,6 +551,14 @@ const (
 	Yak_DeleteAISession_FullMethodName                            = "/ypb.Yak/DeleteAISession"
 	Yak_GetRandomAIMaterials_FullMethodName                       = "/ypb.Yak/GetRandomAIMaterials"
 	Yak_ExportAILogs_FullMethodName                               = "/ypb.Yak/ExportAILogs"
+	Yak_CreateAIReActSchedule_FullMethodName                      = "/ypb.Yak/CreateAIReActSchedule"
+	Yak_UpdateAIReActSchedule_FullMethodName                      = "/ypb.Yak/UpdateAIReActSchedule"
+	Yak_DeleteAIReActSchedule_FullMethodName                      = "/ypb.Yak/DeleteAIReActSchedule"
+	Yak_GetAIReActSchedule_FullMethodName                         = "/ypb.Yak/GetAIReActSchedule"
+	Yak_QueryAIReActSchedules_FullMethodName                      = "/ypb.Yak/QueryAIReActSchedules"
+	Yak_SetAIReActScheduleEnabled_FullMethodName                  = "/ypb.Yak/SetAIReActScheduleEnabled"
+	Yak_PreviewAIReActScheduleTimes_FullMethodName                = "/ypb.Yak/PreviewAIReActScheduleTimes"
+	Yak_RunAIReActScheduleNow_FullMethodName                      = "/ypb.Yak/RunAIReActScheduleNow"
 	Yak_CreateAIMemoryEntity_FullMethodName                       = "/ypb.Yak/CreateAIMemoryEntity"
 	Yak_UpdateAIMemoryEntity_FullMethodName                       = "/ypb.Yak/UpdateAIMemoryEntity"
 	Yak_DeleteAIMemoryEntity_FullMethodName                       = "/ypb.Yak/DeleteAIMemoryEntity"
@@ -1348,6 +1356,15 @@ type YakClient interface {
 	DeleteAISession(ctx context.Context, in *DeleteAISessionRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(ctx context.Context, in *ExportAILogsRequest, opts ...grpc.CallOption) (*ExportAILogsResponse, error)
+	// AI ReAct recurring schedules
+	CreateAIReActSchedule(ctx context.Context, in *CreateAIReActScheduleRequest, opts ...grpc.CallOption) (*AIReActSchedule, error)
+	UpdateAIReActSchedule(ctx context.Context, in *UpdateAIReActScheduleRequest, opts ...grpc.CallOption) (*AIReActSchedule, error)
+	DeleteAIReActSchedule(ctx context.Context, in *DeleteAIReActScheduleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	GetAIReActSchedule(ctx context.Context, in *GetAIReActScheduleRequest, opts ...grpc.CallOption) (*AIReActSchedule, error)
+	QueryAIReActSchedules(ctx context.Context, in *QueryAIReActSchedulesRequest, opts ...grpc.CallOption) (*QueryAIReActSchedulesResponse, error)
+	SetAIReActScheduleEnabled(ctx context.Context, in *SetAIReActScheduleEnabledRequest, opts ...grpc.CallOption) (*AIReActSchedule, error)
+	PreviewAIReActScheduleTimes(ctx context.Context, in *PreviewAIReActScheduleTimesRequest, opts ...grpc.CallOption) (*PreviewAIReActScheduleTimesResponse, error)
+	RunAIReActScheduleNow(ctx context.Context, in *RunAIReActScheduleNowRequest, opts ...grpc.CallOption) (*Empty, error)
 	// AI Memory CRUD
 	CreateAIMemoryEntity(ctx context.Context, in *CreateAIMemoryEntityRequest, opts ...grpc.CallOption) (*Empty, error)
 	UpdateAIMemoryEntity(ctx context.Context, in *AIMemoryEntity, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -7586,6 +7603,86 @@ func (c *yakClient) ExportAILogs(ctx context.Context, in *ExportAILogsRequest, o
 	return out, nil
 }
 
+func (c *yakClient) CreateAIReActSchedule(ctx context.Context, in *CreateAIReActScheduleRequest, opts ...grpc.CallOption) (*AIReActSchedule, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIReActSchedule)
+	err := c.cc.Invoke(ctx, Yak_CreateAIReActSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateAIReActSchedule(ctx context.Context, in *UpdateAIReActScheduleRequest, opts ...grpc.CallOption) (*AIReActSchedule, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIReActSchedule)
+	err := c.cc.Invoke(ctx, Yak_UpdateAIReActSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteAIReActSchedule(ctx context.Context, in *DeleteAIReActScheduleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteAIReActSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAIReActSchedule(ctx context.Context, in *GetAIReActScheduleRequest, opts ...grpc.CallOption) (*AIReActSchedule, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIReActSchedule)
+	err := c.cc.Invoke(ctx, Yak_GetAIReActSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryAIReActSchedules(ctx context.Context, in *QueryAIReActSchedulesRequest, opts ...grpc.CallOption) (*QueryAIReActSchedulesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAIReActSchedulesResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAIReActSchedules_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetAIReActScheduleEnabled(ctx context.Context, in *SetAIReActScheduleEnabledRequest, opts ...grpc.CallOption) (*AIReActSchedule, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIReActSchedule)
+	err := c.cc.Invoke(ctx, Yak_SetAIReActScheduleEnabled_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) PreviewAIReActScheduleTimes(ctx context.Context, in *PreviewAIReActScheduleTimesRequest, opts ...grpc.CallOption) (*PreviewAIReActScheduleTimesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PreviewAIReActScheduleTimesResponse)
+	err := c.cc.Invoke(ctx, Yak_PreviewAIReActScheduleTimes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RunAIReActScheduleNow(ctx context.Context, in *RunAIReActScheduleNowRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_RunAIReActScheduleNow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) CreateAIMemoryEntity(ctx context.Context, in *CreateAIMemoryEntityRequest, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -9578,6 +9675,15 @@ type YakServer interface {
 	DeleteAISession(context.Context, *DeleteAISessionRequest) (*DbOperateMessage, error)
 	GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(context.Context, *ExportAILogsRequest) (*ExportAILogsResponse, error)
+	// AI ReAct recurring schedules
+	CreateAIReActSchedule(context.Context, *CreateAIReActScheduleRequest) (*AIReActSchedule, error)
+	UpdateAIReActSchedule(context.Context, *UpdateAIReActScheduleRequest) (*AIReActSchedule, error)
+	DeleteAIReActSchedule(context.Context, *DeleteAIReActScheduleRequest) (*DbOperateMessage, error)
+	GetAIReActSchedule(context.Context, *GetAIReActScheduleRequest) (*AIReActSchedule, error)
+	QueryAIReActSchedules(context.Context, *QueryAIReActSchedulesRequest) (*QueryAIReActSchedulesResponse, error)
+	SetAIReActScheduleEnabled(context.Context, *SetAIReActScheduleEnabledRequest) (*AIReActSchedule, error)
+	PreviewAIReActScheduleTimes(context.Context, *PreviewAIReActScheduleTimesRequest) (*PreviewAIReActScheduleTimesResponse, error)
+	RunAIReActScheduleNow(context.Context, *RunAIReActScheduleNowRequest) (*Empty, error)
 	// AI Memory CRUD
 	CreateAIMemoryEntity(context.Context, *CreateAIMemoryEntityRequest) (*Empty, error)
 	UpdateAIMemoryEntity(context.Context, *AIMemoryEntity) (*DbOperateMessage, error)
@@ -11326,6 +11432,30 @@ func (UnimplementedYakServer) GetRandomAIMaterials(context.Context, *GetRandomAI
 }
 func (UnimplementedYakServer) ExportAILogs(context.Context, *ExportAILogsRequest) (*ExportAILogsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExportAILogs not implemented")
+}
+func (UnimplementedYakServer) CreateAIReActSchedule(context.Context, *CreateAIReActScheduleRequest) (*AIReActSchedule, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateAIReActSchedule not implemented")
+}
+func (UnimplementedYakServer) UpdateAIReActSchedule(context.Context, *UpdateAIReActScheduleRequest) (*AIReActSchedule, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAIReActSchedule not implemented")
+}
+func (UnimplementedYakServer) DeleteAIReActSchedule(context.Context, *DeleteAIReActScheduleRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAIReActSchedule not implemented")
+}
+func (UnimplementedYakServer) GetAIReActSchedule(context.Context, *GetAIReActScheduleRequest) (*AIReActSchedule, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIReActSchedule not implemented")
+}
+func (UnimplementedYakServer) QueryAIReActSchedules(context.Context, *QueryAIReActSchedulesRequest) (*QueryAIReActSchedulesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAIReActSchedules not implemented")
+}
+func (UnimplementedYakServer) SetAIReActScheduleEnabled(context.Context, *SetAIReActScheduleEnabledRequest) (*AIReActSchedule, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAIReActScheduleEnabled not implemented")
+}
+func (UnimplementedYakServer) PreviewAIReActScheduleTimes(context.Context, *PreviewAIReActScheduleTimesRequest) (*PreviewAIReActScheduleTimesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PreviewAIReActScheduleTimes not implemented")
+}
+func (UnimplementedYakServer) RunAIReActScheduleNow(context.Context, *RunAIReActScheduleNowRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RunAIReActScheduleNow not implemented")
 }
 func (UnimplementedYakServer) CreateAIMemoryEntity(context.Context, *CreateAIMemoryEntityRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAIMemoryEntity not implemented")
@@ -20532,6 +20662,150 @@ func _Yak_ExportAILogs_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateAIReActSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAIReActScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateAIReActSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateAIReActSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateAIReActSchedule(ctx, req.(*CreateAIReActScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateAIReActSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAIReActScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAIReActSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAIReActSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAIReActSchedule(ctx, req.(*UpdateAIReActScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAIReActSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAIReActScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAIReActSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAIReActSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAIReActSchedule(ctx, req.(*DeleteAIReActScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAIReActSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIReActScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIReActSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIReActSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIReActSchedule(ctx, req.(*GetAIReActScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryAIReActSchedules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAIReActSchedulesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAIReActSchedules(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAIReActSchedules_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAIReActSchedules(ctx, req.(*QueryAIReActSchedulesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetAIReActScheduleEnabled_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAIReActScheduleEnabledRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetAIReActScheduleEnabled(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SetAIReActScheduleEnabled_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetAIReActScheduleEnabled(ctx, req.(*SetAIReActScheduleEnabledRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_PreviewAIReActScheduleTimes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewAIReActScheduleTimesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).PreviewAIReActScheduleTimes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_PreviewAIReActScheduleTimes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).PreviewAIReActScheduleTimes(ctx, req.(*PreviewAIReActScheduleTimesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RunAIReActScheduleNow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunAIReActScheduleNowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RunAIReActScheduleNow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_RunAIReActScheduleNow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RunAIReActScheduleNow(ctx, req.(*RunAIReActScheduleNowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_CreateAIMemoryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateAIMemoryEntityRequest)
 	if err := dec(in); err != nil {
@@ -24104,6 +24378,38 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExportAILogs",
 			Handler:    _Yak_ExportAILogs_Handler,
+		},
+		{
+			MethodName: "CreateAIReActSchedule",
+			Handler:    _Yak_CreateAIReActSchedule_Handler,
+		},
+		{
+			MethodName: "UpdateAIReActSchedule",
+			Handler:    _Yak_UpdateAIReActSchedule_Handler,
+		},
+		{
+			MethodName: "DeleteAIReActSchedule",
+			Handler:    _Yak_DeleteAIReActSchedule_Handler,
+		},
+		{
+			MethodName: "GetAIReActSchedule",
+			Handler:    _Yak_GetAIReActSchedule_Handler,
+		},
+		{
+			MethodName: "QueryAIReActSchedules",
+			Handler:    _Yak_QueryAIReActSchedules_Handler,
+		},
+		{
+			MethodName: "SetAIReActScheduleEnabled",
+			Handler:    _Yak_SetAIReActScheduleEnabled_Handler,
+		},
+		{
+			MethodName: "PreviewAIReActScheduleTimes",
+			Handler:    _Yak_PreviewAIReActScheduleTimes_Handler,
+		},
+		{
+			MethodName: "RunAIReActScheduleNow",
+			Handler:    _Yak_RunAIReActScheduleNow_Handler,
 		},
 		{
 			MethodName: "CreateAIMemoryEntity",

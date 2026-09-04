@@ -51,6 +51,27 @@ func TestRDPWindowsLiveBrute(t *testing.T) {
 	}
 }
 
+// TestRDPXPLiveProbe 只打一对账密，用来对照 XP 真机 PDU（0x26 / 位图 / 失败对话框）。
+func TestRDPXPLiveProbe(t *testing.T) {
+	addr := os.Getenv("YAK_BRUTE_RDP_ADDR")
+	if addr == "" {
+		t.Skip("set YAK_BRUTE_RDP_ADDR")
+	}
+	user := os.Getenv("YAK_BRUTE_RDP_USER")
+	if user == "" {
+		user = "rdpuser"
+	}
+	pass := os.Getenv("YAK_BRUTE_RDP_PASS")
+	if pass == "" {
+		t.Fatal("set YAK_BRUTE_RDP_PASS")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	start := time.Now()
+	res := rdpAuth.BrutePass(&BruteItem{Type: "rdp", Target: addr, Username: user, Password: pass, Context: ctx})
+	t.Logf("user=%q pass=%q ok=%v finished=%v elapsed=%s", user, pass, res.Ok, res.Finished, time.Since(start).Round(50*time.Millisecond))
+}
+
 func TestRDPWindowsLiveDictHunt(t *testing.T) {
 	addr := os.Getenv("YAK_BRUTE_RDP_ADDR")
 	if addr == "" {

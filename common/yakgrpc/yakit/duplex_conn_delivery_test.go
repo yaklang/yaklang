@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -9,6 +10,31 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestBroadcastAISessionChanged(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	responses := make(chan *ypb.DuplexConnectionResponse, 1)
+	registerServerPushCallback(t.Name(), ctx, 2, func(response *ypb.DuplexConnectionResponse) error {
+		responses <- response
+		return nil
+	})
+	t.Cleanup(func() { UnRegisterServerPushCallback(t.Name()) })
+
+	BroadcastAISessionChanged(AISessionPushActionStarted, "ai-schedule-running-session")
+	select {
+	case response := <-responses:
+		require.Equal(t, ServerPushType_AISession, response.GetMessageType())
+		var push AISessionPush
+		require.NoError(t, json.Unmarshal(response.GetData(), &push))
+		require.Equal(t, AISessionPushActionStarted, push.Action)
+		require.Equal(t, "ai-schedule-running-session", push.SessionID)
+		require.True(t, push.IsRunning)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for AI session server push")
+	}
+}
 
 func TestServerPushSlowClientDoesNotBlockOtherClients(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
