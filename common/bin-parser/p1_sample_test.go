@@ -2561,6 +2561,49 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, raw))
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("Ack Count")))
 	})
+
+	t.Run("sctp/data", func(t *testing.T) {
+		// Wireshark SampleCaptures/sctp.cap frame 1: DATA B+E, PPI 7 MEGACO/2. RFC 4960 §3.3.1.
+		raw := mustHex(t, "40000b8000016f0a6db018820003005b280243450000a0bd000000074d454741434f2f32203c6d672d74723e3a31363338340a5265706c79203d203137343039317b0a436f6e74657874203d203235357b0a4d6f64696679203d204d55582f3235350a7d0a7d0a67")
+		n := parseRule(t, raw, "sctp", "SCTP")
+		require.Equal(t, uint64(16384), uintVal(t, n.Child("Source Port")))
+		ch := n.Child("Chunks").Children()[0]
+		require.Equal(t, uint64(0), uintVal(t, ch.Child("Type")))
+		require.Equal(t, uint64(0x03), uintVal(t, ch.Child("Flags")))
+		require.Equal(t, uint64(0x28024345), uintVal(t, ch.Child("TSN")))
+		require.Equal(t, uint64(7), uintVal(t, ch.Child("PPI")))
+		require.True(t, strings.HasPrefix(strVal(t, ch.Child("User Data")), "MEGACO/2"))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 132, raw))
+		require.Equal(t, uint64(7), uintVal(t, mustChild(t, eth, "IP", "SCTP").Child("Chunks").Children()[0].Child("PPI")))
+		require.True(t, strings.HasPrefix(strVal(t, mustChild(t, eth, "IP", "SCTP").Child("Chunks").Children()[0].Child("User Data")), "MEGACO/2"))
+	})
+
+	t.Run("sctp/sack", func(t *testing.T) {
+		// Wireshark SampleCaptures/sctp.cap frame 2: SACK Cumulative TSN 0x28024345 a_rwnd 0x2000. RFC 4960 §3.3.4.
+		raw := mustHex(t, "0b804000214415232bf2024e03000010280243450000200000000000")
+		n := parseRule(t, raw, "sctp", "SCTP")
+		ch := n.Child("Chunks").Children()[0]
+		require.Equal(t, uint64(3), uintVal(t, ch.Child("Type")))
+		require.Equal(t, uint64(0x28024345), uintVal(t, ch.Child("Cumulative TSN")))
+		require.Equal(t, uint64(0x2000), uintVal(t, ch.Child("Rwnd")))
+		require.Equal(t, uint64(0), uintVal(t, ch.Child("Gap Ack Blocks")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 132, raw))
+		require.Equal(t, uint64(0x28024345), uintVal(t, mustChild(t, eth, "IP", "SCTP").Child("Chunks").Children()[0].Child("Cumulative TSN")))
+	})
+
+	t.Run("sctp/init", func(t *testing.T) {
+		// Wireshark SampleCaptures/sctp-test.cap frame 1: INIT Initiate Tag 0x43232544 OS/IS 17. RFC 4960 §3.3.2.
+		raw := mustHex(t, "00070007000000003761a74601000020432325440000ffff001100115cfe379fc0000004000c000600050000")
+		n := parseRule(t, raw, "sctp", "SCTP")
+		ch := n.Child("Chunks").Children()[0]
+		require.Equal(t, uint64(1), uintVal(t, ch.Child("Type")))
+		require.Equal(t, uint64(0x43232544), uintVal(t, ch.Child("Initiate Tag")))
+		require.Equal(t, uint64(17), uintVal(t, ch.Child("Outbound Streams")))
+		require.Equal(t, uint64(17), uintVal(t, ch.Child("Inbound Streams")))
+		require.Equal(t, uint64(0x5cfe379f), uintVal(t, ch.Child("Initial TSN")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 132, raw))
+		require.Equal(t, uint64(0x43232544), uintVal(t, mustChild(t, eth, "IP", "SCTP").Child("Chunks").Children()[0].Child("Initiate Tag")))
+	})
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
