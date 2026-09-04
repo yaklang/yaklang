@@ -89,7 +89,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | CREDSSP | A | 90 | 15 | 25 | 20 | 20 | 10 | L1 | alias of TLS |
 | VNC/RFB | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `vnc.yaml` |
 | WinRM | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
-| MariaDB | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `application-layer/mysql.yaml` |
+| MariaDB | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/mysql.yaml` |
 | MongoDB | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `mongodb.yaml` |
 | Memcached | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `memcached.yaml` |
 | Elasticsearch | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |

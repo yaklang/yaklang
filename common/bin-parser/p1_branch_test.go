@@ -587,4 +587,18 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x74000004), uintVal(t, lg.Child("TDS Version")))
 		require.Equal(t, uint64(4), uintVal(t, lg.Child("HostName Chars")))
 	})
+
+	t.Run("mysql/query", func(t *testing.T) {
+		n := parseRule(t, mysqlPacket(0, append([]byte{0x03}, []byte("SELECT 1")...)), "application-layer.mysql", "MySQLPacket")
+		require.Equal(t, "SELECT 1", strVal(t, mustChild(t, n, "Payload").Child("Query")))
+	})
+	t.Run("mysql/err", func(t *testing.T) {
+		errp := mustChild(t, parseRule(t, mysqlPacket(1, []byte{0xff, 0x15, 0x04, '#', '2', '8', '0', '0', '0', 'A', 'c', 'c', 'e', 's', 's', ' ', 'd', 'e', 'n', 'i', 'e', 'd'}), "application-layer.mysql", "MySQLPacket"), "Payload", "MySQLERR")
+		require.Equal(t, uint64(1045), uintVal(t, errp.Child("Error Code")))
+		require.Equal(t, "28000", strVal(t, errp.Child("SQL State")))
+	})
+	t.Run("mysql/ok", func(t *testing.T) {
+		okp := mustChild(t, parseRule(t, mysqlPacket(1, []byte{0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00}), "application-layer.mysql", "MySQLPacket"), "Payload", "MySQLOK")
+		require.Equal(t, uint64(2), uintVal(t, okp.Child("Status Flags")))
+	})
 }
