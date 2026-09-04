@@ -56,6 +56,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("HT Control")))
 		require.Equal(t, "htc1", joinUint8(t, n.Child("Next Protocol Data")))
 	})
+	t.Run("ieee_802_11/mgmt-htc", func(t *testing.T) {
+		raw := append([]byte{0xd0, 0x80, 0x00, 0x00}, make([]byte, 20)...)
+		raw = append(raw, 0x78, 0x56, 0x34, 0x12)
+		raw = append(raw, []byte("act1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("HT Control")))
+		require.Nil(t, n.Child("QoS Control"))
+		require.Equal(t, "act1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
 	t.Run("ieee_802_11/block-ack", func(t *testing.T) {
 		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
 		ta := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
