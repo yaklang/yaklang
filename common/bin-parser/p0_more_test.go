@@ -105,7 +105,7 @@ func TestHTTP2PrefaceFrameAndEdges(t *testing.T) {
 	copy(data[9:], []byte("hello"))
 	d := parseRule(t, data, "application-layer.http2", "HTTP2")
 	require.Equal(t, uint64(5), uintVal(t, d.Child("Length")))
-	require.Equal(t, []byte("hello"), bytesVal(t, d.Child("Payload")))
+	require.Equal(t, []byte("hello"), bytesVal(t, d.Child("Octets")))
 
 	headers := make([]byte, 9)
 	headers[3] = 1

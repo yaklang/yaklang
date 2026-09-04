@@ -1659,4 +1659,41 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 80, 50000, raw))
 		require.Equal(t, "hello", strVal(t, mustChild(t, eth, "IP", "TCP", "HTTP", "HTTP Response", "Body").Child("Octets")))
 	})
+
+	t.Run("http2/data", func(t *testing.T) {
+		// RFC 9113 §6.1 DATA END_STREAM; Wireshark http2.data.data.
+		raw := make([]byte, 9+5)
+		raw[2] = 5
+		raw[4] = 0x01
+		copy(raw[9:], []byte("hello"))
+		n := parseRule(t, raw, "application-layer.http2", "HTTP2")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Type")))
+		require.Equal(t, "hello", strVal(t, n.Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 80, raw))
+		require.Equal(t, "hello", strVal(t, mustChild(t, eth, "IP", "TCP", "HTTP2").Child("Octets")))
+	})
+
+	t.Run("http2/rst", func(t *testing.T) {
+		// RFC 9113 §6.4 RST_STREAM PROTOCOL_ERROR=1 on stream 1.
+		// Wireshark http2.rst_stream.error.
+		raw := []byte{0x00, 0x00, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01}
+		n := parseRule(t, raw, "application-layer.http2", "HTTP2")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Stream Identifier")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Error Code")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, raw))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "HTTP2").Child("Error Code")))
+	})
+
+	t.Run("http2/goaway", func(t *testing.T) {
+		// RFC 9113 §6.8 GOAWAY Additional Debug Data; Wireshark http2.goaway.debug_data.
+		raw := append([]byte{0x00, 0x00, 0x0b, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, []byte("bye")...)
+		n := parseRule(t, raw, "application-layer.http2", "HTTP2")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Error Code")))
+		require.Equal(t, "bye", strVal(t, n.Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, raw))
+		require.Equal(t, "bye", strVal(t, mustChild(t, eth, "IP", "TCP", "HTTP2").Child("Octets")))
+	})
 }
