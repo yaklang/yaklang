@@ -98,8 +98,30 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	var res any
 	if forgeName != "" {
-		log.Infof("forgeName is %v, start call yak.ExecuteForge", forgeName)
-		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, configOption...)...)
+		runtimeResult, handledByRuntime, runtimeErr := s.executeRuntimeForge(
+			forgeName,
+			baseCtx,
+			startParams.GetForgeParams(),
+			startParams.GetUserQuery(),
+			configOption...,
+		)
+		if handledByRuntime {
+			err = runtimeErr
+			if err == nil && runtimeResult != nil {
+				res = runtimeResult.Formated
+			}
+		}
+
+		if handledByRuntime {
+			log.Infof("forgeName is %v, executed by server runtime provider", forgeName)
+		} else {
+			log.Infof("forgeName is %v, start call yak.ExecuteForge", forgeName)
+			res, err = yak.ExecuteForge(
+				forgeName,
+				params,
+				buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, configOption...)...,
+			)
+		}
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err

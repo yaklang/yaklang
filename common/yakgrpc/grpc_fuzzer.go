@@ -990,6 +990,20 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 10
 	}
+	var transformCaller browserTransformCaller
+	if s.browserBridge != nil {
+		transformCaller = s.browserBridge
+	}
+	browserTransform, err := prepareBrowserTransform(
+		stream.Context(),
+		transformCaller,
+		req.GetBrowserExtensionDeviceId(),
+		req.GetBrowserTransformProfileId(),
+		time.Duration(timeoutSeconds*float64(time.Second)),
+	)
+	if err != nil {
+		return err
+	}
 
 	dialTimeoutSeconds := req.GetDialTimeoutSeconds()
 	if dialTimeoutSeconds <= 0 {
@@ -1179,7 +1193,17 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 
 		if strings.TrimSpace(hotPatchChain.GlobalCode) != "" || strings.TrimSpace(hotPatchChain.ModuleCode) != "" {
 			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
+			if browserTransform != nil {
+				beforeRequest = composeBrowserTransformBefore(beforeRequest, browserTransform.beforeHook(stream.Context()))
+				afterRequest = composeBrowserTransformAfter(browserTransform.afterHook(stream.Context()), afterRequest)
+			}
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest))
+		} else if browserTransform != nil {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(
+				browserTransform.beforeHook(stream.Context()),
+				browserTransform.afterHook(stream.Context()),
+				nil, nil, nil, nil,
+			))
 		}
 
 		if req.GetOverwriteSNI() {
@@ -1290,6 +1314,12 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 
 			// SSE incremental updates (chunk-style). The final aggregated response will be handled by normal path.
 			if result != nil && result.ExtraInfo != nil && result.ExtraInfo["__yak_sse_update"] == "1" {
+				// A streamed wire body cannot be labelled as plaintext before the
+				// document-bound response pipeline has seen the complete packet.
+				// The final aggregated result is still processed and delivered below.
+				if browserTransform != nil {
+					continue
+				}
 				streamID := result.ExtraInfo["__yak_sse_stream_id"]
 				if streamID == "" {
 					// Fallback: keep it stable across updates (e.g. older engines not providing stream-id).
@@ -1391,6 +1421,12 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				continue
 			}
 
+			plainRequestRaw, wireRequestRaw, wireResponseRaw := transformedResponsePackets(
+				browserTransform,
+				result.RequestRaw,
+				result.ResponseRaw,
+			)
+
 			// 2M
 			if len(result.RequestRaw) > 2*1024*1024 {
 				result.RequestRaw = result.RequestRaw[:2*1024*1024]
@@ -1427,11 +1463,17 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				log.Errorf("http pool error: %s", result.Error)
 				hiddenIndex := ensureLowhttpHiddenIndex(result.LowhttpResponse)
 				rsp := &ypb.FuzzerResponse{}
-				rsp.RequestRaw = result.RequestRaw
+				rsp.RequestRaw = plainRequestRaw
+				rsp.WireRequestRaw = wireRequestRaw
+				rsp.WireResponseRaw = wireResponseRaw
+				rsp.BrowserTransformProfileId = req.GetBrowserTransformProfileId()
 				rsp.UUID = uuid.New().String()
 				rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(result.Url))
 				rsp.Ok = false
 				rsp.Reason = result.Error.Error()
+				if transformReason := browserTransformRequestFailureReason(wireRequestRaw); transformReason != "" {
+					rsp.Reason = transformReason
+				}
 				rsp.TaskId = int64(taskID)
 				rsp.Payloads = payloads
 				rsp.RuntimeID = runtimeID
@@ -1557,7 +1599,10 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				Method:                     utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
 				ResponseRaw:                result.ResponseRaw,
 				GuessResponseEncoding:      Chardet(result.ResponseRaw),
-				RequestRaw:                 result.RequestRaw,
+				RequestRaw:                 plainRequestRaw,
+				WireRequestRaw:             wireRequestRaw,
+				WireResponseRaw:            wireResponseRaw,
+				BrowserTransformProfileId:  req.GetBrowserTransformProfileId(),
 				Payloads:                   payloads,
 				IsHTTPS:                    strings.HasPrefix(strings.ToLower(result.Url), "https://"),
 				ExtractedResults:           extractorResults,
@@ -1607,6 +1652,10 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			if len(rsp.ResponseRaw) == 0 { // 只有在http pool请求、解析未出错，但响应为空时才会进入此分支
 				rsp.Ok = false
 				rsp.Reason = "empty response"
+			}
+			if transformReason := browserTransformResponseFailureReason(browserTransform, rsp.ResponseRaw); transformReason != "" {
+				rsp.Ok = false
+				rsp.Reason = transformReason
 			}
 			ApplyFuzzerMatcherResultToResponse(rsp, matchResult)
 			if rsp.ResponseRaw != nil {
@@ -1803,6 +1852,12 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				if len(redirectPacket) > 0 {
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
+			}
+			if browserTransform != nil {
+				rsp.RequestRaw = plainRequestRaw
+				rsp.WireRequestRaw = wireRequestRaw
+				rsp.WireResponseRaw = wireResponseRaw
+				rsp.BrowserTransformProfileId = req.GetBrowserTransformProfileId()
 			}
 			rsp.TaskId = int64(taskID)
 			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)

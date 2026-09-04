@@ -446,6 +446,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		Seq:               cfg.Seq,
 		TypeName:          schema.AIAgentRuntimeType_ReAct,
 		PersistentSession: cfg.PersistentSessionId,
+		ForgeName:         cfg.GetForgeName(),
 	}); err != nil {
 		return nil, err
 	}
