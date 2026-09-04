@@ -9,6 +9,7 @@ Package:
         return
       }
       this.ProcessSubNode("Data")
+      return
     IAC:
       operator: |
         this.ProcessSubNode("IACByte")
@@ -22,9 +23,73 @@ Package:
         }
         if cmd == 251 || cmd == 252 || cmd == 253 || cmd == 254 {
           this.ProcessSubNode("Option")
+          return
         }
+        if cmd == 250 {
+          this.ProcessSubNode("SB Option")
+          opt = getNodeResult("SB Option").Value
+          if opt == 24 {
+            this.ProcessSubNode("SB Command")
+            this.ProcessSubNode("Terminal Type")
+            this.ProcessSubNode("SB IAC")
+            if getNodeResult("SB IAC").Value != 0xff {
+              panic("telnet: expected IAC before SE")
+            }
+            this.ProcessSubNode("SE")
+            if getNodeResult("SE").Value != 240 {
+              panic("telnet: expected SE")
+            }
+            return
+          }
+          if opt == 31 {
+            this.ProcessSubNode("Width")
+            this.ProcessSubNode("Height")
+            this.ProcessSubNode("SB IAC")
+            if getNodeResult("SB IAC").Value != 0xff {
+              panic("telnet: expected IAC before SE")
+            }
+            this.ProcessSubNode("SE")
+            if getNodeResult("SE").Value != 240 {
+              panic("telnet: expected SE")
+            }
+            return
+          }
+          panic("telnet: unknown SB option")
+        }
+        return
       IACByte: uint8
       Command: uint8
       Option: uint8
+      SB Option: uint8
+      SB Command: uint8
+      Terminal Type:
+        list: true
+        Char: uint8
+        operator: |
+          for {
+            res, op = this.TryProcessByType("PeekByte")
+            if !op.OK {
+              op.Recovery()
+              break
+            }
+            if res.Value == 0xff {
+              op.Recovery()
+              break
+            }
+            op.Recovery()
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 1 {
+              break
+            }
+            prev = this.Length()
+            ele.Process()
+            if this.Length() <= prev {
+              break
+            }
+          }
+      Width: uint16
+      Height: uint16
+      SB IAC: uint8
+      SE: uint8
     Data: "del:\r\n;type:string"
 PeekByte: uint8
