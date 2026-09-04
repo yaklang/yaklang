@@ -106,6 +106,12 @@ Package:
           }
         }
       }
+      if typ < 1 {
+        order = (fc >> 15) & 1
+        if order == 1 {
+          this.ProcessSubNode("HT Control")
+        }
+      }
       res, op = this.TryProcessByType("PeekByte")
       op.Recovery()
       if op.OK {

@@ -3092,6 +3092,50 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "htc1", joinUint8(t, n.Child("Next Protocol Data")))
 	})
 
+	t.Run("ieee_802_11/mgmt-htc", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.2.4.1.10: Management Action (type 0 subtype 13) Order=1
+		// includes HT Control after Sequence Control. Wireshark wlan.fc.order / wlan.htc.
+		addr1 := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		addr2 := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		addr3 := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+		raw := make([]byte, 0, 32)
+		raw = append(raw, 0xd0, 0x80, 0x00, 0x00)
+		raw = append(raw, addr1...)
+		raw = append(raw, addr2...)
+		raw = append(raw, addr3...)
+		raw = append(raw, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12)
+		raw = append(raw, []byte("act1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x80d0), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, uint64(0), (uintVal(t, n.Child("Frame Control"))>>2)&3)
+		require.Equal(t, uint64(13), (uintVal(t, n.Child("Frame Control"))>>4)&0xf)
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Frame Control"))>>15)
+		require.Equal(t, addr1, bytesVal(t, n.Child("Addr1")))
+		require.Nil(t, n.Child("QoS Control"))
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("HT Control")))
+		require.Equal(t, "act1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+
+	t.Run("ieee_802_11/action", func(t *testing.T) {
+		// IEEE 802.11-2016 Table 9-1 Management Action Order=0: no HT Control.
+		// Wireshark wlan.fc.type_subtype. Body leftover is Next Protocol Data.
+		addr1 := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		addr2 := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		addr3 := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+		raw := make([]byte, 0, 28)
+		raw = append(raw, 0xd0, 0x00, 0x00, 0x00)
+		raw = append(raw, addr1...)
+		raw = append(raw, addr2...)
+		raw = append(raw, addr3...)
+		raw = append(raw, 0x00, 0x00)
+		raw = append(raw, []byte("act0")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x00d0), uintVal(t, n.Child("Frame Control")))
+		require.Nil(t, n.Child("HT Control"))
+		require.Nil(t, n.Child("QoS Control"))
+		require.Equal(t, "act0", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+
 	t.Run("ieee_802_11/block-ack", func(t *testing.T) {
 		// IEEE 802.11-2016 §9.3.1.8 Compressed BlockAck (type 1 subtype 9).
 		// BA Control TID 6 + Compressed Bitmap, Starting Seq 16, 8-octet bitmap.

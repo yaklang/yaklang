@@ -238,6 +238,7 @@ var p1FailCases = []p1FailCase{
 		{"ieee_802_11", []string{"Dot11"}, append(append([]byte{0x84, 0x00, 0x00, 0x00}, make([]byte, 6)...), make([]byte, 6)...), "trunc-bar"},
 		{"ieee_802_11", []string{"Dot11"}, append(append(append([]byte{0x94, 0x00, 0x00, 0x00}, make([]byte, 6)...), make([]byte, 6)...), 0x06, 0x10, 0x00, 0x00), "trunc-mtid"},
 		{"ieee_802_11", []string{"Dot11"}, append(append(append(append([]byte{0x94, 0x00, 0x00, 0x00}, make([]byte, 6)...), make([]byte, 6)...), 0x00, 0x60, 0x00, 0x01), make([]byte, 8)...), "trunc-basic"},
+		{"ieee_802_11", []string{"Dot11"}, append([]byte{0xd0, 0x80}, make([]byte, 22)...), "trunc-mgmt-htc"},
 		{"ieee_802_11", []string{"RSN"}, []byte{0x01}, "bad-eid"},
 		{"ieee_802_11", []string{"RSN"}, nil, "rsn-empty"},
 		{"ieee_802_11", []string{"RSN"}, []byte{48}, "rsn-trunc"},
