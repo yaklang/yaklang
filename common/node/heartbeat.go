@@ -12,6 +12,9 @@ func (n *NodeBase) heartbeat() error {
 		return fmt.Errorf("node session not established")
 	}
 	status := n.runtimeStatus()
+	if !session.RuntimeHostCapacityAccepted {
+		status.RuntimeHostCapacity = nil
+	}
 
 	ctx, cancel := context.WithTimeout(n.rootCtx, n.requestTimeout)
 	defer cancel()
@@ -26,6 +29,7 @@ func (n *NodeBase) heartbeat() error {
 		ObservedAt:               time.Now().UTC(),
 		HeartbeatIntervalSeconds: durationToWholeSeconds(n.heartbeatInterval),
 		ActiveAttempts:           cloneActiveAttemptHeartbeats(status.ActiveAttempts),
+		RuntimeHostCapacity:      cloneRuntimeHostCapacity(status.RuntimeHostCapacity),
 		HostInfo:                 n.hostInfoSnapshot(),
 	})
 }
@@ -49,5 +53,6 @@ func (n *NodeBase) runtimeStatus() RuntimeStatus {
 		status.MaxRunningJobs = snapshot.MaxRunningJobs
 	}
 	status.ActiveAttempts = cloneActiveAttemptHeartbeats(snapshot.ActiveAttempts)
+	status.RuntimeHostCapacity = cloneRuntimeHostCapacity(snapshot.RuntimeHostCapacity)
 	return status
 }

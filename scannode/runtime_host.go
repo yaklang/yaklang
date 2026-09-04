@@ -27,7 +27,7 @@ import (
 
 const (
 	AIRuntimeHostCapabilityKey = "ai.runtime.host.v1"
-	runtimeHostSpecVersion     = "v1"
+	runtimeHostSpecVersion     = "v2"
 	runtimeHostReplyPrefix     = "legion.realtime.ai.runtime."
 	runtimeHostCleanupLabel    = "legion.ai.runtime.cleanup_key"
 	runtimeHostLeaseLabel      = "legion.ai.runtime.lease_token"
@@ -41,20 +41,28 @@ var runtimeHostSHA256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var runtimeHostReleaseIDPattern = regexp.MustCompile(`^sha256-[a-f0-9]{64}$`)
 var errRuntimeHostReleaseMismatch = errors.New("runtime release does not match the installed node release")
 
+const (
+	maxRuntimeHostCPUMillicores = uint64((1<<63 - 1) / 1_000_000)
+	maxRuntimeHostMemoryBytes   = uint64(1<<63 - 1)
+)
+
 type RuntimeHostConfig struct {
-	Enabled                   bool
-	BaseDir                   string
-	PlatformAPIBaseURL        string
-	RuntimePlatformAPIBaseURL string
-	EnrollmentToken           string
-	AgentInstallationID       string
-	EngineReleaseID           string
-	EngineDigest              string
-	Network                   string
-	HTTPClient                *http.Client
-	NodeIDProvider            func() string
-	SessionProvider           func() (node.SessionState, bool)
-	docker                    runtimeHostDocker
+	Enabled                     bool
+	BaseDir                     string
+	PlatformAPIBaseURL          string
+	RuntimePlatformAPIBaseURL   string
+	EnrollmentToken             string
+	AgentInstallationID         string
+	EngineReleaseID             string
+	EngineDigest                string
+	Network                     string
+	HTTPClient                  *http.Client
+	NodeIDProvider              func() string
+	SessionProvider             func() (node.SessionState, bool)
+	SystemReservedCPUMillicores uint64
+	SystemReservedMemoryBytes   uint64
+	docker                      runtimeHostDocker
+	resourceSource              runtimeHostResourceSource
 }
 
 type runtimeHostExecutor struct {
@@ -70,6 +78,7 @@ type runtimeHostExecutor struct {
 	httpClient                *http.Client
 	nodeIDProvider            func() string
 	sessionProvider           func() (node.SessionState, bool)
+	resources                 *runtimeHostResourceCollector
 	operations                map[string]runtimeHostOperationRecord
 	images                    map[string]runtimeHostImageRecord
 	mu                        sync.Mutex
@@ -143,6 +152,14 @@ func newRuntimeHostExecutor(cfg RuntimeHostConfig) (*runtimeHostExecutor, error)
 		!runtimeHostSHA256Pattern.MatchString(executor.engineDigest) {
 		return nil, fmt.Errorf("runtime host installed release identity is required")
 	}
+	executor.resources, err = newRuntimeHostResourceCollector(
+		cfg.resourceSource,
+		cfg.SystemReservedCPUMillicores,
+		cfg.SystemReservedMemoryBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
 	if err := executor.loadOperationJournal(); err != nil {
 		return nil, err
 	}
@@ -152,6 +169,14 @@ func newRuntimeHostExecutor(cfg RuntimeHostConfig) (*runtimeHostExecutor, error)
 		return nil, err
 	}
 	return executor, nil
+}
+
+func (e *runtimeHostExecutor) ResourceCapacity() (node.RuntimeHostCapacity, bool) {
+	if e == nil || e.resources == nil {
+		return node.RuntimeHostCapacity{}, false
+	}
+	capacity, err := e.resources.Snapshot()
+	return capacity, err == nil
 }
 
 func (e *runtimeHostExecutor) Close() error {
@@ -175,6 +200,14 @@ func (e *runtimeHostExecutor) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 		status = "unavailable"
 		reason = classifyRuntimeHostDockerError(err)
 		message = "Local Docker is unavailable"
+	} else if e.resources == nil {
+		status = "unavailable"
+		reason = "runtime_host_capacity_unavailable"
+		message = "Runtime Host capacity is unavailable"
+	} else if _, err := e.resources.snapshot(false); err != nil {
+		status = "unavailable"
+		reason = "runtime_host_capacity_unavailable"
+		message = "Runtime Host capacity is unavailable"
 	}
 	detail, _ := json.Marshal(runtimeHostStatusDetail{ReasonCode: reason, ObservedAt: now})
 	return CapabilityRuntimeStatus{
@@ -329,6 +362,19 @@ func (e *runtimeHostExecutor) validateContainerSpec(spec *nodev1.AIRuntimeContai
 	}
 	if strings.TrimSpace(spec.Network) != e.network {
 		return fmt.Errorf("runtime container network is not allowed")
+	}
+	if spec.Resources == nil ||
+		spec.Resources.CpuMillicores == 0 ||
+		spec.Resources.CpuMillicores > maxRuntimeHostCPUMillicores ||
+		spec.Resources.MemoryBytes == 0 ||
+		spec.Resources.MemoryBytes > maxRuntimeHostMemoryBytes {
+		return fmt.Errorf("runtime container resource envelope is invalid")
+	}
+	if e.resources == nil {
+		return fmt.Errorf("runtime host resource collector is unavailable")
+	}
+	if err := e.resources.ValidateEnvelope(spec.Resources.CpuMillicores, spec.Resources.MemoryBytes); err != nil {
+		return err
 	}
 	allowedEnvironment := map[string]struct{}{
 		"LEGION_NATS_URL": {}, "LEGION_API_URL": {}, "LEGION_ENROLLMENT_TOKEN": {},
@@ -567,6 +613,9 @@ func (e *runtimeHostExecutor) start(ctx context.Context, command *nodev1.AIRunti
 	created, err := e.docker.CreateAndStart(ctx, runtimeHostContainerInput{
 		Name: command.Container.ContainerName, Image: imageID, Network: e.network,
 		Args: append([]string(nil), command.Container.Arguments...), Env: environment,
+		CPUMillicores:   command.Container.Resources.CpuMillicores,
+		MemoryBytes:     command.Container.Resources.MemoryBytes,
+		MemorySwapBytes: command.Container.Resources.MemoryBytes,
 		Labels: map[string]string{
 			runtimeHostCleanupLabel: command.CleanupKey,
 			runtimeHostLeaseLabel:   command.LeaseToken,
@@ -642,6 +691,13 @@ func validateOwnedRuntimeContainer(container runtimeHostContainer, command *node
 		container.Labels[runtimeHostReleaseLabel] != command.Release.ReleaseId ||
 		container.Labels[runtimeHostOwnerLabel] != strings.TrimSpace(owner) {
 		return fmt.Errorf("runtime container ownership does not match the requested generation")
+	}
+	if command.Operation == nodev1.AIRuntimeOperation_AI_RUNTIME_OPERATION_START &&
+		(command.Container == nil || command.Container.Resources == nil ||
+			container.CPUMillicores != command.Container.Resources.CpuMillicores ||
+			container.MemoryBytes != command.Container.Resources.MemoryBytes ||
+			container.MemorySwapBytes != command.Container.Resources.MemoryBytes) {
+		return fmt.Errorf("runtime container resources do not match the requested generation")
 	}
 	return nil
 }

@@ -86,7 +86,15 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 		lifecycleState: DefaultLifecycleState,
 		requestTimeout: time.Second,
 		transport:      transport,
-		statusProvider: stubRuntimeStatusProvider{snapshot: RuntimeStatus{RunningJobs: 2, ActiveAttempts: activeAttempts}},
+		statusProvider: stubRuntimeStatusProvider{snapshot: RuntimeStatus{
+			RunningJobs:    2,
+			ActiveAttempts: activeAttempts,
+			RuntimeHostCapacity: &RuntimeHostCapacity{
+				Scope: "host", CPUCapacityMillicores: 8000, CPUAllocatableMillicores: 7500,
+				MemoryCapacityBytes: 16 << 30, MemoryAllocatableBytes: 15 << 30,
+				MemoryAvailableBytes: 12 << 30, SampleSequence: 9,
+			},
+		}},
 		hostInfoProvider: stubHostInfoProvider{info: HostInfo{
 			Hostname:        "host-a",
 			PrimaryIP:       "10.0.0.5",
@@ -96,8 +104,9 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 		}},
 		heartbeatInterval: 1500 * time.Millisecond,
 		session: SessionState{
-			SessionID:    "session-1",
-			SessionToken: "token-1",
+			SessionID:                   "session-1",
+			SessionToken:                "token-1",
+			RuntimeHostCapacityAccepted: true,
 		},
 	}
 
@@ -153,10 +162,16 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 			transport.heartbeatRequest.ActiveAttempts[0].AttemptID,
 		)
 	}
+	if capacity := transport.heartbeatRequest.RuntimeHostCapacity; capacity == nil ||
+		capacity.CPUAllocatableMillicores != 7500 || capacity.MemoryAllocatableBytes != 15<<30 ||
+		capacity.SampleSequence != 9 {
+		t.Fatalf("unexpected Runtime Host capacity: %+v", capacity)
+	}
 
 	node.labels["zone"] = "us"
 	node.capabilityKeys[0] = "mutated"
 	activeAttempts[0].AttemptID = "changed"
+	node.statusProvider.(stubRuntimeStatusProvider).snapshot.RuntimeHostCapacity.CPUAllocatableMillicores = 1
 	node.hostInfoProvider = stubHostInfoProvider{info: HostInfo{
 		Hostname:        "changed",
 		PrimaryIP:       "127.0.0.1",
@@ -180,6 +195,9 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 			transport.heartbeatRequest.ActiveAttempts[0].AttemptID,
 		)
 	}
+	if transport.heartbeatRequest.RuntimeHostCapacity.CPUAllocatableMillicores != 7500 {
+		t.Fatalf("heartbeat Runtime Host capacity was not cloned: %+v", transport.heartbeatRequest.RuntimeHostCapacity)
+	}
 	if transport.heartbeatRequest.Hostname != "host-a" || transport.heartbeatRequest.PrimaryIP != "10.0.0.5" {
 		t.Fatalf("heartbeat host info was not cloned: %+v", transport.heartbeatRequest.HostInfo)
 	}
@@ -196,5 +214,25 @@ func TestNodeBaseHeartbeatWithoutSessionReturnsError(t *testing.T) {
 
 	if err := node.heartbeat(); err == nil {
 		t.Fatal("expected heartbeat error")
+	}
+}
+
+func TestNodeBaseHeartbeatSuppressesCapacityUntilBootstrapNegotiatesIt(t *testing.T) {
+	transport := &stubSessionTransport{}
+	node := &NodeBase{
+		rootCtx: context.Background(), NodeId: "node-1", version: "dev",
+		lifecycleState: DefaultLifecycleState, requestTimeout: time.Second, transport: transport,
+		statusProvider: stubRuntimeStatusProvider{snapshot: RuntimeStatus{RuntimeHostCapacity: &RuntimeHostCapacity{
+			Scope: "host", CPUCapacityMillicores: 2000, CPUAllocatableMillicores: 1500,
+			MemoryCapacityBytes: 4 << 30, MemoryAllocatableBytes: 3 << 30, SampleSequence: 1,
+		}}},
+		hostInfoProvider: stubHostInfoProvider{}, heartbeatInterval: time.Second,
+		session: SessionState{SessionID: "session-1", SessionToken: "token-1"},
+	}
+	if err := node.heartbeat(); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	if transport.heartbeatRequest.RuntimeHostCapacity != nil {
+		t.Fatalf("capacity sent to an unnegotiated server: %+v", transport.heartbeatRequest.RuntimeHostCapacity)
 	}
 }
