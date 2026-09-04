@@ -141,3 +141,5 @@ func ExecuteWithStringHandlerWithCallbackEx(
 		return cb(string(bytes), results)
 	})
 }
+
+// ci-cache-probe: touched to force a realistic build-cache invalidation run.

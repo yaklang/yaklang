@@ -256,3 +256,5 @@ func (f *FuzzTagAST) readMethodNode(t []*token, index int, inParam bool, deep in
 		//panic(fmt.Sprintf("read tag failed... ERR For token: [%v]", n.Type))
 	}
 }
+
+// ci-cache-probe: touched to force a realistic build-cache invalidation run.
