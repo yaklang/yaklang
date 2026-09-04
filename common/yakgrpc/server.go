@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools/dicts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync"
 )
 
 type Server struct {
@@ -28,6 +29,7 @@ type Server struct {
 	cacheDir            string
 	_abandonedDatabase  *gorm.DB
 	reverseServer       *facades.FacadeServer
+	reverseServerMu     sync.Mutex
 	profileDatabase     *gorm.DB
 	projectDatabase     *gorm.DB
 	projectReadDatabase *gorm.DB
@@ -145,9 +147,7 @@ func NewServerWithLogCache(opts ...ServerOpts) (*Server, error) {
 }
 
 func newServerEx(opts ...ServerOpts) (*Server, error) {
-	serverConfig := &ServerConfig{
-		initFacadeServer: true,
-	}
+	serverConfig := &ServerConfig{}
 	for _, opt := range opts {
 		opt(serverConfig)
 	}
@@ -181,19 +181,9 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 	}
 
 	if serverConfig.initFacadeServer {
-		// if serverConfig.reverseServerPort == 0 {
-		// 	port, err = utils.GetRangeAvailableTCPPort(50000, 65535, 3)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// } else {
-		// 	if utils.IsTCPPortAvailable(serverConfig.reverseServerPort) && !utils.IsTCPPortOpen("127.0.0.1", serverConfig.reverseServerPort) {
-		// 		port = serverConfig.reverseServerPort
-		// 	} else {
-		// 		return nil, utils.Errorf("this port has used: %v", port)
-		// 	}
-		// }
-		s.reverseServer = facades.NewFacadeServer("0.0.0.0", 0)
+		if err := s.ensureReverseServer(); err != nil {
+			return nil, err
+		}
 	}
 
 	err := s.init()
@@ -242,16 +232,24 @@ func (s *Server) init() error {
 		return err
 	}
 
-	err = s.initFacadeServer()
-	if err != nil {
-		return err
-	}
 	return nil
+}
+
+// ensureReverseServer 按需启动反连服务：改动前由 NewServer 无条件创建并监听，
+// 现在只在真正需要反连地址或注册 facade 资源时创建一次。
+func (s *Server) ensureReverseServer() error {
+	s.reverseServerMu.Lock()
+	defer s.reverseServerMu.Unlock()
+	if s.reverseServer != nil {
+		return nil
+	}
+	return s.initFacadeServer()
 }
 
 func (s *Server) initFacadeServer() error {
 	if s.reverseServer == nil {
-		return nil
+		// 与重构前保持一致：监听随机可用端口，不固定反连端口。
+		s.reverseServer = facades.NewFacadeServer("0.0.0.0", 0)
 	}
 
 	s.reverseServer.OnHandle(func(n *facades.Notification) {
@@ -275,6 +273,7 @@ func (s *Server) initFacadeServer() error {
 		}
 		return res
 	}
+
 	go func() {
 		_run := func() {
 			defer func() {
@@ -294,6 +293,17 @@ func (s *Server) initFacadeServer() error {
 			time.Sleep(500 * time.Millisecond)
 		}
 	}()
+
+	// 调用方拿到地址时端口必须已经确定，因此这里等一小会儿。
+	if s.reverseServer.Port == 0 {
+		deadline := time.Now().Add(2 * time.Second)
+		for s.reverseServer.Port == 0 && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if s.reverseServer.Port == 0 {
+			return utils.Error("reverse server port was not assigned")
+		}
+	}
 	return nil
 }
 

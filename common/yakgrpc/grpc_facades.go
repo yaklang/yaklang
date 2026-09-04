@@ -40,6 +40,9 @@ var (
 )
 
 func (s *Server) GetGlobalReverseServer(ctx context.Context, req *ypb.Empty) (*ypb.GetGlobalReverseServerResponse, error) {
+	if err := s.ensureReverseServer(); err != nil {
+		return nil, err
+	}
 	// LocalReverseAddr is the UI-configured value (may be empty). Effective runtime IP is
 	// exposed via YAK_BRIDGE_LOCAL_REVERSE_ADDR / MCP enriched fields.
 	configured := configuredLocalReverseHost
@@ -97,6 +100,9 @@ func (s *Server) AvailableLocalAddr(ctx context.Context, empty *ypb.Empty) (*ypb
 }
 
 func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream ypb.Yak_ConfigGlobalReverseServer) error {
+	if err := s.ensureReverseServer(); err != nil {
+		return err
+	}
 	configuredLocalReverseHost = req.GetLocalAddr()
 	os.Setenv(consts.YAK_CONFIGURED_LOCAL_REVERSE_HOST, configuredLocalReverseHost)
 

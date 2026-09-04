@@ -212,7 +212,7 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 		)
 	}
 	// 添加环境变量 本地 YAK_BRIDGE_REMOTE_REVERSE_ADDR
-	if effectiveLocalReverseHost != "" {
+	if effectiveLocalReverseHost != "" && s.reverseServer != nil {
 		cmd.Env = append(
 			cmd.Env,
 			fmt.Sprintf("YAK_BRIDGE_LOCAL_REVERSE_ADDR=%v", utils.HostPort(effectiveLocalReverseHost, s.reverseServer.Port)),
