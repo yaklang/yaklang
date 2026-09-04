@@ -2,12 +2,15 @@ package csharp2ssa
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	"github.com/yaklang/yaklang/common/yak/csharp/asp"
 	csharpparser "github.com/yaklang/yaklang/common/yak/csharp/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -99,11 +102,30 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		prog.ExtraFile = make(map[string]string)
 	}
 	path := editor.GetUrl()
-	if filepath.Ext(path) == ".cs" {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".cs":
 		return prog.Build(ast, editor, fb)
+	case ".aspx", ".ascx", ".ashx", ".asmx":
+		cs, err := asp.ConvertToCSharp(editor.GetSourceCode(), path)
+		if err != nil {
+			log.Debugf("convert asp to csharp %s: %v", path, err)
+			prog.ExtraFile[path] = editor.GetIrSourceHash()
+			return nil
+		}
+		genAST, err := s.ParseAST(cs, s.GetAntlrCache())
+		if err != nil {
+			log.Debugf("parse generated csharp from %s: %v", path, err)
+			prog.ExtraFile[path] = editor.GetIrSourceHash()
+			return nil
+		}
+		defer ssa.ReleaseASTRoot(genAST)
+		templateEditor := prog.CreateEditor([]byte(cs), path+".cs")
+		return prog.Build(genAST, templateEditor, fb)
+	default:
+		prog.ExtraFile[path] = editor.GetIrSourceHash()
+		return nil
 	}
-	prog.ExtraFile[path] = editor.GetIrSourceHash()
-	return nil
 }
 
 type singleFileBuilder struct {
