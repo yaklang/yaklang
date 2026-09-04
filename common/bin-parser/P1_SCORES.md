@@ -33,7 +33,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | IEEE 802.11 | A | 90 | 25 | 15 | 20 | 20 | 10 | L2 | `ieee_802_11.yaml` |
 | WPA/RSN | A | 90 | 25 | 15 | 20 | 20 | 10 | L2 | `ieee_802_11.yaml` |
 | IEEE 802.1X | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | alias of EAPOL |
-| ICMPv6 NDP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `internet_control_message_protocol_v6.yaml` |
+| ICMPv6 NDP | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `internet_control_message_protocol_v6.yaml` |
 | IGMP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `igmp.yaml` |
 | GRE | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `generic_routing_encapsulation.yaml` |
 | IPsec AH | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `ipsec.yaml` |

@@ -63,6 +63,60 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(3600), uintVal(t, v6.Child("Options").Children()[2].Child("T1")))
 	})
 
+	t.Run("icmp/echo", func(t *testing.T) {
+		// RFC 792 Echo: Type 8 Identifier/Sequence + Data (gopacket layers.ICMPv4TypeEchoRequest).
+		echo := append([]byte{0x08, 0x00, 0x00, 0x00, 0x12, 0x34, 0x00, 0x01}, []byte("abcdefghijklmnop")...)
+		n := parseRule(t, echo, "internet_control_message_protocol", "ICMP")
+		require.Equal(t, uint64(8), uintVal(t, n.Child("Type")))
+		e := mustChild(t, n, "ICMP Echo")
+		require.Equal(t, uint64(0x1234), uintVal(t, e.Child("Identifier")))
+		require.Equal(t, uint64(1), uintVal(t, e.Child("Sequence Number")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 1, echo))
+		require.Equal(t, "abcdefghijklmnop", strVal(t, mustChild(t, eth, "IP", "ICMP", "ICMP Echo").Child("Echo Data")))
+	})
+
+	t.Run("icmp/echo-reply", func(t *testing.T) {
+		rep := append([]byte{0x00, 0x00, 0x00, 0x00, 0x12, 0x34, 0x00, 0x01}, []byte("abcdefghijklmnop")...)
+		n := parseRule(t, rep, "internet_control_message_protocol", "ICMP")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Type")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 1, rep))
+		require.Equal(t, "abcdefghijklmnop", strVal(t, mustChild(t, eth, "IP", "ICMP", "ICMP Echo Reply").Child("Echo Data")))
+		require.Equal(t, uint64(0x1234), uintVal(t, mustChild(t, eth, "IP", "ICMP", "ICMP Echo Reply").Child("Identifier")))
+	})
+
+	t.Run("icmpv6/echo", func(t *testing.T) {
+		// RFC 4443 Echo Request Type 128, Identifier/Sequence + Data.
+		echo := append([]byte{0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x02}, []byte("ping6")...)
+		n := parseRule(t, echo, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(128), uintVal(t, n.Child("Type")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, echo))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Echo Request").Child("Identifier")))
+		require.Equal(t, "ping6", strVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Echo Request").Child("Echo Data")))
+	})
+
+	t.Run("icmpv6/ra-opt", func(t *testing.T) {
+		// gopacket layers/icmp6msg_test.go Router Advertisement: SLLA + MTU 1500 + Prefix 2001:db8:0:1::/64.
+		ra := []byte{
+			0x33, 0x33, 0x00, 0x00, 0x00, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x86, 0xdd, 0x6e, 0x00,
+			0x00, 0x00, 0x00, 0x40, 0x3a, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00,
+			0x54, 0xff, 0xfe, 0xf5, 0x00, 0x00, 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0x00, 0xc4, 0xfe, 0x40, 0x00, 0x07, 0x08, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00, 0x05, 0x01,
+			0x00, 0x00, 0x00, 0x00, 0x05, 0xdc, 0x03, 0x04, 0x40, 0xc0, 0x00, 0x27, 0x8d, 0x00, 0x00, 0x09,
+			0x3a, 0x80, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		}
+		adv := mustChild(t, parseEthernet(t, ra), "IPv6", "ICMPv6", "Router Advertisement")
+		opts := adv.Child("Options").Children()
+		require.GreaterOrEqual(t, len(opts), 3)
+		require.Equal(t, uint64(1), uintVal(t, opts[0].Child("Type")))
+		require.Equal(t, []byte{0xc2, 0x00, 0x54, 0xf5, 0x00, 0x00}, bytesVal(t, opts[0].Child("Link Layer")))
+		require.Equal(t, uint64(5), uintVal(t, opts[1].Child("Type")))
+		require.Equal(t, uint64(1500), uintVal(t, opts[1].Child("MTU")))
+		require.Equal(t, uint64(3), uintVal(t, opts[2].Child("Type")))
+		require.Equal(t, uint64(64), uintVal(t, opts[2].Child("Prefix Length")))
+	})
+
 	t.Run("pap/request", func(t *testing.T) {
 		// RFC 1334 §2.2.1 Authenticate-Request: Peer-ID "ixia", Password "ixia".
 		pap := []byte{0x01, 0x00, 0x00, 0x0e, 0x04, 'i', 'x', 'i', 'a', 0x04, 'i', 'x', 'i', 'a'}

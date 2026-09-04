@@ -13,6 +13,12 @@ type p1FailCase struct {
 }
 
 var p1FailCases = []p1FailCase{
+		{"internet_control_message_protocol", []string{"ICMP"}, nil, "empty"},
+		{"internet_control_message_protocol", []string{"ICMP"}, []byte{0x08}, "trunc"},
+		{"internet_control_message_protocol", []string{"ICMP"}, []byte{0x08, 0x00}, "trunc-hdr"},
+		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, nil, "empty"},
+		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, []byte{0x80}, "trunc"},
+		{"internet_control_message_protocol_v6", []string{"ICMPV6"}, []byte{0x80, 0x00}, "trunc-hdr"},
 		{"vxlan", []string{"VXLAN"}, nil, "empty"},
 		{"vxlan", []string{"VXLAN"}, []byte{0x00}, "trunc"},
 		{"vxlan", []string{"VXLAN"}, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, "no-i-flag"},
