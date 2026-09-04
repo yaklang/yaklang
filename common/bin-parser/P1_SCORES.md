@@ -128,7 +128,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | MinIO/S3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | RMI | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |
 | JMX | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |
-| JDWP | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `jdwp.yaml` |
+| JDWP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `jdwp.yaml` |
 | FastCGI | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `fastcgi.yaml` |
 | IIOP Locate | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of IIOP/GIOP |
 | Memcache binary | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of Memcached |
@@ -147,7 +147,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Hessian2 | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `hessian.yaml` |
 | PHP serialize | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `php_ser.yaml` |
 | Python pickle | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `pickle.yaml` |
-| JDWP handshake | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | alias of JDWP |
+| JDWP handshake | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of JDWP |
 | Rsync daemon | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `rsync.yaml` |
 | Docker Registry | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | gRPC reflection | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | alias of HTTP/2 |
