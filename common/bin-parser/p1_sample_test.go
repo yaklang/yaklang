@@ -2096,6 +2096,19 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, eth, "IP", "GRE").Child("Key")))
 	})
 
+	t.Run("gre/next-type", func(t *testing.T) {
+		// RFC 2784 Protocol Type is an EtherType. IEEE Std 802-2014 Table C-1
+		// Local Experimental EtherType 1 (0x88B5) has no GRE dissector arm:
+		// leftover is Next Protocol Data, not an unnamed tail. IP proto 47.
+		raw := append([]byte{0x00, 0x00, 0x88, 0xb5}, []byte("exp1")...)
+		n := parseRule(t, raw, "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0x88b5), uintVal(t, n.Child("Protocol Type")))
+		require.Equal(t, "exp1", joinUint8(t, mustChild(t, n, "Payload").Child("Next Protocol Data")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, raw))
+		require.Equal(t, uint64(0x88b5), uintVal(t, mustChild(t, eth, "IP", "GRE").Child("Protocol Type")))
+		require.Equal(t, "exp1", joinUint8(t, mustChild(t, eth, "IP", "GRE", "Payload").Child("Next Protocol Data")))
+	})
+
 	t.Run("qinq/s-tag", func(t *testing.T) {
 		// IEEE 802.1ad S-TAG: PCP=5 DEI=1 VID=100, EtherType ARP.
 		// Wireshark ieee8021ad.priority / ieee8021ad.dei / ieee8021ad.id.

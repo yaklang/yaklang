@@ -63,9 +63,29 @@ Package:
           this.ProcessByType("PPP")
           return
         }
+        res, op = this.TryProcessByType("PeekByte")
+        op.Recovery()
+        if op.OK {
+          this.ProcessByType("Next Protocol Data")
+        }
         return
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 PPP: "import:ppp.yaml;node:PPP"
 EAPOL: "import:eapol.yaml;node:EAPOL"
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8
