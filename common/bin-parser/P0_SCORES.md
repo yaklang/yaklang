@@ -8,7 +8,7 @@
 
 | 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ethernet II | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `ethernet.yaml` |
+| Ethernet II | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `ethernet.yaml` |
 | IEEE 802.1Q | B | 78 | 20 | 8 | 20 | 20 | 10 | L3 | `ieee_802_1q.yaml` |
 | ARP | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `address_resolution_protocol.yaml` |
 | IPv4 | B | 85 | 20 | 25 | 16 | 14 | 10 | L1 | `internet_protocol.yaml` |
