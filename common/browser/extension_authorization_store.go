@@ -224,6 +224,20 @@ func authorizationContextMatches(
 		slot.ContextReference.ID == context.ID
 }
 
+func authorizationContextBoundaryMatches(
+	slot ExtensionAuthorizationIdentitySlot,
+	context extensionAuthorizationContextBase,
+) bool {
+	return slot.DeviceID == context.DeviceID &&
+		slot.InstallationID == context.InstallationID &&
+		slot.IsolationContextID == context.IsolationContextID &&
+		slot.CookieStoreID == context.CookieStoreID &&
+		slot.Origin == context.Origin &&
+		slot.GrantID == context.GrantID &&
+		slot.Target.TabID == context.Target.TabID &&
+		slot.Target.FrameID == context.Target.FrameID
+}
+
 func (m *ExtensionBridgeManager) revalidateExtensionAuthorizationWorkspace(
 	ctx context.Context,
 	workspace ExtensionAuthorizationWorkspace,
@@ -240,7 +254,7 @@ func (m *ExtensionBridgeManager) revalidateExtensionAuthorizationWorkspace(
 		case "handle":
 			return "browser.authorization.context.get", nil
 		case "attestation":
-			return "browser.authorization.context.attestation.get", nil
+			return "browser.authorization.context.attest", nil
 		default:
 			return "", errors.New("authorization workspace contains an unknown context reference")
 		}
@@ -274,20 +288,29 @@ func (m *ExtensionBridgeManager) revalidateExtensionAuthorizationWorkspace(
 	if err != nil {
 		return workspace, err
 	}
+	paramsFor := func(reference validationReference) map[string]interface{} {
+		if reference.kind == "attestation" {
+			return map[string]interface{}{
+				"tabId": reference.slot.Target.TabID, "frameId": reference.slot.Target.FrameID,
+			}
+		}
+		return map[string]interface{}{"id": reference.id}
+	}
 	leftRaw, rightRaw, err := m.callAuthorizationPair(
 		ctx,
 		workspace.Left.DeviceID,
 		leftReference.method,
-		map[string]interface{}{"id": leftReference.id},
+		paramsFor(leftReference),
 		workspace.Right.DeviceID,
 		rightReference.method,
-		map[string]interface{}{"id": rightReference.id},
+		paramsFor(rightReference),
 	)
 	if err != nil {
 		return workspace, err
 	}
 	type validationOutcome struct {
 		baseline       *ExtensionAuthorizationBaseline
+		slot           *ExtensionAuthorizationIdentitySlot
 		logicalCleared bool
 	}
 	validateResult := func(
@@ -328,10 +351,16 @@ func (m *ExtensionBridgeManager) revalidateExtensionAuthorizationWorkspace(
 		if err := decodeAuthorizationResult(raw, &attestation); err != nil {
 			return validationOutcome{}, err
 		}
-		if !authorizationContextMatches(reference.slot, attestation.extensionAuthorizationContextBase) {
+		if !authorizationContextBoundaryMatches(reference.slot, attestation.extensionAuthorizationContextBase) {
 			return validationOutcome{}, errors.New("authorization identity context changed")
 		}
-		return validationOutcome{}, nil
+		refreshed := authorizationSlotFromContext(
+			reference.slot.Side,
+			reference.slot.AccountLabel,
+			"attestation",
+			attestation.extensionAuthorizationContextBase,
+		)
+		return validationOutcome{slot: &refreshed}, nil
 	}
 	leftOutcome, err := validateResult(leftReference, leftRaw)
 	if err != nil {
@@ -340,6 +369,32 @@ func (m *ExtensionBridgeManager) revalidateExtensionAuthorizationWorkspace(
 	rightOutcome, err := validateResult(rightReference, rightRaw)
 	if err != nil {
 		return workspace, err
+	}
+	if leftOutcome.slot != nil || rightOutcome.slot != nil {
+		if leftOutcome.slot != nil {
+			workspace.Left = *leftOutcome.slot
+		}
+		if rightOutcome.slot != nil {
+			workspace.Right = *rightOutcome.slot
+		}
+		workspace.Proof = evaluateAuthorizationProof(
+			"separate-installations",
+			"",
+			"strong",
+			"unknown",
+			"not-required",
+			[]string{"两个身份来自不同的已配对插件安装与浏览器 Profile"},
+			workspace.Left,
+			workspace.Right,
+			time.Now().UnixMilli(),
+			minAuthorizationExpiry(workspace.ExpiresAt, workspace.Left.ExpiresAt, workspace.Right.ExpiresAt),
+		)
+		workspace.State = authorizationWorkspaceState(workspace.Proof.Level)
+		workspace.StaleReason = ""
+		workspace.Recovery = nil
+		if err := m.updateExtensionAuthorizationWorkspace(workspace); err != nil {
+			return workspace, err
+		}
 	}
 	if workspace.Baselines.Verification != nil {
 		verificationReference, err := referenceFor(
