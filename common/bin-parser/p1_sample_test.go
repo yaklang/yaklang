@@ -2106,6 +2106,47 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "ID47", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("MsgID")))
 		require.Equal(t, "1", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("Version")))
 	})
+
+	t.Run("sdp/origin", func(t *testing.T) {
+		// RFC 4566 §5 o=<username> <sess-id> <sess-version> <nettype> <addrtype> <unicast-address>.
+		// Wireshark sdp.owner.username / sdp.owner.address. UDP/5006.
+		raw := []byte("v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n")
+		n := parseRule(t, raw, "sdp", "SDP")
+		require.Equal(t, uint64('v'), uintVal(t, n.Child("Type")))
+		require.Equal(t, "0", strVal(t, n.Child("Value")))
+		require.Equal(t, "alice", strVal(t, n.Child("Username")))
+		require.Equal(t, "2890844526", strVal(t, n.Child("Sess ID")))
+		require.Equal(t, "IN", strVal(t, n.Child("Net Type")))
+		require.Equal(t, "IP4", strVal(t, n.Child("Addr Type")))
+		require.Equal(t, "pc33.atlanta.example.com", strVal(t, n.Child("Address")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5006, 5006, raw))
+		require.Equal(t, "alice", strVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Username")))
+		require.Equal(t, "pc33.atlanta.example.com", strVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Address")))
+	})
+
+	t.Run("sdp/media", func(t *testing.T) {
+		// RFC 4566 §5 session + m=audio 49170 RTP/AVP 0. Wireshark sdp.session_name / sdp.media.port.
+		raw := []byte("v=0\r\no=jdoe 2890844526 2890842807 IN IP4 10.47.16.5\r\n" +
+			"s=SDP Seminar\r\nc=IN IP4 224.2.17.12/127\r\nt=2873397496 2873404696\r\n" +
+			"m=audio 49170 RTP/AVP 0\r\n")
+		n := parseRule(t, raw, "sdp", "SDP")
+		require.Equal(t, "jdoe", strVal(t, n.Child("Username")))
+		require.Equal(t, "10.47.16.5", strVal(t, n.Child("Address")))
+		lines := n.Child("Lines").Children()
+		require.GreaterOrEqual(t, len(lines), 4)
+		require.Equal(t, "SDP Seminar", strVal(t, lines[0].Child("Session Name")))
+		require.Equal(t, "IN", strVal(t, lines[1].Child("Net Type")))
+		require.Equal(t, "224.2.17.12/127", strVal(t, lines[1].Child("Connection Address")))
+		require.Equal(t, "2873397496", strVal(t, lines[2].Child("Start")))
+		require.Equal(t, "audio", strVal(t, lines[3].Child("Media")))
+		require.Equal(t, "49170", strVal(t, lines[3].Child("Port")))
+		require.Equal(t, "RTP/AVP", strVal(t, lines[3].Child("Proto")))
+		require.Equal(t, "0", strVal(t, lines[3].Child("Format")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5006, 5006, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "SDP").Child("Lines").Children()
+		require.Equal(t, "49170", strVal(t, wired[3].Child("Port")))
+		require.Equal(t, "SDP Seminar", strVal(t, wired[0].Child("Session Name")))
+	})
 }
 
 func vncServerInit() []byte {

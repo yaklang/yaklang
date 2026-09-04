@@ -73,9 +73,12 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, uint64('v'), uintVal(t, sd.Child("Type")))
 	require.Equal(t, "0", strVal(t, sd.Child("Value")))
 	require.Equal(t, uint64('o'), uintVal(t, sd.Child("Origin Type")))
+	require.Equal(t, "-", strVal(t, sd.Child("Username")))
+	require.Equal(t, "10.0.0.1", strVal(t, sd.Child("Address")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 5006, 5006, sdp))
 	require.Equal(t, uint64('v'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Type")))
 	require.Equal(t, uint64('o'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Origin Type")))
+	require.Equal(t, "10.0.0.1", strVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Address")))
 
 
 	// RFC 3550 RTP v2

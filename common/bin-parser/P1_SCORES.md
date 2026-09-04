@@ -109,7 +109,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Syslog | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `syslog.yaml` |
 | IPMI | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `ipmi.yaml` |
 | SIP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `sip.yaml` |
-| SDP | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `sdp.yaml` |
+| SDP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `sdp.yaml` |
 | RTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
 | RTCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtp.yaml` |
 | RTSP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rtsp.yaml` |
