@@ -136,7 +136,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Kubernetes API | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
 | Elasticsearch transport | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
 | Jenkins remoting | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `jenkins.yaml` |
-| Redis Sentinel/Cluster | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `application-layer/redis.yaml` |
+| Redis Sentinel/Cluster | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/redis.yaml` |
 | Zabbix agent | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `zabbix.yaml` |
 | VMware SOAP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
 | IPMI RMCP+ | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of IPMI |
