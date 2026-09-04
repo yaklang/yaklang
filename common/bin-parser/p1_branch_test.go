@@ -361,6 +361,28 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "Stop Control Conn Req").Child("Reason")))
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "Stop Control Conn Req").Child("Reason")))
 	})
+	t.Run("pptp/stop-reply", func(t *testing.T) {
+		pptp := make([]byte, 16)
+		binary.BigEndian.PutUint16(pptp[0:], 16)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 4)
+		pptp[12] = 1
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "Stop Control Conn Reply").Child("ResultCode")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "Stop Control Conn Reply").Child("ResultCode")))
+	})
+	t.Run("pptp/icrq", func(t *testing.T) {
+		pptp := make([]byte, 220)
+		binary.BigEndian.PutUint16(pptp[0:], 220)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 9)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint16(pptp[24:], 7)
+		copy(pptp[28:], []byte("5551212"))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, pptp, "application-layer.pptp", "PPTP"), "Incoming Call Req").Child("CallId")))
+		require.True(t, strings.HasPrefix(strVal(t, mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp)), "IP", "TCP", "PPTP", "Incoming Call Req").Child("DialedNumber")), "5551212"))
+	})
 	t.Run("pptp/set-link-info", func(t *testing.T) {
 		pptp := make([]byte, 24)
 		binary.BigEndian.PutUint16(pptp[0:], 24)
