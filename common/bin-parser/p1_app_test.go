@@ -457,6 +457,12 @@ func TestP1TCPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4TCPFrame(t, 2809, 2809, giop))
 	require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "GIOP").Child("Message Type")))
 
+	giopNS := mustHex(t, "47494f50010200030000001700000002000000000000000b4e616d6553657276696365")
+	g := parseRule(t, giopNS, "application-layer.iiop", "GIOP")
+	require.Equal(t, "NameService", strVal(t, mustChild(t, g, "LocateRequest").Child("Object Key")))
+	eth = parseEthernet(t, ipv4TCPFrame(t, 2809, 2809, giopNS))
+	require.Equal(t, "NameService", strVal(t, mustChild(t, eth, "IP", "TCP", "GIOP", "LocateRequest").Child("Object Key")))
+
 	t3 := make([]byte, 19)
 	binary.BigEndian.PutUint32(t3[0:], 19)
 	t3[4] = 1
