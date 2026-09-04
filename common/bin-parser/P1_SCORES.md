@@ -116,7 +116,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | WebRTC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of STUN |
 | STUN | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `stun.yaml` |
 | TURN | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of STUN |
-| RTMP | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `rtmp.yaml` |
+| RTMP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtmp.yaml` |
 | WKSSVC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | SPOOLSS | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | ATSVC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |

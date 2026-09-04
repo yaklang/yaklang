@@ -6,20 +6,30 @@ Package:
       if getNodeResult("Version").Value != 3 {
         panic("rtmp: version must be 3")
       }
-      if this.GetMaxLength() < 1048576 {
-        rest = this.GetMaxLength() - this.Length()
-        if rest >= 8 {
-          this.ProcessSubNode("C1")
-        }
-        rest = this.GetMaxLength() - this.Length()
-        if rest >= 8 {
-          this.ProcessSubNode("C2")
-        }
-      } else {
-        if this.Length() < this.GetMaxLength() {
-          this.ProcessSubNode("C1")
-        }
+      rest = this.GetMaxLength() - this.Length()
+      if rest >= 1048576 {
+        this.ProcessSubNode("C1")
+        return
       }
+      didc1 = 0
+      if rest >= 1536 {
+        this.GetSubNode("C1").SetMaxLength(1536)
+        this.ProcessSubNode("C1")
+        didc1 = 1
+      }
+      rest = this.GetMaxLength() - this.Length()
+      if didc1 == 0 && rest >= 8 {
+        this.GetSubNode("C1").SetMaxLength(rest)
+        this.ProcessSubNode("C1")
+      }
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        return
+      }
+      op.Recovery()
+      this.ProcessSubNode("Chunks")
+      return
     Version: uint8
     C1:
       operator: |
@@ -28,13 +38,15 @@ Package:
         if getNodeResult("Zero").Value != 0 {
           panic("rtmp: C1 zero field must be 0")
         }
-        if this.Length() < this.GetMaxLength() {
-          rest = this.GetMaxLength() - this.Length()
-          if rest > 0 && rest < 1048576 {
-            this.GetSubNode("Random").SetMaxLength(rest)
-            this.ProcessSubNode("Random")
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          if rest > 1528 {
+            rest = 1528
           }
+          this.GetSubNode("Random").SetMaxLength(rest)
+          this.ProcessSubNode("Random")
         }
+        return
       Time: uint32
       Zero: uint32
       Random: raw
@@ -42,13 +54,97 @@ Package:
       operator: |
         this.ProcessSubNode("Time2")
         this.ProcessSubNode("TimeEcho")
-        if this.Length() < this.GetMaxLength() {
-          rest = this.GetMaxLength() - this.Length()
-          if rest > 0 && rest < 1048576 {
-            this.GetSubNode("Random").SetMaxLength(rest)
-            this.ProcessSubNode("Random")
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          if rest > 1528 {
+            rest = 1528
           }
+          this.GetSubNode("Random").SetMaxLength(rest)
+          this.ProcessSubNode("Random")
         }
+        return
       Time2: uint32
       TimeEcho: uint32
       Random: raw
+    Chunks:
+      list: true
+      Chunk: RTMPChunk
+      operator: |
+        for {
+          if this.GetMaxLength() < 1 {
+            break
+          }
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 1 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+        }
+RTMPChunk:
+  operator: |
+    this.ProcessSubNode("FmtCSID")
+    fcs = getNodeResult("FmtCSID").Value
+    btype = fcs >> 6
+    if btype != 0 {
+      return
+    }
+    this.ProcessSubNode("Timestamp")
+    this.ProcessSubNode("MsgLen0")
+    this.ProcessSubNode("MsgLen1")
+    this.ProcessSubNode("MsgLen2")
+    this.ProcessSubNode("Message Type")
+    this.ProcessSubNode("Message Stream ID")
+    mt = getNodeResult("Message Type").Value
+    ml = getNodeResult("MsgLen0").Value * 65536 + getNodeResult("MsgLen1").Value * 256 + getNodeResult("MsgLen2").Value
+    if mt == 1 {
+      this.ProcessSubNode("Chunk Size")
+      return
+    }
+    if mt == 20 {
+      if ml > 0 && ml < 1048576 {
+        this.GetSubNode("AMF0").SetMaxLength(ml)
+        this.ProcessSubNode("AMF0")
+      }
+      return
+    }
+    if ml > 0 && ml < 1048576 {
+      this.GetSubNode("Message Data").SetMaxLength(ml)
+      this.ProcessSubNode("Message Data")
+    }
+    return
+  FmtCSID: uint8
+  Timestamp: raw,3
+  MsgLen0: uint8
+  MsgLen1: uint8
+  MsgLen2: uint8
+  Message Type: uint8
+  Message Stream ID: raw,4
+  Chunk Size: uint32
+  AMF0:
+    operator: |
+      this.ProcessSubNode("Marker")
+      m = getNodeResult("Marker").Value
+      if m == 2 {
+        this.ProcessSubNode("String Length")
+        sl = getNodeResult("String Length").Value
+        if sl > 0 && sl < 1048576 {
+          this.GetSubNode("Command Name").SetMaxLength(sl)
+          this.ProcessSubNode("Command Name")
+        }
+      }
+      return
+    Marker: uint8
+    String Length: uint16
+    Command Name: string
+  Message Data: string
+PeekByte: uint8
