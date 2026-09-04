@@ -3,19 +3,49 @@ Package:
   SOCKS4:
     operator: |
       this.ProcessSubNode("Version")
-      if getNodeResult("Version").Value != 4 {
-        panic("socks4: version must be 4")
+      ver = getNodeResult("Version").Value
+      if ver == 4 {
+        this.ProcessByType("SOCKS4Request")
+        return
       }
-      this.ProcessSubNode("Command")
-      cmd = getNodeResult("Command").Value
-      if cmd != 1 && cmd != 2 && cmd != 90 && cmd != 91 && cmd != 92 && cmd != 93 {
-        panic("socks4: unknown command")
+      if ver == 0 {
+        this.ProcessByType("SOCKS4Reply")
+        return
       }
-      this.ProcessSubNode("Port")
-      this.ProcessSubNode("IP")
-      this.ProcessSubNode("UserID")
+      panic("socks4: version must be 0 or 4")
     Version: uint8
-    Command: uint8
-    Port: uint16
-    IP: raw,4
-    UserID: "del:\x00;type:string"
+SOCKS4Request:
+  unpack: true
+  operator: |
+    this.ProcessSubNode("Command")
+    cmd = getNodeResult("Command").Value
+    if cmd != 1 && cmd != 2 {
+      panic("socks4: unknown command")
+    }
+    this.ProcessSubNode("Port")
+    this.ProcessSubNode("IP")
+    this.ProcessSubNode("UserID")
+    ip = getNodeResult("IP").Value
+    if len(ip) == 4 && ip[0] == 0 && ip[1] == 0 && ip[2] == 0 && ip[3] != 0 {
+      this.ProcessSubNode("Domain")
+    }
+    return
+  Command: uint8
+  Port: uint16
+  IP: raw,4
+  UserID: "del:\x00;type:string"
+  Domain: "del:\x00;type:string"
+SOCKS4Reply:
+  unpack: true
+  operator: |
+    this.ProcessSubNode("Command")
+    cmd = getNodeResult("Command").Value
+    if cmd != 90 && cmd != 91 && cmd != 92 && cmd != 93 {
+      panic("socks4: unknown reply code")
+    }
+    this.ProcessSubNode("Port")
+    this.ProcessSubNode("IP")
+    return
+  Command: uint8
+  Port: uint16
+  IP: raw,4

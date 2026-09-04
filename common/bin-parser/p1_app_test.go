@@ -204,8 +204,10 @@ func TestP1TCPApplications(t *testing.T) {
 	socks4 := []byte{0x04, 0x01, 0x00, 0x50, 10, 0, 0, 1, 'u', 0}
 	s4 := parseRule(t, socks4, "socks4", "SOCKS4")
 	require.Equal(t, uint64(4), uintVal(t, s4.Child("Version")))
+	require.Equal(t, "u", strVal(t, s4.Child("UserID")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 1080, 1080, socks4))
 	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("Command")))
+	require.Equal(t, "u", strVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("UserID")))
 
 	tel := []byte{0xff, 0xfd, 0x01}
 	te := parseRule(t, tel, "telnet", "Telnet")
