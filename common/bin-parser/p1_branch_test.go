@@ -17,6 +17,14 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x8100), uintVal(t, q.Child("Type")))
 	})
 
+	t.Run("link_control_protocol/conf-req", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "0101000e0304c02305060f3f117c"), "link_control_protocol", "LCP")
+		require.Equal(t, uint64(0xc023), uintVal(t, n.Child("Options").Children()[0].Child("Auth Protocol")))
+	})
+	t.Run("link_control_protocol/echo", func(t *testing.T) {
+		n := parseRule(t, []byte{0x09, 0x01, 0x00, 0x08, 0x12, 0x34, 0x56, 0x78}, "link_control_protocol", "LCP")
+		require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, n, "Echo").Child("Magic Number")))
+	})
 	t.Run("ppp/lcp", func(t *testing.T) {
 		p := parseRule(t, []byte{0xff, 0x03, 0xc0, 0x21, 0x01, 0x01, 0x00, 0x0e, 0x03, 0x04, 0xc0, 0x23, 0x05, 0x06, 0x0f, 0x3f, 0x11, 0x7c}, "ppp", "PPP")
 		require.Equal(t, uint64(0xc021), uintVal(t, p.Child("Protocol")))
