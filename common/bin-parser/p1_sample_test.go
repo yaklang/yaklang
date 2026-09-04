@@ -2901,6 +2901,42 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x88f7), uintVal(t, eth.Child("Type")))
 		require.Equal(t, "sync", joinUint8(t, eth.Child("Next Protocol Data")))
 	})
+
+	t.Run("ppp/next-type", func(t *testing.T) {
+		// RFC 1661 Protocol field + IANA 0x002d Van Jacobson Compressed TCP/IP (RFC 1144).
+		// No VJ dissector: leftover is Next Protocol Data, not Unknown raw. Ethernet+GRE 0x880B.
+		ppp := append([]byte{0xff, 0x03, 0x00, 0x2d}, []byte("vj01")...)
+		n := parseRule(t, ppp, "ppp", "PPP")
+		require.Equal(t, uint64(0x002d), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, "vj01", joinUint8(t, n.Child("Next Protocol Data")))
+		gre := append([]byte{0x00, 0x00, 0x88, 0x0b}, ppp...)
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, gre))
+		wired := mustChild(t, eth, "IP", "GRE", "Payload", "PPP")
+		require.Equal(t, uint64(0x002d), uintVal(t, wired.Child("Protocol")))
+		require.Equal(t, "vj01", joinUint8(t, wired.Child("Next Protocol Data")))
+	})
+
+	t.Run("ppp/ipv6", func(t *testing.T) {
+		// RFC 5072 IPv6 over PPP protocol 0x0057. Wireshark ppp.protocol. Ethernet+GRE 0x880B.
+		ip6 := []byte{
+			0x60, 0x00, 0x00, 0x00, 0x00, 0x04, 0x63, 0x40,
+			0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+			0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+			'v', '6', 'o', 'k',
+		}
+		ppp := append([]byte{0xff, 0x03, 0x00, 0x57}, ip6...)
+		n := parseRule(t, ppp, "ppp", "PPP")
+		require.Equal(t, uint64(0x0057), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, n, "IPv6").Child("Version")))
+		require.Equal(t, "v6ok", strVal(t, mustChild(t, n, "IPv6").Child("Next Protocol Data")))
+		gre := append([]byte{0x00, 0x00, 0x88, 0x0b}, ppp...)
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, gre))
+		v6 := mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "IPv6")
+		require.Equal(t, uint64(6), uintVal(t, v6.Child("Version")))
+		require.Equal(t, "v6ok", strVal(t, v6.Child("Next Protocol Data")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
