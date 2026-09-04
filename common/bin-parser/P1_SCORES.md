@@ -29,7 +29,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | LLDP | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `lldp.yaml` |
 | CDP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `cdp.yaml` |
 | Loopback | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `loopback.yaml` |
-| Linux SLL | B | 80 | 15 | 15 | 20 | 20 | 10 | L2 | `linux_sll.yaml` |
+| Linux SLL | B | 85 | 20 | 15 | 20 | 20 | 10 | L2 | `linux_sll.yaml` |
 | IEEE 802.11 | A | 90 | 25 | 15 | 20 | 20 | 10 | L2 | `ieee_802_11.yaml` |
 | WPA/RSN | A | 90 | 25 | 15 | 20 | 20 | 10 | L2 | `ieee_802_11.yaml` |
 | IEEE 802.1X | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of EAPOL |
