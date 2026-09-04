@@ -9,7 +9,35 @@ Package:
       this.ProcessSubNode("Space")
       this.ProcessSubNode("Major")
       this.ProcessSubNode("Minor")
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        return
+      }
+      first = res.Value
+      op.Recovery()
+      if first == 0x40 {
+        this.ProcessSubNode("At")
+        this.ProcessSubNode("Status Kind")
+        this.ProcessSubNode("Status Space")
+        this.ProcessSubNode("Status")
+        return
+      }
+      this.ProcessSubNode("Module")
+      return
     Magic: string,8
     Space: uint8
     Major: "del:.;type:string"
     Minor: "del:\n;type:string"
+    At: uint8
+    Status Kind:
+      type: string
+      del: ":"
+    Status Space: uint8
+    Status:
+      type: string
+      del: "\n"
+    Module:
+      type: string
+      del: "\n"
+PeekByte: uint8
