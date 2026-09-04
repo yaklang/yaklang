@@ -1,6 +1,7 @@
 package bin_parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,21 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "+OK", strVal(t, mustChild(t, eth, "IP", "TCP", "POP3").Child("Status")))
 	})
 
+	t.Run("pop3/capa", func(t *testing.T) {
+		// RFC 2449 CAPA multiline: +OK / USER / UIDL / .
+		capa := []byte("+OK Capability list follows\r\nUSER\r\nUIDL\r\n.\r\n")
+		po := parseRule(t, capa, "pop3", "POP3")
+		require.Equal(t, "+OK", strVal(t, po.Child("Status")))
+		lines := mustChild(t, po, "POP3Extra").Children()
+		require.GreaterOrEqual(t, len(lines), 3)
+		require.Equal(t, "USER", strVal(t, lines[0].Child("Text")))
+		require.Equal(t, "UIDL", strVal(t, lines[1].Child("Text")))
+		require.Equal(t, ".", strVal(t, lines[2].Child("Text")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 110, 110, capa))
+		el := mustChild(t, eth, "IP", "TCP", "POP3", "POP3Extra").Children()
+		require.Equal(t, "USER", strVal(t, el[0].Child("Text")))
+	})
+
 	t.Run("imap/rfc3501", func(t *testing.T) {
 		imapGreet := []byte("* OK IMAP4rev1 server ready\r\n")
 		im := parseRule(t, imapGreet, "imap", "IMAP")
@@ -41,6 +57,20 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "OK", strVal(t, im.Child("Command")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 143, 143, imapGreet))
 		require.Equal(t, "IMAP4rev1 server ready", strVal(t, mustChild(t, eth, "IP", "TCP", "IMAP").Child("Arg")))
+	})
+
+	t.Run("imap/flags-extra", func(t *testing.T) {
+		// RFC 3501 untagged FLAGS then greeting (two lines).
+		body := []byte("* FLAGS (\\Seen)\r\n* OK IMAP4rev1 server ready\r\n")
+		im := parseRule(t, body, "imap", "IMAP")
+		require.Equal(t, "FLAGS", strVal(t, im.Child("Command")))
+		require.Equal(t, "(\\Seen)", strVal(t, im.Child("Arg")))
+		extra := mustChild(t, im, "IMAPExtra").Children()
+		require.GreaterOrEqual(t, len(extra), 1)
+		require.Equal(t, "* OK IMAP4rev1 server ready", strVal(t, extra[0].Child("Text")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 143, 143, body))
+		el := mustChild(t, eth, "IP", "TCP", "IMAP", "IMAPExtra").Children()
+		require.Equal(t, "* OK IMAP4rev1 server ready", strVal(t, el[0].Child("Text")))
 	})
 
 	t.Run("bgp/open", func(t *testing.T) {
@@ -96,16 +126,24 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("amqp/connection-start", func(t *testing.T) {
-		// AMQP 0-9-1 §4.2.4 method frame + Connection.Start (class 10 method 10)
-		frame := mustHex(t, "01000000000006000a000a0009ce")
+		// AMQP 0-9-1 §4.2.4 Connection.Start (class 10 method 10):
+		// version 0.9, server-properties table {product: "RabbitMQ"},
+		// mechanisms longstr PLAIN, locales longstr en_US, frame-end 0xce.
+		frame := mustHex(t, "01000000000031000a000a0009000000150770726f6475637453000000085261626269744d5100000005504c41494e00000005656e5f5553ce")
 		am := parseRule(t, frame, "amqp", "AMQP")
 		require.Equal(t, uint64(1), uintVal(t, am.Child("Type")))
 		require.Equal(t, uint64(10), uintVal(t, am.Child("Class ID")))
 		require.Equal(t, uint64(10), uintVal(t, am.Child("Method ID")))
 		require.Equal(t, uint64(0), uintVal(t, am.Child("Version Major")))
 		require.Equal(t, uint64(9), uintVal(t, am.Child("Version Minor")))
+		require.Equal(t, uint64(0xce), uintVal(t, am.Child("Frame End")))
+		ent := mustChild(t, am, "Properties", "Entries").Children()
+		require.Equal(t, "product", strVal(t, ent[0].Child("Name")))
+		require.Equal(t, "RabbitMQ", strVal(t, ent[0].Child("Str")))
+		require.Equal(t, "PLAIN", strVal(t, mustChild(t, am, "Mechanisms").Child("Value")))
+		require.Equal(t, "en_US", strVal(t, mustChild(t, am, "Locales").Child("Value")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 5672, 5672, frame))
-		require.Equal(t, uint64(10), uintVal(t, mustChild(t, eth, "IP", "TCP", "AMQP").Child("Class ID")))
+		require.Equal(t, "PLAIN", strVal(t, mustChild(t, eth, "IP", "TCP", "AMQP", "Mechanisms").Child("Value")))
 	})
 
 	t.Run("thrift/i32-field", func(t *testing.T) {
@@ -138,6 +176,28 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(2013), uintVal(t, mustChild(t, eth, "IP", "TCP", "MongoDB").Child("Op Code")))
 		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_MSG", "Document", "Elements").Children()
 		require.Equal(t, "ping", strVal(t, el[0].Child("Name")))
+	})
+
+	t.Run("mongodb/bson-string", func(t *testing.T) {
+		// OP_QUERY admin.$cmd {msg: "hi"} BSON type 0x02
+		mongo := mustHex(t, "380000000100000000000000d407000000000000"+
+			"61646d696e2e24636d64000000000001000000"+
+			"11000000026d7367000300000068690000")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "Query", "Elements").Children()
+		require.Equal(t, "msg", strVal(t, el[0].Child("Name")))
+		require.Equal(t, "hi", strings.TrimRight(strVal(t, el[0].Child("Str")), "\x00"))
+	})
+
+	t.Run("mongodb/bson-int64", func(t *testing.T) {
+		// OP_QUERY admin.$cmd {n: int64(2)} BSON type 0x12
+		mongo := mustHex(t, "370000000100000000000000d407000000000000"+
+			"61646d696e2e24636d64000000000001000000"+
+			"10000000126e00020000000000000000")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "Query", "Elements").Children()
+		require.Equal(t, "n", strVal(t, el[0].Child("Name")))
+		require.Equal(t, uint64(2), uintVal(t, el[0].Child("Int64")))
 	})
 
 	t.Run("memcached/get-key", func(t *testing.T) {

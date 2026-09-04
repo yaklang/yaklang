@@ -62,6 +62,22 @@ Package:
                 this.ProcessSubNode("Int32")
                 return
               }
+              if t == 0x12 {
+                this.ProcessSubNode("Int64")
+                return
+              }
+              if t == 0x01 {
+                this.ProcessSubNode("Double")
+                return
+              }
+              if t == 0x09 {
+                this.ProcessSubNode("Datetime")
+                return
+              }
+              if t == 0x07 {
+                this.ProcessSubNode("ObjectId")
+                return
+              }
               if t == 0x02 {
                 this.ProcessSubNode("StrLen")
                 sl = getNodeResult("StrLen").Value
@@ -71,15 +87,35 @@ Package:
                 }
                 return
               }
+              if t == 0x05 {
+                this.ProcessSubNode("BinLen")
+                bl = getNodeResult("BinLen").Value
+                this.ProcessSubNode("BinSubtype")
+                if bl > 0 && bl < 1048576 {
+                  this.GetSubNode("Binary").SetMaxLength(bl)
+                  this.ProcessSubNode("Binary")
+                }
+                return
+              }
               if t == 0x08 {
                 this.ProcessSubNode("Bool")
+                return
+              }
+              if t == 0x0a {
                 return
               }
             Type: uint8
             Name: "del:\x00;type:string"
             Int32: uint32
+            Int64: uint64
+            Double: raw,8
+            Datetime: uint64
+            ObjectId: raw,12
             StrLen: uint32
             Str: string
+            BinLen: uint32
+            BinSubtype: uint8
+            Binary: string
             Bool: uint8
           operator: |
             for {
@@ -127,6 +163,22 @@ Package:
                 this.ProcessSubNode("Int32")
                 return
               }
+              if t == 0x12 {
+                this.ProcessSubNode("Int64")
+                return
+              }
+              if t == 0x01 {
+                this.ProcessSubNode("Double")
+                return
+              }
+              if t == 0x09 {
+                this.ProcessSubNode("Datetime")
+                return
+              }
+              if t == 0x07 {
+                this.ProcessSubNode("ObjectId")
+                return
+              }
               if t == 0x02 {
                 this.ProcessSubNode("StrLen")
                 sl = getNodeResult("StrLen").Value
@@ -136,15 +188,35 @@ Package:
                 }
                 return
               }
+              if t == 0x05 {
+                this.ProcessSubNode("BinLen")
+                bl = getNodeResult("BinLen").Value
+                this.ProcessSubNode("BinSubtype")
+                if bl > 0 && bl < 1048576 {
+                  this.GetSubNode("Binary").SetMaxLength(bl)
+                  this.ProcessSubNode("Binary")
+                }
+                return
+              }
               if t == 0x08 {
                 this.ProcessSubNode("Bool")
+                return
+              }
+              if t == 0x0a {
                 return
               }
             Type: uint8
             Name: "del:\x00;type:string"
             Int32: uint32
+            Int64: uint64
+            Double: raw,8
+            Datetime: uint64
+            ObjectId: raw,12
             StrLen: uint32
             Str: string
+            BinLen: uint32
+            BinSubtype: uint8
+            Binary: string
             Bool: uint8
           operator: |
             for {
