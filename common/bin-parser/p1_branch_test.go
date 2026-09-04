@@ -611,4 +611,14 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, "GET", strVal(t, mustChild(t, n, "Array", "RedisCommand").Child("Command")))
 		require.Equal(t, "mykey", strVal(t, mustChild(t, mustChild(t, n, "Array", "Arguments").Children()[0], "Bulk").Child("Bulk")))
 	})
+
+	t.Run("postgres/query", func(t *testing.T) {
+		n := parseRule(t, pgTyped('Q', append([]byte("SELECT 1"), 0)), "application-layer.postgresql", "PostgreSQL")
+		require.Equal(t, "SELECT 1", strVal(t, mustChild(t, n, "Payload", "PostgreSQLQuery").Child("SQL")))
+	})
+	t.Run("postgres/error", func(t *testing.T) {
+		fields := mustChild(t, parseRule(t, pgTyped('E', []byte("SERROR\x00C42601\x00Msyntax\x00\x00")), "application-layer.postgresql", "PostgreSQL"), "Payload", "PostgreSQLError").Children()
+		require.Equal(t, "42601", strVal(t, fields[1].Child("SQLState")))
+		require.Equal(t, "syntax", strVal(t, fields[2].Child("Message")))
+	})
 }

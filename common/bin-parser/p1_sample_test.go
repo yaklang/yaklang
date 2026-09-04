@@ -1390,4 +1390,30 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "GET", strVal(t, mustChild(t, wired, "Array", "RedisCommand").Child("Command")))
 		require.Equal(t, "mykey", strVal(t, mustChild(t, mustChild(t, wired, "Array", "Arguments").Children()[0], "Bulk").Child("Bulk")))
 	})
+
+	t.Run("postgres/query", func(t *testing.T) {
+		// PostgreSQL protocol 3.0 Query (F) 'Q' + SQL NUL. Wireshark pgsql.query.
+		// https://www.postgresql.org/docs/current/protocol-message-formats.html
+		raw := pgTyped('Q', append([]byte("SELECT 1"), 0))
+		n := parseRule(t, raw, "application-layer.postgresql", "PostgreSQL")
+		require.Equal(t, uint64('Q'), uintVal(t, n.Child("First")))
+		require.Equal(t, "SELECT 1", strVal(t, mustChild(t, n, "Payload", "PostgreSQLQuery").Child("SQL")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 5432, raw))
+		require.Equal(t, "SELECT 1", strVal(t, mustChild(t, eth, "IP", "TCP", "PostgreSQL", "Payload", "PostgreSQLQuery").Child("SQL")))
+	})
+
+	t.Run("postgres/error", func(t *testing.T) {
+		// ErrorResponse fields S/C/M: Severity ERROR, SQLSTATE 42601 syntax_error.
+		// https://www.postgresql.org/docs/current/protocol-error-fields.html
+		// Wireshark pgsql.error.code / pgsql.error.message.
+		raw := pgTyped('E', []byte("SERROR\x00C42601\x00Msyntax\x00\x00"))
+		fields := mustChild(t, parseRule(t, raw, "application-layer.postgresql", "PostgreSQL"), "Payload", "PostgreSQLError").Children()
+		require.GreaterOrEqual(t, len(fields), 3)
+		require.Equal(t, "ERROR", strVal(t, fields[0].Child("Severity")))
+		require.Equal(t, "42601", strVal(t, fields[1].Child("SQLState")))
+		require.Equal(t, "syntax", strVal(t, fields[2].Child("Message")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5432, 50000, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "PostgreSQL", "Payload", "PostgreSQLError").Children()
+		require.Equal(t, "42601", strVal(t, wired[1].Child("SQLState")))
+	})
 }

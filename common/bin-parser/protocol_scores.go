@@ -154,7 +154,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("MySQL", "application-layer/mysql.yaml", 20, 15, 16, 14, 10, "L2",
 		"TestMySQLHandshakeV10; TestMySQLQueryCommand; TestMySQLERRPacket; TestMySQLFailPaths", ""),
 	card("PostgreSQL", "application-layer/postgresql.yaml", 20, 15, 16, 20, 10, "L2",
-		"TestPostgreSQLStartupSSLQueryAndEdges SSLRequest 80877103", ""),
+		"TestPostgreSQLStartupSSLQueryAndEdges Query SELECT 1 + Error SQLSTATE 42601; SSLRequest 80877103", ""),
 	card("MSSQL TDS", "application-layer/tds.yaml", 20, 15, 16, 20, 10, "L2",
 		"TestTDSPreloginLoginBatchAndEdges [MS-TDS] 2.2.1", "BATCH payload"),
 	card("Oracle TNS", "application-layer/tns.yaml", 20, 15, 16, 20, 10, "L2",
