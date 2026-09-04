@@ -21,7 +21,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | PPPoE Session | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `pppoe.yaml` |
 | LCP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `link_control_protocol.yaml` |
 | PAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `password_authentication_protocol.yaml` |
-| CHAP | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `challenge_handshake_authentication_protocol.yaml` |
+| CHAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `challenge_handshake_authentication_protocol.yaml` |
 | EAPOL | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `eapol.yaml` |
 | EAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `eapol.yaml` |
 | STP | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `stp.yaml` |

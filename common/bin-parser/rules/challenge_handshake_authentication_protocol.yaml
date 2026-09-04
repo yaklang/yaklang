@@ -12,11 +12,27 @@ Package:
            case 0x01:
               this.ProcessByType("Data")
            case 0x02:
-              this.ProcessByType("Data")
+              this.ProcessByType("CHAPResponse")
            default:
               this.ProcessByType("Message")
         }
 Data:
+  operator: |
+    this.ProcessSubNode("Value Size")
+    vs = getNodeResult("Value Size").Value
+    if vs > 0 && vs < 255 {
+      this.GetSubNode("Value").SetMaxLength(vs)
+      this.ProcessSubNode("Value")
+    }
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Name").SetMaxLength(rest)
+      this.ProcessSubNode("Name")
+    }
+  Value Size: uint8
+  Value: string
+  Name: string
+CHAPResponse:
   operator: |
     this.ProcessSubNode("Value Size")
     vs = getNodeResult("Value Size").Value
