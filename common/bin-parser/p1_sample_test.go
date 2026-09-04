@@ -2956,6 +2956,49 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "exp1", joinUint8(t, n.Child("Next Protocol Data")))
 	})
 
+	t.Run("ieee_802_11/qos", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.2.4.5.4 QoS Data (type 2 subtype 8), TID 6 (AC_VO).
+		// Wireshark wlan.fc.type_subtype / wlan.qos.tid. 3-address + MSDU leftover.
+		addr1 := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		addr2 := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		addr3 := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+		raw := make([]byte, 0, 30)
+		raw = append(raw, 0x88, 0x00, 0x00, 0x00)
+		raw = append(raw, addr1...)
+		raw = append(raw, addr2...)
+		raw = append(raw, addr3...)
+		raw = append(raw, 0x00, 0x00, 0x06, 0x00)
+		raw = append(raw, []byte("qos1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0088), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, addr1, bytesVal(t, n.Child("Addr1")))
+		require.Equal(t, uint64(6), uintVal(t, n.Child("QoS Control"))&0xf)
+		require.Nil(t, n.Child("Addr4"))
+		require.Equal(t, "qos1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+
+	t.Run("ieee_802_11/addr4", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.2.4.3.4: ToDS=1 FromDS=1 four-address (WDS) Data.
+		// Wireshark wlan.fc.tods / wlan.fc.fromds / wlan.addr. Addr4 after Sequence Control.
+		addr1 := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		addr2 := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		addr3 := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
+		addr4 := []byte{0x10, 0x20, 0x30, 0x40, 0x50, 0x60}
+		raw := make([]byte, 0, 34)
+		raw = append(raw, 0x08, 0x03, 0x00, 0x00)
+		raw = append(raw, addr1...)
+		raw = append(raw, addr2...)
+		raw = append(raw, addr3...)
+		raw = append(raw, 0x00, 0x00)
+		raw = append(raw, addr4...)
+		raw = append(raw, []byte("wds1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0308), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, addr4, bytesVal(t, n.Child("Addr4")))
+		require.Nil(t, n.Child("QoS Control"))
+		require.Equal(t, "wds1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
 		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
