@@ -3159,6 +3159,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Nil(t, n.Child("BA Bitmap"))
 	})
 
+	t.Run("ieee_802_11/basic-ba", func(t *testing.T) {
+		// IEEE 802.11-2016 §9.3.1.8 / Table 9-20 Basic BlockAck (Multi-TID=0, Compressed=0).
+		// BA Information: Starting Sequence Control + 128-octet Block Ack Bitmap.
+		// Wireshark wlan.ba.control / wlan.ba.ssc / wlan.ba.bm. TID 6, SSN 16.
+		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		ta := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		bm := make([]byte, 128)
+		bm[0] = 0xff
+		raw := make([]byte, 0, 148)
+		raw = append(raw, 0x94, 0x00, 0x00, 0x00)
+		raw = append(raw, ra...)
+		raw = append(raw, ta...)
+		raw = append(raw, 0x00, 0x60, 0x00, 0x01)
+		raw = append(raw, bm...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x0094), uintVal(t, n.Child("Frame Control")))
+		require.Equal(t, ra, bytesVal(t, n.Child("Addr1")))
+		require.Equal(t, ta, bytesVal(t, n.Child("Addr2")))
+		require.Equal(t, uint64(0x6000), uintVal(t, n.Child("BA Control")))
+		require.Equal(t, uint64(6), uintVal(t, n.Child("BA Control"))>>12)
+		require.Equal(t, uint64(0), (uintVal(t, n.Child("BA Control"))>>2)&1)
+		require.Equal(t, uint64(0x0100), uintVal(t, n.Child("Starting Sequence Control")))
+		require.Equal(t, bm, bytesVal(t, n.Child("Block Ack Bitmap")))
+		require.Equal(t, 128, len(bytesVal(t, n.Child("Block Ack Bitmap"))))
+		require.Nil(t, n.Child("BA Bitmap"))
+		require.Nil(t, n.Child("Seq"))
+		require.Nil(t, n.Child("Next Protocol Data"))
+	})
+
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
 		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
