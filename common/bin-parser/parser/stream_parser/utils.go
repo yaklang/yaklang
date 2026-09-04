@@ -62,6 +62,84 @@ func newNodeValue(node *base.Node, v any) *base.NodeValue {
 		},
 	}
 }
+
+func newNamedValue(name string, v any) *base.NodeValue {
+	return &base.NodeValue{
+		Name:  name,
+		Value: v,
+		AppendSub: func(value *base.NodeValue) error {
+			return errors.New("current node is complex node")
+		},
+	}
+}
+
+func newNamedStruct(name string, children []*base.NodeValue) *base.NodeValue {
+	var v *base.NodeValue
+	v = &base.NodeValue{
+		Name:  name,
+		Value: children,
+		AppendSub: func(value *base.NodeValue) error {
+			val, ok := v.Value.([]*base.NodeValue)
+			if !ok {
+				return errors.New("current node is complex node")
+			}
+			v.Value = append(val, value)
+			return nil
+		},
+	}
+	return v
+}
+
+func collectNodeValues(rest []any) []*base.NodeValue {
+	var out []*base.NodeValue
+	for _, r := range rest {
+		switch x := r.(type) {
+		case *base.NodeValue:
+			out = append(out, x)
+		case []*base.NodeValue:
+			out = append(out, x...)
+		case []any:
+			out = append(out, collectNodeValues(x)...)
+		default:
+			rv := reflect.ValueOf(r)
+			if rv.Kind() == reflect.Slice {
+				for i := 0; i < rv.Len(); i++ {
+					out = append(out, collectNodeValues([]any{rv.Index(i).Interface()})...)
+				}
+			} else {
+				panic(fmt.Sprintf("newStructValue: unexpected child %T", r))
+			}
+		}
+	}
+	return out
+}
+
+// newValueAny accepts either (*base.Node, value) or (name string, value).
+func newValueAny(a any, v any) *base.NodeValue {
+	switch x := a.(type) {
+	case *base.Node:
+		return newNodeValue(x, v)
+	case string:
+		return newNamedValue(x, v)
+	default:
+		panic(fmt.Sprintf("newValue: first arg must be *Node or string, got %T", a))
+	}
+}
+
+func newStructValueAny(args ...any) *base.NodeValue {
+	if len(args) == 0 {
+		panic("newStructValue: missing name")
+	}
+	children := collectNodeValues(args[1:])
+	switch x := args[0].(type) {
+	case *base.Node:
+		return newStructNodeValue(x, children...)
+	case string:
+		return newNamedStruct(x, children)
+	default:
+		panic(fmt.Sprintf("newStructValue: first arg must be *Node or string, got %T", x))
+	}
+}
 func ListNodeNewElement(node *base.Node) (*base.Node, error) {
 	if !node.Cfg.GetBool(CfgIsList) {
 		return nil, errors.New("not list node")

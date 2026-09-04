@@ -498,9 +498,10 @@ func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 			return reflect.ValueOf(i).Len()
 		},
 		"data":           res,
-		"newStructValue": newStructNodeValue,
+		"newStructValue": newStructValueAny,
 		"newListValue":   newListNodeValue,
-		"newValue":       newNodeValue,
+		"newValue":       newValueAny,
+		"node":           node,
 	}
 	engine := antlr4yak.New()
 	engine.ImportLibs(engineLib)

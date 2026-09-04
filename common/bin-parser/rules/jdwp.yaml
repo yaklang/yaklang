@@ -9,12 +9,27 @@ Package:
       }
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
-        if rest >= 11 && rest < 1048576 {
+        if rest >= 11 {
           this.ProcessSubNode("Command")
         }
       }
     Handshake: raw,14
     Command:
+      operator: |
+        this.ProcessSubNode("Length")
+        l = getNodeResult("Length").Value
+        if l < 11 {
+          panic("jdwp: command length smaller than 11")
+        }
+        this.ProcessSubNode("Id")
+        this.ProcessSubNode("Flags")
+        this.ProcessSubNode("Command Set")
+        this.ProcessSubNode("Command")
+        rest = l - 11
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Data").SetMaxLength(rest)
+          this.ProcessSubNode("Data")
+        }
       Length: uint32
       Id: uint32
       Flags: uint8

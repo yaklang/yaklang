@@ -2,9 +2,8 @@ endian: little
 Package:
   Pickle:
     operator: |
-      this.ProcessSubNode("Opcode")
-      op = getNodeResult("Opcode").Value
-      if op != 0x80 {
+      this.ProcessSubNode("PROTO")
+      if getNodeResult("PROTO").Value != 0x80 {
         panic("pickle: expected PROTO opcode")
       }
       this.ProcessSubNode("Version")
@@ -12,13 +11,17 @@ Package:
       if v < 2 || v > 5 {
         panic("pickle: protocol version 2-5")
       }
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Body").SetMaxLength(rest)
-          this.ProcessSubNode("Body")
-        }
+      this.ProcessSubNode("BININT1")
+      if getNodeResult("BININT1").Value != 0x4b {
+        panic("pickle: expected BININT1")
       }
-    Opcode: uint8
+      this.ProcessSubNode("Value")
+      this.ProcessSubNode("STOP")
+      if getNodeResult("STOP").Value != 0x2e {
+        panic("pickle: expected STOP")
+      }
+    PROTO: uint8
     Version: uint8
-    Body: raw
+    BININT1: uint8
+    Value: uint8
+    STOP: uint8

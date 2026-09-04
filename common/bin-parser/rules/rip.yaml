@@ -15,12 +15,34 @@ Package:
       this.ProcessSubNode("Unused")
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Entries").SetMaxLength(rest)
+        if rest >= 20 {
+          if rest < 1048576 {
+            this.GetSubNode("Entries").SetMaxLength(rest)
+          }
           this.ProcessSubNode("Entries")
         }
       }
     Command: uint8
     Version: uint8
     Unused: uint16
-    Entries: raw
+    Entries:
+      list: true
+      Entry: RIPEntry
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          if ele.GetMaxLength() < 20 {
+            break
+          }
+          ele.Process()
+        }
+RIPEntry:
+  Address Family: uint16
+  Route Tag: uint16
+  Address: raw,4
+  Subnet Mask: raw,4
+  Next Hop: raw,4
+  Metric: uint32

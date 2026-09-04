@@ -8,12 +8,25 @@ Package:
       }
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
-        if rest >= 8 && rest < 1048576 {
+        if rest >= 8 {
           this.ProcessSubNode("C1")
         }
       }
     Version: uint8
     C1:
+      operator: |
+        this.ProcessSubNode("Time")
+        this.ProcessSubNode("Zero")
+        if getNodeResult("Zero").Value != 0 {
+          panic("rtmp: C1 zero field must be 0")
+        }
+        if this.Length() < this.GetMaxLength() {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 && rest < 1048576 {
+            this.GetSubNode("Random").SetMaxLength(rest)
+            this.ProcessSubNode("Random")
+          }
+        }
       Time: uint32
       Zero: uint32
       Random: raw

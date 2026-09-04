@@ -2,7 +2,9 @@ package bin_parser
 
 import (
 	"bytes"
+	"encoding/hex"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/gopacket/gopacket"
@@ -13,6 +15,19 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/rules"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+func mustHex(t *testing.T, s string) []byte {
+	t.Helper()
+	s = strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\n' || r == '\t' {
+			return -1
+		}
+		return r
+	}, s)
+	b, err := hex.DecodeString(s)
+	require.NoError(t, err)
+	return b
+}
 
 func TestProtocolCatalogRuleFilesExist(t *testing.T) {
 	for _, item := range ProtocolCatalog {
