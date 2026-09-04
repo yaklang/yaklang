@@ -345,7 +345,27 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						}
 					}
 				}
+				// Some frontends represent an out/ref fallback as call[index]. This
+				// is especially useful for a forward local-function call, whose body
+				// (and therefore pointer side effect) is completed only after the call
+				// instruction was emitted. Resolve that indexed member against the
+				// finished callee metadata at analysis time; this also survives a DB
+				// reload because FunctionType.SideEffects is serialized.
+				if functionType, ok := ssa.ToFunctionType(inst.GetType()); ok {
+					for _, sideEffect := range functionType.SideEffects {
+						if sideEffect == nil || sideEffect.Kind != ssa.PointerSideEffect ||
+							sideEffect.MemberCallKind != ssa.ParameterCall || sideEffect.MemberCallObjectIndex != targetIdx {
+							continue
+						}
+						if modified, ok := actx.getResolvedValue(inst, sideEffect.Modify); ok && !utils.IsNil(modified) {
+							traceRets = append(traceRets, i.NewValue(modified))
+						}
+					}
+				}
 				return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
+					if item == nil {
+						return nil
+					}
 					return item.getTopDefs(actx, opt...)
 				})
 			} else {
@@ -418,6 +438,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		handlerReturn(i)
 		if len(vals) == 0 {
 			vals = append(vals, i)
+		}
+		if callEntry, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY); ok {
+			if call, ok := ssa.ToCall(callEntry.getValue()); ok && call.IsNonVirtual {
+				return vals
+			}
 		}
 		// handler child-class function
 		for _, child := range inst.GetPointer() {
@@ -528,6 +553,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 
 			var actualParam ssa.Value
+			omittedDefault := false
 			if inst.IsFreeValue {
 				// free value
 				if binding, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
@@ -562,24 +588,36 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			} else {
 				// parameter
 				if inst.FormalParameterIndex >= len(calledInstance.Args) {
-					log.Debugf("formal parameter index: %d is out of range", inst.FormalParameterIndex)
-					return getMemberCall(i, i.getValue(), actx)
-				}
-				argID := calledInstance.Args[inst.FormalParameterIndex]
-				// Prefer resolving actual argument in the call-site scope first.
-				actualParam, ok = actx.getResolvedValue(calledInstance, argID)
-				if !ok {
-					// Fallback to current instruction scope for compatibility.
-					actualParam, ok = actx.getResolvedValue(inst, argID)
-					if !ok {
-						actualParam = nil
+					// Optional parameters keep their declared default on the formal.
+					// A call intentionally omits trailing optional arguments, so an
+					// out-of-range formal is not necessarily a broken call vector.
+					// Resolve the default in the callee program before falling back to
+					// the unresolved parameter itself.
+					if fallback := inst.GetDefault(); !utils.IsNil(fallback) {
+						actualParam = fallback
+						omittedDefault = true
+					} else {
+						log.Debugf("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+						return getMemberCall(i, i.getValue(), actx)
 					}
-				}
-			}
-			// After DB reload, Binding id lookup may fail while Parameter.defaultValue still resolves.
-			if utils.IsNil(actualParam) && inst.IsFreeValue {
-				if d := inst.GetDefault(); !utils.IsNil(d) {
-					actualParam = d
+				} else {
+					argID := calledInstance.Args[inst.FormalParameterIndex]
+					// Prefer resolving actual argument in the call-site scope first.
+					actualParam, ok = actx.getResolvedValue(calledInstance, argID)
+					if !ok {
+						// Fallback to current instruction scope for compatibility.
+						actualParam, ok = actx.getResolvedValue(inst, argID)
+						if !ok {
+							actualParam = nil
+						}
+					}
+					// A frontend may need to materialize an omitted default into an
+					// earlier call-vector slot so a later named argument stays aligned.
+					// The exact declared-default instruction is still callee-local and
+					// must not be rejected by the caller/callee crossing guard.
+					if fallback := inst.GetDefault(); !utils.IsNil(actualParam) && !utils.IsNil(fallback) && actualParam.GetId() == fallback.GetId() {
+						omittedDefault = true
+					}
 				}
 			}
 			if utils.IsNil(actualParam) {
@@ -587,7 +625,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				return getMemberCall(i, i.getValue(), actx)
 			}
 			traced := i.NewValue(actualParam)
-			if !actx.needCrossProcess(i, traced) {
+			// A declared default is local to the callee, so it does not cross a
+			// function boundary. Explicit arguments still require the ordinary
+			// caller-to-callee guard.
+			if !omittedDefault && !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
 			ret := traced.getTopDefs(actx, opt...)

@@ -179,37 +179,54 @@ func (c *Blueprint) AddInterfaceBlueprint(b *Blueprint) {
 	c.addParentBlueprintEx(b, BlueprintRelationInterface)
 }
 
-func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRelationKind) {
+// AddParentBlueprintRelationOnly records inheritance without copying/linking
+// name-only method slots. Frontends with signature-aware overload resolution
+// use this to avoid treating unrelated overloads as virtual overrides.
+func (c *Blueprint) AddParentBlueprintRelationOnly(parent *Blueprint) {
+	c.addBlueprintRelationOnly(parent, BlueprintRelationParents)
+}
+
+// AddInterfaceBlueprintRelationOnly is the interface counterpart of
+// AddParentBlueprintRelationOnly.
+func (c *Blueprint) AddInterfaceBlueprintRelationOnly(parent *Blueprint) {
+	c.addBlueprintRelationOnly(parent, BlueprintRelationInterface)
+}
+
+func (c *Blueprint) addBlueprintRelationOnly(parent *Blueprint, relation BlueprintRelationKind) bool {
 	if parent == nil || c == nil {
-		return
+		return false
 	}
 
 	switch relation {
 	case BlueprintRelationParents:
 		for _, existing := range c.ParentBlueprints {
 			if existing == parent {
-				return
+				return false
 			}
 		}
 	case BlueprintRelationInterface:
 		for _, existing := range c.InterfaceBlueprints {
 			if existing == parent {
-				return
+				return false
 			}
 		}
 	}
 	if c == parent || c.Name == parent.Name {
 		log.Debugf("skip self blueprint relation: blueprint name=%v relation=%v", c.Name, relation)
-		return
+		return false
 	}
 
 	// 使用新的循环依赖检查函数
 	if HasCircularDependency(c, parent) {
 		log.Errorf("BUG!: add parent blueprint error: loop. blueprint name: %v, parent name: %v", c.Name, parent.Name)
-		return
+		return false
 	}
 
-	if !c.setBlueprintRelation(parent, relation) {
+	return c.setBlueprintRelation(parent, relation)
+}
+
+func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRelationKind) {
+	if !c.addBlueprintRelationOnly(parent, relation) {
 		return
 	}
 
@@ -220,7 +237,41 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		c.RegisterStaticMethod(name, f, false)
 	}
 	for name, f := range parent.MagicMethod {
-		c.RegisterMagicMethod(name, f)
+		// RegisterMagicMethod intentionally keeps an existing placeholder in the
+		// map while moving the effective implementation into the dedicated slot.
+		// Inherit that effective implementation so a grandchild does not fall back
+		// to its parent's stale Undefined placeholder.
+		inherited := f
+		switch name {
+		case Constructor:
+			if !utils.IsNil(parent.Constructor) {
+				inherited = parent.Constructor
+			}
+		case Destructor:
+			if !utils.IsNil(parent.Destructor) {
+				inherited = parent.Destructor
+			}
+		}
+		// Constructors and destructors are not ordinary inherited overloads. If
+		// the child declared its own magic method, RegisterMagicMethod would
+		// replace child.Constructor/Destructor with the parent's value even
+		// though the child's MagicMethod entry remains present. Inspect the
+		// effective slot rather than MagicMethod directly: some frontends seed
+		// the map with an Undefined placeholder and RegisterMagicMethod keeps
+		// that placeholder there while updating Constructor/Destructor.
+		var own Value
+		switch name {
+		case Constructor:
+			own = c.Constructor
+		case Destructor:
+			own = c.Destructor
+		default:
+			own = c.MagicMethod[name]
+		}
+		if _, concrete := ToFunction(own); concrete {
+			continue
+		}
+		c.RegisterMagicMethod(name, inherited)
 	}
 	for name, values := range parent.NormalMember {
 		if len(c.NormalMember[name]) > 0 {
