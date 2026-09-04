@@ -391,7 +391,11 @@ var icmpV6Expect = `Ethernet:
       Neighbor Solicitation:
         Reserved: "00000000"
         Target Address: fe8000000000000014ae6f6a11a35b78
-        Options: 0101f84d8991af52
+        Options:
+          Option:
+            Type: 1
+            Length: 1
+            Link Layer: f84d8991af52
 `
 var dnsResponseExpect = `Ethernet:
   Destination: f84d8991af52
@@ -620,7 +624,9 @@ var icmpExpect = `Ethernet:
       ICMP Echo:
         Identifier: 18297
         Sequence Number: 0
-        Data: 657fb59d00030e6708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637
+        Echo Data: !!binary |
+          ZX+1nQADDmcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMz
+          Q1Njc=
 `
 var arpExpect = `Ethernet:
   Destination: ffffffffffff
