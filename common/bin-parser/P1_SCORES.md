@@ -117,10 +117,10 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | STUN | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `stun.yaml` |
 | TURN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of STUN |
 | RTMP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `rtmp.yaml` |
-| WKSSVC | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
-| SPOOLSS | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
-| ATSVC | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
-| IObjectExporter | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
+| WKSSVC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
+| SPOOLSS | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
+| ATSVC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
+| IObjectExporter | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | LLMNR-MDNS collision | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of LLMNR |
 | WPAD | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | TPKT | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `application-layer/msrdp.yaml` |

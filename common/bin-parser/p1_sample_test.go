@@ -1,6 +1,7 @@
 package bin_parser
 
 import (
+	"encoding/binary"
 	"strings"
 	"testing"
 
@@ -1044,5 +1045,46 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(65507), uintVal(t, wired.Child("MsgMaxSize")))
 		require.Equal(t, uint64(4), uintVal(t, wired.Child("MsgFlags")))
 		require.Equal(t, uint64(3), uintVal(t, wired.Child("Security Model")))
+	})
+
+	t.Run("dcerpc/bind", func(t *testing.T) {
+		// [MS-RPCE] 2.2.2.6 bind: EPM UUID 8a885d04-... is NDR transfer; abstract e1af8308-...
+		epm := []byte{0x08, 0x83, 0xaf, 0xe1, 0x1f, 0x5d, 0xc9, 0x11, 0x91, 0xa4, 0x08, 0x00, 0x2b, 0x14, 0xa0, 0xfa}
+		ndr := []byte{0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10, 0x48, 0x60}
+		body := make([]byte, 12+44)
+		binary.LittleEndian.PutUint16(body[0:], 5840)
+		binary.LittleEndian.PutUint16(body[2:], 5840)
+		body[8] = 1
+		body[12] = 1
+		copy(body[16:32], epm)
+		binary.LittleEndian.PutUint32(body[32:], 3)
+		copy(body[36:52], ndr)
+		binary.LittleEndian.PutUint32(body[52:], 2)
+		raw := append(dcerpcHeader(11, uint16(16+len(body)), 1), body...)
+		n := parseRule(t, raw, "application-layer.dcerpc", "DCERPC")
+		require.Equal(t, uint64(11), uintVal(t, n.Child("PType")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "PDU", "Bind").Child("Num Ctx Items")))
+		require.Equal(t, epm, bytesVal(t, mustChild(t, n, "PDU", "Bind", "Contexts").Children()[0].Child("Abstract Syntax")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 135, raw))
+		require.Equal(t, uint64(11), uintVal(t, mustChild(t, eth, "IP", "TCP", "DCERPC").Child("PType")))
+	})
+
+	t.Run("dcerpc/bind-ack", func(t *testing.T) {
+		// [MS-RPCE] 2.2.2.3 / DCE 1.1 bind_ack port_any_t; Wireshark packet-dcerpc.c
+		// dissect_dcerpc_cn_bind_ack dcerpc.cn_sec_addr FT_STRINGZ "135".
+		raw := mustHex(t, "05000c03100000003c00000001000000d016d0160100000004003133350000000100000000000000045d888aeb1cc9119fe808002b10486002000000")
+		n := parseRule(t, raw, "application-layer.dcerpc", "DCERPC")
+		require.Equal(t, uint64(12), uintVal(t, n.Child("PType")))
+		ack := mustChild(t, n, "PDU", "BindAck")
+		require.Equal(t, uint64(5840), uintVal(t, ack.Child("Max Xmit Frag")))
+		require.Equal(t, uint64(4), uintVal(t, ack.Child("Sec Addr Len")))
+		require.Equal(t, "135", strings.TrimRight(strVal(t, ack.Child("Sec Addr")), "\x00"))
+		res := mustChild(t, ack, "DCERPCResults")
+		require.Equal(t, uint64(1), uintVal(t, res.Child("Num Results")))
+		require.Equal(t, uint64(0), uintVal(t, res.Child("Ack Result")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 135, 50000, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "DCERPC", "PDU", "BindAck")
+		require.Equal(t, "135", strings.TrimRight(strVal(t, wired.Child("Sec Addr")), "\x00"))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, wired, "DCERPCResults").Child("Ack Result")))
 	})
 }
