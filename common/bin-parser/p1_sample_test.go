@@ -144,6 +144,14 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0), uintVal(t, avps[0].Child("Attribute Type")))
 	})
 
+	t.Run("l2tp/data-ppp", func(t *testing.T) {
+		// RFC 2661 data (T=0, no L/S/O): Tunnel 0x0014 + PPP Protocol 0x002d.
+		l2 := mustHex(t, "000200140001ff03002d")
+		eth := parseEthernet(t, ipv4UDPBytes(t, 1701, 1701, l2))
+		require.Equal(t, uint64(0x0014), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Tunnel ID")))
+		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP", "PPP").Child("Protocol")))
+	})
+
 	t.Run("amqp/connection-start", func(t *testing.T) {
 		// AMQP 0-9-1 §4.2.4 Connection.Start (class 10 method 10):
 		// version 0.9, server-properties table {product: "RabbitMQ"},
@@ -327,9 +335,14 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("eap/identity", func(t *testing.T) {
-		eap := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
+		// RFC 3748 §5.1 EAP-Response/Identity Type-Data "anonymous" inside EAPOL.
+		eap := append([]byte{0x01, 0x00, 0x00, 0x0e, 0x02, 0x01, 0x00, 0x0e, 0x01}, []byte("anonymous")...)
 		ep := parseRule(t, eap, "eapol", "EAPOL")
-		require.Equal(t, uint64(1), uintVal(t, mustChild(t, ep, "EAPPacket").Child("Type")))
+		pkt := mustChild(t, ep, "EAPPacket")
+		require.Equal(t, uint64(1), uintVal(t, pkt.Child("Type")))
+		require.Equal(t, "anonymous", strVal(t, pkt.Child("Identity")))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		require.Equal(t, "anonymous", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("Identity")))
 	})
 
 	t.Run("jdwp/command-set", func(t *testing.T) {
