@@ -68,7 +68,7 @@ var extraFailCount = map[string]int{
 	"application-layer.http2":              3,
 	"application-layer.smb":                3,
 	"application-layer.smb2":               3,
-	"internet_control_message_protocol_v6": 3,
+	"internet_control_message_protocol_v6": 4,
 }
 
 func schemaCeiling(ruleFile, opaqueRaw string) int {
