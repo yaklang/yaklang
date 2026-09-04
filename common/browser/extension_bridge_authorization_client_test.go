@@ -33,41 +33,23 @@ func TestExtensionAuthorizationClientTaskRejectsUnknownEnvelopeFields(t *testing
 	require.Contains(t, bridgeErr.Message, "unknown field")
 }
 
-func TestExtensionAuthorizationClientWorkspaceIgnoresCallerDeviceSelection(t *testing.T) {
+func TestExtensionAuthorizationClientWorkspaceRequiresCallerInstance(t *testing.T) {
 	var input extensionAuthorizationClientWorkspaceInput
 	err := decodeExtensionAuthorizationClientJSON(
-		json.RawMessage(`{"mode":"horizontal","left":{"tabId":11,"frameId":0,"accountLabel":"A"},"right":{"tabId":12,"frameId":0,"accountLabel":"B"}}`),
+		json.RawMessage(`{"mode":"horizontal","left":{"deviceId":"device-a","tabId":11,"frameId":0,"accountLabel":"A"},"right":{"deviceId":"device-b","tabId":12,"frameId":0,"accountLabel":"B"}}`),
 		&input,
 	)
 	require.NoError(t, err)
-	require.Equal(t, 11, input.Left.TabID)
-
-	err = decodeExtensionAuthorizationClientJSON(
-		json.RawMessage(`{"mode":"horizontal","left":{"deviceId":"other","tabId":11,"frameId":0},"right":{"tabId":12,"frameId":0}}`),
-		&input,
-	)
-	require.ErrorContains(t, err, "unknown field")
-}
-
-func TestDecodeExtensionAuthorizationYakitOpen(t *testing.T) {
-	prepared, err := decodeExtensionAuthorizationYakitOpen(
-		json.RawMessage(`{"tabId":11,"mode":"vertical","targetDeviceId":"device-b"}`),
-	)
+	prepared, err := extensionAuthorizationWorkspaceInputForDevice("device-a", input)
 	require.NoError(t, err)
-	require.Equal(t, 11, prepared.TabID)
-	require.Equal(t, "vertical", prepared.Mode)
-	require.Equal(t, "device-b", prepared.TargetDeviceID)
+	require.Equal(t, "device-a", prepared.Left.DeviceID)
+	require.Equal(t, "device-b", prepared.Right.DeviceID)
 
-	existing, err := decodeExtensionAuthorizationYakitOpen(
-		json.RawMessage(`{"workspaceId":"workspace-a"}`),
+	_, err = extensionAuthorizationWorkspaceInputForDevice(
+		"device-b",
+		input,
 	)
-	require.NoError(t, err)
-	require.Equal(t, "workspace-a", existing.WorkspaceID)
-
-	_, err = decodeExtensionAuthorizationYakitOpen(
-		json.RawMessage(`{"workspaceId":"workspace-a","tabId":11}`),
-	)
-	require.ErrorContains(t, err, "cannot be combined")
+	require.ErrorContains(t, err, "left identity")
 }
 
 func TestExtensionAuthorizationInstances(t *testing.T) {
@@ -77,7 +59,19 @@ func TestExtensionAuthorizationInstances(t *testing.T) {
 		{DeviceID: "device-other"},
 	}
 	require.Equal(t, []extensionAuthorizationInstance{
-		{DeviceID: "device-a", Badge: "A", Current: true},
-		{DeviceID: "device-b", Badge: "B", Current: false},
+		{DeviceID: "device-a", Badge: "A", Current: true, Tabs: []extensionAuthorizationInstanceTab{}},
+		{DeviceID: "device-b", Badge: "B", Current: false, Tabs: []extensionAuthorizationInstanceTab{}},
 	}, extensionAuthorizationInstances(connections, "device-a"))
+}
+
+func TestExtensionAuthorizationClientSlotKeepsRemoteDevice(t *testing.T) {
+	workspace := ExtensionAuthorizationWorkspace{
+		Left:  ExtensionAuthorizationIdentitySlot{DeviceID: "device-a"},
+		Right: ExtensionAuthorizationIdentitySlot{DeviceID: "device-b"},
+	}
+	right, err := extensionAuthorizationClientSlot(workspace, "right")
+	require.NoError(t, err)
+	require.Equal(t, "device-b", right.DeviceID)
+	_, err = extensionAuthorizationClientSlot(workspace, "unknown")
+	require.Error(t, err)
 }

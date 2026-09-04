@@ -42,7 +42,6 @@ var extensionBridgeEngineCapabilities = []string{
 	"yakit.browser_request.prepare_analysis",
 	"yakit.browser_authorization.task",
 	"yakit.browser_authorization.instances",
-	"yakit.browser_authorization.open",
 }
 
 type ExtensionBridgeError struct {

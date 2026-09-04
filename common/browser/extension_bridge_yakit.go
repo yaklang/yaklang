@@ -61,9 +61,7 @@ func (s *ExtensionBridgeServer) handleExtensionClientRequest(ctx context.Context
 	case "yakit.browser_authorization.task":
 		return s.handleExtensionAuthorizationClientTask(ctx, deviceID, params)
 	case "yakit.browser_authorization.instances":
-		return s.listExtensionAuthorizationInstances(deviceID)
-	case "yakit.browser_authorization.open":
-		return s.openExtensionAuthorizationWorkspaceInYakit(ctx, deviceID, params)
+		return s.listExtensionAuthorizationInstances(ctx, deviceID)
 	default:
 		return nil, &ExtensionBridgeError{Code: "method_not_found", Message: "unsupported engine method: " + method}
 	}

@@ -115,7 +115,6 @@ func TestExtensionBridgeCallRoundTrip(t *testing.T) {
 	require.Contains(t, helloAck.Capabilities, "yakit.browser_request.prepare_analysis")
 	require.Contains(t, helloAck.Capabilities, "yakit.browser_authorization.task")
 	require.Contains(t, helloAck.Capabilities, "yakit.browser_authorization.instances")
-	require.Contains(t, helloAck.Capabilities, "yakit.browser_authorization.open")
 	require.Eventually(t, func() bool {
 		return server.Status()["connected"] == true
 	}, time.Second, 10*time.Millisecond)
