@@ -54,6 +54,16 @@ EAPPacket:
         this.ProcessSubNode("Identity")
         return
       }
+      if t == 2 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Notification").SetMaxLength(dlen)
+        this.ProcessSubNode("Notification")
+        return
+      }
+      if t == 3 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Nak").SetMaxLength(dlen)
+        this.ProcessSubNode("Nak")
+        return
+      }
       if t == 4 && dlen > 1 && dlen < 1048576 {
         this.GetSubNode("MD5-Challenge").SetMaxLength(dlen)
         this.ProcessSubNode("MD5-Challenge")
@@ -66,6 +76,18 @@ EAPPacket:
   Length: uint16
   Type: uint8
   Identity: string
+  Notification: string
+  Nak:
+    operator: |
+      for {
+        res, op = this.TryProcessByType("PeekByte")
+        if !op.OK {
+          op.Recovery()
+          break
+        }
+        op.Recovery()
+        this.ProcessByType("Desired Type")
+      }
   MD5-Challenge:
     operator: |
       this.ProcessSubNode("Value Size")
@@ -113,6 +135,7 @@ EAPOLKey:
 EAPOLASFAlert:
   Vendor ID: uint32
   Vendor Type: uint32
+Desired Type: uint8
 Next Protocol Data:
   list: true
   Octet: uint8
