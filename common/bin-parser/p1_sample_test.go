@@ -1230,6 +1230,34 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "host", strVal(t, wired.Child("Name")))
 	})
 
+	t.Run("eap/notification", func(t *testing.T) {
+		// RFC 3748 §5.2 EAP-Request/Notification Type-Data displayable "hello".
+		// Wireshark eap.type=2 / eap.notification. EtherType 0x888e.
+		eap := append([]byte{0x01, 0x00, 0x00, 0x0a, 0x01, 0x01, 0x00, 0x0a, 0x02}, []byte("hello")...)
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(2), uintVal(t, pkt.Child("Type")))
+		require.Equal(t, "hello", strVal(t, pkt.Child("Notification")))
+		require.Nil(t, pkt.Child("Identity"))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		require.Equal(t, "hello", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("Notification")))
+	})
+
+	t.Run("eap/nak", func(t *testing.T) {
+		// RFC 3748 §5.3 EAP-Response/Nak: Type-Data desired Types 4 (MD5) then 13 (TLS).
+		// Wireshark eap.type=3 / eap.desired_type. EtherType 0x888e.
+		eap := []byte{0x01, 0x00, 0x00, 0x07, 0x02, 0x01, 0x00, 0x07, 0x03, 0x04, 0x0d}
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(3), uintVal(t, pkt.Child("Type")))
+		nak := pkt.Child("Nak").Children()
+		require.Equal(t, 2, len(nak))
+		require.Equal(t, uint64(4), uintVal(t, nak[0]))
+		require.Equal(t, uint64(13), uintVal(t, nak[1]))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		wired := mustChild(t, eth, "EAPOL", "EAPPacket").Child("Nak").Children()
+		require.Equal(t, uint64(4), uintVal(t, wired[0]))
+		require.Equal(t, uint64(13), uintVal(t, wired[1]))
+	})
+
 	t.Run("eapol/mka", func(t *testing.T) {
 		// IEEE 802.1X-2010 Table 11-3 Packet Type 5 EAPOL-MKA. Wireshark eapol.type.
 		// No MKA dissector: Body Length-bounded leftover is Next Protocol Data, not Unknown raw.
