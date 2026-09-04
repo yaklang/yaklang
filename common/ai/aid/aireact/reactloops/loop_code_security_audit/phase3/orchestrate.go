@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
@@ -84,7 +83,6 @@ func runAllFindingVerifications(
 		ParentLoop:         loop,
 		TimelineMode:       reactloops.SubAgentTimelineFork,
 		ExecuteConcurrency: concurrency,
-		ExtraConfigOpts:    auditopts.SubAgentConfigOpts(),
 		LoopBuilder:        phase3FindingLoopBuilder{state: state, catalog: catalog},
 	})
 

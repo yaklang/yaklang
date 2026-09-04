@@ -231,15 +231,8 @@ func RegisterValueFeedbackSubmitter(submitter ValueFeedbackSubmitter) {
 
 // SubmitValueFeedback 把一次价值评估上下文交给已注册的实现.
 // 未注册时安全 no-op; 任何 panic 被本函数兜底收敛, 绝不影响主流程.
-//
-// 这是全部价值评估提交路径 (loop 埋点 / verification 信号 / tool_review /
-// plan / task / aiforge review / risk) 的唯一汇聚点: cfg.DisableValueFeedback
-// 在此统一门控, 一处封死全部 (含无法逐 loop 注入选项的子通路, 如工具审批).
 func SubmitValueFeedback(cfg *Config, record *ValueFeedbackRecord) {
 	if cfg == nil || record == nil {
-		return
-	}
-	if cfg.DisableValueFeedback {
 		return
 	}
 	valueFeedbackSubmitterMu.RLock()

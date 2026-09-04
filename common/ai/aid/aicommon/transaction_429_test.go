@@ -20,12 +20,11 @@ type transactionTestConfig struct {
 	*KeyValueConfig
 	*BaseInteractiveHandler
 	*BaseCheckpointableStorage
-	ctx         context.Context
-	emitter     *Emitter
-	idSeq       int64
-	retryMax    int64
-	formatRetry int64
-	retryWait   func(context.Context, time.Duration) error
+	ctx       context.Context
+	emitter   *Emitter
+	idSeq     int64
+	retryMax  int64
+	retryWait func(context.Context, time.Duration) error
 }
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
@@ -64,9 +63,6 @@ func (t *transactionTestConfig) IsCtxDone() bool {
 func (t *transactionTestConfig) GetContext() context.Context           { return t.ctx }
 func (t *transactionTestConfig) CallAIResponseConsumptionCallback(int) {}
 func (t *transactionTestConfig) GetAITransactionAutoRetryCount() int64 { return t.retryMax }
-func (t *transactionTestConfig) GetAIFormatAutoRetryCount() int64 {
-	return t.formatRetry
-}
 func (t *transactionTestConfig) waitBeforeAIRetry(ctx context.Context, delay time.Duration) error {
 	if t.retryWait != nil {
 		return t.retryWait(ctx, delay)

@@ -2,14 +2,14 @@
 //
 // Operational note: the dominant runtime cost in long audits is usually the AI
 // upstream (TLS/EOF/timeouts). Prefer a stable gateway/model before relying on
-// these code-side budgets. Defaults below reduce wasted retries and long-tail
-// category scans when the channel is flaky.
+// these code-side budgets. The knobs here are audit-layer only: wall-clock
+// budgets via the sub-agent job timeout parameter and loop-level auxiliary
+// cuts via pre-existing reactloops options — no config-layer switches.
 package auditopts
 
 import (
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
 
@@ -18,38 +18,11 @@ const (
 	// sub-agent. Prevents a single long-tail class from holding a concurrency
 	// slot for hours.
 	DefaultCategoryScanTimeout = 75 * time.Minute
-
-	// DefaultAuditTransactionRetry caps network+format transaction retries for
-	// audit sub-agents (parent default is often 5).
-	DefaultAuditTransactionRetry int64 = 3
-
-	// DefaultAuditFormatRetry caps action-format retries (think-only / missing
-	// @action). Lower than network retry so format failures fail fast.
-	DefaultAuditFormatRetry int64 = 2
 )
 
-// SubAgentConfigOpts returns config options applied to Phase2/Phase3 forked
-// sub-agent invokers.
-func SubAgentConfigOpts() []aicommon.ConfigOption {
-	return []aicommon.ConfigOption{
-		aicommon.WithAITransactionAutoRetry(DefaultAuditTransactionRetry),
-		aicommon.WithAIFormatAutoRetry(DefaultAuditFormatRetry),
-		aicommon.WithSkipToolCallReasonGeneration(true),
-		aicommon.WithDisablePerception(true),
-		// Config-level switches propagate to every child invoker at any depth
-		// (category loops, verify loops, fast_context sub-loops): the value
-		// feedback gate blocks all submission paths (incl. tool review), and
-		// the periodic verification entry disables the watchdog even in loops
-		// built without explicit per-loop options.
-		aicommon.WithDisableValueFeedbackSubmission(true),
-		aicommon.WithDisablePeriodicVerification(true),
-	}
-}
-
 // LoopAuxiliaryOpts disables expensive auxiliary AI paths that amplify request
-// volume under slow networks (perception, periodic verification). Value feedback
-// is covered by the config-level gate in SubAgentConfigOpts, which propagates
-// to all child invokers; no per-loop option is needed.
+// volume under slow networks (perception, periodic verification). Both are
+// pre-existing loop-level options applied to the audit's own loops only.
 func LoopAuxiliaryOpts() []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
 		reactloops.WithDisableLoopPerception(true),

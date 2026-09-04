@@ -8,9 +8,6 @@ import (
 const (
 	aiRetryInitialBackoff = 2 * time.Second
 	aiRetryMaxBackoff     = 32 * time.Second
-
-	aiTransportRetryInitialBackoff = 10 * time.Second
-	aiTransportRetryMaxBackoff     = 60 * time.Second
 )
 
 // aiRetryBackoff returns the delay before the numbered retry. The first retry
@@ -23,21 +20,6 @@ func aiRetryBackoff(retryNumber int64) time.Duration {
 		return aiRetryMaxBackoff
 	}
 	return aiRetryInitialBackoff << (retryNumber - 1)
-}
-
-// aiTransportRetryBackoff returns the delay before the numbered retry after a
-// transport-class failure (dial/TLS/gateway outage). It starts at ten seconds
-// and doubles up to sixty seconds, so sub-minute outage windows observed in
-// engine logs can be ridden out within the network retry budget instead of
-// burning attempts inside a two-second spread.
-func aiTransportRetryBackoff(retryNumber int64) time.Duration {
-	if retryNumber <= 0 {
-		return 0
-	}
-	if retryNumber >= 4 {
-		return aiTransportRetryMaxBackoff
-	}
-	return aiTransportRetryInitialBackoff << (retryNumber - 1)
 }
 
 type aiRetryWaiter interface {

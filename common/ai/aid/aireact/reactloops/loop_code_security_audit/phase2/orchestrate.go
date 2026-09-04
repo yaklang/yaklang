@@ -84,7 +84,6 @@ func runAllCategoryScans(
 		TimelineMode:       reactloops.SubAgentTimelineFork,
 		ExecuteConcurrency: concurrency,
 		DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
-		ExtraConfigOpts:    auditopts.SubAgentConfigOpts(),
 		LoopBuilder: phase2CategoryLoopBuilder{
 			state: state, catalog: catalog, artifacts: artifacts, scanStates: &scanStates,
 		},
@@ -162,7 +161,6 @@ func runAllCategoryScans(
 			TimelineMode:       reactloops.SubAgentTimelineFork,
 			ExecuteConcurrency: concurrency,
 			DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
-			ExtraConfigOpts:    auditopts.SubAgentConfigOpts(),
 			LoopBuilder: phase2ResumeBatchLoopBuilder{
 				state: state, resumeCatalog: resumeCatalog, artifacts: artifacts, scanStates: &scanStates,
 			},

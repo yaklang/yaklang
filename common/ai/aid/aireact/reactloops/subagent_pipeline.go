@@ -897,10 +897,6 @@ type SubAgentOptions struct {
 	// DefaultJobTimeout 是每个子 Agent 的默认 wall-clock 预算。当 job.Timeout
 	// 未设置时生效；<=0 表示不限制（仅受父 context 约束）。
 	DefaultJobTimeout time.Duration
-
-	// ExtraConfigOpts 追加到子 invoker 的 config（在 ConvertConfigToOptions 之后）。
-	// 用于审计等场景收紧重试、关闭 tool-call-reason 等。
-	ExtraConfigOpts []aicommon.ConfigOption
 }
 
 // LoopBuilder 构建子 Agent 的 ReActLoop。默认实现按 job.LoopName 查注册表
