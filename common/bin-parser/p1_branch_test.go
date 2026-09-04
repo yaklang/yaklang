@@ -34,6 +34,18 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, succ, "stun", "STUN")
 		require.Equal(t, uint64(0xa147), uintVal(t, n.Child("Attributes").Children()[0].Child("X-Port")))
 	})
+	t.Run("bittorrent/handshake", func(t *testing.T) {
+		n := parseRule(t, btHandshake(), "bittorrent", "BitTorrent")
+		require.Equal(t, uint64(19), uintVal(t, n.Child("Pstrlen")))
+		require.Equal(t, []byte("-UT2210-abcdefghijkl"), bytesVal(t, n.Child("Peer ID")))
+	})
+	t.Run("bittorrent/have", func(t *testing.T) {
+		raw := append(btHandshake(), 0, 0, 0, 5, 4, 0, 0, 0, 7)
+		n := parseRule(t, raw, "bittorrent", "BitTorrent")
+		msg := n.Child("Messages").Children()[0]
+		require.Equal(t, uint64(4), uintVal(t, msg.Child("Message ID")))
+		require.Equal(t, uint64(7), uintVal(t, msg.Child("Piece Index")))
+	})
 	t.Run("sdp/origin", func(t *testing.T) {
 		n := parseRule(t, []byte("v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"), "sdp", "SDP")
 		require.Equal(t, "alice", strVal(t, n.Child("Username")))
