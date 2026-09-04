@@ -47,7 +47,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | IKEv1 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ike.yaml` |
 | IKEv2 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ike.yaml` |
 | NAT-T | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of IKEv2 |
-| OSPF | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `ospf.yaml` |
+| OSPF | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `ospf.yaml` |
 | BGP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `bgp.yaml` |
 | RIP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rip.yaml` |
 | EIGRP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `eigrp.yaml` |
