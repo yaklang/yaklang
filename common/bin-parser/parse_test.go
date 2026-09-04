@@ -431,13 +431,13 @@ var dnsResponseExpect = `Ethernet:
             Name:
               Label:
                 Count: 11
-                Data: cloudconfig
+                Text: cloudconfig
               Label:
                 Count: 9
-                Data: jetbrains
+                Text: jetbrains
               Label:
                 Count: 3
-                Data: com
+                Text: com
               Label:
                 Count: 0
             Type: 1
@@ -451,7 +451,8 @@ var dnsResponseExpect = `Ethernet:
             Class: 1
             TTL: 19
             RDLength: 4
-            RData: 3412ec15
+            DNSA:
+              Address: 3412ec15
           Answer:
             Name:
               Pointer: 12
@@ -460,7 +461,8 @@ var dnsResponseExpect = `Ethernet:
             Class: 1
             TTL: 19
             RDLength: 4
-            RData: 364dbb13
+            DNSA:
+              Address: 364dbb13
 `
 var dnsExpect = `Ethernet:
   Destination: 3066d026811b
@@ -496,13 +498,13 @@ var dnsExpect = `Ethernet:
             Name:
               Label:
                 Count: 17
-                Data: copilot-telemetry
+                Text: copilot-telemetry
               Label:
                 Count: 17
-                Data: githubusercontent
+                Text: githubusercontent
               Label:
                 Count: 3
-                Data: com
+                Text: com
               Label:
                 Count: 0
             Type: 1

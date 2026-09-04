@@ -630,4 +630,19 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("tpkt/cc", func(t *testing.T) {
 		require.Equal(t, uint64(0xd0), uintVal(t, mustChild(t, parseRule(t, []byte{0x03, 0x00, 0x00, 0x0b, 0x06, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}, "application-layer.msrdp", "RDP"), "X224").Child("Flag")))
 	})
+
+	t.Run("mdns/ptr", func(t *testing.T) {
+		raw := []byte{
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x05, '_', 'h', 't', 't', 'p', 0x04, '_', 't', 'c', 'p', 0x05, 'l', 'o', 'c', 'a', 'l', 0x00,
+			0x00, 0x0c, 0x00, 0x01,
+		}
+		q := parseRule(t, raw, "application-layer.dns", "DNS").Child("Questions").Children()[0]
+		require.Equal(t, "_http", strVal(t, q.Child("Name").Children()[0].Child("Text")))
+		require.Equal(t, uint64(12), uintVal(t, q.Child("Type")))
+	})
+	t.Run("mdns/a", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "bc35818000010002000000000b636c6f7564636f6e666967096a6574627261696e7303636f6d0000010001c00c000100010000001300043412ec15c00c00010001000000130004364dbb13"), "application-layer.dns", "DNS")
+		require.Equal(t, []byte{0x34, 0x12, 0xec, 0x15}, bytesVal(t, mustChild(t, n.Child("Answers").Children()[0], "DNSA").Child("Address")))
+	})
 }

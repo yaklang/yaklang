@@ -55,8 +55,8 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | HSRP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `hsrp.yaml` |
 | SCTP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `sctp.yaml` |
 | NBT DG | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `nbt_dg.yaml` |
-| mDNS | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/dns.yaml` |
-| LLMNR | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of mDNS |
+| mDNS | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dns.yaml` |
+| LLMNR | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of mDNS |
 | DoT | A | 90 | 15 | 25 | 20 | 20 | 10 | L1 | alias of TLS |
 | DoH | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
 | DHCPv6 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `dhcpv6.yaml` |
@@ -121,7 +121,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | SPOOLSS | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | ATSVC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | IObjectExporter | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
-| LLMNR-MDNS collision | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of LLMNR |
+| LLMNR-MDNS collision | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of LLMNR |
 | WPAD | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
 | TPKT | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/msrdp.yaml` |
 | BitTorrent | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `bittorrent.yaml` |
