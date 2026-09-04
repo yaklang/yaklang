@@ -1883,6 +1883,47 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, frame)
 		require.Equal(t, uint64(200), vlanVID(t, mustChild(t, eth, "QinQ", "CTag")))
 	})
+
+	t.Run("loopback/reply", func(t *testing.T) {
+		// Wireshark LOOP (packet-loop.c): little-endian skipCount then functions from offset 2.
+		// Function 1 Reply + Receipt Number. wiki.wireshark.org/Configuration_Test_Protocol
+		raw := mustHex(t, "000001000100")
+		n := parseRule(t, raw, "loopback", "Loopback")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Skip Count")))
+		fn := n.Child("Functions").Children()[0]
+		require.Equal(t, uint64(1), uintVal(t, fn.Child("Function")))
+		require.Equal(t, uint64(1), uintVal(t, fn.Child("Reply").Child("Receipt Number")))
+		frame := make([]byte, 14+len(raw))
+		copy(frame[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+		copy(frame[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+		binary.BigEndian.PutUint16(frame[12:14], 0x9000)
+		copy(frame[14:], raw)
+		eth := parseEthernet(t, frame)
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "Loopback").Child("Functions").Children()[0].Child("Reply").Child("Receipt Number")))
+	})
+
+	t.Run("loopback/forward", func(t *testing.T) {
+		// Wireshark LOOP parses ALL functions from offset 2; skipCount=8 is recorded, not a tcpdump skip.
+		// Function 2 Forward Data MAC aa:00:04:00:1d:04 then Function 1 Reply receipt=1.
+		raw := mustHex(t, "08000200aa0004001d0401000100")
+		n := parseRule(t, raw, "loopback", "Loopback")
+		require.Equal(t, uint64(8), uintVal(t, n.Child("Skip Count")))
+		fns := n.Child("Functions").Children()
+		require.GreaterOrEqual(t, len(fns), 2)
+		require.Equal(t, uint64(2), uintVal(t, fns[0].Child("Function")))
+		require.Equal(t, []byte{0xaa, 0x00, 0x04, 0x00, 0x1d, 0x04}, bytesVal(t, fns[0].Child("Forward").Child("Forwarding Address")))
+		require.Equal(t, uint64(1), uintVal(t, fns[1].Child("Function")))
+		require.Equal(t, uint64(1), uintVal(t, fns[1].Child("Reply").Child("Receipt Number")))
+		frame := make([]byte, 14+len(raw))
+		copy(frame[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+		copy(frame[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+		binary.BigEndian.PutUint16(frame[12:14], 0x9000)
+		copy(frame[14:], raw)
+		eth := parseEthernet(t, frame)
+		wired := mustChild(t, eth, "Loopback")
+		require.Equal(t, uint64(8), uintVal(t, wired.Child("Skip Count")))
+		require.Equal(t, []byte{0xaa, 0x00, 0x04, 0x00, 0x1d, 0x04}, bytesVal(t, wired.Child("Functions").Children()[0].Child("Forward").Child("Forwarding Address")))
+	})
 }
 
 func tnsConnectPacket(cdata []byte) []byte {

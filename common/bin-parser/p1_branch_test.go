@@ -119,10 +119,14 @@ func TestP1BranchRows(t *testing.T) {
 	})
 
 	t.Run("loopback/other", func(t *testing.T) {
-		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{0x00, 0x01}, "loopback", "Loopback").Child("Function")))
+		n := parseRule(t, []byte{0x00, 0x00, 0x01, 0x00, 0x01, 0x00}, "loopback", "Loopback")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Functions").Children()[0].Child("Function")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Functions").Children()[0].Child("Reply").Child("Receipt Number")))
 	})
 	t.Run("loopback/custom", func(t *testing.T) {
-		require.Equal(t, uint64(0x0002), uintVal(t, parseRule(t, []byte{0x00, 0x02}, "loopback", "Loopback").Child("Function")))
+		n := parseRule(t, []byte{0x00, 0x00, 0x02, 0x00, 0xaa, 0x00, 0x04, 0x00, 0x1d, 0x04}, "loopback", "Loopback")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Functions").Children()[0].Child("Function")))
+		require.Equal(t, []byte{0xaa, 0x00, 0x04, 0x00, 0x1d, 0x04}, bytesVal(t, n.Child("Functions").Children()[0].Child("Forward").Child("Forwarding Address")))
 	})
 
 	t.Run("ssh/kexinit", func(t *testing.T) {

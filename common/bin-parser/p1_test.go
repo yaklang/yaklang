@@ -257,13 +257,17 @@ func TestP1PPPoEQinQLoopbackCDP(t *testing.T) {
 	require.Equal(t, uint64(1), vlanVID(t, ctag))
 	require.Equal(t, uint64(0x0806), uintVal(t, ctag.Child("Type")))
 
-	// Loopback EtherType 0x9000 then IPv4 proto field 0x0800 + truncated IP is optional; use protocol 0x0800 + 20-byte IP
-	lb := make([]byte, 16)
+	// Loopback EtherType 0x9000: Wireshark LOOP little-endian skipCount then Function 1 Reply.
+	reply := []byte{0x00, 0x00, 0x01, 0x00, 0x01, 0x00}
+	lb := make([]byte, 14+len(reply))
 	copy(lb[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
 	copy(lb[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
 	binary.BigEndian.PutUint16(lb[12:14], 0x9000)
-	binary.BigEndian.PutUint16(lb[14:16], 0x0001)
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, lb), "Loopback").Child("Function")))
+	copy(lb[14:], reply)
+	loop := mustChild(t, parseEthernet(t, lb), "Loopback")
+	require.Equal(t, uint64(0), uintVal(t, loop.Child("Skip Count")))
+	require.Equal(t, uint64(1), uintVal(t, loop.Child("Functions").Children()[0].Child("Function")))
+	require.Equal(t, uint64(1), uintVal(t, loop.Child("Functions").Children()[0].Child("Reply").Child("Receipt Number")))
 
 	// CDP over SNAP: 802.3 + AA AA 03 00 00 0c 20 00 + CDP v2
 	cdp := []byte{0x02, 0xb4, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 's', 'w', '1'}
