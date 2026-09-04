@@ -13,15 +13,20 @@ Package:
       if (cls & 0x0f) != 0x06 && (cls & 0x0f) != 0x07 {
         panic("ipmi: class must be IPMI or ASF")
       }
-      if this.Length() < this.GetMaxLength() {
+      if (cls & 0x0f) == 0x06 && this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Body").SetMaxLength(rest)
-          this.ProcessSubNode("Body")
+        if rest >= 8 && rest < 1048576 {
+          this.ProcessSubNode("ASF")
+          return
         }
       }
     Version: uint8
     Reserved: uint8
     Sequence: uint8
     Class: uint8
-    Body: raw
+    ASF:
+      IANA: uint32
+      Msg Type: uint8
+      Msg Tag: uint8
+      ASF Reserved: uint8
+      Data Len: uint8

@@ -2,23 +2,35 @@ endian: big
 Package:
   Salt:
     operator: |
-      this.ProcessSubNode("Length")
-      l = getNodeResult("Length").Value
-      if l == 0 || l > 65535 {
-        panic("salt: invalid zeromq frame length")
-      }
-      this.GetSubNode("Payload").SetMaxLength(l)
-      this.ProcessSubNode("Payload")
-    Length: uint32
-    Payload: raw
+      this.ProcessSubNode("Frames")
     Frames:
       list: true
-      Frame: raw,0
+      Frame: SaltFrame
       operator: |
         for {
           ele = this.NewElement()
-          if ele.GetMaxLength() == 0 {
+          if ele.GetMaxLength() < 4 {
+            if this.Length() == 0 {
+              panic("salt: empty")
+            }
             break
           }
-          break
+          ele.Process()
+          if this.GetMaxLength() >= 1048576 {
+            break
+          }
+          if this.GetMaxLength() > 0 && this.Length() >= this.GetMaxLength() {
+            break
+          }
         }
+SaltFrame:
+  operator: |
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l == 0 || l > 65535 {
+      panic("salt: invalid zeromq frame length")
+    }
+    this.GetSubNode("Payload").SetMaxLength(l)
+    this.ProcessSubNode("Payload")
+  Length: uint32
+  Payload: raw

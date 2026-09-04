@@ -9,14 +9,4 @@ Package:
       this.ProcessSubNode("Value")
     Prefix: string,9
     Value: "del:\n;type:string"
-    Lines:
-      list: true
-      Line: "del:\n;type:string"
-      operator: |
-        for {
-          ele = this.NewElement()
-          if ele.GetMaxLength() == 0 {
-            break
-          }
-          ele.Process()
-        }
+    Session: "del:\n;type:string"

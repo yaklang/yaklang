@@ -9,14 +9,15 @@ Package:
       }
       this.ProcessSubNode("Version")
       this.ProcessSubNode("Protocol")
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Body").SetMaxLength(rest)
-          this.ProcessSubNode("Body")
-        }
+      p = getNodeResult("Protocol").Value
+      if p != 0x4b && p != 0x4c && p != 0x4d {
+        panic("rmi: unknown protocol")
+      }
+      if p == 0x4c {
+        this.ProcessSubNode("Endpoint")
+        return
       }
     Magic: raw,4
     Version: uint16
     Protocol: uint8
-    Body: raw
+    Endpoint: "del:\n;type:string"
