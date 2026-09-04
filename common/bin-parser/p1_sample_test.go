@@ -1212,6 +1212,24 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "anonymous", strVal(t, mustChild(t, eth, "EAPOL", "EAPPacket").Child("Identity")))
 	})
 
+	t.Run("eap/md5", func(t *testing.T) {
+		// RFC 3748 §5.4 EAP-Request/MD5-Challenge: Value-Size 16, Name "host".
+		// Wireshark eap.type=4 / eap.md5.value_size. EtherType 0x888e.
+		val := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+		eap := append(append([]byte{0x01, 0x00, 0x00, 0x1a, 0x01, 0x01, 0x00, 0x1a, 0x04, 0x10}, val...), []byte("host")...)
+		pkt := mustChild(t, parseRule(t, eap, "eapol", "EAPOL"), "EAPPacket")
+		require.Equal(t, uint64(4), uintVal(t, pkt.Child("Type")))
+		md5 := mustChild(t, pkt, "MD5-Challenge")
+		require.Equal(t, uint64(16), uintVal(t, md5.Child("Value Size")))
+		require.Equal(t, val, bytesVal(t, md5.Child("Value")))
+		require.Equal(t, "host", strVal(t, md5.Child("Name")))
+		require.Nil(t, pkt.Child("Identity"))
+		eth := parseEthernet(t, eapolEthernetFrame(t, eap))
+		wired := mustChild(t, eth, "EAPOL", "EAPPacket", "MD5-Challenge")
+		require.Equal(t, uint64(16), uintVal(t, wired.Child("Value Size")))
+		require.Equal(t, "host", strVal(t, wired.Child("Name")))
+	})
+
 	t.Run("eapol/mka", func(t *testing.T) {
 		// IEEE 802.1X-2010 Table 11-3 Packet Type 5 EAPOL-MKA. Wireshark eapol.type.
 		// No MKA dissector: Body Length-bounded leftover is Next Protocol Data, not Unknown raw.
