@@ -601,13 +601,14 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		tf := parseRule(t, raw, "tftp", "TFTP")
 		require.Equal(t, "foo", strVal(t, tf.Child("Filename")))
 		require.Equal(t, "octet", strVal(t, tf.Child("Mode")))
-		opt := mustChild(t, tf, "TFTPOption")
-		require.Equal(t, "blksize", strVal(t, opt.Child("Name")))
-		require.Equal(t, "512", strVal(t, opt.Child("Value")))
+		opts := tf.Child("Options").Children()
+		require.GreaterOrEqual(t, len(opts), 1)
+		require.Equal(t, "blksize", strVal(t, opts[0].Child("Name")))
+		require.Equal(t, "512", strVal(t, opts[0].Child("Value")))
 		eth := parseEthernet(t, ipv4UDPBytes(t, 12345, 69, raw))
-		wired := mustChild(t, eth, "IP", "UDP", "TFTP", "TFTPOption")
-		require.Equal(t, "blksize", strVal(t, wired.Child("Name")))
-		require.Equal(t, "512", strVal(t, wired.Child("Value")))
+		wired := mustChild(t, eth, "IP", "UDP", "TFTP").Child("Options").Children()
+		require.Equal(t, "blksize", strVal(t, wired[0].Child("Name")))
+		require.Equal(t, "512", strVal(t, wired[0].Child("Value")))
 	})
 
 	t.Run("tftp/oack", func(t *testing.T) {
@@ -615,11 +616,27 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		raw := append([]byte{0x00, 0x06}, []byte("tsize\x001234\x00")...)
 		tf := parseRule(t, raw, "tftp", "TFTP")
 		require.Equal(t, uint64(6), uintVal(t, tf.Child("Opcode")))
-		opt := mustChild(t, tf, "TFTPOption")
+		opt := mustChild(t, tf, "Options").Children()[0]
 		require.Equal(t, "tsize", strVal(t, opt.Child("Name")))
 		require.Equal(t, "1234", strVal(t, opt.Child("Value")))
-		eth := parseEthernet(t, ipv4UDPBytes(t, 69, 12345, raw))
-		require.Equal(t, "tsize", strVal(t, mustChild(t, eth, "IP", "UDP", "TFTP", "TFTPOption").Child("Name")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 12345, 69, raw))
+		require.Equal(t, "tsize", strVal(t, mustChild(t, eth, "IP", "UDP", "TFTP").Child("Options").Children()[0].Child("Name")))
+	})
+
+	t.Run("tftp/timeout", func(t *testing.T) {
+		// RFC 2347 two options: RFC 2348 blksize 1432 + RFC 2349 timeout 5. UDP/69.
+		raw := append([]byte{0x00, 0x01}, []byte("boot\x00octet\x00blksize\x001432\x00timeout\x005\x00")...)
+		tf := parseRule(t, raw, "tftp", "TFTP")
+		opts := tf.Child("Options").Children()
+		require.Equal(t, 2, len(opts))
+		require.Equal(t, "blksize", strVal(t, opts[0].Child("Name")))
+		require.Equal(t, "1432", strVal(t, opts[0].Child("Value")))
+		require.Equal(t, "timeout", strVal(t, opts[1].Child("Name")))
+		require.Equal(t, "5", strVal(t, opts[1].Child("Value")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 12345, 69, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "TFTP").Child("Options").Children()
+		require.Equal(t, "timeout", strVal(t, wired[1].Child("Name")))
+		require.Equal(t, "5", strVal(t, wired[1].Child("Value")))
 	})
 
 	t.Run("pop3/rfc1939", func(t *testing.T) {
