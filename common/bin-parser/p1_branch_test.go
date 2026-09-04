@@ -694,6 +694,20 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x00), uintVal(t, n.Child("Control")))
 		require.Equal(t, uint64(0x01), uintVal(t, n.Child("Control Extended")))
 	})
+	t.Run("openvpn/hard-reset", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "3801020304050607080000000001"), "openvpn", "OpenVPN")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Opcode")))
+	})
+	t.Run("openvpn/data-v2", func(t *testing.T) {
+		n := parseRule(t, []byte{0x48, 0x00, 0x00, 0x01, 0xde, 0xad, 0xbe, 0xef}, "openvpn", "OpenVPN")
+		require.Equal(t, uint64(9), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Peer ID")))
+	})
+	t.Run("openvpn/ack", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "28010203040506070801000000010807060504030201"), "openvpn", "OpenVPN")
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Acks").Children()[0]))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))

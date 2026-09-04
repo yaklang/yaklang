@@ -42,7 +42,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | VXLAN | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `vxlan.yaml` |
 | L2TP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `l2tp.yaml` |
 | PPTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/pptp.yaml` |
-| OpenVPN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `openvpn.yaml` |
+| OpenVPN | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `openvpn.yaml` |
 | WireGuard | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `wireguard.yaml` |
 | IKEv1 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ike.yaml` |
 | IKEv2 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ike.yaml` |
