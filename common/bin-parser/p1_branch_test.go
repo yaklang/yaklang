@@ -719,4 +719,21 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, "200", strVal(t, resp.Child("Status")))
 		require.Equal(t, "hello", strVal(t, mustChild(t, resp, "Body").Child("Octets")))
 	})
+
+	t.Run("http2/data", func(t *testing.T) {
+		raw := make([]byte, 9+5)
+		raw[2] = 5
+		raw[4] = 0x01
+		copy(raw[9:], []byte("hello"))
+		require.Equal(t, "hello", strVal(t, parseRule(t, raw, "application-layer.http2", "HTTP2").Child("Octets")))
+	})
+	t.Run("http2/rst", func(t *testing.T) {
+		n := parseRule(t, []byte{0x00, 0x00, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01}, "application-layer.http2", "HTTP2")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Error Code")))
+	})
+	t.Run("http2/goaway", func(t *testing.T) {
+		raw := append([]byte{0x00, 0x00, 0x0b, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, []byte("bye")...)
+		require.Equal(t, "bye", strVal(t, parseRule(t, raw, "application-layer.http2", "HTTP2").Child("Octets")))
+	})
 }
