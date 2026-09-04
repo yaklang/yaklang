@@ -527,4 +527,15 @@ func TestP1BranchRows(t *testing.T) {
 		init := mustChild(t, parseRule(t, mustHex(t, "601b06062b0601050502a011300fa00d300b06092a864886f712010202"), "application-layer.spnego", "SPNEGO"), "Token", "SPNEGOInit")
 		require.Equal(t, []byte{0x2a, 0x86, 0x48, 0x86, 0xf7, 0x12, 0x01, 0x02, 0x02}, bytesVal(t, init.Child("MechOID")))
 	})
+
+	t.Run("kerberos/as-req", func(t *testing.T) {
+		req := mustChild(t, parseRule(t, mustHex(t, "6a0c300aa103020105a20302010a"), "application-layer.kerberos", "Kerberos"), "Body", "KerberosASReq")
+		require.Equal(t, uint64(5), uintVal(t, req.Child("Pvno")))
+		require.Equal(t, uint64(10), uintVal(t, req.Child("MsgType")))
+	})
+	t.Run("kerberos/as-rep", func(t *testing.T) {
+		rep := mustChild(t, parseRule(t, mustHex(t, "6b0c300aa003020105a10302010b"), "application-layer.kerberos", "Kerberos"), "Body", "KerberosASRep")
+		require.Equal(t, uint64(5), uintVal(t, rep.Child("Pvno")))
+		require.Equal(t, uint64(11), uintVal(t, rep.Child("MsgType")))
+	})
 }

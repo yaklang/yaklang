@@ -15,6 +15,7 @@ Package:
         this.GetSubNode("Body").SetMaxLength(l)
         this.ProcessSubNode("Body")
       }
+      return
     Application Tag: uint8
     Length: uint8
     Body:
@@ -25,13 +26,37 @@ Package:
         }
         this.ProcessSubNode("Seq Length")
         sl = getNodeResult("Seq Length").Value
-        if sl > 0 {
-          this.GetSubNode("Content").SetMaxLength(sl)
-          this.ProcessSubNode("Content")
+        if sl > 0 && sl < 1048576 {
+          tag = getNodeResult("../Application Tag").Value
+          if tag == 0x6a {
+            res, op = this.TryProcessByType("KerberosASReq")
+            if op.OK {
+              op.Save()
+            } else {
+              op.Recovery()
+              this.GetSubNode("Octets").SetMaxLength(sl)
+              this.ProcessSubNode("Octets")
+            }
+          } else {
+            if tag == 0x6b {
+              res, op = this.TryProcessByType("KerberosASRep")
+              if op.OK {
+                op.Save()
+              } else {
+                op.Recovery()
+                this.GetSubNode("Octets").SetMaxLength(sl)
+                this.ProcessSubNode("Octets")
+              }
+            } else {
+              this.GetSubNode("Octets").SetMaxLength(sl)
+              this.ProcessSubNode("Octets")
+            }
+          }
         }
+        return
       Seq Tag: uint8
       Seq Length: uint8
-      Content: raw
+      Octets: string
   KerberosTCP:
     operator: |
       this.ProcessSubNode("Record Length")
@@ -57,6 +82,7 @@ Package:
           this.GetSubNode("Body").SetMaxLength(l)
           this.ProcessSubNode("Body")
         }
+        return
       Application Tag: uint8
       Length: uint8
       Body:
@@ -67,13 +93,37 @@ Package:
           }
           this.ProcessSubNode("Seq Length")
           sl = getNodeResult("Seq Length").Value
-          if sl > 0 {
-            this.GetSubNode("Content").SetMaxLength(sl)
-            this.ProcessSubNode("Content")
+          if sl > 0 && sl < 1048576 {
+            tag = getNodeResult("../Application Tag").Value
+            if tag == 0x6a {
+              res, op = this.TryProcessByType("KerberosASReq")
+              if op.OK {
+                op.Save()
+              } else {
+                op.Recovery()
+                this.GetSubNode("Octets").SetMaxLength(sl)
+                this.ProcessSubNode("Octets")
+              }
+            } else {
+              if tag == 0x6b {
+                res, op = this.TryProcessByType("KerberosASRep")
+                if op.OK {
+                  op.Save()
+                } else {
+                  op.Recovery()
+                  this.GetSubNode("Octets").SetMaxLength(sl)
+                  this.ProcessSubNode("Octets")
+                }
+              } else {
+                this.GetSubNode("Octets").SetMaxLength(sl)
+                this.ProcessSubNode("Octets")
+              }
+            }
           }
+          return
         Seq Tag: uint8
         Seq Length: uint8
-        Content: raw
+        Octets: string
   PAC:
     endian: little
     operator: |
@@ -95,4 +145,85 @@ Package:
         UlType: uint32
         CbBufferSize: uint32
         Offset: uint32
-
+KerberosASReq:
+  operator: |
+    this.ProcessSubNode("Pvno Ctx")
+    if getNodeResult("Pvno Ctx").Value != 0xa1 {
+      panic("kerberos: expected pvno [1]")
+    }
+    this.ProcessSubNode("Pvno CtxLen")
+    this.ProcessSubNode("Pvno IntTag")
+    if getNodeResult("Pvno IntTag").Value != 0x02 {
+      panic("kerberos: expected INTEGER pvno")
+    }
+    this.ProcessSubNode("Pvno IntLen")
+    if getNodeResult("Pvno IntLen").Value != 1 {
+      panic("kerberos: pvno length must be 1")
+    }
+    this.ProcessSubNode("Pvno")
+    this.ProcessSubNode("MsgType Ctx")
+    if getNodeResult("MsgType Ctx").Value != 0xa2 {
+      panic("kerberos: expected msg-type [2]")
+    }
+    this.ProcessSubNode("MsgType CtxLen")
+    this.ProcessSubNode("MsgType IntTag")
+    if getNodeResult("MsgType IntTag").Value != 0x02 {
+      panic("kerberos: expected INTEGER msg-type")
+    }
+    this.ProcessSubNode("MsgType IntLen")
+    if getNodeResult("MsgType IntLen").Value != 1 {
+      panic("kerberos: msg-type length must be 1")
+    }
+    this.ProcessSubNode("MsgType")
+    return
+  Pvno Ctx: uint8
+  Pvno CtxLen: uint8
+  Pvno IntTag: uint8
+  Pvno IntLen: uint8
+  Pvno: uint8
+  MsgType Ctx: uint8
+  MsgType CtxLen: uint8
+  MsgType IntTag: uint8
+  MsgType IntLen: uint8
+  MsgType: uint8
+KerberosASRep:
+  operator: |
+    this.ProcessSubNode("Pvno Ctx")
+    if getNodeResult("Pvno Ctx").Value != 0xa0 {
+      panic("kerberos: expected pvno [0]")
+    }
+    this.ProcessSubNode("Pvno CtxLen")
+    this.ProcessSubNode("Pvno IntTag")
+    if getNodeResult("Pvno IntTag").Value != 0x02 {
+      panic("kerberos: expected INTEGER pvno")
+    }
+    this.ProcessSubNode("Pvno IntLen")
+    if getNodeResult("Pvno IntLen").Value != 1 {
+      panic("kerberos: pvno length must be 1")
+    }
+    this.ProcessSubNode("Pvno")
+    this.ProcessSubNode("MsgType Ctx")
+    if getNodeResult("MsgType Ctx").Value != 0xa1 {
+      panic("kerberos: expected msg-type [1]")
+    }
+    this.ProcessSubNode("MsgType CtxLen")
+    this.ProcessSubNode("MsgType IntTag")
+    if getNodeResult("MsgType IntTag").Value != 0x02 {
+      panic("kerberos: expected INTEGER msg-type")
+    }
+    this.ProcessSubNode("MsgType IntLen")
+    if getNodeResult("MsgType IntLen").Value != 1 {
+      panic("kerberos: msg-type length must be 1")
+    }
+    this.ProcessSubNode("MsgType")
+    return
+  Pvno Ctx: uint8
+  Pvno CtxLen: uint8
+  Pvno IntTag: uint8
+  Pvno IntLen: uint8
+  Pvno: uint8
+  MsgType Ctx: uint8
+  MsgType CtxLen: uint8
+  MsgType IntTag: uint8
+  MsgType IntLen: uint8
+  MsgType: uint8
