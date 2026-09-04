@@ -36,6 +36,8 @@ Package:
             this.ProcessByType("LLDP")
           case 0x9000:
             this.ProcessByType("Loopback")
+          case 0x88f7:
+            this.ProcessByType("PTP")
           default:
             res, op = this.TryProcessByType("PeekByte")
             op.Recovery()
@@ -56,6 +58,7 @@ PPPoESession: "import:pppoe.yaml;node:PPPoE"
 MPLS: "import:mpls.yaml;node:MPLS"
 LLDP: "import:lldp.yaml;node:LLDP"
 Loopback: "import:loopback.yaml;node:Loopback"
+PTP: "import:ptp.yaml;node:PTP"
 Next Protocol Data:
   list: true
   Octet: uint8

@@ -62,6 +62,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | DHCPv6 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `dhcpv6.yaml` |
 | BOOTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dhcp.yaml` |
 | NTP | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `application-layer/ntp.yaml` |
+| PTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `ptp.yaml` |
 | SSDP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | UPnP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | HTTP/3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/quic.yaml` |
