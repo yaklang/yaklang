@@ -59,6 +59,10 @@ run_package() {
   local max_retries="${retry:-0}" delay="${retry_delay:-5}"
   local attempt=0 rc=1
 
+  local pkg_dir="$pkg"
+  pkg_dir="${pkg_dir%/...}"; pkg_dir="${pkg_dir%/.}"
+  [[ -d "$pkg_dir" ]] || pkg_dir="."
+
   local args=("-count=1" "-timeout" "$timeout")
   [[ "$TEST_VERBOSE" = "1" ]] && args+=("-v")
   [[ -n "$run_pat" ]] && args+=("-run" "$run_pat")
@@ -72,8 +76,10 @@ run_package() {
       echo " retry ($((attempt + 1))/$((max_retries + 1))): $pkg"
       sleep "$delay"
     fi
-    echo "===== go test $pkg ${args[*]} ====="
-    if go test "$pkg" "${args[@]}" 2>&1 | tee -a "$log"; then
+    echo "===== go test $pkg ${args[*]} (cwd: $pkg_dir) ====="
+    # Run from the package directory like the compiled-binary runner did, so tests
+    # that resolve testdata or fixtures through relative paths behave identically.
+    if (cd "$pkg_dir" && go test . "${args[@]}") 2>&1 | tee -a "$log"; then
       echo "PASS: $pkg"
       rc=0
       break
