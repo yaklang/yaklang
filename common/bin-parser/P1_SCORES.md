@@ -44,9 +44,9 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | PPTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/pptp.yaml` |
 | OpenVPN | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `openvpn.yaml` |
 | WireGuard | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `wireguard.yaml` |
-| IKEv1 | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `ike.yaml` |
-| IKEv2 | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `ike.yaml` |
-| NAT-T | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of IKEv2 |
+| IKEv1 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ike.yaml` |
+| IKEv2 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ike.yaml` |
+| NAT-T | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of IKEv2 |
 | OSPF | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | `ospf.yaml` |
 | BGP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `bgp.yaml` |
 | RIP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `rip.yaml` |

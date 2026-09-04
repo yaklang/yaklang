@@ -152,6 +152,38 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP", "PPP").Child("Protocol")))
 	})
 
+	t.Run("ike/sa-init", func(t *testing.T) {
+		// RFC 7296 §3.3 SA + Wireshark test/captures ikev2 initiator SPI layout.
+		// IKE_SA_INIT: SA proposal proto IKE, PRF HMAC_SHA1 transform.
+		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
+			"2200001400000010010100010000000802000002"+
+			"28000010000200000102030405060708"+
+			"00000008aabbccdd")
+		ik := parseRule(t, ike, "ike", "IKE")
+		require.Equal(t, uint64(0x22), uintVal(t, ik.Child("Exchange Type")))
+		sa := mustChild(t, ik, "Payloads").Children()[0]
+		prop := mustChild(t, sa, "Proposals").Children()[0]
+		require.Equal(t, uint64(1), uintVal(t, prop.Child("Protocol ID")))
+		xf := mustChild(t, prop, "Transforms").Children()[0]
+		require.Equal(t, uint64(2), uintVal(t, xf.Child("Transform Type")))
+		require.Equal(t, uint64(2), uintVal(t, xf.Child("Transform ID")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 500, 500, ike))
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "IKE", "Payloads").Children()[0].Child("Proposals").Children()[0].Child("Transforms").Children()[0].Child("Transform ID")))
+	})
+
+	t.Run("ike/ke-nonce", func(t *testing.T) {
+		// RFC 7296 §3.4 KE DH group 2 + §3.9 Nonce.
+		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
+			"2200001400000010010100010000000802000002"+
+			"28000010000200000102030405060708"+
+			"00000008aabbccdd")
+		eth := parseEthernet(t, ipv4UDPBytes(t, 500, 500, ike))
+		pl := mustChild(t, eth, "IP", "UDP", "IKE", "Payloads").Children()
+		require.Equal(t, uint64(2), uintVal(t, pl[1].Child("DH Group")))
+		require.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8}, bytesVal(t, pl[1].Child("Key Exchange")))
+		require.Equal(t, []byte{0xaa, 0xbb, 0xcc, 0xdd}, bytesVal(t, pl[2].Child("Nonce")))
+	})
+
 	t.Run("amqp/connection-start", func(t *testing.T) {
 		// AMQP 0-9-1 §4.2.4 Connection.Start (class 10 method 10):
 		// version 0.9, server-properties table {product: "RabbitMQ"},
