@@ -70,7 +70,7 @@ Package:
                 } else if src == 1099 || dst == 1099 {
                   typeNameList = ["RMI", "JavaSer"]
                 } else if src == 3389 || dst == 3389 {
-                  typeNameList = ["TPKT"]
+                  typeNameList = ["RDP", "TPKT"]
                 } else if src == 389 || dst == 389 {
                   typeNameList = ["LDAPMessage"]
                 } else if src == 23 || dst == 23 {
@@ -204,6 +204,7 @@ DCERPC: "import:application-layer/dcerpc.yaml;node:DCERPC"
 JavaSer: "import:application-layer/java_ser.yaml;node:JavaSer"
 SMB3Transform: "import:application-layer/smb3.yaml;node:SMB3Transform"
 TPKT: "import:application-layer/msrdp.yaml;node:TPKT"
+RDP: "import:application-layer/msrdp.yaml;node:RDP"
 LDAPMessage: "import:application-layer/ldap.yaml;node:LDAPMessage"
 Telnet: "import:telnet.yaml;node:Telnet"
 POP3: "import:pop3.yaml;node:POP3"
