@@ -232,6 +232,7 @@ var p1FailCases = []p1FailCase{
 		{"ieee_802_11", []string{"Dot11"}, nil, "empty"},
 		{"ieee_802_11", []string{"Dot11"}, []byte{0x00}, "trunc"},
 		{"ieee_802_11", []string{"Dot11"}, []byte{0x0c, 0x00}, "reserved-type"},
+		{"ieee_802_11", []string{"Dot11"}, append([]byte{0x88, 0x00}, make([]byte, 22)...), "trunc-qos"},
 		{"ieee_802_11", []string{"RSN"}, []byte{0x01}, "bad-eid"},
 		{"ieee_802_11", []string{"RSN"}, nil, "rsn-empty"},
 		{"ieee_802_11", []string{"RSN"}, []byte{48}, "rsn-trunc"},

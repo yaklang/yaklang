@@ -9,6 +9,23 @@ import (
 )
 
 func TestP1BranchRows(t *testing.T) {
+	t.Run("ieee_802_11/qos", func(t *testing.T) {
+		raw := append([]byte{0x88, 0x00, 0x00, 0x00}, make([]byte, 20)...)
+		raw = append(raw, 0x06, 0x00)
+		raw = append(raw, []byte("qos1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(6), uintVal(t, n.Child("QoS Control"))&0xf)
+		require.Equal(t, "qos1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+	t.Run("ieee_802_11/addr4", func(t *testing.T) {
+		raw := append([]byte{0x08, 0x03, 0x00, 0x00}, make([]byte, 20)...)
+		addr4 := []byte{0x10, 0x20, 0x30, 0x40, 0x50, 0x60}
+		raw = append(raw, addr4...)
+		raw = append(raw, []byte("wds1")...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, addr4, bytesVal(t, n.Child("Addr4")))
+		require.Equal(t, "wds1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
 	t.Run("ieee_802_1ad/arp", func(t *testing.T) {
 		q := parseRule(t, append([]byte{0xb0, 0x64, 0x08, 0x06}, []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}...), "ieee_802_1ad", "QinQ")
 		require.Equal(t, uint64(5), uintVal(t, q.Child("PCP")))
