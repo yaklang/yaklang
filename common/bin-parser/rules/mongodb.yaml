@@ -33,7 +33,7 @@ Package:
       Collection: "del:\x00;type:string"
       Skip: uint32
       Return: uint32
-      Query: raw
+      Query: raw,0
     OP_MSG:
       Flag Bits: uint32
       Section Kind: uint8

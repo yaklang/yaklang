@@ -10,7 +10,13 @@ Package:
       if len(pri) == 0 {
         panic("syslog: empty PRI")
       }
-      this.ProcessSubNode("Message")
+      this.ProcessSubNode("Timestamp")
+      this.ProcessSubNode("Space")
+      this.ProcessSubNode("Hostname")
+      this.ProcessSubNode("TagMsg")
     Lt: uint8
     PRI: "del:>;type:string"
-    Message: "del:\n;type:string"
+    Timestamp: string,15
+    Space: uint8
+    Hostname: "del: ;type:string"
+    TagMsg: "del:\n;type:string"
