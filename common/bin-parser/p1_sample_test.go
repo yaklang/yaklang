@@ -29,7 +29,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		popGreet := []byte("+OK POP3 server ready\r\n")
 		po := parseRule(t, popGreet, "pop3", "POP3")
 		require.Equal(t, "+OK", strVal(t, po.Child("Status")))
-		require.Equal(t, "POP3 server ready", strVal(t, po.Child("Rest")))
+		require.Equal(t, "POP3 server ready", strVal(t, po.Child("Arg")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 110, 110, popGreet))
 		require.Equal(t, "+OK", strVal(t, mustChild(t, eth, "IP", "TCP", "POP3").Child("Status")))
 	})
@@ -40,7 +40,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "*", strVal(t, im.Child("Tag")))
 		require.Equal(t, "OK", strVal(t, im.Child("Command")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 143, 143, imapGreet))
-		require.Equal(t, "IMAP4rev1 server ready", strVal(t, mustChild(t, eth, "IP", "TCP", "IMAP").Child("Rest")))
+		require.Equal(t, "IMAP4rev1 server ready", strVal(t, mustChild(t, eth, "IP", "TCP", "IMAP").Child("Arg")))
 	})
 
 	t.Run("bgp/open", func(t *testing.T) {
@@ -93,5 +93,110 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		avps := l.Child("AVPs").Children()
 		require.GreaterOrEqual(t, len(avps), 1)
 		require.Equal(t, uint64(0), uintVal(t, avps[0].Child("Attribute Type")))
+	})
+
+	t.Run("amqp/connection-start", func(t *testing.T) {
+		// AMQP 0-9-1 §4.2.4 method frame + Connection.Start (class 10 method 10)
+		frame := mustHex(t, "01000000000006000a000a0009ce")
+		am := parseRule(t, frame, "amqp", "AMQP")
+		require.Equal(t, uint64(1), uintVal(t, am.Child("Type")))
+		require.Equal(t, uint64(10), uintVal(t, am.Child("Class ID")))
+		require.Equal(t, uint64(10), uintVal(t, am.Child("Method ID")))
+		require.Equal(t, uint64(0), uintVal(t, am.Child("Version Major")))
+		require.Equal(t, uint64(9), uintVal(t, am.Child("Version Minor")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5672, 5672, frame))
+		require.Equal(t, uint64(10), uintVal(t, mustChild(t, eth, "IP", "TCP", "AMQP").Child("Class ID")))
+	})
+
+	t.Run("thrift/i32-field", func(t *testing.T) {
+		// Binary protocol: version 0x80010001, empty name, seq 1, field type i32 id 1 value 7, STOP
+		th := mustHex(t, "8001000100000000000000010800010000000700")
+		n := parseEthernet(t, ipv4TCPFrame(t, 9090, 9090, th))
+		tf := mustChild(t, n, "IP", "TCP", "Thrift")
+		require.Equal(t, uint64(1), uintVal(t, tf.Child("Seq ID")))
+		f := tf.Child("Fields").Children()[0]
+		require.Equal(t, uint64(8), uintVal(t, f.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, f.Child("Field ID")))
+		require.Equal(t, uint64(7), uintVal(t, f.Child("I32")))
+	})
+
+	t.Run("mongodb/bson-ping", func(t *testing.T) {
+		mongo := mustHex(t, "360000000100000000000000d407000000000000"+
+			"61646d696e2e24636d64000000000001000000"+
+			"0f0000001070696e67000100000000")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "Query", "Elements").Children()
+		require.Equal(t, "ping", strVal(t, el[0].Child("Name")))
+		require.Equal(t, uint64(1), uintVal(t, el[0].Child("Int32")))
+	})
+
+	t.Run("mongodb/op-msg", func(t *testing.T) {
+		// OP_MSG (2013) section kind 0 + BSON {ping:1}
+		msg := mustHex(t, "240000000100000000000000dd0700000000000000"+
+			"0f0000001070696e67000100000000")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, msg))
+		require.Equal(t, uint64(2013), uintVal(t, mustChild(t, eth, "IP", "TCP", "MongoDB").Child("Op Code")))
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_MSG", "Document", "Elements").Children()
+		require.Equal(t, "ping", strVal(t, el[0].Child("Name")))
+	})
+
+	t.Run("memcached/get-key", func(t *testing.T) {
+		// Binary GET key "a" (Couchbase binary protocol)
+		mc := mustHex(t, "80000001000000000000000100000000000000000000000061")
+		m := parseRule(t, mc, "memcached", "Memcached")
+		require.Equal(t, uint64(1), uintVal(t, m.Child("Key Length")))
+		require.Equal(t, "a", strVal(t, m.Child("Key")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 11211, 11211, mc))
+		require.Equal(t, "a", strVal(t, mustChild(t, eth, "IP", "TCP", "Memcached").Child("Key")))
+	})
+
+	t.Run("fastcgi/begin-request", func(t *testing.T) {
+		// FastCGI BEGIN_REQUEST Role=responder (1) (spec 3.3)
+		fc := mustHex(t, "01010001000800000001000000000000")
+		n := parseEthernet(t, ipv4TCPFrame(t, 9000, 9000, fc))
+		br := mustChild(t, n, "IP", "TCP", "FastCGI", "BEGIN_REQUEST")
+		require.Equal(t, uint64(1), uintVal(t, br.Child("Role")))
+	})
+
+	t.Run("zabbix/json", func(t *testing.T) {
+		zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
+		z := parseRule(t, zb, "zabbix", "Zabbix")
+		require.Equal(t, "{}", strVal(t, z.Child("JSON")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 10050, 10050, zb))
+		require.Equal(t, "{}", strVal(t, mustChild(t, eth, "IP", "TCP", "Zabbix").Child("JSON")))
+	})
+
+	t.Run("pptp/sccrq", func(t *testing.T) {
+		pptp := make([]byte, 156)
+		pptp[1] = 156
+		pptp[3] = 1
+		pptp[4], pptp[5], pptp[6], pptp[7] = 0x1a, 0x2b, 0x3c, 0x4d
+		pptp[9] = 1
+		pptp[13] = 1
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		require.Equal(t, uint64(0x1a2b3c4d), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP").Child("MagicCookie")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP").Child("ProtocolVersion")))
+	})
+
+	t.Run("eap/identity", func(t *testing.T) {
+		eap := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
+		ep := parseRule(t, eap, "eapol", "EAPOL")
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, ep, "EAPPacket").Child("Type")))
+	})
+
+	t.Run("jdwp/command-set", func(t *testing.T) {
+		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000001000101")...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5005, 5005, jd))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "JDWP", "Command").Child("Command Set")))
+	})
+
+	t.Run("net-remoting/preamble", func(t *testing.T) {
+		nr := make([]byte, 14)
+		copy(nr, []byte(".NET"))
+		nr[5] = 1
+		n := parseRule(t, nr, "net_remoting", "NetRemoting")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Major")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 8088, 8088, nr))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "NetRemoting").Child("Major")))
 	})
 }

@@ -16,8 +16,8 @@ Package:
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
         if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Data").SetMaxLength(rest)
-          this.ProcessSubNode("Data")
+          this.GetSubNode("Datagram").SetMaxLength(rest)
+          this.ProcessSubNode("Datagram")
         }
       }
     Message Type: uint8
@@ -27,4 +27,4 @@ Package:
     Source Port: uint16
     Length: uint16
     Packet Offset: uint16
-    Data: string
+    Datagram: string

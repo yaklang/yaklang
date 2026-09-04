@@ -16,14 +16,13 @@ Package:
       this.ProcessSubNode("Padding Length")
       this.ProcessSubNode("Reserved")
       cl = getNodeResult("Content Length").Value
-      if cl > 0 {
-        this.GetSubNode("Content").SetMaxLength(cl)
-        this.ProcessSubNode("Content")
-      }
-      pad = getNodeResult("Padding Length").Value
-      if pad > 0 {
-        this.GetSubNode("Padding").SetMaxLength(pad)
-        this.ProcessSubNode("Padding")
+      if typ == 1 && cl >= 8 {
+        this.ProcessSubNode("BEGIN_REQUEST")
+      } else {
+        if cl > 0 && cl < 1048576 {
+          this.GetSubNode("Params").SetMaxLength(cl)
+          this.ProcessSubNode("Params")
+        }
       }
     Version: uint8
     Type: uint8
@@ -31,5 +30,22 @@ Package:
     Content Length: uint16
     Padding Length: uint8
     Reserved: uint8
-    Content: string
-    Padding: string
+    BEGIN_REQUEST:
+      Role: uint16
+      Flags: uint8
+      Reserved5: raw,5
+    Params:
+      list: true
+      Pair: FastCGIPair
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          ele.Process()
+        }
+FastCGIPair:
+  Name Len: uint8
+  Value Len: uint8
+

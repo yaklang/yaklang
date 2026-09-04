@@ -10,11 +10,11 @@ Package:
       this.ProcessSubNode("Flags")
       this.ProcessSubNode("Length")
       l = getNodeResult("Length").Value
-      if l > 0 {
-        this.GetSubNode("Data").SetMaxLength(l)
-        this.ProcessSubNode("Data")
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("JSON").SetMaxLength(l)
+        this.ProcessSubNode("JSON")
       }
     Magic: raw,4
     Flags: uint8
     Length: uint32
-    Data: string
+    JSON: string

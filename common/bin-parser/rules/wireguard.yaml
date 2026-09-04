@@ -32,4 +32,4 @@ Package:
     Timestamp: raw,28
     MAC1: raw,16
     MAC2: raw,16
-    Body: string
+    Body: raw

@@ -6,9 +6,17 @@ Package:
       if getNodeResult("Version").Value != 3 {
         panic("rtmp: version must be 3")
       }
-      if this.Length() < this.GetMaxLength() {
+      if this.GetMaxLength() < 1048576 {
         rest = this.GetMaxLength() - this.Length()
         if rest >= 8 {
+          this.ProcessSubNode("C1")
+        }
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 8 {
+          this.ProcessSubNode("C2")
+        }
+      } else {
+        if this.Length() < this.GetMaxLength() {
           this.ProcessSubNode("C1")
         }
       }
@@ -29,4 +37,18 @@ Package:
         }
       Time: uint32
       Zero: uint32
-      Random: string
+      Random: raw
+    C2:
+      operator: |
+        this.ProcessSubNode("Time2")
+        this.ProcessSubNode("TimeEcho")
+        if this.Length() < this.GetMaxLength() {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 && rest < 1048576 {
+            this.GetSubNode("Random").SetMaxLength(rest)
+            this.ProcessSubNode("Random")
+          }
+        }
+      Time2: uint32
+      TimeEcho: uint32
+      Random: raw

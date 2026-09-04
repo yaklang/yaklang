@@ -16,13 +16,14 @@ import (
 // Unbounded leftover blob: "Name: raw" with no ",N" length. Spec-opaque leftovers
 // (ICV/Ciphertext/Stub/TPDU/…) may stay raw only when OpaqueRaw names that field.
 var leftoverRawRe = regexp.MustCompile(`(?m)^\s+([A-Za-z][^:\n]{0,40}): raw\s*$`)
+var leftoverBlobRe = regexp.MustCompile(`(?m)^\s+(Payload|Body|Section|Fields|Raw|Unknown|Content|Data|Rest): string\s*$`)
 var namedScalarRe = regexp.MustCompile(`(?m)^\s+[A-Za-z][^:\n]{0,40}:\s*(uint\d+|int\d+|string|raw,\d+|"del:)`)
 var typeArmRe = regexp.MustCompile(`ProcessByType\(|ProcessSubNode\("(OPEN|OP_QUERY|OP_MSG|Command|C1|Handshake|AuthenStart|ASF|Int|Endpoint|Headers|BININT1|Version|Protocol|Values|Pairs|Frames|Acks|Topics|Client ID|Integer|Request|Response|Line|Prefix|Value|AuthenStart|ASF)"\)`)
 
 var specOpaqueLeftover = map[string]bool{
 	"ICV": true, "Ciphertext": true, "Stub": true, "TPDU": true,
 	"RDATA": true, "Key Data": true, "Fragment": true, "Authentication": true,
-	"Random": true, "NDR": true, "MsgGlobal": true, "Value": true,
+	"Random": true, "NDR": true, "MsgGlobal": true, "Value": true, "Body": true,
 }
 
 func ruleKey(ruleFile string) string {
@@ -84,6 +85,14 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 		if name == "type" || name == "endian" || name == "parser" {
 			continue
 		}
+		if specOpaqueLeftover[name] && opaque != "" && strings.Contains(opaque, strings.ToLower(name)) {
+			continue
+		}
+		leftoverOK = false
+		incomplete = true
+	}
+	for _, m := range leftoverBlobRe.FindAllStringSubmatch(text, -1) {
+		name := strings.TrimSpace(m[1])
 		if specOpaqueLeftover[name] && opaque != "" && strings.Contains(opaque, strings.ToLower(name)) {
 			continue
 		}
