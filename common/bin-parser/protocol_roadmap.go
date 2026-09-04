@@ -179,7 +179,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "BOOTP", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1, Notes: "folded into DHCP"},
 	{Name: "NTP", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "SNTP", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
-	{Name: "PTP", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
+	{Name: "PTP", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "WINS", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "WINS-Replication", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "SSDP", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},

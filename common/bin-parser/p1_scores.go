@@ -36,6 +36,8 @@ var P1Scorecards = []ProtocolScorecard{
 		"cdp/device-id Wireshark SampleCaptures/cdp.pcap Device ID R1; cdp/port Port ID Ethernet0 SNAP 802.3; TestP1FailPaths cdp", ""),
 	p1card("Loopback", "loopback.yaml", 20, 25, 20, 20, 10, "L2",
 		"loopback/reply skipCount=0 Function=1 Receipt=1; loopback/forward skipCount=8 MAC aa:00:04:00:1d:04 EtherType 0x9000; TestP1FailPaths loopback", ""),
+	p1card("PTP", "ptp.yaml", 20, 25, 20, 20, 10, "L2",
+		"ethernet/ptp IEEE 1588-2008 Sync Sequence ID 1 Origin Timestamp ns 123456789 EtherType 0x88F7; ptp/follow-up Precise Origin Timestamp; TestP1FailPaths trunc-ptp", ""),
 	p1card("Linux SLL", "linux_sll.yaml", 20, 15, 20, 20, 10, "L2",
 		"linux_sll/ipv4 HOST ARPHRD_ETHER MAC 00:11:22:33:44:55 IPv4 Version 4; linux_sll/next-type ETH_P_802_EX1 0x88B5 Next Protocol Data; TestP1FailPaths linux_sll", ""),
 	p1card("IEEE 802.11", "ieee_802_11.yaml", 25, 15, 20, 20, 10, "L2",

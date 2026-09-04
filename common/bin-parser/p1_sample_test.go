@@ -3750,16 +3750,52 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("ethernet/ptp", func(t *testing.T) {
-		// IEEE 1588 PTP EtherType 0x88F7 (Wireshark SampleCaptures/ptp.pcap).
-		// No PTP dissector: payload is Next Protocol Data, not Unknown raw.
+		// IEEE 1588-2008 PTPv2 Sync over Ethernet EtherType 0x88F7.
+		// Wireshark SampleCaptures/ptp.pcap / ptp.v2.messagetype / ptp.v2.sequenceid.
+		// Dest 01:1b:19:00:00:00 (IEEE 1588). Do not leave as Next Protocol Data.
+		clock := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}
+		ptp := ptpV2Sync(t, 1, clock, 123456789)
+		n := parseRule(t, ptp, "ptp", "PTP")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Message Type"))&0xf)
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Version"))&0xf)
+		require.Equal(t, uint64(44), uintVal(t, n.Child("Message Length")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Sequence ID")))
+		require.Equal(t, clock, bytesVal(t, n.Child("Clock Identity")))
+		require.Equal(t, uint64(123456789), uintVal(t, mustChild(t, n, "Origin Timestamp").Child("Nanoseconds")))
+		require.Nil(t, n.Child("Next Protocol Data"))
 		frame := append([]byte{
 			0x01, 0x1b, 0x19, 0x00, 0x00, 0x00,
 			0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
 			0x88, 0xf7,
-		}, []byte("sync")...)
+		}, ptp...)
 		eth := parseEthernet(t, frame)
 		require.Equal(t, uint64(0x88f7), uintVal(t, eth.Child("Type")))
-		require.Equal(t, "sync", joinUint8(t, eth.Child("Next Protocol Data")))
+		wired := mustChild(t, eth, "PTP")
+		require.Equal(t, uint64(0), uintVal(t, wired.Child("Message Type"))&0xf)
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("Sequence ID")))
+		require.Equal(t, uint64(123456789), uintVal(t, mustChild(t, wired, "Origin Timestamp").Child("Nanoseconds")))
+		require.Nil(t, eth.Child("Next Protocol Data"))
+	})
+
+	t.Run("ptp/follow-up", func(t *testing.T) {
+		// IEEE 1588-2008 Follow_Up (messageType 8) Precise Origin Timestamp.
+		// Wireshark ptp.v2.fu.preciseorigintimestamp. EtherType 0x88F7.
+		clock := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}
+		ptp := ptpV2FollowUp(t, 7, clock, 987654321)
+		n := parseRule(t, ptp, "ptp", "PTP")
+		require.Equal(t, uint64(8), uintVal(t, n.Child("Message Type"))&0xf)
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Sequence ID")))
+		require.Equal(t, uint64(987654321), uintVal(t, mustChild(t, n, "Precise Origin Timestamp").Child("Nanoseconds")))
+		require.Nil(t, n.Child("Origin Timestamp"))
+		frame := append([]byte{
+			0x01, 0x1b, 0x19, 0x00, 0x00, 0x00,
+			0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+			0x88, 0xf7,
+		}, ptp...)
+		eth := parseEthernet(t, frame)
+		wired := mustChild(t, eth, "PTP")
+		require.Equal(t, uint64(8), uintVal(t, wired.Child("Message Type"))&0xf)
+		require.Equal(t, uint64(987654321), uintVal(t, mustChild(t, wired, "Precise Origin Timestamp").Child("Nanoseconds")))
 	})
 
 	t.Run("ppp/next-type", func(t *testing.T) {
@@ -3940,6 +3976,34 @@ func smb2SessionNTLM(ntlm []byte) []byte {
 	binary.LittleEndian.PutUint16(body[14:], uint16(len(ntlm)))
 	raw := append(smb2SyncHeader(1, 0, 2), body...)
 	return append(raw, ntlm...)
+}
+
+func ptpV2Header(msgType, control byte, seq uint16, msgLen uint16, clock []byte) []byte {
+	b := make([]byte, 34)
+	b[0] = msgType & 0x0f
+	b[1] = 2
+	binary.BigEndian.PutUint16(b[2:], msgLen)
+	copy(b[20:28], clock)
+	binary.BigEndian.PutUint16(b[28:], 1)
+	binary.BigEndian.PutUint16(b[30:], seq)
+	b[32] = control
+	return b
+}
+
+func ptpV2Timestamp(hdr []byte, nanos uint32) []byte {
+	ts := make([]byte, 10)
+	binary.BigEndian.PutUint32(ts[6:], nanos)
+	return append(hdr, ts...)
+}
+
+func ptpV2Sync(t *testing.T, seq uint16, clock []byte, nanos uint32) []byte {
+	t.Helper()
+	return ptpV2Timestamp(ptpV2Header(0, 0, seq, 44, clock), nanos)
+}
+
+func ptpV2FollowUp(t *testing.T, seq uint16, clock []byte, nanos uint32) []byte {
+	t.Helper()
+	return ptpV2Timestamp(ptpV2Header(8, 2, seq, 44, clock), nanos)
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
