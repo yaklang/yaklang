@@ -24,6 +24,58 @@ type recordedAIFocusRisk struct {
 	raw       []byte
 }
 
+func TestLegionAIFocusAttachmentReportTargetAndKind(t *testing.T) {
+	newReport := func(resourceID string) aiFocusCodeAuditReport {
+		t.Helper()
+		var report aiFocusCodeAuditReport
+		raw := `{"resource_id":"` + resourceID + `","markdown":"# Synthetic attachment report","structured_summary":{"retry_count":1}}`
+		if err := json.Unmarshal([]byte(raw), &report); err != nil {
+			t.Fatal(err)
+		}
+		return report
+	}
+	_, sink, publisher := newTestAttachmentFocusRuntime(t)
+	const kind = "ai_log_analysis_v1"
+	if err := sink.Succeed(context.Background(), nil); err == nil {
+		t.Fatal("unbound attachment execution was completed")
+	}
+	if _, err := sink.SubmitAsset(context.Background(), aiFocusAssetResult{Kind: "endpoint", Target: testAttachmentTaskTarget, Title: "Synthetic", IdentityKey: "synthetic"}); err == nil || !strings.Contains(err.Error(), "attachment") {
+		t.Fatalf("attachment task accepted an asset result: %v", err)
+	}
+	if _, err := sink.SubmitRisk(context.Background(), &schema.Risk{Url: testAttachmentTaskTarget, Title: "Synthetic", RiskType: "test"}); err == nil || !strings.Contains(err.Error(), "attachment") {
+		t.Fatalf("attachment task accepted a risk result: %v", err)
+	}
+	if _, err := sink.SubmitCodeFinding(context.Background(), "ai_code_finding", validCodeFinding()); err == nil || !strings.Contains(err.Error(), "attachment") {
+		t.Fatalf("attachment task accepted a source finding: %v", err)
+	}
+	if _, err := sink.SubmitCodeAuditReport(context.Background(), kind, newReport(testLegionCodeWorkspaceID)); err == nil {
+		t.Fatal("unbound attachment report kind accepted")
+	}
+	if err := sink.bindFocusExecutionContract(testAttachmentTaskExecutionContract(t)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sink.SubmitCodeAuditReport(context.Background(), "unbound_report", newReport(testLegionCodeWorkspaceID)); err == nil {
+		t.Fatal("report kind outside the immutable contract accepted")
+	}
+	if _, err := sink.SubmitCodeAuditReport(context.Background(), kind, newReport("aicw_fedcba9876543210fedcba9876543210")); err == nil {
+		t.Fatal("report resource from another task accepted")
+	}
+	wrongSource := newReport(testLegionCodeWorkspaceID)
+	wrongSource.WorkspaceID = testLegionCodeWorkspaceID
+	if _, err := sink.SubmitCodeAuditReport(context.Background(), kind, wrongSource); err == nil {
+		t.Fatal("attachment report accepted a source workspace identity")
+	}
+	if len(publisher.reports) != 0 {
+		t.Fatal("invalid attachment report was published")
+	}
+	if _, err := sink.SubmitCodeAuditReport(context.Background(), kind, newReport(testLegionCodeWorkspaceID)); err != nil {
+		t.Fatalf("valid pinned attachment report rejected: %v", err)
+	}
+	if len(publisher.reports) != 1 {
+		t.Fatalf("expected one published attachment report, got %d", len(publisher.reports))
+	}
+}
+
 type recordedAIFocusAsset struct {
 	eventID     string
 	ref         jobExecutionRef

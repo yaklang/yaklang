@@ -145,8 +145,9 @@ func (e *AIEngine) sendMsgAndGetTaskName(input string, attachedResources ...*aic
 
 	// 发送输入事件
 	event := &ypb.AIInputEvent{
-		IsFreeInput: true,
-		FreeInput:   input,
+		IsFreeInput:          true,
+		FreeInput:            input,
+		AttachedResourceInfo: e.messageAttachedResourceInfo(attachedResources),
 	}
 
 	if err := e.operator.SendInputEvent(event); err != nil {
@@ -165,6 +166,27 @@ func (e *AIEngine) sendMsgAndGetTaskName(input string, attachedResources ...*aic
 	}
 
 	return "", utils.Error("failed to get task ID from endpoint")
+}
+
+func (e *AIEngine) messageAttachedResourceInfo(perMessage []*aicommon.AttachedResource) []*ypb.AttachedResourceInfo {
+	var result []*ypb.AttachedResourceInfo
+	appendResources := func(resources []*aicommon.AttachedResource) {
+		for _, resource := range resources {
+			if resource == nil {
+				continue
+			}
+			result = append(result, &ypb.AttachedResourceInfo{
+				Type: resource.Type, Key: resource.Key, Value: resource.Value,
+			})
+		}
+	}
+	// Engine resources apply to every message. Per-message resources are copied
+	// into this event only and must not be appended to the engine configuration.
+	if e.config != nil {
+		appendResources(e.config.AttachedResources)
+	}
+	appendResources(perMessage)
+	return result
 }
 
 // SendMsg 执行 AI 任务（阻塞直到该任务完成）
@@ -735,7 +757,9 @@ func InvokeReAct(input string, options ...AIEngineConfigOption) error {
 	}
 	defer engine.Close()
 
-	return engine.SendMsg(input, options...)
+	// The options already belong to the engine. Reapplying them as per-message
+	// options duplicates configured attachments and repeats option side effects.
+	return engine.SendMsg(input)
 }
 
 // InvokeReActAsync 异步执行 ReAct 任务，并返回引擎实例（导出名为 aim.InvokeReActAsync）

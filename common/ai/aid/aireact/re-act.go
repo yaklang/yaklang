@@ -242,6 +242,27 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 
 	cfg.SetBrowserSessionTracker(react)
+	var rollbackExtraMCPServers func()
+	constructed := false
+	defer func() {
+		// Until construction succeeds, no caller owns the mounted clients.
+		// Roll back on every failure, including errors after the MCP mount.
+		if !constructed && rollbackExtraMCPServers != nil {
+			rollbackExtraMCPServers()
+		}
+	}()
+
+	// Session-scoped MCP capabilities are part of the immutable execution
+	// contract. Mount them before any ReAct goroutine or persistent runtime
+	// record is started so a restricted Session can fail closed without
+	// leaking a half-started runtime when its evidence plane is unavailable.
+	if len(react.config.ExtraMCPServers) > 0 {
+		var err error
+		rollbackExtraMCPServers, err = react.loadExtraMCPServers(react.config.ExtraMCPServers)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if cfg.PersistentSessionId != "" && cfg.GetDB() != nil {
 		meta, err := yakit.EnsureAISessionMeta(cfg.GetDB(), cfg.PersistentSessionId, cfg.SessionSource)
@@ -470,12 +491,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		react.loadMCPServers()
 	}
 
-	// 会话级显式挂载（内存态，不读 profile DB、不进全局列表）。
-	// 同步加载，保证首轮推理前工具已就绪。
-	if len(react.config.ExtraMCPServers) > 0 {
-		react.loadExtraMCPServers(react.config.ExtraMCPServers)
-	}
-
+	constructed = true
 	return react, nil
 }
 
@@ -604,13 +620,13 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 
 	for _, task := range queueingTasks {
 		taskInfo := map[string]interface{}{
-			"id":         task.GetId(),
-			"user_input": task.GetUserInput(),
+			"id":              task.GetId(),
+			"user_input":      task.GetUserInput(),
 			"user_input_uuid": task.GetUserInputUUID(),
-			"status":     task.GetStatus(),
-			"created_at": task.GetCreatedAt(),
-			"focus_mode": task.GetFocusMode(),
-			"is_recovery": task.GetTaskKind() == aicommon.AITaskKind_Recovery,
+			"status":          task.GetStatus(),
+			"created_at":      task.GetCreatedAt(),
+			"focus_mode":      task.GetFocusMode(),
+			"is_recovery":     task.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		}
 
 		taskInfos = append(taskInfos, taskInfo)
@@ -814,27 +830,44 @@ func (r *ReAct) preloadMCPStubsFromDB() {
 // loadExtraMCPServers mounts session-scoped MCP servers at construction time.
 // 每个 server 经 aitool.LoadAIToolsFromMCPServer 取工具（不查 profile DB），
 // 并按 AllowedTools 在 client 侧做白名单过滤后 AppendTools。
-func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
+// The returned rollback closes only clients opened by this mount, including
+// clients whose tool names were already present in the caller's tool manager.
+func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) (func(), error) {
+	var clients []aitool.MCPClientCloser
+	seenClients := make(map[aitool.MCPClientCloser]struct{})
+	rollback := func() {
+		for _, client := range clients {
+			_ = client.Close()
+		}
+	}
 	mng := r.config.GetAiToolManager()
 	if mng == nil {
-		log.Errorf("cannot mount session-scoped mcp servers: tool manager is nil")
-		return
+		return rollback, utils.Errorf("cannot mount session-scoped MCP servers: tool manager is unavailable")
 	}
 	var mountedNames []string
+	var failureClasses []string
 	for _, s := range servers {
 		if s == nil || s.Server == nil {
+			failureClasses = append(failureClasses, "invalid_server")
 			continue
 		}
 		tools, err := aitool.LoadAIToolsFromMCPServer(r.config.Ctx, s.Server, s.AllowedTools)
 		if err != nil {
-			log.Errorf("load session-scoped mcp server %s failed: %v", s.Server.Name, err)
+			log.Error(redactedSessionMCPMountFailure(s.Server.Name, err))
+			failureClasses = append(failureClasses, classifySessionMCPMountFailure(err))
 			continue
 		}
 		if len(tools) > 0 {
-			mng.AppendTools(tools...)
 			for _, tool := range tools {
+				if client := tool.BridgeMCPClient; client != nil {
+					if _, seen := seenClients[client]; !seen {
+						seenClients[client] = struct{}{}
+						clients = append(clients, client)
+					}
+				}
 				mountedNames = append(mountedNames, tool.Name)
 			}
+			mng.AppendTools(tools...)
 			log.Infof("session-scoped mcp server %s mounted %d tool(s)", s.Server.Name, len(tools))
 		}
 	}
@@ -844,6 +877,59 @@ func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
 	if r.config.RestrictToolsToExtraMCPServers {
 		mng.RestrictToTools(mountedNames...)
 		log.Infof("session tools restricted to %d session-scoped mcp tool(s): %v", len(mountedNames), mountedNames)
+		if len(failureClasses) > 0 || len(mountedNames) == 0 {
+			if len(failureClasses) == 0 {
+				failureClasses = append(failureClasses, "no_tools")
+			}
+			return rollback, utils.Errorf(
+				"required session-scoped MCP capabilities are unavailable: %s",
+				strings.Join(failureClasses, ","),
+			)
+		}
+	}
+	return rollback, nil
+}
+
+// redactedSessionMCPMountFailure intentionally discards the nested transport
+// error. MCP clients may include URLs and authentication material in that
+// error chain; emitting it would turn a connection failure into a credential
+// disclosure. The quoted server name remains enough to correlate the bounded
+// Session capability without enabling log injection.
+func redactedSessionMCPMountFailure(serverName string, err error) string {
+	return fmt.Sprintf(
+		"load session-scoped mcp server %q failed: class=%s connection details redacted",
+		strings.TrimSpace(serverName),
+		classifySessionMCPMountFailure(err),
+	)
+}
+
+// classifySessionMCPMountFailure deliberately emits only a small, static
+// operator category. Never return nested error text: transport errors may
+// contain absolute URLs, Authorization values, or server response bodies.
+func classifySessionMCPMountFailure(err error) string {
+	if err == nil {
+		return "unknown"
+	}
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "initialize mcp client failed") && strings.Contains(message, "status 401"):
+		return "message_unauthorized"
+	case strings.Contains(message, "initialize mcp client failed") && strings.Contains(message, "status 404"):
+		return "message_not_found"
+	case strings.Contains(message, "unexpected status code: 401"):
+		return "sse_unauthorized"
+	case strings.Contains(message, "unexpected status code: 404"):
+		return "sse_not_found"
+	case strings.Contains(message, "connection refused") || strings.Contains(message, "no such host"):
+		return "connect_failed"
+	case strings.Contains(message, "deadline exceeded") || strings.Contains(message, "timeout") || strings.Contains(message, "context cancelled"):
+		return "timeout"
+	case strings.Contains(message, "origin does not match"):
+		return "endpoint_origin_mismatch"
+	case strings.Contains(message, "initialize mcp client failed"):
+		return "initialize_failed"
+	default:
+		return "transport_failed"
 	}
 }
 

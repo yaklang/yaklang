@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ const (
 	aiSessionRuntimeEventToolCall           = "ai.session.tool_call"
 	aiSessionRuntimeEventToolResult         = "ai.session.tool_result"
 	maxAISessionAttachmentBytes             = 64 << 10
+	maxAISessionAttachmentTotalBytes        = 256 << 10
 )
 
 type yakAIEngineRuntimeDriver struct{}
@@ -130,6 +132,10 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		return h.sendControlInput(event, "sync event")
 	}
 
+	content, err = appendAITaskFocusInput(content, input.PayloadJSON)
+	if err != nil {
+		return err
+	}
 	return h.enqueueMessage(ctx, input.Ref.CommandID, content, options...)
 }
 
@@ -609,6 +615,10 @@ type yakRuntimeOptions struct {
 	Language                       string                    `json:"language"`
 	SessionMCPServers              []sessionMCPServer        `json:"session_mcp_servers"`
 	SourceWorkspace                *legionCodeWorkspaceSpec  `json:"source_workspace,omitempty"`
+	// RiskJudgementScope is a private bind-only recovery pin. The node checks
+	// it against the protobuf ResultContext, then strips it before runtime or
+	// model configuration is constructed.
+	RiskJudgementScope json.RawMessage `json:"risk_judgement_scope,omitempty"`
 }
 
 type yakProviderModelOptions struct {
@@ -654,9 +664,10 @@ type yakAIStrategy struct {
 }
 
 type sessionMCPServer struct {
-	Name         string   `json:"name"`
-	URL          string   `json:"url"`
-	AllowedTools []string `json:"allowed_tools"`
+	Name         string            `json:"name"`
+	URL          string            `json:"url"`
+	Headers      map[string]string `json:"headers"`
+	AllowedTools []string          `json:"allowed_tools"`
 }
 
 func buildYakAIEngineOptions(
@@ -667,6 +678,28 @@ func buildYakAIEngineOptions(
 	options, err := mergedYakRuntimeOptions(binding)
 	if err != nil {
 		return nil, fmt.Errorf("decode runtime options: %w", err)
+	}
+	attachmentTask := isLegionAttachmentTarget(binding.AuthorizedTargetURL) || isLegionAttachmentTarget(options.FocusTargetURL)
+	if attachmentTask {
+		if binding.ProjectID != "" || binding.ExecutionMode != "single_run" || binding.LegionResultRuntime == nil || binding.LegionResultRuntime.AuthorizedTarget() != binding.AuthorizedTargetURL {
+			return nil, fmt.Errorf("attachment task requires a projectless single-run server resource binding")
+		}
+		focusMode, _, _ := strings.Cut(binding.AuthorizedFocusReleaseID, "@")
+		if err := validateAttachmentTaskRuntimeOptions(options, binding.AuthorizedTargetURL, focusMode, binding.AuthorizedFocusReleaseID); err != nil {
+			return nil, err
+		}
+		if err := validateAttachmentTaskPins(binding.Attachments); err != nil {
+			return nil, err
+		}
+		// Immutable attachment Focus code owns stage/report execution. Do not
+		// expose the ordinary engine's tools, filesystem, search, or ambient MCP
+		// surfaces through merged provider/session configuration.
+		enabled, disabled := true, false
+		options.DisableToolUse = &enabled
+		options.EnableSystemFileSystemOperator = &disabled
+		options.EnableAISearchTool = &disabled
+		options.EnableAISearchInternet = &disabled
+		options.EnabledCapabilities = nil
 	}
 
 	config := []aiengine.AIEngineConfigOption{
@@ -708,6 +741,9 @@ func buildYakAIEngineOptions(
 		return nil, err
 	}
 	extOptions := buildYakAICommonExtOptions(options)
+	if attachmentTask {
+		extOptions = append(extOptions, aicommon.WithDisallowMCPServers(true))
+	}
 	if callbacks.Vision != nil {
 		extOptions = append(extOptions, aicommon.WithVisionPriorityAICallback(callbacks.Vision))
 	}
@@ -877,13 +913,19 @@ func buildYakSessionMCPServers(options yakRuntimeOptions) ([]*aicommon.ExtraMCPS
 		name := strings.TrimSpace(server.Name)
 		url := strings.TrimSpace(server.URL)
 		if name == "" || url == "" {
-			log.Warnf("skip session-scoped mcp server with empty name or url: name=%q url=%q", name, url)
+			log.Warnf("skip session-scoped mcp server with incomplete identity: has_name=%t has_url=%t", name != "", url != "")
 			continue
+		}
+		headers := make(schema.MapStringAny, len(server.Headers))
+		for key, value := range server.Headers {
+			headers[key] = value
 		}
 		servers = append(servers, &aicommon.ExtraMCPServer{
 			Server: &schema.MCPServer{
-				Type: "sse",
-				URL:  url,
+				Name:    name,
+				Type:    "sse",
+				URL:     url,
+				Headers: headers,
 			},
 			AllowedTools: append([]string(nil), server.AllowedTools...),
 		})
@@ -1166,6 +1208,18 @@ func downloadAISessionAttachment(
 		return "", fmt.Errorf("read body: %w", err)
 	}
 	truncated := len(raw) > maxAISessionAttachmentBytes
+	if isLegionAttachmentTarget(binding.AuthorizedTargetURL) {
+		if truncated {
+			return "", fmt.Errorf("attachment task content exceeds the attachment size limit")
+		}
+		if uint64(len(raw)) != attachment.SizeBytes {
+			return "", fmt.Errorf("attachment task content size does not match the pinned size")
+		}
+		checksum := fmt.Sprintf("%x", sha256.Sum256(raw))
+		if checksum != attachment.SHA256 {
+			return "", fmt.Errorf("attachment task content sha256 does not match the pinned sha256")
+		}
+	}
 	if truncated {
 		raw = raw[:maxAISessionAttachmentBytes]
 	}
@@ -1641,6 +1695,9 @@ func buildYakAIHotpatchEvent(input aiSessionInput) (*ypb.AIInputEvent, error) {
 }
 
 func validateYakAIHotpatch(hotpatchType string, params yakRuntimeOptions) error {
+	if hasYakRuntimeJSONValue(params.RiskJudgementScope) {
+		return fmt.Errorf("ai session hotpatch cannot change risk_judgement_scope")
+	}
 	required := func(ok bool, field string) error {
 		if ok {
 			return nil

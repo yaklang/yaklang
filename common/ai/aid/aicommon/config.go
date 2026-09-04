@@ -132,6 +132,11 @@ func (cis *ConfigInitStatus) GetOrCreateConsumptionState() *ConfigConsumptionSta
 	return cis.ConsumptionState
 }
 
+type toolManagerConfigUpdate struct {
+	manager *buildinaitools.AiToolManager
+	apply   func(*buildinaitools.AiToolManager) error
+}
+
 type Config struct {
 	// Embedded structs
 	*Emitter
@@ -238,6 +243,10 @@ type Config struct {
 	*/
 	// tool manager
 	AiToolManager *buildinaitools.AiToolManager
+	// Built-in policy/capability options defer manager writes until NewConfig
+	// can isolate an explicitly injected MCP session. User options run once.
+	collectingToolManagerOptions bool
+	pendingToolManagerUpdates    []toolManagerConfigUpdate
 
 	// browserSessionTracker records browser ids opened by yak tools for session cleanup.
 	browserSessionTracker BrowserSessionTracker
@@ -581,10 +590,19 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	config := newConfig(ctx)
 
 	// Apply options
+	config.collectingToolManagerOptions = true
 	for _, opt := range opts {
 		opt(config)
 	}
+	config.collectingToolManagerOptions = false
 	config.originOptions = opts
+	callerToolManager := config.AiToolManager
+	isolateToolManager := len(config.ExtraMCPServers) > 0
+	if isolateToolManager && callerToolManager != nil {
+		// Session MCP callbacks and restrictions must not enter a caller's
+		// reusable manager, even if later ReAct construction fails.
+		config.AiToolManager = callerToolManager.ForkForSession()
+	}
 
 	// Initialize checkpoint storage
 	config.BaseCheckpointableStorage = NewCheckpointableStorageWithDB(config.id, consts.GetGormProjectDatabase())
@@ -621,6 +639,19 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if config.AiToolManager == nil {
 		config.AiToolManager = buildinaitools.NewToolManager(config.AiToolManagerOption...)
 	}
+	for _, update := range config.pendingToolManagerUpdates {
+		manager := update.manager
+		if isolateToolManager {
+			if manager != callerToolManager {
+				continue // A replaced caller manager must remain untouched too.
+			}
+			manager = config.AiToolManager
+		}
+		if err := update.apply(manager); err != nil {
+			log.Warnf("apply deferred tool manager update failed: %v", err)
+		}
+	}
+	config.pendingToolManagerUpdates = nil
 	if config.AiToolManager != nil {
 		config.AiToolManager.SetDisallowMCPServers(config.DisallowMCPServers)
 	}
@@ -1796,6 +1827,19 @@ func WithEnableToolManagerAISearch(enable bool) ConfigOption {
 	}
 }
 
+// queueToolManagerUpdateLocked defers only built-in manager mutations during
+// constructor option collection. The caller must hold c.m.
+func (c *Config) queueToolManagerUpdateLocked(apply func(*buildinaitools.AiToolManager) error) bool {
+	if !c.collectingToolManagerOptions || c.AiToolManager == nil {
+		return false
+	}
+	c.pendingToolManagerUpdates = append(c.pendingToolManagerUpdates, toolManagerConfigUpdate{
+		manager: c.AiToolManager,
+		apply:   apply,
+	})
+	return true
+}
+
 func WithDisallowMCPServers(disallow bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1804,7 +1848,11 @@ func WithDisallowMCPServers(disallow bool) ConfigOption {
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.DisallowMCPServers = disallow
-		if c.AiToolManager != nil {
+		deferred := c.queueToolManagerUpdateLocked(func(manager *buildinaitools.AiToolManager) error {
+			manager.SetDisallowMCPServers(disallow)
+			return nil
+		})
+		if c.AiToolManager != nil && !deferred {
 			c.AiToolManager.SetDisallowMCPServers(disallow)
 		}
 		if c.AiToolManagerOption == nil {
@@ -4294,7 +4342,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	if i.ContextProviderManager != nil {
-		opts = append(opts, WithContextProvider(i.ContextProviderManager))
+		opts = append(opts, WithContextProvider(i.ContextProviderManager.snapshotForChild()))
 	}
 
 	// Dynamic planning propagation

@@ -186,6 +186,10 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	if input.ContextPackage != nil && input.ContextPackage.UserInput != "" {
 		userInput = input.ContextPackage.UserInput
 	}
+	userInput, err := appendAITaskFocusInput(userInput, input.PayloadJSON)
+	if err != nil {
+		return fmt.Errorf("stateless sendinput: %w", err)
+	}
 	if userInput == "" {
 		return fmt.Errorf("stateless sendinput: empty user input")
 	}

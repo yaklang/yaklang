@@ -245,6 +245,16 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 	}
 }
 
+// FileContentContextProvider renders an inline input snapshot without creating
+// temporary files or applying the file-path preview limit. The context manager
+// still enforces its shared token budget on the complete rendered context.
+func FileContentContextProvider(content string, userPrompt ...string) ContextProvider {
+	return func(AICallerConfigIf, *Emitter, string) (string, error) {
+		return fmt.Sprintf("User Prompt: %s\nFile: inline content\nMIME Type: text/plain\nFile Size: %d bytes\n\n--- File Content ---\n%s\n--- End of File Content ---\n",
+			strings.Join(userPrompt, " "), len(content), content), nil
+	}
+}
+
 // OutputFileContextProvider has been removed. It used to read each
 // verification-confirmed output file (up to 40KB) and re-inject its full body
 // into Pure Dynamic / AutoContext on every prompt build via
@@ -357,10 +367,7 @@ func NewContextProvider(typ string, key string, value string, userPrompt ...stri
 			case CONTEXT_PROVIDER_KEY_FILE_PATH:
 				return FileContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			case CONTEXT_PROVIDER_KEY_FILE_CONTENT:
-				// TODO: 将文件存到 AI 工作目录
-				// 先暂时存到临时文件
-				tempFile := consts.TempAIFileFast("file-*.txt", value)
-				return FileContextProvider(tempFile, userPrompt...)(config, emitter, providerKey)
+				return FileContentContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
 				return baseInfo + fmt.Sprintf("[Error: unknown file context provider key: %s]", key), utils.Errorf("unknown file context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
@@ -496,6 +503,12 @@ type ContextProviderManager struct {
 	maxTokens int
 	m         sync.RWMutex
 	callback  *omap.OrderedMap[string, ContextProvider]
+
+	// Derived managers share ordinary providers, but own a snapshot of the
+	// task-only layer. They never read later task layers from the shared owner.
+	ordinary      *ContextProviderManager
+	taskProviders *omap.OrderedMap[string, ContextProvider]
+	taskScopes    int
 }
 
 const maxInlineKnowledgeBaseTokens = 2 * 1024
@@ -505,6 +518,60 @@ func NewContextProviderManager() *ContextProviderManager {
 		maxTokens: 48 * 1024, // 48k tokens
 		callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
+}
+
+// BeginTaskContext binds an immutable provider to one execution scope. A nil
+// provider still marks the scope: children of an input without attachments must
+// not inherit inline content from a later input. Cleanup never removes ordinary
+// providers or the copies already captured by derived managers.
+func (r *ContextProviderManager) BeginTaskContext(name string, cb ContextProvider) func() {
+	r.m.Lock()
+	r.taskScopes++
+	registered := false
+	if cb != nil {
+		if r.taskProviders == nil {
+			r.taskProviders = omap.NewOrderedMap(make(map[string]ContextProvider))
+		}
+		if !r.taskProviders.Have(name) {
+			r.taskProviders.Set(name, wrapContextProvider(name, cb))
+			registered = true
+		}
+	}
+	r.m.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			r.m.Lock()
+			defer r.m.Unlock()
+			r.taskScopes--
+			if registered {
+				r.taskProviders.Delete(name)
+			}
+		})
+	}
+}
+
+// snapshotForChild freezes only task-owned context, including an empty task
+// scope. Ordinary managers outside task execution retain pointer sharing.
+func (r *ContextProviderManager) snapshotForChild() *ContextProviderManager {
+	r.m.RLock()
+	defer r.m.RUnlock()
+	if r.ordinary == nil && r.taskScopes == 0 {
+		return r
+	}
+	ordinary := r.ordinary
+	if ordinary == nil {
+		ordinary = r
+	}
+	child := &ContextProviderManager{maxTokens: r.maxTokens, ordinary: ordinary}
+	if r.taskProviders != nil {
+		child.taskProviders = omap.NewOrderedMap(make(map[string]ContextProvider))
+		r.taskProviders.ForEach(func(name string, cb ContextProvider) bool {
+			child.taskProviders.Set(name, cb)
+			return true
+		})
+	}
+	return child
 }
 
 func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextProvider) {
@@ -588,13 +655,21 @@ func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextPr
 }
 
 func (r *ContextProviderManager) Register(name string, cb ContextProvider) {
+	if r.ordinary != nil {
+		r.ordinary.Register(name, cb)
+		return
+	}
 	r.m.Lock()
 	defer r.m.Unlock()
 	if r.callback.Have(name) {
 		log.Warnf("context provider %s already registered, ignore, if you want to use new callback, unregister first", name)
 		return
 	}
-	r.callback.Set(name, func(config AICallerConfigIf, emitter *Emitter, key string) (_ string, finalErr error) {
+	r.callback.Set(name, wrapContextProvider(name, cb))
+}
+
+func wrapContextProvider(name string, cb ContextProvider) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (_ string, finalErr error) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("context provider %s panic: %v", name, err)
@@ -603,10 +678,14 @@ func (r *ContextProviderManager) Register(name string, cb ContextProvider) {
 			}
 		}()
 		return cb(config, emitter, key)
-	})
+	}
 }
 
 func (r *ContextProviderManager) Unregister(name string) {
+	if r.ordinary != nil {
+		r.ordinary.Unregister(name)
+		return
+	}
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.callback.Delete(name)
@@ -635,15 +714,23 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 	emitter *Emitter,
 	tagStrategy func(name string) string,
 ) string {
+	ordinary := r
+	if r.ordinary != nil {
+		ordinary = r.ordinary
+		// Always lock the shared registry before the local task layer. Mutations
+		// touch only one of them, so derived views cannot invert this order.
+		ordinary.m.RLock()
+		defer ordinary.m.RUnlock()
+	}
 	r.m.RLock()
 	defer r.m.RUnlock()
 
-	if r.callback.Len() == 0 {
+	if ordinary.callback.Len() == 0 && (r.taskProviders == nil || r.taskProviders.Len() == 0) {
 		return ""
 	}
 
 	var buf bytes.Buffer
-	r.callback.ForEach(func(name string, cb ContextProvider) bool {
+	render := func(name string, cb ContextProvider) bool {
 		result, err := cb(config, emitter, name)
 		if err != nil {
 			result = `[Error getting context: ` + err.Error() + `]`
@@ -660,7 +747,11 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 		buf.WriteString(result)
 		buf.WriteString(fmt.Sprintf("\n<|AUTO_PROVIDE_CTX_[%v]_END|>", flag))
 		return true
-	})
+	}
+	ordinary.callback.ForEach(render)
+	if r.taskProviders != nil {
+		r.taskProviders.ForEach(render)
+	}
 
 	result := buf.String()
 	if TokenCountExceeds(result, r.maxTokens) {

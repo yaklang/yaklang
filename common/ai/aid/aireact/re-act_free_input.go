@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,43 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// installTaskInlineAttachmentProvider owns only the running queue task's inline
+// snapshot. Installing it at dequeue (not input arrival) prevents queued inputs
+// and nested task-pointer changes from replacing the active Focus context.
+func installTaskInlineAttachmentProvider(manager *aicommon.ContextProviderManager, task aicommon.AIStatefulTask) func() {
+	if manager == nil || task == nil {
+		return func() {}
+	}
+	var providers []aicommon.ContextProvider
+	for _, resource := range task.GetAttachedDatas() {
+		if resource == nil || resource.Type != aicommon.CONTEXT_PROVIDER_TYPE_FILE ||
+			resource.Key != aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT || resource.Value == "" {
+			continue
+		}
+		providers = append(providers, aicommon.FileContentContextProvider(resource.Value, task.GetUserInput()))
+	}
+	if len(providers) == 0 {
+		return manager.BeginTaskContext("", nil)
+	}
+	// A private key avoids overwriting a caller's provider or a file-path key.
+	// Cleanup removes only the provider created for this execution scope.
+	providerKey := "free-input-inline-file-attachments-" + ksuid.New().String()
+	return manager.BeginTaskContext(providerKey, func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+		var result bytes.Buffer
+		for index, provider := range providers {
+			content, err := provider(config, emitter, key)
+			if err != nil {
+				return "", fmt.Errorf("render inline attachment %d: %w", index+1, err)
+			}
+			if index > 0 {
+				result.WriteByte('\n')
+			}
+			result.WriteString(content)
+		}
+		return result.String(), nil
+	})
+}
 
 func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	if r.pureInvokerMode {

@@ -251,6 +251,94 @@ func (f *fakeStatelessTurnEngine) Close() {
 	f.closeOnce.Do(func() { close(f.closed) })
 }
 
+func TestStatelessDriverTaskFocusInput(t *testing.T) {
+	for _, test := range taskFocusInputCases() {
+		t.Run(test.name, func(t *testing.T) {
+			engine := newTaskFocusCaptureEngine(t)
+			factoryCalls := 0
+			handle := &statelessAIEngineRuntimeHandle{
+				emitter:       noopEmitter{},
+				cachedOptions: []aiengine.AIEngineConfigOption{aiengine.WithAttachedFileContent("BOUND_ATTACHMENT_BODY")},
+				newEngine: func(options ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+					factoryCalls++
+					engine.config = aiengine.NewAIEngineConfig(options...)
+					return engine, nil
+				},
+			}
+			t.Cleanup(func() { handle.Close("test finished") })
+			input := aiSessionInput{
+				Ref:       aiSessionCommandRef{CommandID: "task-focus-command", SessionID: "task-focus-session", RunID: "task-focus-run", BindEpoch: 3},
+				InputType: "message", PayloadJSON: test.payload,
+				ContextPackage: &aiv1.ContextPackage{UserInput: "CONTEXT_PACKAGE_USER_INPUT"},
+			}
+			beforePayload, beforeRef := string(input.PayloadJSON), input.Ref
+			beforeContext := string(mustJSON(input.ContextPackage))
+			err := handle.SendInput(context.Background(), input)
+			if string(input.PayloadJSON) != beforePayload || input.Ref != beforeRef || string(mustJSON(input.ContextPackage)) != beforeContext {
+				t.Fatal("focus projection changed durable payload, context, or identity")
+			}
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Errorf("invalid focus was not explicitly rejected (%s): %v", test.wantErr, err)
+				}
+				if err != nil && strings.Contains(err.Error(), "DO_NOT_LOG_USER_VALUE") {
+					t.Error("focus validation disclosed the rejected value")
+				}
+				if factoryCalls != 0 {
+					t.Error("invalid focus constructed a turn engine")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			message := receiveTaskFocusMessage(t, engine)
+			assertTaskFocusMessage(t, message.content, "CONTEXT_PACKAGE_USER_INPUT", test)
+			assertTaskFocusAttachmentOption(t, message.options)
+			if len(engine.config.AttachedResources) != 1 || engine.config.AttachedResources[0].Value != "BOUND_ATTACHMENT_BODY" {
+				t.Error("focus projection changed engine attachment options")
+			}
+			close(engine.release)
+			select {
+			case <-engine.closed:
+			case <-time.After(time.Second):
+				t.Fatal("stateless task did not close after engine release")
+			}
+		})
+	}
+}
+
+func TestStatelessDriverTaskFocusControlInputUnchanged(t *testing.T) {
+	for _, input := range taskFocusControlInputs() {
+		t.Run(input.InputType, func(t *testing.T) {
+			engine := newTaskFocusCaptureEngine(t)
+			handle := &statelessAIEngineRuntimeHandle{
+				emitter: noopEmitter{}, activeTurn: &statelessAITurn{engine: engine, turnID: "active-turn"},
+				newEngine: func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+					t.Fatal("control input created a turn engine")
+					return nil, errFakeEngineFactory
+				},
+			}
+			t.Cleanup(func() { handle.Close("test finished") })
+			before := string(input.PayloadJSON)
+			if err := handle.SendInput(context.Background(), input); err != nil {
+				t.Fatalf("control input was treated as a task focus message: %v", err)
+			}
+			if len(engine.messages) != 0 || string(input.PayloadJSON) != before {
+				t.Fatal("control input was rewritten or sent as a user message")
+			}
+			event := <-engine.events
+			if input.InputType == "interactive_response" {
+				if !event.GetIsInteractiveMessage() || event.GetInteractiveId() != "review-task-focus" || event.GetInteractiveJSONInput() != before {
+					t.Fatal("interactive response changed")
+				}
+			} else if !event.GetIsSyncMessage() || event.GetSyncID() != "sync-task-focus" || event.GetSyncJsonInput() != "{}" {
+				t.Fatal("sync input changed")
+			}
+		})
+	}
+}
+
 func TestStatelessTurnWaitsForReActQueueDrainBeforeCompleting(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
 	engine.drainStarted = make(chan struct{})
