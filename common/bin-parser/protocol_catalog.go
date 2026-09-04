@@ -98,7 +98,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "Yakit MITM magic", Layer: "L7", RuleFile: "application-layer/http.yaml", Status: statusNew, Notes: "HTTP CONNECT intercept", SampleFrom: "yak-mitm CONNECT"},
 	{Name: "LLC", Layer: "L2", RuleFile: "llc.yaml", Status: statusNew, SampleFrom: "IEEE 802.3 + STP BPDU (gopacket)"},
 	{Name: "IEEE 802.1ad QinQ", Layer: "L2", RuleFile: "ieee_802_1ad.yaml", Status: statusNew, SampleFrom: "EtherType 0x88a8"},
-	{Name: "PPPoE Discovery", Layer: "L2", RuleFile: "pppoe.yaml", Status: statusNew, SampleFrom: "RFC 2516 PADI"},
+	{Name: "PPPoE Discovery", Layer: "L2", RuleFile: "pppoe.yaml", Status: statusNew, SampleFrom: "RFC 2516 PADI/PADO tags"},
 	{Name: "STP", Layer: "L2", RuleFile: "stp.yaml", Status: statusNew, SampleFrom: "gopacket STP BPDU"},
 	{Name: "LLDP", Layer: "L2", RuleFile: "lldp.yaml", Status: statusNew, SampleFrom: "gopacket Siemens LLDP"},
 	{Name: "CDP", Layer: "L2", RuleFile: "cdp.yaml", Status: statusNew, SampleFrom: "Wireshark SampleCaptures/cdp.pcap"},

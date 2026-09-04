@@ -2696,6 +2696,47 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "port-001", strVal(t, lldp.Child("TLVs").Children()[1].Child("Port ID")))
 		require.Equal(t, uint64(20), uintVal(t, lldp.Child("TLVs").Children()[2].Child("TTL")))
 	})
+
+	t.Run("pppoe/padi", func(t *testing.T) {
+		// RFC 2516 §5.1 PADI: exactly one Service-Name tag. Empty TAG_LENGTH is "any service" (Appendix B);
+		// named payload uses Service-Name "isp" so the string is observable. EtherType 0x8863.
+		anySvc := mustHex(t, "11090000000401010000")
+		n := parseRule(t, anySvc, "pppoe", "PPPoE")
+		require.Equal(t, uint64(0x09), uintVal(t, n.Child("Code")))
+		require.Equal(t, uint64(0x0101), uintVal(t, n.Child("Payload").Child("Tags").Children()[0].Child("Type")))
+		require.Nil(t, n.Child("Payload").Child("Tags").Children()[0].Child("Service-Name"))
+		padi := rfcPPPoEPADI(t)
+		n = parseRule(t, padi, "pppoe", "PPPoE")
+		require.Equal(t, "isp", strVal(t, n.Child("Payload").Child("Tags").Children()[0].Child("Service-Name")))
+		eth := parseEthernet(t, pppoeDiscoveryFrame(t, padi))
+		require.Equal(t, "isp", strVal(t, mustChild(t, eth, "PPPoEDiscovery").Child("Payload").Child("Tags").Children()[0].Child("Service-Name")))
+	})
+
+	t.Run("pppoe/pado", func(t *testing.T) {
+		// RFC 2516 §5.2 PADO: AC-Name + Service-Name identical to PADI, plus Host-Uniq echo.
+		pado := rfcPPPoEPADO(t)
+		n := parseRule(t, pado, "pppoe", "PPPoE")
+		require.Equal(t, uint64(0x07), uintVal(t, n.Child("Code")))
+		tags := n.Child("Payload").Child("Tags").Children()
+		require.Equal(t, "isp", strVal(t, tags[0].Child("Service-Name")))
+		require.Equal(t, "BRAS1", strVal(t, tags[1].Child("AC-Name")))
+		require.Equal(t, []byte{0x01, 0x02, 0x03, 0x04}, bytesVal(t, tags[2].Child("Host-Uniq")))
+		eth := parseEthernet(t, pppoeDiscoveryFrame(t, pado))
+		p := mustChild(t, eth, "PPPoEDiscovery")
+		require.Equal(t, "BRAS1", strVal(t, p.Child("Payload").Child("Tags").Children()[1].Child("AC-Name")))
+		require.Equal(t, []byte{0x01, 0x02, 0x03, 0x04}, bytesVal(t, p.Child("Payload").Child("Tags").Children()[2].Child("Host-Uniq")))
+	})
+
+	t.Run("pppoe/session", func(t *testing.T) {
+		// RFC 2516 §4 session (code 0) carries PPP. Protocol 0x002d as in RFC 2661 data example. EtherType 0x8864.
+		sess := mustHex(t, "110000010004ff03002d")
+		n := parseRule(t, sess, "pppoe", "PPPoE")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Code")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Session ID")))
+		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, n, "Payload", "PPP").Child("Protocol")))
+		eth := parseEthernet(t, pppoeSessionFrame(t, sess))
+		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "PPPoESession", "Payload", "PPP").Child("Protocol")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
@@ -2726,6 +2767,38 @@ func gopacketSiemensLLDPFrame(t *testing.T) []byte {
 func gopacketSiemensLLDP(t *testing.T) []byte {
 	t.Helper()
 	return gopacketSiemensLLDPFrame(t)[14:]
+}
+
+func rfcPPPoEPADI(t *testing.T) []byte {
+	t.Helper()
+	// RFC 2516 §5.1 PADI with Service-Name "isp" (Appendix B uses empty name for "any").
+	return mustHex(t, "11090000000701010003697370")
+}
+
+func rfcPPPoEPADO(t *testing.T) []byte {
+	t.Helper()
+	// RFC 2516 §5.2 PADO: Service-Name "isp", AC-Name "BRAS1", Host-Uniq 01020304.
+	return mustHex(t, "110700000018010100036973700102000542524153310103000401020304")
+}
+
+func pppoeDiscoveryFrame(t *testing.T, pdu []byte) []byte {
+	t.Helper()
+	eth := make([]byte, 14+len(pdu))
+	copy(eth[0:6], []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+	copy(eth[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+	binary.BigEndian.PutUint16(eth[12:14], 0x8863)
+	copy(eth[14:], pdu)
+	return eth
+}
+
+func pppoeSessionFrame(t *testing.T, pdu []byte) []byte {
+	t.Helper()
+	eth := make([]byte, 14+len(pdu))
+	copy(eth[0:6], []byte{0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee})
+	copy(eth[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+	binary.BigEndian.PutUint16(eth[12:14], 0x8864)
+	copy(eth[14:], pdu)
+	return eth
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
