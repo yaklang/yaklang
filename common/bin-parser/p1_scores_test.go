@@ -1,6 +1,8 @@
 package bin_parser
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -105,6 +107,32 @@ func TestP1ScorecardsCovered(t *testing.T) {
 	}
 }
 
+func TestP1RequiredAliases(t *testing.T) {
+	childNames := p1MustChildNames()
+	for _, name := range []string{
+		"IEEE 802.1X", "RPC", "Portmap/Rpcbind", "RabbitMQ", "IIOP Locate", "Memcache binary",
+	} {
+		sc, ok := ResolveP1Scorecard(name)
+		require.True(t, ok, "missing scorecard for %s", name)
+		require.NotEmpty(t, sc.AliasOf, "%s should share a YAML via AliasOf", name)
+		eth := hasEthernetMustChild(sc, childNames)
+		ported := strings.Contains(sc.Evidence, "TCP/") || strings.Contains(sc.Evidence, "UDP/")
+		sc = deriveP1Gates(sc, failCount(sc.Rule), eth, ported)
+		require.Equal(t, "A", sc.Grade(), "%s alias grade %s total %d aliasOf=%s", name, sc.Grade(), sc.Total(), sc.AliasOf)
+	}
+}
+
+func TestP1CardsDoNotHardcodeGates(t *testing.T) {
+	for _, s := range P1Scorecards {
+		if s.AliasOf != "" {
+			continue
+		}
+		require.False(t, s.G1, "%s G1 must be derived, not hardcoded", s.Name)
+		require.False(t, s.G6, "%s G6 must be derived, not hardcoded", s.Name)
+		require.False(t, s.G7, "%s G7 must be derived, not hardcoded", s.Name)
+	}
+}
+
 func TestP1DerivedGatesRejectFake(t *testing.T) {
 	fake := p1card("NoSuchProto", "no-such.yaml", 25, 25, 20, 20, 10, "L2", "handmade", "")
 	require.False(t, fake.G1)
@@ -116,6 +144,62 @@ func TestP1DerivedGatesRejectFake(t *testing.T) {
 	require.False(t, derived.G6)
 	require.False(t, derived.G7)
 	require.Equal(t, "F", derived.Grade())
+}
+
+func TestP1DumpInventory(t *testing.T) {
+	path := os.Getenv("P1_DUMP")
+	if path == "" {
+		t.Skip("set P1_DUMP to write inventory markdown")
+	}
+	require.NoError(t, os.WriteFile(path, []byte(p1InventoryMarkdown()), 0o644))
+}
+
+func TestP1ScoresDocListsEveryName(t *testing.T) {
+	b, err := os.ReadFile("P1_SCORES.md")
+	if err != nil {
+		b, err = os.ReadFile("common/bin-parser/P1_SCORES.md")
+	}
+	require.NoError(t, err)
+	text := string(b)
+	for _, item := range ProtocolRoadmap {
+		if item.Priority != priP1 {
+			continue
+		}
+		require.Contains(t, text, item.Name, "P1_SCORES.md missing %s", item.Name)
+	}
+}
+
+func p1InventoryMarkdown() string {
+	childNames := p1MustChildNames()
+	var b strings.Builder
+	b.WriteString("# P1 协议交付打分\n\n")
+	b.WriteString("对照 [PROTOCOL_DELIVERY.md](PROTOCOL_DELIVERY.md)。机器可读记录在 `p1_scores.go`，由 `TestP1ScorecardsCovered` 校验：每个 P1 名称都有计分卡；`Status: done` 必须是 **A**（总分 ≥ 90）。\n\n")
+	b.WriteString("维度（满分 100）：Schema 25 / 真实流量 25 / 测试 20 / 分支覆盖 20 / 栈集成 10。硬门槛 G1–G8 全过才计分。\n\n")
+	b.WriteString("别名与主规则共用同一张卡（见 `AliasOf`）。样本来源包括 gopacket 测试帧、RFC 完整 PDU，以及 Ethernet+IP+L4 整帧断言。\n\n")
+	b.WriteString("G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gopacket serialize 的 Traffic ≤ 8。\n\n")
+	b.WriteString("`TestP1ScorecardsCovered` 用 YAML/`p1FailCases`/mustChild 扫描卡死 Schema/Tests/Traffic 上限：声称分不得高于 `schemaCeiling` / `testsCeiling` / `trafficCeiling`。G1–G4/G6–G8 由测试从规则文件、失败路径和以太网封装推导，`p1card` 不得写死为 true。\n\n")
+	b.WriteString("| 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+	for _, item := range ProtocolRoadmap {
+		if item.Priority != priP1 {
+			continue
+		}
+		sc, ok := ResolveP1Scorecard(item.Name)
+		if !ok {
+			fmt.Fprintf(&b, "| %s | missing | | | | | | | | |\n", item.Name)
+			continue
+		}
+		eth := hasEthernetMustChild(sc, childNames)
+		ported := strings.Contains(sc.Evidence, "TCP/") || strings.Contains(sc.Evidence, "UDP/")
+		sc = deriveP1Gates(sc, failCount(sc.Rule), eth, ported)
+		rule := "`" + sc.Rule + "`"
+		if sc.AliasOf != "" {
+			rule = "alias of " + sc.AliasOf
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %d | %d | %d | %s | %s |\n",
+			item.Name, sc.Grade(), sc.Total(), sc.Schema, sc.Traffic, sc.Tests, sc.Branches, sc.Stack, sc.SampleClass, rule)
+	}
+	return b.String()
 }
 
 func TestP1RoadmapCovered(t *testing.T) {
