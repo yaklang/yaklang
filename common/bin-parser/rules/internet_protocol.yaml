@@ -45,7 +45,7 @@ Package:
           case 132:
             node = this.NewSubNode("SCTP")
           default:
-            node = this.NewUnknownNode()
+            node = this.NewSubNode("Next Protocol Data")
         }
         node.SetMaxLength(l)
         node.Process()
@@ -61,4 +61,4 @@ OSPF: "import:ospf.yaml;node:OSPF"
 EIGRP: "import:eigrp.yaml;node:EIGRP"
 VRRP: "import:vrrp.yaml;node:VRRP"
 SCTP: "import:sctp.yaml;node:SCTP"
-Unknown: raw
+Next Protocol Data: string

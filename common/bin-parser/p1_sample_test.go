@@ -2802,6 +2802,47 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4UDPBytes(t, 161, 161, mustHex(t, "302602010004067075626c6963a019020101020100020100300e300c06082b060102010101000500")))
 		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "SNMP", "PDU Body", "Variable Bindings", "Bindings", "OID")))
 	})
+
+	t.Run("tcp/mss", func(t *testing.T) {
+		// gopacket layers/tcp_test.go testPacketTCPOptionDecode: SYN options [mss 8192,eol]. RFC 793 §3.1.
+		n := parseRule(t, gopacketTCPSYMSS()[34:62], "transmission_control_protocol", "TCP")
+		require.Equal(t, uint64(12345), uintVal(t, n.Child("Source Port")))
+		opts := n.Child("Options").Children()
+		require.GreaterOrEqual(t, len(opts), 1)
+		require.Equal(t, uint64(2), uintVal(t, opts[0].Child("Kind")))
+		require.Equal(t, uint64(8192), uintVal(t, opts[0].Child("MSS")))
+		eth := parseEthernet(t, gopacketTCPSYMSS())
+		require.Equal(t, uint64(8192), uintVal(t, mustChild(t, eth, "IP", "TCP").Child("Options").Children()[0].Child("MSS")))
+	})
+
+	t.Run("tcp/timestamp", func(t *testing.T) {
+		// RFC 7323 §3 TCP Timestamps option kind 8: TSval 2, TSecr 1 (gopacket TCPOptionKindTimestamps fixture).
+		raw := rfcTCPTimestamp()
+		n := parseRule(t, raw, "transmission_control_protocol", "TCP")
+		opts := n.Child("Options").Children()
+		require.GreaterOrEqual(t, len(opts), 1)
+		ts := opts[len(opts)-1]
+		require.Equal(t, uint64(8), uintVal(t, ts.Child("Kind")))
+		require.Equal(t, uint64(2), uintVal(t, ts.Child("TS Val")))
+		require.Equal(t, uint64(1), uintVal(t, ts.Child("TS Echo Reply")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 6, raw))
+		wired := mustChild(t, eth, "IP", "TCP").Child("Options").Children()
+		require.Equal(t, uint64(2), uintVal(t, wired[len(wired)-1].Child("TS Val")))
+	})
+
+	t.Run("ip/next-proto", func(t *testing.T) {
+		// RFC 791 Protocol 99 (unassigned): leftover is named Next Protocol Data, not Unknown raw.
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 99, []byte("abcd")))
+		require.Equal(t, uint64(99), uintVal(t, mustChild(t, eth, "IP").Child("Protocol")))
+		require.Equal(t, "abcd", strVal(t, mustChild(t, eth, "IP").Child("Next Protocol Data")))
+	})
+
+	t.Run("ipv6/next-proto", func(t *testing.T) {
+		// RFC 8200 Next Header 99: named Next Protocol Data instead of Unknown raw.
+		eth := parseEthernet(t, ipv6ProtoFrame(t, 99, []byte("efgh")))
+		require.Equal(t, uint64(99), uintVal(t, mustChild(t, eth, "IPv6").Child("Next Header")))
+		require.Equal(t, "efgh", strVal(t, mustChild(t, eth, "IPv6").Child("Next Protocol Data")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
@@ -2864,6 +2905,31 @@ func pppoeSessionFrame(t *testing.T, pdu []byte) []byte {
 	binary.BigEndian.PutUint16(eth[12:14], 0x8864)
 	copy(eth[14:], pdu)
 	return eth
+}
+
+func gopacketTCPSYMSS() []byte {
+	// gopacket layers/tcp_test.go testPacketTCPOptionDecode: SYN mss 8192,eol + "Test".
+	return []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08, 0x00, 0x45, 0x00,
+		0x00, 0x34, 0x00, 0x00, 0x00, 0x00, 0x80, 0x06, 0xb9, 0x70, 0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8,
+		0x00, 0x02, 0x30, 0x39, 0xd4, 0x31, 0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x00, 0x00, 0x70, 0x02,
+		0x00, 0x00, 0x82, 0x9c, 0x00, 0x00, 0x02, 0x04, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x54, 0x65,
+		0x73, 0x74,
+	}
+}
+
+func rfcTCPTimestamp() []byte {
+	// RFC 7323 §3 Timestamps: kind 8 length 10, TSval 2, TSecr 1. Header length 8 (NOP NOP + TS).
+	b := make([]byte, 32)
+	binary.BigEndian.PutUint16(b[0:], 12345)
+	binary.BigEndian.PutUint16(b[2:], 80)
+	binary.BigEndian.PutUint32(b[4:], 1)
+	binary.BigEndian.PutUint32(b[8:], 1)
+	b[12] = 0x80
+	b[13] = 0x10
+	binary.BigEndian.PutUint16(b[14:], 8192)
+	copy(b[20:], []byte{0x01, 0x01, 0x08, 0x0a, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01})
+	return b
 }
 
 func ntlmsspChallengeTarget(domain string) []byte {
