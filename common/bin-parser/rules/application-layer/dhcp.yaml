@@ -65,8 +65,59 @@ Option:
     }
     this.ProcessSubNode("Length")
     l = getNodeResult("Length").Value
-    this.GetSubNode("Data").SetMaxLength(l)
-    this.ProcessSubNode("Data")
+    if code == 53 {
+      if l != 1 {
+        panic("dhcp: message-type length must be 1")
+      }
+      this.ProcessSubNode("Message Type")
+      return
+    }
+    if code == 12 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Host Name").SetMaxLength(l)
+        this.ProcessSubNode("Host Name")
+      }
+      return
+    }
+    if code == 50 {
+      if l != 4 {
+        panic("dhcp: requested-ip length must be 4")
+      }
+      this.ProcessSubNode("Requested IP")
+      return
+    }
+    if code == 54 {
+      if l != 4 {
+        panic("dhcp: server-id length must be 4")
+      }
+      this.ProcessSubNode("Server ID")
+      return
+    }
+    if code == 1 {
+      if l != 4 {
+        panic("dhcp: subnet-mask length must be 4")
+      }
+      this.ProcessSubNode("Subnet Mask")
+      return
+    }
+    if code == 51 {
+      if l != 4 {
+        panic("dhcp: lease-time length must be 4")
+      }
+      this.ProcessSubNode("Lease Time")
+      return
+    }
+    if l > 0 && l < 1048576 {
+      this.GetSubNode("Octets").SetMaxLength(l)
+      this.ProcessSubNode("Octets")
+    }
+    return
   Code: uint8
   Length: uint8
-  Data: raw
+  Message Type: uint8
+  Host Name: string
+  Requested IP: raw,4
+  Server ID: raw,4
+  Subnet Mask: raw,4
+  Lease Time: uint32
+  Octets: string

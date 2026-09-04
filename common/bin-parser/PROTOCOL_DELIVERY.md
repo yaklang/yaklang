@@ -4,6 +4,14 @@
 
 交付物是 YAML 规则 + 走 `parser.ParseBinary` 的测试，不是旁路实现。
 
+**2026-09 修订（针对机械 A 返工）：**
+
+- **去掉 leftover 不等于 Schema 25。** 无界 `*: raw` 清掉、再加几个 `uint8` 和一句 `if`，最高只到 15。25 分要求：leftover 合法 **并且** 有真实 TLV/列表循环 **并且** type/command 分发 **并且** 足够多的具名标量。
+- **禁止 leftover 改名刷分。** `Body`/`Payload`/`Data`/`Rest` 从 `raw` 改成 `string` 仍算未完成 leftover。
+- **P0 规则不得把 P1 卡抬到满分。** 同一 YAML 上的 P1 别名按该文件真实 leftover / 测试行数封顶。
+- **P1 `done` 改为 B 级（≥ 75）。** A 级（≥ 90）留给 Wireshark 级主 PDU：引用样本上至少两类报文、具名字段断言、整帧。
+- **L2 样本必须带出所断言的字段。** 只有魔数/版本的 RFC 附录 hex 不能当 Traffic 25。
+
 ---
 
 ## 1. 怎么用
@@ -32,7 +40,7 @@
 | G2 | 测试调用已交付解析器：`parser.ParseBinary` / `parseRule` / `parseEthernet` | 禁止另写一套解码器当测试 oracle；禁止从 PDU 中段切开再喂解析器（除非测的就是该子节点） |
 | G3 | 根节点最后一项不得是无界 `raw`（`MaxUint64` 会 panic） | 剩余数据必须有 `SetMaxLength`、`length-from-field` 或 list 循环退出条件 |
 | G4 | 不得破坏已有黄金样例与 ABI | TLS 应用数据仍有 `Payload`；HTTP GET 不得被 TLS 吃成 GGET；TPKT 的 `TPDU` 保持 raw，供 `protocol-impl` 往返 |
-| G5 | 至少一份 **L1、L2 或 L3** 样本（第 5 节），测试注释写清出处 | 仅 L4 手工拼包不能作为唯一样本。规范中字节由公开文本**唯一确定**的完整 PDU（HTTP/2 preface、AJP CPING、Java `ACED0005`、PostgreSQL SSLRequest、NTLMSSP 签名头、SMB2 `\\xfeSMB` 头）视为 L2 |
+| G5 | 至少一份 **L1、L2 或 L3** 样本（第 5 节），测试注释写清出处 | 仅 L4 手工拼包不能作为唯一样本。L3 只能作补充（Traffic ≤ 8）。**A 级**必须另有 L1/L2，且 hex/pcap 含本次断言的具名字段（不能只断言 Type/Length） |
 | G6 | 至少一条 **截断 / 错误魔数 / 非法长度** 的 `parseMustFail` | 只有 happy path 不算交付 |
 | G7 | 若协议走 TCP/UDP 端口分发，必须有 **Ethernet+IP+TCP/UDP** 整帧测试 | 只测 `parseRule(payload)` 不够 |
 | G8 | 路线图与目录一致 | P0 翻 `done` 时 `ProtocolCatalog` 不得仍是 `partial`；`TestP0RoadmapCovered` 必须绿 |
@@ -47,30 +55,40 @@ G4 细则：TLS 只在 ContentType==22 时尝试 ClientHello；探测 ContentTyp
 
 ### 3.1 Schema 完成度 — 25 分
 
-「完成」指规范里的**主 PDU 与约束字段被命名并真正吃掉字节**，不是文件里有个同名节点。
+「完成」指规范 / Wireshark 里**主 PDU 的字段被命名并且测试读到了值**，不是 YAML 里有个同名节点，也不是把 leftover blob 换个类型。
 
-| 分 | 标准 |
+机器封顶（`schemaCeiling`）按下表，**声称分不得高于封顶**：
+
+| 分 | 必须同时满足 |
 | --- | --- |
-| 0 | 只有魔数/版本；其余全是一块 `raw` |
-| 8 | 固定头字段命名；变长区仍是一块 blob |
-| 15 | 主 PDU 按 type/command 分发；每个已声明 PDU 的定长字段都解析 |
-| 20 | TLV / 列表 / 剩余空间按元素循环，而不是只解第一个 Type/Length/Value |
-| 25 | 规范主路径字段全部命名；唯一允许的 `raw` 是第 3.1.1 节「规范不透明」 |
+| 0 | 几乎没有具名标量 |
+| 8 | 固定头有具名字段；变长区仍是 leftover blob（无界 `*: raw`，或 `Payload\|Body\|Data\|Rest\|Content: string`） |
+| 15 | 有 type/command 分发；**或** leftover 已清但仍只有头字段 + 一句 `if`（无 TLV 列表、不足两个 `ProcessByType` 臂） |
+| 20 | leftover 合法 **且**（真实 list 循环 **或** ≥2 个 `ProcessByType` 臂）**且** 具名标量足够 |
+| 25 | leftover 合法 **且** 真实 TLV/list 循环 **且** type/command 分发 **且** 具名标量 ≥ 8。这是「主路径能当 Wireshark 用」的上限，不是「没有 leftover」的默认分 |
+
+**明确不算 Schema 25 / 甚至仍算 leftover：**
+
+- 把 `Body: raw` / `Payload: raw` / `Data: raw` 改成同名 `string`
+- dummy `list: true` 循环一进来就 `break`，或从未 `ele.Process()`
+- `raw,0` 占位、从不 `ProcessSubNode`
+- `OpaqueRaw: "MsgGlobal opaque"` 给**尚未拆开的结构化字段**开绿灯
+- P0 已有同一 YAML 就自动把 P1 卡写成 25
 
 #### 3.1.1 规范不透明 vs 未完成 leftover
 
-允许保持 `raw` 的（必须在 Notes 写明理由）：
+允许保持 `raw` 的（必须在计分卡 `OpaqueRaw` **写出字段名**，且该名属于载荷本身）：
 
-- 加密载荷：TLS application-data、SMB3 transform 密文、SSH 加密包体
-- 规范定义为 opaque 且本层不解码：DNS/NBNS RDATA、DCE/RPC NDR stub、TPKT TPDU（ABI）
-- 压缩/隧道内层交给另一个 dissector 的 payload
+- 加密载荷：TLS application-data、SMB3 transform 密文、SSH 加密包体、IPsec ICV/Ciphertext、WireGuard transport 密文
+- 规范定义为 opaque 且本层不解码：DNS/NBNS RDATA、DCE/RPC NDR stub、ONC RPC Stub、TPKT TPDU（ABI）、RTMP C1/S1 Random、EAPOL Key Data
+- 压缩/隧道内层交给另一个 dissector 的 payload（RTP 媒体 bitstream）
 
-**不算**规范不透明、扣 Schema 分：
+**不算**规范不透明、必须拆成具名字段：
 
-- RADIUS 只解第一个 Attribute，后面丢掉
+- SNMPv3 HeaderData、LDAP BindRequest DN、DCERPC BindAck Sec Addr、Kerberos pvno/msg-type、AJP FORWARD URI、TDS LOGIN7 HostName、DHCP option 53/12/54
+- RADIUS / LLDP / CDP 只解 Type/Length 把 Value 整段留下（除非 OpaqueRaw 标明该 TLV 的 Value 且规范就是不透明）
 - HTTP/2 SETTINGS 只解第一对 Identifier/Value
 - ClientHello 不读 Extensions
-- Handshake / CONNECT 后半截（plugin name、client id、token）不读
 - `operator` 里 `return` 掉了后续字段，树上看不到名字
 
 #### 3.1.2 长度必须约束
@@ -85,9 +103,9 @@ G4 细则：TLS 只在 ContentType==22 时尝试 ClientHello；探测 ContentTyp
 | --- | --- |
 | 0 | 无样本，或只有现场随手构造、无出处 |
 | 8 | 仅 L4：规范附录 hex / 本仓库 `protocol-impl` 已有 hex，且注释标明 |
-| 15 | 至少一份 L1 或 L2，注释含来源（pcap 名、gopacket 测试文件、RFC 章节） |
-| 20 | L1/L2 覆盖请求**和**响应（或协议单向则覆盖主 PDU 两类） |
-| 25 | L1/L2 经 Ethernet+IP+L4 整帧解析，且断言打到应用层**命名字段**（不是只断言「有这个节点」） |
+| 15 | 至少一份 L1 或 L2，注释含来源（pcap 名、gopacket 测试文件、RFC 章节），且断言读到**应用层具名字段值** |
+| 20 | L1/L2 覆盖请求**和**响应（或协议单向则覆盖主 PDU 两类），两类都有具名断言 |
+| 25 | L1/L2 经 Ethernet+IP+L4 整帧解析，且整帧路径上断言打到应用层**命名字段**（不是只断言 Type/Length） |
 
 `ProtocolCatalog.SampleFrom` 必须能回溯到测试里的注释。
 
@@ -140,15 +158,17 @@ G4 细则：TLS 只在 ContentType==22 时尝试 ClientHello；探测 ContentTyp
 
 ## 4. 等级 → 路线图状态
 
-| 总分 | 等级 | `ProtocolRoadmap.Status` | `ProtocolCatalog.Status` | P0 |
-| --- | --- | --- | --- | --- |
-| 硬门槛失败 | F | 保持 `todo` 或 `partial` | `partial` 或不要标 `new` 当完成 | 禁止 `done` |
-| 0–59 | D | `todo` / `partial` | `partial` | 禁止 `done` |
-| 60–74 | C | `partial` | `partial` | 禁止 `done` |
-| 75–89 | B | `done`，Notes 写清不透明块与未实现 PDU | `new` 或 `stable` | 允许 |
-| 90–100 | A | `done` | `stable` 或 `new` | 允许 |
+| 总分 | 等级 | `ProtocolRoadmap.Status` | `ProtocolCatalog.Status` | P0 | P1 |
+| --- | --- | --- | --- | --- | --- |
+| 硬门槛失败 | F | 保持 `todo` 或 `partial` | `partial` 或不要标 `new` 当完成 | 禁止 `done` | 禁止 `done` |
+| 0–59 | D | `todo` / `partial` | `partial` | 禁止 `done` | 禁止 `done` |
+| 60–74 | C | `partial` | `partial` | 禁止 `done` | 禁止 `done` |
+| 75–89 | B | `done`，Notes 写清不透明块与未实现 PDU | `new` 或 `stable` | 允许 | **允许（P1 验收线）** |
+| 90–100 | A | `done` | `stable` 或 `new` | 允许 | 允许；表示 Wireshark 级主 PDU，不是默认目标 |
 
-P0 验收线：**硬门槛全过 + 总分 ≥ 75（B）**。C 及以下一律 `partial`。
+P0 验收线：**硬门槛全过 + 总分 ≥ 75（B）**。
+
+P1 验收线与 P0 对齐：**硬门槛全过 + 总分 ≥ 75（B）**。C 及以下一律 `partial`。A 级是质量目标，不是把 leftover 清掉之后的默认分。
 
 翻 `done` 时 Notes 至少写：主 PDU 列表、样本出处、仍为 raw 的字段及原因。
 
@@ -161,8 +181,8 @@ P0 验收线：**硬门槛全过 + 总分 ≥ 75（B）**。C 及以下一律 `p
 | 级 | 定义 | 例子 | 可否单独作为交付样本 |
 | --- | --- | --- | --- |
 | L1 | 从真实 pcap / 抓包文件抽出的帧字节，测试里原样保存 | Wireshark SampleCaptures、gopacket `layers/*_test.go` 里标注 pcap 名的 `[]byte`、本仓库 `protocol-impl` 捕获 hex | 是 |
-| L2 | 规范或实现文档中的**完整报文 hex**（不是自己按字段拼的） | RFC 1157 SNMP GetRequest、RFC 6455 §5.7 WebSocket `81 05 Hello`、RFC 4511 anonymous bind、RFC 9113 SETTINGS | 是 |
-| L3 | 用 gopacket / 标准库 **Serialize** 生成、字段符合 RFC 的包 | `layers.DHCPv4` Discover | 只能作补充，不能当唯一样本 |
+| L2 | 规范或实现文档中的**完整报文 hex**（不是自己按字段拼的），且 hex 里含本次断言的字段 | RFC 1157 SNMP GetRequest community `public`、RFC 6455 §5.7 WebSocket `81 05 Hello`、RFC 2132 option 53 DHCPDISCOVER | 是 |
+| L3 | 用 gopacket / 标准库 **Serialize** 生成、字段符合 RFC 的包 | `layers.DHCPv4` Discover | 只能作补充，不能当唯一样本；Traffic ≤ 8 |
 | L4 | 测试里 `make([]byte)` / `binary.Put*` 按规范拼的骨架 | SMB2 sync header builder、NTLMSSP 手工 type1 | 只能测分支/失败路径，**不能**当「真实流量」 |
 
 要求：
@@ -170,6 +190,7 @@ P0 验收线：**硬门槛全过 + 总分 ≥ 75（B）**。C 及以下一律 `p
 - 字节数组上方注释必须写：来源文件或 URL、pcap 包序号或 RFC 章节、这是什么 PDU。
 - L1 帧应保留以太网头；用 `parseEthernet` 走到 `IP/TCP|UDP/<Proto>`。
 - 同一协议至少覆盖一种「对端会看到」的方向（客户端请求或服务器响应）；有握手的协议两边都要有。
+- **只有魔数/版本的短 hex 不算 L2 主样本**（例如只断言 `Type==1` 的 4 字节头）。
 
 ---
 

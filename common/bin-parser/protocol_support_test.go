@@ -301,7 +301,9 @@ func TestDHCPGopacketDiscover(t *testing.T) {
 	require.True(t, opts.IsList())
 	require.GreaterOrEqual(t, len(opts.Children()), 2)
 	require.Equal(t, uint64(53), uintVal(t, opts.Children()[0].Child("Code")))
-	require.Equal(t, []byte{1}, bytesVal(t, opts.Children()[0].Child("Data")))
+	require.Equal(t, uint64(1), uintVal(t, opts.Children()[0].Child("Message Type")))
+	require.Equal(t, uint64(12), uintVal(t, opts.Children()[1].Child("Code")))
+	require.Equal(t, "example.com", strVal(t, opts.Children()[1].Child("Host Name")))
 }
 
 func TestDHCPOfferYourIP(t *testing.T) {
@@ -328,6 +330,10 @@ func TestDHCPOfferYourIP(t *testing.T) {
 	require.Equal(t, uint64(2), uintVal(t, parsed.Child("Operation")))
 	require.Equal(t, []byte{192, 168, 0, 123}, bytesVal(t, parsed.Child("Your IP")))
 	require.Equal(t, []byte{192, 168, 0, 1}, bytesVal(t, parsed.Child("Server IP")))
+	opts := parsed.Child("Options")
+	require.GreaterOrEqual(t, len(opts.Children()), 2)
+	require.Equal(t, uint64(2), uintVal(t, opts.Children()[0].Child("Message Type")))
+	require.Equal(t, []byte{192, 168, 0, 1}, bytesVal(t, opts.Children()[1].Child("Server ID")))
 }
 
 func TestSNMPGetRequest(t *testing.T) {
