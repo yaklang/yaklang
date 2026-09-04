@@ -1997,6 +1997,44 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(90), uintVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("Command")))
 		require.Nil(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("UserID"))
 	})
+
+	t.Run("telnet/do-echo", func(t *testing.T) {
+		// RFC 854 IAC DO ECHO (option 1). Wireshark telnet.cmd / telnet.option. TCP/23.
+		raw := []byte{0xff, 0xfd, 0x01}
+		n := parseRule(t, raw, "telnet", "Telnet")
+		require.Equal(t, uint64(0xff), uintVal(t, mustChild(t, n, "IAC").Child("IACByte")))
+		require.Equal(t, uint64(0xfd), uintVal(t, mustChild(t, n, "IAC").Child("Command")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "IAC").Child("Option")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 23, 23, raw))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "Telnet", "IAC").Child("Option")))
+	})
+
+	t.Run("telnet/ttype", func(t *testing.T) {
+		// RFC 1091 TERMINAL-TYPE IS "xterm": IAC SB 24 IS xterm IAC SE.
+		// Wireshark telnet.ttype. TCP/23.
+		raw := append([]byte{0xff, 0xfa, 0x18, 0x00}, append([]byte("xterm"), 0xff, 0xf0)...)
+		n := parseRule(t, raw, "telnet", "Telnet")
+		iac := mustChild(t, n, "IAC")
+		require.Equal(t, uint64(250), uintVal(t, iac.Child("Command")))
+		require.Equal(t, uint64(24), uintVal(t, iac.Child("SB Option")))
+		require.Equal(t, uint64(0), uintVal(t, iac.Child("SB Command")))
+		require.Equal(t, "xterm", joinUint8(t, iac.Child("Terminal Type")))
+		require.Equal(t, uint64(240), uintVal(t, iac.Child("SE")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 23, 23, raw))
+		require.Equal(t, "xterm", joinUint8(t, mustChild(t, eth, "IP", "TCP", "Telnet", "IAC").Child("Terminal Type")))
+	})
+
+	t.Run("telnet/naws", func(t *testing.T) {
+		// RFC 1073 NAWS 80x24: IAC SB 31 00 50 00 18 IAC SE. Wireshark telnet.naws.
+		raw := []byte{0xff, 0xfa, 0x1f, 0x00, 0x50, 0x00, 0x18, 0xff, 0xf0}
+		n := parseRule(t, raw, "telnet", "Telnet")
+		iac := mustChild(t, n, "IAC")
+		require.Equal(t, uint64(31), uintVal(t, iac.Child("SB Option")))
+		require.Equal(t, uint64(80), uintVal(t, iac.Child("Width")))
+		require.Equal(t, uint64(24), uintVal(t, iac.Child("Height")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 23, 23, raw))
+		require.Equal(t, uint64(80), uintVal(t, mustChild(t, eth, "IP", "TCP", "Telnet", "IAC").Child("Width")))
+	})
 }
 
 func stpConfigBPDU() []byte {
