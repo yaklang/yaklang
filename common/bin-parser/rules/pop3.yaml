@@ -8,18 +8,27 @@ Package:
       }
       this.ProcessSubNode("Arg")
       this.ProcessSubNode("LF")
+      res, op = this.TryProcessByType("POP3Extra")
+      if op.OK {
+        op.Save()
+      } else {
+        op.Recovery()
+      }
       return
     Status: "del: ;type:string"
     Arg: "del:\r;type:string"
     LF: uint8
-    Extra:
-      list: true
-      Line: "del:\r\n;type:string"
-      operator: |
-        for {
-          ele = this.NewElement()
-          if ele.GetMaxLength() < 3 {
-            break
-          }
-          ele.Process()
-        }
+POP3Extra:
+  list: true
+  operator: |
+    for {
+      res, op = this.TryProcessByType("POP3Line")
+      if op.OK {
+        op.Save()
+      } else {
+        op.Recovery()
+        break
+      }
+    }
+POP3Line:
+  Text: "del:\r\n;type:string"
