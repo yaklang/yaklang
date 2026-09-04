@@ -727,6 +727,17 @@ func TestP1BranchRows(t *testing.T) {
 		raw := mustHex(t, "0007000743232544ceec2d790b000004")
 		require.Equal(t, uint64(11), uintVal(t, parseRule(t, raw, "sctp", "SCTP").Child("Chunks").Children()[0].Child("Type")))
 	})
+	t.Run("eigrp/hello", func(t *testing.T) {
+		raw := mustHex(t, "0205ee68000000000000000000000000000000640001000c010001000000000f000400080c040102")
+		n := parseRule(t, raw, "eigrp", "EIGRP")
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Opcode")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("TLVs").Children()[0].Child("K1")))
+	})
+	t.Run("eigrp/swver", func(t *testing.T) {
+		raw := mustHex(t, "0205ee68000000000000000000000000000000640001000c010001000000000f000400080c040102")
+		n := parseRule(t, raw, "eigrp", "EIGRP")
+		require.Equal(t, uint64(12), uintVal(t, n.Child("TLVs").Children()[1].Child("IOS Major")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
