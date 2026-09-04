@@ -10,13 +10,47 @@ Package:
       if len(pri) == 0 {
         panic("syslog: empty PRI")
       }
-      this.ProcessSubNode("Timestamp")
-      this.ProcessSubNode("Space")
-      this.ProcessSubNode("Hostname")
-      this.ProcessSubNode("TagMsg")
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      first = res.Value
+      if first >= 48 && first <= 57 {
+        this.ProcessByType("Syslog5424")
+        return
+      }
+      this.ProcessByType("Syslog3164")
+      return
     Lt: uint8
     PRI: "del:>;type:string"
-    Timestamp: string,15
-    Space: uint8
-    Hostname: "del: ;type:string"
-    TagMsg: "del:\n;type:string"
+Syslog3164:
+  unpack: true
+  operator: |
+    this.ProcessSubNode("Timestamp")
+    this.ProcessSubNode("Space")
+    this.ProcessSubNode("Hostname")
+    this.ProcessSubNode("Message")
+    return
+  Timestamp: string,15
+  Space: uint8
+  Hostname: "del: ;type:string"
+  Message: "del:\n;type:string"
+Syslog5424:
+  unpack: true
+  operator: |
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("Timestamp")
+    this.ProcessSubNode("Hostname")
+    this.ProcessSubNode("App Name")
+    this.ProcessSubNode("ProcID")
+    this.ProcessSubNode("MsgID")
+    this.ProcessSubNode("Structured Data")
+    this.ProcessSubNode("Message")
+    return
+  Version: "del: ;type:string"
+  Timestamp: "del: ;type:string"
+  Hostname: "del: ;type:string"
+  App Name: "del: ;type:string"
+  ProcID: "del: ;type:string"
+  MsgID: "del: ;type:string"
+  Structured Data: "del: ;type:string"
+  Message: "del:\n;type:string"
+PeekByte: uint8
