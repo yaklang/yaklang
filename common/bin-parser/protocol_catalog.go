@@ -101,7 +101,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "PPPoE Discovery", Layer: "L2", RuleFile: "pppoe.yaml", Status: statusNew, SampleFrom: "RFC 2516 PADI"},
 	{Name: "STP", Layer: "L2", RuleFile: "stp.yaml", Status: statusNew, SampleFrom: "gopacket STP BPDU"},
 	{Name: "LLDP", Layer: "L2", RuleFile: "lldp.yaml", Status: statusNew, SampleFrom: "gopacket Siemens LLDP"},
-	{Name: "CDP", Layer: "L2", RuleFile: "cdp.yaml", Status: statusNew, SampleFrom: "SNAP CDP v2"},
+	{Name: "CDP", Layer: "L2", RuleFile: "cdp.yaml", Status: statusNew, SampleFrom: "Wireshark SampleCaptures/cdp.pcap"},
 	{Name: "Loopback", Layer: "L2", RuleFile: "loopback.yaml", Status: statusNew, SampleFrom: "EtherType 0x9000"},
 	{Name: "Linux SLL", Layer: "L2", RuleFile: "linux_sll.yaml", Status: statusNew, SampleFrom: "DLT_LINUX_SLL"},
 	{Name: "IEEE 802.11", Layer: "L2", RuleFile: "ieee_802_11.yaml", Status: statusNew, SampleFrom: "Dot11 + RSN IE"},

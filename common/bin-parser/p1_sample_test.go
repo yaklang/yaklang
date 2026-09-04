@@ -2637,6 +2637,42 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4ProtoFrame(t, 88, raw))
 		require.Equal(t, uint64(12), uintVal(t, mustChild(t, eth, "IP", "EIGRP").Child("TLVs").Children()[1].Child("IOS Major")))
 	})
+
+	t.Run("cdp/device-id", func(t *testing.T) {
+		// Wireshark SampleCaptures/cdp.pcap frame 1: CDP v1 Device ID "R1" over SNAP OUI 00:00:0c PID 0x2000.
+		n := parseRule(t, wiresharkCDP(t), "cdp", "CDP")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(180), uintVal(t, n.Child("TTL")))
+		tlvs := n.Child("TLVs").Children()
+		require.GreaterOrEqual(t, len(tlvs), 6)
+		require.Equal(t, uint64(1), uintVal(t, tlvs[0].Child("Type")))
+		require.Equal(t, "R1", strVal(t, tlvs[0].Child("Device ID")))
+		snap := append([]byte{0xaa, 0xaa, 0x03, 0x00, 0x00, 0x0c, 0x20, 0x00}, wiresharkCDP(t)...)
+		eth := parseEthernet(t, ethernet8023([]byte{0x01, 0x00, 0x0c, 0xcc, 0xcc, 0xcc}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, snap))
+		require.Equal(t, "R1", strVal(t, mustChild(t, eth, "LLC", "SNAP", "CDP").Child("TLVs").Children()[0].Child("Device ID")))
+	})
+
+	t.Run("cdp/port", func(t *testing.T) {
+		// Same cdp.pcap: Port ID "Ethernet0", Capabilities Router, Address 192.168.10.1, Platform "cisco 1601".
+		n := parseRule(t, wiresharkCDP(t), "cdp", "CDP")
+		tlvs := n.Child("TLVs").Children()
+		require.Equal(t, uint64(2), uintVal(t, tlvs[1].Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, tlvs[1].Child("Number of Addresses")))
+		require.Equal(t, uint64(0xcc), uintVal(t, tlvs[1].Child("Protocol")))
+		require.Equal(t, []byte{192, 168, 10, 1}, bytesVal(t, tlvs[1].Child("Address")))
+		require.Equal(t, "Ethernet0", strVal(t, tlvs[2].Child("Port ID")))
+		require.Equal(t, uint64(1), uintVal(t, tlvs[3].Child("Capabilities")))
+		require.Equal(t, "cisco 1601", strVal(t, tlvs[5].Child("Platform")))
+		snap := append([]byte{0xaa, 0xaa, 0x03, 0x00, 0x00, 0x0c, 0x20, 0x00}, wiresharkCDP(t)...)
+		eth := parseEthernet(t, ethernet8023([]byte{0x01, 0x00, 0x0c, 0xcc, 0xcc, 0xcc}, []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}, snap))
+		cdp := mustChild(t, eth, "LLC", "SNAP", "CDP")
+		require.Equal(t, "Ethernet0", strVal(t, cdp.Child("TLVs").Children()[2].Child("Port ID")))
+		require.Equal(t, "cisco 1601", strVal(t, cdp.Child("TLVs").Children()[5].Child("Platform")))
+	})
+}
+
+func wiresharkCDP(t *testing.T) []byte {
+	return mustHex(t, "01b4dff000010006523100020011000000010101cc0004c0a80a010003000d45746865726e6574300004000800000001000500d8436973636f20496e7465726e6574776f726b204f7065726174696e672053797374656d20536f667477617265200a494f532028746d29203136303020536f667477617265202843313630302d4e592d4c292c2056657273696f6e2031312e3228313229502c2052454c4541534520534f4654574152452028666331290a436f707972696768742028632920313938362d3139393820627920636973636f2053797374656d732c20496e632e0a436f6d70696c6564205475652030332d4d61722d39382030363a33332062792064736368776172740006000e636973636f2031363031")
 }
 
 func linuxSLL(pktType, arphrd, halen uint16, mac []byte, proto uint16) []byte {
