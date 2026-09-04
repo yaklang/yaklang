@@ -604,6 +604,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(4), uintVal(t, parseRule(t, []byte{1, 4, 0, 1, 0, 0, 0, 0}, "fastcgi", "FastCGI").Child("Type")))
 	})
 
+	t.Run("php_ser/int", func(t *testing.T) {
+		n := parseRule(t, []byte("i:12;"), "php_ser", "PHPSer")
+		require.Equal(t, uint64('i'), uintVal(t, n.Child("Kind")))
+		require.Equal(t, "12", strVal(t, n.Child("Int")))
+	})
+	t.Run("php_ser/string", func(t *testing.T) {
+		n := parseRule(t, []byte("s:5:\"hello\";"), "php_ser", "PHPSer")
+		require.Equal(t, "hello", strVal(t, n.Child("String")))
+	})
 	t.Run("zabbix/data", func(t *testing.T) {
 		zb := zabbixPacket(0x01, []byte("{}"), true)
 		require.Equal(t, uint64(2), uintVal(t, parseRule(t, zb, "zabbix", "Zabbix").Child("Length")))

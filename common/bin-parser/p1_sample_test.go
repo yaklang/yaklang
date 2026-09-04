@@ -2254,6 +2254,41 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 6881, 6881, raw))
 		require.Equal(t, uint64(16384), uintVal(t, mustChild(t, eth, "IP", "TCP", "BitTorrent").Child("Messages").Children()[0].Child("Block Length")))
 	})
+
+	t.Run("php_ser/int", func(t *testing.T) {
+		// PHP unserialize integer (php.net/unserialize). Multi-digit i:12; not string,1.
+		raw := []byte("i:12;")
+		n := parseRule(t, raw, "php_ser", "PHPSer")
+		require.Equal(t, uint64('i'), uintVal(t, n.Child("Kind")))
+		require.Equal(t, "12", strVal(t, n.Child("Int")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 40001, 7777, raw))
+		require.Equal(t, "12", strVal(t, mustChild(t, eth, "IP", "TCP", "PHPSer").Child("Int")))
+	})
+
+	t.Run("php_ser/string", func(t *testing.T) {
+		// PHP serialize s:5:"hello"; length-prefixed quoted string.
+		raw := []byte("s:5:\"hello\";")
+		n := parseRule(t, raw, "php_ser", "PHPSer")
+		require.Equal(t, uint64('s'), uintVal(t, n.Child("Kind")))
+		require.Equal(t, "5", strVal(t, n.Child("Strlen")))
+		require.Equal(t, "hello", strVal(t, n.Child("String")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 40001, 7777, raw))
+		require.Equal(t, "hello", strVal(t, mustChild(t, eth, "IP", "TCP", "PHPSer").Child("String")))
+	})
+
+	t.Run("php_ser/array", func(t *testing.T) {
+		// PHP serialize a:1:{s:3:"foo";i:42;} one key/value pair.
+		raw := []byte("a:1:{s:3:\"foo\";i:42;}")
+		n := parseRule(t, raw, "php_ser", "PHPSer")
+		require.Equal(t, uint64('a'), uintVal(t, n.Child("Kind")))
+		require.Equal(t, "1", strVal(t, n.Child("Count")))
+		mem := n.Child("Members").Children()
+		require.GreaterOrEqual(t, len(mem), 2)
+		require.Equal(t, "foo", strVal(t, mem[0].Child("String")))
+		require.Equal(t, "42", strVal(t, mem[1].Child("Int")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 40001, 7777, raw))
+		require.Equal(t, "foo", strVal(t, mustChild(t, eth, "IP", "TCP", "PHPSer").Child("Members").Children()[0].Child("String")))
+	})
 }
 
 func zabbixPacket(flags uint8, json []byte, reserved bool) []byte {
