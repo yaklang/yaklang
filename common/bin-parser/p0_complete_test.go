@@ -261,7 +261,7 @@ func TestICMPTimestampRedirectAndNBNSAnswer(t *testing.T) {
 	answers := nb.Child("Answers")
 	require.True(t, answers.IsList())
 	require.Equal(t, uint64(1), uintVal(t, mustChild(t, nb, "Header", "Answer RRs")))
-	require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, answers.Children()[0].Child("RData")))
+	require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, mustChild(t, answers.Children()[0], "NBNSA").Child("Address")))
 
 	ll := parseRule(t, ans, "application-layer.nbns", "LLMNR")
 	require.Equal(t, uint64(1), uintVal(t, mustChild(t, ll, "Header", "Answer RRs")))
