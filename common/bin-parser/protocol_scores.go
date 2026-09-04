@@ -119,7 +119,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("TLS", "application-layer/tls.yaml", 20, 25, 20, 20, 10, "L1",
 		"TestTLSClientHelloFromCapture scapy-ssl_tls; TestTLSRecordGatesAndClientHello; TestBaseProtocol tls", "app-data Payload"),
 	card("JA3/JA4", "application-layer/tls_hello.yaml", 20, 25, 16, 14, 10, "L1",
-		"TestTLSClientHelloFromCapture cipher suites + extensions", "JA3 hash not computed"),
+		"tls/suites 0x002f 0x0035; tls/sni RFC 6066 example.com; TestTLSClientHelloFromCapture", "JA3 hash not computed"),
 	card("SMTP", "application-layer/smtp.yaml", 20, 15, 16, 14, 10, "L2",
 		"TestSMTPReply RFC 5321; TestSSHPacketAndFTPSMTPCommands EHLO", ""),
 	card("FTP", "application-layer/ftp.yaml", 20, 15, 16, 14, 10, "L2",
