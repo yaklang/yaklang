@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 const maxExtensionAuthorizationTaskBytes = 256 << 10
@@ -20,6 +18,7 @@ type extensionAuthorizationClientTaskParams struct {
 }
 
 type extensionAuthorizationClientIdentityInput struct {
+	DeviceID     string `json:"deviceId,omitempty"`
 	TabID        int    `json:"tabId"`
 	FrameID      int    `json:"frameId"`
 	AccountLabel string `json:"accountLabel,omitempty"`
@@ -31,46 +30,22 @@ type extensionAuthorizationClientWorkspaceInput struct {
 	Right extensionAuthorizationClientIdentityInput `json:"right"`
 }
 
-type extensionAuthorizationYakitOpenInput struct {
-	WorkspaceID    string `json:"workspaceId,omitempty"`
-	TabID          int    `json:"tabId,omitempty"`
-	Mode           string `json:"mode,omitempty"`
-	TargetDeviceID string `json:"targetDeviceId,omitempty"`
-}
-
 type extensionAuthorizationInstance struct {
-	DeviceID string `json:"deviceId"`
-	Badge    string `json:"badge"`
-	Current  bool   `json:"current"`
+	DeviceID string                              `json:"deviceId"`
+	Badge    string                              `json:"badge"`
+	Current  bool                                `json:"current"`
+	Tabs     []extensionAuthorizationInstanceTab `json:"tabs"`
+	Error    string                              `json:"error,omitempty"`
 }
 
-func decodeExtensionAuthorizationYakitOpen(raw json.RawMessage) (extensionAuthorizationYakitOpenInput, error) {
-	var input extensionAuthorizationYakitOpenInput
-	if err := decodeExtensionAuthorizationClientJSON(raw, &input); err != nil {
-		return input, err
-	}
-	input.WorkspaceID = strings.TrimSpace(input.WorkspaceID)
-	input.Mode = strings.ToLower(strings.TrimSpace(input.Mode))
-	input.TargetDeviceID = strings.TrimSpace(input.TargetDeviceID)
-	if input.WorkspaceID != "" {
-		if input.TabID != 0 || input.Mode != "" || input.TargetDeviceID != "" {
-			return input, errors.New("workspaceId cannot be combined with tabId, mode or targetDeviceId")
-		}
-		return input, nil
-	}
-	if input.TabID <= 0 {
-		return input, errors.New("workspaceId or tabId is required")
-	}
-	if input.Mode == "" {
-		input.Mode = "horizontal"
-	}
-	if input.Mode != "horizontal" && input.Mode != "vertical" {
-		return input, errors.New("mode must be horizontal or vertical")
-	}
-	if len(input.TargetDeviceID) > 160 {
-		return input, errors.New("targetDeviceId is too long")
-	}
-	return input, nil
+type extensionAuthorizationInstanceTab struct {
+	ID           int     `json:"id"`
+	WindowID     int     `json:"windowId"`
+	Active       bool    `json:"active,omitempty"`
+	Title        string  `json:"title"`
+	URL          string  `json:"url"`
+	Incognito    bool    `json:"incognito"`
+	LastAccessed float64 `json:"lastAccessed,omitempty"`
 }
 
 func extensionAuthorizationInstances(connections []ExtensionBridgeConnection, currentDeviceID string) []extensionAuthorizationInstance {
@@ -83,17 +58,75 @@ func extensionAuthorizationInstances(connections []ExtensionBridgeConnection, cu
 			DeviceID: connection.DeviceID,
 			Badge:    connection.ManagedInstance.Badge,
 			Current:  connection.DeviceID == currentDeviceID,
+			Tabs:     []extensionAuthorizationInstanceTab{},
 		})
 	}
 	return instances
 }
 
-func (s *ExtensionBridgeServer) listExtensionAuthorizationInstances(deviceID string) (interface{}, *ExtensionBridgeError) {
+func (s *ExtensionBridgeServer) listExtensionAuthorizationInstances(
+	ctx context.Context,
+	deviceID string,
+) (interface{}, *ExtensionBridgeError) {
 	if s.manager == nil {
 		return nil, &ExtensionBridgeError{Code: "unavailable", Message: "browser extension bridge manager is not available"}
 	}
+	instances := extensionAuthorizationInstances(s.Connections(), deviceID)
+	for index := range instances {
+		raw, err := s.manager.CallDevice(ctx, instances[index].DeviceID, "browser.tabs", map[string]interface{}{})
+		if err != nil {
+			instances[index].Error = err.Error()
+			continue
+		}
+		var tabs []extensionAuthorizationInstanceTab
+		if err := json.Unmarshal(raw, &tabs); err != nil {
+			instances[index].Error = "browser returned an invalid tab list"
+			continue
+		}
+		for _, tab := range tabs {
+			if len(instances[index].Tabs) >= 256 {
+				break
+			}
+			if tab.ID <= 0 || (!strings.HasPrefix(tab.URL, "http://") && !strings.HasPrefix(tab.URL, "https://")) {
+				continue
+			}
+			instances[index].Tabs = append(instances[index].Tabs, tab)
+		}
+	}
 	return map[string]interface{}{
-		"instances": extensionAuthorizationInstances(s.Connections(), deviceID),
+		"instances": instances,
+	}, nil
+}
+
+func extensionAuthorizationWorkspaceInputForDevice(
+	deviceID string,
+	input extensionAuthorizationClientWorkspaceInput,
+) (ExtensionAuthorizationWorkspaceInput, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return ExtensionAuthorizationWorkspaceInput{}, errors.New("connected browser identity is missing")
+	}
+	input.Left.DeviceID = strings.TrimSpace(input.Left.DeviceID)
+	input.Right.DeviceID = strings.TrimSpace(input.Right.DeviceID)
+	if input.Left.DeviceID != "" && input.Left.DeviceID != deviceID {
+		return ExtensionAuthorizationWorkspaceInput{}, errors.New(
+			"authorization workspace left identity must be the calling browser instance",
+		)
+	}
+	input.Left.DeviceID = deviceID
+	if input.Right.DeviceID == "" {
+		input.Right.DeviceID = deviceID
+	}
+	return ExtensionAuthorizationWorkspaceInput{
+		Mode: input.Mode,
+		Left: ExtensionAuthorizationIdentityInput{
+			DeviceID: input.Left.DeviceID, TabID: input.Left.TabID, FrameID: input.Left.FrameID,
+			AccountLabel: input.Left.AccountLabel,
+		},
+		Right: ExtensionAuthorizationIdentityInput{
+			DeviceID: input.Right.DeviceID, TabID: input.Right.TabID, FrameID: input.Right.FrameID,
+			AccountLabel: input.Right.AccountLabel,
+		},
 	}, nil
 }
 
@@ -131,6 +164,20 @@ func extensionAuthorizationClientError(err error) *ExtensionBridgeError {
 	}
 }
 
+func extensionAuthorizationClientSlot(
+	workspace ExtensionAuthorizationWorkspace,
+	side string,
+) (ExtensionAuthorizationIdentitySlot, error) {
+	switch strings.ToLower(strings.TrimSpace(side)) {
+	case "left":
+		return workspace.Left, nil
+	case "right":
+		return workspace.Right, nil
+	default:
+		return ExtensionAuthorizationIdentitySlot{}, errors.New("authorization side must be left or right")
+	}
+}
+
 func (s *ExtensionBridgeServer) extensionAuthorizationWorkspaceForDevice(
 	ctx context.Context,
 	deviceID, workspaceID string,
@@ -151,9 +198,9 @@ func (s *ExtensionBridgeServer) extensionAuthorizationWorkspaceForDevice(
 	if err != nil {
 		return ExtensionAuthorizationWorkspace{}, err
 	}
-	if workspace.Left.DeviceID != deviceID || workspace.Right.DeviceID != deviceID {
+	if workspace.Left.DeviceID != deviceID {
 		return ExtensionAuthorizationWorkspace{}, errors.New(
-			"authorization workspace does not belong exclusively to this browser extension",
+			"authorization workspace does not belong to this browser extension",
 		)
 	}
 	return workspace, nil
@@ -191,17 +238,11 @@ func (s *ExtensionBridgeServer) handleExtensionAuthorizationClientTask(
 		if err := decodeExtensionAuthorizationClientJSON(task.Payload, &input); err != nil {
 			return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "invalid authorization workspace: " + err.Error()}
 		}
-		workspace, err := s.manager.CreateExtensionAuthorizationWorkspace(ctx, ExtensionAuthorizationWorkspaceInput{
-			Mode: input.Mode,
-			Left: ExtensionAuthorizationIdentityInput{
-				DeviceID: deviceID, TabID: input.Left.TabID, FrameID: input.Left.FrameID,
-				AccountLabel: input.Left.AccountLabel,
-			},
-			Right: ExtensionAuthorizationIdentityInput{
-				DeviceID: deviceID, TabID: input.Right.TabID, FrameID: input.Right.FrameID,
-				AccountLabel: input.Right.AccountLabel,
-			},
-		})
+		workspaceInput, err := extensionAuthorizationWorkspaceInputForDevice(deviceID, input)
+		if err != nil {
+			return nil, &ExtensionBridgeError{Code: "invalid_params", Message: err.Error()}
+		}
+		workspace, err := s.manager.CreateExtensionAuthorizationWorkspace(ctx, workspaceInput)
 		if err != nil {
 			return nil, extensionAuthorizationClientError(err)
 		}
@@ -238,14 +279,8 @@ func (s *ExtensionBridgeServer) handleExtensionAuthorizationClientTask(
 		if err != nil {
 			return nil, extensionAuthorizationClientError(err)
 		}
-		side := strings.ToLower(strings.TrimSpace(input.Side))
-		var slot ExtensionAuthorizationIdentitySlot
-		switch side {
-		case "left":
-			slot = workspace.Left
-		case "right":
-			slot = workspace.Right
-		default:
+		slot, err := extensionAuthorizationClientSlot(workspace, input.Side)
+		if err != nil {
 			return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "baseline side must be left or right"}
 		}
 		limit := input.Limit
@@ -255,7 +290,7 @@ func (s *ExtensionBridgeServer) handleExtensionAuthorizationClientTask(
 		if limit < 1 || limit > 200 {
 			return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "baseline candidate limit must be between 1 and 200"}
 		}
-		raw, err := s.manager.CallDevice(ctx, deviceID, "browser.authorization.baseline.candidates", map[string]interface{}{
+		raw, err := s.manager.CallDevice(ctx, slot.DeviceID, "browser.authorization.baseline.candidates", map[string]interface{}{
 			"tabId":           slot.Target.TabID,
 			"frameId":         slot.Target.FrameID,
 			"documentId":      slot.Target.DocumentID,
@@ -271,6 +306,48 @@ func (s *ExtensionBridgeServer) handleExtensionAuthorizationClientTask(
 			return nil, &ExtensionBridgeError{Code: "invalid_device_result", Message: "invalid baseline candidates: " + err.Error()}
 		}
 		return candidates, nil
+
+	case "authorization.capture.start", "authorization.capture.status", "authorization.capture.stop":
+		var input struct {
+			WorkspaceID string `json:"workspaceId"`
+			Side        string `json:"side"`
+		}
+		if err := decodeExtensionAuthorizationClientJSON(task.Payload, &input); err != nil {
+			return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "invalid authorization capture task: " + err.Error()}
+		}
+		workspace, err := s.extensionAuthorizationWorkspaceForDevice(ctx, deviceID, input.WorkspaceID, false)
+		if err != nil {
+			return nil, extensionAuthorizationClientError(err)
+		}
+		if task.Schema == "authorization.capture.start" && workspace.State != "ready" && workspace.State != "conditional" {
+			return nil, &ExtensionBridgeError{Code: "workspace_not_ready", Message: "authorization workspace is not ready for capture"}
+		}
+		slot, err := extensionAuthorizationClientSlot(workspace, input.Side)
+		if err != nil {
+			return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "capture side must be left or right"}
+		}
+		method := "browser.network.status"
+		params := map[string]interface{}{
+			"tabId": slot.Target.TabID, "frameId": slot.Target.FrameID, "documentId": slot.Target.DocumentID,
+		}
+		if task.Schema == "authorization.capture.start" {
+			method = "browser.network.start"
+			params["captureHeaders"] = true
+			params["captureBody"] = true
+			params["maxEntries"] = 200
+			params["maxBodyBytes"] = 64 * 1024
+		} else if task.Schema == "authorization.capture.stop" {
+			method = "browser.network.stop"
+		}
+		raw, err := s.manager.CallDevice(ctx, slot.DeviceID, method, params)
+		if err != nil {
+			return nil, extensionAuthorizationClientError(err)
+		}
+		var result interface{}
+		if err := json.Unmarshal(raw, &result); err != nil {
+			return nil, &ExtensionBridgeError{Code: "invalid_device_result", Message: "invalid authorization capture result: " + err.Error()}
+		}
+		return result, nil
 
 	case "authorization.baseline.bind":
 		var input ExtensionAuthorizationBaselineInput
@@ -390,59 +467,4 @@ func (s *ExtensionBridgeServer) handleExtensionAuthorizationClientTask(
 			Message: "unsupported authorization task schema: " + task.Schema,
 		}
 	}
-}
-
-func (s *ExtensionBridgeServer) openExtensionAuthorizationWorkspaceInYakit(
-	ctx context.Context,
-	deviceID string,
-	params json.RawMessage,
-) (interface{}, *ExtensionBridgeError) {
-	input, err := decodeExtensionAuthorizationYakitOpen(params)
-	if err != nil {
-		return nil, &ExtensionBridgeError{
-			Code:    "invalid_params",
-			Message: "invalid authorization workspace handoff: " + err.Error(),
-		}
-	}
-	handoff := map[string]interface{}{
-		"event":    "authorization.workspace.open",
-		"deviceId": deviceID,
-	}
-	result := map[string]interface{}{"opened": true}
-	if input.WorkspaceID != "" {
-		workspace, workspaceErr := s.extensionAuthorizationWorkspaceForDevice(
-			ctx,
-			deviceID,
-			input.WorkspaceID,
-			false,
-		)
-		if workspaceErr != nil {
-			return nil, extensionAuthorizationClientError(workspaceErr)
-		}
-		handoff["workspaceId"] = workspace.ID
-		handoff["mode"] = workspace.Mode
-		result["workspaceId"] = workspace.ID
-	} else {
-		if input.TargetDeviceID != "" {
-			if input.TargetDeviceID == deviceID {
-				return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "target browser must differ from the current browser"}
-			}
-			targetOnline := false
-			for _, connection := range s.Connections() {
-				if connection.DeviceID == input.TargetDeviceID {
-					targetOnline = true
-					break
-				}
-			}
-			if !targetOnline {
-				return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "target browser is not online"}
-			}
-			handoff["targetDeviceId"] = input.TargetDeviceID
-		}
-		handoff["tabId"] = input.TabID
-		handoff["mode"] = input.Mode
-		result["tabId"] = input.TabID
-	}
-	yakit.BroadcastData(yakit.ServerPushType_BrowserExtension, handoff)
-	return result, nil
 }
