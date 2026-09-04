@@ -78,6 +78,23 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(2), uintVal(t, parseRule(t, pptp, "application-layer.pptp", "PPTP").Child("ControlMessageType")))
 	})
 
+	t.Run("dtls/handshake", func(t *testing.T) {
+		dt := mustHex(t, "16fefd000000000000000000360100002a000000000000002afefd"+
+			"000000000000000000000000000000000000000000000000000000000000000000000002002f0100")
+		require.Equal(t, uint64(1), uintVal(t, parseRule(t, dt, "dtls", "DTLS").Child("Fragment").Child("Handshake Type")))
+	})
+	t.Run("dtls/client-hello", func(t *testing.T) {
+		dt := mustHex(t, "16fefd000000000000000000360100002a000000000000002afefd"+
+			"000000000000000000000000000000000000000000000000000000000000000000000002002f0100")
+		require.Equal(t, uint64(0xfefd), uintVal(t, parseRule(t, dt, "dtls", "DTLS").Child("Fragment").Child("Client Version")))
+	})
+	t.Run("rtp/extension", func(t *testing.T) {
+		require.Equal(t, uint64(0xbede), uintVal(t, parseRule(t, mustHex(t, "900000010000000200000003bede000110000000aa"), "rtp", "RTP").Child("Ext Profile")))
+	})
+	t.Run("rtp/seq", func(t *testing.T) {
+		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}, "rtp", "RTP").Child("Sequence")))
+	})
+
 	t.Run("ike/sa-init", func(t *testing.T) {
 		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
 			"2200001400000010010100010000000802000002"+

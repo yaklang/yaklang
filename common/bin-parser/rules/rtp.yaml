@@ -17,6 +17,16 @@ Package:
       if n > 0 {
         this.ProcessSubNode("CSRCs")
       }
+      xbit = (vpc >> 4) & 1
+      if xbit == 1 {
+        this.ProcessSubNode("Ext Profile")
+        this.ProcessSubNode("Ext Length")
+        el = getNodeResult("Ext Length").Value
+        if el > 0 && el < 1024 {
+          this.GetSubNode("Extension").SetMaxLength(el * 4)
+          this.ProcessSubNode("Extension")
+        }
+      }
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
         if rest > 0 && rest < 1048576 {
@@ -29,6 +39,9 @@ Package:
     Sequence: uint16
     Timestamp: uint32
     SSRC: uint32
+    Ext Profile: uint16
+    Ext Length: uint16
+    Extension: string
     CSRCs:
       list: true
       CSRC: uint32
