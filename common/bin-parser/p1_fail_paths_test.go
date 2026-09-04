@@ -242,6 +242,7 @@ var p1FailCases = []p1FailCase{
 		{"generic_routing_encapsulation", []string{"GRE"}, nil, "empty"},
 		{"generic_routing_encapsulation", []string{"GRE"}, []byte{0x00}, "trunc"},
 		{"generic_routing_encapsulation", []string{"GRE"}, []byte{0x00, 0x00}, "trunc2"},
+		{"generic_routing_encapsulation", []string{"GRE"}, []byte{0x20, 0x00, 0x08, 0x00}, "trunc-key"},
 		{"eapol", []string{"EAPOL"}, nil, "empty"},
 		{"eapol", []string{"EAPOL"}, []byte{0x01}, "trunc"},
 		{"eapol", []string{"EAPOL"}, []byte{0x01, 0x00, 0x00, 0x10}, "trunc-body"},
