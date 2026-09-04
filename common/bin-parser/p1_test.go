@@ -217,7 +217,7 @@ func TestP1PPPoEQinQLoopbackCDP(t *testing.T) {
 	copy(lb[6:12], []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
 	binary.BigEndian.PutUint16(lb[12:14], 0x9000)
 	binary.BigEndian.PutUint16(lb[14:16], 0x0001)
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, lb), "Loopback").Child("Protocol")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseEthernet(t, lb), "Loopback").Child("Function")))
 
 	// CDP over SNAP: 802.3 + AA AA 03 00 00 0c 20 00 + CDP v2
 	cdp := []byte{0x02, 0xb4, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 's', 'w', '1'}

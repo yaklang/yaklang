@@ -55,9 +55,9 @@ Package:
     Procedure: uint32
     Cred Flavor: uint32
     Cred Length: uint32
-    Cred Body: raw
+    Cred Body: string
     Verf Flavor: uint32
     Verf Length: uint32
-    Verf Body: raw
+    Verf Body: string
     Reply Stat: uint32
     Stub: raw

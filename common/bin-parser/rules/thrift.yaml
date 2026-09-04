@@ -26,6 +26,6 @@ Package:
       }
     Version: uint32
     Name Length: uint32
-    Name: raw
+    Name: string
     Seq ID: uint32
-    Fields: raw
+    Fields: string

@@ -17,4 +17,4 @@ Package:
     Magic: raw,4
     Flags: uint8
     Length: uint32
-    Data: raw
+    Data: string

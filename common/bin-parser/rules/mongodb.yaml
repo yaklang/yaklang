@@ -37,5 +37,5 @@ Package:
     OP_MSG:
       Flag Bits: uint32
       Section Kind: uint8
-      Section: raw
-    Body: raw
+      Section: string
+    Body: string

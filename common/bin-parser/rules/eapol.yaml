@@ -36,7 +36,7 @@ EAPPacket:
   Code: uint8
   Identifier: uint8
   Length: uint16
-  Data: raw
+  Data: string
 EAPOLKey:
   operator: |
     this.ProcessSubNode("Descriptor Type")
@@ -66,4 +66,4 @@ EAPOLKey:
   Key Data Length: uint16
   Key Data: raw
 EAPOLASFAlert:
-  Data: raw
+  Data: string

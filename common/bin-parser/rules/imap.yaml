@@ -12,6 +12,7 @@ Package:
         panic("imap: unknown command")
       }
       this.ProcessSubNode("Rest")
+      return
     Tag: "del: ;type:string"
     Command: "del: ;type:string"
     Rest: "del:\r\n;type:string"

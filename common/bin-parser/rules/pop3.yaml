@@ -7,5 +7,6 @@ Package:
         panic("pop3: unknown status or command")
       }
       this.ProcessSubNode("Rest")
+      return
     Status: "del: ;type:string"
     Rest: "del:\r\n;type:string"
