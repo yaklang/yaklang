@@ -78,6 +78,21 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(2), uintVal(t, parseRule(t, pptp, "application-layer.pptp", "PPTP").Child("ControlMessageType")))
 	})
 
+	t.Run("ike/sa-init", func(t *testing.T) {
+		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
+			"2200001400000010010100010000000802000002"+
+			"28000010000200000102030405060708"+
+			"00000008aabbccdd")
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, parseRule(t, ike, "ike", "IKE"), "Payloads").Children()[0].Child("Proposals").Children()[0].Child("Protocol ID")))
+	})
+	t.Run("ike/ke-nonce", func(t *testing.T) {
+		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
+			"2200001400000010010100010000000802000002"+
+			"28000010000200000102030405060708"+
+			"00000008aabbccdd")
+		require.Equal(t, uint64(2), uintVal(t, parseRule(t, ike, "ike", "IKE").Child("Payloads").Children()[1].Child("DH Group")))
+	})
+
 	t.Run("wireguard/init", func(t *testing.T) {
 		wg := make([]byte, 148)
 		wg[0] = 1
