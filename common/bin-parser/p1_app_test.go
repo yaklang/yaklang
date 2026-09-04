@@ -229,7 +229,7 @@ func TestP1TCPApplications(t *testing.T) {
 	require.Equal(t, uint64(2004), uintVal(t, mg.Child("Op Code")))
 	require.Equal(t, uint64(54), uintVal(t, mg.Child("Message Length")))
 	require.Equal(t, "admin.$cmd", strVal(t, mustChild(t, mg, "OP_QUERY").Child("Collection")))
-	qel := mustChild(t, mg, "OP_QUERY", "Query", "Elements").Children()
+	qel := mustChild(t, mg, "OP_QUERY", "BSONDoc", "Elements").Children()
 	require.GreaterOrEqual(t, len(qel), 1)
 	require.Equal(t, "ping", strVal(t, qel[0].Child("Name")))
 	require.Equal(t, uint64(1), uintVal(t, qel[0].Child("Int32")))

@@ -35,99 +35,9 @@ Package:
       Skip: uint32
       Return: uint32
       Query:
+        unpack: true
         operator: |
-          this.ProcessSubNode("Size")
-          sz = getNodeResult("Size").Value
-          if sz < 5 {
-            panic("bson: document too small")
-          }
-          body = sz - 4
-          if body > 0 && body < 1048576 {
-            this.GetSubNode("Elements").SetMaxLength(body)
-            this.ProcessSubNode("Elements")
-          }
-        Size: uint32
-        Elements:
-          list: true
-          Element:
-            operator: |
-              this.ProcessSubNode("Type")
-              t = getNodeResult("Type").Value
-              if t == 0 {
-                setCtx("bson_eoo", 1)
-                return
-              }
-              this.ProcessSubNode("Name")
-              if t == 0x10 {
-                this.ProcessSubNode("Int32")
-                return
-              }
-              if t == 0x12 {
-                this.ProcessSubNode("Int64")
-                return
-              }
-              if t == 0x01 {
-                this.ProcessSubNode("Double")
-                return
-              }
-              if t == 0x09 {
-                this.ProcessSubNode("Datetime")
-                return
-              }
-              if t == 0x07 {
-                this.ProcessSubNode("ObjectId")
-                return
-              }
-              if t == 0x02 {
-                this.ProcessSubNode("StrLen")
-                sl = getNodeResult("StrLen").Value
-                if sl > 0 && sl < 1048576 {
-                  this.GetSubNode("Str").SetMaxLength(sl)
-                  this.ProcessSubNode("Str")
-                }
-                return
-              }
-              if t == 0x05 {
-                this.ProcessSubNode("BinLen")
-                bl = getNodeResult("BinLen").Value
-                this.ProcessSubNode("BinSubtype")
-                if bl > 0 && bl < 1048576 {
-                  this.GetSubNode("Binary").SetMaxLength(bl)
-                  this.ProcessSubNode("Binary")
-                }
-                return
-              }
-              if t == 0x08 {
-                this.ProcessSubNode("Bool")
-                return
-              }
-              if t == 0x0a {
-                return
-              }
-            Type: uint8
-            Name: "del:\x00;type:string"
-            Int32: uint32
-            Int64: uint64
-            Double: raw,8
-            Datetime: uint64
-            ObjectId: raw,12
-            StrLen: uint32
-            Str: string
-            BinLen: uint32
-            BinSubtype: uint8
-            Binary: string
-            Bool: uint8
-          operator: |
-            for {
-              ele = this.NewElement()
-              if ele.GetMaxLength() < 2 {
-                break
-              }
-              ele.Process()
-              if getCtx("bson_eoo") == 1 {
-                break
-              }
-            }
+          this.ProcessByType("BSONDoc")
     OP_MSG:
       operator: |
         this.ProcessSubNode("Flag Bits")
@@ -136,96 +46,108 @@ Package:
       Flag Bits: uint32
       Section Kind: uint8
       Document:
+        unpack: true
         operator: |
-          this.ProcessSubNode("Size")
-          sz = getNodeResult("Size").Value
-          if sz < 5 {
-            panic("bson: document too small")
+          this.ProcessByType("BSONDoc")
+BSONDoc:
+  operator: |
+    deleteCtx("bson_eoo")
+    this.ProcessSubNode("Size")
+    sz = getNodeResult("Size").Value
+    if sz < 5 {
+      panic("bson: document too small")
+    }
+    body = sz - 4
+    if body > 0 && body < 1048576 {
+      this.GetSubNode("Elements").SetMaxLength(body)
+      this.ProcessSubNode("Elements")
+    }
+  Size: uint32
+  Elements:
+    list: true
+    Element:
+      operator: |
+        this.ProcessSubNode("Type")
+        t = getNodeResult("Type").Value
+        if t == 0 {
+          setCtx("bson_eoo", 1)
+          return
+        }
+        this.ProcessSubNode("Name")
+        if t == 0x10 {
+          this.ProcessSubNode("Int32")
+          return
+        }
+        if t == 0x12 {
+          this.ProcessSubNode("Int64")
+          return
+        }
+        if t == 0x01 {
+          this.ProcessSubNode("Double")
+          return
+        }
+        if t == 0x09 {
+          this.ProcessSubNode("Datetime")
+          return
+        }
+        if t == 0x07 {
+          this.ProcessSubNode("ObjectId")
+          return
+        }
+        if t == 0x02 {
+          this.ProcessSubNode("StrLen")
+          sl = getNodeResult("StrLen").Value
+          if sl > 0 && sl < 1048576 {
+            this.GetSubNode("Str").SetMaxLength(sl)
+            this.ProcessSubNode("Str")
           }
-          body = sz - 4
-          if body > 0 && body < 1048576 {
-            this.GetSubNode("Elements").SetMaxLength(body)
-            this.ProcessSubNode("Elements")
+          return
+        }
+        if t == 0x05 {
+          this.ProcessSubNode("BinLen")
+          bl = getNodeResult("BinLen").Value
+          this.ProcessSubNode("BinSubtype")
+          if bl > 0 && bl < 1048576 {
+            this.GetSubNode("Binary").SetMaxLength(bl)
+            this.ProcessSubNode("Binary")
           }
-        Size: uint32
-        Elements:
-          list: true
-          Element:
-            operator: |
-              this.ProcessSubNode("Type")
-              t = getNodeResult("Type").Value
-              if t == 0 {
-                setCtx("bson_eoo", 1)
-                return
-              }
-              this.ProcessSubNode("Name")
-              if t == 0x10 {
-                this.ProcessSubNode("Int32")
-                return
-              }
-              if t == 0x12 {
-                this.ProcessSubNode("Int64")
-                return
-              }
-              if t == 0x01 {
-                this.ProcessSubNode("Double")
-                return
-              }
-              if t == 0x09 {
-                this.ProcessSubNode("Datetime")
-                return
-              }
-              if t == 0x07 {
-                this.ProcessSubNode("ObjectId")
-                return
-              }
-              if t == 0x02 {
-                this.ProcessSubNode("StrLen")
-                sl = getNodeResult("StrLen").Value
-                if sl > 0 && sl < 1048576 {
-                  this.GetSubNode("Str").SetMaxLength(sl)
-                  this.ProcessSubNode("Str")
-                }
-                return
-              }
-              if t == 0x05 {
-                this.ProcessSubNode("BinLen")
-                bl = getNodeResult("BinLen").Value
-                this.ProcessSubNode("BinSubtype")
-                if bl > 0 && bl < 1048576 {
-                  this.GetSubNode("Binary").SetMaxLength(bl)
-                  this.ProcessSubNode("Binary")
-                }
-                return
-              }
-              if t == 0x08 {
-                this.ProcessSubNode("Bool")
-                return
-              }
-              if t == 0x0a {
-                return
-              }
-            Type: uint8
-            Name: "del:\x00;type:string"
-            Int32: uint32
-            Int64: uint64
-            Double: raw,8
-            Datetime: uint64
-            ObjectId: raw,12
-            StrLen: uint32
-            Str: string
-            BinLen: uint32
-            BinSubtype: uint8
-            Binary: string
-            Bool: uint8
-          operator: |
-            for {
-              ele = this.NewElement()
-              if ele.GetMaxLength() < 2 {
-                break
-              }
-              ele.Process()
-              if getCtx("bson_eoo") == 1 {
-                break
-              }
-            }
+          return
+        }
+        if t == 0x08 {
+          this.ProcessSubNode("Bool")
+          return
+        }
+        if t == 0x0a {
+          return
+        }
+        if t == 0x03 || t == 0x04 {
+          deleteCtx("bson_eoo")
+          this.ProcessByType("BSONDoc")
+          deleteCtx("bson_eoo")
+          return
+        }
+      Type: uint8
+      Name: "del:\x00;type:string"
+      Int32: uint32
+      Int64: uint64
+      Double: raw,8
+      Datetime: uint64
+      ObjectId: raw,12
+      StrLen: uint32
+      Str: string
+      BinLen: uint32
+      BinSubtype: uint8
+      Binary: string
+      Bool: uint8
+    operator: |
+      deleteCtx("bson_eoo")
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        ele.Process()
+        if getCtx("bson_eoo") == 1 {
+          break
+        }
+      }

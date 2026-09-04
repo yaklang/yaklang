@@ -51,9 +51,35 @@ ThriftField:
       return
     }
     this.ProcessSubNode("Field ID")
-    if t == 8 || t == 10 || t == 4 || t == 6 || t == 3 {
+    if t == 8 {
       this.ProcessSubNode("I32")
+      return
+    }
+    if t == 6 {
+      this.ProcessSubNode("I16")
+      return
+    }
+    if t == 10 {
+      this.ProcessSubNode("I64")
+      return
+    }
+    if t == 4 {
+      this.ProcessSubNode("Double")
+      return
+    }
+    if t == 11 {
+      this.ProcessSubNode("StrLen")
+      sl = getNodeResult("StrLen").Value
+      if sl > 0 && sl < 1048576 {
+        this.GetSubNode("Str").SetMaxLength(sl)
+        this.ProcessSubNode("Str")
+      }
     }
   Type: uint8
   Field ID: uint16
   I32: uint32
+  I16: uint16
+  I64: uint64
+  Double: raw,8
+  StrLen: uint32
+  Str: string

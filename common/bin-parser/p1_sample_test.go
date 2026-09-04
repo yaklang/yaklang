@@ -59,6 +59,18 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "IMAP4rev1 server ready", strVal(t, mustChild(t, eth, "IP", "TCP", "IMAP").Child("Arg")))
 	})
 
+	t.Run("imap/fetch", func(t *testing.T) {
+		// RFC 3501 §7.4.2 untagged FETCH with FLAGS and RFC822.SIZE.
+		fetch := []byte("* 12 FETCH (FLAGS (\\Seen) RFC822.SIZE 448)\r\n")
+		im := parseRule(t, fetch, "imap", "IMAP")
+		require.Equal(t, "*", strVal(t, im.Child("Tag")))
+		require.Equal(t, "12", strVal(t, im.Child("Command")))
+		require.Equal(t, "FETCH", strVal(t, im.Child("Item")))
+		require.Equal(t, "(FLAGS (\\Seen) RFC822.SIZE 448)", strVal(t, im.Child("Arg")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 143, 143, fetch))
+		require.Equal(t, "FETCH", strVal(t, mustChild(t, eth, "IP", "TCP", "IMAP").Child("Item")))
+	})
+
 	t.Run("imap/flags-extra", func(t *testing.T) {
 		// RFC 3501 untagged FLAGS then greeting (two lines).
 		body := []byte("* FLAGS (\\Seen)\r\n* OK IMAP4rev1 server ready\r\n")
@@ -137,13 +149,30 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0), uintVal(t, am.Child("Version Major")))
 		require.Equal(t, uint64(9), uintVal(t, am.Child("Version Minor")))
 		require.Equal(t, uint64(0xce), uintVal(t, am.Child("Frame End")))
-		ent := mustChild(t, am, "Properties", "Entries").Children()
+		ent := mustChild(t, am, "Properties", "AMQPTable", "Entries").Children()
 		require.Equal(t, "product", strVal(t, ent[0].Child("Name")))
 		require.Equal(t, "RabbitMQ", strVal(t, ent[0].Child("Str")))
 		require.Equal(t, "PLAIN", strVal(t, mustChild(t, am, "Mechanisms").Child("Value")))
 		require.Equal(t, "en_US", strVal(t, mustChild(t, am, "Locales").Child("Value")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 5672, 5672, frame))
 		require.Equal(t, "PLAIN", strVal(t, mustChild(t, eth, "IP", "TCP", "AMQP", "Mechanisms").Child("Value")))
+	})
+
+	t.Run("amqp/nested-table", func(t *testing.T) {
+		// Connection.Start with nested capabilities table (F) + tags array (A).
+		frame := mustHex(t, "0100000000006a000a000a00090000004e0770726f6475637453000000085261626269744d510c6361706162696c69746965734600000015127075626c69736865725f636f6e6669726d73740104746167734100000008530000000367656e00000005504c41494e00000005656e5f5553ce")
+		am := parseRule(t, frame, "amqp", "AMQP")
+		ent := mustChild(t, am, "Properties", "AMQPTable", "Entries").Children()
+		require.GreaterOrEqual(t, len(ent), 3)
+		require.Equal(t, "capabilities", strVal(t, ent[1].Child("Name")))
+		caps := mustChild(t, ent[1], "AMQPTable", "Entries").Children()
+		require.Equal(t, "publisher_confirms", strVal(t, caps[0].Child("Name")))
+		require.Equal(t, uint64(1), uintVal(t, caps[0].Child("Bool")))
+		require.Equal(t, "tags", strVal(t, ent[2].Child("Name")))
+		tags := mustChild(t, ent[2], "AMQPArray", "Values").Children()
+		require.Equal(t, "gen", strVal(t, tags[0].Child("Str")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5672, 5672, frame))
+		require.Equal(t, "publisher_confirms", strVal(t, mustChild(t, eth, "IP", "TCP", "AMQP", "Properties", "AMQPTable", "Entries").Children()[1].Child("AMQPTable").Child("Entries").Children()[0].Child("Name")))
 	})
 
 	t.Run("thrift/i32-field", func(t *testing.T) {
@@ -163,7 +192,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 			"61646d696e2e24636d64000000000001000000"+
 			"0f0000001070696e67000100000000")
 		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
-		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "Query", "Elements").Children()
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "BSONDoc", "Elements").Children()
 		require.Equal(t, "ping", strVal(t, el[0].Child("Name")))
 		require.Equal(t, uint64(1), uintVal(t, el[0].Child("Int32")))
 	})
@@ -174,7 +203,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 			"0f0000001070696e67000100000000")
 		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, msg))
 		require.Equal(t, uint64(2013), uintVal(t, mustChild(t, eth, "IP", "TCP", "MongoDB").Child("Op Code")))
-		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_MSG", "Document", "Elements").Children()
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_MSG", "BSONDoc", "Elements").Children()
 		require.Equal(t, "ping", strVal(t, el[0].Child("Name")))
 	})
 
@@ -184,7 +213,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 			"61646d696e2e24636d64000000000001000000"+
 			"11000000026d7367000300000068690000")
 		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
-		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "Query", "Elements").Children()
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "BSONDoc", "Elements").Children()
 		require.Equal(t, "msg", strVal(t, el[0].Child("Name")))
 		require.Equal(t, "hi", strings.TrimRight(strVal(t, el[0].Child("Str")), "\x00"))
 	})
@@ -195,9 +224,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 			"61646d696e2e24636d64000000000001000000"+
 			"10000000126e00020000000000000000")
 		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
-		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "Query", "Elements").Children()
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "BSONDoc", "Elements").Children()
 		require.Equal(t, "n", strVal(t, el[0].Child("Name")))
 		require.Equal(t, uint64(2), uintVal(t, el[0].Child("Int64")))
+	})
+
+	t.Run("mongodb/bson-nested", func(t *testing.T) {
+		// OP_QUERY {filter: {n: 1}} BSON type 0x03 embedded document
+		mongo := mustHex(t, "400000000100000000000000d407000000000000"+
+			"61646d696e2e24636d64000000000001000000"+
+			"190000000366696c746572000c000000106e00010000000000")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "BSONDoc", "Elements").Children()
+		require.Equal(t, "filter", strVal(t, el[0].Child("Name")))
+		inner := mustChild(t, el[0], "BSONDoc", "Elements").Children()
+		require.Equal(t, "n", strVal(t, inner[0].Child("Name")))
+		require.Equal(t, uint64(1), uintVal(t, inner[0].Child("Int32")))
+	})
+
+	t.Run("mongodb/bson-array", func(t *testing.T) {
+		// OP_QUERY {a: [2]} BSON type 0x04 array
+		mongo := mustHex(t, "3b0000000100000000000000d407000000000000"+
+			"61646d696e2e24636d64000000000001000000"+
+			"140000000461000c000000103000020000000000")
+		eth := parseEthernet(t, ipv4TCPFrame(t, 27017, 27017, mongo))
+		el := mustChild(t, eth, "IP", "TCP", "MongoDB", "OP_QUERY", "BSONDoc", "Elements").Children()
+		require.Equal(t, "a", strVal(t, el[0].Child("Name")))
+		inner := mustChild(t, el[0], "BSONDoc", "Elements").Children()
+		require.Equal(t, "0", strVal(t, inner[0].Child("Name")))
+		require.Equal(t, uint64(2), uintVal(t, inner[0].Child("Int32")))
 	})
 
 	t.Run("memcached/get-key", func(t *testing.T) {
