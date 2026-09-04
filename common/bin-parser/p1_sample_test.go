@@ -2289,6 +2289,37 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 40001, 7777, raw))
 		require.Equal(t, "foo", strVal(t, mustChild(t, eth, "IP", "TCP", "PHPSer").Child("Members").Children()[0].Child("String")))
 	})
+
+	t.Run("rsync/greeting", func(t *testing.T) {
+		// rsync daemon greeting @RSYNCD: 31.0. Wireshark rsync.version. TCP/873.
+		raw := []byte("@RSYNCD: 31.0\n")
+		n := parseRule(t, raw, "rsync", "Rsync")
+		require.Equal(t, "@RSYNCD:", strVal(t, n.Child("Magic")))
+		require.Equal(t, "31", strVal(t, n.Child("Major")))
+		require.Equal(t, "0", strVal(t, n.Child("Minor")))
+		require.Nil(t, n.Child("Module"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 873, 873, raw))
+		require.Equal(t, "31", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Major")))
+	})
+
+	t.Run("rsync/module", func(t *testing.T) {
+		// Client selects module after greeting. Wireshark rsync.module. TCP/873.
+		raw := []byte("@RSYNCD: 31.0\npublic\n")
+		n := parseRule(t, raw, "rsync", "Rsync")
+		require.Equal(t, "public", strVal(t, n.Child("Module")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 873, 873, raw))
+		require.Equal(t, "public", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Module")))
+	})
+
+	t.Run("rsync/ok", func(t *testing.T) {
+		// Server @RSYNCD: OK after module. Wireshark rsync.status. TCP/873.
+		raw := []byte("@RSYNCD: 31.0\n@RSYNCD: OK\n")
+		n := parseRule(t, raw, "rsync", "Rsync")
+		require.Equal(t, "RSYNCD", strVal(t, n.Child("Status Kind")))
+		require.Equal(t, "OK", strVal(t, n.Child("Status")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 873, 873, raw))
+		require.Equal(t, "OK", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Status")))
+	})
 }
 
 func zabbixPacket(flags uint8, json []byte, reserved bool) []byte {
