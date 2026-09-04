@@ -117,6 +117,14 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x0002), uintVal(t, parseRule(t, []byte{0x00, 0x02}, "loopback", "Loopback").Child("Function")))
 	})
 
+	t.Run("ssh/kexinit", func(t *testing.T) {
+		kex := mustChild(t, parseRule(t, mustHex(t, "000000950414000102030405060708090a0b0c0d0e0f00000011637572766532353531392d7368613235360000000b7373682d656432353531390000000a6165733132382d6374720000000a6165733132382d6374720000000d686d61632d736861322d3235360000000d686d61632d736861322d323536000000046e6f6e65000000046e6f6e650000000000000000000000000000000000"), "application-layer.ssh", "SSHPacket"), "Payload", "SSHKexInit")
+		require.Equal(t, "curve25519-sha256", strVal(t, kex.Child("Kex Algos")))
+	})
+	t.Run("ssh/kexdh", func(t *testing.T) {
+		dh := mustChild(t, parseRule(t, mustHex(t, "0000000b041e000000010200000000"), "application-layer.ssh", "SSHPacket"), "Payload", "SSHKexDHInit")
+		require.Equal(t, uint64(1), uintVal(t, dh.Child("E Length")))
+	})
 	t.Run("dhcp/discover", func(t *testing.T) {
 		n := parseRule(t, mustHex(t, "010106001234567800000000"+
 			"00000000000000000000000000000000"+
