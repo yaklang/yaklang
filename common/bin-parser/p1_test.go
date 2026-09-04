@@ -204,6 +204,10 @@ func TestP1STP8023AndPPPFamily(t *testing.T) {
 	stp := mustChild(t, parseEthernet(t, frame), "LLC", "STP")
 	require.Equal(t, uint64(0), uintVal(t, stp.Child("Protocol ID")))
 	require.Equal(t, uint64(0), uintVal(t, stp.Child("BPDU Type")))
+	cfg := mustChild(t, stp, "Config")
+	require.Equal(t, uint64(8), uintVal(t, cfg.Child("Root Priority")))
+	require.Equal(t, uint64(1), uintVal(t, cfg.Child("Root Ext High"))<<8|uintVal(t, cfg.Child("Root Ext Low")))
+	require.Equal(t, []byte{0xaa, 0xbb, 0xcc, 0x00, 0x01, 0x00}, bytesVal(t, cfg.Child("Root MAC")))
 
 	// existing PPP/LCP/PAP/CHAP/GRE fixtures, now on Ethernet+IP
 	gre := []byte{0x30, 0x81, 0x88, 0x0b, 0x00, 0x12, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0xc0, 0x21, 0x01, 0x01, 0x00, 0x0e, 0x03, 0x04, 0xc0, 0x23, 0x05, 0x06, 0x0f, 0x3f, 0x11, 0x7c}
