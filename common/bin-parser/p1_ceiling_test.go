@@ -48,26 +48,26 @@ func failCount(ruleFile string) int {
 
 // extraFailCount covers P0-owned rules that P1 names reuse (parseMustFail live in p0_*_test.go).
 var extraFailCount = map[string]int{
-	"application-layer.dhcp":    4,
-	"application-layer.mysql":   3,
-	"application-layer.redis":   3,
-	"application-layer.http":    3,
-	"application-layer.dns":     3,
-	"application-layer.snmp":    3,
-	"application-layer.nbss":    3,
-	"application-layer.socks5":  3,
-	"application-layer.ntlm":    9,
-	"application-layer.kerberos": 3,
-	"application-layer.ldap":    3,
-	"application-layer.ssh":     3,
-	"application-layer.quic":    3,
-	"application-layer.dcerpc":  3,
-	"application-layer.msrdp":   3,
-	"application-layer.spnego":  3,
-	"application-layer.tls":     3,
-	"application-layer.http2":   3,
-	"application-layer.smb":     3,
-	"application-layer.smb2":    3,
+	"application-layer.dhcp":               4,
+	"application-layer.mysql":              3,
+	"application-layer.redis":              3,
+	"application-layer.http":               3,
+	"application-layer.dns":                3,
+	"application-layer.snmp":               3,
+	"application-layer.nbss":               3,
+	"application-layer.socks5":             3,
+	"application-layer.ntlm":               9,
+	"application-layer.kerberos":           3,
+	"application-layer.ldap":               3,
+	"application-layer.ssh":                3,
+	"application-layer.quic":               3,
+	"application-layer.dcerpc":             3,
+	"application-layer.msrdp":              3,
+	"application-layer.spnego":             3,
+	"application-layer.tls":                3,
+	"application-layer.http2":              3,
+	"application-layer.smb":                3,
+	"application-layer.smb2":               3,
 	"internet_control_message_protocol_v6": 3,
 }
 
@@ -103,16 +103,16 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 	hasList := strings.Contains(text, "list: true") && (strings.Contains(text, "ele.Process()") || strings.Contains(text, "NewElement().Process()") || strings.Contains(text, "n = this.NewElement().Process()") || strings.Contains(text, "list-length-from-field"))
 	named := len(namedScalarRe.FindAllString(text, -1))
 	hasArms := typeArmRe.MatchString(text) || (strings.Contains(text, "if ") && strings.Contains(text, "ProcessSubNode("))
+	byType := uniqueProcessByType(text)
+	ifCount := strings.Count(text, "if ")
 
-	// PROTOCOL_DELIVERY 3.1:
-	// leftover blob without list/TLV → 8; type/command arms with named PDUs → 15; list/TLV → 20.
-	if hasList {
-		if leftoverOK && !incomplete {
-			return 25
-		}
-		return 20
-	}
+	// PROTOCOL_DELIVERY 3.1 (2026-09): leftover-clear is not Schema 25.
+	// 8 leftover blob; 15 type arms or leftover-clear header; 20 list XOR ≥2 ProcessByType;
+	// 25 leftoverOK + real list + arms + named≥8.
 	if incomplete {
+		if hasList {
+			return 20
+		}
 		if hasArms && named >= 2 {
 			return 15
 		}
@@ -121,10 +121,16 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 		}
 		return 0
 	}
-	if leftoverOK && named >= 4 && hasArms {
+	if hasList && named >= 8 && (hasArms || byType >= 2) {
 		return 25
 	}
-	if hasArms && named >= 2 {
+	if hasList {
+		return 20
+	}
+	if leftoverOK && (byType >= 2 || ifCount >= 2) && named >= 8 {
+		return 20
+	}
+	if hasArms && named >= 4 {
 		return 15
 	}
 	if named >= 2 {
@@ -134,6 +140,18 @@ func schemaCeiling(ruleFile, opaqueRaw string) int {
 		return 8
 	}
 	return 0
+}
+
+var processByTypeNameRe = regexp.MustCompile(`(?:ProcessByType|TryProcessByType)\("([^"]+)"\)`)
+
+func uniqueProcessByType(text string) int {
+	seen := map[string]struct{}{}
+	for _, m := range processByTypeNameRe.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			seen[m[1]] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 func testsCeiling(ruleFile string, hasEth bool, portDispatched bool) int {
