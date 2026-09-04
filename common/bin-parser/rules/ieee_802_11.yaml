@@ -70,6 +70,9 @@ Package:
           if compressed == 1 {
             this.ProcessSubNode("BA Bitmap")
           }
+          if compressed == 0 {
+            this.ProcessSubNode("Block Ack Bitmap")
+          }
           res, op = this.TryProcessByType("PeekByte")
           op.Recovery()
           if op.OK {
@@ -122,6 +125,7 @@ Package:
     BA Control: uint16
     Starting Sequence Control: uint16
     BA Bitmap: raw,8
+    Block Ack Bitmap: raw,128
     BAR TID Info:
       list: true
       Record: BARTIDRecord

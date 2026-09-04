@@ -39,7 +39,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("Linux SLL", "linux_sll.yaml", 20, 15, 20, 20, 10, "L2",
 		"linux_sll/ipv4 HOST ARPHRD_ETHER MAC 00:11:22:33:44:55 IPv4 Version 4; linux_sll/next-type ETH_P_802_EX1 0x88B5 Next Protocol Data; TestP1FailPaths linux_sll", ""),
 	p1card("IEEE 802.11", "ieee_802_11.yaml", 25, 15, 20, 20, 10, "L2",
-		"ieee_802_11/mtid-ba IEEE 802.11 Multi-TID Compressed BA TID 0/6; ieee_802_11/mtid-bar BAR TID Info; TestP1FailPaths trunc-mtid", ""),
+		"ieee_802_11/basic-ba IEEE 802.11 Basic BlockAck 128-octet Block Ack Bitmap; ieee_802_11/mtid-ba Multi-TID Compressed BA; TestP1FailPaths trunc-basic", ""),
 	p1card("WPA/RSN", "ieee_802_11.yaml", 25, 15, 20, 20, 10, "L2",
 		"TestP1MiscAndAliases RSN IE; TestP1FailPaths RSN", ""),
 	alias("IEEE 802.1X", "EAPOL"),

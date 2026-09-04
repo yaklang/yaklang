@@ -74,6 +74,20 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(6), uintVal(t, tids[1].Child("Per TID Info"))>>12)
 		require.Equal(t, []byte{0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, bytesVal(t, tids[1].Child("BA Bitmap")))
 	})
+	t.Run("ieee_802_11/basic-ba", func(t *testing.T) {
+		ra := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		ta := []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+		bm := make([]byte, 128)
+		bm[0] = 0xff
+		raw := append([]byte{0x94, 0x00, 0x00, 0x00}, ra...)
+		raw = append(raw, ta...)
+		raw = append(raw, 0x00, 0x60, 0x00, 0x01)
+		raw = append(raw, bm...)
+		n := parseRule(t, raw, "ieee_802_11", "Dot11")
+		require.Equal(t, uint64(0x6000), uintVal(t, n.Child("BA Control")))
+		require.Equal(t, bm, bytesVal(t, n.Child("Block Ack Bitmap")))
+		require.Nil(t, n.Child("BA Bitmap"))
+	})
 	t.Run("ieee_802_1ad/arp", func(t *testing.T) {
 		q := parseRule(t, append([]byte{0xb0, 0x64, 0x08, 0x06}, []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}...), "ieee_802_1ad", "QinQ")
 		require.Equal(t, uint64(5), uintVal(t, q.Child("PCP")))
