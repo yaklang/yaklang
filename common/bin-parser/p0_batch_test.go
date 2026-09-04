@@ -330,7 +330,7 @@ func TestAJPPingPongForwardAndEdges(t *testing.T) {
 	fwd := ajpPacket(0x1234, 0x02, []byte{0x02, 0x00, 0x01, '/'})
 	f := parseRule(t, fwd, "application-layer.ajp", "AJP")
 	require.Equal(t, uint64(0x02), uintVal(t, f.Child("Code")))
-	require.Equal(t, []byte{0x02, 0x00, 0x01, '/'}, bytesVal(t, f.Child("Body")))
+	require.Equal(t, []byte{0x02, 0x00, 0x01, '/'}, bytesVal(t, f.Child("Octets")))
 
 	shutdown := ajpPacket(0x1234, 0x07, nil)
 	s := parseRule(t, shutdown, "application-layer.ajp", "AJP")
