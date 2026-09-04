@@ -5,9 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
 	"math"
 	"os"
 	"strings"
@@ -15,6 +12,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -52,6 +53,10 @@ type ScanState struct {
 	TargetFiles   []string        // 阶段B的目标文件（累积追加，去重）
 	TargetFileSet map[string]bool // 去重用
 	AuditedFiles  map[string]bool // 已完成审计的文件
+
+	// auditedCount 是 TargetFiles 中已 mark 的文件数（与 AuditedFiles 同步维护，
+	// 仅统计目标文件），使 Progress/AllDone 免于 O(T) 重扫。
+	auditedCount int
 
 	// PhaseASpotReadsSinceLock 阶段A 自上次 lock 以来的 read_file 抽查次数（用于提示及时 lock）
 	PhaseASpotReadsSinceLock int
@@ -165,6 +170,25 @@ func (s *ScanState) PhaseBGrepCount(file string) int {
 	return s.PhaseBGrepCounts[file]
 }
 
+// PhaseBReadAndGrepCount 一次读锁同时返回目标文件的 read / trace grep 计数
+// （reactive builder 逐文件展示用，替代每文件两次独立加锁）。
+func (s *ScanState) PhaseBReadAndGrepCount(file string) (read int, grep int) {
+	if file == "" {
+		return 0, 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.PhaseBReadCounts[file], s.PhaseBGrepCounts[file]
+}
+
+// PhaseBReadGuardSnapshot 一次读锁返回 read_file 防打转 guard 所需的全部状态
+// （phase / 是否目标文件 / 是否已 mark / phase-B read 计数），替代 4 次独立加锁。
+func (s *ScanState) PhaseBReadGuardSnapshot(file string) (phase ScanPhase, isTarget bool, audited bool, readCount int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Phase, s.TargetFileSet[file], s.AuditedFiles[file], s.PhaseBReadCounts[file]
+}
+
 // ClearPhaseBGreps clears phase-B trace grep counter for a file (call after mark_file_done).
 func (s *ScanState) ClearPhaseBGreps(file string) {
 	if file == "" {
@@ -184,6 +208,10 @@ func (s *ScanState) AddTargetFiles(files []string) (added int, total int) {
 			s.TargetFileSet[f] = true
 			s.TargetFiles = append(s.TargetFiles, f)
 			added++
+			if s.AuditedFiles[f] {
+				// 先 mark 后纳入的顺序同样计入（保持 auditedCount 精确）。
+				s.auditedCount++
+			}
 		}
 	}
 	return added, len(s.TargetFiles)
@@ -215,31 +243,11 @@ func (s *ScanState) CollectedTargetFiles() []string {
 	return result
 }
 
-// MarkFileDone marks a file audited without recording disposition (internal/tests/auto-finalize only).
-func (s *ScanState) MarkFileDone(filePath string) int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.AuditedFiles[filePath] = true
-	remaining := 0
-	for _, f := range s.TargetFiles {
-		if !s.AuditedFiles[f] {
-			remaining++
-		}
-	}
-	return remaining
-}
-
 // Progress 返回（已完成数，总数），仅统计 TargetFiles 中已 mark 的文件
 func (s *ScanState) Progress() (int, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	done := 0
-	for _, f := range s.TargetFiles {
-		if s.AuditedFiles[f] {
-			done++
-		}
-	}
-	return done, len(s.TargetFiles)
+	return s.auditedCount, len(s.TargetFiles)
 }
 
 // CurrentPhase returns the active scan phase.
@@ -280,23 +288,15 @@ func (s *ScanState) RemainingFiles() []string {
 func (s *ScanState) AllDone() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.TargetFiles) == 0 {
-		return false
-	}
-	for _, f := range s.TargetFiles {
-		if !s.AuditedFiles[f] {
-			return false
-		}
-	}
-	return true
+	return len(s.TargetFiles) > 0 && s.auditedCount >= len(s.TargetFiles)
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // Reactive data 模板
 // ─────────────────────────────────────────────────────────────────────
 
-const phase2ReactiveDataTpl = `## 当前扫描任务
-<|SCAN_TASK_{{ .Nonce }}|>
+const phase2ReactiveDataTpl = `## 当前扫描进度
+<|SCAN_PROGRESS_{{ .Nonce }}|>
 **漏洞类别**: {{ .CategoryName }} ({{ .CategoryID }})
 **技术栈**: {{ .TechStack }}
 **入口点摘要**: {{ .EntryPoints }}
@@ -314,16 +314,17 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 {{ end }}
 
 > [路径规则] 所有文件路径参数必须使用用户指定的项目绝对路径，禁止使用相对路径。
-{{ if .ReconOutline }}
-**项目背景报告章节大纲**（包含路由列表、数据访问模式、认证机制等）:
-{{ .ReconOutline }}
-{{ else if .ReconFileHint }}
-**项目背景报告**（包含路由列表、数据访问模式、认证机制等）: {{ .ReconFileHint }}（调用 read_recon_notes 读取全文）
-{{ end }}
+
 {{ if .PrevFindingsSummary }}
----
 ### 前序类别已发现的 Findings（仅供参考，避免重复提交）
 {{ .PrevFindingsSummary }}
+{{ end }}
+
+{{ if .ReconOutline }}
+**项目背景报告章节大纲**:
+{{ .ReconOutline }}
+{{ else if .ReconFileHint }}
+**项目背景报告**: {{ .ReconFileHint }}（调用 read_recon_notes 读取全文）
 {{ end }}
 
 ---
@@ -333,24 +334,24 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 ### 阶段A：关键词搜索
 目标：根据 **Sink 语义提示** 发现候选文件。
 
-**阶段A read_file 限制**：仅抽查，必须 offset + lines（≤80）；禁止全文件读。违反时运行时会自动截断。
+**阶段A read_file 限制**：仅抽查，必须 offset + lines（≤80）；禁止全文件读。
 
-**首选 fast_context**：子 loop 内并行 grep；参考材料为**可选目录**（子 loop 内按需 require_tool + read_file 打开 recon_report）。若发现质量偏弱，父 loop 应先 **read_recon_notes 深度调研** 再重写 query 重试 fast_context。
+**首选 fast_context**：子 loop 内并行 grep。若发现质量偏弱，先 **read_recon_notes** 再重写 query 重试。
 
 {{ if .DiscoveryQualityWarning }}
 **发现质量提醒**: {{ .DiscoveryQualityWarning }}
 {{ end }}
 
-**阶段A推荐循环（广度优先）**：fast_context →（可选 read 抽查）→ lock_target_files 批量纳入 → 可继续 fast_context 扩搜 → done=true 进阶段B。
+**阶段A推荐循环**：fast_context →（可选 read 抽查）→ lock_target_files → 可继续扩搜 → done=true 进阶段B。
 
 {{ if ge .PhaseASpotReads 1 }}
 **阶段A 已抽查 read_file**: {{ .PhaseASpotReads }} 次（自上次 lock 起）
 {{ end }}
 {{ if ge .PhaseASpotReads 2 }}
-**请尽快 lock**：已连续抽查 {{ .PhaseASpotReads }} 次 read_file 仍未 lock。下一 action 应是 lock_target_files(done=false) 纳入已读候选，不要连读多个文件不 lock。
+**请尽快 lock**：已连续抽查 {{ .PhaseASpotReads }} 次 read_file 仍未 lock。
 {{ end }}
 {{ if .PendingDiscoveryList }}
-**fast_context 候选处理进度**（建议全部纳入；done=true 可自动纳入剩余）:
+**fast_context 候选处理进度**:
 {{ .PendingDiscoveryList }}
 {{ end }}
 {{ if .DiscoveryGateWarning }}
@@ -362,47 +363,33 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 **已纳入目标文件列表**:
 {{ .CollectedFilesList }}
 {{ else if eq .CollectedFileCount 0 }}
-（尚未 lock 任何文件；fast_context/grep 候选需经 read_file 判断后调用 lock_target_files 写入）
+（尚未 lock 任何文件）
 {{ end }}
 
 **Sink 语义提示**（根据实际技术栈自主选择合适的 grep 关键词，示例仅供参考）:
 {{ .SinkHints }}
 {{ else }}
 ### 阶段B：逐文件审计
-目标：对**已 lock 的目标文件**逐文件审计。**一次只处理一个文件**：read_file →（可选 trace grep）→ **可疑则 add_finding** → **mark_file_done(disposition=...)**。
-
-**文件归属（代码强制）**：每个 lock 的文件必须有且仅有一种归属：
-- finding：已 add_finding → mark_file_done(disposition="finding")
-- not_vul：本类别无漏洞 → mark_file_done(disposition="not_vul", audit_summary="...")
-- complete_scan 会校验全部目标文件均已归属，否则拒绝并列出待处理文件
-
-**阶段B 允许 trace grep（content 模式）**：在目标文件、其父目录或项目根内搜索符号/调用链，用于 data_flow 上溯；**禁止** files_with_matches / find_file / tree / fast_context。
-
-**审计进度**: {{ .AuditDone }} / {{ .AuditTotal }} 个目标文件已完成 mark_file_done
-
-**待审计文件**（须全部 mark_file_done 后才能 complete_scan）:
-{{ .RemainingFilesList }}
+进度：{{ .AuditDone }}/{{ .AuditTotal }}（剩余 {{ .AuditRemaining }}）
 {{ if .PhaseBReadWarning }}
-**阶段B read 提醒**: {{ .PhaseBReadWarning }}
+**警告**: {{ .PhaseBReadWarning }}
 {{ end }}
 {{ if .PhaseBGrepWarning }}
-**阶段B trace grep 提醒**: {{ .PhaseBGrepWarning }}
+**警告**: {{ .PhaseBGrepWarning }}
 {{ end }}
-{{ if eq .AuditRemaining 1 }}
-**仅剩 1 个文件**：read 后**立即** mark_file_done，然后 complete_scan。
-{{ end }}
+**待审计文件**:
+{{ .RemainingFilesList }}
 {{ end }}
 
 {{ if .FeedbackMessages }}
 ---
-### 上步操作反馈
+### 系统反馈
 {{ .FeedbackMessages }}
 {{ end }}
-<|SCAN_TASK_END_{{ .Nonce }}|>
 
-**当前 Finding 数**: {{ .FindingsCount }}
-
-{{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 todo_delta 跳过 mark。{{ end }}`
+**全局 findings 数**: {{ .FindingsCount }}
+<|SCAN_PROGRESS_END_{{ .Nonce }}|>
+`
 
 // buildSingleCategoryScanLoop 构建针对单一漏洞类别的扫描 Loop（两阶段：discovery → 逐文件审计）。
 //
@@ -431,7 +418,9 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
-
+	}
+	preset = append(preset, auditopts.LoopAuxiliaryOpts()...)
+	preset = append(preset,
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			vars := map[string]any{
 				"Nonce":       nonce,
@@ -459,17 +448,13 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				phaseLabel = "阶段B：逐文件审计"
 			}
 
-			// SinkHints（阶段A显示，替代硬编码关键词列表）
-			sinkHintsText := category.RenderSinkHints()
-
 			// 待审计 / 已纳入文件列表
 			auditDone, auditTotal := scan.Progress()
 			remaining := scan.RemainingFiles()
 			var remainingFilesSB strings.Builder
 			for i, f := range remaining {
 				attrib := formatRemainingFileAttributionHint(scan, state, category.ID, f, state.ProjectPath)
-				readCnt := scan.PhaseBReadCount(f)
-				grepCnt := scan.PhaseBGrepCount(f)
+				readCnt, grepCnt := scan.PhaseBReadAndGrepCount(f)
 				switch {
 				case readCnt > 0 && grepCnt > 0:
 					remainingFilesSB.WriteString(fmt.Sprintf("  %d. %s（已 read %d 次、trace grep %d 次，须 mark）%s\n", i+1, f, readCnt, grepCnt, attrib))
@@ -488,12 +473,13 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			phaseBGrepWarning := ""
 			if !isSearchPhase && len(remaining) > 0 {
 				first := remaining[0]
-				if cnt := scan.PhaseBReadCount(first); cnt >= 1 {
-					phaseBReadWarning = fmt.Sprintf("%q 已 read %d 次，下一 action 必须是 mark_file_done（不可继续 read）", first, cnt)
+				firstRead, firstGrep := scan.PhaseBReadAndGrepCount(first)
+				if firstRead >= 1 {
+					phaseBReadWarning = fmt.Sprintf("%q 已 read %d 次，下一 action 必须是 mark_file_done（不可继续 read）", first, firstRead)
 				}
-				if cnt := scan.PhaseBGrepCount(first); cnt >= 3 {
+				if firstGrep >= 3 {
 					phaseBGrepWarning = fmt.Sprintf("%q 已 trace grep %d 次（上限 %d），请尽快完成 data_flow 并 mark_file_done",
-						first, cnt, phase2MaxPhaseBTraceGrepsPerFile)
+						first, firstGrep, phase2MaxPhaseBTraceGrepsPerFile)
 				}
 			}
 			auditRemaining := 0
@@ -514,19 +500,19 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			}
 			pendingDiscoveryList, discoveryGateWarning := formatPendingDiscoveryForReactive(scan)
 			discoveryQualityWarning := FormatDiscoveryQualityWarningForReactive(category, scan)
-			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, mergePhase2ReactiveVars(map[string]any{
+			reactiveVars := map[string]any{
 				"Nonce":                   nonce,
 				"CategoryID":              category.ID,
 				"CategoryName":            category.Name,
 				"TechStack":               state.TechStack,
-				"LanguageFocus":           model.LanguageFocusForCategory(state.TechStack, category.ID),
 				"EntryPoints":             state.EntryPoints,
+				"LanguageFocus":           model.LanguageFocusForCategory(state.TechStack, category.ID),
+				"SinkHints":               category.RenderSinkHints(),
 				"ReconOutline":            state.GetReconOutline(),
 				"ReconFileHint":           reconFileHint,
 				"PrevFindingsSummary":     buildPrevFindingsSummary(state, category.ID),
 				"PhaseLabel":              phaseLabel,
 				"IsSearchPhase":           isSearchPhase,
-				"SinkHints":               sinkHintsText,
 				"CollectedFileCount":      scan.TargetFileCount(),
 				"CollectedFilesList":      collectedFilesSB.String(),
 				"PendingDiscoveryList":    pendingDiscoveryList,
@@ -539,9 +525,13 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				"PhaseBGrepWarning":       phaseBGrepWarning,
 				"AuditRemaining":          auditRemaining,
 				"FeedbackMessages":        feedbacker.String(),
-				"FindingsCount":           len(state.GetFindings()),
+				"FindingsCount":           state.GetFindingCount(),
 				"PhaseASpotReads":         scan.PhaseASpotReadCount(),
-			}, state))
+			}
+			for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
+				reactiveVars[k] = v
+			}
+			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, reactiveVars)
 			return reactivePrompt, err
 		}),
 
@@ -828,9 +818,9 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 
 				loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "code_audit_finding", map[string]any{
 					"finding": f,
-					"total":   len(state.GetFindings()),
+					"total":   state.GetFindingCount(),
 				})
-				emit.Phase2FindingAdded(loop, category, f, len(state.GetFindings()))
+				emit.Phase2FindingAdded(loop, category, f, state.GetFindingCount())
 
 				log.Infof("[CodeAudit/Phase2] Finding added: %s - %s (%s:%d)", f.ID, f.Category, f.File, f.Line)
 
@@ -891,11 +881,15 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				coverageSummary := action.GetString("coverage_summary")
 				coverageSpill, _ := reactloops.SpillLongContent(loop, "scan_coverage_"+category.ID, coverageSummary)
 
+				auditedFiles, targetFiles := scan.Progress()
 				obs := &model.ScanObservation{
 					CategoryID:      category.ID,
 					CategoryName:    category.Name,
 					StopReason:      "files_all_audited",
 					CoverageSummary: coverageSummary,
+					Status:          model.ScanStatusCompleted,
+					AuditedFiles:    auditedFiles,
+					TargetFiles:     targetFiles,
 				}
 				state.AddScanObservation(obs)
 
@@ -919,7 +913,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				op.Exit()
 			},
 		),
-	}
+	)
 
 	preset = append(preset, buildPhase2WhitelistFSToolOptions(r)...)
 
@@ -1148,11 +1142,4 @@ func buildPrevFindingsSummary(state *model.AuditState, currentCategoryID string)
 			f.Severity, f.ID, f.Category, f.File, f.Line, f.Title))
 	}
 	return sb.String()
-}
-
-func mergePhase2ReactiveVars(base map[string]any, state *model.AuditState) map[string]any {
-	for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
-		base[k] = v
-	}
-	return base
 }

@@ -163,6 +163,9 @@ func (s *ScanState) PrepareDiscoveryGateForPhaseB() (autoLocked, skipped int) {
 		s.TargetFileSet[p] = true
 		s.TargetFiles = append(s.TargetFiles, p)
 		autoLocked++
+		if s.AuditedFiles[p] {
+			s.auditedCount++
+		}
 	}
 	return autoLocked, skipped
 }

@@ -231,6 +231,10 @@ type ReActLoop struct {
 	// TodoSnapshot 数据块 (plan / intent 等轻量子循环使用).
 	disableTodoSnapshot bool
 
+	// extraFrozenPartitions 由 WithFrozenBlockPartitions 注入，在每轮
+	// generateLoopPrompt 并入 frozen-block，用于把稳定指令 hoist 出 dynamic 区。
+	extraFrozenPartitions []aicommon.FrozenBlockPartition
+
 	// scenarioToolWhitelist 是这个 loop 对 "VisibilityScenario 工具" 的拉回
 	// 名单, 由 focus mode 的 __SCENARIO_TOOLS__ dunder 或代码侧 WithScenarioToolWhitelist
 	// 显式声明. 默认 nil/空, 即不把任何 scenario 工具拉回 Tool Inventory.

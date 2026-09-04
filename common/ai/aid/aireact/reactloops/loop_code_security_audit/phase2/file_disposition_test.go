@@ -78,6 +78,27 @@ func TestValidateAllTargetsAttributed_AllAttributed(t *testing.T) {
 	require.Empty(t, msg)
 }
 
+// TestValidateAllTargetsAttributed_NotAuditedAccepted 系统兜底写入的
+// not_audited 归属必须通过 complete_scan 验证（未审计 ≠ 无漏洞，但已归属）。
+func TestValidateAllTargetsAttributed_NotAuditedAccepted(t *testing.T) {
+	scan := newScanState()
+	scan.AddTargetFiles([]string{"/proj/a.php", "/proj/b.php"})
+	scan.CommitToAudit()
+	scan.MarkFileDoneWithDisposition("/proj/a.php", FileDispositionNotVul)
+	scan.MarkFileDoneWithDisposition("/proj/b.php", FileDispositionNotAudited)
+
+	ok, msg := validateAllTargetsAttributed(scan, nil, "sqli", "/proj")
+	require.True(t, ok)
+	require.Empty(t, msg)
+}
+
+// TestNormalizeFileDisposition_RejectsNotAuditedFromModel 模型不得自报
+// not_audited（该值仅系统兜底写入）——经 normalize 后必须被拒绝。
+func TestNormalizeFileDisposition_RejectsNotAuditedFromModel(t *testing.T) {
+	require.Equal(t, "", normalizeFileDisposition("not_audited"))
+	require.Equal(t, "", normalizeFileDisposition("not audited"))
+}
+
 func TestResolveTargetAbsPath(t *testing.T) {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/proj/vulnerabilities/sqli/source/low.php"})

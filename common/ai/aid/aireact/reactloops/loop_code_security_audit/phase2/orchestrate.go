@@ -2,11 +2,13 @@ package phase2
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
@@ -23,9 +25,15 @@ type categoryScanJob struct {
 type categoryScanOutcome struct {
 	category     model.VulnCategory
 	index        int
+	total        int
 	incomplete   bool
 	findingCount int
-	execErr      error
+}
+
+// pendingResume 是一个被中断、等待批量恢复续扫的类别条目。
+type pendingResume struct {
+	catJob    categoryScanJob
+	scanState *ScanState
 }
 
 // runAllCategoryScans executes Phase2 category scans via forked sub-agents (timeline isolation, optional parallelism).
@@ -50,6 +58,7 @@ func runAllCategoryScans(
 			TaskName:   goal,
 			Goal:       goal,
 			LoopName:   schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT,
+			Timeout:    auditopts.DefaultCategoryScanTimeout,
 		})
 		catalog[category.ID] = categoryScanJob{
 			category: category,
@@ -60,9 +69,11 @@ func runAllCategoryScans(
 
 	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(categories))
 
-	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d)", len(categories), concurrency)
+	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d, per-category timeout=%s)",
+		len(categories), concurrency, auditopts.DefaultCategoryScanTimeout)
 	r.AddToTimeline("[PHASE2_START]",
-		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离）。", len(categories)))
+		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离，每类超时 %s）。",
+			len(categories), auditopts.DefaultCategoryScanTimeout))
 
 	artifacts := newCategoryArtifactStore(state)
 
@@ -72,6 +83,7 @@ func runAllCategoryScans(
 		ParentLoop:         loop,
 		TimelineMode:       reactloops.SubAgentTimelineFork,
 		ExecuteConcurrency: concurrency,
+		DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
 		LoopBuilder: phase2CategoryLoopBuilder{
 			state: state, catalog: catalog, artifacts: artifacts, scanStates: &scanStates,
 		},
@@ -81,7 +93,15 @@ func runAllCategoryScans(
 		return forkResults[i].Order < forkResults[j].Order
 	})
 
+	// ── 收尾三段式 ──
+	// 1) 评估：逐类算 incomplete，判定可恢复类（阶段A/阶段B中断）并做阶段A的
+	//    gate+commit 预处理；不可恢复且无 observation 的当场走兜底。
+	// 2) 批量 resume：所有可恢复类合并成一次 DispatchSubAgents（同主池并发度，
+	//    并行续扫），避免逐类串行 resume 把 Phase2 尾部拖成 8×75min。
+	// 3) 兜底复查：resume 后仍无 observation 且未完成的类别执行 auto-finalize
+	//    兜底，保证每个类别在 Phase2 结束时必有 observation（Phase3/4 依赖）。
 	outcomes := make([]categoryScanOutcome, 0, len(forkResults))
+	resumables := make([]pendingResume, 0, len(forkResults))
 	for _, forkResult := range forkResults {
 		if forkResult == nil {
 			continue
@@ -94,12 +114,87 @@ func runAllCategoryScans(
 		if raw, ok := scanStates.Load(catJob.category.ID); ok {
 			scanState, _ = raw.(*ScanState)
 		}
-		outcome := finalizeCategoryScanAfterFork(r, loop, task, state, catJob, forkResult, scanState, &scanStates, artifacts)
-		outcomes = append(outcomes, outcome)
 
-		emit.Phase2CategoryOutcome(loop, catJob.index, catJob.total, catJob.category, outcome.findingCount, outcome.incomplete)
+		category := catJob.category
+		if forkResult.ExecErr != nil {
+			log.Warnf("[CodeAudit/Phase2] Category '%s' forked sub-agent error: %v", category.ID, forkResult.ExecErr)
+		}
+
+		incomplete := countScanObservationsForCategory(state, category.ID) == 0
+		if incomplete && prepareCategoryResume(scanState, category.ID) {
+			log.Infof("[CodeAudit/Phase2] Category '%s' interrupted; queued for phase-B resume.", category.ID)
+			r.AddToTimeline("[PHASE2_RESUME_QUEUED]",
+				fmt.Sprintf("[Phase2/%s] 扫描被中断但可恢复，已加入批量恢复队列。", category.ID))
+			resumables = append(resumables, pendingResume{catJob: catJob, scanState: scanState})
+			continue
+		}
+		if incomplete {
+			// 不可恢复（无 scanState / 无目标 / 阶段A空手 / 阶段B已全部mark）：
+			// 直接兜底，保证该类别在 Phase2 结束时有 observation 供 Phase3/4 消费。
+			fallbackFinalizeCategoryScan(r, state, scanState, category, forkResult.ExecErr, artifacts)
+		}
+		outcomes = append(outcomes, buildCategoryScanOutcome(state, catJob))
+	}
+
+	if len(resumables) > 0 {
+		resumeJobs := make([]reactloops.SubAgentJob, 0, len(resumables))
+		resumeCatalog := make(map[string]pendingResume, len(resumables))
+		for _, p := range resumables {
+			resumeGoal := fmt.Sprintf("Phase 2 category scan resume: %s", p.catJob.category.Name)
+			identifier := resumeJobIdentifier(p.catJob.category.ID)
+			resumeJobs = append(resumeJobs, reactloops.SubAgentJob{
+				Order:      p.catJob.index,
+				Identifier: identifier,
+				TaskName:   resumeGoal,
+				Goal:       resumeGoal,
+				Timeout:    auditopts.DefaultCategoryScanTimeout,
+			})
+			resumeCatalog[identifier] = p
+		}
+		log.Infof("[CodeAudit/Phase2] Resuming %d interrupted categories in parallel (timeout=%s each).",
+			len(resumables), auditopts.DefaultCategoryScanTimeout)
+		r.AddToTimeline("[PHASE2_RESUME_BATCH]",
+			fmt.Sprintf("[Phase2] 恢复 %d 个被中断的类别扫描（并行，每类预算 %s）。", len(resumables), auditopts.DefaultCategoryScanTimeout))
+
+		resumeResults := reactloops.DispatchSubAgents(r, task, resumeJobs, reactloops.SubAgentOptions{
+			ParentLoop:         loop,
+			TimelineMode:       reactloops.SubAgentTimelineFork,
+			ExecuteConcurrency: concurrency,
+			DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
+			LoopBuilder: phase2ResumeBatchLoopBuilder{
+				state: state, resumeCatalog: resumeCatalog, artifacts: artifacts, scanStates: &scanStates,
+			},
+		})
+		resumeExecErrs := make(map[string]error, len(resumeResults))
+		for _, result := range resumeResults {
+			if result == nil {
+				continue
+			}
+			resumeExecErrs[result.Identifier] = result.ExecErr
+		}
+
+		// resume 批结束后逐类复查：仍无 observation → 兜底 auto-finalize。
+		for _, p := range resumables {
+			category := p.catJob.category
+			if countScanObservationsForCategory(state, category.ID) == 0 {
+				resumeErr := resumeExecErrs[resumeJobIdentifier(category.ID)]
+				if resumeErr == nil {
+					// resume 轮自身未报执行错误但也没产出 observation（如循环正常
+					// 结束却没走到 complete_scan）——显式记录而非 execErr=<nil>。
+					resumeErr = fmt.Errorf("resume round finished without producing any scan observation")
+				}
+				fallbackFinalizeCategoryScan(r, state, p.scanState, category, resumeErr, artifacts)
+			}
+			outcomes = append(outcomes, buildCategoryScanOutcome(state, p.catJob))
+		}
+	}
+
+	// 统一发 outcome 事件（反映 resume 后的真实状态）。
+	sort.Slice(outcomes, func(i, j int) bool { return outcomes[i].index < outcomes[j].index })
+	for _, outcome := range outcomes {
+		emit.Phase2CategoryOutcome(loop, outcome.index, outcome.total, outcome.category, outcome.findingCount, outcome.incomplete)
 		log.Infof("[CodeAudit/Phase2] [%d/%d] Category '%s' complete. Total findings so far: %d",
-			catJob.index, catJob.total, catJob.category.ID, len(state.GetFindings()))
+			outcome.index, outcome.total, outcome.category.ID, state.GetFindingCount())
 	}
 
 	auditDirPath := util.AuditDir(state)
@@ -110,50 +205,43 @@ func runAllCategoryScans(
 	return outcomes
 }
 
-func finalizeCategoryScanAfterFork(
-	r aicommon.AIInvokeRuntime,
-	loop *reactloops.ReActLoop,
-	task aicommon.AIStatefulTask,
-	state *model.AuditState,
-	catJob categoryScanJob,
-	forkResult *reactloops.SubAgentResult,
-	scanState *ScanState,
-	scanStates *sync.Map,
-	artifacts *categoryArtifactStore,
-) categoryScanOutcome {
-	category := catJob.category
-	if forkResult.ExecErr != nil {
-		log.Warnf("[CodeAudit/Phase2] Category '%s' forked sub-agent error: %v", category.ID, forkResult.ExecErr)
+// resumeJobIdentifier 构造批量恢复 job 的 identifier（派发与复查共用同一来源）。
+func resumeJobIdentifier(categoryID string) string {
+	return categoryID + "-resume"
+}
+
+// prepareCategoryResume 判定一个被中断的类别是否可恢复续扫，并做必要的预处理。
+//
+// 阶段A中断（有 locked targets 或 discovery 候选）：做 gate+commit 把候选纳入
+// 目标并推进到阶段B，返回 true。
+// 阶段B中断（已 lock 且仍有未 mark 文件）：清理中断文件的残留 read/grep 计数
+// （避免续扫首轮触发 read-repeat/trace-grep guard 误警），返回 true。
+// 其余（无 scanState、阶段A空手、阶段B已全部 mark 完）：不可恢复，返回 false。
+func prepareCategoryResume(scanState *ScanState, categoryID string) bool {
+	if scanState == nil {
+		return false
 	}
-
-	obsBefore := countScanObservationsForCategory(state, category.ID)
-	incomplete := obsBefore == 0
-
-	if incomplete && tryResumeCategoryScanPhaseB(r, loop, task, state, catJob, scanState, scanStates, artifacts) {
-		incomplete = countScanObservationsForCategory(state, category.ID) == 0
-	}
-
-	if incomplete {
-		log.Warnf("[CodeAudit/Phase2] Category '%s' ended without calling complete_scan.", category.ID)
-		msg := fmt.Sprintf("类别 '%s' 扫描未调用 complete_scan 就结束了，可能未完整审计。", category.ID)
-		r.AddToTimeline("[PHASE2_CAT_INCOMPLETE]", "警告："+msg)
-		emit.Phase2ScanWarning(loop, category, "incomplete", msg)
-	}
-
-	findingCount := 0
-	for _, f := range state.GetFindings() {
-		if f.Category == category.ID {
-			findingCount++
+	if shouldResumeCategoryScanFromPhaseA(scanState) {
+		autoLocked, skipped := scanState.PrepareDiscoveryGateForPhaseB()
+		locked := scanState.CommitToAudit()
+		if len(locked) == 0 {
+			return false
 		}
+		log.Warnf("[CodeAudit/Phase2] Category '%s' stuck in phase A; resuming phase B (targets=%d auto_locked=%d skipped=%d)",
+			categoryID, len(locked), autoLocked, skipped)
+		return true
 	}
-
-	return categoryScanOutcome{
-		category:     category,
-		index:        catJob.index,
-		incomplete:   incomplete,
-		findingCount: findingCount,
-		execErr:      forkResult.ExecErr,
+	if shouldResumeCategoryScanFromPhaseB(scanState) {
+		for _, filePath := range scanState.RemainingFiles() {
+			scanState.ClearPhaseBReads(filePath)
+			scanState.ClearPhaseBGreps(filePath)
+		}
+		done, total := scanState.Progress()
+		log.Warnf("[CodeAudit/Phase2] Category '%s' interrupted in phase B; resuming audit (done=%d total=%d)",
+			categoryID, done, total)
+		return true
 	}
+	return false
 }
 
 // shouldResumeCategoryScanFromPhaseA returns true when a category sub-agent ended
@@ -165,61 +253,93 @@ func shouldResumeCategoryScanFromPhaseA(scanState *ScanState) bool {
 	return scanState.TargetFileCount() > 0 || scanState.DiscoveryCandidateCount() > 0
 }
 
-func tryResumeCategoryScanPhaseB(
-	r aicommon.AIInvokeRuntime,
-	loop *reactloops.ReActLoop,
-	task aicommon.AIStatefulTask,
-	state *model.AuditState,
-	catJob categoryScanJob,
-	scanState *ScanState,
-	scanStates *sync.Map,
-	artifacts *categoryArtifactStore,
-) bool {
+// shouldResumeCategoryScanFromPhaseB returns true when a category sub-agent ended
+// in phase B with locked targets but not all files marked yet (e.g. cut by the
+// per-category wall-clock timeout mid-audit).
+func shouldResumeCategoryScanFromPhaseB(scanState *ScanState) bool {
+	if scanState == nil || scanState.CurrentPhase() != ScanPhaseAudit {
+		return false
+	}
+	return scanState.TargetFileCount() > 0 && !scanState.AllDone()
+}
+
+// buildCategoryScanOutcome 从 state 汇总单个类别的收尾结果。
+func buildCategoryScanOutcome(state *model.AuditState, catJob categoryScanJob) categoryScanOutcome {
 	category := catJob.category
-	if !shouldResumeCategoryScanFromPhaseA(scanState) {
-		return false
+	findingCount := 0
+	for _, f := range state.GetFindings() {
+		if f.Category == category.ID {
+			findingCount++
+		}
+	}
+	return categoryScanOutcome{
+		category:     category,
+		index:        catJob.index,
+		total:        catJob.total,
+		incomplete:   countScanObservationsForCategory(state, category.ID) == 0,
+		findingCount: findingCount,
+	}
+}
+
+// fallbackFinalizeCategoryScan 是不可恢复类别（或 resume 后仍未完成）的兜底：
+// 把剩余目标文件 mark 为 not_audited（区别于模型亲自审计的 not_vul）并写入
+// observation，保证 Phase2 结束时每个类别都有 observation 供 Phase3/4 消费
+// （原 finalize.go auto-finalize 的职责移到这里，只在恢复无望时执行，不再
+// 销毁可恢复性）。
+func fallbackFinalizeCategoryScan(
+	r aicommon.AIInvokeRuntime,
+	state *model.AuditState,
+	scanState *ScanState,
+	category model.VulnCategory,
+	execErr error,
+	artifacts *categoryArtifactStore,
+) {
+	var remaining []string
+	done, total := 0, 0
+	if scanState != nil {
+		remaining = scanState.RemainingFiles()
+		done, total = scanState.Progress()
+		for _, filePath := range remaining {
+			scanState.MarkFileDoneWithDisposition(filePath, FileDispositionNotAudited)
+			scanState.ClearPhaseBReads(filePath)
+			scanState.ClearPhaseBGreps(filePath)
+		}
 	}
 
-	autoLocked, skipped := scanState.PrepareDiscoveryGateForPhaseB()
-	locked := scanState.CommitToAudit()
-	if len(locked) == 0 {
-		return false
+	stopReason := "auto_finalized_on_timeout"
+	obsStatus := model.ScanStatusPartial
+	summary := fmt.Sprintf("类别 '%s' 扫描被中断且无法恢复续扫（execErr=%v），已由系统兜底收尾。", category.ID, execErr)
+	if scanState == nil || total == 0 {
+		// 从未真正扫描（排队即死 / 循环从未构建 scanState）：记录 not_run。
+		stopReason = "not_run_interrupted"
+		obsStatus = model.ScanStatusNotRun
+		summary = fmt.Sprintf("类别 '%s' 扫描未真正开始即被中断（execErr=%v）。", category.ID, execErr)
+	} else {
+		summary = fmt.Sprintf(
+			"类别 '%s' 扫描被中断且无法恢复续扫：%d/%d 文件已审计，剩余 %d 个已由系统兜底标记为 not_audited（未经审计，区别于 not_vul）（execErr=%v）。",
+			category.ID, done, total, len(remaining), execErr)
 	}
 
-	log.Warnf("[CodeAudit/Phase2] Category '%s' stuck in phase A; resuming phase B (targets=%d auto_locked=%d skipped=%d)",
-		category.ID, len(locked), autoLocked, skipped)
-	r.AddToTimeline("[PHASE2_RESUME]",
-		fmt.Sprintf("[Phase2/%s] 阶段A 提前结束，已自动纳入候选并恢复阶段B（%d 个目标）",
-			category.ID, len(locked)))
-	emit.Phase2ScanWarning(loop, category, "resume_phase_b",
-		fmt.Sprintf("阶段A 未完成，已从 %d 个目标恢复阶段B", len(locked)))
+	log.Warnf("[CodeAudit/Phase2] %s", summary)
+	r.AddToTimeline("[SCAN_AUTO_FINALIZE]", fmt.Sprintf("[Phase2/%s] %s", category.ID, summary))
 
-	resumeGoal := fmt.Sprintf("Phase 2 category scan resume: %s", category.Name)
-	resumeJob := reactloops.SubAgentJob{
-		Order:      catJob.index,
-		Identifier: category.ID + "-resume",
-		TaskName:   resumeGoal,
-		Goal:       resumeGoal,
+	obs := &model.ScanObservation{
+		CategoryID:      category.ID,
+		CategoryName:    category.Name,
+		StopReason:      stopReason,
+		CoverageSummary: summary,
+		Status:          obsStatus,
+		AuditedFiles:    done,
+		TargetFiles:     total,
 	}
-	resumeResults := reactloops.DispatchSubAgents(r, task, []reactloops.SubAgentJob{resumeJob}, reactloops.SubAgentOptions{
-		ParentLoop:   loop,
-		TimelineMode: reactloops.SubAgentTimelineFork,
-		LoopBuilder: phase2CategoryResumeLoopBuilder{
-			state: state, category: category, catJob: catJob, scanState: scanState,
-			artifacts: artifacts, scanStates: scanStates,
-		},
-	})
-	var resumeResult *reactloops.SubAgentResult
-	var resumeErr error
-	if len(resumeResults) > 0 {
-		resumeResult = resumeResults[0]
+	state.AddScanObservation(obs)
+
+	auditDirPath := util.AuditDir(state)
+	if mkErr := os.MkdirAll(auditDirPath, 0o755); mkErr != nil {
+		log.Warnf("[CodeAudit/Phase2] Failed to create audit dir for fallback finalize: %v", mkErr)
+		return
 	}
-	if resumeResult != nil && resumeResult.ExecErr != nil {
-		resumeErr = resumeResult.ExecErr
-		log.Warnf("[CodeAudit/Phase2] Category '%s' resume scan failed: %v", category.ID, resumeResult.ExecErr)
-	}
-	_ = resumeErr
-	return true
+	persistCategoryObservation(artifacts, auditDirPath, category.ID, obs)
 }
 
 func countScanObservationsForCategory(state *model.AuditState, categoryID string) int {
@@ -256,21 +376,27 @@ func (b phase2CategoryLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) 
 	return catLoop, err
 }
 
-// phase2CategoryResumeLoopBuilder 是 phase2 单个 category resume 子 Agent 的
-// 自定义 LoopBuilder，替代原 fork 子 Agent 入口的 loop 构造回调。
-type phase2CategoryResumeLoopBuilder struct {
-	state      *model.AuditState
-	category   model.VulnCategory
-	catJob     categoryScanJob
-	scanState  *ScanState
-	artifacts  *categoryArtifactStore
-	scanStates *sync.Map
+// phase2ResumeBatchLoopBuilder 是 phase2 批量恢复续扫子 Agent 的自定义
+// LoopBuilder：按 resume job identifier 查回该类别的 scanState，复用既有
+// scanState 续跑（阶段A恢复类已在 prepareCategoryResume 做过 gate+commit，
+// 阶段B恢复类直接续审剩余文件）。
+type phase2ResumeBatchLoopBuilder struct {
+	state         *model.AuditState
+	resumeCatalog map[string]pendingResume
+	artifacts     *categoryArtifactStore
+	scanStates    *sync.Map
 }
 
-func (b phase2CategoryResumeLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) (*reactloops.ReActLoop, error) {
-	catLoop, scan, err := buildSingleCategoryScanLoop(prepared.Invoker, b.state, b.category, b.catJob.index, b.catJob.total, b.scanState, b.artifacts)
+func (b phase2ResumeBatchLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) (*reactloops.ReActLoop, error) {
+	p, ok := b.resumeCatalog[prepared.Job.Identifier]
+	if !ok {
+		return nil, fmt.Errorf("unknown category resume job %q", prepared.Job.Identifier)
+	}
+	catLoop, scan, err := buildSingleCategoryScanLoop(
+		prepared.Invoker, b.state, p.catJob.category, p.catJob.index, p.catJob.total, p.scanState, b.artifacts,
+	)
 	if scan != nil {
-		b.scanStates.Store(b.category.ID, scan)
+		b.scanStates.Store(p.catJob.category.ID, scan)
 	}
 	return catLoop, err
 }

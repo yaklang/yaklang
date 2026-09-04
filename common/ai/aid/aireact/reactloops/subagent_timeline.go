@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -122,6 +124,12 @@ func buildSubAgentRuntime(
 	}
 
 	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
+	if timeout := resolveSubAgentJobTimeout(job, opts); timeout > 0 {
+		// 释放上一层的 cancel 句柄再覆盖，避免 cancel 泄漏（go vet lostcancel）。
+		jobCancel()
+		jobCtx, jobCancel = context.WithTimeout(parentTask.GetContext(), timeout)
+		log.Infof("[SubAgent] job %q wall-clock timeout=%s (armed on slot acquisition)", job.Identifier, timeout)
+	}
 
 	userInput := strings.TrimSpace(job.UserInput)
 	if userInput == "" {
@@ -184,6 +192,18 @@ func buildSubAgentRuntime(
 		}
 	}
 	return childInvoker, subTask, release, nil
+}
+
+// resolveSubAgentJobTimeout returns the effective wall-clock budget for a job.
+// Job.Timeout wins; otherwise DefaultJobTimeout; <=0 means unlimited.
+func resolveSubAgentJobTimeout(job SubAgentJob, opts SubAgentOptions) time.Duration {
+	if job.Timeout > 0 {
+		return job.Timeout
+	}
+	if opts.DefaultJobTimeout > 0 {
+		return opts.DefaultJobTimeout
+	}
+	return 0
 }
 
 // buildSubAgentInvoker 根据子 timeline 容器和父 config 构建子 invoker。
