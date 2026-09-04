@@ -118,6 +118,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, ep.Child("Packet Type")))
 	})
 
+	t.Run("telnet/do-echo", func(t *testing.T) {
+		n := parseRule(t, []byte{0xff, 0xfd, 0x01}, "telnet", "Telnet")
+		require.Equal(t, uint64(0xfd), uintVal(t, mustChild(t, n, "IAC").Child("Command")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "IAC").Child("Option")))
+	})
+	t.Run("telnet/ttype", func(t *testing.T) {
+		raw := append([]byte{0xff, 0xfa, 0x18, 0x00}, append([]byte("xterm"), 0xff, 0xf0)...)
+		n := parseRule(t, raw, "telnet", "Telnet")
+		require.Equal(t, uint64(24), uintVal(t, mustChild(t, n, "IAC").Child("SB Option")))
+		require.Equal(t, "xterm", joinUint8(t, mustChild(t, n, "IAC").Child("Terminal Type")))
+	})
 	t.Run("socks4/connect", func(t *testing.T) {
 		n := parseRule(t, []byte{0x04, 0x01, 0x00, 0x50, 10, 0, 0, 1, 'u', 0}, "socks4", "SOCKS4")
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Command")))

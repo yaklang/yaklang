@@ -122,6 +122,16 @@ func vlanVID(t *testing.T, n *base.NodeValue) uint64 {
 	return uintVal(t, n.Child("VID High"))<<8 | uintVal(t, n.Child("VID Low"))
 }
 
+func joinUint8(t *testing.T, n *base.NodeValue) string {
+	t.Helper()
+	require.NotNil(t, n)
+	var b []byte
+	for _, c := range n.Children() {
+		b = append(b, byte(uintVal(t, c)))
+	}
+	return string(b)
+}
+
 func uintVal(t *testing.T, v *base.NodeValue) uint64 {
 	t.Helper()
 	require.NotNil(t, v)

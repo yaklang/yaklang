@@ -85,7 +85,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | TACACS+ | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `tacacs.yaml` |
 | SOCKS4 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `socks4.yaml` |
 | HTTP Proxy CONNECT | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
-| Telnet | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `telnet.yaml` |
+| Telnet | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `telnet.yaml` |
 | CREDSSP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of TLS |
 | VNC/RFB | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `vnc.yaml` |
 | WinRM | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
