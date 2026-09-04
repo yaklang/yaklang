@@ -1,6 +1,30 @@
 endian: big
 Package:
   FTPData:
+    operator: |
+      rest = 0
+      if this.GetMaxLength() > this.Length() {
+        rest = this.GetMaxLength() - this.Length()
+      }
+      if rest == 0 {
+        panic("ftp-data: empty payload")
+      }
+      res, op = this.TryProcessByType("FTPBlockProbe")
+      if op.OK {
+        op.Recovery()
+        if rest < 3 {
+          panic("ftp-data: truncated block header")
+        }
+        this.ProcessSubNode("Blocks")
+        return
+      }
+      err = op.Recovery()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("File Data").SetMaxLength(rest)
+        this.ProcessSubNode("File Data")
+        return
+      }
+      panic("ftp-data: empty payload")
     Blocks:
       list: true
       Block: FTPBlock
@@ -21,6 +45,17 @@ Package:
             break
           }
         }
+    File Data: string
+FTPBlockProbe:
+  operator: |
+    this.ProcessSubNode("Descriptor")
+    d = getNodeResult("Descriptor").Value
+    low = d & 0x0f
+    high = d & 0xf0
+    if low != 0 || high == 0 {
+      panic("ftp-data: stream payload")
+    }
+  Descriptor: uint8
 FTPBlock:
   operator: |
     this.ProcessSubNode("Descriptor")
@@ -34,9 +69,9 @@ FTPBlock:
       if n > avail {
         panic("ftp-data: byte count exceeds remaining")
       }
-      this.GetSubNode("Data").SetMaxLength(n)
-      this.ProcessSubNode("Data")
+      this.GetSubNode("File Data").SetMaxLength(n)
+      this.ProcessSubNode("File Data")
     }
   Descriptor: uint8
   Byte Count: uint16
-  Data: raw
+  File Data: string

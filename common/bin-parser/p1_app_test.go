@@ -404,7 +404,7 @@ func TestP1TCPApplications(t *testing.T) {
 	blk := mustChild(t, eth, "IP", "TCP", "FTPData", "Blocks").Children()[0]
 	require.Equal(t, uint64(0x80), uintVal(t, blk.Child("Descriptor")))
 	require.Equal(t, uint64(10), uintVal(t, blk.Child("Byte Count")))
-	require.Equal(t, []byte("file-bytes"), bytesVal(t, blk.Child("Data")))
+	require.Equal(t, []byte("file-bytes"), bytesVal(t, blk.Child("File Data")))
 
 	jk := []byte("Protocol:HTTP11\n")
 	jn := parseRule(t, jk, "jenkins", "Jenkins")
