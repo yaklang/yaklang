@@ -381,7 +381,10 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
-			if b.TryBuildExternValue(variable.GetName()) != nil {
+			// Explicit local declarations are allowed to shadow an external symbol.
+			// Reporting ContAssignExtern here makes ordinary locals such as `x` or
+			// `bin` fail merely because a host/plugin exports the same name.
+			if !variable.GetLocal() && b.TryBuildExternValue(variable.GetName()) != nil {
 				b.NewErrorWithPos(Warn, SSATAG, getAssignExternErrorPos(scope, variable), ContAssignExtern(variable.GetName()))
 			}
 			return
@@ -392,7 +395,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		b.TryBuildValueWithoutParent(variable.GetName(), value)
 	}
 
-	if b.TryBuildExternValue(variable.GetName()) != nil {
+	if !variable.GetLocal() && b.TryBuildExternValue(variable.GetName()) != nil {
 		b.NewErrorWithPos(Warn, SSATAG, getAssignExternErrorPos(scope, variable), ContAssignExtern(variable.GetName()))
 	}
 

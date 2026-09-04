@@ -129,6 +129,20 @@ func (c *Blueprint) RegisterNormalMethod(name string, val *Function, store ...bo
 	}
 }
 
+// RegisterNormalMethodExact installs one callable in the blueprint slot without
+// adding a pointer/reference edge to the previous slot value. Frontends with
+// their own overload registry use this to keep overload edges distinct from
+// virtual-dispatch edges.
+func (c *Blueprint) RegisterNormalMethodExact(name string, val *Function, store ...bool) {
+	if len(store) == 0 || store[0] {
+		c.storeField(name, val, BluePrintNormalMethod)
+	}
+	if f, ok := ToFunction(val); ok {
+		f.SetMethod(true, c)
+	}
+	c.NormalMethod[name] = val
+}
+
 func (c *Blueprint) GetNormalMethod(key string) Value {
 	var f Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
@@ -152,6 +166,15 @@ func (c *Blueprint) RegisterStaticMethod(name string, val *Function, store ...bo
 		}
 		c.StaticMethod[name] = val
 	}
+}
+
+// RegisterStaticMethodExact is the static counterpart of
+// RegisterNormalMethodExact.
+func (c *Blueprint) RegisterStaticMethodExact(name string, val *Function, store ...bool) {
+	if len(store) == 0 || store[0] {
+		c.storeField(name, val, BluePrintStaticMember)
+	}
+	c.StaticMethod[name] = val
 }
 
 func (c *Blueprint) GetStaticMethod(key string) Value {
