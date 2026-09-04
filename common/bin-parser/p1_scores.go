@@ -22,7 +22,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("PAP", "password_authentication_protocol.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 1334 Authenticate-Request Peer-ID ixia Ethernet+GRE/PPP + Ack Message OK; TestP1FailPaths PAP", ""),
 	p1card("CHAP", "challenge_handshake_authentication_protocol.yaml", 20, 25, 20, 20, 10, "L2",
-		"TestP1WiresharkAndRFCSamples RFC 1994 Challenge Name HiPer.att.net Value-Size 16 + Response Name Ethernet+GRE/PPP 0xc223; TestCHAPMessage; TestP1FailPaths CHAP", ""),
+		"chap/success RFC 1994 Code 3 Message Welcome; chap/failure Login incorrect GRE/PPP 0xc223; chap/rfc1994 HiPer.att.net; TestP1FailPaths CHAP", ""),
 	p1card("EAPOL", "eapol.yaml", 20, 25, 20, 20, 10, "L1",
 		"eapol/mka IEEE 802.1X-2010 type 5 Next Protocol Data; eapol/announcement type 6; TestEAPOLKeyFromWPAInductionCapture; TestP1FailPaths eapol", "Key Data bounded"),
 	p1card("EAP", "eapol.yaml", 20, 25, 20, 20, 10, "L2",

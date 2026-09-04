@@ -817,6 +817,29 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "HiPer.att.net", strVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "CHAP", "CHAPResponse").Child("Name")))
 	})
 
+	t.Run("chap/success", func(t *testing.T) {
+		// RFC 1994 §4.3 Success: Code 3, Message "Welcome". Wireshark chap.message. PPP 0xc223.
+		chap := append([]byte{0x03, 0x03, 0x00, 0x0b}, []byte("Welcome")...)
+		ch := parseRule(t, chap, "challenge_handshake_authentication_protocol", "CHAP")
+		require.Equal(t, uint64(3), uintVal(t, ch.Child("Code")))
+		require.Equal(t, "Welcome", strVal(t, mustChild(t, ch, "CHAPSuccess").Child("Message")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, append([]byte{0x30, 0x81, 0x88, 0x0b, 0x00, 0x0f, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0xc2, 0x23}, chap...)))
+		require.Equal(t, "Welcome", strVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "CHAP", "CHAPSuccess").Child("Message")))
+	})
+
+	t.Run("chap/failure", func(t *testing.T) {
+		// RFC 1994 §4.4 Failure: Code 4, Message "Login incorrect". Wireshark chap.message.
+		msg := []byte("Login incorrect")
+		chap := append([]byte{0x04, 0x03, 0x00, byte(4 + len(msg))}, msg...)
+		ch := parseRule(t, chap, "challenge_handshake_authentication_protocol", "CHAP")
+		require.Equal(t, uint64(4), uintVal(t, ch.Child("Code")))
+		require.Equal(t, "Login incorrect", strVal(t, mustChild(t, ch, "CHAPFailure").Child("Message")))
+		plen := uint16(4 + len(chap))
+		gre := []byte{0x30, 0x81, 0x88, 0x0b, byte(plen >> 8), byte(plen), 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0xc2, 0x23}
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, append(gre, chap...)))
+		require.Equal(t, "Login incorrect", strVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "PPP", "CHAP", "CHAPFailure").Child("Message")))
+	})
+
 	t.Run("tacacs/rfc8907", func(t *testing.T) {
 		tac := []byte{
 			0xc0, 0x01, 0x01, 0x01,
