@@ -1362,4 +1362,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 3306, 50000, raw))
 		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "TCP", "MySQL", "Payload", "MySQLOK").Child("Status Flags")))
 	})
+
+	t.Run("redis/ping", func(t *testing.T) {
+		// RESP2: clients send commands as an Array of Bulk Strings.
+		// https://github.com/redis/redis-specifications/blob/master/protocol/RESP2.md
+		// Wireshark redis.command PING.
+		raw := []byte("*1\r\n$4\r\nPING\r\n")
+		n := redisRoot(t, parseRule(t, raw, "application-layer.redis", "Redis"))
+		require.Equal(t, uint64('*'), uintVal(t, n.Child("Prefix")))
+		require.Equal(t, "PING", strVal(t, mustChild(t, n, "Array", "RedisCommand").Child("Command")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 6379, raw))
+		wired := redisRoot(t, mustChild(t, eth, "IP", "TCP", "Redis"))
+		require.Equal(t, "PING", strVal(t, mustChild(t, wired, "Array", "RedisCommand").Child("Command")))
+	})
+
+	t.Run("redis/get", func(t *testing.T) {
+		// RESP2 GET mykey: *2 $3 GET $5 mykey. Wireshark redis.command / redis.bulk.
+		raw := []byte("*2\r\n$3\r\nGET\r\n$5\r\nmykey\r\n")
+		n := redisRoot(t, parseRule(t, raw, "application-layer.redis", "Redis"))
+		require.Equal(t, "GET", strVal(t, mustChild(t, n, "Array", "RedisCommand").Child("Command")))
+		args := mustChild(t, n, "Array", "Arguments")
+		require.True(t, args.IsList())
+		require.Len(t, args.Children(), 1)
+		require.Equal(t, "mykey", strVal(t, mustChild(t, args.Children()[0], "Bulk").Child("Bulk")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 6379, raw))
+		wired := redisRoot(t, mustChild(t, eth, "IP", "TCP", "Redis"))
+		require.Equal(t, "GET", strVal(t, mustChild(t, wired, "Array", "RedisCommand").Child("Command")))
+		require.Equal(t, "mykey", strVal(t, mustChild(t, mustChild(t, wired, "Array", "Arguments").Children()[0], "Bulk").Child("Bulk")))
+	})
 }

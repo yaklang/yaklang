@@ -28,10 +28,17 @@ RESP:
       if n < 0 {
         return
       }
-      this.GetSubNode("Elements").SetCfg("list-length", n)
-      this.ProcessSubNode("Elements")
+      if n >= 1 {
+        this.ProcessByType("RedisCommand")
+      }
+      rest = n - 1
+      if rest > 0 {
+        this.GetSubNode("Arguments").SetCfg("list-length", rest)
+        this.ProcessSubNode("Arguments")
+      }
+      return
     Count: "del:\r\n;type:string"
-    Elements:
+    Arguments:
       list: true
       Element: RESP
   Bulk:
@@ -41,11 +48,13 @@ RESP:
       if n < 0 {
         return
       }
-      this.GetSubNode("Data").SetMaxLength(n)
-      this.ProcessSubNode("Data")
+      if n > 0 && n < 1048576 {
+        this.GetSubNode("Bulk").SetMaxLength(n)
+        this.ProcessSubNode("Bulk")
+      }
       this.ProcessSubNode("CRLF")
     Len: "del:\r\n;type:string"
-    Data: raw
+    Bulk: string
     CRLF: raw,2
   Simple:
     Message: "del:\r\n;type:string"
@@ -53,3 +62,24 @@ RESP:
     Message: "del:\r\n;type:string"
   Integer:
     Message: "del:\r\n;type:string"
+RedisCommand:
+  operator: |
+    p = this.ProcessSubNode("Prefix").Value
+    if p != 0x24 {
+      panic("redis: command must be a bulk string")
+    }
+    nstr = this.ProcessSubNode("Len").Value
+    n = int(nstr)
+    if n < 0 {
+      return
+    }
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Command").SetMaxLength(n)
+      this.ProcessSubNode("Command")
+    }
+    this.ProcessSubNode("CRLF")
+    return
+  Prefix: uint8
+  Len: "del:\r\n;type:string"
+  Command: string
+  CRLF: raw,2
