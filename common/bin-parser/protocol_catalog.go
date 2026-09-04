@@ -153,7 +153,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "Hessian2", Layer: "L7", RuleFile: "hessian.yaml", Status: statusNew, SampleFrom: "H 2.0"},
 	{Name: "Rsync daemon", Layer: "L7", RuleFile: "rsync.yaml", Status: statusNew, SampleFrom: "@RSYNCD"},
 	{Name: "RTSP", Layer: "L7", RuleFile: "rtsp.yaml", Status: statusNew, SampleFrom: "RFC 2326 OPTIONS"},
-	{Name: "RTMP", Layer: "L7", RuleFile: "rtmp.yaml", Status: statusNew, SampleFrom: "C0 version 3"},
+	{Name: "RTMP", Layer: "L7", RuleFile: "rtmp.yaml", Status: statusNew, SampleFrom: "Adobe RTMP Set Chunk Size + AMF0 connect"},
 	{Name: "FTP-DATA", Layer: "L7", RuleFile: "ftp_data.yaml", Status: statusNew, SampleFrom: "TCP/20 payload"},
 	{Name: "Jenkins remoting", Layer: "L7", RuleFile: "jenkins.yaml", Status: statusNew, SampleFrom: "Protocol:HTTP11"},
 	{Name: "SaltStack", Layer: "L7", RuleFile: "salt.yaml", Status: statusNew, SampleFrom: "ZMTP greeting NULL + ping frame"},

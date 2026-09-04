@@ -2843,6 +2843,26 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(99), uintVal(t, mustChild(t, eth, "IPv6").Child("Next Header")))
 		require.Equal(t, "efgh", strVal(t, mustChild(t, eth, "IPv6").Child("Next Protocol Data")))
 	})
+
+	t.Run("rtmp/chunk-size", func(t *testing.T) {
+		// Adobe RTMP spec: Type 0 chunk, message type 1 Set Chunk Size 128. After C0+C1 (1536).
+		raw := append(rtmpC0C1(), mustHex(t, "02000000000004010000000000000080")...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1935, 1935, raw))
+		rt := mustChild(t, eth, "IP", "TCP", "RTMP")
+		require.Equal(t, uint64(3), uintVal(t, rt.Child("Version")))
+		ch := rt.Child("Chunks").Children()[0]
+		require.Equal(t, uint64(1), uintVal(t, ch.Child("Message Type")))
+		require.Equal(t, uint64(128), uintVal(t, ch.Child("Chunk Size")))
+	})
+
+	t.Run("rtmp/connect", func(t *testing.T) {
+		// Adobe RTMP AMF0 command: string "connect" (message type 20). TCP/1935.
+		raw := append(rtmpC0C1(), mustHex(t, "0300000000000a1400000000020007636f6e6e656374")...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1935, 1935, raw))
+		ch := mustChild(t, eth, "IP", "TCP", "RTMP").Child("Chunks").Children()[0]
+		require.Equal(t, uint64(20), uintVal(t, ch.Child("Message Type")))
+		require.Equal(t, "connect", strVal(t, mustChild(t, ch, "AMF0").Child("Command Name")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
@@ -2916,6 +2936,14 @@ func gopacketTCPSYMSS() []byte {
 		0x00, 0x00, 0x82, 0x9c, 0x00, 0x00, 0x02, 0x04, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x54, 0x65,
 		0x73, 0x74,
 	}
+}
+
+func rtmpC0C1() []byte {
+	b := make([]byte, 1+1536)
+	b[0] = 3
+	binary.BigEndian.PutUint32(b[1:], 1)
+	copy(b[9:], []byte("rand"))
+	return b
 }
 
 func rfcTCPTimestamp() []byte {

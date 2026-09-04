@@ -579,6 +579,17 @@ func TestP1BranchRows(t *testing.T) {
 		rtmp := mustHex(t, "03000000020000000072616e64")
 		require.Equal(t, uint64(2), uintVal(t, mustChild(t, parseRule(t, rtmp, "rtmp", "RTMP"), "C1").Child("Time")))
 	})
+	t.Run("rtmp/chunk-size", func(t *testing.T) {
+		raw := append(rtmpC0C1(), mustHex(t, "02000000000004010000000000000080")...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1935, 1935, raw))
+		require.Equal(t, uint64(128), uintVal(t, mustChild(t, eth, "IP", "TCP", "RTMP").Child("Chunks").Children()[0].Child("Chunk Size")))
+	})
+	t.Run("rtmp/connect", func(t *testing.T) {
+		raw := append(rtmpC0C1(), mustHex(t, "0300000000000a1400000000020007636f6e6e656374")...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1935, 1935, raw))
+		ch := mustChild(t, eth, "IP", "TCP", "RTMP").Child("Chunks").Children()[0]
+		require.Equal(t, "connect", strVal(t, mustChild(t, ch, "AMF0").Child("Command Name")))
+	})
 
 	t.Run("jdwp/handshake", func(t *testing.T) {
 		jd := append([]byte("JDWP-Handshake"), mustHex(t, "0000000b00000001000101")...)
