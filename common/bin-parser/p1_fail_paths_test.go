@@ -191,6 +191,7 @@ var p1FailCases = []p1FailCase{
 		{"application-layer.pptp", []string{"PPTP"}, []byte{0, 12, 0, 2}, "bad-msgtype"},
 		{"application-layer.pptp", []string{"PPTP"}, []byte{0, 20, 0, 1, 0x1a, 0x2b, 0x3c, 0x4d, 0, 7, 0, 0}, "trunc-ocrq"},
 		{"application-layer.pptp", []string{"PPTP"}, []byte{0, 14, 0, 1, 0x1a, 0x2b, 0x3c, 0x4d, 0, 5, 0, 0, 0, 1}, "trunc-echo"},
+		{"application-layer.pptp", []string{"PPTP"}, []byte{0, 16, 0, 1, 0x1a, 0x2b, 0x3c, 0x4d, 0, 6, 0, 0, 0, 0, 0, 1}, "trunc-echoreply"},
 		{"application-layer.ntp", []string{"NTP"}, nil, "empty"},
 		{"application-layer.ntp", []string{"NTP"}, []byte{0xe8}, "bad-ver"},
 		{"application-layer.ntp", []string{"NTP"}, []byte{0x1c}, "trunc"},
