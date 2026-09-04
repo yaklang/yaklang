@@ -334,6 +334,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, "testing", strVal(t, f.Child("Str")))
 	})
 
+	t.Run("iiop/locate", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "47494f50010200030000001700000002000000000000000b4e616d6553657276696365"), "application-layer.iiop", "GIOP")
+		require.Equal(t, "NameService", strVal(t, mustChild(t, n, "LocateRequest").Child("Object Key")))
+	})
+	t.Run("iiop/request", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "47494f50010200000000001a00000001030000000000000000000000000000065f69735f6100"), "application-layer.iiop", "GIOP")
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, n, "GIOPRequest").Child("Op Len")))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))
