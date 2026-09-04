@@ -111,7 +111,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "VXLAN", Layer: "L3", RuleFile: "vxlan.yaml", Status: statusNew, SampleFrom: "gopacket RFC 7348 VNI 255"},
 	{Name: "L2TP", Layer: "L4", RuleFile: "l2tp.yaml", Status: statusNew, SampleFrom: "RFC 2661"},
 	{Name: "OpenVPN", Layer: "L4", RuleFile: "openvpn.yaml", Status: statusNew, SampleFrom: "opcode header"},
-	{Name: "WireGuard", Layer: "L4", RuleFile: "wireguard.yaml", Status: statusNew, SampleFrom: "handshake initiation"},
+	{Name: "WireGuard", Layer: "L4", RuleFile: "wireguard.yaml", Status: statusNew, SampleFrom: "handshake initiation Sender + response Receiver"},
 	{Name: "IKEv2", Layer: "L4", RuleFile: "ike.yaml", Status: statusNew, SampleFrom: "RFC 7296 header"},
 	{Name: "OSPF", Layer: "L3", RuleFile: "ospf.yaml", Status: statusNew, SampleFrom: "gopacket OSPFv2 Hello"},
 	{Name: "BGP", Layer: "L4", RuleFile: "bgp.yaml", Status: statusNew, SampleFrom: "RFC 4271 keepalive"},
