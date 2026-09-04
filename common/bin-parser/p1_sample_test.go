@@ -1754,6 +1754,67 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1521, raw))
 		require.Equal(t, "AB", strVal(t, mustChild(t, eth, "IP", "TCP", "TNS").Child("Octets")))
 	})
+
+	t.Run("smb2/tree-connect", func(t *testing.T) {
+		// [MS-SMB2] 2.2.9 TREE_CONNECT Request; Wireshark smb2.tree_connect.path.
+		path := utf16LE(`\\srv\share`)
+		tcBody := make([]byte, 8+len(path))
+		binary.LittleEndian.PutUint16(tcBody[0:], 9)
+		binary.LittleEndian.PutUint16(tcBody[4:], 72)
+		binary.LittleEndian.PutUint16(tcBody[6:], uint16(len(path)))
+		copy(tcBody[8:], path)
+		raw := append(smb2SyncHeader(3, 0, 4), tcBody...)
+		req := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Tree Connect Request")
+		require.Equal(t, path, bytesVal(t, req.Child("Path")))
+		require.Equal(t, `\\srv\share`, strings.ReplaceAll(strVal(t, req.Child("Path")), "\x00", ""))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, raw))
+		require.Equal(t, `\\srv\share`, strings.ReplaceAll(strVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Tree Connect Request").Child("Path")), "\x00", ""))
+	})
+
+	t.Run("smb2/create", func(t *testing.T) {
+		// [MS-SMB2] 2.2.13 CREATE Request; Wireshark smb2.filename.
+		name := utf16LE("file.txt")
+		cr := make([]byte, 56+len(name))
+		binary.LittleEndian.PutUint16(cr[0:], 57)
+		binary.LittleEndian.PutUint32(cr[4:], 2)
+		binary.LittleEndian.PutUint32(cr[36:], 1)
+		binary.LittleEndian.PutUint16(cr[44:], 120)
+		binary.LittleEndian.PutUint16(cr[46:], uint16(len(name)))
+		copy(cr[56:], name)
+		raw := append(smb2SyncHeader(5, 0, 5), cr...)
+		creq := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Create Request")
+		require.Equal(t, "file.txt", strings.ReplaceAll(strVal(t, creq.Child("Name")), "\x00", ""))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, raw))
+		require.Equal(t, "file.txt", strings.ReplaceAll(strVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Create Request").Child("Name")), "\x00", ""))
+	})
+
+	t.Run("smb2/read", func(t *testing.T) {
+		// [MS-SMB2] 2.2.20 READ Response; Wireshark smb2.read_length / smb2.file_data.
+		rdata := []byte("abcdefgh")
+		rr := make([]byte, 16+len(rdata))
+		binary.LittleEndian.PutUint16(rr[0:], 17)
+		rr[2] = 80
+		binary.LittleEndian.PutUint32(rr[4:], uint32(len(rdata)))
+		copy(rr[16:], rdata)
+		raw := append(smb2SyncHeader(8, 1, 6), rr...)
+		require.Equal(t, "abcdefgh", strVal(t, mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Read Response").Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 445, 50000, raw))
+		require.Equal(t, "abcdefgh", strVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Read Response").Child("Octets")))
+	})
+
+	t.Run("smb/tree-connect", func(t *testing.T) {
+		// [MS-CIFS] 2.2.4.55 TREE_CONNECT_ANDX; Wireshark smb.path / smb.service.
+		raw := smb1TreeConnectAndX(`\\srv\share`, "A:")
+		n := parseRule(t, raw, "application-layer.smb", "SMB")
+		require.Equal(t, uint64(0x75), uintVal(t, n.Child("Command")))
+		tc := mustChild(t, n, "TreeConnectAndX")
+		require.Equal(t, `\\srv\share`, strVal(t, tc.Child("Path")))
+		require.Equal(t, "A:", strVal(t, tc.Child("Service")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "SMB", "TreeConnectAndX")
+		require.Equal(t, `\\srv\share`, strVal(t, wired.Child("Path")))
+		require.Equal(t, "A:", strVal(t, wired.Child("Service")))
+	})
 }
 
 func tnsConnectPacket(cdata []byte) []byte {
@@ -1766,4 +1827,12 @@ func tnsConnectPacket(cdata []byte) []byte {
 	binary.BigEndian.PutUint16(pkt[26:], 34)
 	copy(pkt[34:], cdata)
 	return pkt
+}
+
+func smb1TreeConnectAndX(path, service string) []byte {
+	payload := append([]byte{0x04}, append([]byte(path), 0)...)
+	payload = append(payload, append([]byte{0x04}, append([]byte(service), 0)...)...)
+	body := []byte{4, 0xff, 0, 0, 0, 0, 0, 0, 0, byte(len(payload)), 0}
+	body = append(body, payload...)
+	return append(smb1Header(0x75, 0x18, 0xc807, 2), body...)
 }

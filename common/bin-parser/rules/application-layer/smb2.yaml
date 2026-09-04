@@ -102,7 +102,6 @@ Package:
     TreeId: uint32
     SessionId: uint64
     Signature: raw,16
-    Body: raw
 Negotiate Request:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -142,8 +141,8 @@ Negotiate Response:
     this.ProcessSubNode("NegotiateContextOffset")
     l = getNodeResult("SecurityBufferLength").Value
     if l > 0 {
-      this.GetSubNode("SecurityBuffer").SetMaxLength(l)
-      this.ProcessSubNode("SecurityBuffer")
+      this.GetSubNode("Octets").SetMaxLength(l)
+      this.ProcessSubNode("Octets")
     }
   StructureSize: uint16
   SecurityMode: uint16
@@ -159,7 +158,7 @@ Negotiate Response:
   SecurityBufferOffset: uint16
   SecurityBufferLength: uint16
   NegotiateContextOffset: uint32
-  SecurityBuffer: raw
+  Octets: string
 Session Setup Request:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -196,8 +195,8 @@ Session Setup Request:
       if err != nil {
         panic(err)
       }
-      this.GetSubNode("SecurityBuffer").SetMaxLength(l)
-      this.ProcessSubNode("SecurityBuffer")
+      this.GetSubNode("Octets").SetMaxLength(l)
+      this.ProcessSubNode("Octets")
     }
   StructureSize: uint16
   Flags: uint8
@@ -207,7 +206,7 @@ Session Setup Request:
   SecurityBufferOffset: uint16
   SecurityBufferLength: uint16
   PreviousSessionId: uint64
-  SecurityBuffer: raw
+  Octets: string
 Session Setup Response:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -240,14 +239,14 @@ Session Setup Response:
       if err != nil {
         panic(err)
       }
-      this.GetSubNode("SecurityBuffer").SetMaxLength(l)
-      this.ProcessSubNode("SecurityBuffer")
+      this.GetSubNode("Octets").SetMaxLength(l)
+      this.ProcessSubNode("Octets")
     }
   StructureSize: uint16
   SessionFlags: uint16
   SecurityBufferOffset: uint16
   SecurityBufferLength: uint16
-  SecurityBuffer: raw
+  Octets: string
 Logoff:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -272,7 +271,7 @@ Tree Connect Request:
   Reserved: uint16
   PathOffset: uint16
   PathLength: uint16
-  Path: raw
+  Path: string
 Tree Connect Response:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -333,7 +332,7 @@ Create Request:
   NameLength: uint16
   CreateContextsOffset: uint32
   CreateContextsLength: uint32
-  Name: raw
+  Name: string
 Create Response:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -413,8 +412,8 @@ Read Response:
       if dl > 0x100000 {
         panic("smb2: read data too large")
       }
-      this.GetSubNode("Data").SetMaxLength(dl)
-      this.ProcessSubNode("Data")
+      this.GetSubNode("Octets").SetMaxLength(dl)
+      this.ProcessSubNode("Octets")
     }
   StructureSize: uint16
   DataOffset: uint8
@@ -422,7 +421,7 @@ Read Response:
   DataLength: uint32
   DataRemaining: uint32
   Reserved: uint32
-  Data: raw
+  Octets: string
 Write Request:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -440,8 +439,8 @@ Write Request:
       if wl > 0x100000 {
         panic("smb2: write data too large")
       }
-      this.GetSubNode("Data").SetMaxLength(wl)
-      this.ProcessSubNode("Data")
+      this.GetSubNode("Octets").SetMaxLength(wl)
+      this.ProcessSubNode("Octets")
     }
   StructureSize: uint16
   DataOffset: uint16
@@ -453,7 +452,7 @@ Write Request:
   WriteChannelInfoOffset: uint16
   WriteChannelInfoLength: uint16
   Flags: uint32
-  Data: raw
+  Octets: string
 IOCTL:
   operator: |
     this.ProcessSubNode("StructureSize")

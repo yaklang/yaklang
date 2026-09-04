@@ -76,7 +76,7 @@ func TestSMB2TreeConnectCreateReadWriteClose(t *testing.T) {
 	copy(rr[16:], rdata)
 	raw = append(smb2SyncHeader(8, 1, 6), rr...)
 	rresp := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Read Response")
-	require.Equal(t, rdata, bytesVal(t, rresp.Child("Data")))
+	require.Equal(t, rdata, bytesVal(t, rresp.Child("Octets")))
 
 	wr := make([]byte, 48+len(rdata))
 	binary.LittleEndian.PutUint16(wr[0:], 49)
@@ -86,7 +86,7 @@ func TestSMB2TreeConnectCreateReadWriteClose(t *testing.T) {
 	copy(wr[48:], rdata)
 	raw = append(smb2SyncHeader(9, 0, 7), wr...)
 	wreq := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Write Request")
-	require.Equal(t, rdata, bytesVal(t, wreq.Child("Data")))
+	require.Equal(t, rdata, bytesVal(t, wreq.Child("Octets")))
 
 	cl := make([]byte, 24)
 	binary.LittleEndian.PutUint16(cl[0:], 24)
@@ -215,12 +215,12 @@ func TestDCERPCBindAckFaultAndSMB1AndX(t *testing.T) {
 	rr := append(dcerpcHeader(2, 24, 2), respBody...)
 	require.Equal(t, uint64(2), uintVal(t, parseRule(t, rr, "application-layer.dcerpc", "DCERPC").Child("PType")))
 
-	// SMB1 Tree Connect AndX (0x75)
-	body := []byte{4, 0xff, 0, 0, 0, 0, 0}
-	raw = append(smb1Header(0x75, 0x18, 0xc807, 2), body...)
+	// SMB1 Logoff AndX (0x74)
+	body := []byte{2, 0xff, 0, 0, 0, 0, 0}
+	raw = append(smb1Header(0x74, 0x18, 0xc807, 2), body...)
 	smb := parseRule(t, raw, "application-layer.smb", "SMB")
-	require.Equal(t, uint64(0x75), uintVal(t, smb.Child("Command")))
-	require.Equal(t, uint64(4), uintVal(t, mustChild(t, smb, "AndX", "WordCount")))
+	require.Equal(t, uint64(0x74), uintVal(t, smb.Child("Command")))
+	require.Equal(t, uint64(2), uintVal(t, mustChild(t, smb, "AndX", "WordCount")))
 }
 
 func TestICMPTimestampRedirectAndNBNSAnswer(t *testing.T) {
