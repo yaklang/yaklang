@@ -746,6 +746,15 @@ func TestP1BranchRows(t *testing.T) {
 		n := parseRule(t, wiresharkCDP(t), "cdp", "CDP")
 		require.Equal(t, "Ethernet0", strVal(t, n.Child("TLVs").Children()[2].Child("Port ID")))
 	})
+	t.Run("lldp/chassis", func(t *testing.T) {
+		n := parseRule(t, gopacketSiemensLLDP(t), "lldp", "LLDP")
+		require.Equal(t, "switch1", strVal(t, n.Child("TLVs").Children()[0].Child("Chassis ID")))
+	})
+	t.Run("lldp/port", func(t *testing.T) {
+		n := parseRule(t, gopacketSiemensLLDP(t), "lldp", "LLDP")
+		require.Equal(t, "port-001", strVal(t, n.Child("TLVs").Children()[1].Child("Port ID")))
+		require.Equal(t, uint64(20), uintVal(t, n.Child("TLVs").Children()[2].Child("TTL")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
