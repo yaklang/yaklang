@@ -226,6 +226,31 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, int64(0), intVal(t, eid.Child("InvokableId")))
 	})
 
+	t.Run("quic/initial", func(t *testing.T) {
+		// RFC 9001 Appendix A.2 Client Initial (truncated): DCID 8394c8f03e515708.
+		// Wireshark packet-quic.c quic.dcid; golang.org/x/net internal/quic packet_test rfc9001_a1.
+		initp := mustHex(t, "c000000001088394c8f03e51570800")
+		n := parseRule(t, initp, "application-layer.quic", "QUIC")
+		require.Equal(t, uint64(0xc0), uintVal(t, n.Child("First Byte")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(8), uintVal(t, n.Child("DCID Length")))
+		require.Equal(t, []byte{0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08}, bytesVal(t, n.Child("DCID")))
+		require.Equal(t, uint64(0), uintVal(t, n.Child("SCID Length")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 50000, 443, initp))
+		require.Equal(t, []byte{0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "QUIC").Child("DCID")))
+	})
+
+	t.Run("quic/server-initial", func(t *testing.T) {
+		// RFC 9001 Appendix A.3 Server Initial (truncated): SCID f067a5502a4262b5, DCID empty.
+		srv := mustHex(t, "cf000000010008f067a5502a4262b500")
+		n := parseRule(t, srv, "application-layer.quic", "QUIC")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("DCID Length")))
+		require.Equal(t, uint64(8), uintVal(t, n.Child("SCID Length")))
+		require.Equal(t, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, bytesVal(t, n.Child("SCID")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 443, 50000, srv))
+		require.Equal(t, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "QUIC").Child("SCID")))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"

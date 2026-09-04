@@ -69,7 +69,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "Kerberos PAC", Layer: "L7", RuleFile: "application-layer/kerberos.yaml", Status: statusNew, Notes: "PAC_INFO_BUFFER list", SampleFrom: "[MS-PAC] 2.3"},
 	{Name: "HTTP/2", Layer: "L7", RuleFile: "application-layer/http2.yaml", Status: statusNew, Notes: "preface + DATA/SETTINGS list/PING/GOAWAY/WINDOW_UPDATE", SampleFrom: "RFC 9113"},
 	{Name: "WebSocket", Layer: "L7", RuleFile: "application-layer/websocket.yaml", Status: statusNew, Notes: "RFC 6455 frame", SampleFrom: "RFC 6455"},
-	{Name: "QUIC", Layer: "L4", RuleFile: "application-layer/quic.yaml", Status: statusNew, Notes: "long/short header + CID", SampleFrom: "RFC 9000"},
+	{Name: "QUIC", Layer: "L4", RuleFile: "application-layer/quic.yaml", Status: statusNew, Notes: "long/short header + CID", SampleFrom: "RFC 9001 A.2/A.3 Initial DCID/SCID"},
 	{Name: "RADIUS", Layer: "L7", RuleFile: "application-layer/radius.yaml", Status: statusNew, Notes: "RFC 2865 header + attribute list", SampleFrom: "gopacket radius_test.go (Wireshark radtest.pcap)"},
 	{Name: "Oracle TNS", Layer: "L7", RuleFile: "application-layer/tns.yaml", Status: statusNew, Notes: "TNS packet header types 1-15", SampleFrom: "Oracle TNS"},
 	{Name: "TNS", Layer: "L7", RuleFile: "application-layer/tns.yaml", Status: statusNew, Notes: "alias of Oracle TNS", SampleFrom: "Oracle TNS"},

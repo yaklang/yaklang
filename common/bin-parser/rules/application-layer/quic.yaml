@@ -52,9 +52,9 @@ Package:
     First Byte: uint8
     Version: uint32
     DCID Length: uint8
-    DCID: raw
+    DCID: string
     SCID Length: uint8
-    SCID: raw
+    SCID: string
 QUICToken:
   operator: |
     this.ProcessSubNode("Token Length")
@@ -67,4 +67,4 @@ QUICToken:
       this.ProcessSubNode("Token")
     }
   Token Length: uint8
-  Token: raw
+  Token: string
