@@ -31,23 +31,29 @@ Package:
           return
         }
         if first == 0x51 {
-          this.ProcessSubNode("Query")
+          this.ProcessByType("PostgreSQLQuery")
           return
         }
         if first == 0x45 {
-          this.ProcessSubNode("Error")
+          this.ProcessByType("PostgreSQLError")
           return
         }
         if first == 0x5a {
           this.ProcessSubNode("Ready")
           return
         }
-        this.ProcessSubNode("Data")
+        rem = 0
+        if this.GetMaxLength() > this.Length() {
+          rem = this.GetMaxLength() - this.Length()
+        }
+        if rem > 0 && rem < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rem)
+          this.ProcessSubNode("Octets")
+        }
+        return
       AuthType: uint32
-      Query: raw
-      Error: raw
       Ready: uint8
-      Data: raw
+      Octets: string
   Startup:
     operator: |
       this.ProcessSubNode("Length")
@@ -67,7 +73,20 @@ Package:
       this.ProcessSubNode("Parameters")
     Length: uint32
     Protocol: uint32
-    Parameters: raw
+    Parameters:
+      list: true
+      Pair: PGParam
+      operator: |
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+          if ele.GetSubNode("Name").Result().Value == "" {
+            break
+          }
+        }
   SSLRequest:
     operator: |
       this.ProcessSubNode("Length")
@@ -93,3 +112,53 @@ Package:
     Code: uint32
     ProcessID: uint32
     SecretKey: uint32
+PostgreSQLQuery:
+  SQL: "del:\0;type:string"
+PostgreSQLError:
+  list: true
+  Field: PGErrorField
+  operator: |
+    for {
+      if this.GetRemainingSpace() == 0 {
+        break
+      }
+      ele = this.NewElement()
+      ele.Process()
+      if ele.GetSubNode("Type").Result().Value == 0 {
+        break
+      }
+    }
+PGErrorField:
+  operator: |
+    t = this.ProcessSubNode("Type").Value
+    if t == 0 {
+      return
+    }
+    if t == 0x53 {
+      this.ProcessSubNode("Severity")
+      return
+    }
+    if t == 0x43 {
+      this.ProcessSubNode("SQLState")
+      return
+    }
+    if t == 0x4d {
+      this.ProcessSubNode("Message")
+      return
+    }
+    this.ProcessSubNode("Value")
+    return
+  Type: uint8
+  Severity: "del:\0;type:string"
+  SQLState: "del:\0;type:string"
+  Message: "del:\0;type:string"
+  Value: "del:\0;type:string"
+PGParam:
+  operator: |
+    this.ProcessSubNode("Name")
+    if getNodeResult("Name").Value == "" {
+      return
+    }
+    this.ProcessSubNode("Value")
+  Name: "del:\0;type:string"
+  Value: "del:\0;type:string"
