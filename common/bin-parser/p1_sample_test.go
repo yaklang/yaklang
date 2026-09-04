@@ -2782,6 +2782,26 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, utf16LE("Admin"), bytesVal(t, wired.Child("User Name")))
 		require.Equal(t, utf16LE("CORP"), bytesVal(t, wired.Child("Domain Name")))
 	})
+
+	t.Run("ber/integer", func(t *testing.T) {
+		// X.690 §8.3 INTEGER 5. Same encoding as RFC 1157 version INTEGER.
+		n := parseRule(t, []byte{0x02, 0x01, 0x05}, "application-layer.ber", "BER Element")
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, n, "Type").Child("Tag")))
+		require.Equal(t, uint64(5), uintVal(t, n.Child("Integer")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 161, 161, mustHex(t, "302602010004067075626c6963a019020101020100020100300e300c06082b060102010101000500")))
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "SNMP", "PDU Body", "Variable Bindings", "Bindings", "OID")))
+	})
+
+	t.Run("ber/oid", func(t *testing.T) {
+		// X.690 §8.19 / RFC 1213 sysDescr.0 (1.3.6.1.2.1.1.1.0) as OBJECT IDENTIFIER.
+		oid := []byte{0x06, 0x08, 0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}
+		n := parseRule(t, oid, "application-layer.ber", "BER Element")
+		require.Equal(t, uint64(6), uintVal(t, mustChild(t, n, "Type").Child("Tag")))
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, n.Child("OBJECT IDENTIFIER")))
+		require.Nil(t, n.Child("Value"))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 161, 161, mustHex(t, "302602010004067075626c6963a019020101020100020100300e300c06082b060102010101000500")))
+		require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, mustChild(t, eth, "IP", "UDP", "SNMP", "PDU Body", "Variable Bindings", "Bindings", "OID")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
