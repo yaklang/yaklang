@@ -2,6 +2,7 @@ package bin_parser
 
 import (
 	"encoding/binary"
+	"net"
 	"testing"
 
 	"github.com/gopacket/gopacket"
@@ -12,6 +13,26 @@ import (
 func ipv4UDPBytes(t *testing.T, src, dst layers.UDPPort, payload []byte) []byte {
 	t.Helper()
 	return ipv4UDPFrame(t, src, dst, gopacket.Payload(payload))
+}
+
+// ipv6UDPBytes builds Ethernet+IPv6+UDP. DHCPv6 uses ff02::1:2 (RFC 8415 §7.1).
+func ipv6UDPBytes(t *testing.T, src, dst layers.UDPPort, payload []byte) []byte {
+	t.Helper()
+	eth := &layers.Ethernet{
+		SrcMAC:       []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55},
+		DstMAC:       []byte{0x33, 0x33, 0x00, 0x01, 0x00, 0x02},
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+	ip := &layers.IPv6{
+		Version:    6,
+		HopLimit:   1,
+		NextHeader: layers.IPProtocolUDP,
+		SrcIP:      net.ParseIP("fe80::1"),
+		DstIP:      net.ParseIP("ff02::1:2"),
+	}
+	udp := &layers.UDP{SrcPort: src, DstPort: dst}
+	require.NoError(t, udp.SetNetworkLayerForChecksum(ip))
+	return serializeLayers(t, eth, ip, udp, gopacket.Payload(payload))
 }
 
 func ipv4ProtoFrame(t *testing.T, proto layers.IPProtocol, payload []byte) []byte {

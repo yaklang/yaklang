@@ -52,6 +52,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x0002), uintVal(t, parseRule(t, []byte{0x00, 0x02}, "loopback", "Loopback").Child("Function")))
 	})
 
+	t.Run("ftp_data/eor", func(t *testing.T) {
+		blk := mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 20, 20, []byte{0x80, 0x00, 0x03, 'a', 'b', 'c'})), "IP", "TCP", "FTPData", "Blocks").Children()[0]
+		require.Equal(t, uint64(0x80), uintVal(t, blk.Child("Descriptor")))
+	})
+	t.Run("ftp_data/eof", func(t *testing.T) {
+		blk := mustChild(t, parseEthernet(t, ipv4TCPFrame(t, 20, 20, []byte{0x40, 0x00, 0x03, 'a', 'b', 'c'})), "IP", "TCP", "FTPData", "Blocks").Children()[0]
+		require.Equal(t, uint64(0x40), uintVal(t, blk.Child("Descriptor")))
+	})
+
 	t.Run("l2tp/flags", func(t *testing.T) {
 		l := parseRule(t, mustHex(t, "02020014000100020000ff03002d"), "l2tp", "L2TP")
 		require.Equal(t, uint64(0x0014), uintVal(t, l.Child("Tunnel ID")))
