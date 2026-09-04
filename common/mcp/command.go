@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/samber/lo"
@@ -67,11 +68,27 @@ var MCPCommand = &cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		transport := c.String("transport")
+		protocolStdout := os.Stdout
 		if transport == "stdio" {
-			// Re-apply at the action boundary as a defense for embedded callers
-			// that invoke MCPCommand without Yak's normal os.Args layout.
+			// Re-apply at the action boundary for embedded callers that invoke
+			// MCPCommand without Yak's normal os.Args layout. Then reserve the
+			// original stdout exclusively for JSON-RPC and redirect every other
+			// process-level stdout write to stderr. This also contains direct
+			// fmt/println output from tools and embedded Yak scripts.
 			log.EnableMCPStdioLogging()
 			log.SetLevel(log.FatalLevel)
+
+			var restoreStdout func() error
+			var isolateErr error
+			protocolStdout, restoreStdout, isolateErr = reserveMCPProtocolStdout()
+			if isolateErr != nil {
+				return utils.Wrap(isolateErr, "reserve stdout for MCP stdio")
+			}
+			defer func() {
+				if err := restoreStdout(); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "restore stdout after MCP stdio: %v\n", err)
+				}
+			}()
 		}
 
 		yakit.CallPostInitDatabase()
@@ -163,7 +180,7 @@ var MCPCommand = &cli.Command{
 		}
 		switch transport {
 		case "stdio":
-			err = s.ServeStdio()
+			err = s.ServeStdioWithIO(os.Stdin, protocolStdout)
 		case "sse":
 			if port == 0 {
 				port = utils.GetRandomAvailableTCPPort()

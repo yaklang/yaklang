@@ -113,7 +113,7 @@ func (c *StdioMCPClient) readResponses() {
 			line, err := c.stdout.ReadString('\n')
 			if err != nil {
 				if err != io.EOF {
-					fmt.Printf("Error reading response: %v\n", err)
+					_, _ = fmt.Fprintf(os.Stderr, "MCP stdio client: error reading response: %v\n", err)
 				}
 				return
 			}

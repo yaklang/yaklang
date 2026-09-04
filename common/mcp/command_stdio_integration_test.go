@@ -38,7 +38,12 @@ func TestMUSTPASS_MCPCommandStdioKeepsStdoutJSONRPCOnly(t *testing.T) {
 		t.Fatalf("build yak command: %v\n%s", buildErr, output)
 	}
 
-	request := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"stdio-regression-test","version":"1"}}}` + "\n"
+	const stdoutSentinel = "MCP_STDOUT_SENTINEL"
+	request := strings.Join([]string{
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"stdio-regression-test","version":"1"}}}`,
+		`{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}`,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"exec_yak_script","arguments":{"pluginType":"yak","code":"println(\"` + stdoutSentinel + `\")"}}}`,
+	}, "\n") + "\n"
 	runContext, cancelRun := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancelRun()
 	run := exec.CommandContext(
@@ -48,6 +53,8 @@ func TestMUSTPASS_MCPCommandStdioKeepsStdoutJSONRPCOnly(t *testing.T) {
 		"--transport",
 		"stdio",
 		"--enable-aitool-framework",
+		"--tool",
+		"yak_script",
 	)
 	run.Env = appendWithoutEnvKeys(
 		os.Environ(),
@@ -72,8 +79,14 @@ func TestMUSTPASS_MCPCommandStdioKeepsStdoutJSONRPCOnly(t *testing.T) {
 	if bytes.ContainsRune(stdout.Bytes(), '\x1b') {
 		t.Fatalf("stdout contains ANSI escape bytes: %q", stdout.String())
 	}
+	if bytes.Contains(stdout.Bytes(), []byte(stdoutSentinel)) {
+		t.Fatalf("tool stdout leaked into JSON-RPC stream: %q", stdout.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte(stdoutSentinel)) {
+		t.Fatalf("tool stdout was not redirected to stderr; stderr: %q", stderr.String())
+	}
 
-	responseCount := 0
+	responseIDs := make(map[int]bool)
 	scanner := bufio.NewScanner(bytes.NewReader(stdout.Bytes()))
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
@@ -85,6 +98,7 @@ func TestMUSTPASS_MCPCommandStdioKeepsStdoutJSONRPCOnly(t *testing.T) {
 		}
 		var response struct {
 			JSONRPC string `json:"jsonrpc"`
+			ID      int    `json:"id"`
 		}
 		if decodeErr := json.Unmarshal(line, &response); decodeErr != nil {
 			t.Fatalf("decode stdout response: %v", decodeErr)
@@ -92,13 +106,15 @@ func TestMUSTPASS_MCPCommandStdioKeepsStdoutJSONRPCOnly(t *testing.T) {
 		if response.JSONRPC != "2.0" {
 			t.Fatalf("stdout JSON is not JSON-RPC 2.0: %s", line)
 		}
-		responseCount++
+		if response.ID != 0 {
+			responseIDs[response.ID] = true
+		}
 	}
 	if scanErr := scanner.Err(); scanErr != nil {
 		t.Fatalf("scan stdout: %v", scanErr)
 	}
-	if responseCount != 1 {
-		t.Fatalf("got %d JSON-RPC responses, want 1; stdout: %q", responseCount, stdout.String())
+	if !responseIDs[1] || !responseIDs[2] {
+		t.Fatalf("missing initialize or tools/call response; response IDs: %v; stdout: %q", responseIDs, stdout.String())
 	}
 }
 
