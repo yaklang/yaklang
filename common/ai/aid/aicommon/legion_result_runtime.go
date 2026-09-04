@@ -30,3 +30,13 @@ func LegionResultRuntimeFromConfig(config any) LegionResultRuntime {
 	}
 	return provider.GetLegionResultRuntime()
 }
+
+// ManagedInputRuntimePolicy is opt-in for server-managed filesystem sessions.
+// It prevents built-in dynamic capabilities from escaping a finite tool set.
+type ManagedInputRuntimePolicy interface{ ManagedInputRestricted() bool }
+
+func HasManagedInputRestriction(config any) bool {
+	runtime := LegionResultRuntimeFromConfig(config)
+	policy, ok := runtime.(ManagedInputRuntimePolicy)
+	return ok && policy.ManagedInputRestricted()
+}

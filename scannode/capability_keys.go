@@ -1,6 +1,7 @@
 package scannode
 
 import (
+	"github.com/yaklang/yaklang/scannode/inputresolver"
 	"os"
 	"strings"
 )
@@ -11,6 +12,7 @@ const (
 	capabilityKeyAIBindEpochV1              = "ai.session.bind_epoch.v1"
 	capabilityKeyAITurnLifecycleV1          = "ai.session.turn_lifecycle.v1"
 	capabilityKeyAICodeWorkspaceV1          = "ai.code_workspace.v1"
+	capabilityKeyAIManagedInputV1           = inputresolver.CapabilityV1
 )
 
 func normalizeScanNodeCapabilityKeys(input []string) []string {
@@ -27,7 +29,10 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 		if trimmed == "" {
 			return
 		}
-		if trimmed == capabilityKeyAICodeWorkspaceV1 && runtimeMode == aiSessionRuntimeModeStateful {
+		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1) && runtimeMode == aiSessionRuntimeModeStateful {
+			return
+		}
+		if trimmed == capabilityKeyAIManagedInputV1 && !inputresolver.Supported() {
 			return
 		}
 		if _, exists := seen[trimmed]; exists {

@@ -860,6 +860,10 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
+	if aicommon.HasManagedInputRestriction(config) {
+		restrictManagedInputActions(r)
+	}
+
 	if r.emitter == nil {
 		return nil, utils.Error("loop's emitter is nil in ReActLoop")
 	}
@@ -1227,4 +1231,17 @@ func (r *ReActLoop) GetLastLoopSchema() string {
 		return ""
 	}
 	return r.lastLoopSchema
+}
+
+// Keep server-signed Focus actions, while removing process-global capability
+// loading, Forge, file, network, MCP and child-agent actions. Tool actions only
+// resolve objects from the separately enforced finite tool manager.
+func restrictManagedInputActions(loop *ReActLoop) {
+	for _, name := range GetRegisteredActionNames() {
+		switch name {
+		case "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch":
+		default:
+			loop.RemoveAction(name)
+		}
+	}
 }

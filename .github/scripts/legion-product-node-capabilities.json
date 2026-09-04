@@ -1,5 +1,6 @@
 [
   "ai.code_workspace.v1",
+  "ai.input.managed_attachment.v1",
   "ai.runtime.host.v1",
   "ai.session.bind_epoch.v1",
   "ai.session.turn_lifecycle.v1",
