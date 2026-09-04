@@ -148,6 +148,18 @@ type legionAIFocusResultSink struct {
 	codeWorkspaceSHA256    string
 }
 
+func newLegionAIFocusResultSinkForBind(publisher aiFocusResultEventPublisher, command *aiv1.BindAISessionCommand) (aiFocusResultSink, error) {
+	sink, err := newLegionAIFocusResultSink(publisher, command.GetMetadata().GetCommandId(), command.GetResultContext())
+	if err != nil || sink == nil {
+		return sink, err
+	}
+	if command.GetInputManifest() != nil {
+		// Use the actual transport command, not the manifest's initial command.
+		sink.(*legionAIFocusResultSink).ref.EventNamespace = command.GetMetadata().GetCommandId()
+	}
+	return sink, nil
+}
+
 func newLegionAIFocusResultSink(
 	publisher aiFocusResultEventPublisher,
 	bindCommandID string,
@@ -487,6 +499,7 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 	); err != nil {
 		return aiFocusResultReceipt{}, fmt.Errorf("publish ai code finding: %w", err)
 	}
+	eventID = s.ref.scopedEventID(eventID)
 	s.recordRisk(eventID, target)
 	s.mu.Lock()
 	s.publishedResultKinds[kind] = struct{}{}
@@ -584,7 +597,7 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 	s.mu.Lock()
 	s.publishedResultKinds[kind] = struct{}{}
 	s.mu.Unlock()
-	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: kind, BackendID: s.ref.JobID}, nil
+	return aiFocusResultReceipt{ResultID: s.ref.scopedEventID(eventID), DedupeKey: kind, BackendID: s.ref.JobID}, nil
 }
 
 func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFocusExecutionContract) error {
@@ -664,6 +677,7 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 	); err != nil {
 		return aiFocusResultReceipt{}, fmt.Errorf("publish ai focus risk: %w", err)
 	}
+	eventID = s.ref.scopedEventID(eventID)
 	s.recordRisk(eventID, target)
 	return aiFocusResultReceipt{
 		ResultID:  eventID,
@@ -718,6 +732,7 @@ func (s *legionAIFocusResultSink) SubmitAsset(
 	); err != nil {
 		return aiFocusResultReceipt{}, fmt.Errorf("publish ai focus asset: %w", err)
 	}
+	eventID = s.ref.scopedEventID(eventID)
 	s.recordAsset(eventID, asset.Target)
 	return aiFocusResultReceipt{
 		ResultID:  eventID,

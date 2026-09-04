@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/scannode/inputresolver"
 	"io"
 	"math"
 	"net"
@@ -66,12 +67,13 @@ var serverFocusAPIReferencePattern = regexp.MustCompile(
 // knows nothing about a particular Focus name or stage order; Legion-delivered
 // Yak code owns that orchestration.
 type legionServerFocusRuntime struct {
-	ctx        context.Context
-	authorized *url.URL
-	client     *http.Client
-	sink       aiFocusAssetResultSink
-	workspace  *legionCodeWorkspaceRuntime
-	emitEvent  func(string, []byte)
+	ctx            context.Context
+	authorized     *url.URL
+	client         *http.Client
+	sink           aiFocusAssetResultSink
+	workspace      *legionCodeWorkspaceRuntime
+	inputWorkspace *inputresolver.Workspace
+	emitEvent      func(string, []byte)
 	// A source workspace belongs to one server-authorized Focus Run. The
 	// capability surface is dormant between Turns and is activated only while
 	// the matching immutable Focus Release executes.
@@ -143,7 +145,7 @@ func (r *legionServerFocusRuntime) Execute(
 	}
 	requestedCapability := strings.TrimSpace(capability)
 	capability = normalizeLegionFocusCapability(requestedCapability)
-	if r.workspace != nil {
+	if r.workspace != nil || r.inputWorkspace != nil {
 		r.mu.Lock()
 		active := strings.TrimSpace(r.activeFocusReleaseID)
 		authorized := strings.TrimSpace(r.authorizedFocusReleaseID)
@@ -152,28 +154,34 @@ func (r *legionServerFocusRuntime) Execute(
 		if active == "" || authorized == "" || active != authorized {
 			return nil, fmt.Errorf("source workspace capabilities are available only during the authorized Focus Turn")
 		}
-		if contract == nil || !contract.allowsCapability(capability) {
+		if contract == nil || (!contract.allowsCapability(capability) && !(r.inputWorkspace != nil && managedInputCapabilityAllowed(contract, capability))) {
 			return nil, fmt.Errorf("server focus capability %q is not allowed by the immutable Focus execution contract", requestedCapability)
+		}
+	}
+	if r.inputWorkspace != nil {
+		switch capability {
+		case "input.workspace.info", "input.list", "input.read", "input.search", "output.write", serverFocusCapabilitySourceWorkspaceInfo, serverFocusCapabilitySourceList, serverFocusCapabilitySourceRead, serverFocusCapabilitySourceSearch:
+			return r.executeInputCapability(capability, params)
 		}
 	}
 	switch capability {
 	case serverFocusCapabilityHTTPRequest:
-		if r.workspace != nil {
+		if r.workspace != nil || r.inputWorkspace != nil {
 			return nil, fmt.Errorf("http.request is disabled for source workspace sessions")
 		}
 		return r.executeHTTPRequest(params)
 	case serverFocusCapabilityExtractReferences:
-		if r.workspace != nil {
+		if r.workspace != nil || r.inputWorkspace != nil {
 			return nil, fmt.Errorf("web.extract_references is disabled for source workspace sessions")
 		}
 		return r.extractReferences(params)
 	case serverFocusCapabilitySubmitAsset:
-		if r.workspace != nil {
+		if r.workspace != nil || r.inputWorkspace != nil {
 			return nil, fmt.Errorf("result.asset is disabled for source workspace sessions")
 		}
 		return r.submitAsset(params)
 	case serverFocusCapabilitySubmitRisk:
-		if r.workspace != nil {
+		if r.workspace != nil || r.inputWorkspace != nil {
 			return nil, fmt.Errorf("result.risk is disabled for source workspace sessions; use result.finding.v1")
 		}
 		return r.submitRisk(params)
@@ -209,7 +217,7 @@ func (r *legionServerFocusRuntime) Execute(
 }
 
 func (r *legionServerFocusRuntime) activateFocusTurn(releaseID string, contracts ...*legionFocusExecutionContract) error {
-	if r == nil || r.workspace == nil {
+	if r == nil || (r.workspace == nil && r.inputWorkspace == nil) {
 		return nil
 	}
 	releaseID = strings.TrimSpace(releaseID)
@@ -239,7 +247,7 @@ func (r *legionServerFocusRuntime) activateFocusTurn(releaseID string, contracts
 }
 
 func (r *legionServerFocusRuntime) deactivateFocusTurn(releaseID string) {
-	if r == nil || r.workspace == nil {
+	if r == nil || (r.workspace == nil && r.inputWorkspace == nil) {
 		return
 	}
 	r.mu.Lock()
@@ -252,11 +260,12 @@ func (r *legionServerFocusRuntime) deactivateFocusTurn(releaseID string) {
 	r.mu.Unlock()
 	if cleanup {
 		_ = r.workspace.Cleanup()
+		_ = r.inputWorkspace.Cleanup()
 	}
 }
 
 func (r *legionServerFocusRuntime) publishTaskStage(params map[string]any) (map[string]any, error) {
-	if r.workspace == nil {
+	if r.workspace == nil && r.inputWorkspace == nil {
 		return nil, fmt.Errorf("task.stage requires a source workspace")
 	}
 	if r.emitEvent == nil {
@@ -276,9 +285,16 @@ func (r *legionServerFocusRuntime) publishTaskStage(params map[string]any) (map[
 		return nil, fmt.Errorf("task.stage status %q is unsupported", status)
 	}
 	payload := map[string]any{
-		"workspace_id": r.workspace.spec.WorkspaceID,
+		"workspace_id": r.workspaceID(),
 		"phase":        phase,
 		"status":       status,
+	}
+	if r.inputWorkspace != nil {
+		identity := r.inputWorkspace.Identity()
+		payload["run_id"] = identity.RunID
+		payload["session_id"] = identity.SessionID
+		payload["attempt_id"] = identity.AttemptID
+		payload["manifest_id"] = identity.ManifestID
 	}
 	if message := focusRuntimeRawString(params, "message"); message != "" {
 		if len(message) > 2048 {
@@ -370,7 +386,7 @@ func (r *legionServerFocusRuntime) submitFindingV1(capability string, params map
 }
 
 func (r *legionServerFocusRuntime) submitReportV1(capability string, params map[string]any) (map[string]any, error) {
-	if r.workspace == nil {
+	if r.workspace == nil && r.inputWorkspace == nil {
 		return nil, fmt.Errorf("result.report.v1 requires a source workspace")
 	}
 	r.mu.Lock()
@@ -392,8 +408,19 @@ func (r *legionServerFocusRuntime) submitReportV1(capability string, params map[
 	if err != nil {
 		return nil, fmt.Errorf("result.report.v1 structured_summary: %w", err)
 	}
+	if r.inputWorkspace != nil {
+		identity := r.inputWorkspace.Identity()
+		canonical := map[string]any{}
+		if len(summary) > 0 && string(summary) != "null" {
+			if err := json.Unmarshal(summary, &canonical); err != nil {
+				return nil, fmt.Errorf("report structured summary must be an object")
+			}
+		}
+		canonical["input_identity"] = map[string]any{"run_id": identity.RunID, "session_id": identity.SessionID, "attempt_id": identity.AttemptID, "workspace_id": identity.WorkspaceID, "manifest_id": identity.ManifestID}
+		summary, _ = json.Marshal(canonical)
+	}
 	receipt, err := sink.SubmitCodeAuditReport(r.ctx, resultContract.Kind, aiFocusCodeAuditReport{
-		WorkspaceID:       r.workspace.spec.WorkspaceID,
+		WorkspaceID:       r.workspaceID(),
 		Title:             focusRuntimeRawString(params, "title"),
 		Markdown:          focusRuntimeRawString(params, "markdown"),
 		StructuredSummary: summary,

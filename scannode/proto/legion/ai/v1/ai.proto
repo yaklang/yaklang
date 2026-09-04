@@ -46,6 +46,8 @@ message BindAISessionCommand {
   // Monotonic durable command sequence for this Session's bind generation.
   // Nodes fence delayed/redelivered binds by epoch; issued_at is diagnostic.
   uint64 bind_epoch = 12;
+  // Requires the ai.input.managed_attachment.v1 node capability.
+  InputManifest input_manifest = 13;
 }
 
 message PushAISessionInputCommand {
@@ -2061,4 +2063,37 @@ message ContextFocusRelease {
   repeated ContextFocusSidekick sidekicks = 7;
   string sha256 = 8;
   string execution_contract_json = 9; // checksummed engine capability/stage/result contract
+}
+
+// InputManifest pins authorized managed resources for one execution attempt.
+// It never carries download URLs, object-store locators or credentials.
+message InputManifest {
+  string schema_version = 1;
+  // SHA-256 of the deterministic protobuf encoding with manifest_id cleared.
+  string manifest_id = 2;
+  string owner_user_id = 3;
+  string product_key = 4;
+  string run_id = 5;
+  string session_id = 6;
+  string attempt_id = 7;
+  string workspace_id = 8;
+  repeated InputResource resources = 9;
+  // Relative writable output directory, separate from all input resources.
+  string output_path = 10;
+  // Initial attempt dispatch identity; transport rebind commands may differ.
+  string attempt_command_id = 11;
+}
+
+message InputResource {
+  string resource_id = 1;
+  // v1 supports only "managed_attachment"; external URLs are not supported.
+  string kind = 2;
+  string input_field = 3;
+  string relative_path = 4;
+  string filename = 5;
+  uint64 size_bytes = 6;
+  string sha256 = 7;
+  string media_type = 8;
+  bool required = 9;
+  bool read_only = 10;
 }

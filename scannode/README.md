@@ -1,5 +1,8 @@
 # scannode
 
+Managed AI execution inputs, resource admission, storage and scoped file access
+are documented in [Managed input workspaces](../docs/legion-managed-input-workspaces.md).
+
 ## Legion professional task source failures
 
 Source preparation runs before AI execution. A failure emits
