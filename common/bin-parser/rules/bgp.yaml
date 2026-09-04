@@ -13,12 +13,23 @@ Package:
       if typ < 1 || typ > 5 {
         panic("bgp: unknown type")
       }
+      if typ == 1 {
+        this.ProcessSubNode("OPEN")
+        return
+      }
       rest = l - 19
-      if rest > 0 {
+      if rest > 0 && rest < 1048576 {
         this.GetSubNode("Body").SetMaxLength(rest)
         this.ProcessSubNode("Body")
       }
     Marker: raw,16
     Length: uint16
     Type: uint8
+    OPEN:
+      Version: uint8
+      My AS: uint16
+      Hold Time: uint16
+      BGP Identifier: raw,4
+      Optional Length: uint8
+      Optional: raw
     Body: raw

@@ -1,19 +1,50 @@
 endian: little
 Package:
   Protobuf:
-    operator: |
-      this.ProcessSubNode("Tag")
-      tag = getNodeResult("Tag").Value
-      wt = tag & 0x07
-      if wt > 5 {
-        panic("protobuf: unknown wire type")
-      }
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Value").SetMaxLength(rest)
-          this.ProcessSubNode("Value")
+    Fields:
+      list: true
+      Field: ProtoField
+      operator: |
+        for {
+          if this.Length() > 0 {
+            avail = this.GetMaxLength() - this.Length()
+            if avail < 1 || avail > 1048576 {
+              break
+            }
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          ele.Process()
         }
-      }
-    Tag: uint8
-    Value: raw
+ProtoField:
+  operator: |
+    this.ProcessSubNode("Tag")
+    tag = getNodeResult("Tag").Value
+    wt = tag & 0x07
+    if wt > 5 {
+      panic("protobuf: unknown wire type")
+    }
+    if wt == 0 {
+      this.ProcessSubNode("Varint")
+      return
+    }
+    if wt == 5 {
+      this.ProcessSubNode("Fixed32")
+      return
+    }
+    if wt == 1 {
+      this.ProcessSubNode("Fixed64")
+      return
+    }
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Bytes").SetMaxLength(rest)
+      this.ProcessSubNode("Bytes")
+    }
+  Tag: uint8
+  Varint: uint8
+  Fixed32: raw,4
+  Fixed64: raw,8
+  Bytes: raw

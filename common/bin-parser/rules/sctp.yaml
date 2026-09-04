@@ -8,7 +8,7 @@ Package:
       this.ProcessSubNode("Checksum")
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
-        if rest >= 4 && rest < 1048576 {
+        if rest > 0 && rest < 1048576 {
           this.GetSubNode("Chunks").SetMaxLength(rest)
           this.ProcessSubNode("Chunks")
         }

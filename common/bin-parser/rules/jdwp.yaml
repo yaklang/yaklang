@@ -1,3 +1,4 @@
+endian: big
 Package:
   JDWP:
     operator: |
@@ -6,4 +7,17 @@ Package:
       if s != "JDWP-Handshake" {
         panic("jdwp: handshake mismatch")
       }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 11 && rest < 1048576 {
+          this.ProcessSubNode("Command")
+        }
+      }
     Handshake: raw,14
+    Command:
+      Length: uint32
+      Id: uint32
+      Flags: uint8
+      Command Set: uint8
+      Command: uint8
+      Data: raw
