@@ -87,9 +87,29 @@ class MyClass:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestSelfAttributeAccess — self 属性访问
+// TestNestedClassInheritsParentConstructorDataflow — nested class constructor inheritance
 // ─────────────────────────────────────────────────────────────────────────────
 
+func TestNestedClassInheritsParentConstructorDataflow(t *testing.T) {
+	prog := parsePython(t, `
+class Parent:
+    def __init__(self, value):
+        sink(value)
+
+class Outer:
+    class Child(Parent):
+        pass
+
+item = Outer.Child(source())
+`)
+
+	result, err := prog.SyntaxFlowWithError(`source() as $source; sink(* #-> as $origin)`)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.GetValues("source"))
+	require.NotEmpty(t, result.GetValues("origin"), "nested child without __init__ must invoke the inherited constructor")
+}
+
+// TestSelfAttributeAccess — self 属性访问
 func TestSelfAttributeAccess(t *testing.T) {
 	t.Run("self attribute assignment - println traces value", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowPrintWithPython(t, `
