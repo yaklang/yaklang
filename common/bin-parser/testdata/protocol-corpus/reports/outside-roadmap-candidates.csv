@@ -1,0 +1,11 @@
+capture_id,protocol,source,evidence_kind,notes
+ndpi-dlep,DLEP,ndpi,upstream-positive,outside current 616-item roadmap
+ndpi-someip-sd,SOME/IP SD (nDPI regression; undecoded UDP payload in Wireshark defaults),ndpi,upstream-positive,outside current 616-item roadmap
+ndpi-nat-pmp,NAT-PMP / Port Control Protocol,ndpi,upstream-positive,outside current 616-item roadmap
+ndpi-someip-method,SOME/IP method call (nDPI regression; undecoded UDP payload in Wireshark defaults),ndpi,upstream-positive,outside current 616-item roadmap
+ndpi-c1222,ANSI C12.22,ndpi,upstream-positive,outside current 616-item roadmap
+ndpi-coap,CoAP,ndpi,upstream-positive,outside current 616-item roadmap
+ndpi-massscan,Masscan TCP probes,ndpi,upstream-positive,pentest traffic outside current roadmap
+tcpdump-empty-pcapng,empty pcapng container,tcpdump,upstream-negative,
+tcpdump-unsupported-linktype,unsupported link type 160,tcpdump,upstream-negative,
+google-ctf-engraver,Google CTF USB HID engraver,google-ctf,ctf,official 2022 Google CTF USB reverse-engineering challenge capture

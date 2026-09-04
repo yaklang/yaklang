@@ -1,0 +1,617 @@
+protocol,family,priority,implementation_status,authoritative_capture_count,material_status
+Ethernet II,link,P0,done,0,missing
+Ethernet 802.2,link,P1,done,0,missing
+Ethernet 802.3,link,P1,done,0,missing
+Ethernet SNAP,link,P1,done,0,missing
+IEEE 802.1Q,link,P0,done,0,missing
+IEEE 802.1ad QinQ,link,P1,done,0,missing
+ARP,link,P0,done,0,missing
+RARP,link,P2,todo,0,missing
+PPP,link,P1,done,0,missing
+PPPoE Discovery,link,P1,done,1,collected
+PPPoE Session,link,P1,done,0,missing
+LCP,link,P1,done,0,missing
+PAP,link,P1,done,0,missing
+CHAP,link,P1,done,0,missing
+EAPOL,link,P1,done,0,missing
+EAP,link,P1,done,0,missing
+STP,link,P1,done,0,missing
+RSTP,link,P1,done,0,missing
+MSTP,link,P2,todo,0,missing
+LLDP,link,P1,done,1,collected
+CDP,link,P1,done,0,missing
+LACP,link,P2,todo,0,missing
+MACSec,link,P2,todo,0,missing
+ISL,link,P4,todo,0,missing
+LLC,link,P2,todo,0,missing
+SNAP,link,P2,todo,0,missing
+Loopback,link,P1,done,0,missing
+Linux SLL,link,P1,done,0,missing
+Linux SLL2,link,P2,todo,0,missing
+IEEE 802.11,link,P1,done,0,missing
+IEEE 802.11 Radiotap,link,P2,todo,1,collected
+WEP,link,P2,todo,0,missing
+WPA/RSN,link,P1,done,0,missing
+FCoE,link,P2,todo,0,missing
+Fibre Channel,link,P2,todo,0,missing
+HomePlug AV,link,P4,todo,0,missing
+IEEE 802.1AB,link,P4,todo,0,missing
+IEEE 802.1X,link,P1,done,0,missing
+IEEE 802.1ah PBB,link,P4,todo,0,missing
+IEEE 802.3 Slow Protocols,link,P4,todo,0,missing
+MRP-MMRP,link,P4,todo,0,missing
+MRP-MVRP,link,P4,todo,0,missing
+MRP-MSRP,link,P4,todo,0,missing
+EOAM,link,P4,todo,0,missing
+CFM,link,P4,todo,0,missing
+E-LMI,link,P4,todo,0,missing
+VNTAG,link,P4,todo,0,missing
+TRILL,link,P4,todo,0,missing
+SPB,link,P4,todo,0,missing
+IPv4,internet,P0,done,1,collected
+IPv6,internet,P0,done,1,collected
+IPv6 Hop-by-Hop,internet,P2,todo,0,missing
+IPv6 Routing Header,internet,P2,todo,0,missing
+IPv6 Fragment,internet,P2,todo,0,missing
+IPv6 Destination Options,internet,P2,todo,0,missing
+ICMP,internet,P0,done,0,missing
+ICMPv6,internet,P0,done,0,missing
+ICMPv6 NDP,internet,P1,done,0,missing
+ICMPv6 MLD,internet,P2,todo,0,missing
+IGMP,internet,P1,done,0,missing
+GRE,internet,P1,done,1,collected
+IPIP,internet,P2,todo,0,missing
+IPsec AH,internet,P1,done,1,collected
+IPsec ESP,internet,P1,done,2,collected
+IPcomp,internet,P4,todo,0,missing
+MPLS,internet,P1,done,0,missing
+MPLS PW,internet,P2,todo,0,missing
+VXLAN,internet,P1,done,1,collected
+Geneve,internet,P2,todo,0,missing
+NVGRE,internet,P2,todo,0,missing
+STT,internet,P4,todo,0,missing
+GTP-C,internet,P2,todo,1,collected
+GTP-U,internet,P2,todo,1,collected
+GTPv2,internet,P2,todo,0,missing
+Mobile IP,internet,P4,todo,0,missing
+MIPv6,internet,P4,todo,0,missing
+L2TP,internet,P1,done,0,missing
+L2F,internet,P4,todo,0,missing
+PPTP,internet,P1,done,1,collected
+SSTP,internet,P2,todo,0,missing
+OpenVPN,internet,P1,done,1,collected
+WireGuard,internet,P1,done,1,collected
+IKEv1,internet,P1,done,0,missing
+IKEv2,internet,P1,done,0,missing
+NAT-T,internet,P1,done,0,missing
+Teredo,internet,P4,todo,0,missing
+6in4,internet,P4,todo,0,missing
+6to4,internet,P4,todo,0,missing
+ISATAP,internet,P4,todo,0,missing
+OSPF,routing,P1,done,1,collected
+OSPFv3,routing,P2,todo,0,missing
+BGP,routing,P1,done,1,collected
+RIP,routing,P1,done,0,missing
+RIPng,routing,P2,todo,0,missing
+EIGRP,routing,P1,done,0,missing
+IS-IS,routing,P2,todo,0,missing
+IGRP,routing,P4,todo,0,missing
+EGP,routing,P4,todo,0,missing
+VRRP,routing,P1,done,0,missing
+HSRP,routing,P1,done,1,collected
+GLBP,routing,P2,todo,1,collected
+CARP,routing,P4,todo,0,missing
+PIM,routing,P2,todo,2,collected
+DVMRP,routing,P4,todo,0,missing
+MSDP,routing,P4,todo,0,missing
+LDP,routing,P2,todo,1,collected
+RSVP,routing,P2,todo,0,missing
+BFD,routing,P2,todo,1,collected
+LACP-marker,routing,P4,todo,0,missing
+NHRP,routing,P2,todo,0,missing
+DMVPN,routing,P2,todo,0,missing
+OLSR,routing,P4,todo,0,missing
+Babel,routing,P4,todo,0,missing
+TCP,transport,P0,done,1,collected
+UDP,transport,P0,done,1,collected
+SCTP,transport,P1,done,1,collected
+DCCP,transport,P4,todo,0,missing
+UDP-Lite,transport,P4,todo,0,missing
+QUIC,transport,P0,done,1,collected
+NetBIOS,transport,P0,done,0,missing
+NBT NS,transport,P0,done,0,missing
+NBT DG,transport,P1,done,0,missing
+NBT SS,transport,P0,done,0,missing
+DNS,name-config,P0,done,1,collected
+mDNS,name-config,P1,done,0,missing
+LLMNR,name-config,P1,done,0,missing
+NBNS,name-config,P0,done,0,missing
+DoT,name-config,P1,done,0,missing
+DoH,name-config,P1,done,0,missing
+DoQ,name-config,P2,todo,1,collected
+DHCP,name-config,P0,done,1,collected
+DHCPv6,name-config,P1,done,0,missing
+BOOTP,name-config,P1,done,1,collected
+NTP,name-config,P1,done,3,collected
+SNTP,name-config,P2,todo,0,missing
+PTP,name-config,P2,todo,0,missing
+WINS,name-config,P2,todo,0,missing
+WINS-Replication,name-config,P4,todo,0,missing
+SSDP,name-config,P1,done,1,collected
+UPnP,name-config,P1,done,0,missing
+WS-Discovery,name-config,P2,todo,0,missing
+Bonjour,name-config,P2,todo,0,missing
+HTTP,web,P0,done,2,collected
+HTTP/2,web,P0,done,1,collected
+HTTP/3,web,P1,done,0,missing
+WebSocket,web,P0,done,1,collected
+SPDY,web,P4,todo,0,missing
+TLS,web,P0,done,1,collected
+SSL,web,P1,done,0,missing
+DTLS,web,P1,done,1,collected
+JA3/JA4,web,P0,done,0,missing
+gRPC,web,P1,done,0,missing
+SOAP,web,P1,done,0,missing
+XML-RPC,web,P2,todo,0,missing
+JSON-RPC,web,P1,done,1,collected
+WebDAV,web,P2,todo,0,missing
+OCSP,web,P2,todo,0,missing
+ACMEv2,web,P4,todo,0,missing
+SMTP,mail,P0,done,1,collected
+SMTPS,mail,P1,done,0,missing
+POP3,mail,P1,done,1,collected
+POP3S,mail,P2,todo,0,missing
+IMAP,mail,P1,done,1,collected
+IMAPS,mail,P2,todo,0,missing
+NNTP,mail,P4,todo,1,collected
+LMTP,mail,P4,todo,0,missing
+Submission,mail,P2,todo,0,missing
+FTP,file,P0,done,1,collected
+FTP-DATA,file,P1,done,0,missing
+FTPS,file,P2,todo,0,missing
+TFTP,file,P1,done,2,collected
+SFTP,file,P1,done,0,missing
+SCP,file,P2,todo,0,missing
+NFS,file,P1,done,1,collected
+RPC,file,P1,done,0,missing
+Portmap/Rpcbind,file,P1,done,0,missing
+Mount,file,P2,todo,0,missing
+SMB,file,P0,done,1,collected
+SMB2,file,P0,done,0,missing
+SMB3,file,P0,done,0,missing
+CIFS,file,P0,done,0,missing
+SMB-Direct,file,P2,todo,0,missing
+AFP,file,P2,todo,1,collected
+NCP,file,P4,todo,0,missing
+IPP,file,P2,todo,0,missing
+LPD,file,P4,todo,0,missing
+Rsync,file,P2,todo,0,missing
+9P,file,P4,todo,0,missing
+LDAP,auth,P0,done,0,missing
+LDAPS,auth,P1,done,0,missing
+CLDAP,auth,P1,done,0,missing
+Kerberos,auth,P0,done,2,collected
+NTLM,auth,P0,done,0,missing
+NTLMSSP,auth,P0,done,0,missing
+SPNEGO,auth,P0,done,0,missing
+GSS-API,auth,P1,done,0,missing
+RADIUS,auth,P0,done,1,collected
+TACACS+,auth,P1,done,0,missing
+Diameter,auth,P2,todo,1,collected
+OAuth/OIDC wire,auth,P2,todo,0,missing
+SAML,auth,P2,todo,0,missing
+SOCKS4,auth,P1,done,0,missing
+SOCKS5,auth,P0,done,1,collected
+HTTP Proxy CONNECT,auth,P1,done,0,missing
+SSH,remote,P0,done,1,collected
+Telnet,remote,P1,done,1,collected
+Rlogin,remote,P4,todo,0,missing
+RSH,remote,P4,todo,0,missing
+RDP,remote,P0,done,1,collected
+CREDSSP,remote,P1,done,0,missing
+VNC/RFB,remote,P1,done,1,collected
+X11,remote,P4,todo,0,missing
+Citrix ICA,remote,P2,todo,0,missing
+TeamViewer,remote,P3,todo,1,collected
+AnyDesk,remote,P3,todo,1,collected
+Sunlogin/Oray,remote,P3,todo,0,missing
+ToDesk,remote,P3,todo,0,missing
+RustDesk,remote,P3,todo,0,missing
+PCAnywhere,remote,P4,todo,0,missing
+WinRM,remote,P1,done,0,missing
+PsExec/SMB-svcctl,remote,P0,done,0,missing
+MySQL,database,P0,done,1,collected
+MariaDB,database,P1,done,0,missing
+PostgreSQL,database,P0,done,0,missing
+MSSQL TDS,database,P0,done,1,collected
+Oracle TNS,database,P0,done,1,collected
+MongoDB,database,P1,done,1,collected
+Redis,database,P0,done,0,missing
+Memcached,database,P1,done,1,collected
+Elasticsearch,database,P1,done,1,collected
+Cassandra CQL,database,P2,todo,1,collected
+CouchDB,database,P4,todo,0,missing
+HBase,database,P2,todo,0,missing
+ClickHouse,database,P2,todo,0,missing
+InfluxDB,database,P4,todo,0,missing
+DB2 DRDA,database,P2,todo,1,collected
+Sybase TDS,database,P2,todo,0,missing
+Informix,database,P4,todo,0,missing
+SQLite over net,database,P4,todo,0,missing
+ETCD,database,P2,todo,0,missing
+ZooKeeper,database,P2,todo,0,missing
+AMQP,mq-rpc,P1,done,1,collected
+MQTT,mq-rpc,P0,done,1,collected
+MQTT-SN,mq-rpc,P2,todo,0,missing
+Kafka,mq-rpc,P1,done,1,collected
+RocketMQ,mq-rpc,P3,todo,0,missing
+RabbitMQ,mq-rpc,P1,done,0,missing
+ActiveMQ OpenWire,mq-rpc,P2,todo,1,collected
+STOMP,mq-rpc,P2,todo,0,missing
+NATS,mq-rpc,P2,todo,1,collected
+NSQ,mq-rpc,P4,todo,0,missing
+Pulsar,mq-rpc,P3,todo,0,missing
+IBM MQ,mq-rpc,P2,todo,0,missing
+TIBCO Rendezvous,mq-rpc,P4,todo,0,missing
+Thrift,mq-rpc,P1,done,1,collected
+Protobuf,mq-rpc,P1,done,0,missing
+Cap'n Proto,mq-rpc,P4,todo,0,missing
+Hessian,mq-rpc,P3,todo,0,missing
+Dubbo,mq-rpc,P3,todo,0,missing
+SofaRPC,mq-rpc,P3,todo,0,missing
+gRPC-Web,mq-rpc,P2,todo,0,missing
+JSON-RPC 2.0,mq-rpc,P1,done,0,missing
+ONC RPC,mq-rpc,P1,done,0,missing
+DCE/RPC,mq-rpc,P0,done,1,collected
+MSRPC,mq-rpc,P0,done,0,missing
+IIOP/GIOP,mq-rpc,P1,done,1,collected
+T3,mq-rpc,P1,done,0,missing
+RMI/JRMP,mq-rpc,P1,done,1,collected
+JNDI,mq-rpc,P1,done,0,missing
+BER,mq-rpc,P1,done,0,missing
+DER,mq-rpc,P2,todo,0,missing
+ASN.1,mq-rpc,P2,todo,0,missing
+SNMP,mgmt,P0,done,2,collected
+SNMPv3,mgmt,P1,done,0,missing
+Syslog,mgmt,P1,done,1,collected
+NetFlow v5,mgmt,P2,todo,0,missing
+NetFlow v9,mgmt,P2,todo,1,collected
+IPFIX,mgmt,P2,todo,0,missing
+sFlow,mgmt,P2,todo,1,collected
+ICMP Timestamp,mgmt,P2,todo,0,missing
+CWMP/TR-069,mgmt,P2,todo,0,missing
+NETCONF,mgmt,P2,todo,0,missing
+RESTCONF,mgmt,P2,todo,0,missing
+gNMI,mgmt,P4,todo,0,missing
+IPMI,mgmt,P1,done,1,collected
+Redfish,mgmt,P2,todo,0,missing
+Collectd,mgmt,P4,todo,1,collected
+Zabbix,mgmt,P2,todo,0,missing
+Nagios NSCA,mgmt,P4,todo,0,missing
+Prometheus exposition,mgmt,P2,todo,0,missing
+Graphite,mgmt,P4,todo,0,missing
+StatsD,mgmt,P4,todo,0,missing
+SIP,voip,P1,done,1,collected
+SDP,voip,P1,done,0,missing
+RTP,voip,P1,done,1,collected
+RTCP,voip,P1,done,1,collected
+RTSP,voip,P1,done,1,collected
+H.323,voip,P2,todo,1,collected
+H.225,voip,P2,todo,0,missing
+H.245,voip,P2,todo,0,missing
+Q.931,voip,P2,todo,0,missing
+MGCP,voip,P2,todo,0,missing
+Megaco/H.248,voip,P4,todo,0,missing
+SCCP/Skinny,voip,P2,todo,0,missing
+IAX2,voip,P4,todo,0,missing
+T.38,voip,P4,todo,0,missing
+WebRTC,voip,P1,done,0,missing
+STUN,voip,P1,done,1,collected
+TURN,voip,P1,done,0,missing
+ICE,voip,P2,todo,0,missing
+SRTP,voip,P2,todo,0,missing
+HLS,voip,P4,todo,0,missing
+RTMP,voip,P1,done,0,missing
+RTMPE,voip,P3,todo,0,missing
+MPEG-TS,voip,P2,todo,0,missing
+MSRPC EPM,microsoft,P0,done,0,missing
+SAMR,microsoft,P0,done,0,missing
+LSARPC,microsoft,P0,done,0,missing
+NETLOGON,microsoft,P0,done,0,missing
+DRSUAPI,microsoft,P0,done,0,missing
+SRVSVC,microsoft,P0,done,0,missing
+WKSSVC,microsoft,P1,done,0,missing
+SVCCTL,microsoft,P0,done,0,missing
+WINREG,microsoft,P0,done,0,missing
+SPOOLSS,microsoft,P1,done,0,missing
+ATSVC,microsoft,P1,done,0,missing
+RPRN,microsoft,P2,todo,0,missing
+OXABREF/NSPI,microsoft,P2,todo,0,missing
+MAPI,microsoft,P2,todo,0,missing
+Exchange EWS,microsoft,P2,todo,0,missing
+ADWS,microsoft,P2,todo,0,missing
+WMI,microsoft,P0,done,0,missing
+DCOM,microsoft,P0,done,0,missing
+IObjectExporter,microsoft,P1,done,0,missing
+MS-WSP,microsoft,P4,todo,0,missing
+MS-FASP,microsoft,P4,todo,0,missing
+LLMNR-MDNS collision,microsoft,P1,done,0,missing
+WPAD,microsoft,P1,done,0,missing
+Modbus TCP,ics,P2,todo,1,collected
+Modbus RTU/ASCII,ics,P2,todo,0,missing
+S7comm,ics,P2,todo,1,collected
+S7comm-plus,ics,P2,todo,1,collected
+COTP,ics,P2,todo,0,missing
+TPKT,ics,P1,done,0,missing
+DNP3,ics,P2,todo,1,collected
+IEC 60870-5-104,ics,P2,todo,1,collected
+IEC 60870-5-101,ics,P2,todo,0,missing
+IEC 61850 MMS,ics,P2,todo,0,missing
+IEC 61850 GOOSE,ics,P2,todo,0,missing
+IEC 61850 SV,ics,P2,todo,0,missing
+OPC UA,ics,P2,todo,1,collected
+OPC DA,ics,P2,todo,0,missing
+BACnet,ics,P2,todo,1,collected
+EtherNet/IP CIP,ics,P2,todo,1,collected
+Profinet IO,ics,P2,todo,1,collected
+Profinet DCP,ics,P2,todo,0,missing
+PROFIBUS,ics,P2,todo,0,missing
+EtherCAT,ics,P2,todo,0,missing
+Powerlink,ics,P4,todo,0,missing
+SERCOS III,ics,P4,todo,0,missing
+CC-Link IE,ics,P3,todo,0,missing
+MELSEC,ics,P3,todo,1,collected
+Omron FINS,ics,P2,todo,1,collected
+GE SRTP,ics,P2,todo,0,missing
+Beckhoff ADS,ics,P2,todo,1,collected
+CODESYS,ics,P2,todo,0,missing
+Hart-IP,ics,P2,todo,1,collected
+FF HSE,ics,P4,todo,0,missing
+LonTalk,ics,P4,todo,0,missing
+KNX/IP,ics,P2,todo,1,collected
+DALI,ics,P4,todo,0,missing
+CAN/ISO-TP,ics,P2,todo,1,collected
+J1939,ics,P2,todo,0,missing
+UDS,ics,P2,todo,0,missing
+DoIP,ics,P2,todo,0,missing
+VARAN,ics,P4,todo,0,missing
+AES50,ics,P4,todo,0,missing
+Zigbee,ics,P2,todo,0,missing
+Z-Wave,ics,P2,todo,0,missing
+LoRaWAN,ics,P2,todo,0,missing
+DLMS/COSEM,ics,P2,todo,1,collected
+IEC 62056,ics,P2,todo,0,missing
+M-Bus,ics,P4,todo,0,missing
+DALI-2,ics,P4,todo,0,missing
+QQ,cn-app,P3,todo,0,missing
+QQ Login,cn-app,P3,todo,0,missing
+QQ KeepAlive,cn-app,P3,todo,0,missing
+QQ Message,cn-app,P3,todo,0,missing
+WeChat/MicroMsg,cn-app,P3,todo,0,missing
+WeChat MMTLS,cn-app,P3,todo,0,missing
+DingTalk,cn-app,P3,todo,1,collected
+Feishu/Lark,cn-app,P3,todo,0,missing
+WeCom,cn-app,P3,todo,0,missing
+TIM,cn-app,P3,todo,0,missing
+YY,cn-app,P3,todo,0,missing
+NetEase POPO,cn-app,P3,todo,0,missing
+AliWangWang,cn-app,P3,todo,0,missing
+Fetion,cn-app,P4,todo,0,missing
+BaiduHi,cn-app,P4,todo,0,missing
+MSNMS,cn-app,P4,todo,0,missing
+Yahoo Messenger,cn-app,P4,todo,0,missing
+IRC,cn-app,P2,todo,1,collected
+XMPP,cn-app,P2,todo,0,missing
+BitTorrent,cn-app,P1,done,1,collected
+eMule/ED2K,cn-app,P3,todo,0,missing
+Thunder/Xunlei,cn-app,P3,todo,0,missing
+PPLive,cn-app,P3,todo,0,missing
+PPStream,cn-app,P3,todo,0,missing
+Qvod,cn-app,P4,todo,0,missing
+Funshion,cn-app,P4,todo,0,missing
+SoulSeek,cn-app,P4,todo,0,missing
+Gnutella,cn-app,P4,todo,1,collected
+BaiduNetdisk,cn-app,P3,todo,0,missing
+AliyunDrive,cn-app,P3,todo,0,missing
+Quark,cn-app,P3,todo,0,missing
+iQIYI P2P,cn-app,P3,todo,0,missing
+Youku P2P,cn-app,P3,todo,0,missing
+Bilibili P2P,cn-app,P3,todo,0,missing
+Douyin/TikTok,cn-app,P3,todo,0,missing
+Kuaishou,cn-app,P3,todo,0,missing
+Kugou,cn-app,P3,todo,0,missing
+Kuwo,cn-app,P3,todo,0,missing
+Netease Cloud Music,cn-app,P3,todo,0,missing
+QQ Music,cn-app,P3,todo,0,missing
+Alipay,cn-app,P3,todo,0,missing
+WeChat Pay,cn-app,P3,todo,0,missing
+UnionPay,cn-app,P3,todo,0,missing
+Taobao,cn-app,P3,todo,0,missing
+JD,cn-app,P3,todo,0,missing
+Meituan,cn-app,P3,todo,0,missing
+DiDi,cn-app,P3,todo,0,missing
+Pinduoduo,cn-app,P3,todo,0,missing
+Huawei NCA,cn-vendor,P3,todo,0,missing
+Huawei SSL VPN,cn-vendor,P3,todo,0,missing
+Huawei NHRP+,cn-vendor,P3,todo,0,missing
+H3C,cn-vendor,P3,todo,0,missing
+H3C IRF,cn-vendor,P3,todo,0,missing
+Sangfor SSL VPN,cn-vendor,P3,todo,0,missing
+Sangfor aTrust,cn-vendor,P3,todo,0,missing
+Sangfor AF,cn-vendor,P3,todo,0,missing
+QiAnXin Tianqing,cn-vendor,P3,todo,0,missing
+QiAnXin NGFW,cn-vendor,P3,todo,0,missing
+360 Tianji,cn-vendor,P3,todo,0,missing
+360 Safe,cn-vendor,P3,todo,0,missing
+Hillstone,cn-vendor,P3,todo,0,missing
+Topsec,cn-vendor,P3,todo,0,missing
+Venustech,cn-vendor,P3,todo,0,missing
+Leadsec,cn-vendor,P3,todo,0,missing
+DPTech,cn-vendor,P3,todo,0,missing
+NSFOCUS,cn-vendor,P3,todo,0,missing
+Venus NTA,cn-vendor,P3,todo,0,missing
+Ruijie,cn-vendor,P3,todo,0,missing
+Maipu,cn-vendor,P3,todo,0,missing
+ZTE,cn-vendor,P3,todo,0,missing
+Fiberhome,cn-vendor,P3,todo,0,missing
+Dahua,cn-vendor,P3,todo,0,missing
+Hikvision ISAPI,cn-vendor,P3,todo,0,missing
+Hikvision SDK,cn-vendor,P3,todo,0,missing
+Uniview,cn-vendor,P3,todo,0,missing
+GB28181,cn-vendor,P2,todo,0,missing
+ONVIF,cn-vendor,P2,todo,0,missing
+RTSP-over-GB,cn-vendor,P3,todo,0,missing
+WPS Office sync,cn-vendor,P4,todo,0,missing
+Kingsoft,cn-vendor,P4,todo,0,missing
+Yakit MITM magic,cn-vendor,P0,done,0,missing
+CMPP,carrier,P3,todo,0,missing
+SGIP,carrier,P3,todo,0,missing
+SMGP,carrier,P3,todo,0,missing
+SMPP,carrier,P2,todo,0,missing
+UCP/EMI,carrier,P4,todo,0,missing
+Diameter Cx/Dx,carrier,P2,todo,0,missing
+SIP IMS,carrier,P2,todo,0,missing
+RADIUS accounting CN,carrier,P3,todo,0,missing
+Portal/WebAuth,carrier,P3,todo,0,missing
+PPPoE+BRAS,carrier,P2,todo,0,missing
+DOCSIS,carrier,P4,todo,0,missing
+PacketCable,carrier,P4,todo,0,missing
+3GPP S1AP,carrier,P2,todo,0,missing
+3GPP NGAP,carrier,P2,todo,0,missing
+3GPP NAS,carrier,P2,todo,0,missing
+3GPP M2AP,carrier,P4,todo,0,missing
+3GPP M3AP,carrier,P4,todo,0,missing
+PFCP,carrier,P2,todo,0,missing
+GTP Prime,carrier,P4,todo,1,collected
+WoW,game,P4,todo,0,missing
+Quake,game,P4,todo,0,missing
+Quake2,game,P4,todo,0,missing
+Quake3,game,P4,todo,0,missing
+Steam,game,P4,todo,0,missing
+Xbox Live,game,P4,todo,0,missing
+PlayStation,game,P4,todo,0,missing
+Tencent Games,game,P3,todo,0,missing
+NetEase Games,game,P3,todo,0,missing
+miHoYo/HoYoverse,game,P3,todo,0,missing
+iSCSI,storage,P2,todo,0,missing
+NBD,storage,P4,todo,0,missing
+AoE,storage,P4,todo,0,missing
+FCP,storage,P2,todo,0,missing
+NVMe-oF,storage,P2,todo,0,missing
+Ceph,storage,P2,todo,1,collected
+Gluster,storage,P4,todo,0,missing
+MinIO/S3,storage,P1,done,0,missing
+NFS4.1/4.2,storage,P2,todo,0,missing
+SMB3 multichannel,storage,P2,todo,0,missing
+RMI,pentest,P1,done,0,missing
+JMX,pentest,P1,done,0,missing
+JDWP,pentest,P1,done,0,missing
+FastCGI,pentest,P1,done,1,collected
+AJP,pentest,P0,done,1,collected
+IIOP Locate,pentest,P1,done,0,missing
+Memcache binary,pentest,P1,done,0,missing
+Docker API,pentest,P1,done,0,missing
+Kubernetes API,pentest,P1,done,0,missing
+etcd raft,pentest,P2,todo,0,missing
+Consul,pentest,P2,todo,0,missing
+Vault,pentest,P2,todo,0,missing
+Elasticsearch transport,pentest,P1,done,0,missing
+Solr,pentest,P2,todo,0,missing
+Jenkins remoting,pentest,P1,done,0,missing
+Redis Sentinel/Cluster,pentest,P1,done,0,missing
+Zabbix agent,pentest,P1,done,0,missing
+Nagios NRPE,pentest,P2,todo,0,missing
+Checkmk,pentest,P4,todo,0,missing
+VMware SOAP,pentest,P1,done,0,missing
+VMware AFD,pentest,P2,todo,0,missing
+ESXi hostd,pentest,P2,todo,0,missing
+vSphere NBDSSL,pentest,P2,todo,0,missing
+Xen API,pentest,P4,todo,0,missing
+Libvirt,pentest,P2,todo,0,missing
+QEMU QMP,pentest,P2,todo,0,missing
+IPMI RMCP+,pentest,P1,done,0,missing
+Redfish SSDP,pentest,P2,todo,0,missing
+WS-Man,pentest,P1,done,0,missing
+WinRM HTTP,pentest,P1,done,0,missing
+PowerShell PSRP,pentest,P1,done,0,missing
+WCF,pentest,P2,todo,0,missing
+.NET Remoting,pentest,P1,done,0,missing
+Java serialization,pentest,P0,done,0,missing
+Hessian2,pentest,P1,done,0,missing
+Kryo,pentest,P2,todo,0,missing
+PHP serialize,pentest,P1,done,0,missing
+Python pickle,pentest,P1,done,0,missing
+Ruby Marshal,pentest,P2,todo,0,missing
+AMF0/AMF3,pentest,P2,todo,0,missing
+Burlap,pentest,P4,todo,0,missing
+IIOP over SSL,pentest,P2,todo,0,missing
+JDWP handshake,pentest,P1,done,0,missing
+Rsync daemon,pentest,P1,done,1,collected
+Git daemon,pentest,P2,todo,1,collected
+SVN,pentest,P4,todo,0,missing
+Mercurial,pentest,P4,todo,0,missing
+Docker Registry,pentest,P1,done,0,missing
+OCI distribution,pentest,P2,todo,0,missing
+gRPC reflection,pentest,P1,done,0,missing
+Consul RPC,pentest,P2,todo,0,missing
+Nomad,pentest,P4,todo,0,missing
+SaltStack,pentest,P1,done,0,missing
+Ansible,pentest,P2,todo,0,missing
+Puppet,pentest,P2,todo,0,missing
+Chef,pentest,P4,todo,0,missing
+LDAP paged/SASL,pentest,P1,done,0,missing
+Kerberos PAC,pentest,P0,done,0,missing
+AS-REP / TGS,pentest,P0,done,0,missing
+NTLM v1/v2,pentest,P0,done,0,missing
+NetNTLMv2,pentest,P0,done,0,missing
+LLMNR poison,pentest,P0,done,0,missing
+NBT-NS poison,pentest,P0,done,0,missing
+DHCPv6 spoof,pentest,P1,done,0,missing
+WPAD proxy,pentest,P0,done,0,missing
+IPv6 RA,pentest,P1,done,0,missing
+ISO 8583,finance,P2,todo,0,missing
+FIX,finance,P2,todo,1,collected
+SWIFT,finance,P2,todo,0,missing
+UnionPay CUPS,finance,P3,todo,0,missing
+PBOC,finance,P3,todo,0,missing
+Alipay mtop,finance,P3,todo,0,missing
+XDMCP,longtail,P4,todo,0,missing
+XOT,longtail,P4,todo,0,missing
+XYPLEX,longtail,P4,todo,0,missing
+TZSP,longtail,P4,todo,0,missing
+TIPC,longtail,P4,todo,0,missing
+SAMETIME,longtail,P4,todo,0,missing
+SEBEK,longtail,P4,todo,0,missing
+SIGCOMP,longtail,P4,todo,0,missing
+SliMP3,longtail,P4,todo,0,missing
+SMUX,longtail,P4,todo,0,missing
+SRVLOC/SLP,longtail,P2,todo,0,missing
+TNS,longtail,P0,done,0,missing
+TPNCP,longtail,P4,todo,0,missing
+ULP,longtail,P4,todo,0,missing
+WASSP,longtail,P4,todo,0,missing
+WTLS,longtail,P4,todo,0,missing
+ZEP,longtail,P4,todo,0,missing
+AllJoyn,longtail,P4,todo,0,missing
+Roofnet,longtail,P4,todo,0,missing
+ROHC,longtail,P4,todo,0,missing
+TDMoE,longtail,P4,todo,0,missing
+TELKONET,longtail,P4,todo,0,missing
+WAI,longtail,P3,todo,0,missing
+WAPI,longtail,P3,todo,0,missing
+WSMP,longtail,P4,todo,0,missing
+swIPe,longtail,P4,todo,0,missing
+XTP,longtail,P4,todo,0,missing
+VINES,longtail,P4,todo,0,missing
+IPX,longtail,P4,todo,1,collected
+SPX,longtail,P4,todo,0,missing
+AppleTalk,longtail,P4,todo,0,missing
+AARP,longtail,P4,todo,0,missing
+DECnet,longtail,P4,todo,0,missing
+SNA,longtail,P4,todo,0,missing
+NetBEUI,longtail,P4,todo,0,missing
+LAT,longtail,P4,todo,0,missing
+MOP,longtail,P4,todo,0,missing
+PUP,longtail,P4,todo,0,missing
+XNS,longtail,P4,todo,0,missing
+CHAOS,longtail,P4,todo,0,missing
