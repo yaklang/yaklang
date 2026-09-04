@@ -191,6 +191,41 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "_is_a", strings.TrimRight(strVal(t, mustChild(t, eth, "IP", "TCP", "GIOP", "GIOPRequest").Child("Operation")), "\x00"))
 	})
 
+	t.Run("t3/hello", func(t *testing.T) {
+		// WebLogic T3 handshake (Wireshark tcp.port==7001; SANS ISC t3 12.2.1): AS:255 HL:19.
+		hello := []byte("t3 12.2.1\nAS:255\nHL:19\nMS:10000000\n\n")
+		n := parseRule(t, hello, "application-layer.t3", "T3")
+		h := mustChild(t, n, "T3Hello")
+		require.Equal(t, "t3", strVal(t, h.Child("Proto")))
+		require.Equal(t, "12.2.1", strVal(t, h.Child("Version")))
+		require.Equal(t, "255", strVal(t, h.Child("AS")))
+		require.Equal(t, "19", strVal(t, h.Child("HL")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 7001, 7001, hello))
+		require.Equal(t, "12.2.1", strVal(t, mustChild(t, eth, "IP", "TCP", "T3", "T3Hello").Child("Version")))
+		require.Equal(t, "19", strVal(t, mustChild(t, eth, "IP", "TCP", "T3", "T3Hello").Child("HL")))
+	})
+
+	t.Run("t3/identify", func(t *testing.T) {
+		// WebLogic T3 binary header HL:19: Cmd/Qos/Flags + ResponseId/InvokableId/AbbrevOffset
+		// (parse_test.go _TestT3 000005be016501ffffffff… layout, length 19).
+		pkt := make([]byte, 19)
+		pkt[3] = 19
+		pkt[4] = 1    // Cmd
+		pkt[5] = 0x65 // Qos (in-tree IDENTIFY-style)
+		pkt[6] = 1    // Flags
+		n := parseRule(t, pkt, "application-layer.t3", "T3")
+		id := mustChild(t, n, "T3Identify")
+		require.Equal(t, uint64(19), uintVal(t, id.Child("Total Length")))
+		require.Equal(t, uint64(1), uintVal(t, id.Child("Cmd")))
+		require.Equal(t, uint64(0x65), uintVal(t, id.Child("Qos")))
+		require.Equal(t, int64(0), intVal(t, id.Child("ResponseId")))
+		require.Equal(t, int64(0), intVal(t, id.Child("AbbrevOffset")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 7001, 7001, pkt))
+		eid := mustChild(t, eth, "IP", "TCP", "T3", "T3Identify")
+		require.Equal(t, uint64(0x65), uintVal(t, eid.Child("Qos")))
+		require.Equal(t, int64(0), intVal(t, eid.Child("InvokableId")))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"
