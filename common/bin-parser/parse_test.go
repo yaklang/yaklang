@@ -91,10 +91,17 @@ func TestPPPMessage(t *testing.T) {
 		"Address":  0xff,
 		"Control":  0x03,
 		"Protocol": 0xc023,
-		//"Information": map[string]any{
-		"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
-		//
-		//},
+		"PAP": map[string]any{
+			"Code":       1,
+			"Identifier": 0,
+			"Length":     14,
+			"Request": map[string]any{
+				"Peer ID Length":  4,
+				"Peer ID":         "ixia",
+				"Password Length": 4,
+				"Password":        "ixia",
+			},
+		},
 	}
 	res, err = parser.GenerateBinary(mapData, "ppp", "PPP")
 	if err != nil {
