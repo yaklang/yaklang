@@ -1198,6 +1198,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP").Child("ProtocolVersion")))
 	})
 
+	t.Run("pptp/ocrq", func(t *testing.T) {
+		// RFC 2637 §2.7 Outgoing-Call-Request (control type 7), 168-byte message.
+		// Wireshark pptp.control_message_type / pptp.call_id / pptp.phone_number. TCP/1723.
+		pptp := make([]byte, 168)
+		binary.BigEndian.PutUint16(pptp[0:], 168)
+		binary.BigEndian.PutUint16(pptp[2:], 1)
+		binary.BigEndian.PutUint32(pptp[4:], 0x1a2b3c4d)
+		binary.BigEndian.PutUint16(pptp[8:], 7)
+		binary.BigEndian.PutUint16(pptp[12:], 1)
+		binary.BigEndian.PutUint16(pptp[14:], 2)
+		binary.BigEndian.PutUint32(pptp[16:], 300)
+		binary.BigEndian.PutUint32(pptp[20:], 64000)
+		binary.BigEndian.PutUint32(pptp[24:], 1)
+		binary.BigEndian.PutUint32(pptp[28:], 1)
+		binary.BigEndian.PutUint16(pptp[32:], 64)
+		binary.BigEndian.PutUint16(pptp[36:], 7)
+		copy(pptp[40:], []byte("5551212"))
+		n := parseRule(t, pptp, "application-layer.pptp", "PPTP")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("ControlMessageType")))
+		ocrq := mustChild(t, n, "Outgoing Call Req")
+		require.Equal(t, uint64(1), uintVal(t, ocrq.Child("CallId")))
+		require.Equal(t, uint64(7), uintVal(t, ocrq.Child("PhoneNumberLength")))
+		require.True(t, strings.HasPrefix(strVal(t, ocrq.Child("PhoneNumber")), "5551212"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
+		wired := mustChild(t, eth, "IP", "TCP", "PPTP", "Outgoing Call Req")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("CallId")))
+		require.True(t, strings.HasPrefix(strVal(t, wired.Child("PhoneNumber")), "5551212"))
+	})
+
 	t.Run("eap/identity", func(t *testing.T) {
 		// RFC 3748 §5.1: Length=5 Request/Identity has no Type-Data.
 		req := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
