@@ -717,6 +717,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTP").Child("Sequence")))
 	})
 
+	t.Run("rtcp/sr", func(t *testing.T) {
+		// RFC 3550 §6.4.1 Sender Report: 20-octet sender info after SSRC.
+		// WebRTC sender_report_unittest.cc kPacket; Wireshark rtcp.sender.packetcount.
+		sr := mustHex(t, "80c80006123456781112141822242628333435364445464755565758")
+		n := parseRule(t, sr, "rtp", "RTCP")
+		require.Equal(t, uint64(200), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("SSRC")))
+		info := mustChild(t, n, "RTCPSR")
+		require.Equal(t, uint64(0x11121418), uintVal(t, info.Child("NTP MSW")))
+		require.Equal(t, uint64(0x22242628), uintVal(t, info.Child("NTP LSW")))
+		require.Equal(t, uint64(0x33343536), uintVal(t, info.Child("RTP Timestamp")))
+		require.Equal(t, uint64(0x44454647), uintVal(t, info.Child("Packet Count")))
+		require.Equal(t, uint64(0x55565758), uintVal(t, info.Child("Octet Count")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5005, 5005, sr))
+		require.Equal(t, uint64(0x44454647), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTCP", "RTCPSR").Child("Packet Count")))
+		require.Equal(t, uint64(0x55565758), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTCP", "RTCPSR").Child("Octet Count")))
+	})
+
+	t.Run("rtcp/rr", func(t *testing.T) {
+		// RFC 3550 §6.4.2 Receiver Report: PT=201, RC=0, no sender info.
+		rr := mustHex(t, "80c9000112345678")
+		n := parseRule(t, rr, "rtp", "RTCP")
+		require.Equal(t, uint64(201), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("SSRC")))
+		require.Nil(t, n.Child("RTCPSR"))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5005, 5005, rr))
+		require.Equal(t, uint64(201), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTCP").Child("Packet Type")))
+	})
+
 	t.Run("websocket/text", func(t *testing.T) {
 		// RFC 6455 §5.7 unmasked text: 0x81 0x05 "Hello" (PROTOCOL_DELIVERY L2 sample).
 		ws := []byte{0x81, 0x05, 'H', 'e', 'l', 'l', 'o'}
