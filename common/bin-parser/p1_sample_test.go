@@ -623,6 +623,26 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, dest, bytesVal(t, wired.Child("Destination Address")))
 	})
 
+	t.Run("icmpv6/mldv2-report", func(t *testing.T) {
+		// RFC 3810 §5.2 Version 2 Multicast Listener Report Type 143.
+		// One MODE_IS_EXCLUDE record (type 2), 0 sources, group ff02::1:ff00:1.
+		// Wireshark icmpv6.mldr.mar.record_type / icmpv6.mldr.mar.multicast_address.
+		group := []byte{0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0xff, 0, 0, 0x01}
+		r := append([]byte{0x8f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00}, group...)
+		n := parseRule(t, r, "internet_control_message_protocol_v6", "ICMPV6")
+		require.Equal(t, uint64(143), uintVal(t, n.Child("Type")))
+		rep := mustChild(t, n, "Multicast Listener Report v2")
+		require.Equal(t, uint64(1), uintVal(t, rep.Child("Number of Mcast Address Records")))
+		rec := rep.Child("Records").Children()[0]
+		require.Equal(t, uint64(2), uintVal(t, rec.Child("Record Type")))
+		require.Equal(t, group, bytesVal(t, rec.Child("Multicast Address")))
+		eth := parseEthernet(t, ipv6ICMPBytes(t, r))
+		wired := mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Report v2")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("Number of Mcast Address Records")))
+		require.Equal(t, uint64(2), uintVal(t, wired.Child("Records").Children()[0].Child("Record Type")))
+		require.Equal(t, group, bytesVal(t, wired.Child("Records").Children()[0].Child("Multicast Address")))
+	})
+
 	t.Run("icmpv6/ra-opt", func(t *testing.T) {
 		// gopacket layers/icmp6msg_test.go Router Advertisement: SLLA + MTU 1500 + Prefix 2001:db8:0:1::/64.
 		ra := []byte{
