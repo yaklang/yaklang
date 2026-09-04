@@ -1815,6 +1815,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, `\\srv\share`, strVal(t, wired.Child("Path")))
 		require.Equal(t, "A:", strVal(t, wired.Child("Service")))
 	})
+
+	t.Run("gre/rfc2784", func(t *testing.T) {
+		// RFC 2784 §2.1: C=K=S=0 Ver=0, Protocol Type 0x0806 ARP.
+		// Wireshark gre.proto. A PPTP layout would steal 0x0001 as Payload Length.
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append([]byte{0x00, 0x00, 0x08, 0x06}, arp...)
+		n := parseRule(t, raw, "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Flags And Version")))
+		require.Equal(t, uint64(0x0806), uintVal(t, n.Child("Protocol Type")))
+		require.Nil(t, n.Child("Call ID"))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Payload", "ARP").Child("Opcode")))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, raw))
+		require.Equal(t, uint64(0x0806), uintVal(t, mustChild(t, eth, "IP", "GRE").Child("Protocol Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "GRE", "Payload", "ARP").Child("Opcode")))
+	})
+
+	t.Run("gre/key", func(t *testing.T) {
+		// RFC 2890 Key Present (K=1 Ver=0); Wireshark gre.key.
+		// PPTP would parse 0x12345678 as Payload Length=0x1234 Call ID=0x5678.
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append([]byte{0x20, 0x00, 0x08, 0x06, 0x12, 0x34, 0x56, 0x78}, arp...)
+		n := parseRule(t, raw, "generic_routing_encapsulation", "GRE")
+		require.Equal(t, uint64(0x2000), uintVal(t, n.Child("Flags And Version")))
+		require.Equal(t, uint64(0x12345678), uintVal(t, n.Child("Key")))
+		require.NotEqual(t, uint64(0x5678), uintVal(t, n.Child("Key")))
+		require.Nil(t, n.Child("Call ID"))
+		eth := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, raw))
+		require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, eth, "IP", "GRE").Child("Key")))
+	})
 }
 
 func tnsConnectPacket(cdata []byte) []byte {

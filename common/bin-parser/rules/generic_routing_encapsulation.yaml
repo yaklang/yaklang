@@ -1,45 +1,71 @@
+endian: big
 Package:
   GRE:
+    operator: |
+      this.ProcessSubNode("Flags And Version")
+      flags = getNodeResult("Flags And Version").Value
+      this.ProcessSubNode("Protocol Type")
+      proto = getNodeResult("Protocol Type").Value
+      ver = flags & 7
+      if (flags & 0x8000) != 0 {
+        this.ProcessSubNode("Checksum")
+        this.ProcessSubNode("Reserved1")
+      }
+      if (flags & 0x2000) != 0 {
+        if ver == 1 && proto == 0x880b {
+          this.ProcessSubNode("Payload Length")
+          this.ProcessSubNode("Call ID")
+          plen = getNodeResult("Payload Length").Value
+          if plen > 0 && plen < 1048576 {
+            this.GetSubNode("Payload").SetMaxLength(plen)
+          }
+        } else {
+          this.ProcessSubNode("Key")
+        }
+      }
+      if (flags & 0x1000) != 0 {
+        this.ProcessSubNode("Sequence Number")
+      }
+      if (flags & 0x0080) != 0 {
+        this.ProcessSubNode("Acknowledgment Number")
+      }
+      this.ProcessSubNode("Payload")
+      return
     Flags And Version: uint16
     Protocol Type: uint16
+    Checksum: uint16
+    Reserved1: uint16
     Payload Length: uint16
     Call ID: uint16
-    Optional:
-      unpack: true
-      operator: |
-        flag := getNodeResult("../Flags And Version").Value
-        if (flag & 0x1000) == 0x1000 {
-          this.ProcessByType("Sequence Number")
-        }
-        if (flag & 0x0080) == 0x0080 {
-          this.ProcessByType("Acknowledgment Number")
-        }
+    Key: uint32
+    Sequence Number: uint32
+    Acknowledgment Number: uint32
     Payload:
-      length-from-field: "../Payload Length"
       operator: |
-        length = getNodeResult("../Payload Length").Value
-        if length <= 0 {
+        proto = getNodeResult("../Protocol Type").Value
+        if proto == 0x0800 {
+          this.ProcessByType("IP")
           return
         }
-        type = getNodeResult("../Protocol Type").Value
-        switch type {
-          case 0x0800:
-            this.ProcessByType("IP")
-          case 0x86dd:
-            this.ProcessByType("IPv6")
-          case 0x0806:
-            this.ProcessByType("ARP")
-          case 0x888e:
-            this.ProcessByType("EAPOL")
-          case 0x880b:
-            this.ProcessByType("PPP")
-          default:
-            this.NewUnknownNode()
+        if proto == 0x86dd {
+          this.ProcessByType("IPv6")
+          return
         }
+        if proto == 0x0806 {
+          this.ProcessByType("ARP")
+          return
+        }
+        if proto == 0x888e {
+          this.ProcessByType("EAPOL")
+          return
+        }
+        if proto == 0x880b {
+          this.ProcessByType("PPP")
+          return
+        }
+        return
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 PPP: "import:ppp.yaml;node:PPP"
 EAPOL: "import:eapol.yaml;node:EAPOL"
-Sequence Number: uint32
-Acknowledgment Number: uint32
