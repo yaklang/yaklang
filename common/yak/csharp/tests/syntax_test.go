@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/csharp/csharp2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -36,11 +37,17 @@ func validateSource(t *testing.T, filename string, src string, caches ...*ssa.An
 		if len(caches) > 0 {
 			cache = caches[0]
 		}
+		antlr4util.ResetSLLFirstCounters()
 		start := time.Now()
 		ast, err := csharp2ssa.Frontend(src, cache)
+		parseDur := time.Since(start)
 		require.NoError(t, err, "parse AST FrontEnd error")
 		require.NotNil(t, ast)
-		require.LessOrEqual(t, time.Since(start), savedCSharpFixtureMaxParseDuration, "parse took too long for %s", name)
+		require.LessOrEqual(t, parseDur, savedCSharpFixtureMaxParseDuration, "parse took too long for %s", name)
+		stats := antlr4util.SLLFirstCountersSnapshot()
+		t.Logf("csharp fixture=%s parse=%s sll_attempts=%d fallbacks=%d cancelled=%d errors=%d",
+			name, parseDur, stats.SLLAttempts, stats.Fallbacks, stats.FallbackCancelled, stats.FallbackError)
+		require.Zero(t, stats.FallbackError, "SLL fallback error for %s", name)
 	})
 }
 
@@ -63,6 +70,7 @@ func TestAllSyntaxForCSharp_G4(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, found, "no embed syntax files found")
+	require.Equal(t, csharpGAFixtureCount, len(listCSharpASTFixtures(t)), "syntax walk must see exactly 100 C# fixtures")
 }
 
 func TestCSharpIfPreprocessor(t *testing.T) {
