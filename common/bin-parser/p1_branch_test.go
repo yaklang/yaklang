@@ -324,6 +324,16 @@ func TestP1BranchRows(t *testing.T) {
 		require.Nil(t, n.Child("Client ID"))
 	})
 
+	t.Run("protobuf/varint", func(t *testing.T) {
+		f := parseRule(t, mustHex(t, "089601"), "protobuf", "Protobuf").Child("Fields").Children()[0]
+		require.Equal(t, uint64(0x96), uintVal(t, f.Child("Varint")))
+		require.Equal(t, uint64(0x01), uintVal(t, f.Child("Varint2")))
+	})
+	t.Run("protobuf/string", func(t *testing.T) {
+		f := parseRule(t, append([]byte{0x12, 0x07}, []byte("testing")...), "protobuf", "Protobuf").Child("Fields").Children()[0]
+		require.Equal(t, "testing", strVal(t, f.Child("Str")))
+	})
+
 	t.Run("thrift/binary", func(t *testing.T) {
 		th := []byte{0x80, 0x01, 0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0}
 		require.Equal(t, uint64(0x80010001), uintVal(t, parseRule(t, th, "thrift", "Thrift").Child("Version")))
