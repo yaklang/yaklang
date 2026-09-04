@@ -54,11 +54,12 @@ func TestRADIUSAccessRequestFromCapture(t *testing.T) {
 	require.True(t, attrs.IsList())
 	require.Len(t, attrs.Children(), 5)
 	require.Equal(t, uint64(1), uintVal(t, attrs.Children()[0].Child("Type")))
-	require.Equal(t, []byte("Admin"), bytesVal(t, attrs.Children()[0].Child("Value")))
+	require.Equal(t, "Admin", strVal(t, attrs.Children()[0].Child("User-Name")))
 	require.Equal(t, uint64(2), uintVal(t, attrs.Children()[1].Child("Type"))) // User-Password
 	require.Equal(t, uint64(4), uintVal(t, attrs.Children()[2].Child("Type"))) // NAS-IP-Address
-	require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, attrs.Children()[2].Child("Value")))
+	require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, attrs.Children()[2].Child("NAS-IP-Address")))
 	require.Equal(t, uint64(5), uintVal(t, attrs.Children()[3].Child("Type"))) // NAS-Port
+	require.Equal(t, uint64(0), uintVal(t, attrs.Children()[3].Child("NAS-Port")))
 	require.Equal(t, uint64(80), uintVal(t, attrs.Children()[4].Child("Type"))) // Message-Authenticator
 }
 

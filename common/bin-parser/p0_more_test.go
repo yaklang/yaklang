@@ -206,7 +206,7 @@ func TestRADIUSAndEdges(t *testing.T) {
 	require.True(t, attrs.IsList())
 	require.GreaterOrEqual(t, len(attrs.Children()), 1)
 	require.Equal(t, uint64(1), uintVal(t, attrs.Children()[0].Child("Type")))
-	require.Equal(t, user, bytesVal(t, attrs.Children()[0].Child("Value")))
+	require.Equal(t, user, bytesVal(t, attrs.Children()[0].Child("User-Name")))
 
 	accept := make([]byte, 20)
 	accept[0] = 2

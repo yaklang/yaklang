@@ -2737,6 +2737,28 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, pppoeSessionFrame(t, sess))
 		require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "PPPoESession", "Payload", "PPP").Child("Protocol")))
 	})
+
+	t.Run("radius/user-name", func(t *testing.T) {
+		// Wireshark radtest.pcap / gopacket layers/radius_test.go Access-Request User-Name "Admin". RFC 2865 §5.1.
+		raw := radiusAccessRequestFrame[42:]
+		n := parseRule(t, raw, "application-layer.radius", "RADIUS")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Code")))
+		require.Equal(t, "Admin", strVal(t, n.Child("Attributes").Children()[0].Child("User-Name")))
+		eth := parseEthernet(t, radiusAccessRequestFrame)
+		require.Equal(t, "Admin", strVal(t, mustChild(t, eth, "IP", "UDP", "RADIUS").Child("Attributes").Children()[0].Child("User-Name")))
+	})
+
+	t.Run("radius/nas-ip", func(t *testing.T) {
+		// Same radtest.pcap: NAS-IP-Address 127.0.0.1, NAS-Port 0. RFC 2865 §5.4 / §5.5. UDP/1812.
+		raw := radiusAccessRequestFrame[42:]
+		n := parseRule(t, raw, "application-layer.radius", "RADIUS")
+		attrs := n.Child("Attributes").Children()
+		require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, attrs[2].Child("NAS-IP-Address")))
+		require.Equal(t, uint64(0), uintVal(t, attrs[3].Child("NAS-Port")))
+		eth := parseEthernet(t, radiusAccessRequestFrame)
+		r := mustChild(t, eth, "IP", "UDP", "RADIUS")
+		require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, r.Child("Attributes").Children()[2].Child("NAS-IP-Address")))
+	})
 }
 
 func wiresharkCDP(t *testing.T) []byte {
