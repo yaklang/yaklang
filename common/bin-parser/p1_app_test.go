@@ -94,8 +94,11 @@ func TestP1UDPApplications(t *testing.T) {
 	l := parseRule(t, l2tp, "l2tp", "L2TP")
 	require.Equal(t, uint64(0x0014), uintVal(t, l.Child("Tunnel ID")))
 	require.NotEqual(t, uint64(1), uintVal(t, l.Child("Tunnel ID")))
+	require.Equal(t, uint64(2), uintVal(t, l.Child("Offset Size")))
+	require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, l, "PPP").Child("Protocol")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1701, 1701, l2tp))
 	require.Equal(t, uint64(0x0014), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Tunnel ID")))
+	require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Offset Size")))
 	require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP", "PPP").Child("Protocol")))
 
 	// RFC 7296 empty IKEv2 IKE_SA_INIT: version 0x20, exchange 0x22, length 0x1c
