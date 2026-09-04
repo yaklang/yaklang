@@ -1416,4 +1416,32 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		wired := mustChild(t, eth, "IP", "TCP", "PostgreSQL", "Payload", "PostgreSQLError").Children()
 		require.Equal(t, "42601", strVal(t, wired[1].Child("SQLState")))
 	})
+
+	t.Run("tpkt/cookie", func(t *testing.T) {
+		// [MS-RDPBCGR] 4.1.1 Client X.224 Connection Request PDU.
+		// Cookie: mstshash=eltons + RDP_NEG_REQ type 1 length 8 PROTOCOL_RDP.
+		// TPKT TPDU stays raw (G4 ABI). Wireshark tpkt / cotp / rdp.neg.request.
+		raw := mustHex(t, "0300002c27e00000000000436f6f6b69653a206d737473686173683d656c746f6e730d0a0100080000000000")
+		tpkt := parseRule(t, raw, "application-layer.msrdp", "TPKT")
+		require.Equal(t, uint64(3), uintVal(t, tpkt.Child("Version")))
+		require.Equal(t, uint64(0x2c), uintVal(t, tpkt.Child("PacketLength")))
+		require.Equal(t, raw[4:], bytesVal(t, tpkt.Child("TPDU")))
+		rdp := parseRule(t, raw, "application-layer.msrdp", "RDP")
+		require.Equal(t, uint64(0xe0), uintVal(t, mustChild(t, rdp, "X224").Child("Flag")))
+		require.Equal(t, "Cookie: mstshash=eltons", strVal(t, mustChild(t, rdp, "X224", "VariableData", "RDPCookie").Child("Line")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, rdp, "X224", "VariableData", "RDPNegotiation").Child("Type")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, rdp, "X224", "VariableData", "RDPNegotiation").Child("Protocol")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 3389, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "RDP", "X224", "VariableData")
+		require.Equal(t, "Cookie: mstshash=eltons", strVal(t, mustChild(t, wired, "RDPCookie").Child("Line")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, wired, "RDPNegotiation").Child("Protocol")))
+	})
+
+	t.Run("tpkt/cc", func(t *testing.T) {
+		// [MS-RDPBCGR] X.224 Connection Confirm: TPDU code 0xd0, no cookie.
+		raw := []byte{0x03, 0x00, 0x00, 0x0b, 0x06, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}
+		require.Equal(t, uint64(0xd0), uintVal(t, mustChild(t, parseRule(t, raw, "application-layer.msrdp", "RDP"), "X224").Child("Flag")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 3389, 50000, raw))
+		require.Equal(t, uint64(0xd0), uintVal(t, mustChild(t, eth, "IP", "TCP", "RDP", "X224").Child("Flag")))
+	})
 }
