@@ -88,12 +88,13 @@ func TestP1UDPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4UDPBytes(t, 5005, 5005, rtcp))
 	require.Equal(t, uint64(200), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTCP").Child("Packet Type")))
 
-	// RFC 2661 L2TP data
-	l2tp := []byte{0x02, 0x02, 0x00, 0x14, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	// RFC 2661 data: T=0 L=0 S=0 O=0 Ver=2, Tunnel 0x0014, Session 0x0001, PPP LCP.
+	l2tp := mustHex(t, "000200140001ff03002d")
 	l := parseRule(t, l2tp, "l2tp", "L2TP")
-	require.Equal(t, uint64(1), uintVal(t, l.Child("Tunnel ID")))
+	require.Equal(t, uint64(0x0014), uintVal(t, l.Child("Tunnel ID")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1701, 1701, l2tp))
-	require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Session ID")))
+	require.Equal(t, uint64(0x0014), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Tunnel ID")))
+	require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP", "PPP").Child("Protocol")))
 
 	// RFC 7296 empty IKEv2 IKE_SA_INIT: version 0x20, exchange 0x22, length 0x1c
 	ike := mustHex(t, "0000000000000001000000000000000000202208000000000000001c")

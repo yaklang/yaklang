@@ -41,10 +41,19 @@ EAPPacket:
     if el >= 5 {
       this.ProcessSubNode("Type")
     }
+    if el > 5 {
+      t = getNodeResult("Type").Value
+      dlen = el - 5
+      if t == 1 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Identity").SetMaxLength(dlen)
+        this.ProcessSubNode("Identity")
+      }
+    }
   Code: uint8
   Identifier: uint8
   Length: uint16
   Type: uint8
+  Identity: string
 EAPOLKey:
   operator: |
     this.ProcessSubNode("Descriptor Type")
