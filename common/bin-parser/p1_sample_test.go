@@ -98,6 +98,43 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0xa147), uintVal(t, mustChild(t, eth, "IP", "UDP", "STUN").Child("Attributes").Children()[0].Child("X-Port")))
 	})
 
+	t.Run("kafka/metadata", func(t *testing.T) {
+		// Apache Kafka protocol.html Request Header v1 client_id NULLABLE_STRING;
+		// Metadata Request v0 API key 3 [topics] STRING (Wireshark packet-kafka.c kafka_get_string).
+		// Size 23, Client ID "test", one topic "foo" (same layout as the protocol-guide
+		// 00000012…74657374ffffffff all-topics request plus one STRING topic).
+		kf := mustHex(t, "00000017 0003 0000 00000001 0004 74657374 00000001 0003 666f6f")
+		n := parseRule(t, kf, "kafka", "Kafka")
+		require.Equal(t, int64(23), intVal(t, n.Child("Length")))
+		require.Equal(t, int64(3), intVal(t, n.Child("API Key")))
+		require.Equal(t, int64(1), intVal(t, n.Child("Correlation ID")))
+		require.Equal(t, int64(4), intVal(t, n.Child("Client ID Len")))
+		require.Equal(t, "test", strVal(t, n.Child("Client ID")))
+		require.Equal(t, int64(1), intVal(t, n.Child("Topics Count")))
+		topics := n.Child("Topics").Children()
+		require.Equal(t, 1, len(topics))
+		require.Equal(t, int64(3), intVal(t, topics[0].Child("Name Len")))
+		require.Equal(t, "foo", strVal(t, topics[0].Child("Name")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 9092, 9092, kf))
+		k := mustChild(t, eth, "IP", "TCP", "Kafka")
+		require.Equal(t, "test", strVal(t, k.Child("Client ID")))
+		require.Equal(t, "foo", strVal(t, k.Child("Topics").Children()[0].Child("Name")))
+	})
+
+	t.Run("kafka/apiversions", func(t *testing.T) {
+		// Apache Kafka protocol.html ApiVersions API key 18 v0: empty body, NULLABLE_STRING client_id -1.
+		kf := mustHex(t, "0000000a0012000000000000ffff")
+		n := parseRule(t, kf, "kafka", "Kafka")
+		require.Equal(t, int64(10), intVal(t, n.Child("Length")))
+		require.Equal(t, int64(18), intVal(t, n.Child("API Key")))
+		require.Equal(t, int64(-1), intVal(t, n.Child("Client ID Len")))
+		require.Nil(t, n.Child("Client ID"))
+		require.Nil(t, n.Child("Topics Count"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 9092, 9092, kf))
+		require.Equal(t, int64(18), intVal(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("API Key")))
+		require.Nil(t, mustChild(t, eth, "IP", "TCP", "Kafka").Child("Client ID"))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"

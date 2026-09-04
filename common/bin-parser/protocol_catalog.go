@@ -135,7 +135,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "MongoDB", Layer: "L7", RuleFile: "mongodb.yaml", Status: statusNew, SampleFrom: "OP_MSG"},
 	{Name: "Memcached", Layer: "L7", RuleFile: "memcached.yaml", Status: statusNew, SampleFrom: "binary protocol"},
 	{Name: "AMQP", Layer: "L7", RuleFile: "amqp.yaml", Status: statusNew, SampleFrom: "AMQP 0-9-1 header"},
-	{Name: "Kafka", Layer: "L7", RuleFile: "kafka.yaml", Status: statusNew, SampleFrom: "request header"},
+	{Name: "Kafka", Layer: "L7", RuleFile: "kafka.yaml", Status: statusNew, SampleFrom: "Metadata v0 Client ID + topic Name"},
 	{Name: "JSON-RPC", Layer: "L7", RuleFile: "jsonrpc.yaml", Status: statusNew, SampleFrom: "JSON-RPC 2.0 ping"},
 	{Name: "TACACS+", Layer: "L7", RuleFile: "tacacs.yaml", Status: statusNew, SampleFrom: "TACACS+ header"},
 	{Name: "DTLS", Layer: "L7", RuleFile: "dtls.yaml", Status: statusNew, SampleFrom: "DTLS 1.2 record"},
