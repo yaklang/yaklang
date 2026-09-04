@@ -16,6 +16,14 @@ Package:
         this.ProcessByType("WGResponse")
         return
       }
+      if typ == 3 {
+        this.ProcessByType("WGCookie")
+        return
+      }
+      if typ == 4 {
+        this.ProcessByType("WGTransport")
+        return
+      }
     Type: uint8
     Reserved: raw,3
 WGInit:
@@ -46,3 +54,25 @@ WGResponse:
   Encrypted Empty: raw,16
   MAC1: raw,16
   MAC2: raw,16
+WGCookie:
+  operator: |
+    this.ProcessSubNode("Receiver")
+    this.ProcessSubNode("Nonce")
+    this.ProcessSubNode("Encrypted Cookie")
+  Receiver: uint32
+  Nonce: raw,24
+  Encrypted Cookie: raw,32
+WGTransport:
+  operator: |
+    this.ProcessSubNode("Receiver")
+    this.ProcessSubNode("Counter")
+    if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 {
+        this.GetSubNode("Ciphertext").SetMaxLength(rest)
+        this.ProcessSubNode("Ciphertext")
+      }
+    }
+  Receiver: uint32
+  Counter: uint64
+  Ciphertext: raw
