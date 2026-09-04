@@ -1087,11 +1087,27 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("zabbix/json", func(t *testing.T) {
-		zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
+		zb := zabbixPacket(0x01, []byte("{}"), true)
 		z := parseRule(t, zb, "zabbix", "Zabbix")
 		require.Equal(t, "{}", strVal(t, z.Child("JSON")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, z, "Flags").Child("Protocol")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 10050, 10050, zb))
 		require.Equal(t, "{}", strVal(t, mustChild(t, eth, "IP", "TCP", "Zabbix").Child("JSON")))
+	})
+
+	t.Run("zabbix/active-checks", func(t *testing.T) {
+		// Zabbix 4.0 13-byte header (reserved uint32) + agent "active checks" JSON.
+		// Wireshark zabbix.flags / zabbix.reserved / zabbix.json. TCP/10050.
+		js := []byte(`{"request":"active checks","host":"testhost"}`)
+		zb := zabbixPacket(0x01, js, true)
+		z := parseRule(t, zb, "zabbix", "Zabbix")
+		require.Equal(t, uint64(len(js)), uintVal(t, z.Child("Length")))
+		require.Equal(t, uint64(0), uintVal(t, z.Child("Reserved")))
+		require.Equal(t, string(js), strVal(t, z.Child("JSON")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, z, "Flags").Child("Compression")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 10050, 10050, zb))
+		require.Equal(t, string(js), strVal(t, mustChild(t, eth, "IP", "TCP", "Zabbix").Child("JSON")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IP", "TCP", "Zabbix").Child("Reserved")))
 	})
 
 	t.Run("pptp/sccrq", func(t *testing.T) {
@@ -2238,6 +2254,17 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 6881, 6881, raw))
 		require.Equal(t, uint64(16384), uintVal(t, mustChild(t, eth, "IP", "TCP", "BitTorrent").Child("Messages").Children()[0].Child("Block Length")))
 	})
+}
+
+func zabbixPacket(flags uint8, json []byte, reserved bool) []byte {
+	b := append([]byte("ZBXD"), flags)
+	lenb := make([]byte, 4)
+	binary.LittleEndian.PutUint32(lenb, uint32(len(json)))
+	b = append(b, lenb...)
+	if reserved {
+		b = append(b, 0, 0, 0, 0)
+	}
+	return append(b, json...)
 }
 
 func btHandshake() []byte {

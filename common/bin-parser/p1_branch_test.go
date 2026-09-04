@@ -605,12 +605,14 @@ func TestP1BranchRows(t *testing.T) {
 	})
 
 	t.Run("zabbix/data", func(t *testing.T) {
-		zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
+		zb := zabbixPacket(0x01, []byte("{}"), true)
 		require.Equal(t, uint64(2), uintVal(t, parseRule(t, zb, "zabbix", "Zabbix").Child("Length")))
 	})
 	t.Run("zabbix/flags", func(t *testing.T) {
-		zb := append([]byte("ZBXD"), 0x03, 0x00, 0x00, 0x00, 0x00)
-		require.Equal(t, uint64(3), uintVal(t, parseRule(t, zb, "zabbix", "Zabbix").Child("Flags")))
+		zb := zabbixPacket(0x03, nil, true)
+		n := parseRule(t, zb, "zabbix", "Zabbix")
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Flags").Child("Protocol")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Flags").Child("Compression")))
 	})
 
 	t.Run("net_remoting/preamble", func(t *testing.T) {
