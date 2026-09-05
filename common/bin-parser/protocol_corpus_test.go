@@ -220,10 +220,10 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 			t.Fatalf("source capture %q is absent from manifest", id)
 		}
 	}
-	if len(manifest.Captures) < 334 || totalPackets < 57900 || len(mappedProtocols) < 287 {
+	if len(manifest.Captures) < 384 || totalPackets < 58000 || len(mappedProtocols) < 337 {
 		t.Fatalf("corpus unexpectedly shrank: captures=%d packets=%d mapped_protocols=%d", len(manifest.Captures), totalPackets, len(mappedProtocols))
 	}
-	if evidenceCounts["upstream-positive"] < 155 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["educational-challenge"] != 3 || evidenceCounts["generated-positive"] < 100 {
+	if evidenceCounts["upstream-positive"] < 155 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["educational-challenge"] != 3 || evidenceCounts["generated-positive"] < 150 {
 		t.Fatalf("corpus evidence classes unexpectedly shrank: %+v", evidenceCounts)
 	}
 

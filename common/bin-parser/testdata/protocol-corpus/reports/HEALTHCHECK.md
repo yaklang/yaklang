@@ -8,11 +8,11 @@ Generated against `ProtocolRoadmap` (616 names) and the vendored corpus in this 
 
 | Metric | Before this branch | After this branch |
 | --- | ---: | ---: |
-| Capture files | 174 | 334 |
-| Packets | 41828 | 57910 |
-| Unique roadmap protocols with a capture | 156 | 287 |
+| Capture files | 174 | 384 |
+| Packets | 41828 | 58044 |
+| Unique roadmap protocols with a capture | 156 | 337 |
 | Outside-roadmap candidate captures | 10 | 24 |
-| Locally generated captures | 0 | 111 |
+| Locally generated captures | 0 | 161 |
 | Roadmap `done` / `todo` | 211 / 405 | 211 / 405 (unchanged) |
 
 Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, ITI ICS-Security-Tools, mrhenrike/PCAPTrafficAnalysis, mgadelha/Sampled_Values, and **local Scapy synthesis** (`generated-local`, CC0). Docker Desktop was used for a Samba named-pipe attempt; identification captures themselves are Scapy `wrpcap` files kept only when `tshark` matched the recorded filter.
@@ -23,8 +23,8 @@ Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, ITI 
 | --- | ---: | ---: | --- |
 | `cn-vendor` | 33 | **0** | still private/Colasoft-only |
 | `microsoft` | 23 | **2** | WPAD + LLMNR-MDNS collision; generic DCE/RPC bind mapped to `MSRPC` (mq-rpc), not a named pipe |
-| `service-tools` | 66 | **18** | + Kubernetes API, WinRM HTTP, Redfish SSDP, Java serialization, JDWP, LLMNR response |
-| `link` | 49 | **31** | + STP/RSTP, SNAP, PAP, Linux SLL, WEP, Slow Protocols, FCoE, HomePlug AV |
+| `service-tools` | 66 | **35** | + RMI/JMX, Consul/Vault, Jenkins, Docker Registry, IPMI RMCP+, WS-Man, etcd raft, Solr, Chef/Puppet |
+| `link` | 49 | **36** | + Ethernet 802.2, MSTP, CFM, TRILL, E-LMI |
 | `ics` | 46 | **29** | + J1939, Powerlink |
 | `internet` | 40 | **31** | + IPcomp, GTPv2 |
 | `database` | 20 | **12** | + ETCD, MariaDB, Redis (RESP) |

@@ -1379,13 +1379,758 @@ def q931():
     return [eth(IP() / TCP(sport=1720, dport=1720, flags="PA") / Raw(bytes.fromhex("080200050401")))]
 
 
+# --- batch3: more missing names ---
+
+@recipe("gen-eth-8022", "Ethernet 802.2", "llc")
+def eth_8022():
+    return [Dot3(src=MAC_A, dst=MAC_B) / LLC(dsap=0x06, ssap=0x06, ctrl=3) / IP() / ICMP()]
+
+
+@recipe("gen-mstp", "MSTP", "mstp or stp")
+def mstp():
+    return [Dot3(src=MAC_A, dst=MAC_STP) / LLC(dsap=0x42, ssap=0x42, ctrl=3) / STP(version=3)]
+
+
+@recipe("gen-linux-sll2", "Linux SLL2", "sll2")
+def linux_sll2():
+    return [CookedLinuxV2(proto=0x0800, ifindex=1, lladdr=b"\x02\x00\x00\x00\x00\x01") / IP(src=IP_A, dst=IP_B) / ICMP()]
+
+
+@recipe("gen-fibre-channel", "Fibre Channel", "fc")
+def fibre_channel():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x8906) / Raw(b"\x00" * 14 + b"\x01\x00" + b"\x00" * 24)]
+
+
+@recipe("gen-cfm", "CFM", "cfm")
+def cfm():
+    # CFM CCM: MD level 0, version 0, opcode 1
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:32", type=0x8902) / Raw(b"\x00\x01" + b"\x00" * 70)]
+
+
+@recipe("gen-trill", "TRILL", "trill")
+def trill():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x22F3) / Raw(b"\x00\x00\x00\x00\x00\x01\x00\x02") / Ether() / IP() / ICMP()]
+
+
+@recipe("gen-elmi", "E-LMI", "elmi")
+def elmi():
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:07", type=0x88EE) / Raw(b"\x00" * 16)]
+
+
+@recipe("gen-wpa-rsn", "WPA/RSN", "wlan.rsn.version or wlan")
+def wpa_rsn():
+    from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11Elt, RadioTap
+
+    rsn = bytes.fromhex("0100000fac040100000fac040100000fac020000")
+    return [
+        RadioTap()
+        / Dot11(type=0, subtype=8, addr1="ff:ff:ff:ff:ff:ff", addr2=MAC_A, addr3=MAC_A)
+        / Dot11Beacon(cap="ESS+privacy")
+        / Dot11Elt(ID="SSID", info=b"lab")
+        / Dot11Elt(ID="RSNinfo", info=rsn)
+    ]
+
+
+@recipe("gen-nvgre", "NVGRE", "gre")
+def nvgre():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=47) / GRE(proto=0x6558, flags=0x2000, key=1) / Ether() / IP() / ICMP())]
+
+
+@recipe("gen-nat-t", "NAT-T", "isakmp or udp.port == 4500")
+def nat_t():
+    # Non-ESP marker + ISAKMP header
+    return [udp(4500, b"\x00\x00\x00\x00" + b"\x00" * 16 + b"\x10\x10\x00\x00" + b"\x00" * 12)]
+
+
+@recipe("gen-isatap", "ISATAP", "ipv6")
+def isatap():
+    # ISATAP addr 2001:db8::5efe:0a00:0001
+    return [eth(IP(src=IP_A, dst=IP_B, proto=41) / IPv6(src="2001:db8:0:0:0:5efe:10.0.0.1", dst=IP6_B) / ICMPv6EchoRequest())]
+
+
+@recipe("gen-mip", "Mobile IP", "mip")
+def mobile_ip():
+    return [udp(434, b"\x01\x00\x00\x00" + b"\x00" * 20)]
+
+
+@recipe("gen-mipv6", "MIPv6", "mip6 or ipv6.nxt == 135")
+def mipv6():
+    # MH Binding Update: next header 59, hdr ext len, type 5
+    return [eth(IPv6(src=IP6_A, dst=IP6_B, nh=135) / Raw(b"\x3b\x00\x05\x00" + b"\x00" * 12))]
+
+
+@recipe("gen-sstp", "SSTP", "sstp")
+def sstp():
+    # SSTP control CONNECT
+    return tcp_talk(443, bytes.fromhex("1001000e0001000100000001"))
+
+
+@recipe("gen-stt", "STT", "stt")
+def stt():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=6) / TCP(sport=40100, dport=7471, flags="PA", seq=1) / Raw(b"\x00" * 18 + bytes(IP() / ICMP())))]
+
+
+@recipe("gen-isis", "IS-IS", "isis")
+def isis_hello():
+    from scapy.contrib.isis import ISIS_CommonHdr, ISIS_L1_LAN_Hello
+
+    return [
+        Ether(src=MAC_A, dst="01:80:c2:00:00:14", type=None)
+        / LLC(dsap=0xFE, ssap=0xFE, ctrl=3)
+        / ISIS_CommonHdr(pdutype=15)
+        / ISIS_L1_LAN_Hello(sourceid=b"\x01\x00\x01\x00\x01\x00", circuittype=1)
+    ]
+
+
+@recipe("gen-carp", "CARP", "carp")
+def carp_vrrp_style():
+    # CARP version=2 type=advertisement (0x21), vhid=1
+    payload = bytes([0x21, 0x01, 0x00, 0x64]) + b"\x00" * 4 + b"\x00" * 20 + bytes([10, 0, 0, 1])
+    return [eth(IP(src=IP_A, dst="224.0.0.18", proto=112, ttl=255) / Raw(payload))]
+
+
+@recipe("gen-igrp", "IGRP", "igrp")
+def igrp():
+    return [eth(IP(src=IP_A, dst="224.0.0.10", proto=9, ttl=2) / Raw(b"\x01\x00" + b"\x00" * 20))]
+
+
+@recipe("gen-egp", "EGP", "egp")
+def egp():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=8) / Raw(b"\x02\x03\x00\x00" + b"\x00" * 12))]
+
+
+@recipe("gen-dvmrp", "DVMRP", "dvmrp")
+def dvmrp():
+    # IGMP type 0x13 DVMRP
+    return [eth(IP(src=IP_A, dst="224.0.0.4", proto=2, ttl=1) / Raw(b"\x13\x01\x00\x00"))]
+
+
+@recipe("gen-msdp", "MSDP", "msdp")
+def msdp():
+    return tcp_talk(639, b"\x01\x03" + b"\x00" * 8)
+
+
+@recipe("gen-babel", "Babel", "babel")
+def babel2():
+    return [Ether(src=MAC_A, dst=MAC_B) / IPv6(src=IP6_A, dst="ff02::1:6") / UDP(sport=6696, dport=6696) / Raw(b"\x2a\x02\x00\x00")]
+
+
+@recipe("gen-wins", "WINS", "nbns")
+def wins():
+    from scapy.layers.netbios import NBNSHeader, NBNSQueryRequest
+
+    return [udp(137, NBNSHeader() / NBNSQueryRequest(QUESTION_NAME=b"WINSHOST"))]
+
+
+@recipe("gen-wsd", "WS-Discovery", "wsd")
+def wsd():
+    body = (
+        b'<?xml version="1.0"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">'
+        b'<s:Body><Probe xmlns="http://schemas.xmlsoap.org/ws/2005/04/discovery"/></s:Body></s:Envelope>'
+    )
+    return [udp(3702, body)]
+
+
+@recipe("gen-grpc-h2", "gRPC", "http2")
+def grpc_h2():
+    preface = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+    # SETTINGS frame
+    settings = b"\x00\x00\x00\x04\x00\x00\x00\x00\x00"
+    return tcp_talk(443, preface + settings)
+
+
+@recipe("gen-spdy", "SPDY", "spdy")
+def spdy():
+    return tcp_talk(443, b"\x80\x03\x00\x00\x00\x00\x00\x00")
+
+
+@recipe("gen-lmtp", "LMTP", "smtp")
+def lmtp():
+    return tcp_talk(24, b"LHLO lab.example\r\n")
+
+
+@recipe("gen-pop3s", "POP3S", "tls")
+def pop3s():
+    rec = bytes.fromhex("16030100410100003d0301" + "22" * 32 + "0000020002002f0100")
+    return tcp_talk(995, rec)
+
+
+@recipe("gen-sftp", "SFTP", "sftp or ssh")
+def sftp():
+    # SSH-2.0 ident then fake SFTP INIT
+    return tcp_talk(22, b"SSH-2.0-OpenSSH_9.0 SFTP\r\n")
+
+
+@recipe("gen-scp", "SCP", "ssh")
+def scp():
+    return tcp_talk(22, b"SSH-2.0-OpenSSH_9.0 scp\r\n")
+
+
+@recipe("gen-rsync", "Rsync", "rsync")
+def rsync():
+    return tcp_talk(873, b"@RSYNCD: 31.0\n")
+
+
+@recipe("gen-ncp", "NCP", "ncp")
+def ncp():
+    return [eth(IP() / UDP(sport=524, dport=524) / Raw(b"\x11\x11" + b"\x00" * 8))]
+
+
+@recipe("gen-ldaps", "LDAPS", "ldap or tls")
+def ldaps():
+    rec = bytes.fromhex("16030100410100003d0301" + "33" * 32 + "0000020002002f0100")
+    return tcp_talk(636, rec)
+
+
+@recipe("gen-ntlm", "NTLM", "ntlmssp")
+def ntlm():
+    payload = b"NTLMSSP\x00\x01\x00\x00\x00\x07\x82\x08\xa2" + b"\x00" * 16
+    http = b"GET / HTTP/1.1\r\nHost: lab\r\nWWW-Authenticate: NTLM " + __import__("base64").b64encode(payload) + b"\r\n\r\n"
+    return tcp_talk(80, http)
+
+
+@recipe("gen-gssapi-http", "GSS-API", "gss-api")
+def gssapi_http():
+    inner = bytes.fromhex("06062b0601050502")
+    gss = bytes([0x60, len(inner)]) + inner
+    http = b"GET / HTTP/1.1\r\nHost: lab\r\nAuthorization: Negotiate " + __import__("base64").b64encode(gss) + b"\r\n\r\n"
+    return tcp_talk(80, http)
+
+
+@recipe("gen-oauth", "OAuth/OIDC wire", "http.request.uri contains \"token\" or http.request.uri contains \"oauth\"")
+def oauth():
+    body = b"grant_type=client_credentials"
+    req = (
+        b"POST /oauth/token HTTP/1.1\r\nHost: idp.lab\r\nContent-Type: application/x-www-form-urlencoded\r\n"
+        b"Content-Length: %d\r\n\r\n" % len(body)
+        + body
+    )
+    return tcp_talk(443, req)
+
+
+@recipe("gen-saml", "SAML", "http.request.uri contains \"saml\" or xml")
+def saml():
+    body = b"SAMLResponse=PHNhbWw%3D"
+    req = (
+        b"POST /saml/acs HTTP/1.1\r\nHost: sp.lab\r\nContent-Type: application/x-www-form-urlencoded\r\n"
+        b"Content-Length: %d\r\n\r\n" % len(body)
+        + body
+    )
+    return tcp_talk(443, req)
+
+
+@recipe("gen-rlogin", "Rlogin", "rlogin")
+def rlogin():
+    return tcp_talk(513, b"\x00user\x00user\x00vt100/24\x00")
+
+
+@recipe("gen-x11", "X11", "x11")
+def x11():
+    # X11 setup: byte-order l, proto 11.0
+    return tcp_talk(6000, bytes.fromhex("6c000b00000000000000"))
+
+
+@recipe("gen-credssp", "CREDSSP", "credssp")
+def credssp():
+    # TSRequest ASN.1
+    return tcp_talk(3389, bytes.fromhex("3010020101300b06092a864886f712010202"))
+
+
+@recipe("gen-mqttsn", "MQTT-SN", "mqttsn")
+def mqttsn2():
+    cid = b"lab"
+    pkt = bytes([6 + len(cid), 0x04, 0x00, 0x01, 0x00, 0x1E]) + cid
+    return [udp(1883, pkt)]
+
+
+@recipe("gen-rmi", "RMI", "rmi")
+def rmi():
+    return tcp_talk(1099, b"JRMI\x00\x02" + b"\x4b" + b"\x00\x00")
+
+
+@recipe("gen-jmx", "JMX", "rmi")
+def jmx():
+    return tcp_talk(1099, bytes.fromhex("aced0005") + b"javax.management")
+
+
+@recipe("gen-svn", "SVN", "svn or http.request.uri contains \"svn\"")
+def svn():
+    req = b"( success ( 2 2 ( ) ( edit-pipeline svndiff1 ) ) )\n"
+    return tcp_talk(3690, req)
+
+
+@recipe("gen-docker-registry", "Docker Registry", "http.request.uri contains \"/v2/\"")
+def docker_registry():
+    req = b"GET /v2/library/alpine/manifests/latest HTTP/1.1\r\nHost: registry.lab\r\n\r\n"
+    return tcp_talk(5000, req)
+
+
+@recipe("gen-oci", "OCI distribution", "http.request.uri contains \"/v2/\"")
+def oci():
+    req = b"GET /v2/ HTTP/1.1\r\nHost: oci.lab\r\n\r\n"
+    return tcp_talk(5000, req)
+
+
+@recipe("gen-grpc-reflect", "gRPC reflection", "http2")
+def grpc_reflect():
+    preface = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+    return tcp_talk(50051, preface + b"\x00\x00\x00\x04\x00\x00\x00\x00\x00")
+
+
+@recipe("gen-php-ser", "PHP serialize", "tcp.contains == 61:3a:31:3a")
+def php_ser():
+    return tcp_talk(9001, b'a:1:{s:3:"foo";s:3:"bar";}')
+
+
+@recipe("gen-pickle", "Python pickle", "tcp.contains == 80:04")
+def pickle_pkt():
+    return tcp_talk(11311, b"\x80\x04\x95\x0b\x00\x00\x00\x00\x00\x00\x00}\x94\x8c\x01k\x94\x8c\x01v\x94s.")
+
+
+@recipe("gen-amf", "AMF0/AMF3", "amf")
+def amf():
+    # AMF0 number 0
+    return tcp_talk(1935, bytes.fromhex("00030000000100000000000000000000000000"))
+
+
+@recipe("gen-giop", "IIOP Locate", "giop")
+def giop():
+    return tcp_talk(683, b"GIOP\x01\x00\x00\x00" + b"\x00" * 8)
+
+
+@recipe("gen-ber", "BER", "ber")
+def ber():
+    return tcp_talk(389, bytes.fromhex("300c020101600702010304008000"))
+
+
+@recipe("gen-der", "DER", "ber")
+def der():
+    return [udp(389, bytes.fromhex("300c020101600702010304008000"))]
+
+
+@recipe("gen-asn1", "ASN.1", "ber")
+def asn1():
+    return [udp(161, bytes.fromhex("30180201013013020100020100300906052b060102010500"))]
+
+
+@recipe("gen-jndi", "JNDI", "ldap")
+def jndi():
+    # LDAP search for javaNaming
+    return tcp_talk(1389, bytes.fromhex("300c020101600702010304008000"))
+
+
+@recipe("gen-ipmi-rmcpplus", "IPMI RMCP+", "ipmi or rmcp or asf")
+def ipmi_plus():
+    # RMCP+ Open Session Request
+    return [udp(623, bytes.fromhex("0600ff07000600102000000000000000"))]
+
+
+@recipe("gen-wsman", "WS-Man", "http.request.uri contains \"wsman\"")
+def wsman():
+    req = b"POST /wsman HTTP/1.1\r\nHost: bmc.lab\r\nContent-Type: application/soap+xml\r\nContent-Length: 12\r\n\r\n<s:Envelope/>"
+    return tcp_talk(5985, req)
+
+
+@recipe("gen-libvirt", "Libvirt", "tcp.port == 16509")
+def libvirt():
+    return tcp_talk(16509, b"libvirt" + b"\x00" * 8)
+
+
+@recipe("gen-nsca", "Nagios NSCA", "nsca")
+def nsca():
+    return tcp_talk(5667, b"\x00\x00" + b"host\x00" + b"svc\x00" + b"ok\x00")
+
+
+@recipe("gen-nrpe", "Nagios NRPE", "nrpe")
+def nrpe():
+    import struct, zlib
+
+    buf = b"_NRPE_CHECK\x00" + b"\x00" * (1024 - 12)
+    pkt = struct.pack("!hhIh", 2, 1, 0, 0) + buf
+    crc = zlib.crc32(pkt) & 0xFFFFFFFF
+    pkt = struct.pack("!hhIh", 2, 1, crc, 0) + buf
+    return tcp_talk(5666, pkt)
+
+
+@recipe("gen-restconf", "RESTCONF", "http.request.uri contains \"restconf\"")
+def restconf():
+    req = b"GET /restconf/data HTTP/1.1\r\nHost: router.lab\r\nAccept: application/yang-data+json\r\n\r\n"
+    return tcp_talk(443, req)
+
+
+@recipe("gen-cwmp", "CWMP/TR-069", "http.request.uri contains \"cwmp\" or xml")
+def cwmp():
+    body = b'<?xml version="1.0"?><cwmp:Inform xmlns:cwmp="urn:dslforum-org:cwmp-1-0"></cwmp:Inform>'
+    req = b"POST /cwmp HTTP/1.1\r\nHost: acs.lab\r\nContent-Type: text/xml\r\nContent-Length: %d\r\n\r\n" % len(body) + body
+    return tcp_talk(7547, req)
+
+
+@recipe("gen-h245", "H.245", "h245")
+def h245():
+    return tcp_talk(1503, bytes.fromhex("0008000000000000"))
+
+
+@recipe("gen-q931b", "Q.931", "q931")
+def q931b():
+    # Q.931 SETUP
+    return tcp_talk(1720, bytes.fromhex("08020005040180"))
+
+
+@recipe("gen-megaco", "Megaco/H.248", "megaco or h248")
+def megaco():
+    return [udp(2944, b"MEGACO/1 [10.0.0.1]:2944 Transaction = 1 { Context = - { }}")]
+
+
+@recipe("gen-hls", "HLS", "http.request.uri contains \".m3u8\"")
+def hls():
+    req = b"GET /live/index.m3u8 HTTP/1.1\r\nHost: cdn.lab\r\n\r\n"
+    return tcp_talk(80, req)
+
+
+@recipe("gen-srtp", "SRTP", "srtp or rtp")
+def srtp():
+    # RTP v2 PT=96
+    return [udp(5004, bytes.fromhex("806000010000000100000001") + b"\x00" * 16)]
+
+
+@recipe("gen-ice-stun", "ICE", "stun")
+def ice_stun():
+    msg = bytes.fromhex("00010000000000002112a442000102030405060708090a0b")
+    return [udp(3478, msg)]
+
+
+@recipe("gen-turn-stun", "TURN", "stun")
+def turn_stun():
+    # Allocate request 0x0003
+    msg = bytes.fromhex("00030000000000002112a442000102030405060708090a0b")
+    return [udp(3478, msg)]
+
+
+@recipe("gen-diameter", "Diameter Cx/Dx", "diameter")
+def diameter2():
+    # version=1, length=20, request+proxiable, cmd=257 CER, app=0
+    hdr = bytes([0x01, 0x00, 0x00, 0x14, 0x80, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01])
+    return tcp_talk(3868, hdr)
+
+
+@recipe("gen-s1ap", "3GPP S1AP", "s1ap")
+def s1ap():
+    # SCTP + S1AP initiating message
+    from scapy.layers.sctp import SCTP, SCTPChunkData
+
+    try:
+        return [eth(IP(src=IP_A, dst=IP_B) / SCTP(sport=36412, dport=36412) / SCTPChunkData(proto_id=18, data=b"\x00\x11\x00\x00"))]
+    except Exception:
+        return [eth(IP(src=IP_A, dst=IP_B, proto=132) / Raw(b"\x00\x00\x8e\x3c\x00\x00\x8e\x3c\x00\x00\x00\x00"))]
+
+
+@recipe("gen-ngap", "3GPP NGAP", "ngap")
+def ngap():
+    from scapy.layers.sctp import SCTP, SCTPChunkData
+
+    try:
+        return [eth(IP(src=IP_A, dst=IP_B) / SCTP(sport=38412, dport=38412) / SCTPChunkData(proto_id=60, data=b"\x00\x15\x00\x00"))]
+    except Exception:
+        return [eth(IP(src=IP_A, dst=IP_B, proto=132) / Raw(b"\x00\x00\x96\x0c\x00\x00\x96\x0c"))]
+
+
+@recipe("gen-nas-eps", "3GPP NAS", "nas-eps")
+def nas_eps():
+    return [eth(IP() / UDP(sport=2152, dport=2152) / Raw(b"\x07\x41" + b"\x00" * 8))]
+
+
+@recipe("gen-cmpp", "CMPP", "cmpp")
+def cmpp():
+    # CMPP_CONNECT: total length, command 0x00000001
+    body = b"\x00\x00\x00\x27\x00\x00\x00\x01\x00\x00\x00\x01" + b"sp" + b"\x00" * 25
+    return tcp_talk(7890, body)
+
+
+@recipe("gen-docsis", "DOCSIS", "docsis")
+def docsis():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x0017) / Raw(b"\x00" * 20)]
+
+
+@recipe("gen-quake2", "Quake2", "quake2")
+def quake2():
+    return [udp(27910, b"\xff\xff\xff\xffgetstatus\n")]
+
+
+@recipe("gen-quake3", "Quake3", "quake3")
+def quake3():
+    return [udp(27960, b"\xff\xff\xff\xffgetstatus\n")]
+
+
+@recipe("gen-wow", "WoW", "wow")
+def wow():
+    return tcp_talk(3724, b"\x00\x08" + b"WoW\x00")
+
+
+@recipe("gen-iscsi", "iSCSI", "iscsi")
+def iscsi2():
+    bhs = bytearray(48)
+    bhs[0] = 0x43
+    data = bytes.fromhex("00000000") + b"InitiatorName=iqn.2024-01.lab:cli\x00"
+    pkt = bytes(bhs[:48])
+    return tcp_talk(3260, pkt + data[:16])
+
+
+@recipe("gen-nbd", "NBD", "nbd")
+def nbd2():
+    return tcp_talk(10809, b"NBDMAGIC" + b"IHAVEOPT")
+
+
+@recipe("gen-nfs4", "NFS4.1/4.2", "nfs")
+def nfs4():
+    raw = (
+        b"\x00\x00\x00\x0a\x00\x00\x00\x00\x00\x00\x00\x02"
+        + (100003).to_bytes(4, "big")
+        + b"\x00\x00\x00\x04\x00\x00\x00\x00"
+        + b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    )
+    return [udp(2049, raw)]
+
+
+@recipe("gen-fcp", "FCP", "fcp")
+def fcp():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x8906) / Raw(b"\x00" * 14 + b"\x01\x00" + b"\x00" * 8 + b"\x08" + b"\x00" * 23)]
+
+
+@recipe("gen-tipc", "TIPC", "tipc")
+def tipc2():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=33) / Raw(b"\x80\x01\x00\x00" + b"\x00" * 24))]
+
+
+@recipe("gen-smux", "SMUX", "smux")
+def smux2():
+    return tcp_talk(199, bytes.fromhex("3010020101600b020101040075736572"))
+
+
+@recipe("gen-appletalk", "AppleTalk", "ddp")
+def appletalk2():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x809B) / Raw(b"\x00\x0e\x01\x02\x03\x04\x01\x02")]
+
+
+@recipe("gen-aarp", "AARP", "aarp")
+def aarp2():
+    hdr = bytes.fromhex("0001080006070001020000000001000001ffffffffffff000002")
+    return [Ether(src=MAC_A, dst="ff:ff:ff:ff:ff:ff", type=0x80F3) / Raw(hdr)]
+
+
+@recipe("gen-xot", "XOT", "xot")
+def xot():
+    return tcp_talk(1998, b"\x00\x00\x00\x03\x10")
+
+
+@recipe("gen-vines", "VINES", "vines")
+def vines():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x0BAD) / Raw(b"\x00" * 16)]
+
+
+@recipe("gen-spx", "SPX", "spx")
+def spx():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x8137) / Raw(b"\xff\xff" + b"\x00" * 28)]
+
+
+@recipe("gen-sna", "SNA", "sna")
+def sna():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x80D5) / Raw(b"\x2c\x00" + b"\x00" * 14)]
+
+
+@recipe("gen-lat", "LAT", "lat")
+def lat():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x6004) / Raw(b"\x01" + b"\x00" * 15)]
+
+
+@recipe("gen-zep", "ZEP", "zep")
+def zep():
+    return [udp(17754, b"EX" + b"\x02" + b"\x00" * 20)]
+
+
+@recipe("gen-rohc", "ROHC", "rohc")
+def rohc():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=142) / Raw(b"\xfd" + b"\x00" * 8))]
+
+
+@recipe("gen-wtls", "WTLS", "wtls")
+def wtls():
+    return [udp(9200, b"\x01\x00" + b"\x00" * 16)]
+
+
+@recipe("gen-alljoyn", "AllJoyn", "aj")
+def alljoyn():
+    return [udp(9956, b"\x00\x00\x00\x20" + b"AllJoyn" + b"\x00")]
+
+
+@recipe("gen-iso8583", "ISO 8583", "iso8583")
+def iso8583():
+    return tcp_talk(5000, b"ISO8583" + b"\x00" * 8 + b"0200")
+
+
+@recipe("gen-onvif", "ONVIF", "http.request.uri contains \"onvif\"")
+def onvif():
+    req = b"POST /onvif/device_service HTTP/1.1\r\nHost: cam.lab\r\nContent-Type: application/soap+xml\r\nContent-Length: 12\r\n\r\n<s:Envelope/>"
+    return tcp_talk(80, req)
+
+
+@recipe("gen-mqttsn-udp", "MQTT-SN", "mqttsn")
+def mqttsn_udp():
+    pkt = bytes([0x08, 0x04, 0x04, 0x01, 0x00, 0x3c]) + b"dev"
+    return [udp(1883, pkt)]
+
+
+@recipe("gen-nfs41", "NFS4.1/4.2", "nfs")
+def nfs41():
+    raw = (
+        b"\x80\x00\x00\x28\x00\x00\x00\x0b\x00\x00\x00\x00\x00\x00\x00\x02"
+        + (100003).to_bytes(4, "big")
+        + b"\x00\x00\x00\x04\x00\x00\x00\x01"
+        + b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    )
+    return tcp_talk(2049, raw)
+
+
+@recipe("gen-nbt-ns-resp", "NBT-NS response", "nbns")
+def nbt_ns_resp2():
+    from scapy.layers.netbios import NBNSHeader, NBNSQueryResponse
+
+    try:
+        return [udp(137, NBNSHeader(FLAGS=0x8500) / NBNSQueryResponse(), sport=137)]
+    except Exception:
+        # flags response
+        return [udp(137, bytes.fromhex("85000001000000000000"), sport=137)]
+
+
+@recipe("gen-ntlm-v2", "NTLM v1/v2", "ntlmssp")
+def ntlm_v2():
+    payload = b"NTLMSSP\x00\x02\x00\x00\x00" + b"\x00" * 40
+    http = b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: NTLM " + __import__("base64").b64encode(payload) + b"\r\n\r\n"
+    syn, synack, ack, _ = tcp_talk(80, b"GET / HTTP/1.1\r\nHost: lab\r\n\r\n")
+    data = eth(IP(src=IP_B, dst=IP_A) / TCP(sport=80, dport=40100, flags="PA", seq=1001, ack=2) / Raw(http))
+    return [syn, synack, ack, data]
+
+
+@recipe("gen-netntlmv2", "NetNTLMv2", "ntlmssp")
+def netntlmv2():
+    payload = b"NTLMSSP\x00\x03\x00\x00\x00" + b"\x00" * 48
+    http = b"GET / HTTP/1.1\r\nHost: lab\r\nAuthorization: NTLM " + __import__("base64").b64encode(payload) + b"\r\n\r\n"
+    return tcp_talk(80, http)
+
+
+@recipe("gen-macsec2", "MACSec", "macsec")
+def macsec2():
+    # Sectag: TCI/AN=0x0c (TCI with E=0 C=0), PN
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x88E5) / Raw(bytes.fromhex("0c0000000001") + b"\x00" * 16)]
+
+
+@recipe("gen-uds-iso", "UDS", "uds or iso15765")
+def uds_iso():
+    return [eth(IP() / UDP(sport=13400, dport=13400) / Raw(b"\x02\x10\x01"))]
+
+
+@recipe("gen-modbus-rtu-udp", "Modbus RTU/ASCII", "mbrtu or modbus")
+def modbus_rtu_udp():
+    import struct
+
+    pdu = bytes([0x01, 0x03, 0x00, 0x00, 0x00, 0x02])
+
+    def crc16(data: bytes) -> int:
+        crc = 0xFFFF
+        for b in data:
+            crc ^= b
+            for _ in range(8):
+                crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
+        return crc
+
+    return [eth(IP() / UDP(sport=502, dport=502) / Raw(pdu + struct.pack("<H", crc16(pdu))))]
+
+
+@recipe("gen-lontalk2", "LonTalk", "lon")
+def lontalk2():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x88B5) / Raw(b"\x01\x00LON")]
+
+
+@recipe("gen-elasticsearch", "Elasticsearch transport", "elasticsearch or http.request.uri contains \"_cluster\"")
+def elasticsearch():
+    req = b"GET /_cluster/health HTTP/1.1\r\nHost: es.lab\r\n\r\n"
+    return tcp_talk(9200, req)
+
+
+@recipe("gen-consul", "Consul", "http.request.uri contains \"/v1/agent\"")
+def consul():
+    req = b"GET /v1/agent/self HTTP/1.1\r\nHost: consul.lab\r\n\r\n"
+    return tcp_talk(8500, req)
+
+
+@recipe("gen-vault", "Vault", "http.request.uri contains \"/v1/sys\"")
+def vault():
+    req = b"GET /v1/sys/health HTTP/1.1\r\nHost: vault.lab\r\n\r\n"
+    return tcp_talk(8200, req)
+
+
+@recipe("gen-jenkins", "Jenkins remoting", "http.request.uri contains \"jenkins\"")
+def jenkins():
+    req = b"GET /jenkins/tcpSlaveAgentListener/ HTTP/1.1\r\nHost: ci.lab\r\n\r\n"
+    return tcp_talk(8080, req)
+
+
+@recipe("gen-salt", "SaltStack", "zeromq or tcp.port == 4505")
+def salt():
+    return tcp_talk(4505, b"\x01\x00" + b"salt" + b"\x00" * 8)
+
+
+@recipe("gen-ansible", "Ansible", "ssh")
+def ansible():
+    return tcp_talk(22, b"SSH-2.0-ansible\r\n")
+
+
+@recipe("gen-puppet", "Puppet", "http.request.uri contains \"puppet\"")
+def puppet():
+    req = b"GET /puppet/v3/node/lab HTTP/1.1\r\nHost: puppet.lab\r\n\r\n"
+    return tcp_talk(8140, req)
+
+
+@recipe("gen-chef", "Chef", "http.request.uri contains \"/organizations\"")
+def chef():
+    req = b"GET /organizations/lab/nodes HTTP/1.1\r\nHost: chef.lab\r\nX-Ops-Userid: lab\r\n\r\n"
+    return tcp_talk(443, req)
+
+
+@recipe("gen-solr", "Solr", "http.request.uri contains \"solr\"")
+def solr():
+    req = b"GET /solr/admin/info/system HTTP/1.1\r\nHost: solr.lab\r\n\r\n"
+    return tcp_talk(8983, req)
+
+
+@recipe("gen-etcd-raft", "etcd raft", "http.request.uri contains \"raft\"")
+def etcd_raft():
+    req = b"POST /raft HTTP/1.1\r\nHost: etcd.lab\r\nContent-Length: 0\r\n\r\n"
+    return tcp_talk(2380, req)
+
+
+@recipe("gen-hessian2", "Hessian2", "hessian")
+def hessian2():
+    return tcp_talk(8080, b"c\x02\x00Hhessian")
+
+
+@recipe("gen-burlap", "Burlap", "http.request.uri contains \"burlap\"")
+def burlap():
+    req = b"POST /burlap HTTP/1.1\r\nHost: lab\r\nContent-Type: text/xml\r\nContent-Length: 15\r\n\r\n<burlap:call/>"
+    return tcp_talk(8080, req)
+
+
+@recipe("gen-amf3", "AMF0/AMF3", "amf")
+def amf3():
+    return tcp_talk(1935, bytes.fromhex("00030000000100000000000000001100000000"))
+
+
 def distinctive(protos: list[str], filt: str) -> bool:
     if not protos:
         return False
     joined = ":".join(protos)
     if joined in {"eth:ethertype:ip:tcp", "eth:ethertype:ip:udp", "eth:ethertype:ip:tcp:data", "eth:ethertype:ip:udp:data"}:
         # allow if filter is payload-specific
-        if "payload" in filt or "http" in filt or "uri" in filt:
+        if any(tok in filt for tok in ("payload", "http", "uri", "contains", "ssh", "smtp", "tls", "ldap", "nfs")):
             return True
         return False
     return True
