@@ -1,6 +1,6 @@
 protocol,family,priority,implementation_status,authoritative_capture_count,material_status
 Ethernet II,link,P0,done,1,collected
-Ethernet 802.2,link,P1,done,0,missing
+Ethernet 802.2,link,P1,done,1,collected
 Ethernet 802.3,link,P1,done,1,collected
 Ethernet SNAP,link,P1,done,1,collected
 IEEE 802.1Q,link,P0,done,1,collected
@@ -17,7 +17,7 @@ EAPOL,link,P1,done,1,collected
 EAP,link,P1,done,1,collected
 STP,link,P1,done,1,collected
 RSTP,link,P1,done,1,collected
-MSTP,link,P2,todo,0,missing
+MSTP,link,P2,todo,1,collected
 LLDP,link,P1,done,1,collected
 CDP,link,P1,done,1,collected
 LACP,link,P2,todo,1,collected
@@ -43,10 +43,10 @@ MRP-MMRP,link,P4,todo,0,missing
 MRP-MVRP,link,P4,todo,0,missing
 MRP-MSRP,link,P4,todo,0,missing
 EOAM,link,P4,todo,0,missing
-CFM,link,P4,todo,0,missing
-E-LMI,link,P4,todo,0,missing
+CFM,link,P4,todo,1,collected
+E-LMI,link,P4,todo,1,collected
 VNTAG,link,P4,todo,0,missing
-TRILL,link,P4,todo,0,missing
+TRILL,link,P4,todo,1,collected
 SPB,link,P4,todo,0,missing
 IPv4,internet,P0,done,1,collected
 IPv6,internet,P0,done,1,collected
@@ -68,12 +68,12 @@ MPLS,internet,P1,done,1,collected
 MPLS PW,internet,P2,todo,0,missing
 VXLAN,internet,P1,done,1,collected
 Geneve,internet,P2,todo,1,collected
-NVGRE,internet,P2,todo,0,missing
+NVGRE,internet,P2,todo,1,collected
 STT,internet,P4,todo,0,missing
 GTP-C,internet,P2,todo,1,collected
 GTP-U,internet,P2,todo,1,collected
 GTPv2,internet,P2,todo,1,collected
-Mobile IP,internet,P4,todo,0,missing
+Mobile IP,internet,P4,todo,1,collected
 MIPv6,internet,P4,todo,0,missing
 L2TP,internet,P1,done,1,collected
 L2F,internet,P4,todo,0,missing
@@ -83,7 +83,7 @@ OpenVPN,internet,P1,done,1,collected
 WireGuard,internet,P1,done,1,collected
 IKEv1,internet,P1,done,1,collected
 IKEv2,internet,P1,done,1,collected
-NAT-T,internet,P1,done,0,missing
+NAT-T,internet,P1,done,1,collected
 Teredo,internet,P4,todo,1,collected
 6in4,internet,P4,todo,1,collected
 6to4,internet,P4,todo,1,collected
@@ -95,15 +95,15 @@ RIP,routing,P1,done,1,collected
 RIPng,routing,P2,todo,1,collected
 EIGRP,routing,P1,done,1,collected
 IS-IS,routing,P2,todo,0,missing
-IGRP,routing,P4,todo,0,missing
+IGRP,routing,P4,todo,1,collected
 EGP,routing,P4,todo,0,missing
 VRRP,routing,P1,done,1,collected
 HSRP,routing,P1,done,1,collected
 GLBP,routing,P2,todo,1,collected
 CARP,routing,P4,todo,0,missing
 PIM,routing,P2,todo,2,collected
-DVMRP,routing,P4,todo,0,missing
-MSDP,routing,P4,todo,0,missing
+DVMRP,routing,P4,todo,1,collected
+MSDP,routing,P4,todo,1,collected
 LDP,routing,P2,todo,1,collected
 RSVP,routing,P2,todo,1,collected
 BFD,routing,P2,todo,1,collected
@@ -111,7 +111,7 @@ LACP-marker,routing,P4,todo,0,missing
 NHRP,routing,P2,todo,1,collected
 DMVPN,routing,P2,todo,0,missing
 OLSR,routing,P4,todo,1,collected
-Babel,routing,P4,todo,0,missing
+Babel,routing,P4,todo,1,collected
 TCP,transport,P0,done,1,collected
 UDP,transport,P0,done,1,collected
 SCTP,transport,P1,done,1,collected
@@ -135,7 +135,7 @@ BOOTP,name-config,P1,done,1,collected
 NTP,name-config,P1,done,4,collected
 SNTP,name-config,P2,todo,1,collected
 PTP,name-config,P1,done,1,collected
-WINS,name-config,P2,todo,0,missing
+WINS,name-config,P2,todo,1,collected
 WINS-Replication,name-config,P4,todo,0,missing
 SSDP,name-config,P1,done,1,collected
 UPnP,name-config,P1,done,1,collected
@@ -182,30 +182,30 @@ SMB3,file,P0,done,1,collected
 CIFS,file,P0,done,1,collected
 SMB-Direct,file,P2,todo,0,missing
 AFP,file,P2,todo,1,collected
-NCP,file,P4,todo,0,missing
+NCP,file,P4,todo,1,collected
 IPP,file,P2,todo,1,collected
 LPD,file,P4,todo,1,collected
-Rsync,file,P2,todo,0,missing
+Rsync,file,P2,todo,1,collected
 9P,file,P4,todo,1,collected
 LDAP,auth,P0,done,1,collected
 LDAPS,auth,P1,done,0,missing
 CLDAP,auth,P1,done,1,collected
 Kerberos,auth,P0,done,2,collected
-NTLM,auth,P0,done,0,missing
+NTLM,auth,P0,done,1,collected
 NTLMSSP,auth,P0,done,1,collected
 SPNEGO,auth,P0,done,1,collected
-GSS-API,auth,P1,done,0,missing
+GSS-API,auth,P1,done,1,collected
 RADIUS,auth,P0,done,1,collected
 TACACS+,auth,P1,done,1,collected
 Diameter,auth,P2,todo,1,collected
-OAuth/OIDC wire,auth,P2,todo,0,missing
-SAML,auth,P2,todo,0,missing
+OAuth/OIDC wire,auth,P2,todo,1,collected
+SAML,auth,P2,todo,1,collected
 SOCKS4,auth,P1,done,1,collected
 SOCKS5,auth,P0,done,1,collected
 HTTP Proxy CONNECT,auth,P1,done,1,collected
 SSH,remote,P0,done,1,collected
 Telnet,remote,P1,done,1,collected
-Rlogin,remote,P4,todo,0,missing
+Rlogin,remote,P4,todo,1,collected
 RSH,remote,P4,todo,1,collected
 RDP,remote,P0,done,1,collected
 CREDSSP,remote,P1,done,0,missing
@@ -279,9 +279,9 @@ NetFlow v9,mgmt,P2,todo,2,collected
 IPFIX,mgmt,P2,todo,1,collected
 sFlow,mgmt,P2,todo,1,collected
 ICMP Timestamp,mgmt,P2,todo,1,collected
-CWMP/TR-069,mgmt,P2,todo,0,missing
+CWMP/TR-069,mgmt,P2,todo,1,collected
 NETCONF,mgmt,P2,todo,0,missing
-RESTCONF,mgmt,P2,todo,0,missing
+RESTCONF,mgmt,P2,todo,1,collected
 gNMI,mgmt,P4,todo,0,missing
 IPMI,mgmt,P1,done,1,collected
 Redfish,mgmt,P2,todo,1,collected
@@ -301,7 +301,7 @@ H.225,voip,P2,todo,1,collected
 H.245,voip,P2,todo,0,missing
 Q.931,voip,P2,todo,0,missing
 MGCP,voip,P2,todo,1,collected
-Megaco/H.248,voip,P4,todo,0,missing
+Megaco/H.248,voip,P4,todo,1,collected
 SCCP/Skinny,voip,P2,todo,1,collected
 IAX2,voip,P4,todo,1,collected
 T.38,voip,P4,todo,1,collected
@@ -310,7 +310,7 @@ STUN,voip,P1,done,1,collected
 TURN,voip,P1,done,0,missing
 ICE,voip,P2,todo,0,missing
 SRTP,voip,P2,todo,0,missing
-HLS,voip,P4,todo,0,missing
+HLS,voip,P4,todo,1,collected
 RTMP,voip,P1,done,1,collected
 RTMPE,voip,P3,todo,0,missing
 MPEG-TS,voip,P2,todo,1,collected
@@ -338,7 +338,7 @@ MS-FASP,microsoft,P4,todo,0,missing
 LLMNR-MDNS collision,microsoft,P1,done,1,collected
 WPAD,microsoft,P1,done,1,collected
 Modbus TCP,ics,P2,todo,1,collected
-Modbus RTU/ASCII,ics,P2,todo,0,missing
+Modbus RTU/ASCII,ics,P2,todo,1,collected
 S7comm,ics,P2,todo,1,collected
 S7comm-plus,ics,P2,todo,1,collected
 COTP,ics,P2,todo,1,collected
@@ -459,12 +459,12 @@ Hikvision ISAPI,cn-vendor,P3,todo,0,missing
 Hikvision SDK,cn-vendor,P3,todo,0,missing
 Uniview,cn-vendor,P3,todo,0,missing
 GB28181,cn-vendor,P2,todo,0,missing
-ONVIF,cn-vendor,P2,todo,0,missing
+ONVIF,cn-vendor,P2,todo,1,collected
 RTSP-over-GB,cn-vendor,P3,todo,0,missing
 WPS Office sync,cn-vendor,P4,todo,0,missing
 Kingsoft,cn-vendor,P4,todo,0,missing
 Yakit proxy framing,cn-vendor,P0,done,0,missing
-CMPP,carrier,P3,todo,0,missing
+CMPP,carrier,P3,todo,1,collected
 SGIP,carrier,P3,todo,0,missing
 SMGP,carrier,P3,todo,0,missing
 SMPP,carrier,P2,todo,1,collected
@@ -485,15 +485,15 @@ PFCP,carrier,P2,todo,2,collected
 GTP Prime,carrier,P4,todo,1,collected
 WoW,game,P4,todo,0,missing
 Quake,game,P4,todo,1,collected
-Quake2,game,P4,todo,0,missing
-Quake3,game,P4,todo,0,missing
+Quake2,game,P4,todo,1,collected
+Quake3,game,P4,todo,1,collected
 Steam,game,P4,todo,1,collected
 Xbox Live,game,P4,todo,0,missing
 PlayStation,game,P4,todo,0,missing
 Tencent Games,game,P3,todo,1,collected
 NetEase Games,game,P3,todo,1,collected
 miHoYo/HoYoverse,game,P3,todo,1,collected
-iSCSI,storage,P2,todo,0,missing
+iSCSI,storage,P2,todo,1,collected
 NBD,storage,P4,todo,0,missing
 AoE,storage,P4,todo,1,collected
 FCP,storage,P2,todo,0,missing
@@ -501,23 +501,23 @@ NVMe-oF,storage,P2,todo,1,collected
 Ceph,storage,P2,todo,1,collected
 Gluster,storage,P4,todo,0,missing
 MinIO/S3,storage,P1,done,1,collected
-NFS4.1/4.2,storage,P2,todo,0,missing
+NFS4.1/4.2,storage,P2,todo,1,collected
 SMB3 multichannel,storage,P2,todo,0,missing
-RMI,service-tools,P1,done,0,missing
-JMX,service-tools,P1,done,0,missing
+RMI,service-tools,P1,done,1,collected
+JMX,service-tools,P1,done,1,collected
 JDWP,service-tools,P1,done,1,collected
 FastCGI,service-tools,P1,done,1,collected
 AJP,service-tools,P0,done,1,collected
-IIOP Locate,service-tools,P1,done,0,missing
+IIOP Locate,service-tools,P1,done,1,collected
 Memcache binary,service-tools,P1,done,1,collected
 Docker API,service-tools,P1,done,1,collected
 Kubernetes API,service-tools,P1,done,1,collected
-etcd raft,service-tools,P2,todo,0,missing
-Consul,service-tools,P2,todo,0,missing
-Vault,service-tools,P2,todo,0,missing
-Elasticsearch transport,service-tools,P1,done,0,missing
-Solr,service-tools,P2,todo,0,missing
-Jenkins remoting,service-tools,P1,done,0,missing
+etcd raft,service-tools,P2,todo,1,collected
+Consul,service-tools,P2,todo,1,collected
+Vault,service-tools,P2,todo,1,collected
+Elasticsearch transport,service-tools,P1,done,1,collected
+Solr,service-tools,P2,todo,1,collected
+Jenkins remoting,service-tools,P1,done,1,collected
 Redis Sentinel/Cluster,service-tools,P1,done,0,missing
 Zabbix agent,service-tools,P1,done,1,collected
 Nagios NRPE,service-tools,P2,todo,0,missing
@@ -529,9 +529,9 @@ vSphere NBDSSL,service-tools,P2,todo,0,missing
 Xen API,service-tools,P4,todo,0,missing
 Libvirt,service-tools,P2,todo,0,missing
 QEMU QMP,service-tools,P2,todo,0,missing
-IPMI RMCP+,service-tools,P1,done,0,missing
+IPMI RMCP+,service-tools,P1,done,1,collected
 Redfish SSDP,service-tools,P2,todo,1,collected
-WS-Man,service-tools,P1,done,0,missing
+WS-Man,service-tools,P1,done,1,collected
 WinRM HTTP,service-tools,P1,done,1,collected
 PowerShell PSRP,service-tools,P1,done,0,missing
 WCF,service-tools,P2,todo,0,missing
@@ -550,22 +550,22 @@ Rsync daemon,service-tools,P1,done,1,collected
 Git daemon,service-tools,P2,todo,2,collected
 SVN,service-tools,P4,todo,0,missing
 Mercurial,service-tools,P4,todo,0,missing
-Docker Registry,service-tools,P1,done,0,missing
-OCI distribution,service-tools,P2,todo,0,missing
+Docker Registry,service-tools,P1,done,1,collected
+OCI distribution,service-tools,P2,todo,1,collected
 gRPC reflection,service-tools,P1,done,0,missing
 Consul RPC,service-tools,P2,todo,0,missing
 Nomad,service-tools,P4,todo,0,missing
 SaltStack,service-tools,P1,done,0,missing
 Ansible,service-tools,P2,todo,0,missing
-Puppet,service-tools,P2,todo,0,missing
-Chef,service-tools,P4,todo,0,missing
+Puppet,service-tools,P2,todo,1,collected
+Chef,service-tools,P4,todo,1,collected
 LDAP paged/SASL,service-tools,P1,done,0,missing
 Kerberos PAC,service-tools,P0,done,0,missing
 AS-REP / TGS,service-tools,P0,done,0,missing
 NTLM v1/v2,service-tools,P0,done,0,missing
-NetNTLMv2,service-tools,P0,done,0,missing
+NetNTLMv2,service-tools,P0,done,1,collected
 LLMNR response,service-tools,P0,done,1,collected
-NBT-NS response,service-tools,P0,done,0,missing
+NBT-NS response,service-tools,P0,done,1,collected
 DHCPv6 server exchange,service-tools,P1,done,1,collected
 WPAD proxy,service-tools,P0,done,1,collected
 IPv6 RA,service-tools,P1,done,1,collected
@@ -605,12 +605,12 @@ XTP,longtail,P4,todo,0,missing
 VINES,longtail,P4,todo,0,missing
 IPX,longtail,P4,todo,2,collected
 SPX,longtail,P4,todo,0,missing
-AppleTalk,longtail,P4,todo,0,missing
+AppleTalk,longtail,P4,todo,1,collected
 AARP,longtail,P4,todo,0,missing
 DECnet,longtail,P4,todo,0,missing
 SNA,longtail,P4,todo,0,missing
 NetBEUI,longtail,P4,todo,1,collected
-LAT,longtail,P4,todo,0,missing
+LAT,longtail,P4,todo,1,collected
 MOP,longtail,P4,todo,0,missing
 PUP,longtail,P4,todo,0,missing
 XNS,longtail,P4,todo,0,missing
