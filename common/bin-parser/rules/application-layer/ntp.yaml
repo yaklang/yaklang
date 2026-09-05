@@ -13,6 +13,10 @@ Package:
       if m > 7 {
         panic("ntp: mode must be 0-7")
       }
+      if m == 7 {
+        this.ProcessSubNode("Private")
+        return
+      }
       this.ProcessSubNode("Stratum")
       this.ProcessSubNode("Poll")
       this.ProcessSubNode("Precision")
@@ -36,3 +40,35 @@ Package:
     Origin Timestamp: raw,8
     Receive Timestamp: raw,8
     Transmit Timestamp: raw,8
+    Private:
+      operator: |
+        this.ProcessSubNode("Authenticated")
+        this.ProcessSubNode("Sequence")
+        this.ProcessSubNode("Implementation")
+        this.ProcessSubNode("Request Code")
+        this.ProcessSubNode("Error and Item Count")
+        this.ProcessSubNode("MBZ and Item Size")
+        count = getNodeResult("Error and Item Count").Value & 0x0fff
+        size = getNodeResult("MBZ and Item Size").Value & 0x0fff
+        total = count * size
+        remaining = this.GetMaxLength() - this.Length()
+        if total > remaining || total >= 1048576 {
+          panic("ntp: private data length exceeds packet")
+        }
+        if total > 0 {
+          this.GetSubNode("Data").SetMaxLength(total)
+          this.ProcessSubNode("Data")
+        }
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Authentication").SetMaxLength(rest)
+          this.ProcessSubNode("Authentication")
+        }
+      Authenticated: uint8,1bit
+      Sequence: uint8,7bit
+      Implementation: uint8
+      Request Code: uint8
+      Error and Item Count: uint16
+      MBZ and Item Size: uint16
+      Data: raw
+      Authentication: raw

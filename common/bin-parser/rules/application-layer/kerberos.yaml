@@ -9,7 +9,18 @@ Package:
       this.ProcessSubNode("Length")
       l = getNodeResult("Length").Value
       if l >= 0x80 {
-        panic("kerberos: long-form BER length not in this rule")
+        n = l & 0x7f
+        if n == 1 {
+          this.ProcessSubNode("Length 8")
+          l = getNodeResult("Length 8").Value
+        } else {
+          if n == 2 {
+            this.ProcessSubNode("Length 16")
+            l = getNodeResult("Length 16").Value
+          } else {
+            panic("kerberos: unsupported BER length width")
+          }
+        }
       }
       if l > 0 {
         this.GetSubNode("Body").SetMaxLength(l)
@@ -26,6 +37,20 @@ Package:
         }
         this.ProcessSubNode("Seq Length")
         sl = getNodeResult("Seq Length").Value
+        if sl >= 0x80 {
+          sn = sl & 0x7f
+          if sn == 1 {
+            this.ProcessSubNode("Seq Length 8")
+            sl = getNodeResult("Seq Length 8").Value
+          } else {
+            if sn == 2 {
+              this.ProcessSubNode("Seq Length 16")
+              sl = getNodeResult("Seq Length 16").Value
+            } else {
+              panic("kerberos: unsupported SEQUENCE length width")
+            }
+          }
+        }
         if sl > 0 && sl < 1048576 {
           tag = getNodeResult("../Application Tag").Value
           if tag == 0x6a {
@@ -34,7 +59,7 @@ Package:
               op.Save()
             } else {
               op.Recovery()
-              this.GetSubNode("Octets").SetMaxLength(sl)
+              this.GetSubNode("Octets").SetMaxLength(this.GetMaxLength() - this.Length())
               this.ProcessSubNode("Octets")
             }
           } else {
@@ -44,19 +69,29 @@ Package:
                 op.Save()
               } else {
                 op.Recovery()
-                this.GetSubNode("Octets").SetMaxLength(sl)
+                this.GetSubNode("Octets").SetMaxLength(this.GetMaxLength() - this.Length())
                 this.ProcessSubNode("Octets")
               }
             } else {
-              this.GetSubNode("Octets").SetMaxLength(sl)
+              this.GetSubNode("Octets").SetMaxLength(this.GetMaxLength() - this.Length())
               this.ProcessSubNode("Octets")
             }
           }
         }
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Encoded Fields").SetMaxLength(rest)
+          this.ProcessSubNode("Encoded Fields")
+        }
         return
       Seq Tag: uint8
       Seq Length: uint8
+      Seq Length 8: uint8
+      Seq Length 16: uint16
       Octets: string
+      Encoded Fields: raw
+    Length 8: uint8
+    Length 16: uint16
   KerberosTCP:
     operator: |
       this.ProcessSubNode("Record Length")
@@ -76,7 +111,18 @@ Package:
         this.ProcessSubNode("Length")
         l = getNodeResult("Length").Value
         if l >= 0x80 {
-          panic("kerberos: long-form BER length not in this rule")
+          n = l & 0x7f
+          if n == 1 {
+            this.ProcessSubNode("Length 8")
+            l = getNodeResult("Length 8").Value
+          } else {
+            if n == 2 {
+              this.ProcessSubNode("Length 16")
+              l = getNodeResult("Length 16").Value
+            } else {
+              panic("kerberos: unsupported BER length width")
+            }
+          }
         }
         if l > 0 {
           this.GetSubNode("Body").SetMaxLength(l)
@@ -93,6 +139,20 @@ Package:
           }
           this.ProcessSubNode("Seq Length")
           sl = getNodeResult("Seq Length").Value
+          if sl >= 0x80 {
+            sn = sl & 0x7f
+            if sn == 1 {
+              this.ProcessSubNode("Seq Length 8")
+              sl = getNodeResult("Seq Length 8").Value
+            } else {
+              if sn == 2 {
+                this.ProcessSubNode("Seq Length 16")
+                sl = getNodeResult("Seq Length 16").Value
+              } else {
+                panic("kerberos: unsupported SEQUENCE length width")
+              }
+            }
+          }
           if sl > 0 && sl < 1048576 {
             tag = getNodeResult("../Application Tag").Value
             if tag == 0x6a {
@@ -101,7 +161,7 @@ Package:
                 op.Save()
               } else {
                 op.Recovery()
-                this.GetSubNode("Octets").SetMaxLength(sl)
+                this.GetSubNode("Octets").SetMaxLength(this.GetMaxLength() - this.Length())
                 this.ProcessSubNode("Octets")
               }
             } else {
@@ -111,19 +171,29 @@ Package:
                   op.Save()
                 } else {
                   op.Recovery()
-                  this.GetSubNode("Octets").SetMaxLength(sl)
+                  this.GetSubNode("Octets").SetMaxLength(this.GetMaxLength() - this.Length())
                   this.ProcessSubNode("Octets")
                 }
               } else {
-                this.GetSubNode("Octets").SetMaxLength(sl)
+                this.GetSubNode("Octets").SetMaxLength(this.GetMaxLength() - this.Length())
                 this.ProcessSubNode("Octets")
               }
             }
           }
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 && rest < 1048576 {
+            this.GetSubNode("Encoded Fields").SetMaxLength(rest)
+            this.ProcessSubNode("Encoded Fields")
+          }
           return
         Seq Tag: uint8
         Seq Length: uint8
+        Seq Length 8: uint8
+        Seq Length 16: uint16
         Octets: string
+        Encoded Fields: raw
+      Length 8: uint8
+      Length 16: uint16
   PAC:
     endian: little
     operator: |

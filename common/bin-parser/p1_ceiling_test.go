@@ -24,7 +24,7 @@ var specOpaqueLeftover = map[string]bool{
 	"ICV": true, "Ciphertext": true, "Stub": true, "TPDU": true,
 	"RDATA": true, "Key Data": true, "Fragment": true, "Authentication": true,
 	"Random": true, "NDR": true, "MsgGlobal": true, "Value": true, "Body": true,
-	"Payload": true,
+	"Payload": true, "First Packet Payload": true,
 }
 
 func ruleKey(ruleFile string) string {
@@ -440,7 +440,7 @@ func nodesHitByEvidence(sc ProtocolScorecard, nodes map[string]bool) bool {
 		"PPPoE Session": "PPPoE", "ICMPv6 NDP": "ICMPv6",
 		"mDNS": "MDNS", "NBT DG": "NBTDG", "WKSSVC": "DCERPC",
 		"SPOOLSS": "DCERPC", "ATSVC": "DCERPC", "IObjectExporter": "DCERPC",
-		"BOOTP": "DHCP", "HTTP/3": "QUIC", "SFTP": "SSH",
+		"BOOTP": "BOOTP", "HTTP/3": "QUIC", "SFTP": "SSH",
 		"CLDAP": "LDAPMessage", "MariaDB": "MySQLPacket",
 		"Redis Sentinel/Cluster": "Redis", "LDAP paged/SASL": "LDAPMessage",
 		"GSS-API": "SPNEGO", "TPKT": "TPKT", "BER": "BER Element",

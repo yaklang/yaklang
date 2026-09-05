@@ -28,15 +28,6 @@
       "homepage": "https://github.com/the-tcpdump-group/tcpdump",
       "license_file": "licenses/tcpdump-LICENSE.txt",
       "license_sha256": "8a54594d257e14a5260ac770f1633516cb51e3fc28c40136ce2697014eda7afd"
-    },
-    {
-      "id": "google-challenges",
-      "repository": "google/google-ctf",
-      "commit": "067421eb7e918c29e39f187fac5a0f0d72a6ab83",
-      "license": "Apache-2.0",
-      "homepage": "https://github.com/google/google-ctf",
-      "license_file": "licenses/google-challenges-LICENSE.txt",
-      "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     }
   ],
   "captures": [
@@ -1372,12 +1363,13 @@
       "size_bytes": 35192,
       "packet_count": 109,
       "link_type": "Ethernet",
-      "display_filter": "tftp",
+      "display_filter": "tftp.source_file == \"rfc1350.txt\"",
       "evidence_kind": "upstream-positive",
+      "notes": "Select the first complete read request; earlier frames intentionally exercise empty fields.",
       "representative_frame": {
-        "number": 1,
-        "length_bytes": 61,
-        "hex_file": "hex/ndpi-tftp.frame-1.hex"
+        "number": 3,
+        "length_bytes": 62,
+        "hex_file": "hex/ndpi-tftp.frame-3.hex"
       },
       "frame_protocols": [
         "eth",
@@ -1820,14 +1812,14 @@
       ]
     },
     {
-      "id": "ndpi-dhcp-fuzz",
+      "id": "ndpi-dhcp-boundary",
       "repository_id": "ndpi",
-      "protocol": "DHCP fuzz boundary",
+      "protocol": "DHCP malformed-input boundary",
       "roadmap_name": "DHCP",
       "roadmap_family": "name-config",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/ndpi/ndpi-dhcp-fuzz.pcapng",
+      "capture_file": "captures/ndpi/ndpi-dhcp-boundary.pcapng",
       "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/dhcp-fuzz.pcapng",
       "upstream_path": "tests/cfgs/default/pcap/dhcp-fuzz.pcapng",
       "sha256": "b18e80d03175a7ae7dddb0f60e9d4b2f6b05be3f4aa8fa895e44698938765db5",
@@ -1839,7 +1831,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 342,
-        "hex_file": "hex/ndpi-dhcp-fuzz.frame-1.hex"
+        "hex_file": "hex/ndpi-dhcp-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -1894,12 +1886,13 @@
       "size_bytes": 5170,
       "packet_count": 16,
       "link_type": "Raw",
-      "display_filter": "tls",
+      "display_filter": "tls.handshake.extensions_server_name contains \"dingtalk\"",
       "evidence_kind": "upstream-positive",
+      "notes": "Select the first reassembled ClientHello carrying a DingTalk server name.",
       "representative_frame": {
-        "number": 4,
-        "length_bytes": 144,
-        "hex_file": "hex/ndpi-dingtalk.frame-4.hex"
+        "number": 9,
+        "length_bytes": 45,
+        "hex_file": "hex/ndpi-dingtalk.frame-9.hex"
       },
       "frame_protocols": [
         "raw",
@@ -3160,19 +3153,20 @@
       "size_bytes": 12736,
       "packet_count": 60,
       "link_type": "Ethernet",
-      "display_filter": "socks",
+      "display_filter": "tcp.stream == 0 \u0026\u0026 tcp.len == 21 \u0026\u0026 tcp.payload[0] == 0x05",
       "evidence_kind": "upstream-positive",
+      "notes": "Select the complete SOCKS5 domain-name CONNECT request; the capture also contains SOCKS4 exchanges.",
       "representative_frame": {
-        "number": 18,
+        "number": 6,
         "length_bytes": 75,
-        "hex_file": "hex/ndpi-socks.frame-18.hex"
+        "hex_file": "hex/ndpi-socks.frame-6.hex"
       },
       "frame_protocols": [
         "eth",
         "ethertype",
         "ip",
         "tcp",
-        "socks"
+        "data"
       ]
     },
     {
@@ -3420,14 +3414,14 @@
       ]
     },
     {
-      "id": "ndpi-radius-false-positive",
+      "id": "ndpi-radius-classification-boundary",
       "repository_id": "ndpi",
-      "protocol": "RADIUS false-positive boundary",
+      "protocol": "RADIUS classification boundary",
       "roadmap_name": "RADIUS",
       "roadmap_family": "auth",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/ndpi/ndpi-radius-false-positive.pcapng",
+      "capture_file": "captures/ndpi/ndpi-radius-classification-boundary.pcapng",
       "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/radius_false_positive.pcapng",
       "upstream_path": "tests/cfgs/default/pcap/radius_false_positive.pcapng",
       "sha256": "dff5c9fd73aa1424fe64a07eeaa708e49e501b79a647ed5808dbe298de89415d",
@@ -3439,7 +3433,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1292,
-        "hex_file": "hex/ndpi-radius-false-positive.frame-1.hex"
+        "hex_file": "hex/ndpi-radius-classification-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -3450,14 +3444,14 @@
       ]
     },
     {
-      "id": "ndpi-quic-overflow",
+      "id": "ndpi-quic-length-boundary",
       "repository_id": "ndpi",
       "protocol": "QUIC malformed length boundary",
       "roadmap_name": "QUIC",
       "roadmap_family": "transport",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/ndpi/ndpi-quic-overflow.pcapng",
+      "capture_file": "captures/ndpi/ndpi-quic-length-boundary.pcapng",
       "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/quic-fuzz-overflow.pcapng",
       "upstream_path": "tests/cfgs/default/pcap/quic-fuzz-overflow.pcapng",
       "sha256": "0db4235a6986c47308d283691455e46c530d62cebd9c1418af7f1198c78eb49f",
@@ -3469,7 +3463,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1280,
-        "hex_file": "hex/ndpi-quic-overflow.frame-1.hex"
+        "hex_file": "hex/ndpi-quic-length-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "ip",
@@ -3692,31 +3686,32 @@
     {
       "id": "ndpi-upnp",
       "repository_id": "ndpi",
-      "protocol": "UPnP device messages",
+      "protocol": "UPnP SSDP device announcement",
       "roadmap_name": "UPnP",
       "roadmap_family": "name-config",
       "roadmap_priority": "P1",
       "roadmap_status": "done",
-      "capture_file": "captures/ndpi/ndpi-upnp.pcap",
-      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/upnp.pcap",
-      "upstream_path": "tests/cfgs/default/pcap/upnp.pcap",
-      "sha256": "5001ae0b38de6dc107e0467c44c67103499d718013c1cdf93d391b80142066e0",
-      "size_bytes": 10648,
-      "packet_count": 14,
+      "capture_file": "captures/ndpi/ndpi-upnp.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/ssdp.pcapng",
+      "upstream_path": "tests/cfgs/default/pcap/ssdp.pcapng",
+      "sha256": "40432d7a4f15e87a24f84f0e8a5cfe0742e7bebc196fb913e8bf4fc22e2e0ed8",
+      "size_bytes": 888,
+      "packet_count": 1,
       "link_type": "Ethernet",
-      "display_filter": "xml",
+      "display_filter": "ssdp \u0026\u0026 http.request.method == \"NOTIFY\"",
       "evidence_kind": "upstream-positive",
+      "notes": "The upstream file named upnp.pcap is a WSD regression fixture; use the pinned SSDP announcement that carries UPnP NT, USN, SERVER, and LOCATION metadata.",
       "representative_frame": {
         "number": 1,
-        "length_bytes": 718,
+        "length_bytes": 848,
         "hex_file": "hex/ndpi-upnp.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
         "ethertype",
-        "ipv6",
+        "ip",
         "udp",
-        "xml"
+        "ssdp"
       ]
     },
     {
@@ -3947,12 +3942,13 @@
       "size_bytes": 85580,
       "packet_count": 344,
       "link_type": "Ethernet",
-      "display_filter": "ocsp",
+      "display_filter": "http.request.method == \"POST\" \u0026\u0026 ocsp.serialNumber",
       "evidence_kind": "upstream-positive",
+      "notes": "Select the first complete DER OCSP request body so certificate identifier fields are executable parser evidence.",
       "representative_frame": {
-        "number": 8,
-        "length_bytes": 701,
-        "hex_file": "hex/ndpi-ocsp.frame-8.hex"
+        "number": 27,
+        "length_bytes": 512,
+        "hex_file": "hex/ndpi-ocsp.frame-27.hex"
       },
       "frame_protocols": [
         "eth",
@@ -3960,25 +3956,7 @@
         "ip",
         "tcp",
         "http",
-        "ocsp",
-        "ocsp",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509sat",
-        "x509ce",
-        "x509ce",
-        "x509ce",
-        "ocsp",
-        "x509ce",
-        "x509ce",
-        "x509ce"
+        "ocsp"
       ]
     },
     {
@@ -4181,7 +4159,7 @@
       "link_type": "Ethernet",
       "display_filter": "sdp",
       "evidence_kind": "upstream-positive",
-      "notes": "representative SDP advertises image/udptl with T.38 format",
+      "notes": "The representative frame is SDP signaling that advertises image/udptl with T.38 format. Post-advertisement media in the same flow retains contiguous RTP/PCMA headers, so it is deliberately excluded from field-level T.38 evidence.",
       "representative_frame": {
         "number": 21,
         "length_bytes": 376,
@@ -4520,13 +4498,13 @@
       "size_bytes": 694086,
       "packet_count": 1672,
       "link_type": "Ethernet",
-      "display_filter": "tls",
+      "display_filter": "tls.handshake.extensions_server_name == \"web.wechat.com\"",
       "evidence_kind": "upstream-positive",
-      "notes": "nDPI classification regression over TLS",
+      "notes": "Select the first complete ClientHello carrying the WeChat server name.",
       "representative_frame": {
-        "number": 1,
-        "length_bytes": 670,
-        "hex_file": "hex/ndpi-wechat.frame-1.hex"
+        "number": 94,
+        "length_bytes": 304,
+        "hex_file": "hex/ndpi-wechat.frame-94.hex"
       },
       "frame_protocols": [
         "eth",
@@ -4583,7 +4561,7 @@
       "link_type": "Raw",
       "display_filter": "data",
       "evidence_kind": "upstream-positive",
-      "notes": "nDPI classification regression; undecoded TCP payload in Wireshark defaults",
+      "notes": "nDPI classification regression; Wireshark leaves the TCP payload undecoded. In this pinned sample only, TCP stream 2 frames 20 and 22 are consecutive application-data records with a BE32 compressed-length prefix and one exact zlib member; this is not a general Tencent Games protocol grammar.",
       "representative_frame": {
         "number": 4,
         "length_bytes": 116,
@@ -4682,6 +4660,37 @@
       "frame_protocols": [
         "fr",
         "arp"
+      ]
+    },
+    {
+      "id": "wireshark-dhcp",
+      "repository_id": "wireshark-tests",
+      "protocol": "DHCP over the BOOTP message format",
+      "roadmap_name": "DHCP",
+      "roadmap_family": "name-config",
+      "roadmap_priority": "P0",
+      "roadmap_status": "done",
+      "capture_file": "captures/wireshark-tests/wireshark-dhcp.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/dhcp.pcap",
+      "upstream_path": "test/captures/dhcp.pcap",
+      "sha256": "2471b5420bdac826eecf8f61a2bbb4a3eb20dbfab7c02ff2be502f349f368214",
+      "size_bytes": 1400,
+      "packet_count": 4,
+      "link_type": "Ethernet",
+      "display_filter": "dhcp",
+      "evidence_kind": "upstream-positive",
+      "notes": "Wireshark's ordinary DHCP parser fixture; its fixed header also supplies positive BOOTP-format coverage.",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 314,
+        "hex_file": "hex/wireshark-dhcp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "dhcp"
       ]
     },
     {
@@ -4883,6 +4892,93 @@
       ]
     },
     {
+      "id": "tcpdump-radius",
+      "repository_id": "tcpdump",
+      "protocol": "RADIUS",
+      "roadmap_name": "RADIUS",
+      "roadmap_family": "auth",
+      "roadmap_priority": "P0",
+      "roadmap_status": "done",
+      "capture_file": "captures/tcpdump/tcpdump-radius.pcap",
+      "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/RADIUS.pcap",
+      "upstream_path": "tests/RADIUS.pcap",
+      "sha256": "9cd173ba614345281e4b66927f3b17b357519540bbc0feedbc15dbc7ba8ad921",
+      "size_bytes": 775,
+      "packet_count": 4,
+      "link_type": "Ethernet",
+      "display_filter": "radius",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 181,
+        "hex_file": "hex/tcpdump-radius.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "radius",
+        "eap"
+      ]
+    },
+    {
+      "id": "tcpdump-lldp",
+      "repository_id": "tcpdump",
+      "protocol": "LLDP",
+      "roadmap_name": "LLDP",
+      "roadmap_family": "link",
+      "roadmap_priority": "P1",
+      "roadmap_status": "done",
+      "capture_file": "captures/tcpdump/tcpdump-lldp.pcap",
+      "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/LLDP_and_CDP.pcap",
+      "upstream_path": "tests/LLDP_and_CDP.pcap",
+      "sha256": "aaf42bcd72ed9c9ab0237fb8c69c7753ece7d9d0aea7574a68b3108874d8badd",
+      "size_bytes": 4108,
+      "packet_count": 12,
+      "link_type": "Ethernet",
+      "display_filter": "lldp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 3,
+        "length_bytes": 296,
+        "hex_file": "hex/tcpdump-lldp.frame-3.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "lldp"
+      ]
+    },
+    {
+      "id": "tcpdump-radiotap",
+      "repository_id": "tcpdump",
+      "protocol": "IEEE 802.11 Radiotap",
+      "roadmap_name": "IEEE 802.11 Radiotap",
+      "roadmap_family": "link",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/tcpdump/tcpdump-radiotap.pcap",
+      "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/ieee802.11_exthdr.pcap",
+      "upstream_path": "tests/ieee802.11_exthdr.pcap",
+      "sha256": "5d1179c7045f3fe6a4a6621b758ee25c7a8ec1eece9d3d7be707969aa96a5236",
+      "size_bytes": 4499,
+      "packet_count": 26,
+      "link_type": "RadioTap",
+      "display_filter": "radiotap \u0026\u0026 wlan",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 170,
+        "hex_file": "hex/tcpdump-radiotap.frame-1.hex"
+      },
+      "frame_protocols": [
+        "radiotap",
+        "wlan_radio",
+        "wlan"
+      ]
+    },
+    {
       "id": "tcpdump-pppoe",
       "repository_id": "tcpdump",
       "protocol": "PPPoE",
@@ -4970,14 +5066,14 @@
       ]
     },
     {
-      "id": "tcpdump-lldp-oob",
+      "id": "tcpdump-lldp-tlv-boundary",
       "repository_id": "tcpdump",
       "protocol": "LLDP malformed TLV",
       "roadmap_name": "LLDP",
       "roadmap_family": "link",
       "roadmap_priority": "P1",
       "roadmap_status": "done",
-      "capture_file": "captures/tcpdump/tcpdump-lldp-oob.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-lldp-tlv-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/lldp_asan.pcap",
       "upstream_path": "tests/lldp_asan.pcap",
       "sha256": "ee7427958f947c5c2214b3fce0ce224b5bda911b978f8059b399be413a6f0cfe",
@@ -4989,7 +5085,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/tcpdump-lldp-oob.frame-1.hex"
+        "hex_file": "hex/tcpdump-lldp-tlv-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -4998,14 +5094,14 @@
       ]
     },
     {
-      "id": "tcpdump-snmp-overflow",
+      "id": "tcpdump-snmp-length-boundary",
       "repository_id": "tcpdump",
       "protocol": "SNMP malformed length",
       "roadmap_name": "SNMP",
       "roadmap_family": "mgmt",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/tcpdump/tcpdump-snmp-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-snmp-length-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/snmp-heapoverflow-2.pcap",
       "upstream_path": "tests/snmp-heapoverflow-2.pcap",
       "sha256": "89dfd2397b98817637652f8ffe93e6556026b9e947fc5f6fd0a5f19b569dd24f",
@@ -5017,7 +5113,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/tcpdump-snmp-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-snmp-length-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -5028,14 +5124,14 @@
       ]
     },
     {
-      "id": "tcpdump-bootp-overflow",
+      "id": "tcpdump-bootp-packet-boundary",
       "repository_id": "tcpdump",
       "protocol": "BOOTP malformed packet",
       "roadmap_name": "BOOTP",
       "roadmap_family": "name-config",
       "roadmap_priority": "P1",
       "roadmap_status": "done",
-      "capture_file": "captures/tcpdump/tcpdump-bootp-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-bootp-packet-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/bootp_asan-2.pcap",
       "upstream_path": "tests/bootp_asan-2.pcap",
       "sha256": "b1c3b5edf028012132d952adab3ecd20bd7f9b62e4be247e1c0c8feab68e0dfd",
@@ -5047,7 +5143,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 53,
-        "hex_file": "hex/tcpdump-bootp-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-bootp-packet-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -5058,14 +5154,14 @@
       ]
     },
     {
-      "id": "tcpdump-pim-overflow",
+      "id": "tcpdump-pim-header-boundary",
       "repository_id": "tcpdump",
       "protocol": "PIM malformed header",
       "roadmap_name": "PIM",
       "roadmap_family": "routing",
       "roadmap_priority": "P2",
       "roadmap_status": "todo",
-      "capture_file": "captures/tcpdump/tcpdump-pim-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-pim-header-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/pim_header_asan-3.pcap",
       "upstream_path": "tests/pim_header_asan-3.pcap",
       "sha256": "456def390f2ae2bf94344681287ce75f74cd87549c6895eeb37a8fae245459c8",
@@ -5077,7 +5173,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 55,
-        "hex_file": "hex/tcpdump-pim-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-pim-header-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -5087,14 +5183,14 @@
       ]
     },
     {
-      "id": "tcpdump-tftp-overflow",
+      "id": "tcpdump-tftp-packet-boundary",
       "repository_id": "tcpdump",
       "protocol": "TFTP malformed packet",
       "roadmap_name": "TFTP",
       "roadmap_family": "file",
       "roadmap_priority": "P1",
       "roadmap_status": "done",
-      "capture_file": "captures/tcpdump/tcpdump-tftp-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-tftp-packet-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/tftp-heapoverflow.pcap",
       "upstream_path": "tests/tftp-heapoverflow.pcap",
       "sha256": "632900682ff8e38b01ad71a82086f7a0f51e65918ca230763838813aef59ab66",
@@ -5106,7 +5202,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/tcpdump-tftp-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-tftp-packet-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "sll",
@@ -5117,14 +5213,14 @@
       ]
     },
     {
-      "id": "tcpdump-radiotap-overflow",
+      "id": "tcpdump-radiotap-header-boundary",
       "repository_id": "tcpdump",
       "protocol": "Radiotap malformed header",
       "roadmap_name": "IEEE 802.11 Radiotap",
       "roadmap_family": "link",
       "roadmap_priority": "P2",
       "roadmap_status": "todo",
-      "capture_file": "captures/tcpdump/tcpdump-radiotap-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-radiotap-header-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/radiotap-heapoverflow.pcap",
       "upstream_path": "tests/radiotap-heapoverflow.pcap",
       "sha256": "9fcd8a3b22792214bf53f84068a6627f5c9a5f8166c54643b5fa255db38437d2",
@@ -5136,7 +5232,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 8,
-        "hex_file": "hex/tcpdump-radiotap-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-radiotap-header-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "radiotap",
@@ -5145,14 +5241,14 @@
       ]
     },
     {
-      "id": "tcpdump-tcp-overflow",
+      "id": "tcpdump-tcp-header-boundary",
       "repository_id": "tcpdump",
       "protocol": "TCP malformed header",
       "roadmap_name": "TCP",
       "roadmap_family": "transport",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/tcpdump/tcpdump-tcp-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-tcp-header-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/tcp_header_heapoverflow.pcap",
       "upstream_path": "tests/tcp_header_heapoverflow.pcap",
       "sha256": "8b20240cdeeed367fdbd178d735eed627cebabab147aa3f6d660600f6137f673",
@@ -5164,7 +5260,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/tcpdump-tcp-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-tcp-header-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -5174,14 +5270,14 @@
       ]
     },
     {
-      "id": "tcpdump-udp-overflow",
+      "id": "tcpdump-udp-length-boundary",
       "repository_id": "tcpdump",
       "protocol": "UDP invalid length",
       "roadmap_name": "UDP",
       "roadmap_family": "transport",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/tcpdump/tcpdump-udp-overflow.pcap",
+      "capture_file": "captures/tcpdump/tcpdump-udp-length-boundary.pcap",
       "source_url": "https://raw.githubusercontent.com/the-tcpdump-group/tcpdump/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests/udp-length-heapoverflow.pcap",
       "upstream_path": "tests/udp-length-heapoverflow.pcap",
       "sha256": "649f9b2307e55f6942cccf317533464f1a932949203b0ffa197cb9d52956696c",
@@ -5193,7 +5289,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 38,
-        "hex_file": "hex/tcpdump-udp-overflow.frame-1.hex"
+        "hex_file": "hex/tcpdump-udp-length-boundary.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -5230,59 +5326,57 @@
       ]
     },
     {
-      "id": "google-challenge-ascii-art",
-      "repository_id": "google-challenges",
-      "protocol": "Google educational challenge ASCII Art HTTP client",
+      "id": "wireshark-http",
+      "repository_id": "wireshark-tests",
+      "protocol": "HTTP request",
       "roadmap_name": "HTTP",
       "roadmap_family": "web",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/google-challenges/google-challenge-ascii-art.pcap",
-      "source_url": "https://raw.githubusercontent.com/google/google-ctf/067421eb7e918c29e39f187fac5a0f0d72a6ab83/2017/quals/2017-re-ascii-art/attachments/aart_client_capture.pcap",
-      "upstream_path": "2017/quals/2017-re-ascii-art/attachments/aart_client_capture.pcap",
-      "sha256": "70c1f7300366d402e4a7853482188dbe141ef05024031d51643c73d2fc508292",
-      "size_bytes": 10176,
-      "packet_count": 60,
+      "capture_file": "captures/wireshark-tests/wireshark-http.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/http.pcap",
+      "upstream_path": "test/captures/http.pcap",
+      "sha256": "69e489a26a59208a1dd56fbea4c606b1e59e8ac32d3d4789ca6cc81e71bad3f2",
+      "size_bytes": 247,
+      "packet_count": 1,
       "link_type": "Ethernet",
-      "display_filter": "http",
-      "evidence_kind": "educational-challenge",
-      "notes": "official 2017 Google qualification exercise capture",
+      "display_filter": "http.request",
+      "evidence_kind": "upstream-positive",
       "representative_frame": {
-        "number": 4,
-        "length_bytes": 287,
-        "hex_file": "hex/google-challenge-ascii-art.frame-4.hex"
+        "number": 1,
+        "length_bytes": 207,
+        "hex_file": "hex/wireshark-http.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
         "ethertype",
         "ip",
         "tcp",
-        "http",
-        "urlencoded-form"
+        "http"
       ]
     },
     {
-      "id": "google-challenge-engraver",
-      "repository_id": "google-challenges",
-      "protocol": "Google educational challenge USB HID engraver",
+      "id": "wireshark-usb-hid",
+      "repository_id": "wireshark-tests",
+      "protocol": "USB HID input report",
       "roadmap_name": null,
       "roadmap_family": null,
       "roadmap_priority": null,
       "roadmap_status": null,
-      "capture_file": "captures/google-challenges/google-challenge-engraver.pcapng",
-      "source_url": "https://raw.githubusercontent.com/google/google-ctf/067421eb7e918c29e39f187fac5a0f0d72a6ab83/2022/quals/hardware-engraver/attachments/engraver.pcapng",
-      "upstream_path": "2022/quals/hardware-engraver/attachments/engraver.pcapng",
-      "sha256": "7eff7c6c7aaed582054076e0cc1c8353b39d7135f881834ff3688afba35378b4",
-      "size_bytes": 79008,
-      "packet_count": 860,
-      "link_type": "UnknownLinkType",
+      "capture_file": "captures/wireshark-tests/wireshark-usb-hid.pcapng",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/usb-hid.pcapng",
+      "upstream_path": "test/captures/usb-hid.pcapng",
+      "sha256": "893f285dce30121687f164c57572dc873595a7bc289dde3596b7bb0ec160bc34",
+      "size_bytes": 1408,
+      "packet_count": 10,
+      "link_type": "USB",
       "display_filter": "usbhid.data",
-      "evidence_kind": "educational-challenge",
-      "notes": "official 2022 Google USB reverse-engineering exercise capture",
+      "evidence_kind": "upstream-positive",
+      "notes": "The selected frame carries a complete four-byte input report; the generic rule retains descriptor-dependent report data as opaque bytes.",
       "representative_frame": {
-        "number": 23,
-        "length_bytes": 91,
-        "hex_file": "hex/google-challenge-engraver.frame-23.hex"
+        "number": 5,
+        "length_bytes": 68,
+        "hex_file": "hex/wireshark-usb-hid.frame-5.hex"
       },
       "frame_protocols": [
         "usb",
@@ -5290,33 +5384,30 @@
       ]
     },
     {
-      "id": "google-challenge-sc",
-      "repository_id": "google-challenges",
-      "protocol": "Google educational challenge IPX/LLC game traffic",
+      "id": "wireshark-ipx-rip",
+      "repository_id": "wireshark-tests",
+      "protocol": "IPX Routing Information Protocol response",
       "roadmap_name": "IPX",
       "roadmap_family": "longtail",
       "roadmap_priority": "P4",
       "roadmap_status": "todo",
-      "capture_file": "captures/google-challenges/google-challenge-sc.pcapng",
-      "source_url": "https://raw.githubusercontent.com/google/google-ctf/067421eb7e918c29e39f187fac5a0f0d72a6ab83/2019/finals/misc-sc/attachments/sc.pcapng",
-      "upstream_path": "2019/finals/misc-sc/attachments/sc.pcapng",
-      "sha256": "b40b193e219d78121b10aa1ce1ac1c0061fc4a4ac78f75c36c48a7b6768c2baa",
-      "size_bytes": 1679492,
-      "packet_count": 16827,
+      "capture_file": "captures/wireshark-tests/wireshark-ipx-rip.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/ipx_rip.pcap",
+      "upstream_path": "test/captures/ipx_rip.pcap",
+      "sha256": "2dcd7a321301d900e7af1740087e8219a86321d775efb4b1934e571b4345414b",
+      "size_bytes": 100,
+      "packet_count": 1,
       "link_type": "Ethernet",
       "display_filter": "ipx",
-      "evidence_kind": "educational-challenge",
-      "notes": "official 2019 Google game-traffic exercise capture",
+      "evidence_kind": "upstream-positive",
       "representative_frame": {
         "number": 1,
-        "length_bytes": 68,
-        "hex_file": "hex/google-challenge-sc.frame-1.hex"
+        "length_bytes": 60,
+        "hex_file": "hex/wireshark-ipx-rip.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
-        "llc",
-        "ipx",
-        "data"
+        "ipx"
       ]
     }
   ]

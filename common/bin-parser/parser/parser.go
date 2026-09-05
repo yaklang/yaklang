@@ -8,6 +8,21 @@ import (
 	"strings"
 )
 
+// inputBitLengthReader is an opt-in contract for callers that need rules to
+// treat the supplied reader as an exact, bounded message. Plain bytes.Reader
+// values intentionally keep the historical unbounded-root behavior.
+type inputBitLengthReader interface {
+	InputBitLength() uint64
+}
+
+func setKnownInputLength(rootNode *base.Node, data io.Reader) {
+	reader, ok := data.(inputBitLengthReader)
+	if !ok {
+		return
+	}
+	rootNode.Cfg.SetItem(base.CfgLength, reader.InputBitLength())
+}
+
 func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, keys ...string) (*base.Node, error) {
 	splits := strings.Split(rule, ".")
 	if len(splits) > 0 {
@@ -18,6 +33,7 @@ func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, k
 	if err != nil {
 		return nil, err
 	}
+	setKnownInputLength(rootNode, data)
 	for k, v := range config {
 		rootNode.Ctx.SetItem(k, v)
 	}
@@ -49,6 +65,7 @@ func ParseBinary(data io.Reader, rule string, keys ...string) (*base.Node, error
 	if err != nil {
 		return nil, err
 	}
+	setKnownInputLength(rootNode, data)
 	if len(keys) == 0 {
 		err = rootNode.Parse(base.NewBitReader(data))
 		if err != nil {

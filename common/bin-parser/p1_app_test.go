@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/bin-parser/parser"
 )
 
 func TestP1UDPApplications(t *testing.T) {
@@ -79,7 +80,6 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, uint64('v'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Type")))
 	require.Equal(t, uint64('o'), uintVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Origin Type")))
 	require.Equal(t, "10.0.0.1", strVal(t, mustChild(t, eth, "IP", "UDP", "SDP").Child("Address")))
-
 
 	// RFC 3550 RTP v2
 	rtp := []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}
@@ -183,16 +183,21 @@ func TestP1UDPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1900, 1900, ssdp))
 	require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, eth, "IP", "UDP", "SSDP", "HTTP Request").Child("Method")))
 
-	// RFC 951 BOOTREQUEST + RFC 1497 magic cookie + END (DHCP Discover layout)
+	// RFC 951 BOOTREQUEST with an RFC 1497 vendor area.
 	bootp := mustHex(t, "010106001234567800000000"+
 		"00000000000000000000000000000000"+
 		"123456789abc00000000000000000000"+
 		"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
 		"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
 		"63825363ff")
-	bp := parseRule(t, bootp, "application-layer.dhcp", "DHCP")
+	bootpNode, err := parser.ParseBinary(newProtocolCorpusBoundedReader(bootp), "application-layer.bootp", "BOOTP")
+	require.NoError(t, err)
+	bp, err := bootpNode.Result()
+	require.NoError(t, err)
 	require.Equal(t, uint64(1), uintVal(t, bp.Child("Operation")))
-	require.Equal(t, uint64(0x63825363), uintVal(t, bp.Child("Magic Cookie")))
+	require.Equal(t, uint64(0x12345678), uintVal(t, bp.Child("Xid")))
+	require.Equal(t, mustHex(t, "63825363ff"), bytesVal(t, bp.Child("Vendor Area")))
+	// UDP port dispatch remains DHCP-aware for the RFC 2131 extension.
 	eth = parseEthernet(t, ipv4UDPBytes(t, 68, 67, bootp))
 	require.Equal(t, uint64(0x12345678), uintVal(t, mustChild(t, eth, "IP", "UDP", "DHCP").Child("Xid")))
 }
@@ -539,13 +544,21 @@ func TestP1MiscAndAliases(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, rs.Child("Version")))
 	})
 
-	sctp := make([]byte, 16)
+	sctp := make([]byte, 28)
 	binary.BigEndian.PutUint16(sctp[0:], 1234)
 	binary.BigEndian.PutUint16(sctp[2:], 80)
-	binary.BigEndian.PutUint16(sctp[14:], 4)
+	sctp[13] = 0x03
+	binary.BigEndian.PutUint16(sctp[14:], 16)
+	binary.BigEndian.PutUint32(sctp[16:], 1)
+	binary.BigEndian.PutUint16(sctp[20:], 2)
+	binary.BigEndian.PutUint16(sctp[22:], 3)
+	binary.BigEndian.PutUint32(sctp[24:], 7)
 	eth := parseEthernet(t, ipv4ProtoFrame(t, 132, sctp))
-	require.Equal(t, uint64(1234), uintVal(t, mustChild(t, eth, "IP", "SCTP").Child("Source Port")))
-	require.Equal(t, uint64(80), uintVal(t, mustChild(t, eth, "IP", "SCTP").Child("Destination Port")))
+	sctpNode := mustChild(t, eth, "IP", "SCTP")
+	require.Equal(t, uint64(1234), uintVal(t, sctpNode.Child("Source Port")))
+	require.Equal(t, uint64(80), uintVal(t, sctpNode.Child("Destination Port")))
+	require.Equal(t, uint64(16), uintVal(t, sctpNode.Child("Chunks").Children()[0].Child("Length")))
+	require.Equal(t, uint64(7), uintVal(t, sctpNode.Child("Chunks").Children()[0].Child("PPI")))
 
 	// gopacket layers/ipsec_test.go testPacketIPSecAHTransport Ethernet+IPv4+AH+ICMP
 	ahFrame := mustHex(t, ""+
@@ -602,7 +615,6 @@ func TestP1MiscAndAliases(t *testing.T) {
 		berNull := parseRule(t, []byte{0x05, 0x00}, "application-layer.ber", "BER Element")
 		require.Equal(t, uint64(5), uintVal(t, mustChild(t, berNull, "Type").Child("Tag")))
 	})
-
 
 	eap := []byte{0x01, 0x00, 0x00, 0x05, 0x01, 0x01, 0x00, 0x05, 0x01}
 	// EAPOL version 1, type EAP-Packet, body length 5, EAP request identity

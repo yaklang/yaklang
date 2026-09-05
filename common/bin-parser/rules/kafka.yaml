@@ -42,6 +42,11 @@ Package:
           }
         }
       }
+      left = this.GetMaxLength() - this.Length()
+      if left > 0 && left < 1048576 {
+        this.GetSubNode("Body").SetMaxLength(left)
+        this.ProcessSubNode("Body")
+      }
     Length: int32
     API Key: int16
     API Version: int16
@@ -49,6 +54,7 @@ Package:
     Client ID Len: int16
     Client ID: string
     Topics Count: int32
+    Body: raw
     Topics:
       list: true
       Topic: KafkaTopic

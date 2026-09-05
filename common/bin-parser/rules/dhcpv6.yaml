@@ -20,6 +20,8 @@ Package:
         if op.OK {
           op.Recovery()
           this.ProcessSubNode("Options")
+        } else {
+          op.Recovery()
         }
       }
     Message Type: uint8

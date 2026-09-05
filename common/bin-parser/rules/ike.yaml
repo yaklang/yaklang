@@ -81,6 +81,17 @@ IKEPayload:
       this.ProcessSubNode("SPI Size")
       this.ProcessSubNode("Notify Type")
     }
+    consumed = this.Length() - 4
+    if consumed > body {
+      panic("ike: payload parser exceeded declared payload length")
+    }
+    if consumed < body {
+      payloadRest = body - consumed
+      if payloadRest > 0 && payloadRest < 1048576 {
+        this.GetSubNode("Payload Data").SetMaxLength(payloadRest)
+        this.ProcessSubNode("Payload Data")
+      }
+    }
     setCtx("ike_type", nxt)
   Next Payload: uint8
   Critical: uint8
@@ -92,6 +103,7 @@ IKEPayload:
   Protocol ID: uint8
   SPI Size: uint8
   Notify Type: uint16
+  Payload Data: raw
   Proposals:
     list: true
     Proposal:
@@ -103,10 +115,22 @@ IKEPayload:
         this.ProcessSubNode("Protocol ID")
         this.ProcessSubNode("SPI Size")
         this.ProcessSubNode("Num Transforms")
+        plen = getNodeResult("Proposal Length").Value
+        ssize = getNodeResult("SPI Size").Value
+        if plen < 8 + ssize {
+          panic("ike: proposal length smaller than header and SPI")
+        }
+        if ssize > 0 {
+          this.GetSubNode("SPI").SetMaxLength(ssize)
+          this.ProcessSubNode("SPI")
+        }
         n = getNodeResult("Num Transforms").Value
         setCtx("ike_ntrans", n)
-        if n > 0 && this.GetMaxLength() > this.Length() {
-          rest = this.GetMaxLength() - this.Length()
+        rest = plen - 8 - ssize
+        if rest > this.GetMaxLength() - this.Length() {
+          panic("ike: proposal length exceeds payload")
+        }
+        if n > 0 && rest > 0 {
           if rest >= 8 {
             this.GetSubNode("Transforms").SetMaxLength(rest)
             this.ProcessSubNode("Transforms")
@@ -119,15 +143,33 @@ IKEPayload:
       Protocol ID: uint8
       SPI Size: uint8
       Num Transforms: uint8
+      SPI: raw
       Transforms:
         list: true
         Transform:
+          operator: |
+            this.ProcessSubNode("Last Substruc")
+            this.ProcessSubNode("Reserved")
+            this.ProcessSubNode("Transform Length")
+            this.ProcessSubNode("Transform Type")
+            this.ProcessSubNode("Reserved2")
+            this.ProcessSubNode("Transform ID")
+            tl = getNodeResult("Transform Length").Value
+            if tl < 8 || tl > this.GetMaxLength() {
+              panic("ike: invalid transform length")
+            }
+            al = tl - 8
+            if al > 0 {
+              this.GetSubNode("Attributes").SetMaxLength(al)
+              this.ProcessSubNode("Attributes")
+            }
           Last Substruc: uint8
           Reserved: uint8
           Transform Length: uint16
           Transform Type: uint8
           Reserved2: uint8
           Transform ID: uint16
+          Attributes: raw
         operator: |
           i = 0
           n = getCtx("ike_ntrans")

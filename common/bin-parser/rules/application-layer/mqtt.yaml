@@ -66,6 +66,22 @@ Package:
         Client ID:
           type: string
           length-from-field: ../Client ID Length
+        Will Topic Length: uint16
+        Will Topic:
+          type: string
+          length-from-field: ../Will Topic Length
+        Will Payload Length: uint16
+        Will Payload:
+          type: raw
+          length-from-field: ../Will Payload Length
+        Username Length: uint16
+        Username:
+          type: string
+          length-from-field: ../Username Length
+        Password Length: uint16
+        Password:
+          type: raw
+          length-from-field: ../Password Length
         operator: |
           this.ProcessSubNode("Protocol Name Length")
           this.ProcessSubNode("Protocol Name")
@@ -75,9 +91,30 @@ Package:
           }
           this.ProcessSubNode("Protocol Level")
           this.ProcessSubNode("Connect Flags")
+          flags = getNodeResult("Connect Flags").Value
+          if (flags & 1) != 0 {
+            panic("mqtt: CONNECT reserved flag must be zero")
+          }
+          if (flags & 4) == 0 && (flags & 0x38) != 0 {
+            panic("mqtt: will options require will flag")
+          }
           this.ProcessSubNode("Keep Alive")
           this.ProcessSubNode("Client ID Length")
           this.ProcessSubNode("Client ID")
+          if (flags & 4) != 0 {
+            this.ProcessSubNode("Will Topic Length")
+            this.ProcessSubNode("Will Topic")
+            this.ProcessSubNode("Will Payload Length")
+            this.ProcessSubNode("Will Payload")
+          }
+          if (flags & 0x80) != 0 {
+            this.ProcessSubNode("Username Length")
+            this.ProcessSubNode("Username")
+          }
+          if (flags & 0x40) != 0 {
+            this.ProcessSubNode("Password Length")
+            this.ProcessSubNode("Password")
+          }
       Connack:
         Flags: uint8
         Return Code: uint8

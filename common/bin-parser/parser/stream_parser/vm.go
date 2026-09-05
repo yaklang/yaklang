@@ -73,9 +73,9 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	yakNode.ProcessSubNode = func(name string) any {
 		return yakNode.GetSubNode(name).Process()
 	}
-	yakNode.TryProcessSubNode = func(name string) (any, map[string]any) {
+	yakNode.TryProcessSubNode = func(name string) (result any, response map[string]any) {
 		typeNode := yakNode.GetSubNode(name)
-		response := map[string]any{
+		response = map[string]any{
 			"OK":       false,
 			"Message":  "",
 			"Save":     func() {},
@@ -98,25 +98,25 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		//	return
 		//}
 		deferFun, err := operator(copyNode)
-		if err != nil {
-			response["Message"] = err.Error()
-			response["OK"] = false
-		} else {
-			response["OK"] = true
-		}
-
 		response["Save"] = func() {
 			deferFun(false)
 		}
 		response["GetNode"] = func() any {
 			return copyYakNode
 		}
-		response["Result"] = copyYakNode.Result()
 		response["Recovery"] = func() {
 			deferFun(true)
 			yakNode.origin.Children = yakNode.origin.Children[:len(yakNode.origin.Children)-1]
 		}
-		return copyYakNode.Result(), response
+		if err != nil {
+			response["Message"] = err.Error()
+			return nil, response
+		}
+
+		result = copyYakNode.Result()
+		response["Result"] = result
+		response["OK"] = true
+		return result, response
 	}
 	yakNode.GetMaxLength = func(uints ...string) uint64 {
 		n := getMulti(yakNode.origin, uints...)
@@ -251,25 +251,25 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		//	return
 		//}
 		deferFun, err := operator(copyNode)
-		if err != nil {
-			response["Message"] = err.Error()
-			response["OK"] = false
-		} else {
-			response["OK"] = true
-		}
-
 		response["Save"] = func() {
 			deferFun(false)
 		}
 		response["GetNode"] = func() any {
 			return copyYakNode
 		}
-		response["Result"] = copyYakNode.Result()
 		response["Recovery"] = func() {
 			deferFun(true)
 			yakNode.origin.Children = yakNode.origin.Children[:len(yakNode.origin.Children)-1]
 		}
-		return copyYakNode.Result(), response
+		if err != nil {
+			response["Message"] = err.Error()
+			return nil, response
+		}
+
+		result = copyYakNode.Result()
+		response["Result"] = result
+		response["OK"] = true
+		return result, response
 	}
 	yakNode.Process = func() any {
 		//defer func() {
@@ -279,6 +279,9 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		//}()
 		deferFun, err := operator(node)
 		if err != nil {
+			if deferFun != nil {
+				deferFun(true)
+			}
 			panic(err)
 		}
 		deferFun(false)

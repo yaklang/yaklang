@@ -7,6 +7,9 @@ Package:
         Payload:
             unpack: true
             operator: |
+              payloadStart = getCurrentPosition()
+              maximum = this.GetMaxLength()
+              bounded = maximum > 0 && maximum < 1048576
               src = getNodeResult("@UDP/Source Port").Value
               dst = getNodeResult("@UDP/Destination Port").Value
               typeNameList = ["DNS", "DHCP", "NTP", "SNMP"]
@@ -80,6 +83,15 @@ Package:
                       if err != nil{
                           panic(err)
                       }
+                      if bounded {
+                          consumed = getCurrentPosition() - payloadStart
+                          if consumed < maximum {
+                              remaining = maximum - consumed
+                              tail = this.NewUnknownNode("Remaining Payload")
+                              tail.SetMaxLength(remaining)
+                              tail.Process()
+                          }
+                      }
                       return
                   }else{
                       debug(op.Message)
@@ -87,6 +99,15 @@ Package:
                       if err != nil{
                           panic(err)
                       }
+                  }
+              }
+              if bounded {
+                  consumed = getCurrentPosition() - payloadStart
+                  if consumed < maximum {
+                      remaining = maximum - consumed
+                      tail = this.NewUnknownNode("Remaining Payload")
+                      tail.SetMaxLength(remaining)
+                      tail.Process()
                   }
               }
 DNS: "import:application-layer/dns.yaml;node:DNS"

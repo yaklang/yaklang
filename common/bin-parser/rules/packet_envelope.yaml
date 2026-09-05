@@ -1,0 +1,454 @@
+endian: big
+Package:
+  Ethernet Envelope:
+    operator: |
+      this.ProcessSubNode("Destination")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Ether Type")
+      if this.GetMaxLength() > 14 {
+        payloadLength = this.GetMaxLength() - 14
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+    Destination: raw,6
+    Source: raw,6
+    Ether Type: uint16
+    Payload: raw
+
+  Truncated Ethernet Record Envelope:
+    Destination Byte 1: uint8
+    Destination Byte 2: uint8
+    Destination Byte 3: uint8
+    Destination Byte 4: uint8
+
+  Linux SLL Envelope:
+    operator: |
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("ARPHRD Type")
+      this.ProcessSubNode("Address Length")
+      this.ProcessSubNode("Address")
+      this.ProcessSubNode("Protocol")
+      packetType = getNodeResult("Packet Type").Value
+      addressLength = getNodeResult("Address Length").Value
+      if packetType > 6 {
+        panic("packet envelope: Linux SLL packet type is outside [0,6]")
+      }
+      if addressLength > 8 {
+        panic("packet envelope: Linux SLL address length exceeds 8")
+      }
+      if this.GetMaxLength() > 16 {
+        payloadLength = this.GetMaxLength() - 16
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+    Packet Type: uint16
+    ARPHRD Type: uint16
+    Address Length: uint16
+    Address: raw,8
+    Protocol: uint16
+    Payload: raw
+
+  PPP Envelope:
+    operator: |
+      this.ProcessSubNode("Protocol High")
+      this.ProcessSubNode("Protocol Low")
+      high = getNodeResult("Protocol High").Value
+      low = getNodeResult("Protocol Low").Value
+      if high % 2 != 0 || low % 2 != 1 {
+        panic("packet envelope: PPP two-byte protocol field has invalid extension bits")
+      }
+      if this.GetMaxLength() > 2 {
+        payloadLength = this.GetMaxLength() - 2
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+    Protocol High: uint8
+    Protocol Low: uint8
+    Payload: raw
+
+  IPv4 Envelope:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Header Length")
+      this.ProcessSubNode("Differentiated Services")
+      this.ProcessSubNode("Total Length")
+      this.ProcessSubNode("Identification")
+      this.ProcessSubNode("Flags and Fragment Offset")
+      this.ProcessSubNode("Time to Live")
+      this.ProcessSubNode("Protocol")
+      this.ProcessSubNode("Header Checksum")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Destination")
+      version = getNodeResult("Version").Value
+      headerLength = getNodeResult("Header Length").Value * 4
+      totalLength = getNodeResult("Total Length").Value
+      if version != 4 {
+        panic("packet envelope: IPv4 version is not 4")
+      }
+      if headerLength < 20 {
+        panic("packet envelope: IPv4 header length is below 20")
+      }
+      if totalLength < headerLength || totalLength > this.GetMaxLength() {
+        panic("packet envelope: IPv4 total length is outside the bounded input")
+      }
+      optionsLength = headerLength - 20
+      if optionsLength > 0 {
+        this.GetSubNode("Options").SetMaxLength(optionsLength)
+        this.ProcessSubNode("Options")
+      }
+      payloadLength = totalLength - headerLength
+      if payloadLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+      if this.GetMaxLength() > this.Length() {
+        trailerLength = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Capture Trailer").SetMaxLength(trailerLength)
+        this.ProcessSubNode("Capture Trailer")
+      }
+    Version: uint8,4bit
+    Header Length: uint8,4bit
+    Differentiated Services: uint8
+    Total Length: uint16
+    Identification: uint16
+    Flags and Fragment Offset: uint16
+    Time to Live: uint8
+    Protocol: uint8
+    Header Checksum: uint16
+    Source: raw,4
+    Destination: raw,4
+    Options: raw
+    Payload: raw
+    Capture Trailer: raw
+
+  IPv6 Envelope:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Traffic Class")
+      this.ProcessSubNode("Flow Label")
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("Next Header")
+      this.ProcessSubNode("Hop Limit")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Destination")
+      version = getNodeResult("Version").Value
+      payloadLength = getNodeResult("Payload Length").Value
+      if version != 6 {
+        panic("packet envelope: IPv6 version is not 6")
+      }
+      if 40 + payloadLength > this.GetMaxLength() {
+        panic("packet envelope: IPv6 payload length is outside the bounded input")
+      }
+      if payloadLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+      if this.GetMaxLength() > this.Length() {
+        trailerLength = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Capture Trailer").SetMaxLength(trailerLength)
+        this.ProcessSubNode("Capture Trailer")
+      }
+    Version: uint8,4bit
+    Traffic Class: uint8
+    Flow Label: uint32,20bit
+    Payload Length: uint16
+    Next Header: uint8
+    Hop Limit: uint8
+    Source: raw,16
+    Destination: raw,16
+    Payload: raw
+    Capture Trailer: raw
+
+  Null IPv4 Envelope:
+    operator: |
+      this.ProcessSubNode("Family Byte 1")
+      this.ProcessSubNode("Family Byte 2")
+      this.ProcessSubNode("Family Byte 3")
+      this.ProcessSubNode("Family Byte 4")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Header Length")
+      this.ProcessSubNode("Differentiated Services")
+      this.ProcessSubNode("Total Length")
+      this.ProcessSubNode("Identification")
+      this.ProcessSubNode("Flags and Fragment Offset")
+      this.ProcessSubNode("Time to Live")
+      this.ProcessSubNode("Protocol")
+      this.ProcessSubNode("Header Checksum")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Destination")
+      version = getNodeResult("Version").Value
+      family1 = getNodeResult("Family Byte 1").Value
+      family2 = getNodeResult("Family Byte 2").Value
+      family3 = getNodeResult("Family Byte 3").Value
+      family4 = getNodeResult("Family Byte 4").Value
+      familyLittle = family1 + family2 * 256 + family3 * 65536 + family4 * 16777216
+      familyBig = family4 + family3 * 256 + family2 * 65536 + family1 * 16777216
+      headerLength = getNodeResult("Header Length").Value * 4
+      totalLength = getNodeResult("Total Length").Value
+      if version != 4 || (familyLittle != 2 && familyBig != 2) {
+        panic("packet envelope: null family does not match IPv4")
+      }
+      if headerLength < 20 {
+        panic("packet envelope: null IPv4 header length is below 20")
+      }
+      if totalLength < headerLength || 4 + totalLength > this.GetMaxLength() {
+        panic("packet envelope: null IPv4 total length is outside the bounded input")
+      }
+      optionsLength = headerLength - 20
+      if optionsLength > 0 {
+        this.GetSubNode("Options").SetMaxLength(optionsLength)
+        this.ProcessSubNode("Options")
+      }
+      payloadLength = totalLength - headerLength
+      if payloadLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+      if this.GetMaxLength() > this.Length() {
+        trailerLength = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Capture Trailer").SetMaxLength(trailerLength)
+        this.ProcessSubNode("Capture Trailer")
+      }
+    Family Byte 1: uint8
+    Family Byte 2: uint8
+    Family Byte 3: uint8
+    Family Byte 4: uint8
+    Version: uint8,4bit
+    Header Length: uint8,4bit
+    Differentiated Services: uint8
+    Total Length: uint16
+    Identification: uint16
+    Flags and Fragment Offset: uint16
+    Time to Live: uint8
+    Protocol: uint8
+    Header Checksum: uint16
+    Source: raw,4
+    Destination: raw,4
+    Options: raw
+    Payload: raw
+    Capture Trailer: raw
+
+  Null IPv6 Envelope:
+    operator: |
+      this.ProcessSubNode("Family Byte 1")
+      this.ProcessSubNode("Family Byte 2")
+      this.ProcessSubNode("Family Byte 3")
+      this.ProcessSubNode("Family Byte 4")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Traffic Class")
+      this.ProcessSubNode("Flow Label")
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("Next Header")
+      this.ProcessSubNode("Hop Limit")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Destination")
+      version = getNodeResult("Version").Value
+      family1 = getNodeResult("Family Byte 1").Value
+      family2 = getNodeResult("Family Byte 2").Value
+      family3 = getNodeResult("Family Byte 3").Value
+      family4 = getNodeResult("Family Byte 4").Value
+      familyLittle = family1 + family2 * 256 + family3 * 65536 + family4 * 16777216
+      familyBig = family4 + family3 * 256 + family2 * 65536 + family1 * 16777216
+      payloadLength = getNodeResult("Payload Length").Value
+      validFamily = familyLittle == 10 || familyLittle == 24 || familyLittle == 28 || familyLittle == 30 || familyBig == 10 || familyBig == 24 || familyBig == 28 || familyBig == 30
+      if version != 6 || !validFamily {
+        panic("packet envelope: null family does not match IPv6")
+      }
+      if 44 + payloadLength > this.GetMaxLength() {
+        panic("packet envelope: null IPv6 payload length is outside the bounded input")
+      }
+      if payloadLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+      if this.GetMaxLength() > this.Length() {
+        trailerLength = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Capture Trailer").SetMaxLength(trailerLength)
+        this.ProcessSubNode("Capture Trailer")
+      }
+    Family Byte 1: uint8
+    Family Byte 2: uint8
+    Family Byte 3: uint8
+    Family Byte 4: uint8
+    Version: uint8,4bit
+    Traffic Class: uint8
+    Flow Label: uint32,20bit
+    Payload Length: uint16
+    Next Header: uint8
+    Hop Limit: uint8
+    Source: raw,16
+    Destination: raw,16
+    Payload: raw
+    Capture Trailer: raw
+
+  RadioTap Envelope:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Padding")
+      this.ProcessSubNode("Header Length")
+      this.ProcessSubNode("Present Flags")
+      version = getNodeResult("Version").Value
+      headerLength = getNodeResult("Header Length").Value
+      if version != 0 {
+        panic("packet envelope: RadioTap version is not 0")
+      }
+      if headerLength < 8 || headerLength > this.GetMaxLength() {
+        panic("packet envelope: RadioTap header length is outside the bounded input")
+      }
+      fieldsLength = headerLength - 8
+      if fieldsLength > 0 {
+        this.GetSubNode("Header Fields").SetMaxLength(fieldsLength)
+        this.ProcessSubNode("Header Fields")
+      }
+      if this.GetMaxLength() > this.Length() {
+        payloadLength = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+    Version: uint8
+    Padding: uint8
+    Header Length: uint16
+    Present Flags: uint32
+    Header Fields: raw
+    Payload: raw
+
+  Cisco HDLC Envelope:
+    operator: |
+      this.ProcessSubNode("Address")
+      this.ProcessSubNode("Control")
+      this.ProcessSubNode("Protocol")
+      if getNodeResult("Address").Value != 0x0f || getNodeResult("Control").Value != 0 {
+        panic("packet envelope: Cisco HDLC address/control mismatch")
+      }
+      this.ProcessSubNode("Payload")
+    Address: uint8
+    Control: uint8
+    Protocol: uint16
+    Payload: raw
+
+  PPI Envelope:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Header Length")
+      this.ProcessSubNode("Data Link Type")
+      version = getNodeResult("Version").Value
+      headerLength = getNodeResult("Header Length").Value
+      if version != 0 {
+        panic("packet envelope: PPI version is not 0")
+      }
+      if headerLength < 8 || headerLength > this.GetMaxLength() {
+        panic("packet envelope: PPI header length is outside the bounded input")
+      }
+      fieldsLength = headerLength - 8
+      if fieldsLength > 0 {
+        this.GetSubNode("Header Fields").SetMaxLength(fieldsLength)
+        this.ProcessSubNode("Header Fields")
+      }
+      if this.GetMaxLength() > this.Length() {
+        payloadLength = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Payload").SetMaxLength(payloadLength)
+        this.ProcessSubNode("Payload")
+      }
+    Version: uint8
+    Flags: uint8
+    Header Length: uint16
+    Data Link Type: uint32
+    Header Fields: raw
+    Payload: raw
+
+  Frame Relay SNAP Envelope:
+    operator: |
+      this.ProcessSubNode("Address")
+      this.ProcessSubNode("Control")
+      this.ProcessSubNode("Pad")
+      this.ProcessSubNode("NLPID")
+      this.ProcessSubNode("OUI")
+      this.ProcessSubNode("Ether Type")
+      if getNodeResult("Control").Value != 3 || getNodeResult("NLPID").Value != 0x80 || getNodeResult("Ether Type").Value != 0x0806 {
+        panic("packet envelope: Frame Relay SNAP header mismatch")
+      }
+      this.ProcessSubNode("Payload")
+    Address: raw,2
+    Control: uint8
+    Pad: uint8
+    NLPID: uint8
+    OUI: raw,3
+    Ether Type: uint16
+    Payload: raw
+
+  USB Mon Envelope:
+    endian: little
+    operator: |
+      this.ProcessSubNode("URB ID")
+      this.ProcessSubNode("Event Type")
+      this.ProcessSubNode("Transfer Type")
+      this.ProcessSubNode("Endpoint")
+      this.ProcessSubNode("Device")
+      this.ProcessSubNode("Bus")
+      this.ProcessSubNode("Setup Flag")
+      this.ProcessSubNode("Data Flag")
+      this.ProcessSubNode("Timestamp Seconds")
+      this.ProcessSubNode("Timestamp Microseconds")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("URB Length")
+      this.ProcessSubNode("Captured Length")
+      this.ProcessSubNode("Setup")
+      this.ProcessSubNode("Interval")
+      this.ProcessSubNode("Start Frame")
+      this.ProcessSubNode("Transfer Flags")
+      this.ProcessSubNode("ISO Descriptor Count")
+      capturedLength = getNodeResult("Captured Length").Value
+      if 64 + capturedLength != this.GetMaxLength() {
+        panic("packet envelope: usbmon captured length does not match bounded input")
+      }
+      if capturedLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(capturedLength)
+        this.ProcessSubNode("Payload")
+      }
+    URB ID: uint64
+    Event Type: uint8
+    Transfer Type: uint8
+    Endpoint: uint8
+    Device: uint8
+    Bus: uint16
+    Setup Flag: uint8
+    Data Flag: uint8
+    Timestamp Seconds: int64
+    Timestamp Microseconds: int32
+    Status: int32
+    URB Length: uint32
+    Captured Length: uint32
+    Setup: raw,8
+    Interval: int32
+    Start Frame: int32
+    Transfer Flags: uint32
+    ISO Descriptor Count: uint32
+    Payload: raw
+
+  Pcap Record Envelope:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Timestamp Seconds")
+      this.ProcessSubNode("Timestamp Fraction")
+      this.ProcessSubNode("Captured Length")
+      this.ProcessSubNode("Original Length")
+      capturedLength = getNodeResult("Captured Length").Value
+      originalLength = getNodeResult("Original Length").Value
+      if originalLength < capturedLength {
+        panic("packet envelope: pcap original length is below captured length")
+      }
+      if 16 + capturedLength != this.GetMaxLength() {
+        panic("packet envelope: pcap captured length does not match record size")
+      }
+      if capturedLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(capturedLength)
+        this.ProcessSubNode("Payload")
+      }
+    Timestamp Seconds: uint32
+    Timestamp Fraction: uint32
+    Captured Length: uint32
+    Original Length: uint32
+    Payload: raw

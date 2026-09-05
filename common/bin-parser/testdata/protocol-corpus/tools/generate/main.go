@@ -37,12 +37,13 @@ type sourceSpec struct {
 }
 
 type repositorySpec struct {
-	ID          string `json:"id"`
-	Repository  string `json:"repository"`
-	Commit      string `json:"commit"`
-	License     string `json:"license"`
-	LicensePath string `json:"license_path"`
-	Homepage    string `json:"homepage,omitempty"`
+	ID            string `json:"id"`
+	Repository    string `json:"repository"`
+	Commit        string `json:"commit"`
+	License       string `json:"license"`
+	LicensePath   string `json:"license_path"`
+	LicenseSHA256 string `json:"license_sha256"`
+	Homepage      string `json:"homepage,omitempty"`
 }
 
 type captureSpec struct {
@@ -55,6 +56,7 @@ type captureSpec struct {
 	EvidenceKind  string  `json:"evidence_kind"`
 	Notes         string  `json:"notes,omitempty"`
 	AllowEmpty    bool    `json:"allow_empty,omitempty"`
+	SourceSHA256  string  `json:"source_sha256"`
 }
 
 type manifest struct {
@@ -120,7 +122,13 @@ type packetDataReader interface {
 	ReadPacketData() ([]byte, gopacket.CaptureInfo, error)
 }
 
-var roadmapPattern = regexp.MustCompile(`\{Name: "([^"]+)", Family: "([^"]+)".*Status: (st\w+), Priority: (pri\w+)`)
+var (
+	roadmapPattern    = regexp.MustCompile(`\{Name: "([^"]+)", Family: "([^"]+)".*Status: (st\w+), Priority: (pri\w+)`)
+	sourceIDPattern   = regexp.MustCompile(`^[a-z0-9-]+$`)
+	repositoryPattern = regexp.MustCompile(`^[^/]+/[^/]+$`)
+	commitPattern     = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	sha256Pattern     = regexp.MustCompile(`^[0-9a-f]{64}$`)
+)
 
 func main() {
 	fetch := flag.Bool("fetch", false, "download pinned captures and license texts before generating")
@@ -183,16 +191,32 @@ func readJSON(fileName string, dst any) error {
 	defer f.Close()
 	dec := json.NewDecoder(f)
 	dec.DisallowUnknownFields()
-	return dec.Decode(dst)
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("unexpected trailing JSON value")
+		}
+		return fmt.Errorf("read trailing JSON: %w", err)
+	}
+	return nil
 }
 
 func validateSpec(spec sourceSpec) error {
+	if spec.Schema != "./source-spec.schema.json" {
+		return fmt.Errorf("unexpected source schema %q", spec.Schema)
+	}
 	if spec.SchemaVersion != 1 {
 		return fmt.Errorf("unsupported source schema version %d", spec.SchemaVersion)
 	}
+	if len(spec.Repositories) == 0 || len(spec.Captures) == 0 {
+		return errors.New("source specification must include repositories and captures")
+	}
 	repos := make(map[string]struct{}, len(spec.Repositories))
 	for _, repo := range spec.Repositories {
-		if repo.ID == "" || repo.Repository == "" || len(repo.Commit) != 40 || repo.LicensePath == "" {
+		if !sourceIDPattern.MatchString(repo.ID) || !repositoryPattern.MatchString(repo.Repository) || !commitPattern.MatchString(repo.Commit) || repo.License == "" || !validProtocolCorpusUpstreamPath(repo.LicensePath) || !sha256Pattern.MatchString(repo.LicenseSHA256) {
 			return fmt.Errorf("invalid repository specification: %+v", repo)
 		}
 		if _, exists := repos[repo.ID]; exists {
@@ -202,6 +226,9 @@ func validateSpec(spec sourceSpec) error {
 	}
 	ids := make(map[string]struct{}, len(spec.Captures))
 	for _, capture := range spec.Captures {
+		if !sourceIDPattern.MatchString(capture.ID) {
+			return fmt.Errorf("capture has invalid id %q", capture.ID)
+		}
 		if _, exists := ids[capture.ID]; exists {
 			return fmt.Errorf("duplicate capture id %q", capture.ID)
 		}
@@ -209,16 +236,27 @@ func validateSpec(spec sourceSpec) error {
 		if _, exists := repos[capture.RepositoryID]; !exists {
 			return fmt.Errorf("capture %q references unknown repository %q", capture.ID, capture.RepositoryID)
 		}
-		if capture.UpstreamPath == "" || capture.Protocol == "" || capture.DisplayFilter == "" {
+		if !validProtocolCorpusUpstreamPath(capture.UpstreamPath) || capture.Protocol == "" || capture.DisplayFilter == "" || !sha256Pattern.MatchString(capture.SourceSHA256) {
 			return fmt.Errorf("capture %q has an empty required field", capture.ID)
 		}
+		if capture.RoadmapName != nil && *capture.RoadmapName == "" {
+			return fmt.Errorf("capture %q has an empty roadmap name", capture.ID)
+		}
 		switch capture.EvidenceKind {
-		case "upstream-positive", "upstream-negative", "educational-challenge":
+		case "upstream-positive", "upstream-negative":
 		default:
 			return fmt.Errorf("capture %q has invalid evidence kind %q", capture.ID, capture.EvidenceKind)
 		}
 	}
 	return nil
+}
+
+func validProtocolCorpusUpstreamPath(value string) bool {
+	if value == "" || strings.Contains(value, "\\") || strings.HasPrefix(value, "/") {
+		return false
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(value)))
+	return clean == value && clean != ".." && !strings.HasPrefix(clean, "../")
 }
 
 func readRoadmap(fileName string) ([]roadmapItem, error) {
@@ -273,6 +311,9 @@ func prepareRepositories(corpusDir string, specs []repositorySpec, fetch bool) (
 		if err != nil {
 			return nil, nil, err
 		}
+		if digest != repo.LicenseSHA256 {
+			return nil, nil, fmt.Errorf("license digest mismatch for %s: got %s, want %s", repo.ID, digest, repo.LicenseSHA256)
+		}
 		result = append(result, manifestRepository{
 			ID: repo.ID, Repository: repo.Repository, Commit: repo.Commit,
 			License: repo.License, Homepage: repo.Homepage,
@@ -318,6 +359,9 @@ func prepareCaptures(corpusDir string, specs []captureSpec, repoByID map[string]
 		digest, size, err := fileDigest(captureAbs)
 		if err != nil {
 			return nil, err
+		}
+		if digest != item.SourceSHA256 {
+			return nil, fmt.Errorf("capture digest mismatch for %s: got %s, want %s", item.ID, digest, item.SourceSHA256)
 		}
 		frameNumber, protocols, err := selectRepresentativeFrame(captureAbs, item.DisplayFilter)
 		if err != nil {
@@ -700,7 +744,7 @@ func writeDistributionSVG(fileName string, stats []familyStat) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-labelledby="title desc">`, width, height, width, height)
 	b.WriteString(`<title id="title">Protocol roadmap and collected authoritative material by family</title>`)
-	b.WriteString(`<desc id="desc">Horizontal bars compare all roadmap protocols with unique protocols that have at least one collected upstream or educational challenge capture. Exact covered and total counts are printed on every row.</desc>`)
+	b.WriteString(`<desc id="desc">Horizontal bars compare all roadmap protocols with unique protocols that have at least one collected sample capture. Exact covered and total counts are printed on every row.</desc>`)
 	b.WriteString(`<rect width="100%" height="100%" fill="#FFFFFF"/>`)
 	b.WriteString(`<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#171717}.title{font-size:22px;font-weight:650}.subtitle{font-size:13px;fill:#59636E}.label{font-size:13px}.count{font-size:12px;font-variant-numeric:tabular-nums}.legend{font-size:12px;fill:#59636E}</style>`)
 	b.WriteString(`<text class="title" x="28" y="36">616-item protocol roadmap: collected capture material</text>`)
@@ -753,7 +797,7 @@ func writeReportMarkdown(fileName string, roadmap []roadmapItem, captures []mani
 	fmt.Fprintf(&b, "- Roadmap: **%d** protocols; %d `done`, %d `partial`, %d `todo`.\n", len(roadmap), statusCounts["done"], statusCounts["partial"], statusCounts["todo"])
 	fmt.Fprintf(&b, "- Corpus: **%d capture files**, **%d packets**, **%d bytes**.\n", len(captures), totalPackets(captures), totalBytes)
 	fmt.Fprintf(&b, "- Direct roadmap material: **%d unique protocols**; outside-roadmap candidates: **%d captures**.\n", len(covered), outside)
-	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream, %d negative/boundary upstream, %d official educational challenge.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"], kindCounts["educational-challenge"])
+	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream and %d negative/boundary upstream captures.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"])
 
 	b.WriteString("## Source distribution\n\n| Source | Captures | Packets |\n| --- | ---: | ---: |\n")
 	sources := sortedKeys(sourceCaptures)
@@ -767,7 +811,7 @@ func writeReportMarkdown(fileName string, roadmap []roadmapItem, captures []mani
 	b.WriteString("\n![Protocol material distribution. Every row prints collected protocol count over the full roadmap family count.](protocol-material-distribution.svg)\n\n")
 	b.WriteString("**Figure 1 | Authoritative capture material by roadmap family.** Blue marks unique roadmap protocols with at least one collected file; the gray extent is the full family backlog. Exact values are printed, so color is not the only encoding.\n\n")
 	b.WriteString("## Interpretation limits\n\n")
-	b.WriteString("A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and false-positive resistance are part of parser robustness. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.\n")
+	b.WriteString("A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and classification-boundary handling are part of parser robustness. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.\n")
 	return os.WriteFile(fileName, []byte(b.String()), 0o644)
 }
 

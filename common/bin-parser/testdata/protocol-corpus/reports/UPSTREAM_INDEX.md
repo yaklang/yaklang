@@ -8,27 +8,26 @@ recorded commits, not estimates of distinct protocols.
 
 | Source | Pinned commit | Capture files upstream | Selected here | Why it is useful |
 | --- | --- | ---: | ---: | --- |
-| [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 151 | Positive classifications, version variants, false-positive cases and malformed inputs used by a maintained traffic classifier. |
-| [Wireshark test captures](https://github.com/wireshark/wireshark/tree/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures) | `4f63ea0eae68cf6facea31604994f1a339e43640` | 136 | 6 | Official dissector regression material for ARP, ICMP, IKEv1, IKEv2, mDNS and HTTP/3, stored in the licensed source repository. |
-| [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 14 | Small parser boundaries: truncation, invalid lengths, unsupported link types and historical parser regressions. |
-| [Google educational challenge archive](https://github.com/google/google-ctf/tree/067421eb7e918c29e39f187fac5a0f0d72a6ab83) | `067421eb7e918c29e39f187fac5a0f0d72a6ab83` | 3 | 3 | Official exercise traffic with a real reverse-engineering objective rather than a synthetic one-packet fixture. |
+| [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 151 | Positive classifications, version variants, classification-boundary cases and malformed inputs used by a maintained traffic classifier. |
+| [Wireshark test captures](https://github.com/wireshark/wireshark/tree/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures) | `4f63ea0eae68cf6facea31604994f1a339e43640` | 136 | 10 | Official dissector regression material for ARP, DHCP, HTTP, ICMP, IKEv1, IKEv2, IPX, mDNS, USB HID and HTTP/3, stored in the licensed source repository. |
+| [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 17 | Small parser samples and boundaries: positive LLDP, RADIUS and Radiotap inputs plus truncation, invalid lengths, unsupported link types and historical parser regressions. |
 
 The selected set is deliberately smaller than the upstream inventory. Duplicate
 application-classification captures, captures that require additional secrets
 to decode, and large files that do not add a new roadmap protocol or boundary
 were left in the upstream index. `sources.json` is the reviewable allow-list.
 
-## Official educational exercises
+## Selected neutral fixtures
 
-| Capture | Challenge context | Packets | Useful exercise |
+| Capture | Sample context | Packets | Useful parser validation |
 | --- | --- | ---: | --- |
-| `google-challenge-ascii-art` | 2017 qualification reverse-engineering exercise | 60 | Recover an application exchange carried by HTTP form traffic and distinguish transport parsing from application semantics. |
-| `google-challenge-engraver` | 2022 qualification hardware exercise | 860 | Decode USB HID reports and reconstruct device actions from a capture with a non-Ethernet link type. |
-| `google-challenge-sc` | 2019 game-traffic exercise | 16827 | Handle LLC/IPX traffic and recover state from a long bidirectional game trace. |
+| `wireshark-http` | HTTP request fixture | 1 | Parse a complete application request and verify method, path, version, headers and exact input consumption. |
+| `wireshark-usb-hid` | USB HID input-report fixture | 10 | Decode a complete four-byte input report from a capture with a non-Ethernet link type while keeping descriptor-dependent data opaque. |
+| `wireshark-ipx-rip` | IPX routing-response fixture | 1 | Parse the complete IPX packet, exclude Ethernet padding and preserve the routing payload as exact bytes. |
 
-These are passive exercise artifacts. Solving them is intentionally out of
-scope for the corpus verifier; the verifier checks provenance and bytes, not a
-published solution.
+These are passive sample artifacts from the same immutable Wireshark source
+used elsewhere in the corpus. The verifier checks provenance, exact bytes and
+bounded parser behavior.
 
 ## Indexed, not vendored
 

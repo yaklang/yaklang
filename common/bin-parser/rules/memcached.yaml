@@ -2,6 +2,19 @@ endian: big
 Package:
   Memcached:
     operator: |
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if !op.OK {
+        panic("memcached: empty message")
+      }
+      first = res.Value
+      if first != 0x80 && first != 0x81 {
+        if (first >= 0x41 && first <= 0x5a) || (first >= 0x61 && first <= 0x7a) {
+          this.ProcessSubNode("Text Line")
+          return
+        }
+        panic("memcached: magic must be binary or text")
+      }
       this.ProcessSubNode("Magic")
       mag = getNodeResult("Magic").Value
       if mag != 0x80 && mag != 0x81 {
@@ -43,3 +56,5 @@ Package:
     Extras: string
     Key: string
     Value: string
+    Text Line: "del:\r\n;type:string"
+PeekByte: uint8

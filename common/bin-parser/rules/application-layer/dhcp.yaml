@@ -27,6 +27,21 @@ Package:
         panic("dhcp: invalid magic cookie")
       }
       this.ProcessSubNode("Options")
+      maximum = this.GetMaxLength()
+      bounded = maximum > 0 && maximum < 1048576
+      if bounded {
+        remaining = maximum - this.Length()
+        if remaining > 0 {
+          this.GetSubNode("Padding").SetMaxLength(remaining)
+          this.ProcessSubNode("Padding")
+          padding = getNodeResult("Padding").Value
+          for _, octet = range padding {
+            if octet != 0 && octet != 255 {
+              panic("dhcp: unexpected data follows the end option")
+            }
+          }
+        }
+      }
     Operation: uint8
     Hardware Type: uint8
     Hardware Length: uint8
@@ -57,6 +72,7 @@ Package:
             break
           }
         }
+    Padding: raw
 Option:
   operator: |
     code = this.ProcessSubNode("Code").Value

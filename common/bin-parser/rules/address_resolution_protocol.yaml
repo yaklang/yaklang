@@ -1,11 +1,30 @@
 Package:
   Address Resolution Protocol:
+    operator: |
+      this.ProcessSubNode("Hardware type")
+      this.ProcessSubNode("Protocol type")
+      this.ProcessSubNode("Hardware size")
+      this.ProcessSubNode("Protocol size")
+      this.ProcessSubNode("Opcode")
+      hlen = getNodeResult("Hardware size").Value
+      plen = getNodeResult("Protocol size").Value
+      if hlen == 0 || hlen > 32 || plen == 0 || plen > 32 {
+        panic("arp: invalid address size")
+      }
+      this.GetSubNode("Sender MAC address").SetMaxLength(hlen)
+      this.ProcessSubNode("Sender MAC address")
+      this.GetSubNode("Sender IP address").SetMaxLength(plen)
+      this.ProcessSubNode("Sender IP address")
+      this.GetSubNode("Target MAC address").SetMaxLength(hlen)
+      this.ProcessSubNode("Target MAC address")
+      this.GetSubNode("Target IP address").SetMaxLength(plen)
+      this.ProcessSubNode("Target IP address")
     Hardware type: uint16
     Protocol type: uint16
     Hardware size: uint8
     Protocol size: uint8
     Opcode: uint16 # 1/2
-    Sender MAC address: raw,6
-    Sender IP address: raw,4
-    Target MAC address: raw,6
-    Target IP address: raw,4
+    Sender MAC address: raw
+    Sender IP address: raw
+    Target MAC address: raw
+    Target IP address: raw

@@ -549,6 +549,9 @@ func GetParentLengthCache(parentNode *base.Node, childName string) (uint64, bool
 }
 func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	if node.Name == "root" {
+		if node.Cfg.Has(CfgLength) {
+			return node.Cfg.GetUint64(CfgLength), true, nil
+		}
 		return math.MaxUint64, false, nil
 	}
 	iparent := node.Cfg.GetItem(CfgParent)

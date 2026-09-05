@@ -2,7 +2,6 @@ endian: big
 Package:
   Internet Protocol:
     length-from-field: Total Length
-    length-from-field-multiply: 4
     Version: uint8,4bit
     Header Length: uint8,4bit
     Type of Service: raw,1
@@ -32,6 +31,8 @@ Package:
             node = this.NewSubNode("IGMP")
           case 0x2f:
             node = this.NewSubNode("GRE")
+          case 41:
+            node = this.NewSubNode("IPv6")
           case 50:
             node = this.NewSubNode("ESP")
           case 51:
@@ -55,6 +56,7 @@ UDP: "import:user_datagram_protocol.yaml;node:UDP"
 ICMP: "import:internet_control_message_protocol.yaml;node:ICMP"
 IGMP: "import:igmp.yaml;node:IGMP"
 GRE: "import:generic_routing_encapsulation.yaml;node:GRE"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ESP: "import:ipsec.yaml;node:ESP"
 AH: "import:ipsec.yaml;node:AH"
 OSPF: "import:ospf.yaml;node:OSPF"

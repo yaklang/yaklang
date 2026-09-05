@@ -3,25 +3,24 @@
 This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.
 
 - Roadmap: **616** protocols; 211 `done`, 0 `partial`, 405 `todo`.
-- Corpus: **174 capture files**, **41828 packets**, **7278893 bytes**.
+- Corpus: **178 capture files**, **24126 packets**, **5512994 bytes**.
 - Direct roadmap material: **156 unique protocols**; outside-roadmap candidates: **10 captures**.
-- Evidence classes: 155 positive upstream, 16 negative/boundary upstream, 3 official educational challenge.
+- Evidence classes: 162 positive upstream and 16 negative/boundary upstream captures.
 
 ## Source distribution
 
 | Source | Captures | Packets |
 | --- | ---: | ---: |
-| `google-challenges` | 3 | 17747 |
-| `ndpi` | 151 | 23448 |
-| `tcpdump` | 14 | 13 |
-| `wireshark-tests` | 6 | 620 |
+| `ndpi` | 151 | 23435 |
+| `tcpdump` | 17 | 55 |
+| `wireshark-tests` | 10 | 636 |
 
 ## Roadmap family distribution
 
 | Family | Roadmap protocols | With collected capture | Capture files |
 | --- | ---: | ---: | ---: |
 | `service-tools` | 66 | 5 | 5 |
-| `link` | 49 | 5 | 5 |
+| `link` | 49 | 5 | 7 |
 | `cn-app` | 48 | 6 | 6 |
 | `ics` | 46 | 17 | 17 |
 | `internet` | 40 | 16 | 17 |
@@ -35,9 +34,9 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 | `database` | 20 | 9 | 9 |
 | `mgmt` | 20 | 6 | 7 |
 | `carrier` | 19 | 3 | 3 |
-| `name-config` | 19 | 11 | 13 |
+| `name-config` | 19 | 11 | 14 |
 | `remote` | 17 | 8 | 8 |
-| `auth` | 16 | 5 | 6 |
+| `auth` | 16 | 5 | 7 |
 | `web` | 16 | 10 | 11 |
 | `game` | 10 | 2 | 2 |
 | `storage` | 10 | 1 | 1 |
@@ -51,4 +50,4 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 
 ## Interpretation limits
 
-A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and false-positive resistance are part of parser robustness. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.
+A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and classification-boundary handling are part of parser robustness. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.

@@ -17,6 +17,8 @@ Package:
         if op.OK {
           op.Recovery()
           this.ProcessSubNode("Functions")
+        } else {
+          op.Recovery()
         }
       }
       return

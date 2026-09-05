@@ -2,6 +2,16 @@ endian: big
 Package:
   HSRP:
     operator: |
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if !op.OK {
+        panic("hsrp: empty message")
+      }
+      first = res.Value
+      if first == 1 {
+        this.ProcessByType("HSRPv2")
+        return
+      }
       this.ProcessSubNode("Version")
       if getNodeResult("Version").Value != 0 {
         panic("hsrp: version must be 0")
@@ -29,3 +39,70 @@ Package:
     Reserved: uint8
     Authentication: raw,8
     Virtual IP: raw,4
+HSRPv2:
+  unpack: true
+  TLVs:
+    list: true
+    TLV: HSRPv2TLV
+    operator: |
+      for {
+        res, op = this.TryProcessByType("PeekByte")
+        if !op.OK {
+          op.Recovery()
+          break
+        }
+        op.Recovery()
+        ele = this.NewElement()
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+HSRPv2TLV:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    typ = getNodeResult("Type").Value
+    l = getNodeResult("Length").Value
+    if l > this.GetMaxLength() - this.Length() {
+      panic("hsrp: TLV length exceeds message")
+    }
+    if typ == 1 && l == 40 {
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Op Code")
+      this.ProcessSubNode("State")
+      this.ProcessSubNode("IP Version")
+      this.ProcessSubNode("Group")
+      this.ProcessSubNode("Identifier")
+      this.ProcessSubNode("Priority")
+      this.ProcessSubNode("Hello Time")
+      this.ProcessSubNode("Hold Time")
+      this.ProcessSubNode("Virtual IP")
+      this.ProcessSubNode("Reserved")
+      return
+    }
+    if typ == 3 && l == 8 {
+      this.ProcessSubNode("Authentication Data")
+      return
+    }
+    if l > 0 && l < 1048576 {
+      this.GetSubNode("Value").SetMaxLength(l)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint8
+  Length: uint8
+  Version: uint8
+  Op Code: uint8
+  State: uint8
+  IP Version: uint8
+  Group: uint16
+  Identifier: raw,6
+  Priority: uint32
+  Hello Time: uint32
+  Hold Time: uint32
+  Virtual IP: raw,4
+  Reserved: raw,12
+  Authentication Data: raw,8
+  Value: raw
+PeekByte: uint8
