@@ -3,14 +3,15 @@
 This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.
 
 - Roadmap: **616** protocols; 211 `done`, 0 `partial`, 405 `todo`.
-- Corpus: **223 capture files**, **57695 packets**, **10417051 bytes**.
-- Direct roadmap material: **176 unique protocols**; outside-roadmap candidates: **24 captures**.
-- Evidence classes: 204 positive upstream, 16 negative/boundary upstream, 3 official educational challenge.
+- Corpus: **295 capture files**, **57826 packets**, **10430026 bytes**.
+- Direct roadmap material: **248 unique protocols**; outside-roadmap candidates: **24 captures**.
+- Evidence classes: 204 positive upstream, 16 negative/boundary upstream, 3 official educational challenge, 72 locally generated.
 
 ## Source distribution
 
 | Source | Captures | Packets |
 | --- | ---: | ---: |
+| `generated-local` | 72 | 131 |
 | `google-challenges` | 3 | 17747 |
 | `iti-ics` | 4 | 18 |
 | `mgadelha-sv` | 1 | 10161 |
@@ -24,28 +25,28 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 
 | Family | Roadmap protocols | With collected capture | Capture files |
 | --- | ---: | ---: | ---: |
-| `service-tools` | 66 | 6 | 7 |
-| `link` | 49 | 5 | 5 |
+| `service-tools` | 66 | 12 | 13 |
+| `link` | 49 | 21 | 21 |
 | `cn-app` | 48 | 9 | 9 |
-| `ics` | 46 | 27 | 33 |
-| `internet` | 40 | 16 | 17 |
+| `ics` | 46 | 28 | 34 |
+| `internet` | 40 | 29 | 30 |
 | `longtail` | 40 | 4 | 5 |
 | `cn-vendor` | 33 | 0 | 0 |
-| `mq-rpc` | 31 | 11 | 11 |
-| `routing` | 24 | 8 | 9 |
-| `microsoft` | 23 | 0 | 0 |
-| `voip` | 23 | 12 | 13 |
-| `file` | 21 | 7 | 10 |
-| `database` | 20 | 9 | 9 |
-| `mgmt` | 20 | 7 | 9 |
+| `mq-rpc` | 31 | 14 | 14 |
+| `routing` | 24 | 13 | 14 |
+| `microsoft` | 23 | 2 | 2 |
+| `voip` | 23 | 13 | 14 |
+| `file` | 21 | 11 | 14 |
+| `database` | 20 | 11 | 11 |
+| `mgmt` | 20 | 12 | 14 |
 | `carrier` | 19 | 3 | 4 |
-| `name-config` | 19 | 11 | 15 |
+| `name-config` | 19 | 15 | 19 |
 | `remote` | 17 | 8 | 8 |
-| `auth` | 16 | 5 | 6 |
-| `web` | 16 | 10 | 11 |
+| `auth` | 16 | 8 | 9 |
+| `web` | 16 | 12 | 13 |
 | `game` | 10 | 4 | 4 |
-| `storage` | 10 | 2 | 2 |
-| `transport` | 10 | 5 | 5 |
+| `storage` | 10 | 4 | 4 |
+| `transport` | 10 | 8 | 8 |
 | `mail` | 9 | 6 | 6 |
 | `finance` | 6 | 1 | 1 |
 

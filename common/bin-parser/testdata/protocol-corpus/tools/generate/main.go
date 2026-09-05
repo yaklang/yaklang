@@ -38,11 +38,13 @@ type sourceSpec struct {
 
 type repositorySpec struct {
 	ID          string `json:"id"`
+	Origin      string `json:"origin,omitempty"`
 	Repository  string `json:"repository"`
 	Commit      string `json:"commit"`
 	License     string `json:"license"`
 	LicensePath string `json:"license_path"`
 	Homepage    string `json:"homepage,omitempty"`
+	Recipe      string `json:"recipe,omitempty"`
 }
 
 type captureSpec struct {
@@ -192,8 +194,18 @@ func validateSpec(spec sourceSpec) error {
 	}
 	repos := make(map[string]struct{}, len(spec.Repositories))
 	for _, repo := range spec.Repositories {
+		origin := repo.Origin
+		if origin == "" {
+			origin = "github"
+		}
 		if repo.ID == "" || repo.Repository == "" || len(repo.Commit) != 40 || repo.LicensePath == "" {
 			return fmt.Errorf("invalid repository specification: %+v", repo)
+		}
+		if origin != "github" && origin != "generated" {
+			return fmt.Errorf("repository %q has invalid origin %q", repo.ID, origin)
+		}
+		if origin == "generated" && repo.Recipe == "" {
+			return fmt.Errorf("generated repository %q is missing recipe", repo.ID)
 		}
 		if _, exists := repos[repo.ID]; exists {
 			return fmt.Errorf("duplicate repository id %q", repo.ID)
@@ -213,7 +225,7 @@ func validateSpec(spec sourceSpec) error {
 			return fmt.Errorf("capture %q has an empty required field", capture.ID)
 		}
 		switch capture.EvidenceKind {
-		case "upstream-positive", "upstream-negative", "educational-challenge":
+		case "upstream-positive", "upstream-negative", "educational-challenge", "generated-positive":
 		default:
 			return fmt.Errorf("capture %q has invalid evidence kind %q", capture.ID, capture.EvidenceKind)
 		}
@@ -258,12 +270,30 @@ func prepareRepositories(corpusDir string, specs []repositorySpec, fetch bool) (
 	byID := make(map[string]repositorySpec, len(specs))
 	for _, repo := range specs {
 		byID[repo.ID] = repo
-		licenseName := repo.ID + "-" + filepath.Base(repo.LicensePath) + ".txt"
+		base := filepath.Base(repo.LicensePath)
+		if !strings.HasSuffix(strings.ToLower(base), ".txt") {
+			base += ".txt"
+		}
+		licenseName := repo.ID + "-" + base
 		licenseAbs := filepath.Join(licenseDir, licenseName)
-		url := rawGitHubURL(repo, repo.LicensePath)
-		if fetch {
-			if err := download(url, licenseAbs); err != nil {
-				return nil, nil, fmt.Errorf("download %s license: %w", repo.ID, err)
+		if repo.Origin == "generated" {
+			src := repo.LicensePath
+			if !filepath.IsAbs(src) {
+				src = filepath.Join(corpusDir, src)
+			}
+			data, err := os.ReadFile(src)
+			if err != nil {
+				return nil, nil, fmt.Errorf("read %s license: %w", repo.ID, err)
+			}
+			if err := os.WriteFile(licenseAbs, data, 0o644); err != nil {
+				return nil, nil, err
+			}
+		} else {
+			url := rawGitHubURL(repo, repo.LicensePath)
+			if fetch {
+				if err := download(url, licenseAbs); err != nil {
+					return nil, nil, fmt.Errorf("download %s license: %w", repo.ID, err)
+				}
 			}
 		}
 		if _, err := os.Stat(licenseAbs); err != nil {
@@ -305,10 +335,15 @@ func prepareCaptures(corpusDir string, specs []captureSpec, repoByID map[string]
 		}
 		captureName := item.ID + ext
 		captureAbs := filepath.Join(dir, captureName)
-		sourceURL := rawGitHubURL(repo, item.UpstreamPath)
-		if fetch {
-			if err := download(sourceURL, captureAbs); err != nil {
-				return nil, fmt.Errorf("download %s: %w", item.ID, err)
+		var sourceURL string
+		if repo.Origin == "generated" {
+			sourceURL = fmt.Sprintf("generated://scapy/%s/%s", repo.Commit, item.ID)
+		} else {
+			sourceURL = rawGitHubURL(repo, item.UpstreamPath)
+			if fetch {
+				if err := download(sourceURL, captureAbs); err != nil {
+					return nil, fmt.Errorf("download %s: %w", item.ID, err)
+				}
 			}
 		}
 		if _, err := os.Stat(captureAbs); err != nil {
@@ -767,7 +802,7 @@ func writeReportMarkdown(fileName string, roadmap []roadmapItem, captures []mani
 	fmt.Fprintf(&b, "- Roadmap: **%d** protocols; %d `done`, %d `partial`, %d `todo`.\n", len(roadmap), statusCounts["done"], statusCounts["partial"], statusCounts["todo"])
 	fmt.Fprintf(&b, "- Corpus: **%d capture files**, **%d packets**, **%d bytes**.\n", len(captures), totalPackets(captures), totalBytes)
 	fmt.Fprintf(&b, "- Direct roadmap material: **%d unique protocols**; outside-roadmap candidates: **%d captures**.\n", len(covered), outside)
-	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream, %d negative/boundary upstream, %d official educational challenge.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"], kindCounts["educational-challenge"])
+	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream, %d negative/boundary upstream, %d official educational challenge, %d locally generated.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"], kindCounts["educational-challenge"], kindCounts["generated-positive"])
 
 	b.WriteString("## Source distribution\n\n| Source | Captures | Packets |\n| --- | ---: | ---: |\n")
 	sources := sortedKeys(sourceCaptures)

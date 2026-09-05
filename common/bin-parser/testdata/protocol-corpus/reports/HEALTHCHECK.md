@@ -8,63 +8,41 @@ Generated against `ProtocolRoadmap` (616 names) and the vendored corpus in this 
 
 | Metric | Before this branch | After this branch |
 | --- | ---: | ---: |
-| Capture files | 174 | 223 |
-| Packets | 41828 | 57695 |
-| Unique roadmap protocols with a capture | 156 | 176 |
+| Capture files | 174 | 295 |
+| Packets | 41828 | 57826 |
+| Unique roadmap protocols with a capture | 156 | 248 |
 | Outside-roadmap candidate captures | 10 | 24 |
+| Locally generated captures | 0 | 72 |
 | Roadmap `done` / `todo` | 211 / 405 | 211 / 405 (unchanged) |
 
-Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, **ITI ICS-Security-Tools** (CC-BY-4.0), **mrhenrike/PCAPTrafficAnalysis** (MIT), **mgadelha/Sampled_Values** (README only). Wiki SampleCaptures and automayt/ICS-pcap LFS dumps stay indexed, not vendored (LFS pointers, not packet bytes).
+Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, ITI ICS-Security-Tools, mrhenrike/PCAPTrafficAnalysis, mgadelha/Sampled_Values, and **local Scapy synthesis** (`generated-local`, CC0). Docker Desktop was used for a Samba named-pipe attempt; identification captures themselves are Scapy `wrpcap` files kept only when `tshark` matched the recorded filter.
 
 ## Family coverage (after)
 
-Worst sample deserts:
-
 | Family | Roadmap | With capture | Note |
 | --- | ---: | ---: | --- |
-| `cn-vendor` | 33 | **0** | Huawei/H3C/Sangfor/Hikvision/GB28181 etc. are `srcPrivate`; no public PCAP in the selected trees |
-| `microsoft` | 23 | **0** | DCE/RPC exists under `mq-rpc`; named Microsoft product protocols (SAMR/LSARPC/WMI/…) still empty |
-| `service-tools` | 66 | 6 | added **Checkmk**; Jenkins/Nagios/Docker/… still missing |
-| `longtail` | 40 | 4 | added **NetBEUI** |
-| `ics` | 46 | **27** | was 21; added GOOSE, SV, EtherCAT, Profinet DCP, TPKT, COTP |
+| `cn-vendor` | 33 | **0** | still private/Colasoft-only |
+| `microsoft` | 23 | **2** | WPAD + LLMNR-MDNS collision; generic DCE/RPC bind mapped to `MSRPC` (mq-rpc), not a named pipe |
+| `service-tools` | 66 | **12** | Docker API, Memcache binary, JDWP handshake, IPv6 RA, DHCPv6 server, WPAD proxy |
+| `link` | 49 | **21** | Ethernet II/802.3, VLAN/QinQ, RARP, LLC, LACP, EAPOL/EAP/802.1X, 802.11, CDP, Loopback, PPPoE Session, LCP, CHAP |
+| `ics` | 46 | **28** | + J1939 |
+| `internet` | 40 | **29** | IPv6 extension headers, NDP/MLD, IGMP, MPLS, Geneve, L2TP, IPIP, 6to4 |
+| `database` | 20 | **11** | + ETCD, MariaDB (live docker greeting) |
+| `mgmt` | 20 | **12** | + NetFlow v5, SNMPv3, ICMP Timestamp, Prometheus, Redfish |
+| `storage` | 10 | **4** | + AoE, MinIO/S3 |
+
+## Locally generated this round (72 names / 16 families)
+
+Scapy recipes in `tools/generate-local/generate.py`. Dropped recipes (no tshark hit) are listed in `generated-index.json` `failed`.
+
+Notable new names: Ethernet II, IEEE 802.1Q, QinQ, RARP, LACP, EAPOL, IEEE 802.11, CDP, ICMPv6 NDP, IPv6 Hop-by-Hop/Routing/Fragment/DstOpt, IGMP, MPLS, Geneve, RIP, RIPng, OSPFv3, EIGRP, LLMNR, DHCPv6, NetFlow v5, SNMPv3, LDAP/CLDAP, SOCKS4, Memcache binary, Docker API, AoE, MinIO/S3, JDWP handshake, JSON-RPC 2.0, ONC RPC, LPD, FTP-DATA, SDP, J1939, SSL, XML-RPC, WPAD, MSRPC, **SMB2**, **MariaDB**.
 
 ## ICS remaining without a capture
 
-Still `missing` after this round:
+Modbus RTU/ASCII, IEC 60870-5-101, OPC DA, PROFIBUS, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
 
-Modbus RTU/ASCII, IEC 60870-5-101, OPC DA, PROFIBUS, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, J1939, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
+## How to grow further
 
-automayt/ICS-pcap `ETHERCAT/ethercat.pcap` and `POWERLINK/epl.pcap` are 131-byte Git LFS pointers, not packet captures. Do not invent hex.
-
-## Captures added this round (identification only)
-
-From nDPI (LGPL-3.0, commit `4cae778e`):
-
-- **Checkmk**, **IAX2**, **Steam**, **miHoYo/HoYoverse** (Genshin Impact), **NetBEUI** (Win98 SMB/NetBEUI)
-
-From ITI ICS-Security-Tools (CC-BY-4.0, commit `9b826091`):
-
-- **IEC 61850 GOOSE** (`GOOSE.pcap`, tshark `goose`)
-- **Profinet DCP** (`ChangeIPUsingDCP.pcap`, tshark `pn_dcp`)
-- **TPKT** / **COTP** from the smallest Snap7 S7 setup/readVar frames (tshark `tpkt`/`cotp`/`s7comm`)
-
-From mrhenrike/PCAPTrafficAnalysis (MIT, commit `216566e9`):
-
-- **EtherCAT** (`ICS-Ethercat-001.pcap`, tshark `ecat`)
-
-From mgadelha/Sampled_Values (README only, commit `0d6760c7`):
-
-- **IEC 61850 SV** (`SV_Normal_Traffic.cap`, 1.4MB / 10161 packets; 5–8MB variants skipped)
-
-Earlier on this branch: nDPI CIP explicit / UMAS / TriStation / C37.118 / TRDP / GE EGD / Meshtastic; Wireshark KNX/OPC UA/NFS/Git; Scapy DoIP/Zigbee/IPFIX.
-
-## Chinese-app / vendor
-
-Public material exists for WeChat, DingTalk, Weibo, Aliyun, Xiaomi, Tuya. **cn-vendor (33)** still has zero files; those names are private/Colasoft-only by roadmap source tags.
-
-## How to grow further without writing dissectors
-
-1. Keep using `sources.json` + `go run ./tools/generate -fetch`.
-2. Prefer one small capture per new roadmap name; skip duplicate HTTP/TLS/QUIC floods and Git LFS pointer files.
-3. Keep the upstream LICENSE or README next to the capture (`licenses/`).
-4. Microsoft named RPC interfaces still need a capture that tshark labels as those DCE/RPC pipes, not a generic `dcerpc` frame already mapped to DCE/RPC.
+1. `PATH` must include tshark. `./tools/generate-local/.venv/bin/python generate.py` then `go run ./tools/generate`.
+2. Keep one small capture per new roadmap name; require a tshark filter hit.
+3. Named Microsoft pipes need a tshark `epm`/`samr`/`srvsvc` label, not a generic `dcerpc` bind.
