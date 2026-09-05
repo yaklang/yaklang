@@ -105,8 +105,8 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 	if manifest.RoadmapTotal != len(ProtocolRoadmap) || manifest.RoadmapTotal < 600 {
 		t.Fatalf("manifest roadmap total %d does not match %d in source", manifest.RoadmapTotal, len(ProtocolRoadmap))
 	}
-	if len(manifest.Repositories) != 3 {
-		t.Fatalf("manifest has %d source repositories, want 3", len(manifest.Repositories))
+	if len(manifest.Repositories) != len(sourceSpec.Repositories) || len(manifest.Repositories) < 4 {
+		t.Fatalf("manifest has %d source repositories, source spec has %d", len(manifest.Repositories), len(sourceSpec.Repositories))
 	}
 	if len(manifest.Captures) != len(sourceSpec.Captures) {
 		t.Fatalf("manifest has %d captures but source spec has %d", len(manifest.Captures), len(sourceSpec.Captures))
@@ -220,10 +220,10 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 			t.Fatalf("source capture %q is absent from manifest", id)
 		}
 	}
-	if len(manifest.Captures) < 130 || totalPackets < 34000 || len(mappedProtocols) < 110 {
+	if len(manifest.Captures) < 174 || totalPackets < 41800 || len(mappedProtocols) < 156 {
 		t.Fatalf("corpus unexpectedly shrank: captures=%d packets=%d mapped_protocols=%d", len(manifest.Captures), totalPackets, len(mappedProtocols))
 	}
-	if evidenceCounts["upstream-positive"] < 110 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["educational-challenge"] != 3 {
+	if evidenceCounts["upstream-positive"] < 155 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["educational-challenge"] != 3 {
 		t.Fatalf("corpus evidence classes unexpectedly shrank: %+v", evidenceCounts)
 	}
 

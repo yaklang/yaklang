@@ -8,14 +8,15 @@ recorded commits, not estimates of distinct protocols.
 
 | Source | Pinned commit | Capture files upstream | Selected here | Why it is useful |
 | --- | --- | ---: | ---: | --- |
-| [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 114 | Positive classifications, version variants, false-positive cases and malformed inputs used by a maintained traffic classifier. |
-| [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 14 | Small parser boundaries: truncation, invalid lengths, unsupported link types and historical memory-safety regressions. |
+| [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 151 | Positive classifications, version variants, false-positive cases and malformed inputs used by a maintained traffic classifier. |
+| [Wireshark test captures](https://github.com/wireshark/wireshark/tree/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures) | `4f63ea0eae68cf6facea31604994f1a339e43640` | 136 | 6 | Official dissector regression material for ARP, ICMP, IKEv1, IKEv2, mDNS and HTTP/3, stored in the licensed source repository. |
+| [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 14 | Small parser boundaries: truncation, invalid lengths, unsupported link types and historical parser regressions. |
 | [Google educational challenge archive](https://github.com/google/google-ctf/tree/067421eb7e918c29e39f187fac5a0f0d72a6ab83) | `067421eb7e918c29e39f187fac5a0f0d72a6ab83` | 3 | 3 | Official exercise traffic with a real reverse-engineering objective rather than a synthetic one-packet fixture. |
 
 The selected set is deliberately smaller than the upstream inventory. Duplicate
-application-classification captures, captures that require secrets to decrypt,
-and large files that do not add a new roadmap protocol or boundary were left in
-the upstream index. `sources.json` is the reviewable allow-list.
+application-classification captures, captures that require additional secrets
+to decode, and large files that do not add a new roadmap protocol or boundary
+were left in the upstream index. `sources.json` is the reviewable allow-list.
 
 ## Official educational exercises
 
@@ -25,18 +26,19 @@ the upstream index. `sources.json` is the reviewable allow-list.
 | `google-challenge-engraver` | 2022 qualification hardware exercise | 860 | Decode USB HID reports and reconstruct device actions from a capture with a non-Ethernet link type. |
 | `google-challenge-sc` | 2019 game-traffic exercise | 16827 | Handle LLC/IPX traffic and recover state from a long bidirectional game trace. |
 
-These are passive challenge artifacts. Solving them is intentionally out of
+These are passive exercise artifacts. Solving them is intentionally out of
 scope for the corpus verifier; the verifier checks provenance and bytes, not a
-published flag.
+published solution.
 
 ## Indexed, not vendored
 
-- [Wireshark SampleCaptures](https://wiki.wireshark.org/SampleCaptures) is the
-  best broad manual index for protocol-oriented PCAPs. It covers common L2/L3,
-  routing, file sharing, VoIP, databases, SCTP and industrial protocols. The
-  wiki page does not provide one uniform redistribution license for every
-  historical attachment, so those files are candidates for local experiments,
-  not committed inputs, until each attachment is cleared.
+- [Wireshark SampleCaptures](https://wiki.wireshark.org/SampleCaptures) is a
+  broad manual index distinct from the vendored files in Wireshark's official
+  Git repository. It covers common L2/L3, routing, file sharing, VoIP,
+  databases, SCTP and industrial protocols. The wiki page does not provide one
+  uniform redistribution license for every historical attachment, so those
+  files are candidates for local experiments, not committed inputs, until each
+  attachment is cleared.
 - [Zeek testing](https://github.com/zeek/zeek-testing) is authoritative for
   analyzer regression behavior, but the current repository tree does not carry
   the PCAP payloads directly. It is therefore not treated as a vendorable
