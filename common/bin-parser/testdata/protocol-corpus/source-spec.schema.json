@@ -16,11 +16,13 @@
         "additionalProperties": false,
         "properties": {
           "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "origin": {"type": "string", "enum": ["github", "generated"]},
           "repository": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
           "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
           "license": {"type": "string", "minLength": 1},
           "license_path": {"type": "string", "minLength": 1},
-          "homepage": {"type": "string", "format": "uri"}
+          "homepage": {"type": "string", "format": "uri"},
+          "recipe": {"type": "string"}
         }
       }
     },
@@ -38,7 +40,7 @@
           "protocol": {"type": "string", "minLength": 1},
           "roadmap_name": {"type": ["string", "null"]},
           "display_filter": {"type": "string", "minLength": 1},
-          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge"]},
+          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge", "generated-positive"]},
           "notes": {"type": "string"},
           "allow_empty": {"type": "boolean"}
         }

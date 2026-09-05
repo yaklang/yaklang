@@ -4,10 +4,11 @@ This directory is test and experiment material for the 616-item
 `ProtocolRoadmap`. It deliberately keeps evidence collection separate from
 claims that a Yaklang dissector is complete.
 
-The current snapshot contains 174 capture files, 41,828 packets and direct
-material for 156 unique roadmap protocols. The source and family breakdown is
-generated in `reports/REPORT.md`; `reports/UPSTREAM_INDEX.md` records the wider
-authoritative collections and selection policy.
+The current snapshot contains 295 capture files, 57,826 packets and direct
+material for 248 unique roadmap protocols. The source and family breakdown is
+generated in `reports/REPORT.md`; `reports/HEALTHCHECK.md` is the coverage
+gap survey; `reports/UPSTREAM_INDEX.md` records the wider authoritative
+collections and selection policy.
 
 Each capture has all of the following:
 
@@ -56,10 +57,10 @@ The committed corpus is passive data consumed by local parser tests. Reading a
 capture does not contact any service. Educational captures may contain exercise
 solutions by design.
 
-Upstream license texts are stored under `licenses/`. Captures from Wireshark's
-official repository are pinned and vendored under its project license.
-Wireshark SampleCaptures is retained separately as a research index in
-`reports/UPSTREAM_INDEX.md`; historical wiki attachments are not vendored
-because attachment-level redistribution terms are not uniform. This corpus
-vendors only captures from repositories with an explicit project license at
-the pinned commit.
+Upstream license texts (or README when a repo has no LICENSE file) are stored
+under `licenses/`. GitHub captures are pinned to an upstream commit. Locally
+generated captures (`generated-local`) are synthesized with Scapy; their
+`source_url` is `generated://scapy/<recipe-sha1>/<id>` and the recipe lives
+in `tools/generate-local/`. Wireshark SampleCaptures and automayt/ICS-pcap
+LFS pointer files remain indexed in `reports/UPSTREAM_INDEX.md` rather than
+vendored.

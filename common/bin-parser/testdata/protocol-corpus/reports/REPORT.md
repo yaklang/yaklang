@@ -3,45 +3,50 @@
 This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.
 
 - Roadmap: **616** protocols; 211 `done`, 0 `partial`, 405 `todo`.
-- Corpus: **174 capture files**, **41828 packets**, **7278893 bytes**.
-- Direct roadmap material: **156 unique protocols**; outside-roadmap candidates: **10 captures**.
-- Evidence classes: 155 positive upstream, 16 negative/boundary upstream, 3 official educational challenge.
+- Corpus: **295 capture files**, **57826 packets**, **10430026 bytes**.
+- Direct roadmap material: **248 unique protocols**; outside-roadmap candidates: **24 captures**.
+- Evidence classes: 204 positive upstream, 16 negative/boundary upstream, 3 official educational challenge, 72 locally generated.
 
 ## Source distribution
 
 | Source | Captures | Packets |
 | --- | ---: | ---: |
+| `generated-local` | 72 | 131 |
 | `google-challenges` | 3 | 17747 |
-| `ndpi` | 151 | 23448 |
+| `iti-ics` | 4 | 18 |
+| `mgadelha-sv` | 1 | 10161 |
+| `mrhenrike-pcap` | 1 | 986 |
+| `ndpi` | 176 | 27761 |
+| `scapy` | 6 | 264 |
 | `tcpdump` | 14 | 13 |
-| `wireshark-tests` | 6 | 620 |
+| `wireshark-tests` | 18 | 745 |
 
 ## Roadmap family distribution
 
 | Family | Roadmap protocols | With collected capture | Capture files |
 | --- | ---: | ---: | ---: |
-| `service-tools` | 66 | 5 | 5 |
-| `link` | 49 | 5 | 5 |
-| `cn-app` | 48 | 6 | 6 |
-| `ics` | 46 | 17 | 17 |
-| `internet` | 40 | 16 | 17 |
-| `longtail` | 40 | 3 | 3 |
+| `service-tools` | 66 | 12 | 13 |
+| `link` | 49 | 21 | 21 |
+| `cn-app` | 48 | 9 | 9 |
+| `ics` | 46 | 28 | 34 |
+| `internet` | 40 | 29 | 30 |
+| `longtail` | 40 | 4 | 5 |
 | `cn-vendor` | 33 | 0 | 0 |
-| `mq-rpc` | 31 | 11 | 11 |
-| `routing` | 24 | 8 | 9 |
-| `microsoft` | 23 | 0 | 0 |
-| `voip` | 23 | 11 | 11 |
-| `file` | 21 | 7 | 8 |
-| `database` | 20 | 9 | 9 |
-| `mgmt` | 20 | 6 | 7 |
-| `carrier` | 19 | 3 | 3 |
-| `name-config` | 19 | 11 | 13 |
+| `mq-rpc` | 31 | 14 | 14 |
+| `routing` | 24 | 13 | 14 |
+| `microsoft` | 23 | 2 | 2 |
+| `voip` | 23 | 13 | 14 |
+| `file` | 21 | 11 | 14 |
+| `database` | 20 | 11 | 11 |
+| `mgmt` | 20 | 12 | 14 |
+| `carrier` | 19 | 3 | 4 |
+| `name-config` | 19 | 15 | 19 |
 | `remote` | 17 | 8 | 8 |
-| `auth` | 16 | 5 | 6 |
-| `web` | 16 | 10 | 11 |
-| `game` | 10 | 2 | 2 |
-| `storage` | 10 | 1 | 1 |
-| `transport` | 10 | 5 | 5 |
+| `auth` | 16 | 8 | 9 |
+| `web` | 16 | 12 | 13 |
+| `game` | 10 | 4 | 4 |
+| `storage` | 10 | 4 | 4 |
+| `transport` | 10 | 8 | 8 |
 | `mail` | 9 | 6 | 6 |
 | `finance` | 6 | 1 | 1 |
 
