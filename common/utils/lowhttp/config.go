@@ -141,6 +141,7 @@ type LowhttpExecConfig struct {
 	RandomJA3FingerPrint bool
 	ClientHelloSpec      *utls.ClientHelloSpec
 	TLSFingerprint       string
+	HTTP2Fingerprint     string
 
 	Tags []string
 
@@ -1031,6 +1032,16 @@ func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 func WithTLSFingerprint(name string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.TLSFingerprint = name
+	}
+}
+
+// WithHTTP2Fingerprint selects a built-in HTTP/2 framing fingerprint profile
+// (see AvailableHTTP2Profiles). It is independent of WithTLSFingerprint: the
+// default HTTP/2 framing stays compatible with non-conforming servers unless a
+// profile is requested explicitly.
+func WithHTTP2Fingerprint(name string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.HTTP2Fingerprint = name
 	}
 }
 

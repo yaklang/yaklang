@@ -724,6 +724,18 @@ func (pc *persistConn) h2Conn() {
 	// cached H2 connection.
 	fr.SetMaxReadFrameSize(defaultMaxFrameSize)
 
+	var profile *http2Profile
+	if pc.cacheKey != nil && pc.cacheKey.http2Fingerprint != "" {
+		resolved, err := getHTTP2Profile(pc.cacheKey.http2Fingerprint)
+		if err != nil {
+			// exec.go validates the name up front; falling back to the default
+			// framing keeps an unexpected value from breaking the connection.
+			log.Warnf("lowhttp: %v, falling back to default HTTP/2 framing", err)
+		} else {
+			profile = resolved
+		}
+	}
+
 	newH2Conn := &http2ClientConn{
 		conn:              pc.conn,
 		ctx:               pc.p.ctx,
@@ -746,6 +758,7 @@ func (pc *persistConn) h2Conn() {
 		closeCh:           make(chan struct{}),
 		readLoopExited:    make(chan struct{}),
 		serverPrefaceCh:   make(chan struct{}, 1),
+		http2Profile:      profile,
 		// pc back-reference: used by setClose() to evict this connection from
 		// the pool's h2ConnMap when it transitions to closed state.
 		pc: pc,
@@ -1330,18 +1343,19 @@ func (e connPoolReadFromServerError) Error() string {
 }
 
 type connectKey struct {
-	proxy           []string // 可以使用的代理
-	scheme, addr    string   // 协议和目标地址
-	https           bool
-	gmTls           bool
-	clientHelloSpec *utls.ClientHelloSpec
-	tlsFingerprint  string
-	sni             string
-	strongHost      string
+	proxy            []string // 可以使用的代理
+	scheme, addr     string   // 协议和目标地址
+	https            bool
+	gmTls            bool
+	clientHelloSpec  *utls.ClientHelloSpec
+	tlsFingerprint   string
+	http2Fingerprint string
+	sni              string
+	strongHost       string
 }
 
 func (c *connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.tlsFingerprint, c.sni, c.strongHost)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.tlsFingerprint, c.http2Fingerprint, c.sni, c.strongHost)
 }
 
 type connLRU struct {
