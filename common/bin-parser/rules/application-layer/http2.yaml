@@ -139,6 +139,48 @@ Package:
     Promised Stream ID: uint32,31bit
     Header Block: string
     Octets: string
+  HTTP2Connection: HTTP2Connection
+HTTP2Connection:
+  operator: |
+    this.ProcessSubNode("Preface")
+    this.ProcessSubNode("Frames")
+  Preface:
+    operator: |
+      this.ProcessSubNode("Magic")
+      m = getNodeResult("Magic").Value
+      if len(m) != 24 || m[0] != 0x50 || m[1] != 0x52 || m[2] != 0x49 || m[3] != 0x20 || m[4] != 0x2a || m[5] != 0x20 {
+        panic("http2: preface must start with 'PRI * '")
+      }
+      if m[6] != 0x48 || m[7] != 0x54 || m[8] != 0x54 || m[9] != 0x50 || m[10] != 0x2f || m[11] != 0x32 {
+        panic("http2: preface must contain HTTP/2")
+      }
+    Magic: raw,24
+  Frames:
+    list: true
+    Frame: "import:application-layer/http2.yaml;node:HTTP2"
+    operator: |
+      for {
+        res, probe = this.TryProcessByType("HTTP2Byte")
+        if !probe.OK {
+          probe.Recovery()
+          break
+        }
+        probe.Recovery()
+        remaining = this.GetMaxLength() - this.Length()
+        if remaining == 0 {
+          break
+        }
+        if remaining < 9 {
+          panic("http2: truncated frame header")
+        }
+        ele = this.NewElement()
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          panic("http2: frame made no progress")
+        }
+      }
 HTTP2Setting:
   Identifier: uint16
   Value: uint32
+HTTP2Byte: uint8

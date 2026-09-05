@@ -38,19 +38,65 @@ Package:
         }
 JSONPair:
   operator: |
+    for {
+      res, op = this.TryProcessByType("JSONWhitespaceByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Save()
+    }
     this.ProcessSubNode("QKey")
     if getNodeResult("QKey").Value != 0x22 {
       panic("jsonrpc: expected quote")
     }
     this.ProcessSubNode("Key")
+    for {
+      res, op = this.TryProcessByType("JSONWhitespaceByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Save()
+    }
     this.ProcessSubNode("Colon")
     if getNodeResult("Colon").Value != 0x3a {
       panic("jsonrpc: expected colon")
+    }
+    for {
+      res, op = this.TryProcessByType("JSONWhitespaceByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Save()
     }
     this.ProcessSubNode("ValLead")
     lead = getNodeResult("ValLead").Value
     if lead == 0x22 {
       this.ProcessSubNode("StrVal")
+    }
+    if lead == 0x7b {
+      this.ProcessSubNode("Empty Object End")
+      if getNodeResult("Empty Object End").Value != 0x7d {
+        panic("jsonrpc: non-empty object values are not supported")
+      }
+    }
+    if lead == 0x5b {
+      this.ProcessSubNode("Empty Array End")
+      if getNodeResult("Empty Array End").Value != 0x5d {
+        panic("jsonrpc: non-empty array values are not supported")
+      }
+    }
+    if lead != 0x22 && lead != 0x7b && lead != 0x5b {
+      for {
+        res, op = this.TryProcessByType("JSONPrimitiveByte")
+        if !op.OK {
+          op.Recovery()
+          break
+        }
+        op.Save()
+      }
     }
     key = string(getNodeResult("Key").Value)
     if key == "method" {
@@ -61,6 +107,14 @@ JSONPair:
     }
     if key == "error" {
       setCtx("has_error", 1)
+    }
+    for {
+      res, op = this.TryProcessByType("JSONWhitespaceByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Save()
     }
     this.ProcessSubNode("Sep")
     sep = getNodeResult("Sep").Value
@@ -76,4 +130,22 @@ JSONPair:
   Colon: uint8
   ValLead: uint8
   StrVal: "del:\";type:string"
+  Empty Object End: uint8
+  Empty Array End: uint8
   Sep: uint8
+JSONWhitespaceByte:
+  operator: |
+    this.ProcessSubNode("Octet")
+    b = getNodeResult("Octet").Value
+    if b != 0x20 && b != 0x09 && b != 0x0a && b != 0x0d {
+      panic("jsonrpc: expected whitespace")
+    }
+  Octet: uint8
+JSONPrimitiveByte:
+  operator: |
+    this.ProcessSubNode("Octet")
+    b = getNodeResult("Octet").Value
+    if b == 0x2c || b == 0x7d || b == 0x20 || b == 0x09 || b == 0x0a || b == 0x0d {
+      panic("jsonrpc: primitive separator")
+    }
+  Octet: uint8

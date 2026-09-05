@@ -1,0 +1,107 @@
+endian: big
+Package:
+  ProfinetIOReadImplicit:
+    operator: |
+      this.ProcessSubNode("RPC Version")
+      if getNodeResult("RPC Version").Value != 4 {
+        panic("profinet-io: DCE/RPC version must be 4")
+      }
+      this.ProcessSubNode("Packet Type")
+      if getNodeResult("Packet Type").Value != 0 {
+        panic("profinet-io: expected a DCE/RPC request")
+      }
+      this.ProcessSubNode("Flags 1")
+      this.ProcessSubNode("Flags 2")
+      this.ProcessSubNode("Data Representation")
+      this.ProcessSubNode("Character Representation")
+      this.ProcessSubNode("Floating Point Representation")
+      this.ProcessSubNode("Serial High")
+      this.ProcessSubNode("Object ID")
+      this.ProcessSubNode("Interface ID")
+      interfaceID = getNodeResult("Interface ID").Value
+      if len(interfaceID) != 16 || interfaceID[0] != 0x01 || interfaceID[1] != 0x00 || interfaceID[2] != 0xa0 || interfaceID[3] != 0xde || interfaceID[4] != 0x97 || interfaceID[5] != 0x6c || interfaceID[6] != 0xd1 || interfaceID[7] != 0x11 || interfaceID[8] != 0x82 || interfaceID[9] != 0x71 || interfaceID[10] != 0x00 || interfaceID[11] != 0xa0 || interfaceID[12] != 0x24 || interfaceID[13] != 0x42 || interfaceID[14] != 0xdf || interfaceID[15] != 0x7d {
+        panic("profinet-io: DCE/RPC interface is not PNIO Device Interface")
+      }
+      this.ProcessSubNode("Activity ID")
+      this.ProcessSubNode("Server Boot")
+      this.ProcessSubNode("Interface Version")
+      this.ProcessSubNode("DCE Sequence Number")
+      this.ProcessSubNode("Operation Number")
+      if getNodeResult("Operation Number").Value != 5 {
+        panic("profinet-io: expected Read Implicit operation")
+      }
+      this.ProcessSubNode("Interface Hint")
+      this.ProcessSubNode("Activity Hint")
+      this.ProcessSubNode("Fragment Length")
+      fragmentLength = getNodeResult("Fragment Length").Value
+      if fragmentLength != this.GetMaxLength() - 80 {
+        panic("profinet-io: DCE/RPC fragment length does not match stub")
+      }
+      this.ProcessSubNode("Fragment Number")
+      this.ProcessSubNode("Authentication Protocol")
+      this.ProcessSubNode("Serial Low")
+      this.ProcessSubNode("NDR Wrapper")
+      this.ProcessSubNode("Block Type")
+      if getNodeResult("Block Type").Value != 0x0009 {
+        panic("profinet-io: expected IODReadReqHeader block")
+      }
+      this.ProcessSubNode("Block Length")
+      blockLength = getNodeResult("Block Length").Value
+      if blockLength != this.GetMaxLength() - this.Length() {
+        panic("profinet-io: block length does not match input")
+      }
+      this.ProcessSubNode("Block Version High")
+      this.ProcessSubNode("Block Version Low")
+      if getNodeResult("Block Version High").Value != 1 || getNodeResult("Block Version Low").Value != 0 {
+        panic("profinet-io: unsupported IODReadReqHeader version")
+      }
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("AR UUID")
+      this.ProcessSubNode("API")
+      this.ProcessSubNode("Slot Number")
+      this.ProcessSubNode("Subslot Number")
+      this.ProcessSubNode("Padding 1")
+      this.ProcessSubNode("Index")
+      this.ProcessSubNode("Record Data Length")
+      this.ProcessSubNode("Target AR UUID")
+      this.ProcessSubNode("Padding 2")
+    RPC Version: uint8
+    Packet Type: uint8
+    Flags 1: uint8
+    Flags 2: uint8
+    Data Representation: uint8
+    Character Representation: uint8
+    Floating Point Representation: uint8
+    Serial High: uint8
+    Object ID: raw,16
+    Interface ID: raw,16
+    Activity ID: raw,16
+    Server Boot: raw,4
+    Interface Version: raw,4
+    DCE Sequence Number: raw,4
+    Operation Number:
+      type: uint16
+      endian: little
+    Interface Hint: raw,2
+    Activity Hint: raw,2
+    Fragment Length:
+      type: uint16
+      endian: little
+    Fragment Number: raw,2
+    Authentication Protocol: uint8
+    Serial Low: uint8
+    NDR Wrapper: raw,20
+    Block Type: uint16
+    Block Length: uint16
+    Block Version High: uint8
+    Block Version Low: uint8
+    Sequence Number: uint16
+    AR UUID: raw,16
+    API: uint32
+    Slot Number: uint16
+    Subslot Number: uint16
+    Padding 1: raw,2
+    Index: uint16
+    Record Data Length: uint32
+    Target AR UUID: raw,16
+    Padding 2: raw,8

@@ -1,0 +1,1404 @@
+endian: big
+Package:
+  AFP:
+    operator: |
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("DSI Command")
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Data Offset")
+      this.ProcessSubNode("Data Length")
+      this.ProcessSubNode("Reserved")
+      length = getNodeResult("Data Length").Value
+      if length != this.GetMaxLength() - this.Length() {
+        panic("afp: DSI data length does not match input")
+      }
+      if length > 0 {
+        this.GetSubNode("AFP Data").SetMaxLength(length)
+        this.ProcessSubNode("AFP Data")
+      }
+    Flags: uint8
+    DSI Command: uint8
+    Request ID: uint16
+    Data Offset: uint32
+    Data Length: uint32
+    Reserved: uint32
+    AFP Data:
+      Function: uint8
+      Payload: raw
+
+  ActiveMQOpenWire:
+    operator: |
+      this.ProcessSubNode("Frame Length")
+      length = getNodeResult("Frame Length").Value
+      if length != this.GetMaxLength() - 4 {
+        panic("openwire: frame length does not match input")
+      }
+      this.ProcessSubNode("Data Type")
+      this.ProcessSubNode("Magic")
+      this.ProcessSubNode("Version")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Properties").SetMaxLength(remaining)
+        this.ProcessSubNode("Properties")
+      }
+    Frame Length: uint32
+    Data Type: uint8
+    Magic: raw,8
+    Version: uint32
+    Properties: raw
+
+  BFD:
+    operator: |
+      this.ProcessSubNode("Version Diagnostic")
+      version = getNodeResult("Version Diagnostic").Value >> 5
+      if version != 1 {
+        panic("bfd: version must be 1")
+      }
+      this.ProcessSubNode("State Flags")
+      this.ProcessSubNode("Detect Multiplier")
+      this.ProcessSubNode("Packet Length")
+      if getNodeResult("Packet Length").Value != this.GetMaxLength() {
+        panic("bfd: packet length does not match input")
+      }
+      this.ProcessSubNode("My Discriminator")
+      this.ProcessSubNode("Your Discriminator")
+      this.ProcessSubNode("Desired Minimum TX")
+      this.ProcessSubNode("Required Minimum RX")
+      this.ProcessSubNode("Required Minimum Echo RX")
+    Version Diagnostic: uint8
+    State Flags: uint8
+    Detect Multiplier: uint8
+    Packet Length: uint8
+    My Discriminator: uint32
+    Your Discriminator: uint32
+    Desired Minimum TX: uint32
+    Required Minimum RX: uint32
+    Required Minimum Echo RX: uint32
+
+  BeckhoffADS:
+    endian: little
+    operator: |
+      this.ProcessSubNode("TCP Reserved")
+      this.ProcessSubNode("TCP Length")
+      length = getNodeResult("TCP Length").Value
+      if length != this.GetMaxLength() - 6 {
+        panic("ads: AMS/TCP length does not match input")
+      }
+      this.ProcessSubNode("Target Net ID")
+      this.ProcessSubNode("Target Port")
+      this.ProcessSubNode("Source Net ID")
+      this.ProcessSubNode("Source Port")
+      this.ProcessSubNode("Command ID")
+      this.ProcessSubNode("State Flags")
+      this.ProcessSubNode("Data Length")
+      this.ProcessSubNode("Error Code")
+      this.ProcessSubNode("Invoke ID")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Data")
+      }
+    TCP Reserved: uint16
+    TCP Length: uint32
+    Target Net ID: raw,6
+    Target Port: uint16
+    Source Net ID: raw,6
+    Source Port: uint16
+    Command ID: uint16
+    State Flags: uint16
+    Data Length: uint32
+    Error Code: uint32
+    Invoke ID: uint32
+    Data: raw
+
+  CassandraCQL:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Stream")
+      this.ProcessSubNode("Opcode")
+      this.ProcessSubNode("Body Length")
+      length = getNodeResult("Body Length").Value
+      if length != this.GetMaxLength() - this.Length() {
+        panic("cql: body length does not match input")
+      }
+      if length > 0 {
+        this.GetSubNode("Body").SetMaxLength(length)
+        this.ProcessSubNode("Body")
+      }
+    Version: uint8
+    Flags: uint8
+    Stream: uint16
+    Opcode: uint8
+    Body Length: uint32
+    Body: raw
+
+  CitrixICA:
+    operator: |
+      this.ProcessSubNode("Magic")
+      magic = getNodeResult("Magic").Value
+      if magic[0] != 0x7f || magic[1] != 0x7f || magic[2] != 0x49 || magic[3] != 0x43 || magic[4] != 0x41 {
+        panic("ica: invalid opening signature")
+      }
+      this.ProcessSubNode("Terminator")
+      if getNodeResult("Terminator").Value != 0 {
+        panic("ica: opening signature is not terminated")
+      }
+    Magic: raw,5
+    Terminator: uint8
+
+  DNP3:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Start")
+      if getNodeResult("Start").Value != 0x6405 {
+        panic("dnp3: start bytes must be 05 64")
+      }
+      this.ProcessSubNode("Data Length")
+      this.ProcessSubNode("Control")
+      this.ProcessSubNode("Destination")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Header CRC")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Transport Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Transport Data")
+      }
+    Start: uint16
+    Data Length: uint8
+    Control: uint8
+    Destination: uint16
+    Source: uint16
+    Header CRC: uint16
+    Transport Data: raw
+
+  Diameter:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("diameter: version must be 1")
+      }
+      this.ProcessSubNode("Message Length")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Command Code")
+      this.ProcessSubNode("Application ID")
+      this.ProcessSubNode("Hop-by-Hop ID")
+      this.ProcessSubNode("End-to-End ID")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("AVPs").SetMaxLength(remaining)
+        this.ProcessSubNode("AVPs")
+      }
+    Version: uint8
+    Message Length: raw,3
+    Flags: uint8
+    Command Code: raw,3
+    Application ID: uint32
+    Hop-by-Hop ID: uint32
+    End-to-End ID: uint32
+    AVPs: raw
+
+  FIX:
+    Begin String: "del:\x01;type:string"
+    Body Length: "del:\x01;type:string"
+    Message Type: "del:\x01;type:string"
+    Sender: "del:\x01;type:string"
+    Checksum: "del:\x01;type:string"
+
+  GTPv1:
+    operator: |
+      this.ProcessSubNode("Flags")
+      version = getNodeResult("Flags").Value >> 5
+      if version != 1 {
+        panic("gtp: version must be 1")
+      }
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("TEID")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+    Flags: uint8
+    Message Type: uint8
+    Payload Length: uint16
+    TEID: uint32
+    Payload: raw
+
+  GTPv2:
+    operator: |
+      this.ProcessSubNode("Flags")
+      version = getNodeResult("Flags").Value >> 5
+      if version != 2 {
+        panic("gtpv2: version must be 2")
+      }
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("TEID")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Spare")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Information Elements").SetMaxLength(remaining)
+        this.ProcessSubNode("Information Elements")
+      }
+    Flags: uint8
+    Message Type: uint8
+    Payload Length: uint16
+    TEID: uint32
+    Sequence Number: raw,3
+    Spare: uint8
+    Information Elements: raw
+
+  GTPPrime:
+    operator: |
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("Sequence Number")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Information Elements").SetMaxLength(remaining)
+        this.ProcessSubNode("Information Elements")
+      }
+    Flags: uint8
+    Message Type: uint8
+    Payload Length: uint16
+    Sequence Number: uint16
+    Information Elements: raw
+
+  GitDaemon:
+    Packet Length: string,4
+    Service Path: "del:\x00;type:string"
+    Host: "del:\x00;type:string"
+
+  Gnutella:
+    Start Line: "del:\r\n;type:string"
+    Headers: "del:\r\n\r\n;type:string"
+
+  H323:
+    operator: |
+      this.ProcessSubNode("TPKT Version")
+      if getNodeResult("TPKT Version").Value != 3 {
+        panic("h323: TPKT version must be 3")
+      }
+      this.ProcessSubNode("TPKT Reserved")
+      this.ProcessSubNode("Packet Length")
+      if getNodeResult("Packet Length").Value != this.GetMaxLength() {
+        panic("h323: TPKT length does not match input")
+      }
+      this.ProcessSubNode("Q931 Protocol Discriminator")
+      this.ProcessSubNode("Call Reference Length")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Q931 and H225 Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Q931 and H225 Data")
+      }
+    TPKT Version: uint8
+    TPKT Reserved: uint8
+    Packet Length: uint16
+    Q931 Protocol Discriminator: uint8
+    Call Reference Length: uint8
+    Q931 and H225 Data: raw
+
+  HartIP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("hart-ip: unsupported version")
+      }
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Message ID")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Byte Count")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Data")
+      }
+    Version: uint8
+    Message Type: uint8
+    Message ID: uint8
+    Status: uint8
+    Sequence Number: uint16
+    Byte Count: uint16
+    Data: raw
+
+  IEC104:
+    operator: |
+      this.ProcessSubNode("Start")
+      if getNodeResult("Start").Value != 0x68 {
+        panic("iec104: APDU must start with 0x68")
+      }
+      this.ProcessSubNode("APDU Length")
+      if getNodeResult("APDU Length").Value != this.GetMaxLength() - 2 {
+        panic("iec104: APDU length does not match input")
+      }
+      this.ProcessSubNode("Control")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("ASDU").SetMaxLength(remaining)
+        this.ProcessSubNode("ASDU")
+      }
+    Start: uint8
+    APDU Length: uint8
+    Control: raw,4
+    ASDU: raw
+
+  IRC:
+    Command: "del: ;type:string"
+    Parameters: "del:\r\n;type:string"
+
+  KNXIP:
+    operator: |
+      this.ProcessSubNode("Header Length")
+      if getNodeResult("Header Length").Value != 6 {
+        panic("knxip: header length must be 6")
+      }
+      this.ProcessSubNode("Protocol Version")
+      this.ProcessSubNode("Service Type")
+      this.ProcessSubNode("Total Length")
+      if getNodeResult("Total Length").Value != this.GetMaxLength() {
+        panic("knxip: total length does not match input")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Service Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Service Data")
+      }
+    Header Length: uint8
+    Protocol Version: uint8
+    Service Type: uint16
+    Total Length: uint16
+    Service Data: raw
+
+  LDP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("ldp: version must be 1")
+      }
+      this.ProcessSubNode("PDU Length")
+      if getNodeResult("PDU Length").Value + 4 != this.GetMaxLength() {
+        panic("ldp: PDU length does not match input")
+      }
+      this.ProcessSubNode("LSR ID")
+      this.ProcessSubNode("Label Space")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Messages").SetMaxLength(remaining)
+        this.ProcessSubNode("Messages")
+      }
+    Version: uint16
+    PDU Length: uint16
+    LSR ID: raw,4
+    Label Space: uint16
+    Messages: raw
+
+  MELSEC:
+    Subheader: uint8
+    Network Number: uint8
+    PC Number: uint8
+    IO Number: uint8
+
+  MGCP:
+    Request Line: "del:\r\n;type:string"
+    Headers: "del:\r\n\r\n;type:string"
+
+  ModbusTCP:
+    operator: |
+      this.ProcessSubNode("Transaction ID")
+      this.ProcessSubNode("Protocol ID")
+      if getNodeResult("Protocol ID").Value != 0 {
+        panic("modbus: protocol id must be zero")
+      }
+      this.ProcessSubNode("Length")
+      if getNodeResult("Length").Value != this.GetMaxLength() - 6 {
+        panic("modbus: length does not match input")
+      }
+      this.ProcessSubNode("Unit ID")
+      this.ProcessSubNode("Function Code")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Function Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Function Data")
+      }
+    Transaction ID: uint16
+    Protocol ID: uint16
+    Length: uint16
+    Unit ID: uint8
+    Function Code: uint8
+    Function Data: raw
+
+  NATS:
+    Operation: "del: ;type:string"
+    Arguments: "del:\r\n;type:string"
+
+  NNTP:
+    Status Code: string,3
+    Separator: uint8
+    Message: "del:\r\n;type:string"
+
+  OPCUAHello:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Chunk Type")
+      this.ProcessSubNode("Message Size")
+      if getNodeResult("Message Size").Value != this.GetMaxLength() {
+        panic("opcua: message size does not match input")
+      }
+      this.ProcessSubNode("Protocol Version")
+      this.ProcessSubNode("Receive Buffer Size")
+      this.ProcessSubNode("Send Buffer Size")
+      this.ProcessSubNode("Maximum Message Size")
+      this.ProcessSubNode("Maximum Chunk Count")
+      this.ProcessSubNode("Endpoint URL Length")
+      length = getNodeResult("Endpoint URL Length").Value
+      if length > this.GetMaxLength() - this.Length() {
+        panic("opcua: endpoint url exceeds message")
+      }
+      this.GetSubNode("Endpoint URL").SetMaxLength(length)
+      this.ProcessSubNode("Endpoint URL")
+    Message Type: string,3
+    Chunk Type: string,1
+    Message Size: uint32
+    Protocol Version: uint32
+    Receive Buffer Size: uint32
+    Send Buffer Size: uint32
+    Maximum Message Size: uint32
+    Maximum Chunk Count: uint32
+    Endpoint URL Length: uint32
+    Endpoint URL: string
+
+  OmronFINS:
+    ICF: uint8
+    Reserved: uint8
+    Gateway Count: uint8
+    Destination Network: uint8
+    Destination Node: uint8
+    Destination Unit: uint8
+    Source Network: uint8
+    Source Node: uint8
+    Source Unit: uint8
+    Service ID: uint8
+    Main Request Code: uint8
+    Sub Request Code: uint8
+    Command Data: raw
+
+  PFCP:
+    operator: |
+      this.ProcessSubNode("Flags")
+      version = getNodeResult("Flags").Value >> 5
+      if version != 1 {
+        panic("pfcp: version must be 1")
+      }
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Message Length")
+      if getNodeResult("Message Length").Value + 4 != this.GetMaxLength() {
+        panic("pfcp: message length does not match input")
+      }
+      if (getNodeResult("Flags").Value & 1) != 0 {
+        this.ProcessSubNode("SEID")
+      }
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Priority Spare")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Information Elements").SetMaxLength(remaining)
+        this.ProcessSubNode("Information Elements")
+      }
+    Flags: uint8
+    Message Type: uint8
+    Message Length: uint16
+    SEID: uint64
+    Sequence Number: raw,3
+    Priority Spare: uint8
+    Information Elements: raw
+
+  RSH:
+    Secondary Port: "del:\x00;type:string"
+
+  Skinny:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Data Length")
+      this.ProcessSubNode("Header Version")
+      this.ProcessSubNode("Message ID")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Message Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Message Data")
+      }
+    Data Length: uint32
+    Header Version: uint32
+    Message ID: uint32
+    Message Data: raw
+
+  SMPPBind:
+    operator: |
+      this.ProcessSubNode("Command Length")
+      if getNodeResult("Command Length").Value != this.GetMaxLength() {
+        panic("smpp: command length does not match input")
+      }
+      this.ProcessSubNode("Command ID")
+      this.ProcessSubNode("Command Status")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("System ID")
+      this.ProcessSubNode("Password")
+      this.ProcessSubNode("System Type")
+      this.ProcessSubNode("Interface Version")
+      this.ProcessSubNode("TON")
+      this.ProcessSubNode("NPI")
+      this.ProcessSubNode("Address Range")
+    Command Length: uint32
+    Command ID: uint32
+    Command Status: uint32
+    Sequence Number: uint32
+    System ID: "del:\x00;type:string"
+    Password: "del:\x00;type:string"
+    System Type: "del:\x00;type:string"
+    Interface Version: uint8
+    TON: uint8
+    NPI: uint8
+    Address Range: "del:\x00;type:string"
+
+  SLPv2:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 2 {
+        panic("slp: version must be 2")
+      }
+      this.ProcessSubNode("Function ID")
+      this.ProcessSubNode("Message Length")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Next Extension")
+      this.ProcessSubNode("XID")
+      this.ProcessSubNode("Language Length")
+      length = getNodeResult("Language Length").Value
+      if length > this.GetMaxLength() - this.Length() {
+        panic("slp: language tag exceeds message")
+      }
+      this.GetSubNode("Language Tag").SetMaxLength(length)
+      this.ProcessSubNode("Language Tag")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Function Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Function Data")
+      }
+    Version: uint8
+    Function ID: uint8
+    Message Length: raw,3
+    Flags: uint16
+    Next Extension: raw,3
+    XID: uint16
+    Language Length: uint16
+    Language Tag: string
+    Function Data: raw
+
+  STOMP:
+    Command: "del:\n;type:string"
+    Headers: "del:\n\n;type:string"
+    Terminator: uint8
+
+  XDMCP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("xdmcp: version must be 1")
+      }
+      this.ProcessSubNode("Opcode")
+      this.ProcessSubNode("Message Length")
+      remaining = this.GetMaxLength() - this.Length()
+      if getNodeResult("Message Length").Value != remaining {
+        panic("xdmcp: message length does not match input")
+      }
+      if remaining > 0 {
+        this.GetSubNode("Message Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Message Data")
+      }
+    Version: uint16
+    Opcode: uint16
+    Message Length: uint16
+    Message Data: raw
+
+  BACnetIP:
+    operator: |
+      this.ProcessSubNode("BVLC Type")
+      if getNodeResult("BVLC Type").Value != 0x81 {
+        panic("bacnet: BVLC type must be 0x81")
+      }
+      this.ProcessSubNode("BVLC Function")
+      this.ProcessSubNode("BVLC Length")
+      if getNodeResult("BVLC Length").Value != this.GetMaxLength() {
+        panic("bacnet: BVLC length does not match input")
+      }
+      this.ProcessSubNode("NPDU Version")
+      this.ProcessSubNode("NPDU Control")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("APDU").SetMaxLength(remaining)
+        this.ProcessSubNode("APDU")
+      }
+    BVLC Type: uint8
+    BVLC Function: uint8
+    BVLC Length: uint16
+    NPDU Version: uint8
+    NPDU Control: uint8
+    APDU: raw
+
+  CANEthernet:
+    operator: |
+      this.ProcessSubNode("Magic")
+      magic = getNodeResult("Magic").Value
+      if string(magic) != "ISO11898" {
+        panic("can-ethernet: invalid magic")
+      }
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("can-ethernet: unsupported version")
+      }
+      this.ProcessSubNode("Frame Count")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining < 5 {
+        panic("can-ethernet: missing options")
+      }
+      this.GetSubNode("CAN Frame Data").SetMaxLength(remaining - 5)
+      this.ProcessSubNode("CAN Frame Data")
+      this.ProcessSubNode("Options")
+    Magic: string,8
+    Version: uint8
+    Frame Count: uint8
+    CAN Frame Data: raw
+    Options: raw,5
+
+  CephConnect:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Protocol Banner")
+      if string(getNodeResult("Protocol Banner").Value) != "ceph v027" {
+        panic("ceph: unexpected protocol banner")
+      }
+      this.ProcessSubNode("Server Identity")
+      this.ProcessSubNode("Client Identity")
+    Protocol Banner: string,9
+    Server Identity:
+      Entity Type: uint32
+      Nonce: uint32
+      Socket Address: raw,128
+    Client Identity:
+      Entity Type: uint32
+      Nonce: uint32
+      Socket Address: raw,128
+
+  Collectd:
+    Parts:
+      list: true
+      Part: CollectdPart
+      operator: |
+        for {
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining == 0 {
+            break
+          }
+          if remaining < 4 {
+            panic("collectd: truncated part header")
+          }
+          previous = this.Length()
+          this.NewElement().Process()
+          if this.Length() <= previous {
+            panic("collectd: part parser made no progress")
+          }
+        }
+
+  DRDA:
+    Messages:
+      list: true
+      Message: DRDAMessage
+      operator: |
+        for {
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining == 0 {
+            break
+          }
+          if remaining < 10 {
+            panic("drda: truncated DDM header")
+          }
+          previous = this.Length()
+          this.NewElement().Process()
+          if this.Length() <= previous {
+            panic("drda: DDM parser made no progress")
+          }
+        }
+
+  DLMSHDLC:
+    operator: |
+      this.ProcessSubNode("Opening Flag")
+      if getNodeResult("Opening Flag").Value != 0x7e {
+        panic("dlms: opening flag must be 0x7e")
+      }
+      this.ProcessSubNode("Frame Format and Length")
+      this.ProcessSubNode("Destination Address")
+      this.ProcessSubNode("Source Address")
+      this.ProcessSubNode("Control")
+      this.ProcessSubNode("Header Check Sequence")
+      this.ProcessSubNode("Closing Flag")
+      if getNodeResult("Closing Flag").Value != 0x7e {
+        panic("dlms: closing flag must be 0x7e")
+      }
+    Opening Flag: uint8
+    Frame Format and Length: uint16
+    Destination Address: uint8
+    Source Address: uint8
+    Control: uint8
+    Header Check Sequence: uint16
+    Closing Flag: uint8
+
+  EtherNetIPCIPIO:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Item Count")
+      if getNodeResult("Item Count").Value != 2 {
+        panic("ethernet-ip: expected two common packet format items")
+      }
+      this.ProcessSubNode("Sequenced Address Item")
+      this.ProcessSubNode("Connected Data Item")
+    Item Count: uint16
+    Sequenced Address Item:
+      Type ID: uint16
+      Length: uint16
+      Connection ID: uint32
+      Encapsulation Sequence: uint32
+    Connected Data Item:
+      operator: |
+        this.ProcessSubNode("Type ID")
+        this.ProcessSubNode("Length")
+        length = getNodeResult("Length").Value
+        if length != this.GetMaxLength() - this.Length() {
+          panic("ethernet-ip: connected data length does not match input")
+        }
+        this.GetSubNode("Sequence Count").SetMaxLength(2)
+        this.ProcessSubNode("Sequence Count")
+        remaining = this.GetMaxLength() - this.Length()
+        if remaining > 0 {
+          this.GetSubNode("I/O Data").SetMaxLength(remaining)
+          this.ProcessSubNode("I/O Data")
+        }
+      Type ID: uint16
+      Length: uint16
+      Sequence Count: uint16
+      I/O Data: raw
+
+  GLBP:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Unknown 1")
+      this.ProcessSubNode("Group")
+      this.ProcessSubNode("Unknown 2")
+      this.ProcessSubNode("Owner ID")
+      this.ProcessSubNode("TLV Type")
+      this.ProcessSubNode("TLV Length")
+      length = getNodeResult("TLV Length").Value
+      if length < 2 || length - 2 != this.GetMaxLength() - this.Length() {
+        panic("glbp: TLV length does not match input")
+      }
+      this.GetSubNode("TLV Value").SetMaxLength(length - 2)
+      this.ProcessSubNode("TLV Value")
+    Version: uint8
+    Unknown 1: uint8
+    Group: uint16
+    Unknown 2: raw,2
+    Owner ID: raw,6
+    TLV Type: uint8
+    TLV Length: uint8
+    TLV Value: raw
+
+  IPP:
+    operator: |
+      this.ProcessSubNode("Version Major")
+      this.ProcessSubNode("Version Minor")
+      this.ProcessSubNode("Operation ID")
+      this.ProcessSubNode("Request ID")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Attribute Groups").SetMaxLength(remaining)
+        this.ProcessSubNode("Attribute Groups")
+      }
+    Version Major: uint8
+    Version Minor: uint8
+    Operation ID: uint16
+    Request ID: uint32
+    Attribute Groups: raw
+
+  MPEGTransportStream:
+    Packets:
+      list: true
+      Packet:
+        Sync Byte: uint8
+        PID High: uint8
+        PID Low: uint8
+        Flags and Continuity: uint8
+        Packet Data: raw,184
+      operator: |
+        for {
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining == 0 {
+            break
+          }
+          if remaining < 188 {
+            panic("mpeg-ts: truncated transport packet")
+          }
+          this.NewElement().Process()
+        }
+
+  NetFlowV9:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 9 {
+        panic("netflow: version must be 9")
+      }
+      this.ProcessSubNode("Count")
+      this.ProcessSubNode("System Uptime")
+      this.ProcessSubNode("Unix Seconds")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Source ID")
+      this.ProcessSubNode("FlowSets")
+    Version: uint16
+    Count: uint16
+    System Uptime: uint32
+    Unix Seconds: uint32
+    Sequence Number: uint32
+    Source ID: uint32
+    FlowSets:
+      list: true
+      FlowSet: NetFlowV9FlowSet
+      operator: |
+        for {
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining == 0 {
+            break
+          }
+          if remaining < 4 {
+            panic("netflow: truncated flowset header")
+          }
+          previous = this.Length()
+          this.NewElement().Process()
+          if this.Length() <= previous {
+            panic("netflow: flowset parser made no progress")
+          }
+        }
+
+  PIM:
+    operator: |
+      this.ProcessSubNode("Version Type")
+      versionType = getNodeResult("Version Type").Value
+      if (versionType >> 4) != 2 {
+        panic("pim: version must be 2")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Checksum")
+      remaining = this.GetMaxLength() - this.Length()
+      if (versionType & 0x0f) == 1 {
+        if remaining < 24 {
+          panic("pim: truncated register message")
+        }
+        this.ProcessSubNode("Register Flags")
+        remaining = this.GetMaxLength() - this.Length()
+        this.GetSubNode("Encapsulated Packet").SetMaxLength(remaining)
+        this.ProcessSubNode("Encapsulated Packet")
+        return
+      }
+      if remaining > 0 {
+        this.GetSubNode("Message Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Message Data")
+      }
+    Version Type: uint8
+    Reserved: uint8
+    Checksum: uint16
+    Register Flags: uint32
+    Encapsulated Packet: raw
+    Message Data: raw
+
+  S7comm:
+    operator: |
+      this.ProcessSubNode("TPKT Version")
+      this.ProcessSubNode("TPKT Reserved")
+      this.ProcessSubNode("TPKT Length")
+      if getNodeResult("TPKT Version").Value != 3 || getNodeResult("TPKT Length").Value != this.GetMaxLength() {
+        panic("s7comm: invalid TPKT header")
+      }
+      this.ProcessSubNode("COTP Length")
+      this.ProcessSubNode("COTP PDU Type")
+      this.ProcessSubNode("COTP Flags")
+      this.ProcessSubNode("Protocol ID")
+      if getNodeResult("Protocol ID").Value != 0x32 {
+        panic("s7comm: protocol id must be 0x32")
+      }
+      this.ProcessSubNode("ROSCTR")
+      this.ProcessSubNode("Redundancy ID")
+      this.ProcessSubNode("PDU Reference")
+      this.ProcessSubNode("Parameter Length")
+      this.ProcessSubNode("Data Length")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Parameters and Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Parameters and Data")
+      }
+    TPKT Version: uint8
+    TPKT Reserved: uint8
+    TPKT Length: uint16
+    COTP Length: uint8
+    COTP PDU Type: uint8
+    COTP Flags: uint8
+    Protocol ID: uint8
+    ROSCTR: uint8
+    Redundancy ID: uint16
+    PDU Reference: uint16
+    Parameter Length: uint16
+    Data Length: uint16
+    Parameters and Data: raw
+
+  S7commPlus:
+    operator: |
+      this.ProcessSubNode("TPKT Version")
+      this.ProcessSubNode("TPKT Reserved")
+      this.ProcessSubNode("TPKT Length")
+      if getNodeResult("TPKT Version").Value != 3 || getNodeResult("TPKT Length").Value != this.GetMaxLength() {
+        panic("s7comm-plus: invalid TPKT header")
+      }
+      this.ProcessSubNode("COTP Length")
+      this.ProcessSubNode("COTP PDU Type")
+      this.ProcessSubNode("COTP Flags")
+      this.ProcessSubNode("Protocol ID")
+      if getNodeResult("Protocol ID").Value != 0x72 {
+        panic("s7comm-plus: protocol id must be 0x72")
+      }
+      this.ProcessSubNode("Protocol Version")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Message Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Message Data")
+      }
+    TPKT Version: uint8
+    TPKT Reserved: uint8
+    TPKT Length: uint16
+    COTP Length: uint8
+    COTP PDU Type: uint8
+    COTP Flags: uint8
+    Protocol ID: uint8
+    Protocol Version: uint8
+    Message Data: raw
+
+  SFlowV5:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 5 {
+        panic("sflow: version must be 5")
+      }
+      this.ProcessSubNode("Agent Address Type")
+      if getNodeResult("Agent Address Type").Value != 1 {
+        panic("sflow: this entry expects an IPv4 agent")
+      }
+      this.ProcessSubNode("Agent Address")
+      this.ProcessSubNode("Sub Agent ID")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("System Uptime")
+      this.ProcessSubNode("Sample Count")
+      this.ProcessSubNode("Samples")
+    Version: uint32
+    Agent Address Type: uint32
+    Agent Address: raw,4
+    Sub Agent ID: uint32
+    Sequence Number: uint32
+    System Uptime: uint32
+    Sample Count: uint32
+    Samples:
+      list: true
+      Sample: SFlowSample
+      operator: |
+        count = getNodeResult("../Sample Count").Value
+        i = 0
+        for {
+          if i >= count {
+            break
+          }
+          this.NewElement().Process()
+          i = i + 1
+        }
+
+  TeredoAuthentication:
+    operator: |
+      this.ProcessSubNode("Indicator Type")
+      if getNodeResult("Indicator Type").Value != 1 {
+        panic("teredo: expected authentication indication")
+      }
+      this.ProcessSubNode("Client ID Length")
+      this.ProcessSubNode("Authentication Data Length")
+      clientLength = getNodeResult("Client ID Length").Value
+      authLength = getNodeResult("Authentication Data Length").Value
+      if clientLength > 0 {
+        this.GetSubNode("Client ID").SetMaxLength(clientLength)
+        this.ProcessSubNode("Client ID")
+      }
+      if authLength > 0 {
+        this.GetSubNode("Authentication Data").SetMaxLength(authLength)
+        this.ProcessSubNode("Authentication Data")
+      }
+      this.ProcessSubNode("Nonce")
+      this.ProcessSubNode("Confirmation")
+      this.ProcessByType("TeredoIPv6")
+    Indicator Type: uint16
+    Client ID Length: uint8
+    Authentication Data Length: uint8
+    Client ID: raw
+    Authentication Data: raw
+    Nonce: raw,8
+    Confirmation: uint8
+
+  DLEPSignal:
+    operator: |
+      this.ProcessSubNode("Magic")
+      if string(getNodeResult("Magic").Value) != "DLEP" {
+        panic("dlep: invalid signal magic")
+      }
+      this.ProcessSubNode("Signal Type")
+      this.ProcessSubNode("Signal Length")
+      length = getNodeResult("Signal Length").Value
+      if length != this.GetMaxLength() - this.Length() {
+        panic("dlep: signal length does not match input")
+      }
+      this.ProcessSubNode("Data Items")
+    Magic: string,4
+    Signal Type: uint16
+    Signal Length: uint16
+    Data Items:
+      list: true
+      Data Item: DLEPDataItem
+      operator: |
+        for {
+          if this.Length() >= this.GetMaxLength() {
+            break
+          }
+          this.NewElement().Process()
+        }
+
+  SOMEIP:
+    operator: |
+      this.ProcessSubNode("Message ID")
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      if length < 8 || length + 8 != this.GetMaxLength() {
+        panic("someip: message length does not match input")
+      }
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Protocol Version")
+      if getNodeResult("Protocol Version").Value != 1 {
+        panic("someip: protocol version must be 1")
+      }
+      this.ProcessSubNode("Interface Version")
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Return Code")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+    Message ID: uint32
+    Length: uint32
+    Request ID: uint32
+    Protocol Version: uint8
+    Interface Version: uint8
+    Message Type: uint8
+    Return Code: uint8
+    Payload: raw
+
+  NATPMPPublicAddressRequest:
+    operator: |
+      if this.GetMaxLength() != 2 {
+        panic("nat-pmp: public-address request must be two bytes")
+      }
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Opcode")
+      if getNodeResult("Version").Value != 0 || getNodeResult("Opcode").Value != 0 {
+        panic("nat-pmp: expected a version-0 public-address request")
+      }
+    Version: uint8
+    Opcode: uint8
+
+  C1222Message:
+    operator: |
+      this.ProcessSubNode("Type")
+      if getNodeResult("Type").Value != 0x60 {
+        panic("c1222: expected an application-0 constructed message")
+      }
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      maximum = this.GetMaxLength()
+      bounded = maximum > 0 && maximum < 1048576
+      if bounded && length != maximum - this.Length() {
+        panic("c1222: BER length does not match input")
+      }
+      if length >= 1048576 {
+        panic("c1222: message is too large")
+      }
+      this.GetSubNode("Children").SetMaxLength(length)
+      this.ProcessSubNode("Children")
+    Type: uint8
+    Length:
+      list: true
+      Octet: uint8
+      out: |
+        octets = data.Value
+        value = 0
+        for index, octet = range octets {
+          current = octet.Value
+          if index == 0 {
+            if current == 0x80 {
+              return 0
+            }
+            if current >> 7 == 0 {
+              return current
+            }
+          } else {
+            value = (value << 8) + current
+          }
+        }
+        return value
+      operator: |
+        first = this.NewElement().Process().Value
+        if first == 0x80 {
+          panic("c1222: indefinite BER length is not supported")
+        }
+        if first >> 7 == 0 {
+          return
+        }
+        count = first & 0x7f
+        if count == 0 || count > 4 {
+          panic("c1222: invalid BER length width")
+        }
+        for i = range count {
+          this.NewElement().Process()
+        }
+    Children:
+      list: true
+      Element: C1222BER
+      operator: |
+        for {
+          if this.Length() >= this.GetMaxLength() {
+            break
+          }
+          previous = this.Length()
+          this.NewElement().Process()
+          if this.Length() <= previous {
+            panic("c1222: BER element made no progress")
+          }
+        }
+
+  CoAP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("coap: version must be 1")
+      }
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Token Length")
+      tokenLength = getNodeResult("Token Length").Value
+      if tokenLength > 8 || tokenLength > this.GetMaxLength() - 4 {
+        panic("coap: invalid token length")
+      }
+      this.ProcessSubNode("Code")
+      this.ProcessSubNode("Message ID")
+      if tokenLength > 0 {
+        this.GetSubNode("Token").SetMaxLength(tokenLength)
+        this.ProcessSubNode("Token")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Options and Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Options and Payload")
+      }
+    Version: uint8,2bit
+    Type: uint8,2bit
+    Token Length: uint8,4bit
+    Code: uint8
+    Message ID: uint16
+    Token: raw
+    Options and Payload: raw
+
+  SDPT38Advertisement:
+    operator: |
+      this.GetSubNode("Session Fragment").SetMaxLength(this.GetMaxLength())
+      this.ProcessSubNode("Session Fragment")
+      document = string(getNodeResult("Session Fragment").Value)
+      if !document.HasPrefix("v=0\r\n") || !document.Contains("m=image ") || !document.Contains(" udptl t38") {
+        panic("sdp: no T.38 image media advertisement")
+      }
+    Session Fragment: string
+
+  IPX:
+    operator: |
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      if length != this.GetMaxLength() || length < 30 {
+        panic("ipx: packet length does not match input")
+      }
+      this.ProcessSubNode("Transport Control")
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("Destination Network")
+      this.ProcessSubNode("Destination Node")
+      this.ProcessSubNode("Destination Socket")
+      this.ProcessSubNode("Source Network")
+      this.ProcessSubNode("Source Node")
+      this.ProcessSubNode("Source Socket")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+    Checksum: uint16
+    Length: uint16
+    Transport Control: uint8
+    Packet Type: uint8
+    Destination Network: uint32
+    Destination Node: raw,6
+    Destination Socket: uint16
+    Source Network: uint32
+    Source Node: raw,6
+    Source Socket: uint16
+    Payload: raw
+
+  USBHIDReport:
+    operator: |
+      if this.GetMaxLength() < 1 {
+        panic("usb-hid: report is empty")
+      }
+      this.ProcessSubNode("Report ID")
+      if this.Length() < this.GetMaxLength() {
+        this.GetSubNode("Report Data").SetMaxLength(this.GetMaxLength() - this.Length())
+        this.ProcessSubNode("Report Data")
+      }
+    Report ID: uint8
+    Report Data: raw
+
+  RadioTapHeader:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 0 {
+        panic("radiotap: version must be zero")
+      }
+      this.ProcessSubNode("Pad")
+      this.ProcessSubNode("Header Length")
+      length = getNodeResult("Header Length").Value
+      if length < 8 || length > this.GetMaxLength() {
+        panic("radiotap: invalid header length")
+      }
+      this.ProcessSubNode("Present Flags")
+      if length > this.Length() {
+        this.GetSubNode("Fields").SetMaxLength(length - this.Length())
+        this.ProcessSubNode("Fields")
+      }
+      if this.Length() < this.GetMaxLength() {
+        this.GetSubNode("Frame Data").SetMaxLength(this.GetMaxLength() - this.Length())
+        this.ProcessSubNode("Frame Data")
+      }
+    Version: uint8
+    Pad: uint8
+    Header Length: uint16
+    Present Flags: uint32
+    Fields: raw
+    Frame Data: raw
+
+CollectdPart:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length < 4 || length > this.GetMaxLength() {
+      panic("collectd: invalid part length")
+    }
+    this.GetSubNode("Value").SetMaxLength(length - 4)
+    this.ProcessSubNode("Value")
+  Type: uint16
+  Length: uint16
+  Value: raw
+
+DRDAMessage:
+  operator: |
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length < 10 || length > this.GetMaxLength() {
+      panic("drda: invalid DDM length")
+    }
+    this.SetMaxLength(length)
+    this.ProcessSubNode("Magic")
+    if getNodeResult("Magic").Value != 0xd0 {
+      panic("drda: DDM magic must be 0xd0")
+    }
+    this.ProcessSubNode("Format")
+    this.ProcessSubNode("Correlation ID")
+    this.ProcessSubNode("Length 2")
+    this.ProcessSubNode("Code Point")
+    remaining = this.GetMaxLength() - this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Parameters").SetMaxLength(remaining)
+      this.ProcessSubNode("Parameters")
+    }
+  Length: uint16
+  Magic: uint8
+  Format: uint8
+  Correlation ID: uint16
+  Length 2: uint16
+  Code Point: uint16
+  Parameters: raw
+
+NetFlowV9FlowSet:
+  operator: |
+    this.ProcessSubNode("FlowSet ID")
+    this.ProcessSubNode("FlowSet Length")
+    length = getNodeResult("FlowSet Length").Value
+    if length < 4 || length > this.GetMaxLength() {
+      panic("netflow: invalid flowset length")
+    }
+    this.SetMaxLength(length)
+    this.GetSubNode("Records").SetMaxLength(length - 4)
+    this.ProcessSubNode("Records")
+  FlowSet ID: uint16
+  FlowSet Length: uint16
+  Records: raw
+
+SFlowSample:
+  operator: |
+    this.ProcessSubNode("Sample Type")
+    this.ProcessSubNode("Sample Length")
+    length = getNodeResult("Sample Length").Value
+    if length > this.GetMaxLength() - this.Length() {
+      panic("sflow: sample length exceeds datagram")
+    }
+    this.GetSubNode("Sample Data").SetMaxLength(length)
+    this.ProcessSubNode("Sample Data")
+  Sample Type: uint32
+  Sample Length: uint32
+  Sample Data: raw
+
+TeredoIPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+C1222BER: "import:application-layer/ber.yaml;node:BER Element"
+
+DLEPDataItem:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength() - this.Length() {
+      panic("dlep: data-item length exceeds signal")
+    }
+    if length > 0 {
+      this.GetSubNode("Value").SetMaxLength(length)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint16
+  Length: uint16
+  Value: raw

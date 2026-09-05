@@ -1,0 +1,763 @@
+endian: big
+Package:
+  MMSInitiateRequest:
+    operator: |
+      this.ProcessSubNode("PDU Tag")
+      if getNodeResult("PDU Tag").Value != 0xa8 {
+        panic("mms: expected initiate-request PDU tag")
+      }
+      this.ProcessSubNode("PDU Length")
+      pduLength = getNodeResult("PDU Length").Value
+      if pduLength != this.GetMaxLength() - this.Length() {
+        panic("mms: PDU length does not match input")
+      }
+
+      this.ProcessSubNode("Local Detail Tag")
+      if getNodeResult("Local Detail Tag").Value != 0x80 {
+        panic("mms: expected local-detail-calling tag")
+      }
+      this.ProcessSubNode("Local Detail Length")
+      localLength = getNodeResult("Local Detail Length").Value
+      if localLength == 0 || localLength > 4 || localLength > this.GetMaxLength() - this.Length() {
+        panic("mms: invalid local-detail-calling length")
+      }
+      this.GetSubNode("Local Detail Calling").SetMaxLength(localLength)
+      this.ProcessSubNode("Local Detail Calling")
+
+      this.ProcessSubNode("Calling Limit Tag")
+      if getNodeResult("Calling Limit Tag").Value != 0x81 {
+        panic("mms: expected proposed-calling-limit tag")
+      }
+      this.ProcessSubNode("Calling Limit Length")
+      if getNodeResult("Calling Limit Length").Value != 1 {
+        panic("mms: proposed-calling-limit must be one byte")
+      }
+      this.ProcessSubNode("Proposed Calling Limit")
+
+      this.ProcessSubNode("Called Limit Tag")
+      if getNodeResult("Called Limit Tag").Value != 0x82 {
+        panic("mms: expected proposed-called-limit tag")
+      }
+      this.ProcessSubNode("Called Limit Length")
+      if getNodeResult("Called Limit Length").Value != 1 {
+        panic("mms: proposed-called-limit must be one byte")
+      }
+      this.ProcessSubNode("Proposed Called Limit")
+
+      this.ProcessSubNode("Nesting Level Tag")
+      if getNodeResult("Nesting Level Tag").Value != 0x83 {
+        panic("mms: expected proposed-nesting-level tag")
+      }
+      this.ProcessSubNode("Nesting Level Length")
+      if getNodeResult("Nesting Level Length").Value != 1 {
+        panic("mms: proposed-nesting-level must be one byte")
+      }
+      this.ProcessSubNode("Proposed Nesting Level")
+
+      this.ProcessSubNode("Detail Tag")
+      if getNodeResult("Detail Tag").Value != 0xa4 {
+        panic("mms: expected initiate-request-detail tag")
+      }
+      this.ProcessSubNode("Detail Length")
+      detailLength = getNodeResult("Detail Length").Value
+      if detailLength == 0 || detailLength != this.GetMaxLength() - this.Length() {
+        panic("mms: initiate-request-detail length does not match input")
+      }
+      this.GetSubNode("Initiate Request Detail").SetMaxLength(detailLength)
+      this.ProcessSubNode("Initiate Request Detail")
+    PDU Tag: uint8
+    PDU Length: uint8
+    Local Detail Tag: uint8
+    Local Detail Length: uint8
+    Local Detail Calling: raw
+    Calling Limit Tag: uint8
+    Calling Limit Length: uint8
+    Proposed Calling Limit: uint8
+    Called Limit Tag: uint8
+    Called Limit Length: uint8
+    Proposed Called Limit: uint8
+    Nesting Level Tag: uint8
+    Nesting Level Length: uint8
+    Proposed Nesting Level: uint8
+    Detail Tag: uint8
+    Detail Length: uint8
+    Initiate Request Detail:
+      operator: |
+        this.ProcessSubNode("Version Tag")
+        if getNodeResult("Version Tag").Value != 0x80 {
+          panic("mms: expected proposed-version tag")
+        }
+        this.ProcessSubNode("Version Length")
+        if getNodeResult("Version Length").Value != 1 {
+          panic("mms: proposed-version must be one byte")
+        }
+        this.ProcessSubNode("Proposed Version")
+
+        this.ProcessSubNode("Parameter CBB Tag")
+        if getNodeResult("Parameter CBB Tag").Value != 0x81 {
+          panic("mms: expected parameter-CBB tag")
+        }
+        this.ProcessSubNode("Parameter CBB Length")
+        parameterLength = getNodeResult("Parameter CBB Length").Value
+        if parameterLength != 3 || parameterLength > this.GetMaxLength() - this.Length() {
+          panic("mms: invalid parameter-CBB bit-string length")
+        }
+        this.ProcessSubNode("Parameter CBB Unused Bits")
+        this.ProcessSubNode("Parameter CBB Bits")
+
+        this.ProcessSubNode("Services Tag")
+        if getNodeResult("Services Tag").Value != 0x82 {
+          panic("mms: expected services-supported tag")
+        }
+        this.ProcessSubNode("Services Length")
+        servicesLength = getNodeResult("Services Length").Value
+        if servicesLength != 12 || servicesLength != this.GetMaxLength() - this.Length() {
+          panic("mms: invalid services-supported bit-string length")
+        }
+        this.ProcessSubNode("Services Unused Bits")
+        this.ProcessSubNode("Services Supported Bits")
+      Version Tag: uint8
+      Version Length: uint8
+      Proposed Version: uint8
+      Parameter CBB Tag: uint8
+      Parameter CBB Length: uint8
+      Parameter CBB Unused Bits: uint8
+      Parameter CBB Bits: raw,2
+      Services Tag: uint8
+      Services Length: uint8
+      Services Unused Bits: uint8
+      Services Supported Bits: raw,11
+  MMSPDU:
+    operator: |
+      this.ProcessSubNode("PDU Tag")
+      pduTag = getNodeResult("PDU Tag").Value
+      if pduTag != 0xa0 && pduTag != 0xa1 && pduTag != 0xa2 && pduTag != 0xa8 && pduTag != 0xa9 && pduTag != 0x8b && pduTag != 0x8c {
+        panic("mms: unsupported PDU tag")
+      }
+      this.ProcessSubNode("PDU Length")
+      pduLength = getNodeResult("PDU Length").Value
+      if pduLength >= 0x80 {
+        panic("mms: long-form PDU length is unsupported")
+      }
+      if pduLength != this.GetMaxLength() - this.Length() {
+        panic("mms: PDU length does not match input")
+      }
+
+      if pduTag == 0xa8 {
+        this.GetSubNode("Initiate Request").SetMaxLength(pduLength)
+        this.ProcessSubNode("Initiate Request")
+      } else if pduTag == 0xa9 {
+        this.GetSubNode("Initiate Response").SetMaxLength(pduLength)
+        this.ProcessSubNode("Initiate Response")
+      } else if pduTag == 0xa0 {
+        this.GetSubNode("Confirmed Request").SetMaxLength(pduLength)
+        this.ProcessSubNode("Confirmed Request")
+      } else if pduTag == 0xa1 {
+        this.GetSubNode("Confirmed Response").SetMaxLength(pduLength)
+        this.ProcessSubNode("Confirmed Response")
+      } else if pduTag == 0xa2 {
+        this.GetSubNode("Confirmed Error").SetMaxLength(pduLength)
+        this.ProcessSubNode("Confirmed Error")
+      } else if pduLength != 0 {
+        panic("mms: conclude PDU must have an empty body")
+      }
+      if this.Length() != this.GetMaxLength() {
+        panic("mms: PDU body was not completely consumed")
+      }
+      return
+    PDU Tag: uint8
+    PDU Length: uint8
+    Initiate Request:
+      operator: |
+        this.ProcessSubNode("Local Detail Tag")
+        if getNodeResult("Local Detail Tag").Value != 0x80 {
+          panic("mms: expected local-detail-calling tag")
+        }
+        this.ProcessSubNode("Local Detail Length")
+        localLength = getNodeResult("Local Detail Length").Value
+        if localLength == 0 || localLength > 4 || localLength > this.GetMaxLength() - this.Length() {
+          panic("mms: invalid local-detail-calling length")
+        }
+        this.GetSubNode("Local Detail Calling").SetMaxLength(localLength)
+        this.ProcessSubNode("Local Detail Calling")
+
+        this.ProcessSubNode("Calling Limit Tag")
+        if getNodeResult("Calling Limit Tag").Value != 0x81 {
+          panic("mms: expected proposed-calling-limit tag")
+        }
+        this.ProcessSubNode("Calling Limit Length")
+        if getNodeResult("Calling Limit Length").Value != 1 {
+          panic("mms: proposed-calling-limit must be one byte")
+        }
+        this.ProcessSubNode("Proposed Calling Limit")
+
+        this.ProcessSubNode("Called Limit Tag")
+        if getNodeResult("Called Limit Tag").Value != 0x82 {
+          panic("mms: expected proposed-called-limit tag")
+        }
+        this.ProcessSubNode("Called Limit Length")
+        if getNodeResult("Called Limit Length").Value != 1 {
+          panic("mms: proposed-called-limit must be one byte")
+        }
+        this.ProcessSubNode("Proposed Called Limit")
+
+        this.ProcessSubNode("Nesting Level Tag")
+        if getNodeResult("Nesting Level Tag").Value != 0x83 {
+          panic("mms: expected proposed-nesting-level tag")
+        }
+        this.ProcessSubNode("Nesting Level Length")
+        if getNodeResult("Nesting Level Length").Value != 1 {
+          panic("mms: proposed-nesting-level must be one byte")
+        }
+        this.ProcessSubNode("Proposed Nesting Level")
+
+        this.ProcessSubNode("Detail Tag")
+        if getNodeResult("Detail Tag").Value != 0xa4 {
+          panic("mms: expected initiate-request-detail tag")
+        }
+        this.ProcessSubNode("Detail Length")
+        detailLength = getNodeResult("Detail Length").Value
+        if detailLength == 0 || detailLength != this.GetMaxLength() - this.Length() {
+          panic("mms: initiate-request-detail length does not match body")
+        }
+        this.GetSubNode("Initiate Request Detail").SetMaxLength(detailLength)
+        this.ProcessSubNode("Initiate Request Detail")
+        if this.Length() != this.GetMaxLength() {
+          panic("mms: initiate-request body was not completely consumed")
+        }
+        return
+      Local Detail Tag: uint8
+      Local Detail Length: uint8
+      Local Detail Calling: raw
+      Calling Limit Tag: uint8
+      Calling Limit Length: uint8
+      Proposed Calling Limit: uint8
+      Called Limit Tag: uint8
+      Called Limit Length: uint8
+      Proposed Called Limit: uint8
+      Nesting Level Tag: uint8
+      Nesting Level Length: uint8
+      Proposed Nesting Level: uint8
+      Detail Tag: uint8
+      Detail Length: uint8
+      Initiate Request Detail:
+        operator: |
+          this.ProcessSubNode("Version Tag")
+          if getNodeResult("Version Tag").Value != 0x80 {
+            panic("mms: expected proposed-version tag")
+          }
+          this.ProcessSubNode("Version Length")
+          if getNodeResult("Version Length").Value != 1 {
+            panic("mms: proposed-version must be one byte")
+          }
+          this.ProcessSubNode("Proposed Version")
+
+          this.ProcessSubNode("Parameter CBB Tag")
+          if getNodeResult("Parameter CBB Tag").Value != 0x81 {
+            panic("mms: expected proposed-parameter-CBB tag")
+          }
+          this.ProcessSubNode("Parameter CBB Length")
+          if getNodeResult("Parameter CBB Length").Value != 3 {
+            panic("mms: proposed-parameter-CBB must be a three-byte bit string")
+          }
+          this.ProcessSubNode("Parameter CBB Unused Bits")
+          this.ProcessSubNode("Parameter CBB Bits")
+
+          this.ProcessSubNode("Services Tag")
+          if getNodeResult("Services Tag").Value != 0x82 {
+            panic("mms: expected services-supported-calling tag")
+          }
+          this.ProcessSubNode("Services Length")
+          if getNodeResult("Services Length").Value != 12 || getNodeResult("Services Length").Value != this.GetMaxLength() - this.Length() {
+            panic("mms: invalid services-supported-calling bit-string length")
+          }
+          this.ProcessSubNode("Services Unused Bits")
+          this.ProcessSubNode("Services Supported Bits")
+          return
+        Version Tag: uint8
+        Version Length: uint8
+        Proposed Version: uint8
+        Parameter CBB Tag: uint8
+        Parameter CBB Length: uint8
+        Parameter CBB Unused Bits: uint8
+        Parameter CBB Bits: raw,2
+        Services Tag: uint8
+        Services Length: uint8
+        Services Unused Bits: uint8
+        Services Supported Bits: raw,11
+    Initiate Response:
+      operator: |
+        this.ProcessSubNode("Local Detail Tag")
+        if getNodeResult("Local Detail Tag").Value != 0x80 {
+          panic("mms: expected local-detail-called tag")
+        }
+        this.ProcessSubNode("Local Detail Length")
+        localLength = getNodeResult("Local Detail Length").Value
+        if localLength == 0 || localLength > 4 || localLength > this.GetMaxLength() - this.Length() {
+          panic("mms: invalid local-detail-called length")
+        }
+        this.GetSubNode("Local Detail Called").SetMaxLength(localLength)
+        this.ProcessSubNode("Local Detail Called")
+
+        this.ProcessSubNode("Calling Limit Tag")
+        if getNodeResult("Calling Limit Tag").Value != 0x81 {
+          panic("mms: expected negotiated-calling-limit tag")
+        }
+        this.ProcessSubNode("Calling Limit Length")
+        if getNodeResult("Calling Limit Length").Value != 1 {
+          panic("mms: negotiated-calling-limit must be one byte")
+        }
+        this.ProcessSubNode("Negotiated Calling Limit")
+
+        this.ProcessSubNode("Called Limit Tag")
+        if getNodeResult("Called Limit Tag").Value != 0x82 {
+          panic("mms: expected negotiated-called-limit tag")
+        }
+        this.ProcessSubNode("Called Limit Length")
+        if getNodeResult("Called Limit Length").Value != 1 {
+          panic("mms: negotiated-called-limit must be one byte")
+        }
+        this.ProcessSubNode("Negotiated Called Limit")
+
+        this.ProcessSubNode("Nesting Level Tag")
+        if getNodeResult("Nesting Level Tag").Value != 0x83 {
+          panic("mms: expected negotiated-nesting-level tag")
+        }
+        this.ProcessSubNode("Nesting Level Length")
+        if getNodeResult("Nesting Level Length").Value != 1 {
+          panic("mms: negotiated-nesting-level must be one byte")
+        }
+        this.ProcessSubNode("Negotiated Nesting Level")
+
+        this.ProcessSubNode("Detail Tag")
+        if getNodeResult("Detail Tag").Value != 0xa4 {
+          panic("mms: expected initiate-response-detail tag")
+        }
+        this.ProcessSubNode("Detail Length")
+        detailLength = getNodeResult("Detail Length").Value
+        if detailLength == 0 || detailLength != this.GetMaxLength() - this.Length() {
+          panic("mms: initiate-response-detail length does not match body")
+        }
+        this.GetSubNode("Initiate Response Detail").SetMaxLength(detailLength)
+        this.ProcessSubNode("Initiate Response Detail")
+        if this.Length() != this.GetMaxLength() {
+          panic("mms: initiate-response body was not completely consumed")
+        }
+        return
+      Local Detail Tag: uint8
+      Local Detail Length: uint8
+      Local Detail Called: raw
+      Calling Limit Tag: uint8
+      Calling Limit Length: uint8
+      Negotiated Calling Limit: uint8
+      Called Limit Tag: uint8
+      Called Limit Length: uint8
+      Negotiated Called Limit: uint8
+      Nesting Level Tag: uint8
+      Nesting Level Length: uint8
+      Negotiated Nesting Level: uint8
+      Detail Tag: uint8
+      Detail Length: uint8
+      Initiate Response Detail:
+        operator: |
+          this.ProcessSubNode("Version Tag")
+          if getNodeResult("Version Tag").Value != 0x80 {
+            panic("mms: expected negotiated-version tag")
+          }
+          this.ProcessSubNode("Version Length")
+          if getNodeResult("Version Length").Value != 1 {
+            panic("mms: negotiated-version must be one byte")
+          }
+          this.ProcessSubNode("Negotiated Version")
+
+          this.ProcessSubNode("Parameter CBB Tag")
+          if getNodeResult("Parameter CBB Tag").Value != 0x81 {
+            panic("mms: expected negotiated-parameter-CBB tag")
+          }
+          this.ProcessSubNode("Parameter CBB Length")
+          if getNodeResult("Parameter CBB Length").Value != 3 {
+            panic("mms: negotiated-parameter-CBB must be a three-byte bit string")
+          }
+          this.ProcessSubNode("Parameter CBB Unused Bits")
+          this.ProcessSubNode("Parameter CBB Bits")
+
+          this.ProcessSubNode("Services Tag")
+          if getNodeResult("Services Tag").Value != 0x82 {
+            panic("mms: expected services-supported-called tag")
+          }
+          this.ProcessSubNode("Services Length")
+          if getNodeResult("Services Length").Value != 12 || getNodeResult("Services Length").Value != this.GetMaxLength() - this.Length() {
+            panic("mms: invalid services-supported-called bit-string length")
+          }
+          this.ProcessSubNode("Services Unused Bits")
+          this.ProcessSubNode("Services Supported Bits")
+          return
+        Version Tag: uint8
+        Version Length: uint8
+        Negotiated Version: uint8
+        Parameter CBB Tag: uint8
+        Parameter CBB Length: uint8
+        Parameter CBB Unused Bits: uint8
+        Parameter CBB Bits: raw,2
+        Services Tag: uint8
+        Services Length: uint8
+        Services Unused Bits: uint8
+        Services Supported Bits: raw,11
+    Confirmed Request:
+      operator: |
+        this.ProcessSubNode("Invoke ID Tag")
+        if getNodeResult("Invoke ID Tag").Value != 0x02 {
+          panic("mms: expected confirmed-request invoke-ID tag")
+        }
+        this.ProcessSubNode("Invoke ID Length")
+        invokeLength = getNodeResult("Invoke ID Length").Value
+        if invokeLength == 0 || invokeLength > 4 || invokeLength > this.GetMaxLength() - this.Length() {
+          panic("mms: invalid confirmed-request invoke-ID length")
+        }
+        this.GetSubNode("Invoke ID").SetMaxLength(invokeLength)
+        this.ProcessSubNode("Invoke ID")
+
+        this.ProcessSubNode("Service Tag")
+        serviceTag = getNodeResult("Service Tag").Value
+        this.ProcessSubNode("Service Length")
+        serviceLength = getNodeResult("Service Length").Value
+        if serviceLength != this.GetMaxLength() - this.Length() {
+          panic("mms: confirmed-request service length does not match body")
+        }
+        if serviceTag == 0xa6 {
+          this.GetSubNode("Get Variable Access Attributes").SetMaxLength(serviceLength)
+          this.ProcessSubNode("Get Variable Access Attributes")
+        } else if serviceTag == 0xa4 {
+          this.GetSubNode("Read Request").SetMaxLength(serviceLength)
+          this.ProcessSubNode("Read Request")
+        } else {
+          panic("mms: unsupported confirmed-request service tag")
+        }
+        if this.Length() != this.GetMaxLength() {
+          panic("mms: confirmed-request body was not completely consumed")
+        }
+        return
+      Invoke ID Tag: uint8
+      Invoke ID Length: uint8
+      Invoke ID:
+        type: raw
+        out: |
+          b = data.Value
+          value = 0
+          for _, octet = range b {
+            value = (value << 8) + octet
+          }
+          return value
+      Service Tag: uint8
+      Service Length: uint8
+      Get Variable Access Attributes:
+        operator: |
+          this.ProcessSubNode("Name Choice Tag")
+          if getNodeResult("Name Choice Tag").Value != 0xa0 {
+            panic("mms: expected get-variable-access-attributes name choice")
+          }
+          this.ProcessSubNode("Name Choice Length")
+          nameLength = getNodeResult("Name Choice Length").Value
+          if nameLength != this.GetMaxLength() - this.Length() {
+            panic("mms: object-name length does not match service")
+          }
+          this.GetSubNode("Object Name").SetMaxLength(nameLength)
+          this.ProcessSubNode("Object Name")
+          return
+        Name Choice Tag: uint8
+        Name Choice Length: uint8
+        Object Name:
+          operator: |
+            this.ProcessSubNode("Domain Specific Tag")
+            if getNodeResult("Domain Specific Tag").Value != 0xa1 {
+              panic("mms: expected domain-specific object name")
+            }
+            this.ProcessSubNode("Domain Specific Length")
+            objectLength = getNodeResult("Domain Specific Length").Value
+            if objectLength != this.GetMaxLength() - this.Length() {
+              panic("mms: domain-specific object-name length does not match body")
+            }
+            this.GetSubNode("Domain Specific").SetMaxLength(objectLength)
+            this.ProcessSubNode("Domain Specific")
+            return
+          Domain Specific Tag: uint8
+          Domain Specific Length: uint8
+          Domain Specific:
+            operator: |
+              this.ProcessSubNode("Domain ID Tag")
+              if getNodeResult("Domain ID Tag").Value != 0x1a {
+                panic("mms: expected domain-ID visible string")
+              }
+              this.ProcessSubNode("Domain ID Length")
+              domainLength = getNodeResult("Domain ID Length").Value
+              if domainLength == 0 || domainLength > this.GetMaxLength() - this.Length() {
+                panic("mms: invalid domain-ID length")
+              }
+              this.GetSubNode("Domain ID").SetMaxLength(domainLength)
+              this.ProcessSubNode("Domain ID")
+
+              this.ProcessSubNode("Item ID Tag")
+              if getNodeResult("Item ID Tag").Value != 0x1a {
+                panic("mms: expected item-ID visible string")
+              }
+              this.ProcessSubNode("Item ID Length")
+              itemLength = getNodeResult("Item ID Length").Value
+              if itemLength == 0 || itemLength != this.GetMaxLength() - this.Length() {
+                panic("mms: item-ID length does not match object name")
+              }
+              this.GetSubNode("Item ID").SetMaxLength(itemLength)
+              this.ProcessSubNode("Item ID")
+              return
+            Domain ID Tag: uint8
+            Domain ID Length: uint8
+            Domain ID: string
+            Item ID Tag: uint8
+            Item ID Length: uint8
+            Item ID: string
+      Read Request:
+        operator: |
+          this.ProcessSubNode("Read Request Tag")
+          if getNodeResult("Read Request Tag").Value != 0xa1 {
+            panic("mms: expected read-request sequence tag")
+          }
+          this.ProcessSubNode("Read Request Length")
+          readLength = getNodeResult("Read Request Length").Value
+          if readLength != this.GetMaxLength() - this.Length() {
+            panic("mms: read-request sequence length does not match service")
+          }
+          this.ProcessSubNode("Variable Access Specification Tag")
+          if getNodeResult("Variable Access Specification Tag").Value != 0xa0 {
+            panic("mms: expected list-of-variable access specification")
+          }
+          this.ProcessSubNode("Variable Access Specification Length")
+          accessLength = getNodeResult("Variable Access Specification Length").Value
+          if accessLength != this.GetMaxLength() - this.Length() {
+            panic("mms: variable-access-specification length does not match read request")
+          }
+          this.GetSubNode("Variable Access Specification").SetMaxLength(accessLength)
+          this.ProcessSubNode("Variable Access Specification")
+          return
+        Read Request Tag: uint8
+        Read Request Length: uint8
+        Variable Access Specification Tag: uint8
+        Variable Access Specification Length: uint8
+        Variable Access Specification:
+          operator: |
+            this.ProcessSubNode("List Of Variable Tag")
+            if getNodeResult("List Of Variable Tag").Value != 0x30 {
+              panic("mms: expected list-of-variable sequence")
+            }
+            this.ProcessSubNode("List Of Variable Length")
+            listLength = getNodeResult("List Of Variable Length").Value
+            if listLength != this.GetMaxLength() - this.Length() {
+              panic("mms: list-of-variable length does not match access specification")
+            }
+            this.GetSubNode("List Of Variable").SetMaxLength(listLength)
+            this.ProcessSubNode("List Of Variable")
+            return
+          List Of Variable Tag: uint8
+          List Of Variable Length: uint8
+          List Of Variable:
+            operator: |
+              this.ProcessSubNode("Variable Specification Tag")
+              if getNodeResult("Variable Specification Tag").Value != 0xa0 {
+                panic("mms: expected variable-specification name choice")
+              }
+              this.ProcessSubNode("Variable Specification Length")
+              variableLength = getNodeResult("Variable Specification Length").Value
+              if variableLength != this.GetMaxLength() - this.Length() {
+                panic("mms: variable-specification length does not match list")
+              }
+              this.GetSubNode("Variable Specification").SetMaxLength(variableLength)
+              this.ProcessSubNode("Variable Specification")
+              return
+            Variable Specification Tag: uint8
+            Variable Specification Length: uint8
+            Variable Specification:
+              operator: |
+                this.ProcessSubNode("Domain Specific Tag")
+                if getNodeResult("Domain Specific Tag").Value != 0xa1 {
+                  panic("mms: expected domain-specific variable name")
+                }
+                this.ProcessSubNode("Domain Specific Length")
+                objectLength = getNodeResult("Domain Specific Length").Value
+                if objectLength != this.GetMaxLength() - this.Length() {
+                  panic("mms: domain-specific variable-name length does not match body")
+                }
+                this.GetSubNode("Domain Specific").SetMaxLength(objectLength)
+                this.ProcessSubNode("Domain Specific")
+                return
+              Domain Specific Tag: uint8
+              Domain Specific Length: uint8
+              Domain Specific:
+                operator: |
+                  this.ProcessSubNode("Domain ID Tag")
+                  if getNodeResult("Domain ID Tag").Value != 0x1a {
+                    panic("mms: expected domain-ID visible string")
+                  }
+                  this.ProcessSubNode("Domain ID Length")
+                  domainLength = getNodeResult("Domain ID Length").Value
+                  if domainLength == 0 || domainLength > this.GetMaxLength() - this.Length() {
+                    panic("mms: invalid domain-ID length")
+                  }
+                  this.GetSubNode("Domain ID").SetMaxLength(domainLength)
+                  this.ProcessSubNode("Domain ID")
+
+                  this.ProcessSubNode("Item ID Tag")
+                  if getNodeResult("Item ID Tag").Value != 0x1a {
+                    panic("mms: expected item-ID visible string")
+                  }
+                  this.ProcessSubNode("Item ID Length")
+                  itemLength = getNodeResult("Item ID Length").Value
+                  if itemLength == 0 || itemLength != this.GetMaxLength() - this.Length() {
+                    panic("mms: item-ID length does not match variable name")
+                  }
+                  this.GetSubNode("Item ID").SetMaxLength(itemLength)
+                  this.ProcessSubNode("Item ID")
+                  return
+                Domain ID Tag: uint8
+                Domain ID Length: uint8
+                Domain ID: string
+                Item ID Tag: uint8
+                Item ID Length: uint8
+                Item ID: string
+    Confirmed Response:
+      operator: |
+        this.ProcessSubNode("Invoke ID Tag")
+        if getNodeResult("Invoke ID Tag").Value != 0x02 {
+          panic("mms: expected confirmed-response invoke-ID tag")
+        }
+        this.ProcessSubNode("Invoke ID Length")
+        invokeLength = getNodeResult("Invoke ID Length").Value
+        if invokeLength == 0 || invokeLength > 4 || invokeLength > this.GetMaxLength() - this.Length() {
+          panic("mms: invalid confirmed-response invoke-ID length")
+        }
+        this.GetSubNode("Invoke ID").SetMaxLength(invokeLength)
+        this.ProcessSubNode("Invoke ID")
+
+        this.ProcessSubNode("Service Tag")
+        if getNodeResult("Service Tag").Value != 0xa4 {
+          panic("mms: unsupported confirmed-response service tag")
+        }
+        this.ProcessSubNode("Service Length")
+        serviceLength = getNodeResult("Service Length").Value
+        if serviceLength != this.GetMaxLength() - this.Length() {
+          panic("mms: confirmed-response service length does not match body")
+        }
+        this.GetSubNode("Read Response").SetMaxLength(serviceLength)
+        this.ProcessSubNode("Read Response")
+        return
+      Invoke ID Tag: uint8
+      Invoke ID Length: uint8
+      Invoke ID:
+        type: raw
+        out: |
+          b = data.Value
+          value = 0
+          for _, octet = range b {
+            value = (value << 8) + octet
+          }
+          return value
+      Service Tag: uint8
+      Service Length: uint8
+      Read Response:
+        operator: |
+          this.ProcessSubNode("Access Results Tag")
+          if getNodeResult("Access Results Tag").Value != 0xa1 {
+            panic("mms: expected list-of-access-result tag")
+          }
+          this.ProcessSubNode("Access Results Length")
+          resultsLength = getNodeResult("Access Results Length").Value
+          if resultsLength != this.GetMaxLength() - this.Length() {
+            panic("mms: access-result list length does not match read response")
+          }
+          this.GetSubNode("Access Results").SetMaxLength(resultsLength)
+          this.ProcessSubNode("Access Results")
+          return
+        Access Results Tag: uint8
+        Access Results Length: uint8
+        Access Results:
+          operator: |
+            this.ProcessSubNode("Failure Tag")
+            if getNodeResult("Failure Tag").Value != 0x80 {
+              panic("mms: only the captured failure access-result is supported")
+            }
+            this.ProcessSubNode("Failure Length")
+            if getNodeResult("Failure Length").Value != 1 || getNodeResult("Failure Length").Value != this.GetMaxLength() - this.Length() {
+              panic("mms: invalid failure access-result length")
+            }
+            this.ProcessSubNode("Data Access Error")
+            return
+          Failure Tag: uint8
+          Failure Length: uint8
+          Data Access Error: uint8
+    Confirmed Error:
+      operator: |
+        this.ProcessSubNode("Invoke ID Tag")
+        if getNodeResult("Invoke ID Tag").Value != 0x80 {
+          panic("mms: expected confirmed-error invoke-ID tag")
+        }
+        this.ProcessSubNode("Invoke ID Length")
+        invokeLength = getNodeResult("Invoke ID Length").Value
+        if invokeLength == 0 || invokeLength > 4 || invokeLength > this.GetMaxLength() - this.Length() {
+          panic("mms: invalid confirmed-error invoke-ID length")
+        }
+        this.GetSubNode("Invoke ID").SetMaxLength(invokeLength)
+        this.ProcessSubNode("Invoke ID")
+
+        this.ProcessSubNode("Service Error Tag")
+        if getNodeResult("Service Error Tag").Value != 0xa2 {
+          panic("mms: expected service-error tag")
+        }
+        this.ProcessSubNode("Service Error Length")
+        serviceErrorLength = getNodeResult("Service Error Length").Value
+        if serviceErrorLength != this.GetMaxLength() - this.Length() {
+          panic("mms: service-error length does not match confirmed-error body")
+        }
+        this.GetSubNode("Service Error").SetMaxLength(serviceErrorLength)
+        this.ProcessSubNode("Service Error")
+        return
+      Invoke ID Tag: uint8
+      Invoke ID Length: uint8
+      Invoke ID:
+        type: raw
+        out: |
+          b = data.Value
+          value = 0
+          for _, octet = range b {
+            value = (value << 8) + octet
+          }
+          return value
+      Service Error Tag: uint8
+      Service Error Length: uint8
+      Service Error:
+        operator: |
+          this.ProcessSubNode("Error Class Tag")
+          if getNodeResult("Error Class Tag").Value != 0xa0 {
+            panic("mms: expected error-class tag")
+          }
+          this.ProcessSubNode("Error Class Length")
+          errorClassLength = getNodeResult("Error Class Length").Value
+          if errorClassLength != this.GetMaxLength() - this.Length() {
+            panic("mms: error-class length does not match service error")
+          }
+          this.GetSubNode("Error Class").SetMaxLength(errorClassLength)
+          this.ProcessSubNode("Error Class")
+          return
+        Error Class Tag: uint8
+        Error Class Length: uint8
+        Error Class:
+          operator: |
+            this.ProcessSubNode("Access Error Tag")
+            if getNodeResult("Access Error Tag").Value != 0x87 {
+              panic("mms: expected access error-class choice")
+            }
+            this.ProcessSubNode("Access Error Length")
+            if getNodeResult("Access Error Length").Value != 1 || getNodeResult("Access Error Length").Value != this.GetMaxLength() - this.Length() {
+              panic("mms: invalid access error-class length")
+            }
+            this.ProcessSubNode("Access Error")
+            return
+          Access Error Tag: uint8
+          Access Error Length: uint8
+          Access Error: uint8

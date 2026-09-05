@@ -14,8 +14,11 @@ Package:
       list: true
       TLV: LLDPTLV
       operator: |
+        index = 0
+        ended = false
         for {
-          if this.GetMaxLength() < 2 {
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining < 2 {
             break
           }
           res, op = this.TryProcessByType("PeekByte")
@@ -34,9 +37,24 @@ Package:
             break
           }
           hdr = ele.GetSubNode("TypeLen").Result().Value
-          if (hdr >> 9) == 0 {
+          typ = hdr >> 9
+          if index == 0 && typ != 1 {
+            panic("lldp: first TLV must be chassis ID")
+          }
+          if index == 1 && typ != 2 {
+            panic("lldp: second TLV must be port ID")
+          }
+          if index == 2 && typ != 3 {
+            panic("lldp: third TLV must be TTL")
+          }
+          index = index + 1
+          if typ == 0 {
+            ended = true
             break
           }
+        }
+        if !ended {
+          panic("lldp: missing end TLV")
         }
 LLDPTLV:
   operator: |

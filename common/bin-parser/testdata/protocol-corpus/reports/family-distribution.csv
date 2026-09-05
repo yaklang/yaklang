@@ -1,6 +1,6 @@
 family,roadmap_protocols,protocols_with_collected_capture,capture_files
 service-tools,66,5,5
-link,49,5,5
+link,49,5,7
 cn-app,48,6,6
 ics,46,17,17
 internet,40,16,17
@@ -14,9 +14,9 @@ file,21,7,8
 database,20,9,9
 mgmt,20,6,7
 carrier,19,3,3
-name-config,19,11,13
+name-config,19,11,14
 remote,17,8,8
-auth,16,5,6
+auth,16,5,7
 web,16,10,11
 game,10,2,2
 storage,10,1,1

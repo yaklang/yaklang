@@ -8,4 +8,4 @@ ndpi-coap,CoAP,ndpi,upstream-positive,outside current 616-item roadmap
 ndpi-tcp-measurement,High-rate TCP measurement,ndpi,upstream-positive,network measurement traffic outside current roadmap
 tcpdump-empty-pcapng,empty pcapng container,tcpdump,upstream-negative,
 tcpdump-unsupported-linktype,unsupported link type 160,tcpdump,upstream-negative,
-google-challenge-engraver,Google educational challenge USB HID engraver,google-challenges,educational-challenge,official 2022 Google USB reverse-engineering exercise capture
+wireshark-usb-hid,USB HID input report,wireshark-tests,upstream-positive,The selected frame carries a complete four-byte input report; the generic rule retains descriptor-dependent report data as opaque bytes.

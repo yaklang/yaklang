@@ -32,6 +32,9 @@ Package:
         Payload:
             unpack: true
             operator: |
+                payloadStart = getCurrentPosition()
+                maximum = this.GetMaxLength()
+                bounded = maximum > 0 && maximum < 1048576
                 src = getNodeResult("@TCP/Source Port").Value
                 dst = getNodeResult("@TCP/Destination Port").Value
                 typeNameList = ["TLS", "HTTP", "SSH", "Redis", "MQTT", "FTP", "SMTP"]
@@ -147,6 +150,15 @@ Package:
                         if err != nil{
                             panic(err)
                         }
+                        if bounded {
+                            consumed = getCurrentPosition() - payloadStart
+                            if consumed < maximum {
+                                remaining = maximum - consumed
+                                tail = this.NewUnknownNode("Remaining Payload")
+                                tail.SetMaxLength(remaining)
+                                tail.Process()
+                            }
+                        }
                         return
                     }else{
                         err = op.Recovery()
@@ -154,6 +166,15 @@ Package:
                             panic(err)
                         }
                         debug("parse node %s failed: %v", typeName, op.Message)
+                    }
+                }
+                if bounded {
+                    consumed = getCurrentPosition() - payloadStart
+                    if consumed < maximum {
+                        remaining = maximum - consumed
+                        tail = this.NewUnknownNode("Remaining Payload")
+                        tail.SetMaxLength(remaining)
+                        tail.Process()
                     }
                 }
 Option:

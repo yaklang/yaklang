@@ -1,6 +1,57 @@
 endian: big
 unit: byte
 Package:
+  RDPConnectionRequest:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 3 {
+        panic("rdp: TPKT version must be 3")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("PacketLength")
+      packetLength = getNodeResult("PacketLength").Value
+      if packetLength != this.GetMaxLength() {
+        panic("rdp: TPKT length does not match input")
+      }
+      this.ProcessSubNode("X224Length")
+      x224Length = getNodeResult("X224Length").Value
+      if x224Length + 5 != packetLength {
+        panic("rdp: X224 length does not match TPKT")
+      }
+      this.ProcessSubNode("TPDUCode")
+      if (getNodeResult("TPDUCode").Value & 0xf0) != 0xe0 {
+        panic("rdp: expected X224 connection request")
+      }
+      this.ProcessSubNode("DestinationReference")
+      this.ProcessSubNode("SourceReference")
+      this.ProcessSubNode("ClassOption")
+      this.ProcessSubNode("NegotiationType")
+      negotiationType = getNodeResult("NegotiationType").Value
+      if negotiationType < 1 || negotiationType > 3 {
+        panic("rdp: invalid negotiation type")
+      }
+      this.ProcessSubNode("NegotiationFlags")
+      this.ProcessSubNode("NegotiationLength")
+      if getNodeResult("NegotiationLength").Value != 8 {
+        panic("rdp: negotiation length must be 8")
+      }
+      this.ProcessSubNode("RequestedProtocols")
+    Version: uint8
+    Reserved: uint8
+    PacketLength: uint16
+    X224Length: uint8
+    TPDUCode: uint8
+    DestinationReference: uint16
+    SourceReference: uint16
+    ClassOption: uint8
+    NegotiationType: uint8
+    NegotiationFlags: uint8
+    NegotiationLength:
+      endian: little
+      type: uint16
+    RequestedProtocols:
+      endian: little
+      type: uint32
   TPKT:
     Version: uint8
     Reserved: uint8

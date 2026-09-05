@@ -27,6 +27,16 @@ Package:
         if cid == 10 && mid == 10 && rest >= 2 && rest < 1048576 {
           this.GetSubNode("Arguments").SetMaxLength(rest)
           this.ProcessSubNode("Arguments")
+        } else {
+          if rest > 0 && rest < 1048576 {
+            this.GetSubNode("Arguments Raw").SetMaxLength(rest)
+            this.ProcessSubNode("Arguments Raw")
+          }
+        }
+      } else {
+        if l > 0 && l < 1048576 {
+          this.GetSubNode("Frame Payload").SetMaxLength(l)
+          this.ProcessSubNode("Frame Payload")
         }
       }
       this.ProcessSubNode("Frame End")
@@ -79,6 +89,8 @@ Package:
           }
         Len: uint32
         Value: string
+    Arguments Raw: raw
+    Frame Payload: raw
     Frame End: uint8
 AMQPTable:
   operator: |

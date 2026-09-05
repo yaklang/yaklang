@@ -18,7 +18,7 @@ EAP,link,P1,done,0,missing
 STP,link,P1,done,0,missing
 RSTP,link,P1,done,0,missing
 MSTP,link,P2,todo,0,missing
-LLDP,link,P1,done,1,collected
+LLDP,link,P1,done,2,collected
 CDP,link,P1,done,0,missing
 LACP,link,P2,todo,0,missing
 MACSec,link,P2,todo,0,missing
@@ -29,7 +29,7 @@ Loopback,link,P1,done,0,missing
 Linux SLL,link,P1,done,0,missing
 Linux SLL2,link,P2,todo,0,missing
 IEEE 802.11,link,P1,done,0,missing
-IEEE 802.11 Radiotap,link,P2,todo,1,collected
+IEEE 802.11 Radiotap,link,P2,todo,2,collected
 WEP,link,P2,todo,0,missing
 WPA/RSN,link,P1,done,0,missing
 FCoE,link,P2,todo,0,missing
@@ -129,7 +129,7 @@ NBNS,name-config,P0,done,0,missing
 DoT,name-config,P1,done,1,collected
 DoH,name-config,P1,done,1,collected
 DoQ,name-config,P2,todo,1,collected
-DHCP,name-config,P0,done,1,collected
+DHCP,name-config,P0,done,2,collected
 DHCPv6,name-config,P1,done,0,missing
 BOOTP,name-config,P1,done,1,collected
 NTP,name-config,P1,done,3,collected
@@ -195,7 +195,7 @@ NTLM,auth,P0,done,0,missing
 NTLMSSP,auth,P0,done,0,missing
 SPNEGO,auth,P0,done,0,missing
 GSS-API,auth,P1,done,0,missing
-RADIUS,auth,P0,done,1,collected
+RADIUS,auth,P0,done,2,collected
 TACACS+,auth,P1,done,0,missing
 Diameter,auth,P2,todo,1,collected
 OAuth/OIDC wire,auth,P2,todo,0,missing

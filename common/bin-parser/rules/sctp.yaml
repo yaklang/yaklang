@@ -16,64 +16,45 @@ Package:
       list: true
       Chunk: SCTPData
       operator: |
+        parsed = 0
         for {
-          if this.GetMaxLength() < 4 {
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining == 0 {
             break
+          }
+          if remaining < 4 {
+            panic("sctp: truncated chunk header")
           }
           res, op = this.TryProcessByType("PeekByte")
           if !op.OK {
             op.Recovery()
+            if parsed == 0 {
+              panic("sctp: missing chunk")
+            }
             break
           }
           first = res.Value
           op.Recovery()
           prev = this.Length()
-          if first == 1 || first == 2 {
-            res, op = this.TryProcessByType("SCTPInit")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Save()
+          if first == 0 {
+            this.ProcessByType("SCTPData")
+          } else if first == 1 || first == 2 {
+            this.ProcessByType("SCTPInit")
           } else if first == 3 {
-            res, op = this.TryProcessByType("SCTPSack")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Save()
+            this.ProcessByType("SCTPSack")
           } else if first == 4 || first == 5 {
-            res, op = this.TryProcessByType("SCTPHeartbeat")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Save()
+            this.ProcessByType("SCTPHeartbeat")
           } else if first == 10 {
-            res, op = this.TryProcessByType("SCTPCookieEcho")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Save()
+            this.ProcessByType("SCTPCookieEcho")
           } else if first == 11 {
-            res, op = this.TryProcessByType("SCTPCookieAck")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Save()
+            this.ProcessByType("SCTPCookieAck")
           } else {
-            res, op = this.TryProcessByType("SCTPData")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Save()
+            this.ProcessByType("SCTPUnknown")
           }
           if this.Length() <= prev {
-            break
+            panic("sctp: chunk parser made no progress")
           }
+          parsed++
         }
 SCTPData:
   operator: |
@@ -84,18 +65,20 @@ SCTPData:
     if l < 4 {
       panic("sctp: chunk length smaller than 4")
     }
-    if l >= 16 {
-      this.ProcessSubNode("TSN")
-      this.ProcessSubNode("Stream ID")
-      this.ProcessSubNode("Stream Seq")
-      this.ProcessSubNode("PPI")
-      dlen = l - 20
-      if dlen > 0 && dlen < 1048576 {
-        this.GetSubNode("User Data").SetMaxLength(dlen)
-        this.ProcessSubNode("User Data")
-      }
+    if l < 16 {
+      panic("sctp: DATA chunk length smaller than 16")
     }
     pad = (4 - (l % 4)) % 4
+    this.SetMaxLength(l+pad)
+    this.ProcessSubNode("TSN")
+    this.ProcessSubNode("Stream ID")
+    this.ProcessSubNode("Stream Seq")
+    this.ProcessSubNode("PPI")
+    dlen = l - 16
+    if dlen > 0 && dlen < 1048576 {
+      this.GetSubNode("User Data").SetMaxLength(dlen)
+      this.ProcessSubNode("User Data")
+    }
     if pad > 0 {
       this.GetSubNode("Padding").SetMaxLength(pad)
       this.ProcessSubNode("Padding")
@@ -119,6 +102,8 @@ SCTPInit:
     if l < 20 {
       panic("sctp: INIT length smaller than 20")
     }
+    pad = (4 - (l % 4)) % 4
+    this.SetMaxLength(l+pad)
     this.ProcessSubNode("Initiate Tag")
     this.ProcessSubNode("Rwnd")
     this.ProcessSubNode("Outbound Streams")
@@ -129,7 +114,6 @@ SCTPInit:
       this.GetSubNode("Parameters").SetMaxLength(plen)
       this.ProcessSubNode("Parameters")
     }
-    pad = (4 - (l % 4)) % 4
     if pad > 0 {
       this.GetSubNode("Padding").SetMaxLength(pad)
       this.ProcessSubNode("Padding")
@@ -154,11 +138,26 @@ SCTPSack:
     if l < 16 {
       panic("sctp: SACK length smaller than 16")
     }
+    pad = (4 - (l % 4)) % 4
+    this.SetMaxLength(l+pad)
     this.ProcessSubNode("Cumulative TSN")
     this.ProcessSubNode("Rwnd")
     this.ProcessSubNode("Gap Ack Blocks")
     this.ProcessSubNode("Duplicate TSNs")
-    pad = (4 - (l % 4)) % 4
+    gaps = getNodeResult("Gap Ack Blocks").Value
+    duplicates = getNodeResult("Duplicate TSNs").Value
+    expected = 16 + gaps*4 + duplicates*4
+    if l != expected {
+      panic("sctp: SACK length does not match block counts")
+    }
+    if gaps > 0 {
+      this.GetSubNode("Gap Ack Block Data").SetMaxLength(gaps*4)
+      this.ProcessSubNode("Gap Ack Block Data")
+    }
+    if duplicates > 0 {
+      this.GetSubNode("Duplicate TSN Data").SetMaxLength(duplicates*4)
+      this.ProcessSubNode("Duplicate TSN Data")
+    }
     if pad > 0 {
       this.GetSubNode("Padding").SetMaxLength(pad)
       this.ProcessSubNode("Padding")
@@ -171,6 +170,8 @@ SCTPSack:
   Rwnd: uint32
   Gap Ack Blocks: uint16
   Duplicate TSNs: uint16
+  Gap Ack Block Data: string
+  Duplicate TSN Data: string
   Padding: string
 SCTPHeartbeat:
   operator: |
@@ -181,12 +182,13 @@ SCTPHeartbeat:
     if l < 4 {
       panic("sctp: HEARTBEAT length smaller than 4")
     }
+    pad = (4 - (l % 4)) % 4
+    this.SetMaxLength(l+pad)
     hlen = l - 4
     if hlen > 0 && hlen < 1048576 {
       this.GetSubNode("Heartbeat Info").SetMaxLength(hlen)
       this.ProcessSubNode("Heartbeat Info")
     }
-    pad = (4 - (l % 4)) % 4
     if pad > 0 {
       this.GetSubNode("Padding").SetMaxLength(pad)
       this.ProcessSubNode("Padding")
@@ -206,12 +208,13 @@ SCTPCookieEcho:
     if l < 4 {
       panic("sctp: COOKIE ECHO length smaller than 4")
     }
+    pad = (4 - (l % 4)) % 4
+    this.SetMaxLength(l+pad)
     clen = l - 4
     if clen > 0 && clen < 1048576 {
       this.GetSubNode("Cookie").SetMaxLength(clen)
       this.ProcessSubNode("Cookie")
     }
-    pad = (4 - (l % 4)) % 4
     if pad > 0 {
       this.GetSubNode("Padding").SetMaxLength(pad)
       this.ProcessSubNode("Padding")
@@ -231,8 +234,35 @@ SCTPCookieAck:
     if l != 4 {
       panic("sctp: COOKIE ACK length must be 4")
     }
+    this.SetMaxLength(4)
     return
   Type: uint8
   Flags: uint8
   Length: uint16
+SCTPUnknown:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l < 4 {
+      panic("sctp: chunk length smaller than 4")
+    }
+    pad = (4 - (l % 4)) % 4
+    this.SetMaxLength(l+pad)
+    body = l - 4
+    if body > 0 {
+      this.GetSubNode("Chunk Data").SetMaxLength(body)
+      this.ProcessSubNode("Chunk Data")
+    }
+    if pad > 0 {
+      this.GetSubNode("Padding").SetMaxLength(pad)
+      this.ProcessSubNode("Padding")
+    }
+    return
+  Type: uint8
+  Flags: uint8
+  Length: uint16
+  Chunk Data: string
+  Padding: string
 PeekByte: uint8

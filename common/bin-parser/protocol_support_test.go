@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/rules"
+	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -30,13 +31,39 @@ func mustHex(t *testing.T, s string) []byte {
 }
 
 func TestProtocolCatalogRuleFilesExist(t *testing.T) {
+	seen := make(map[string]struct{}, len(ProtocolCatalog))
 	for _, item := range ProtocolCatalog {
+		_, duplicate := seen[item.Name]
+		require.False(t, duplicate, "duplicate protocol catalog name %s", item.Name)
+		seen[item.Name] = struct{}{}
 		if item.RuleFile == "" {
 			continue
 		}
-		_, err := rules.RuleFS.ReadFile(item.RuleFile)
+		ruleContent, err := rules.RuleFS.ReadFile(item.RuleFile)
 		require.NoError(t, err, "missing rule for %s: %s", item.Name, item.RuleFile)
+		_, err = base.ParseRule(item.RuleFile)
+		require.NoError(t, err, "invalid rule for %s: %s", item.Name, item.RuleFile)
+		if item.EntryNode == "" {
+			continue
+		}
+		var document yaml.MapSlice
+		require.NoError(t, yaml.Unmarshal(ruleContent, &document), "decode rule %s", item.RuleFile)
+		packageValue, ok := protocolRuleMapValue(document, "Package")
+		require.True(t, ok, "rule %s has no Package node", item.RuleFile)
+		packageMap, ok := packageValue.(yaml.MapSlice)
+		require.True(t, ok, "rule %s Package is not a map", item.RuleFile)
+		_, ok = protocolRuleMapValue(packageMap, item.EntryNode)
+		require.True(t, ok, "protocol %s entry node %s is missing from %s", item.Name, item.EntryNode, item.RuleFile)
 	}
+}
+
+func protocolRuleMapValue(items yaml.MapSlice, key string) (any, bool) {
+	for _, item := range items {
+		if item.Key == key {
+			return item.Value, true
+		}
+	}
+	return nil, false
 }
 
 func TestProtocolRoadmapIntegrity(t *testing.T) {
@@ -60,7 +87,7 @@ func TestProtocolRoadmapIntegrity(t *testing.T) {
 		if !ok {
 			// catalog uses a few aliases (Ethernet vs Ethernet II, MSRdp vs RDP)
 			switch item.Name {
-			case "Ethernet", "MSRdp", "IIOP":
+			case "Ethernet", "MSRdp", "IIOP", "ANSI C12.22", "CoAP", "DLEP", "NAT-PMP", "SOME/IP", "USB HID report":
 				continue
 			}
 			t.Errorf("catalog protocol %q missing from ProtocolRoadmap", item.Name)

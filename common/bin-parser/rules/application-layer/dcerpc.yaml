@@ -3,7 +3,12 @@ Package:
   DCERPC:
     operator: |
       this.ProcessSubNode("RPC Vers")
-      if getNodeResult("RPC Vers").Value != 5 {
+      vers = getNodeResult("RPC Vers").Value
+      if vers == 4 {
+        this.ProcessByType("DCERPCv4")
+        return
+      }
+      if vers != 5 {
         panic("dcerpc: RPC vers must be 5")
       }
       this.ProcessSubNode("RPC Vers Minor")
@@ -175,6 +180,75 @@ Package:
         operator: |
           this.ProcessSubNode("Reject Reason")
         Reject Reason: uint16
+DCERPCv4:
+  unpack: true
+  operator: |
+    this.ProcessSubNode("Packet Type")
+    this.ProcessSubNode("Flags 1")
+    this.ProcessSubNode("Flags 2")
+    this.ProcessSubNode("Data Representation")
+    this.ProcessSubNode("Character Representation")
+    this.ProcessSubNode("Floating Point Representation")
+    this.ProcessSubNode("Serial High")
+    this.ProcessSubNode("Object ID")
+    this.ProcessSubNode("Interface ID")
+    this.ProcessSubNode("Activity ID")
+    this.ProcessSubNode("Server Boot")
+    this.ProcessSubNode("Interface Version")
+    this.ProcessSubNode("Sequence Number")
+    this.ProcessSubNode("Operation Number")
+    this.ProcessSubNode("Interface Hint")
+    this.ProcessSubNode("Activity Hint")
+    this.ProcessSubNode("Fragment Length First")
+    this.ProcessSubNode("Fragment Length Second")
+    this.ProcessSubNode("Fragment Number")
+    this.ProcessSubNode("Authentication Protocol")
+    this.ProcessSubNode("Serial Low")
+    first = getNodeResult("Fragment Length First").Value
+    second = getNodeResult("Fragment Length Second").Value
+    fl = 0
+    if getNodeResult("Data Representation").Value == 0x10 {
+      fl = first | (second << 8)
+    } else {
+      fl = (first << 8) | second
+    }
+    if fl > this.GetMaxLength() - this.Length() {
+      panic("dcerpc: v4 fragment length exceeds message")
+    }
+    if fl > 0 && fl < 1048576 {
+      this.GetSubNode("Stub").SetMaxLength(fl)
+      this.ProcessSubNode("Stub")
+    }
+    if this.Length() < this.GetMaxLength() {
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Trailer").SetMaxLength(rest)
+        this.ProcessSubNode("Trailer")
+      }
+    }
+  Packet Type: uint8
+  Flags 1: uint8
+  Flags 2: uint8
+  Data Representation: uint8
+  Character Representation: uint8
+  Floating Point Representation: uint8
+  Serial High: uint8
+  Object ID: raw,16
+  Interface ID: raw,16
+  Activity ID: raw,16
+  Server Boot: raw,4
+  Interface Version: raw,4
+  Sequence Number: raw,4
+  Operation Number: raw,2
+  Interface Hint: raw,2
+  Activity Hint: raw,2
+  Fragment Length First: uint8
+  Fragment Length Second: uint8
+  Fragment Number: raw,2
+  Authentication Protocol: uint8
+  Serial Low: uint8
+  Stub: raw
+  Trailer: raw
 DCERPCResults:
   operator: |
     this.ProcessSubNode("Num Results")

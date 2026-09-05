@@ -20,6 +20,10 @@ Package:
           return
         }
       }
+      if (cls & 0x0f) == 0x07 && this.Length() < this.GetMaxLength() {
+        this.ProcessSubNode("Session")
+        return
+      }
     Version: uint8
     Reserved: uint8
     Sequence: uint8
@@ -30,3 +34,58 @@ Package:
       Msg Tag: uint8
       ASF Reserved: uint8
       Data Len: uint8
+    Session:
+      endian: little
+      operator: |
+        this.ProcessSubNode("Authentication Type")
+        auth = getNodeResult("Authentication Type").Value
+        this.ProcessSubNode("Session Sequence")
+        this.ProcessSubNode("Session ID")
+        if auth != 0 {
+          this.ProcessSubNode("Authentication Code")
+        }
+        this.ProcessSubNode("Message Length")
+        n = getNodeResult("Message Length").Value
+        if n < 7 || n >= 1048576 {
+          panic("ipmi: invalid message length")
+        }
+        remaining = this.GetMaxLength() - this.Length()
+        if n > remaining {
+          panic("ipmi: message length exceeds packet")
+        }
+        this.GetSubNode("Message").SetMaxLength(n)
+        this.ProcessSubNode("Message")
+      Authentication Type: uint8
+      Session Sequence: uint32
+      Session ID: uint32
+      Authentication Code: raw,16
+      Message Length: uint8
+      Message:
+        operator: |
+          this.ProcessSubNode("Target Address")
+          this.ProcessSubNode("Network Function")
+          this.ProcessSubNode("Target LUN")
+          this.ProcessSubNode("Header Checksum")
+          this.ProcessSubNode("Source Address")
+          this.ProcessSubNode("Source Sequence")
+          this.ProcessSubNode("Source LUN")
+          this.ProcessSubNode("Command")
+          rest = this.GetMaxLength() - this.Length()
+          if rest < 1 {
+            panic("ipmi: missing data checksum")
+          }
+          if rest > 1 {
+            this.GetSubNode("Data").SetMaxLength(rest - 1)
+            this.ProcessSubNode("Data")
+          }
+          this.ProcessSubNode("Data Checksum")
+        Target Address: uint8
+        Network Function: uint8,6bit
+        Target LUN: uint8,2bit
+        Header Checksum: uint8
+        Source Address: uint8
+        Source Sequence: uint8,6bit
+        Source LUN: uint8,2bit
+        Command: uint8
+        Data: raw
+        Data Checksum: uint8

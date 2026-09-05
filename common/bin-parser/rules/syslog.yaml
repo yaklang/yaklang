@@ -32,7 +32,10 @@ Syslog3164:
   Timestamp: string,15
   Space: uint8
   Hostname: "del: ;type:string"
-  Message: "del:\n;type:string"
+  Message:
+    type: string
+    delimiter: "\n"
+    delimiter-optional: true
 Syslog5424:
   unpack: true
   operator: |
@@ -52,5 +55,8 @@ Syslog5424:
   ProcID: "del: ;type:string"
   MsgID: "del: ;type:string"
   Structured Data: "del: ;type:string"
-  Message: "del:\n;type:string"
+  Message:
+    type: string
+    delimiter: "\n"
+    delimiter-optional: true
 PeekByte: uint8

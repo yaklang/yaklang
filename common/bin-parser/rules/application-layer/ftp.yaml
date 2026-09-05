@@ -23,3 +23,15 @@ Package:
         panic("ftp: unknown command")
       }
     Line: "del:\r\n;type:string"
+  FTPAuthTLS:
+    operator: |
+      this.ProcessSubNode("Command")
+      if string(getNodeResult("Command").Value) != "AUTH" {
+        panic("ftps: expected AUTH command")
+      }
+      this.ProcessSubNode("Mechanism")
+      if string(getNodeResult("Mechanism").Value) != "TLS" {
+        panic("ftps: expected TLS mechanism")
+      }
+    Command: "del: ;type:string"
+    Mechanism: "del:\r\n;type:string"

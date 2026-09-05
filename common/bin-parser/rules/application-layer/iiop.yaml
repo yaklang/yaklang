@@ -75,6 +75,35 @@ GIOPRequest:
       this.GetSubNode("Operation").SetMaxLength(ol)
       this.ProcessSubNode("Operation")
     }
+    remaining = this.GetMaxLength() - this.Length()
+    if remaining == 0 {
+      return
+    }
+    pad = (4 - (this.Length() % 4)) % 4
+    if pad > 0 {
+      if remaining < pad {
+        panic("giop: truncated operation padding")
+      }
+      this.GetSubNode("Operation Padding").SetMaxLength(pad)
+      this.ProcessSubNode("Operation Padding")
+    }
+    remaining = this.GetMaxLength() - this.Length()
+    if remaining < 4 {
+      panic("giop: truncated service context count")
+    }
+    this.ProcessSubNode("Service Context Count")
+    count = getNodeResult("Service Context Count").Value
+    if count > 1024 {
+      panic("giop: too many service contexts")
+    }
+    if count > 0 {
+      this.ProcessSubNode("Service Contexts")
+    }
+    remaining = this.GetMaxLength() - this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Stub Data").SetMaxLength(remaining)
+      this.ProcessSubNode("Stub Data")
+    }
   Request ID: uint32
   Response Flags: uint8
   Reserved: raw,3
@@ -84,3 +113,36 @@ GIOPRequest:
   Object Key: string
   Op Len: uint32
   Operation: string
+  Operation Padding: raw
+  Service Context Count: uint32
+  Service Contexts:
+    list: true
+    list-length-from-field: "../Service Context Count"
+    Service Context: GIOPServiceContext
+  Stub Data: raw
+
+GIOPServiceContext:
+  operator: |
+    this.ProcessSubNode("Context ID")
+    this.ProcessSubNode("Context Data Length")
+    l = getNodeResult("Context Data Length").Value
+    if l > 1048576 {
+      panic("giop: service context too large")
+    }
+    if l > 0 {
+      this.GetSubNode("Context Data").SetMaxLength(l)
+      this.ProcessSubNode("Context Data")
+    }
+    index = this.GetCfg("element index")
+    count = getNodeResult("../../Service Context Count").Value
+    if index + 1 < count {
+      pad = (4 - (this.Length() % 4)) % 4
+      if pad > 0 {
+        this.GetSubNode("Context Padding").SetMaxLength(pad)
+        this.ProcessSubNode("Context Padding")
+      }
+    }
+  Context ID: uint32
+  Context Data Length: uint32
+  Context Data: raw
+  Context Padding: raw
