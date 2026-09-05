@@ -315,7 +315,7 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, "003", strVal(t, n.Child("Major")))
 		require.Equal(t, "008", strVal(t, n.Child("Minor")))
 	})
-	t.Run("vnc/security", func(t *testing.T) {
+	t.Run("vnc/negotiation", func(t *testing.T) {
 		raw := append([]byte("RFB 003.008\n"), 0x02, 0x01, 0x02)
 		n := parseRule(t, raw, "vnc", "VNC")
 		require.Equal(t, uint64(2), uintVal(t, n.Child("Number of Security Types")))

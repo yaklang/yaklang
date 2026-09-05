@@ -65,15 +65,15 @@
 | WINREG | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | WMI | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | DCOM | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
-| Yakit MITM magic | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
+| Yakit proxy framing | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
 | AJP | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/ajp.yaml` |
 | Java serialization | B | 80 | 20 | 20 | 16 | 14 | 10 | L2 | `application-layer/java_ser.yaml` |
 | Kerberos PAC | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/kerberos.yaml` |
 | AS-REP / TGS | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | alias of Kerberos |
 | NTLM v1/v2 | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of NTLMSSP |
 | NetNTLMv2 | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/ntlm.yaml` |
-| LLMNR poison | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/nbns.yaml` |
-| NBT-NS poison | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/nbns.yaml` |
+| LLMNR response | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/nbns.yaml` |
+| NBT-NS response | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/nbns.yaml` |
 | WPAD proxy | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
 
 67 个 P0：A 10 / B 57，最低 75（B）。IEEE 802.1Q / DHCP 为 L3 样本，流量维按标准记 8 分。802.1Q 的 Payload switch（IP / IPv6 / ARP / EAPOL / default）由 `TestVLANPayloadTypeArms` + ARP 内层测试覆盖。证据见 `protocol_scores.go` 的 `Evidence`；G6 失败路径在 `p0_fail_paths_test.go`。

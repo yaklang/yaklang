@@ -2,16 +2,16 @@
 
 This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.
 
-- Roadmap: **616** protocols; 210 `done`, 0 `partial`, 406 `todo`.
+- Roadmap: **616** protocols; 211 `done`, 0 `partial`, 405 `todo`.
 - Corpus: **131 capture files**, **34885 packets**, **5398203 bytes**.
 - Direct roadmap material: **113 unique protocols**; outside-roadmap candidates: **10 captures**.
-- Evidence classes: 112 positive upstream, 16 negative/boundary upstream, 3 official CTF.
+- Evidence classes: 112 positive upstream, 16 negative/boundary upstream, 3 official educational challenge.
 
 ## Source distribution
 
 | Source | Captures | Packets |
 | --- | ---: | ---: |
-| `google-ctf` | 3 | 17747 |
+| `google-challenges` | 3 | 17747 |
 | `ndpi` | 114 | 17125 |
 | `tcpdump` | 14 | 13 |
 
@@ -19,7 +19,7 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 
 | Family | Roadmap protocols | With collected capture | Capture files |
 | --- | ---: | ---: | ---: |
-| `pentest` | 66 | 4 | 4 |
+| `service-tools` | 66 | 4 | 4 |
 | `link` | 49 | 3 | 3 |
 | `cn-app` | 48 | 4 | 4 |
 | `ics` | 46 | 16 | 16 |

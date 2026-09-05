@@ -2761,8 +2761,8 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "008", strVal(t, mustChild(t, eth, "IP", "TCP", "VNC").Child("Minor")))
 	})
 
-	t.Run("vnc/security", func(t *testing.T) {
-		// RFC 6143 §7.1.2: number-of-security-types=2, None (1) and VNC Authentication (2).
+	t.Run("vnc/negotiation", func(t *testing.T) {
+		// RFC 6143 §7.1.2: two negotiation types, None (1) and VNC Authentication (2).
 		// Wireshark vnc.num_security_types / vnc.security_type. TCP/5900.
 		raw := append([]byte("RFB 003.008\n"), 0x02, 0x01, 0x02)
 		n := parseRule(t, raw, "vnc", "VNC")

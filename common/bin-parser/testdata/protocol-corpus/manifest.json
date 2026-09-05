@@ -21,12 +21,12 @@
       "license_sha256": "8a54594d257e14a5260ac770f1633516cb51e3fc28c40136ce2697014eda7afd"
     },
     {
-      "id": "google-ctf",
+      "id": "google-challenges",
       "repository": "google/google-ctf",
       "commit": "067421eb7e918c29e39f187fac5a0f0d72a6ab83",
       "license": "Apache-2.0",
       "homepage": "https://github.com/google/google-ctf",
-      "license_file": "licenses/google-ctf-LICENSE.txt",
+      "license_file": "licenses/google-challenges-LICENSE.txt",
       "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     }
   ],
@@ -1512,7 +1512,7 @@
       "repository_id": "ndpi",
       "protocol": "Apache JServ Protocol",
       "roadmap_name": "AJP",
-      "roadmap_family": "pentest",
+      "roadmap_family": "service-tools",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
       "capture_file": "captures/ndpi/ndpi-ajp.pcap",
@@ -2114,7 +2114,7 @@
       "repository_id": "ndpi",
       "protocol": "FastCGI (nDPI regression; undecoded TCP payload in Wireshark defaults)",
       "roadmap_name": "FastCGI",
-      "roadmap_family": "pentest",
+      "roadmap_family": "service-tools",
       "roadmap_priority": "P1",
       "roadmap_status": "done",
       "capture_file": "captures/ndpi/ndpi-fastcgi.pcap",
@@ -2234,7 +2234,7 @@
       "repository_id": "ndpi",
       "protocol": "Git native protocol",
       "roadmap_name": "Git daemon",
-      "roadmap_family": "pentest",
+      "roadmap_family": "service-tools",
       "roadmap_priority": "P2",
       "roadmap_status": "todo",
       "capture_file": "captures/ndpi/ndpi-git.pcap",
@@ -2896,7 +2896,7 @@
       "repository_id": "ndpi",
       "protocol": "Rsync daemon",
       "roadmap_name": "Rsync daemon",
-      "roadmap_family": "pentest",
+      "roadmap_family": "service-tools",
       "roadmap_priority": "P1",
       "roadmap_status": "done",
       "capture_file": "captures/ndpi/ndpi-rsync.pcap",
@@ -3468,14 +3468,14 @@
       ]
     },
     {
-      "id": "ndpi-massscan",
+      "id": "ndpi-tcp-measurement",
       "repository_id": "ndpi",
-      "protocol": "Masscan TCP probes",
+      "protocol": "High-rate TCP measurement",
       "roadmap_name": null,
       "roadmap_family": null,
       "roadmap_priority": null,
       "roadmap_status": null,
-      "capture_file": "captures/ndpi/ndpi-massscan.pcap",
+      "capture_file": "captures/ndpi/ndpi-tcp-measurement.pcap",
       "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/massscan.pcap",
       "upstream_path": "tests/cfgs/default/pcap/massscan.pcap",
       "sha256": "68f19770ba2149a33ad40876bf0ce09de8de91bbf75ce9a2f5bea7829b3c43cd",
@@ -3484,11 +3484,11 @@
       "link_type": "Ethernet",
       "display_filter": "tcp",
       "evidence_kind": "upstream-positive",
-      "notes": "pentest traffic outside current roadmap",
+      "notes": "network measurement traffic outside current roadmap",
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/ndpi-massscan.frame-1.hex"
+        "hex_file": "hex/ndpi-tcp-measurement.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -3893,14 +3893,14 @@
       ]
     },
     {
-      "id": "google-ctf-ascii-art",
-      "repository_id": "google-ctf",
-      "protocol": "Google CTF ASCII Art HTTP client",
+      "id": "google-challenge-ascii-art",
+      "repository_id": "google-challenges",
+      "protocol": "Google educational challenge ASCII Art HTTP client",
       "roadmap_name": "HTTP",
       "roadmap_family": "web",
       "roadmap_priority": "P0",
       "roadmap_status": "done",
-      "capture_file": "captures/google-ctf/google-ctf-ascii-art.pcap",
+      "capture_file": "captures/google-challenges/google-challenge-ascii-art.pcap",
       "source_url": "https://raw.githubusercontent.com/google/google-ctf/067421eb7e918c29e39f187fac5a0f0d72a6ab83/2017/quals/2017-re-ascii-art/attachments/aart_client_capture.pcap",
       "upstream_path": "2017/quals/2017-re-ascii-art/attachments/aart_client_capture.pcap",
       "sha256": "70c1f7300366d402e4a7853482188dbe141ef05024031d51643c73d2fc508292",
@@ -3908,12 +3908,12 @@
       "packet_count": 60,
       "link_type": "Ethernet",
       "display_filter": "http",
-      "evidence_kind": "ctf",
-      "notes": "official 2017 Google CTF qualification challenge capture",
+      "evidence_kind": "educational-challenge",
+      "notes": "official 2017 Google qualification exercise capture",
       "representative_frame": {
         "number": 4,
         "length_bytes": 287,
-        "hex_file": "hex/google-ctf-ascii-art.frame-4.hex"
+        "hex_file": "hex/google-challenge-ascii-art.frame-4.hex"
       },
       "frame_protocols": [
         "eth",
@@ -3925,14 +3925,14 @@
       ]
     },
     {
-      "id": "google-ctf-engraver",
-      "repository_id": "google-ctf",
-      "protocol": "Google CTF USB HID engraver",
+      "id": "google-challenge-engraver",
+      "repository_id": "google-challenges",
+      "protocol": "Google educational challenge USB HID engraver",
       "roadmap_name": null,
       "roadmap_family": null,
       "roadmap_priority": null,
       "roadmap_status": null,
-      "capture_file": "captures/google-ctf/google-ctf-engraver.pcapng",
+      "capture_file": "captures/google-challenges/google-challenge-engraver.pcapng",
       "source_url": "https://raw.githubusercontent.com/google/google-ctf/067421eb7e918c29e39f187fac5a0f0d72a6ab83/2022/quals/hardware-engraver/attachments/engraver.pcapng",
       "upstream_path": "2022/quals/hardware-engraver/attachments/engraver.pcapng",
       "sha256": "7eff7c6c7aaed582054076e0cc1c8353b39d7135f881834ff3688afba35378b4",
@@ -3940,12 +3940,12 @@
       "packet_count": 860,
       "link_type": "UnknownLinkType",
       "display_filter": "usbhid.data",
-      "evidence_kind": "ctf",
-      "notes": "official 2022 Google CTF USB reverse-engineering challenge capture",
+      "evidence_kind": "educational-challenge",
+      "notes": "official 2022 Google USB reverse-engineering exercise capture",
       "representative_frame": {
         "number": 23,
         "length_bytes": 91,
-        "hex_file": "hex/google-ctf-engraver.frame-23.hex"
+        "hex_file": "hex/google-challenge-engraver.frame-23.hex"
       },
       "frame_protocols": [
         "usb",
@@ -3953,14 +3953,14 @@
       ]
     },
     {
-      "id": "google-ctf-sc",
-      "repository_id": "google-ctf",
-      "protocol": "Google CTF IPX/LLC game traffic",
+      "id": "google-challenge-sc",
+      "repository_id": "google-challenges",
+      "protocol": "Google educational challenge IPX/LLC game traffic",
       "roadmap_name": "IPX",
       "roadmap_family": "longtail",
       "roadmap_priority": "P4",
       "roadmap_status": "todo",
-      "capture_file": "captures/google-ctf/google-ctf-sc.pcapng",
+      "capture_file": "captures/google-challenges/google-challenge-sc.pcapng",
       "source_url": "https://raw.githubusercontent.com/google/google-ctf/067421eb7e918c29e39f187fac5a0f0d72a6ab83/2019/finals/misc-sc/attachments/sc.pcapng",
       "upstream_path": "2019/finals/misc-sc/attachments/sc.pcapng",
       "sha256": "b40b193e219d78121b10aa1ce1ac1c0061fc4a4ac78f75c36c48a7b6768c2baa",
@@ -3968,12 +3968,12 @@
       "packet_count": 16827,
       "link_type": "Ethernet",
       "display_filter": "ipx",
-      "evidence_kind": "ctf",
-      "notes": "official 2019 Google CTF finals challenge capture",
+      "evidence_kind": "educational-challenge",
+      "notes": "official 2019 Google game-traffic exercise capture",
       "representative_frame": {
         "number": 1,
         "length_bytes": 68,
-        "hex_file": "hex/google-ctf-sc.frame-1.hex"
+        "hex_file": "hex/google-challenge-sc.frame-1.hex"
       },
       "frame_protocols": [
         "eth",

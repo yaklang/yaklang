@@ -115,7 +115,7 @@ func TestSMB2NegotiateResponse(t *testing.T) {
 }
 
 func TestSMB2SessionSetupRequest(t *testing.T) {
-	// [MS-SMB2] 2.2.5 SESSION_SETUP Request, empty security buffer.
+	// [MS-SMB2] 2.2.5 SESSION_SETUP Request, empty negotiation buffer.
 	body := make([]byte, 24)
 	binary.LittleEndian.PutUint16(body[0:], 25)
 	body[2] = 0

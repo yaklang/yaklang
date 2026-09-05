@@ -47,7 +47,7 @@
           "packet_count": {"type": "integer", "minimum": 0},
           "link_type": {"type": "string"},
           "display_filter": {"type": "string"},
-          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "ctf"]},
+          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge"]},
           "notes": {"type": "string"},
           "representative_frame": {
             "type": ["object", "null"],
