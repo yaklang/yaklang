@@ -4,8 +4,8 @@ This directory is test and experiment material for the 616-item
 `ProtocolRoadmap`. It deliberately keeps evidence collection separate from
 claims that a Yaklang dissector is complete.
 
-The current snapshot contains 223 capture files, 57,695 packets and direct
-material for 176 unique roadmap protocols. The source and family breakdown is
+The current snapshot contains 295 capture files, 57,826 packets and direct
+material for 248 unique roadmap protocols. The source and family breakdown is
 generated in `reports/REPORT.md`; `reports/HEALTHCHECK.md` is the coverage
 gap survey; `reports/UPSTREAM_INDEX.md` records the wider authoritative
 collections and selection policy.
@@ -58,7 +58,9 @@ capture does not contact any service. Educational captures may contain exercise
 solutions by design.
 
 Upstream license texts (or README when a repo has no LICENSE file) are stored
-under `licenses/`. Captures are pinned to an upstream commit and selected for
-protocol identification, with large dumps filtered out. Wireshark SampleCaptures
-and automayt/ICS-pcap LFS pointer files remain indexed in
-`reports/UPSTREAM_INDEX.md` rather than vendored.
+under `licenses/`. GitHub captures are pinned to an upstream commit. Locally
+generated captures (`generated-local`) are synthesized with Scapy; their
+`source_url` is `generated://scapy/<recipe-sha1>/<id>` and the recipe lives
+in `tools/generate-local/`. Wireshark SampleCaptures and automayt/ICS-pcap
+LFS pointer files remain indexed in `reports/UPSTREAM_INDEX.md` rather than
+vendored.
