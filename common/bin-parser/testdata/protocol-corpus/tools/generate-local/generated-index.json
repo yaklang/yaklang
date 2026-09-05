@@ -2512,6 +2512,368 @@
       ],
       "frame": 4,
       "packets": 4
+    },
+    {
+      "id": "gen-ice-stun",
+      "roadmap_name": "ICE",
+      "display_filter": "stun",
+      "file": "captures/generated-local/gen-ice-stun.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "stun"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-tipc",
+      "roadmap_name": "TIPC",
+      "display_filter": "tipc",
+      "file": "captures/generated-local/gen-tipc.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "tipc"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-isis",
+      "roadmap_name": "IS-IS",
+      "display_filter": "isis",
+      "file": "captures/generated-local/gen-isis.pcap",
+      "frame_protocols": [
+        "eth",
+        "llc",
+        "osi",
+        "isis",
+        "isis.hello"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-linux-sll2",
+      "roadmap_name": "Linux SLL2",
+      "display_filter": "sll",
+      "file": "captures/generated-local/gen-linux-sll2.pcap",
+      "frame_protocols": [
+        "sll",
+        "ethertype",
+        "ip",
+        "icmp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-alljoyn",
+      "roadmap_name": "AllJoyn",
+      "display_filter": "ajns",
+      "file": "captures/generated-local/gen-alljoyn.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "ajns"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-aarp",
+      "roadmap_name": "AARP",
+      "display_filter": "frame.protocols contains \"aarp\"",
+      "file": "captures/generated-local/gen-aarp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "aarp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-fibre-channel",
+      "roadmap_name": "Fibre Channel",
+      "display_filter": "frame.protocols contains \"fcoe:fc\"",
+      "file": "captures/generated-local/gen-fibre-channel.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "fcoe",
+        "fc"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-mipv6",
+      "roadmap_name": "MIPv6",
+      "display_filter": "mipv6",
+      "file": "captures/generated-local/gen-mipv6.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ipv6",
+        "mipv6"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-vines",
+      "roadmap_name": "VINES",
+      "display_filter": "frame.protocols contains \"vines_ip\"",
+      "file": "captures/generated-local/gen-vines.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "vines_ip"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-sna",
+      "roadmap_name": "SNA",
+      "display_filter": "snaeth",
+      "file": "captures/generated-local/gen-sna.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "snaeth",
+        "llc",
+        "data"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-x11",
+      "roadmap_name": "X11",
+      "display_filter": "x11",
+      "file": "captures/generated-local/gen-x11.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "x11"
+      ],
+      "frame": 4,
+      "packets": 4
+    },
+    {
+      "id": "gen-diameter",
+      "roadmap_name": "Diameter Cx/Dx",
+      "display_filter": "frame.protocols contains \"diameter\"",
+      "file": "captures/generated-local/gen-diameter.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "diameter",
+        "data"
+      ],
+      "frame": 4,
+      "packets": 4
+    },
+    {
+      "id": "gen-ntlm-v2",
+      "roadmap_name": "NTLM v1/v2",
+      "display_filter": "ntlmssp",
+      "file": "captures/generated-local/gen-ntlm-v2.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "http",
+        "ntlmssp"
+      ],
+      "frame": 4,
+      "packets": 4
+    },
+    {
+      "id": "gen-slimp3",
+      "roadmap_name": "SliMP3",
+      "display_filter": "slimp3",
+      "file": "captures/generated-local/gen-slimp3.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "slimp3"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-sigcomp",
+      "roadmap_name": "SIGCOMP",
+      "display_filter": "sigcomp",
+      "file": "captures/generated-local/gen-sigcomp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "sip",
+        "sigcomp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-swipe",
+      "roadmap_name": "swIPe",
+      "display_filter": "swipe",
+      "file": "captures/generated-local/gen-swipe.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "swipe",
+        "data"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-wsmp",
+      "roadmap_name": "WSMP",
+      "display_filter": "wsmp",
+      "file": "captures/generated-local/gen-wsmp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "wsmp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-vntag",
+      "roadmap_name": "VNTAG",
+      "display_filter": "vntag",
+      "file": "captures/generated-local/gen-vntag.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "vntag",
+        "ethertype",
+        "data"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-pbb",
+      "roadmap_name": "IEEE 802.1ah PBB",
+      "display_filter": "ieee8021ah",
+      "file": "captures/generated-local/gen-pbb.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ieee8021ah",
+        "ethertype",
+        "ip",
+        "icmp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-eoam",
+      "roadmap_name": "EOAM",
+      "display_filter": "oampdu",
+      "file": "captures/generated-local/gen-eoam.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "slow",
+        "oampdu"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-lacp-marker",
+      "roadmap_name": "LACP-marker",
+      "display_filter": "marker",
+      "file": "captures/generated-local/gen-lacp-marker.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "slow",
+        "marker"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-ucp",
+      "roadmap_name": "UCP/EMI",
+      "display_filter": "frame.protocols contains \"ucp\"",
+      "file": "captures/generated-local/gen-ucp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "ucp"
+      ],
+      "frame": 4,
+      "packets": 4
+    },
+    {
+      "id": "gen-decnet",
+      "roadmap_name": "DECnet",
+      "display_filter": "dec_dna",
+      "file": "captures/generated-local/gen-decnet.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "dec_dna"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-sebek",
+      "roadmap_name": "SEBEK",
+      "display_filter": "sebek",
+      "file": "captures/generated-local/gen-sebek.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "sebek"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-xns",
+      "roadmap_name": "XNS",
+      "display_filter": "idp",
+      "file": "captures/generated-local/gen-xns.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "idp"
+      ],
+      "frame": 1,
+      "packets": 1
     }
   ],
   "failed": [
@@ -2611,21 +2973,6 @@
       "error": "filter 'q931' matched nothing (protos from frame: [])"
     },
     {
-      "id": "gen-linux-sll2",
-      "roadmap_name": "Linux SLL2",
-      "error": "lladdr"
-    },
-    {
-      "id": "gen-fibre-channel",
-      "roadmap_name": "Fibre Channel",
-      "error": "filter 'fc' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-mipv6",
-      "roadmap_name": "MIPv6",
-      "error": "tshark: \"mip6\" is neither a field nor a protocol name.\n    mip6 or ipv6.nxt == 135\n    ^~~~"
-    },
-    {
       "id": "gen-sstp",
       "roadmap_name": "SSTP",
       "error": "filter 'sstp' matched nothing (protos from frame: [])"
@@ -2634,11 +2981,6 @@
       "id": "gen-stt",
       "roadmap_name": "STT",
       "error": "filter 'stt' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-isis",
-      "roadmap_name": "IS-IS",
-      "error": "While building field 'sourceid': a bytes-like object is required, not 'str'"
     },
     {
       "id": "gen-carp",
@@ -2669,11 +3011,6 @@
       "id": "gen-lmtp",
       "roadmap_name": "LMTP",
       "error": "filter 'smtp' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-x11",
-      "roadmap_name": "X11",
-      "error": "filter 'x11' matched nothing (protos from frame: [])"
     },
     {
       "id": "gen-credssp",
@@ -2761,19 +3098,9 @@
       "error": "tshark: \"srtp\" is neither a field nor a protocol name.\n    srtp or rtp\n    ^~~~"
     },
     {
-      "id": "gen-ice-stun",
-      "roadmap_name": "ICE",
-      "error": "filter 'stun' matched nothing (protos from frame: [])"
-    },
-    {
       "id": "gen-turn-stun",
       "roadmap_name": "TURN",
       "error": "filter 'stun' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-diameter",
-      "roadmap_name": "Diameter Cx/Dx",
-      "error": "filter 'diameter' matched nothing (protos from frame: [])"
     },
     {
       "id": "gen-s1ap",
@@ -2811,19 +3138,9 @@
       "error": "filter 'fcp' matched nothing (protos from frame: [])"
     },
     {
-      "id": "gen-tipc",
-      "roadmap_name": "TIPC",
-      "error": "filter 'tipc' matched nothing (protos from frame: [])"
-    },
-    {
       "id": "gen-smux",
       "roadmap_name": "SMUX",
       "error": "non-distinctive hierarchy ['eth', 'ethertype', 'ip', 'tcp', 'data']"
-    },
-    {
-      "id": "gen-aarp",
-      "roadmap_name": "AARP",
-      "error": "filter 'aarp' matched nothing (protos from frame: [])"
     },
     {
       "id": "gen-xot",
@@ -2831,19 +3148,9 @@
       "error": "filter 'xot' matched nothing (protos from frame: [])"
     },
     {
-      "id": "gen-vines",
-      "roadmap_name": "VINES",
-      "error": "filter 'vines' matched nothing (protos from frame: [])"
-    },
-    {
       "id": "gen-spx",
       "roadmap_name": "SPX",
       "error": "filter 'spx' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-sna",
-      "roadmap_name": "SNA",
-      "error": "filter 'sna' matched nothing (protos from frame: [])"
     },
     {
       "id": "gen-zep",
@@ -2861,11 +3168,6 @@
       "error": "filter 'wtls' matched nothing (protos from frame: [])"
     },
     {
-      "id": "gen-alljoyn",
-      "roadmap_name": "AllJoyn",
-      "error": "filter 'aj' matched nothing (protos from frame: [])"
-    },
-    {
       "id": "gen-iso8583",
       "roadmap_name": "ISO 8583",
       "error": "filter 'iso8583' matched nothing (protos from frame: [])"
@@ -2874,11 +3176,6 @@
       "id": "gen-mqttsn-udp",
       "roadmap_name": "MQTT-SN",
       "error": "filter 'mqttsn' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-ntlm-v2",
-      "roadmap_name": "NTLM v1/v2",
-      "error": "filter 'ntlmssp' matched nothing (protos from frame: [])"
     },
     {
       "id": "gen-macsec2",

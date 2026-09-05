@@ -70,7 +70,7 @@
       "id": "generated-local",
       "origin": "generated",
       "repository": "local/generated",
-      "commit": "deb4a0e91e565c22e19b9951803d8c55dabb719c",
+      "commit": "2538016a79f60835f5ae75cfeee37258ca59faa6",
       "license": "CC0-1.0",
       "license_path": "tools/generate-local/NOTICE.txt",
       "homepage": "https://github.com/yaklang/yaklang",
@@ -3249,16 +3249,6 @@
       "notes": "batch3 Scapy/local; tshark eth:llc:ip:icmp"
     },
     {
-      "id": "gen-mstp",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-mstp.pcap",
-      "protocol": "MSTP",
-      "roadmap_name": "MSTP",
-      "display_filter": "mstp or stp",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:llc:stp"
-    },
-    {
       "id": "gen-cfm",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-cfm.pcap",
@@ -3349,26 +3339,6 @@
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:msdp"
     },
     {
-      "id": "gen-babel",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-babel.pcap",
-      "protocol": "Babel",
-      "roadmap_name": "Babel",
-      "display_filter": "babel",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ipv6:udp:data"
-    },
-    {
-      "id": "gen-wins",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-wins.pcap",
-      "protocol": "WINS",
-      "roadmap_name": "WINS",
-      "display_filter": "nbns",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:udp:nbns"
-    },
-    {
       "id": "gen-rsync",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-rsync.pcap",
@@ -3409,26 +3379,6 @@
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:gss-api"
     },
     {
-      "id": "gen-oauth",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-oauth.pcap",
-      "protocol": "OAuth/OIDC wire",
-      "roadmap_name": "OAuth/OIDC wire",
-      "display_filter": "http.request.uri contains \"token\" or http.request.uri contains \"oauth\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:urlencoded-form"
-    },
-    {
-      "id": "gen-saml",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-saml.pcap",
-      "protocol": "SAML",
-      "roadmap_name": "SAML",
-      "display_filter": "http.request.uri contains \"saml\" or xml",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:urlencoded-form"
-    },
-    {
       "id": "gen-rlogin",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-rlogin.pcap",
@@ -3447,36 +3397,6 @@
       "display_filter": "rmi",
       "evidence_kind": "generated-positive",
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:rmi"
-    },
-    {
-      "id": "gen-jmx",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-jmx.pcap",
-      "protocol": "JMX",
-      "roadmap_name": "JMX",
-      "display_filter": "rmi",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:rmi"
-    },
-    {
-      "id": "gen-docker-registry",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-docker-registry.pcap",
-      "protocol": "Docker Registry",
-      "roadmap_name": "Docker Registry",
-      "display_filter": "http.request.uri contains \"/v2/\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
-    },
-    {
-      "id": "gen-oci",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-oci.pcap",
-      "protocol": "OCI distribution",
-      "roadmap_name": "OCI distribution",
-      "display_filter": "http.request.uri contains \"/v2/\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
     },
     {
       "id": "gen-giop",
@@ -3499,36 +3419,6 @@
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:udp:rmcp:ipmi_session"
     },
     {
-      "id": "gen-wsman",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-wsman.pcap",
-      "protocol": "WS-Man",
-      "roadmap_name": "WS-Man",
-      "display_filter": "http.request.uri contains \"wsman\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:xml"
-    },
-    {
-      "id": "gen-restconf",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-restconf.pcap",
-      "protocol": "RESTCONF",
-      "roadmap_name": "RESTCONF",
-      "display_filter": "http.request.uri contains \"restconf\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
-    },
-    {
-      "id": "gen-cwmp",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-cwmp.pcap",
-      "protocol": "CWMP/TR-069",
-      "roadmap_name": "CWMP/TR-069",
-      "display_filter": "http.request.uri contains \"cwmp\" or xml",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:xml"
-    },
-    {
       "id": "gen-megaco",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-megaco.pcap",
@@ -3537,16 +3427,6 @@
       "display_filter": "megaco or h248",
       "evidence_kind": "generated-positive",
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:udp:megaco"
-    },
-    {
-      "id": "gen-hls",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-hls.pcap",
-      "protocol": "HLS",
-      "roadmap_name": "HLS",
-      "display_filter": "http.request.uri contains \".m3u8\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
     },
     {
       "id": "gen-cmpp",
@@ -3589,16 +3469,6 @@
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:iscsi"
     },
     {
-      "id": "gen-nfs4",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-nfs4.pcap",
-      "protocol": "NFS4.1/4.2",
-      "roadmap_name": "NFS4.1/4.2",
-      "display_filter": "nfs",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:udp:rpc"
-    },
-    {
       "id": "gen-appletalk",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-appletalk.pcap",
@@ -3619,26 +3489,6 @@
       "notes": "batch3 Scapy/local; tshark eth:ethertype:lat"
     },
     {
-      "id": "gen-onvif",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-onvif.pcap",
-      "protocol": "ONVIF",
-      "roadmap_name": "ONVIF",
-      "display_filter": "http.request.uri contains \"onvif\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:xml"
-    },
-    {
-      "id": "gen-nbt-ns-resp",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-nbt-ns-resp.pcap",
-      "protocol": "NBT-NS response",
-      "roadmap_name": "NBT-NS response",
-      "display_filter": "nbns",
-      "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:udp:nbns"
-    },
-    {
       "id": "gen-netntlmv2",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-netntlmv2.pcap",
@@ -3649,94 +3499,254 @@
       "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http:ntlmssp"
     },
     {
-      "id": "gen-modbus-rtu-udp",
+      "id": "gen-x11",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-modbus-rtu-udp.pcap",
-      "protocol": "Modbus RTU/ASCII",
-      "roadmap_name": "Modbus RTU/ASCII",
-      "display_filter": "mbrtu or modbus",
+      "upstream_path": "captures/generated-local/gen-x11.pcap",
+      "protocol": "X11",
+      "roadmap_name": "X11",
+      "display_filter": "x11",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:udp:mbudp:modbus"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:tcp:x11"
     },
     {
-      "id": "gen-elasticsearch",
+      "id": "gen-alljoyn",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-elasticsearch.pcap",
-      "protocol": "Elasticsearch transport",
-      "roadmap_name": "Elasticsearch transport",
-      "display_filter": "elasticsearch or http.request.uri contains \"_cluster\"",
+      "upstream_path": "captures/generated-local/gen-alljoyn.pcap",
+      "protocol": "AllJoyn",
+      "roadmap_name": "AllJoyn",
+      "display_filter": "ajns",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:udp:ajns"
     },
     {
-      "id": "gen-consul",
+      "id": "gen-aarp",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-consul.pcap",
-      "protocol": "Consul",
-      "roadmap_name": "Consul",
-      "display_filter": "http.request.uri contains \"/v1/agent\"",
+      "upstream_path": "captures/generated-local/gen-aarp.pcap",
+      "protocol": "AARP",
+      "roadmap_name": "AARP",
+      "display_filter": "frame.protocols contains \"aarp\"",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:aarp"
     },
     {
-      "id": "gen-vault",
+      "id": "gen-fibre-channel",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-vault.pcap",
-      "protocol": "Vault",
-      "roadmap_name": "Vault",
-      "display_filter": "http.request.uri contains \"/v1/sys\"",
+      "upstream_path": "captures/generated-local/gen-fibre-channel.pcap",
+      "protocol": "Fibre Channel",
+      "roadmap_name": "Fibre Channel",
+      "display_filter": "frame.protocols contains \"fcoe:fc\"",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:fcoe:fc"
     },
     {
-      "id": "gen-jenkins",
+      "id": "gen-mipv6",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-jenkins.pcap",
-      "protocol": "Jenkins remoting",
-      "roadmap_name": "Jenkins remoting",
-      "display_filter": "http.request.uri contains \"jenkins\"",
+      "upstream_path": "captures/generated-local/gen-mipv6.pcap",
+      "protocol": "MIPv6",
+      "roadmap_name": "MIPv6",
+      "display_filter": "mipv6",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ipv6:mipv6"
     },
     {
-      "id": "gen-puppet",
+      "id": "gen-vines",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-puppet.pcap",
-      "protocol": "Puppet",
-      "roadmap_name": "Puppet",
-      "display_filter": "http.request.uri contains \"puppet\"",
+      "upstream_path": "captures/generated-local/gen-vines.pcap",
+      "protocol": "VINES",
+      "roadmap_name": "VINES",
+      "display_filter": "frame.protocols contains \"vines_ip\"",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:vines_ip"
     },
     {
-      "id": "gen-chef",
+      "id": "gen-sna",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-chef.pcap",
-      "protocol": "Chef",
-      "roadmap_name": "Chef",
-      "display_filter": "http.request.uri contains \"/organizations\"",
+      "upstream_path": "captures/generated-local/gen-sna.pcap",
+      "protocol": "SNA",
+      "roadmap_name": "SNA",
+      "display_filter": "snaeth",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:snaeth:llc:data"
     },
     {
-      "id": "gen-solr",
+      "id": "gen-slimp3",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-solr.pcap",
-      "protocol": "Solr",
-      "roadmap_name": "Solr",
-      "display_filter": "http.request.uri contains \"solr\"",
+      "upstream_path": "captures/generated-local/gen-slimp3.pcap",
+      "protocol": "SliMP3",
+      "roadmap_name": "SliMP3",
+      "display_filter": "slimp3",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:udp:slimp3"
     },
     {
-      "id": "gen-etcd-raft",
+      "id": "gen-sigcomp",
       "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-etcd-raft.pcap",
-      "protocol": "etcd raft",
-      "roadmap_name": "etcd raft",
-      "display_filter": "http.request.uri contains \"raft\"",
+      "upstream_path": "captures/generated-local/gen-sigcomp.pcap",
+      "protocol": "SIGCOMP",
+      "roadmap_name": "SIGCOMP",
+      "display_filter": "sigcomp",
       "evidence_kind": "generated-positive",
-      "notes": "batch3 Scapy/local; tshark eth:ethertype:ip:tcp:http"
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:udp:sip:sigcomp"
+    },
+    {
+      "id": "gen-swipe",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-swipe.pcap",
+      "protocol": "swIPe",
+      "roadmap_name": "swIPe",
+      "display_filter": "swipe",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:swipe:data"
+    },
+    {
+      "id": "gen-wsmp",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-wsmp.pcap",
+      "protocol": "WSMP",
+      "roadmap_name": "WSMP",
+      "display_filter": "wsmp",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:wsmp"
+    },
+    {
+      "id": "gen-vntag",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-vntag.pcap",
+      "protocol": "VNTAG",
+      "roadmap_name": "VNTAG",
+      "display_filter": "vntag",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:vntag:ethertype:data"
+    },
+    {
+      "id": "gen-pbb",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-pbb.pcap",
+      "protocol": "IEEE 802.1ah PBB",
+      "roadmap_name": "IEEE 802.1ah PBB",
+      "display_filter": "ieee8021ah",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ieee8021ah:ethertype:ip:icmp"
+    },
+    {
+      "id": "gen-eoam",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-eoam.pcap",
+      "protocol": "EOAM",
+      "roadmap_name": "EOAM",
+      "display_filter": "oampdu",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:slow:oampdu"
+    },
+    {
+      "id": "gen-lacp-marker",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-lacp-marker.pcap",
+      "protocol": "LACP-marker",
+      "roadmap_name": "LACP-marker",
+      "display_filter": "marker",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:slow:marker"
+    },
+    {
+      "id": "gen-diameter",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-diameter.pcap",
+      "protocol": "Diameter Cx/Dx",
+      "roadmap_name": "Diameter Cx/Dx",
+      "display_filter": "frame.protocols contains \"diameter\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:tcp:diameter:data"
+    },
+    {
+      "id": "gen-ucp",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-ucp.pcap",
+      "protocol": "UCP/EMI",
+      "roadmap_name": "UCP/EMI",
+      "display_filter": "frame.protocols contains \"ucp\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:tcp:ucp"
+    },
+    {
+      "id": "gen-decnet",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-decnet.pcap",
+      "protocol": "DECnet",
+      "roadmap_name": "DECnet",
+      "display_filter": "dec_dna",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:dec_dna"
+    },
+    {
+      "id": "gen-sebek",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-sebek.pcap",
+      "protocol": "SEBEK",
+      "roadmap_name": "SEBEK",
+      "display_filter": "sebek",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:udp:sebek"
+    },
+    {
+      "id": "gen-ntlm-v2",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-ntlm-v2.pcap",
+      "protocol": "NTLM v1/v2",
+      "roadmap_name": "NTLM v1/v2",
+      "display_filter": "ntlmssp",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:tcp:http:ntlmssp"
+    },
+    {
+      "id": "gen-xns",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-xns.pcap",
+      "protocol": "XNS",
+      "roadmap_name": "XNS",
+      "display_filter": "idp",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:idp"
+    },
+    {
+      "id": "gen-ice-stun",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-ice-stun.pcap",
+      "protocol": "ICE",
+      "roadmap_name": "ICE",
+      "display_filter": "stun",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:udp:stun"
+    },
+    {
+      "id": "gen-tipc",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-tipc.pcap",
+      "protocol": "TIPC",
+      "roadmap_name": "TIPC",
+      "display_filter": "tipc",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:ethertype:tipc"
+    },
+    {
+      "id": "gen-isis",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-isis.pcap",
+      "protocol": "IS-IS",
+      "roadmap_name": "IS-IS",
+      "display_filter": "isis",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark eth:llc:osi:isis:isis.hello"
+    },
+    {
+      "id": "gen-linux-sll2",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-linux-sll2.pcap",
+      "protocol": "Linux SLL2",
+      "roadmap_name": "Linux SLL2",
+      "display_filter": "sll",
+      "evidence_kind": "generated-positive",
+      "notes": "batch4 Scapy/local; tshark sll:ethertype:ip:icmp"
     }
   ]
 }
