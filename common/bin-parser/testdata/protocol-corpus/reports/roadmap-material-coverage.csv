@@ -303,7 +303,7 @@ Q.931,voip,P2,todo,0,missing
 MGCP,voip,P2,todo,1,collected
 Megaco/H.248,voip,P4,todo,0,missing
 SCCP/Skinny,voip,P2,todo,1,collected
-IAX2,voip,P4,todo,0,missing
+IAX2,voip,P4,todo,1,collected
 T.38,voip,P4,todo,1,collected
 WebRTC,voip,P1,done,0,missing
 STUN,voip,P1,done,1,collected
@@ -341,22 +341,22 @@ Modbus TCP,ics,P2,todo,1,collected
 Modbus RTU/ASCII,ics,P2,todo,0,missing
 S7comm,ics,P2,todo,1,collected
 S7comm-plus,ics,P2,todo,1,collected
-COTP,ics,P2,todo,0,missing
-TPKT,ics,P1,done,0,missing
+COTP,ics,P2,todo,1,collected
+TPKT,ics,P1,done,1,collected
 DNP3,ics,P2,todo,1,collected
 IEC 60870-5-104,ics,P2,todo,1,collected
 IEC 60870-5-101,ics,P2,todo,0,missing
 IEC 61850 MMS,ics,P2,todo,1,collected
-IEC 61850 GOOSE,ics,P2,todo,0,missing
-IEC 61850 SV,ics,P2,todo,0,missing
+IEC 61850 GOOSE,ics,P2,todo,1,collected
+IEC 61850 SV,ics,P2,todo,1,collected
 OPC UA,ics,P2,todo,2,collected
 OPC DA,ics,P2,todo,0,missing
 BACnet,ics,P2,todo,1,collected
 EtherNet/IP CIP,ics,P2,todo,2,collected
 Profinet IO,ics,P2,todo,1,collected
-Profinet DCP,ics,P2,todo,0,missing
+Profinet DCP,ics,P2,todo,1,collected
 PROFIBUS,ics,P2,todo,0,missing
-EtherCAT,ics,P2,todo,0,missing
+EtherCAT,ics,P2,todo,1,collected
 Powerlink,ics,P4,todo,0,missing
 SERCOS III,ics,P4,todo,0,missing
 CC-Link IE,ics,P3,todo,0,missing
@@ -487,12 +487,12 @@ WoW,game,P4,todo,0,missing
 Quake,game,P4,todo,0,missing
 Quake2,game,P4,todo,0,missing
 Quake3,game,P4,todo,0,missing
-Steam,game,P4,todo,0,missing
+Steam,game,P4,todo,1,collected
 Xbox Live,game,P4,todo,0,missing
 PlayStation,game,P4,todo,0,missing
 Tencent Games,game,P3,todo,1,collected
 NetEase Games,game,P3,todo,1,collected
-miHoYo/HoYoverse,game,P3,todo,0,missing
+miHoYo/HoYoverse,game,P3,todo,1,collected
 iSCSI,storage,P2,todo,0,missing
 NBD,storage,P4,todo,0,missing
 AoE,storage,P4,todo,0,missing
@@ -521,7 +521,7 @@ Jenkins remoting,service-tools,P1,done,0,missing
 Redis Sentinel/Cluster,service-tools,P1,done,0,missing
 Zabbix agent,service-tools,P1,done,1,collected
 Nagios NRPE,service-tools,P2,todo,0,missing
-Checkmk,service-tools,P4,todo,0,missing
+Checkmk,service-tools,P4,todo,1,collected
 VMware SOAP,service-tools,P1,done,0,missing
 VMware AFD,service-tools,P2,todo,0,missing
 ESXi hostd,service-tools,P2,todo,0,missing
@@ -609,7 +609,7 @@ AppleTalk,longtail,P4,todo,0,missing
 AARP,longtail,P4,todo,0,missing
 DECnet,longtail,P4,todo,0,missing
 SNA,longtail,P4,todo,0,missing
-NetBEUI,longtail,P4,todo,0,missing
+NetBEUI,longtail,P4,todo,1,collected
 LAT,longtail,P4,todo,0,missing
 MOP,longtail,P4,todo,0,missing
 PUP,longtail,P4,todo,0,missing
