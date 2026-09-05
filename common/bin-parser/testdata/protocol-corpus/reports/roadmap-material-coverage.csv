@@ -275,8 +275,8 @@ SNMP,mgmt,P0,done,2,collected
 SNMPv3,mgmt,P1,done,0,missing
 Syslog,mgmt,P1,done,1,collected
 NetFlow v5,mgmt,P2,todo,0,missing
-NetFlow v9,mgmt,P2,todo,1,collected
-IPFIX,mgmt,P2,todo,0,missing
+NetFlow v9,mgmt,P2,todo,2,collected
+IPFIX,mgmt,P2,todo,1,collected
 sFlow,mgmt,P2,todo,1,collected
 ICMP Timestamp,mgmt,P2,todo,0,missing
 CWMP/TR-069,mgmt,P2,todo,0,missing
@@ -368,15 +368,15 @@ CODESYS,ics,P2,todo,0,missing
 Hart-IP,ics,P2,todo,1,collected
 FF HSE,ics,P4,todo,0,missing
 LonTalk,ics,P4,todo,0,missing
-KNX/IP,ics,P2,todo,2,collected
+KNX/IP,ics,P2,todo,4,collected
 DALI,ics,P4,todo,0,missing
 CAN/ISO-TP,ics,P2,todo,1,collected
 J1939,ics,P2,todo,0,missing
 UDS,ics,P2,todo,0,missing
-DoIP,ics,P2,todo,0,missing
+DoIP,ics,P2,todo,1,collected
 VARAN,ics,P4,todo,0,missing
 AES50,ics,P4,todo,0,missing
-Zigbee,ics,P2,todo,0,missing
+Zigbee,ics,P2,todo,2,collected
 Z-Wave,ics,P2,todo,0,missing
 LoRaWAN,ics,P2,todo,1,collected
 DLMS/COSEM,ics,P2,todo,1,collected
@@ -481,7 +481,7 @@ PacketCable,carrier,P4,todo,0,missing
 3GPP NAS,carrier,P2,todo,0,missing
 3GPP M2AP,carrier,P4,todo,0,missing
 3GPP M3AP,carrier,P4,todo,0,missing
-PFCP,carrier,P2,todo,1,collected
+PFCP,carrier,P2,todo,2,collected
 GTP Prime,carrier,P4,todo,1,collected
 WoW,game,P4,todo,0,missing
 Quake,game,P4,todo,0,missing

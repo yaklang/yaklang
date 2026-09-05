@@ -2,7 +2,7 @@ family,roadmap_protocols,protocols_with_collected_capture,capture_files
 service-tools,66,5,6
 link,49,5,5
 cn-app,48,9,9
-ics,46,19,22
+ics,46,21,27
 internet,40,16,17
 longtail,40,3,4
 cn-vendor,33,0,0
@@ -12,8 +12,8 @@ microsoft,23,0,0
 voip,23,11,12
 file,21,7,10
 database,20,9,9
-mgmt,20,6,7
-carrier,19,3,3
+mgmt,20,7,9
+carrier,19,3,4
 name-config,19,11,15
 remote,17,8,8
 auth,16,5,6

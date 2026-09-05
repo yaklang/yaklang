@@ -6,15 +6,15 @@ Generated against `ProtocolRoadmap` (616 names) and the vendored corpus in this 
 
 ## Snapshot
 
-| Metric | Before this batch | After this batch |
+| Metric | Before this branch | After this branch |
 | --- | ---: | ---: |
-| Capture files | 174 | 202 |
-| Packets | 41828 | 45705 |
-| Unique roadmap protocols with a capture | 156 | 162 |
-| Outside-roadmap candidate captures | 10 | 22 |
+| Capture files | 174 | 212 |
+| Packets | 41828 | 46024 |
+| Unique roadmap protocols with a capture | 156 | 165 |
+| Outside-roadmap candidate captures | 10 | 24 |
 | Roadmap `done` / `todo` | 211 / 405 | 211 / 405 (unchanged) |
 
-Sources remain the four licensed GitHub trees already pinned: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF. Wiki SampleCaptures and ICS-pcap LFS dumps were **indexed, not vendored** (no uniform attachment license).
+Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, **Scapy** (GPL-2.0). Wiki SampleCaptures and ICS-pcap LFS dumps were **indexed, not vendored** (no uniform attachment license).
 
 ## Family coverage (after)
 
@@ -26,13 +26,13 @@ Worst licensed-sample deserts:
 | `microsoft` | 23 | **0** | MSRPC subsets exist under `mq-rpc`/`auth`; named Microsoft product protocols still empty |
 | `service-tools` | 66 | 5 | Jenkins/Zabbix/… mostly still missing |
 | `longtail` | 40 | 3 | IPX now has a second capture |
-| `ics` | 46 | **19** | was 17; GE SRTP (via GE EGD) and LoRa-family (Meshtastic) added |
+| `ics` | 46 | **21** | was 17; added GE EGD, LoRa/Meshtastic, **DoIP**, **Zigbee** (Scapy) |
 
 ## ICS remaining without a licensed capture
 
-These are still `missing` in `roadmap-material-coverage.csv` after scanning nDPI 629 default pcaps and Wireshark 136 test captures:
+Still `missing` after nDPI 629 default pcaps, Wireshark 136 test captures, and Scapy 17 test pcaps:
 
-Modbus RTU/ASCII, COTP, TPKT, IEC 60870-5-101, IEC 61850 GOOSE, IEC 61850 SV, OPC DA, Profinet DCP, PROFIBUS, EtherCAT, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, J1939, UDS, DoIP, VARAN, AES50, Zigbee, Z-Wave, IEC 62056, M-Bus, DALI-2.
+Modbus RTU/ASCII, COTP, TPKT, IEC 60870-5-101, IEC 61850 GOOSE, IEC 61850 SV, OPC DA, Profinet DCP, PROFIBUS, EtherCAT, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, J1939, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
 
 They do not appear as named files in the two licensed trees. Do not invent hex or pull unlicensed wiki attachments.
 
@@ -47,7 +47,11 @@ From nDPI (LGPL-3.0, commit `4cae778e`):
 
 From Wireshark tests (GPL-2.0-or-later):
 
-- KNX/IP DataSec, OPC UA signed, NFS, Git daemon, SIP, TFTP, NVMe-oF discovery, IPX RIP, DHCP, NTP
+- KNX/IP DataSec / SecureWrapper / TimerNotify, OPC UA signed, NFS, Git daemon, SIP, TFTP, NVMe-oF discovery, IPX RIP, DHCP, NTP
+
+From Scapy (GPL-2.0, commit `6f158c0c`):
+
+- **DoIP** ACK, **Zigbee** join + SKKE, IPFIX, NetFlow v9, PFCP
 
 ## Chinese-app / vendor
 
