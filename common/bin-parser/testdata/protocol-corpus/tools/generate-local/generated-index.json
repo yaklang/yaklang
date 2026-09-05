@@ -2874,6 +2874,121 @@
       ],
       "frame": 1,
       "packets": 1
+    },
+    {
+      "id": "gen-mmrp",
+      "roadmap_name": "MRP-MMRP",
+      "display_filter": "frame.protocols contains \"mrp-mmrp\"",
+      "file": "captures/generated-local/gen-mmrp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "mrp-mmrp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-mvrp",
+      "roadmap_name": "MRP-MVRP",
+      "display_filter": "frame.protocols contains \"mrp-mvrp\"",
+      "file": "captures/generated-local/gen-mvrp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "mrp-mvrp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-msrp",
+      "roadmap_name": "MRP-MSRP",
+      "display_filter": "frame.protocols contains \"mrp-msrp\"",
+      "file": "captures/generated-local/gen-msrp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "mrp-msrp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-tdmoe",
+      "roadmap_name": "TDMoE",
+      "display_filter": "frame.protocols contains \"tdmoe\"",
+      "file": "captures/generated-local/gen-tdmoe.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "tdmoe"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-xtp",
+      "roadmap_name": "XTP",
+      "display_filter": "frame.protocols contains \"xtp\"",
+      "file": "captures/generated-local/gen-xtp.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "xtp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-xyplex",
+      "roadmap_name": "XYPLEX",
+      "display_filter": "frame.protocols contains \"xyplex\"",
+      "file": "captures/generated-local/gen-xyplex.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "xyplex"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-mpls-pw",
+      "roadmap_name": "MPLS PW",
+      "display_filter": "frame.protocols contains \"pwethcw\"",
+      "file": "captures/generated-local/gen-mpls-pw.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "mpls",
+        "pwethheuristic",
+        "pwethcw",
+        "eth",
+        "ethertype",
+        "ip",
+        "icmp"
+      ],
+      "frame": 1,
+      "packets": 1
+    },
+    {
+      "id": "gen-macsec",
+      "roadmap_name": "MACSec",
+      "display_filter": "frame.protocols contains \"macsec\"",
+      "file": "captures/generated-local/gen-macsec.pcap",
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "macsec",
+        "ethertype",
+        "data"
+      ],
+      "frame": 1,
+      "packets": 1
     }
   ],
   "failed": [
@@ -2901,11 +3016,6 @@
       "id": "gen-srvsvc",
       "roadmap_name": "SRVSVC",
       "error": "filter 'srvsvc or dcerpc' matched nothing (protos from frame: [])"
-    },
-    {
-      "id": "gen-macsec",
-      "roadmap_name": "MACSec",
-      "error": "filter 'macsec' matched nothing (protos from frame: [])"
     },
     {
       "id": "gen-turn",
