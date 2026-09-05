@@ -3,15 +3,15 @@
 This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.
 
 - Roadmap: **616** protocols; 211 `done`, 0 `partial`, 405 `todo`.
-- Corpus: **385 capture files**, **58003 packets**, **10446322 bytes**.
-- Direct roadmap material: **338 unique protocols**; outside-roadmap candidates: **24 captures**.
-- Evidence classes: 204 positive upstream, 16 negative/boundary upstream, 3 official educational challenge, 162 locally generated.
+- Corpus: **391 capture files**, **58006 packets**, **10446612 bytes**.
+- Direct roadmap material: **344 unique protocols**; outside-roadmap candidates: **24 captures**.
+- Evidence classes: 204 positive upstream, 16 negative/boundary upstream, 3 official educational challenge, 168 locally generated.
 
 ## Source distribution
 
 | Source | Captures | Packets |
 | --- | ---: | ---: |
-| `generated-local` | 162 | 308 |
+| `generated-local` | 168 | 311 |
 | `google-challenges` | 3 | 17747 |
 | `iti-ics` | 4 | 18 |
 | `mgadelha-sv` | 1 | 10161 |
@@ -26,20 +26,20 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 | Family | Roadmap protocols | With collected capture | Capture files |
 | --- | ---: | ---: | ---: |
 | `service-tools` | 66 | 23 | 24 |
-| `link` | 49 | 40 | 40 |
+| `link` | 49 | 44 | 44 |
 | `cn-app` | 48 | 9 | 9 |
 | `ics` | 46 | 29 | 35 |
-| `internet` | 40 | 35 | 36 |
-| `longtail` | 40 | 19 | 20 |
+| `internet` | 40 | 36 | 37 |
+| `longtail` | 40 | 22 | 23 |
 | `cn-vendor` | 33 | 0 | 0 |
 | `mq-rpc` | 31 | 14 | 14 |
 | `routing` | 24 | 20 | 21 |
 | `microsoft` | 23 | 2 | 2 |
-| `voip` | 23 | 16 | 17 |
+| `voip` | 23 | 15 | 16 |
 | `file` | 21 | 18 | 21 |
 | `database` | 20 | 12 | 12 |
 | `mgmt` | 20 | 13 | 15 |
-| `carrier` | 19 | 6 | 7 |
+| `carrier` | 19 | 5 | 6 |
 | `name-config` | 19 | 16 | 20 |
 | `remote` | 17 | 10 | 10 |
 | `auth` | 16 | 13 | 14 |

@@ -70,7 +70,7 @@
       "id": "generated-local",
       "origin": "generated",
       "repository": "local/generated",
-      "commit": "2538016a79f60835f5ae75cfeee37258ca59faa6",
+      "commit": "eba6701547c2059f7bfe4b060dcf8ae4be83aa1e",
       "license": "CC0-1.0",
       "license_path": "tools/generate-local/NOTICE.txt",
       "homepage": "https://github.com/yaklang/yaklang",
@@ -3649,16 +3649,6 @@
       "notes": "batch4 Scapy/local; tshark eth:ethertype:slow:marker"
     },
     {
-      "id": "gen-diameter",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-diameter.pcap",
-      "protocol": "Diameter Cx/Dx",
-      "roadmap_name": "Diameter Cx/Dx",
-      "display_filter": "frame.protocols contains \"diameter\"",
-      "evidence_kind": "generated-positive",
-      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:tcp:diameter:data"
-    },
-    {
       "id": "gen-ucp",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-ucp.pcap",
@@ -3709,16 +3699,6 @@
       "notes": "batch4 Scapy/local; tshark eth:ethertype:idp"
     },
     {
-      "id": "gen-ice-stun",
-      "repository_id": "generated-local",
-      "upstream_path": "captures/generated-local/gen-ice-stun.pcap",
-      "protocol": "ICE",
-      "roadmap_name": "ICE",
-      "display_filter": "stun",
-      "evidence_kind": "generated-positive",
-      "notes": "batch4 Scapy/local; tshark eth:ethertype:ip:udp:stun"
-    },
-    {
       "id": "gen-tipc",
       "repository_id": "generated-local",
       "upstream_path": "captures/generated-local/gen-tipc.pcap",
@@ -3747,6 +3727,86 @@
       "display_filter": "sll",
       "evidence_kind": "generated-positive",
       "notes": "batch4 Scapy/local; tshark sll:ethertype:ip:icmp"
+    },
+    {
+      "id": "gen-mmrp",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-mmrp.pcap",
+      "protocol": "MRP-MMRP",
+      "roadmap_name": "MRP-MMRP",
+      "display_filter": "frame.protocols contains \"mrp-mmrp\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,mrp-mmrp"
+    },
+    {
+      "id": "gen-mvrp",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-mvrp.pcap",
+      "protocol": "MRP-MVRP",
+      "roadmap_name": "MRP-MVRP",
+      "display_filter": "frame.protocols contains \"mrp-mvrp\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,mrp-mvrp"
+    },
+    {
+      "id": "gen-msrp",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-msrp.pcap",
+      "protocol": "MRP-MSRP",
+      "roadmap_name": "MRP-MSRP",
+      "display_filter": "frame.protocols contains \"mrp-msrp\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,mrp-msrp"
+    },
+    {
+      "id": "gen-tdmoe",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-tdmoe.pcap",
+      "protocol": "TDMoE",
+      "roadmap_name": "TDMoE",
+      "display_filter": "frame.protocols contains \"tdmoe\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,tdmoe"
+    },
+    {
+      "id": "gen-xtp",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-xtp.pcap",
+      "protocol": "XTP",
+      "roadmap_name": "XTP",
+      "display_filter": "frame.protocols contains \"xtp\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,ip,xtp"
+    },
+    {
+      "id": "gen-xyplex",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-xyplex.pcap",
+      "protocol": "XYPLEX",
+      "roadmap_name": "XYPLEX",
+      "display_filter": "frame.protocols contains \"xyplex\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,ip,udp,xyplex"
+    },
+    {
+      "id": "gen-mpls-pw",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-mpls-pw.pcap",
+      "protocol": "MPLS PW",
+      "roadmap_name": "MPLS PW",
+      "display_filter": "frame.protocols contains \"pwethcw\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,mpls,pwethheuristic,pwethcw,eth,ethertype,ip,icmp"
+    },
+    {
+      "id": "gen-macsec",
+      "repository_id": "generated-local",
+      "upstream_path": "captures/generated-local/gen-macsec.pcap",
+      "protocol": "MACSec",
+      "roadmap_name": "MACSec",
+      "display_filter": "frame.protocols contains \"macsec\"",
+      "evidence_kind": "generated-positive",
+      "notes": "batch5 Scapy/local; tshark eth,ethertype,macsec,ethertype,data"
     }
   ]
 }
