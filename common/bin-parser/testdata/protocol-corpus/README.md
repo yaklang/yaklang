@@ -4,8 +4,8 @@ This directory is test and experiment material for the 616-item
 `ProtocolRoadmap`. It deliberately keeps evidence collection separate from
 claims that a Yaklang dissector is complete.
 
-The current snapshot contains 212 capture files, 46,024 packets and direct
-material for 165 unique roadmap protocols. The source and family breakdown is
+The current snapshot contains 223 capture files, 57,695 packets and direct
+material for 176 unique roadmap protocols. The source and family breakdown is
 generated in `reports/REPORT.md`; `reports/HEALTHCHECK.md` is the coverage
 gap survey; `reports/UPSTREAM_INDEX.md` records the wider authoritative
 collections and selection policy.
@@ -57,10 +57,8 @@ The committed corpus is passive data consumed by local parser tests. Reading a
 capture does not contact any service. Educational captures may contain exercise
 solutions by design.
 
-Upstream license texts are stored under `licenses/`. Captures from Wireshark's
-official repository are pinned and vendored under its project license.
-Wireshark SampleCaptures is retained separately as a research index in
-`reports/UPSTREAM_INDEX.md`; historical wiki attachments are not vendored
-because attachment-level redistribution terms are not uniform. This corpus
-vendors only captures from repositories with an explicit project license at
-the pinned commit.
+Upstream license texts (or README when a repo has no LICENSE file) are stored
+under `licenses/`. Captures are pinned to an upstream commit and selected for
+protocol identification, with large dumps filtered out. Wireshark SampleCaptures
+and automayt/ICS-pcap LFS pointer files remain indexed in
+`reports/UPSTREAM_INDEX.md` rather than vendored.
