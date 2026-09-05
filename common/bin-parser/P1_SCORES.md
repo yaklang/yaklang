@@ -154,5 +154,5 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | gRPC reflection | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | alias of HTTP/2 |
 | SaltStack | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `salt.yaml` |
 | LDAP paged/SASL | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ldap.yaml` |
-| DHCPv6 spoof | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of DHCPv6 |
+| DHCPv6 server exchange | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of DHCPv6 |
 | IPv6 RA | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | alias of ICMPv6 NDP |

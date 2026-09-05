@@ -10,20 +10,20 @@ recorded commits, not estimates of distinct protocols.
 | --- | --- | ---: | ---: | --- |
 | [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 114 | Positive classifications, version variants, false-positive cases and malformed inputs used by a maintained traffic classifier. |
 | [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 14 | Small parser boundaries: truncation, invalid lengths, unsupported link types and historical memory-safety regressions. |
-| [Google CTF](https://github.com/google/google-ctf/tree/067421eb7e918c29e39f187fac5a0f0d72a6ab83) | `067421eb7e918c29e39f187fac5a0f0d72a6ab83` | 3 | 3 | Official challenge traffic with a real reverse-engineering objective rather than a synthetic one-packet fixture. |
+| [Google educational challenge archive](https://github.com/google/google-ctf/tree/067421eb7e918c29e39f187fac5a0f0d72a6ab83) | `067421eb7e918c29e39f187fac5a0f0d72a6ab83` | 3 | 3 | Official exercise traffic with a real reverse-engineering objective rather than a synthetic one-packet fixture. |
 
 The selected set is deliberately smaller than the upstream inventory. Duplicate
 application-classification captures, captures that require secrets to decrypt,
 and large files that do not add a new roadmap protocol or boundary were left in
 the upstream index. `sources.json` is the reviewable allow-list.
 
-## Official CTF exercises
+## Official educational exercises
 
 | Capture | Challenge context | Packets | Useful exercise |
 | --- | --- | ---: | --- |
-| `google-ctf-ascii-art` | 2017 qualification reverse-engineering challenge | 60 | Recover an application exchange carried by HTTP form traffic and distinguish transport parsing from application semantics. |
-| `google-ctf-engraver` | 2022 qualification hardware challenge | 860 | Decode USB HID reports and reconstruct device actions from a capture with a non-Ethernet link type. |
-| `google-ctf-sc` | 2019 finals miscellaneous challenge | 16827 | Handle LLC/IPX traffic and recover state from a long bidirectional game trace. |
+| `google-challenge-ascii-art` | 2017 qualification reverse-engineering exercise | 60 | Recover an application exchange carried by HTTP form traffic and distinguish transport parsing from application semantics. |
+| `google-challenge-engraver` | 2022 qualification hardware exercise | 860 | Decode USB HID reports and reconstruct device actions from a capture with a non-Ethernet link type. |
+| `google-challenge-sc` | 2019 game-traffic exercise | 16827 | Handle LLC/IPX traffic and recover state from a long bidirectional game trace. |
 
 These are passive challenge artifacts. Solving them is intentionally out of
 scope for the corpus verifier; the verifier checks provenance and bytes, not a

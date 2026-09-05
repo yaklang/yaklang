@@ -139,7 +139,7 @@ var P1Scorecards = []ProtocolScorecard{
 		"telnet/do-echo IAC DO ECHO; telnet/ttype RFC 1091 xterm; telnet/naws RFC 1073 80x24 TCP/23; TestP1FailPaths telnet", ""),
 	alias("CREDSSP", "TLS"),
 	p1card("VNC/RFB", "vnc.yaml", 20, 25, 20, 20, 10, "L2",
-		"vnc/version RFB 003.008; vnc/security None+VNC Auth; vnc/server-init 800x600 x11 TCP/5900; TestP1FailPaths vnc", ""),
+		"vnc/version RFB 003.008; vnc/negotiation None+VNC Auth; vnc/server-init 800x600 x11 TCP/5900; TestP1FailPaths vnc", ""),
 	alias("WinRM", "HTTP"),
 	p1card("MariaDB", "application-layer/mysql.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples MySQL COM_QUERY SELECT 1 + ERR 1045 Access denied SQL State 28000 Ethernet+TCP/3306; TestMySQLHandshakeV10 5.7.29; TestMySQLFailPaths", ""),
@@ -245,7 +245,7 @@ var P1Scorecards = []ProtocolScorecard{
 		"TestP1WiresharkAndRFCSamples ZeroMQ RFC 23 ZMTP greeting NULL + length-prefixed ping Ethernet+TCP/4505; TestP1FailPaths salt", ""),
 	p1card("LDAP paged/SASL", "application-layer/ldap.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 4511 BindRequest uid=akarasulu,dc=example,dc=com simple password Ethernet+TCP/389 + Unbind APPLICATION 2; TestLDAPAnonymousBindSample", ""),
-	alias("DHCPv6 spoof", "DHCPv6"),
+	alias("DHCPv6 server exchange", "DHCPv6"),
 	alias("IPv6 RA", "ICMPv6 NDP"),
 }
 
