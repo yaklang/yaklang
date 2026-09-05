@@ -3,16 +3,19 @@
 This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.
 
 - Roadmap: **616** protocols; 211 `done`, 0 `partial`, 405 `todo`.
-- Corpus: **212 capture files**, **46024 packets**, **8782586 bytes**.
-- Direct roadmap material: **165 unique protocols**; outside-roadmap candidates: **24 captures**.
-- Evidence classes: 193 positive upstream, 16 negative/boundary upstream, 3 official educational challenge.
+- Corpus: **223 capture files**, **57695 packets**, **10417051 bytes**.
+- Direct roadmap material: **176 unique protocols**; outside-roadmap candidates: **24 captures**.
+- Evidence classes: 204 positive upstream, 16 negative/boundary upstream, 3 official educational challenge.
 
 ## Source distribution
 
 | Source | Captures | Packets |
 | --- | ---: | ---: |
 | `google-challenges` | 3 | 17747 |
-| `ndpi` | 171 | 27255 |
+| `iti-ics` | 4 | 18 |
+| `mgadelha-sv` | 1 | 10161 |
+| `mrhenrike-pcap` | 1 | 986 |
+| `ndpi` | 176 | 27761 |
 | `scapy` | 6 | 264 |
 | `tcpdump` | 14 | 13 |
 | `wireshark-tests` | 18 | 745 |
@@ -21,17 +24,17 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 
 | Family | Roadmap protocols | With collected capture | Capture files |
 | --- | ---: | ---: | ---: |
-| `service-tools` | 66 | 5 | 6 |
+| `service-tools` | 66 | 6 | 7 |
 | `link` | 49 | 5 | 5 |
 | `cn-app` | 48 | 9 | 9 |
-| `ics` | 46 | 21 | 27 |
+| `ics` | 46 | 27 | 33 |
 | `internet` | 40 | 16 | 17 |
-| `longtail` | 40 | 3 | 4 |
+| `longtail` | 40 | 4 | 5 |
 | `cn-vendor` | 33 | 0 | 0 |
 | `mq-rpc` | 31 | 11 | 11 |
 | `routing` | 24 | 8 | 9 |
 | `microsoft` | 23 | 0 | 0 |
-| `voip` | 23 | 11 | 12 |
+| `voip` | 23 | 12 | 13 |
 | `file` | 21 | 7 | 10 |
 | `database` | 20 | 9 | 9 |
 | `mgmt` | 20 | 7 | 9 |
@@ -40,7 +43,7 @@ This report is generated from `sources.json`, the pinned capture bytes and `prot
 | `remote` | 17 | 8 | 8 |
 | `auth` | 16 | 5 | 6 |
 | `web` | 16 | 10 | 11 |
-| `game` | 10 | 2 | 2 |
+| `game` | 10 | 4 | 4 |
 | `storage` | 10 | 2 | 2 |
 | `transport` | 10 | 5 | 5 |
 | `mail` | 9 | 6 | 6 |

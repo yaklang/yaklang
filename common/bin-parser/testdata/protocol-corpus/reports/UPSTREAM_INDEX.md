@@ -13,6 +13,9 @@ recorded commits, not estimates of distinct protocols.
 | [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 14 | Small parser boundaries: truncation, invalid lengths, unsupported link types and historical parser regressions. |
 | [Scapy test pcaps](https://github.com/secdev/scapy/tree/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps) | `6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91` | 17 | 6 | GPL-2.0 industrial/mgmt traces: DoIP, Zigbee, IPFIX, NetFlow v9, PFCP. |
 | [Google educational challenge archive](https://github.com/google/google-ctf/tree/067421eb7e918c29e39f187fac5a0f0d72a6ab83) | `067421eb7e918c29e39f187fac5a0f0d72a6ab83` | 3 | 3 | Official exercise traffic with a real reverse-engineering objective rather than a synthetic one-packet fixture. |
+| [ITI ICS-Security-Tools pcaps](https://github.com/ITI/ICS-Security-Tools/tree/9b826091e7ba3fbdd5997d31e116f29e09cbbb48/pcaps) | `9b826091e7ba3fbdd5997d31e116f29e09cbbb48` | CC-BY-4.0 | 4 | GOOSE, Profinet DCP, and the smallest Snap7 TPKT/COTP frames. |
+| [mrhenrike PCAPTrafficAnalysis](https://github.com/mrhenrike/PCAPTrafficAnalysis/tree/216566e9464410322bd99923a90c3a23e050cc05) | `216566e9464410322bd99923a90c3a23e050cc05` | MIT | 1 | Lab EtherCAT master/slave capture. |
+| [mgadelha Sampled_Values](https://github.com/mgadelha/Sampled_Values/tree/0d6760c7022bc82c915e044c50292da1c0b42556) | `0d6760c7022bc82c915e044c50292da1c0b42556` | README only | 1 | IEC 61850-9-2 SV normal stream (1.4MB; larger variants skipped). |
 
 The selected set is deliberately smaller than the upstream inventory. Duplicate
 application-classification captures, captures that require additional secrets

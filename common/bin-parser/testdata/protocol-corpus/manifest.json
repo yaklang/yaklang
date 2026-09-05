@@ -46,6 +46,33 @@
       "homepage": "https://github.com/secdev/scapy",
       "license_file": "licenses/scapy-LICENSE.txt",
       "license_sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "id": "iti-ics",
+      "repository": "ITI/ICS-Security-Tools",
+      "commit": "9b826091e7ba3fbdd5997d31e116f29e09cbbb48",
+      "license": "CC-BY-4.0",
+      "homepage": "https://github.com/ITI/ICS-Security-Tools",
+      "license_file": "licenses/iti-ics-LICENSE.md.txt",
+      "license_sha256": "5d6d1fa496eea302c4aef394c7dbb42e35d76ffd2af5d8ad1f8a6b4b91423970"
+    },
+    {
+      "id": "mrhenrike-pcap",
+      "repository": "mrhenrike/PCAPTrafficAnalysis",
+      "commit": "216566e9464410322bd99923a90c3a23e050cc05",
+      "license": "MIT",
+      "homepage": "https://github.com/mrhenrike/PCAPTrafficAnalysis",
+      "license_file": "licenses/mrhenrike-pcap-LICENSE.txt",
+      "license_sha256": "15f36708540cd42b32812c78e239cc1536c9c5aa25d0f73a0316bfd56acd01d9"
+    },
+    {
+      "id": "mgadelha-sv",
+      "repository": "mgadelha/Sampled_Values",
+      "commit": "0d6760c7022bc82c915e044c50292da1c0b42556",
+      "license": "unspecified",
+      "homepage": "https://github.com/mgadelha/Sampled_Values",
+      "license_file": "licenses/mgadelha-sv-README.md.txt",
+      "license_sha256": "2835c9f8bd1f9bd5e709f61d3729fb2943fe02675c54769b0cd8ffe8c5808506"
     }
   ],
   "captures": [
@@ -6473,6 +6500,339 @@
         "ip",
         "udp",
         "kip"
+      ]
+    },
+    {
+      "id": "ndpi-checkmk",
+      "repository_id": "ndpi",
+      "protocol": "Checkmk agent",
+      "roadmap_name": "Checkmk",
+      "roadmap_family": "service-tools",
+      "roadmap_priority": "P4",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-checkmk.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/check_mk_new.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/check_mk_new.pcap",
+      "sha256": "824edfd34ae720564e89b10070ea72db7c22769c729b007afcef5a4020a76a36",
+      "size_bytes": 21834,
+      "packet_count": 98,
+      "link_type": "Ethernet",
+      "display_filter": "tcp.len \u003e 0",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 4,
+        "length_bytes": 81,
+        "hex_file": "hex/ndpi-checkmk.frame-4.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-iax2",
+      "repository_id": "ndpi",
+      "protocol": "IAX2",
+      "roadmap_name": "IAX2",
+      "roadmap_family": "voip",
+      "roadmap_priority": "P4",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-iax2.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/iax.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/iax.pcap",
+      "sha256": "8da0ef936985e4f85d42fec6797f4eab0ebba26c9f5f63ea22062bc9c07f776d",
+      "size_bytes": 9996,
+      "packet_count": 50,
+      "link_type": "Ethernet",
+      "display_filter": "iax2",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 108,
+        "hex_file": "hex/ndpi-iax2.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "iax2"
+      ]
+    },
+    {
+      "id": "ndpi-steam",
+      "repository_id": "ndpi",
+      "protocol": "Steam",
+      "roadmap_name": "Steam",
+      "roadmap_family": "game",
+      "roadmap_priority": "P4",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-steam.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/steam.pcapng",
+      "upstream_path": "tests/cfgs/default/pcap/steam.pcapng",
+      "sha256": "d4064515b97c5b3ff5a2e8b0493b878a377a9ef6ff9a376e886eb268ceba3fde",
+      "size_bytes": 14740,
+      "packet_count": 48,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 226,
+        "hex_file": "hex/ndpi-steam.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "steam_ihs_discovery"
+      ]
+    },
+    {
+      "id": "ndpi-genshin",
+      "repository_id": "ndpi",
+      "protocol": "Genshin Impact / miHoYo",
+      "roadmap_name": "miHoYo/HoYoverse",
+      "roadmap_family": "game",
+      "roadmap_priority": "P3",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-genshin.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/genshin-impact.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/genshin-impact.pcap",
+      "sha256": "f225ecb9472a2a6cbbf63d64373aa84e14201f0a1a2711f1603e987f7cee4158",
+      "size_bytes": 19869,
+      "packet_count": 90,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 62,
+        "hex_file": "hex/ndpi-genshin.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-netbeui",
+      "repository_id": "ndpi",
+      "protocol": "NetBEUI / NetBIOS over LLC",
+      "roadmap_name": "NetBEUI",
+      "roadmap_family": "longtail",
+      "roadmap_priority": "P4",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-netbeui.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/dos_win98_smb_netbeui.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/dos_win98_smb_netbeui.pcap",
+      "sha256": "e69ac0625ece685059e38bcae17c083d2a10b427b57aac7abfa7e1a191af6323",
+      "size_bytes": 26256,
+      "packet_count": 220,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "Win98 SMB/NetBEUI regression; representative frame may be LLC/NetBIOS rather than a named NetBEUI dissector",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 61,
+        "hex_file": "hex/ndpi-netbeui.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "llc",
+        "netbios"
+      ]
+    },
+    {
+      "id": "iti-goose",
+      "repository_id": "iti-ics",
+      "protocol": "IEC 61850 GOOSE",
+      "roadmap_name": "IEC 61850 GOOSE",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/iti-ics/iti-goose.pcap",
+      "source_url": "https://raw.githubusercontent.com/ITI/ICS-Security-Tools/9b826091e7ba3fbdd5997d31e116f29e09cbbb48/pcaps/IEC61850/GOOSE/GOOSE.pcap",
+      "upstream_path": "pcaps/IEC61850/GOOSE/GOOSE.pcap",
+      "sha256": "746619df546905feb6f1217ee40750004a1ca1d85fe7be1740bacdf52dca6850",
+      "size_bytes": 1420,
+      "packet_count": 8,
+      "link_type": "Ethernet",
+      "display_filter": "goose",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 159,
+        "hex_file": "hex/iti-goose.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "goose"
+      ]
+    },
+    {
+      "id": "iti-profinet-dcp",
+      "repository_id": "iti-ics",
+      "protocol": "Profinet DCP Identify/Set IP",
+      "roadmap_name": "Profinet DCP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/iti-ics/iti-profinet-dcp.pcap",
+      "source_url": "https://raw.githubusercontent.com/ITI/ICS-Security-Tools/9b826091e7ba3fbdd5997d31e116f29e09cbbb48/pcaps/profinet/PROFINET-RT-DCP/ChangeIPUsingDCP.pcap",
+      "upstream_path": "pcaps/profinet/PROFINET-RT-DCP/ChangeIPUsingDCP.pcap",
+      "sha256": "aaba0d1492ca2cae77dcac3ae311bcc5c63b72e79b2a8fd04389c0f9d1d01c98",
+      "size_bytes": 532,
+      "packet_count": 6,
+      "link_type": "Ethernet",
+      "display_filter": "pn_dcp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 56,
+        "hex_file": "hex/iti-profinet-dcp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "pn_rt",
+        "pn_dcp"
+      ]
+    },
+    {
+      "id": "iti-tpkt",
+      "repository_id": "iti-ics",
+      "protocol": "TPKT envelope of S7 setup communication",
+      "roadmap_name": "TPKT",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P1",
+      "roadmap_status": "done",
+      "capture_file": "captures/iti-ics/iti-tpkt.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ITI/ICS-Security-Tools/9b826091e7ba3fbdd5997d31e116f29e09cbbb48/pcaps/s7/snap7_s300_setupCommunication.pcapng",
+      "upstream_path": "pcaps/s7/snap7_s300_setupCommunication.pcapng",
+      "sha256": "72ef8d4809b074e5d1734547db37a4d46d9b550261c7e381ae4da9664f332f52",
+      "size_bytes": 216,
+      "packet_count": 2,
+      "link_type": "Ethernet",
+      "display_filter": "tpkt",
+      "evidence_kind": "upstream-positive",
+      "notes": "ISO-on-TCP TPKT wrapping COTP/S7comm; smallest licensed S7 setup capture",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 79,
+        "hex_file": "hex/iti-tpkt.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "tpkt",
+        "cotp",
+        "s7comm"
+      ]
+    },
+    {
+      "id": "iti-cotp",
+      "repository_id": "iti-ics",
+      "protocol": "COTP inside S7 readVar",
+      "roadmap_name": "COTP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/iti-ics/iti-cotp.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ITI/ICS-Security-Tools/9b826091e7ba3fbdd5997d31e116f29e09cbbb48/pcaps/s7/snap7_s300_readVar.pcapng",
+      "upstream_path": "pcaps/s7/snap7_s300_readVar.pcapng",
+      "sha256": "19333fdf9b8e7bc582dbac9faadf1f6c23e79b82f4cd5c26806f7c95e4a3bd3d",
+      "size_bytes": 220,
+      "packet_count": 2,
+      "link_type": "Ethernet",
+      "display_filter": "cotp",
+      "evidence_kind": "upstream-positive",
+      "notes": "COTP COTP-on-TCP carrying S7comm; companion of the TPKT setup capture",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 85,
+        "hex_file": "hex/iti-cotp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "tpkt",
+        "cotp",
+        "s7comm"
+      ]
+    },
+    {
+      "id": "mrhenrike-ethercat",
+      "repository_id": "mrhenrike-pcap",
+      "protocol": "EtherCAT master/slave PDO",
+      "roadmap_name": "EtherCAT",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/mrhenrike-pcap/mrhenrike-ethercat.pcap",
+      "source_url": "https://raw.githubusercontent.com/mrhenrike/PCAPTrafficAnalysis/216566e9464410322bd99923a90c3a23e050cc05/ICS-Ethercat-001.pcap",
+      "upstream_path": "ICS-Ethercat-001.pcap",
+      "sha256": "c2c5699ebed47a578e16558b4932ec941cfb16604ff6de0ee42ff5027a24dd37",
+      "size_bytes": 157462,
+      "packet_count": 986,
+      "link_type": "Ethernet",
+      "display_filter": "ecat",
+      "evidence_kind": "upstream-positive",
+      "notes": "lab OT capture claimed original in README; MIT license text vendored",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 60,
+        "hex_file": "hex/mrhenrike-ethercat.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ecatf",
+        "ecat"
+      ]
+    },
+    {
+      "id": "mgadelha-sv",
+      "repository_id": "mgadelha-sv",
+      "protocol": "IEC 61850-9-2 Sampled Values",
+      "roadmap_name": "IEC 61850 SV",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/mgadelha-sv/mgadelha-sv.cap",
+      "source_url": "https://raw.githubusercontent.com/mgadelha/Sampled_Values/0d6760c7022bc82c915e044c50292da1c0b42556/SV_Normal_Traffic.cap",
+      "upstream_path": "SV_Normal_Traffic.cap",
+      "sha256": "c41f67c5c5f4d2b6e3e15713981767f9c2b6be9880f9e159d027514a50095ac2",
+      "size_bytes": 1381920,
+      "packet_count": 10161,
+      "link_type": "Ethernet",
+      "display_filter": "sv",
+      "evidence_kind": "upstream-positive",
+      "notes": "1.4MB normal SV stream; larger 5–8MB variants skipped. Repo has README only, no LICENSE file",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 120,
+        "hex_file": "hex/mgadelha-sv.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "vlan",
+        "ethertype",
+        "sv"
       ]
     }
   ]

@@ -8,58 +8,63 @@ Generated against `ProtocolRoadmap` (616 names) and the vendored corpus in this 
 
 | Metric | Before this branch | After this branch |
 | --- | ---: | ---: |
-| Capture files | 174 | 212 |
-| Packets | 41828 | 46024 |
-| Unique roadmap protocols with a capture | 156 | 165 |
+| Capture files | 174 | 223 |
+| Packets | 41828 | 57695 |
+| Unique roadmap protocols with a capture | 156 | 176 |
 | Outside-roadmap candidate captures | 10 | 24 |
 | Roadmap `done` / `todo` | 211 / 405 | 211 / 405 (unchanged) |
 
-Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, **Scapy** (GPL-2.0). Wiki SampleCaptures and ICS-pcap LFS dumps were **indexed, not vendored** (no uniform attachment license).
+Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, **ITI ICS-Security-Tools** (CC-BY-4.0), **mrhenrike/PCAPTrafficAnalysis** (MIT), **mgadelha/Sampled_Values** (README only). Wiki SampleCaptures and automayt/ICS-pcap LFS dumps stay indexed, not vendored (LFS pointers, not packet bytes).
 
 ## Family coverage (after)
 
-Worst licensed-sample deserts:
+Worst sample deserts:
 
 | Family | Roadmap | With capture | Note |
 | --- | ---: | ---: | --- |
-| `cn-vendor` | 33 | **0** | Huawei/H3C/Sangfor/Hikvision/GB28181 etc. are `srcPrivate`; no licensed public PCAP in nDPI/Wireshark tests |
-| `microsoft` | 23 | **0** | MSRPC subsets exist under `mq-rpc`/`auth`; named Microsoft product protocols still empty |
-| `service-tools` | 66 | 5 | Jenkins/Zabbix/… mostly still missing |
-| `longtail` | 40 | 3 | IPX now has a second capture |
-| `ics` | 46 | **21** | was 17; added GE EGD, LoRa/Meshtastic, **DoIP**, **Zigbee** (Scapy) |
+| `cn-vendor` | 33 | **0** | Huawei/H3C/Sangfor/Hikvision/GB28181 etc. are `srcPrivate`; no public PCAP in the selected trees |
+| `microsoft` | 23 | **0** | DCE/RPC exists under `mq-rpc`; named Microsoft product protocols (SAMR/LSARPC/WMI/…) still empty |
+| `service-tools` | 66 | 6 | added **Checkmk**; Jenkins/Nagios/Docker/… still missing |
+| `longtail` | 40 | 4 | added **NetBEUI** |
+| `ics` | 46 | **27** | was 21; added GOOSE, SV, EtherCAT, Profinet DCP, TPKT, COTP |
 
-## ICS remaining without a licensed capture
+## ICS remaining without a capture
 
-Still `missing` after nDPI 629 default pcaps, Wireshark 136 test captures, and Scapy 17 test pcaps:
+Still `missing` after this round:
 
-Modbus RTU/ASCII, COTP, TPKT, IEC 60870-5-101, IEC 61850 GOOSE, IEC 61850 SV, OPC DA, Profinet DCP, PROFIBUS, EtherCAT, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, J1939, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
+Modbus RTU/ASCII, IEC 60870-5-101, OPC DA, PROFIBUS, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, J1939, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
 
-They do not appear as named files in the two licensed trees. Do not invent hex or pull unlicensed wiki attachments.
+automayt/ICS-pcap `ETHERCAT/ethercat.pcap` and `POWERLINK/epl.pcap` are 131-byte Git LFS pointers, not packet captures. Do not invent hex.
 
-## ICS / rare captures added this round
+## Captures added this round (identification only)
 
 From nDPI (LGPL-3.0, commit `4cae778e`):
 
-- EtherNet/IP CIP **explicit** (`ethernet_ip-cip.pcap`) in addition to existing CIP I/O
-- Schneider **UMAS**, Triconex **TriStation**, IEEE **C37.118**, **TRDP**, EtherS-Bus, EtherSIO, **HiSLIP**, Veeder-Root **ATG**, GE **EGD** (mapped to GE SRTP with an honest note)
-- Matter, Meshtastic (LoRa mesh; mapped to LoRaWAN with an honest note)
-- XMPP/Jabber, eDonkey, Weibo, Aliyun, Xiaomi IoT, Tuya
+- **Checkmk**, **IAX2**, **Steam**, **miHoYo/HoYoverse** (Genshin Impact), **NetBEUI** (Win98 SMB/NetBEUI)
 
-From Wireshark tests (GPL-2.0-or-later):
+From ITI ICS-Security-Tools (CC-BY-4.0, commit `9b826091`):
 
-- KNX/IP DataSec / SecureWrapper / TimerNotify, OPC UA signed, NFS, Git daemon, SIP, TFTP, NVMe-oF discovery, IPX RIP, DHCP, NTP
+- **IEC 61850 GOOSE** (`GOOSE.pcap`, tshark `goose`)
+- **Profinet DCP** (`ChangeIPUsingDCP.pcap`, tshark `pn_dcp`)
+- **TPKT** / **COTP** from the smallest Snap7 S7 setup/readVar frames (tshark `tpkt`/`cotp`/`s7comm`)
 
-From Scapy (GPL-2.0, commit `6f158c0c`):
+From mrhenrike/PCAPTrafficAnalysis (MIT, commit `216566e9`):
 
-- **DoIP** ACK, **Zigbee** join + SKKE, IPFIX, NetFlow v9, PFCP
+- **EtherCAT** (`ICS-Ethercat-001.pcap`, tshark `ecat`)
+
+From mgadelha/Sampled_Values (README only, commit `0d6760c7`):
+
+- **IEC 61850 SV** (`SV_Normal_Traffic.cap`, 1.4MB / 10161 packets; 5–8MB variants skipped)
+
+Earlier on this branch: nDPI CIP explicit / UMAS / TriStation / C37.118 / TRDP / GE EGD / Meshtastic; Wireshark KNX/OPC UA/NFS/Git; Scapy DoIP/Zigbee/IPFIX.
 
 ## Chinese-app / vendor
 
-Public licensed material exists for WeChat (already in corpus), DingTalk (already), Weibo, Aliyun, Xiaomi, Tuya, Line/Kakao (Kakao not added this round). **cn-vendor (33)** still has zero vendorable files; those names are private/Colasoft-only by roadmap source tags.
+Public material exists for WeChat, DingTalk, Weibo, Aliyun, Xiaomi, Tuya. **cn-vendor (33)** still has zero files; those names are private/Colasoft-only by roadmap source tags.
 
 ## How to grow further without writing dissectors
 
 1. Keep using `sources.json` + `go run ./tools/generate -fetch`.
-2. Prefer nDPI `tests/cfgs/default/pcap` and Wireshark `test/captures` (explicit repo license).
-3. Skip Wireshark wiki SampleCaptures and automayt/ICS-pcap until each file has a redistributable license.
-4. Filter: one small capture per new roadmap name; skip duplicate HTTP/TLS/QUIC floods.
+2. Prefer one small capture per new roadmap name; skip duplicate HTTP/TLS/QUIC floods and Git LFS pointer files.
+3. Keep the upstream LICENSE or README next to the capture (`licenses/`).
+4. Microsoft named RPC interfaces still need a capture that tshark labels as those DCE/RPC pipes, not a generic `dcerpc` frame already mapped to DCE/RPC.

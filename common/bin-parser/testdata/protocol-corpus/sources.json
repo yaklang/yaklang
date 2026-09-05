@@ -41,6 +41,30 @@
       "license": "GPL-2.0",
       "license_path": "LICENSE",
       "homepage": "https://github.com/secdev/scapy"
+    },
+    {
+      "id": "iti-ics",
+      "repository": "ITI/ICS-Security-Tools",
+      "commit": "9b826091e7ba3fbdd5997d31e116f29e09cbbb48",
+      "license": "CC-BY-4.0",
+      "license_path": "LICENSE.md",
+      "homepage": "https://github.com/ITI/ICS-Security-Tools"
+    },
+    {
+      "id": "mrhenrike-pcap",
+      "repository": "mrhenrike/PCAPTrafficAnalysis",
+      "commit": "216566e9464410322bd99923a90c3a23e050cc05",
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "homepage": "https://github.com/mrhenrike/PCAPTrafficAnalysis"
+    },
+    {
+      "id": "mgadelha-sv",
+      "repository": "mgadelha/Sampled_Values",
+      "commit": "0d6760c7022bc82c915e044c50292da1c0b42556",
+      "license": "unspecified",
+      "license_path": "README.md",
+      "homepage": "https://github.com/mgadelha/Sampled_Values"
     }
   ],
   "captures": [
@@ -255,6 +279,17 @@
     {"id": "ndpi-dicom","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/dicom.pcap","protocol": "DICOM","roadmap_name": null,"display_filter": "dicom","evidence_kind": "upstream-positive","notes": "outside current 616-item roadmap; medical imaging ICS-adjacent"},
     {"id": "ndpi-hl7","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/hl7.pcap","protocol": "HL7","roadmap_name": null,"display_filter": "hl7","evidence_kind": "upstream-positive","notes": "outside current 616-item roadmap; healthcare"},
     {"id": "ws-knxip-securewrapper","repository_id": "wireshark-tests","upstream_path": "test/captures/knxip_SecureWrapper.pcap","protocol": "KNX/IP SecureWrapper","roadmap_name": "KNX/IP","display_filter": "kip","evidence_kind": "upstream-positive"},
-    {"id": "ws-knxip-timernotify","repository_id": "wireshark-tests","upstream_path": "test/captures/knxip_TimerNotify.pcap","protocol": "KNX/IP TimerNotify","roadmap_name": "KNX/IP","display_filter": "kip","evidence_kind": "upstream-positive"}
+    {"id": "ws-knxip-timernotify","repository_id": "wireshark-tests","upstream_path": "test/captures/knxip_TimerNotify.pcap","protocol": "KNX/IP TimerNotify","roadmap_name": "KNX/IP","display_filter": "kip","evidence_kind": "upstream-positive"},
+    {"id": "ndpi-checkmk","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/check_mk_new.pcap","protocol": "Checkmk agent","roadmap_name": "Checkmk","display_filter": "tcp.len > 0","evidence_kind": "upstream-positive"},
+    {"id": "ndpi-iax2","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/iax.pcap","protocol": "IAX2","roadmap_name": "IAX2","display_filter": "iax2","evidence_kind": "upstream-positive"},
+    {"id": "ndpi-steam","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/steam.pcapng","protocol": "Steam","roadmap_name": "Steam","display_filter": "frame","evidence_kind": "upstream-positive"},
+    {"id": "ndpi-genshin","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/genshin-impact.pcap","protocol": "Genshin Impact / miHoYo","roadmap_name": "miHoYo/HoYoverse","display_filter": "frame","evidence_kind": "upstream-positive"},
+    {"id": "ndpi-netbeui","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/dos_win98_smb_netbeui.pcap","protocol": "NetBEUI / NetBIOS over LLC","roadmap_name": "NetBEUI","display_filter": "frame","evidence_kind": "upstream-positive","notes": "Win98 SMB/NetBEUI regression; representative frame may be LLC/NetBIOS rather than a named NetBEUI dissector"},
+    {"id": "iti-goose","repository_id": "iti-ics","upstream_path": "pcaps/IEC61850/GOOSE/GOOSE.pcap","protocol": "IEC 61850 GOOSE","roadmap_name": "IEC 61850 GOOSE","display_filter": "goose","evidence_kind": "upstream-positive"},
+    {"id": "iti-profinet-dcp","repository_id": "iti-ics","upstream_path": "pcaps/profinet/PROFINET-RT-DCP/ChangeIPUsingDCP.pcap","protocol": "Profinet DCP Identify/Set IP","roadmap_name": "Profinet DCP","display_filter": "pn_dcp","evidence_kind": "upstream-positive"},
+    {"id": "iti-tpkt","repository_id": "iti-ics","upstream_path": "pcaps/s7/snap7_s300_setupCommunication.pcapng","protocol": "TPKT envelope of S7 setup communication","roadmap_name": "TPKT","display_filter": "tpkt","evidence_kind": "upstream-positive","notes": "ISO-on-TCP TPKT wrapping COTP/S7comm; smallest licensed S7 setup capture"},
+    {"id": "iti-cotp","repository_id": "iti-ics","upstream_path": "pcaps/s7/snap7_s300_readVar.pcapng","protocol": "COTP inside S7 readVar","roadmap_name": "COTP","display_filter": "cotp","evidence_kind": "upstream-positive","notes": "COTP COTP-on-TCP carrying S7comm; companion of the TPKT setup capture"},
+    {"id": "mrhenrike-ethercat","repository_id": "mrhenrike-pcap","upstream_path": "ICS-Ethercat-001.pcap","protocol": "EtherCAT master/slave PDO","roadmap_name": "EtherCAT","display_filter": "ecat","evidence_kind": "upstream-positive","notes": "lab OT capture claimed original in README; MIT license text vendored"},
+    {"id": "mgadelha-sv","repository_id": "mgadelha-sv","upstream_path": "SV_Normal_Traffic.cap","protocol": "IEC 61850-9-2 Sampled Values","roadmap_name": "IEC 61850 SV","display_filter": "sv","evidence_kind": "upstream-positive","notes": "1.4MB normal SV stream; larger 5–8MB variants skipped. Repo has README only, no LICENSE file"}
   ]
 }
