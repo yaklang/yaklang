@@ -2271,6 +2271,62 @@ def xns():
     return [Ether(src=MAC_A, dst=MAC_B, type=0x0600) / Raw(b"\x00" * 16)]
 
 
+# --- batch5: drop ICE/Diameter-as-base; add tshark-named missing names ---
+
+@recipe("gen-mmrp", "MRP-MMRP", 'frame.protocols contains "mrp-mmrp"')
+def mmrp():
+    body = bytes([0x00, 0x01, 0x07, 0x00, 0x00, 0x00]) + b"\x00" * 16
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:20", type=0x88F6) / Raw(body)]
+
+
+@recipe("gen-mvrp", "MRP-MVRP", 'frame.protocols contains "mrp-mvrp"')
+def mvrp():
+    body = bytes([0x00, 0x01, 0x07, 0x00, 0x00, 0x00]) + b"\x00" * 16
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:21", type=0x88F5) / Raw(body)]
+
+
+@recipe("gen-msrp", "MRP-MSRP", 'frame.protocols contains "mrp-msrp"')
+def msrp():
+    body = bytes([0x00, 0x01, 0x07, 0x00, 0x00, 0x00]) + b"\x00" * 16
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:0e", type=0x22EA) / Raw(body)]
+
+
+@recipe("gen-tdmoe", "TDMoE", 'frame.protocols contains "tdmoe"')
+def tdmoe():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0xD00D) / Raw(b"\x00\x00" + b"\x00" * 32)]
+
+
+@recipe("gen-xtp", "XTP", 'frame.protocols contains "xtp"')
+def xtp():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=36) / Raw(b"\x00" * 32))]
+
+
+@recipe("gen-xyplex", "XYPLEX", 'frame.protocols contains "xyplex"')
+def xyplex():
+    return [udp(173, b"\x00" * 16)]
+
+
+@recipe("gen-mpls-pw", "MPLS PW", 'frame.protocols contains "pwethcw"')
+def mpls_pw():
+    from scapy.contrib.mpls import MPLS
+
+    return [
+        Ether(src=MAC_A, dst=MAC_B, type=0x8847)
+        / MPLS(label=16, s=1, ttl=255)
+        / Raw(b"\x00\x00\x00\x00")
+        / Ether()
+        / IP()
+        / ICMP()
+    ]
+
+
+@recipe("gen-macsec", "MACSec", 'frame.protocols contains "macsec"')
+def macsec_fixed():
+    from scapy.contrib.macsec import MACsec
+
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x88E5) / MACsec(PN=1, E=0, C=0, AN=0, SL=0) / Raw(b"\x00" * 32)]
+
+
 def distinctive(protos: list[str], filt: str) -> bool:
     if not protos:
         return False

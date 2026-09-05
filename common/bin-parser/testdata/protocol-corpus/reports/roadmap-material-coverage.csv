@@ -21,7 +21,7 @@ MSTP,link,P2,todo,0,missing
 LLDP,link,P1,done,1,collected
 CDP,link,P1,done,1,collected
 LACP,link,P2,todo,1,collected
-MACSec,link,P2,todo,0,missing
+MACSec,link,P2,todo,1,collected
 ISL,link,P4,todo,0,missing
 LLC,link,P2,todo,1,collected
 SNAP,link,P2,todo,1,collected
@@ -39,9 +39,9 @@ IEEE 802.1AB,link,P4,todo,0,missing
 IEEE 802.1X,link,P1,done,1,collected
 IEEE 802.1ah PBB,link,P4,todo,1,collected
 IEEE 802.3 Slow Protocols,link,P4,todo,1,collected
-MRP-MMRP,link,P4,todo,0,missing
-MRP-MVRP,link,P4,todo,0,missing
-MRP-MSRP,link,P4,todo,0,missing
+MRP-MMRP,link,P4,todo,1,collected
+MRP-MVRP,link,P4,todo,1,collected
+MRP-MSRP,link,P4,todo,1,collected
 EOAM,link,P4,todo,1,collected
 CFM,link,P4,todo,1,collected
 E-LMI,link,P4,todo,1,collected
@@ -65,7 +65,7 @@ IPsec AH,internet,P1,done,1,collected
 IPsec ESP,internet,P1,done,2,collected
 IPcomp,internet,P4,todo,1,collected
 MPLS,internet,P1,done,1,collected
-MPLS PW,internet,P2,todo,0,missing
+MPLS PW,internet,P2,todo,1,collected
 VXLAN,internet,P1,done,1,collected
 Geneve,internet,P2,todo,1,collected
 NVGRE,internet,P2,todo,1,collected
@@ -308,7 +308,7 @@ T.38,voip,P4,todo,1,collected
 WebRTC,voip,P1,done,0,missing
 STUN,voip,P1,done,1,collected
 TURN,voip,P1,done,0,missing
-ICE,voip,P2,todo,1,collected
+ICE,voip,P2,todo,0,missing
 SRTP,voip,P2,todo,0,missing
 HLS,voip,P4,todo,0,missing
 RTMP,voip,P1,done,1,collected
@@ -469,7 +469,7 @@ SGIP,carrier,P3,todo,0,missing
 SMGP,carrier,P3,todo,0,missing
 SMPP,carrier,P2,todo,1,collected
 UCP/EMI,carrier,P4,todo,1,collected
-Diameter Cx/Dx,carrier,P2,todo,1,collected
+Diameter Cx/Dx,carrier,P2,todo,0,missing
 SIP IMS,carrier,P2,todo,0,missing
 RADIUS accounting CN,carrier,P3,todo,0,missing
 Portal/WebAuth,carrier,P3,todo,0,missing
@@ -577,7 +577,7 @@ PBOC,finance,P3,todo,0,missing
 Alipay mtop,finance,P3,todo,0,missing
 XDMCP,longtail,P4,todo,1,collected
 XOT,longtail,P4,todo,0,missing
-XYPLEX,longtail,P4,todo,0,missing
+XYPLEX,longtail,P4,todo,1,collected
 TZSP,longtail,P4,todo,1,collected
 TIPC,longtail,P4,todo,1,collected
 SAMETIME,longtail,P4,todo,0,missing
@@ -595,13 +595,13 @@ ZEP,longtail,P4,todo,0,missing
 AllJoyn,longtail,P4,todo,1,collected
 Roofnet,longtail,P4,todo,0,missing
 ROHC,longtail,P4,todo,0,missing
-TDMoE,longtail,P4,todo,0,missing
+TDMoE,longtail,P4,todo,1,collected
 TELKONET,longtail,P4,todo,0,missing
 WAI,longtail,P3,todo,0,missing
 WAPI,longtail,P3,todo,0,missing
 WSMP,longtail,P4,todo,1,collected
 swIPe,longtail,P4,todo,1,collected
-XTP,longtail,P4,todo,0,missing
+XTP,longtail,P4,todo,1,collected
 VINES,longtail,P4,todo,1,collected
 IPX,longtail,P4,todo,2,collected
 SPX,longtail,P4,todo,0,missing
