@@ -9,3 +9,15 @@ ndpi-tcp-measurement,High-rate TCP measurement,ndpi,upstream-positive,network me
 tcpdump-empty-pcapng,empty pcapng container,tcpdump,upstream-negative,
 tcpdump-unsupported-linktype,unsupported link type 160,tcpdump,upstream-negative,
 google-challenge-engraver,Google educational challenge USB HID engraver,google-challenges,educational-challenge,official 2022 Google USB reverse-engineering exercise capture
+ndpi-umas,Schneider UMAS,ndpi,upstream-positive,outside current 616-item roadmap; rare ICS PLC programming protocol
+ndpi-tristation,Triconex TriStation,ndpi,upstream-positive,outside current 616-item roadmap; safety-PLC engineering traffic
+ndpi-c37118,IEEE C37.118 synchrophasor,ndpi,upstream-positive,outside current 616-item roadmap; power-grid synchrophasor
+ndpi-trdp,TRDP,ndpi,upstream-positive,outside current 616-item roadmap; train real-time data protocol
+ndpi-ethersbus,EtherS-Bus,ndpi,upstream-positive,outside current 616-item roadmap; rare ICS
+ndpi-ethersio,EtherSIO,ndpi,upstream-positive,outside current 616-item roadmap; rare ICS
+ndpi-hislip,HiSLIP,ndpi,upstream-positive,outside current 616-item roadmap; instrument control
+ndpi-atg,Veeder-Root ATG,ndpi,upstream-positive,outside current 616-item roadmap; fuel-tank ICS
+ndpi-matter,Matter on/off,ndpi,upstream-positive,outside current 616-item roadmap; smart-home Matter
+ndpi-weibo,Weibo,ndpi,upstream-positive,Chinese app traffic; Weibo is not a named 616-item but is CN-app material
+ndpi-xiaomi,Xiaomi IoT,ndpi,upstream-positive,outside named cn-vendor items; Chinese vendor IoT
+ndpi-tuya,Tuya smart-home,ndpi,upstream-positive,outside current 616-item roadmap; CN IoT

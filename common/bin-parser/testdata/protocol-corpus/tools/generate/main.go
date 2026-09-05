@@ -438,6 +438,20 @@ func fileDigest(fileName string) (string, int64, error) {
 }
 
 func selectRepresentativeFrame(fileName, displayFilter string) (int, []string, error) {
+	number, protocols, err := tsharkFirstFrame(fileName, displayFilter)
+	if err != nil {
+		return 0, nil, err
+	}
+	if number > 0 {
+		return number, protocols, nil
+	}
+	if displayFilter != "frame" {
+		return tsharkFirstFrame(fileName, "frame")
+	}
+	return 0, []string{}, nil
+}
+
+func tsharkFirstFrame(fileName, displayFilter string) (int, []string, error) {
 	cmd := exec.Command("tshark", "-r", fileName, "-Y", displayFilter, "-T", "fields", "-e", "frame.number", "-e", "frame.protocols")
 	output, err := cmd.Output()
 	if err != nil {

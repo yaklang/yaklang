@@ -214,6 +214,7 @@
       "frame_protocols": [
         "chdlc",
         "mpls",
+        "ip",
         "tcp",
         "bgp"
       ]
@@ -245,7 +246,7 @@
         "ethertype",
         "ip",
         "udp",
-        "enip",
+        "cipio",
         "cipio"
       ]
     },
@@ -1112,7 +1113,7 @@
         "ethertype",
         "ip",
         "tcp",
-        "http2"
+        "data"
       ]
     },
     {
@@ -2559,9 +2560,9 @@
       "display_filter": "mongo",
       "evidence_kind": "upstream-positive",
       "representative_frame": {
-        "number": 6,
-        "length_bytes": 317,
-        "hex_file": "hex/ndpi-mongodb.frame-6.hex"
+        "number": 1,
+        "length_bytes": 82,
+        "hex_file": "hex/ndpi-mongodb.frame-1.hex"
       },
       "frame_protocols": [
         "eth",
@@ -2569,8 +2570,7 @@
         "vlan",
         "ethertype",
         "ip",
-        "tcp",
-        "mongo"
+        "tcp"
       ]
     },
     {
@@ -3716,7 +3716,7 @@
         "ethertype",
         "ipv6",
         "udp",
-        "xml"
+        "data"
       ]
     },
     {
@@ -4822,9 +4822,9 @@
       "display_filter": "http3",
       "evidence_kind": "upstream-positive",
       "representative_frame": {
-        "number": 2,
-        "length_bytes": 105,
-        "hex_file": "hex/wireshark-http3-qpack.frame-2.hex"
+        "number": 4,
+        "length_bytes": 95,
+        "hex_file": "hex/wireshark-http3-qpack.frame-4.hex"
       },
       "frame_protocols": [
         "raw",
@@ -5317,6 +5317,857 @@
         "llc",
         "ipx",
         "data"
+      ]
+    },
+    {
+      "id": "ndpi-enip-cip",
+      "repository_id": "ndpi",
+      "protocol": "EtherNet/IP CIP explicit",
+      "roadmap_name": "EtherNet/IP CIP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-enip-cip.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/ethernet_ip-cip.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/ethernet_ip-cip.pcap",
+      "sha256": "972ecad7521cb5a0e67d6ef604a155fc77f7b9470f26932c4a7db7d6e3975389",
+      "size_bytes": 55708,
+      "packet_count": 268,
+      "link_type": "Ethernet",
+      "display_filter": "enip",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 264,
+        "hex_file": "hex/ndpi-enip-cip.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "enip",
+        "cip"
+      ]
+    },
+    {
+      "id": "ndpi-umas",
+      "repository_id": "ndpi",
+      "protocol": "Schneider UMAS",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-umas.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/umas.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/umas.pcap",
+      "sha256": "bd9ddf4762e77426640b875b45351beb1bdf7c59ffd5a370e4d7669717900b32",
+      "size_bytes": 32126,
+      "packet_count": 191,
+      "link_type": "Ethernet",
+      "display_filter": "tcp",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; rare ICS PLC programming protocol",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 66,
+        "hex_file": "hex/ndpi-umas.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-tristation",
+      "repository_id": "ndpi",
+      "protocol": "Triconex TriStation",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-tristation.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/tristation.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/tristation.pcap",
+      "sha256": "cedc1481f3f4f667545a147e7ef9913510fb6226e438724b1dfbd9981d9169e4",
+      "size_bytes": 158696,
+      "packet_count": 896,
+      "link_type": "Ethernet",
+      "display_filter": "tcp",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; safety-PLC engineering traffic",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 48,
+        "hex_file": "hex/ndpi-tristation.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-c37118",
+      "repository_id": "ndpi",
+      "protocol": "IEEE C37.118 synchrophasor",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-c37118.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/ieee_c37118.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/ieee_c37118.pcap",
+      "sha256": "a1a6931af517600d2b5cb728a998decd97a92128e28ae42e9e6bb538598510f3",
+      "size_bytes": 86506,
+      "packet_count": 778,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; power-grid synchrophasor",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 74,
+        "hex_file": "hex/ndpi-c37118.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-trdp",
+      "repository_id": "ndpi",
+      "protocol": "TRDP",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-trdp.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/trdp.pcapng",
+      "upstream_path": "tests/cfgs/default/pcap/trdp.pcapng",
+      "sha256": "4bbf8d00d4f3e448e16e62e1636385153ed99e703b390e38f1643e527a287ef2",
+      "size_bytes": 2140,
+      "packet_count": 14,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; train real-time data protocol",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 74,
+        "hex_file": "hex/ndpi-trdp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-ethersbus",
+      "repository_id": "ndpi",
+      "protocol": "EtherS-Bus",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-ethersbus.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/ethersbus.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/ethersbus.pcap",
+      "sha256": "4969db44bdb166c8efbd3c0439ed4d41929569036ad8219016c5d20a9a8c16b3",
+      "size_bytes": 1604,
+      "packet_count": 20,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; rare ICS",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 55,
+        "hex_file": "hex/ndpi-ethersbus.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "sbus"
+      ]
+    },
+    {
+      "id": "ndpi-ethersio",
+      "repository_id": "ndpi",
+      "protocol": "EtherSIO",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-ethersio.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/ethersio.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/ethersio.pcap",
+      "sha256": "9a8def6c611b1f301cd99c842facdc4ebf629fb963d285f5f110abd6f9c1d890",
+      "size_bytes": 3826,
+      "packet_count": 36,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; rare ICS",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 91,
+        "hex_file": "hex/ndpi-ethersio.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "esio"
+      ]
+    },
+    {
+      "id": "ndpi-hislip",
+      "repository_id": "ndpi",
+      "protocol": "HiSLIP",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-hislip.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/hislip.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/hislip.pcap",
+      "sha256": "022e05bac4a9297b0e013efffc19c1950f8f090e42f77933c47db9d1804e85d2",
+      "size_bytes": 15172,
+      "packet_count": 184,
+      "link_type": "Ethernet",
+      "display_filter": "tcp",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; instrument control",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 66,
+        "hex_file": "hex/ndpi-hislip.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-atg",
+      "repository_id": "ndpi",
+      "protocol": "Veeder-Root ATG",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-atg.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/atg.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/atg.pcap",
+      "sha256": "bd268e0bc9763a26f68aeee8d4c5851e2f94b4ff48eae722991f668988df43c1",
+      "size_bytes": 3496,
+      "packet_count": 31,
+      "link_type": "Ethernet",
+      "display_filter": "tcp",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; fuel-tank ICS",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 75,
+        "hex_file": "hex/ndpi-atg.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-egd",
+      "repository_id": "ndpi",
+      "protocol": "GE Ethernet Global Data",
+      "roadmap_name": "GE SRTP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-egd.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/egd.pcapng",
+      "upstream_path": "tests/cfgs/default/pcap/egd.pcapng",
+      "sha256": "20ef93bd62399760717526e0ae6d51eb7b5a3c59257353ee4f16df8a620de33e",
+      "size_bytes": 1124,
+      "packet_count": 5,
+      "link_type": "Ethernet",
+      "display_filter": "udp",
+      "evidence_kind": "upstream-positive",
+      "notes": "GE EGD share-memory traffic; closest collected GE ICS material for GE SRTP family",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 101,
+        "hex_file": "hex/ndpi-egd.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "egd",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-matter",
+      "repository_id": "ndpi",
+      "protocol": "Matter on/off",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-matter.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/matter_onoff.pcapng",
+      "upstream_path": "tests/cfgs/default/pcap/matter_onoff.pcapng",
+      "sha256": "ad6589fa7aac4127360d9661eb89eb8eb475de8f6341b77fae8134e0788cc984",
+      "size_bytes": 22924,
+      "packet_count": 63,
+      "link_type": "Linux SLL",
+      "display_filter": "udp",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; smart-home Matter",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 484,
+        "hex_file": "hex/ndpi-matter.frame-1.hex"
+      },
+      "frame_protocols": [
+        "sll",
+        "ethertype",
+        "ip",
+        "udp",
+        "mdns"
+      ]
+    },
+    {
+      "id": "ndpi-meshtastic",
+      "repository_id": "ndpi",
+      "protocol": "Meshtastic LoRa mesh",
+      "roadmap_name": "LoRaWAN",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-meshtastic.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/meshtastic.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/meshtastic.pcap",
+      "sha256": "f55445a3493dd7495872e9a6831394d872a784316f4b730e0bc22c00d1602c85",
+      "size_bytes": 179,
+      "packet_count": 2,
+      "link_type": "Ethernet",
+      "display_filter": "udp",
+      "evidence_kind": "upstream-positive",
+      "notes": "LoRa mesh rather than LoRaWAN MAC; only licensed LoRa-family capture in nDPI",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 60,
+        "hex_file": "hex/ndpi-meshtastic.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-xmpp-jabber",
+      "repository_id": "ndpi",
+      "protocol": "XMPP/Jabber",
+      "roadmap_name": "XMPP",
+      "roadmap_family": "cn-app",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-xmpp-jabber.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/jabber.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/jabber.pcap",
+      "sha256": "56cc0ef9f612b0f717fae27a375a46b7c68f65c05b5a032f00d118356db467fc",
+      "size_bytes": 75040,
+      "packet_count": 376,
+      "link_type": "Ethernet",
+      "display_filter": "xmpp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 6,
+        "length_bytes": 88,
+        "hex_file": "hex/ndpi-xmpp-jabber.frame-6.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "xmpp",
+        "xml"
+      ]
+    },
+    {
+      "id": "ndpi-edonkey",
+      "repository_id": "ndpi",
+      "protocol": "eDonkey/eMule",
+      "roadmap_name": "eMule/ED2K",
+      "roadmap_family": "cn-app",
+      "roadmap_priority": "P3",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-edonkey.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/edonkey.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/edonkey.pcap",
+      "sha256": "7b2d333f2c99b7532e2f9826ac5a4100b3ffb13208391cce5b66fb191e78b06c",
+      "size_bytes": 2312,
+      "packet_count": 17,
+      "link_type": "Ethernet",
+      "display_filter": "edonkey",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 62,
+        "hex_file": "hex/ndpi-edonkey.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-weibo",
+      "repository_id": "ndpi",
+      "protocol": "Weibo",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-weibo.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/weibo.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/weibo.pcap",
+      "sha256": "4c29e0d705980b9dba76667f21455ef5d992d9273e7885902a6d51624c582161",
+      "size_bytes": 275547,
+      "packet_count": 498,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "Chinese app traffic; Weibo is not a named 616-item but is CN-app material",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 179,
+        "hex_file": "hex/ndpi-weibo.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "data"
+      ]
+    },
+    {
+      "id": "ndpi-alicloud",
+      "repository_id": "ndpi",
+      "protocol": "Aliyun/Alibaba Cloud",
+      "roadmap_name": "AliyunDrive",
+      "roadmap_family": "cn-app",
+      "roadmap_priority": "P3",
+      "roadmap_status": "todo",
+      "capture_file": "captures/ndpi/ndpi-alicloud.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/alicloud.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/alicloud.pcap",
+      "sha256": "4b96410544b55d28e8744a10df3c7811dd7c6dbaea6eb9200c2bdc4281f4d867",
+      "size_bytes": 26610,
+      "packet_count": 225,
+      "link_type": "Ethernet",
+      "display_filter": "tls",
+      "evidence_kind": "upstream-positive",
+      "notes": "Aliyun cloud TLS; closest licensed AliyunDrive-family material",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 74,
+        "hex_file": "hex/ndpi-alicloud.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-xiaomi",
+      "repository_id": "ndpi",
+      "protocol": "Xiaomi IoT",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-xiaomi.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/xiaomi.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/xiaomi.pcap",
+      "sha256": "b1d68b0b5cabb21e49a7eff9e52fe622b933de451aeb6b61c56952f6aefd30f1",
+      "size_bytes": 12323,
+      "packet_count": 52,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside named cn-vendor items; Chinese vendor IoT",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 136,
+        "hex_file": "hex/ndpi-xiaomi.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "vlan",
+        "ethertype",
+        "ip",
+        "tcp"
+      ]
+    },
+    {
+      "id": "ndpi-tuya",
+      "repository_id": "ndpi",
+      "protocol": "Tuya smart-home",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-tuya.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/tuya_lp.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/tuya_lp.pcap",
+      "sha256": "8127b829f8eb483150098208d86096f33176223c8b6fca8fb8c73b21133c23c3",
+      "size_bytes": 23540,
+      "packet_count": 98,
+      "link_type": "Ethernet",
+      "display_filter": "frame",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; CN IoT",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 230,
+        "hex_file": "hex/ndpi-tuya.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "data"
+      ]
+    },
+    {
+      "id": "ws-knxip-datasec",
+      "repository_id": "wireshark-tests",
+      "protocol": "KNX/IP DataSec",
+      "roadmap_name": "KNX/IP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-knxip-datasec.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/knxip_DataSec.pcap",
+      "upstream_path": "test/captures/knxip_DataSec.pcap",
+      "sha256": "52261f9fffae0d1307e83a10e05f54e5e57e81b45a205b0a2edd0210d40c4d56",
+      "size_bytes": 125,
+      "packet_count": 1,
+      "link_type": "Ethernet",
+      "display_filter": "kip",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 85,
+        "hex_file": "hex/ws-knxip-datasec.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "kip",
+        "cemi"
+      ]
+    },
+    {
+      "id": "ws-opcua-signed",
+      "repository_id": "wireshark-tests",
+      "protocol": "OPC UA signed",
+      "roadmap_name": "OPC UA",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-opcua-signed.pcapng",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/opcua-signed.pcapng",
+      "upstream_path": "test/captures/opcua-signed.pcapng",
+      "sha256": "a2aaa4a74040dd079de4358131864725f01634bf53477f1a23485f6a0acfc7d2",
+      "size_bytes": 597228,
+      "packet_count": 98,
+      "link_type": "Ethernet",
+      "display_filter": "opcua",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 4,
+        "length_bytes": 134,
+        "hex_file": "hex/ws-opcua-signed.frame-4.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "opcua"
+      ]
+    },
+    {
+      "id": "ws-nfs",
+      "repository_id": "wireshark-tests",
+      "protocol": "NFS",
+      "roadmap_name": "NFS",
+      "roadmap_family": "file",
+      "roadmap_priority": "P1",
+      "roadmap_status": "done",
+      "capture_file": "captures/wireshark-tests/ws-nfs.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/nfs.pcap",
+      "upstream_path": "test/captures/nfs.pcap",
+      "sha256": "29a3c8fbcf74e34ea1bbdf3c4ceee18b208dbab7a2cc08dd99dc3d22b3e823df",
+      "size_bytes": 1112,
+      "packet_count": 4,
+      "link_type": "FDDI",
+      "display_filter": "nfs",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 201,
+        "hex_file": "hex/ws-nfs.frame-1.hex"
+      },
+      "frame_protocols": [
+        "fddi",
+        "llc",
+        "ip",
+        "udp",
+        "rpc",
+        "nfs"
+      ]
+    },
+    {
+      "id": "ws-git",
+      "repository_id": "wireshark-tests",
+      "protocol": "Git daemon",
+      "roadmap_name": "Git daemon",
+      "roadmap_family": "service-tools",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-git.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/gitOverTCP.pcap",
+      "upstream_path": "test/captures/gitOverTCP.pcap",
+      "sha256": "81b56c70ca07c3b4849044051b27beb727a9fd9044f78ad637eb74d96852d956",
+      "size_bytes": 582,
+      "packet_count": 4,
+      "link_type": "Ethernet",
+      "display_filter": "git",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 68,
+        "hex_file": "hex/ws-git.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "git"
+      ]
+    },
+    {
+      "id": "ws-sip",
+      "repository_id": "wireshark-tests",
+      "protocol": "SIP",
+      "roadmap_name": "SIP",
+      "roadmap_family": "voip",
+      "roadmap_priority": "P1",
+      "roadmap_status": "done",
+      "capture_file": "captures/wireshark-tests/ws-sip.pcapng",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/sip.pcapng",
+      "upstream_path": "test/captures/sip.pcapng",
+      "sha256": "d6e2084936f4113d154a2fab2d7dfc728baa278a54ae1ff8af2a8f14761d4718",
+      "size_bytes": 3636,
+      "packet_count": 6,
+      "link_type": "Raw",
+      "display_filter": "sip",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 364,
+        "hex_file": "hex/ws-sip.frame-1.hex"
+      },
+      "frame_protocols": [
+        "raw",
+        "ip",
+        "udp",
+        "sip"
+      ]
+    },
+    {
+      "id": "ws-tftp",
+      "repository_id": "wireshark-tests",
+      "protocol": "TFTP",
+      "roadmap_name": "TFTP",
+      "roadmap_family": "file",
+      "roadmap_priority": "P1",
+      "roadmap_status": "done",
+      "capture_file": "captures/wireshark-tests/ws-tftp.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/tftp.pcap",
+      "upstream_path": "test/captures/tftp.pcap",
+      "sha256": "43365ac8f39704cfc70bf9ffdc01ad1e63acfe8d138ad64f43344ab19db14b39",
+      "size_bytes": 117,
+      "packet_count": 1,
+      "link_type": "UnknownLinkType",
+      "display_filter": "tftp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 77,
+        "hex_file": "hex/ws-tftp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "tr",
+        "llc",
+        "ip",
+        "udp",
+        "tftp"
+      ]
+    },
+    {
+      "id": "ws-nvme-tcp",
+      "repository_id": "wireshark-tests",
+      "protocol": "NVMe over TCP discovery",
+      "roadmap_name": "NVMe-oF",
+      "roadmap_family": "storage",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-nvme-tcp.pcapng",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/nvme-tcp-discovery.pcapng",
+      "upstream_path": "test/captures/nvme-tcp-discovery.pcapng",
+      "sha256": "1bfcc11cb79531d9cd7979c7fae9ac04f4a16eafbd0de5a3e00fad2eb862df08",
+      "size_bytes": 3552,
+      "packet_count": 3,
+      "link_type": "Ethernet",
+      "display_filter": "nvme-tcp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 126,
+        "hex_file": "hex/ws-nvme-tcp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "nvme-tcp"
+      ]
+    },
+    {
+      "id": "ws-ipx-rip",
+      "repository_id": "wireshark-tests",
+      "protocol": "IPX RIP",
+      "roadmap_name": "IPX",
+      "roadmap_family": "longtail",
+      "roadmap_priority": "P4",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-ipx-rip.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/ipx_rip.pcap",
+      "upstream_path": "test/captures/ipx_rip.pcap",
+      "sha256": "2dcd7a321301d900e7af1740087e8219a86321d775efb4b1934e571b4345414b",
+      "size_bytes": 100,
+      "packet_count": 1,
+      "link_type": "Ethernet",
+      "display_filter": "ipx",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 60,
+        "hex_file": "hex/ws-ipx-rip.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ipx"
+      ]
+    },
+    {
+      "id": "ws-dhcp",
+      "repository_id": "wireshark-tests",
+      "protocol": "DHCP",
+      "roadmap_name": "DHCP",
+      "roadmap_family": "name-config",
+      "roadmap_priority": "P0",
+      "roadmap_status": "done",
+      "capture_file": "captures/wireshark-tests/ws-dhcp.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/dhcp.pcap",
+      "upstream_path": "test/captures/dhcp.pcap",
+      "sha256": "2471b5420bdac826eecf8f61a2bbb4a3eb20dbfab7c02ff2be502f349f368214",
+      "size_bytes": 1400,
+      "packet_count": 4,
+      "link_type": "Ethernet",
+      "display_filter": "dhcp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 314,
+        "hex_file": "hex/ws-dhcp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "dhcp"
+      ]
+    },
+    {
+      "id": "ws-ntp",
+      "repository_id": "wireshark-tests",
+      "protocol": "NTP",
+      "roadmap_name": "NTP",
+      "roadmap_family": "name-config",
+      "roadmap_priority": "P1",
+      "roadmap_status": "done",
+      "capture_file": "captures/wireshark-tests/ws-ntp.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/ntp.pcap",
+      "upstream_path": "test/captures/ntp.pcap",
+      "sha256": "17fb7c76e791f33a74399c5af1ca01fcb2b72a36490822ac946c1567a4b07905",
+      "size_bytes": 130,
+      "packet_count": 1,
+      "link_type": "Ethernet",
+      "display_filter": "ntp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 90,
+        "hex_file": "hex/ws-ntp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "ntp"
       ]
     }
   ]

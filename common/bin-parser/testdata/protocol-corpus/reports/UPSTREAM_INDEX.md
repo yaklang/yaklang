@@ -8,8 +8,8 @@ recorded commits, not estimates of distinct protocols.
 
 | Source | Pinned commit | Capture files upstream | Selected here | Why it is useful |
 | --- | --- | ---: | ---: | --- |
-| [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 151 | Positive classifications, version variants, false-positive cases and malformed inputs used by a maintained traffic classifier. |
-| [Wireshark test captures](https://github.com/wireshark/wireshark/tree/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures) | `4f63ea0eae68cf6facea31604994f1a339e43640` | 136 | 6 | Official dissector regression material for ARP, ICMP, IKEv1, IKEv2, mDNS and HTTP/3, stored in the licensed source repository. |
+| [nDPI regression corpus](https://github.com/ntop/nDPI/tree/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs) | `4cae778e7e8f846b34f11d4f8392504cdebd3db8` | 743 | 169 | Positive classifications, version variants, false-positive cases and malformed inputs used by a maintained traffic classifier. |
+| [Wireshark test captures](https://github.com/wireshark/wireshark/tree/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures) | `4f63ea0eae68cf6facea31604994f1a339e43640` | 136 | 16 | Official dissector regression material, including ICS (KNX DataSec, OPC UA signed) and file/storage (NFS, TFTP, NVMe-oF, Git). |
 | [tcpdump tests](https://github.com/the-tcpdump-group/tcpdump/tree/007db68e28a14a0e8231bd71db9bc6cf8ba37874/tests) | `007db68e28a14a0e8231bd71db9bc6cf8ba37874` | 831 | 14 | Small parser boundaries: truncation, invalid lengths, unsupported link types and historical parser regressions. |
 | [Google educational challenge archive](https://github.com/google/google-ctf/tree/067421eb7e918c29e39f187fac5a0f0d72a6ab83) | `067421eb7e918c29e39f187fac5a0f0d72a6ab83` | 3 | 3 | Official exercise traffic with a real reverse-engineering objective rather than a synthetic one-packet fixture. |
 

@@ -4,10 +4,11 @@ This directory is test and experiment material for the 616-item
 `ProtocolRoadmap`. It deliberately keeps evidence collection separate from
 claims that a Yaklang dissector is complete.
 
-The current snapshot contains 174 capture files, 41,828 packets and direct
-material for 156 unique roadmap protocols. The source and family breakdown is
-generated in `reports/REPORT.md`; `reports/UPSTREAM_INDEX.md` records the wider
-authoritative collections and selection policy.
+The current snapshot contains 202 capture files, 45,705 packets and direct
+material for 162 unique roadmap protocols. The source and family breakdown is
+generated in `reports/REPORT.md`; `reports/HEALTHCHECK.md` is the coverage
+gap survey; `reports/UPSTREAM_INDEX.md` records the wider authoritative
+collections and selection policy.
 
 Each capture has all of the following:
 

@@ -129,10 +129,10 @@ NBNS,name-config,P0,done,0,missing
 DoT,name-config,P1,done,1,collected
 DoH,name-config,P1,done,1,collected
 DoQ,name-config,P2,todo,1,collected
-DHCP,name-config,P0,done,1,collected
+DHCP,name-config,P0,done,2,collected
 DHCPv6,name-config,P1,done,0,missing
 BOOTP,name-config,P1,done,1,collected
-NTP,name-config,P1,done,3,collected
+NTP,name-config,P1,done,4,collected
 SNTP,name-config,P2,todo,0,missing
 PTP,name-config,P1,done,1,collected
 WINS,name-config,P2,todo,0,missing
@@ -169,10 +169,10 @@ Submission,mail,P2,todo,0,missing
 FTP,file,P0,done,1,collected
 FTP-DATA,file,P1,done,0,missing
 FTPS,file,P2,todo,1,collected
-TFTP,file,P1,done,2,collected
+TFTP,file,P1,done,3,collected
 SFTP,file,P1,done,0,missing
 SCP,file,P2,todo,0,missing
-NFS,file,P1,done,1,collected
+NFS,file,P1,done,2,collected
 RPC,file,P1,done,0,missing
 Portmap/Rpcbind,file,P1,done,0,missing
 Mount,file,P2,todo,0,missing
@@ -291,7 +291,7 @@ Nagios NSCA,mgmt,P4,todo,0,missing
 Prometheus exposition,mgmt,P2,todo,0,missing
 Graphite,mgmt,P4,todo,0,missing
 StatsD,mgmt,P4,todo,0,missing
-SIP,voip,P1,done,1,collected
+SIP,voip,P1,done,2,collected
 SDP,voip,P1,done,0,missing
 RTP,voip,P1,done,1,collected
 RTCP,voip,P1,done,1,collected
@@ -349,10 +349,10 @@ IEC 60870-5-101,ics,P2,todo,0,missing
 IEC 61850 MMS,ics,P2,todo,1,collected
 IEC 61850 GOOSE,ics,P2,todo,0,missing
 IEC 61850 SV,ics,P2,todo,0,missing
-OPC UA,ics,P2,todo,1,collected
+OPC UA,ics,P2,todo,2,collected
 OPC DA,ics,P2,todo,0,missing
 BACnet,ics,P2,todo,1,collected
-EtherNet/IP CIP,ics,P2,todo,1,collected
+EtherNet/IP CIP,ics,P2,todo,2,collected
 Profinet IO,ics,P2,todo,1,collected
 Profinet DCP,ics,P2,todo,0,missing
 PROFIBUS,ics,P2,todo,0,missing
@@ -362,13 +362,13 @@ SERCOS III,ics,P4,todo,0,missing
 CC-Link IE,ics,P3,todo,0,missing
 MELSEC,ics,P3,todo,1,collected
 Omron FINS,ics,P2,todo,1,collected
-GE SRTP,ics,P2,todo,0,missing
+GE SRTP,ics,P2,todo,1,collected
 Beckhoff ADS,ics,P2,todo,1,collected
 CODESYS,ics,P2,todo,0,missing
 Hart-IP,ics,P2,todo,1,collected
 FF HSE,ics,P4,todo,0,missing
 LonTalk,ics,P4,todo,0,missing
-KNX/IP,ics,P2,todo,1,collected
+KNX/IP,ics,P2,todo,2,collected
 DALI,ics,P4,todo,0,missing
 CAN/ISO-TP,ics,P2,todo,1,collected
 J1939,ics,P2,todo,0,missing
@@ -378,7 +378,7 @@ VARAN,ics,P4,todo,0,missing
 AES50,ics,P4,todo,0,missing
 Zigbee,ics,P2,todo,0,missing
 Z-Wave,ics,P2,todo,0,missing
-LoRaWAN,ics,P2,todo,0,missing
+LoRaWAN,ics,P2,todo,1,collected
 DLMS/COSEM,ics,P2,todo,1,collected
 IEC 62056,ics,P2,todo,0,missing
 M-Bus,ics,P4,todo,0,missing
@@ -401,9 +401,9 @@ BaiduHi,cn-app,P4,todo,0,missing
 MSNMS,cn-app,P4,todo,0,missing
 Yahoo Messenger,cn-app,P4,todo,0,missing
 IRC,cn-app,P2,todo,1,collected
-XMPP,cn-app,P2,todo,0,missing
+XMPP,cn-app,P2,todo,1,collected
 BitTorrent,cn-app,P1,done,1,collected
-eMule/ED2K,cn-app,P3,todo,0,missing
+eMule/ED2K,cn-app,P3,todo,1,collected
 Thunder/Xunlei,cn-app,P3,todo,0,missing
 PPLive,cn-app,P3,todo,0,missing
 PPStream,cn-app,P3,todo,0,missing
@@ -412,7 +412,7 @@ Funshion,cn-app,P4,todo,0,missing
 SoulSeek,cn-app,P4,todo,0,missing
 Gnutella,cn-app,P4,todo,1,collected
 BaiduNetdisk,cn-app,P3,todo,0,missing
-AliyunDrive,cn-app,P3,todo,0,missing
+AliyunDrive,cn-app,P3,todo,1,collected
 Quark,cn-app,P3,todo,0,missing
 iQIYI P2P,cn-app,P3,todo,1,collected
 Youku P2P,cn-app,P3,todo,0,missing
@@ -497,7 +497,7 @@ iSCSI,storage,P2,todo,0,missing
 NBD,storage,P4,todo,0,missing
 AoE,storage,P4,todo,0,missing
 FCP,storage,P2,todo,0,missing
-NVMe-oF,storage,P2,todo,0,missing
+NVMe-oF,storage,P2,todo,1,collected
 Ceph,storage,P2,todo,1,collected
 Gluster,storage,P4,todo,0,missing
 MinIO/S3,storage,P1,done,0,missing
@@ -547,7 +547,7 @@ Burlap,service-tools,P4,todo,0,missing
 IIOP over SSL,service-tools,P2,todo,0,missing
 JDWP handshake,service-tools,P1,done,0,missing
 Rsync daemon,service-tools,P1,done,1,collected
-Git daemon,service-tools,P2,todo,1,collected
+Git daemon,service-tools,P2,todo,2,collected
 SVN,service-tools,P4,todo,0,missing
 Mercurial,service-tools,P4,todo,0,missing
 Docker Registry,service-tools,P1,done,0,missing
@@ -603,7 +603,7 @@ WSMP,longtail,P4,todo,0,missing
 swIPe,longtail,P4,todo,0,missing
 XTP,longtail,P4,todo,0,missing
 VINES,longtail,P4,todo,0,missing
-IPX,longtail,P4,todo,1,collected
+IPX,longtail,P4,todo,2,collected
 SPX,longtail,P4,todo,0,missing
 AppleTalk,longtail,P4,todo,0,missing
 AARP,longtail,P4,todo,0,missing
