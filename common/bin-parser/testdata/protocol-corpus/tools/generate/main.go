@@ -767,7 +767,7 @@ func writeReportMarkdown(fileName string, roadmap []roadmapItem, captures []mani
 	b.WriteString("\n![Protocol material distribution. Every row prints collected protocol count over the full roadmap family count.](protocol-material-distribution.svg)\n\n")
 	b.WriteString("**Figure 1 | Authoritative capture material by roadmap family.** Blue marks unique roadmap protocols with at least one collected file; the gray extent is the full family backlog. Exact values are printed, so color is not the only encoding.\n\n")
 	b.WriteString("## Interpretation limits\n\n")
-	b.WriteString("A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and false-positive resistance are part of parser authentication. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.\n")
+	b.WriteString("A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and false-positive resistance are part of parser robustness. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.\n")
 	return os.WriteFile(fileName, []byte(b.String()), 0o644)
 }
 
