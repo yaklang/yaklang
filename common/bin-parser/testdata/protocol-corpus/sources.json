@@ -33,6 +33,14 @@
       "license": "Apache-2.0",
       "license_path": "LICENSE",
       "homepage": "https://github.com/google/google-ctf"
+    },
+    {
+      "id": "scapy",
+      "repository": "secdev/scapy",
+      "commit": "6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91",
+      "license": "GPL-2.0",
+      "license_path": "LICENSE",
+      "homepage": "https://github.com/secdev/scapy"
     }
   ],
   "captures": [
@@ -237,6 +245,16 @@
     {"id": "ws-nvme-tcp","repository_id": "wireshark-tests","upstream_path": "test/captures/nvme-tcp-discovery.pcapng","protocol": "NVMe over TCP discovery","roadmap_name": "NVMe-oF","display_filter": "nvme-tcp","evidence_kind": "upstream-positive"},
     {"id": "ws-ipx-rip","repository_id": "wireshark-tests","upstream_path": "test/captures/ipx_rip.pcap","protocol": "IPX RIP","roadmap_name": "IPX","display_filter": "ipx","evidence_kind": "upstream-positive"},
     {"id": "ws-dhcp","repository_id": "wireshark-tests","upstream_path": "test/captures/dhcp.pcap","protocol": "DHCP","roadmap_name": "DHCP","display_filter": "dhcp","evidence_kind": "upstream-positive"},
-    {"id": "ws-ntp","repository_id": "wireshark-tests","upstream_path": "test/captures/ntp.pcap","protocol": "NTP","roadmap_name": "NTP","display_filter": "ntp","evidence_kind": "upstream-positive"}
+    {"id": "ws-ntp","repository_id": "wireshark-tests","upstream_path": "test/captures/ntp.pcap","protocol": "NTP","roadmap_name": "NTP","display_filter": "ntp","evidence_kind": "upstream-positive"},
+    {"id": "scapy-doip","repository_id": "scapy","upstream_path": "test/pcaps/doip_ack.pcap","protocol": "DoIP ACK","roadmap_name": "DoIP","display_filter": "doip","evidence_kind": "upstream-positive"},
+    {"id": "scapy-zigbee-join","repository_id": "scapy","upstream_path": "test/pcaps/zigbee-join-authenticate.pcap","protocol": "Zigbee join/authenticate","roadmap_name": "Zigbee","display_filter": "wpan","evidence_kind": "upstream-positive"},
+    {"id": "scapy-zigbee-skke","repository_id": "scapy","upstream_path": "test/pcaps/zigbee-transport-key-skke_1.pcap","protocol": "Zigbee SKKE transport key","roadmap_name": "Zigbee","display_filter": "wpan","evidence_kind": "upstream-positive"},
+    {"id": "scapy-ipfix","repository_id": "scapy","upstream_path": "test/pcaps/ipfix.pcap","protocol": "IPFIX","roadmap_name": "IPFIX","display_filter": "cflow","evidence_kind": "upstream-positive"},
+    {"id": "scapy-netflowv9","repository_id": "scapy","upstream_path": "test/pcaps/netflowv9.pcap","protocol": "NetFlow v9","roadmap_name": "NetFlow v9","display_filter": "cflow","evidence_kind": "upstream-positive"},
+    {"id": "scapy-pfcp","repository_id": "scapy","upstream_path": "test/pcaps/pfcp.pcap","protocol": "PFCP","roadmap_name": "PFCP","display_filter": "pfcp","evidence_kind": "upstream-positive"},
+    {"id": "ndpi-dicom","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/dicom.pcap","protocol": "DICOM","roadmap_name": null,"display_filter": "dicom","evidence_kind": "upstream-positive","notes": "outside current 616-item roadmap; medical imaging ICS-adjacent"},
+    {"id": "ndpi-hl7","repository_id": "ndpi","upstream_path": "tests/cfgs/default/pcap/hl7.pcap","protocol": "HL7","roadmap_name": null,"display_filter": "hl7","evidence_kind": "upstream-positive","notes": "outside current 616-item roadmap; healthcare"},
+    {"id": "ws-knxip-securewrapper","repository_id": "wireshark-tests","upstream_path": "test/captures/knxip_SecureWrapper.pcap","protocol": "KNX/IP SecureWrapper","roadmap_name": "KNX/IP","display_filter": "kip","evidence_kind": "upstream-positive"},
+    {"id": "ws-knxip-timernotify","repository_id": "wireshark-tests","upstream_path": "test/captures/knxip_TimerNotify.pcap","protocol": "KNX/IP TimerNotify","roadmap_name": "KNX/IP","display_filter": "kip","evidence_kind": "upstream-positive"}
   ]
 }
