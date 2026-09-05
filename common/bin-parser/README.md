@@ -2,6 +2,8 @@
 
 rule文件以yaml格式编写，支持解析多种格式的数据流，二进制文件、链路层、网络层、应用层协议等。
 
+逐协议交付与打分验收见 [PROTOCOL_DELIVERY.md](PROTOCOL_DELIVERY.md)。P0 打分结果见 [P0_SCORES.md](P0_SCORES.md)，P1 打分结果见 [P1_SCORES.md](P1_SCORES.md)。P0 / P1 标 `done` 前必须过硬门槛并达到 **B 级及以上（总分 ≥ 75）**。A 级（≥ 90）留给 Wireshark 级主 PDU，不是清掉 leftover 之后的默认分。
+
 ## 1. rule组成
 rule的根节点为Package，其下包含多个子节点，用来描述数据的结构、属性。
 如

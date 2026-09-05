@@ -1,0 +1,164 @@
+endian: big
+Package:
+  PostgreSQL:
+    operator: |
+      # Startup/SSLRequest have no type byte: first 4 bytes are length.
+      # Typed messages start with an ASCII letter then int32 length.
+      first = this.ProcessSubNode("First").Value
+      if (first >= 0x41 && first <= 0x5a) || (first >= 0x61 && first <= 0x7a) {
+        this.ProcessSubNode("Length")
+        l = getNodeResult("Length").Value
+        if l < 4 || l > 0x1000000 {
+          panic("postgresql: length too small or too large")
+        }
+        if l > 4 {
+          this.GetSubNode("Payload").SetMaxLength(l - 4)
+          this.ProcessSubNode("Payload")
+        }
+        return
+      }
+      # unread First as part of Length: First was the high byte of a 32-bit length.
+      # Reconstruct startup: Length = first<<24 | next 3 bytes. Easier to require
+      # typed messages OR dedicated Startup/SSLRequest entry points.
+      panic("postgresql: use Startup or SSLRequest for untyped client packets")
+    First: uint8
+    Length: uint32
+    Payload:
+      operator: |
+        first = getNodeResult("../First").Value
+        if first == 0x52 {
+          this.ProcessSubNode("AuthType")
+          return
+        }
+        if first == 0x51 {
+          this.ProcessByType("PostgreSQLQuery")
+          return
+        }
+        if first == 0x45 {
+          this.ProcessByType("PostgreSQLError")
+          return
+        }
+        if first == 0x5a {
+          this.ProcessSubNode("Ready")
+          return
+        }
+        rem = 0
+        if this.GetMaxLength() > this.Length() {
+          rem = this.GetMaxLength() - this.Length()
+        }
+        if rem > 0 && rem < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rem)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      AuthType: uint32
+      Ready: uint8
+      Octets: string
+  Startup:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 8 {
+        panic("postgresql: startup length too small")
+      }
+      this.ProcessSubNode("Protocol")
+      proto = getNodeResult("Protocol").Value
+      if proto == 80877103 {
+        return
+      }
+      if proto != 196608 && proto != 196608+1 && proto != 131072 {
+        panic("postgresql: unknown startup protocol")
+      }
+      this.GetSubNode("Parameters").SetMaxLength(l - 8)
+      this.ProcessSubNode("Parameters")
+    Length: uint32
+    Protocol: uint32
+    Parameters:
+      list: true
+      Pair: PGParam
+      operator: |
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+          if ele.GetSubNode("Name").Result().Value == "" {
+            break
+          }
+        }
+  SSLRequest:
+    operator: |
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Code")
+      if getNodeResult("Length").Value != 8 {
+        panic("postgresql: SSLRequest length must be 8")
+      }
+      if getNodeResult("Code").Value != 80877103 {
+        panic("postgresql: SSLRequest code mismatch")
+      }
+    Length: uint32
+    Code: uint32
+  CancelRequest:
+    operator: |
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Code")
+      this.ProcessSubNode("ProcessID")
+      this.ProcessSubNode("SecretKey")
+      if getNodeResult("Code").Value != 80877102 {
+        panic("postgresql: CancelRequest code mismatch")
+      }
+    Length: uint32
+    Code: uint32
+    ProcessID: uint32
+    SecretKey: uint32
+PostgreSQLQuery:
+  SQL: "del:\0;type:string"
+PostgreSQLError:
+  list: true
+  Field: PGErrorField
+  operator: |
+    for {
+      if this.GetRemainingSpace() == 0 {
+        break
+      }
+      ele = this.NewElement()
+      ele.Process()
+      if ele.GetSubNode("Type").Result().Value == 0 {
+        break
+      }
+    }
+PGErrorField:
+  operator: |
+    t = this.ProcessSubNode("Type").Value
+    if t == 0 {
+      return
+    }
+    if t == 0x53 {
+      this.ProcessSubNode("Severity")
+      return
+    }
+    if t == 0x43 {
+      this.ProcessSubNode("SQLState")
+      return
+    }
+    if t == 0x4d {
+      this.ProcessSubNode("Message")
+      return
+    }
+    this.ProcessSubNode("Value")
+    return
+  Type: uint8
+  Severity: "del:\0;type:string"
+  SQLState: "del:\0;type:string"
+  Message: "del:\0;type:string"
+  Value: "del:\0;type:string"
+PGParam:
+  operator: |
+    this.ProcessSubNode("Name")
+    if getNodeResult("Name").Value == "" {
+      return
+    }
+    this.ProcessSubNode("Value")
+  Name: "del:\0;type:string"
+  Value: "del:\0;type:string"

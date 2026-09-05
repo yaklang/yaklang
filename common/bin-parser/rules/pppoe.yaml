@@ -1,0 +1,115 @@
+endian: big
+Package:
+  PPPoE:
+    operator: |
+      this.ProcessSubNode("VersionType")
+      vt = getNodeResult("VersionType").Value
+      if (vt >> 4) != 1 {
+        panic("pppoe: version must be 1")
+      }
+      this.ProcessSubNode("Code")
+      this.ProcessSubNode("Session ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Payload").SetMaxLength(l)
+        this.ProcessSubNode("Payload")
+      }
+      return
+    VersionType: uint8
+    Code: uint8
+    Session ID: uint16
+    Length: uint16
+    Payload:
+      operator: |
+        code = getNodeResult("../Code").Value
+        if code == 0 {
+          this.ProcessByType("PPP")
+          return
+        }
+        res, op = this.TryProcessByType("PeekByte")
+        if !op.OK {
+          op.Recovery()
+          return
+        }
+        op.Recovery()
+        this.ProcessSubNode("Tags")
+        return
+      Tags:
+        list: true
+        Tag: PPPoETag
+        operator: |
+          for {
+            if this.GetMaxLength() < 4 {
+              break
+            }
+            res, op = this.TryProcessByType("PeekByte")
+            if !op.OK {
+              op.Recovery()
+              break
+            }
+            op.Recovery()
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 4 {
+              break
+            }
+            prev = this.Length()
+            ele.Process()
+            if this.Length() <= prev {
+              break
+            }
+            if ele.GetSubNode("Type").Result().Value == 0 {
+              break
+            }
+          }
+PPP: "import:ppp.yaml;node:PPP"
+PPPoETag:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    t = getNodeResult("Type").Value
+    l = getNodeResult("Length").Value
+    if t == 0 {
+      return
+    }
+    if t == 257 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Service-Name").SetMaxLength(l)
+        this.ProcessSubNode("Service-Name")
+      }
+      return
+    }
+    if t == 258 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("AC-Name").SetMaxLength(l)
+        this.ProcessSubNode("AC-Name")
+      }
+      return
+    }
+    if t == 259 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Host-Uniq").SetMaxLength(l)
+        this.ProcessSubNode("Host-Uniq")
+      }
+      return
+    }
+    if t == 260 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("AC-Cookie").SetMaxLength(l)
+        this.ProcessSubNode("AC-Cookie")
+      }
+      return
+    }
+    if l > 0 && l < 1048576 {
+      this.GetSubNode("Tag Data").SetMaxLength(l)
+      this.ProcessSubNode("Tag Data")
+    }
+    return
+  Type: uint16
+  Length: uint16
+  Service-Name: string
+  AC-Name: string
+  Host-Uniq: string
+  AC-Cookie: string
+  Tag Data: string
+PeekByte: uint8

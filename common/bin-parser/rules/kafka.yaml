@@ -1,0 +1,76 @@
+endian: big
+Package:
+  Kafka:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 8 {
+        panic("kafka: length smaller than 8")
+      }
+      if l >= 1048576 {
+        panic("kafka: length too large")
+      }
+      this.SetMaxLength(this.Length()+l)
+      this.ProcessSubNode("API Key")
+      this.ProcessSubNode("API Version")
+      this.ProcessSubNode("Correlation ID")
+      this.ProcessSubNode("Client ID Len")
+      n = getNodeResult("Client ID Len").Value
+      if n > 0 && n < 512 {
+        this.GetSubNode("Client ID").SetMaxLength(n)
+        this.ProcessSubNode("Client ID")
+      }
+      api = getNodeResult("API Key").Value
+      if api == 3 {
+        left = 0
+        if this.GetMaxLength() > this.Length() {
+          left = this.GetMaxLength() - this.Length()
+        }
+        if left < 4 {
+          panic("kafka: truncated topics count")
+        }
+        this.ProcessSubNode("Topics Count")
+        c = getNodeResult("Topics Count").Value
+        if c > 0 && c < 4096 {
+          left = 0
+          if this.GetMaxLength() > this.Length() {
+            left = this.GetMaxLength() - this.Length()
+          }
+          if left >= 2 && left < 1048576 {
+            this.GetSubNode("Topics").SetMaxLength(left)
+            this.ProcessSubNode("Topics")
+          }
+        }
+      }
+    Length: int32
+    API Key: int16
+    API Version: int16
+    Correlation ID: int32
+    Client ID Len: int16
+    Client ID: string
+    Topics Count: int32
+    Topics:
+      list: true
+      Topic: KafkaTopic
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+        }
+KafkaTopic:
+  operator: |
+    this.ProcessSubNode("Name Len")
+    n = getNodeResult("Name Len").Value
+    if n > 0 && n < 512 {
+      this.GetSubNode("Name").SetMaxLength(n)
+      this.ProcessSubNode("Name")
+    }
+  Name Len: int16
+  Name: string

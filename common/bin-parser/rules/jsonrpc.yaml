@@ -1,0 +1,79 @@
+Package:
+  JSONRPC:
+    operator: |
+      this.ProcessSubNode("Brace")
+      if getNodeResult("Brace").Value != 0x7b {
+        panic("jsonrpc: expected object")
+      }
+      if this.GetMaxLength() > 0 && this.GetMaxLength() < 1048576 {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 3 {
+          this.GetSubNode("Pairs").SetMaxLength(rest)
+        }
+      }
+      this.ProcessSubNode("Pairs")
+      hm = getCtx("has_method")
+      hr = getCtx("has_result")
+      he = getCtx("has_error")
+      if hm != 1 && hr != 1 && he != 1 {
+        panic("jsonrpc: expected method or result")
+      }
+    Brace: uint8
+    Pairs:
+      list: true
+      Pair: JSONPair
+      operator: |
+        for {
+          if getCtx("json_end") == 1 {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 3 {
+            if this.Length() == 0 {
+              panic("jsonrpc: empty pairs")
+            }
+            break
+          }
+          ele.Process()
+        }
+JSONPair:
+  operator: |
+    this.ProcessSubNode("QKey")
+    if getNodeResult("QKey").Value != 0x22 {
+      panic("jsonrpc: expected quote")
+    }
+    this.ProcessSubNode("Key")
+    this.ProcessSubNode("Colon")
+    if getNodeResult("Colon").Value != 0x3a {
+      panic("jsonrpc: expected colon")
+    }
+    this.ProcessSubNode("ValLead")
+    lead = getNodeResult("ValLead").Value
+    if lead == 0x22 {
+      this.ProcessSubNode("StrVal")
+    }
+    key = string(getNodeResult("Key").Value)
+    if key == "method" {
+      setCtx("has_method", 1)
+    }
+    if key == "result" {
+      setCtx("has_result", 1)
+    }
+    if key == "error" {
+      setCtx("has_error", 1)
+    }
+    this.ProcessSubNode("Sep")
+    sep = getNodeResult("Sep").Value
+    if sep == 0x7d {
+      setCtx("json_end", 1)
+    } else {
+      if sep != 0x2c {
+        panic("jsonrpc: expected comma or end")
+      }
+    }
+  QKey: uint8
+  Key: "del:\";type:string"
+  Colon: uint8
+  ValLead: uint8
+  StrVal: "del:\";type:string"
+  Sep: uint8

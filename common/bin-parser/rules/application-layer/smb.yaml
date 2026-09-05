@@ -1,0 +1,226 @@
+endian: little
+Package:
+  SMB:
+    operator: |
+      this.ProcessSubNode("ProtocolId")
+      magic = getNodeResult("ProtocolId").Value
+      if magic != 0x424d53ff {
+        panic("smb: ProtocolId must be \\xffSMB")
+      }
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Flags2")
+      this.ProcessSubNode("PIDHigh")
+      this.ProcessSubNode("SecurityFeatures")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("TID")
+      this.ProcessSubNode("PID")
+      this.ProcessSubNode("UID")
+      this.ProcessSubNode("MID")
+      cmd = getNodeResult("Command").Value
+      if cmd == 0x72 {
+        this.ProcessByType("Negotiate")
+        return
+      }
+      if cmd == 0x75 {
+        this.ProcessByType("TreeConnectAndX")
+        return
+      }
+      if cmd == 0x73 || cmd == 0xa2 || cmd == 0x2f || cmd == 0x2e || cmd == 0x74 {
+        this.ProcessByType("AndX")
+        return
+      }
+      if cmd == 0x04 {
+        this.ProcessByType("Close")
+        return
+      }
+      if cmd == 0x71 {
+        this.ProcessByType("TreeDisconnect")
+        return
+      }
+      if cmd == 0x25 || cmd == 0x32 {
+        this.ProcessByType("Transaction")
+        return
+      }
+    ProtocolId: uint32
+    Command: uint8
+    Status: uint32
+    Flags: uint8
+    Flags2: uint16
+    PIDHigh: uint16
+    SecurityFeatures: raw,8
+    Reserved: uint16
+    TID: uint16
+    PID: uint16
+    UID: uint16
+    MID: uint16
+Negotiate:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    this.ProcessSubNode("ByteCount")
+    this.GetSubNode("Dialects").SetMaxLength(getNodeResult("ByteCount").Value)
+    this.ProcessSubNode("Dialects")
+  WordCount: uint8
+  ByteCount: uint16
+  Dialects:
+    list: true
+    exception-plan: stopList
+    Dialect:
+      operator: |
+        fmt = this.ProcessSubNode("BufferFormat").Value
+        if fmt != 0x02 {
+          panic("smb: dialect BufferFormat must be 0x02")
+        }
+        this.ProcessSubNode("Name")
+      BufferFormat: uint8
+      Name: "del:\0;type:string"
+AndX:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    this.ProcessSubNode("AndXCommand")
+    this.ProcessSubNode("AndXReserved")
+    this.ProcessSubNode("AndXOffset")
+    this.ProcessSubNode("ByteCount")
+    bc = getNodeResult("ByteCount").Value
+    if bc > 0 {
+      if bc > 0x10000 {
+        panic("smb: ByteCount too large")
+      }
+      this.GetSubNode("Octets").SetMaxLength(bc)
+      this.ProcessSubNode("Octets")
+    }
+    return
+  WordCount: uint8
+  AndXCommand: uint8
+  AndXReserved: uint8
+  AndXOffset: uint16
+  ByteCount: uint16
+  Octets: string
+Close:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    if getNodeResult("WordCount").Value != 3 {
+      panic("smb: CLOSE WordCount must be 3")
+    }
+    this.ProcessSubNode("FID")
+    this.ProcessSubNode("LastWrite")
+    this.ProcessSubNode("ByteCount")
+  WordCount: uint8
+  FID: uint16
+  LastWrite: uint32
+  ByteCount: uint16
+TreeDisconnect:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    this.ProcessSubNode("ByteCount")
+  WordCount: uint8
+  ByteCount: uint16
+Transaction:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    wc = getNodeResult("WordCount").Value
+    if wc < 14 {
+      panic("smb: TRANSACTION WordCount < 14")
+    }
+    this.ProcessSubNode("Total Parameter Count")
+    this.ProcessSubNode("Total Data Count")
+    this.ProcessSubNode("Max Parameter Count")
+    this.ProcessSubNode("Max Data Count")
+    this.ProcessSubNode("Max Setup Count")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Timeout")
+    this.ProcessSubNode("Reserved2")
+    this.ProcessSubNode("Parameter Count")
+    this.ProcessSubNode("Parameter Offset")
+    this.ProcessSubNode("Data Count")
+    this.ProcessSubNode("Data Offset")
+    this.ProcessSubNode("Setup Count")
+    this.ProcessSubNode("Reserved3")
+    setup = getNodeResult("Setup Count").Value
+    if setup > 32 {
+      panic("smb: TRANSACTION SetupCount too large")
+    }
+    extra = wc - 14
+    if extra != setup {
+      panic("smb: TRANSACTION WordCount/SetupCount mismatch")
+    }
+    if setup > 0 {
+      this.GetSubNode("Setup").SetMaxLength(setup * 2)
+      this.ProcessSubNode("Setup")
+    }
+    this.ProcessSubNode("ByteCount")
+    bc = getNodeResult("ByteCount").Value
+    if bc > 0 {
+      if bc > 0x10000 {
+        panic("smb: TRANSACTION ByteCount too large")
+      }
+      this.GetSubNode("Octets").SetMaxLength(bc)
+      this.ProcessSubNode("Octets")
+    }
+  WordCount: uint8
+  Total Parameter Count: uint16
+  Total Data Count: uint16
+  Max Parameter Count: uint16
+  Max Data Count: uint16
+  Max Setup Count: uint8
+  Reserved: uint8
+  Flags: uint16
+  Timeout: uint32
+  Reserved2: uint16
+  Parameter Count: uint16
+  Parameter Offset: uint16
+  Data Count: uint16
+  Data Offset: uint16
+  Setup Count: uint8
+  Reserved3: uint8
+  Setup:
+    list: true
+    Word: SMBSetupWord
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        ele.Process()
+      }
+  ByteCount: uint16
+  Octets: string
+TreeConnectAndX:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    if getNodeResult("WordCount").Value != 4 {
+      panic("smb: TREE_CONNECT_ANDX WordCount must be 4")
+    }
+    this.ProcessSubNode("AndXCommand")
+    this.ProcessSubNode("AndXReserved")
+    this.ProcessSubNode("AndXOffset")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("PasswordLength")
+    this.ProcessSubNode("ByteCount")
+    plen = getNodeResult("PasswordLength").Value
+    if plen > 0 && plen < 1048576 {
+      this.GetSubNode("Password").SetMaxLength(plen)
+      this.ProcessSubNode("Password")
+    }
+    this.ProcessSubNode("Path Format")
+    this.ProcessSubNode("Path")
+    this.ProcessSubNode("Service Format")
+    this.ProcessSubNode("Service")
+    return
+  WordCount: uint8
+  AndXCommand: uint8
+  AndXReserved: uint8
+  AndXOffset: uint16
+  Flags: uint16
+  PasswordLength: uint16
+  ByteCount: uint16
+  Password: string
+  Path Format: uint8
+  Path: "del:\0;type:string"
+  Service Format: uint8
+  Service: "del:\0;type:string"
+SMBSetupWord:
+  Word: uint16

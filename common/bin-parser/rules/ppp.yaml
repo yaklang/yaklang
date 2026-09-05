@@ -11,17 +11,82 @@ Package:
          switch type {
             case 0x0021:
                this.ProcessByType("IP")
+               return
+            case 0x0057:
+               this.ProcessByType("IPv6")
+               return
             case 0xc021:
                this.ProcessByType("LCP")
+               return
             case 0xc023:
                this.ProcessByType("PAP")
+               return
             case 0xc223:
                this.ProcessByType("CHAP")
+               return
+            case 0x8021:
+               this.ProcessByType("IPCP")
+               return
             default:
-               this.NewUnknownNode()
+               res, op = this.TryProcessByType("PeekByte")
+               op.Recovery()
+               if op.OK {
+                 this.ProcessByType("Next Protocol Data")
+               }
+               return
          }
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 PAP: "import:password_authentication_protocol.yaml;node:PAP"
 CHAP: "import:challenge_handshake_authentication_protocol.yaml;node:CHAP"
 LCP: "import:link_control_protocol.yaml;node:LCP"
-Unknown: raw
+IPCP:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l > 4 && l < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(l-4)
+      this.ProcessSubNode("Options")
+    }
+  Code: uint8
+  Identifier: uint8
+  Length: uint16
+  Options:
+    list: true
+    Option:
+      operator: |
+        this.ProcessSubNode("Type")
+        this.ProcessSubNode("Length")
+        n = getNodeResult("Length").Value
+        if n > 2 && n < 256 {
+          this.GetSubNode("Value").SetMaxLength(n-2)
+          this.ProcessSubNode("Value")
+        }
+      Type: uint8
+      Length: uint8
+      Value: string
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        ele.Process()
+      }
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8

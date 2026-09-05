@@ -1,0 +1,107 @@
+endian: big
+Package:
+  RTP:
+    operator: |
+      this.ProcessSubNode("VersionPXPCC")
+      vpc = getNodeResult("VersionPXPCC").Value
+      ver = vpc >> 6
+      if ver != 2 {
+        panic("rtp: version must be 2")
+      }
+      cc = vpc & 0x0f
+      this.ProcessSubNode("MarkerPayload")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Timestamp")
+      this.ProcessSubNode("SSRC")
+      n = vpc & 0x0f
+      if n > 0 {
+        this.ProcessSubNode("CSRCs")
+      }
+      xbit = (vpc >> 4) & 1
+      if xbit == 1 {
+        this.ProcessSubNode("Ext Profile")
+        this.ProcessSubNode("Ext Length")
+        el = getNodeResult("Ext Length").Value
+        if el > 0 && el < 1024 {
+          this.GetSubNode("Extension").SetMaxLength(el * 4)
+          this.ProcessSubNode("Extension")
+        }
+      }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Payload").SetMaxLength(rest)
+          this.ProcessSubNode("Payload")
+        }
+      }
+    VersionPXPCC: uint8
+    MarkerPayload: uint8
+    Sequence: uint16
+    Timestamp: uint32
+    SSRC: uint32
+    Ext Profile: uint16
+    Ext Length: uint16
+    Extension: string
+    CSRCs:
+      list: true
+      CSRC: uint32
+      operator: |
+        vpc = getNodeResult("../VersionPXPCC").Value
+        n = vpc & 0x0f
+        i = 0
+        for {
+          if i >= n {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+          i = i + 1
+        }
+    Payload: raw
+  RTCP:
+    operator: |
+      this.ProcessSubNode("VersionPCount")
+      vpc = getNodeResult("VersionPCount").Value
+      ver = vpc >> 6
+      if ver != 2 {
+        panic("rtcp: version must be 2")
+      }
+      this.ProcessSubNode("Packet Type")
+      pt = getNodeResult("Packet Type").Value
+      if pt < 200 || pt > 204 {
+        panic("rtcp: unexpected packet type")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      total = (l + 1) * 4
+      if total < 8 {
+        panic("rtcp: length too small")
+      }
+      if total >= 1048576 {
+        panic("rtcp: packet too large")
+      }
+      this.SetMaxLength(total)
+      this.ProcessSubNode("SSRC")
+      if pt == 200 {
+        rest = 0
+        if this.GetMaxLength() > this.Length() {
+          rest = this.GetMaxLength() - this.Length()
+        }
+        if rest >= 20 && rest < 1048576 {
+          this.ProcessByType("RTCPSR")
+        }
+        return
+      }
+    VersionPCount: uint8
+    Packet Type: uint8
+    Length: uint16
+    SSRC: uint32
+RTCPSR:
+  NTP MSW: uint32
+  NTP LSW: uint32
+  RTP Timestamp: uint32
+  Packet Count: uint32
+  Octet Count: uint32

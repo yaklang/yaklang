@@ -1,0 +1,201 @@
+endian: big
+Package:
+  AMQP:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ == 0x41 {
+        this.ProcessSubNode("Protocol")
+        proto = string(getNodeResult("MQ").Value) + string(getNodeResult("QP").Value)
+        if proto != "MQP" {
+          panic("amqp: protocol header magic")
+        }
+        return
+      }
+      if typ != 1 && typ != 2 && typ != 3 && typ != 8 {
+        panic("amqp: unknown frame type")
+      }
+      this.ProcessSubNode("Channel")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if typ == 1 && l >= 4 {
+        this.ProcessSubNode("Class ID")
+        this.ProcessSubNode("Method ID")
+        rest = l - 4
+        cid = getNodeResult("Class ID").Value
+        mid = getNodeResult("Method ID").Value
+        if cid == 10 && mid == 10 && rest >= 2 && rest < 1048576 {
+          this.GetSubNode("Arguments").SetMaxLength(rest)
+          this.ProcessSubNode("Arguments")
+        }
+      }
+      this.ProcessSubNode("Frame End")
+      if getNodeResult("Frame End").Value != 0xce {
+        panic("amqp: frame end must be 0xce")
+      }
+    Type: uint8
+    Protocol:
+      unpack: true
+      MQ: raw,1
+      QP: raw,2
+      Id: uint8
+      Major: uint8
+      Minor: uint8
+      Revision: uint8
+    Channel: uint16
+    Length: uint32
+    Class ID: uint16
+    Method ID: uint16
+    Arguments:
+      unpack: true
+      operator: |
+        this.ProcessSubNode("Version Major")
+        this.ProcessSubNode("Version Minor")
+        this.ProcessSubNode("Properties")
+        this.ProcessSubNode("Mechanisms")
+        this.ProcessSubNode("Locales")
+      Version Major: uint8
+      Version Minor: uint8
+      Properties:
+        operator: |
+          this.ProcessByType("AMQPTable")
+      Mechanisms:
+        operator: |
+          this.ProcessSubNode("Len")
+          n = getNodeResult("Len").Value
+          if n > 0 && n < 1048576 {
+            this.GetSubNode("Value").SetMaxLength(n)
+            this.ProcessSubNode("Value")
+          }
+        Len: uint32
+        Value: string
+      Locales:
+        operator: |
+          this.ProcessSubNode("Len")
+          n = getNodeResult("Len").Value
+          if n > 0 && n < 1048576 {
+            this.GetSubNode("Value").SetMaxLength(n)
+            this.ProcessSubNode("Value")
+          }
+        Len: uint32
+        Value: string
+    Frame End: uint8
+AMQPTable:
+  operator: |
+    this.ProcessSubNode("Table Size")
+    n = getNodeResult("Table Size").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Entries").SetMaxLength(n)
+      this.ProcessSubNode("Entries")
+    }
+  Table Size: uint32
+  Entries:
+    list: true
+    Entry:
+      operator: |
+        this.ProcessSubNode("Name Len")
+        n = getNodeResult("Name Len").Value
+        if n > 0 && n < 256 {
+          this.GetSubNode("Name").SetMaxLength(n)
+          this.ProcessSubNode("Name")
+        }
+        this.ProcessSubNode("Kind")
+        k = getNodeResult("Kind").Value
+        if k == 0x53 {
+          this.ProcessSubNode("Str Len")
+          sl = getNodeResult("Str Len").Value
+          if sl > 0 && sl < 1048576 {
+            this.GetSubNode("Str").SetMaxLength(sl)
+            this.ProcessSubNode("Str")
+          }
+          return
+        }
+        if k == 0x73 {
+          this.ProcessSubNode("Short Len")
+          sn = getNodeResult("Short Len").Value
+          if sn > 0 && sn < 256 {
+            this.GetSubNode("Short").SetMaxLength(sn)
+            this.ProcessSubNode("Short")
+          }
+          return
+        }
+        if k == 0x74 {
+          this.ProcessSubNode("Bool")
+          return
+        }
+        if k == 0x49 {
+          this.ProcessSubNode("Long")
+          return
+        }
+        if k == 0x54 {
+          this.ProcessSubNode("Timestamp")
+          return
+        }
+        if k == 0x56 {
+          return
+        }
+        if k == 0x46 {
+          this.ProcessByType("AMQPTable")
+          return
+        }
+        if k == 0x41 {
+          this.ProcessByType("AMQPArray")
+          return
+        }
+      Name Len: uint8
+      Name: string
+      Kind: uint8
+      Str Len: uint32
+      Str: string
+      Short Len: uint8
+      Short: string
+      Bool: uint8
+      Long: int32
+      Timestamp: uint64
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        ele.Process()
+      }
+AMQPArray:
+  operator: |
+    this.ProcessSubNode("Array Size")
+    n = getNodeResult("Array Size").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Values").SetMaxLength(n)
+      this.ProcessSubNode("Values")
+    }
+  Array Size: uint32
+  Values:
+    list: true
+    Item:
+      operator: |
+        this.ProcessSubNode("Kind")
+        k = getNodeResult("Kind").Value
+        if k == 0x53 {
+          this.ProcessSubNode("Str Len")
+          sl = getNodeResult("Str Len").Value
+          if sl > 0 && sl < 1048576 {
+            this.GetSubNode("Str").SetMaxLength(sl)
+            this.ProcessSubNode("Str")
+          }
+          return
+        }
+        if k == 0x74 {
+          this.ProcessSubNode("Bool")
+        }
+      Kind: uint8
+      Str Len: uint32
+      Str: string
+      Bool: uint8
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 1 {
+          break
+        }
+        ele.Process()
+      }

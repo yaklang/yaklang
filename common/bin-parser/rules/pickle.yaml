@@ -1,0 +1,57 @@
+endian: little
+Package:
+  Pickle:
+    operator: |
+      this.ProcessSubNode("Ops")
+    Ops:
+      list: true
+      Op: PickleOp
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            panic("pickle: empty")
+          }
+          ele.Process()
+          op = ele.GetSubNode("Opcode").Result().Value
+          if op == 0x2e {
+            break
+          }
+          if this.GetMaxLength() > 0 && this.Length() >= this.GetMaxLength() {
+            break
+          }
+        }
+PickleOp:
+  operator: |
+    this.ProcessSubNode("Opcode")
+    op = getNodeResult("Opcode").Value
+    if op == 0x80 {
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v > 5 {
+        panic("pickle: protocol version > 5")
+      }
+      return
+    }
+    if op == 0x4b {
+      this.ProcessSubNode("BININT1")
+      return
+    }
+    if op == 0x4a {
+      this.ProcessSubNode("BININT")
+      return
+    }
+    if op == 0x4e {
+      return
+    }
+    if op == 0x2e {
+      return
+    }
+    if op == 0x61 || op == 0x65 || op == 0x71 || op == 0x5d || op == 0x7d || op == 0x28 || op == 0x2e {
+      return
+    }
+    panic("pickle: unknown opcode")
+  Opcode: uint8
+  Version: uint8
+  BININT1: uint8
+  BININT: uint32

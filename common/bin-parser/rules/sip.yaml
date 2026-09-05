@@ -1,0 +1,73 @@
+Package:
+  SIP:
+    operator: |
+      res,op = this.TryProcessByType("FirstWorld")
+      op.Recovery()
+      first = string(res.Value)
+      if first.HasPrefix("SIP/") {
+        this.ProcessSubNode("SIP Response")
+      }else{
+        if !(first.HasPrefix("INVITE") || first.HasPrefix("ACK") || first.HasPrefix("BYE") || first.HasPrefix("CANCEL") || first.HasPrefix("REGISTER") || first.HasPrefix("OPTIONS") || first.HasPrefix("INFO") || first.HasPrefix("PRACK") || first.HasPrefix("SUBSCRIBE") || first.HasPrefix("NOTIFY") || first.HasPrefix("UPDATE") || first.HasPrefix("MESSAGE") || first.HasPrefix("REFER") || first.HasPrefix("PUBLISH")) {
+          panic("sip: unknown method")
+        }
+        this.ProcessSubNode("SIP Request")
+      }
+    SIP Request:
+      FirstLine:
+        unpack: true
+        Method: "del: ;type:string"
+        URI: "del: ;type:string"
+        Version: "del:\r\n;type:string"
+      Headers: SIPHeaders
+      Body: SIPBody
+    SIP Response:
+      FirstLine:
+        unpack: true
+        Version: "del: ;type:string"
+        Status: "del: ;type:string"
+        Reason: "del:\r\n;type:string"
+      Headers: SIPHeaders
+      Body: SIPBody
+FirstWorld: "del: ;type:string"
+SIPBody:
+  operator: |
+    l = getCtx("body_length")
+    ct = getCtx("content_type")
+    if l > 0 && l < 1048576 {
+      sdp = false
+      if ct != nil {
+        if string(ct).Contains("application/sdp") {
+          sdp = true
+        }
+      }
+      if sdp {
+        this.GetSubNode("SDP").SetMaxLength(l)
+        this.ProcessSubNode("SDP")
+        return
+      }
+      this.GetSubNode("Octets").SetMaxLength(l)
+      this.ProcessSubNode("Octets")
+    }
+  SDP:
+    unpack: true
+    operator: |
+      this.ProcessByType("SDPSession")
+  Octets: string
+SIPHeaders:
+  operator: |
+    for {
+      data := this.NewElement().Process().Value
+      if data == nil || len(data) == 0 {
+        return
+      }
+      s = string(data)
+      if s.HasPrefix("Content-Length: ") {
+        setCtx("body_length", int(s[len("Content-Length: "):]))
+      }
+      if s.HasPrefix("Content-Type: ") {
+        setCtx("content_type", s[len("Content-Type: "):])
+      }
+    }
+  list: true
+  Item: "del:\r\n;type:string"
+SDPSession: "import:sdp.yaml;node:SDP"

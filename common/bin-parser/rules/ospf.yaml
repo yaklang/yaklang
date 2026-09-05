@@ -1,0 +1,123 @@
+endian: big
+Package:
+  OSPF:
+    operator: |
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v != 2 && v != 3 {
+        panic("ospf: version must be 2 or 3")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 5 {
+        panic("ospf: unknown packet type")
+      }
+      this.ProcessSubNode("Packet Length")
+      l = getNodeResult("Packet Length").Value
+      if l < 24 {
+        panic("ospf: header too short")
+      }
+      if l >= 1048576 {
+        panic("ospf: packet too large")
+      }
+      this.SetMaxLength(l)
+      this.ProcessSubNode("Router ID")
+      this.ProcessSubNode("Area ID")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("AuType")
+      this.ProcessSubNode("Authentication")
+      if typ == 1 {
+        this.ProcessByType("OSPFHello")
+        return
+      }
+      if typ == 2 {
+        this.ProcessByType("OSPFDBDesc")
+        return
+      }
+    Version: uint8
+    Type: uint8
+    Packet Length: uint16
+    Router ID: raw,4
+    Area ID: raw,4
+    Checksum: uint16
+    AuType: uint16
+    Authentication: raw,8
+OSPFHello:
+  operator: |
+    this.ProcessSubNode("Network Mask")
+    this.ProcessSubNode("Hello Interval")
+    this.ProcessSubNode("Options")
+    this.ProcessSubNode("Priority")
+    this.ProcessSubNode("Dead Interval")
+    this.ProcessSubNode("Designated Router")
+    this.ProcessSubNode("Backup Designated Router")
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+      if rest >= 4 && rest < 1048576 {
+        this.GetSubNode("Neighbors").SetMaxLength(rest)
+        this.ProcessSubNode("Neighbors")
+      }
+    }
+  Network Mask: raw,4
+  Hello Interval: uint16
+  Options: uint8
+  Priority: uint8
+  Dead Interval: uint32
+  Designated Router: raw,4
+  Backup Designated Router: raw,4
+  Neighbors:
+    list: true
+    Neighbor: raw,4
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 4 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+OSPFDBDesc:
+  operator: |
+    this.ProcessSubNode("Interface MTU")
+    this.ProcessSubNode("Options")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("DD Sequence")
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+      if rest >= 20 && rest < 1048576 {
+        this.GetSubNode("LSA Headers").SetMaxLength(rest)
+        this.ProcessSubNode("LSA Headers")
+      }
+    }
+  Interface MTU: uint16
+  Options: uint8
+  Flags: uint8
+  DD Sequence: uint32
+  LSA Headers:
+    list: true
+    Header: OSPFLSAHdr
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 20 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+OSPFLSAHdr:
+  LS Age: uint16
+  Options: uint8
+  LS Type: uint8
+  Link State ID: raw,4
+  Advertising Router: raw,4
+  Sequence: uint32
+  Checksum: uint16
+  Length: uint16

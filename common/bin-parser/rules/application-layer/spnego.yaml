@@ -1,0 +1,101 @@
+endian: big
+Package:
+  SPNEGO:
+    operator: |
+      tag = this.ProcessSubNode("Tag").Value
+      if tag != 0x60 {
+        panic("spnego: expected GSS-API 0x60")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l >= 0x80 {
+        panic("spnego: long-form BER length not in this rule")
+      }
+      if l < 2 {
+        panic("spnego: token too small")
+      }
+      this.ProcessSubNode("OID Tag")
+      if getNodeResult("OID Tag").Value != 0x06 {
+        panic("spnego: expected OID tag 0x06")
+      }
+      this.ProcessSubNode("OID Length")
+      ol = getNodeResult("OID Length").Value
+      if ol == 0 || ol > 32 {
+        panic("spnego: bad OID length")
+      }
+      this.GetSubNode("OID").SetMaxLength(ol)
+      this.ProcessSubNode("OID")
+      rest = l - 2 - ol
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Token").SetMaxLength(rest)
+        this.ProcessSubNode("Token")
+      }
+      return
+    Tag: uint8
+    Length: uint8
+    OID Tag: uint8
+    OID Length: uint8
+    OID: string
+    Token:
+      operator: |
+        this.ProcessSubNode("NegTag")
+        this.ProcessSubNode("NegLength")
+        nl = getNodeResult("NegLength").Value
+        if nl > 0 && nl < 1048576 {
+          tag = getNodeResult("NegTag").Value
+          if tag == 0xa0 {
+            res, op = this.TryProcessByType("SPNEGOInit")
+            if op.OK {
+              op.Save()
+            } else {
+              op.Recovery()
+              this.GetSubNode("Octets").SetMaxLength(nl)
+              this.ProcessSubNode("Octets")
+            }
+          } else {
+            this.GetSubNode("Octets").SetMaxLength(nl)
+            this.ProcessSubNode("Octets")
+          }
+        }
+        return
+      NegTag: uint8
+      NegLength: uint8
+      Octets: string
+SPNEGOInit:
+  operator: |
+    this.ProcessSubNode("Sequence Tag")
+    if getNodeResult("Sequence Tag").Value != 0x30 {
+      panic("spnego: expected NegTokenInit SEQUENCE")
+    }
+    this.ProcessSubNode("Sequence Length")
+    this.ProcessSubNode("MechTypes Tag")
+    if getNodeResult("MechTypes Tag").Value != 0xa0 {
+      panic("spnego: expected mechTypes [0]")
+    }
+    this.ProcessSubNode("MechTypes Length")
+    this.ProcessSubNode("MechList Tag")
+    if getNodeResult("MechList Tag").Value != 0x30 {
+      panic("spnego: expected MechTypeList SEQUENCE")
+    }
+    this.ProcessSubNode("MechList Length")
+    this.ProcessSubNode("MechOID Tag")
+    if getNodeResult("MechOID Tag").Value != 0x06 {
+      panic("spnego: expected MechType OID")
+    }
+    this.ProcessSubNode("MechOID Length")
+    mol = getNodeResult("MechOID Length").Value
+    if mol <= 0 || mol > 32 {
+      panic("spnego: bad MechType OID length")
+    }
+    this.GetSubNode("MechOID").SetMaxLength(mol)
+    this.ProcessSubNode("MechOID")
+    return
+  Sequence Tag: uint8
+  Sequence Length: uint8
+  MechTypes Tag: uint8
+  MechTypes Length: uint8
+  MechList Tag: uint8
+  MechList Length: uint8
+  MechOID Tag: uint8
+  MechOID Length: uint8
+  MechOID: string

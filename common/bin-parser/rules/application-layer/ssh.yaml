@@ -1,0 +1,158 @@
+endian: big
+Package:
+  SSH:
+    operator: |
+      ident = this.ProcessSubNode("Identification").Value
+      s = string(ident)
+      if !s.HasPrefix("SSH-") {
+        panic("ssh: identification must start with SSH-")
+      }
+    Identification: "del:\r\n;type:string"
+  SSHPacket:
+    operator: |
+      this.ProcessSubNode("Packet Length")
+      plen = getNodeResult("Packet Length").Value
+      if plen < 5 || plen > 35000 {
+        panic("ssh: invalid packet length")
+      }
+      this.ProcessSubNode("Padding Length")
+      pad = getNodeResult("Padding Length").Value
+      if pad > plen - 1 {
+        panic("ssh: padding longer than packet")
+      }
+      pay = plen - pad - 1
+      if pay > 0 {
+        this.GetSubNode("Payload").SetMaxLength(pay)
+        this.ProcessSubNode("Payload")
+      }
+      if pad > 0 {
+        this.GetSubNode("Padding").SetMaxLength(pad)
+        this.ProcessSubNode("Padding")
+      }
+      return
+    Packet Length: uint32
+    Padding Length: uint8
+    Payload:
+      operator: |
+        this.ProcessSubNode("Message Number")
+        msg = getNodeResult("Message Number").Value
+        rem = 0
+        if this.GetMaxLength() > this.Length() {
+          rem = this.GetMaxLength() - this.Length()
+        }
+        if msg == 20 && rem >= 61 && rem < 1048576 {
+          this.ProcessByType("SSHKexInit")
+          return
+        }
+        if msg == 30 && rem >= 4 && rem < 1048576 {
+          this.ProcessByType("SSHKexDHInit")
+          return
+        }
+        if rem > 0 && rem < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rem)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      Message Number: uint8
+      Octets: string
+    Padding: string
+SSHKexInit:
+  operator: |
+    this.ProcessSubNode("Cookie")
+    this.ProcessSubNode("Kex Algos Length")
+    kl = getNodeResult("Kex Algos Length").Value
+    if kl > 0 && kl < 1048576 {
+      this.GetSubNode("Kex Algos").SetMaxLength(kl)
+      this.ProcessSubNode("Kex Algos")
+    }
+    this.ProcessSubNode("Host Key Algos Length")
+    hl = getNodeResult("Host Key Algos Length").Value
+    if hl > 0 && hl < 1048576 {
+      this.GetSubNode("Host Key Algos").SetMaxLength(hl)
+      this.ProcessSubNode("Host Key Algos")
+    }
+    this.ProcessSubNode("Enc C2S Length")
+    el = getNodeResult("Enc C2S Length").Value
+    if el > 0 && el < 1048576 {
+      this.GetSubNode("Enc C2S").SetMaxLength(el)
+      this.ProcessSubNode("Enc C2S")
+    }
+    this.ProcessSubNode("Enc S2C Length")
+    es = getNodeResult("Enc S2C Length").Value
+    if es > 0 && es < 1048576 {
+      this.GetSubNode("Enc S2C").SetMaxLength(es)
+      this.ProcessSubNode("Enc S2C")
+    }
+    this.ProcessSubNode("MAC C2S Length")
+    ml = getNodeResult("MAC C2S Length").Value
+    if ml > 0 && ml < 1048576 {
+      this.GetSubNode("MAC C2S").SetMaxLength(ml)
+      this.ProcessSubNode("MAC C2S")
+    }
+    this.ProcessSubNode("MAC S2C Length")
+    ms = getNodeResult("MAC S2C Length").Value
+    if ms > 0 && ms < 1048576 {
+      this.GetSubNode("MAC S2C").SetMaxLength(ms)
+      this.ProcessSubNode("MAC S2C")
+    }
+    this.ProcessSubNode("Comp C2S Length")
+    cl = getNodeResult("Comp C2S Length").Value
+    if cl > 0 && cl < 1048576 {
+      this.GetSubNode("Comp C2S").SetMaxLength(cl)
+      this.ProcessSubNode("Comp C2S")
+    }
+    this.ProcessSubNode("Comp S2C Length")
+    cs = getNodeResult("Comp S2C Length").Value
+    if cs > 0 && cs < 1048576 {
+      this.GetSubNode("Comp S2C").SetMaxLength(cs)
+      this.ProcessSubNode("Comp S2C")
+    }
+    this.ProcessSubNode("Lang C2S Length")
+    ll = getNodeResult("Lang C2S Length").Value
+    if ll > 0 && ll < 1048576 {
+      this.GetSubNode("Lang C2S").SetMaxLength(ll)
+      this.ProcessSubNode("Lang C2S")
+    }
+    this.ProcessSubNode("Lang S2C Length")
+    ls = getNodeResult("Lang S2C Length").Value
+    if ls > 0 && ls < 1048576 {
+      this.GetSubNode("Lang S2C").SetMaxLength(ls)
+      this.ProcessSubNode("Lang S2C")
+    }
+    this.ProcessSubNode("First Kex Follows")
+    this.ProcessSubNode("Reserved")
+    return
+  Cookie: raw,16
+  Kex Algos Length: uint32
+  Kex Algos: string
+  Host Key Algos Length: uint32
+  Host Key Algos: string
+  Enc C2S Length: uint32
+  Enc C2S: string
+  Enc S2C Length: uint32
+  Enc S2C: string
+  MAC C2S Length: uint32
+  MAC C2S: string
+  MAC S2C Length: uint32
+  MAC S2C: string
+  Comp C2S Length: uint32
+  Comp C2S: string
+  Comp S2C Length: uint32
+  Comp S2C: string
+  Lang C2S Length: uint32
+  Lang C2S: string
+  Lang S2C Length: uint32
+  Lang S2C: string
+  First Kex Follows: uint8
+  Reserved: uint32
+SSHKexDHInit:
+  operator: |
+    this.ProcessSubNode("E Length")
+    n = getNodeResult("E Length").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("E").SetMaxLength(n)
+      this.ProcessSubNode("E")
+    }
+    return
+  E Length: uint32
+  E: string

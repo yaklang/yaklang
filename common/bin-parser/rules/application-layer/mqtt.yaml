@@ -1,0 +1,108 @@
+endian: big
+Package:
+  MQTT:
+    operator: |
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("Flags")
+      ptype = getNodeResult("Packet Type").Value
+      if ptype < 1 || ptype > 14 {
+        panic("mqtt: invalid packet type")
+      }
+      this.ProcessSubNode("RL0")
+      b0 = getNodeResult("RL0").Value
+      rem = b0 & 127
+      if (b0 & 128) != 0 {
+        this.ProcessSubNode("RL1")
+        b1 = getNodeResult("RL1").Value
+        rem = rem + (b1 & 127) * 128
+        if (b1 & 128) != 0 {
+          panic("mqtt: remaining length longer than 2 bytes")
+        }
+      }
+      avail = this.GetSubNode("Payload").GetRemainingSpace()
+      if rem > avail {
+        panic("mqtt: remaining length exceeds payload")
+      }
+      if rem > 0 {
+        this.GetSubNode("Payload").SetMaxLength(rem)
+        this.ProcessSubNode("Payload")
+      }
+    Packet Type: uint8,4bit
+    Flags: uint8,4bit
+    RL0: uint8
+    RL1: uint8
+    Payload:
+      operator: |
+        ptype = getNodeResult("../Packet Type").Value
+        if ptype == 1 {
+          this.ProcessSubNode("Connect")
+          return
+        }
+        if ptype == 2 {
+          this.ProcessSubNode("Connack")
+          return
+        }
+        if ptype == 3 {
+          this.ProcessSubNode("Publish")
+          return
+        }
+        if ptype == 8 {
+          this.ProcessSubNode("Subscribe")
+          return
+        }
+        if ptype == 4 || ptype == 5 || ptype == 6 || ptype == 7 || ptype == 9 || ptype == 10 || ptype == 11 {
+          this.ProcessSubNode("Packet ID")
+          return
+        }
+      Connect:
+        Protocol Name Length: uint16
+        Protocol Name:
+          type: string
+          length-from-field: ../Protocol Name Length
+        Protocol Level: uint8
+        Connect Flags: uint8
+        Keep Alive: uint16
+        Client ID Length: uint16
+        Client ID:
+          type: string
+          length-from-field: ../Client ID Length
+        operator: |
+          this.ProcessSubNode("Protocol Name Length")
+          this.ProcessSubNode("Protocol Name")
+          name = string(getNodeResult("Protocol Name").Value)
+          if name != "MQTT" && name != "MQIsdp" {
+            panic("mqtt: unknown protocol name")
+          }
+          this.ProcessSubNode("Protocol Level")
+          this.ProcessSubNode("Connect Flags")
+          this.ProcessSubNode("Keep Alive")
+          this.ProcessSubNode("Client ID Length")
+          this.ProcessSubNode("Client ID")
+      Connack:
+        Flags: uint8
+        Return Code: uint8
+      Publish:
+        operator: |
+          this.ProcessSubNode("Topic Length")
+          this.ProcessSubNode("Topic")
+          qos = (getNodeResult("@MQTT/Flags").Value >> 1) & 3
+          if qos > 0 {
+            this.ProcessSubNode("Packet ID")
+          }
+          if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+            rest = this.GetMaxLength() - this.Length()
+            if rest > 0 {
+              this.GetSubNode("Message").SetMaxLength(rest)
+              this.ProcessSubNode("Message")
+            }
+          }
+          return
+        Topic Length: uint16
+        Topic:
+          type: string
+          length-from-field: ../Topic Length
+        Packet ID: uint16
+        Message: string
+      Subscribe:
+        Packet ID: uint16
+      Packet ID: uint16

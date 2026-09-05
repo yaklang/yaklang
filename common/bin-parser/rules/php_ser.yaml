@@ -1,0 +1,221 @@
+Package:
+  PHPSer:
+    operator: |
+      this.ProcessSubNode("Kind")
+      k = getNodeResult("Kind").Value
+      if k == 0x4e {
+        this.ProcessSubNode("End")
+        if getNodeResult("End").Value != 0x3b {
+          panic("php_ser: expected semicolon")
+        }
+        return
+      }
+      this.ProcessSubNode("Colon")
+      if getNodeResult("Colon").Value != 0x3a {
+        panic("php_ser: expected colon")
+      }
+      if k == 0x69 || k == 0x62 || k == 0x64 {
+        this.ProcessSubNode("Int")
+        return
+      }
+      if k == 0x73 {
+        this.ProcessSubNode("Strlen")
+        slen = int(string(getNodeResult("Strlen").Value))
+        this.ProcessSubNode("Quote")
+        if getNodeResult("Quote").Value != 0x22 {
+          panic("php_ser: expected quote")
+        }
+        if slen > 0 && slen < 1048576 {
+          this.GetSubNode("String").SetMaxLength(slen)
+          this.ProcessSubNode("String")
+        }
+        this.ProcessSubNode("Quote2")
+        if getNodeResult("Quote2").Value != 0x22 {
+          panic("php_ser: expected quote")
+        }
+        this.ProcessSubNode("End")
+        if getNodeResult("End").Value != 0x3b {
+          panic("php_ser: expected semicolon")
+        }
+        return
+      }
+      if k == 0x61 {
+        this.ProcessSubNode("Count")
+        this.ProcessSubNode("Open")
+        if getNodeResult("Open").Value != 0x7b {
+          panic("php_ser: expected {")
+        }
+        this.ProcessSubNode("Members")
+        this.ProcessSubNode("Close")
+        if getNodeResult("Close").Value != 0x7d {
+          panic("php_ser: expected }")
+        }
+        return
+      }
+      if k == 0x4f {
+        this.ProcessSubNode("Namelen")
+        nlen = int(string(getNodeResult("Namelen").Value))
+        this.ProcessSubNode("Quote")
+        if getNodeResult("Quote").Value != 0x22 {
+          panic("php_ser: expected quote")
+        }
+        if nlen > 0 && nlen < 1024 {
+          this.GetSubNode("Class").SetMaxLength(nlen)
+          this.ProcessSubNode("Class")
+        }
+        this.ProcessSubNode("Quote2")
+        if getNodeResult("Quote2").Value != 0x22 {
+          panic("php_ser: expected quote")
+        }
+        this.ProcessSubNode("Colon2")
+        if getNodeResult("Colon2").Value != 0x3a {
+          panic("php_ser: expected colon")
+        }
+        this.ProcessSubNode("Count")
+        this.ProcessSubNode("Open")
+        if getNodeResult("Open").Value != 0x7b {
+          panic("php_ser: expected {")
+        }
+        this.ProcessSubNode("Members")
+        this.ProcessSubNode("Close")
+        if getNodeResult("Close").Value != 0x7d {
+          panic("php_ser: expected }")
+        }
+        return
+      }
+      panic("php_ser: unknown type")
+    Kind: uint8
+    Colon: uint8
+    Colon2: uint8
+    Int:
+      type: string
+      del: ";"
+    End: uint8
+    Strlen:
+      type: string
+      del: ":"
+    Namelen:
+      type: string
+      del: ":"
+    Count:
+      type: string
+      del: ":"
+    Quote: uint8
+    Quote2: uint8
+    String: string
+    Class: string
+    Open: uint8
+    Close: uint8
+    Members:
+      list: true
+      Value: PHPValue
+      operator: |
+        nmem = int(string(getNodeResult("../Count").Value)) * 2
+        i = 0
+        for {
+          if i >= nmem {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+          i = i + 1
+        }
+PHPValue:
+  operator: |
+    this.ProcessSubNode("Kind")
+    k = getNodeResult("Kind").Value
+    if k == 0x4e {
+      this.ProcessSubNode("End")
+      if getNodeResult("End").Value != 0x3b {
+        panic("php_ser: expected semicolon")
+      }
+      return
+    }
+    this.ProcessSubNode("Colon")
+    if getNodeResult("Colon").Value != 0x3a {
+      panic("php_ser: expected colon")
+    }
+    if k == 0x69 || k == 0x62 || k == 0x64 {
+      this.ProcessSubNode("Int")
+      return
+    }
+    if k == 0x73 {
+      this.ProcessSubNode("Strlen")
+      slen = int(string(getNodeResult("Strlen").Value))
+      this.ProcessSubNode("Quote")
+      if getNodeResult("Quote").Value != 0x22 {
+        panic("php_ser: expected quote")
+      }
+      if slen > 0 && slen < 1048576 {
+        this.GetSubNode("String").SetMaxLength(slen)
+        this.ProcessSubNode("String")
+      }
+      this.ProcessSubNode("Quote2")
+      if getNodeResult("Quote2").Value != 0x22 {
+        panic("php_ser: expected quote")
+      }
+      this.ProcessSubNode("End")
+      if getNodeResult("End").Value != 0x3b {
+        panic("php_ser: expected semicolon")
+      }
+      return
+    }
+    if k == 0x61 {
+      this.ProcessSubNode("Count")
+      this.ProcessSubNode("Open")
+      if getNodeResult("Open").Value != 0x7b {
+        panic("php_ser: expected {")
+      }
+      this.ProcessSubNode("Members")
+      this.ProcessSubNode("Close")
+      if getNodeResult("Close").Value != 0x7d {
+        panic("php_ser: expected }")
+      }
+      return
+    }
+    panic("php_ser: unknown type")
+  Kind: uint8
+  Colon: uint8
+  Int:
+    type: string
+    del: ";"
+  End: uint8
+  Strlen:
+    type: string
+    del: ":"
+  Count:
+    type: string
+    del: ":"
+  Quote: uint8
+  Quote2: uint8
+  String: string
+  Open: uint8
+  Close: uint8
+  Members:
+    list: true
+    Value: PHPValue
+    operator: |
+      nmem = int(string(getNodeResult("../Count").Value)) * 2
+      i = 0
+      for {
+        if i >= nmem {
+          break
+        }
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+        i = i + 1
+      }

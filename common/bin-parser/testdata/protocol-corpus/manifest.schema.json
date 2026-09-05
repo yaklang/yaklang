@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yaklang.io/schemas/bin-parser/protocol-corpus-manifest-v1.json",
+  "title": "Yaklang bin-parser protocol corpus manifest",
+  "type": "object",
+  "required": ["schema_version", "roadmap_total", "repositories", "captures"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "roadmap_total": {"type": "integer", "minimum": 1},
+    "repositories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "repository", "commit", "license", "license_file", "license_sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "repository": {"type": "string"},
+          "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "license": {"type": "string"},
+          "homepage": {"type": "string", "format": "uri"},
+          "license_file": {"type": "string"},
+          "license_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "captures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "repository_id", "protocol", "capture_file", "source_url", "upstream_path", "sha256", "size_bytes", "packet_count", "link_type", "display_filter", "evidence_kind", "frame_protocols"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "repository_id": {"type": "string"},
+          "protocol": {"type": "string"},
+          "roadmap_name": {"type": ["string", "null"]},
+          "roadmap_family": {"type": ["string", "null"]},
+          "roadmap_priority": {"type": ["string", "null"], "pattern": "^P[0-4]$"},
+          "roadmap_status": {"type": ["string", "null"], "enum": ["done", "partial", "todo", null]},
+          "capture_file": {"type": "string"},
+          "source_url": {"type": "string", "format": "uri"},
+          "upstream_path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 24},
+          "packet_count": {"type": "integer", "minimum": 0},
+          "link_type": {"type": "string"},
+          "display_filter": {"type": "string"},
+          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge", "generated-positive"]},
+          "notes": {"type": "string"},
+          "representative_frame": {
+            "type": ["object", "null"],
+            "required": ["number", "length_bytes", "hex_file"],
+            "additionalProperties": false,
+            "properties": {
+              "number": {"type": "integer", "minimum": 1},
+              "length_bytes": {"type": "integer", "minimum": 1},
+              "hex_file": {"type": "string"}
+            }
+          },
+          "frame_protocols": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

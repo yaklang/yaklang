@@ -91,10 +91,17 @@ func TestPPPMessage(t *testing.T) {
 		"Address":  0xff,
 		"Control":  0x03,
 		"Protocol": 0xc023,
-		//"Information": map[string]any{
-		"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
-		//
-		//},
+		"PAP": map[string]any{
+			"Code":       1,
+			"Identifier": 0,
+			"Length":     14,
+			"Request": map[string]any{
+				"Peer ID Length":  4,
+				"Peer ID":         "ixia",
+				"Password Length": 4,
+				"Password":        "ixia",
+			},
+		},
 	}
 	res, err = parser.GenerateBinary(mapData, "ppp", "PPP")
 	if err != nil {
@@ -116,8 +123,6 @@ func TestGRE_PPP_Message(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	LCPDate, _ := codec.DecodeHex("0101000e0304c02305060f3f117c")
-
 	mapData := map[string]any{
 		"Flags And Version":     0x3081,
 		"Protocol Type":         0x880b,
@@ -131,7 +136,15 @@ func TestGRE_PPP_Message(t *testing.T) {
 				"Address":  0xff,
 				"Control":  0x03,
 				"Protocol": 0xc021,
-				"LCP":      LCPDate,
+				"LCP": map[string]any{
+					"Code":       1,
+					"Identifier": 1,
+					"Length":     14,
+					"Options": []map[string]any{
+						{"Type": 3, "Length": 4, "Auth Protocol": 0xc023},
+						{"Type": 5, "Length": 6, "Magic Number": 0x0f3f117c},
+					},
+				},
 			},
 		},
 	}
@@ -149,63 +162,12 @@ func TestLCPMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := bytes.NewReader(payload)
-	res, err := parser.ParseBinary(reader, "link_control_protocol")
-	if err != nil {
-		t.Fatal(err)
-	}
-	DumpNode(res)
-	mapData := map[string]any{
-		"Code":       1,
-		"Identifier": 1,
-		"Length":     36,
-		"Info": map[string]any{
-			"Options": []map[string]any{
-				{
-					"Type":   1,
-					"Length": 4,
-					"Data":   "\x05\xea",
-				}, {
-					"Type":   2,
-					"Length": 6,
-					"Data":   "\x00\x00\x00\x00",
-				}, {
-					"Type":   3,
-					"Length": 5,
-					"Data":   "\xc2\x23\x05",
-				},
-				{
-					"Type":   5,
-					"Length": 6,
-					"Data":   "\xdf\xc5\x3f\x2f",
-				},
-				{
-					"Type":   7,
-					"Length": 2,
-					"Data":   "",
-				},
-				{
-					"Type":   8,
-					"Length": 2,
-					"Data":   "",
-				}, {
-					"Type":   17,
-					"Length": 4,
-					"Data":   "\x05\xea",
-				}, {
-					"Type":   19,
-					"Length": 3,
-					"Data":   "\x00",
-				},
-			},
-		},
-	}
-	res, err = parser.GenerateBinary(mapData, "link_control_protocol", "LCP")
-	if err != nil {
-		t.Fatal(err)
-	}
-	DumpNode(res)
-	assert.Equal(t, "01010024010405ea0206000000000305c223050506dfc53f2f07020802110405ea130300", codec.EncodeToHex(NodeToBytes(res)))
+	n := parseRule(t, payload, "link_control_protocol", "LCP")
+	opts := n.Child("Options").Children()
+	assert.Equal(t, uint64(1), uintVal(t, opts[0].Child("Type")))
+	assert.Equal(t, uint64(0x05ea), uintVal(t, opts[0].Child("MRU")))
+	assert.Equal(t, uint64(0xc223), uintVal(t, opts[2].Child("Auth Protocol")))
+	assert.Equal(t, uint64(0xdfc53f2f), uintVal(t, opts[3].Child("Magic Number")))
 }
 
 func TestBaseProtocol(t *testing.T) {
@@ -426,7 +388,14 @@ var icmpV6Expect = `Ethernet:
       Type: 135
       Code: 0
       Checksum: 3154
-      Payload: 00000000fe8000000000000014ae6f6a11a35b780101f84d8991af52
+      Neighbor Solicitation:
+        Reserved: "00000000"
+        Target Address: fe8000000000000014ae6f6a11a35b78
+        Options:
+          Option:
+            Type: 1
+            Length: 1
+            Link Layer: f84d8991af52
 `
 var dnsResponseExpect = `Ethernet:
   Destination: f84d8991af52
@@ -462,13 +431,13 @@ var dnsResponseExpect = `Ethernet:
             Name:
               Label:
                 Count: 11
-                Data: cloudconfig
+                Text: cloudconfig
               Label:
                 Count: 9
-                Data: jetbrains
+                Text: jetbrains
               Label:
                 Count: 3
-                Data: com
+                Text: com
               Label:
                 Count: 0
             Type: 1
@@ -482,7 +451,8 @@ var dnsResponseExpect = `Ethernet:
             Class: 1
             TTL: 19
             RDLength: 4
-            RData: 3412ec15
+            DNSA:
+              Address: 3412ec15
           Answer:
             Name:
               Pointer: 12
@@ -491,7 +461,8 @@ var dnsResponseExpect = `Ethernet:
             Class: 1
             TTL: 19
             RDLength: 4
-            RData: 364dbb13
+            DNSA:
+              Address: 364dbb13
 `
 var dnsExpect = `Ethernet:
   Destination: 3066d026811b
@@ -527,13 +498,13 @@ var dnsExpect = `Ethernet:
             Name:
               Label:
                 Count: 17
-                Data: copilot-telemetry
+                Text: copilot-telemetry
               Label:
                 Count: 17
-                Data: githubusercontent
+                Text: githubusercontent
               Label:
                 Count: 3
-                Data: com
+                Text: com
               Label:
                 Count: 0
             Type: 1
@@ -573,13 +544,14 @@ var tlsExpect = `Ethernet:
         Option:
           Kind: 8
           Length: 10
-          Data: 858e40e3c784a921
+          TS Val: 2240692451
+          TS Echo Reply: 3347360033
       TLS:
         Record Layer:
           ContentType: 23
           Version: 771
           Length: 35
-          Payload: 39aa76173aee3468a1e8402150499a9585259f6f799c7895d7d40be6879f
+          Payload: 39aa76173aee3468a1e8402150499a9585259f6f799c7895d7d40be6879f4b63cdec72
 `
 var httpRequestExpect = `Ethernet:
   Destination: 3066d026811b
@@ -615,7 +587,8 @@ var httpRequestExpect = `Ethernet:
         Option:
           Kind: 8
           Length: 10
-          Data: 929a15075619e69f
+          TS Val: 2459571463
+          TS Echo Reply: 1444538015
       HTTP:
         HTTP Request:
           Method: GET
@@ -630,7 +603,7 @@ var httpRequestExpect = `Ethernet:
             Item: 'Upgrade: websocket'
             Item: ""
           Body:
-            Data: 2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b
+            Octets: !!binary KsycyBnlHM9Eve5vTib0X2MDimz934alUKb/m10fh1s=
 `
 var icmpExpect = `Ethernet:
   Destination: 3066d026811b
@@ -655,7 +628,9 @@ var icmpExpect = `Ethernet:
       ICMP Echo:
         Identifier: 18297
         Sequence Number: 0
-        Data: 657fb59d00030e6708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637
+        Echo Data: !!binary |
+          ZX+1nQADDmcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMz
+          Q1Njc=
 `
 var arpExpect = `Ethernet:
   Destination: ffffffffffff

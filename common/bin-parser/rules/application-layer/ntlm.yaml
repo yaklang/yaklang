@@ -1,5 +1,133 @@
 endian: little
 Package:
+  NTLMSSP:
+    operator: |
+      this.ProcessSubNode("Signature")
+      sig = getNodeResult("Signature").Value
+      if len(sig) != 8 || sig[0] != 0x4e || sig[1] != 0x54 || sig[2] != 0x4c || sig[3] != 0x4d || sig[4] != 0x53 || sig[5] != 0x53 || sig[6] != 0x50 || sig[7] != 0 {
+        panic("ntlmssp: signature must be NTLMSSP\\0")
+      }
+      this.ProcessSubNode("MessageType")
+      t = getNodeResult("MessageType").Value
+      if t == 1 {
+        this.ProcessSubNode("NegotiateFlags")
+        return
+      }
+      if t == 2 {
+        this.ProcessSubNode("TargetNameFields")
+        this.ProcessSubNode("NegotiateFlags")
+        this.ProcessSubNode("ServerChallenge")
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("TargetInfoFields")
+        tlen = getNodeResult("TargetNameFields/Length").Value
+        toff = getNodeResult("TargetNameFields/BufferOffset").Value
+        cur = this.Length()
+        if tlen > 0 && tlen < 1048576 && toff >= cur {
+          if toff > cur {
+            this.GetSubNode("Pad").SetMaxLength(toff - cur)
+            this.ProcessSubNode("Pad")
+          }
+          this.GetSubNode("Target Name").SetMaxLength(tlen)
+          this.ProcessSubNode("Target Name")
+        }
+        return
+      }
+      if t == 3 {
+        this.ProcessSubNode("LmChallengeResponseFields")
+        this.ProcessSubNode("NtChallengeResponseFields")
+        this.ProcessSubNode("DomainNameFields")
+        this.ProcessSubNode("UserNameFields")
+        this.ProcessSubNode("WorkstationFields")
+        this.ProcessSubNode("EncryptedRandomSessionKeyFields")
+        this.ProcessSubNode("NegotiateFlags")
+        dlen = getNodeResult("DomainNameFields/Length").Value
+        doff = getNodeResult("DomainNameFields/BufferOffset").Value
+        ulen = getNodeResult("UserNameFields/Length").Value
+        uoff = getNodeResult("UserNameFields/BufferOffset").Value
+        cur = this.Length()
+        if dlen > 0 && dlen < 1048576 && doff >= cur {
+          if doff > cur {
+            this.GetSubNode("Pad").SetMaxLength(doff - cur)
+            this.ProcessSubNode("Pad")
+          }
+          this.GetSubNode("Domain Name").SetMaxLength(dlen)
+          this.ProcessSubNode("Domain Name")
+          cur = this.Length()
+        }
+        if ulen > 0 && ulen < 1048576 && uoff >= cur {
+          if uoff > cur {
+            this.GetSubNode("Pad2").SetMaxLength(uoff - cur)
+            this.ProcessSubNode("Pad2")
+          }
+          this.GetSubNode("User Name").SetMaxLength(ulen)
+          this.ProcessSubNode("User Name")
+        }
+        return
+      }
+      panic("ntlmssp: MessageType must be 1, 2 or 3")
+    Signature: raw,8
+    MessageType: uint32
+    NegotiateFlags: uint32
+    TargetNameFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    ServerChallenge: raw,8
+    Reserved: raw,8
+    TargetInfoFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    LmChallengeResponseFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    NtChallengeResponseFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    DomainNameFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    UserNameFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    WorkstationFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    EncryptedRandomSessionKeyFields:
+      Length: uint16
+      MaxLength: uint16
+      BufferOffset: uint32
+    Target Name: string
+    Domain Name: string
+    User Name: string
+    Pad: string
+    Pad2: string
+  NetNTLMv2:
+    operator: |
+      this.ProcessSubNode("NTProofStr")
+      this.ProcessSubNode("RespType")
+      this.ProcessSubNode("HiRespType")
+      if getNodeResult("RespType").Value != 1 {
+        panic("netntlmv2: RespType must be 1")
+      }
+      this.ProcessSubNode("Reserved1")
+      this.ProcessSubNode("Reserved2")
+      this.ProcessSubNode("TimeStamp")
+      this.ProcessSubNode("ClientChallenge")
+      this.ProcessSubNode("Reserved3")
+    NTProofStr: raw,16
+    RespType: uint8
+    HiRespType: uint8
+    Reserved1: uint16
+    Reserved2: uint32
+    TimeStamp: raw,8
+    ClientChallenge: raw,8
+    Reserved3: uint32
   NegotiateMessage:
     Signature: raw,8
     MessageType: uint32

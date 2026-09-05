@@ -1,0 +1,152 @@
+endian: big
+Package:
+  IKE:
+    operator: |
+      this.ProcessSubNode("Initiator SPI")
+      this.ProcessSubNode("Responder SPI")
+      this.ProcessSubNode("Next Payload")
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      major = ver >> 4
+      if major != 1 && major != 2 {
+        panic("ike: version major must be 1 or 2")
+      }
+      this.ProcessSubNode("Exchange Type")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Message ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 28 {
+        panic("ike: length smaller than header")
+      }
+      np = getNodeResult("Next Payload").Value
+      setCtx("ike_type", np)
+      if l > 28 {
+        rest = l - 28
+        if rest < 1048576 {
+          this.GetSubNode("Payloads").SetMaxLength(rest)
+          this.ProcessSubNode("Payloads")
+        }
+      }
+    Initiator SPI: raw,8
+    Responder SPI: raw,8
+    Next Payload: uint8
+    Version: uint8
+    Exchange Type: uint8
+    Flags: uint8
+    Message ID: uint32
+    Length: uint32
+    Payloads:
+      list: true
+      Payload: IKEPayload
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+        }
+IKEPayload:
+  operator: |
+    typ = getCtx("ike_type")
+    this.ProcessSubNode("Next Payload")
+    nxt = getNodeResult("Next Payload").Value
+    this.ProcessSubNode("Critical")
+    this.ProcessSubNode("Payload Length")
+    l = getNodeResult("Payload Length").Value
+    if l < 4 {
+      panic("ike: payload length smaller than 4")
+    }
+    body = l - 4
+    if typ == 33 && body >= 8 {
+      this.GetSubNode("Proposals").SetMaxLength(body)
+      this.ProcessSubNode("Proposals")
+    }
+    if typ == 34 && body >= 4 {
+      this.ProcessSubNode("DH Group")
+      this.ProcessSubNode("KE Reserved")
+      klen = body - 4
+      if klen > 0 && klen < 1048576 {
+        this.GetSubNode("Key Exchange").SetMaxLength(klen)
+        this.ProcessSubNode("Key Exchange")
+      }
+    }
+    if typ == 40 && body > 0 && body < 1048576 {
+      this.GetSubNode("Nonce").SetMaxLength(body)
+      this.ProcessSubNode("Nonce")
+    }
+    if typ == 41 && body >= 4 {
+      this.ProcessSubNode("Protocol ID")
+      this.ProcessSubNode("SPI Size")
+      this.ProcessSubNode("Notify Type")
+    }
+    setCtx("ike_type", nxt)
+  Next Payload: uint8
+  Critical: uint8
+  Payload Length: uint16
+  DH Group: uint16
+  KE Reserved: uint16
+  Key Exchange: string
+  Nonce: string
+  Protocol ID: uint8
+  SPI Size: uint8
+  Notify Type: uint16
+  Proposals:
+    list: true
+    Proposal:
+      operator: |
+        this.ProcessSubNode("Last Substruc")
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("Proposal Length")
+        this.ProcessSubNode("Proposal Num")
+        this.ProcessSubNode("Protocol ID")
+        this.ProcessSubNode("SPI Size")
+        this.ProcessSubNode("Num Transforms")
+        n = getNodeResult("Num Transforms").Value
+        setCtx("ike_ntrans", n)
+        if n > 0 && this.GetMaxLength() > this.Length() {
+          rest = this.GetMaxLength() - this.Length()
+          if rest >= 8 {
+            this.GetSubNode("Transforms").SetMaxLength(rest)
+            this.ProcessSubNode("Transforms")
+          }
+        }
+      Last Substruc: uint8
+      Reserved: uint8
+      Proposal Length: uint16
+      Proposal Num: uint8
+      Protocol ID: uint8
+      SPI Size: uint8
+      Num Transforms: uint8
+      Transforms:
+        list: true
+        Transform:
+          Last Substruc: uint8
+          Reserved: uint8
+          Transform Length: uint16
+          Transform Type: uint8
+          Reserved2: uint8
+          Transform ID: uint16
+        operator: |
+          i = 0
+          n = getCtx("ike_ntrans")
+          for {
+            if i >= n {
+              break
+            }
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 8 {
+              break
+            }
+            ele.Process()
+            i = i + 1
+          }
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 8 {
+          break
+        }
+        ele.Process()
+      }

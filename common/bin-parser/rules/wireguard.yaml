@@ -1,0 +1,78 @@
+endian: little
+Package:
+  WireGuard:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 4 {
+        panic("wireguard: type must be 1-4")
+      }
+      this.ProcessSubNode("Reserved")
+      if typ == 1 {
+        this.ProcessByType("WGInit")
+        return
+      }
+      if typ == 2 {
+        this.ProcessByType("WGResponse")
+        return
+      }
+      if typ == 3 {
+        this.ProcessByType("WGCookie")
+        return
+      }
+      if typ == 4 {
+        this.ProcessByType("WGTransport")
+        return
+      }
+    Type: uint8
+    Reserved: raw,3
+WGInit:
+  operator: |
+    this.ProcessSubNode("Sender")
+    this.ProcessSubNode("Ephemeral")
+    this.ProcessSubNode("Static")
+    this.ProcessSubNode("Timestamp")
+    this.ProcessSubNode("MAC1")
+    this.ProcessSubNode("MAC2")
+  Sender: uint32
+  Ephemeral: raw,32
+  Static: raw,48
+  Timestamp: raw,28
+  MAC1: raw,16
+  MAC2: raw,16
+WGResponse:
+  operator: |
+    this.ProcessSubNode("Sender")
+    this.ProcessSubNode("Receiver")
+    this.ProcessSubNode("Ephemeral")
+    this.ProcessSubNode("Encrypted Empty")
+    this.ProcessSubNode("MAC1")
+    this.ProcessSubNode("MAC2")
+  Sender: uint32
+  Receiver: uint32
+  Ephemeral: raw,32
+  Encrypted Empty: raw,16
+  MAC1: raw,16
+  MAC2: raw,16
+WGCookie:
+  operator: |
+    this.ProcessSubNode("Receiver")
+    this.ProcessSubNode("Nonce")
+    this.ProcessSubNode("Encrypted Cookie")
+  Receiver: uint32
+  Nonce: raw,24
+  Encrypted Cookie: raw,32
+WGTransport:
+  operator: |
+    this.ProcessSubNode("Receiver")
+    this.ProcessSubNode("Counter")
+    if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 {
+        this.GetSubNode("Ciphertext").SetMaxLength(rest)
+        this.ProcessSubNode("Ciphertext")
+      }
+    }
+  Receiver: uint32
+  Counter: uint64
+  Ciphertext: raw

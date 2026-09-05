@@ -7,7 +7,72 @@ Package:
         Payload:
             unpack: true
             operator: |
+              src = getNodeResult("@UDP/Source Port").Value
+              dst = getNodeResult("@UDP/Destination Port").Value
               typeNameList = ["DNS", "DHCP", "NTP", "SNMP"]
+              if src == 53 || dst == 53 {
+                typeNameList = ["DNS"]
+              } else if src == 5353 || dst == 5353 {
+                typeNameList = ["MDNS"]
+              } else if src == 67 || dst == 67 || src == 68 || dst == 68 {
+                typeNameList = ["DHCP"]
+              } else if src == 546 || dst == 546 || src == 547 || dst == 547 {
+                typeNameList = ["DHCPv6"]
+              } else if src == 123 || dst == 123 {
+                typeNameList = ["NTP"]
+              } else if src == 161 || dst == 161 || src == 162 || dst == 162 {
+                typeNameList = ["SNMPv3", "SNMP"]
+              } else if src == 88 || dst == 88 {
+                typeNameList = ["Kerberos"]
+              } else if src == 137 || dst == 137 {
+                typeNameList = ["NBNS"]
+              } else if src == 138 || dst == 138 {
+                typeNameList = ["NBTDG"]
+              } else if src == 5355 || dst == 5355 {
+                typeNameList = ["LLMNR"]
+              } else if src == 1812 || dst == 1812 || src == 1813 || dst == 1813 || src == 1645 || dst == 1645 {
+                typeNameList = ["RADIUS"]
+              } else if src == 443 || dst == 443 {
+                typeNameList = ["QUIC", "DTLS"]
+              } else if src == 389 || dst == 389 {
+                typeNameList = ["LDAPMessage"]
+              } else if src == 69 || dst == 69 {
+                typeNameList = ["TFTP"]
+              } else if src == 514 || dst == 514 {
+                typeNameList = ["Syslog"]
+              } else if src == 520 || dst == 520 {
+                typeNameList = ["RIP"]
+              } else if src == 4789 || dst == 4789 {
+                typeNameList = ["VXLAN"]
+              } else if src == 500 || dst == 500 {
+                typeNameList = ["IKE"]
+              } else if src == 4500 || dst == 4500 {
+                typeNameList = ["NATT"]
+              } else if src == 1701 || dst == 1701 {
+                typeNameList = ["L2TP"]
+              } else if src == 5060 || dst == 5060 {
+                typeNameList = ["SIP"]
+              } else if src == 5006 || dst == 5006 {
+                typeNameList = ["SDP"]
+              } else if src == 3478 || dst == 3478 {
+                typeNameList = ["STUN"]
+              } else if src == 1900 || dst == 1900 {
+                typeNameList = ["SSDP"]
+              } else if src == 623 || dst == 623 {
+                typeNameList = ["IPMI"]
+              } else if src == 111 || dst == 111 {
+                typeNameList = ["ONCRPC"]
+              } else if src == 1194 || dst == 1194 {
+                typeNameList = ["OpenVPN"]
+              } else if src == 51820 || dst == 51820 {
+                typeNameList = ["WireGuard"]
+              } else if src == 1985 || dst == 1985 {
+                typeNameList = ["HSRP"]
+              } else if src == 5004 || dst == 5004 {
+                typeNameList = ["RTP"]
+              } else if src == 5005 || dst == 5005 {
+                typeNameList = ["RTCP"]
+              }
               for typeName in typeNameList{
                   res,op = this.TryProcessByType(typeName)
                   if op.OK {
@@ -24,8 +89,36 @@ Package:
                       }
                   }
               }
-              # this.NewUnknownNode().Process()
 DNS: "import:application-layer/dns.yaml;node:DNS"
+MDNS: "import:application-layer/dns.yaml;node:DNS"
 DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
+DHCPv6: "import:dhcpv6.yaml;node:DHCPv6"
 NTP: "import:application-layer/ntp.yaml;node:NTP"
 SNMP: "import:application-layer/snmp.yaml;node:SNMP"
+SNMPv3: "import:application-layer/snmp.yaml;node:SNMPv3"
+Kerberos: "import:application-layer/kerberos.yaml;node:Kerberos"
+NBNS: "import:application-layer/nbns.yaml;node:NBNS"
+NBTDG: "import:nbt_dg.yaml;node:NBTDG"
+LLMNR: "import:application-layer/nbns.yaml;node:LLMNR"
+RADIUS: "import:application-layer/radius.yaml;node:RADIUS"
+QUIC: "import:application-layer/quic.yaml;node:QUIC"
+LDAPMessage: "import:application-layer/ldap.yaml;node:LDAPMessage"
+TFTP: "import:tftp.yaml;node:TFTP"
+Syslog: "import:syslog.yaml;node:Syslog"
+RIP: "import:rip.yaml;node:RIP"
+VXLAN: "import:vxlan.yaml;node:VXLAN"
+IKE: "import:ike.yaml;node:IKE"
+NATT: "import:ike.yaml;node:IKE"
+L2TP: "import:l2tp.yaml;node:L2TP"
+SIP: "import:sip.yaml;node:SIP"
+SDP: "import:sdp.yaml;node:SDP"
+STUN: "import:stun.yaml;node:STUN"
+SSDP: "import:application-layer/http.yaml;node:HTTP"
+IPMI: "import:ipmi.yaml;node:IPMI"
+ONCRPC: "import:onc_rpc.yaml;node:ONCRPC"
+OpenVPN: "import:openvpn.yaml;node:OpenVPN"
+WireGuard: "import:wireguard.yaml;node:WireGuard"
+HSRP: "import:hsrp.yaml;node:HSRP"
+RTP: "import:rtp.yaml;node:RTP"
+RTCP: "import:rtp.yaml;node:RTCP"
+DTLS: "import:dtls.yaml;node:DTLS"

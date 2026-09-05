@@ -1,0 +1,45 @@
+endian: big
+Package:
+  Memcached:
+    operator: |
+      this.ProcessSubNode("Magic")
+      mag = getNodeResult("Magic").Value
+      if mag != 0x80 && mag != 0x81 {
+        panic("memcached: magic must be 0x80 or 0x81")
+      }
+      this.ProcessSubNode("Opcode")
+      this.ProcessSubNode("Key Length")
+      this.ProcessSubNode("Extras Length")
+      this.ProcessSubNode("Data Type")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Total Body")
+      this.ProcessSubNode("Opaque")
+      this.ProcessSubNode("CAS")
+      body = getNodeResult("Total Body").Value
+      extra = getNodeResult("Extras Length").Value
+      klen = getNodeResult("Key Length").Value
+      if extra > 0 {
+        this.GetSubNode("Extras").SetMaxLength(extra)
+        this.ProcessSubNode("Extras")
+      }
+      if klen > 0 {
+        this.GetSubNode("Key").SetMaxLength(klen)
+        this.ProcessSubNode("Key")
+      }
+      val = body - extra - klen
+      if val > 0 {
+        this.GetSubNode("Value").SetMaxLength(val)
+        this.ProcessSubNode("Value")
+      }
+    Magic: uint8
+    Opcode: uint8
+    Key Length: uint16
+    Extras Length: uint8
+    Data Type: uint8
+    Status: uint16
+    Total Body: uint32
+    Opaque: uint32
+    CAS: raw,8
+    Extras: string
+    Key: string
+    Value: string

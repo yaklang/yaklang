@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yaklang.io/schemas/bin-parser/protocol-corpus-source-spec-v1.json",
+  "title": "Yaklang bin-parser protocol corpus source specification",
+  "type": "object",
+  "required": ["schema_version", "repositories", "captures"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "repository", "commit", "license", "license_path"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "origin": {"type": "string", "enum": ["github", "generated"]},
+          "repository": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
+          "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "license": {"type": "string", "minLength": 1},
+          "license_path": {"type": "string", "minLength": 1},
+          "homepage": {"type": "string", "format": "uri"},
+          "recipe": {"type": "string"}
+        }
+      }
+    },
+    "captures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "repository_id", "upstream_path", "protocol", "display_filter", "evidence_kind"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "repository_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "upstream_path": {"type": "string", "minLength": 1},
+          "protocol": {"type": "string", "minLength": 1},
+          "roadmap_name": {"type": ["string", "null"]},
+          "display_filter": {"type": "string", "minLength": 1},
+          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge", "generated-positive"]},
+          "notes": {"type": "string"},
+          "allow_empty": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

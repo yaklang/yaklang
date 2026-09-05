@@ -1,0 +1,139 @@
+endian: big
+Package:
+  TLSClientHello:
+    operator: |
+      this.ProcessSubNode("Handshake Type")
+      if getNodeResult("Handshake Type").Value != 1 {
+        panic("tls: not ClientHello")
+      }
+      this.ProcessSubNode("Length")
+      hl = getNodeResult("Length").Value
+      this.GetSubNode("ClientHello").SetMaxLength(hl)
+      this.ProcessSubNode("ClientHello")
+    Handshake Type: uint8
+    Length: uint32,24bit
+    ClientHello:
+      operator: |
+        this.ProcessSubNode("Legacy Version")
+        this.ProcessSubNode("Random")
+        this.ProcessSubNode("Session ID Length")
+        sid = getNodeResult("Session ID Length").Value
+        if sid > 32 {
+          panic("tls: session id too long")
+        }
+        if sid > 0 {
+          this.GetSubNode("Session ID").SetMaxLength(sid)
+          this.ProcessSubNode("Session ID")
+        }
+        this.ProcessSubNode("Cipher Suites Length")
+        cl = getNodeResult("Cipher Suites Length").Value
+        if cl > 512 {
+          panic("tls: cipher list too long")
+        }
+        if cl > 0 {
+          this.GetSubNode("Cipher Suites").SetMaxLength(cl)
+          this.ProcessSubNode("Cipher Suites")
+        }
+        this.ProcessSubNode("Compression Length")
+        cpl = getNodeResult("Compression Length").Value
+        if cpl > 16 {
+          panic("tls: compression list too long")
+        }
+        if cpl > 0 {
+          this.GetSubNode("Compression Methods").SetMaxLength(cpl)
+          this.ProcessSubNode("Compression Methods")
+        }
+        if this.GetMaxLength() != 0 && this.Length() < this.GetMaxLength() {
+          this.ProcessSubNode("Extensions Length")
+          el = getNodeResult("Extensions Length").Value
+          avail = this.GetMaxLength() - this.Length()
+          if el > avail {
+            el = avail
+          }
+          if el > 0 {
+            this.GetSubNode("Extensions").SetMaxLength(el)
+            this.ProcessSubNode("Extensions")
+          }
+        }
+      Legacy Version: uint16
+      Random: raw,32
+      Session ID Length: uint8
+      Session ID: string
+      Cipher Suites Length: uint16
+      Cipher Suites:
+        list: true
+        CipherSuite: TLSCipherSuite
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 2 {
+              break
+            }
+            ele.Process()
+          }
+      Compression Length: uint8
+      Compression Methods:
+        list: true
+        Compression: TLSCompression
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 1 {
+              break
+            }
+            ele.Process()
+          }
+      Extensions Length: uint16
+      Extensions:
+        list: true
+        Extension: TLSExtension
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 4 {
+              break
+            }
+            ele.Process()
+          }
+TLSCipherSuite:
+  Suite: uint16
+TLSCompression:
+  Method: uint8
+TLSExtension:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    el = getNodeResult("Length").Value
+    avail = this.GetMaxLength() - this.Length()
+    if el > avail {
+      el = avail
+    }
+    t = getNodeResult("Type").Value
+    if t == 0 && el > 0 {
+      this.GetSubNode("SNI").SetMaxLength(el)
+      this.ProcessSubNode("SNI")
+      return
+    }
+    if el > 0 {
+      this.GetSubNode("Octets").SetMaxLength(el)
+      this.ProcessSubNode("Octets")
+    }
+    return
+  Type: uint16
+  Length: uint16
+  SNI:
+    operator: |
+      this.ProcessSubNode("List Length")
+      this.ProcessSubNode("Name Type")
+      this.ProcessSubNode("Name Length")
+      nl = getNodeResult("Name Length").Value
+      if nl > 0 && nl < 1048576 {
+        this.GetSubNode("Host Name").SetMaxLength(nl)
+        this.ProcessSubNode("Host Name")
+      }
+      return
+    List Length: uint16
+    Name Type: uint8
+    Name Length: uint16
+    Host Name: string
+  Octets: string

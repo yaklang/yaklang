@@ -1,0 +1,144 @@
+endian: big
+Package:
+  HTTP2Preface:
+    operator: |
+      this.ProcessSubNode("Magic")
+      m = getNodeResult("Magic").Value
+      if len(m) != 24 || m[0] != 0x50 || m[1] != 0x52 || m[2] != 0x49 || m[3] != 0x20 || m[4] != 0x2a || m[5] != 0x20 {
+        panic("http2: preface must start with 'PRI * '")
+      }
+      if m[6] != 0x48 || m[7] != 0x54 || m[8] != 0x54 || m[9] != 0x50 || m[10] != 0x2f || m[11] != 0x32 {
+        panic("http2: preface must contain HTTP/2")
+      }
+    Magic: raw,24
+  HTTP2:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0x400000 {
+        panic("http2: frame longer than 4MiB")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ > 0x0c {
+        panic("http2: unknown frame type")
+      }
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("R")
+      this.ProcessSubNode("Stream Identifier")
+      if typ == 0 {
+        if l > 0 && l < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(l)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      }
+      if typ == 1 || typ == 9 {
+        if l > 0 && l < 1048576 {
+          this.GetSubNode("Header Block").SetMaxLength(l)
+          this.ProcessSubNode("Header Block")
+        }
+        return
+      }
+      if typ == 2 {
+        if l != 5 {
+          panic("http2: PRIORITY payload must be 5")
+        }
+        this.ProcessSubNode("Exclusive")
+        this.ProcessSubNode("Stream Dependency")
+        this.ProcessSubNode("Weight")
+        return
+      }
+      if typ == 3 {
+        if l != 4 {
+          panic("http2: RST_STREAM payload must be 4")
+        }
+        this.ProcessSubNode("Error Code")
+        return
+      }
+      if typ == 4 {
+        if l > 0 {
+          if l % 6 != 0 {
+            panic("http2: SETTINGS payload not multiple of 6")
+          }
+          this.GetSubNode("Settings").SetMaxLength(l)
+          this.ProcessSubNode("Settings")
+        }
+        return
+      }
+      if typ == 5 {
+        if l < 4 {
+          panic("http2: PUSH_PROMISE too small")
+        }
+        this.ProcessSubNode("Promised R")
+        this.ProcessSubNode("Promised Stream ID")
+        if l > 4 && l < 1048576 {
+          this.GetSubNode("Header Block").SetMaxLength(l - 4)
+          this.ProcessSubNode("Header Block")
+        }
+        return
+      }
+      if typ == 6 {
+        if l != 8 {
+          panic("http2: PING payload must be 8")
+        }
+        this.ProcessSubNode("Ping")
+        return
+      }
+      if typ == 7 {
+        if l < 8 {
+          panic("http2: GOAWAY too small")
+        }
+        this.ProcessSubNode("Last Stream ID")
+        this.ProcessSubNode("Error Code")
+        if l > 8 && l < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(l - 8)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      }
+      if typ == 8 {
+        if l != 4 {
+          panic("http2: WINDOW_UPDATE payload must be 4")
+        }
+        this.ProcessSubNode("Window Size Increment")
+        return
+      }
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Octets").SetMaxLength(l)
+        this.ProcessSubNode("Octets")
+      }
+      return
+    Length: uint32,24bit
+    Type: uint8
+    Flags: uint8
+    R: uint8,1bit
+    Stream Identifier: uint32,31bit
+    Settings:
+      list: true
+      Setting: HTTP2Setting
+      operator: |
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          ele.Process()
+        }
+    Ping: raw,8
+    Last Stream ID: uint32
+    Error Code: uint32
+    Window Size Increment: uint32
+    Exclusive: uint8,1bit
+    Stream Dependency: uint32,31bit
+    Weight: uint8
+    Promised R: uint8,1bit
+    Promised Stream ID: uint32,31bit
+    Header Block: string
+    Octets: string
+HTTP2Setting:
+  Identifier: uint16
+  Value: uint32

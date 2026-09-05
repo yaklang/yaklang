@@ -8,19 +8,68 @@ Package:
       unpack: true
       operator: |
         type = getNodeResult("@CHAP/Code").Value
-        switch type {
-           case 0x01:
-              this.ProcessByType("Data")
-           case 0x02:
-              this.ProcessByType("Data")
-           default:
-              this.ProcessByType("Message")
+        if type == 1 {
+          this.ProcessByType("Data")
+          return
         }
+        if type == 2 {
+          this.ProcessByType("CHAPResponse")
+          return
+        }
+        if type == 3 {
+          this.ProcessByType("CHAPSuccess")
+          return
+        }
+        if type == 4 {
+          this.ProcessByType("CHAPFailure")
+          return
+        }
+        panic("chap: unknown code")
 Data:
+  operator: |
+    this.ProcessSubNode("Value Size")
+    vs = getNodeResult("Value Size").Value
+    if vs > 0 && vs < 255 {
+      this.GetSubNode("Value").SetMaxLength(vs)
+      this.ProcessSubNode("Value")
+    }
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Name").SetMaxLength(rest)
+      this.ProcessSubNode("Name")
+    }
   Value Size: uint8
-  Value:
-    type: raw
-    length-from-field: "../Value Size"
-  Name: raw
-
-Message: raw
+  Value: string
+  Name: string
+CHAPResponse:
+  operator: |
+    this.ProcessSubNode("Value Size")
+    vs = getNodeResult("Value Size").Value
+    if vs > 0 && vs < 255 {
+      this.GetSubNode("Value").SetMaxLength(vs)
+      this.ProcessSubNode("Value")
+    }
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Name").SetMaxLength(rest)
+      this.ProcessSubNode("Name")
+    }
+  Value Size: uint8
+  Value: string
+  Name: string
+CHAPSuccess:
+  operator: |
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Message").SetMaxLength(rest)
+      this.ProcessSubNode("Message")
+    }
+  Message: string
+CHAPFailure:
+  operator: |
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Message").SetMaxLength(rest)
+      this.ProcessSubNode("Message")
+    }
+  Message: string

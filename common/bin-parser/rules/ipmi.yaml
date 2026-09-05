@@ -1,0 +1,32 @@
+endian: big
+Package:
+  IPMI:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 0x06 {
+        panic("ipmi: rmcp version must be 6")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Class")
+      cls = getNodeResult("Class").Value
+      if (cls & 0x0f) != 0x06 && (cls & 0x0f) != 0x07 {
+        panic("ipmi: class must be IPMI or ASF")
+      }
+      if (cls & 0x0f) == 0x06 && this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 8 && rest < 1048576 {
+          this.ProcessSubNode("ASF")
+          return
+        }
+      }
+    Version: uint8
+    Reserved: uint8
+    Sequence: uint8
+    Class: uint8
+    ASF:
+      IANA: uint32
+      Msg Type: uint8
+      Msg Tag: uint8
+      ASF Reserved: uint8
+      Data Len: uint8

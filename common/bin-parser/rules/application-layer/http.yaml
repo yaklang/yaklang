@@ -29,27 +29,55 @@ Body:
   operator: |
     if getCtx("isChunked") {
       this.ProcessSubNode("DataChunks")
-    }else{
-      this.GetSubNode("Data").SetMaxLength(getCtx("body_length"))
-      this.ProcessSubNode("Data")
+      return
     }
-  Data: raw
+    l = getCtx("body_length")
+    if l {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Octets").SetMaxLength(l)
+        this.ProcessSubNode("Octets")
+      }
+    }
+    return
+  Octets: string
   DataChunks:
     list: true
     DataChunk:
       operator: |
-        res = this.GetSubNode("DataChunkLength").Process().Value
-        length = int(res)
+        res = this.GetSubNode("Size").Process().Value
+        s = string(res)
+        length = 0
+        got = false
+        for i = 0; i < len(s); i++ {
+          c = s[i]
+          v = -1
+          if c >= 48 && c <= 57 {
+            v = c - 48
+          } else if c >= 97 && c <= 102 {
+            v = c - 97 + 10
+          } else if c >= 65 && c <= 70 {
+            v = c - 65 + 10
+          } else {
+            break
+          }
+          length = length * 16 + v
+          got = true
+        }
+        if !got {
+          panic("http: invalid chunk size")
+        }
         if length == 0 {
           setCtx("inList",false)
           return
         }
-        this.GetSubNode("DataChunk").SetCfg("length", length*8)
-        this.GetSubNode("DataChunk").Process()
-        this.GetSubNode("DataChunkEnd").Process()
-      DataChunkLength: "type:string;del:\r\n"
-      DataChunk: raw
-      DataChunkEnd: "del:\r\n;type:string"
+        if length > 0 && length < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(length)
+          this.ProcessSubNode("Octets")
+        }
+        this.ProcessSubNode("End")
+      Size: "type:string;del:\r\n"
+      Octets: string
+      End: "del:\r\n;type:string"
 Headers:
   operator: |
     for {

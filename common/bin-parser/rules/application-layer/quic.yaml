@@ -1,0 +1,70 @@
+endian: big
+Package:
+  QUIC:
+    operator: |
+      this.ProcessSubNode("First Byte")
+      first = getNodeResult("First Byte").Value
+      long = (first & 0x80) != 0
+      if !long {
+        if (first & 0x40) == 0 {
+          panic("quic: short header missing fixed bit")
+        }
+        return
+      }
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      if ver != 0 && (first & 0x40) == 0 {
+        panic("quic: long header missing fixed bit")
+      }
+      this.ProcessSubNode("DCID Length")
+      dlen = getNodeResult("DCID Length").Value
+      if dlen > 20 {
+        panic("quic: DCID longer than 20")
+      }
+      if dlen > 0 {
+        this.GetSubNode("DCID").SetMaxLength(dlen)
+        this.ProcessSubNode("DCID")
+      }
+      this.ProcessSubNode("SCID Length")
+      slen = getNodeResult("SCID Length").Value
+      if slen > 20 {
+        panic("quic: SCID longer than 20")
+      }
+      if slen > 0 {
+        this.GetSubNode("SCID").SetMaxLength(slen)
+        this.ProcessSubNode("SCID")
+      }
+      pktType = (first >> 4) & 0x03
+      if ver != 0 && pktType == 0 {
+        res,op = this.TryProcessByType("QUICToken")
+        if op.OK {
+          err = op.Save()
+          if err != nil {
+            panic(err)
+          }
+        } else {
+          err = op.Recovery()
+          if err != nil {
+            panic(err)
+          }
+        }
+      }
+    First Byte: uint8
+    Version: uint32
+    DCID Length: uint8
+    DCID: string
+    SCID Length: uint8
+    SCID: string
+QUICToken:
+  operator: |
+    this.ProcessSubNode("Token Length")
+    tlen = getNodeResult("Token Length").Value
+    if tlen >= 64 {
+      panic("quic: token length varint longer than 1 byte")
+    }
+    if tlen > 0 {
+      this.GetSubNode("Token").SetMaxLength(tlen)
+      this.ProcessSubNode("Token")
+    }
+  Token Length: uint8
+  Token: string

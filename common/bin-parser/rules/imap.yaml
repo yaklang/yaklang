@@ -1,0 +1,82 @@
+Package:
+  IMAP:
+    operator: |
+      this.ProcessSubNode("Tag")
+      tag = string(getNodeResult("Tag").Value)
+      if len(tag) == 0 {
+        panic("imap: empty tag")
+      }
+      this.ProcessSubNode("Command")
+      cmd = string(getNodeResult("Command").Value)
+      known = cmd.HasPrefix("OK") || cmd.HasPrefix("NO") || cmd.HasPrefix("BAD") || cmd.HasPrefix("BYE") || cmd.HasPrefix("PREAUTH") || cmd.HasPrefix("CAPABILITY") || cmd.HasPrefix("LOGIN") || cmd.HasPrefix("LOGOUT") || cmd.HasPrefix("SELECT") || cmd.HasPrefix("EXAMINE") || cmd.HasPrefix("CREATE") || cmd.HasPrefix("DELETE") || cmd.HasPrefix("RENAME") || cmd.HasPrefix("SUBSCRIBE") || cmd.HasPrefix("UNSUBSCRIBE") || cmd.HasPrefix("LIST") || cmd.HasPrefix("LSUB") || cmd.HasPrefix("STATUS") || cmd.HasPrefix("APPEND") || cmd.HasPrefix("CHECK") || cmd.HasPrefix("CLOSE") || cmd.HasPrefix("EXPUNGE") || cmd.HasPrefix("SEARCH") || cmd.HasPrefix("FETCH") || cmd.HasPrefix("STORE") || cmd.HasPrefix("COPY") || cmd.HasPrefix("UID") || cmd.HasPrefix("NOOP") || cmd.HasPrefix("STARTTLS") || cmd.HasPrefix("AUTHENTICATE") || cmd.HasPrefix("IDLE") || cmd.HasPrefix("FLAGS") || cmd.HasPrefix("EXISTS") || cmd.HasPrefix("RECENT")
+      if !known {
+        this.ProcessSubNode("Item")
+        item = string(getNodeResult("Item").Value)
+        if item.HasPrefix("FETCH") {
+          this.ProcessSubNode("Open")
+          this.ProcessSubNode("Attrs")
+        } else {
+          if !(item.HasPrefix("EXPUNGE") || item.HasPrefix("EXISTS")) {
+            panic("imap: unknown command")
+          }
+        }
+      }
+      this.ProcessSubNode("Arg")
+      this.ProcessSubNode("LF")
+      res, op = this.TryProcessByType("IMAPExtra")
+      if op.OK {
+        op.Save()
+      } else {
+        op.Recovery()
+      }
+      return
+    Tag: "del: ;type:string"
+    Command: "del: ;type:string"
+    Item: "del: ;type:string"
+    Open: uint8
+    Attrs:
+      list: true
+      Attr:
+        operator: |
+          this.ProcessSubNode("Name")
+          n = string(getNodeResult("Name").Value)
+          setCtx("fetch_name", n)
+          if n.HasPrefix("FLAGS") {
+            this.ProcessSubNode("Flags")
+            return
+          }
+          if n.HasPrefix("RFC822.SIZE") {
+            this.ProcessSubNode("Size")
+            return
+          }
+        Name: "del: ;type:string"
+        Flags: "del: ;type:string"
+        Size: "del:);type:string"
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 3 {
+            break
+          }
+          ele.Process()
+          n = string(getCtx("fetch_name"))
+          if n.HasPrefix("RFC822.SIZE") {
+            break
+          }
+        }
+    Arg: "del:\r;type:string"
+    LF: uint8
+IMAPExtra:
+  list: true
+  operator: |
+    for {
+      res, op = this.TryProcessByType("IMAPLine")
+      if op.OK {
+        op.Save()
+      } else {
+        op.Recovery()
+        break
+      }
+    }
+IMAPLine:
+  Text: "del:\r\n;type:string"

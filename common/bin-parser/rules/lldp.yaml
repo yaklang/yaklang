@@ -1,0 +1,131 @@
+endian: big
+Package:
+  LLDP:
+    operator: |
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        panic("lldp: empty PDU")
+      }
+      op.Recovery()
+      this.ProcessSubNode("TLVs")
+      return
+    TLVs:
+      list: true
+      TLV: LLDPTLV
+      operator: |
+        for {
+          if this.GetMaxLength() < 2 {
+            break
+          }
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+          hdr = ele.GetSubNode("TypeLen").Result().Value
+          if (hdr >> 9) == 0 {
+            break
+          }
+        }
+LLDPTLV:
+  operator: |
+    this.ProcessSubNode("TypeLen")
+    hdr = getNodeResult("TypeLen").Value
+    t = hdr >> 9
+    l = hdr & 511
+    rest = this.GetMaxLength() - this.Length()
+    if l > rest {
+      panic("lldp: tlv truncated")
+    }
+    if t == 0 {
+      return
+    }
+    if t == 1 {
+      if l < 2 {
+        panic("lldp: chassis id shorter than 2")
+      }
+      this.ProcessSubNode("Chassis ID Subtype")
+      dlen = l - 1
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Chassis ID").SetMaxLength(dlen)
+        this.ProcessSubNode("Chassis ID")
+      }
+      return
+    }
+    if t == 2 {
+      if l < 2 {
+        panic("lldp: port id shorter than 2")
+      }
+      this.ProcessSubNode("Port ID Subtype")
+      dlen = l - 1
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Port ID").SetMaxLength(dlen)
+        this.ProcessSubNode("Port ID")
+      }
+      return
+    }
+    if t == 3 {
+      if l < 2 {
+        panic("lldp: ttl shorter than 2")
+      }
+      this.ProcessSubNode("TTL")
+      return
+    }
+    if t == 4 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Port Description").SetMaxLength(l)
+        this.ProcessSubNode("Port Description")
+      }
+      return
+    }
+    if t == 5 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("System Name").SetMaxLength(l)
+        this.ProcessSubNode("System Name")
+      }
+      return
+    }
+    if t == 6 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("System Description").SetMaxLength(l)
+        this.ProcessSubNode("System Description")
+      }
+      return
+    }
+    if t == 7 {
+      if l < 4 {
+        panic("lldp: capabilities shorter than 4")
+      }
+      this.ProcessSubNode("System Capabilities")
+      this.ProcessSubNode("Enabled Capabilities")
+      return
+    }
+    if l > 0 && l < 1048576 {
+      this.GetSubNode("TLV Data").SetMaxLength(l)
+      this.ProcessSubNode("TLV Data")
+    }
+    return
+  TypeLen: uint16
+  Chassis ID Subtype: uint8
+  Chassis ID: string
+  Port ID Subtype: uint8
+  Port ID: string
+  TTL: uint16
+  Port Description: string
+  System Name: string
+  System Description: string
+  System Capabilities: uint16
+  Enabled Capabilities: uint16
+  TLV Data: string
+PeekByte: uint8

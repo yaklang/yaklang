@@ -1,0 +1,194 @@
+endian: little
+Package:
+  DCERPC:
+    operator: |
+      this.ProcessSubNode("RPC Vers")
+      if getNodeResult("RPC Vers").Value != 5 {
+        panic("dcerpc: RPC vers must be 5")
+      }
+      this.ProcessSubNode("RPC Vers Minor")
+      this.ProcessSubNode("PType")
+      ptype = getNodeResult("PType").Value
+      if ptype > 19 {
+        panic("dcerpc: unknown ptype")
+      }
+      this.ProcessSubNode("PFC Flags")
+      this.ProcessSubNode("Packed Drep")
+      this.ProcessSubNode("Frag Length")
+      fl = getNodeResult("Frag Length").Value
+      if fl < 16 {
+        panic("dcerpc: frag length smaller than header")
+      }
+      if fl > 0x100000 {
+        panic("dcerpc: frag length too large")
+      }
+      this.ProcessSubNode("Auth Length")
+      this.ProcessSubNode("Call ID")
+      this.GetSubNode("PDU").SetMaxLength(fl - 16)
+      this.ProcessSubNode("PDU")
+    RPC Vers: uint8
+    RPC Vers Minor: uint8
+    PType: uint8
+    PFC Flags: uint8
+    Packed Drep: raw,4
+    Frag Length: uint16
+    Auth Length: uint16
+    Call ID: uint32
+    PDU:
+      operator: |
+        ptype = getNodeResult("../PType").Value
+        if ptype == 11 || ptype == 14 {
+          this.ProcessSubNode("Bind")
+          return
+        }
+        if ptype == 12 {
+          this.ProcessSubNode("BindAck")
+          return
+        }
+        if ptype == 13 {
+          this.ProcessSubNode("BindNak")
+          return
+        }
+        if ptype == 0 {
+          this.ProcessSubNode("Request")
+          return
+        }
+        if ptype == 2 {
+          this.ProcessSubNode("Response")
+          return
+        }
+        if ptype == 3 {
+          this.ProcessSubNode("Fault")
+          return
+        }
+      Bind:
+        operator: |
+          this.ProcessSubNode("Max Xmit Frag")
+          this.ProcessSubNode("Max Recv Frag")
+          this.ProcessSubNode("Assoc Group")
+          this.ProcessSubNode("Num Ctx Items")
+          n = getNodeResult("Num Ctx Items").Value
+          if n > 20 {
+            panic("dcerpc: too many presentation contexts")
+          }
+          this.ProcessSubNode("Reserved")
+          this.ProcessSubNode("Reserved2")
+          if n > 0 {
+            this.ProcessSubNode("Contexts")
+          }
+          return
+        Max Xmit Frag: uint16
+        Max Recv Frag: uint16
+        Assoc Group: uint32
+        Num Ctx Items: uint8
+        Reserved: uint8
+        Reserved2: uint16
+        Contexts:
+          list: true
+          list-length-from-field: ../Num Ctx Items
+          Context:
+            Context ID: uint16
+            Num Trans Items: uint8
+            Reserved: uint8
+            Abstract Syntax: raw,16
+            Abstract Version: uint32
+            Transfer Syntax: raw,16
+            Transfer Version: uint32
+      Request:
+        operator: |
+          this.ProcessSubNode("Alloc Hint")
+          this.ProcessSubNode("Context ID")
+          this.ProcessSubNode("OpNum")
+          if this.GetSubNode("Stub").GetRemainingSpace() != 0 {
+            rem = this.GetSubNode("Stub").GetRemainingSpace()
+            if rem > 0x100000 {
+              panic("dcerpc: stub too large")
+            }
+            this.GetSubNode("Stub").SetMaxLength(rem)
+            this.ProcessSubNode("Stub")
+          }
+        Alloc Hint: uint32
+        Context ID: uint16
+        OpNum: uint16
+        Stub: raw
+      Response:
+        operator: |
+          this.ProcessSubNode("Alloc Hint")
+          this.ProcessSubNode("Context ID")
+          this.ProcessSubNode("Cancel Count")
+          this.ProcessSubNode("Reserved")
+        Alloc Hint: uint32
+        Context ID: uint16
+        Cancel Count: uint8
+        Reserved: uint8
+      Fault:
+        operator: |
+          this.ProcessSubNode("Alloc Hint")
+          this.ProcessSubNode("Context ID")
+          this.ProcessSubNode("Cancel Count")
+          this.ProcessSubNode("Reserved")
+          this.ProcessSubNode("Status")
+        Alloc Hint: uint32
+        Context ID: uint16
+        Cancel Count: uint8
+        Reserved: uint8
+        Status: uint32
+      BindAck:
+        operator: |
+          this.ProcessSubNode("Max Xmit Frag")
+          this.ProcessSubNode("Max Recv Frag")
+          this.ProcessSubNode("Assoc Group")
+          this.ProcessSubNode("Sec Addr Len")
+          sl = getNodeResult("Sec Addr Len").Value
+          if sl > 0 {
+            if sl > 256 {
+              panic("dcerpc: secondary address too long")
+            }
+            this.GetSubNode("Sec Addr").SetMaxLength(sl)
+            this.ProcessSubNode("Sec Addr")
+          }
+          if this.GetMaxLength() > this.Length() {
+            rest = this.GetMaxLength() - this.Length()
+            if rest > 0 && rest < 1048576 {
+              used = this.Length()
+              pad = (4 - (used % 4)) % 4
+              if pad > 0 && pad <= rest {
+                this.GetSubNode("Pad").SetMaxLength(pad)
+                this.ProcessSubNode("Pad")
+              }
+              if this.GetMaxLength() > this.Length() {
+                r2 = this.GetMaxLength() - this.Length()
+                if r2 >= 4 && r2 < 1048576 {
+                  this.ProcessByType("DCERPCResults")
+                }
+              }
+            }
+          }
+          return
+        Max Xmit Frag: uint16
+        Max Recv Frag: uint16
+        Assoc Group: uint32
+        Sec Addr Len: uint16
+        Sec Addr: string
+        Pad: string
+      BindNak:
+        operator: |
+          this.ProcessSubNode("Reject Reason")
+        Reject Reason: uint16
+DCERPCResults:
+  operator: |
+    this.ProcessSubNode("Num Results")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Reserved2")
+    this.ProcessSubNode("Ack Result")
+    this.ProcessSubNode("Ack Reason")
+    this.ProcessSubNode("Transfer Syntax")
+    this.ProcessSubNode("Transfer Version")
+    return
+  Num Results: uint8
+  Reserved: uint8
+  Reserved2: uint16
+  Ack Result: uint16
+  Ack Reason: uint16
+  Transfer Syntax: raw,16
+  Transfer Version: uint32

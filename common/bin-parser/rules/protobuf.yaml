@@ -1,0 +1,70 @@
+endian: little
+Package:
+  Protobuf:
+    Fields:
+      list: true
+      Field: ProtoField
+      operator: |
+        for {
+          if this.Length() > 0 {
+            avail = this.GetMaxLength() - this.Length()
+            if avail < 1 || avail > 1048576 {
+              break
+            }
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+        }
+ProtoField:
+  operator: |
+    this.ProcessSubNode("Tag")
+    tag = getNodeResult("Tag").Value
+    wt = tag & 0x07
+    if wt > 5 {
+      panic("protobuf: unknown wire type")
+    }
+    if wt == 3 || wt == 4 {
+      panic("protobuf: group wire type")
+    }
+    if wt == 0 {
+      this.ProcessSubNode("Varint")
+      v = getNodeResult("Varint").Value
+      if (v & 0x80) != 0 {
+        this.ProcessSubNode("Varint2")
+      }
+      return
+    }
+    if wt == 5 {
+      this.ProcessSubNode("Fixed32")
+      return
+    }
+    if wt == 1 {
+      this.ProcessSubNode("Fixed64")
+      return
+    }
+    if wt == 2 {
+      this.ProcessSubNode("Len")
+      n = getNodeResult("Len").Value
+      if (n & 0x80) != 0 {
+        panic("protobuf: length varint too long")
+      }
+      if n > 0 && n < 1048576 {
+        this.GetSubNode("Str").SetMaxLength(n)
+        this.ProcessSubNode("Str")
+      }
+      return
+    }
+  Tag: uint8
+  Varint: uint8
+  Varint2: uint8
+  Fixed32: raw,4
+  Fixed64: raw,8
+  Len: uint8
+  Str: string
