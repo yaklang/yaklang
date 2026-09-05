@@ -213,7 +213,7 @@ func validateSpec(spec sourceSpec) error {
 			return fmt.Errorf("capture %q has an empty required field", capture.ID)
 		}
 		switch capture.EvidenceKind {
-		case "upstream-positive", "upstream-negative", "ctf":
+		case "upstream-positive", "upstream-negative", "educational-challenge":
 		default:
 			return fmt.Errorf("capture %q has invalid evidence kind %q", capture.ID, capture.EvidenceKind)
 		}
@@ -700,7 +700,7 @@ func writeDistributionSVG(fileName string, stats []familyStat) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-labelledby="title desc">`, width, height, width, height)
 	b.WriteString(`<title id="title">Protocol roadmap and collected authoritative material by family</title>`)
-	b.WriteString(`<desc id="desc">Horizontal bars compare all roadmap protocols with unique protocols that have at least one collected upstream or CTF capture. Exact covered and total counts are printed on every row.</desc>`)
+	b.WriteString(`<desc id="desc">Horizontal bars compare all roadmap protocols with unique protocols that have at least one collected upstream or educational challenge capture. Exact covered and total counts are printed on every row.</desc>`)
 	b.WriteString(`<rect width="100%" height="100%" fill="#FFFFFF"/>`)
 	b.WriteString(`<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#171717}.title{font-size:22px;font-weight:650}.subtitle{font-size:13px;fill:#59636E}.label{font-size:13px}.count{font-size:12px;font-variant-numeric:tabular-nums}.legend{font-size:12px;fill:#59636E}</style>`)
 	b.WriteString(`<text class="title" x="28" y="36">616-item protocol roadmap: collected capture material</text>`)
@@ -753,7 +753,7 @@ func writeReportMarkdown(fileName string, roadmap []roadmapItem, captures []mani
 	fmt.Fprintf(&b, "- Roadmap: **%d** protocols; %d `done`, %d `partial`, %d `todo`.\n", len(roadmap), statusCounts["done"], statusCounts["partial"], statusCounts["todo"])
 	fmt.Fprintf(&b, "- Corpus: **%d capture files**, **%d packets**, **%d bytes**.\n", len(captures), totalPackets(captures), totalBytes)
 	fmt.Fprintf(&b, "- Direct roadmap material: **%d unique protocols**; outside-roadmap candidates: **%d captures**.\n", len(covered), outside)
-	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream, %d negative/boundary upstream, %d official CTF.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"], kindCounts["ctf"])
+	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream, %d negative/boundary upstream, %d official educational challenge.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"], kindCounts["educational-challenge"])
 
 	b.WriteString("## Source distribution\n\n| Source | Captures | Packets |\n| --- | ---: | ---: |\n")
 	sources := sortedKeys(sourceCaptures)

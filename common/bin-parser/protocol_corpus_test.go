@@ -163,7 +163,7 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 				t.Fatalf("source URL is not pinned to repository commit %s", repository.Commit)
 			}
 			switch capture.EvidenceKind {
-			case "upstream-positive", "upstream-negative", "ctf":
+			case "upstream-positive", "upstream-negative", "educational-challenge":
 			default:
 				t.Fatalf("unknown evidence kind %q", capture.EvidenceKind)
 			}
@@ -223,7 +223,7 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 	if len(manifest.Captures) < 130 || totalPackets < 34000 || len(mappedProtocols) < 110 {
 		t.Fatalf("corpus unexpectedly shrank: captures=%d packets=%d mapped_protocols=%d", len(manifest.Captures), totalPackets, len(mappedProtocols))
 	}
-	if evidenceCounts["upstream-positive"] < 110 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["ctf"] != 3 {
+	if evidenceCounts["upstream-positive"] < 110 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["educational-challenge"] != 3 {
 		t.Fatalf("corpus evidence classes unexpectedly shrank: %+v", evidenceCounts)
 	}
 

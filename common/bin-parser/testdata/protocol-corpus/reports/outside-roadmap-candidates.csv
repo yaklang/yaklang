@@ -5,7 +5,7 @@ ndpi-nat-pmp,NAT-PMP / Port Control Protocol,ndpi,upstream-positive,outside curr
 ndpi-someip-method,SOME/IP method call (nDPI regression; undecoded UDP payload in Wireshark defaults),ndpi,upstream-positive,outside current 616-item roadmap
 ndpi-c1222,ANSI C12.22,ndpi,upstream-positive,outside current 616-item roadmap
 ndpi-coap,CoAP,ndpi,upstream-positive,outside current 616-item roadmap
-ndpi-massscan,Masscan TCP probes,ndpi,upstream-positive,pentest traffic outside current roadmap
+ndpi-tcp-measurement,High-rate TCP measurement,ndpi,upstream-positive,network measurement traffic outside current roadmap
 tcpdump-empty-pcapng,empty pcapng container,tcpdump,upstream-negative,
 tcpdump-unsupported-linktype,unsupported link type 160,tcpdump,upstream-negative,
-google-ctf-engraver,Google CTF USB HID engraver,google-ctf,ctf,official 2022 Google CTF USB reverse-engineering challenge capture
+google-challenge-engraver,Google educational challenge USB HID engraver,google-challenges,educational-challenge,official 2022 Google USB reverse-engineering exercise capture

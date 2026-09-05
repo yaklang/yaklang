@@ -38,7 +38,7 @@
           "protocol": {"type": "string", "minLength": 1},
           "roadmap_name": {"type": ["string", "null"]},
           "display_filter": {"type": "string", "minLength": 1},
-          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "ctf"]},
+          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge"]},
           "notes": {"type": "string"},
           "allow_empty": {"type": "boolean"}
         }

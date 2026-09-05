@@ -20,7 +20,8 @@ Each capture has all of the following:
 
 `upstream-positive` means the upstream project uses the capture as positive
 protocol material. `upstream-negative` means malformed, truncated or
-false-positive regression material. `ctf` is an official challenge capture.
+false-positive regression material. `educational-challenge` is an official
+exercise capture.
 None of these labels proves that the current Yaklang YAML rule parses every
 packet correctly.
 
@@ -49,10 +50,11 @@ frame hex and roadmap mappings without requiring Wireshark or network access.
 The SVG chart is the canonical generated figure; the adjacent PNG is a rendered
 review copy.
 
-## Safety and licensing
+## Responsible use and licensing
 
-The committed corpus is passive data. Do not replay it on a network you do not
-own or administer. CTF captures can contain challenge secrets by design.
+The committed corpus is passive data. Use it only in isolated labs or on
+systems you own or administer. Educational captures may contain exercise
+answers by design.
 
 Upstream license texts are stored under `licenses/`. Wireshark SampleCaptures
 is retained as a research index in `reports/UPSTREAM_INDEX.md`, but those wiki

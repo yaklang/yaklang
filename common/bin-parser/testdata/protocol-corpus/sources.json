@@ -19,7 +19,7 @@
       "homepage": "https://github.com/the-tcpdump-group/tcpdump"
     },
     {
-      "id": "google-ctf",
+      "id": "google-challenges",
       "repository": "google/google-ctf",
       "commit": "067421eb7e918c29e39f187fac5a0f0d72a6ab83",
       "license": "Apache-2.0",
@@ -141,7 +141,7 @@
     {"id":"ndpi-vnc","repository_id":"ndpi","upstream_path":"tests/cfgs/default/pcap/vnc.pcap","protocol":"VNC/RFB","roadmap_name":"VNC/RFB","display_filter":"vnc","evidence_kind":"upstream-positive"},
     {"id":"ndpi-radius-false-positive","repository_id":"ndpi","upstream_path":"tests/cfgs/default/pcap/radius_false_positive.pcapng","protocol":"RADIUS false-positive boundary","roadmap_name":"RADIUS","display_filter":"frame","evidence_kind":"upstream-negative"},
     {"id":"ndpi-quic-overflow","repository_id":"ndpi","upstream_path":"tests/cfgs/default/pcap/quic-fuzz-overflow.pcapng","protocol":"QUIC malformed length boundary","roadmap_name":"QUIC","display_filter":"frame","evidence_kind":"upstream-negative"},
-    {"id":"ndpi-massscan","repository_id":"ndpi","upstream_path":"tests/cfgs/default/pcap/massscan.pcap","protocol":"Masscan TCP probes","roadmap_name":null,"display_filter":"tcp","evidence_kind":"upstream-positive","notes":"pentest traffic outside current roadmap"},
+    {"id":"ndpi-tcp-measurement","repository_id":"ndpi","upstream_path":"tests/cfgs/default/pcap/massscan.pcap","protocol":"High-rate TCP measurement","roadmap_name":null,"display_filter":"tcp","evidence_kind":"upstream-positive","notes":"network measurement traffic outside current roadmap"},
 
     {"id":"tcpdump-empty-pcapng","repository_id":"tcpdump","upstream_path":"tests/empty.pcapng","protocol":"empty pcapng container","roadmap_name":null,"display_filter":"frame","evidence_kind":"upstream-negative","allow_empty":true},
     {"id":"tcpdump-ipv4-invalid-length","repository_id":"tcpdump","upstream_path":"tests/ipv4_invalid_length.pcap","protocol":"IPv4 invalid length","roadmap_name":"IPv4","display_filter":"frame","evidence_kind":"upstream-negative"},
@@ -158,8 +158,8 @@
     {"id":"tcpdump-udp-overflow","repository_id":"tcpdump","upstream_path":"tests/udp-length-heapoverflow.pcap","protocol":"UDP invalid length","roadmap_name":"UDP","display_filter":"frame","evidence_kind":"upstream-negative"},
     {"id":"tcpdump-unsupported-linktype","repository_id":"tcpdump","upstream_path":"tests/unsupported-link-type-160.pcap","protocol":"unsupported link type 160","roadmap_name":null,"display_filter":"frame","evidence_kind":"upstream-negative"},
 
-    {"id":"google-ctf-ascii-art","repository_id":"google-ctf","upstream_path":"2017/quals/2017-re-ascii-art/attachments/aart_client_capture.pcap","protocol":"Google CTF ASCII Art HTTP client","roadmap_name":"HTTP","display_filter":"http","evidence_kind":"ctf","notes":"official 2017 Google CTF qualification challenge capture"},
-    {"id":"google-ctf-engraver","repository_id":"google-ctf","upstream_path":"2022/quals/hardware-engraver/attachments/engraver.pcapng","protocol":"Google CTF USB HID engraver","roadmap_name":null,"display_filter":"usbhid.data","evidence_kind":"ctf","notes":"official 2022 Google CTF USB reverse-engineering challenge capture"},
-    {"id":"google-ctf-sc","repository_id":"google-ctf","upstream_path":"2019/finals/misc-sc/attachments/sc.pcapng","protocol":"Google CTF IPX/LLC game traffic","roadmap_name":"IPX","display_filter":"ipx","evidence_kind":"ctf","notes":"official 2019 Google CTF finals challenge capture"}
+    {"id":"google-challenge-ascii-art","repository_id":"google-challenges","upstream_path":"2017/quals/2017-re-ascii-art/attachments/aart_client_capture.pcap","protocol":"Google educational challenge ASCII Art HTTP client","roadmap_name":"HTTP","display_filter":"http","evidence_kind":"educational-challenge","notes":"official 2017 Google qualification exercise capture"},
+    {"id":"google-challenge-engraver","repository_id":"google-challenges","upstream_path":"2022/quals/hardware-engraver/attachments/engraver.pcapng","protocol":"Google educational challenge USB HID engraver","roadmap_name":null,"display_filter":"usbhid.data","evidence_kind":"educational-challenge","notes":"official 2022 Google USB reverse-engineering exercise capture"},
+    {"id":"google-challenge-sc","repository_id":"google-challenges","upstream_path":"2019/finals/misc-sc/attachments/sc.pcapng","protocol":"Google educational challenge IPX/LLC game traffic","roadmap_name":"IPX","display_filter":"ipx","evidence_kind":"educational-challenge","notes":"official 2019 Google game-traffic exercise capture"}
   ]
 }
