@@ -2124,6 +2124,153 @@ def amf3():
     return tcp_talk(1935, bytes.fromhex("00030000000100000000000000001100000000"))
 
 
+# --- batch4: tshark-named replacements (last-wins on duplicate ids) ---
+
+@recipe("gen-ice-stun", "ICE", "stun")
+def ice_stun_fixed():
+    # Binding request: type + length + magic cookie + 12-byte txid
+    return [udp(3478, bytes.fromhex("000100002112a442000102030405060708090a0b"))]
+
+
+@recipe("gen-tipc", "TIPC", "tipc")
+def tipc_ethertype():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x88CA) / Raw(b"\x80\x01\x00\x00" + b"\x00" * 20)]
+
+
+@recipe("gen-isis", "IS-IS", "isis")
+def isis_hello_fixed():
+    from scapy.contrib.isis import ISIS_CommonHdr, ISIS_L1_LAN_Hello
+
+    return [
+        Dot3(src=MAC_A, dst="01:80:c2:00:00:14")
+        / LLC(dsap=0xFE, ssap=0xFE, ctrl=3)
+        / ISIS_CommonHdr(pdutype=15)
+        / ISIS_L1_LAN_Hello(sourceid="01.00.01.00.01.00", circuittype=1, lanid="01.00.01.00.01.00.01")
+    ]
+
+
+@recipe("gen-linux-sll2", "Linux SLL2", "sll")
+def linux_sll2_fixed():
+    return [
+        CookedLinuxV2(proto=0x0800, ifindex=1, lladdrtype=1, pkttype=0, lladdrlen=6, src=b"\x02\x00\x00\x00\x00\x01")
+        / IP(src=IP_A, dst=IP_B)
+        / ICMP()
+    ]
+
+
+@recipe("gen-alljoyn", "AllJoyn", "ajns")
+def alljoyn_ns():
+    return [udp(9956, b"\x00\x00\x00\x20" + b"AllJoyn" + b"\x00")]
+
+
+@recipe("gen-aarp", "AARP", 'frame.protocols contains "aarp"')
+def aarp_fixed():
+    hdr = bytes.fromhex("0001080006070001020000000001000001ffffffffffff000002")
+    return [Ether(src=MAC_A, dst="ff:ff:ff:ff:ff:ff", type=0x80F3) / Raw(hdr)]
+
+
+@recipe("gen-fibre-channel", "Fibre Channel", 'frame.protocols contains "fcoe:fc"')
+def fibre_channel_fixed():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x8906) / Raw(b"\x00" * 14 + b"\x01\x00" + b"\x00" * 24)]
+
+
+@recipe("gen-mipv6", "MIPv6", "mipv6")
+def mipv6_fixed():
+    return [eth(IPv6(src=IP6_A, dst=IP6_B, nh=135) / Raw(b"\x3b\x00\x05\x00" + b"\x00" * 12))]
+
+
+@recipe("gen-vines", "VINES", 'frame.protocols contains "vines_ip"')
+def vines_fixed():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x0BAD) / Raw(b"\x00" * 16)]
+
+
+@recipe("gen-sna", "SNA", "snaeth")
+def sna_fixed():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x80D5) / Raw(b"\x2c\x00" + b"\x00" * 14)]
+
+
+@recipe("gen-x11", "X11", "x11")
+def x11_fixed():
+    return tcp_talk(6000, bytes.fromhex("6c000b0000000000000000000000"))
+
+
+@recipe("gen-diameter", "Diameter Cx/Dx", 'frame.protocols contains "diameter"')
+def diameter_cer():
+    hdr = bytes([0x01, 0x00, 0x00, 0x14, 0x80, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01])
+    return tcp_talk(3868, hdr)
+
+
+@recipe("gen-ntlm-v2", "NTLM v1/v2", "ntlmssp")
+def ntlm_v2_fixed():
+    payload = b"NTLMSSP\x00\x03\x00\x00\x00" + b"\x00" * 48
+    http = b"GET / HTTP/1.1\r\nHost: lab\r\nAuthorization: NTLM " + __import__("base64").b64encode(payload) + b"\r\n\r\n"
+    return tcp_talk(80, http)
+
+
+@recipe("gen-slimp3", "SliMP3", "slimp3")
+def slimp3():
+    return [udp(3483, b"d\x00\x00\x00\x01")]
+
+
+@recipe("gen-sigcomp", "SIGCOMP", "sigcomp")
+def sigcomp():
+    return [udp(5060, b"\xff\xff" + b"\x00" * 8)]
+
+
+@recipe("gen-swipe", "swIPe", "swipe")
+def swipe():
+    return [eth(IP(src=IP_A, dst=IP_B, proto=53) / Raw(b"\x00" * 16))]
+
+
+@recipe("gen-wsmp", "WSMP", "wsmp")
+def wsmp():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x88DC) / Raw(bytes.fromhex("02") + b"\x00" * 10)]
+
+
+@recipe("gen-vntag", "VNTAG", "vntag")
+def vntag():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x8926) / Raw(bytes.fromhex("00000000") + bytes(Ether() / IP() / ICMP()))]
+
+
+@recipe("gen-pbb", "IEEE 802.1ah PBB", "ieee8021ah")
+def pbb():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x88E7) / Raw(bytes.fromhex("00000000") + bytes(Ether() / IP() / ICMP()))]
+
+
+@recipe("gen-eoam", "EOAM", "oampdu")
+def eoam():
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:02", type=0x8809) / Raw(b"\x03" + b"\x00" * 42)]
+
+
+@recipe("gen-lacp-marker", "LACP-marker", "marker")
+def lacp_marker():
+    from scapy.contrib.lacp import MarkerProtocol, SlowProtocol
+
+    return [Ether(src=MAC_A, dst="01:80:c2:00:00:02", type=0x8809) / SlowProtocol() / MarkerProtocol(requester_system=MAC_A)]
+
+
+@recipe("gen-ucp", "UCP/EMI", 'frame.protocols contains "ucp"')
+def ucp():
+    return tcp_talk(3027, b"\x02" + b"00/00000/O/30/1.0\x03")
+
+
+@recipe("gen-decnet", "DECnet", "dec_dna")
+def decnet():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x6003) / Raw(b"\x02\x00" + b"\x00" * 14)]
+
+
+@recipe("gen-sebek", "SEBEK", "sebek")
+def sebek():
+    from scapy.contrib.sebek import SebekHead, SebekV3
+
+    return [udp(1101, SebekHead(magic=0xD0D0D0D0, version=3) / SebekV3(cmd=b"bash".ljust(12, b"\x00"), data=b"ls\n"))]
+
+
+@recipe("gen-xns", "XNS", "idp")
+def xns():
+    return [Ether(src=MAC_A, dst=MAC_B, type=0x0600) / Raw(b"\x00" * 16)]
+
+
 def distinctive(protos: list[str], filt: str) -> bool:
     if not protos:
         return False

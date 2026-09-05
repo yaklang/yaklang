@@ -8,14 +8,14 @@ Generated against `ProtocolRoadmap` (616 names) and the vendored corpus in this 
 
 | Metric | Before this branch | After this branch |
 | --- | ---: | ---: |
-| Capture files | 174 | 384 |
-| Packets | 41828 | 58044 |
-| Unique roadmap protocols with a capture | 156 | 337 |
+| Capture files | 174 | 385 |
+| Packets | 41828 | 58003 |
+| Unique roadmap protocols with a capture | 156 | 338 |
 | Outside-roadmap candidate captures | 10 | 24 |
-| Locally generated captures | 0 | 161 |
+| Locally generated captures | 0 | 162 |
 | Roadmap `done` / `todo` | 211 / 405 | 211 / 405 (unchanged) |
 
-Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, ITI ICS-Security-Tools, mrhenrike/PCAPTrafficAnalysis, mgadelha/Sampled_Values, and **local Scapy synthesis** (`generated-local`, CC0). Docker Desktop was used for a Samba named-pipe attempt; identification captures themselves are Scapy `wrpcap` files kept only when `tshark` matched the recorded filter.
+Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, ITI ICS-Security-Tools, mrhenrike/PCAPTrafficAnalysis, mgadelha/Sampled_Values, and **local Scapy synthesis** (`generated-local`, CC0). Identification captures are Scapy `wrpcap` files kept only when `tshark` recorded a protocol token that names the roadmap entry. HTTP/TLS/RPC/RMI/STP/NBNS/data-only frames are not remapped to a more specific missing name.
 
 ## Family coverage (after)
 
@@ -23,28 +23,33 @@ Sources: nDPI, Wireshark `test/captures`, tcpdump tests, Google CTF, Scapy, ITI 
 | --- | ---: | ---: | --- |
 | `cn-vendor` | 33 | **0** | still private/Colasoft-only |
 | `microsoft` | 23 | **2** | WPAD + LLMNR-MDNS collision; generic DCE/RPC bind mapped to `MSRPC` (mq-rpc), not a named pipe |
-| `service-tools` | 66 | **35** | + RMI/JMX, Consul/Vault, Jenkins, Docker Registry, IPMI RMCP+, WS-Man, etcd raft, Solr, Chef/Puppet |
-| `link` | 49 | **36** | + Ethernet 802.2, MSTP, CFM, TRILL, E-LMI |
+| `service-tools` | 66 | **23** | + RMI, IPMI RMCP+, NTLM v1/v2 (tshark `ntlmssp`); HTTP-only Consul/Jenkins/etc. dropped |
+| `link` | 49 | **40** | + Ethernet 802.2, CFM, TRILL, E-LMI, Fibre Channel, VNTAG, IEEE 802.1ah PBB, EOAM, Linux SLL2 |
 | `ics` | 46 | **29** | + J1939, Powerlink |
-| `internet` | 40 | **31** | + IPcomp, GTPv2 |
+| `internet` | 40 | **35** | + IPcomp, GTPv2, MIPv6 |
+| `longtail` | 40 | **19** | + X11-adjacent longtail: TIPC, AllJoyn, AARP, VINES, SNA, SliMP3, SIGCOMP, swIPe, WSMP, DECnet, SEBEK, XNS |
+| `routing` | 24 | **20** | + IGRP, DVMRP, MSDP, IS-IS, LACP-marker |
 | `database` | 20 | **12** | + ETCD, MariaDB, Redis (RESP) |
 | `mgmt` | 20 | **13** | + Zabbix |
-| `storage` | 10 | **4** | AoE, MinIO/S3 |
-| `file` | 21 | **16** | + SMB2/SMB3, CIFS, 9P, Portmap, Mount |
-| `auth` | 16 | **11** | + TACACS+, NTLMSSP, SPNEGO |
+| `storage` | 10 | **5** | AoE, MinIO/S3, iSCSI |
+| `file` | 21 | **18** | + SMB2/SMB3, CIFS, 9P, Portmap, Mount |
+| `auth` | 16 | **13** | + TACACS+, NTLMSSP, SPNEGO |
+| `carrier` | 19 | **6** | + Diameter Cx/Dx, UCP/EMI |
+| `voip` | 23 | **16** | + Megaco, ICE (`stun`) |
+| `remote` | 17 | **10** | + Rlogin, X11 |
 | `transport` | 10 | **10** | complete |
 
-## Locally generated (111 captures / 287 unique mapped)
+## Locally generated (162 captures / 338 unique mapped)
 
-Batch 2 adds STP/RSTP, Ethernet SNAP, PAP, Linux SLL, WEP, DCCP, NBT SS, Redis RESP, TACACS+, Portmap/Mount, Bonjour, ACMEv2, Kubernetes API, WinRM HTTP, Submission, NTLMSSP/SPNEGO, SMB3/CIFS, 9P, FCoE, TZSP, Quake, Powerlink, IPcomp, HomePlug AV, Java serialization, JDWP, GTPv2, OLSR, NHRP, Zabbix, H.225.
+Batch 4 replaces HTTP/RPC/RMI/STP/NBNS floods with tshark-named frames. New names: X11, AllJoyn, AARP, Fibre Channel, MIPv6, VINES, SNA, SliMP3, SIGCOMP, swIPe, WSMP, VNTAG, IEEE 802.1ah PBB, EOAM, LACP-marker, Diameter Cx/Dx, UCP/EMI, DECnet, SEBEK, NTLM v1/v2, XNS, ICE, TIPC, IS-IS, Linux SLL2.
+
+Kept honest batch-3 names include Ethernet 802.2, CFM, TRILL, E-LMI, NVGRE, NAT-T, Mobile IP, IGRP, DVMRP, MSDP, Rsync, NCP, NTLM, GSS-API, Rlogin, RMI, IIOP Locate, IPMI RMCP+, Megaco/H.248, CMPP, Quake2, Quake3, iSCSI, AppleTalk, LAT, NetNTLMv2.
 
 Scapy recipes in `tools/generate-local/generate.py`. Dropped recipes (no tshark hit) are listed in `generated-index.json` `failed`.
 
-Notable new names: Ethernet II, IEEE 802.1Q, QinQ, RARP, LACP, EAPOL, IEEE 802.11, CDP, ICMPv6 NDP, IPv6 Hop-by-Hop/Routing/Fragment/DstOpt, IGMP, MPLS, Geneve, RIP, RIPng, OSPFv3, EIGRP, LLMNR, DHCPv6, NetFlow v5, SNMPv3, LDAP/CLDAP, SOCKS4, Memcache binary, Docker API, AoE, MinIO/S3, JDWP handshake, JSON-RPC 2.0, ONC RPC, LPD, FTP-DATA, SDP, J1939, SSL, XML-RPC, WPAD, MSRPC, **SMB2**, **MariaDB**.
-
 ## ICS remaining without a capture
 
-Modbus RTU/ASCII, IEC 60870-5-101, OPC DA, PROFIBUS, Powerlink, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
+Modbus RTU/ASCII, IEC 60870-5-101, OPC DA, PROFIBUS, SERCOS III, CC-Link IE, CODESYS, FF HSE, LonTalk, DALI, UDS, VARAN, AES50, Z-Wave, IEC 62056, M-Bus, DALI-2.
 
 ## How to grow further
 
