@@ -4,8 +4,8 @@ This directory is test and experiment material for the 616-item
 `ProtocolRoadmap`. It deliberately keeps evidence collection separate from
 claims that a Yaklang dissector is complete.
 
-The current snapshot contains 131 capture files, 34,885 packets and direct
-material for 113 unique roadmap protocols. The source and family breakdown is
+The current snapshot contains 174 capture files, 41,828 packets and direct
+material for 156 unique roadmap protocols. The source and family breakdown is
 generated in `reports/REPORT.md`; `reports/UPSTREAM_INDEX.md` records the wider
 authoritative collections and selection policy.
 
@@ -50,14 +50,16 @@ frame hex and roadmap mappings without requiring Wireshark or network access.
 The SVG chart is the canonical generated figure; the adjacent PNG is a rendered
 review copy.
 
-## Responsible use and licensing
+## Data handling and licensing
 
-The committed corpus is passive data. Use it only in isolated labs or on
-systems you own or administer. Educational captures may contain exercise
-answers by design.
+The committed corpus is passive data consumed by local parser tests. Reading a
+capture does not contact any service. Educational captures may contain exercise
+solutions by design.
 
-Upstream license texts are stored under `licenses/`. Wireshark SampleCaptures
-is retained as a research index in `reports/UPSTREAM_INDEX.md`, but those wiki
-attachments are not vendored because attachment-level redistribution terms are
-not uniform. This corpus vendors only captures from repositories with an
-explicit project license at the pinned commit.
+Upstream license texts are stored under `licenses/`. Captures from Wireshark's
+official repository are pinned and vendored under its project license.
+Wireshark SampleCaptures is retained separately as a research index in
+`reports/UPSTREAM_INDEX.md`; historical wiki attachments are not vendored
+because attachment-level redistribution terms are not uniform. This corpus
+vendors only captures from repositories with an explicit project license at
+the pinned commit.
