@@ -21,3 +21,5 @@ ndpi-matter,Matter on/off,ndpi,upstream-positive,outside current 616-item roadma
 ndpi-weibo,Weibo,ndpi,upstream-positive,Chinese app traffic; Weibo is not a named 616-item but is CN-app material
 ndpi-xiaomi,Xiaomi IoT,ndpi,upstream-positive,outside named cn-vendor items; Chinese vendor IoT
 ndpi-tuya,Tuya smart-home,ndpi,upstream-positive,outside current 616-item roadmap; CN IoT
+ndpi-dicom,DICOM,ndpi,upstream-positive,outside current 616-item roadmap; medical imaging ICS-adjacent
+ndpi-hl7,HL7,ndpi,upstream-positive,outside current 616-item roadmap; healthcare

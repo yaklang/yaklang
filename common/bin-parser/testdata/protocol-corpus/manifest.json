@@ -37,6 +37,15 @@
       "homepage": "https://github.com/google/google-ctf",
       "license_file": "licenses/google-challenges-LICENSE.txt",
       "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "id": "scapy",
+      "repository": "secdev/scapy",
+      "commit": "6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91",
+      "license": "GPL-2.0",
+      "homepage": "https://github.com/secdev/scapy",
+      "license_file": "licenses/scapy-LICENSE.txt",
+      "license_sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
     }
   ],
   "captures": [
@@ -6168,6 +6177,302 @@
         "ip",
         "udp",
         "ntp"
+      ]
+    },
+    {
+      "id": "scapy-doip",
+      "repository_id": "scapy",
+      "protocol": "DoIP ACK",
+      "roadmap_name": "DoIP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/scapy/scapy-doip.pcap",
+      "source_url": "https://raw.githubusercontent.com/secdev/scapy/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps/doip_ack.pcap",
+      "upstream_path": "test/pcaps/doip_ack.pcap",
+      "sha256": "2032075e348b447bf783be811b525cd3eabc72ce34c2b96a67bbd57744f0f1fe",
+      "size_bytes": 110,
+      "packet_count": 1,
+      "link_type": "Ethernet",
+      "display_filter": "doip",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 70,
+        "hex_file": "hex/scapy-doip.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "doip"
+      ]
+    },
+    {
+      "id": "scapy-zigbee-join",
+      "repository_id": "scapy",
+      "protocol": "Zigbee join/authenticate",
+      "roadmap_name": "Zigbee",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/scapy/scapy-zigbee-join.pcap",
+      "source_url": "https://raw.githubusercontent.com/secdev/scapy/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps/zigbee-join-authenticate.pcap",
+      "upstream_path": "test/pcaps/zigbee-join-authenticate.pcap",
+      "sha256": "2b33b210d972515babb348a14454359602fa6c919247e038446c5404ec78a823",
+      "size_bytes": 2840,
+      "packet_count": 54,
+      "link_type": "UnknownLinkType",
+      "display_filter": "wpan",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 45,
+        "hex_file": "hex/scapy-zigbee-join.frame-1.hex"
+      },
+      "frame_protocols": [
+        "wpan",
+        "zbee_nwk",
+        "data"
+      ]
+    },
+    {
+      "id": "scapy-zigbee-skke",
+      "repository_id": "scapy",
+      "protocol": "Zigbee SKKE transport key",
+      "roadmap_name": "Zigbee",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/scapy/scapy-zigbee-skke.pcap",
+      "source_url": "https://raw.githubusercontent.com/secdev/scapy/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps/zigbee-transport-key-skke_1.pcap",
+      "upstream_path": "test/pcaps/zigbee-transport-key-skke_1.pcap",
+      "sha256": "a48e8339fb54be229de0d449936667f22267bda8bc93982d870baa389ba9ad36",
+      "size_bytes": 96,
+      "packet_count": 1,
+      "link_type": "UnknownLinkType",
+      "display_filter": "wpan",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 56,
+        "hex_file": "hex/scapy-zigbee-skke.frame-1.hex"
+      },
+      "frame_protocols": [
+        "wpan",
+        "zbee_nwk",
+        "zbee_aps"
+      ]
+    },
+    {
+      "id": "scapy-ipfix",
+      "repository_id": "scapy",
+      "protocol": "IPFIX",
+      "roadmap_name": "IPFIX",
+      "roadmap_family": "mgmt",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/scapy/scapy-ipfix.pcap",
+      "source_url": "https://raw.githubusercontent.com/secdev/scapy/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps/ipfix.pcap",
+      "upstream_path": "test/pcaps/ipfix.pcap",
+      "sha256": "b2a08a30badb35ffec435ee00cf406f23e33440b2130f496eac6f18e5ac09b8c",
+      "size_bytes": 450,
+      "packet_count": 3,
+      "link_type": "Ethernet",
+      "display_filter": "cflow",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 158,
+        "hex_file": "hex/scapy-ipfix.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "data"
+      ]
+    },
+    {
+      "id": "scapy-netflowv9",
+      "repository_id": "scapy",
+      "protocol": "NetFlow v9",
+      "roadmap_name": "NetFlow v9",
+      "roadmap_family": "mgmt",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/scapy/scapy-netflowv9.pcap",
+      "source_url": "https://raw.githubusercontent.com/secdev/scapy/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps/netflowv9.pcap",
+      "upstream_path": "test/pcaps/netflowv9.pcap",
+      "sha256": "fc3368101cb41877013e82a5e0209ff0ba478471ec07a8040873b94ab64cb160",
+      "size_bytes": 2031,
+      "packet_count": 5,
+      "link_type": "Ethernet",
+      "display_filter": "cflow",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 158,
+        "hex_file": "hex/scapy-netflowv9.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "cflow"
+      ]
+    },
+    {
+      "id": "scapy-pfcp",
+      "repository_id": "scapy",
+      "protocol": "PFCP",
+      "roadmap_name": "PFCP",
+      "roadmap_family": "carrier",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/scapy/scapy-pfcp.pcap",
+      "source_url": "https://raw.githubusercontent.com/secdev/scapy/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/test/pcaps/pfcp.pcap",
+      "upstream_path": "test/pcaps/pfcp.pcap",
+      "sha256": "b0ba57dca02c72402582ffc29584b95490b4f9a28c0cb7a716905f034992d18a",
+      "size_bytes": 46260,
+      "packet_count": 200,
+      "link_type": "Raw",
+      "display_filter": "pfcp",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 63,
+        "hex_file": "hex/scapy-pfcp.frame-1.hex"
+      },
+      "frame_protocols": [
+        "raw",
+        "ip",
+        "udp",
+        "pfcp"
+      ]
+    },
+    {
+      "id": "ndpi-dicom",
+      "repository_id": "ndpi",
+      "protocol": "DICOM",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-dicom.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/dicom.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/dicom.pcap",
+      "sha256": "547bfbfe1e077141ce54e6fbf6d343d9ffd25f0017252044426ad710dcead185",
+      "size_bytes": 35420,
+      "packet_count": 6,
+      "link_type": "Null",
+      "display_filter": "dicom",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; medical imaging ICS-adjacent",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 739,
+        "hex_file": "hex/ndpi-dicom.frame-1.hex"
+      },
+      "frame_protocols": [
+        "null",
+        "ip",
+        "tcp",
+        "dicom"
+      ]
+    },
+    {
+      "id": "ndpi-hl7",
+      "repository_id": "ndpi",
+      "protocol": "HL7",
+      "roadmap_name": null,
+      "roadmap_family": null,
+      "roadmap_priority": null,
+      "roadmap_status": null,
+      "capture_file": "captures/ndpi/ndpi-hl7.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/hl7.pcap",
+      "upstream_path": "tests/cfgs/default/pcap/hl7.pcap",
+      "sha256": "a9255fcd795c6db4a051ad7641323bf423e57cabd831aa5cd65ffa066b9b302c",
+      "size_bytes": 9376,
+      "packet_count": 47,
+      "link_type": "Ethernet",
+      "display_filter": "hl7",
+      "evidence_kind": "upstream-positive",
+      "notes": "outside current 616-item roadmap; healthcare",
+      "representative_frame": {
+        "number": 13,
+        "length_bytes": 222,
+        "hex_file": "hex/ndpi-hl7.frame-13.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "tcp",
+        "hl7"
+      ]
+    },
+    {
+      "id": "ws-knxip-securewrapper",
+      "repository_id": "wireshark-tests",
+      "protocol": "KNX/IP SecureWrapper",
+      "roadmap_name": "KNX/IP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-knxip-securewrapper.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/knxip_SecureWrapper.pcap",
+      "upstream_path": "test/captures/knxip_SecureWrapper.pcap",
+      "sha256": "5bf8779363a3abd8d556d17f06bd21ba36250bdfc7a970a121d81f84fd0e8da7",
+      "size_bytes": 137,
+      "packet_count": 1,
+      "link_type": "Ethernet",
+      "display_filter": "kip",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 97,
+        "hex_file": "hex/ws-knxip-securewrapper.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "kip"
+      ]
+    },
+    {
+      "id": "ws-knxip-timernotify",
+      "repository_id": "wireshark-tests",
+      "protocol": "KNX/IP TimerNotify",
+      "roadmap_name": "KNX/IP",
+      "roadmap_family": "ics",
+      "roadmap_priority": "P2",
+      "roadmap_status": "todo",
+      "capture_file": "captures/wireshark-tests/ws-knxip-timernotify.pcap",
+      "source_url": "https://raw.githubusercontent.com/wireshark/wireshark/4f63ea0eae68cf6facea31604994f1a339e43640/test/captures/knxip_TimerNotify.pcap",
+      "upstream_path": "test/captures/knxip_TimerNotify.pcap",
+      "sha256": "444af624f83655cccd933c0ecdd778111a91eb0314b5ad00f0f92d7baf356949",
+      "size_bytes": 118,
+      "packet_count": 1,
+      "link_type": "Ethernet",
+      "display_filter": "kip",
+      "evidence_kind": "upstream-positive",
+      "representative_frame": {
+        "number": 1,
+        "length_bytes": 78,
+        "hex_file": "hex/ws-knxip-timernotify.frame-1.hex"
+      },
+      "frame_protocols": [
+        "eth",
+        "ethertype",
+        "ip",
+        "udp",
+        "kip"
       ]
     }
   ]
