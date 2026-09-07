@@ -364,9 +364,10 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 }
 
 type operatorInvocation struct {
-	node     *base.Node
-	operator func(*base.Node) (func(bool), error)
-	modes    []string
+	bridgeResult *bridgeCallResult
+	node         *base.Node
+	operator     func(*base.Node) (func(bool), error)
+	modes        []string
 }
 
 // The ordinary evaluator owns an immutable invocation. A pooled bridge worker
@@ -379,12 +380,18 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 	}
 	return map[string]interface{}{
 		"parseMemcachedFields": func(profile string) error {
+			if invocation.bridgeResult != nil {
+				return invocation.bridgeResult.deliver()
+			}
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("memcached-fields: structured generation is unsupported")
 			}
 			return parseMemcachedFields(invocation.node, invocation.operator, profile)
 		},
 		"parseCassandraFields": func(profile string) error {
+			if invocation.bridgeResult != nil {
+				return invocation.bridgeResult.deliver()
+			}
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("cassandra-fields: structured generation is unsupported")
 			}
@@ -768,6 +775,9 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 }
 
 func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (func(bool), error), modes ...string) error {
+	if handled, err := execRegisteredNativeBridge(node, code, operator, modes); handled {
+		return err
+	}
 	if reusableBridgeOperator(code) {
 		return execBridgeOperator(node, code, operator, modes)
 	}

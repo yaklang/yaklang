@@ -69,7 +69,7 @@ func (w *bridgeWorker) program(source string) (*bridgeProgram, error) {
 	return &w.programs[0], nil
 }
 
-func (w *bridgeWorker) execute(ctx context.Context, source string, node *base.Node, operator func(*base.Node) (func(bool), error), modes []string) (err error) {
+func (w *bridgeWorker) execute(ctx context.Context, source string, node *base.Node, operator func(*base.Node) (func(bool), error), modes []string, results ...*bridgeCallResult) (err error) {
 	// Clear packet references and root variables after success, panic and
 	// cancellation alike. Programs contain only immutable scalar literals.
 	defer func() {
@@ -82,9 +82,19 @@ func (w *bridgeWorker) execute(ctx context.Context, source string, node *base.No
 	p, err := w.program(source)
 	if err != nil {
 		// Preparation is optional, and occurs before executing any callback.
+		if len(results) > 0 && results[0] != nil {
+			invocation := &operatorInvocation{node: node, operator: operator, modes: modes, bridgeResult: results[0]}
+			engine := antlr4yak.New()
+			engine.GetVM().GetConfig().SetSuppressPanicDebugStack(true)
+			engine.ImportLibs(invocation.library())
+			return evalOperatorProgram(ctx, engine, source)
+		}
 		return execFreshOperator(node, source, operator, modes)
 	}
 	w.invocation = operatorInvocation{node: node, operator: operator, modes: modes}
+	if len(results) > 0 {
+		w.invocation.bridgeResult = results[0]
+	}
 	w.engine.GetVM().SetSymboltable(p.symbols)
 	// Execute the original program with its original source locations. No
 	// generated wrapper, shortened result or native replacement of Yak errors.
@@ -92,6 +102,9 @@ func (w *bridgeWorker) execute(ctx context.Context, source string, node *base.No
 }
 
 func execBridgeOperator(node *base.Node, source string, operator func(*base.Node) (func(bool), error), modes []string) error {
+	return execBridgeOperatorResult(node, source, operator, modes, nil)
+}
+func execBridgeOperatorResult(node *base.Node, source string, operator func(*base.Node) (func(bool), error), modes []string, result *bridgeCallResult) error {
 	var w *bridgeWorker
 	select {
 	case w = <-bridgeWorkers:
@@ -106,7 +119,7 @@ func execBridgeOperator(node *base.Node, source string, operator func(*base.Node
 	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	return w.execute(ctx, source, node, operator, modes)
+	return w.execute(ctx, source, node, operator, modes, result)
 }
 
 // This is a deliberately closed grammar, NOT an arbitrary Yak purity analysis.

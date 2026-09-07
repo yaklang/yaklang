@@ -1,0 +1,198 @@
+ok  	github.com/yaklang/yaklang/common/bin-parser	1.554s
+Current goroutine call stack:
+goroutine 558 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x105ea14d8)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x105b71520?, 0x14000376db0?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x14000a61c99?, {0x105b71520?, 0x14000376db0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000d203c0, 0x140002d6230, 0xc8?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000d203c0, 0x140002d6230, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000d203c0, 0x60?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode.func1(0x140002140c0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:401 +0xbc
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x140002140c0, {0x105ebd980, 0x10720ce60}, 0x0, 0x0, 0x1400017fcc8, {0x1400017fd78, 0x1, 0x0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:416
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:412
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode(0x14000117d58?, {0x105ebd980?, 0x10720ce60?}, {0x105593a2e?, 0x1f6b680?}, {0x14000117d58?, 0x14000d0c1c0?, 0x14000bbcc48?}, {0x1400017fd78?, 0x696e01043f039c?, ...})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:398 +0x7c
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.execOperatorProgram({0x105ebd980, 0x10720ce60}, 0x14000d04140, {0x105593a2e, 0x1b}, {0x140007aa380, 0x5a, 0x80})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/operator_program.go:83 +0x1f8
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOperatorProgram({0x105ebd980, 0x10720ce60}, 0x14000d04140, {0x105593a2e, 0x1b})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_pa
+Current goroutine call stack:
+goroutine 558 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x105ea14d8)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x105b71520?, 0x105ea68c8?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption.func2()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:151 +0xfc
+panic({0x105b71520?, 0x105ea68c8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.TestOperatorPanicDebugSuppressionPreservesDiagnostics.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/operator_diagnostics_test.go:23 +0x2c
+reflect.Value.call({0x105b50ea0?, 0x105e9fec0?, 0x1400089d178?}, {0x10554a616, 0x4}, {0x10720ce60, 0x0, 0x104f691a8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/reflect/value.go:596 +0x970
+reflect.Value.Call({0x105b50ea0?, 0x105e9fec0?, 0x1400089d218?}, {0x10720ce60?, 0x1075446e8?, 0x140002ba170?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/reflect/value.go:380 +0x94
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).nativeCall(0x140007f4d70, 0x0, 0x0, 0x14000d20780, {0x0, 0x0, 0x1400016b830?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/value_call.go:101 +0x398
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).NativeCall(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/value_call.go:17
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).Call(0x140007f4d70, 0x14000d20780, 0x0, {0x0, 0x0, 0x0})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/value_call.go:183 +0x58
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).call(0x14000d20780, 0x140007f4d70, 0x0, {0x0, 0x0, 0x0})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/op_call.go:38 +0xdc
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000d20780, 0x140007f4870, 0x38?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1284 +0x3a04
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000d20780, 0x140007f4870, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000d20780, 0x80?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*
+Current goroutine call stack:
+goroutine 558 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x105ea14d8)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x105b71520?, 0x140002bac00?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x14000967891?, {0x105b71520?, 0x140002bac00?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000d20c80, 0x140007f5e50, 0x38?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000d20c80, 0x140007f5e50, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000d20c80, 0xa0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execYakFunctionWithParentFrame.func2(0x14000d20c80)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:321 +0x238
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x140007b5c80, {0x105ebd980, 0x10720ce60}, 0x14000d20b40, 0x0, 0x1400089e810, {0x1400089e7e8, 0x1, 0x1400089e701?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execYakFunctionWithParentFrame(0x14000a38580?, {0x105ebd980?, 0x10720ce60?}, 0x18?, 0x1400089e801?, 0x1043eff50?, 0x107625a78?, {0x0?, 0x14000814320?, 0x14000a47020?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:304 +0xcc
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).CallYakFunction(0x14000d20b40, 0x0, 0x14000a38580, {0x0?, 0x105df59c0?, 0x14000a38580?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/func.go:263 +0x148
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).yakFunctionNCall(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/value_call.go:169
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).YakFunctionNCall(0x105df59c0?, 0x14000a38580?, {0x0?, 0x104f59f9c?, 0x0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/value_call.go:148 +0x50
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).Call(0x140008143c0, 0x14000d20b40, 0x0, {0x0, 0x0, 0x0})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/val
+Current goroutine call stack:
+goroutine 558 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x105ea14d8)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x105b71520?, 0x140004ccd60?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x14000113a88?, {0x105b71520?, 0x140004ccd60?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000d20000, 0x140007d6ff0, 0x48?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000d20000, 0x140007d6ff0, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000d20000, 0xe0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode.func1(0x140001435c0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:401 +0xbc
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x140001435c0, {0x105ebd980, 0x10720ce60}, 0x0, 0x0, 0x14000c1fc48, {0x14000c1fcf8, 0x1, 0x0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:416
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:412
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode(0x14000814c80?, {0x105ebd980?, 0x10720ce60?}, {0x14000c38000?, 0x10?}, {0x140007b85c0?, 0x1400037c000?, 0x14000baf080?}, {0x14000c1fcf8?, 0x10524c13c?, ...})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:398 +0x7c
+github.com/yaklang/yaklang/common/yak/antlr4yak.(*Engine).evalWithInline(0x14000814c80, {0x105ebd980, 0x10720ce60}, {0x14000c38000, 0x1001f}, 0x29?, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/engine.go:483 +0x20c
+github.com/yaklang/yaklang/common/yak/antlr4yak.(*Engine).EvalWithoutCache(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/engine.go:452
+github.com/yaklang/yaklang/common/yak/antlr4yak.(*Engine).SafeEvalWithoutCache(0x14000c38000?, {0x105ebd980?, 0x10720ce60?}, {0x1
+--- FAIL: TestNativeBridgeExactRegistrationAndDiagnostics (0.00s)
+    operator_native_test.go:32: 
+        	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/operator_native_test.go:32
+        	Error:      	Not equal: 
+        	            	expected: 1
+        	            	actual  : 0
+        	Test:       	TestNativeBridgeExactRegistrationAndDiagnostics
+        	Messages:   	native diagnostic replay must not call process twice
+Current goroutine call stack:
+goroutine 674 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x105ea14d8)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x105b71520?, 0x140008f2580?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x14000b76ae1?, {0x105b71520?, 0x140008f2580?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x140005468c0, 0x140005347d0, 0x58?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x140005468c0, 0x140005347d0, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x140005468c0, 0xf0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode.func1(0x140008420c0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:401 +0xbc
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x140008420c0, {0x105ebd980, 0x10720ce60}, 0x0, 0x0, 0x1400121bd58, {0x1400121be08, 0x1, 0x0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:416
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:412
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode(0x14000dbf5f0?, {0x105ebd980?, 0x10720ce60?}, {0x1055e0825?, 0x1055e0860?}, {0x14000dbf5f0?, 0x1400121be69?, 0xffffffffffffffff?}, {0x1400121be08?, 0x696e01043f039c?, ...})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:398 +0x7c
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.execOperatorProgram({0x105ebd980, 0x10720ce60}, 0x14000534460, {0x1055e0825, 0x42}, {0x14000340000, 0x193, 0x200})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/operator_program.go:83 +0x1f8
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOperatorProgram({0x105ebd980, 0x10720ce60}, 0x14000534460, {0x1055e0825, 0x42})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/
+FAIL
+FAIL	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	1.069s
+FAIL
