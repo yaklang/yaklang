@@ -1,0 +1,40 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Puppeteer Exposed Chrome Devtools"
+	title_zh: "检测到 Puppeteer 暴露 Chrome 远程调试端口",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-puppeteer-exposed-chrome-devtools"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `puppeteer-exposed-chrome-devtools` (/tmp/semgrep-rules/javascript/puppeteer/security/audit/puppeteer-exposed-chrome-devtools.yaml).
+Original message: Remote debugging protocol does not perform any authentication, so exposing it too widely can be a security risk.
+
+CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')
+References:
+- https://owasp.org/Top10/A03_2021-Injection
+Note: context-aware regex — remote debugging flags are kept only in files containing `require('puppeteer')`.
+DESC
+	solution: <<<SOLUTION
+Do not expose Puppeteer's Chrome remote debugging endpoint broadly. Bind debugging ports to localhost or remove remote-debugging flags in untrusted contexts.
+SOLUTION
+	alert_min: 1
+	"file://pos.js": <<<POS
+const puppeteer = require('puppeteer');
+const args = ['--remote-debugging-port=9222'];
+POS
+	"safefile://neg.js": <<<NEG
+const puppeteer = require('puppeteer');
+// no remote debugging flags
+NEG
+)
+
+${*}.pattern_regex(/require\(\s*['"]puppeteer['"]\s*\)/) as $ctx
+$ctx.regexp(/--remote-debugging-(?:address|port|socket-name|targets)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Puppeteer Exposed Chrome Devtools",
+	title_zh: "检测到 Puppeteer 暴露 Chrome 远程调试端口",
+	message: "Puppeteer remote debugging is exposed without authentication.",
+}

@@ -1,0 +1,41 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Apex Specify Sharing Level"
+	title_zh: "检测到 Apex 类未显式声明共享级别",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-apex-specify-sharing-level"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `specify-sharing-level` (/tmp/semgrep-rules/apex/lang/security/ncino/sharing/SpecifySharingLevel.yaml).
+Original message: Every Apex class should have an explicit sharing mode declared. Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced. Use the `inherited sharing` keyword on an Apex class to run the class in the sharing mode of the class that called it.
+
+CWE: CWE-284: Improper Access Control
+References:
+- https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta.apexcode/apex_classes_keywords_sharing.htm
+- https://cwe.mitre.org/data/definitions/284.html
+DESC
+	solution: <<<SOLUTION
+Declare `with sharing`, `without sharing`, or `inherited sharing` explicitly on every Apex class.
+SOLUTION
+	alert_min: 1
+	"file://pos.cls": <<<POS
+public class ExampleController {
+}
+POS
+	"safefile://neg.cls": <<<NEG
+public with sharing class ExampleController {
+}
+NEG
+)
+
+${*.cls}.pattern_regex_not(/(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\b(?:with|without|inherited)\s+sharing\b[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\bextends\s+Exception\b[\s\S]*?\{/) as $p0
+${*.apex}.pattern_regex_not(/(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\b(?:with|without|inherited)\s+sharing\b[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\bextends\s+Exception\b[\s\S]*?\{/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Apex Specify Sharing Level",
+	title_zh: "检测到 Apex 类未显式声明共享级别",
+	message: "Apex class does not explicitly declare a sharing level.",
+}

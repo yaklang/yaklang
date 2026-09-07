@@ -1,0 +1,63 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Package Dependencies Check"
+	title_zh: "检测到 npm 依赖使用变体版本",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-package-dependencies-check"
+	risk: "Security Misconfiguration"
+	desc: <<<DESC
+Migrated from Semgrep rule `package-dependencies-check` (/tmp/semgrep-rules/json/npm/security/package-dependencies-check.yml).
+Original message: Package dependencies with variant versions may lead to dependency hijack and confusion attacks. Better to specify an exact version or use package-lock.json for a specific version of the package.
+
+CWE: CWE-427: Uncontrolled Search Path Element
+References:
+- https://security.snyk.io/vuln/SNYK-JS-COLORS-2331906
+- https://medium.com/@alex.birsan/dependency-confusion-4a5d60fec610
+- https://cwe.mitre.org/data/definitions/427.html
+Note: context-aware regex — dependency entries are kept only inside dependencies blocks and dropped inside `_shrinkwrap` blocks. Prerelease exact versions are excluded by the original negative regex.
+DESC
+	solution: <<<SOLUTION
+Pin dependencies to exact versions, or commit a lockfile and validate all dependency ranges before installation.
+SOLUTION
+	alert_min: 1
+	"file://package.json": <<<POS
+{
+  "dependencies": {
+    "colors": "latest",
+    "left-pad": "^1.3.0"
+  }
+}
+POS
+	"safefile://package.json": <<<NEG
+{
+  "dependencies": {
+    "colors": "1.4.0",
+    "safe-dep": "1.2.3-beta.1"
+  },
+  "devDependencies": {
+    "build-dep": "2.0.0"
+  }
+}
+NEG
+)
+
+${*package.json}.pattern_regex(/"(?:dependencies|devDependencies|optionalDependencies|peerDependencies)"\s*:\s*\{[\s\S]*?\n[\t ]*\}/) as $ctx
+${*package.json}.pattern_regex(/"_shrinkwrap"\s*:\s*\{[\s\S]*?\n[\t ]*\}/) as $excluded
+${*package.json}.pattern_regex(/"[\w\-.]*"\s*:\s*"latest"/) as $latest
+${*package.json}.pattern_regex(/"[\w\-.]*"\s*:\s*"[^~\-\^><="x]*[~\-\^><=x]+.*"/) as $variant
+$latest inside $ctx as $a
+$a not_inside $excluded as $b
+$variant inside $ctx as $c
+$c not_inside $excluded as $d
+${*package.json}.pattern_regex(/"[\w\-.]*"\s*:\s*"[\d.]+-[\w.]+"/) as $prerelease
+$b - $prerelease as $e
+$d - $prerelease as $f
+$e + $f as $hit
+alert $hit for {
+	level: "middle",
+	title: "Package Dependencies Check",
+	title_zh: "检测到 npm 依赖使用变体版本",
+	message: "Package dependency uses a variant version and may be vulnerable to dependency hijacking.",
+}
