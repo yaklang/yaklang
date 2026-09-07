@@ -856,12 +856,16 @@ func GetNodeResult(node *base.Node) any {
 }
 
 func getNodeResult(node *base.Node, isByte bool) (any, error) {
-	endian := node.Cfg.GetString(CfgEndian)
+	return getNodeResultWithSettings(node, isByte, node.Cfg.ResultSettings())
+}
+
+func getNodeResultWithSettings(node *base.Node, isByte bool, settings base.ResultSettings) (any, error) {
+	endian := settings.Endian
 	if endian != "little" {
 		endian = "big"
 	}
 	var resPoint [2]uint64
-	composite := !node.Cfg.Has(CfgNodeResult)
+	composite := !settings.Present
 	if composite {
 		var start, end uint64
 		first := true
@@ -885,7 +889,7 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 		resPoint = [2]uint64{start, end}
 		isByte = true
 	} else {
-		resPoint = node.Cfg.GetItem(CfgNodeResult).([2]uint64)
+		resPoint = settings.Position.([2]uint64)
 	}
 	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
 	byts := buffer.Bytes()
@@ -911,7 +915,7 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 	// their storage, including a non-nil empty slice for a zero-width leaf.
 	if !isByte && resPoint[0]%8 == 0 && bitLength%8 == 0 && byteEnd <= uint64(len(byts)) {
 		window := byts[byteStart:byteEnd]
-		typ := node.Cfg.GetString(CfgType)
+		typ := settings.Type
 		switch typ {
 		case "string":
 			return string(window), nil
@@ -920,32 +924,36 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 		}
 	}
 	buf := make([]byte, (bitLength+7)/8)
-	// A final partial octet is right aligned, matching BitReader.ReadBits. Read
-	// the pending writer octet without appending to or mutating the buffer.
-	octet := func(index uint64) byte {
-		if index < uint64(len(byts)) {
-			return byts[index]
+	if resPoint[0]%8 == 0 && bitLength%8 == 0 && byteEnd <= uint64(len(byts)) {
+		copy(buf, byts[byteStart:byteEnd])
+	} else {
+		// A final partial octet is right aligned, matching BitReader.ReadBits. Read
+		// the pending writer octet without appending to or mutating the buffer.
+		octet := func(index uint64) byte {
+			if index < uint64(len(byts)) {
+				return byts[index]
+			}
+			return writer.PreByte << (8 - writer.PreByteLen)
 		}
-		return writer.PreByte << (8 - writer.PreByteLen)
-	}
-	for i := uint64(0); i < uint64(len(buf)); i++ {
-		at := resPoint[0] + i*8
-		width := min(uint64(8), resPoint[1]-at)
-		value := uint16(octet(at/8)) << 8
-		if at%8+width > 8 {
-			value |= uint16(octet(at/8 + 1))
+		for i := uint64(0); i < uint64(len(buf)); i++ {
+			at := resPoint[0] + i*8
+			width := min(uint64(8), resPoint[1]-at)
+			value := uint16(octet(at/8)) << 8
+			if at%8+width > 8 {
+				value |= uint16(octet(at/8 + 1))
+			}
+			buf[i] = byte(value>>(16-at%8-width)) & byte((uint16(1)<<width)-1)
 		}
-		buf[i] = byte(value>>(16-at%8-width)) & byte((uint16(1)<<width)-1)
-	}
 
+	}
 	if isByte {
 		return buf, nil
 	} else {
-		if node.Cfg.GetString(CfgType) == "string" {
+		if settings.Type == "string" {
 			return string(buf), nil
 		}
 		_ = endian
-		typeName := node.Cfg.GetString(CfgType)
+		typeName := settings.Type
 		bitLength := resPoint[1] - resPoint[0]
 		// ReadBits returns full octets followed by a right-aligned final
 		// partial octet. A big-endian integer needs the entire value aligned
