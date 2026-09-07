@@ -31,6 +31,10 @@ Package:
                 typeNameList = ["NBNS"]
               } else if src == 138 || dst == 138 {
                 typeNameList = ["NBTDG"]
+              } else if dst == 173 {
+                typeNameList = ["XYPLEXRequestCarrier"]
+              } else if src == 173 {
+                typeNameList = ["XYPLEXReplyCarrier"]
               } else if src == 5355 || dst == 5355 {
                 typeNameList = ["LLMNR"]
               } else if src == 1812 || dst == 1812 || src == 1813 || dst == 1813 || src == 1645 || dst == 1645 {
@@ -45,6 +49,12 @@ Package:
                 typeNameList = ["Syslog"]
               } else if src == 520 || dst == 520 {
                 typeNameList = ["RIP"]
+              } else if src == 521 || dst == 521 {
+                typeNameList = ["RIPng"]
+              } else if src == 524 || dst == 524 {
+                typeNameList = ["NCPCarrier"]
+              } else if src == 6081 || dst == 6081 {
+                typeNameList = ["Geneve"]
               } else if src == 4789 || dst == 4789 {
                 typeNameList = ["VXLAN"]
               } else if src == 500 || dst == 500 {
@@ -55,12 +65,28 @@ Package:
                 typeNameList = ["L2TP"]
               } else if src == 5060 || dst == 5060 {
                 typeNameList = ["SIP"]
+              } else if src == 4569 || dst == 4569 {
+                typeNameList = ["IAX2"]
+              } else if src == 5050 || dst == 5050 {
+                typeNameList = ["EtherSBus"]
+              } else if src == 6060 || dst == 6060 {
+                typeNameList = ["EtherSIO"]
               } else if src == 5006 || dst == 5006 {
                 typeNameList = ["SDP"]
               } else if src == 3478 || dst == 3478 {
                 typeNameList = ["STUN"]
+              } else if src == 27036 || dst == 27036 {
+                typeNameList = ["SteamDiscoveryCarrier"]
+              } else if src == 3483 || dst == 3483 || src == 1069 || dst == 1069 {
+                typeNameList = ["SliMP3Carrier"]
+              } else if src == 9956 || dst == 9956 {
+                typeNameList = ["AllJoynNSCarrier"]
               } else if src == 1900 || dst == 1900 {
                 typeNameList = ["SSDP"]
+              } else if src == 3702 || dst == 3702 {
+                typeNameList = ["WSDiscovery"]
+              } else if src == 4712 || dst == 4712 || src == 4713 || dst == 4713 {
+                typeNameList = ["C37118"]
               } else if src == 623 || dst == 623 {
                 typeNameList = ["IPMI"]
               } else if src == 111 || dst == 111 {
@@ -75,6 +101,10 @@ Package:
                 typeNameList = ["RTP"]
               } else if src == 5005 || dst == 5005 {
                 typeNameList = ["RTCP"]
+              } else if src == 18246 || dst == 18246 {
+                typeNameList = ["EGD"]
+              } else if src == 17224 || dst == 17224 || src == 17225 || dst == 17225 {
+                typeNameList = ["TRDP"]
               }
               for typeName in typeNameList{
                   res,op = this.TryProcessByType(typeName)
@@ -111,6 +141,8 @@ Package:
                   }
               }
 DNS: "import:application-layer/dns.yaml;node:DNS"
+EtherSBus: "import:application-layer/ether_sbus.yaml;node:EtherSBus"
+EtherSIO: "import:application-layer/ether_sio.yaml;node:EtherSIO"
 MDNS: "import:application-layer/dns.yaml;node:DNS"
 DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
 DHCPv6: "import:dhcpv6.yaml;node:DHCPv6"
@@ -120,6 +152,8 @@ SNMPv3: "import:application-layer/snmp.yaml;node:SNMPv3"
 Kerberos: "import:application-layer/kerberos.yaml;node:Kerberos"
 NBNS: "import:application-layer/nbns.yaml;node:NBNS"
 NBTDG: "import:nbt_dg.yaml;node:NBTDG"
+XYPLEXRequestCarrier: "import:xyplex.yaml;node:XYPLEXRequestCarrier"
+XYPLEXReplyCarrier: "import:xyplex.yaml;node:XYPLEXReplyCarrier"
 LLMNR: "import:application-layer/nbns.yaml;node:LLMNR"
 RADIUS: "import:application-layer/radius.yaml;node:RADIUS"
 QUIC: "import:application-layer/quic.yaml;node:QUIC"
@@ -127,14 +161,20 @@ LDAPMessage: "import:application-layer/ldap.yaml;node:LDAPMessage"
 TFTP: "import:tftp.yaml;node:TFTP"
 Syslog: "import:syslog.yaml;node:Syslog"
 RIP: "import:rip.yaml;node:RIP"
+RIPng: "import:ripng.yaml;node:RIPng"
+NCPCarrier: "import:application-layer/ncp.yaml;node:NCPCarrier"
+Geneve: "import:geneve.yaml;node:Geneve"
 VXLAN: "import:vxlan.yaml;node:VXLAN"
 IKE: "import:ike.yaml;node:IKE"
-NATT: "import:ike.yaml;node:IKE"
+NATT: "import:nat_t.yaml;node:NATTCarrier"
+AllJoynNSCarrier: "import:application-layer/alljoyn.yaml;node:AllJoynNSCarrier"
 L2TP: "import:l2tp.yaml;node:L2TP"
 SIP: "import:sip.yaml;node:SIP"
 SDP: "import:sdp.yaml;node:SDP"
 STUN: "import:stun.yaml;node:STUN"
 SSDP: "import:application-layer/http.yaml;node:HTTP"
+WSDiscovery: "import:application-layer/ws_discovery.yaml;node:WSDiscovery"
+C37118: "import:application-layer/c37118.yaml;node:C37118"
 IPMI: "import:ipmi.yaml;node:IPMI"
 ONCRPC: "import:onc_rpc.yaml;node:ONCRPC"
 OpenVPN: "import:openvpn.yaml;node:OpenVPN"
@@ -143,3 +183,8 @@ HSRP: "import:hsrp.yaml;node:HSRP"
 RTP: "import:rtp.yaml;node:RTP"
 RTCP: "import:rtp.yaml;node:RTCP"
 DTLS: "import:dtls.yaml;node:DTLS"
+EGD: "import:application-layer/egd.yaml;node:EGD"
+TRDP: "import:application-layer/trdp.yaml;node:TRDPMessage"
+IAX2: "import:application-layer/iax2.yaml;node:IAX2"
+SteamDiscoveryCarrier: "import:application-layer/steam_discovery.yaml;node:SteamDiscoveryCarrier"
+SliMP3Carrier: "import:application-layer/slimp3.yaml;node:SliMP3Carrier"

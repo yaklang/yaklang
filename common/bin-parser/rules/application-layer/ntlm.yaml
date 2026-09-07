@@ -11,6 +11,18 @@ Package:
       t = getNodeResult("MessageType").Value
       if t == 1 {
         this.ProcessSubNode("NegotiateFlags")
+        this.ProcessSubNode("DomainNameFields")
+        this.ProcessSubNode("WorkstationFields")
+        flags = getNodeResult("NegotiateFlags").Value
+        if (flags & 0x02000000) != 0 {
+          if this.HasMaxLength() && this.GetMaxLength() - this.Length() < 8 { panic("ntlmssp: NEGOTIATE_VERSION requires Version") }
+          this.ProcessSubNode("Version")
+        }
+        if this.HasMaxLength() && this.GetMaxLength() > this.Length() {
+          rest = this.GetMaxLength() - this.Length()
+          this.GetSubNode("Negotiate Payload").SetMaxLength(rest)
+          this.ProcessSubNode("Negotiate Payload")
+        }
         return
       }
       if t == 2 {
@@ -19,16 +31,50 @@ Package:
         this.ProcessSubNode("ServerChallenge")
         this.ProcessSubNode("Reserved")
         this.ProcessSubNode("TargetInfoFields")
+        flags = getNodeResult("NegotiateFlags").Value
+        if (flags & 0x02000000) != 0 {
+          if this.HasMaxLength() && this.GetMaxLength() - this.Length() < 8 { panic("ntlmssp: CHALLENGE NEGOTIATE_VERSION requires Version") }
+          this.ProcessSubNode("Version")
+        }
         tlen = getNodeResult("TargetNameFields/Length").Value
         toff = getNodeResult("TargetNameFields/BufferOffset").Value
+        ilen = getNodeResult("TargetInfoFields/Length").Value
+        ioff = getNodeResult("TargetInfoFields/BufferOffset").Value
+        // MS-NLMP 2.2.1.2 requires these descriptors to be ignored when
+        // their corresponding flag is clear. MaxLength and Reserved are
+        // also ignored on receipt; they do not constrain the payload.
+        if (flags & 0x00000004) == 0 { tlen = 0 }
+        if (flags & 0x00800000) == 0 { ilen = 0 }
         cur = this.Length()
-        if tlen > 0 && tlen < 1048576 && toff >= cur {
+        payloadEnd = cur
+        if tlen > 0 {
+          if toff < cur { panic("ntlmssp: challenge target name overlaps fixed header") }
+          if toff > 1048576 || tlen > 1048576 - toff { panic("ntlmssp: challenge target name exceeds read budget") }
+          if this.HasMaxLength() && (toff > this.GetMaxLength() || tlen > this.GetMaxLength() - toff) { panic("ntlmssp: challenge target name exceeds message") }
+          if (flags & 1) != 0 && (toff % 2 != 0 || tlen % 2 != 0) { panic("ntlmssp: Unicode target name must be aligned to two bytes") }
+          payloadEnd = toff + tlen
+        }
+        if ilen > 0 {
+          if ioff < cur { panic("ntlmssp: challenge target info overlaps fixed header") }
+          if ioff > 1048576 || ilen > 1048576 - ioff { panic("ntlmssp: challenge target info exceeds read budget") }
+          if this.HasMaxLength() && (ioff > this.GetMaxLength() || ilen > this.GetMaxLength() - ioff) { panic("ntlmssp: challenge target info exceeds message") }
+          if ioff + ilen > payloadEnd { payloadEnd = ioff + ilen }
+        }
+        if tlen > 0 {
           if toff > cur {
             this.GetSubNode("Pad").SetMaxLength(toff - cur)
             this.ProcessSubNode("Pad")
           }
           this.GetSubNode("Target Name").SetMaxLength(tlen)
           this.ProcessSubNode("Target Name")
+        }
+        // TargetInfo remains opaque. Offsets may put it before or after the
+        // target name; read through the final referenced byte in either order.
+        // A bounded caller may include the trailing padding allowed by NLMP.
+        if this.HasMaxLength() { payloadEnd = this.GetMaxLength() }
+        if payloadEnd > this.Length() {
+          this.GetSubNode("Challenge Payload").SetMaxLength(payloadEnd - this.Length())
+          this.ProcessSubNode("Challenge Payload")
         }
         return
       }
@@ -39,12 +85,21 @@ Package:
         this.ProcessSubNode("UserNameFields")
         this.ProcessSubNode("WorkstationFields")
         this.ProcessSubNode("EncryptedRandomSessionKeyFields")
+        if this.HasMaxLength() && this.GetMaxLength() - this.Length() < 4 { panic("ntlmssp: authentication message is missing NegotiateFlags") }
         this.ProcessSubNode("NegotiateFlags")
+        ntlen = getNodeResult("NtChallengeResponseFields/Length").Value
+        ntoff = getNodeResult("NtChallengeResponseFields/BufferOffset").Value
         dlen = getNodeResult("DomainNameFields/Length").Value
         doff = getNodeResult("DomainNameFields/BufferOffset").Value
         ulen = getNodeResult("UserNameFields/Length").Value
         uoff = getNodeResult("UserNameFields/BufferOffset").Value
         cur = this.Length()
+        if ntlen > 0 && ntoff == cur {
+          if ntlen >= 1048576 || (this.HasMaxLength() && ntlen > this.GetMaxLength() - this.Length()) { panic("ntlmssp: NT challenge response exceeds message") }
+          this.GetSubNode("NT Challenge Response").SetMaxLength(ntlen)
+          this.ProcessSubNode("NT Challenge Response")
+          cur = this.Length()
+        }
         if dlen > 0 && dlen < 1048576 && doff >= cur {
           if doff > cur {
             this.GetSubNode("Pad").SetMaxLength(doff - cur)
@@ -61,6 +116,11 @@ Package:
           }
           this.GetSubNode("User Name").SetMaxLength(ulen)
           this.ProcessSubNode("User Name")
+        }
+        if this.HasMaxLength() && this.GetMaxLength() > this.Length() {
+          rest = this.GetMaxLength() - this.Length()
+          this.GetSubNode("Authentication Payload").SetMaxLength(rest)
+          this.ProcessSubNode("Authentication Payload")
         }
         return
       }
@@ -105,6 +165,24 @@ Package:
     Target Name: string
     Domain Name: string
     User Name: string
+    Version: Version
+    Challenge Payload: raw
+    Negotiate Payload: raw
+    NT Challenge Response:
+      unpack: true
+      operator: |
+        res, op = this.TryProcessByType("NetNTLMv2Probe")
+        if op.OK {
+          err = op.Save()
+          if err != nil { panic(err) }
+          return
+        }
+        err = op.Recovery()
+        if err != nil { panic(err) }
+        this.GetSubNode("Opaque Response").SetMaxLength(this.GetMaxLength())
+        this.ProcessSubNode("Opaque Response")
+      Opaque Response: raw
+    Authentication Payload: raw
     Pad: string
     Pad2: string
   NetNTLMv2:
@@ -184,3 +262,23 @@ Field:
   Length: uint16
   MaxLength: uint16
   BufferOffset: uint32
+NetNTLMv2Probe:
+  operator: |
+    this.ProcessSubNode("NTProofStr")
+    this.ProcessSubNode("RespType")
+    this.ProcessSubNode("HiRespType")
+    if getNodeResult("RespType").Value != 1 { panic("netntlmv2: RespType must be 1") }
+    if getNodeResult("HiRespType").Value != 1 { panic("netntlmv2: HiRespType must be 1") }
+    this.ProcessSubNode("Reserved1")
+    this.ProcessSubNode("Reserved2")
+    this.ProcessSubNode("TimeStamp")
+    this.ProcessSubNode("ClientChallenge")
+    this.ProcessSubNode("Reserved3")
+  NTProofStr: raw,16
+  RespType: uint8
+  HiRespType: uint8
+  Reserved1: uint16
+  Reserved2: uint32
+  TimeStamp: raw,8
+  ClientChallenge: raw,8
+  Reserved3: uint32

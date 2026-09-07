@@ -18,6 +18,18 @@ func ToMap(node *base.Node) (*base.NodeValue, error) {
 		return false
 	}
 	if NodeHasResult(node) {
+		// A processed, empty list can carry an exact zero-width wire span.
+		// Preserve its collection type; dormant lists without a result still
+		// produce noResultError below, and terminal raw values stay scalar.
+		if node.Cfg.GetBool(CfgIsList) && !NodeIsTerminal(node) && len(node.Children) == 0 {
+			span := GetNodeResultPos(node)
+			if span[0] == span[1] {
+				if _, err := getNodeResult(node, true); err != nil {
+					return nil, err
+				}
+				return newListNodeValue(node), nil
+			}
+		}
 		return newNodeValue(node, GetResultByNode(node)), nil
 	}
 	if node.Cfg.GetBool(CfgIsList) {

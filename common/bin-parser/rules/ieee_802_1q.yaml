@@ -10,6 +10,14 @@ Package:
       unpack: true
       operator: |
         typ = getNodeResult("../Type").Value
+        if typ == 0x8906 {
+          this.ProcessByType("FCoECarrier")
+          return
+        }
+        if typ == 0x22f3 {
+          this.ProcessByType("TRILLCarrier")
+          return
+        }
         if typ == 0x0800 {
           this.ProcessByType("IP")
           return
@@ -26,8 +34,20 @@ Package:
           this.ProcessByType("EAPOL")
           return
         }
+        if typ == 0x88ba {
+          this.ProcessByType("IECSampledValuesCarrier")
+          return
+        }
+        if typ == 0x88b8 {
+          this.ProcessByType("IECGOOSECarrier")
+          return
+        }
         return
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
+FCoECarrier: "import:fcoe.yaml;node:FCoECarrier"
+TRILLCarrier: "import:trill.yaml;node:TRILLCarrier"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 EAPOL: "import:eapol.yaml;node:EAPOL"
+IECSampledValuesCarrier: "import:iec61850.yaml;node:SampledValuesCarrier"
+IECGOOSECarrier: "import:iec61850.yaml;node:GOOSECarrier"

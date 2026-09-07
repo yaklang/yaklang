@@ -1,0 +1,144 @@
+RUN variant=baseline cpu=1 repetition=1
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=1 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes 	       1	26679449375 ns/op	   0.34 MB/s	   8993088 input-B/op	     58533 messages/op	      2194 messages/s	         1.000 workers	19484530376 B/op	397518388 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=1 repetition=1
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=1 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes 	       1	20660203292 ns/op	   0.44 MB/s	   8993088 input-B/op	     58533 messages/op	      2833 messages/s	         1.000 workers	14939870112 B/op	313114792 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=1 repetition=2
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=1 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes 	       1	20704790041 ns/op	   0.43 MB/s	   8993088 input-B/op	     58533 messages/op	      2827 messages/s	         1.000 workers	14939868360 B/op	313114626 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=1 repetition=2
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=1 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes 	       1	26771070291 ns/op	   0.34 MB/s	   8993088 input-B/op	     58533 messages/op	      2186 messages/s	         1.000 workers	19484497744 B/op	397518276 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=1 repetition=3
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=1 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes 	       1	26791914667 ns/op	   0.34 MB/s	   8993088 input-B/op	     58533 messages/op	      2185 messages/s	         1.000 workers	19484500856 B/op	397518379 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=1 repetition=3
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=1 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes 	       1	20700358917 ns/op	   0.43 MB/s	   8993088 input-B/op	     58533 messages/op	      2828 messages/s	         1.000 workers	14939780912 B/op	313114242 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=4 repetition=1
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=4 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-4   	       1	8806261375 ns/op	   1.02 MB/s	   8993088 input-B/op	     58533 messages/op	      6647 messages/s	         4.000 workers	19484605440 B/op	397518179 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=4 repetition=1
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=4 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-4   	       1	6780491875 ns/op	   1.33 MB/s	   8993088 input-B/op	     58533 messages/op	      8633 messages/s	         4.000 workers	14939908552 B/op	313114371 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=4 repetition=2
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=4 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-4   	       1	6738217000 ns/op	   1.33 MB/s	   8993088 input-B/op	     58533 messages/op	      8687 messages/s	         4.000 workers	14939912088 B/op	313114345 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=4 repetition=2
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=4 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-4   	       1	9385406167 ns/op	   0.96 MB/s	   8993088 input-B/op	     58533 messages/op	      6237 messages/s	         4.000 workers	19484619776 B/op	397518117 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=4 repetition=3
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=4 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-4   	       1	8779150333 ns/op	   1.02 MB/s	   8993088 input-B/op	     58533 messages/op	      6667 messages/s	         4.000 workers	19484620048 B/op	397518087 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=4 repetition=3
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=4 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-4   	       1	6800596458 ns/op	   1.32 MB/s	   8993088 input-B/op	     58533 messages/op	      8607 messages/s	         4.000 workers	14939876176 B/op	313114213 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=10 repetition=1
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=10 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-10    	       1	6775354750 ns/op	   1.33 MB/s	   8993088 input-B/op	     58533 messages/op	      8639 messages/s	        10.00 workers	19485029592 B/op	397518220 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=10 repetition=1
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=10 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-10    	       1	5068338666 ns/op	   1.77 MB/s	   8993088 input-B/op	     58533 messages/op	     11549 messages/s	        10.00 workers	14940141408 B/op	313113930 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=10 repetition=2
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=10 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-10    	       1	5251526250 ns/op	   1.71 MB/s	   8993088 input-B/op	     58533 messages/op	     11146 messages/s	        10.00 workers	14940249136 B/op	313114427 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=10 repetition=2
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=10 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-10    	       1	6797928750 ns/op	   1.32 MB/s	   8993088 input-B/op	     58533 messages/op	      8610 messages/s	        10.00 workers	19485028760 B/op	397518398 allocs/op
+PASS
+EXIT 0
+RUN variant=baseline cpu=10 repetition=3
+COMMAND /tmp/binparser-config-baseline-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=10 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-10    	       1	6640603167 ns/op	   1.35 MB/s	   8993088 input-B/op	     58533 messages/op	      8814 messages/s	        10.00 workers	19484938248 B/op	397517900 allocs/op
+PASS
+EXIT 0
+RUN variant=compact cpu=10 repetition=3
+COMMAND /tmp/binparser-config-compact-20260907.test -test.run '^$' -test.bench '^BenchmarkCurrentCorpusEnvelopes$' -test.benchtime=1x -test.count=1 -test.cpu=10 -test.benchmem
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusEnvelopes-10    	       1	5305456291 ns/op	   1.70 MB/s	   8993088 input-B/op	     58533 messages/op	     11033 messages/s	        10.00 workers	14940223584 B/op	313114492 allocs/op
+PASS
+EXIT 0

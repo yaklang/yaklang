@@ -1,0 +1,6 @@
+$ go test -race ./common/bin-parser -run '^(TestP1BranchRows|TestP1ScorecardsCovered|TestP1NativeSchemaRemainsUncredited|TestProtocolCorpusPR5023CorrectedCompanionsEveryRecordAndBoundary|TestSPNEGOScoresMatchCurrentRuleScope|TestProtocolCorpusRMI.*|TestProtocolCorpusWinRM.*|TestProtocolCorpusGSSAPI.*|TestProtocolCorpusMemcachedFields.*|TestProtocolCorpusCassandraFields.*|TestProtocolCorpusCurrentFieldEvidence|TestCurrentFieldInventoryRejectsDrift)$' -count=1 -timeout=3m
+Exit code: 0
+
+# github.com/yaklang/yaklang/common/bin-parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-1617241313/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+ok  	github.com/yaklang/yaklang/common/bin-parser	27.105s

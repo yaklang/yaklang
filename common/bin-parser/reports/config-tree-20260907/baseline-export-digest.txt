@@ -1,0 +1,55 @@
+=== RUN   TestProtocolCorpusExportDigest
+=== RUN   TestProtocolCorpusExportDigest/envelopes
+=== RUN   TestProtocolCorpusExportDigest/envelopes/0
+=== PAUSE TestProtocolCorpusExportDigest/envelopes/0
+=== RUN   TestProtocolCorpusExportDigest/envelopes/1
+=== PAUSE TestProtocolCorpusExportDigest/envelopes/1
+=== RUN   TestProtocolCorpusExportDigest/envelopes/2
+=== PAUSE TestProtocolCorpusExportDigest/envelopes/2
+=== RUN   TestProtocolCorpusExportDigest/envelopes/3
+=== PAUSE TestProtocolCorpusExportDigest/envelopes/3
+=== CONT  TestProtocolCorpusExportDigest/envelopes/0
+=== CONT  TestProtocolCorpusExportDigest/envelopes/2
+=== CONT  TestProtocolCorpusExportDigest/envelopes/1
+=== CONT  TestProtocolCorpusExportDigest/envelopes/3
+=== NAME  TestProtocolCorpusExportDigest/envelopes/1
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852
+=== NAME  TestProtocolCorpusExportDigest/envelopes/3
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f
+=== NAME  TestProtocolCorpusExportDigest/envelopes/2
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb
+=== NAME  TestProtocolCorpusExportDigest/envelopes/0
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b
+=== RUN   TestProtocolCorpusExportDigest/application
+=== RUN   TestProtocolCorpusExportDigest/application/0
+=== PAUSE TestProtocolCorpusExportDigest/application/0
+=== RUN   TestProtocolCorpusExportDigest/application/1
+=== PAUSE TestProtocolCorpusExportDigest/application/1
+=== RUN   TestProtocolCorpusExportDigest/application/2
+=== PAUSE TestProtocolCorpusExportDigest/application/2
+=== RUN   TestProtocolCorpusExportDigest/application/3
+=== PAUSE TestProtocolCorpusExportDigest/application/3
+=== CONT  TestProtocolCorpusExportDigest/application/0
+=== CONT  TestProtocolCorpusExportDigest/application/2
+=== CONT  TestProtocolCorpusExportDigest/application/3
+=== CONT  TestProtocolCorpusExportDigest/application/1
+=== NAME  TestProtocolCorpusExportDigest/application/3
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990
+=== NAME  TestProtocolCorpusExportDigest/application/2
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e
+=== NAME  TestProtocolCorpusExportDigest/application/1
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35
+=== NAME  TestProtocolCorpusExportDigest/application/0
+    protocol_corpus_export_digest_test.go:94: CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136
+--- PASS: TestProtocolCorpusExportDigest (7.43s)
+    --- PASS: TestProtocolCorpusExportDigest/envelopes (0.00s)
+        --- PASS: TestProtocolCorpusExportDigest/envelopes/1 (7.28s)
+        --- PASS: TestProtocolCorpusExportDigest/envelopes/3 (7.35s)
+        --- PASS: TestProtocolCorpusExportDigest/envelopes/2 (7.36s)
+        --- PASS: TestProtocolCorpusExportDigest/envelopes/0 (7.36s)
+    --- PASS: TestProtocolCorpusExportDigest/application (0.00s)
+        --- PASS: TestProtocolCorpusExportDigest/application/3 (0.00s)
+        --- PASS: TestProtocolCorpusExportDigest/application/2 (0.00s)
+        --- PASS: TestProtocolCorpusExportDigest/application/1 (0.00s)
+        --- PASS: TestProtocolCorpusExportDigest/application/0 (0.00s)
+PASS

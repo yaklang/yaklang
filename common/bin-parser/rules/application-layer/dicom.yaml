@@ -1,0 +1,320 @@
+# DICOM PS3.8 9.3, Annexes D/E/F; PS3.7 D.3.3.2 implementation identification.
+# One UL PDU, not a Part 10 file or a decoder for negotiated image datasets.
+# Limits: 16 MiB PDU body, 1 MiB association body, 4096 items/PDVs per PDU.
+# Reserved bytes and version bits other than bit zero are preserved, not rejected.
+endian: big
+Package:
+  DICOM:
+    operator: |
+      kind = this.ProcessSubNode("PDU Type").Value
+      if kind < 1 || kind > 7 { panic("dicom: unsupported PDU type") }
+      this.ProcessSubNode("Reserved")
+      length = this.ProcessSubNode("PDU Length").Value
+      if length > 16777216 { panic("dicom: PDU body exceeds 16 MiB limit") }
+      if this.HasMaxLength() && length != this.GetMaxLength()-this.Length() { panic("dicom: PDU length differs from message boundary") }
+      this.SetMaxLength(length+6)
+      setCtx("dicomItemCount", 0)
+      setCtx("dicomPDUType", kind)
+      if kind == 1 || kind == 2 {
+        if length < 68 { panic("dicom: association fixed fields truncated") }
+        if length > 1048576 { panic("dicom: association exceeds 1 MiB limit") }
+        this.ProcessByType("DICOMAssociation", "Association")
+      } else if kind == 4 {
+        if length < 6 { panic("dicom: missing presentation data value") }
+        this.ProcessByType("DICOMPDVList", "Presentation Data Values")
+      } else {
+        if length != 4 { panic("dicom: control PDU length must be four") }
+        if kind == 3 { this.ProcessByType("DICOMReject", "Association Reject")
+        } else if kind == 7 { this.ProcessByType("DICOMAbort", "Abort")
+        } else { this.ProcessSubNode("Release Reserved") }
+      }
+      if this.Length() != this.GetMaxLength() { panic("dicom: unconsumed PDU bytes") }
+    PDU Type: uint8
+    Reserved: uint8
+    PDU Length: uint32
+    Release Reserved: raw,4
+
+DICOMAssociation:
+  operator: |
+    version = this.ProcessSubNode("Protocol Version").Value
+    if (version & 1) == 0 { panic("dicom: protocol version one is required") }
+    this.ProcessSubNode("Protocol Reserved")
+    this.ProcessSubNode("Called AE Title")
+    this.ProcessSubNode("Calling AE Title")
+    if getCtx("dicomPDUType") == 1 {
+      for _, name = range ["Called AE Title", "Calling AE Title"] {
+        title = string(this.GetSubNode(name).Result().Value)
+        if len(title.Trim(" ")) == 0 { panic("dicom: empty AE title") }
+        for _, octet = range []byte(title) { if octet < 32 || octet > 126 { panic("dicom: invalid AE title character") } }
+      }
+    }
+    this.ProcessSubNode("Association Reserved")
+    this.ProcessSubNode("Items")
+  Protocol Version: uint16
+  Protocol Reserved: raw,2
+  Called AE Title: string,16
+  Calling AE Title: string,16
+  Association Reserved: raw,32
+  Items:
+    list: true
+    Item: DICOMAssociationItem
+    operator: |
+      application = 0
+      presentation = 0
+      user = 0
+      previous = 0
+      ids = []string{}
+      remaining = this.GetMaxLength()
+      for remaining > 0 {
+        ele = this.NewElement()
+        ele.SetMaxLength(remaining)
+        ele.Process()
+        remaining -= ele.GetSubNode("Item Length").Result().Value+4
+        kind = ele.GetSubNode("Item Type").Result().Value
+        if kind < previous { panic("dicom: association item types out of order") }
+        previous = kind
+        if kind == 16 { application++ }
+        if kind == 32 || kind == 33 {
+          presentation++
+          id = string(ele.GetSubNode("Presentation Context").GetSubNode("Context ID").Result().Value)
+          if id in ids { panic("dicom: duplicate presentation context ID") }
+          ids.Append(id)
+        }
+        if kind == 80 { user++ }
+      }
+      if application != 1 || presentation == 0 || user != 1 { panic("dicom: required association items missing or duplicated") }
+
+DICOMAssociationItem:
+  operator: |
+    count = getCtx("dicomItemCount")+1
+    if count > 4096 { panic("dicom: item count exceeds 4096 limit") }
+    setCtx("dicomItemCount", count)
+    kind = this.ProcessSubNode("Item Type").Value
+    this.ProcessSubNode("Item Reserved")
+    size = this.ProcessSubNode("Item Length").Value
+    if size > this.GetMaxLength()-this.Length() { panic("dicom: association item length exceeds parent") }
+    this.SetMaxLength(size+4)
+    if kind == 16 { this.ProcessByType("DICOMUID", "Application Context")
+    } else if kind == 32 || kind == 33 {
+      pdu = getCtx("dicomPDUType")
+      if (pdu == 1 && kind != 32) || (pdu == 2 && kind != 33) { panic("dicom: presentation context type differs from association direction") }
+      if size < 4 { panic("dicom: presentation context fixed fields truncated") }
+      context = this.NewSubNode("DICOMPresentationContext", "Presentation Context")
+      context.SetCfg("dicomContextType", kind)
+      context.Process()
+    } else if kind == 80 { this.ProcessByType("DICOMUserInformation", "User Information")
+    } else if size > 0 {
+      this.GetSubNode("Extension Data").SetMaxLength(size)
+      this.ProcessSubNode("Extension Data")
+    }
+    if this.Length() != this.GetMaxLength() { panic("dicom: unconsumed association item bytes") }
+  Item Type: uint8
+  Item Reserved: uint8
+  Item Length: uint16
+  Extension Data: raw
+
+DICOMPresentationContext:
+  operator: |
+    id = this.ProcessSubNode("Context ID").Value
+    if id == 0 || (id & 1) == 0 { panic("dicom: presentation context ID must be odd") }
+    this.ProcessSubNode("Context Reserved")
+    result = this.ProcessSubNode("Result Reason").Value
+    this.ProcessSubNode("Context Reserved Tail")
+    if this.GetCfg("dicomContextType") == 33 && result > 4 { panic("dicom: invalid presentation context result") }
+    // In a rejected AC context the transfer-syntax field is explicitly not
+    // significant and must not be tested by the receiver (PS3.8 9.3.3.2).
+    if this.GetCfg("dicomContextType") == 33 && result != 0 {
+      size = this.GetMaxLength()-this.Length()
+      if size > 0 { this.GetSubNode("Rejected Transfer Syntax").SetMaxLength(size); this.ProcessSubNode("Rejected Transfer Syntax") }
+      return
+    }
+    this.GetSubNode("Syntaxes").SetCfg("dicomContextType", this.GetCfg("dicomContextType"))
+    this.ProcessSubNode("Syntaxes")
+  Context ID: uint8
+  Context Reserved: uint8
+  Result Reason: uint8
+  Context Reserved Tail: uint8
+  Rejected Transfer Syntax: raw
+  Syntaxes:
+    list: true
+    Syntax: DICOMSyntaxItem
+    operator: |
+      abstract = 0
+      transfer = 0
+      previous = 0
+      remaining = this.GetMaxLength()
+      for remaining > 0 {
+        ele = this.NewElement()
+        ele.SetMaxLength(remaining)
+        ele.Process()
+        remaining -= ele.GetSubNode("Item Length").Result().Value+4
+        kind = ele.GetSubNode("Item Type").Result().Value
+        if kind < previous { panic("dicom: syntax item types out of order") }
+        previous = kind
+        if kind == 48 { abstract++ }
+        if kind == 64 { transfer++ }
+      }
+      if this.GetCfg("dicomContextType") == 32 {
+        if abstract != 1 || transfer == 0 { panic("dicom: request context requires abstract and transfer syntaxes") }
+      } else if abstract != 0 || transfer != 1 { panic("dicom: accepted context requires one transfer syntax") }
+
+DICOMSyntaxItem:
+  operator: |
+    count = getCtx("dicomItemCount")+1
+    if count > 4096 { panic("dicom: item count exceeds 4096 limit") }
+    setCtx("dicomItemCount", count)
+    kind = this.ProcessSubNode("Item Type").Value
+    this.ProcessSubNode("Item Reserved")
+    size = this.ProcessSubNode("Item Length").Value
+    if size > this.GetMaxLength()-this.Length() { panic("dicom: syntax item length exceeds parent") }
+    this.SetMaxLength(size+4)
+    if kind == 48 { this.ProcessByType("DICOMUID", "Abstract Syntax")
+    } else if kind == 64 { this.ProcessByType("DICOMUID", "Transfer Syntax")
+    } else if size > 0 { this.GetSubNode("Extension Data").SetMaxLength(size); this.ProcessSubNode("Extension Data") }
+  Item Type: uint8
+  Item Reserved: uint8
+  Item Length: uint16
+  Extension Data: raw
+
+DICOMUID:
+  operator: |
+    size = this.GetMaxLength()
+    if size == 0 || size > 64 { panic("dicom: UID length must be 1 to 64") }
+    this.GetSubNode("UID").SetMaxLength(size)
+    value = []byte(string(this.ProcessSubNode("UID").Value))
+    component = 0
+    first = 0
+    for _, octet = range value {
+      if octet == 46 {
+        if component == 0 { panic("dicom: empty UID component") }
+        component = 0
+      } else {
+        if octet < 48 || octet > 57 { panic("dicom: invalid UID character") }
+        if component == 0 { first = octet } else if first == 48 { panic("dicom: leading zero in UID component") }
+        component++
+      }
+    }
+    if component == 0 { panic("dicom: empty UID component") }
+  UID: string
+
+DICOMUserInformation:
+  list: true
+  User Item: DICOMUserItem
+  operator: |
+    handled, err = tryParseDICOMUserInformation()
+    if err != nil { panic(err) }
+    if handled { return }
+    maximum = 0
+    implementation = 0
+    version = 0
+    // PS3.8 9.3.2.3 explicitly permits any user-data sub-item order.
+    remaining = this.GetMaxLength()
+    for remaining > 0 {
+      ele = this.NewElement()
+      ele.SetMaxLength(remaining)
+      ele.Process()
+      remaining -= ele.GetSubNode("Item Length").Result().Value+4
+      kind = ele.GetSubNode("Item Type").Result().Value
+      if kind == 81 { maximum++ }
+      if kind == 82 { implementation++ }
+      if kind == 85 { version++ }
+    }
+    if maximum != 1 || implementation != 1 || version > 1 { panic("dicom: required user information missing or duplicated") }
+
+DICOMUserItem:
+  operator: |
+    count = getCtx("dicomItemCount")+1
+    if count > 4096 { panic("dicom: item count exceeds 4096 limit") }
+    setCtx("dicomItemCount", count)
+    kind = this.ProcessSubNode("Item Type").Value
+    this.ProcessSubNode("Item Reserved")
+    size = this.ProcessSubNode("Item Length").Value
+    if size > this.GetMaxLength()-this.Length() { panic("dicom: user sub-item length exceeds parent") }
+    this.SetMaxLength(size+4)
+    if kind == 81 {
+      if size != 4 { panic("dicom: maximum length sub-item must contain four bytes") }
+      this.ProcessSubNode("Maximum PDU Length")
+    } else if kind == 82 { this.ProcessByType("DICOMUID", "Implementation Class")
+    } else if kind == 85 {
+      if size == 0 || size > 16 { panic("dicom: implementation version length must be 1 to 16") }
+      this.GetSubNode("Implementation Version").SetMaxLength(size)
+      version = string(this.ProcessSubNode("Implementation Version").Value)
+      for _, octet = range []byte(version) { if octet < 32 || octet > 126 { panic("dicom: invalid implementation version character") } }
+    } else if size > 0 { this.GetSubNode("Extension Data").SetMaxLength(size); this.ProcessSubNode("Extension Data") }
+  Item Type: uint8
+  Item Reserved: uint8
+  Item Length: uint16
+  Maximum PDU Length: uint32
+  Implementation Version: string
+  Extension Data: raw
+
+DICOMPDVList:
+  list: true
+  PDV: DICOMPDV
+  operator: |
+    handled, err = tryParseDICOMPDVList()
+    if err != nil { panic(err) }
+    if handled { return }
+    previous = 0
+    count = 0
+    // Track the validated remaining bytes instead of rescanning prior PDVs.
+    remaining = this.GetMaxLength()
+    for remaining > 0 {
+      count++
+      if count > 4096 { panic("dicom: PDV count exceeds 4096 limit") }
+      ele = this.NewElement()
+      ele.SetMaxLength(remaining)
+      ele.Process()
+      remaining -= ele.GetSubNode("PDV Length").Result().Value+4
+      id = ele.GetSubNode("Context ID").Result().Value
+      if previous != 0 && previous != id { panic("dicom: PDVs in one PDU must use the same context") }
+      previous = id
+    }
+
+DICOMPDV:
+  operator: |
+    size = this.ProcessSubNode("PDV Length").Value
+    if size < 2 || size > this.GetMaxLength()-this.Length() { panic("dicom: invalid PDV length") }
+    this.SetMaxLength(size+4)
+    id = this.ProcessSubNode("Context ID").Value
+    if id == 0 || (id & 1) == 0 { panic("dicom: PDV context ID must be odd") }
+    this.ProcessSubNode("Control Reserved")
+    this.ProcessSubNode("Last Fragment")
+    this.ProcessSubNode("Command Fragment")
+    // Annex E permits receivers to accept an empty fragment. Dataset/command
+    // bytes require the negotiated transfer syntax and remain explicitly raw.
+    if (size & 1) != 0 { panic("dicom: message fragment must have even byte length") }
+    if size > 2 { this.GetSubNode("Message Fragment").SetMaxLength(size-2); this.ProcessSubNode("Message Fragment") }
+  PDV Length: uint32
+  Context ID: uint8
+  Control Reserved: uint8,6bit
+  Last Fragment: uint8,1bit
+  Command Fragment: uint8,1bit
+  Message Fragment: raw
+
+DICOMReject:
+  operator: |
+    this.ProcessSubNode("Reject Reserved")
+    result = this.ProcessSubNode("Result").Value
+    source = this.ProcessSubNode("Source").Value
+    reason = this.ProcessSubNode("Reason").Value
+    if result != 1 && result != 2 { panic("dicom: invalid association rejection result") }
+    if source < 1 || source > 3 { panic("dicom: invalid association rejection source") }
+    if source == 1 {
+      if reason != 1 && reason != 2 && reason != 3 && reason != 7 { panic("dicom: invalid service-user rejection reason") }
+    } else if reason != 1 && reason != 2 { panic("dicom: invalid provider rejection reason") }
+  Reject Reserved: uint8
+  Result: uint8
+  Source: uint8
+  Reason: uint8
+
+DICOMAbort:
+  operator: |
+    this.ProcessSubNode("Abort Reserved")
+    source = this.ProcessSubNode("Source").Value
+    reason = this.ProcessSubNode("Reason").Value
+    if source != 0 && source != 2 { panic("dicom: invalid abort source") }
+    if source == 2 && (reason > 6 || reason == 3) { panic("dicom: invalid provider abort reason") }
+  Abort Reserved: raw,2
+  Source: uint8
+  Reason: uint8

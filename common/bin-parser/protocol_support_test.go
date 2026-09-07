@@ -82,12 +82,52 @@ func TestProtocolRoadmapIntegrity(t *testing.T) {
 	}
 	require.Empty(t, dupes, "duplicate roadmap names: %v", dupes)
 
+	// These newly observed formats are outside the fixed historical backlog.
+	// Keep their real identities and require an explicit executable capture
+	// contract instead of assigning an unrelated roadmap name.
+	observedOutsideRoadmap := map[string]string{
+		"USBPcap":                    "google-usb-engraver",
+		"HiSLIP":                     "ndpi-hislip",
+		"TRDP":                       "ndpi-trdp",
+		"GE Ethernet Global Data":    "ndpi-egd",
+		"HL7 v2 MLLP":                "ndpi-hl7",
+		"Ether-S-Bus":                "ndpi-ethersbus",
+		"Ether-S-I/O":                "ndpi-ethersio",
+		"DICOM Upper Layer":          "ndpi-dicom",
+		"IEEE C37.118 synchrophasor": "ndpi-c37118",
+	}
 	for _, item := range ProtocolCatalog {
 		_, ok := seen[item.Name]
 		if !ok {
+			// A specialized entry must not replace an established broad alias.
+			if item.Name == "CIFS Negotiate Request" {
+				contract := protocolCorpusParseContracts["CIFS"]
+				require.Equal(t, contract.RuleFile, item.RuleFile)
+				require.Equal(t, contract.EntryNode, item.EntryNode)
+				require.Equal(t, "L7", item.Layer)
+				continue
+			}
+			if spec, exists := protocolCorpusSupplementalProfiles[item.Name]; exists {
+				require.Equal(t, spec.Contract.RuleFile, item.RuleFile)
+				require.Equal(t, spec.Contract.EntryNode, item.EntryNode)
+				require.Equal(t, spec.Contract.Layer, item.Layer)
+				require.Greater(t, spec.Frame, 0)
+				require.NotEmpty(t, spec.ExactValues)
+				continue
+			}
 			// catalog uses a few aliases (Ethernet vs Ethernet II, MSRdp vs RDP)
 			switch item.Name {
 			case "Ethernet", "MSRdp", "IIOP", "ANSI C12.22", "CoAP", "DLEP", "NAT-PMP", "SOME/IP", "USB HID report":
+				continue
+			}
+			if captureID, exists := observedOutsideRoadmap[item.Name]; exists {
+				spec, exists := protocolCorpusCaptureParseSpecs[captureID]
+				require.True(t, exists, "outside-roadmap catalog entry requires a capture contract")
+				require.Equal(t, item.Name, spec.Name)
+				require.Equal(t, item.RuleFile, spec.Contract.RuleFile)
+				require.Equal(t, item.EntryNode, spec.Contract.EntryNode)
+				require.Equal(t, item.Layer, spec.Contract.Layer)
+				require.NotEmpty(t, strings.TrimSpace(spec.AlternateReason))
 				continue
 			}
 			t.Errorf("catalog protocol %q missing from ProtocolRoadmap", item.Name)

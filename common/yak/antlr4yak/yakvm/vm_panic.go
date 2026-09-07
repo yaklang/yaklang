@@ -43,12 +43,22 @@ type VMPanic struct {
 }
 
 func NewVMPanic(i interface{}) *VMPanic {
+	return newVMPanic(i, true)
+}
+
+func (v *Frame) newVMPanic(i interface{}) *VMPanic {
+	return newVMPanic(i, !v.vm.GetConfig().suppressPanicDebugStack)
+}
+
+func newVMPanic(i interface{}, debugStack bool) *VMPanic {
 	if err, ok := i.(error); ok {
 		i = err.Error()
 	}
-	utils.Debug(func() {
-		utils.PrintCurrentGoroutineRuntimeStack()
-	})
+	if debugStack {
+		utils.Debug(func() {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		})
+	}
 	p := &VMPanic{vmstack.New(), i}
 	return p
 }

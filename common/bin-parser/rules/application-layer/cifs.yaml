@@ -1,0 +1,106 @@
+# Exact SMB_COM_NEGOTIATE request profile, [MS-CIFS] 2.2.4.52.1:
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/25c8c3c9-58fc-4bb8-aa8f-0272dede84c5
+# WordCount is zero; ByteCount bounds a complete sequence of 0x02-prefixed,
+# NUL-terminated OEM dialect names. Names are retained without guessing an OEM
+# codepage. Offers are not negotiated capabilities or session-success evidence.
+# This explicit entry does not replace legacy SMB entrypoints. Replies, other
+# commands, compounded messages and stream reassembly are outside this profile.
+# 1024 dialects and 65570 message bytes are implementation resource limits.
+endian: little
+Package:
+  CIFSNegotiateRequest: CIFSRequest
+  CIFSDirectTCP: CIFSDirectRecord
+  CIFSDirectTCPCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("cifs: empty carrier has no record") }
+      result, trial = this.TryProcessByType("CIFSExactRecord")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed CIFS Direct TCP Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+CIFSExactRecord: "import:application-layer/cifs.yaml;node:CIFSDirectTCP"
+
+CIFSDirectRecord:
+  endian: big
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }
+    size = this.GetMaxLength()
+    if size < 4 { panic("cifs: truncated Direct TCP header") }
+    if size > 65574 { panic("cifs: Direct TCP record exceeds implementation profile") }
+    if this.ProcessSubNode("Direct TCP Zero").Value != 0 { panic("cifs: Direct TCP prefix must start with zero") }
+    if int(this.ProcessSubNode("Direct TCP Length").Value) != size-4 { panic("cifs: Direct TCP length does not equal bounded message") }
+    message = this.GetSubNode("Negotiate Request")
+    message.SetMaxLength(size-4)
+    message.Process()
+  Direct TCP Zero: uint8
+  Direct TCP Length: uint32,3
+  Negotiate Request: CIFSRequest
+
+CIFSRequest:
+  endian: little
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }
+    size = this.GetMaxLength()
+    if size < 35 { panic("cifs: truncated negotiate request") }
+    if size > 65570 { panic("cifs: request exceeds implementation profile") }
+    if this.ProcessSubNode("ProtocolId").Value != 0x424d53ff { panic("cifs: invalid SMB signature") }
+    if this.ProcessSubNode("Command").Value != 0x72 { panic("cifs: entry requires SMB_COM_NEGOTIATE") }
+    this.ProcessSubNode("Status")
+    flags = int(this.ProcessSubNode("Flags").Value)
+    if flags & 0x80 != 0 { panic("cifs: entry requires a request, not a reply") }
+    this.ProcessSubNode("Flags2")
+    this.ProcessSubNode("PIDHigh")
+    this.ProcessSubNode("SecurityFeatures")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("TID")
+    this.ProcessSubNode("PID")
+    this.ProcessSubNode("UID")
+    this.ProcessSubNode("MID")
+    if this.ProcessSubNode("WordCount").Value != 0 { panic("cifs: negotiate request WordCount must be zero") }
+    count = int(this.ProcessSubNode("ByteCount").Value)
+    if count < 2 { panic("cifs: dialect byte count must be at least two") }
+    if count != size-35 { panic("cifs: dialect ByteCount does not equal bounded data") }
+    dialects = this.GetSubNode("Dialects")
+    dialects.SetMaxLength(count)
+    dialects.Process()
+    if this.Length() != size { panic("cifs: unconsumed request bytes") }
+    this.AddInfo("Profile", "SMB_COM_NEGOTIATE request dialect fields")
+    this.AddInfo("OEM Codepage Inferred", false)
+    this.AddInfo("Dialect Negotiated", false)
+    this.AddInfo("Session Established", false)
+    this.AddInfo("Signature Verified", false)
+  ProtocolId: uint32
+  Command: uint8
+  Status: uint32
+  Flags: uint8
+  Flags2: uint16
+  PIDHigh: uint16
+  SecurityFeatures: raw,8
+  Reserved: uint16
+  TID: uint16
+  PID: uint16
+  UID: uint16
+  MID: uint16
+  WordCount: uint8
+  ByteCount: uint16
+  Dialects:
+    operator: |
+      size = this.GetMaxLength()
+      count = 0
+      for this.Length() < size {
+        if count >= 1024 { panic("cifs: dialect count exceeds implementation profile") }
+        entry = this.ProcessByType("CIFSDialect")
+        count++
+      }
+      if this.Length() != size { panic("cifs: dialect list exceeds boundary") }
+      this.AddInfo("Dialect Count", count)
+
+CIFSDialect:
+  operator: |
+    if this.ProcessSubNode("BufferFormat").Value != 2 { panic("cifs: dialect BufferFormat must be two") }
+    this.ProcessSubNode("Dialect Name")
+  BufferFormat: uint8
+  Dialect Name: "del:\0;type:string"

@@ -1,0 +1,85 @@
+# Docker Engine v1.41 ContainerList REQUEST parameter-codec profile.
+# https://docs.docker.com/reference/api/engine/version/v1.41.yaml
+# Pinned receiver (v20.10.0), getContainersJSON / BoolValue / filters.FromJSON:
+# https://github.com/moby/moby/tree/eeddea2f9026b9b3e6a14b8bdb40bafec81ef10a/api
+# This opt-in entry decodes origin-form GET /v1.41/containers/json HTTP/1.0 or
+# HTTP/1.1 and its query parameters. The OpenAPI operation defines no body;
+# this narrower bodyless profile excludes Transfer-Encoding and nonzero body
+# framing, without claiming such a request is invalid generic HTTP or that
+# the daemon rejects every such request. Content-Length: 0 is retained.
+# Bounds 16KiB/request, 8192B/target and 256 query pairs are implementation
+# limits. JSON filter encoding is decoded without evaluating values, object
+# identities, patterns or platform semantics. Unknown filter names are marked
+# (Moby rejects them); unknown query parameters and duplicate raw values stay
+# visible. A matching request is not proof of a Docker endpoint or session.
+# HTTPExact supplies every wire leaf and delimiter. Derived Query Pairs spans
+# are relative to the Path field, before percent decoding, not new wire nodes.
+# No response JSON schema, other route/version, daemon state, authorization,
+# application-body interpretation or structured GenerateBinary is provided.
+Package:
+  DockerContainerListRequest: DockerContainerListRequestMessage
+  DockerContainerListRequestCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("docker container-list: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("docker container-list: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("docker container-list: empty carrier") }
+      candidate, trial = this.TryProcessByType("DockerContainerListRequestFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Docker Container List Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+DockerContainerListRequestFrame: "import:application-layer/docker_api.yaml;node:DockerContainerListRequest"
+
+DockerContainerListRequestMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("docker container-list: explicit request boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("docker container-list: explicit byte boundary required") }
+    if this.GetMaxLength() > 16384 { panic("docker container-list: request exceeds 16384-byte implementation profile") }
+    http = this.ProcessSubNode("HTTP")
+    request = http.Child("Message").Child("HTTP Request")
+    if request == nil { panic("docker container-list: request required, not a response") }
+    if request.Child("Method").Value != "GET" { panic("docker container-list: profile requires GET") }
+    decoded, err = decodeDockerContainerListTarget(string(request.Child("Path").Value))
+    if err != nil { panic(string(err)) }
+    host = ""
+    hosts = 0
+    for _, item = range request.Child("Headers").Children() {
+      line = string(item.Value)
+      if len(line) == 0 { continue }
+      parts = line.SplitN(":", 2)
+      name = parts[0].Lower()
+      value = parts[1].Trim(" \t")
+      if name == "host" { hosts++; host = value }
+      if name == "transfer-encoding" { panic("docker container-list: Transfer-Encoding outside bodyless implementation profile") }
+    }
+    if request.Child("Body") != nil { panic("docker container-list: body outside bodyless implementation profile") }
+    if hosts > 1 || (hosts == 1 && len(host) == 0) || (request.Child("Version").Value == "HTTP/1.1" && hosts != 1) {
+      panic("docker container-list: HTTP/1.1 requires one nonempty Host; duplicate or empty Host is unsupported")
+    }
+    hostname = ""
+    port = ""
+    if hosts == 1 {
+      for _, octet = range []byte(host) {
+        if octet <= 32 || octet >= 127 || octet in []byte("/?#@\\") { panic("docker container-list: invalid Host authority") }
+      }
+      endpoint, err = decodeHTTPServiceURL("http://" + host + "/")
+      if err != nil { panic("docker container-list: invalid Host authority: " + string(err)) }
+      hostname = endpoint["hostname"]
+      port = endpoint["port"]
+    }
+    for key, value = range decoded { this.AddInfo(key, value) }
+    this.AddInfo("Profile", "Docker Engine v1.41 ContainerList request parameter codec")
+    this.AddInfo("Method", "GET")
+    this.AddInfo("Request Target Form", "origin-form")
+    this.AddInfo("Host Header", host)
+    this.AddInfo("Host Header Present", hosts == 1)
+    this.AddInfo("Hostname", hostname)
+    this.AddInfo("Port", port)
+    this.AddInfo("Body Profile", "bodyless; no Transfer-Encoding")
+    this.AddInfo("Response Schema Parsed", false)
+    this.AddInfo("Session Observed", false)
+    this.AddInfo("Endpoint Identity Proven", false)
+    this.AddInfo("Maximum Request Bytes", 16384)
+  HTTP: "import:application-layer/http.yaml;node:HTTPExact"

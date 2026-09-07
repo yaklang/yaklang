@@ -1,148 +1,43 @@
+# CORBA 3.2 Interoperability, chapter 9; GIOP 1.0 through 1.3.
+# https://www.omg.org/spec/CORBA/3.2/Interoperability/PDF
+# Parse-only CDR envelope and standard message headers. Operation-dependent
+# stubs and TaggedProfile data remain opaque; no implicit stream reassembly.
 endian: big
+unit: byte
 Package:
   GIOP:
     operator: |
-      this.ProcessSubNode("Magic")
-      mag = getNodeResult("Magic").Value
-      if mag[0] != 0x47 || mag[1] != 0x49 || mag[2] != 0x4f || mag[3] != 0x50 {
-        panic("giop: magic must be GIOP")
-      }
-      this.ProcessSubNode("Major")
-      this.ProcessSubNode("Minor")
-      this.ProcessSubNode("Flags")
-      if (getNodeResult("Flags").Value & 1) == 1 {
-        panic("giop: little-endian GIOP")
-      }
-      this.ProcessSubNode("Message Type")
-      mt = getNodeResult("Message Type").Value
-      if mt > 7 {
-        panic("giop: unknown message type")
-      }
-      this.ProcessSubNode("Message Size")
-      l = getNodeResult("Message Size").Value
-      if l >= 1048576 {
-        panic("giop: message too large")
-      }
-      if l > 0 {
-        this.SetMaxLength(this.Length()+l)
-      }
-      if mt == 3 && l >= 8 {
-        this.ProcessByType("LocateRequest")
-        return
-      }
-      if mt == 0 && l >= 8 {
-        this.ProcessByType("GIOPRequest")
-        return
-      }
-    Magic: raw,4
-    Major: uint8
-    Minor: uint8
-    Flags: uint8
-    Message Type: uint8
-    Message Size: uint32
-LocateRequest:
-  operator: |
-    this.ProcessSubNode("Request ID")
-    this.ProcessSubNode("Addr Disc")
-    this.ProcessSubNode("Addr Pad")
-    this.ProcessSubNode("Key Len")
-    n = getNodeResult("Key Len").Value
-    if n > 0 && n < 1048576 {
-      this.GetSubNode("Object Key").SetMaxLength(n)
-      this.ProcessSubNode("Object Key")
-    }
-  Request ID: uint32
-  Addr Disc: uint16
-  Addr Pad: raw,2
-  Key Len: uint32
-  Object Key: string
-GIOPRequest:
-  operator: |
-    this.ProcessSubNode("Request ID")
-    this.ProcessSubNode("Response Flags")
-    this.ProcessSubNode("Reserved")
-    this.ProcessSubNode("Addr Disc")
-    this.ProcessSubNode("Addr Pad")
-    this.ProcessSubNode("Key Len")
-    n = getNodeResult("Key Len").Value
-    if n > 0 && n < 1048576 {
-      this.GetSubNode("Object Key").SetMaxLength(n)
-      this.ProcessSubNode("Object Key")
-    }
-    this.ProcessSubNode("Op Len")
-    ol = getNodeResult("Op Len").Value
-    if ol > 0 && ol < 512 {
-      this.GetSubNode("Operation").SetMaxLength(ol)
-      this.ProcessSubNode("Operation")
-    }
-    remaining = this.GetMaxLength() - this.Length()
-    if remaining == 0 {
-      return
-    }
-    pad = (4 - (this.Length() % 4)) % 4
-    if pad > 0 {
-      if remaining < pad {
-        panic("giop: truncated operation padding")
-      }
-      this.GetSubNode("Operation Padding").SetMaxLength(pad)
-      this.ProcessSubNode("Operation Padding")
-    }
-    remaining = this.GetMaxLength() - this.Length()
-    if remaining < 4 {
-      panic("giop: truncated service context count")
-    }
-    this.ProcessSubNode("Service Context Count")
-    count = getNodeResult("Service Context Count").Value
-    if count > 1024 {
-      panic("giop: too many service contexts")
-    }
-    if count > 0 {
-      this.ProcessSubNode("Service Contexts")
-    }
-    remaining = this.GetMaxLength() - this.Length()
-    if remaining > 0 {
-      this.GetSubNode("Stub Data").SetMaxLength(remaining)
-      this.ProcessSubNode("Stub Data")
-    }
-  Request ID: uint32
-  Response Flags: uint8
-  Reserved: raw,3
-  Addr Disc: uint16
-  Addr Pad: raw,2
-  Key Len: uint32
-  Object Key: string
-  Op Len: uint32
-  Operation: string
-  Operation Padding: raw
-  Service Context Count: uint32
-  Service Contexts:
-    list: true
-    list-length-from-field: "../Service Context Count"
-    Service Context: GIOPServiceContext
-  Stub Data: raw
+      err = parseGIOPMessage(true)
+      if err != nil { panic(err) }
 
-GIOPServiceContext:
-  operator: |
-    this.ProcessSubNode("Context ID")
-    this.ProcessSubNode("Context Data Length")
-    l = getNodeResult("Context Data Length").Value
-    if l > 1048576 {
-      panic("giop: service context too large")
-    }
-    if l > 0 {
-      this.GetSubNode("Context Data").SetMaxLength(l)
-      this.ProcessSubNode("Context Data")
-    }
-    index = this.GetCfg("element index")
-    count = getNodeResult("../../Service Context Count").Value
-    if index + 1 < count {
-      pad = (4 - (this.Length() % 4)) % 4
-      if pad > 0 {
-        this.GetSubNode("Context Padding").SetMaxLength(pad)
-        this.ProcessSubNode("Context Padding")
+  GIOPStream:
+    list: true
+    operator: |
+      if !this.HasMaxLength() { panic("giop: stream requires explicit boundary") }
+      if this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() < 12 {
+        panic("giop: incomplete stream boundary")
       }
-    }
-  Context ID: uint32
-  Context Data Length: uint32
-  Context Data: raw
-  Context Padding: raw
+      count = 0
+      for this.Length() < this.GetMaxLength() {
+        if count >= 4096 { panic("giop: stream message count exceeds 4096") }
+        this.ProcessByType("GIOPStreamMessage", "GIOP")
+        count++
+      }
+
+  GIOPCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength() == 0 { panic("giop: carrier requires a nonempty boundary") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("giop: carrier requires a byte boundary") }
+      value, trial = this.TryProcessByType("GIOPExactMessage", "GIOP")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("GIOP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+GIOPStreamMessage:
+  operator: |
+    err = parseGIOPMessage(false)
+    if err != nil { panic(err) }
+
+GIOPExactMessage: "import:application-layer/iiop.yaml;node:GIOP"

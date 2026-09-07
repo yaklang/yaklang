@@ -1,0 +1,331 @@
+# Bounded VINES Internet Protocol (VIP), network byte order.
+# RFC 2896 section 3.1.5 independently fixes Protocol at byte 5, addresses at
+# 6/12, IPC short/long headers at 6/16 bytes, and SPP at 16 bytes.
+# https://www.rfc-editor.org/rfc/rfc2896.html#section-3.1.5
+# Additional field layouts: wireshark/wireshark@57bf672140761a871aaad0f709fb7f7c32fd186b,
+# epan/dissectors/packet-vines.c. Its early VIP dispatch reads Protocol one byte
+# too early; this rule uses the RFC offsets, not that dispatch implementation.
+# 1500 bytes is this entry's bounded Ethernet-oriented implementation profile.
+# Checksum is retained, NOT validated: the consulted public primary references
+# do not define its calculation. No IP/XNS checksum algorithm is inferred.
+# IPC Error/Length is not a per-packet body length: reliable messages may span
+# four packets (RFC 2896). Reserved/control values are preserved, not normalized.
+# ARP v0 non-assignment bodies, unknown ARP versions/types, RTP redirects and
+# unknown operations remain explicitly opaque after their common fields.
+# ICP quotes remain bounded raw bytes: partial VIP quotes are not full packets.
+# No FRP, reassembly, routing/session state, application-body interpretation,
+# Ethernet padding inference, or structured GenerateBinary is implemented.
+# NodeToBytes preserves parsed bytes, including reserved values and raw bodies.
+endian: big
+Package:
+  VINESVIP: VINESPacket
+  VINESCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("vines: explicit packet boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("vines: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("vines: empty carrier has no packet") }
+      candidate, trial = this.TryProcessByType("VINESFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed VINES Packet")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+VINESFrame: "import:vines.yaml;node:VINESVIP"
+
+VINESPacket:
+  operator: |
+    if !this.HasMaxLength() { panic("vines: explicit packet boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("vines: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 18 { panic("vines: truncated 18-byte VIP header") }
+    if total > 1500 { panic("vines: packet exceeds 1500-byte implementation profile") }
+    this.ProcessSubNode("Checksum")
+    if int(this.ProcessSubNode("Packet Length").Value) != total { panic("vines: packet length does not equal explicit boundary") }
+    this.ProcessSubNode("Control High Bit")
+    flags = int(this.ProcessSubNode("Control Flags").Value)
+    this.ProcessSubNode("Hop Count")
+    protocol = int(this.ProcessSubNode("Protocol").Value)
+    destination = this.ProcessSubNode("Destination Network").Value
+    host = this.ProcessSubNode("Destination Subnetwork").Value
+    this.ProcessSubNode("Source Network")
+    this.ProcessSubNode("Source Subnetwork")
+    bodyName = "Uninterpreted VIP Body"
+    if protocol == 1 { bodyName = "IPC" }
+    if protocol == 2 { bodyName = "SPP" }
+    if protocol == 4 { bodyName = "ARP" }
+    if protocol == 5 { bodyName = "RTP" }
+    if protocol == 6 { bodyName = "ICP" }
+    if total > 18 || bodyName != "Uninterpreted VIP Body" {
+      body = this.GetSubNode(bodyName)
+      body.SetMaxLength(total-18)
+      body.Process()
+    }
+    if this.Length() != total { panic("vines: unconsumed VIP bytes") }
+    broadcast = destination == 0xffffffff && host == 0xffff
+    this.AddInfo("Profile", "VINES VIP bounded field layout")
+    this.AddInfo("Maximum Packet Bytes", 1500)
+    this.AddInfo("Broadcast Destination", broadcast)
+    this.AddInfo("Control Flags Interpretation", "unicast")
+    if broadcast { this.AddInfo("Control Flags Interpretation", "broadcast class") }
+    this.AddInfo("Control Flags Raw", flags)
+    this.AddInfo("Upper Header Decoded", protocol == 1 || protocol == 2 || protocol == 4 || protocol == 5 || protocol == 6)
+    this.AddInfo("Checksum Validated", false)
+    this.AddInfo("Application Body Decoded", false)
+    this.AddInfo("Reassembled", false)
+    this.AddInfo("Session State Validated", false)
+  Checksum: uint16
+  Packet Length: uint16
+  Control High Bit: uint8,1bit
+  Control Flags: uint8,3bit
+  Hop Count: uint8,4bit
+  Protocol: uint8
+  Destination Network: uint32
+  Destination Subnetwork: uint16
+  Source Network: uint32
+  Source Subnetwork: uint16
+  IPC: VINESIPC
+  SPP: VINESSPP
+  ARP: VINESARP
+  RTP: VINESRTP
+  ICP: VINESICP
+  Uninterpreted VIP Body: raw
+
+VINESIPC:
+  operator: |
+    total = this.GetMaxLength()
+    if total < 6 { panic("vines: truncated 6-byte IPC header") }
+    this.ProcessSubNode("Source Port")
+    this.ProcessSubNode("Destination Port")
+    kind = int(this.ProcessSubNode("IPC Packet Type").Value)
+    header = 6
+    if kind == 0 {
+      this.ProcessSubNode("Datagram Padding")
+    } else {
+      if total < 16 { panic("vines: truncated 16-byte IPC header") }
+      this.ProcessSubNode("Control")
+      this.ProcessSubNode("Local Connection ID")
+      this.ProcessSubNode("Remote Connection ID")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Acknowledgment Number")
+      if kind == 2 { this.ProcessSubNode("Error Code") } else { this.ProcessSubNode("Message Length") }
+      header = 16
+    }
+    if total > header {
+      this.GetSubNode("IPC Data").SetMaxLength(total-header)
+      this.ProcessSubNode("IPC Data")
+    }
+    this.AddInfo("Header Bytes", header)
+    this.AddInfo("Known Packet Type", kind <= 5)
+    this.AddInfo("Message Length Validated", false)
+  Source Port: uint16
+  Destination Port: uint16
+  IPC Packet Type: uint8
+  Datagram Padding: uint8
+  Control: VINESTransportControl
+  Local Connection ID: uint16
+  Remote Connection ID: uint16
+  Sequence Number: uint16
+  Acknowledgment Number: uint16
+  Error Code: uint16
+  Message Length: uint16
+  IPC Data: raw
+
+VINESTransportControl:
+  Immediate Acknowledgment: uint8,1bit
+  End of Message: uint8,1bit
+  Beginning of Message: uint8,1bit
+  Abort Message: uint8,1bit
+  Reserved Control Bits: uint8,4bit
+
+VINESSPP:
+  operator: |
+    total = this.GetMaxLength()
+    if total < 16 { panic("vines: truncated 16-byte SPP header") }
+    this.ProcessSubNode("Source Port")
+    this.ProcessSubNode("Destination Port")
+    kind = int(this.ProcessSubNode("SPP Packet Type").Value)
+    this.ProcessSubNode("Control")
+    this.ProcessSubNode("Local Connection ID")
+    this.ProcessSubNode("Remote Connection ID")
+    this.ProcessSubNode("Sequence Number")
+    this.ProcessSubNode("Acknowledgment Number")
+    this.ProcessSubNode("Window")
+    if total > 16 {
+      this.GetSubNode("SPP Data").SetMaxLength(total-16)
+      this.ProcessSubNode("SPP Data")
+    }
+    this.AddInfo("Header Bytes", 16)
+    this.AddInfo("Known Packet Type", kind <= 5)
+  Source Port: uint16
+  Destination Port: uint16
+  SPP Packet Type: uint8
+  Control: VINESTransportControl
+  Local Connection ID: uint16
+  Remote Connection ID: uint16
+  Sequence Number: uint16
+  Acknowledgment Number: uint16
+  Window: uint16
+  SPP Data: raw
+
+VINESARP:
+  operator: |
+    total = this.GetMaxLength()
+    if total < 2 { panic("vines: truncated ARP common prefix") }
+    version = int(this.ProcessSubNode("ARP Version").Value)
+    kind = int(this.ProcessSubNode("ARP Packet Type").Value)
+    complete = false
+    if version == 0 && kind == 3 {
+      if total != 8 { panic("vines: ARP assignment response must contain 8 bytes") }
+      this.ProcessSubNode("Assigned Network")
+      this.ProcessSubNode("Assigned Subnetwork")
+      complete = true
+    } else if version == 1 && kind <= 3 {
+      if total != 14 { panic("vines: sequenced ARP must contain 14 bytes") }
+      if kind == 3 {
+        this.ProcessSubNode("Assigned Network")
+        this.ProcessSubNode("Assigned Subnetwork")
+      } else { this.ProcessSubNode("Inactive Address Bytes") }
+      this.ProcessSubNode("ARP Sequence Number")
+      this.ProcessSubNode("Interface Metric")
+      complete = true
+    } else if total > 2 {
+      this.GetSubNode("Uninterpreted ARP Body").SetMaxLength(total-2)
+      this.ProcessSubNode("Uninterpreted ARP Body")
+    }
+    this.AddInfo("Body Layout Decoded", complete)
+    this.AddInfo("Legacy Opcode", version*256+kind)
+    this.AddInfo("Legacy Opcode Active", version == 0)
+  ARP Version: uint8
+  ARP Packet Type: uint8
+  Assigned Network: uint32
+  Assigned Subnetwork: uint16
+  Inactive Address Bytes: raw,6
+  ARP Sequence Number: uint32
+  Interface Metric: uint16
+  Uninterpreted ARP Body: raw
+
+VINESRTP:
+  operator: |
+    total = this.GetMaxLength()
+    if total < 4 { panic("vines: truncated RTP common header") }
+    first = int(this.ProcessSubNode("RTP First Octet").Value)
+    sequenced = first == 0
+    operation = first
+    if sequenced {
+      if total < 6 { panic("vines: truncated SRTP common header") }
+      this.ProcessSubNode("RTP Version Low")
+      operation = int(this.ProcessSubNode("RTP Operation").Value)
+      this.ProcessSubNode("Node Type")
+      this.ProcessSubNode("Compatibility Flags")
+      this.ProcessSubNode("SRTP Reserved")
+    } else {
+      this.ProcessSubNode("Node Type")
+      this.ProcessSubNode("Controller Type")
+      this.ProcessSubNode("Machine Type")
+    }
+    complete = false
+    entryBytes = 0
+    if !sequenced && (operation == 1 || operation == 2 || operation == 4) {
+      entryBytes = 6
+    } else if sequenced && operation == 1 {
+      if total != 7 { panic("vines: SRTP request must contain 7 bytes") }
+      this.ProcessSubNode("Requested Information")
+      complete = true
+    } else if sequenced && operation == 2 {
+      if total < 18 { panic("vines: truncated SRTP update header") }
+      this.ProcessSubNode("Information Type")
+      this.ProcessSubNode("Update Control")
+      this.ProcessSubNode("Packet ID")
+      this.ProcessSubNode("Data Offset")
+      this.ProcessSubNode("Router Sequence Number")
+      this.ProcessSubNode("Router Metric")
+      entryBytes = 12
+    } else if sequenced && operation == 4 {
+      if total != 6 { panic("vines: SRTP reinitialize must contain 6 bytes") }
+      complete = true
+    }
+    remaining = total-this.Length()
+    if entryBytes > 0 {
+      if remaining % entryBytes != 0 { panic("vines: partial RTP routing entry") }
+      if remaining > 0 {
+        entries = this.GetSubNode("Routes")
+        entries.AddInfo("Sequenced", sequenced)
+        entries.AddInfo("Entry Bytes", entryBytes)
+        entries.SetMaxLength(remaining)
+        entries.Process()
+      }
+      complete = true
+    } else if !complete && remaining > 0 {
+      this.GetSubNode("Uninterpreted RTP Body").SetMaxLength(remaining)
+      this.ProcessSubNode("Uninterpreted RTP Body")
+    }
+    this.AddInfo("Sequenced", sequenced)
+    this.AddInfo("Operation", operation)
+    this.AddInfo("Body Layout Decoded", complete)
+    this.AddInfo("Routing State Validated", false)
+  RTP First Octet: uint8
+  RTP Version Low: uint8
+  RTP Operation: uint8
+  Node Type: uint8
+  Controller Type: uint8
+  Machine Type: uint8
+  Compatibility Flags: uint8
+  SRTP Reserved: uint8
+  Requested Information: uint8
+  Information Type: uint8
+  Update Control: uint8
+  Packet ID: uint16
+  Data Offset: uint16
+  Router Sequence Number: uint32
+  Router Metric: uint16
+  Routes: VINESRoutes
+  Uninterpreted RTP Body: raw
+
+VINESRoutes:
+  list: true
+  Route:
+    operator: |
+      this.ProcessSubNode("Route Network")
+      this.ProcessSubNode("Neighbor Metric")
+      if this.GetInfo("Sequenced") {
+        this.ProcessSubNode("Route Sequence Number")
+        this.ProcessSubNode("Network Flags")
+        this.ProcessSubNode("Route Reserved")
+      }
+    Route Network: uint32
+    Neighbor Metric: uint16
+    Route Sequence Number: uint32
+    Network Flags: uint8
+    Route Reserved: uint8
+  operator: |
+    size = this.GetInfo("Entry Bytes")
+    count = this.GetMaxLength()/size
+    for i = 0; i < count; i++ {
+      element = this.NewElement()
+      element.AddInfo("Sequenced", this.GetInfo("Sequenced"))
+      element.SetMaxLength(size)
+      element.Process()
+    }
+
+VINESICP:
+  operator: |
+    total = this.GetMaxLength()
+    if total < 4 { panic("vines: truncated ICP notification header") }
+    kind = int(this.ProcessSubNode("ICP Packet Type").Value)
+    name = "Uninterpreted Notification Value"
+    if kind == 0 { name = "Exception Code" }
+    if kind == 1 { name = "Notification Metric" }
+    this.ProcessSubNode(name)
+    if total > 4 {
+      this.GetSubNode("Quoted Packet Bytes").SetMaxLength(total-4)
+      this.ProcessSubNode("Quoted Packet Bytes")
+    }
+    this.AddInfo("Known Packet Type", kind <= 1)
+    this.AddInfo("Quoted Packet Decoded", false)
+    this.AddInfo("Quote Extent Validated", false)
+  ICP Packet Type: uint16
+  Exception Code: uint16
+  Notification Metric: uint16
+  Uninterpreted Notification Value: uint16
+  Quoted Packet Bytes: raw

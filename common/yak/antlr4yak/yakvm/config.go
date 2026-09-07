@@ -13,6 +13,14 @@ type VirtualMachineConfig struct {
 	stopRecover              bool
 	closureSupport           bool
 	vmMode                   YVMMode
+	suppressPanicDebugStack  bool
+}
+
+// SetSuppressPanicDebugStack disables only the optional Go runtime stack dump
+// on panic construction. The returned VMPanic, Yak source review and recovery
+// behavior are unchanged. Configure this VM before starting execution.
+func (c *VirtualMachineConfig) SetSuppressPanicDebugStack(b bool) {
+	c.suppressPanicDebugStack = b
 }
 
 func NewVMConfig() *VirtualMachineConfig {

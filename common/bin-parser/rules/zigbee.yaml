@@ -1,0 +1,44 @@
+# Explicit complete IEEE 802.15.4-2003/2006 capture records carrying Zigbee.
+# CSA 05-3474-23 sections 2.2.5, 3.3, 3.4, 3.6.8, 4.4.11 and 4.5.1:
+# https://csa-iot.org/wp-content/uploads/2023/04/05-3474-23-csg-zigbee-specification-compressed.pdf
+# MAC cross-check (same revision as the original upstream capture fixtures):
+# https://github.com/secdev/scapy/blob/6f158c0c0ca4c1b6f1c8a0e9aa4b0905e0086b91/scapy/layers/dot15d4.py
+#
+# Bounded MAC, 15-byte beacon info, NWK v2 unicast/broadcast and APS envelopes.
+# No MAC auxiliary header, inter-PAN, multicast NWK extension, application
+# cluster schema, decryption, authentication or fragment reassembly. Unknown
+# command bodies remain explicitly uninterpreted. Auxiliary control level zero
+# never invents a configured MIC length. Legacy ACK tails are preserved as raw
+# and flagged in metadata; this is not a conformance claim for those tails.
+# The FCS entry validates CRC-16/KERMIT, never infers FCS from payload length.
+endian: little
+unit: byte
+Package:
+  Zigbee:
+    operator: |
+      err = parseZigbeeFrame(false)
+      if err != nil { panic(err) }
+  ZigbeeFCS:
+    operator: |
+      err = parseZigbeeFrame(true)
+      if err != nil { panic(err) }
+  ZigbeeCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("zigbee: explicit nonempty byte carrier boundary required") }
+      candidate, trial = this.TryProcessByType("ZigbeeExactFrame", "Zigbee")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Zigbee Frame")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  ZigbeeFCSCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("zigbee: explicit nonempty byte carrier boundary required") }
+      candidate, trial = this.TryProcessByType("ZigbeeExactFCSFrame", "ZigbeeFCS")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Zigbee Frame")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+ZigbeeExactFrame: "import:zigbee.yaml;node:Zigbee"
+ZigbeeExactFCSFrame: "import:zigbee.yaml;node:ZigbeeFCS"

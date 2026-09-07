@@ -7,6 +7,8 @@ import (
 )
 
 func init() {
-	base.RegisterParser("default", &stream_parser.DefParser{})
+	base.RegisterParserFactory("default", func() base.Parser {
+		return &stream_parser.DefParser{}
+	})
 	base.RegisterParser("ser", &ser_parser.SerParser{})
 }

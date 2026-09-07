@@ -113,7 +113,8 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP").Child("Offset Size")))
 	require.Equal(t, uint64(0x002d), uintVal(t, mustChild(t, eth, "IP", "UDP", "L2TP", "PPP").Child("Protocol")))
 
-	// RFC 7296 empty IKEv2 IKE_SA_INIT: version 0x20, exchange 0x22, length 0x1c
+	// RFC 7296 header-only IKEv2 layout: version 0x20, exchange 0x22,
+	// length 0x1c. This is not a complete IKE_SA_INIT message exchange.
 	ike := mustHex(t, "0000000000000001000000000000000000202208000000000000001c")
 	ik := parseRule(t, ike, "ike", "IKE")
 	require.Equal(t, uint64(0x20), uintVal(t, ik.Child("Version")))
@@ -123,7 +124,22 @@ func TestP1UDPApplications(t *testing.T) {
 	require.Equal(t, uint64(0x22), uintVal(t, mustChild(t, eth, "IP", "UDP", "IKE").Child("Exchange Type")))
 
 	natt := parseEthernet(t, ipv4UDPBytes(t, 4500, 4500, ike))
-	require.Equal(t, uint64(0x22), uintVal(t, mustChild(t, natt, "IP", "UDP", "NATT").Child("Exchange Type")))
+	// Keep the old unmarked UDP/4500 bytes as a negative control. RFC 3948
+	// requires a four-byte non-ESP marker before an IKE message on this port.
+	require.Equal(t, ike, mustChild(t, natt, "IP", "UDP", "NATT", "Unparsed NAT-T Payload").Value)
+	require.Nil(t, mustChild(t, natt, "IP", "UDP", "NATT").Child("NATTFrame"))
+	_, nattErr := parser.ParseBinary(newProtocolCorpusBoundedReader(ike), "nat_t", "NATT")
+	require.ErrorContains(t, nattErr, "non-ESP marker requires a complete IKE header")
+	markedIKE := append([]byte{0, 0, 0, 0}, ike...)
+	nattWire := ipv4UDPBytes(t, 4500, 4500, markedIKE)
+	natt = parseEthernet(t, nattWire)
+	nattFrame := mustChild(t, natt, "IP", "UDP", "NATT", "NATTFrame")
+	require.Equal(t, uint64(0), uintVal(t, nattFrame.Child("Marker or SPI")))
+	nattIKE := mustChild(t, nattFrame, "IKE Message")
+	require.Equal(t, uint64(0x20), uintVal(t, nattIKE.Child("Version")))
+	require.Equal(t, uint64(0x22), uintVal(t, nattIKE.Child("Exchange Type")))
+	require.Equal(t, uint64(28), uintVal(t, nattIKE.Child("IKE Length")))
+	require.Equal(t, nattWire, NodeToBytes(natt.Origin))
 
 	// OpenVPN P_CONTROL_HARD_RESET_CLIENT_V2 (opcode 7 << 3). Wireshark openvpn.opcode.
 	openvpn := mustHex(t, "3801020304050607080000000001")
@@ -473,8 +489,9 @@ func TestP1TCPApplications(t *testing.T) {
 	giop[5] = 2
 	giop[7] = 3
 	parseMustFail(t, []byte("XXXX"), "application-layer.iiop", "GIOP")
+	parseMustFail(t, giop, "application-layer.iiop", "GIOP")
 	eth = parseEthernet(t, ipv4TCPFrame(t, 2809, 2809, giop))
-	require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "GIOP").Child("Message Type")))
+	require.Nil(t, mustChild(t, eth, "IP", "TCP").Child("GIOP"))
 
 	giopNS := mustHex(t, "47494f50010200030000001700000002000000000000000b4e616d6553657276696365")
 	g := parseRule(t, giopNS, "application-layer.iiop", "GIOP")

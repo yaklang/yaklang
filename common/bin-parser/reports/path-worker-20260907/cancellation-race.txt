@@ -1,0 +1,5 @@
+$ go test -race ./common/bin-parser/parser/stream_parser -run '^TestBridgeWorkerErrorsCancellationAndEviction$' -count=1 -timeout=120s
+# github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-553048080/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	2.135s
+The final assertion requires errors.Is(err, context.Canceled), not merely a non-nil error. Production source and frozen benchmark binaries are unchanged.

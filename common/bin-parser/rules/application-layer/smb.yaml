@@ -55,6 +55,39 @@ Package:
     PID: uint16
     UID: uint16
     MID: uint16
+  SMBHeader: SMBFixedHeader
+
+# Fixed SMB1 header entry for callers that have only a header-sized boundary.
+# It intentionally does not claim that a following command body is complete.
+SMBFixedHeader:
+  operator: |
+    this.ProcessSubNode("ProtocolId")
+    if getNodeResult("ProtocolId").Value != 0x424d53ff {
+      panic("smb: ProtocolId must be \\xffSMB")
+    }
+    this.ProcessSubNode("Command")
+    this.ProcessSubNode("Status")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Flags2")
+    this.ProcessSubNode("PIDHigh")
+    this.ProcessSubNode("SecurityFeatures")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("TID")
+    this.ProcessSubNode("PID")
+    this.ProcessSubNode("UID")
+    this.ProcessSubNode("MID")
+  ProtocolId: uint32
+  Command: uint8
+  Status: uint32
+  Flags: uint8
+  Flags2: uint16
+  PIDHigh: uint16
+  SecurityFeatures: raw,8
+  Reserved: uint16
+  TID: uint16
+  PID: uint16
+  UID: uint16
+  MID: uint16
 Negotiate:
   operator: |
     this.ProcessSubNode("WordCount")

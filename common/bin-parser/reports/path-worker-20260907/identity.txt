@@ -1,0 +1,17 @@
+Date: 2026-09-07
+Branch: wip/optimize-protocol-parse
+HEAD: 0b3ed685b1b462dfc7eb342c2b754313a5e6f9c7
+Binaries built from the dirty working tree, not clean HEAD.
+Hardware: Apple M1 Max; 10 logical CPUs; 68719476736 bytes RAM
+OS: macOS 14.1.2 (23B92)
+Go: go1.22.12 darwin/arm64
+Desktop was not exclusive; no agent-controlled build, test or profiling task overlapped formal benchmarks.
+Binary directory: /tmp/binparser-path-worker-20260907.P7WUdj
+baseline.test sha256: 7796079652e3aa8e5a3f6d499ffc2c6e3f069bdc3676be3eea3a02c046de6d9f
+chain.test sha256: b1181f7c75fc1f51cbfba5ec852c594ab69f37580c693844432c70727b80355f
+worker.test sha256: 68ea8d621f7e9e8759489bd5f3de723647099fc535d9f65720592a56aa3c6b30
+manifest.json sha256: 870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca
+Application: 11 messages, 1421 input bytes per benchmark operation, explicit rule/entry/boundaries.
+Formal order: round 1 baseline, chain, worker; round 2 chain, worker, baseline; round 3 worker, baseline, chain.
+Each invocation: -test.run ^$ -test.bench ^BenchmarkCurrentCorpusApplication(Fields|JSON)$ -test.benchtime=600ms -test.count=1 -test.cpu=1,4,10 -test.benchmem
+Excluded exploratory run: baseline and chain 600ms/count=3/cpu=1 were accidentally started concurrently before formal runs. Their overlapping timing results are excluded from all comparisons.

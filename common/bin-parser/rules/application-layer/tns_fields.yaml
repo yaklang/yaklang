@@ -1,0 +1,143 @@
+# Passive, explicitly selected Oracle TNS v315 and TTC sample layouts.
+# Complete single packet, exact byte boundary; no TCP/session inference.
+# Native type exchange includes timezone/version and no conversion table.
+# Native LE64 function 118 uses short CLR values, not universal encoding.
+# Unsupported variants retain exact bytes in Carrier; no generation.
+endian: big
+unit: byte
+Package:
+  TNSConnect315Fields:
+    operator: |
+      err = parseTNSFields("connect315")
+      if err != nil { panic(err) }
+  TNSConnect315FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSConnect315FieldsExact", "TNSConnect315Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSAccept315Fields:
+    operator: |
+      err = parseTNSFields("accept315")
+      if err != nil { panic(err) }
+  TNSAccept315FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSAccept315FieldsExact", "TNSAccept315Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSResend16Fields:
+    operator: |
+      err = parseTNSFields("resend16")
+      if err != nil { panic(err) }
+  TNSResend16FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSResend16FieldsExact", "TNSResend16Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSServices32Fields:
+    operator: |
+      err = parseTNSFields("services32")
+      if err != nil { panic(err) }
+  TNSServices32FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSServices32FieldsExact", "TNSServices32Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSProtocolRequest32Fields:
+    operator: |
+      err = parseTNSFields("protocol-request32")
+      if err != nil { panic(err) }
+  TNSProtocolRequest32FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSProtocolRequest32FieldsExact", "TNSProtocolRequest32Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSProtocolResponse32Fields:
+    operator: |
+      err = parseTNSFields("protocol-response32")
+      if err != nil { panic(err) }
+  TNSProtocolResponse32FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSProtocolResponse32FieldsExact", "TNSProtocolResponse32Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSTypesRequestNative32Fields:
+    operator: |
+      err = parseTNSFields("types-request-native32")
+      if err != nil { panic(err) }
+  TNSTypesRequestNative32FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSTypesRequestNative32FieldsExact", "TNSTypesRequestNative32Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSTypesResponseNative32Fields:
+    operator: |
+      err = parseTNSFields("types-response-native32")
+      if err != nil { panic(err) }
+  TNSTypesResponseNative32FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSTypesResponseNative32FieldsExact", "TNSTypesResponseNative32Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TNSParametersNativeLE6432Fields:
+    operator: |
+      err = parseTNSFields("parameters-native-le64-32")
+      if err != nil { panic(err) }
+  TNSParametersNativeLE6432FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tns-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tns-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TNSParametersNativeLE6432FieldsExact", "TNSParametersNativeLE6432Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TNS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TNSConnect315FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSConnect315Fields"
+TNSAccept315FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSAccept315Fields"
+TNSResend16FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSResend16Fields"
+TNSServices32FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSServices32Fields"
+TNSProtocolRequest32FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSProtocolRequest32Fields"
+TNSProtocolResponse32FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSProtocolResponse32Fields"
+TNSTypesRequestNative32FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSTypesRequestNative32Fields"
+TNSTypesResponseNative32FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSTypesResponseNative32Fields"
+TNSParametersNativeLE6432FieldsExact: "import:application-layer/tns_fields.yaml;node:TNSParametersNativeLE6432Fields"

@@ -1,0 +1,26 @@
+# Explicit, complete single- or multiline ASCII SMTP reply layout.
+# RFC5321 4.2/4.2.1 and 4.5.3.1.5: https://www.rfc-editor.org/rfc/rfc5321.html
+# At most 512 bytes per line, with local limits of 1024 lines/512 KiB.
+# This is Reply-line grammar, not Greeting or command-specific semantics.
+# Receiver compatibility also accepts empty final text after SP (RFC5321 4.2);
+# this is not a complete sender-conformance validator.
+# No TCP reassembly, port dispatch, TLS success, endpoint or delivery assertion.
+# The historical application-layer/smtp.yaml SMTP single-line API is unchanged.
+endian: big
+unit: byte
+Package:
+  SMTPReply:
+    operator: |
+      err = parseSMTPReply()
+      if err != nil { panic(err) }
+  SMTPReplyCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("smtp-reply: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 524288 { panic("smtp-reply: carrier exceeds 524288-byte resource limit") }
+      candidate, trial = this.TryProcessByType("SMTPReplyExact", "SMTPReply")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SMTP Reply")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+SMTPReplyExact: "import:application-layer/smtp_reply.yaml;node:SMTPReply"

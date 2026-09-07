@@ -1,0 +1,104 @@
+# RFC 2743 section 3.1; RFC 4178 sections 3.1, 4.2 and Appendix A:
+# https://www.rfc-editor.org/rfc/rfc2743.html#section-3.1
+# https://www.rfc-editor.org/rfc/rfc4178.html#section-4.2
+# RFC 4559 sections 4.1/4.2, HTTP Negotiate:
+# https://www.rfc-editor.org/rfc/rfc4559.html#section-4
+#
+# Explicit SPNEGO profile, not every GSS mechanism. Initial tokens have the
+# GSS 0x60 wrapper, SPNEGO OID, and complete NegTokenInit; subsequent tokens
+# are bare NegTokenResp (RFC 4178 forbids generic framing on these). Strict
+# minimal definite DER, ordered explicit fields, nonempty offered mechanisms,
+# 0..3 declared state, and DER named-bit ContextFlags are checked. Mechanism
+# token/MIC bytes remain opaque, not decoded, authenticated or verified.
+# Session-dependent field presence/selection/state rules are not inferred.
+# Unknown negotiation extensions and non-SPNEGO outer OIDs are unsupported.
+# Implementation limits: token 65535B, 64 offered mechanisms, OID 128B/64 arcs
+# with uint64 components; not protocol maxima. No binary generation support.
+#
+# HTTPExact preserves the original HTTP wire tree/body. Token-derived fields
+# are metadata with decoded-token-relative-bits coordinates, NEVER synthetic
+# HTTP wire children. HTTP profile: <=131072B, one selected Authorization or
+# WWW-Authenticate header, simple Negotiate scheme only (no combined challenge
+# list in that field), canonical padded standard Base64. Other header names
+# remain HTTP fields. A tokenless 401 challenge is explicitly envelope-only;
+# it does not count as a decoded GSS token. Populated response tokens must be
+# NegTokenResp. No HTTP status or declared negotiation state proves an outcome.
+endian: big
+Package:
+  GSSAPIToken:
+    operator: |
+      err = parseGSSAPIToken()
+      if err != nil { panic(err) }
+  GSSAPICarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("gssapi: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("gssapi: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("gssapi: empty carrier has no token") }
+      candidate, trial = this.TryProcessByType("GSSAPITokenFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed GSS-API Token")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  GSSAPIHTTP: GSSAPIHTTPMessage
+  GSSAPIHTTPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("gssapi: explicit HTTP carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("gssapi: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("gssapi: empty HTTP carrier has no message") }
+      candidate, trial = this.TryProcessByType("GSSAPIHTTPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed GSS-API HTTP Message")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+GSSAPITokenFrame: "import:application-layer/gssapi.yaml;node:GSSAPIToken"
+GSSAPIHTTPFrame: "import:application-layer/gssapi.yaml;node:GSSAPIHTTP"
+
+GSSAPIHTTPMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("gssapi: explicit HTTP message boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("gssapi: explicit byte boundary required") }
+    if this.GetMaxLength() > 131072 { panic("gssapi: HTTP message exceeds 131072-byte profile") }
+    http = this.ProcessSubNode("HTTP")
+    message = http.Child("Message").Child("HTTP Request")
+    headerName = "authorization"
+    direction = "request"
+    if message == nil {
+      message = http.Child("Message").Child("HTTP Response")
+      headerName = "www-authenticate"
+      direction = "response"
+    }
+    if message == nil { panic("gssapi: expected HTTP request or response") }
+    count = 0
+    value = ""
+    for _, item = range message.Child("Headers").Children() {
+      line = string(item.Value)
+      if len(line) == 0 { continue }
+      header = line.SplitN(":", 2)
+      if header[0].Lower() == headerName { count++; value = header[1].Trim(" \t") }
+    }
+    if count != 1 { panic("gssapi: exactly one selected negotiation header required") }
+    parts = value.SplitN(" ", 2)
+    if parts[0].Lower() != "negotiate" { panic("gssapi: unsupported HTTP negotiation scheme or syntax") }
+    token = ""
+    if len(parts) == 2 { token = parts[1].Trim(" ") }
+    this.AddInfo("Profile", "HTTP Negotiate with complete bounded SPNEGO token")
+    this.AddInfo("HTTP Direction", direction)
+    this.AddInfo("Selected Header", headerName)
+    this.AddInfo("HTTP Body Semantics Decoded", false)
+    this.AddInfo("Negotiation Outcome Validated", false)
+    this.AddInfo("Token Present", len(token) != 0)
+    if len(token) == 0 {
+      if direction != "response" || message.Child("Status").Value != "401" { panic("gssapi: token required outside initial 401 challenge") }
+      this.AddInfo("Profile", "HTTP Negotiate tokenless 401 challenge envelope")
+      this.AddInfo("Token Fields Decoded", false)
+      return
+    }
+    decoded, err = inspectGSSAPIBase64(token)
+    if err != nil { panic(err) }
+    if direction == "response" && decoded["Token Kind"] != "NegTokenResp" { panic("gssapi: response requires subsequent NegTokenResp") }
+    this.AddInfo("Token Fields Decoded", true)
+    this.AddInfo("Decoded Token", decoded)
+  HTTP: "import:application-layer/http.yaml;node:HTTPExact"

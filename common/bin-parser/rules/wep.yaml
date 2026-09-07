@@ -1,0 +1,54 @@
+# Explicit WEP body, excluding the 802.11 header and external frame FCS.
+# Linux v6.12 net/mac80211/wep.c, ieee80211_wep_get_iv/encrypt/decrypt:
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/net/mac80211/wep.c
+# The three-byte IV and key selector are clear; the final four bytes are
+# encrypted ICV bytes, not a clear CRC that can be validated without a key.
+# Cipher selection and capture framing belong to the caller. An extended-IV
+# layout is not WEP. No key material, decryption or authentication is inferred.
+endian: big
+Package:
+  WEP: WEPBody
+  WEPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("wep: explicit body boundary required") }
+      if this.GetMaxLength("bit")%8 != 0 { panic("wep: boundary must be byte-aligned") }
+      if this.GetMaxLength() == 0 { panic("wep: empty carrier") }
+      candidate, trial = this.TryProcessByType("WEPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed WEP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+WEPFrame: "import:wep.yaml;node:WEP"
+WEPBody:
+  operator: |
+    if !this.HasMaxLength() { panic("wep: explicit body boundary required") }
+    if this.GetMaxLength("bit")%8 != 0 { panic("wep: boundary must be byte-aligned") }
+    total = this.GetMaxLength()
+    if total < 8 || total > 65535 { panic("wep: body outside 8..65535 byte implementation boundary") }
+    this.ProcessSubNode("Initialization Vector")
+    flags = this.ProcessSubNode("Key Selector")
+    if int(flags.Child("Extended IV").Value) != 0 { panic("wep: extended IV is not a WEP layout") }
+    if total > 8 {
+      this.GetSubNode("Encrypted Data").SetMaxLength(total-8)
+      this.ProcessSubNode("Encrypted Data")
+    }
+    this.ProcessSubNode("Encrypted ICV")
+    if this.Length() != total { panic("wep: incomplete body consumption") }
+    this.AddInfo("Profile", "Explicit WEP body without MAC header or frame FCS")
+    this.AddInfo("Cipher Selection Explicit", true)
+    this.AddInfo("Cipher Context Validated", false)
+    this.AddInfo("Data Decrypted", false)
+    this.AddInfo("ICV Verified", false)
+    this.AddInfo("Frame FCS Verified", false)
+    this.AddInfo("Application Semantics Decoded", false)
+    this.AddInfo("Reserved Bits Validated", false)
+    this.AddInfo("Encrypted Data Bytes", total-8)
+  Initialization Vector: raw,3
+  Key Selector:
+    Key Index: uint8,2bit
+    Extended IV: uint8,1bit
+    Reserved: uint8,5bit
+  Encrypted Data: raw
+  Encrypted ICV: raw,4

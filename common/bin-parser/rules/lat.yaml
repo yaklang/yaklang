@@ -1,0 +1,32 @@
+# Digital AA-NL26A-TE, June 1989, sections 2.3, 3.3, 4.4.1 and A.6.1:
+# https://www.glaver.org/DECserver/General%20Documents/LAT%20and%20MOP/AA-NL26A-TE%20LAT%20Protocol%20Specification%20June%201989.pdf
+# Independent implementation cross-check:
+# https://github.com/wireshark/wireshark/blob/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-lat.c
+#
+# Parse-only, exact 8..1500-byte virtual-circuit message profile: Run, Start
+# (5.1), Stop, and all six common slot headers. A Start slot carries its own
+# service class, so class 1's fixed fields and parameter envelopes are decoded.
+# Other slot bodies have no stateless service-class discriminator and remain
+# opaque. No discovery, service lookup, session state, negotiated limits, data
+# semantics, Ethernet padding or FCS is inferred. Start's explicitly specified
+# UNPREDICTABLE tail and odd slot padding are preserved without a zero test.
+endian: little
+unit: byte
+Package:
+  LAT:
+    operator: |
+      err = parseLATMessage()
+      if err != nil { panic(err) }
+
+  LATCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 { panic("lat: explicit nonempty carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("lat: carrier requires a byte boundary") }
+      candidate, trial = this.TryProcessByType("LATExactMessage", "LAT")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LAT Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+LATExactMessage: "import:lat.yaml;node:LAT"

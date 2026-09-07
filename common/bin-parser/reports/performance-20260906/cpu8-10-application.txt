@@ -1,0 +1,16 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusApplicationFields-8     	     514	   1376201 ns/op	   1.03 MB/s	      1421 input-B/op	        11.00 messages/op	      7993 messages/s	         8.000 workers	 2040324 B/op	   32418 allocs/op
+BenchmarkCurrentCorpusApplicationFields-8     	     514	   1373799 ns/op	   1.03 MB/s	      1421 input-B/op	        11.00 messages/op	      8007 messages/s	         8.000 workers	 2040096 B/op	   32418 allocs/op
+BenchmarkCurrentCorpusApplicationFields-8     	     522	   1363364 ns/op	   1.04 MB/s	      1421 input-B/op	        11.00 messages/op	      8068 messages/s	         8.000 workers	 2040123 B/op	   32418 allocs/op
+BenchmarkCurrentCorpusApplicationFields-10    	     537	   1337115 ns/op	   1.06 MB/s	      1421 input-B/op	        11.00 messages/op	      8227 messages/s	        10.00 workers	 2040393 B/op	   32422 allocs/op
+BenchmarkCurrentCorpusApplicationFields-10    	     534	   1341886 ns/op	   1.06 MB/s	      1421 input-B/op	        11.00 messages/op	      8197 messages/s	        10.00 workers	 2040419 B/op	   32422 allocs/op
+BenchmarkCurrentCorpusApplicationFields-10    	     525	   1357250 ns/op	   1.05 MB/s	      1421 input-B/op	        11.00 messages/op	      8105 messages/s	        10.00 workers	 2040408 B/op	   32422 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-8       	     342	   2074047 ns/op	   0.69 MB/s	      1421 input-B/op	        11.00 messages/op	      5304 messages/s	         8.000 workers	 2540352 B/op	   45214 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-8       	     350	   2078099 ns/op	   0.68 MB/s	      1421 input-B/op	        11.00 messages/op	      5293 messages/s	         8.000 workers	 2531660 B/op	   45211 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-8       	     345	   2075144 ns/op	   0.68 MB/s	      1421 input-B/op	        11.00 messages/op	      5301 messages/s	         8.000 workers	 2537172 B/op	   45213 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-10      	     357	   2044337 ns/op	   0.70 MB/s	      1421 input-B/op	        11.00 messages/op	      5381 messages/s	        10.00 workers	 2538202 B/op	   45219 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-10      	     350	   2049377 ns/op	   0.69 MB/s	      1421 input-B/op	        11.00 messages/op	      5367 messages/s	        10.00 workers	 2540237 B/op	   45220 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-10      	     354	   2044440 ns/op	   0.70 MB/s	      1421 input-B/op	        11.00 messages/op	      5380 messages/s	        10.00 workers	 2538298 B/op	   45219 allocs/op
+PASS

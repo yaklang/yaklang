@@ -67,6 +67,18 @@ func GetSubNode(node *base.Node, path string) *base.Node {
 }
 func NodeToMap(node *base.Node) any {
 	if node.Cfg.Has(stream_parser.CfgNodeResult) {
+		// Match Result's collection type for an observed zero-width list.
+		// Other result-bearing nodes keep their historical scalar behavior.
+		if node.Cfg.GetBool(stream_parser.CfgIsList) && !stream_parser.NodeIsTerminal(node) && len(node.Children) == 0 {
+			span := stream_parser.GetNodeResultPos(node)
+			if span[0] == span[1] {
+				// NodeToMap historically bypasses custom out expressions.
+				value, err := stream_parser.ToMap(node)
+				if err == nil && value != nil && value.IsList() {
+					return []any{}
+				}
+			}
+		}
 		return stream_parser.GetResultByNode(node)
 	}
 	if node.Cfg.GetBool(stream_parser.CfgIsList) {
@@ -86,7 +98,7 @@ func NodeToMap(node *base.Node) any {
 		for _, sub := range node.Children {
 			d := NodeToMap(sub)
 			if d != nil {
-				res[sub.Name] = NodeToMap(sub)
+				res[sub.Name] = d
 			}
 		}
 		if len(res) == 0 {

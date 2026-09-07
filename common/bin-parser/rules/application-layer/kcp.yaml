@@ -1,0 +1,41 @@
+# Standard KCP segment layout, not an application/vendor protocol classifier.
+# Author's fixed source (ikcp_input, ikcp_encode_seg, little-endian codecs):
+# https://github.com/skywind3000/kcp/blob/b1a7a2101dcbb96017681a500d6b82bbe5a88766/ikcp.c
+#
+# Explicit parse-only entries: one segment, or one complete aggregate of segments
+# sharing the first observed conversation ID. All 24 header bytes are fields;
+# command PUSH/ACK/WASK/WINS and declared data bounds are checked. Non-PUSH data
+# is retained (the author's receiver skips it), and arbitrary fragment, window,
+# timestamp and sequence values are preserved without simulating receiver state.
+# No message reassembly, delivery/ACK processing, application interpretation,
+# externally expected conversation check, or outer wrapper decoding is claimed.
+#
+# The caller must provide an exact, byte-aligned 24..65536-byte input boundary.
+# 65536 is this implementation's resource profile, not a protocol MTU. This exact
+# profile rejects final 1..23 residual bytes that ikcp_input otherwise ignores.
+# KCPDatagramCarrier restores the entire bounded input as raw on layout failure;
+# its resource/byte-boundary checks happen before reading. No UDP port dispatch
+# or vendor prefix deduction is performed. Parsed NodeToBytes preserves input;
+# structured GenerateBinary is unsupported.
+Package:
+  KCPDatagram:
+    operator: |
+      err = parseKCP(false)
+      if err != nil { panic(err) }
+  KCPSegment:
+    operator: |
+      err = parseKCP(true)
+      if err != nil { panic(err) }
+  KCPDatagramCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("kcp: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("kcp: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 || this.GetMaxLength() > 65536 { panic("kcp: carrier boundary must be 1..65536 bytes") }
+      candidate, trial = this.TryProcessByType("KCPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed KCP Datagram")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+KCPFrame: "import:application-layer/kcp.yaml;node:KCPDatagram"

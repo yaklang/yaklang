@@ -1,0 +1,1458 @@
+{
+  "scope": "Local offline experiments; not a real-time lossless link capacity or client/AI result.",
+  "environment": {
+    "cpu": "Apple M1 Max",
+    "logicalCPUs": 10,
+    "ramGiB": 64,
+    "os": "macOS 14.1.2 (23B92)",
+    "go": "1.22.12 darwin/arm64",
+    "isolated": false
+  },
+  "manifestSHA256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca",
+  "prepared": {
+    "binarySHA256": "d6f93b563daf6f8c437d65ee92c56f58dec0ca77c7f70805d0db4b20dabd3a03",
+    "decision": "Withdrawn from production; retained as reproducible patch only. Small timing differences do not support treating sampled Stat fraction as reclaimable time.",
+    "groups": {
+      "BenchmarkCurrentCorpusApplicationFields/cpu1": {
+        "rows": [
+          {
+            "ns": 2931148,
+            "allocatedBytes": 2039199,
+            "allocations": 32403
+          },
+          {
+            "ns": 2767788,
+            "allocatedBytes": 2039129,
+            "allocations": 32403
+          },
+          {
+            "ns": 2764824,
+            "allocatedBytes": 2038937,
+            "allocations": 32403
+          }
+        ],
+        "n": 3,
+        "medianNs": 2767788,
+        "minNs": 2764824,
+        "maxNs": 2931148,
+        "inputMbps": 4.107250988876316
+      },
+      "BenchmarkCurrentCorpusApplicationFields/cpu4": {
+        "rows": [
+          {
+            "ns": 1483139,
+            "allocatedBytes": 2039649,
+            "allocations": 32410
+          },
+          {
+            "ns": 1484798,
+            "allocatedBytes": 2039513,
+            "allocations": 32409
+          },
+          {
+            "ns": 1483932,
+            "allocatedBytes": 2039607,
+            "allocations": 32410
+          }
+        ],
+        "n": 3,
+        "medianNs": 1483932,
+        "minNs": 1483139,
+        "maxNs": 1484798,
+        "inputMbps": 7.660728389171472
+      },
+      "BenchmarkCurrentCorpusApplicationFields/cpu8": {
+        "rows": [
+          {
+            "ns": 1358529,
+            "allocatedBytes": 2040226,
+            "allocations": 32418
+          },
+          {
+            "ns": 1362813,
+            "allocatedBytes": 2040119,
+            "allocations": 32418
+          },
+          {
+            "ns": 1359281,
+            "allocatedBytes": 2040153,
+            "allocations": 32418
+          }
+        ],
+        "n": 3,
+        "medianNs": 1359281,
+        "minNs": 1358529,
+        "maxNs": 1362813,
+        "inputMbps": 8.363244980250588
+      },
+      "BenchmarkCurrentCorpusApplicationFields/cpu10": {
+        "rows": [
+          {
+            "ns": 1326336,
+            "allocatedBytes": 2040434,
+            "allocations": 32422
+          },
+          {
+            "ns": 1338559,
+            "allocatedBytes": 2040474,
+            "allocations": 32422
+          },
+          {
+            "ns": 1354445,
+            "allocatedBytes": 2040342,
+            "allocations": 32422
+          }
+        ],
+        "n": 3,
+        "medianNs": 1338559,
+        "minNs": 1326336,
+        "maxNs": 1354445,
+        "inputMbps": 8.492714927022268
+      },
+      "BenchmarkCurrentCorpusApplicationJSON/cpu1": {
+        "rows": [
+          {
+            "ns": 3960032,
+            "allocatedBytes": 2513182,
+            "allocations": 45189
+          },
+          {
+            "ns": 4020220,
+            "allocatedBytes": 2513168,
+            "allocations": 45190
+          },
+          {
+            "ns": 4114494,
+            "allocatedBytes": 2513307,
+            "allocations": 45190
+          }
+        ],
+        "n": 3,
+        "medianNs": 4020220,
+        "minNs": 3960032,
+        "maxNs": 4114494,
+        "inputMbps": 2.827705946440742
+      },
+      "BenchmarkCurrentCorpusApplicationJSON/cpu4": {
+        "rows": [
+          {
+            "ns": 2438314,
+            "allocatedBytes": 2516923,
+            "allocations": 45197
+          },
+          {
+            "ns": 2229368,
+            "allocatedBytes": 2515441,
+            "allocations": 45197
+          },
+          {
+            "ns": 2227843,
+            "allocatedBytes": 2514341,
+            "allocations": 45196
+          }
+        ],
+        "n": 3,
+        "medianNs": 2229368,
+        "minNs": 2227843,
+        "maxNs": 2438314,
+        "inputMbps": 5.099203002824119
+      },
+      "BenchmarkCurrentCorpusApplicationJSON/cpu8": {
+        "rows": [
+          {
+            "ns": 2031390,
+            "allocatedBytes": 2533776,
+            "allocations": 45211
+          },
+          {
+            "ns": 2028961,
+            "allocatedBytes": 2532220,
+            "allocations": 45211
+          },
+          {
+            "ns": 2051465,
+            "allocatedBytes": 2537116,
+            "allocations": 45214
+          }
+        ],
+        "n": 3,
+        "medianNs": 2031390,
+        "minNs": 2028961,
+        "maxNs": 2051465,
+        "inputMbps": 5.596168141026587
+      },
+      "BenchmarkCurrentCorpusApplicationJSON/cpu10": {
+        "rows": [
+          {
+            "ns": 2018974,
+            "allocatedBytes": 2537758,
+            "allocations": 45218
+          },
+          {
+            "ns": 2002205,
+            "allocatedBytes": 2541079,
+            "allocations": 45220
+          },
+          {
+            "ns": 2016296,
+            "allocatedBytes": 2537443,
+            "allocations": 45219
+          }
+        ],
+        "n": 3,
+        "medianNs": 2016296,
+        "minNs": 2002205,
+        "maxNs": 2018974,
+        "inputMbps": 5.638061078333736
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationFields/cpu1": {
+        "rows": [
+          {
+            "ns": 2710980,
+            "allocatedBytes": 2030355,
+            "allocations": 32293
+          },
+          {
+            "ns": 2712051,
+            "allocatedBytes": 2030185,
+            "allocations": 32293
+          },
+          {
+            "ns": 2709973,
+            "allocatedBytes": 2030322,
+            "allocations": 32293
+          }
+        ],
+        "n": 3,
+        "medianNs": 2710980,
+        "minNs": 2709973,
+        "maxNs": 2712051,
+        "inputMbps": 4.193317545684587
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationFields/cpu4": {
+        "rows": [
+          {
+            "ns": 1464603,
+            "allocatedBytes": 2030694,
+            "allocations": 32299
+          },
+          {
+            "ns": 1471072,
+            "allocatedBytes": 2030691,
+            "allocations": 32299
+          },
+          {
+            "ns": 1470090,
+            "allocatedBytes": 2030684,
+            "allocations": 32299
+          }
+        ],
+        "n": 3,
+        "medianNs": 1470090,
+        "minNs": 1464603,
+        "maxNs": 1471072,
+        "inputMbps": 7.732859892931725
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationFields/cpu8": {
+        "rows": [
+          {
+            "ns": 1350512,
+            "allocatedBytes": 2031238,
+            "allocations": 32307
+          },
+          {
+            "ns": 1348017,
+            "allocatedBytes": 2031387,
+            "allocations": 32308
+          },
+          {
+            "ns": 1344864,
+            "allocatedBytes": 2031321,
+            "allocations": 32308
+          }
+        ],
+        "n": 3,
+        "medianNs": 1348017,
+        "minNs": 1344864,
+        "maxNs": 1350512,
+        "inputMbps": 8.433128068859666
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationFields/cpu10": {
+        "rows": [
+          {
+            "ns": 1314910,
+            "allocatedBytes": 2031571,
+            "allocations": 32312
+          },
+          {
+            "ns": 1324043,
+            "allocatedBytes": 2031543,
+            "allocations": 32312
+          },
+          {
+            "ns": 1323682,
+            "allocatedBytes": 2031463,
+            "allocations": 32311
+          }
+        ],
+        "n": 3,
+        "medianNs": 1323682,
+        "minNs": 1314910,
+        "maxNs": 1324043,
+        "inputMbps": 8.588165435504902
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationJSON/cpu1": {
+        "rows": [
+          {
+            "ns": 3792007,
+            "allocatedBytes": 2504344,
+            "allocations": 45079
+          },
+          {
+            "ns": 3825566,
+            "allocatedBytes": 2504395,
+            "allocations": 45080
+          },
+          {
+            "ns": 3791754,
+            "allocatedBytes": 2504517,
+            "allocations": 45080
+          }
+        ],
+        "n": 3,
+        "medianNs": 3792007,
+        "minNs": 3791754,
+        "maxNs": 3825566,
+        "inputMbps": 2.997884761288679
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationJSON/cpu4": {
+        "rows": [
+          {
+            "ns": 2194322,
+            "allocatedBytes": 2510959,
+            "allocations": 45088
+          },
+          {
+            "ns": 2213190,
+            "allocatedBytes": 2507027,
+            "allocations": 45087
+          },
+          {
+            "ns": 2237246,
+            "allocatedBytes": 2509321,
+            "allocations": 45088
+          }
+        ],
+        "n": 3,
+        "medianNs": 2213190,
+        "minNs": 2194322,
+        "maxNs": 2237246,
+        "inputMbps": 5.136477211626657
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationJSON/cpu8": {
+        "rows": [
+          {
+            "ns": 2056814,
+            "allocatedBytes": 2524561,
+            "allocations": 45102
+          },
+          {
+            "ns": 2036568,
+            "allocatedBytes": 2523910,
+            "allocations": 45102
+          },
+          {
+            "ns": 2039097,
+            "allocatedBytes": 2528957,
+            "allocations": 45104
+          }
+        ],
+        "n": 3,
+        "medianNs": 2039097,
+        "minNs": 2036568,
+        "maxNs": 2056814,
+        "inputMbps": 5.575016784390345
+      },
+      "BenchmarkCurrentCorpusPreparedApplicationJSON/cpu10": {
+        "rows": [
+          {
+            "ns": 2002611,
+            "allocatedBytes": 2526451,
+            "allocations": 45108
+          },
+          {
+            "ns": 2002639,
+            "allocatedBytes": 2524025,
+            "allocations": 45106
+          },
+          {
+            "ns": 1987162,
+            "allocatedBytes": 2532780,
+            "allocations": 45111
+          }
+        ],
+        "n": 3,
+        "medianNs": 2002611,
+        "minNs": 1987162,
+        "maxNs": 2002639,
+        "inputMbps": 5.676589212782712
+      },
+      "BenchmarkCurrentCorpusEnvelopes/cpu1": {
+        "rows": [
+          {
+            "ns": 26786423542,
+            "allocatedBytes": 19484482664,
+            "allocations": 397518295
+          },
+          {
+            "ns": 26934954750,
+            "allocatedBytes": 19484545240,
+            "allocations": 397518511
+          },
+          {
+            "ns": 27028918834,
+            "allocatedBytes": 19484519928,
+            "allocations": 397518286
+          }
+        ],
+        "n": 3,
+        "medianNs": 26934954750,
+        "minNs": 26786423542,
+        "maxNs": 27028918834,
+        "inputMbps": 2.671053457032446
+      },
+      "BenchmarkCurrentCorpusPreparedEnvelopes/cpu1": {
+        "rows": [
+          {
+            "ns": 26883275125,
+            "allocatedBytes": 19442335712,
+            "allocations": 396932937
+          },
+          {
+            "ns": 26776881208,
+            "allocatedBytes": 19442415304,
+            "allocations": 396933134
+          },
+          {
+            "ns": 26606321833,
+            "allocatedBytes": 19442401936,
+            "allocations": 396933089
+          }
+        ],
+        "n": 3,
+        "medianNs": 26776881208,
+        "minNs": 26606321833,
+        "maxNs": 26883275125,
+        "inputMbps": 2.686821644430548
+      },
+      "BenchmarkCurrentCorpusEnvelopes/cpu4": {
+        "rows": [
+          {
+            "ns": 8912535208,
+            "allocatedBytes": 19484633320,
+            "allocations": 397518294
+          },
+          {
+            "ns": 9154374625,
+            "allocatedBytes": 19484723464,
+            "allocations": 397518525
+          },
+          {
+            "ns": 8918121125,
+            "allocatedBytes": 19484769128,
+            "allocations": 397518711
+          }
+        ],
+        "n": 3,
+        "medianNs": 8918121125,
+        "minNs": 8912535208,
+        "maxNs": 9154374625,
+        "inputMbps": 8.067249030551825
+      },
+      "BenchmarkCurrentCorpusPreparedEnvelopes/cpu4": {
+        "rows": [
+          {
+            "ns": 8907088000,
+            "allocatedBytes": 19442543984,
+            "allocations": 396933208
+          },
+          {
+            "ns": 8930014167,
+            "allocatedBytes": 19442517576,
+            "allocations": 396933077
+          },
+          {
+            "ns": 8992136958,
+            "allocatedBytes": 19442519432,
+            "allocations": 396933156
+          }
+        ],
+        "n": 3,
+        "medianNs": 8930014167,
+        "minNs": 8907088000,
+        "maxNs": 8992136958,
+        "inputMbps": 8.056505023907427
+      },
+      "BenchmarkCurrentCorpusEnvelopes/cpu10": {
+        "rows": [
+          {
+            "ns": 6491282334,
+            "allocatedBytes": 19484932264,
+            "allocations": 397517897
+          },
+          {
+            "ns": 6723038875,
+            "allocatedBytes": 19485121848,
+            "allocations": 397518613
+          },
+          {
+            "ns": 7043495541,
+            "allocatedBytes": 19484977384,
+            "allocations": 397518109
+          }
+        ],
+        "n": 3,
+        "medianNs": 6723038875,
+        "minNs": 6491282334,
+        "maxNs": 7043495541,
+        "inputMbps": 10.701217907207178
+      },
+      "BenchmarkCurrentCorpusPreparedEnvelopes/cpu10": {
+        "rows": [
+          {
+            "ns": 6944562875,
+            "allocatedBytes": 19442720752,
+            "allocations": 396932806
+          },
+          {
+            "ns": 6564951750,
+            "allocatedBytes": 19442792008,
+            "allocations": 396933018
+          },
+          {
+            "ns": 6473040541,
+            "allocatedBytes": 19442679008,
+            "allocations": 396932512
+          }
+        ],
+        "n": 3,
+        "medianNs": 6564951750,
+        "minNs": 6473040541,
+        "maxNs": 6944562875,
+        "inputMbps": 10.958908266157477
+      }
+    }
+  },
+  "singlePass": {
+    "binarySHA256": "c8c7fafd9202f96a00fabad6f87a7c90f67f87bfe1f3f68b7d4d2daf0e6645ac",
+    "sourceSHA256": {
+      "utils": "1ff20a822d7ff313977ffe411500b59a7a51c56570b05995fd813fe3cfa80c40",
+      "test": "f0f16e71546c3bfec7c0a39a6b4516b8bbd7425572b7692658cb6ca8bb49af5a",
+      "harness": "e9c04de5fc0a8abc14bc1761f465823c2a1272d726f2623609375a8492eebb1f"
+    },
+    "decision": "Retain one-pass NodeToMap traversal; unchanged field and JSON output.",
+    "groups": {
+      "reference/cpu1": {
+        "rows": [
+          {
+            "ns": 3895862,
+            "allocatedBytes": 2513140,
+            "allocations": 45189
+          },
+          {
+            "ns": 3908034,
+            "allocatedBytes": 2513318,
+            "allocations": 45190
+          },
+          {
+            "ns": 3902027,
+            "allocatedBytes": 2513365,
+            "allocations": 45190
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 3902027,
+          "min": 3895862,
+          "max": 3908034
+        },
+        "allocatedBytes": {
+          "median": 2513318,
+          "min": 2513140,
+          "max": 2513365
+        },
+        "allocations": {
+          "median": 45190,
+          "min": 45189,
+          "max": 45190
+        },
+        "messagesPerSecond": 2819.04763857349,
+        "inputMbps": 2.913357595936676
+      },
+      "reference/cpu4": {
+        "rows": [
+          {
+            "ns": 2253817,
+            "allocatedBytes": 2518815,
+            "allocations": 45198
+          },
+          {
+            "ns": 2264152,
+            "allocatedBytes": 2518456,
+            "allocations": 45198
+          },
+          {
+            "ns": 2250178,
+            "allocatedBytes": 2517663,
+            "allocations": 45198
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 2253817,
+          "min": 2250178,
+          "max": 2264152
+        },
+        "allocatedBytes": {
+          "median": 2518456,
+          "min": 2517663,
+          "max": 2518815
+        },
+        "allocations": {
+          "median": 45198,
+          "min": 45198,
+          "max": 45198
+        },
+        "messagesPerSecond": 4880.609206514992,
+        "inputMbps": 5.043887769060221
+      },
+      "reference/cpu8": {
+        "rows": [
+          {
+            "ns": 2060115,
+            "allocatedBytes": 2537361,
+            "allocations": 45213
+          },
+          {
+            "ns": 2062161,
+            "allocatedBytes": 2536989,
+            "allocations": 45214
+          },
+          {
+            "ns": 2065668,
+            "allocatedBytes": 2529500,
+            "allocations": 45210
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 2062161,
+          "min": 2060115,
+          "max": 2065668
+        },
+        "allocatedBytes": {
+          "median": 2536989,
+          "min": 2529500,
+          "max": 2537361
+        },
+        "allocations": {
+          "median": 45213,
+          "min": 45210,
+          "max": 45214
+        },
+        "messagesPerSecond": 5334.210083499785,
+        "inputMbps": 5.5126636572023235
+      },
+      "reference/cpu10": {
+        "rows": [
+          {
+            "ns": 2051348,
+            "allocatedBytes": 2543749,
+            "allocations": 45221
+          },
+          {
+            "ns": 2026127,
+            "allocatedBytes": 2542723,
+            "allocations": 45222
+          },
+          {
+            "ns": 2042446,
+            "allocatedBytes": 2544874,
+            "allocations": 45222
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 2042446,
+          "min": 2026127,
+          "max": 2051348
+        },
+        "allocatedBytes": {
+          "median": 2543749,
+          "min": 2542723,
+          "max": 2544874
+        },
+        "allocations": {
+          "median": 45222,
+          "min": 45221,
+          "max": 45222
+        },
+        "messagesPerSecond": 5385.699303678041,
+        "inputMbps": 5.565875425837452
+      },
+      "singlePass/cpu1": {
+        "rows": [
+          {
+            "ns": 3377806,
+            "allocatedBytes": 2260974,
+            "allocations": 37713
+          },
+          {
+            "ns": 3407005,
+            "allocatedBytes": 2261000,
+            "allocations": 37713
+          },
+          {
+            "ns": 3446926,
+            "allocatedBytes": 2261221,
+            "allocations": 37714
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 3407005,
+          "min": 3377806,
+          "max": 3446926
+        },
+        "allocatedBytes": {
+          "median": 2261000,
+          "min": 2260974,
+          "max": 2261221
+        },
+        "allocations": {
+          "median": 37713,
+          "min": 37713,
+          "max": 37714
+        },
+        "messagesPerSecond": 3228.6421651861388,
+        "inputMbps": 3.3366549212578205
+      },
+      "singlePass/cpu4": {
+        "rows": [
+          {
+            "ns": 2014323,
+            "allocatedBytes": 2265150,
+            "allocations": 37721
+          },
+          {
+            "ns": 2033133,
+            "allocatedBytes": 2266822,
+            "allocations": 37721
+          },
+          {
+            "ns": 1916824,
+            "allocatedBytes": 2266712,
+            "allocations": 37721
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 2014323,
+          "min": 1916824,
+          "max": 2033133
+        },
+        "allocatedBytes": {
+          "median": 2266712,
+          "min": 2265150,
+          "max": 2266822
+        },
+        "allocations": {
+          "median": 37721,
+          "min": 37721,
+          "max": 37721
+        },
+        "messagesPerSecond": 5460.891823208095,
+        "inputMbps": 5.643583476929966
+      },
+      "singlePass/cpu8": {
+        "rows": [
+          {
+            "ns": 1683834,
+            "allocatedBytes": 2283486,
+            "allocations": 37736
+          },
+          {
+            "ns": 1693242,
+            "allocatedBytes": 2280721,
+            "allocations": 37736
+          },
+          {
+            "ns": 1694174,
+            "allocatedBytes": 2279680,
+            "allocations": 37734
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 1693242,
+          "min": 1683834,
+          "max": 1694174
+        },
+        "allocatedBytes": {
+          "median": 2280721,
+          "min": 2279680,
+          "max": 2283486
+        },
+        "allocations": {
+          "median": 37736,
+          "min": 37734,
+          "max": 37736
+        },
+        "messagesPerSecond": 6496.413389226112,
+        "inputMbps": 6.713747946247494
+      },
+      "singlePass/cpu10": {
+        "rows": [
+          {
+            "ns": 1673611,
+            "allocatedBytes": 2284519,
+            "allocations": 37741
+          },
+          {
+            "ns": 1659364,
+            "allocatedBytes": 2286831,
+            "allocations": 37743
+          },
+          {
+            "ns": 1672023,
+            "allocatedBytes": 2286092,
+            "allocations": 37743
+          }
+        ],
+        "n": 3,
+        "ns": {
+          "median": 1672023,
+          "min": 1659364,
+          "max": 1673611
+        },
+        "allocatedBytes": {
+          "median": 2286092,
+          "min": 2284519,
+          "max": 2286831
+        },
+        "allocations": {
+          "median": 37743,
+          "min": 37741,
+          "max": 37743
+        },
+        "messagesPerSecond": 6578.856869791863,
+        "inputMbps": 6.798949535981263
+      }
+    },
+    "latency": {
+      "fields": {
+        "n": 3,
+        "rows": [
+          {
+            "allocated_bytes": 407920944,
+            "allocations": 6479968,
+            "by_entry": {
+              "CQLOptions4Fields": {
+                "p100_us": 1724.584,
+                "p50_us": 104,
+                "p95_us": 270,
+                "p99_us": 344.958
+              },
+              "CQLOptions5InitialFields": {
+                "p100_us": 2261.208,
+                "p50_us": 105.292,
+                "p95_us": 252.708,
+                "p99_us": 341.583
+              },
+              "CQLStartup4Fields": {
+                "p100_us": 431.292,
+                "p50_us": 130.458,
+                "p95_us": 278.5,
+                "p99_us": 374.125
+              },
+              "CQLStartup5InitialFields": {
+                "p100_us": 525.125,
+                "p50_us": 151.458,
+                "p95_us": 384.916,
+                "p99_us": 462.666
+              },
+              "CQLSupported4Fields": {
+                "p100_us": 534.667,
+                "p50_us": 161.584,
+                "p95_us": 358.417,
+                "p99_us": 492.25
+              },
+              "CQLSupported5InitialFields": {
+                "p100_us": 690.25,
+                "p50_us": 205.333,
+                "p95_us": 502.584,
+                "p99_us": 652.125
+              },
+              "CassandraInternodeInitiateFields": {
+                "p100_us": 367.459,
+                "p50_us": 109.125,
+                "p95_us": 285.166,
+                "p99_us": 347.208
+              },
+              "MemcachedBinaryGetRequestFields": {
+                "p100_us": 390.375,
+                "p50_us": 101.875,
+                "p95_us": 245.958,
+                "p99_us": 303.375
+              },
+              "MemcachedStatsRequestFields": {
+                "p100_us": 314.959,
+                "p50_us": 75.333,
+                "p95_us": 171.25,
+                "p99_us": 227.792
+              },
+              "MemcachedStatsResponseFields": {
+                "p100_us": 3300.042,
+                "p50_us": 1010.25,
+                "p95_us": 2579.084,
+                "p99_us": 2983.042
+              }
+            },
+            "gc_count": 26,
+            "gc_pause_ns": 1091876,
+            "input_bytes": 284200,
+            "input_mbps": 3.8918645036828585,
+            "json_export": false,
+            "latency": {
+              "p100_us": 3300.042,
+              "p50_us": 143.292,
+              "p95_us": 959,
+              "p99_us": 2273.584
+            },
+            "messages": 2200,
+            "messages_per_second": 3765.87874212803,
+            "output_bytes": 0,
+            "sampled_heap_max_bytes": 27044928,
+            "seconds": 0.584193
+          },
+          {
+            "allocated_bytes": 407899776,
+            "allocations": 6479887,
+            "by_entry": {
+              "CQLOptions4Fields": {
+                "p100_us": 554.084,
+                "p50_us": 109.916,
+                "p95_us": 285.166,
+                "p99_us": 381.958
+              },
+              "CQLOptions5InitialFields": {
+                "p100_us": 804.458,
+                "p50_us": 110.041,
+                "p95_us": 275.833,
+                "p99_us": 370.833
+              },
+              "CQLStartup4Fields": {
+                "p100_us": 481.25,
+                "p50_us": 129.75,
+                "p95_us": 339.542,
+                "p99_us": 414.584
+              },
+              "CQLStartup5InitialFields": {
+                "p100_us": 1261,
+                "p50_us": 160.75,
+                "p95_us": 392.208,
+                "p99_us": 905.916
+              },
+              "CQLSupported4Fields": {
+                "p100_us": 503.291,
+                "p50_us": 164.583,
+                "p95_us": 405.25,
+                "p99_us": 482.75
+              },
+              "CQLSupported5InitialFields": {
+                "p100_us": 2187,
+                "p50_us": 209.709,
+                "p95_us": 545.375,
+                "p99_us": 928.667
+              },
+              "CassandraInternodeInitiateFields": {
+                "p100_us": 1097.375,
+                "p50_us": 112.416,
+                "p95_us": 270.625,
+                "p99_us": 478.5
+              },
+              "MemcachedBinaryGetRequestFields": {
+                "p100_us": 429.334,
+                "p50_us": 109.042,
+                "p95_us": 264.667,
+                "p99_us": 398.833
+              },
+              "MemcachedStatsRequestFields": {
+                "p100_us": 1552.792,
+                "p50_us": 76.666,
+                "p95_us": 216.875,
+                "p99_us": 267.459
+              },
+              "MemcachedStatsResponseFields": {
+                "p100_us": 3858.042,
+                "p50_us": 1029.291,
+                "p95_us": 2822.958,
+                "p99_us": 3587.417
+              }
+            },
+            "gc_count": 27,
+            "gc_pause_ns": 1301747,
+            "input_bytes": 284200,
+            "input_mbps": 3.7164546851761586,
+            "json_export": false,
+            "latency": {
+              "p100_us": 3858.042,
+              "p50_us": 150.459,
+              "p95_us": 1010.666,
+              "p99_us": 2177.708
+            },
+            "messages": 2200,
+            "messages_per_second": 3596.1472147200693,
+            "output_bytes": 0,
+            "sampled_heap_max_bytes": 26884816,
+            "seconds": 0.611765834
+          },
+          {
+            "allocated_bytes": 407863632,
+            "allocations": 6479747,
+            "by_entry": {
+              "CQLOptions4Fields": {
+                "p100_us": 371.084,
+                "p50_us": 108,
+                "p95_us": 287.75,
+                "p99_us": 356.25
+              },
+              "CQLOptions5InitialFields": {
+                "p100_us": 1212.125,
+                "p50_us": 104.208,
+                "p95_us": 259.792,
+                "p99_us": 371.417
+              },
+              "CQLStartup4Fields": {
+                "p100_us": 665.459,
+                "p50_us": 126.958,
+                "p95_us": 325.875,
+                "p99_us": 465.041
+              },
+              "CQLStartup5InitialFields": {
+                "p100_us": 545.125,
+                "p50_us": 155.5,
+                "p95_us": 380.958,
+                "p99_us": 432.584
+              },
+              "CQLSupported4Fields": {
+                "p100_us": 505.417,
+                "p50_us": 161.958,
+                "p95_us": 422.333,
+                "p99_us": 483.25
+              },
+              "CQLSupported5InitialFields": {
+                "p100_us": 709.75,
+                "p50_us": 209.75,
+                "p95_us": 496.083,
+                "p99_us": 624.875
+              },
+              "CassandraInternodeInitiateFields": {
+                "p100_us": 418.167,
+                "p50_us": 112.458,
+                "p95_us": 264.458,
+                "p99_us": 346.417
+              },
+              "MemcachedBinaryGetRequestFields": {
+                "p100_us": 2184.625,
+                "p50_us": 106.125,
+                "p95_us": 287.584,
+                "p99_us": 400.709
+              },
+              "MemcachedStatsRequestFields": {
+                "p100_us": 532.208,
+                "p50_us": 75.333,
+                "p95_us": 189.708,
+                "p99_us": 274.375
+              },
+              "MemcachedStatsResponseFields": {
+                "p100_us": 4368.542,
+                "p50_us": 1007,
+                "p95_us": 2780.583,
+                "p99_us": 3716.125
+              }
+            },
+            "gc_count": 27,
+            "gc_pause_ns": 1300417,
+            "input_bytes": 284200,
+            "input_mbps": 3.7575680492045205,
+            "json_export": false,
+            "latency": {
+              "p100_us": 4368.542,
+              "p50_us": 146.583,
+              "p95_us": 975.542,
+              "p99_us": 2343.417
+            },
+            "messages": 2200,
+            "messages_per_second": 3635.929674634916,
+            "output_bytes": 0,
+            "sampled_heap_max_bytes": 28057048,
+            "seconds": 0.605072209
+          }
+        ],
+        "p50_us": {
+          "median": 146.583,
+          "min": 143.292,
+          "max": 150.459
+        },
+        "p95_us": {
+          "median": 975.542,
+          "min": 959,
+          "max": 1010.666
+        },
+        "p99_us": {
+          "median": 2273.584,
+          "min": 2177.708,
+          "max": 2343.417
+        },
+        "p100_us": {
+          "median": 3858.042,
+          "min": 3300.042,
+          "max": 4368.542
+        },
+        "allocated_bytes": {
+          "median": 407899776,
+          "min": 407863632,
+          "max": 407920944
+        },
+        "allocations": {
+          "median": 6479887,
+          "min": 6479747,
+          "max": 6479968
+        },
+        "gc_count": {
+          "median": 27,
+          "min": 26,
+          "max": 27
+        },
+        "gc_pause_ns": {
+          "median": 1300417,
+          "min": 1091876,
+          "max": 1301747
+        },
+        "sampled_heap_max_bytes": {
+          "median": 27044928,
+          "min": 26884816,
+          "max": 28057048
+        },
+        "output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        }
+      },
+      "JSON": {
+        "n": 3,
+        "rows": [
+          {
+            "allocated_bytes": 452296752,
+            "allocations": 7541943,
+            "by_entry": {
+              "CQLOptions4Fields": {
+                "p100_us": 487.416,
+                "p50_us": 110,
+                "p95_us": 287.833,
+                "p99_us": 351.75
+              },
+              "CQLOptions5InitialFields": {
+                "p100_us": 462.209,
+                "p50_us": 109.5,
+                "p95_us": 257.625,
+                "p99_us": 332.75
+              },
+              "CQLStartup4Fields": {
+                "p100_us": 462.916,
+                "p50_us": 133.542,
+                "p95_us": 325.709,
+                "p99_us": 441.292
+              },
+              "CQLStartup5InitialFields": {
+                "p100_us": 1038.75,
+                "p50_us": 172.333,
+                "p95_us": 428.708,
+                "p99_us": 585.25
+              },
+              "CQLSupported4Fields": {
+                "p100_us": 1730.209,
+                "p50_us": 177.625,
+                "p95_us": 440.125,
+                "p99_us": 808.25
+              },
+              "CQLSupported5InitialFields": {
+                "p100_us": 2204.75,
+                "p50_us": 232.75,
+                "p95_us": 523.708,
+                "p99_us": 882.708
+              },
+              "CassandraInternodeInitiateFields": {
+                "p100_us": 483.958,
+                "p50_us": 121.125,
+                "p95_us": 279.459,
+                "p99_us": 411.542
+              },
+              "MemcachedBinaryGetRequestFields": {
+                "p100_us": 1607.542,
+                "p50_us": 118.875,
+                "p95_us": 290.417,
+                "p99_us": 342.834
+              },
+              "MemcachedStatsRequestFields": {
+                "p100_us": 296.125,
+                "p50_us": 77.75,
+                "p95_us": 190.083,
+                "p99_us": 258.833
+              },
+              "MemcachedStatsResponseFields": {
+                "p100_us": 4123.958,
+                "p50_us": 1307.75,
+                "p95_us": 3104.583,
+                "p99_us": 3258.584
+              }
+            },
+            "gc_count": 29,
+            "gc_pause_ns": 1347664,
+            "input_bytes": 284200,
+            "input_mbps": 3.2817096038468,
+            "json_export": true,
+            "latency": {
+              "p100_us": 4123.958,
+              "p50_us": 161.625,
+              "p95_us": 1289.75,
+              "p99_us": 2754.333
+            },
+            "messages": 2200,
+            "messages_per_second": 3175.475513926355,
+            "output_bytes": 5062400,
+            "sampled_heap_max_bytes": 26858832,
+            "seconds": 0.692809625
+          },
+          {
+            "allocated_bytes": 452304736,
+            "allocations": 7541960,
+            "by_entry": {
+              "CQLOptions4Fields": {
+                "p100_us": 514.791,
+                "p50_us": 112.667,
+                "p95_us": 284.375,
+                "p99_us": 421.541
+              },
+              "CQLOptions5InitialFields": {
+                "p100_us": 1007.167,
+                "p50_us": 113.083,
+                "p95_us": 321.542,
+                "p99_us": 456.625
+              },
+              "CQLStartup4Fields": {
+                "p100_us": 1319.375,
+                "p50_us": 141.334,
+                "p95_us": 412.458,
+                "p99_us": 855.625
+              },
+              "CQLStartup5InitialFields": {
+                "p100_us": 1391.333,
+                "p50_us": 179.333,
+                "p95_us": 442.333,
+                "p99_us": 576.333
+              },
+              "CQLSupported4Fields": {
+                "p100_us": 1827.666,
+                "p50_us": 184.583,
+                "p95_us": 462.917,
+                "p99_us": 706.042
+              },
+              "CQLSupported5InitialFields": {
+                "p100_us": 2263.833,
+                "p50_us": 241,
+                "p95_us": 579.5,
+                "p99_us": 738.083
+              },
+              "CassandraInternodeInitiateFields": {
+                "p100_us": 787.584,
+                "p50_us": 124,
+                "p95_us": 284.375,
+                "p99_us": 347.875
+              },
+              "MemcachedBinaryGetRequestFields": {
+                "p100_us": 570.458,
+                "p50_us": 122.042,
+                "p95_us": 324.875,
+                "p99_us": 369.166
+              },
+              "MemcachedStatsRequestFields": {
+                "p100_us": 332.25,
+                "p50_us": 79.125,
+                "p95_us": 183.125,
+                "p99_us": 246.625
+              },
+              "MemcachedStatsResponseFields": {
+                "p100_us": 4456.5,
+                "p50_us": 1303.958,
+                "p95_us": 3136.458,
+                "p99_us": 3476.083
+              }
+            },
+            "gc_count": 29,
+            "gc_pause_ns": 1296954,
+            "input_bytes": 284200,
+            "input_mbps": 3.1950023283424884,
+            "json_export": true,
+            "latency": {
+              "p100_us": 4456.5,
+              "p50_us": 166.875,
+              "p95_us": 1260.041,
+              "p99_us": 2859.25
+            },
+            "messages": 2200,
+            "messages_per_second": 3091.5750890013524,
+            "output_bytes": 5062400,
+            "sampled_heap_max_bytes": 27480216,
+            "seconds": 0.711611375
+          },
+          {
+            "allocated_bytes": 452289072,
+            "allocations": 7541908,
+            "by_entry": {
+              "CQLOptions4Fields": {
+                "p100_us": 408.125,
+                "p50_us": 115.708,
+                "p95_us": 282.625,
+                "p99_us": 325.167
+              },
+              "CQLOptions5InitialFields": {
+                "p100_us": 376.167,
+                "p50_us": 111.291,
+                "p95_us": 239.667,
+                "p99_us": 327.583
+              },
+              "CQLStartup4Fields": {
+                "p100_us": 440.167,
+                "p50_us": 139.792,
+                "p95_us": 329.792,
+                "p99_us": 366.834
+              },
+              "CQLStartup5InitialFields": {
+                "p100_us": 629.375,
+                "p50_us": 176.875,
+                "p95_us": 426,
+                "p99_us": 559
+              },
+              "CQLSupported4Fields": {
+                "p100_us": 1266.625,
+                "p50_us": 185.083,
+                "p95_us": 434.334,
+                "p99_us": 545
+              },
+              "CQLSupported5InitialFields": {
+                "p100_us": 1460,
+                "p50_us": 238.666,
+                "p95_us": 522.958,
+                "p99_us": 813.292
+              },
+              "CassandraInternodeInitiateFields": {
+                "p100_us": 547.292,
+                "p50_us": 125.708,
+                "p95_us": 295.584,
+                "p99_us": 396.292
+              },
+              "MemcachedBinaryGetRequestFields": {
+                "p100_us": 456.083,
+                "p50_us": 125.584,
+                "p95_us": 298.75,
+                "p99_us": 365.042
+              },
+              "MemcachedStatsRequestFields": {
+                "p100_us": 310.375,
+                "p50_us": 81.333,
+                "p95_us": 191.958,
+                "p99_us": 250.667
+              },
+              "MemcachedStatsResponseFields": {
+                "p100_us": 3504.667,
+                "p50_us": 1289.708,
+                "p95_us": 3293.084,
+                "p99_us": 3444.75
+              }
+            },
+            "gc_count": 29,
+            "gc_pause_ns": 1305413,
+            "input_bytes": 284200,
+            "input_mbps": 3.2367628471923577,
+            "json_export": true,
+            "latency": {
+              "p100_us": 3504.667,
+              "p50_us": 166.917,
+              "p95_us": 1259.375,
+              "p99_us": 2828.291
+            },
+            "messages": 2200,
+            "messages_per_second": 3131.983754320543,
+            "output_bytes": 5062400,
+            "sampled_heap_max_bytes": 26905288,
+            "seconds": 0.702430208
+          }
+        ],
+        "p50_us": {
+          "median": 166.875,
+          "min": 161.625,
+          "max": 166.917
+        },
+        "p95_us": {
+          "median": 1260.041,
+          "min": 1259.375,
+          "max": 1289.75
+        },
+        "p99_us": {
+          "median": 2828.291,
+          "min": 2754.333,
+          "max": 2859.25
+        },
+        "p100_us": {
+          "median": 4123.958,
+          "min": 3504.667,
+          "max": 4456.5
+        },
+        "allocated_bytes": {
+          "median": 452296752,
+          "min": 452289072,
+          "max": 452304736
+        },
+        "allocations": {
+          "median": 7541943,
+          "min": 7541908,
+          "max": 7541960
+        },
+        "gc_count": {
+          "median": 29,
+          "min": 29,
+          "max": 29
+        },
+        "gc_pause_ns": {
+          "median": 1305413,
+          "min": 1296954,
+          "max": 1347664
+        },
+        "sampled_heap_max_bytes": {
+          "median": 26905288,
+          "min": 26858832,
+          "max": 27480216
+        },
+        "output_bytes": {
+          "median": 5062400,
+          "min": 5062400,
+          "max": 5062400
+        }
+      }
+    }
+  },
+  "statistics": "Each group includes all three configured results; median and range, not confidence intervals. Correctly configured slow values are retained. The separate default-GOMAXPROCS latency exploration is archived but not combined with explicit GOMAXPROCS=1 observations."
+}

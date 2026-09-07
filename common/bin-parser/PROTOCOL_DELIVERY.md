@@ -45,6 +45,8 @@
 | G7 | 若协议走 TCP/UDP 端口分发，必须有 **Ethernet+IP+TCP/UDP** 整帧测试 | 只测 `parseRule(payload)` 不够 |
 | G8 | 路线图与目录一致 | P0 翻 `done` 时 `ProtocolCatalog` 不得仍是 `partial`；`TestP0RoadmapCovered` 必须绿 |
 
+G8 的历史限定范围：`WPAD proxy` 路线图条目仅承诺 `HTTP GET /wpad.dat`，旧 95 分卡只计 HTTP 封装。专用 WPAD 目录必须继续标为 `partial`，不得据此声称代理使用、完整发现流程或配置正文语义。`TestP0RoadmapCovered` 无条件执行 `requireP0WPADRetrievalScope`：同时锁定该历史范围、评分卡来源、独立入口和未裁剪的 corpus 合同，并实测 HTTP／Ethernet 路径、两份原始请求的全部专用字段／字节及三项未实现语义元数据。把目录状态改成 `new` 或退回普通 HTTP 入口也必须失败；其他 P0 条目的原有状态要求不变。
+
 G4 细则：TLS 只在 ContentType==22 时尝试 ClientHello；探测 ContentType 不得先 peek 再失败回退（会把 `GET` 变成 `GGET`）。
 
 ---

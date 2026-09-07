@@ -38,10 +38,23 @@ func TestProtocolCorpusContractReferencesExist(t *testing.T) {
 		_, ok := roadmapNames[name]
 		require.Truef(t, ok, "parse contract points to missing roadmap name %q", name)
 	}
+	for name, spec := range protocolCorpusSupplementalProfiles {
+		capture, ok := captures[spec.CaptureID]
+		require.Truef(t, ok, "supplemental profile %q points to missing capture %q", name, spec.CaptureID)
+		require.Greater(t, spec.Frame, 0)
+		require.LessOrEqual(t, spec.Frame, capture.PacketCount)
+	}
 
 	catalog := make(map[string]ProtocolInfo, len(ProtocolCatalog))
 	for _, info := range ProtocolCatalog {
 		catalog[info.Name] = info
+	}
+	for name, spec := range protocolCorpusSupplementalProfiles {
+		info, ok := catalog[name]
+		require.Truef(t, ok, "supplemental profile %q has no catalog entry", name)
+		require.Equal(t, spec.Contract.RuleFile, info.RuleFile)
+		require.Equal(t, spec.Contract.EntryNode, info.EntryNode)
+		require.Equal(t, spec.Contract.Layer, info.Layer)
 	}
 	validExactKeys := make(map[string]struct{})
 	for _, capture := range manifest.Captures {

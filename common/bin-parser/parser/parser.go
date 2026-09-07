@@ -4,7 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"io"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -28,7 +27,8 @@ func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, k
 	if len(splits) > 0 {
 		splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
 	}
-	p := filepath.Join(splits...)
+	// Embedded RuleFS names use slash separators on every host OS.
+	p := path.Join(splits...)
 	rootNode, err := base.ParseRule(p)
 	if err != nil {
 		return nil, err

@@ -1,0 +1,172 @@
+# eMule BaseClient.cpp ProcessHelloTypePacket; packets.cpp CTag reader.
+# https://github.com/irwir/eMule (linked by the eMule project download page).
+# Uncompressed client-to-client Hello/HelloAnswer only; not server login,
+# UDP, Kad, compressed packets, transfers, or connection-state validation.
+# Parser limits: 1 MiB bounded input, 256 messages and 256 tags per input.
+# String bytes retain their original encoding; FLOAT32 retains IEEE bits.
+endian: little
+Package:
+  EDonkey:
+    operator: |
+      if !this.HasMaxLength() { panic("edonkey: message boundary is required") }
+      size = this.GetMaxLength()
+      if size == 0 || size > 1048576 { panic("edonkey: input size outside 1 MiB limit") }
+      this.ProcessSubNode("Messages")
+      this.AddInfo("Connection State Validated", false)
+    Messages:
+      list: true
+      Message: EDonkeyMessage
+      operator: |
+        remaining = this.GetMaxLength()
+        budget = 256
+        count = 0
+        for remaining > 0 {
+          if count >= 256 { panic("edonkey: message count exceeds 256 limit") }
+          message = this.NewElement()
+          message.SetMaxLength(remaining)
+          message.SetCfg("EDonkey Tag Budget", budget)
+          message.Process()
+          budget -= message.GetSubNode("Tag Count").Result().Value
+          remaining -= message.GetSubNode("Message Length").Result().Value+5
+          count++
+        }
+
+EDonkeyMessage:
+  operator: |
+    protocol = this.ProcessSubNode("Protocol").Value
+    if protocol != 0xe3 { panic("edonkey: only uncompressed eDonkey client messages are decoded") }
+    size = this.ProcessSubNode("Message Length").Value
+    if size < 33 || size > 1048571 { panic("edonkey: message length outside bounds") }
+    if size+5 > this.GetMaxLength() { panic("edonkey: message length exceeds input") }
+    this.SetMaxLength(size+5)
+    opcode = this.ProcessSubNode("Opcode").Value
+    if opcode != 1 && opcode != 0x4c { panic("edonkey: unsupported client opcode") }
+    if opcode == 1 {
+      if size < 34 { panic("edonkey: Hello fixed fields truncated") }
+      if this.ProcessSubNode("User Hash Length").Value != 16 { panic("edonkey: user hash length must be sixteen") }
+    }
+    this.ProcessSubNode("User Hash")
+    this.ProcessSubNode("Client ID")
+    this.ProcessSubNode("TCP Port")
+    count = this.ProcessSubNode("Tag Count").Value
+    budget = this.GetCfg("EDonkey Tag Budget")
+    if budget == nil { budget = 256 }
+    if count > budget { panic("edonkey: tag count exceeds 256 input limit") }
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining < 6 || count > (remaining-6)/3 { panic("edonkey: tag count exceeds message body") }
+    if count > 0 {
+      tags = this.GetSubNode("Tags")
+      tags.SetMaxLength(remaining-6)
+      tags.SetCfg("EDonkey Tag Count", count)
+      tags.Process()
+    }
+    this.ProcessSubNode("Server Address")
+    this.ProcessSubNode("Server Port")
+    remaining = this.GetMaxLength()-this.Length()
+    // Historical clients append implementation-specific data after the server.
+    // Its exact boundary is known, but no software identity is inferred from it.
+    if remaining > 0 {
+      this.GetSubNode("Extension Data").SetMaxLength(remaining)
+      this.ProcessSubNode("Extension Data")
+    }
+    this.AddInfo("Extension Decoded", remaining == 0)
+  Protocol: uint8
+  Message Length: uint32
+  Opcode: uint8
+  User Hash Length: uint8
+  User Hash: raw,16
+  Client ID: uint32
+  TCP Port: uint16
+  Tag Count: uint32
+  Tags:
+    list: true
+    Tag: EDonkeyTag
+    operator: |
+      remaining = this.GetMaxLength()
+      for i = 0; i < this.GetCfg("EDonkey Tag Count"); i++ {
+        tag = this.NewElement()
+        tag.SetMaxLength(remaining)
+        before = getCurrentPosition()
+        tag.Process()
+        remaining -= getCurrentPosition()-before
+      }
+  Server Address: raw,4
+  Server Port: uint16
+  Extension Data: raw
+
+EDonkeyTag:
+  operator: |
+    wireType = this.ProcessSubNode("Tag Type").Value
+    kind = wireType & 127
+    nameID = -1
+    if (wireType & 128) != 0 {
+      nameID = this.ProcessSubNode("Name ID").Value
+    } else {
+      size = this.ProcessSubNode("Name Length").Value
+      if size > this.GetMaxLength()-this.Length() { panic("edonkey: tag name exceeds message") }
+      if size == 1 { nameID = this.ProcessSubNode("Name ID").Value
+      } else if size > 0 {
+        this.GetSubNode("Name").SetMaxLength(size)
+        this.ProcessSubNode("Name")
+      }
+    }
+    value = nil
+    if kind == 2 || (kind >= 17 && kind <= 32) {
+      size = kind-16
+      if kind == 2 { size = this.ProcessSubNode("String Length").Value }
+      if size > this.GetMaxLength()-this.Length() { panic("edonkey: string exceeds message") }
+      value = ""
+      if size > 0 {
+        this.GetSubNode("String Value").SetMaxLength(size)
+        value = this.ProcessSubNode("String Value").Value
+      }
+    } else if kind == 3 || kind == 8 || kind == 9 || kind == 11 {
+      size = 4
+      if kind == 8 { size = 2 } else if kind == 9 { size = 1 } else if kind == 11 { size = 8 }
+      this.GetSubNode("Unsigned Value").SetMaxLength(size)
+      value = this.ProcessSubNode("Unsigned Value").Value
+    } else if kind == 1 {
+      value = this.ProcessSubNode("Hash Value").Value
+    } else if kind == 4 {
+      value = this.ProcessSubNode("Float32 Bits").Value
+    } else if kind == 5 {
+      value = this.ProcessSubNode("Boolean Byte").Value
+    } else if kind == 6 || kind == 7 {
+      size = 0
+      if kind == 6 {
+        size = this.ProcessSubNode("Boolean Bit Count").Value / 8 + 1
+      } else { size = this.ProcessSubNode("Blob Length").Value }
+      if size > this.GetMaxLength()-this.Length() { panic("edonkey: tag byte value exceeds message") }
+      value = []byte{}
+      if size > 0 {
+        this.GetSubNode("Byte Value").SetMaxLength(size)
+        value = this.ProcessSubNode("Byte Value").Value
+      }
+    } else { panic("edonkey: unsupported tag type with unknown boundary") }
+    this.AddInfo("Value", value)
+    // These are advertised bit values, not negotiated capabilities. Preserve
+    // every original integer, unknown name, duplicate and vendor extension.
+    if kind == 3 || kind == 8 || kind == 9 {
+      if nameID == 0xf9 {
+        this.AddInfo("Fields", {"Kad Port": (value >> 16) & 65535, "UDP Port": value & 65535})
+      } else if nameID == 0xfa {
+        this.AddInfo("Fields", {"AICH Version": (value >> 29) & 7, "Unicode": (value >> 28) & 1, "UDP Version": (value >> 24) & 15, "Compression Version": (value >> 20) & 15, "Identification Version": (value >> 16) & 15, "Source Exchange Version": (value >> 12) & 15, "Extended Requests Version": (value >> 8) & 15, "Comments Version": (value >> 4) & 15, "Peer Cache": (value >> 3) & 1, "No View Shared Files": (value >> 2) & 1, "Multipacket": (value >> 1) & 1, "Preview": value & 1})
+      } else if nameID == 0xfb {
+        this.AddInfo("Fields", {"Compatible Client ID": value >> 24, "Major Version": (value >> 17) & 127, "Minor Version": (value >> 10) & 127, "Update Version": (value >> 7) & 7, "Build Version": value & 127})
+      } else if nameID == 0xfe {
+        this.AddInfo("Fields", {"Reserved High": value >> 14, "File Identifiers": (value >> 13) & 1, "Direct UDP Callback": (value >> 12) & 1, "Chat Captcha": (value >> 11) & 1, "Source Exchange 2": (value >> 10) & 1, "Transport Obfuscation Required": (value >> 9) & 1, "Transport Obfuscation Requested": (value >> 8) & 1, "Transport Obfuscation Supported": (value >> 7) & 1, "Reserved Mod Bit": (value >> 6) & 1, "Extended Multipacket": (value >> 5) & 1, "Large Files": (value >> 4) & 1, "Kad Version": value & 15})
+      }
+    }
+  Tag Type: uint8
+  Name Length: uint16
+  Name ID: uint8
+  Name: string
+  String Length: uint16
+  String Value: string
+  Unsigned Value: uint64
+  Hash Value: raw,16
+  Float32 Bits: uint32
+  Boolean Byte: uint8
+  Boolean Bit Count: uint16
+  Blob Length: uint32
+  Byte Value: raw

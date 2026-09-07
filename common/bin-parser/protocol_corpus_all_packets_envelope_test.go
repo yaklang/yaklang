@@ -179,8 +179,15 @@ type protocolCorpusEnvelopeParseSpec struct {
 
 var protocolCorpusEnvelopeRequiredFields = map[string][]string{
 	"Ethernet Envelope":                  {"Destination", "Source", "Ether Type"},
+	"FDDI Envelope":                      {"Frame Control", "Destination", "Source"},
+	"Token Ring Envelope":                {"Access Control", "Frame Control", "Destination", "Source First Byte", "Source Remaining Bytes"},
+	"IEEE802154 Envelope":                {"Frame Control", "Sequence Number"},
+	"IEEE802154 FCS Envelope":            {"Frame Control", "Sequence Number", "Frame Check Sequence"},
+	"SocketCAN Envelope":                 {"Extended Flag", "Remote Flag", "Error Flag", "Identifier", "Data Length", "Flags", "Reserved", "Length Code", "Data"},
 	"Truncated Ethernet Record Envelope": {"Destination Byte 1", "Destination Byte 2", "Destination Byte 3", "Destination Byte 4"},
 	"Linux SLL Envelope":                 {"Packet Type", "ARPHRD Type", "Address Length", "Address", "Protocol"},
+	"Linux SLL2 Envelope":                {"Protocol", "Reserved", "Interface Index", "ARPHRD Type", "Packet Type", "Address Length", "Address"},
+	"USBPcap Envelope":                   {"Header Length", "IRP ID", "Status", "Function", "Information", "Bus", "Device", "Endpoint", "Transfer Type", "Data Length"},
 	"PPP Envelope":                       {"Protocol High", "Protocol Low"},
 	"IPv4 Envelope":                      {"Version", "Header Length", "Differentiated Services", "Total Length", "Identification", "Flags and Fragment Offset", "Time to Live", "Protocol", "Header Checksum", "Source", "Destination"},
 	"IPv6 Envelope":                      {"Version", "Traffic Class", "Flow Label", "Payload Length", "Next Header", "Hop Limit", "Source", "Destination"},
@@ -331,6 +338,20 @@ func protocolCorpusPacketEnvelopeSpec(capture protocolCorpusCapture, frameNumber
 		return protocolCorpusEnvelopeParseSpec{entry: "Ethernet Envelope", input: frame}, nil
 	case "Linux SLL":
 		return protocolCorpusEnvelopeParseSpec{entry: "Linux SLL Envelope", input: frame}, nil
+	case "Linux SLL2":
+		return protocolCorpusEnvelopeParseSpec{entry: "Linux SLL2 Envelope", input: frame}, nil
+	case "USBPcap":
+		return protocolCorpusEnvelopeParseSpec{entry: "USBPcap Envelope", input: frame}, nil
+	case "FDDI":
+		return protocolCorpusEnvelopeParseSpec{entry: "FDDI Envelope", input: frame}, nil
+	case "Token Ring":
+		return protocolCorpusEnvelopeParseSpec{entry: "Token Ring Envelope", input: frame}, nil
+	case "IEEE 802.15.4 no FCS":
+		return protocolCorpusEnvelopeParseSpec{entry: "IEEE802154 Envelope", input: frame}, nil
+	case "IEEE 802.15.4":
+		return protocolCorpusEnvelopeParseSpec{entry: "IEEE802154 FCS Envelope", input: frame}, nil
+	case "SocketCAN":
+		return protocolCorpusEnvelopeParseSpec{entry: "SocketCAN Envelope", input: frame}, nil
 	case "PPP":
 		return protocolCorpusEnvelopeParseSpec{entry: "PPP Envelope", input: frame}, nil
 	case "RadioTap":

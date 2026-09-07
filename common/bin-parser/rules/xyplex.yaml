@@ -1,0 +1,116 @@
+# XYPLEX UDP registration header field profile, network byte order.
+# Layout and directional selection are defined here by the pinned implementation:
+# https://raw.githubusercontent.com/wireshark/wireshark/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-xyplex.c
+# Request (UDP destination 173): type/pad/server-port/return-port/reserved, 8B.
+# Reply (UDP source 173): type/pad/reply, 4B. If both ports are 173 the request
+# branch has precedence. Bare data cannot establish direction; callers choose
+# these separate entries or use the port-aware UDP dispatcher.
+# Server Port denotes the requested serial port, not a UDP destination port.
+# Return Port denotes an announced TCP port; parsing never opens a connection.
+# No complete vendor wire specification was located. Type, pad, reserved,
+# port values and unknown reply codes are therefore retained without invented
+# validity constraints. Replies 0 and 5 have the pinned labels OK/Queue Full.
+# The dissector stops at 8/4 bytes; this profile explicitly preserves any tail
+# as uninterpreted bytes, without claiming an extension or registration validity.
+# No follow-on TCP data, serial content, session tracking, or service operation
+# is implemented. 65527B is a non-jumbo UDP-payload implementation profile,
+# not a XYPLEX wire length field. Parsed NodeToBytes preserves all bytes;
+# structured GenerateBinary is unsupported.
+endian: big
+Package:
+  XYPLEXRequest: XYPLEXRequestRecord
+  XYPLEXReply: XYPLEXReplyRecord
+  XYPLEXRequestCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("xyplex: explicit datagram boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("xyplex: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("xyplex: empty carrier has no header") }
+      candidate, trial = this.TryProcessByType("XYPLEXRequestFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed XYPLEX Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  XYPLEXReplyCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("xyplex: explicit datagram boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("xyplex: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("xyplex: empty carrier has no header") }
+      candidate, trial = this.TryProcessByType("XYPLEXReplyFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed XYPLEX Reply")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+XYPLEXRequestFrame: "import:xyplex.yaml;node:XYPLEXRequest"
+XYPLEXReplyFrame: "import:xyplex.yaml;node:XYPLEXReply"
+
+XYPLEXRequestRecord:
+  operator: |
+    if !this.HasMaxLength() { panic("xyplex: explicit datagram boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("xyplex: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 8 { panic("xyplex: truncated 8-byte request header") }
+    if total > 65527 { panic("xyplex: datagram exceeds 65527-byte implementation profile") }
+    this.ProcessSubNode("Protocol Type")
+    this.ProcessSubNode("Padding")
+    this.ProcessSubNode("Server Port")
+    this.ProcessSubNode("Return Port")
+    this.ProcessSubNode("Reserved")
+    if total > 8 {
+      this.GetSubNode("Uninterpreted Request Tail").SetMaxLength(total-8)
+      this.ProcessSubNode("Uninterpreted Request Tail")
+    }
+    if this.Length() != total { panic("xyplex: unconsumed request bytes") }
+    this.AddInfo("Profile", "XYPLEX UDP registration header fields")
+    this.AddInfo("Direction", "request")
+    this.AddInfo("Header Bytes", 8)
+    this.AddInfo("Maximum Datagram Bytes", 65527)
+    this.AddInfo("Tail Bytes", total-8)
+    this.AddInfo("Tail Decoded", false)
+    this.AddInfo("Server Port Role", "serial port identifier")
+    this.AddInfo("Return Port Role", "announced TCP port")
+    this.AddInfo("Operation Validated", false)
+    this.AddInfo("Transport Provenance Validated", false)
+    this.AddInfo("TCP Session Decoded", false)
+  Protocol Type: uint8
+  Padding: uint8
+  Server Port: uint16
+  Return Port: uint16
+  Reserved: uint16
+  Uninterpreted Request Tail: raw
+
+XYPLEXReplyRecord:
+  operator: |
+    if !this.HasMaxLength() { panic("xyplex: explicit datagram boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("xyplex: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 4 { panic("xyplex: truncated 4-byte reply header") }
+    if total > 65527 { panic("xyplex: datagram exceeds 65527-byte implementation profile") }
+    this.ProcessSubNode("Protocol Type")
+    this.ProcessSubNode("Padding")
+    reply = int(this.ProcessSubNode("Registration Reply").Value)
+    if total > 4 {
+      this.GetSubNode("Uninterpreted Reply Tail").SetMaxLength(total-4)
+      this.ProcessSubNode("Uninterpreted Reply Tail")
+    }
+    if this.Length() != total { panic("xyplex: unconsumed reply bytes") }
+    this.AddInfo("Profile", "XYPLEX UDP registration header fields")
+    this.AddInfo("Direction", "reply")
+    this.AddInfo("Header Bytes", 4)
+    this.AddInfo("Maximum Datagram Bytes", 65527)
+    this.AddInfo("Tail Bytes", total-4)
+    this.AddInfo("Tail Decoded", false)
+    this.AddInfo("Known Reply Code", reply == 0 || reply == 5)
+    label = "unknown"
+    if reply == 0 { label = "OK" }
+    if reply == 5 { label = "Queue Full" }
+    this.AddInfo("Reply Label", label)
+    this.AddInfo("Operation Validated", false)
+    this.AddInfo("Transport Provenance Validated", false)
+    this.AddInfo("TCP Session Decoded", false)
+  Protocol Type: uint8
+  Padding: uint8
+  Registration Reply: uint16
+  Uninterpreted Reply Tail: raw

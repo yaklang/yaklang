@@ -1,0 +1,7 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkProtocolCorpusIGRP104Routes 	       3	  42560570 ns/op	   0.03 MB/s	11272722 B/op	  257294 allocs/op
+BenchmarkProtocolCorpusIGRP104Routes 	       3	  41132097 ns/op	   0.04 MB/s	11273005 B/op	  257295 allocs/op
+BenchmarkProtocolCorpusIGRP104Routes 	       3	  42502819 ns/op	   0.03 MB/s	11273848 B/op	  257300 allocs/op
+PASS

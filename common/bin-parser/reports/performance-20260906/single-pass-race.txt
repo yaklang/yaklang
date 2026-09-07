@@ -1,0 +1,9 @@
+# github.com/yaklang/yaklang/common/bin-parser/parser/base.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-559346865/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+# github.com/yaklang/yaklang/common/bin-parser/parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-2873196308/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+# github.com/yaklang/yaklang/common/bin-parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-2464683654/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+ok  	github.com/yaklang/yaklang/common/bin-parser	3.163s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	3.855s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser	2.739s

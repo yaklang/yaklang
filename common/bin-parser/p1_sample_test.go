@@ -245,7 +245,8 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 
 	t.Run("iiop/request", func(t *testing.T) {
 		// CORBA 3.1 RequestHeader_1_2: KeyAddr, operation "_is_a" (NUL-terminated CDR string).
-		giop := mustHex(t, "47494f50010200000000001a00000001030000000000000000000000000000065f69735f6100")
+		parseMustFail(t, mustHex(t, "47494f50010200000000001a00000001030000000000000000000000000000065f69735f6100"), "application-layer.iiop", "GIOP")
+		giop := completeEmptyGIOPRequest()
 		n := parseRule(t, giop, "application-layer.iiop", "GIOP")
 		require.Equal(t, uint64(0), uintVal(t, n.Child("Message Type")))
 		req := mustChild(t, n, "GIOPRequest")
@@ -3373,20 +3374,25 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("rmi/ping", func(t *testing.T) {
-		// Java RMI spec §10.2 Ping = 0x52 after StreamProtocol 0x4b. Wireshark rmi.outputstream.message. TCP/1099.
-		raw := []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b, 0x52}
-		n := parseRule(t, raw, "rmi", "RMI")
+		// RMI §10.2 SingleOp has one message and needs no endpoint handshake.
+		raw := []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4c, 0x52}
+		parsed := protocolCorpusRequireBoundedRuleParse(t, raw, "rmi", "RMIHeader")
+		n, err := parsed.Result()
+		require.NoError(t, err)
 		require.Equal(t, "JRMI", string(bytesVal(t, n.Child("Magic"))))
-		require.Equal(t, uint64(0x4b), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, uint64(0x4c), uintVal(t, n.Child("Protocol")))
 		require.Equal(t, uint64(0x52), uintVal(t, mustChild(t, n, "Message").Child("Type")))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 1099, 1099, raw))
 		require.Equal(t, uint64(0x52), uintVal(t, mustChild(t, eth, "IP", "TCP", "RMI", "Message").Child("Type")))
 	})
 
 	t.Run("rmi/call", func(t *testing.T) {
-		// Java RMI spec §10.2 Call = 0x50 then Java serialization STREAM_MAGIC 0xaced. Wireshark rmi.ser.magic. TCP/1099.
-		raw := []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b, 0x50, 0xac, 0xed, 0x00, 0x05}
-		n := parseRule(t, raw, "rmi", "RMI")
+		// RMI §10.3: complete ObjID, operation, hash and String argument. The
+		// former serialization-header-only fixture omitted mandatory call data.
+		raw := mustHex(t, "4a524d4900024c50aced0005772200000000000000000000000000000000000000000000ffffffff010203040506070874000673616d706c65")
+		parsed := protocolCorpusRequireBoundedRuleParse(t, raw, "rmi", "RMIHeader")
+		n, err := parsed.Result()
+		require.NoError(t, err)
 		msg := mustChild(t, n, "Message")
 		require.Equal(t, uint64(0x50), uintVal(t, msg.Child("Type")))
 		require.Equal(t, uint64(0xaced), uintVal(t, msg.Child("Ser Magic")))
@@ -3976,16 +3982,17 @@ func rfcTCPTimestamp() []byte {
 
 func ntlmsspChallengeTarget(domain string) []byte {
 	name := utf16LE(domain)
-	buf := make([]byte, 48+len(name))
+	buf := make([]byte, 56+len(name))
 	copy(buf[:8], []byte("NTLMSSP\x00"))
 	binary.LittleEndian.PutUint32(buf[8:], 2)
 	binary.LittleEndian.PutUint16(buf[12:], uint16(len(name)))
 	binary.LittleEndian.PutUint16(buf[14:], uint16(len(name)))
-	binary.LittleEndian.PutUint32(buf[16:], 48)
+	binary.LittleEndian.PutUint32(buf[16:], 56)
 	binary.LittleEndian.PutUint32(buf[20:], 0xe2088205)
 	copy(buf[24:32], []byte{1, 2, 3, 4, 5, 6, 7, 8})
-	binary.LittleEndian.PutUint32(buf[44:], uint32(48+len(name)))
-	copy(buf[48:], name)
+	binary.LittleEndian.PutUint32(buf[44:], uint32(56+len(name)))
+	copy(buf[48:56], []byte{10, 0, 0x61, 0x4a, 0, 0, 0, 15})
+	copy(buf[56:], name)
 	return buf
 }
 

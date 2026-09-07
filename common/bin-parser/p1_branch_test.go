@@ -807,7 +807,8 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, "NameService", strVal(t, mustChild(t, n, "LocateRequest").Child("Object Key")))
 	})
 	t.Run("iiop/request", func(t *testing.T) {
-		n := parseRule(t, mustHex(t, "47494f50010200000000001a00000001030000000000000000000000000000065f69735f6100"), "application-layer.iiop", "GIOP")
+		parseMustFail(t, mustHex(t, "47494f50010200000000001a00000001030000000000000000000000000000065f69735f6100"), "application-layer.iiop", "GIOP")
+		n := parseRule(t, completeEmptyGIOPRequest(), "application-layer.iiop", "GIOP")
 		require.Equal(t, uint64(6), uintVal(t, mustChild(t, n, "GIOPRequest").Child("Op Len")))
 	})
 
@@ -970,14 +971,34 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Inner", "ARP").Child("Opcode")))
 	})
 	t.Run("rmi/ping", func(t *testing.T) {
-		n := parseRule(t, []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4b, 0x52}, "rmi", "RMI")
-		require.Equal(t, uint64(0x52), uintVal(t, mustChild(t, n, "Message").Child("Type")))
+		// JRMP SingleOp carries one message without a stream endpoint handshake.
+		n := rmiTestParse(t, []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4c, 0x52}, "RMIHeader")
+		protocolCorpusRequireValue(t, n, "Protocol", uint64(0x4c))
+		protocolCorpusRequireValue(t, n, "Type", uint64(0x52))
 	})
 	t.Run("rmi/call", func(t *testing.T) {
-		n := parseRule(t, []byte{'J', 'R', 'M', 'I', 0x00, 0x02, 0x4c, 0x50, 0xac, 0xed, 0x00, 0x05}, "rmi", "RMI")
-		require.Equal(t, uint64(0x4c), uintVal(t, n.Child("Protocol")))
-		require.Equal(t, uint64(0xaced), uintVal(t, mustChild(t, n, "Message").Child("Ser Magic")))
+		n := rmiTestParse(t, mustHex(t, rmiSingleCallLiteral), "RMIHeader")
+		protocolCorpusRequireValue(t, n, "Protocol", uint64(0x4c))
+		protocolCorpusRequireValue(t, n, "Type", uint64(0x50))
+		protocolCorpusRequireValue(t, n, "Ser Magic", uint64(0xaced))
+		protocolCorpusRequireValue(t, n, "Ser Version", uint64(5))
+		rmiTestOperation(t, n, -1)
+		protocolCorpusRequireValue(t, n, "Method Hash", uint64(0x0102030405060708))
+		protocolCorpusRequireValue(t, n, "String", "sample")
 	})
+	// Retain both former positive vectors as exact-record negatives: a stream
+	// header cannot include a message before the handshake, and a Call needs
+	// object ID, operation and hash, not just a serialization stream header.
+	for _, fixture := range []struct{ name, hex, diagnostic string }{
+		{"rmi/stream-ping-without-handshake", "4a524d4900024b52", "transport header has trailing bytes; handshake phase required"},
+		{"rmi/call-without-call-data", "4a524d4900024c50aced0005", "truncated Content Type"},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			reader := newProtocolCorpusBoundedReader(mustHex(t, fixture.hex))
+			_, err := protocolCorpusParseRule(reader, protocolCorpusParseContract{RuleFile: "rmi.yaml", EntryNode: "RMIHeader", Layer: "L7"})
+			require.ErrorContains(t, err, fixture.diagnostic)
+		})
+	}
 	t.Run("llc/stp", func(t *testing.T) {
 		n := parseRule(t, []byte{0x42, 0x42, 0x03, 0x00, 0x00, 0x00, 0x80}, "llc", "LLC")
 		require.Equal(t, uint64(0x42), uintVal(t, n.Child("DSAP")))

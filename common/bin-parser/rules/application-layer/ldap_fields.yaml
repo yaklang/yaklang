@@ -1,0 +1,24 @@
+# Explicit complete LDAPv3 BindRequest (restricted BER), RFC 4511.
+# Long-form definite lengths are accepted without imposing DER minimality.
+# Simple/SASL octets and optional control values are retained, not evaluated.
+# DN grammar, mechanisms, controls, sessions and transport are not validated.
+# Unknown operation/choice/extensions and invalid envelopes use raw fallback.
+# Bounds: 1 MiB input, four BER length octets and 4096 controls.
+endian: big
+unit: byte
+Package:
+  LDAPBindRequestFields:
+    operator: |
+      err = parseLDAPFields("bind-request")
+      if err != nil { panic(err) }
+  LDAPBindRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPBindRequestFieldsExact", "LDAPBindRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+LDAPBindRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPBindRequestFields"

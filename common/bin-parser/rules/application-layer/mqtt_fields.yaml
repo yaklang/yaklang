@@ -1,0 +1,34 @@
+# Exact single packet, explicit MQTT 3.1 (level 3) or 3.1.1 (level 4).
+# No version guessing, TCP reconstruction, session or delivery inference.
+# Local bounds: 1 MiB of wire and 1024 list entries; application bytes stay raw.
+endian: big
+unit: byte
+Package:
+  MQTT31PacketFields:
+    operator: |
+      err = parseMQTTFields(3)
+      if err != nil { panic(err) }
+  MQTT311PacketFields:
+    operator: |
+      err = parseMQTTFields(4)
+      if err != nil { panic(err) }
+  MQTT31PacketFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("mqtt-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("MQTT31Exact", "MQTT31PacketFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MQTT Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MQTT311PacketFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("mqtt-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("MQTT311Exact", "MQTT311PacketFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MQTT Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+MQTT31Exact: "import:application-layer/mqtt_fields.yaml;node:MQTT31PacketFields"
+MQTT311Exact: "import:application-layer/mqtt_fields.yaml;node:MQTT311PacketFields"

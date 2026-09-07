@@ -1,0 +1,48 @@
+# Explicit one-UDP-payload entry; no UDP port dispatch, remote operation,
+# sender identity, workgroup membership, election state or delivery assertion.
+# RFC1002 4.1/4.4: unfragmented direct-group, uncompressed/unscoped names.
+# https://www.rfc-editor.org/rfc/rfc1002.html
+# MS-MAIL 2.2.1: second-class SMB_COM_TRANSACTION BROWSE mailslot.
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-mail/9a6f604c-1d41-4665-a1b4-2ae45c1398df
+# MS-BRWS 2.2.7/2.2.10: Domain and LocalMaster announcements only.
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-brws/7401bb1b-afee-4992-84ba-ee34fcb6409f
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-brws/bad3829d-a8e9-4a85-aa21-81d50867a77f
+# Default is receiver-layout observation, NOT all sender MUST/SHOULD checks.
+# Original ndpi-wechat announcements have DataOffset86 (not 32-bit aligned).
+# Preserve their exact bytes and expose Data Alignment Conformant=false.
+# Strict additionally checks alignment; it is not a complete sender validator.
+# Both entries validate exact ByteCount (MS-MAIL receivers MAY ignore it).
+# Ignored/reserved/advisory fields remain original bytes, never normalized.
+endian: big
+unit: byte
+Package:
+  BrowserMailslotDatagram:
+    operator: |
+      err = parseBrowserMailslotDatagram(false)
+      if err != nil { panic(err) }
+  BrowserMailslotStrictDatagram:
+    operator: |
+      err = parseBrowserMailslotDatagram(true)
+      if err != nil { panic(err) }
+  BrowserMailslotCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("browser-mailslot: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65527 { panic("browser-mailslot: carrier exceeds 65527-byte resource limit") }
+      candidate, trial = this.TryProcessByType("BrowserMailslotExact", "BrowserMailslotDatagram")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Browser Mailslot Datagram")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  BrowserMailslotStrictCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("browser-mailslot: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65527 { panic("browser-mailslot: carrier exceeds 65527-byte resource limit") }
+      candidate, trial = this.TryProcessByType("BrowserMailslotStrictExact", "BrowserMailslotStrictDatagram")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Browser Mailslot Datagram")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+BrowserMailslotExact: "import:application-layer/browser_mailslot.yaml;node:BrowserMailslotDatagram"
+BrowserMailslotStrictExact: "import:application-layer/browser_mailslot.yaml;node:BrowserMailslotStrictDatagram"

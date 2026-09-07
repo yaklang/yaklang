@@ -1,6 +1,19 @@
 endian: big
 Package:
   Ethernet:
+    operator: |
+      this.ProcessSubNode("Destination")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Payload")
+      # A capture boundary can contain link-layer padding or a retained FCS.
+      # Preserve it separately without guessing its meaning or reading beyond
+      # an unbounded caller's explicitly parsed protocol message.
+      if this.HasMaxLength() && this.Length() < this.GetMaxLength() {
+        tail = this.NewUnknownNode("Frame Trailer")
+        tail.SetMaxLength(this.GetMaxLength()-this.Length())
+        tail.Process()
+      }
     Destination: raw,6
     Source: raw,6
     Type: uint16
@@ -20,6 +33,38 @@ Package:
             this.ProcessByType("IPv6")
           case 0x0806:
             this.ProcessByType("ARP")
+          case 0x80f3:
+            this.ProcessByType("AARPCarrier")
+          case 0x809b:
+            this.ProcessByType("DDPCarrier")
+          case 0x8902:
+            this.ProcessByType("CFMCarrier")
+          case 0x22f3:
+            this.ProcessByType("TRILLCarrier")
+          case 0x0600:
+            this.ProcessByType("XNSCarrier")
+          case 0x6003:
+            this.ProcessByType("DECnetCarrier")
+          case 0x6004:
+            this.ProcessByType("LATCarrier")
+          case 0x0bad:
+            this.ProcessByType("VINESCarrier")
+          case 0x80d5:
+            this.ProcessByType("SNAEthernetCarrier")
+          case 0x88ca:
+            this.ProcessByType("TIPCCarrier")
+          case 0xd00d:
+            this.ProcessByType("TDMoECarrier")
+          case 0x88e5:
+            this.ProcessByType("MACSecCarrier")
+          case 0x88dc:
+            this.ProcessByType("WSMPCarrier")
+          case 0x8906:
+            this.ProcessByType("FCoECarrier")
+          case 0x8035:
+            this.ProcessByType("RARP")
+          case 0x88a2:
+            this.ProcessByType("AoE")
           case 0x8100:
             this.ProcessByType("VLAN")
           case 0x88a8:
@@ -38,6 +83,28 @@ Package:
             this.ProcessByType("Loopback")
           case 0x88f7:
             this.ProcessByType("PTP")
+          case 0x8809:
+            this.ProcessByType("SlowProtocols")
+          case 0x88e1:
+            this.ProcessByType("HomePlugAV")
+          case 0x8926:
+            this.ProcessByType("VNTag")
+          case 0x88e7:
+            this.ProcessByType("ProviderBackboneBridge")
+          case 0x88ee:
+            this.ProcessByType("ELMI")
+          case 0x88f6:
+            this.ProcessByType("MMRP")
+          case 0x88f5:
+            this.ProcessByType("MVRP")
+          case 0x22ea:
+            this.ProcessByType("MSRP")
+          case 0x88ab:
+            this.ProcessByType("Powerlink")
+          case 0x88ba:
+            this.ProcessByType("IECSampledValuesCarrier")
+          case 0x88b8:
+            this.ProcessByType("IECGOOSECarrier")
           default:
             res, op = this.TryProcessByType("PeekByte")
             op.Recovery()
@@ -49,6 +116,22 @@ Package:
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+AARPCarrier: "import:aarp.yaml;node:AARPCarrier"
+DDPCarrier: "import:appletalk.yaml;node:DDPCarrier"
+CFMCarrier: "import:cfm.yaml;node:CFMCarrier"
+TRILLCarrier: "import:trill.yaml;node:TRILLCarrier"
+XNSCarrier: "import:xns.yaml;node:XNSCarrier"
+DECnetCarrier: "import:decnet.yaml;node:DECnetCarrier"
+LATCarrier: "import:lat.yaml;node:LATCarrier"
+VINESCarrier: "import:vines.yaml;node:VINESCarrier"
+SNAEthernetCarrier: "import:sna.yaml;node:SNAEthernetCarrier"
+TIPCCarrier: "import:tipc.yaml;node:TIPCCarrier"
+TDMoECarrier: "import:tdmoe.yaml;node:TDMoECarrier"
+MACSecCarrier: "import:macsec.yaml;node:MACSecCarrier"
+WSMPCarrier: "import:wsmp.yaml;node:WSMPCarrier"
+FCoECarrier: "import:fcoe.yaml;node:FCoECarrier"
+RARP: "import:rarp.yaml;node:RARP"
+AoE: "import:aoe.yaml;node:AoE"
 VLAN: "import:ieee_802_1q.yaml;node:IEEE 802.1Q"
 QinQ: "import:ieee_802_1ad.yaml;node:QinQ"
 EAPOL: "import:eapol.yaml;node:EAPOL"
@@ -59,6 +142,17 @@ MPLS: "import:mpls.yaml;node:MPLS"
 LLDP: "import:lldp.yaml;node:LLDP"
 Loopback: "import:loopback.yaml;node:Loopback"
 PTP: "import:ptp.yaml;node:PTP"
+SlowProtocols: "import:link_samples.yaml;node:SlowProtocols"
+HomePlugAV: "import:link_samples.yaml;node:HomePlugAV"
+VNTag: "import:link_samples.yaml;node:VNTag"
+ProviderBackboneBridge: "import:link_samples.yaml;node:ProviderBackboneBridge"
+ELMI: "import:management_samples.yaml;node:ELMI"
+MMRP: "import:management_samples.yaml;node:MMRP"
+MVRP: "import:management_samples.yaml;node:MVRP"
+MSRP: "import:management_samples.yaml;node:MSRP"
+Powerlink: "import:powerlink.yaml;node:Powerlink"
+IECSampledValuesCarrier: "import:iec61850.yaml;node:SampledValuesCarrier"
+IECGOOSECarrier: "import:iec61850.yaml;node:GOOSECarrier"
 Next Protocol Data:
   list: true
   Octet: uint8

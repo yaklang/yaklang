@@ -48,6 +48,29 @@ Package:
     Protocol: uint16
     Payload: raw
 
+  Linux SLL2 Envelope:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength() < 20 { panic("packet envelope: Linux SLL2 requires a complete bounded header") }
+      this.ProcessSubNode("Protocol")
+      if this.ProcessSubNode("Reserved").Value != 0 { panic("packet envelope: Linux SLL2 reserved field must be zero") }
+      if this.ProcessSubNode("Interface Index").Value == 0 { panic("packet envelope: Linux SLL2 interface index must be one-based") }
+      this.ProcessSubNode("ARPHRD Type")
+      this.ProcessSubNode("Packet Type")
+      if this.ProcessSubNode("Address Length").Value > 8 { panic("packet envelope: Linux SLL2 address length exceeds 8") }
+      this.ProcessSubNode("Address")
+      if this.GetMaxLength() > 20 {
+        this.GetSubNode("Payload").SetMaxLength(this.GetMaxLength() - 20)
+        this.ProcessSubNode("Payload")
+      }
+    Protocol: uint16
+    Reserved: uint16
+    Interface Index: uint32
+    ARPHRD Type: uint16
+    Packet Type: uint8
+    Address Length: uint8
+    Address: raw,8
+    Payload: raw
+
   PPP Envelope:
     operator: |
       this.ProcessSubNode("Protocol High")
@@ -426,6 +449,43 @@ Package:
     Start Frame: int32
     Transfer Flags: uint32
     ISO Descriptor Count: uint32
+    Payload: raw
+
+  USBPcap Envelope:
+    endian: little
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength() < 27 { panic("packet envelope: USBPcap requires a complete bounded header") }
+      headerLength = this.ProcessSubNode("Header Length").Value
+      if headerLength < 27 || headerLength > this.GetMaxLength() { panic("packet envelope: USBPcap invalid header length") }
+      this.ProcessSubNode("IRP ID")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Function")
+      if this.ProcessSubNode("Information").Value > 1 { panic("packet envelope: USBPcap information reserved bits must be zero") }
+      this.ProcessSubNode("Bus")
+      this.ProcessSubNode("Device")
+      this.ProcessSubNode("Endpoint")
+      this.ProcessSubNode("Transfer Type")
+      dataLength = this.ProcessSubNode("Data Length").Value
+      if dataLength != this.GetMaxLength() - headerLength { panic("packet envelope: USBPcap data length differs from record boundary") }
+      if headerLength > 27 {
+        this.GetSubNode("Transfer Header").SetMaxLength(headerLength - 27)
+        this.ProcessSubNode("Transfer Header")
+      }
+      if dataLength > 0 {
+        this.GetSubNode("Payload").SetMaxLength(dataLength)
+        this.ProcessSubNode("Payload")
+      }
+    Header Length: uint16
+    IRP ID: uint64
+    Status: uint32
+    Function: uint16
+    Information: uint8
+    Bus: uint16
+    Device: uint16
+    Endpoint: uint8
+    Transfer Type: uint8
+    Data Length: uint32
+    Transfer Header: raw
     Payload: raw
 
   Pcap Record Envelope:

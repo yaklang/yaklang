@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/bin-parser/rules"
 )
@@ -173,61 +174,106 @@ func testsCeiling(ruleFile string, hasEth bool, portDispatched bool) int {
 
 // successBranchRows counts t.Run("proto/arm") success-path subtests (not fail-path files).
 func successBranchRows(ruleFile string) int {
+	return p1SourceEvidence().successBranchRows(ruleFile)
+}
+
+func (index *p1SourceEvidenceIndex) successBranchRows(ruleFile string) int {
 	key := strings.ToLower(ruleKey(ruleFile))
 	base := strings.ToLower(strings.TrimSuffix(filepath.Base(ruleFile), ".yaml"))
 	needles := []string{key, base}
 	for _, n := range yamlRootNodes(ruleFile) {
 		needles = append(needles, strings.ToLower(n))
 	}
+	count := 0
+	for _, low := range index.runNames {
+		for _, nd := range needles {
+			if nd != "" && strings.Contains(low, nd) {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
+type p1SourceEvidenceIndex struct {
+	runNames   []string
+	childNames map[string]bool
+}
+
+var p1SourceEvidenceSnapshot struct {
+	once  sync.Once
+	index p1SourceEvidenceIndex
+}
+
+func p1SourceEvidenceRoot() string {
 	root := "common/bin-parser"
 	if _, err := os.Stat(root); err != nil {
 		root = "."
 	}
+	return root
+}
+
+// Score checks read one immutable test-source snapshot per process. They keep
+// every literal occurrence (including duplicate Run names), and continue to
+// evaluate current rule-specific needles and score gates independently.
+func p1SourceEvidence() *p1SourceEvidenceIndex {
+	p1SourceEvidenceSnapshot.once.Do(func() {
+		p1SourceEvidenceSnapshot.index = scanP1SourceEvidence(p1SourceEvidenceRoot())
+	})
+	return &p1SourceEvidenceSnapshot.index
+}
+
+func scanP1SourceEvidence(root string) p1SourceEvidenceIndex {
+	index := p1SourceEvidenceIndex{childNames: map[string]bool{}}
 	matches, _ := filepath.Glob(filepath.Join(root, "*_test.go"))
 	fset := token.NewFileSet()
-	count := 0
 	for _, path := range matches {
-		if strings.Contains(strings.ToLower(filepath.Base(path)), "fail") {
-			continue
-		}
 		f, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
 			continue
 		}
+		includeRuns := !strings.Contains(strings.ToLower(filepath.Base(path)), "fail")
 		ast.Inspect(f, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel == nil || sel.Sel.Name != "Run" {
+			if sel, ok := call.Fun.(*ast.SelectorExpr); includeRuns && ok && sel.Sel != nil && sel.Sel.Name == "Run" && len(call.Args) > 0 {
+				if literal, ok := call.Args[0].(*ast.BasicLit); ok && literal.Kind == token.STRING {
+					if name, err := strconv.Unquote(literal.Value); err == nil {
+						low := strings.ToLower(name)
+						if strings.Contains(low, "/") {
+							index.runNames = append(index.runNames, low)
+						}
+					}
+				}
+			}
+			id, ok := call.Fun.(*ast.Ident)
+			if !ok || (id.Name != "mustChild" && id.Name != "parseEthernet") {
 				return true
 			}
-			if len(call.Args) < 1 {
-				return true
-			}
-			bl, ok := call.Args[0].(*ast.BasicLit)
-			if !ok || bl.Kind != token.STRING {
-				return true
-			}
-			s, err := strconv.Unquote(bl.Value)
-			if err != nil {
-				return true
-			}
-			low := strings.ToLower(s)
-			if !strings.Contains(low, "/") {
-				return true
-			}
-			for _, nd := range needles {
-				if nd != "" && strings.Contains(low, nd) {
-					count++
-					break
+			for _, argument := range call.Args {
+				literal, ok := argument.(*ast.BasicLit)
+				if !ok || literal.Kind != token.STRING {
+					continue
+				}
+				name, err := strconv.Unquote(literal.Value)
+				if err != nil || name == "" {
+					continue
+				}
+				index.childNames[name] = true
+				if name == "HTTP Request" || name == "HTTP Response" {
+					index.childNames["HTTP"] = true
+				}
+				if name == "TLS Record" || name == "Handshake" || name == "ClientHello" {
+					index.childNames["TLS"] = true
 				}
 			}
 			return true
 		})
 	}
-	return count
+	return index
 }
 
 func rootLastUnboundedRaw(ruleFile string) bool {
@@ -306,45 +352,14 @@ func trafficCeiling(sample string, hasEth bool) int {
 }
 
 func p1MustChildNames() map[string]bool {
-	out := map[string]bool{}
-	root := "common/bin-parser"
-	if _, err := os.Stat(root); err != nil {
-		root = "."
-	}
-	matches, _ := filepath.Glob(filepath.Join(root, "*_test.go"))
-	fset := token.NewFileSet()
-	for _, path := range matches {
-		f, err := parser.ParseFile(fset, path, nil, 0)
-		if err != nil {
-			continue
-		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			id, ok := call.Fun.(*ast.Ident)
-			if !ok || (id.Name != "mustChild" && id.Name != "parseEthernet") {
-				return true
-			}
-			for _, a := range call.Args {
-				bl, ok := a.(*ast.BasicLit)
-				if !ok || bl.Kind != token.STRING {
-					continue
-				}
-				s, err := strconv.Unquote(bl.Value)
-				if err == nil && s != "" {
-					out[s] = true
-					if s == "HTTP Request" || s == "HTTP Response" {
-						out["HTTP"] = true
-					}
-					if s == "TLS Record" || s == "Handshake" || s == "ClientHello" {
-						out["TLS"] = true
-					}
-				}
-			}
-			return true
-		})
+	return p1SourceEvidence().mustChildNames()
+}
+
+func (index *p1SourceEvidenceIndex) mustChildNames() map[string]bool {
+	names := index.childNames
+	out := make(map[string]bool, len(names))
+	for name, present := range names {
+		out[name] = present
 	}
 	return out
 }

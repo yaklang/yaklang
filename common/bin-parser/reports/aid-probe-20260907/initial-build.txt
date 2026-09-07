@@ -1,0 +1,21 @@
+Command: go test -tags=binparser_aid_probe ./common/bin-parser/reports/aid-probe-20260907 -run '^TestAIDPCAPProbe$' -count=1 -v -timeout=3m
+Exit: 1
+Initial harness imported gopacket/pcap in addition to the existing yaklang/pcap binding. This is a probe build failure, not a measured tool behavior. Corrected to use the existing yaklang/pcap binding only; no dependency changes.
+
+# github.com/yaklang/yaklang/common/bin-parser/reports/aid-probe-20260907.test
+/Users/v1ll4n/.goenv/versions/1.22.12/pkg/tool/darwin_arm64/link: running clang failed: exit status 1
+ld: warning: ignoring duplicate libraries: '-lpcap'
+duplicate symbol '_pcap_next_ex_escaping' in:
+    /private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-3600021957/000001.o
+    /private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-3600021957/000015.o
+duplicate symbol '_pcap_offline_filter_escaping' in:
+    /private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-3600021957/000001.o
+    /private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-3600021957/000015.o
+duplicate symbol '_pcap_wait' in:
+    /private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-3600021957/000001.o
+    /private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-3600021957/000015.o
+ld: 3 duplicate symbols
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+
+FAIL	github.com/yaklang/yaklang/common/bin-parser/reports/aid-probe-20260907 [build failed]
+FAIL
