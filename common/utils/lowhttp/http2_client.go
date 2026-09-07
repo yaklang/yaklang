@@ -677,7 +677,7 @@ func (cs *http2ClientStream) doRequest() error {
 	closed := cs.h2Conn.closed
 	cs.h2Conn.mu.Unlock()
 	if closed {
-		return utils.Error("h2 connection already closed")
+		return CreateStreamAfterGoAwayErr // no request bytes have been written
 	}
 
 	fr := cs.h2Conn.fr
@@ -779,7 +779,7 @@ func (cs *http2ClientStream) doRequest() error {
 	cs.h2Conn.mu.Unlock()
 	if closed {
 		cs.h2Conn.frWriteMutex.Unlock()
-		return utils.Error("h2 connection closed during write")
+		return CreateStreamAfterGoAwayErr // still before stream registration or HEADERS
 	}
 	if readGoAway || atomic.LoadUint32(&cs.h2Conn.currentStreamID) > (1<<31)-1 {
 		cs.h2Conn.frWriteMutex.Unlock()
