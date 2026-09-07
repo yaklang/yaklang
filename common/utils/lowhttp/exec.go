@@ -916,10 +916,7 @@ RECONNECT:
 			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
 			if err != nil {
 				if err == CreateStreamAfterGoAwayErr {
-					// Close first, then decide: the connection is unusable
-					// either way, and running out of reconnects must not leave
-					// it in the pool.
-					pc.closeConn(err) // close old connection to avoid goroutine leak
+					h2Conn.retire()
 					if canReconnect(err) {
 						goto RECONNECT
 					}
@@ -930,33 +927,23 @@ RECONNECT:
 				h2Stream.abort()
 				return nil, ctxErr
 			}
-
 			currentRPS.Add(1)
-			if err := h2Stream.doRequest(); err != nil {
+			serverStart := time.Now()
+			h2Stream.SetReadFirstFrameCallback(func() { traceInfo.ServerTime = time.Since(serverStart) })
+			if err := h2Stream.doRequest(); err != nil && !errors.Is(err, errH2UploadAborted) {
 				h2Stream.abort()
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return nil, ctxErr
 				}
 				if err == CreateStreamAfterGoAwayErr {
-					pc.closeConn(err)
+					h2Conn.retire()
 					if canReconnect(err) {
 						goto RECONNECT
 					}
-					return nil, err
 				}
-				if h2Stream.ID <= 1 { // first stream or ID not yet assigned
-					return nil, err
-				}
-				pc.closeConn(err) // close old connection to avoid goroutine leak
-				if canReconnect(err) {
-					goto RECONNECT
-				}
+				// A partially written upload may already have been processed.
 				return nil, err
 			}
-			serverStart := time.Now()
-			h2Stream.SetReadFirstFrameCallback(func() {
-				traceInfo.ServerTime = time.Now().Sub(serverStart)
-			})
 
 			resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
 			_ = resp
@@ -964,8 +951,9 @@ RECONNECT:
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return nil, ctxErr
 				}
-				if conn.(*persistConn).shouldRetryRequest(err) {
-					pc.closeConn(err) // close old connection to avoid goroutine leak
+				if h2RequestCanRetry(reqIns, err) && (option.bodyStreamReaderHandled == nil || !option.bodyStreamReaderHandled.IsSet()) {
+					// REFUSED_STREAM/GOAWAY rejected only this stream. Other accepted
+					// streams are still allowed to finish on the shared connection.
 					if canReconnect(err) {
 						goto RECONNECT
 					}
