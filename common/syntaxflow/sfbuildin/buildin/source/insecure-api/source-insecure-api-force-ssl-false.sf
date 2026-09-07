@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Force Ssl False"
-	title_zh: "Force Ssl False"
+	title: "检测到强制 HTTPS 被关闭"
+	title_zh: "检测到强制 HTTPS 被关闭"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-force-ssl-false"
 	risk: "insecure-tls"
 	desc: <<<DESC
 ### 规则说明
-Checks for configuration setting of force_ssl to false. Force_ssl forces usage of HTTPS, which could lead to network interception of unencrypted application traffic. To fix, set config.force_ssl = true.
+该规则用于检测 强制 HTTPS 被关闭 相关的风险模式，属于 不安全的 TLS 配置 类问题。
 
 ### 风险类型
 不安全的 TLS 配置（insecure-tls）
@@ -18,20 +18,14 @@ Checks for configuration setting of force_ssl to false. Force_ssl forces usage o
 使用旧版 TLS/SSL 或关闭强制 HTTPS，通信可能被降级或窃听。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-311: Missing Encryption of Sensitive Data
+- CWE-311
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 启用 TLS 1.2+，强制 HTTPS，并关闭不安全的协议版本。
-
-推荐修复：
-To fix, set config.force_ssl = true.
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*.rb}.pattern_regex(/(?:config\.force_ssl\s+=\s+false)/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Force Ssl False",
-	title_zh: "Force Ssl False",
-	message: "Force Ssl False detected.",
+	title: "检测到强制 HTTPS 被关闭",
+	title_zh: "检测到强制 HTTPS 被关闭",
+	message: "检测到强制 HTTPS 被关闭",
 }

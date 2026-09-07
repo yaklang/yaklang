@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Use of MD5 in Clojure"
+	title: "Clojure 中使用 MD5"
 	title_zh: "Clojure 中使用 MD5"
 	type: vuln
 	level: middle
@@ -9,7 +9,7 @@ desc(
 	risk: "weak-hash"
 	desc: <<<DESC
 ### 规则说明
-MD5 hash algorithm detected. This is not collision resistant and leads to easily-cracked password hashes. Replace with current recommended hashing algorithms.
+该规则用于检测 Clojure 中使用 MD5 相关的风险模式，属于 弱哈希算法 类问题。
 
 ### 风险类型
 弱哈希算法（weak-hash）
@@ -18,20 +18,14 @@ MD5 hash algorithm detected. This is not collision resistant and leads to easily
 使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-328: Use of Weak Hash
+- CWE-328
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 改用 SHA-256/SHA-3 或针对口令使用 bcrypt/Argon2 等专用算法。
-
-推荐修复：
-Replace with current recommended hashing algorithms.
 SOLUTION
 	alert_min: 1
 	"file://pos.clj": <<<POS
@@ -48,7 +42,7 @@ ${*.cljc}.pattern_regex(/(?:\(MessageDigest\/getInstance\s+"MD5"\))|(?:\(Message
 $p0 + $p1 + $p2 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Use of MD5 in Clojure",
+	title: "Clojure 中使用 MD5",
 	title_zh: "Clojure 中使用 MD5",
-	message: "Use of MD5 detected.",
+	message: "Clojure 中使用 MD5",
 }

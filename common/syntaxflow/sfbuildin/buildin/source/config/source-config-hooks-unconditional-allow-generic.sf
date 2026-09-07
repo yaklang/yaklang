@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Hooks Unconditional Allow Generic"
-	title_zh: "检测到Hooks Unconditional Allow Generic",
+	title: "检测到 Hooks 配置无条件放行"
+	title_zh: "检测到 Hooks 配置无条件放行",
 	type: vuln
 	level: critical
 	rule_id: "source-config-hooks-unconditional-allow-generic"
 	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
-Hook unconditionally allows tool execution by outputting a permissionDecision of "allow" without any conditional check. This bypasses the entire permission system. Add a conditional check to validate the tool or command before allowing.
+该规则用于检测 Hooks 配置无条件放行 相关的风险模式，属于 授权绕过 类问题。
 
 ### 风险类型
 授权绕过（authorization-bypass）
@@ -18,10 +18,10 @@ Hook unconditionally allows tool execution by outputting a permissionDecision of
 访问控制检查缺失或可被绕过，攻击者可访问未授权资源。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-862: Missing Authorization
+- CWE-862
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -45,7 +45,7 @@ ${*.py}.pattern_regex(/permissionDecision.*allow/) as $p2
 $p0 + $p1 + $p2 as $hit
 alert $hit for {
 	level: "critical",
-	title: "Hooks Unconditional Allow Generic",
-	title_zh: "检测到Hooks Unconditional Allow Generic",
-	message: "Hooks Unconditional Allow Generic",
+	title: "检测到 Hooks 配置无条件放行",
+	title_zh: "检测到 Hooks 配置无条件放行",
+	message: "检测到 Hooks 配置无条件放行",
 }

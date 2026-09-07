@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "S3 Public RW Bucket"
-	title_zh: "S3 Public RW Bucket"
+	title: "检测到 S3 存储桶公开读写"
+	title_zh: "检测到 S3 存储桶公开读写"
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-s3-public-rw-bucket"
 	risk: "access-control"
 	desc: <<<DESC
 ### 规则说明
-S3 bucket with public read-write access detected.
+该规则用于检测 S3 存储桶公开读写 相关的风险模式，属于 访问控制缺陷 类问题。
 
 ### 风险类型
 访问控制缺陷（access-control）
@@ -18,13 +18,10 @@ S3 bucket with public read-write access detected.
 资源或接口的访问权限设置不当，可能允许越权访问。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
+- CWE-200
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +39,7 @@ NEG
 ${*.tf}.pattern_regex(/(?:acl\s+=\s+"public\-read\-write")/) as $hit
 alert $hit for {
 	level: "high",
-	title: "S3 Public RW Bucket",
-	title_zh: "S3 Public RW Bucket",
-	message: "S3 Public RW Bucket detected.",
+	title: "检测到 S3 存储桶公开读写",
+	title_zh: "检测到 S3 存储桶公开读写",
+	message: "检测到 S3 存储桶公开读写",
 }

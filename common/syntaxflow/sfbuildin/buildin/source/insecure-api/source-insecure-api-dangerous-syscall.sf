@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Dangerous Syscall"
-	title_zh: "Dangerous Syscall"
+	title: "检测到危险的 syscall 调用"
+	title_zh: "检测到危险的 syscall 调用"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-dangerous-syscall"
 	risk: "unsafe-implementation"
 	desc: <<<DESC
 ### 规则说明
-'syscall' is essentially unsafe and unportable. The DL (https://apidock.com/ruby/Fiddle) library is preferred for safer and a bit more portable programming.
+该规则用于检测 危险的 syscall 调用 相关的风险模式，属于 不安全实现 类问题。
 
 ### 风险类型
 不安全实现（unsafe-implementation）
@@ -18,13 +18,10 @@ desc(
 使用了不安全或不稳定的底层调用，可能引入内存安全或逻辑风险。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')
+- CWE-94
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +39,7 @@ NEG
 ${*.rb}.pattern_regex(/(?:syscall)/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Dangerous Syscall",
-	title_zh: "Dangerous Syscall",
-	message: "Dangerous Syscall detected.",
+	title: "检测到危险的 syscall 调用",
+	title_zh: "检测到危险的 syscall 调用",
+	message: "检测到危险的 syscall 调用",
 }

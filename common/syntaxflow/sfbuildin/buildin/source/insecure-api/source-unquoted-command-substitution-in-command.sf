@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Unquoted Command Substitution In Command"
+	title: "检测到命令中未加引号的命令替换"
 	title_zh: "检测到命令中未加引号的命令替换",
 	type: vuln
 	level: middle
@@ -9,7 +9,7 @@ desc(
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
 ### 规则说明
-The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable. You should surround it with double quotes to avoid splitting the result.
+该规则用于检测 命令中未加引号的命令替换 相关的风险模式，属于 不安全的 Shell 展开 类问题。
 
 ### 风险类型
 不安全的 Shell 展开（unsafe-shell-expansion）
@@ -18,13 +18,7 @@ The result of command substitution $(...) or `...`, if unquoted, is split on whi
 未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: context-aware regex — `$(...)` / backtick substitution hits are dropped inside double-quoted regions (pattern-not-inside) and excluded when preceded by `=` (assignment) or `$((` (arithmetic).
-
-### 参考
-- CWE: -
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -55,7 +49,7 @@ $q_sh + $q_bash as $q
 $t not_inside $q as $hit
 alert $hit for {
 	level: "middle",
-	title: "Unquoted Command Substitution In Command",
+	title: "检测到命令中未加引号的命令替换",
 	title_zh: "检测到命令中未加引号的命令替换",
-	message: "The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable.",
+	message: "检测到命令中未加引号的命令替换",
 }

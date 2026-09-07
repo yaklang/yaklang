@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Autoescape Disabled"
-	title_zh: "检测到Autoescape Disabled",
+	title: "检测到自动转义被禁用"
+	title_zh: "检测到自动转义被禁用",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-autoescape-disabled"
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-Detected an element with disabled HTML escaping. If external data can reach this, this is a cross-site scripting (XSS) vulnerability. Ensure no external data can reach here, or remove 'escape=false' from this element.
+该规则用于检测 自动转义被禁用 相关的风险模式，属于 跨站脚本（XSS） 类问题。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -18,13 +18,10 @@ Detected an element with disabled HTML escaping. If external data can reach this
 未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-False-positive hardening: match only escape=false (not escape=true ... parse=false).
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-150: Improper Neutralization of Escape, Meta, or Control Sequences
+- CWE-150
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -45,7 +42,7 @@ ${*.xhtml}.pattern_regex(/(?i)\bescape\s*=\s*["']?false["']?/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Autoescape Disabled",
-	title_zh: "检测到Autoescape Disabled",
-	message: "Autoescape Disabled",
+	title: "检测到自动转义被禁用",
+	title_zh: "检测到自动转义被禁用",
+	message: "检测到自动转义被禁用",
 }

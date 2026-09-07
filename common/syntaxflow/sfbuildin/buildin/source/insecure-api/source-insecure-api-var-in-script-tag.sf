@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Var In Script Tag"
-	title_zh: "检测到Var In Script Tag",
+	title: "检测到 script 标签中的变量"
+	title_zh: "检测到 script 标签中的变量",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-var-in-script-tag"
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-Detected a template variable used in a script tag. Although template variables are HTML escaped, HTML escaping does not always prevent cross-site scripting (XSS) attacks when used directly in JavaScript. If you need this data on the rendered page, consider placing it in the HTML portion (outside of a script tag). Alternatively, use a JavaScript-specific encoder, such as the one available in OWASP ESAPI.
+该规则用于检测 script 标签中的变量 相关的风险模式，属于 跨站脚本（XSS） 类问题。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -18,10 +18,10 @@ Detected a template variable used in a script tag. Although template variables a
 未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+- CWE-79
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -50,7 +50,7 @@ ${*.pug}.pattern_regex(/script\(.*?\)\s*=\s*[^'"]+\+.*/) as $p5
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Var In Script Tag",
-	title_zh: "检测到Var In Script Tag",
-	message: "Var In Script Tag",
+	title: "检测到 script 标签中的变量",
+	title_zh: "检测到 script 标签中的变量",
+	message: "检测到 script 标签中的变量",
 }

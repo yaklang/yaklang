@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Hooks Stop Missing Active Check Generic"
-	title_zh: "检测到Hooks Stop Missing Active Check Generic",
+	title: "检测到 Hooks 配置缺少停止活动检查"
+	title_zh: "检测到 Hooks 配置缺少停止活动检查",
 	type: vuln
 	level: middle
 	rule_id: "source-config-hooks-stop-missing-active-check-generic"
 	risk: "denial-of-service"
 	desc: <<<DESC
 ### 规则说明
-Stop hook outputs a "block" decision. Ensure you check stop_hook_active first and exit 0 if true, otherwise the hook will cause an infinite loop by blocking its own stop attempts.
+该规则用于检测 Hooks 配置缺少停止活动检查 相关的风险模式，属于 拒绝服务 类问题。
 
 ### 风险类型
 拒绝服务（denial-of-service）
@@ -18,10 +18,10 @@ Stop hook outputs a "block" decision. Ensure you check stop_hook_active first an
 资源消耗或异常处理不当，可能被利用导致服务不可用。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-835: Loop with Unreachable Exit Condition
+- CWE-835
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -44,7 +44,7 @@ ${*.bash}.pattern_regex(/"decision".*"block"/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Hooks Stop Missing Active Check Generic",
-	title_zh: "检测到Hooks Stop Missing Active Check Generic",
-	message: "Hooks Stop Missing Active Check Generic",
+	title: "检测到 Hooks 配置缺少停止活动检查",
+	title_zh: "检测到 Hooks 配置缺少停止活动检查",
+	message: "检测到 Hooks 配置缺少停止活动检查",
 }

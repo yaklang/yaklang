@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Skill Md Prompt Injection Generic"
-	title_zh: "检测到Skill Md Prompt Injection Generic",
+	title: "检测到 Skill 文档存在提示注入"
+	title_zh: "检测到 Skill 文档存在提示注入",
 	type: vuln
 	level: critical
 	rule_id: "source-config-skill-md-prompt-injection-generic"
 	risk: "prompt-injection"
 	desc: <<<DESC
 ### 规则说明
-SKILL.md or AGENT.md frontmatter description contains prompt-injection markers that may override agent behavior. Phrases like "ignore previous instructions", "system: you are", or "<IMPORTANT>" inside a skill description are read as authoritative instructions by agents that load the skill, bypassing the user's intent. Remove the override directive from the description, or move authoritative system text out of the shared skill manifest.
+该规则用于检测 Skill 文档存在提示注入 相关的风险模式，属于 提示词注入 类问题。
 
 ### 风险类型
 提示词注入（prompt-injection）
@@ -18,10 +18,10 @@ SKILL.md or AGENT.md frontmatter description contains prompt-injection markers t
 外部内容可能覆盖或篡改系统提示，导致模型执行非预期指令。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-94: Improper Control of Generation of Code
+- CWE-94
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -66,7 +66,7 @@ ${*skill.md}.pattern_regex(/(?si)description\s*:\s*[|>][^\n]*(?:\n[ \t]+[^\n]*){
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 + $p13 + $p14 + $p15 + $p16 + $p17 + $p18 + $p19 as $hit
 alert $hit for {
 	level: "critical",
-	title: "Skill Md Prompt Injection Generic",
-	title_zh: "检测到Skill Md Prompt Injection Generic",
-	message: "Skill Md Prompt Injection Generic",
+	title: "检测到 Skill 文档存在提示注入",
+	title_zh: "检测到 Skill 文档存在提示注入",
+	message: "检测到 Skill 文档存在提示注入",
 }

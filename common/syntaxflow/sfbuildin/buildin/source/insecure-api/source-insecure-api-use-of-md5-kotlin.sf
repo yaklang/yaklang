@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Use of MD5 in Kotlin"
+	title: "Kotlin 中使用 MD5"
 	title_zh: "Kotlin 中使用 MD5"
 	type: vuln
 	level: middle
@@ -9,7 +9,7 @@ desc(
 	risk: "weak-hash"
 	desc: <<<DESC
 ### 规则说明
-Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.
+该规则用于检测 Kotlin 中使用 MD5 相关的风险模式，属于 弱哈希算法 类问题。
 
 ### 风险类型
 弱哈希算法（weak-hash）
@@ -18,20 +18,14 @@ Detected MD5 hash algorithm which is considered insecure. MD5 is not collision r
 使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-328: Use of Weak Hash
+- CWE-328
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 改用 SHA-256/SHA-3 或针对口令使用 bcrypt/Argon2 等专用算法。
-
-推荐修复：
-Use SHA256 or SHA3 instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.kt": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*.kt}.pattern_regex(/(?:java\.security\.MessageDigest\.getInstance\("MD5"\))|(?:org\.apache\.commons\.codec\.digest\.DigestUtils\.getMd5Digest\(\))/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Use of MD5 in Kotlin",
+	title: "Kotlin 中使用 MD5",
 	title_zh: "Kotlin 中使用 MD5",
-	message: "Use of MD5 detected.",
+	message: "Kotlin 中使用 MD5",
 }

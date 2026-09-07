@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Google Maps APIkeyleak"
-	title_zh: "检测到Google Maps APIkeyleak",
+	title: "检测到 Google Maps API 密钥泄露"
+	title_zh: "检测到 Google Maps API 密钥泄露",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-google-maps-apikeyleak"
 	risk: "hardcoded-credentials"
 	desc: <<<DESC
 ### 规则说明
-Detects potential Google Maps API keys in code
+该规则用于检测 Google Maps API 密钥泄露 相关的风险模式，属于 硬编码凭据 类问题。
 
 ### 风险类型
 硬编码凭据（hardcoded-credentials）
@@ -18,10 +18,10 @@ Detects potential Google Maps API keys in code
 代码中直接写入账号、令牌等敏感凭据，泄露后攻击者可直接使用这些凭据访问系统或服务。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-538: Insertion of Sensitive Information into Externally-Accessible File or Directory
+- CWE-538
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +42,7 @@ ${*}.pattern_regex(/(?:^(AIza[0-9A-Za-z_-]{35}(?!\S))$)|YAKLANG_SF_POS_source\-i
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Google Maps APIkeyleak",
-	title_zh: "检测到Google Maps APIkeyleak",
-	message: "Google Maps APIkeyleak",
+	title: "检测到 Google Maps API 密钥泄露",
+	title_zh: "检测到 Google Maps API 密钥泄露",
+	message: "检测到 Google Maps API 密钥泄露",
 }

@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "No Bidi Characters"
-	title_zh: "检测到No Bidi Characters",
+	title: "检测到双向控制字符"
+	title_zh: "检测到双向控制字符",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-no-bidi-characters"
 	risk: "unicode-direction-control"
 	desc: <<<DESC
 ### 规则说明
-The code must not contain any of Unicode Direction Control Characters
+该规则用于检测 双向控制字符 相关的风险模式，属于 Unicode 双向控制字符 类问题。
 
 ### 风险类型
 Unicode 双向控制字符（unicode-direction-control）
@@ -18,10 +18,10 @@ Unicode 双向控制字符（unicode-direction-control）
 源码中隐藏双向控制字符，可能使显示内容与真实执行逻辑不一致，形成混淆攻击。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-837: Improper Enforcement of a Single, Unique Action
+- CWE-837
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -51,7 +51,7 @@ ${*.sol}.pattern_regex(/⁩/) as $p8
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 as $hit
 alert $hit for {
 	level: "middle",
-	title: "No Bidi Characters",
-	title_zh: "检测到No Bidi Characters",
-	message: "No Bidi Characters",
+	title: "检测到双向控制字符",
+	title_zh: "检测到双向控制字符",
+	message: "检测到双向控制字符",
 }

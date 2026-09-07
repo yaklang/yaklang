@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Use Defused Xmlrpc"
-	title_zh: "Use Defused Xmlrpc"
+	title: "检测到未使用 defusedxmlrpc"
+	title_zh: "检测到未使用 defusedxmlrpc"
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-use-defused-xmlrpc"
 	risk: "xxe"
 	desc: <<<DESC
 ### 规则说明
-Detected use of xmlrpc. xmlrpc is not inherently safe from vulnerabilities. Use defusedxml.xmlrpc instead.
+该规则用于检测 未使用 defusedxmlrpc 相关的风险模式，属于 XML 外部实体注入（XXE） 类问题。
 
 ### 风险类型
 XML 外部实体注入（XXE）（xxe）
@@ -18,20 +18,14 @@ XML 外部实体注入（XXE）（xxe）
 解析不可信 XML 时允许外部实体，可能读取本地文件或发起 SSRF。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-776: Improper Restriction of Recursive Entity References in DTDs ('XML Entity Expansion')
+- CWE-776
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 禁用外部实体和 DTD，使用安全的 XML 解析配置。
-
-推荐修复：
-Use defusedxml.xmlrpc instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*.py}.pattern_regex(/(?:import\s+xmlrpclib)|(?:import\s+SimpleXMLRPCServer)|(?:import\s+xmlrpc)/) as $hit
 alert $hit for {
 	level: "high",
-	title: "Use Defused Xmlrpc",
-	title_zh: "Use Defused Xmlrpc",
-	message: "Use Defused Xmlrpc detected.",
+	title: "检测到未使用 defusedxmlrpc",
+	title_zh: "检测到未使用 defusedxmlrpc",
+	message: "检测到未使用 defusedxmlrpc",
 }

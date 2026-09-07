@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Rails Skip Forgery Protection"
-	title_zh: "Rails Skip Forgery Protection"
+	title: "检测到 Rails 跳过 CSRF 防护"
+	title_zh: "检测到 Rails 跳过 CSRF 防护"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-rails-skip-forgery-protection"
 	risk: "csrf"
 	desc: <<<DESC
 ### 规则说明
-This call turns off CSRF protection allowing CSRF attacks against the application
+该规则用于检测 Rails 跳过 CSRF 防护 相关的风险模式，属于 跨站请求伪造 类问题。
 
 ### 风险类型
 跨站请求伪造（csrf）
@@ -18,13 +18,10 @@ This call turns off CSRF protection allowing CSRF attacks against the applicatio
 缺少 CSRF 防护时，攻击者可诱导用户执行非预期操作。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-352: Cross-Site Request Forgery (CSRF)
+- CWE-352
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +39,7 @@ NEG
 ${*.rb}.pattern_regex(/(?:skip_forgery_protection)/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Rails Skip Forgery Protection",
-	title_zh: "Rails Skip Forgery Protection",
-	message: "Rails Skip Forgery Protection detected.",
+	title: "检测到 Rails 跳过 CSRF 防护",
+	title_zh: "检测到 Rails 跳过 CSRF 防护",
+	message: "检测到 Rails 跳过 CSRF 防护",
 }

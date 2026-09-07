@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Var In Href"
-	title_zh: "检测到Var In Href",
+	title: "检测到 href 属性中的变量"
+	title_zh: "检测到 href 属性中的变量",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-var-in-href"
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-Detected a template variable used in an anchor tag with the 'href' attribute. This allows a malicious actor to input the 'javascript:' URI and is subject to cross- site scripting (XSS) attacks. If using a relative URL, start with a literal forward slash and concatenate the URL, like this: href='/<%= link %>'. You may also consider setting the Content Security Policy (CSP) header.
+该规则用于检测 href 属性中的变量 相关的风险模式，属于 跨站脚本（XSS） 类问题。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -18,10 +18,10 @@ Detected a template variable used in an anchor tag with the 'href' attribute. Th
 未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+- CWE-79
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -46,7 +46,7 @@ ${*.html}.pattern_regex(/<a.*href\s*=[^>]*?[^\/&=]<%.*?%>.*?>/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Var In Href",
-	title_zh: "检测到Var In Href",
-	message: "Var In Href",
+	title: "检测到 href 属性中的变量",
+	title_zh: "检测到 href 属性中的变量",
+	message: "检测到 href 属性中的变量",
 }

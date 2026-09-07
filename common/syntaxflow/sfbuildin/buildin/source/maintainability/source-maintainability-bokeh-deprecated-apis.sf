@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Bokeh Deprecated Apis"
-	title_zh: "Bokeh Deprecated Apis"
+	title: "检测到已废弃的 Bokeh API"
+	title_zh: "检测到已废弃的 Bokeh API"
 	type: maintainability
 	level: middle
 	rule_id: "source-maintainability-bokeh-deprecated-apis"
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-These APIs are deprecated in Bokeh see https://docs.bokeh.org/en/latest/docs/releases.html#api-deprecations
+该规则用于检测 已废弃的 Bokeh API 相关的风险模式，属于 代码规范与兼容性 类问题。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -18,10 +18,7 @@ These APIs are deprecated in Bokeh see https://docs.bokeh.org/en/latest/docs/rel
 使用了已废弃、不兼容或不符合规范的模式，可能导致后续维护困难或运行环境差异。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -39,7 +36,7 @@ NEG
 ${*.py}.pattern_regex(/(?:import\s+bokeh\.layouts\.widgetbox)|(?:import\s+bokeh\.models\.graphs\.from_networkx)/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Bokeh Deprecated Apis",
-	title_zh: "Bokeh Deprecated Apis",
-	message: "Bokeh Deprecated Apis detected.",
+	title: "检测到已废弃的 Bokeh API",
+	title_zh: "检测到已废弃的 Bokeh API",
+	message: "检测到已废弃的 Bokeh API",
 }

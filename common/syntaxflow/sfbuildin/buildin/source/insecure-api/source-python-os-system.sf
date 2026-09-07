@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "Detect Python os.system Usage"
+	title: "检测 Python os.system 调用"
 	title_zh: "检测 Python os.system 调用",
 	type: vuln
 	level: high
@@ -9,7 +9,7 @@ desc(
 	risk: "command-injection"
 	desc: <<<DESC
 ### 规则说明
-检测 Detect Python os.system Usage 相关的风险模式。
+该规则用于检测 Python os.system 调用 相关的风险模式，属于 命令注入 类问题。
 
 ### 风险类型
 命令注入（command-injection）
@@ -18,7 +18,7 @@ desc(
 用户输入未经安全处理即拼接到系统命令中，可能导致任意命令执行。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -38,7 +38,7 @@ NEG
 ${*.py}.pattern_regex(/\bos\.system\s*\(/) as $hit
 alert $hit for {
 	level: "high",
-	title: "Python os.system()",
-	title_zh: "Python os.system()",
-	message: "os.system() call detected",
+	title: "检测 Python os.system 调用",
+	title_zh: "检测 Python os.system 调用",
+	message: "检测 Python os.system 调用",
 }

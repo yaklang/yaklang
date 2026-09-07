@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "JavaScript Debugger"
-	title_zh: "JavaScript Debugger"
+	title: "检测到 JavaScript 调试器残留"
+	title_zh: "检测到 JavaScript 调试器残留"
 	type: audit
 	level: middle
 	rule_id: "source-best-practice-javascript-debugger"
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-found debugger call; should this be in production code?
+该规则用于检测 JavaScript 调试器残留 相关的风险模式，属于 最佳实践 类问题。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -18,10 +18,7 @@ found debugger call; should this be in production code?
 代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -41,7 +38,7 @@ ${*.ts}.pattern_regex(/(?:debugger;)/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "JavaScript Debugger",
-	title_zh: "JavaScript Debugger",
-	message: "JavaScript Debugger detected.",
+	title: "检测到 JavaScript 调试器残留",
+	title_zh: "检测到 JavaScript 调试器残留",
+	message: "检测到 JavaScript 调试器残留",
 }

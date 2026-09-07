@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Ocamllint Digest"
-	title_zh: "Ocamllint Digest"
+	title: "检测到 OCaml 弱哈希 Digest 使用"
+	title_zh: "检测到 OCaml 弱哈希 Digest 使用"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-ocamllint-digest"
 	risk: "weak-hash"
 	desc: <<<DESC
 ### 规则说明
-Digest uses MD5 and should not be used for security purposes. Consider using SHA256 instead.
+该规则用于检测 OCaml 弱哈希 Digest 使用 相关的风险模式，属于 弱哈希算法 类问题。
 
 ### 风险类型
 弱哈希算法（weak-hash）
@@ -18,20 +18,14 @@ Digest uses MD5 and should not be used for security purposes. Consider using SHA
 使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-328: Use of Weak Hash (4.12)
+- CWE-328
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 改用 SHA-256/SHA-3 或针对口令使用 bcrypt/Argon2 等专用算法。
-
-推荐修复：
-Consider using SHA256 instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS
@@ -47,7 +41,7 @@ ${*.mli}.pattern_regex(/(?:Digest\.string)|(?:Digest\.bytes)|(?:Digest\.substrin
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Ocamllint Digest",
-	title_zh: "Ocamllint Digest",
-	message: "Ocamllint Digest detected.",
+	title: "检测到 OCaml 弱哈希 Digest 使用",
+	title_zh: "检测到 OCaml 弱哈希 Digest 使用",
+	message: "检测到 OCaml 弱哈希 Digest 使用",
 }

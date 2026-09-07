@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Avoid Default Routes"
-	title_zh: "Avoid Default Routes"
+	title: "检测到默认路由配置"
+	title_zh: "检测到默认路由配置"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-avoid-default-routes"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-Default routes are enabled in this routes file. This means any public method on a controller can be called as an action. It is very easy to accidentally expose a method you didn't mean to. Instead, remove this line and explicitly include all routes you intend external users to follow.
+该规则用于检测 默认路由配置 相关的风险模式，属于 安全配置不当 类问题。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -18,20 +18,14 @@ Default routes are enabled in this routes file. This means any public method on 
 安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-276: Incorrect Default Permissions
+- CWE-276
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
-
-推荐修复：
-Instead, remove this line and explicitly include all routes you intend external users to follow.
 SOLUTION
 	alert_min: 1
 	"file://routes.rb": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*routes.rb}.pattern_regex(/(?:map\.connect\s+":controller\/:action\/:id")|(?:match\s+':controller\(\/:action\(\/:id\(\.:format\)\)\)')/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Avoid Default Routes",
-	title_zh: "Avoid Default Routes",
-	message: "Avoid Default Routes detected.",
+	title: "检测到默认路由配置",
+	title_zh: "检测到默认路由配置",
+	message: "检测到默认路由配置",
 }
