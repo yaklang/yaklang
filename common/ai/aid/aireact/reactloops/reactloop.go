@@ -1237,12 +1237,13 @@ func (r *ReActLoop) GetLastLoopSchema() string {
 }
 
 // Keep server-signed Focus actions, while removing process-global capability
-// loading, Forge, file, network, MCP and child-agent actions. Tool actions only
+// loading, Forge, file, network and MCP actions. Child agents inherit the same
+// runtime and finite tool manager. Tool actions only
 // resolve objects from the separately enforced finite tool manager.
 func restrictManagedInputActions(loop *ReActLoop) {
 	for _, name := range GetRegisteredActionNames() {
 		switch name {
-		case "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch":
+		case "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch", "dispatch_sub_react_agents":
 		default:
 			loop.RemoveAction(name)
 		}
