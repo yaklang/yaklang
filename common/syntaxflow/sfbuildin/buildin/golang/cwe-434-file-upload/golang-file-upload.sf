@@ -200,6 +200,62 @@ DESC
 
 alert $uploadLow for {
 	solution: <<<SOLUTION
+### 修复建议
+#### 1. 严格验证文件名和路径
+使用 `filepath.Base()` 获取文件名，丢弃路径信息，然后将其安全地拼接到目标上传目录中。同时，验证生成的最终路径是否仍然在预期的上传目录下，防止路径穿越。
+```go
+package main
+
+import (
+"fmt"
+"io"
+"net/http"
+"os"
+"path/filepath"
+"strings"
+)
+
+func main() {
+http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+file, handler, err := r.FormFile("file")
+if err != nil {
+http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+return
+}
+defer file.Close()
+
+// 验证文件路径
+const uploadDir = "/var/www/uploads"
+safeFilename := filepath.Base(handler.Filename) // 仅获取文件名
+safePath := filepath.Join(uploadDir, safeFilename)
+
+// 检查最终路径是否在上传目录下
+if !strings.HasPrefix(safePath, uploadDir) {
+http.Error(w, "Invalid file path", http.StatusBadRequest)
+return
+}
+
+// 保存文件
+dst, err := os.Create(safePath)
+if err != nil {
+http.Error(w, "Error creating the file", http.StatusInternalServerError)
+return
+}
+defer dst.Close()
+
+io.Copy(dst, file)
+fmt.Fprintf(w, "File uploaded successfully")
+})
+}
+```
+#### 2. 限制文件类型和大小
+- **文件类型**: 仅允许上传已知安全的类型，例如图片（JPEG, PNG）、PDF等。依靠文件扩展名是不安全的，因为MIME类型或文件内容可以被伪造。应结合检查文件头部（Magic Bytes）来确定实际文件类型。
+- **文件大小**: 设置最大上传文件大小限制，防止拒绝服务攻击。
+#### 3. 对上传文件进行安全扫描
+在文件保存后，使用杀毒软件或安全扫描工具对文件进行检查，确保不含有恶意代码。
+#### 4. 将文件上传到隔离区域
+将用户上传的文件保存在与Web服务器隔离的区域，避免直接通过Web访问执行。
+### 5. Upload helper 统一防护建议
 如果项目通过统一的 `Upload(...)` 或类似 helper 处理文件上传，应在 helper 内统一验证文件名、MIME、扩展名、大小和目标存储位置，避免把 `multipart.FileHeader.Filename` 直接透传到底层存储逻辑。
 SOLUTION
 	desc: <<<DESC
@@ -210,7 +266,7 @@ DESC
 	type: "vuln",
 	title: "Unvalidated Uploaded Filename Reaches Upload Helper",
 	title_zh: "检测到未校验的上传文件名进入上传辅助函数",
-	risk: "文件上传",
+	risk: "file-upload",
 	name: "low",
 	message: "检测到上传文件名直接进入上传辅助函数，需进一步确认是否存在类型、路径或存储位置校验。",
 }
@@ -220,7 +276,7 @@ alert $uploadLowDirect for {
 	title_zh: "检测到未校验的上传文件名进入上传辅助函数",
 	level: "low",
 	type: "vuln",
-	risk: "文件上传",
+	risk: "file-upload",
 	name: "low",
 	message: "检测到上传文件名直接进入上传辅助函数，需进一步确认是否存在类型、路径或存储位置校验。",
 	desc: <<<DESC
