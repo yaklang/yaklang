@@ -68,3 +68,38 @@ func TestManagedInputSearchContinuation(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedInputSearchByteBudget(t *testing.T) {
+	const budget = 64 << 10
+	needle := "needle-across-page"
+	content := strings.Repeat("x", budget-3) + needle + "\n" + strings.Repeat("x", budget)
+	command := managedInputBindFixture(t, "log_analysis", content)
+	options := inputBindOptionsFixture(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { fmt.Fprint(w, content) }))
+	driver := &recordingAISessionRuntimeDriver{}
+	manager := newAISessionRuntimeManager(driver)
+	if _, err := manager.Bind(context.Background(), command, nil, options); err != nil {
+		t.Fatal(err)
+	}
+	defer driver.bindings[0].InputWorkspace.Cleanup()
+	runtime := driver.bindings[0].LegionResultRuntime.(*legionServerFocusRuntime)
+	if err := runtime.activateFocusTurn(command.ResultContext.FocusReleaseId, inputExecutionContract("source.search")); err != nil {
+		t.Fatal(err)
+	}
+	path := command.InputManifest.Resources[0].RelativePath
+	first, err := runtime.Execute("source.search", map[string]any{"path": path, "query": needle, "case_sensitive": true, "max_scan_bytes": budget})
+	if err != nil || first["complete"] != false || first["count"] != 0 || first["scanned_bytes"] != int64(budget) {
+		t.Fatalf("scan budget ignored: %#v %v", first, err)
+	}
+	cursor := first["next_offset"].(int64)
+	if cursor <= 0 || cursor > budget-3 {
+		t.Fatalf("cross-page query overlap lost: %v", first)
+	}
+	second, err := runtime.Execute("source.search", map[string]any{"path": path, "query": needle, "case_sensitive": true, "offset": cursor, "max_scan_bytes": budget})
+	if err != nil {
+		t.Fatal(err)
+	}
+	matches := second["results"].([]map[string]any)
+	if len(matches) != 1 || matches[0]["byte_offset"] != int64(budget-3) {
+		t.Fatalf("cross-page match lost: %v", second)
+	}
+}
