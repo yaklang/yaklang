@@ -17,6 +17,7 @@ REFERENCE
 )
 
 <include('golang-file-path')> as $path;
+<include('golang-os-sink')> as $sink;
 
 strings.HasPrefix(* as $check);
 $path.Clean(* as $check);
@@ -25,17 +26,12 @@ $path.IsAbs(* as $check);
 $path.Rel(* as $check);
 securejoin.SecureJoin(* as $check);
 
-os.Stat(*<slice(index=0)> as $param);
-os.Remove(*<slice(index=0)> as $param);
-os.Open(*<slice(index=0)> as $param);
-os.OpenFile(*<slice(index=0)> as $param);
-
-$param #{include: `* & $check`}-> as $safe;
-$param #{
+$sink?{<getCall> #{ include: `* & $check` }->} as $safe;
+$sink?{<getCall> #{
 	include: `*?{have: ".Join"}`,
 	until: `*?{opcode:param}`,
-	exclude: `* & $safe`,
-}-> as $low;
+}->} as $all;
+$all - $safe as $low;
 
 alert $low for {
 	type: "vuln",

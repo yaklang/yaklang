@@ -87,6 +87,53 @@ func (c *Controller) createDir(parent string) error {
 	assert.Equal(t, 0, total, "普通用户输入流向文件系统操作不应被文件上传规则误报")
 }
 
+func TestGolangFileUploadRule_Positive_DirectWriteSink(t *testing.T) {
+	rule := loadGolangBuiltinRule(t, "golang/cwe-434-file-upload/golang-file-upload.sf")
+
+	total := runGolangBuiltinRule(t, rule, "upload_direct_write_positive.go", `
+package demo
+
+import (
+	"mime/multipart"
+	"os"
+)
+
+func save(h *multipart.FileHeader) error {
+	dst, err := os.Create(h.Filename)
+	if err != nil {
+		return err
+	}
+	return dst.Close()
+}
+`)
+
+	assert.Greater(t, total, 0, "未验证的上传文件名直接进入文件写入sink应触发告警")
+}
+
+func TestGolangFileUploadRule_Negative_SanitizedWriteSink(t *testing.T) {
+	rule := loadGolangBuiltinRule(t, "golang/cwe-434-file-upload/golang-file-upload.sf")
+
+	total := runGolangBuiltinRule(t, rule, "upload_sanitized_write_negative.go", `
+package demo
+
+import (
+	"mime/multipart"
+	"os"
+	"path/filepath"
+)
+
+func save(h *multipart.FileHeader) error {
+	dst, err := os.Create(filepath.Base(h.Filename))
+	if err != nil {
+		return err
+	}
+	return dst.Close()
+}
+`)
+
+	assert.Equal(t, 0, total, "经过filepath.Base约束的上传文件名不应触发告警")
+}
+
 func TestGolangBeegoORMFilterRule_Positive(t *testing.T) {
 	rule := loadGolangBuiltinRule(t, "golang/cwe-89-sql-injection/golang-beego-orm-filter-sql.sf")
 

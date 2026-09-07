@@ -106,6 +106,9 @@ REFERENCE
 )
 
 <include('golang-file-path')> as $path;
+<include('golang-os-sink')> as $sink;
+<include('golang-file-write-os')> as $sink;
+<include('golang-file-write-ioutil')> as $sink;
 
 strings.HasPrefix(* as $check);
 $path.Clean(* as $check);
@@ -116,16 +119,11 @@ path.Base(* as $check);
 http.DetectContentType(* as $check);
 mime.TypeByExtension(* as $check);
 
-os.Create(*<slice(index=0)> as $writeParam);
-os.OpenFile(*<slice(index=0)> as $writeParam);
-os.WriteFile(*<slice(index=0)> as $writeParam);
-ioutil.WriteFile(*<slice(index=0)> as $writeParam);
-
-$writeParam #{include: `* & $check`}-> as $safe;
-$writeParam #{
+$sink?{<getCall> #{ include: `* & $check` }->} as $safe;
+$sink?{<getCall> #{
 	until: `*?{have: ".Filename"}`,
-	exclude: `* & $safe`,
-}-> as $low;
+}->} as $all;
+$all - $safe as $low;
 
 *?{have: ".Upload"} #{
 	until: `*?{have: ".Filename"}`,
