@@ -96,7 +96,7 @@ func (s *configStore) compactGet(key string) (any, bool) {
 	if k == 1 {
 		return nil, true
 	}
-	return s.writes[s.positions[k]-1].value, true
+	return s.compactWrite(int(s.positions[k] - 1)).value, true
 }
 
 func (s *configStore) compactSet(key string, value any, replay bool, reserve int) bool {
@@ -104,7 +104,7 @@ func (s *configStore) compactSet(key string, value any, replay bool, reserve int
 		return false
 	}
 	k := compactConfigKey(key)
-	if k <= 1 || len(s.writes) >= 65534 {
+	if k <= 1 || s.compactWriteCount() >= 65534 {
 		return false
 	}
 	if s.writes == nil {
@@ -115,7 +115,7 @@ func (s *configStore) compactSet(key string, value any, replay bool, reserve int
 		s.order[s.orderLen] = k
 		s.orderLen++
 	}
-	s.positions[k] = uint16(len(s.writes))
+	s.positions[k] = uint16(s.compactWriteCount())
 	if replay {
 		s.historyCount++
 		if s.positions[1] == 0 {
@@ -144,14 +144,15 @@ func (s *configStore) expandLocked() {
 		var value any
 		if k == 1 {
 			journal := &configReplay{writes: make([]configEntry, 0, int(s.historyCount))}
-			for _, w := range s.writes {
+			for i := 0; i < s.compactWriteCount(); i++ {
+				w := s.compactWrite(i)
 				if w.replay {
 					journal.writes = append(journal.writes, configEntry{compactConfigKeys[w.key], w.value})
 				}
 			}
 			value = journal
 		} else {
-			value = s.writes[s.positions[k]-1].value
+			value = s.compactWrite(int(s.positions[k] - 1)).value
 		}
 		legacy.entries = append(legacy.entries, configEntry{compactConfigKeys[k], value})
 	}
@@ -163,6 +164,7 @@ func (s *configStore) expandLocked() {
 	}
 	s.configStoreLegacy = legacy
 	s.writes = nil
+	s.prefix = nil
 	s.positions = [32]uint16{}
 	s.order = [32]uint8{}
 	s.orderLen = 0

@@ -1,0 +1,5 @@
+--- FAIL: BenchmarkCurrentCorpusApplicationFields
+    protocol_corpus_current_benchmark_test.go:153: open testdata/protocol-corpus/manifest.json: no such file or directory
+--- FAIL: BenchmarkCurrentCorpusApplicationJSON
+    protocol_corpus_current_benchmark_test.go:153: open testdata/protocol-corpus/manifest.json: no such file or directory
+FAIL

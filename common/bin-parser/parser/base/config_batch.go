@@ -24,17 +24,24 @@ func NewConfigWithItems(parent *Config, items ...ConfigItem) *Config {
 	// Keep growth headroom: InitNode and caller state append more assignments
 	// after construction. Exact sizing caused another allocation immediately
 	// after many small configs, and enlarged the total allocated byte count.
+	skip, used := res.data.initializePrefix(inherited, count, items)
+	remaining := count + len(items)
+	if used {
+		remaining = len(items) - skip
+	}
 	capacity := 4
-	for capacity < count+len(items) {
+	for capacity < remaining {
 		capacity *= 2
 	}
-
-	for _, item := range inherited[:count] {
-		res.data.setConfigItemLocked(item.key, item.value, capacity)
+	if !used {
+		for _, item := range inherited[:count] {
+			res.data.setConfigItemLocked(item.key, item.value, capacity)
+		}
 	}
-	for _, item := range items {
+	for _, item := range items[skip:] {
 		res.data.setConfigItemLocked(item.Key, item.Value, capacity)
 	}
+
 	return res
 }
 

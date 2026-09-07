@@ -12,7 +12,7 @@ type nodeConfigAllocation struct {
 // tree. It is an allocation helper, not a pool: retained nodes keep their
 // storage alive and are never reused by another parse. It must be used serially.
 func NewNodeBatch(count int) *nodeBatch {
-	return &nodeBatch{nodes: make([]nodeConfigAllocation, count), writes: make([]compactConfigWrite, count*16)}
+	return &nodeBatch{nodes: make([]nodeConfigAllocation, count), writes: make([]compactConfigWrite, count*8)}
 }
 
 type nodeBatch struct {
@@ -29,14 +29,18 @@ func (b *nodeBatch) NewNode(name string, origin any, parent *Config, ctx *NodeCo
 	b.next++
 	slot := &b.nodes[i]
 	slot.config.data = &slot.store
-	slot.store.writes = b.writes[i*16 : i*16 : (i+1)*16]
+	slot.store.writes = b.writes[i*8 : i*8 : (i+1)*8]
 	inherited, count := parent.data.inheritedItems()
-	for _, item := range inherited[:count] {
-		slot.store.setConfigItemLocked(item.key, item.value, 16)
+	skip, used := slot.store.initializePrefix(inherited, count, items)
+	if !used {
+		for _, item := range inherited[:count] {
+			slot.store.setConfigItemLocked(item.key, item.value, 8)
+		}
 	}
-	for _, item := range items {
-		slot.store.setConfigItemLocked(item.Key, item.Value, 16)
+	for _, item := range items[skip:] {
+		slot.store.setConfigItemLocked(item.Key, item.Value, 8)
 	}
+
 	slot.node = Node{Name: name, Origin: origin, Cfg: &slot.config, Ctx: ctx}
 	return &slot.node
 }

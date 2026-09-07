@@ -7,6 +7,7 @@ import "sync"
 // stores keep entries together; larger contexts acquire an index for lookup.
 // All stores remain independent; no parsed state or mutable values are pooled.
 type configStore struct {
+	prefix       *configPrefix
 	mu           sync.RWMutex
 	writes       []compactConfigWrite
 	positions    [32]uint16
@@ -252,7 +253,8 @@ func (s *configStore) replay(target *Config) {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
 		if s.configStoreLegacy == nil {
-			for _, w := range s.writes {
+			for i := 0; i < s.compactWriteCount(); i++ {
+				w := s.compactWrite(i)
 				if w.replay {
 					writes = append(writes, configEntry{compactConfigKeys[w.key], w.value})
 				}
