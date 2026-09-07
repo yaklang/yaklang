@@ -74,7 +74,9 @@ type DownloadRiskItem struct {
 	SourceType      string  `json:"sourceType"`
 	FromYakScript   string  `json:"fromYakScript"`
 	Tags            string  `json:"tags"`
-	TagsDescription string  `json:"tagsDescription"`
+	VerifierUid        string  `json:"verifierUid"`
+	FixTime         int64   `json:"fixTime"`
+	FixSuggestion   string  `json:"fixSuggestion"`
 	IsPotential     bool    `json:"isPotential"`
 	CVE             string  `json:"cve"`
 	SeverityScore   float64 `json:"severityScore"`
@@ -196,13 +198,15 @@ func (s *OnlineClient) downloadRiskPage(token string, page, limit int64) ([]*Dow
 type setRiskTagsRequest struct {
 	Hash            []string `json:"hash"`
 	Tags            []string `json:"tags"`
-	TagsDescription string   `json:"tagsDescription,omitempty"`
+	VerifierUid        string   `json:"verifierUid,omitempty"`
+	FixTime         int64    `json:"fixTime,omitempty"`
+	FixSuggestion   string   `json:"fixSuggestion,omitempty"`
 	RiskTypeVerbose string   `json:"riskTypeVerbose,omitempty"`
 	Severity        string   `json:"severity,omitempty"`
 	SeverityScore   float64  `json:"severityScore,omitempty"`
 }
 
-func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, hashes []string, tags, tagsDescription, riskTypeVerbose, severity string, severityScore float64) error {
+func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, hashes []string, tags, verifierUid, fixSuggestion, riskTypeVerbose, severity string, fixTime int64, severityScore float64) error {
 	if token == "" {
 		return utils.Errorf("token is empty")
 	}
@@ -219,7 +223,9 @@ func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, ha
 	raw, err := json.Marshal(setRiskTagsRequest{
 		Hash:            hashes,
 		Tags:            tagsSlice,
-		TagsDescription: tagsDescription,
+		VerifierUid:        verifierUid,
+		FixTime:         fixTime,
+		FixSuggestion:   fixSuggestion,
 		RiskTypeVerbose: riskTypeVerbose,
 		Severity:        severity,
 		SeverityScore:   severityScore,
