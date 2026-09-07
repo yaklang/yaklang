@@ -7,8 +7,8 @@ package base
 type configPrefix struct {
 	writes    [5]compactConfigWrite
 	count     uint16
-	positions [32]uint16
-	order     [32]uint8
+	positions [33]uint16
+	order     [33]uint8
 	orderLen  uint8
 }
 
