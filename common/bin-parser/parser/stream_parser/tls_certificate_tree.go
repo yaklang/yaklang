@@ -113,7 +113,7 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
 			if f.Type == "" {
 				child = batch.NewNode(f.Name, yaml.MapSlice{}, parent.Cfg, node.Ctx, items...)
 			} else {
-				child, err = batch.NewNodeTreeWithConfigItems(parent.Cfg, f.Name, f.Type, node.Ctx, items...)
+				child, err = batch.NewNodeTreeWithTypeItems(parent.Cfg, f.Name, f.Type, node.Ctx, items...)
 				if err != nil {
 					return err
 				}

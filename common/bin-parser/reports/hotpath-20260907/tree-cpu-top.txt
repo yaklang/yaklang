@@ -1,0 +1,85 @@
+File: descriptors-stream.test
+Type: cpu
+Time: Sep 7, 2026 at 10:42am (CST)
+Duration: 4.80s, Total samples = 4.35s (90.63%)
+Showing nodes accounting for 3.98s, 91.49% of 4.35s total
+Dropped 73 nodes (cum <= 0.02s)
+      flat  flat%   sum%        cum   cum%
+     2.14s 49.20% 49.20%      2.14s 49.20%  runtime.kevent
+     0.54s 12.41% 61.61%      0.54s 12.41%  runtime.madvise
+     0.18s  4.14% 65.75%      0.18s  4.14%  sync/atomic.(*Int32).Add (inline)
+     0.14s  3.22% 68.97%      0.14s  3.22%  runtime.scanblock
+     0.10s  2.30% 71.26%      0.20s  4.60%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).compactSet
+     0.08s  1.84% 73.10%      0.16s  3.68%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).initializePrefix
+     0.08s  1.84% 74.94%      0.51s 11.72%  runtime.mallocgc
+     0.07s  1.61% 76.55%      0.07s  1.61%  github.com/yaklang/yaklang/common/bin-parser/parser/base.compactConfigKey
+     0.06s  1.38% 77.93%      0.17s  3.91%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).inheritedItems
+     0.05s  1.15% 79.08%      0.11s  2.53%  runtime.scanobject
+     0.04s  0.92% 80.00%      0.04s  0.92%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).compactWriteCount (inline)
+     0.04s  0.92% 80.92%      0.04s  0.92%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.buildExactByteFieldTree.func1
+     0.04s  0.92% 81.84%      0.96s 22.07%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.buildExactByteFieldTree.func2
+     0.04s  0.92% 82.76%      0.04s  0.92%  runtime.duffcopy
+     0.03s  0.69% 83.45%      0.10s  2.30%  gcWriteBarrier
+     0.03s  0.69% 84.14%      0.63s 14.48%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*nodeBatch).NewNode
+     0.03s  0.69% 84.83%      0.03s  0.69%  memeqbody
+     0.03s  0.69% 85.52%      0.07s  1.61%  runtime.bulkBarrierPreWrite
+     0.03s  0.69% 86.21%      0.03s  0.69%  runtime.greyobject
+     0.03s  0.69% 86.90%      0.10s  2.30%  runtime.wbBufFlush1
+     0.03s  0.69% 87.59%      0.03s  0.69%  runtime/internal/atomic.(*UnsafePointer).Load (inline)
+     0.02s  0.46% 88.05%      0.11s  2.53%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).Get
+     0.02s  0.46% 88.51%      0.12s  2.76%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setConfigItem
+     0.02s  0.46% 88.97%      0.25s  5.75%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.InitNode.func1
+     0.02s  0.46% 89.43%      0.06s  1.38%  runtime.findObject
+     0.01s  0.23% 89.66%      0.07s  1.61%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BaseKV).GetBool
+     0.01s  0.23% 89.89%      0.04s  0.92%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).compactGet
+     0.01s  0.23% 90.11%      0.59s 13.56%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*nodeBatch).NewNodeTreeWithTypeItems
+     0.01s  0.23% 90.34%      0.03s  0.69%  runtime.(*unwinder).resolveInternal
+     0.01s  0.23% 90.57%      0.04s  0.92%  runtime.(*wbBuf).get2 (inline)
+     0.01s  0.23% 90.80%      0.04s  0.92%  runtime.gcBgMarkWorker
+     0.01s  0.23% 91.03%      0.04s  0.92%  runtime.strequal
+     0.01s  0.23% 91.26%      0.08s  1.84%  sync.(*RWMutex).RUnlock
+     0.01s  0.23% 91.49%      0.05s  1.15%  sync.(*RWMutex).Unlock
+         0     0% 91.49%      0.05s  1.15%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BaseKV).GetString
+         0     0% 91.49%      0.12s  2.76%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Config).SetItem (inline)
+         0     0% 91.49%      0.22s  5.06%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setConfigItemLocked
+         0     0% 91.49%      0.32s  7.36%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewNodeBatch (inline)
+         0     0% 91.49%      1.61s 37.01%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.BenchmarkNativeFieldTreeLong
+         0     0% 91.49%      0.25s  5.75%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.InitNode
+         0     0% 91.49%      1.61s 37.01%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.buildExactByteFieldTree
+         0     0% 91.49%      0.06s  1.38%  runtime.(*mcache).allocLarge
+         0     0% 91.49%      0.53s 12.18%  runtime.(*mheap).alloc.func1
+         0     0% 91.49%      0.53s 12.18%  runtime.(*mheap).allocSpan
+         0     0% 91.49%      0.04s  0.92%  runtime.(*sweepLocked).sweep
+         0     0% 91.49%      0.03s  0.69%  runtime.(*unwinder).next
+         0     0% 91.49%      0.05s  1.15%  runtime.convTnoptr
+         0     0% 91.49%      0.04s  0.92%  runtime.convTslice
+         0     0% 91.49%      0.26s  5.98%  runtime.deductAssistCredit
+         0     0% 91.49%      0.04s  0.92%  runtime.deductSweepCredit
+         0     0% 91.49%      0.06s  1.38%  runtime.efaceeq
+         0     0% 91.49%      0.26s  5.98%  runtime.gcAssistAlloc
+         0     0% 91.49%      0.26s  5.98%  runtime.gcAssistAlloc.func1
+         0     0% 91.49%      0.26s  5.98%  runtime.gcAssistAlloc1
+         0     0% 91.49%      0.03s  0.69%  runtime.gcBgMarkWorker.func2
+         0     0% 91.49%      0.03s  0.69%  runtime.gcDrain
+         0     0% 91.49%      0.25s  5.75%  runtime.gcDrainN
+         0     0% 91.49%      1.12s 25.75%  runtime.gcMarkTermination.func3
+         0     0% 91.49%      1.02s 23.45%  runtime.gcStart.func3
+         0     0% 91.49%      0.04s  0.92%  runtime.mProf_Malloc
+         0     0% 91.49%      0.40s  9.20%  runtime.makeslice
+         0     0% 91.49%      0.17s  3.91%  runtime.markroot
+         0     0% 91.49%      0.03s  0.69%  runtime.markroot.func1
+         0     0% 91.49%      0.14s  3.22%  runtime.markrootBlock
+         0     0% 91.49%      2.14s 49.20%  runtime.netpoll
+         0     0% 91.49%      0.03s  0.69%  runtime.newobject
+         0     0% 91.49%      0.04s  0.92%  runtime.profilealloc
+         0     0% 91.49%      2.14s 49.20%  runtime.startTheWorldWithSema
+         0     0% 91.49%      0.04s  0.92%  runtime.sweepone
+         0     0% 91.49%      0.52s 11.95%  runtime.sysUsed (inline)
+         0     0% 91.49%      0.52s 11.95%  runtime.sysUsedOS (inline)
+         0     0% 91.49%      3.13s 71.95%  runtime.systemstack
+         0     0% 91.49%      0.10s  2.30%  runtime.wbBufFlush
+         0     0% 91.49%      0.10s  2.30%  runtime.wbBufFlush.func1
+         0     0% 91.49%      0.07s  1.61%  runtime.wbMove
+         0     0% 91.49%      0.08s  1.84%  sync.(*RWMutex).RLock (inline)
+         0     0% 91.49%      1.61s 37.01%  testing.(*B).launch
+         0     0% 91.49%      1.61s 37.01%  testing.(*B).runN

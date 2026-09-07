@@ -3,6 +3,7 @@ package stream_parser
 import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
+	"strings"
 	"testing"
 )
 
@@ -41,6 +42,26 @@ func BenchmarkNativeFieldTree(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		if err := buildExactByteFieldTree(n, fields, info, 0, uint64(len(wire)*8), "memcached-fields", "big"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// Each iteration owns its output config, avoiding a growing metadata replay
+// journal in a diagnostic that repeatedly constructs fields on a prepared rule.
+func BenchmarkNativeFieldTreeLong(b *testing.B) {
+	wire := []byte(strings.Repeat("STAT metric 12345\r\n", 48) + "END\r\n")
+	fields, info, err := decodeMemcachedFields(wire, "stats-response")
+	if err != nil {
+		b.Fatal(err)
+	}
+	parent := base.NewEmptyConfig()
+	parent.SetItems(base.ConfigItem{Key: "endian", Value: "big"}, base.ConfigItem{Key: "parser", Value: "default"}, base.ConfigItem{Key: "unit", Value: "byte"})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		n := &base.Node{Name: "Message", Cfg: base.NewConfig(parent)}
 		if err := buildExactByteFieldTree(n, fields, info, 0, uint64(len(wire)*8), "memcached-fields", "big"); err != nil {
 			b.Fatal(err)
 		}
