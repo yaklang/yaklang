@@ -1,0 +1,168 @@
+diff --git a/common/bin-parser/parser/base/config_compact.go b/common/bin-parser/parser/base/config_compact.go
+index 1c9d6d99c..0db3e87c1 100644
+--- a/common/bin-parser/parser/base/config_compact.go
++++ b/common/bin-parser/parser/base/config_compact.go
+@@ -104,23 +104,17 @@ func (s *configStore) compactSet(key string, value any, replay bool, reserve int
+ 		return false
+ 	}
+ 	k := compactConfigKey(key)
+-	if k <= 1 || s.compactWriteCount() >= 65534 {
++	if k <= 1 || s.compactWriteCount() >= 254 {
+ 		return false
+ 	}
+ 	if s.writes == nil {
+ 		s.writes = make([]compactConfigWrite, 0, reserve)
+ 	}
+ 	s.writes = append(s.writes, compactConfigWrite{value, k, replay})
+-	if s.positions[k] == 0 {
+-		s.order[s.orderLen] = k
+-		s.orderLen++
+-	}
+-	s.positions[k] = uint16(s.compactWriteCount())
++	s.positions[k] = uint8(s.compactWriteCount())
+ 	if replay {
+ 		s.historyCount++
+ 		if s.positions[1] == 0 {
+-			s.order[s.orderLen] = 1
+-			s.orderLen++
+ 			s.positions[1] = 1
+ 		}
+ 	}
+@@ -134,13 +128,33 @@ func (s *configStore) expandLocked() {
+ 	if s.configStoreLegacy != nil {
+ 		return
+ 	}
++	// Derive insertion order only when exposing the generic representation.
++	// The version log already contains this information; carrying a second
++	// per-node order array penalizes every parse for an uncommon operation.
++	var order [32]uint8
++	count := 0
++	var seen uint32
++	add := func(k uint8) {
++		if seen&(1<<k) == 0 {
++			seen |= 1 << k
++			order[count] = k
++			count++
++		}
++	}
++	for i := 0; i < s.compactWriteCount(); i++ {
++		w := s.compactWrite(i)
++		add(w.key)
++		if w.replay {
++			add(1)
++		}
++	}
+ 	legacy := &configStoreLegacy{}
+-	if s.orderLen <= 8 {
++	if count <= 8 {
+ 		legacy.entries = legacy.inline[:0]
+ 	} else {
+-		legacy.entries = make([]configEntry, 0, int(s.orderLen))
++		legacy.entries = make([]configEntry, 0, count)
+ 	}
+-	for _, k := range s.order[:s.orderLen] {
++	for _, k := range order[:count] {
+ 		var value any
+ 		if k == 1 {
+ 			journal := &configReplay{writes: make([]configEntry, 0, int(s.historyCount))}
+@@ -165,8 +179,6 @@ func (s *configStore) expandLocked() {
+ 	s.configStoreLegacy = legacy
+ 	s.writes = nil
+ 	s.prefix = nil
+-	s.positions = [32]uint16{}
+-	s.order = [32]uint8{}
+-	s.orderLen = 0
++	s.positions = [32]uint8{}
+ 	s.historyCount = 0
+ }
+diff --git a/common/bin-parser/parser/base/config_compact_test.go b/common/bin-parser/parser/base/config_compact_test.go
+index 25abf0094..916adb3e2 100644
+--- a/common/bin-parser/parser/base/config_compact_test.go
++++ b/common/bin-parser/parser/base/config_compact_test.go
+@@ -62,3 +62,30 @@ func TestCompactConfigBoundedVersions(t *testing.T) {
+ 	require.True(t, p && v)
+ 	require.NotNil(t, cfg.data.configStoreLegacy)
+ }
++
++func TestCompactConfigSmallIndexFallbackKeepsOrder(t *testing.T) {
++	for _, prefix := range []bool{false, true} {
++		cfg, old := NewEmptyConfig(), NewEmptyConfig()
++		if prefix {
++			parent := NewEmptyConfig()
++			parent.SetItems(ConfigItem{CfgEndian, "big"}, ConfigItem{"parser", "default"})
++			cfg, old = NewConfig(parent), configLegacyInherit(parent)
++		}
++		for i := 0; i < 300; i++ {
++			key := compactConfigKeys[2+i%30]
++			if i%3 == 0 {
++				cfg.BaseKV.SetItem(key, i)
++				old.BaseKV.SetItem(key, i)
++			} else {
++				cfg.SetItem(key, i)
++				configLegacySet(old, key, i)
++			}
++			if i == 250 {
++				require.Nil(t, cfg.data.configStoreLegacy)
++			}
++		}
++		require.NotNil(t, cfg.data.configStoreLegacy)
++		require.Equal(t, configLookupSnapshot(old), configLookupSnapshot(cfg))
++		require.Equal(t, configLookupSnapshot(configLegacyAppend(NewEmptyConfig(), old)), configLookupSnapshot(AppendConfig(NewEmptyConfig(), cfg)))
++	}
++}
+diff --git a/common/bin-parser/parser/base/config_prefix.go b/common/bin-parser/parser/base/config_prefix.go
+index 5030b50f3..e3f71a19b 100644
+--- a/common/bin-parser/parser/base/config_prefix.go
++++ b/common/bin-parser/parser/base/config_prefix.go
+@@ -6,10 +6,8 @@ package base
+ // exposure materializes an independent journal with the original write order.
+ type configPrefix struct {
+ 	writes    [5]compactConfigWrite
+-	count     uint16
+-	positions [32]uint16
+-	order     [32]uint8
+-	orderLen  uint8
++	count     uint8
++	positions [32]uint8
+ }
+ 
+ var configPrefixTypes = [...]string{"", "raw", "string", "uint8", "uint16", "uint32", "uint64", "uint", "int8", "int16", "int32", "int64", "int", "bool"}
+@@ -23,12 +21,8 @@ var configPrefixes = func() [2][2][len(configPrefixTypes)]configPrefix {
+ 					p.writes[p.count] = compactConfigWrite{v, k, true}
+ 					p.count++
+ 					p.positions[k] = p.count
+-					p.order[p.orderLen] = k
+-					p.orderLen++
+ 					if p.positions[1] == 0 {
+ 						p.positions[1] = 1
+-						p.order[p.orderLen] = 1
+-						p.orderLen++
+ 					}
+ 				}
+ 				add(2, []string{"big", "little"}[endian])
+@@ -78,9 +72,7 @@ func (s *configStore) initializePrefix(inherited [3]configEntry, count int, item
+ 	p := &configPrefixes[endian][unit][typ]
+ 	s.prefix = p
+ 	s.positions = p.positions
+-	s.order = p.order
+-	s.orderLen = p.orderLen
+-	s.historyCount = p.count
++	s.historyCount = uint16(p.count)
+ 	return skip, true
+ }
+ 
+diff --git a/common/bin-parser/parser/base/config_store.go b/common/bin-parser/parser/base/config_store.go
+index 782b93b08..45b389f0a 100644
+--- a/common/bin-parser/parser/base/config_store.go
++++ b/common/bin-parser/parser/base/config_store.go
+@@ -10,9 +10,7 @@ type configStore struct {
+ 	prefix       *configPrefix
+ 	mu           sync.RWMutex
+ 	writes       []compactConfigWrite
+-	positions    [32]uint16
+-	order        [32]uint8
+-	orderLen     uint8
++	positions    [32]uint8
+ 	historyCount uint16
+ 	*configStoreLegacy
+ }
