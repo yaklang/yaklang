@@ -21,7 +21,6 @@ func TestHTTP2StreamRecycleDropsRequestOwnedReferences(t *testing.T) {
 		resp:                   &http.Response{Header: make(http.Header)},
 		bodyBuffer:             bytes.NewBuffer(bytes.Repeat([]byte("b"), 1<<20)),
 		respPacket:             bytes.Repeat([]byte("r"), 1<<20),
-		hPackByte:              bytes.NewBuffer(bytes.Repeat([]byte("h"), 4096)),
 		readHeaderEnd:          true,
 		callbackLock:           new(sync.Mutex),
 		readFirstFrameCallback: func() {},
@@ -38,7 +37,6 @@ func TestHTTP2StreamRecycleDropsRequestOwnedReferences(t *testing.T) {
 	require.Nil(t, recycled.resp)
 	require.Nil(t, recycled.bodyBuffer)
 	require.Nil(t, recycled.respPacket)
-	require.Nil(t, recycled.hPackByte)
 	require.False(t, recycled.readHeaderEnd)
 	require.Nil(t, recycled.readFirstFrameCallback)
 	require.Nil(t, recycled.option)
