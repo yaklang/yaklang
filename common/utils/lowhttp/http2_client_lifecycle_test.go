@@ -83,6 +83,21 @@ func TestH2CompleteResponseWinsConnectionClose(t *testing.T) {
 type h2BrokenWriter struct{}
 
 func (h2BrokenWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+
+func TestH2ClosedBeforeHeadersCanReconnect(t *testing.T) {
+	c := newH2ReadLoopTestConn(t, h2BrokenWriter{})
+	req, _ := http.NewRequest("POST", "http://h2.test/", nil)
+	cs, err := c.newStream(req, []byte("POST / HTTP/2\r\nHost: h2.test\r\n\r\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.setClose()
+	if err = cs.doRequest(); !errors.Is(err, CreateStreamAfterGoAwayErr) || cs.ID != 0 {
+		t.Fatalf("unsent request cannot reconnect: %v, stream %d", err, cs.ID)
+	}
+	cs.abort()
+}
+
 func TestH2BrokenHeaderWriteCannotReplayPost(t *testing.T) {
 	c := newH2ReadLoopTestConn(t, h2BrokenWriter{})
 	c.currentStreamID = 1
