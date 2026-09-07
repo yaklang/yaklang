@@ -62,3 +62,22 @@ while optional initialization was waiting on the Provider. Its subsequent
 runtime access and manual cancellation/cleanup are retained as failure evidence.
 The paired Legion runtime-timeout contract owns F-09 and terminal projection;
 F-07 must be rerun only after these affected source changes are frozen.
+
+## September 7 acceptance correction
+
+The final-source 1 GiB Run `aitr_5051d8837d0247699c38d7712e763b39`
+completed and cleaned its workspace, but its report missed the seeded tail
+event. Its search actions contained legal newlines between the `queries`
+colon and array. The streaming JSON parser treated the leading newline as
+a completed empty value, so the resolver correctly rejected an empty query.
+A deterministic before/after regression covers every JSON value type after
+leading LF/CRLF whitespace and the actual search Action consumer. Preserve
+missing-comma recovery after a value has started. The full parser suite and
+focused Action race checks pass. A separate full-package race timing failure
+in the existing 3-second reader-cleanup benchmark is recorded, not hidden.
+
+Cross-owner API denial and zero persisted Runs passed on Legion 6cf72e4a.
+The real page two-file run `aitr_ee36a28a184848a599f208c264eba673` passed
+on Yaklang e5150857f with both hashes, distinct paths, both report markers,
+and cleanup. The large-file tail criterion remains pending the parser fix's
+frozen-source runtime check; a completed status alone is not acceptance.
