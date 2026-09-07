@@ -149,7 +149,7 @@ shell.evaluate(userInput); // 直接执行用户输入的脚本
 - 泄露敏感信息，如数据库密码、用户数据等。
 - 通过服务器进一步渗透内网。
 DESC
-	risk: "信息",
+	risk: "information",
 	name: "output",
 	message: "发现Java GroovyShell代码执行Sink点，该规则用于审计代码中是否存在潜在的远程代码执行风险。",
 }

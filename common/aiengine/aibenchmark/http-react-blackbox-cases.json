@@ -107,5 +107,222 @@
       }
     ],
     "prompt": "这是已有 Python 文件的多位置增量编辑测试，目标文件是 {{WORKDIR}}/inventory_report.py。禁止使用 write_file 覆盖、禁止 bash heredoc/cat/echo/sed 修改文件。先用 read_file 查看带行号的现状，再用 bash 运行一次基线。然后只用 modify_file 完成多个非连续修改：删除 DEFAULT_SEPARATOR；parse_items 要解析逗号分隔的 name:qty，名称 strip 后 casefold，忽略格式错误、非整数和 qty<=0，并合并重复名称数量；build_parser 增加整数 --limit，默认 10；summarize 接收 limit，按数量降序、名称升序输出前 N 个 [name, qty]，total 是全部有效条目的数量总和；main 传递 limit。至少调用三次 modify_file，不要用一次整文件覆盖伪装增量修改。每次多行插入导致行号变化后，应重新 read_file 获取当前行号。最终用 bash 执行 `python3 {{WORKDIR}}/inventory_report.py --items ' Pen :2,book:3,PEN:4,bad,eraser:-1' --limit 2`，必须得到 items=[[\"pen\",6],[\"book\",3]] 和 total=9，并执行 py_compile；若失败，只能继续用 read_file+modify_file 修复，验证通过后立即结束。"
+  },
+  {
+    "name": "exit7-stdout-success-claim",
+    "suite": "execution-semantics",
+    "description": "stdout 声称 SUCCESS，但客观退出码为 7。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["SUCCESS"],
+    "prompt": "执行一次且只执行一次 bash：`printf 'SUCCESS\\n'; exit 7`，shell=bash、timeout=5。不要重试。必须区分 stdout 文本与真实退出码，并明确回答命令是否被默认 accepted-exit-codes=0 接受。"
+  },
+  {
+    "name": "exit0-stderr-error-observation",
+    "suite": "execution-semantics",
+    "description": "stderr 含 ERROR，但客观退出码为 0。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["ERROR"],
+    "prompt": "执行一次且只执行一次 bash：`printf 'ERROR\\n' >&2; exit 0`，shell=bash、timeout=5。不要重试。必须区分 stderr 观察文本与真实退出码，并明确回答命令是否被默认 accepted-exit-codes=0 接受。"
+  },
+  {
+    "name": "final-command-exit0",
+    "suite": "execution-semantics",
+    "description": "前序 false 后 echo 成功，验证 shell 最终退出码。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["complete"],
+    "prompt": "执行一次且只执行一次 bash：`false; echo complete`，shell=bash、timeout=5。不要重试。报告 shell 最终退出码，不得仅凭前面的 false 或输出措辞判断。"
+  },
+  {
+    "name": "pipeline-pipefail-cross-check",
+    "suite": "execution-semantics",
+    "description": "并发对照普通 pipeline 与 pipefail 的退出码差异。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 2,
+    "max_tool_calls": 2,
+    "expected_tool_min_counts": {"bash": 2},
+    "prompt": "在同一轮并发执行两个独立 bash 调用，均为 shell=bash、timeout=5：A=`false | true`；B=`set -o pipefail; false | true`。不得串行，不得重试。比较两者客观退出码和默认接受状态。"
+  },
+  {
+    "name": "timeout-null-exit-code",
+    "suite": "execution-semantics",
+    "description": "超时终止时不得捏造退出码。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["\"timed_out\": true", "\"exit_code\": null", "\"termination_reason\": \"timeout\""],
+    "prompt": "执行一次且只执行一次 bash：`sleep 3; echo TOO_LATE`，shell=bash、timeout=1。不要重试。报告 timed_out、exit_code 是否可用以及 termination_reason；不得从错误字符串猜退出码。"
+  },
+  {
+    "name": "concurrent-exit-codes-with-accepted",
+    "suite": "execution-semantics",
+    "description": "同批 0/1/7，交叉验证 accepted-exit-codes 不改写原始退出码。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 3,
+    "max_tool_calls": 3,
+    "expected_tool_min_counts": {"bash": 3},
+    "prompt": "在同一轮并发执行三个独立 bash 调用，不得串行：A=`sleep 0.3; exit 0`，accepted-exit-codes=`0`；B=`sleep 0.3; exit 1`，accepted-exit-codes=`0,1`；C=`sleep 0.3; exit 7`，accepted-exit-codes=`0,1`。三者 shell=bash、timeout=5。不得重试。逐项报告原始 exit_code 和 exit_code_accepted，并确认 B 的原始退出码仍是 1。"
+  },
+  {
+    "name": "compile-diagnose-repair-recompile",
+    "suite": "execution-semantics",
+    "description": "真实编译失败、定位、增量修复、重新编译和运行。",
+    "include_tools": ["bash", "read_file", "modify_file"],
+    "expected_tools": ["bash", "read_file", "modify_file"],
+    "min_tool_calls": 6,
+    "max_tool_calls": 12,
+    "expected_tool_min_counts": {"bash": 4, "read_file": 1, "modify_file": 1},
+    "setup_files": [
+      {"path": "main.go", "content": "package main\n\nimport \"fmt\"\n\nfunc sum(a, b int) int {\n    return a - b\n}\n\nfunc main() {\n    fmt.Println(sum(2, 3)\n}\n"}
+    ],
+    "expected_files": [
+      {"path": "main.go", "contains": ["return a + b", "fmt.Println(sum(2, 3))"], "not_contains": ["return a - b"]}
+    ],
+    "verification_commands": [
+      {"command": "bash -lc \"cd {{WORKDIR}} && gofmt -w main.go && go build -o app main.go && ./app\"", "expected_tokens": ["5"]}
+    ],
+    "prompt": "在 {{WORKDIR}} 完成真实 Go 修复。先用 bash 运行 `cd {{WORKDIR}} && go build -o app main.go` 取得编译失败退出码；并发读取 main.go 与运行 `cd {{WORKDIR}} && gofmt -d main.go` 取得独立证据。只用 modify_file 修复语法错误和 sum 的减法逻辑。随后依次用 bash 执行 gofmt 检查、go build、./app，最终输出必须为 5。禁止 write_file、sed 或 heredoc；至少 6 次工具调用，所有验证通过再结束。"
+  },
+  {
+    "name": "unit-test-fail-fix-full-rerun",
+    "suite": "execution-semantics",
+    "description": "真实单测失败、代码定位、修复、目标测试和全量复测。",
+    "include_tools": ["bash", "read_file", "modify_file"],
+    "expected_tools": ["bash", "read_file", "modify_file"],
+    "min_tool_calls": 6,
+    "max_tool_calls": 12,
+    "expected_tool_min_counts": {"bash": 3, "read_file": 2, "modify_file": 1},
+    "setup_files": [
+      {"path": "slug.py", "content": "import re\n\ndef slugify(value):\n    value = value.strip().lower()\n    return re.sub(r'[^a-z0-9]+', '_', value).strip('_')\n"},
+      {"path": "test_slug.py", "content": "import unittest\nfrom slug import slugify\n\nclass SlugTests(unittest.TestCase):\n    def test_words(self):\n        self.assertEqual(slugify('Hello, World!'), 'hello-world')\n\n    def test_spaces(self):\n        self.assertEqual(slugify('  Red Blue  '), 'red-blue')\n\nif __name__ == '__main__':\n    unittest.main()\n"}
+    ],
+    "expected_files": [
+      {"path": "slug.py", "contains": ["'-'"], "not_contains": ["'_'" ]}
+    ],
+    "verification_commands": [
+      {"command": "bash -lc \"cd {{WORKDIR}} && python3 -m unittest discover -v\"", "expected_tokens": ["OK"]}
+    ],
+    "prompt": "在 {{WORKDIR}} 排查并修复 Python 单测。先用 bash 运行 `cd {{WORKDIR}} && python3 -m unittest discover -v`，确认失败退出码；随后在同一轮并发 read_file 读取 slug.py 和 test_slug.py。只用 modify_file 修复实现，不得改测试。然后用 bash 先跑 `python3 -m unittest -v test_slug.SlugTests.test_words`，再跑全量 discover，最后用 read_file 回读修复产物。禁止 write_file、sed、heredoc；至少 6 次工具调用。"
+  },
+  {
+    "name": "parallel-troubleshooting-partial-failure",
+    "suite": "execution-semantics",
+    "description": "多个并发探针部分失败，要求保留其余有效证据并继续并发。",
+    "include_tools": ["bash"],
+    "expected_tools": ["bash"],
+    "min_tool_calls": 5,
+    "max_tool_calls": 8,
+    "expected_tool_min_counts": {"bash": 5},
+    "prompt": "做受控排障，第一轮必须并发 4 个 bash 探针：A=`uname -s`；B=`test -f {{WORKDIR}}/missing.flag`；C=`python3 --version`；D=`printf 'ERROR-looking observation\\n' >&2; exit 0`，均 shell=bash、timeout=5。B 预期非零，不能因此丢弃 A/C/D。第二轮至少并发执行两个独立确认探针：`uname -m` 与 `python3 -c 'import sys; print(sys.executable)'`。禁止原样重试失败探针；综合客观退出码给出诊断。"
+  },
+  {
+    "name": "http-status-cross-check",
+    "suite": "execution-semantics",
+    "description": "本地受控 200/404/500，响应状态不能被协议 Success 覆盖。",
+    "include_tools": ["do_http_request"],
+    "expected_tools": ["do_http_request"],
+    "min_tool_calls": 3,
+    "max_tool_calls": 3,
+    "expected_tool_min_counts": {"do_http_request": 3},
+    "prompt": "同一轮并发调用三次 do_http_request，分别 GET {{ORACLE_URL}}/status/200、/status/404、/status/500，timeout=5、redirect-times=0。不得串行或重试。逐项报告 request_built、request_sent、response_received、status_code、transport_error；404/500 是收到 HTTP 响应，不得描述为传输失败。"
+  },
+  {
+    "name": "http-transport-timeout-cross-check",
+    "suite": "execution-semantics",
+    "description": "连接拒绝和延迟超时与 HTTP 响应正反交叉。",
+    "include_tools": ["do_http_request"],
+    "expected_tools": ["do_http_request"],
+    "min_tool_calls": 3,
+    "max_tool_calls": 3,
+    "expected_tool_min_counts": {"do_http_request": 3},
+    "prompt": "同一轮并发调用三次 do_http_request：A=GET {{REFUSED_URL}}/refused timeout=1；B=GET {{ORACLE_URL}}/delay/3 timeout=1；C=GET {{ORACLE_URL}}/status/200 timeout=2。redirect-times=0。不得重试。区分连接拒绝、超时和已收到 200 响应，逐项报告 response_received、status_code、transport_error。"
+  },
+  {
+    "name": "mixed-http-file-shell-artifact",
+    "suite": "execution-semantics",
+    "description": "批量 HTTP、文件增量修改、Bash 验证和 artifact 回读混合闭环。",
+    "include_tools": ["batch_do_http_request", "read_file", "modify_file", "bash"],
+    "expected_tools": ["batch_do_http_request", "read_file", "modify_file", "bash"],
+    "min_tool_calls": 6,
+    "max_tool_calls": 12,
+    "expected_tool_min_counts": {"batch_do_http_request": 1, "read_file": 2, "modify_file": 1, "bash": 2},
+    "setup_files": [
+      {"path": "probe_summary.json", "content": "{\"statuses\": {}, \"verified\": false}\n"}
+    ],
+    "expected_files": [
+      {"path": "probe_summary.json", "contains": ["\"200\"", "\"404\"", "\"500\"", "\"verified\": true"], "not_contains": []}
+    ],
+    "verification_commands": [
+      {"command": "python3 -m json.tool {{WORKDIR}}/probe_summary.json", "expected_tokens": ["\"verified\": true", "\"404\"", "\"500\""]}
+    ],
+    "prompt": "在受控环境完成混合闭环。第一轮并发：调用一次 batch_do_http_request，base-url={{ORACLE_URL}}、paths 为 `/status/200\\n/status/404\\n/status/500`、concurrent=3、timeout=5；同时 read_file 读取 {{WORKDIR}}/probe_summary.json。根据批量 Result 的 status_code_distribution，只用 modify_file 把三个状态计数和 verified=true 写入 JSON。随后用 bash 执行 `python3 -m json.tool {{WORKDIR}}/probe_summary.json`，再用 read_file 回读，最后用 bash 运行 Python 一行断言三个状态各为 1 且 verified 为 true。不得使用 write_file/sed/heredoc；至少 6 次工具调用，必须区分响应数和传输错误数。"
+  },
+  {
+    "name": "finish-multiphase-ledger-repair",
+    "suite": "finish-stability",
+    "description": "多阶段真实修复要求保留 TODO、逐项验证产物，并在软完成性检查点后稳定 finish。",
+    "include_tools": ["bash", "read_file", "modify_file"],
+    "expected_tools": ["bash", "read_file", "modify_file"],
+    "min_tool_calls": 9,
+    "max_tool_calls": 16,
+    "expected_tool_min_counts": {"bash": 4, "read_file": 3, "modify_file": 2},
+    "forbidden_tools": ["write_file"],
+    "min_finish_actions": 2,
+    "max_finish_actions": 2,
+    "max_direct_answers": 1,
+    "max_todo_delta_errors": 0,
+    "max_iteration_deadline_leaks": 0,
+    "setup_files": [
+      {"path": "ledger.py", "content": "def parse_rows(lines):\n    rows = []\n    for line in lines:\n        name, raw_amount = line.split(':')\n        rows.append((name, int(raw_amount)))\n    return rows\n\ndef summarize(rows, limit=10):\n    return {\"owners\": rows[:limit], \"total\": len(rows)}\n"},
+      {"path": "test_ledger.py", "content": "import unittest\nfrom ledger import parse_rows, summarize\n\nclass LedgerTests(unittest.TestCase):\n    def test_parse_normalizes_and_skips_bad_rows(self):\n        self.assertEqual(parse_rows([' Alice :2', 'bad', 'ALICE:3', 'Bob:-1', 'Cara:4']), [('alice', 2), ('alice', 3), ('cara', 4)])\n\n    def test_summarize_aggregates_and_limits(self):\n        rows = [('alice', 2), ('alice', 3), ('cara', 4), ('bob', 1)]\n        self.assertEqual(summarize(rows, limit=2), {\"owners\": [('alice', 5), ('cara', 4)], \"total\": 10})\n\nif __name__ == '__main__':\n    unittest.main()\n"},
+      {"path": "README.md", "content": "# Ledger helper\n\nPending behavior documentation.\n"}
+    ],
+    "expected_files": [
+      {"path": "ledger.py", "contains": ["casefold", "limit", "total"], "not_contains": ["line.split(':')"]},
+      {"path": "README.md", "contains": ["invalid rows", "aggregates owners", "limit"], "not_contains": ["Pending behavior documentation"]}
+    ],
+    "verification_commands": [
+      {"command": "bash -lc \"cd {{WORKDIR}} && python3 -m unittest discover -v\"", "expected_tokens": ["OK"]},
+      {"command": "python3 -m py_compile {{WORKDIR}}/ledger.py", "expected_tokens": []}
+    ],
+    "prompt": "在 {{WORKDIR}} 完成一次真实的多阶段 Python 修复并维护清晰 TODO。禁止 write_file、sed、heredoc 或覆盖整文件。先用 bash 跑全量 unittest 获取失败证据；随后在同一轮并发 read_file 读取 ledger.py、test_ledger.py 和 README.md。第一阶段只用 modify_file 修复 parse_rows：名称 strip+casefold，忽略无冒号、非整数和金额<=0 的行；用 bash 单独运行 parse 测试。第二阶段再用 modify_file 修复 summarize：按名称聚合，owners 按金额降序再名称升序并应用 limit，total 为所有有效金额总和；用 bash 单独运行 summarize 测试。第三阶段只用 modify_file 更新 README，明确 invalid rows、aggregates owners、limit；再跑全量 unittest 和 py_compile，最后 read_file 回读 ledger.py 与 README.md 交叉核对。任何单次失败都必须修正或换有实质差异的方法，不能直接 deferred、清 TODO 或结束。只有代码、文档、目标测试、全量测试和编译检查都完成才可 finish。"
+  },
+  {
+    "name": "finish-recover-after-wrong-test-entry",
+    "suite": "finish-stability",
+    "description": "先遭遇确定的入口错误，再发现真实测试布局、修复、复测并稳定完成，观察是否因错误提前 deferred/finish。",
+    "include_tools": ["bash", "find_file", "read_file", "modify_file"],
+    "expected_tools": ["bash", "find_file", "read_file", "modify_file"],
+    "min_tool_calls": 8,
+    "max_tool_calls": 14,
+    "expected_tool_min_counts": {"bash": 4, "find_file": 1, "read_file": 2, "modify_file": 1},
+    "forbidden_tools": ["write_file"],
+    "min_finish_actions": 2,
+    "max_finish_actions": 2,
+    "max_direct_answers": 1,
+    "max_todo_delta_errors": 0,
+    "max_iteration_deadline_leaks": 0,
+    "setup_files": [
+      {"path": "src/normalize.py", "content": "import re\n\ndef normalize(value):\n    value = value.strip().lower()\n    return re.sub(r'[^a-z0-9]+', '_', value).strip('_')\n"},
+      {"path": "checks/test_normalize.py", "content": "import unittest\nfrom normalize import normalize\n\nclass NormalizeTests(unittest.TestCase):\n    def test_words(self):\n        self.assertEqual(normalize(' Hello, World! '), 'hello-world')\n\n    def test_repeated_separators(self):\n        self.assertEqual(normalize('red___blue'), 'red-blue')\n\nif __name__ == '__main__':\n    unittest.main()\n"}
+    ],
+    "expected_files": [
+      {"path": "src/normalize.py", "contains": ["'-'"], "not_contains": ["'_'" ]}
+    ],
+    "verification_commands": [
+      {"command": "bash -lc \"cd {{WORKDIR}} && PYTHONPATH=src python3 -m unittest discover -s checks -v\"", "expected_tokens": ["OK"]}
+    ],
+    "prompt": "在 {{WORKDIR}} 排查 normalize 的失败并修复。第一步必须原样执行一次 `cd {{WORKDIR}} && python3 -m unittest -v test_normalize`，这个入口错误是诊断样本，失败后禁止重试同一命令、禁止 deferred 或 finish。下一步用 find_file 定位测试与实现，并在同一轮并发 read_file 读取发现的两个文件。只用 modify_file 修复实现，不得修改测试：输出必须使用单个连字符且折叠重复分隔符。然后用 bash 先运行正确的单个测试入口 `cd {{WORKDIR}} && PYTHONPATH=src python3 -m unittest -v checks.test_normalize.NormalizeTests.test_words`，再运行 discover 全量测试，再运行 py_compile；最后 read_file 回读实现。必须区分“错误测试入口”和“实现失败”，完成所有验证后再 finish，不能靠清空或强行关闭 TODO 收尾。"
   }
 ]

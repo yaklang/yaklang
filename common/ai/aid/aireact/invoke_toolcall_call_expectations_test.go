@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -24,7 +25,7 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
 		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮工具结果
 		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-		if strings.Contains(prompt, "COMBINED OUTPUT:") {
+		if strings.Contains(prompt, "RESULT:") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -248,7 +249,7 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 			if utils.MatchAllOfSubString(prompt, "Interval Review") {
-				nonce := aicommon.ExtractPromptNonce(prompt, "EXTRA_PROMPT")
+				nonce := aicommon_testutil.ExtractPromptNonce(prompt, "EXTRA_PROMPT")
 				if nonce != "" {
 					startMarker := "<|EXTRA_PROMPT_" + nonce + "|>"
 					endMarker := "<|EXTRA_PROMPT_END_" + nonce + "|>"

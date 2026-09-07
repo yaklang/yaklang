@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -113,7 +114,7 @@ func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.
 			rsp.Close()
 			return rsp, nil
 		}
-		nonce := aicommon.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
+		nonce := aicommon_testutil.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "run_script", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"timeout": 20} },
@@ -559,10 +560,10 @@ func TestReAct_DirectlyCallTool_PersistentSession(t *testing.T) {
 			prompt := r.GetPrompt()
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. mockedToolCalling
 			// 在 isPrimaryDecisionPrompt 总是返回 require_tool, 工具执行一轮后会无限循环.
-			// 这里在 isPrimaryDecisionPrompt 分支检测到工具结果 (COMBINED OUTPUT) 已
+			// 这里在 isPrimaryDecisionPrompt 分支检测到工具语义结果 (RESULT) 已
 			// 存在于 prompt (作为 timeline-open 段内容), 说明工具已执行过, 主动 finish 收口
 			// (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
-			if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "COMBINED OUTPUT:") {
+			if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "RESULT:") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 				rsp.Close()

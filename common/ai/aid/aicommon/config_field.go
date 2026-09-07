@@ -1,7 +1,6 @@
-﻿package aicommon
+package aicommon
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -191,13 +190,13 @@ func (c *Config) GetExecutionPolicy() string {
 	}
 	if c.GetEnableGoalMode() {
 		lines = append(lines,
-			fmt.Sprintf("- Goal mode is enabled: do not use finish before iteration %d.", c.GetGoalMinIterations()),
-			"- Before the finish gate opens, only emit progress updates via directly_answer when necessary; keep pushing execution forward instead of wrapping up early.",
+			"- Goal mode is enabled: finish is controlled by a host-side completion gate. Keep producing evidence-backed progress while finish is unavailable; decide from the task state rather than the gate.",
+			"- Before the finish gate opens, only emit progress updates via directly_answer when necessary; keep pushing execution forward instead of wrapping up early or administratively clearing TODOs.",
 		)
 	}
 	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
 		lines = append(lines,
-			fmt.Sprintf("- Both modes are active: dispatch sub-agents for parallelizable work, but the top-level loop must still reach iteration %d before finishing; do not idle after dispatch — keep verifying sub-agent results or synthesize outputs until the gate opens.", c.GetGoalMinIterations()),
+			"- Both modes are active: dispatch sub-agents for parallelizable work, then keep verifying their results or synthesizing outputs until the completion gate opens; do not idle after dispatch or attempt to satisfy the gate by closing unfinished TODOs.",
 		)
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))

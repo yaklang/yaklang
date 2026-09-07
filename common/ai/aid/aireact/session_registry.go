@@ -21,6 +21,43 @@ type runningSession struct {
 
 var globalRunningSessions sync.Map // sessionID -> *runningSession
 
+var sessionStartState = struct {
+	sync.Mutex
+	starting map[string]struct{}
+}{starting: make(map[string]struct{})}
+
+// TryBeginSessionStart closes the small gap between the initial registry lookup
+// and NewReAct publishing its running session. Exactly one stream may initialize
+// a persistent session; racing streams wait and attach to that instance.
+func TryBeginSessionStart(sessionID string) (func(), bool) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return func() {}, true
+	}
+	sessionStartState.Lock()
+	if _, exists := sessionStartState.starting[sessionID]; exists {
+		sessionStartState.Unlock()
+		return nil, false
+	}
+	sessionStartState.starting[sessionID] = struct{}{}
+	sessionStartState.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			sessionStartState.Lock()
+			delete(sessionStartState.starting, sessionID)
+			sessionStartState.Unlock()
+		})
+	}, true
+}
+
+func IsSessionStarting(sessionID string) bool {
+	sessionStartState.Lock()
+	_, ok := sessionStartState.starting[strings.TrimSpace(sessionID)]
+	sessionStartState.Unlock()
+	return ok
+}
+
 func registerRunningSession(sessionID string, react *ReAct) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" || react == nil {
@@ -31,8 +68,7 @@ func registerRunningSession(sessionID string, react *ReAct) {
 		react:     react,
 	}
 	if _, loaded := globalRunningSessions.LoadOrStore(sessionID, rs); loaded {
-		log.Warnf("aireact session %s already running, replacing registry entry", sessionID)
-		globalRunningSessions.Store(sessionID, rs)
+		log.Warnf("aireact session %s already running; keep the first registry owner", sessionID)
 	}
 }
 
@@ -82,6 +118,24 @@ func GetRunningSession(sessionID string) (*ReAct, bool) {
 		return nil, false
 	}
 	return rs.react, true
+}
+
+// IsSessionBusy reports whether a persistent session currently owns an active
+// ReAct task. An idle registered stream is not busy and can accept a scheduled
+// follow-up in the same conversation.
+func IsSessionBusy(sessionID string) bool {
+	if IsSessionStarting(sessionID) {
+		return true
+	}
+	react, ok := GetRunningSession(sessionID)
+	if !ok {
+		return false
+	}
+	if react.IsProcessingReAct() || (react.taskQueue != nil && react.taskQueue.Len() > 0) {
+		return true
+	}
+	planTask := react.GetCurrentPlanExecutionTask()
+	return planTask != nil && !planTask.IsFinished()
 }
 
 // SubscribeRunningSession attaches an output event listener to a running session.

@@ -15,8 +15,10 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 		"yak.execute",
 		"hids",
 		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -38,8 +40,10 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		"yak.execute",
 		"hids",
 		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 		"extra.capability",
 	}

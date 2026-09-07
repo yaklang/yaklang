@@ -43,12 +43,13 @@ type Crawler struct {
 	finished *utils.AtomicBool
 	starting *utils.AtomicBool
 
-	requestCounter         int64
-	linkCounter            int64
-	handlingRequestCounter int
+	requestCounter int64
+	linkCounter    int64
+	discoveryMu    sync.Mutex
 
 	requestedHash *sync.Map
 	foundUrls     *sync.Map
+	reportedUrls  *sync.Map
 	scheduler     *requestScheduler
 
 	ctx    context.Context
@@ -60,54 +61,99 @@ type Crawler struct {
 
 type requestScheduler struct {
 	ctx context.Context
-	q   *chanx.UnlimitedChan[*Req]
+
+	mu            sync.Mutex
+	high          []*Req
+	normal        []*Req
+	queueCapacity int
+	highStreak    int
+	wake          chan struct{}
 
 	pending     atomic.Int64
 	startupDone atomic.Bool
 	closed      atomic.Bool
-	closeOnce   sync.Once
 }
+
+const requestSchedulerHighBurst = 8
 
 func newRequestScheduler(ctx context.Context, queueSize int) *requestScheduler {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if queueSize <= 0 {
-		queueSize = 10
+	if queueSize < 0 {
+		queueSize = 0
 	}
 	return &requestScheduler{
-		ctx: ctx,
-		q:   chanx.NewUnlimitedChan[*Req](ctx, queueSize),
+		ctx:           ctx,
+		queueCapacity: queueSize,
+		wake:          make(chan struct{}, 1),
 	}
-}
-
-func (s *requestScheduler) Output() <-chan *Req {
-	if s == nil || s.q == nil {
-		ch := make(chan *Req)
-		close(ch)
-		return ch
-	}
-	return s.q.OutputChannel()
 }
 
 func (s *requestScheduler) Submit(req *Req) (ok bool) {
-	if s == nil || s.q == nil || req == nil || s.contextDone() || s.closed.Load() {
+	if s == nil || req == nil || s.contextDone() || s.closed.Load() {
 		return false
 	}
+
+	s.mu.Lock()
+	if s.closed.Load() || s.contextDone() {
+		s.mu.Unlock()
+		return false
+	}
+	queue := &s.normal
+	if req.priority {
+		queue = &s.high
+	}
+	// A zero capacity is intentionally unlimited. It is used only when the
+	// caller explicitly disables maxUrls; positive limits retain bounded
+	// queues.
+	if s.queueCapacity > 0 && len(*queue) >= s.queueCapacity {
+		s.mu.Unlock()
+		return false
+	}
+	*queue = append(*queue, req)
 	s.pending.Add(1)
-	defer func() {
-		if err := recover(); err != nil {
-			s.pending.Add(-1)
-			s.maybeClose()
-			ok = false
-		}
-	}()
-	if !s.q.SafeFeedWithResult(req) {
-		s.pending.Add(-1)
-		s.maybeClose()
-		return false
-	}
+	s.mu.Unlock()
+	s.signal()
 	return true
+}
+
+// Next returns the next accepted request. Asset requests are preferred, while
+// a bounded burst keeps ordinary pages from being permanently starved.
+func (s *requestScheduler) Next() (*Req, bool) {
+	if s == nil {
+		return nil, false
+	}
+	for {
+		s.mu.Lock()
+		if s.closed.Load() {
+			s.mu.Unlock()
+			return nil, false
+		}
+		if len(s.high) > 0 && (s.highStreak < requestSchedulerHighBurst || len(s.normal) == 0) {
+			req := s.high[0]
+			s.high[0] = nil
+			s.high = s.high[1:]
+			s.highStreak++
+			s.mu.Unlock()
+			return req, true
+		}
+		if len(s.normal) > 0 {
+			req := s.normal[0]
+			s.normal[0] = nil
+			s.normal = s.normal[1:]
+			s.highStreak = 0
+			s.mu.Unlock()
+			return req, true
+		}
+		s.mu.Unlock()
+
+		select {
+		case <-s.ctx.Done():
+			return nil, false
+		case <-s.wake:
+		}
+	}
 }
 
 func (s *requestScheduler) Done() {
@@ -134,21 +180,37 @@ func (s *requestScheduler) StartupDone() {
 }
 
 func (s *requestScheduler) Close() {
-	if s == nil || s.q == nil {
+	if s == nil {
 		return
 	}
-	s.closeOnce.Do(func() {
-		s.closed.Store(true)
-		s.q.Close()
-	})
+	s.mu.Lock()
+	s.closed.Store(true)
+	s.mu.Unlock()
+	s.signal()
 }
 
 func (s *requestScheduler) maybeClose() {
 	if s == nil {
 		return
 	}
-	if s.startupDone.Load() && s.pending.Load() == 0 {
-		s.Close()
+	s.mu.Lock()
+	shouldClose := s.startupDone.Load() && s.pending.Load() == 0 && len(s.high) == 0 && len(s.normal) == 0
+	if shouldClose {
+		s.closed.Store(true)
+	}
+	s.mu.Unlock()
+	if shouldClose {
+		s.signal()
+	}
+}
+
+func (s *requestScheduler) signal() {
+	if s == nil || s.wake == nil {
+		return
+	}
+	select {
+	case s.wake <- struct{}{}:
+	default:
 	}
 }
 
@@ -238,6 +300,10 @@ type Req struct {
 
 	// default
 	disallowedMITMType bool
+
+	// priority marks bounded, high-value assets such as JavaScript chunks,
+	// source maps and runtime manifests. It is intentionally crawler-private.
+	priority bool
 }
 
 func HostToWildcardGlobs(host string) []glob.Glob {
@@ -381,15 +447,23 @@ func StartCrawler(url string, opt ...ConfigOpt) (chan *Req, error) {
 }
 
 func NewCrawler(urls string, opts ...ConfigOpt) (*Crawler, error) {
+	config := &Config{}
+	config.init()
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	urlsRaw := utils.PrettifyListFromStringSplited(urls, ",")
-	urlList := utils.ParseStringToUrlsWith3W(urlsRaw...)
+	var urlList []string
+	if config.exactOrigins {
+		urlList = utils.ParseStringToUrls(urlsRaw...)
+	} else {
+		urlList = utils.ParseStringToUrlsWith3W(urlsRaw...)
+	}
 	for i, rawURL := range urlList {
 		urlList[i] = stripURLFragment(rawURL)
 	}
 	log.Debugf("actual url list: %v", urlList)
-
-	config := &Config{}
-	config.init()
 
 	// 把自己的域名加在里面
 	for _, u := range urlList {
@@ -397,11 +471,11 @@ func NewCrawler(urls string, opts ...ConfigOpt) (*Crawler, error) {
 		if err != nil {
 			continue
 		}
-		WithDomainWhiteList(urlIns.Hostname())(config)
-	}
-
-	for _, opt := range opts {
-		opt(config)
+		if config.exactOrigins {
+			WithDomainWhiteListExactPattern(urlIns.Hostname())(config)
+		} else {
+			WithDomainWhiteList(urlIns.Hostname())(config)
+		}
 	}
 
 	if config.concurrent <= 0 {
@@ -424,6 +498,7 @@ func NewCrawler(urls string, opts ...ConfigOpt) (*Crawler, error) {
 		starting:      utils.NewBool(false),
 		requestedHash: new(sync.Map),
 		foundUrls:     new(sync.Map),
+		reportedUrls:  new(sync.Map),
 		ctx:           ctx,
 		cancel:        cancel,
 		loginOnce:     new(sync.Once),
@@ -513,89 +588,85 @@ func (c *Crawler) run() {
 	}
 	workerLimiter := make(chan struct{}, concurrent)
 	var workerWG sync.WaitGroup
-	reqOutput := c.scheduler.Output()
-
 	for {
-		select {
-		case <-c.ctx.Done():
+		if c.contextDone() {
 			c.scheduler.Close()
 			workerWG.Wait()
 			return
-		case r, ok := <-reqOutput:
-			if !ok {
-				workerWG.Wait()
+		}
+		r, ok := c.scheduler.Next()
+		if !ok {
+			workerWG.Wait()
+			return
+		}
+		if c.contextDone() {
+			c.scheduler.Done()
+			continue
+		}
+
+		log.Debugf("start to handling request: %v", r.request.URL.String())
+
+		// 预处理失败
+		c.preRequestLock.Lock()
+		if c.contextDone() || !c.preReq(r) {
+			c.preRequestLock.Unlock()
+			c.scheduler.Done()
+			continue
+		}
+
+		c.requestCounter++
+		overRequestLimit := c.requestCounter > int64(config.maxCountOfRequest)
+		c.preRequestLock.Unlock()
+
+		// Keep the limit decision under preRequestLock: direct JavaScript
+		// asset workers reserve from the same counter.
+		if overRequestLimit {
+			c.scheduler.Done()
+			continue
+		}
+
+		// 已经被请求过了
+		_, ok = c.requestedHash.Load(r.Hash())
+		if ok {
+			c.scheduler.Done()
+			continue
+		}
+
+		// 检查是不是符合访问标准
+		if r.request.URL.Host == "" {
+			r.request, _ = utils.ReadHTTPRequestFromBytes(r.requestRaw)
+		}
+		if !config.CheckShouldBeHandledURL(r.request.URL) {
+			c.requestedHash.Store(r.Hash(), nil)
+			c.scheduler.Done()
+			continue
+		}
+
+		select {
+		case workerLimiter <- struct{}{}:
+		case <-c.ctx.Done():
+			c.scheduler.Done()
+			continue
+		}
+		workerWG.Add(1)
+		go func(r *Req) {
+			defer func() {
+				<-workerLimiter
+				c.scheduler.Done()
+				workerWG.Done()
+			}()
+			log.Debugf("request to %v", r.request.URL.String())
+			c.requestedHash.Store(r.Hash(), nil)
+			c.execReq(r)
+			if c.contextDone() {
 				return
 			}
-			if c.contextDone() {
-				c.scheduler.Done()
-				continue
-			}
 
-			log.Debugf("start to handling request: %v", r.request.URL.String())
-
-			// 预处理失败
-			c.preRequestLock.Lock()
-			if c.contextDone() || !c.preReq(r) {
-				c.preRequestLock.Unlock()
-				c.scheduler.Done()
-				continue
-			}
-
-			c.requestCounter++
-			c.handlingRequestCounter++
-			c.preRequestLock.Unlock()
-
-			// 请求最大值限制
-			// 判断请求最大值限制
-			if c.requestCounter > int64(config.maxCountOfRequest) {
-				c.scheduler.Done()
-				continue
-			}
-
-			// 已经被请求过了
-			_, ok = c.requestedHash.Load(r.Hash())
-			if ok {
-				c.scheduler.Done()
-				continue
-			}
-
-			// 检查是不是符合访问标准
-			if r.request.URL.Host == "" {
-				r.request, _ = utils.ReadHTTPRequestFromBytes(r.requestRaw)
-			}
-			if !config.CheckShouldBeHandledURL(r.request.URL) {
-				c.requestedHash.Store(r.Hash(), nil)
-				c.scheduler.Done()
-				continue
-			}
-
-			select {
-			case workerLimiter <- struct{}{}:
-			case <-c.ctx.Done():
-				c.scheduler.Done()
-				continue
-			}
-			workerWG.Add(1)
-			go func(r *Req) {
-				defer func() {
-					<-workerLimiter
-					c.scheduler.Done()
-					workerWG.Done()
-				}()
-				log.Debugf("request to %v", r.request.URL.String())
-				c.requestedHash.Store(r.Hash(), nil)
-				c.execReq(r)
-				if c.contextDone() {
-					return
-				}
-
-				// 发送结束了
-				c.afterRequestLock.Lock()
-				c.handleReqResult(r)
-				c.handlingRequestCounter--
-				c.afterRequestLock.Unlock()
-			}(r)
-		}
+			// 发送结束了
+			c.afterRequestLock.Lock()
+			c.handleReqResult(r)
+			c.afterRequestLock.Unlock()
+		}(r)
 	}
 }
 
@@ -685,6 +756,17 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 	return result, nil
 }
 
+func (r *Req) newHTTPRequest(responseRaw []byte, target string) (bool, []byte, error) {
+	// lowhttp's historical URL join treats the complete request path as a
+	// directory. Resolve here with net/url semantics so a response at
+	// /deep/page maps "runtime.js" to /deep/runtime.js, while still preserving
+	// NewHTTPRequest's packet/cookie construction behavior.
+	if absolute := r.AbsoluteURL(target); absolute != "" {
+		target = absolute
+	}
+	return NewHTTPRequest(r.IsHttps(), r.requestRaw, responseRaw, target)
+}
+
 func (c *Crawler) handleReqResult(r *Req) {
 	if c.contextDone() {
 		return
@@ -708,14 +790,26 @@ func (c *Crawler) handleReqResult(r *Req) {
 			log.Errorf("create request from bytes error: %s", err.Error())
 			return
 		}
-		if ret, err := url.Parse(req.Url()); err != nil {
-			if !config.CheckShouldBeHandledURL(ret) {
-				return
-			}
+		ret, err := url.Parse(req.Url())
+		if err != nil || ret == nil || ret.Scheme == "" || ret.Host == "" {
+			return
 		}
-		if c.submit(req) && config.onUrlFound != nil {
-			config.onUrlFound(req.Url())
+		if !c.reportDiscoveredURL(ret.String()) {
+			return
 		}
+		if !config.CheckShouldBeHandledURL(ret) {
+			return
+		}
+		c.submit(req)
+	}
+
+	for _, candidate := range responseHeaderAssetCandidates(r.response) {
+		reqHTTPS, reqBytes, err := r.newHTTPRequest(r.responseRaw, candidate)
+		if err != nil {
+			log.Debugf("response header asset: build request failed for %q: %v", candidate, err)
+			continue
+		}
+		submit(reqHTTPS, reqBytes)
 	}
 
 	var jsContents []*JavaScriptContent
@@ -724,6 +818,13 @@ func (c *Crawler) handleReqResult(r *Req) {
 		lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader)),
 		string(r.responseBody),
 		WithFetcher_JavaScript(func(content *JavaScriptContent) {
+			// Adaptive AI analysis needs compiled/minified and oversized assets.
+			// Preserve every asset here; legacy SSA-only behavior keeps its old
+			// filters below.
+			if config.enableAIJSExtract && config.aiJSExtractConfig != nil && config.aiJSExtractConfig.AdaptiveTrigger {
+				jsContents = append(jsContents, content)
+				return
+			}
 			// skip min.js
 			if strings.HasSuffix(content.UrlPath, ".min.js") {
 				return
@@ -749,7 +850,7 @@ func (c *Crawler) handleReqResult(r *Req) {
 					if attr.Val == "" {
 						continue
 					}
-					reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, attr.Val)
+					reqHttps, reqBytes, err := r.newHTTPRequest(r.responseBody, attr.Val)
 					if err != nil {
 						log.Errorf("new request error: %s", err.Error())
 						continue
@@ -763,10 +864,28 @@ func (c *Crawler) handleReqResult(r *Req) {
 		log.Errorf("page information walker error: %s", err.Error())
 	}
 
-	// External JS contents are needed by both the SSA path (enableJSParser)
-	// and the AI extract path (enableAIJSExtract). Fetch once if either toggle
-	// is on; the helper is idempotent over content.IsCodeText.
-	if config.enableJSParser || config.enableAIJSExtract {
+	adaptiveAI := config.enableAIJSExtract && config.aiJSExtractConfig != nil && config.aiJSExtractConfig.AdaptiveTrigger
+	if adaptiveAI {
+		// In adaptive mode, external scripts are first-class crawler requests.
+		// Their responses therefore pass through onRequest, recursive discovery,
+		// the shared request budget and the AI pipeline exactly once.
+		for _, content := range jsContents {
+			if content == nil || content.IsCodeText || strings.TrimSpace(content.UrlPath) == "" {
+				continue
+			}
+			reqHTTPS, reqBytes, err := r.newHTTPRequest(r.responseRaw, content.UrlPath)
+			if err != nil {
+				log.Debugf("adaptive JavaScript asset: build request failed for %q: %v", content.UrlPath, err)
+				continue
+			}
+			submit(reqHTTPS, reqBytes)
+		}
+	}
+
+	// Legacy SSA and non-adaptive AI retain their historical direct downloader.
+	// Adaptive responses are instead analyzed when their scheduled request is
+	// handled, including when jsParser is enabled alongside adaptive AI.
+	if (config.enableJSParser || config.enableAIJSExtract) && !adaptiveAI {
 		c.fetchExternalJSCodes(r, jsContents)
 	}
 
@@ -774,44 +893,90 @@ func (c *Crawler) handleReqResult(r *Req) {
 	// so users can opt-in to either or both. Each emitted path goes through
 	// the same submit() pipeline so deduplication / domain filters apply.
 	if config.enableAIJSExtract {
-		var combined bytes.Buffer
-		if len(r.responseBody) > 0 {
-			combined.Write(r.responseBody)
-			// Block-end markers must NOT start with "//" or look like a path,
-			// otherwise both the regex pre-filter and the AI step will mis-read
-			// them as protocol-relative URLs (regression: leaked as
-			// "http://---html-end---/" downstream).
-			combined.WriteString("\n/* yak-html-end */\n")
-		}
-		for _, j := range jsContents {
-			if j.IsCodeText && j.Code != "" {
-				combined.WriteString(j.Code)
-				combined.WriteString("\n/* yak-js-end */\n")
-			}
-		}
-		if combined.Len() > 0 {
-			// Build a per-request shallow copy so that RequestRaw / IsHTTPS do
-			// not leak across concurrent crawler requests sharing the shared
-			// config.aiJSExtractConfig template.
+		// Adaptive mode keeps source boundaries and analyzes each response/asset
+		// independently under one crawler-wide AI budget. Legacy callers retain
+		// the previous concatenated behavior below.
+		if config.aiJSExtractConfig.AdaptiveTrigger {
 			extractCfg := *config.aiJSExtractConfig
 			extractCfg.IsHTTPS = r.IsHttps()
 			extractCfg.RequestRaw = r.requestRaw
 
-			extractCtx, extractCancel := context.WithTimeout(c.ctx, 5*time.Minute)
-			err := RunAIJSExtract(extractCtx, combined.String(), &extractCfg, func(p string) {
+			contentType := lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader))
+			assets := []AIJSAsset{{
+				SourceURL:   r.Url(),
+				ContentType: contentType,
+				Body:        string(r.responseBody),
+			}}
+			for _, jsContent := range jsContents {
+				// Inline code is already present in the owning HTML response. A direct
+				// JavaScript response is likewise represented by r.responseBody.
+				if !jsContent.IsCodeText || jsContent.Code == "" || jsContent.UrlPath == "" {
+					continue
+				}
+				assets = append(assets, AIJSAsset{
+					SourceURL:   r.AbsoluteURL(jsContent.UrlPath),
+					ContentType: "application/javascript",
+					Body:        jsContent.Code,
+				})
+			}
+
+			err := RunAIJSExtractAssets(c.ctx, assets, &extractCfg, func(p string) {
 				if c.contextDone() {
 					return
 				}
-				httpsR, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, p)
+				httpsR, reqBytes, err := r.newHTTPRequest(r.responseRaw, p)
 				if err != nil {
 					log.Debugf("ai js extract: build http request failed for %q: %v", p, err)
 					return
 				}
+				// The shared submit closure reports a valid candidate before it
+				// enforces scope. Do not pre-filter here: an out-of-scope AI finding
+				// must remain observable without ever entering the request queue.
 				submit(httpsR, reqBytes)
 			})
-			extractCancel()
 			if err != nil {
-				log.Warnf("ai js extract: pipeline error: %v", err)
+				log.Warnf("ai js extract: adaptive pipeline error: %v", err)
+			}
+		} else {
+			var combined bytes.Buffer
+			if len(r.responseBody) > 0 {
+				combined.Write(r.responseBody)
+				// Block-end markers must NOT start with "//" or look like a path,
+				// otherwise both the regex pre-filter and the AI step will mis-read
+				// them as protocol-relative URLs (regression: leaked as
+				// "http://---html-end---/" downstream).
+				combined.WriteString("\n/* yak-html-end */\n")
+			}
+			for _, j := range jsContents {
+				if j.IsCodeText && j.Code != "" {
+					combined.WriteString(j.Code)
+					combined.WriteString("\n/* yak-js-end */\n")
+				}
+			}
+			if combined.Len() > 0 {
+				// Build a per-request shallow copy so that RequestRaw / IsHTTPS do
+				// not leak across concurrent crawler requests sharing the shared
+				// config.aiJSExtractConfig template.
+				extractCfg := *config.aiJSExtractConfig
+				extractCfg.IsHTTPS = r.IsHttps()
+				extractCfg.RequestRaw = r.requestRaw
+
+				extractCtx, extractCancel := context.WithTimeout(c.ctx, 5*time.Minute)
+				err := RunAIJSExtract(extractCtx, combined.String(), &extractCfg, func(p string) {
+					if c.contextDone() {
+						return
+					}
+					httpsR, reqBytes, err := r.newHTTPRequest(r.responseBody, p)
+					if err != nil {
+						log.Debugf("ai js extract: build http request failed for %q: %v", p, err)
+						return
+					}
+					submit(httpsR, reqBytes)
+				})
+				extractCancel()
+				if err != nil {
+					log.Warnf("ai js extract: pipeline error: %v", err)
+				}
 			}
 		}
 	}
@@ -824,6 +989,11 @@ func (c *Crawler) handleReqResult(r *Req) {
 
 	for _, i := range jsContents {
 		if !i.IsCodeText {
+			continue
+		}
+		// Keep the historical SSA input policy even when adaptive AI retained a
+		// broader asset set above.
+		if strings.HasSuffix(i.UrlPath, ".min.js") || isPopularJSLibrary(i.UrlPath) || len(i.Code) > twoMB {
 			continue
 		}
 		fullJSCode.WriteString(i.Code)
@@ -878,28 +1048,54 @@ FETCH_LOOP:
 				return
 			}
 
-			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, content.UrlPath)
+			reqHttps, reqBytes, err := r.newHTTPRequest(r.responseRaw, content.UrlPath)
 			if err != nil {
 				log.Errorf("build http request(js) failed: %s", content.UrlPath)
 				return
 			}
 			urlIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, reqHttps)
-			if urlIns != nil {
-				log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
-				// External JS <script src=...> is intentionally skipped by the
-				// HtmlTag-based submit pipeline (see handleResponse), so its URL
-				// would otherwise never reach onUrlFound. Report it here to keep
-				// the discovery channel complete.
-				if config.onUrlFound != nil {
-					config.onUrlFound(urlIns.String())
-				}
+			if urlIns == nil {
+				return
 			}
+			// External JS <script src=...> is intentionally skipped by the
+			// HtmlTag-based submit pipeline (see handleResponse), so its URL
+			// would otherwise never reach onUrlFound. Discovery and fetching
+			// are deliberately separate: report the asset, then enforce scope,
+			// deduplication, and the crawler-wide request budget before I/O.
+			if !c.reportDiscoveredURL(urlIns.String()) {
+				return
+			}
+			if !config.CheckShouldBeHandledURL(urlIns) {
+				log.Debugf("skip out-of-scope JavaScript asset: %v", urlIns)
+				return
+			}
+			if !c.reserveDirectJSAssetRequest(urlIns) {
+				log.Debugf("skip duplicate or over-budget JavaScript asset: %v", urlIns)
+				return
+			}
+			log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
 			rsp, _, err := config.DoHTTPRequest(reqHttps, c.config.runtimeID, lowhttp.WithRequest(reqBytes))
 			if err != nil {
 				return
 			}
 
-			if !utils.IContains(lowhttp.GetHTTPPacketContentType(rsp.RawPacket), "javascript") {
+			responseContentType := lowhttp.GetHTTPPacketContentType(rsp.RawPacket)
+			assetPath := strings.ToLower(content.UrlPath)
+			looksLikeJavaScriptPath := strings.HasSuffix(assetPath, ".js") ||
+				strings.HasSuffix(assetPath, ".mjs") ||
+				strings.HasSuffix(assetPath, ".cjs") ||
+				strings.Contains(assetPath, ".js?") ||
+				strings.Contains(assetPath, ".mjs?") ||
+				strings.Contains(assetPath, ".cjs?")
+			// The path-suffix fallback is intentionally adaptive-only. Historical
+			// SSA and legacy AI callers required a JavaScript MIME type; widening
+			// that policy for every jsParser caller could make an HTML error page
+			// named *.js enter the legacy parser.
+			adaptivePathFallback := config.enableAIJSExtract &&
+				config.aiJSExtractConfig != nil &&
+				config.aiJSExtractConfig.AdaptiveTrigger &&
+				looksLikeJavaScriptPath
+			if !utils.IContains(responseContentType, "javascript") && !adaptivePathFallback {
 				return
 			}
 
@@ -909,6 +1105,32 @@ FETCH_LOOP:
 		}()
 	}
 	wg.Wait()
+}
+
+// reserveDirectJSAssetRequest brings the historical direct <script src>
+// downloader under the same crawler-run request cap as scheduled requests.
+// LoadOrStore is also an in-flight reservation, so duplicate tags cannot race
+// into multiple downloads.
+func (c *Crawler) reserveDirectJSAssetRequest(assetURL *url.URL) bool {
+	if c == nil || c.config == nil || assetURL == nil || c.requestedHash == nil {
+		return false
+	}
+	hash := utils.CalcSha1(assetURL.String(), http.MethodGet)
+	if _, loaded := c.requestedHash.LoadOrStore(hash, struct{}{}); loaded {
+		return false
+	}
+
+	c.preRequestLock.Lock()
+	defer c.preRequestLock.Unlock()
+	limit := int64(c.config.maxCountOfRequest)
+	if limit <= 0 || c.requestCounter >= limit {
+		// The crawler-wide budget cannot grow later in the run. Keep the
+		// reservation so repeated tags do not repeatedly retry a permanently
+		// over-budget asset.
+		return false
+	}
+	c.requestCounter++
+	return true
 }
 
 func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(string) bool, extractionRulesHandler func(*Req) []interface{}) {
@@ -1093,6 +1315,30 @@ func (c *Crawler) initScheduler() {
 	}
 
 	size := c.config.concurrent * 3
+	if c.config.maxCountOfRequest > size {
+		size = c.config.maxCountOfRequest
+	}
+	if c.config.maxCountOfLinks <= 0 {
+		// maxUrls explicitly documents non-positive values as unlimited. Do not
+		// reintroduce an implicit queue cap after a discovery has already been
+		// reported and reserved.
+		size = 0
+	} else {
+		// Every admitted discovery may be submitted while a worker is still
+		// processing the owning page. Keep enough room for the complete bounded
+		// discovery set plus seeds, otherwise a transient full queue permanently
+		// loses a URL that reportDiscoveredURL has already reserved.
+		discoveryCapacity := c.config.maxCountOfLinks
+		maxInt := int(^uint(0) >> 1)
+		if len(c.originUrls) <= maxInt-discoveryCapacity {
+			discoveryCapacity += len(c.originUrls)
+		} else {
+			discoveryCapacity = maxInt
+		}
+		if discoveryCapacity > size {
+			size = discoveryCapacity
+		}
+	}
 	c.scheduler = newRequestScheduler(c.ctx, size)
 }
 
@@ -1100,12 +1346,79 @@ func (c *Crawler) submit(r *Req) bool {
 	if c == nil || c.scheduler == nil {
 		return false
 	}
+	if r == nil || r.request == nil || r.request.URL == nil {
+		return false
+	}
+	if isHighPriorityAssetURL(r.request.URL) {
+		r.priority = true
+	}
 	if _, loaded := c.foundUrls.LoadOrStore(r.Hash(), nil); loaded {
 		return false
 	}
 	if !c.scheduler.Submit(r) {
 		c.foundUrls.Delete(r.Hash())
 		return false
+	}
+	return true
+}
+
+// reportDiscoveredURL is the crawler-run admission gate for newly discovered
+// URLs. Seed URLs are free, while every other unique candidate consumes one
+// maxUrls slot before callbacks, scope checks, or scheduling. Keeping the
+// decision before the scope check is intentional: an out-of-scope candidate is
+// still part of the discovered surface and must not provide an unbounded side
+// channel around maxUrls.
+func (c *Crawler) reportDiscoveredURL(rawURL string) bool {
+	if c == nil || c.config == nil {
+		return false
+	}
+	rawURL = stripURLFragment(strings.TrimSpace(rawURL))
+	if rawURL == "" {
+		return false
+	}
+
+	c.discoveryMu.Lock()
+	accepted := func() bool {
+		defer c.discoveryMu.Unlock()
+
+		// originUrls is immutable after construction. Check it directly rather
+		// than relying only on foundUrls, because seed submission happens in a
+		// goroutine and discovery can otherwise race ahead of a later seed.
+		for _, seedURL := range c.originUrls {
+			if rawURL == seedURL {
+				return false
+			}
+		}
+		// Seed URLs and already scheduled requests are not newly discovered. This
+		// also prevents a fragment-only link from reporting the current document.
+		if c.foundUrls != nil {
+			if _, scheduled := c.foundUrls.Load(utils.CalcSha1(rawURL, http.MethodGet)); scheduled {
+				return false
+			}
+		}
+		if c.reportedUrls == nil {
+			c.reportedUrls = new(sync.Map)
+		}
+		if _, loaded := c.reportedUrls.Load(rawURL); loaded {
+			return false
+		}
+		if c.config.maxCountOfLinks > 0 && c.linkCounter >= int64(c.config.maxCountOfLinks) {
+			return false
+		}
+		if _, loaded := c.reportedUrls.LoadOrStore(rawURL, struct{}{}); loaded {
+			return false
+		}
+		c.linkCounter++
+		return true
+	}()
+	if !accepted {
+		return false
+	}
+
+	// User callbacks stay outside the admission lock so a slow observer cannot
+	// block unrelated crawler workers. The URL is already durably reserved.
+	if c.config.onUrlFound != nil {
+		c.config.onUrlFound(rawURL)
 	}
 	return true
 }
@@ -1131,12 +1444,14 @@ func (c *Crawler) createReqFromBytes(preRequest *Req, https bool, req []byte) (*
 	if err != nil {
 		return nil, err
 	}
+	baseURL := *urlIns
 	return &Req{
 		depth:      preRequest.depth + 1,
 		https:      https,
 		url:        urlIns.String(),
 		request:    reqIns,
 		requestRaw: req,
+		baseURL:    &baseURL,
 	}, nil
 }
 
@@ -1173,11 +1488,176 @@ func createReqFromUrlEx(preqRequest *Req, method, u string, body io.Reader, c *C
 	if preqRequest != nil {
 		depth = preqRequest.depth + 1
 	}
+	baseURL := *r.URL
 	return &Req{
 		depth:      depth,
+		https:      strings.EqualFold(r.URL.Scheme, "https"),
+		url:        r.URL.String(),
 		request:    r,
 		requestRaw: reqBytes,
+		baseURL:    &baseURL,
 	}, nil
+}
+
+func isHighPriorityAssetURL(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	lowerPath := strings.ToLower(u.Path)
+	for _, suffix := range []string{".js", ".mjs", ".cjs", ".map", ".wasm"} {
+		if strings.HasSuffix(lowerPath, suffix) {
+			return true
+		}
+	}
+	base := strings.ToLower(path.Base(lowerPath))
+	return strings.Contains(lowerPath, "/.well-known/") ||
+		strings.Contains(base, "chunk") ||
+		strings.Contains(base, "runtime-config") ||
+		strings.Contains(base, "asset-manifest") ||
+		strings.Contains(base, "routes") ||
+		strings.Contains(base, "service-worker") ||
+		strings.Contains(base, "openapi") ||
+		strings.Contains(base, "swagger")
+}
+
+const maxResponseHeaderAssetCandidates = 64
+
+func responseHeaderAssetCandidates(response *http.Response) []string {
+	if response == nil || response.Header == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	result := make([]string, 0, 8)
+	appendCandidate := func(candidate string) {
+		if len(result) >= maxResponseHeaderAssetCandidates {
+			return
+		}
+		candidate = strings.Trim(strings.TrimSpace(candidate), `"'`)
+		if candidate == "" || len(candidate) > 16*1024 || strings.ContainsAny(candidate, "\x00\r\n") {
+			return
+		}
+		parsed, err := url.Parse(candidate)
+		if err != nil || parsed == nil || parsed.Fragment != "" && parsed.Path == "" && parsed.Host == "" {
+			return
+		}
+		if parsed.IsAbs() && !strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https") {
+			return
+		}
+		if _, ok := seen[candidate]; ok {
+			return
+		}
+		seen[candidate] = struct{}{}
+		result = append(result, candidate)
+	}
+
+	for _, name := range []string{"SourceMap", "X-SourceMap"} {
+		for _, value := range response.Header.Values(name) {
+			appendCandidate(value)
+		}
+	}
+	for _, value := range response.Header.Values("Link") {
+		for _, part := range splitHTTPLinkHeader(value) {
+			start := strings.IndexByte(part, '<')
+			if start < 0 {
+				continue
+			}
+			endOffset := strings.IndexByte(part[start+1:], '>')
+			if endOffset < 0 {
+				continue
+			}
+			appendCandidate(part[start+1 : start+1+endOffset])
+		}
+	}
+	return result
+}
+
+func splitHTTPLinkHeader(value string) []string {
+	var result []string
+	start := 0
+	inAngle := false
+	quote := byte(0)
+	for index := 0; index < len(value); index++ {
+		current := value[index]
+		if quote != 0 {
+			if current == '\\' {
+				index++
+				continue
+			}
+			if current == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch current {
+		case '\'', '"':
+			quote = current
+		case '<':
+			inAngle = true
+		case '>':
+			inAngle = false
+		case ',':
+			if !inAngle {
+				result = append(result, value[start:index])
+				start = index + 1
+			}
+		}
+	}
+	result = append(result, value[start:])
+	return result
+}
+
+func (c *Crawler) adoptFinalRequestProvenance(r *Req, response *lowhttp.LowhttpResponse) error {
+	if r == nil || response == nil || len(response.RawRequest) == 0 {
+		return utils.Errorf("crawler response is missing final request provenance")
+	}
+
+	finalRequest, err := utils.ReadHTTPRequestFromBytes(response.RawRequest)
+	if err != nil {
+		return utils.Errorf("parse crawler final request failed: %v", err)
+	}
+
+	var finalURL *url.URL
+	if rawURL := strings.TrimSpace(response.Url); rawURL != "" {
+		parsed, parseErr := url.Parse(rawURL)
+		if parseErr == nil && parsed.Host != "" {
+			finalURL = parsed
+		}
+	}
+	if finalURL == nil {
+		finalURL, err = lowhttp.ExtractURLFromHTTPRequestRaw(response.RawRequest, response.Https)
+		if err != nil || finalURL == nil {
+			return utils.Errorf("extract crawler final request URL failed: %v", err)
+		}
+	}
+	if response.Https {
+		finalURL.Scheme = "https"
+	} else {
+		finalURL.Scheme = "http"
+	}
+	finalURL.Fragment = ""
+	finalURL.RawFragment = ""
+
+	finalRequest.URL = finalURL
+	finalRequest.RequestURI = ""
+	finalBaseURL := *finalURL
+	r.requestRaw = append(r.requestRaw[:0], response.RawRequest...)
+	r.request = finalRequest
+	r.url = finalURL.String()
+	r.https = response.Https
+	r.baseURL = &finalBaseURL
+
+	// Keep both the originally submitted identity and the final effective
+	// identity. A queued request for a redirect/fallback target can then be
+	// rejected before another network call, while the original seed remains
+	// deduplicated as well.
+	finalHash := r.Hash()
+	if c != nil && c.requestedHash != nil {
+		c.requestedHash.Store(finalHash, nil)
+	}
+	if c != nil && c.foundUrls != nil {
+		c.foundUrls.Store(finalHash, nil)
+	}
+	return nil
 }
 
 func (c *Crawler) execReq(r *Req) {
@@ -1203,26 +1683,14 @@ func (c *Crawler) execReq(r *Req) {
 		})
 	}
 
-	lowRspIns, usedHTTPS, err := c.config.DoHTTPRequest(r.IsHttps(), c.config.runtimeID, lowhttp.WithPacketBytes(r.requestRaw))
+	lowRspIns, _, err := c.config.DoHTTPRequest(r.IsHttps(), c.config.runtimeID, lowhttp.WithPacketBytes(r.requestRaw))
 	if err != nil {
 		r.err = err
 		return
 	}
-	if usedHTTPS != r.IsHttps() {
-		if r.request != nil && r.request.URL != nil {
-			if usedHTTPS {
-				r.request.URL.Scheme = "https"
-			} else {
-				r.request.URL.Scheme = "http"
-			}
-		}
-		if r.baseURL != nil {
-			if usedHTTPS {
-				r.baseURL.Scheme = "https"
-			} else {
-				r.baseURL.Scheme = "http"
-			}
-		}
+	if err := c.adoptFinalRequestProvenance(r, lowRspIns); err != nil {
+		r.err = err
+		return
 	}
 	rsp, err := utils.ReadHTTPResponseFromBytes(lowRspIns.RawPacket, r.request)
 	if err != nil {

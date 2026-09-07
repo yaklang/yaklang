@@ -1,0 +1,28 @@
+  deterministic provider failure
+
+Commands
+  @path         mention a project file
+  /              browse commands and settings
+  Tab            accept the selected completion
+  PgUp / PgDn    browse conversation history
+  Paste          supports multiline terminal paste
+  Shift-drag     select terminal output to copy
+  Click an activity to open its details
+  Ctrl+O        toggle the current activity
+  /process      toggle current activity
+  /process all  show earlier activities
+  /history      browse conversation history
+  /status       session and worker status
+  /queue        show queued messages
+  /queue clear  discard queued messages
+  /queue resume continue a paused queue
+  /mode MODE    set yolo, ai, or manual
+  /logs         recent worker diagnostics
+  /clear        clear the view
+  /exit         end the session
+  Enter queues your message while Memfit is working.
+
+╭─ Message ────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────
+○ Ready            test-model · YOLO · click/Ctrl+O details · /help

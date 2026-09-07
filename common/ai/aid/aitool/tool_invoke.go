@@ -227,7 +227,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 			Name:        t.Name,
 			Description: t.Description,
 			Success:     false,
-			Error:       fmt.Sprintf("工具执行失败: %v", err),
+			Error:       fmt.Sprintf("工具调用协议失败: %v", err),
 		}, err
 	}
 

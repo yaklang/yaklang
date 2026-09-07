@@ -37,7 +37,7 @@ func TestByteBucket_TaskContextCarriedIntoToolFirstSubBucket(t *testing.T) {
 	require.Contains(t, strings.Split(blocks[0].Render(), "\n")[0], "task=task-a")
 	require.Contains(t, strings.Split(blocks[1].Render(), "\n")[0], "task=task-a",
 		"a sub-bucket beginning with a tool result must inherit the preceding task context")
-	require.Contains(t, blocks[1].Render(), "[tool/scan ok]")
+	require.Contains(t, blocks[1].Render(), "[tool/scan]")
 	require.NotContains(t, blocks[0].Render(), "[task:task-a]")
 	require.Contains(t, text.Text, "[task:task-a]", "render-only optimization must preserve the stored event")
 }

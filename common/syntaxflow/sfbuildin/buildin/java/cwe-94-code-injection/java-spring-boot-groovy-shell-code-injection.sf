@@ -2,7 +2,7 @@ desc(
 	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞"
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability"
 	type: vuln
-	risk: "远程代码执行（RCE）"
+	risk: "groovy-code-execution"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -55,7 +55,7 @@ $sink #{
 
 alert $high for {
 	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
-	risk: "Groovy-Shell代码执行",
+	risk: "groovy-code-execution",
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞",
 	solution: <<<SOLUTION
@@ -148,7 +148,7 @@ $sink #{
 $result - $high as $low;
 
 alert $low for {
-	risk: "Groovy-Shell代码执行",
+	risk: "groovy-code-execution",
 	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability with Limited Risk",
 	title_zh: "检测具有有限风险的Java Spring Boot Groovy Shell代码注入漏洞",

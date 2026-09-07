@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -20,6 +21,7 @@ import (
 type StdioServer struct {
 	server    *MCPServer
 	errLogger *log.Logger
+	writeMu   sync.Mutex
 }
 
 // NewStdioServer creates a new stdio server wrapper around an MCPServer.
@@ -166,7 +168,14 @@ func (s *StdioServer) writeResponse(
 		return err
 	}
 
-	// Write response followed by newline
+	// Responses from the request loop and notifications from the dispatcher
+	// share the same stdout transport. Serialize the complete JSON-RPC frame so
+	// concurrent writes cannot interleave and corrupt the newline-delimited
+	// protocol stream.
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	// Write response followed by newline.
 	if _, err := fmt.Fprintf(writer, "%s\n", responseBytes); err != nil {
 		return err
 	}
@@ -178,6 +187,13 @@ func (s *StdioServer) writeResponse(
 // It sets up signal handling for graceful shutdown on SIGTERM and SIGINT.
 // Returns an error if the server encounters any issues during operation.
 func ServeStdio(server *MCPServer) error {
+	return ServeStdioWithIO(server, os.Stdin, os.Stdout)
+}
+
+// ServeStdioWithIO serves MCP over the provided streams. Supplying the
+// protocol writer explicitly lets applications reserve their inherited stdout
+// for JSON-RPC while redirecting unrelated process output elsewhere.
+func ServeStdioWithIO(server *MCPServer, stdin io.Reader, stdout io.Writer) error {
 	s := NewStdioServer(server)
 	s.SetErrorLogger(log.New(os.Stderr, "", log.LstdFlags))
 
@@ -193,5 +209,5 @@ func ServeStdio(server *MCPServer) error {
 		cancel()
 	}()
 
-	return s.Listen(ctx, os.Stdin, os.Stdout)
+	return s.Listen(ctx, stdin, stdout)
 }

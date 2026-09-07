@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
 var (
 	stringBuiltinMethod = yakvm.GetStringBuildInMethod()
 	bytesBuiltinMethod  = yakvm.GetBytesBuildInMethod()
@@ -1408,7 +1409,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	scriptType := req.GetYakScriptType()
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 	switch scriptType {
-	case "yak", "mitm", "port-scan", "codec":
+	case "yak", "mitm", "port-scan", "codec", "context-menu":
 		// do nothing
 	default:
 		// unsupported script type

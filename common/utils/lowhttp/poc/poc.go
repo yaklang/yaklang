@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -106,6 +107,7 @@ type PocConfig struct {
 
 	ClientHelloSpec *utls.ClientHelloSpec
 	RandomJA3       bool
+	TLSFingerprint  string
 
 	GmTLS                  bool
 	GmTLSOnly              bool
@@ -255,6 +257,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 
 	if c.RandomJA3 {
 		opts = append(opts, lowhttp.WithRandomJA3FingerPrint(c.RandomJA3))
+	}
+	if c.TLSFingerprint != "" {
+		opts = append(opts, lowhttp.WithTLSFingerprint(c.TLSFingerprint))
 	}
 	if c.GmTLSOnly {
 		opts = append(opts, lowhttp.WithGmTLSOnly(c.GmTLSOnly))
@@ -954,6 +959,18 @@ func WithRandomJA3(b bool) PocConfigOption {
 	return func(c *PocConfig) {
 		c.RandomJA3 = b
 	}
+}
+
+// WithTLSFingerprint selects a built-in TLS fingerprint profile.
+// Available profiles can be queried with TLSFingerprintProfiles.
+func WithTLSFingerprint(name string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.TLSFingerprint = name
+	}
+}
+
+func TLSFingerprintProfiles() []string {
+	return netx.AvailableClientHelloProfiles()
 }
 
 // not export
@@ -2405,8 +2422,10 @@ func fixPacketByConfig(packet []byte, config *PocConfig) []byte {
 }
 
 func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, error) {
-	// poc 模块收 proxy 影响
-	proxy := cli.DefaultCliApp.StringSlice("proxy")
+	// Honor the process-level proxy without declaring a new script parameter on
+	// every request. StringSlice registers metadata and made this hot path retain
+	// one cliExtraParams object per call (and race with concurrent Help reads).
+	proxy := cli.DefaultCliApp.PeekStringSlice("proxy")
 	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
@@ -2487,8 +2506,9 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 		return nil, nil, utils.Errorf("cannot support: %s", reflect.TypeOf(i))
 	}
 
-	// poc 模块收 proxy 影响
-	proxy := cli.DefaultCliApp.StringSlice("proxy")
+	// Keep raw-packet requests on the same non-registering proxy lookup as URL
+	// requests; both entry points are request hot paths.
+	proxy := cli.DefaultCliApp.PeekStringSlice("proxy")
 	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
@@ -3380,8 +3400,8 @@ func extractContentLength(headerBytes []byte) int64 {
 	return size
 }
 
-// RemoveSession 清除指定的 session，删除其关联的 cookiejar
-// 这在完成一系列请求后清理资源时很有用
+// RemoveSession 清除指定的 session，删除其关联的 cookiejar。
+// session 池本身有容量上限，但主动清理可以更早释放 cookie 数据。
 // 参数:
 //   - session: 要清除的 session 标识符
 //
@@ -3622,6 +3642,8 @@ var PoCExports = map[string]interface{}{
 	"username":               WithUsername,
 	"password":               WithPassword,
 	"randomJA3":              WithRandomJA3,
+	"tlsFingerprint":         WithTLSFingerprint,
+	"tlsFingerprintProfiles": TLSFingerprintProfiles,
 	"gmTls":                  WithGmTls,
 	"gmTlsOnly":              WithGmTlsOnly,
 	"gmTLSPrefer":            WithGmTLSPrefer,

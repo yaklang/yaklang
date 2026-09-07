@@ -63,6 +63,49 @@ func TestStatefulDriverKeepsConversationRuntimeAfterTurnFailure(t *testing.T) {
 	}
 }
 
+func TestStatefulTurnWaitsForReActQueueDrainBeforeCompleting(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	engine.drainStarted = make(chan struct{})
+	engine.drainRelease = make(chan struct{})
+	emitter := recordingConversationTurnEmitter{
+		completed: make(chan conversationTurnResult, 1),
+		failed:    make(chan conversationTurnResult, 1),
+	}
+	handle := &yakAIEngineRuntimeHandle{
+		engine:       engine,
+		emitter:      emitter,
+		messageQueue: make(chan yakAIQueuedMessage, 1),
+	}
+
+	go handle.sendMessage(yakAIQueuedMessage{turnID: "turn-with-queued-follow-up", content: "first"})
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("root task did not start")
+	}
+	close(engine.release)
+	select {
+	case <-engine.drainStarted:
+	case <-time.After(time.Second):
+		t.Fatal("stateful runtime did not wait for the ReAct queue to drain")
+	}
+	select {
+	case completed := <-emitter.completed:
+		t.Fatalf("turn completed before queued follow-up drained: %#v", completed)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(engine.drainRelease)
+	select {
+	case completed := <-emitter.completed:
+		if completed.turnID != "turn-with-queued-follow-up" {
+			t.Fatalf("completed turn = %q", completed.turnID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("turn did not complete after queued follow-up drained")
+	}
+}
+
 func TestStatefulControlInputIsLinearizedWithTerminalClose(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
 	engine.eventStarted = make(chan struct{})
@@ -407,6 +450,61 @@ func TestBuildYakAIEngineOptionsUsesExplicitProviderSnapshotForAICallback(t *tes
 	config := aiengine.NewAIEngineConfig(options...)
 	if config.AICallback == nil {
 		t.Fatal("expected explicit provider callback to be configured")
+	}
+}
+
+func TestBuildYakAIEngineOptionsBindsThreeSessionModelRoles(t *testing.T) {
+	originalLoader := loadYakProviderCallback
+	t.Cleanup(func() { loadYakProviderCallback = originalLoader })
+	loaded := make(map[consts.ModelTier]string)
+	invoked := make([]string, 0, 4)
+	loadYakProviderCallback = func(options yakRuntimeOptions, tier consts.ModelTier) (aicommon.AICallbackType, error) {
+		loaded[tier] = options.AIService + "/" + options.AIModelName
+		role := string(tier)
+		return func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			invoked = append(invoked, role)
+			return nil, nil
+		}, nil
+	}
+
+	options, err := buildYakAIEngineOptions(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "ai-session-tiered"},
+		ProviderPolicySnapshotJSON: []byte(`{
+			"schema":"legion.ai.provider-policy.v2",
+			"enabled":true,
+			"intelligent_models":[{"ai_service":"high-provider","ai_model_name":"high-model","api_key":"high-key"}],
+			"lightweight_models":[{"ai_service":"light-provider","ai_model_name":"light-model","api_key":"light-key"}],
+			"vision_models":[{"ai_service":"vision-provider","ai_model_name":"vision-model","api_key":"vision-key"}]
+		}`),
+	}, noopAISessionRuntimeEmitter{})
+	if err != nil {
+		t.Fatalf("build tiered options: %v", err)
+	}
+	config := aiengine.NewAIEngineConfig(options...)
+	if config.AICallback == nil || config.QualityPriorityAICallback == nil || config.SpeedPriorityAICallback == nil {
+		t.Fatalf("missing engine role callbacks: %#v", config)
+	}
+	request := aicommon.NewAIRequest("test")
+	_, _ = config.AICallback(nil, request)
+	_, _ = config.QualityPriorityAICallback(nil, request)
+	_, _ = config.SpeedPriorityAICallback(nil, request)
+	visionConfig := &aicommon.Config{}
+	_ = aicommon.WithContext(context.Background())(visionConfig)
+	for _, option := range config.ExtOptions {
+		_ = option(visionConfig)
+	}
+	if visionConfig.GetVisionPriorityRawAICallback() == nil {
+		t.Fatal("missing session-scoped vision callback")
+	}
+	_, _ = visionConfig.GetVisionPriorityRawAICallback()(visionConfig, aicommon.NewAIRequest("image"))
+
+	if loaded[consts.TierIntelligent] != "high-provider/high-model" ||
+		loaded[consts.TierLightweight] != "light-provider/light-model" ||
+		loaded[consts.TierVision] != "vision-provider/vision-model" {
+		t.Fatalf("wrong provider loaded for model roles: %#v", loaded)
+	}
+	if got := strings.Join(invoked, ","); got != "intelligent,intelligent,lightweight,vision" {
+		t.Fatalf("wrong callback routing: %s", got)
 	}
 }
 

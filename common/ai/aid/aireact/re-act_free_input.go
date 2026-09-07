@@ -228,6 +228,23 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 				task.SetUserInputUUID(resource.GetValue())
 				continue
 			}
+			if resource.GetType() == aicommon.USER_INPUT_SOURCE && resource.GetKey() == aicommon.USER_INPUT_SOURCE_KEY {
+				task.SetInputSource(resource.GetValue())
+				continue
+			}
+			if resource.GetType() == aicommon.USER_INPUT_SCHEDULE_CONTEXT {
+				switch resource.GetKey() {
+				case aicommon.USER_INPUT_SCHEDULE_UUID:
+					task.SetScheduleUUID(resource.GetValue())
+				case aicommon.USER_INPUT_SCHEDULE_NAME:
+					task.SetScheduleName(resource.GetValue())
+				case aicommon.USER_INPUT_SCHEDULED_AT:
+					task.SetScheduledAt(resource.GetValue())
+				case aicommon.USER_INPUT_SCHEDULE_TRIGGER:
+					task.SetScheduleTrigger(resource.GetValue())
+				}
+				continue
+			}
 			attachedDatas = append(attachedDatas, aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue()))
 		}
 	}

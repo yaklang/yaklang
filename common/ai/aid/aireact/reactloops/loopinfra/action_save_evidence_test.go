@@ -2,32 +2,16 @@ package loopinfra
 
 import (
 	"context"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
 )
-
-type saveEvidenceTestInvoker struct {
-	*testInvoker
-	verifyQuery      string
-	verifyPayload    string
-	verifyIsToolCall bool
-	verifyCalls      int
-}
-
-func (t *saveEvidenceTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.verifyCalls++
-	t.verifyQuery = query
-	t.verifyPayload = payload
-	t.verifyIsToolCall = isToolCall
-	return t.verifySatisfactionResult, nil
-}
 
 func buildSaveEvidenceAction(payload string) *aicommon.Action {
 	action, err := aicommon.ExtractAction(payload, schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE)
@@ -37,58 +21,72 @@ func buildSaveEvidenceAction(payload string) *aicommon.Action {
 	return action
 }
 
-func TestSaveEvidence_Handler_UsesExplicitPayloadAndForcesVerification(t *testing.T) {
+func newSaveEvidenceLoop(t *testing.T) (*reactloops.ReActLoop, *mock.MockInvoker, *mock.MockStatefulTask) {
+	t.Helper()
 	ctx := context.Background()
-	invoker := &saveEvidenceTestInvoker{testInvoker: newTestInvoker(ctx)}
-	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
-
-	task := newTestTask(ctx)
-	invoker.currentTask = task
-
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.SetCurrentTask(task)
-
-	action := buildSaveEvidenceAction(`{
-		"@action": "save_evidence",
-		"verification_payload": "implemented the current change and want explicit acceptance now"
-	}`)
-
-	require.NoError(t, loopAction_SaveEvidence.ActionVerifier(loop, action))
-	op := reactloops.NewActionHandlerOperator(task)
-	loopAction_SaveEvidence.ActionHandler(loop, action, op)
-
-	assert.Equal(t, 1, invoker.verifyCalls)
-	assert.Equal(t, task.GetUserInput(), invoker.verifyQuery)
-	assert.Equal(t, "implemented the current change and want explicit acceptance now", invoker.verifyPayload)
-	assert.False(t, invoker.verifyIsToolCall)
-	// verification 收缩为纯观测角色后, satisfied=true 不再触发 operator.Exit
-	// (退出职责迁移到 AI 主动 finish). satisfied 仅作为观测信号沉淀, operator
-	// 不应被终止.
-	terminated, err := op.IsTerminated()
+	invoker := mock.NewMockInvoker(ctx)
+	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, invoker)
 	require.NoError(t, err)
-	assert.False(t, terminated, "verification satisfied must NOT terminate the operator anymore")
+	task := mock.NewMockStatefulTask(ctx, "save-evidence-test", "collect reusable evidence")
+	invoker.SetCurrentTask(task)
+	loop.SetCurrentTask(task)
+	return loop, invoker, task
 }
 
-func TestSaveEvidence_Handler_BuildsDefaultPayloadWhenEmpty(t *testing.T) {
-	ctx := context.Background()
-	invoker := &saveEvidenceTestInvoker{testInvoker: newTestInvoker(ctx)}
-	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(false, "need one more step", "")
-
-	task := newTestTask(ctx)
-	invoker.currentTask = task
-
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.SetCurrentTask(task)
-
-	action := buildSaveEvidenceAction(`{"@action": "save_evidence"}`)
-	require.NoError(t, loopAction_SaveEvidence.ActionVerifier(loop, action))
+func executeSaveEvidence(t *testing.T, loop *reactloops.ReActLoop, task *mock.MockStatefulTask, raw string) *reactloops.LoopActionHandlerOperator {
+	t.Helper()
+	handler, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE)
+	require.NoError(t, err)
+	require.NotNil(t, handler)
+	action := buildSaveEvidenceAction(raw)
+	require.NoError(t, handler.ActionVerifier(loop, action))
 	op := reactloops.NewActionHandlerOperator(task)
-	loopAction_SaveEvidence.ActionHandler(loop, action, op)
+	handler.ActionHandler(loop, action, op)
+	return op
+}
 
-	assert.Equal(t, 1, invoker.verifyCalls)
-	assert.Contains(t, invoker.verifyPayload, "Agent explicitly requested verification")
-	assert.Contains(t, invoker.verifyPayload, "Current iteration:")
-	assert.Contains(t, invoker.verifyPayload, "Use the full timeline, TODO snapshot, and shared context as the primary evidence for acceptance.")
+func TestSaveEvidence_IsCoreActionAndWritesSessionStore(t *testing.T) {
+	loop, invoker, task := newSaveEvidenceLoop(t)
+	op := executeSaveEvidence(t, loop, task, `{
+		"@action": "save_evidence",
+		"evidence_id": "refresh-token-replay",
+		"verification_payload": "POST /token/refresh accepted the same refresh token twice and returned two valid access tokens."
+	}`)
+
 	assert.True(t, op.IsContinued())
-	assert.Contains(t, op.GetFeedback().String(), "need one more step")
+	terminated, err := op.IsTerminated()
+	require.NoError(t, err)
+	assert.False(t, terminated)
+	rendered := invoker.GetConfig().GetSessionEvidenceRendered()
+	assert.Contains(t, rendered, "[id: refresh-token-replay]")
+	assert.Contains(t, rendered, "accepted the same refresh token twice")
+}
+
+func TestSaveEvidence_RetryAndUpdateAreIdempotent(t *testing.T) {
+	loop, invoker, task := newSaveEvidenceLoop(t)
+	first := `{"@action":"save_evidence","evidence_id":"api-auth","verification_payload":"Unauthenticated GET /api/users returned 401."}`
+	executeSaveEvidence(t, loop, task, first)
+	executeSaveEvidence(t, loop, task, first)
+	executeSaveEvidence(t, loop, task, `{"@action":"save_evidence","evidence_id":"api-auth","verification_payload":"Unauthenticated GET /api/users returned 401 with no response body."}`)
+
+	rendered := invoker.GetConfig().GetSessionEvidenceRendered()
+	assert.Len(t, regexp.MustCompile(`\[id: api-auth\]`).FindAllStringIndex(rendered, -1), 1)
+	assert.NotContains(t, rendered, "returned 401.\n")
+	assert.Contains(t, rendered, "returned 401 with no response body")
+}
+
+func TestSaveEvidence_DerivesStableIDAndRejectsEmptyContent(t *testing.T) {
+	loop, invoker, task := newSaveEvidenceLoop(t)
+	raw := `{"@action":"save_evidence","verification_payload":"Controlled comparison ruled out anonymous access to /admin/."}`
+	executeSaveEvidence(t, loop, task, raw)
+	executeSaveEvidence(t, loop, task, raw)
+
+	rendered := invoker.GetConfig().GetSessionEvidenceRendered()
+	assert.Len(t, regexp.MustCompile(`\[id: saved_[0-9a-f]{16}\]`).FindAllStringIndex(rendered, -1), 1)
+
+	handler, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE)
+	require.NoError(t, err)
+	err = handler.ActionVerifier(loop, buildSaveEvidenceAction(`{"@action":"save_evidence"}`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "session evidence content is required")
 }

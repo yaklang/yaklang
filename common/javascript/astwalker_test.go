@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dop251/goja/ast"
-	"github.com/dop251/goja/parser"
+	"github.com/yaklang/goja/ast"
+	"github.com/yaklang/goja/parser"
 	"github.com/yaklang/yaklang/common/go-funk"
 )
 
@@ -16,7 +16,7 @@ const code = `
 (function(){
 	2021-12-23+"asdfasdf"
 
-	0aasd111
+	0; aasd111
 
 	if (3.14159 > 0) {
 		console.log("Hello, World.");

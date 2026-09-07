@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: embed-fs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   generate-commit:
     runs-on: ubuntu-22.04
@@ -20,61 +24,93 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.ref  }}
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || github.token }}
-      - name: Check last commit message is bot message
+
+      - name: Configure git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          
-          COMMIT_MESSAGE=$(git log -1 --pretty=format:%s)
-          echo "Commit Message: $COMMIT_MESSAGE"
-          
-          if [[ "$COMMIT_MESSAGE" == *"[bot commit]"* ]]; then
-            echo "Commit from bot detected. Stopping CI."
-            echo "SKIP_CI=true" >> $GITHUB_ENV
-          else
-            echo "Commit from human. Continuing workflow."
-          fi
-      - name: Set up Go
-        if: ${{env.SKIP_CI != 'true'}}
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: "./go.mod"
-          cache: false
 
-      # - name: Cache Go modules
-      #   if: ${{env.SKIP_CI != 'true'}}
-      #   uses: actions/cache@v3
-      #   id: cache-go-modules
-      #   with:
-      #     path: ~/go/pkg/mod
-      #     key: go-modules-${{ runner.os }}-1.21-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       go-modules-${{ runner.os }}-1.21-${{ hashFiles('**/go.sum') }}
-
-      - name: Try Auto Merge
-        if: ${{env.SKIP_CI != 'true'}}
+      - name: Rebase onto main
         run: |
           git fetch origin main
           git rebase origin/main || true
           CONFLICTS=$(git diff --name-only --diff-filter=U)
           if [[ -n "$CONFLICTS" ]]; then
-          echo "Conflicts detected. Stopping CI."
-          exit 1
+            echo "Conflicts detected. Stopping CI."
+            exit 1
           else
-          echo "No conflicts. Continuing workflow."
+            echo "No conflicts. Continuing workflow."
           fi
-      - name: Execute commands
-        if: ${{env.SKIP_CI != 'true'}}
+
+      - name: Check bot commit and resource changes
+        id: check
         run: |
-          go run common/yak/cmd/yak.go syntaxflow-format ./common/syntaxflow/sfbuildin/buildin
-          go run common/yak/cmd/yak.go sync-rule -o common/syntaxflow/sfdb/rule_versions.json
-          go run common/yak/cmd/yak.go embed-fs-hash --override --all
+          RESOURCE_DIRS=(
+            "common/coreplugin/base-yak-plugin"
+            "common/syntaxflow/sfbuildin/buildin"
+            "common/aiforge/buildinforge"
+            "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai"
+          )
+
+          BOT_COMMIT=""
+          for c in $(git rev-list --reverse origin/main..HEAD); do
+            if git log -1 --pretty=%s "$c" | grep -q "\[bot commit\]"; then
+              BOT_COMMIT="$c"
+            fi
+          done
+
+          if [ -n "$BOT_COMMIT" ]; then
+            echo "Found bot commit: $BOT_COMMIT"
+            CHANGED_AFTER=$(git diff --name-only "$BOT_COMMIT"..HEAD -- "${RESOURCE_DIRS[@]}")
+            if [ -z "$CHANGED_AFTER" ]; then
+              echo "No resource changes after bot commit. Skipping."
+              echo "SKIP_CI=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Resource changes after bot commit. Dropping bot commit and regenerating."
+            BRANCH=$(git branch --show-current)
+            git rebase --onto "$BOT_COMMIT^" "$BOT_COMMIT" "$BRANCH"
+          else
+            echo "No bot commit found. Continuing."
+          fi
+
+      - name: Set up Go
+        if: ${{ env.SKIP_CI != 'true' }}
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Build Yak Binary
+        if: ${{ env.SKIP_CI != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP"
+          DEST="$RUNNER_TEMP/yak"
+          go build -o "$DEST" common/yak/cmd/yak.go
+          "$DEST" version
+          echo "YAK=$DEST" >> "$GITHUB_ENV"
+          echo "Built yak from this checkout; to switch back to a published binary, replace this step with a curl/wget download of yak_linux_amd64 once an OSS release carries embed-fs-hash --dir/--output-file."
+
+      - name: Format SyntaxFlow rules and generate rule versions
+        if: ${{ env.SKIP_CI != 'true' }}
+        run: |
+          "$YAK" syntaxflow-format ./common/syntaxflow/sfbuildin/buildin --rule-version-output ./common/syntaxflow/sfdb/rule_versions.json
+
+      - name: Sync embed FS hash files
+        if: ${{ env.SKIP_CI != 'true' }}
+        run: |
+          # Regenerates every resource hash from the checkout; each file is only rewritten
+          # when its hash actually changed, so an unchanged run leaves no diff and the
+          # commit step below produces no bot commit.
+          YAK="$YAK" bash scripts/sync-embed-fs-hash.sh
 
       - name: Commit changes
-        if: ${{success() && env.SKIP_CI != 'true'}}
+        if: ${{ success() && env.SKIP_CI != 'true' }}
         run: |
           git add .
           git diff --quiet && git diff --staged --quiet || git commit -m "chore: auto-update embed files [bot commit]"

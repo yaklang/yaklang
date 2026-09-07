@@ -88,7 +88,12 @@ func EmitCapabilityMatchingStatus(config aicommon.AICallerConfigIf) {
 	if config == nil || config.GetEmitter() == nil {
 		return
 	}
-	config.GetEmitter().EmitStatus(ReActLoadingStatusKey, "正在匹配相关能力 / Matching related capabilities...")
+	_, _ = config.GetEmitter().EmitStatusI18n(
+		ReActLoadingStatusKey,
+		"正在寻找适合这次任务的能力",
+		"Finding the right capabilities for this task",
+		aicommon.WithStatusCode("capability.matching"),
+	)
 }
 
 func resolveSkillLoaderFromConfig(config aicommon.AICallerConfigIf) aiskillloader.SkillLoader {

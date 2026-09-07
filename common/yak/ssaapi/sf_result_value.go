@@ -38,6 +38,9 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 			return true
 		})
 		r.memResult.AlertSymbolTable.ForEach(func(key string, value sfvm.Values) bool {
+			if _, ok := r.memResult.SymbolTable.Get(key); !ok {
+				return true
+			}
 			if v, ok := r.variable.Get(key); ok && v.(int) > 0 {
 				r.alertVariable = append(r.alertVariable, key)
 			}

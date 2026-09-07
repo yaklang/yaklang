@@ -1,0 +1,41 @@
+definitionRuntimeID = runtime.GetInfo("runtimeId")~
+outerPrefix = "definition"
+
+factory = func(prefix) {
+    return func(index) {
+        line = runtime.GetInfo("line")~
+        runtimeID = runtime.GetInfo("runtimeId")~
+        return line > 0 && runtimeID == definitionRuntimeID && prefix == outerPrefix && index >= 0
+    }
+}
+
+external = factory("definition")
+
+box := sandbox.Create(sandbox.library({
+    "external": external,
+}))
+
+// The injected function keeps its definition VM, globals, closure and runtime
+// helper even though the independent sandbox VM orchestrates the call.
+for index := 0; index < 16; index++ {
+    ok = box.ExecuteAsBoolean("external(index)", {"index": index})~
+    assert ok, "cross-VM sandbox call failed at %d" % index
+}
+
+// Async workers are counted by the sandbox VM but execute the injected
+// function against the definition VM. Each worker must resolve its own frame.
+ok = box.ExecuteAsBoolean(`
+results = make(chan bool, 24)
+for index := 0; index < 24; index++ {
+    go func(current) {
+        results <- external(current)
+    }(index)
+}
+allOK = true
+for index := 0; index < 24; index++ {
+    allOK = allOK && <-results
+}
+waitAllAsyncCallFinish()
+allOK
+`)~
+assert ok, "cross-VM sandbox async functions used the wrong frame"

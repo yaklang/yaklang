@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法"
 	title: "Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm"
-	risk:"不安全加密算法",
+	risk:"weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 [Oracle 官方文档: javax.crypto.KEM.Encapsulator](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/KEM.Encapsulator.html)
@@ -160,7 +160,7 @@ public class SecureKEMExample {
 #### 4. 配置应用程序和服务以废弃弱算法
 在应用程序的配置文件、TLS/SSL 配置中，明确禁用所有已知的弱加密算法，只启用强壮的、高强度算法。例如，在配置 TLS 协议时，只允许 TLS 1.2 或 TLS 1.3，并配置安全的加密套件。
 SOLUTION
-	risk: "不安全加密算法",
+	risk: "weak-cryptographic-algorithm",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

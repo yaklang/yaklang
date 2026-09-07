@@ -184,6 +184,17 @@ func (c *CodesMarshaller) consumeSymbolTable(buf []byte) (*SymbolTable, []byte, 
 }
 
 func (c *CodesMarshaller) marshalSymbolTable(buf []byte, tbl *SymbolTable) ([]byte, error) {
+	// A cached top-level script can finish while one of its Yak async workers is
+	// compiling eval code against the same live symbol table. Snapshot the table
+	// under the same read locks used by compiler/runtime lookups so cache
+	// serialization cannot race with symbol or nested-scope registration.
+	symbolMutex.RLock()
+	symbolTableMutex.RLock()
+	requireSymbolMutex.RLock()
+	defer symbolMutex.RUnlock()
+	defer symbolTableMutex.RUnlock()
+	defer requireSymbolMutex.RUnlock()
+
 	if tbl.parent != nil {
 		return nil, utils.Error("Symbol table is not root table.")
 	}

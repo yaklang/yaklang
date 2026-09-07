@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java未检查返回值是否为null导致空指针解引用漏洞"
 	title: "Check Java Unchecked Return Value to Null Pointer Dereference"
-	risk:"空指针",
+	risk:"null-dereference"
 	level:low
 	reference: <<<REFERENCE
 [CWE-476: NULL Pointer Dereference](https://cwe.mitre.org/data/definitions/476.html)
@@ -256,7 +256,7 @@ System.out.println("Home directory length: " + length);
 DESC
 	level: "low",
 	message: "检测到未检查返回值可能导致空指针异常",
-	risk: "空指针",
+	risk: "null-dereference",
 	name: "weak",
 }
 

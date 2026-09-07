@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang JSON信息泄露漏洞"
 	type: audit
 	level: low
-	risk: "信息泄露（Information Exposure）"
+	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -93,7 +93,7 @@ $obj #{
 
 alert $low for {
 	level: "low",
-	risk: "信息泄露",
+	risk: "information-exposure",
 	type: "vuln",
 	title: "Detect Golang Json Information Exposure",
 	title_zh: "检测到Golang Json信息泄露",

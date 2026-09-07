@@ -80,6 +80,14 @@ type PromptMaterials struct {
 	TodoSnapshot      string
 	UserHistory       string
 	FrozenUserContext string
+
+	// ReportedRisks is the rendered "已报告漏洞清单" block injected at the
+	// very end of the timeline-open prompt section (after PlanContext).
+	// It lists all risks reported via cybersecurity-risk during this
+	// session, so the model can avoid duplicate reports.
+	//
+	// 关键词: ReportedRisks, 已报告漏洞清单, timeline-open 末尾, 去重
+	ReportedRisks string
 }
 
 // HighStaticData 返回空 map: high-static 段是完全无变量的系统级共享 static。
@@ -195,6 +203,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		"UserHistory":            m.UserHistory,
 		"CurrentTime":            m.CurrentTime,
 		"PlanContext":            m.FrozenUserContext,
+		"ReportedRisks":          m.ReportedRisks,
 	}
 }
 
@@ -259,6 +268,10 @@ type PromptFrozenOpenMaterials struct {
 
 	SessionEvidenceFrozen string
 	SessionEvidenceOpen   string
+
+	// ReportedRisks is the rendered "已报告漏洞清单" block for the
+	// timeline-open section. Populated from SessionPromptState.
+	ReportedRisks string
 }
 
 func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
@@ -286,6 +299,7 @@ func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay boo
 		timelineBlocks = RenderTimelineFrozenOpenWithLatestModelReplay(config.GetTimeline())
 	}
 	evidenceBlocks := config.GetSessionPromptState().GetSessionEvidenceFrozenOpenBlocks(timelineBlocks.FrozenTimeUnix, nonce)
+	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:         timelineBlocks.Frozen,
 		TimelineOpen:           timelineBlocks.Open,
@@ -295,6 +309,7 @@ func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay boo
 		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
 		SessionEvidenceFrozen:  evidenceBlocks.Frozen,
 		SessionEvidenceOpen:    evidenceBlocks.Open,
+		ReportedRisks:          reportedRisks,
 	}
 }
 
@@ -310,6 +325,7 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionEvidenceFrozen = frozenOpen.SessionEvidenceFrozen
 	materials.SessionEvidenceOpen = frozenOpen.SessionEvidenceOpen
+	materials.ReportedRisks = frozenOpen.ReportedRisks
 }
 
 func timelineFrozenTimeUnixFromRenderable(blocks TimelineRenderableBlocks) int64 {

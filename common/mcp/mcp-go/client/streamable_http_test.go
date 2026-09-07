@@ -2,6 +2,9 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -9,6 +12,71 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 )
+
+func TestStreamableHTTPMCPClientSessionStateConcurrentAccess(t *testing.T) {
+	client, err := NewStreamableHTTPMCPClient("http://127.0.0.1/mcp")
+	require.NoError(t, err)
+
+	client.markInitialized(mcp.LATEST_PROTOCOL_VERSION)
+	initialHeader := make(http.Header)
+	initialHeader.Set(mcp.HeaderSessionID, "initial-session")
+	client.updateSessionFromHeaders(initialHeader)
+
+	const (
+		writerCount = 4
+		readerCount = 8
+		iterations  = 1_000
+	)
+
+	errorsCh := make(chan error, readerCount)
+	var wg sync.WaitGroup
+	for writer := 0; writer < writerCount; writer++ {
+		writer := writer
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for iteration := 0; iteration < iterations; iteration++ {
+				header := make(http.Header)
+				header.Set(mcp.HeaderSessionID, fmt.Sprintf("session-%d-%d", writer, iteration))
+				client.updateSessionFromHeaders(header)
+			}
+		}()
+	}
+
+	for reader := 0; reader < readerCount; reader++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for iteration := 0; iteration < iterations; iteration++ {
+				req, requestErr := http.NewRequest(http.MethodGet, "http://127.0.0.1/mcp", nil)
+				if requestErr != nil {
+					errorsCh <- requestErr
+					return
+				}
+				client.applyHeaders(req)
+
+				if got := req.Header.Get(mcp.HeaderProtocolVersion); got != mcp.LATEST_PROTOCOL_VERSION {
+					errorsCh <- fmt.Errorf("unexpected protocol version header %q", got)
+					return
+				}
+				if got := req.Header.Get(mcp.HeaderSessionID); got == "" {
+					errorsCh <- fmt.Errorf("missing session ID header")
+					return
+				}
+				if !client.snapshotState().initialized {
+					errorsCh <- fmt.Errorf("client unexpectedly became uninitialized")
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errorsCh)
+	for concurrentErr := range errorsCh {
+		require.NoError(t, concurrentErr)
+	}
+}
 
 func TestStreamableHTTPMCPClient(t *testing.T) {
 	observedClientCh := make(chan server.NotificationContext, 1)

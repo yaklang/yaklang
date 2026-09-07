@@ -106,7 +106,7 @@ func TestTaskArtifacts_SaveResultSummary(t *testing.T) {
 		contentBuilder.WriteString(fmt.Sprintf("Start Time: %s\n", startTime.Format("2006-01-02 15:04:05")))
 		contentBuilder.WriteString(fmt.Sprintf("End Time: %s\n", endTime.Format("2006-01-02 15:04:05")))
 		contentBuilder.WriteString("Task Status: completed\n")
-		contentBuilder.WriteString("Total Tool Calls: 3 (Success: 2, Failed: 1)\n\n")
+		contentBuilder.WriteString("Total Tool Calls: 3 (Completed: 2, Protocol Failed: 1)\n\n")
 
 		contentBuilder.WriteString("## Task Input\n\n")
 		contentBuilder.WriteString("Test user input for task\n\n")

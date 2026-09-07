@@ -21,16 +21,6 @@
 <|RECENT_KEEP_END_{{ .NONCE }}|>
 {{ end }}
 
-{{ if .HasCompressedHead }}
-# 已有历史压缩段（这是之前压缩的产物，请将其内容**原样保留**到你的对应字段中，不要进一步压缩或丢弃）
-<|CURRENT_COMPRESSED_HEAD_{{ .NONCE }}|>
-covered_end_item_id={{ .CompressedHeadID }}
-covered_end_at_ms={{ .CompressedHeadAtMs }}
-version={{ .CompressedHeadVer }}
-{{ .CompressedHeadText }}
-<|CURRENT_COMPRESSED_HEAD_END_{{ .NONCE }}|>
-{{ end }}
-
 # 需要你压缩的过去步骤
 <|ITEMS_TO_COMPRESS_{{ .NONCE }}|>
 {{ .ItemsToCompress }}
@@ -44,30 +34,33 @@ version={{ .CompressedHeadVer }}
 
 ## 输出字段与 token 分配
 
-将浓缩结果按以下 6 个字段输出。各字段的 token 分配比例为建议值，可根据实际内容灵活调整，但**总输出不应超过 {{ .OutputTokenBudget }} tokens**。
+将浓缩结果按以下 7 个字段输出。各字段的 token 分配比例为建议值，可根据实际内容灵活调整，但**总输出不应超过 {{ .OutputTokenBudget }} tokens**。
 
 | 字段 | 建议占比 | 说明 |
 |------|---------|------|
-| `key_findings` | ~40% | 关键发现与确认事实，每条一个独立事实，至少 1 条 |
+| `key_findings` | ~30% | 关键发现与确认事实，每条一个独立事实，至少 1 条 |
 | `active_config` | ~10% | 仍在生效的配置、凭据、参数 |
 | `completed_work` | ~20% | 已完成工作按类型分组概述 |
+| `open_failures` | ~15% | 未解决的执行失败、阻塞项、待办与失效验证 |
 | `failed_and_resolved` | ~10% | 失败→成功的转折记录 |
 | `discarded` | ~5% | 被判定可安全丢弃的内容一句话概述 |
-| `user_directives` | ~15% | 用户给出的指令、修正、偏好（如有） |
+| `user_directives` | ~10% | 用户给出的指令、修正、偏好（如有） |
 
 ### 各字段详细要求
 
-**`key_findings`**（数组，至少 1 条）：每条是一个独立的关键发现或确认事实。包括但不限于：发现的端点/漏洞/服务版本/拓扑结论/鉴权方式/速率限制/黑白名单。如有已有历史压缩段中的 key findings，必须原样保留到本字段中。
+**`key_findings`**（数组，至少 1 条）：每条是一个独立的关键发现或确认事实。包括但不限于：发现的端点/漏洞/服务版本/拓扑结论/鉴权方式/速率限制/黑白名单。
 
-**`active_config`**（字符串）：仍在生效的配置、凭据、参数、环境信息。如：代理地址、token、并发数、速率限制、目标根域、运行环境。如有已有历史压缩段中的配置信息，必须原样保留。
+**`active_config`**（字符串）：仍在生效的配置、凭据、参数、环境信息。如：代理地址、token、并发数、速率限制、目标根域、运行环境。
 
-**`completed_work`**（字符串）：已完成的工作按阶段/类型分组叙述。如"资产侦察: ...；漏洞验证: ...；脚本编写: ..."。如有已有历史压缩段中的已完成工作，合并到本字段中。
+**`completed_work`**（字符串）：仅记录已有客观成功证据或验收证据的工作，按阶段/类型分组叙述。如"资产侦察: ...；漏洞验证: ...；脚本编写: ..."。`stage=done`、`protocol-completed`、工具返回了结果，都只表示调用已结束，不能单独作为完成证据。
 
-**`failed_and_resolved`**（字符串）：失败→成功的转折性记录，含失败原因和解决方案。如"直接请求被 WAF 拦截(401×12)，URL 双编码绕过成功"。无则留空字符串。
+**`open_failures`**（字符串）：仍未解决的执行失败、阻塞条件、未完成 TODO/需求、需要重试的分支，以及最后一次修改后尚未重新验证的结论。保留可机读证据，例如 `exit_code`、`exit_code_accepted=false`、`timed_out=true`、`transport_error` 和失败分支标识。无则留空字符串。
+
+**`failed_and_resolved`**（字符串）：仅记录有更晚、独立成功证据确认已经解决的失败→成功转折，必须同时保留失败原因和成功证据。如"直接请求被 WAF 拦截(401×12)，随后 URL 双编码请求返回预期响应"。没有后续成功证据的失败必须进入 `open_failures`。无则留空字符串。
 
 **`discarded`**（字符串）：被判定为噪音或与当前任务无关、可安全丢弃的内容概述。**限制为一到两句话**，如"前期 Python 环境探测、重复 deps_check 确认、过时目录爆破中间结果"。
 
-**`user_directives`**（字符串）：用户在交互中给出的指令、修正、偏好。如"只测 /api/v1 前缀，跳过 /admin；非破坏性 payload；中文报告"。如有已有历史压缩段中的用户指令，必须原样保留。无则留空字符串。
+**`user_directives`**（字符串）：用户在交互中给出的指令、修正、偏好。如"只测 /api/v1 前缀，跳过 /admin；非破坏性 payload；中文报告"。无则留空字符串。
 
 ## 价值判断原则
 
@@ -77,6 +70,7 @@ version={{ .CompressedHeadVer }}
 - 对 RECENT_KEEP 当前决策仍有约束力的边界条件。
 - 已被采纳并持续生效的关键参数与策略。
 - 失败 → 成功的转折性结论。
+- 所有尚未解决的失败、阻塞、待办、待验证项，以及失败的结构化状态字段。
 - 用户给出的任何指令或修正。
 
 ### 可以聚合或精简
@@ -90,9 +84,10 @@ version={{ .CompressedHeadVer }}
 - 信息密度优先：每一句都有信息含量，但不要为了简短而丢掉关键细节。
 - 关键事件可标时间锚点（如 14:23），但不要每行都加。
 - 同类错误聚合（"超时 12 次，最终成功"），不要逐次列举。
+- 不得把 `done`、`finished`、`protocol-completed`、回调返回或有 stdout 解释为语义成功。
+- 压缩不得把失败弱化成“已执行/已完成”；只有更晚的独立成功证据才能把 `open_failures` 移入 `failed_and_resolved`。
 - 严禁 emoji，严禁主观情绪词。
 - 严禁在输出中出现 RECENT_KEEP 的内容片段。
-- **已有历史压缩段的内容不得丢失**：将其按字段分类合并到你的输出中。
 
 # 输出格式：JSON
 
@@ -102,7 +97,7 @@ version={{ .CompressedHeadVer }}
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["@action", "key_findings"],
+  "required": ["@action", "key_findings", "open_failures"],
   "properties": {
     "@action": {
       "type": "string",
@@ -112,19 +107,23 @@ version={{ .CompressedHeadVer }}
       "type": "array",
       "items": { "type": "string" },
       "minItems": 1,
-      "description": "关键发现与确认事实，每条一个独立事实。至少 1 条。如有历史压缩段中的 findings，必须原样保留。"
+      "description": "关键发现与确认事实，每条一个独立事实。至少 1 条。"
     },
     "active_config": {
       "type": "string",
-      "description": "仍在生效的配置、凭据、参数。无则留空字符串。如有历史压缩段中的配置，必须原样保留。"
+      "description": "仍在生效的配置、凭据、参数。无则留空字符串。"
     },
     "completed_work": {
       "type": "string",
-      "description": "已完成工作按类型分组的概述。无则留空字符串。如有历史压缩段中的已完成工作，合并到本字段。"
+      "description": "有客观成功或验收证据的已完成工作。调用结束或 protocol-completed 不是完成证据。无则留空字符串。"
+    },
+    "open_failures": {
+      "type": "string",
+      "description": "尚未解决的执行失败、阻塞、TODO、待验证项及其结构化失败证据。无则留空字符串。"
     },
     "failed_and_resolved": {
       "type": "string",
-      "description": "失败→成功的转折记录，含失败原因和解决方案。无则留空字符串。"
+      "description": "已有更晚独立成功证据确认解决的失败→成功转折。无则留空字符串。"
     },
     "discarded": {
       "type": "string",
@@ -132,7 +131,7 @@ version={{ .CompressedHeadVer }}
     },
     "user_directives": {
       "type": "string",
-      "description": "用户给出的指令、修正、偏好。无则留空字符串。如有历史压缩段中的用户指令，必须原样保留。"
+      "description": "用户给出的指令、修正、偏好。无则留空字符串。"
     }
   }
 }
@@ -145,25 +144,24 @@ version={{ .CompressedHeadVer }}
 (RECENT_KEEP: agent 正在对 /api/user 深入 SQLi 测试)
 (ITEMS_TO_COMPRESS: 50 条步骤含端口扫描、目录爆破、nuclei 扫描、WAF 探测、50 次 payload 试错、用户指令)
 
-{"@action": "timeline-reducer", "key_findings": ["目标 example.com 开放端口: 22(SSH), 80(HTTP), 443(HTTPS), 8080(HTTP-Proxy)", "/api/user 存在 SQL 注入（UNION-based，4 列，payload: ' UNION SELECT 1,2,3,4--）", "/api/orders 无注入点，/api/admin 待验证", "WAF 对 UNION/SELECT 关键字过滤，URL 双编码可绕过", "目录爆破发现 /admin(403)、/.git/config(200 信息泄露)、/backup.zip(200)", "SSH OpenSSH 8.9p1，无已知可利用 CVE"], "active_config": "代理=127.0.0.1:8080；Authorization Bearer=eyJhbGc...(有效)；并发=20；速率限制=5/s；目标根域=example.com", "completed_work": "资产侦察: 子域枚举发现 3 个子域(api/dev/staging)，nuclei 扫描 30 项命中 5 个中危，端口扫描完成，结果归档 artifacts/recon/。漏洞验证: /api/user 已确认 SQL 注入，/api/orders 排除，/api/admin 待验证。", "failed_and_resolved": "直接请求被 WAF 拦截(401×12, 403×3)，根因为关键字过滤；URL 双编码 + Header 改写后绕过成功。sqlmap --batch 模式超时 3 次，改用 --tamper=charencode 后成功。", "discarded": "前期 Python 环境探测(3 条)、重复 deps_check(5 条)、被全量扫描覆盖的早期目录爆破中间结果。", "user_directives": "只测 /api 前缀下的端点；优先非破坏性 payload；报告用中文。"}
+{"@action": "timeline-reducer", "key_findings": ["目标 example.com 开放端口: 22(SSH), 80(HTTP), 443(HTTPS), 8080(HTTP-Proxy)", "/api/user 存在 SQL 注入（UNION-based，4 列，payload: ' UNION SELECT 1,2,3,4--）", "/api/orders 无注入点，/api/admin 待验证", "WAF 对 UNION/SELECT 关键字过滤，URL 双编码可绕过", "目录爆破发现 /admin(403)、/.git/config(200 信息泄露)、/backup.zip(200)", "SSH OpenSSH 8.9p1，无已知可利用 CVE"], "active_config": "代理=127.0.0.1:8080；Authorization Bearer=eyJhbGc...(有效)；并发=20；速率限制=5/s；目标根域=example.com", "completed_work": "资产侦察: 子域枚举发现 3 个子域(api/dev/staging)，nuclei 扫描 30 项命中 5 个中危，端口扫描完成，结果归档 artifacts/recon/。漏洞验证: /api/user 已确认 SQL 注入，/api/orders 排除。", "open_failures": "/api/admin 尚未验证；最后一次请求返回 403，需取得认证后继续。", "failed_and_resolved": "直接请求被 WAF 拦截(401×12, 403×3)，根因为关键字过滤；URL 双编码 + Header 改写后返回预期响应。sqlmap --batch 模式超时 3 次，改用 --tamper=charencode 后成功。", "discarded": "前期 Python 环境探测(3 条)、重复 deps_check(5 条)、被全量扫描覆盖的早期目录爆破中间结果。", "user_directives": "只测 /api 前缀下的端点；优先非破坏性 payload；报告用中文。"}
 
 ## Good Case 2: 与 RECENT_KEEP 主题无关时的精简输出
 
 (RECENT_KEEP: agent 正在编写 SyntaxFlow rule)
 (ITEMS_TO_COMPRESS: 30 条 nuclei 扫描历史 + 端口扫描 + 子域枚举)
 
-{"@action": "timeline-reducer", "key_findings": ["资产侦察完成: 子域 3 个(api/dev/staging)，开放端口 22/80/443/8080", "nuclei 扫描 30 项命中 5 个中危 CVE，结果归档 artifacts/recon/"], "active_config": "", "completed_work": "资产侦察: 子域枚举、端口扫描、nuclei 扫描均已完成，结果归档 artifacts/recon/。", "failed_and_resolved": "", "discarded": "前期端口扫描和子域枚举的中间过程记录(约 20 条)，已被最终汇总覆盖。", "user_directives": ""}
+{"@action": "timeline-reducer", "key_findings": ["资产侦察完成: 子域 3 个(api/dev/staging)，开放端口 22/80/443/8080", "nuclei 扫描 30 项命中 5 个中危 CVE，结果归档 artifacts/recon/"], "active_config": "", "completed_work": "资产侦察: 子域枚举、端口扫描、nuclei 扫描均已完成，结果归档 artifacts/recon/。", "open_failures": "", "failed_and_resolved": "", "discarded": "前期端口扫描和子域枚举的中间过程记录(约 20 条)，已被最终汇总覆盖。", "user_directives": ""}
 
 ## Good Case 3: 仅有少量步骤时的简洁输出
 
 (RECENT_KEEP: agent 正在对同一目标的下一阶段 fuzz)
 (ITEMS_TO_COMPRESS: 早期建立的代理、token、并发配置)
 
-{"@action": "timeline-reducer", "key_findings": ["目标根域 example.com，已建立有效会话"], "active_config": "代理=127.0.0.1:8080；Authorization Bearer=eyJhbGc...(有效，仍在用)；并发=20；速率限制=每秒5请求；目标根域=example.com", "completed_work": "", "failed_and_resolved": "", "discarded": "", "user_directives": ""}
+{"@action": "timeline-reducer", "key_findings": ["目标根域 example.com，已建立有效会话"], "active_config": "代理=127.0.0.1:8080；Authorization Bearer=eyJhbGc...(有效，仍在用)；并发=20；速率限制=每秒5请求；目标根域=example.com", "completed_work": "", "open_failures": "", "failed_and_resolved": "", "discarded": "", "user_directives": ""}
 
-## Good Case 4: 有历史压缩段时的合并输出
+## Good Case 4: 本批次同时包含已完成工作与未解决失败
 
-(已有历史压缩段包含: 前期扫描发现 3 个端点，WAF 存在关键字过滤)
-(ITEMS_TO_COMPRESS: 新的 20 步 fuzz 测试)
+(ITEMS_TO_COMPRESS: 20 步 fuzz 测试，其中一个分支已成功、一个分支仍返回 403)
 
-{"@action": "timeline-reducer", "key_findings": ["目标 example.com 开放端口: 22, 80, 443, 8080", "已发现端点: /api/user, /api/admin, /api/orders(来自历史)", "WAF 对 UNION/SELECT 过滤，URL 双编码可绕过(来自历史)", "新增: /api/user fuzz 测试发现 3 个参数可注入(id, name, sort)", "新增: /api/admin 返回 403，需认证"], "active_config": "代理=127.0.0.1:8080；并发=20", "completed_work": "资产侦察: 已完成(历史)。漏洞验证: /api/user 三个参数确认可注入，/api/admin 需认证待处理。", "failed_and_resolved": "WAF 关键字过滤(历史)，URL 双编码绕过有效。fuzz 参数 sort 时超时 5 次，增加延迟后成功。", "discarded": "fuzz 中间请求日志(约 15 条重复 200 响应)。", "user_directives": "只测 /api 前缀；非破坏性 payload。"}
+{"@action": "timeline-reducer", "key_findings": ["/api/user fuzz 测试发现 3 个参数可注入(id, name, sort)", "/api/admin 返回 403，需认证"], "active_config": "代理=127.0.0.1:8080；并发=20", "completed_work": "漏洞验证: /api/user 三个参数确认可注入。", "open_failures": "/api/admin 仍返回 403，认证条件未满足，尚未完成验证。", "failed_and_resolved": "fuzz 参数 sort 时超时 5 次，增加延迟后获得预期响应。", "discarded": "fuzz 中间请求日志(约 15 条重复 200 响应)。", "user_directives": "只测 /api 前缀；非破坏性 payload。"}

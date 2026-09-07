@@ -2,15 +2,16 @@ package schema
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/kataras/pio"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -227,8 +228,14 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 }
 
 func (p *Risk) BeforeSave() error {
+	// BeforeSave is called by gorm for both Create and Update. If the caller
+	// (e.g. _createRisk) already set a deterministic Hash, we respect it.
+	// If Hash is still empty (direct gorm.Create without going through the
+	// risk creation helpers), fall back to a deterministic hash computed from
+	// the available fields. This is better than uuid.New() because it enables
+	// FirstOrCreate to dedup.
 	if p.Hash == "" {
-		p.Hash = uuid.New().String()
+		p.Hash = ComputeRiskHashForSchema(p)
 	}
 
 	p.RiskType = strings.ReplaceAll(p.RiskType, "|", "_")
@@ -251,6 +258,28 @@ func (p *Risk) BeforeSave() error {
 	}
 
 	return nil
+}
+
+// ComputeRiskHashForSchema returns a deterministic hash for a Risk based on
+// the dedup key: target + risk type + parameter. This is the schema-layer
+// fallback used in BeforeSave when the caller did not set a Hash explicitly.
+// No normalization is performed; callers are responsible for normalizing
+// inputs before saving.
+func ComputeRiskHashForSchema(r *Risk) string {
+	target := r.Url
+	if target == "" {
+		target = r.Host
+		if r.Port > 0 {
+			target = fmt.Sprintf("%s:%d", r.Host, r.Port)
+		}
+	}
+	key := strings.Join([]string{
+		strings.ToLower(strings.TrimSpace(target)),
+		strings.ToLower(strings.TrimSpace(r.RiskType)),
+		strings.TrimSpace(r.Parameter),
+	}, "|")
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:16])
 }
 
 func (r *Risk) AfterCreate(tx *gorm.DB) (err error) {

@@ -210,6 +210,36 @@ type TestScenario struct {
 	SpecifyHost bool // 是否指定Host
 }
 
+func requireMITMMTLSClientCertRejection(t *testing.T, resp *http.Response, requestErr error) {
+	t.Helper()
+	require.NoError(t, requestErr, "MITM should translate the upstream mTLS rejection into an HTTP error response")
+	require.NotNil(t, resp)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "读取MITM错误响应失败")
+	require.GreaterOrEqual(t, resp.StatusCode, http.StatusInternalServerError,
+		"缺少客户端证书时MITM应返回5xx: status=%d body=%s", resp.StatusCode, body)
+	require.Less(t, resp.StatusCode, 600,
+		"缺少客户端证书时MITM应返回5xx: status=%d body=%s", resp.StatusCode, body)
+
+	warnings := resp.Header.Values("Warning")
+	require.NotEmpty(t, warnings, "MITM错误响应缺少Warning头: status=%d body=%s", resp.StatusCode, body)
+	warning := strings.ToLower(strings.Join(warnings, "\n"))
+	for _, marker := range []string{
+		"certificate required",
+		"client didn't provide a certificate",
+		"alert(116)",
+		"bad certificate",
+	} {
+		if strings.Contains(warning, marker) {
+			return
+		}
+	}
+	require.Failf(t, "MITM错误信息不符合预期",
+		"Warning没有说明缺少客户端证书: %s", warning)
+}
+
 // 启动测试用的TLS服务器
 func startTestTLSServer(t *testing.T, host string, port int, isGM bool, requireClientCert bool) (string, int) {
 	var config interface{}
@@ -548,24 +578,7 @@ func TestGRPCMUSTPASS_MITMV2_MTLS_WithoutClientCert(t *testing.T) {
 			// 发送请求（应该失败）
 			log.Infof("开始无客户端证书的mTLS测试")
 			resp, err := httpClient.Do(req)
-
-			// 验证请求失败（此时通过mitm请求 mitm会返回500系状态码并在header头中以Waring头形式告知mitm失败原因 这里err应该为nil）
-			if err != nil {
-				t.Errorf("当客户端通过MITM访问一个需要MTLS认证的远程目标时，客户端应该正常收到一个状态码为500系的HTTP响应 同时在HEADER头中应该拿到MITM错误原因 err: %s", err.Error())
-			} else {
-
-				defer resp.Body.Close()
-				body, _ := io.ReadAll(resp.Body)
-				if v, ok := resp.Header["Warning"]; ok {
-					if strings.Contains(v[0], "116") { // tls alert 116 = certificate_unknown
-						// 这是预期的结果
-					} else {
-						t.Errorf("MITM错误信息不符合预期 %s", v[0])
-					}
-				} else {
-					t.Errorf("请求成功了，但应该失败（因为没有客户端证书）: 状态码=%d, 响应=%s", resp.StatusCode, string(body))
-				}
-			}
+			requireMITMMTLSClientCertRejection(t, resp, err)
 		},
 		// onRecv: 处理接收到的消息（可选）
 		nil,
@@ -629,24 +642,7 @@ func TestGRPCMUSTPASS_MITMV2_MTLS_WithoutClientCert_GM(t *testing.T) {
 			// 发送请求（应该失败）
 			log.Infof("开始无客户端证书的国密mTLS测试")
 			resp, err := httpClient.Do(req)
-
-			// 验证请求失败（此时通过mitm请求 mitm会返回500系状态码并在header头中以Warning头形式告知mitm失败原因 这里err应该为nil）
-			if err != nil {
-				t.Errorf("当客户端通过MITM访问一个需要国密MTLS认证的远程目标时，客户端应该正常收到一个状态码为500系的HTTP响应 同时在HEADER头中应该拿到MITM错误原因 err: %s", err.Error())
-			} else {
-				defer resp.Body.Close()
-				body, _ := io.ReadAll(resp.Body)
-				if v, ok := resp.Header["Warning"]; ok {
-					if strings.Contains(v[0], "bad certificate") { // tls alert 116 = certificate_unknown
-						log.Infof("国密mTLS请求失败（符合预期）: %s", v[0])
-						// 这是预期的结果
-					} else {
-						t.Errorf("国密MITM错误信息不符合预期 %s", v[0])
-					}
-				} else {
-					t.Errorf("国密请求成功了，但应该失败（因为没有客户端证书）: 状态码=%d, 响应=%s", resp.StatusCode, string(body))
-				}
-			}
+			requireMITMMTLSClientCertRejection(t, resp, err)
 		},
 		// onRecv: 处理接收到的消息（可选）
 		nil,

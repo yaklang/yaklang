@@ -40,6 +40,31 @@ func TestGitFSRemovesWorkspaceWhenCloneFails(t *testing.T) {
 	require.Empty(t, readDirectoryNames(t, root))
 }
 
+func TestGitFSRequestsShallowSingleBranchClone(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv(ssagitworkdir.WorkDirEnv, root)
+	t.Setenv(ssagitworkdir.MinFreeBytesEnv, "0")
+
+	var captured []yakgit.Option
+	originalClone := cloneSSAGitRepository
+	cloneSSAGitRepository = func(_, local string, opts ...yakgit.Option) error {
+		captured = append([]yakgit.Option(nil), opts...)
+		return os.WriteFile(filepath.Join(local, "main.yak"), []byte("println(1)"), 0600)
+	}
+	t.Cleanup(func() { cloneSSAGitRepository = originalClone })
+
+	config := newGitSourceConfigForTest(t)
+	_, err := gitFs(config)
+	require.NoError(t, err)
+
+	settings := yakgit.InspectCloneSettings(captured...)
+	require.Equal(t, 1, settings.Depth)
+	require.True(t, settings.SingleBranch)
+	require.True(t, settings.NoFetchTags)
+	require.Equal(t, "main", settings.Branch)
+	require.False(t, settings.RecursiveSubmodule)
+}
+
 func TestGitFSCleanupRemovesSuccessfulCloneWorkspace(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv(ssagitworkdir.WorkDirEnv, root)

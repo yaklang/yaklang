@@ -37,6 +37,68 @@ func flushCompileUnitThreshold() int {
 	return defaultFlushCompileUnitThreshold
 }
 
+// emitCompileScale publishes an early project-size signal after filesystem scan
+// so Legion/Yakit can show compile scale before AST work starts. Line counts are
+// not available yet; files/bytes come from ScanProjectFiles.
+func emitCompileScale(processCallback func(float64, string, ...any), process float64, scanResult *ScanResult) {
+	if processCallback == nil || scanResult == nil {
+		return
+	}
+	files := scanResult.HandlerTotal
+	if scanResult.PreHandlerTotal > files {
+		files = scanResult.PreHandlerTotal
+	}
+	payload := fmt.Sprintf(
+		`ssa-compile-scale:{"total_files":%d,"handler_files":%d,"prehandler_files":%d,"total_bytes":%d}`,
+		files,
+		scanResult.HandlerTotal,
+		scanResult.PreHandlerTotal,
+		scanResult.HandlerBytes,
+	)
+	processCallback(process, payload)
+}
+
+// deferredBuildProcessFraction maps deferred-build progress into the legacy
+// [0.40, 0.88) band. Unit-mode compile runs many batches; each batch must only
+// own its slice of that band. Mapping every batch onto the full 0.40→0.88 range
+// made the first batch report ~87% within milliseconds while most IR work was
+// still ahead (Legion monitor showed a false compile jump).
+func deferredBuildProcessFraction(batchIndex, batchCount, index, total int) float64 {
+	if batchCount <= 0 {
+		batchCount = 1
+	}
+	if batchIndex < 0 {
+		batchIndex = 0
+	}
+	if batchIndex >= batchCount {
+		batchIndex = batchCount - 1
+	}
+	const (
+		bandStart = 0.40
+		bandEnd   = 0.88
+	)
+	bandSpan := bandEnd - bandStart
+	batchSpan := bandSpan / float64(batchCount)
+	batchBase := bandStart + float64(batchIndex)*batchSpan
+	if total <= 0 {
+		return batchBase + batchSpan
+	}
+	if index < 0 {
+		index = 0
+	}
+	if index > total {
+		index = total
+	}
+	process := batchBase + (float64(index)/float64(total))*batchSpan
+	if process > bandEnd {
+		return bandEnd
+	}
+	if process < bandStart {
+		return bandStart
+	}
+	return process
+}
+
 type SaveFolder struct {
 	name string
 	path []string
@@ -178,6 +240,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+	emitCompileScale(processCallback, process, scanResult)
 	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
@@ -286,6 +349,7 @@ func (c *Config) parseProjectWithFSUnits(
 		if process > 0.4 {
 			process = 0.4
 		}
+		processCallback(process, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, preHandlerNum, preHandlerTotal))
 	}
 
 	compilePhase = "f1_units"
@@ -425,6 +489,10 @@ func (c *Config) parseProjectWithFSUnits(
 		flushedUnits := make(map[string]bool)
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
+				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
+				// Spread that band across all batches so batch 1/N cannot claim ~87%.
+				process = deferredBuildProcessFraction(batchIndex, len(batches), index, total)
+				processCallback(process, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
@@ -667,6 +735,7 @@ func (c *Config) parseProjectWithFSLegacy(
 	// Feed the total compile-input bytes into the adaptive IR cache policy.
 	// This is runtime tuning input, not persistent project metadata.
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+	emitCompileScale(processCallback, 0, scanResult)
 	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
@@ -734,6 +803,7 @@ func (c *Config) parseProjectWithFSLegacy(
 			if process > 0.4 {
 				process = 0.4
 			}
+			processCallback(process, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, preHandlerNum, preHandlerTotal))
 		}
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString())

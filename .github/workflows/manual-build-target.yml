@@ -24,8 +24,8 @@ on:
         default: full
       ee:
         type: boolean
-        description: whether to build ee version
-        default: false
+        description: whether to embed official license certs (customer/EE builds)
+        default: true
       sign:
         type: boolean
         description: whether to sign windows executable

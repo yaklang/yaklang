@@ -50,3 +50,24 @@ func TestDefaultPromptTeachesIndependentBatchBeforeScalarFallback(t *testing.T) 
 	assert.Contains(t, outputExample, "本轮工具 action 就是执行机会")
 	assert.Contains(t, instruction, "恰好 1 个用标量；2-8 个且独立用批次")
 }
+
+func TestDefaultPromptKeepsBatchingAfterCorrectableFailures(t *testing.T) {
+	for name, prompt := range map[string]string{
+		"instruction":    instruction,
+		"output_example": outputExample,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Contains(t, prompt, "只否定本次载荷或假设")
+			assert.Contains(t, prompt, "不否定并发策略")
+			assert.Contains(t, prompt, "禁止原样")
+			assert.Contains(t, prompt, "历史证据")
+			assert.Contains(t, prompt, "永久单工具")
+		})
+	}
+
+	assert.Contains(t, instruction, "2-4 个低成本、安全且可独立验证的候选修复或探测方案")
+	assert.Contains(t, instruction, "batch admission failed")
+	assert.Contains(t, instruction, "重新枚举本轮仍独立的 2-8 个调用继续批量提交")
+	assert.Contains(t, outputExample, "2-4 个有区分力的候选方案继续组成批次")
+	assert.Contains(t, outputExample, "“之前批量失败过”本身不是标量选择条件")
+}

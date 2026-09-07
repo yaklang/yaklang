@@ -52,6 +52,6 @@ func TestExecuteToolCallInternal_WaitsForMCPStubBeforeInvoke(t *testing.T) {
 	assert.True(t, result.Success)
 	data, ok := result.Data.(string)
 	require.True(t, ok, "AI orchestration must expose the canonical bounded string Data")
-	assert.Contains(t, data, "COMBINED OUTPUT:\nlive-ok")
+	assert.Contains(t, data, "RESULT:\nlive-ok")
 	assert.Contains(t, data, "ARTIFACT:\n- combined:")
 }

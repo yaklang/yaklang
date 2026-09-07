@@ -185,17 +185,18 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 			// Log error in result if present - but don't terminate the loop
 			if result.Error != "" {
 				// FIX: Instead of terminating the loop, record error and allow AI to retry
-				errMsg := fmt.Sprintf("Tool '%s' returned error: %s. Please try a different approach or tool.", tool.GetName(), result.Error)
-				invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
+				errMsg := fmt.Sprintf("Tool '%s' protocol did not complete: %s. Please correct the invocation or try a different approach.", tool.GetName(), result.Error)
+				invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)
 				// Continue to allow AI to try another approach
 				// Note: We still proceed to verify user satisfaction to give AI context
+			} else {
+				// Lifecycle completion is deliberately neutral. The execution result in
+				// the ToolResult/Timeline determines command, HTTP, or task effects.
+				invoker.AddToTimeline(
+					"[TOOL_PROTOCOL_COMPLETED]",
+					fmt.Sprintf("tool '%s' returned a result envelope; inspect execution_result before judging the effect", tool.GetName()),
+				)
 			}
-
-			// Log success
-			invoker.AddToTimeline(
-				"[TOOL_EXECUTION_SUCCESS]",
-				utils.Errorf("tool '%s' executed successfully", tool.GetName()).Error(),
-			)
 
 			task := loop.GetCurrentTask()
 			if task == nil {

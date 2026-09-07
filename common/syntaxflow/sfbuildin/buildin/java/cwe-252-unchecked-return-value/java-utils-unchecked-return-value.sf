@@ -1,4 +1,5 @@
 desc(
+	risk: "api-misuse"
 	title: "Check Java Util Unchecked Return Value"
 	title_zh: "检测Java Util库未检查返回值的API"
 	type:security
@@ -109,7 +110,7 @@ Java的`java.util`库中，尤其是与资源管理、并发控制相关的API�
 本规则主要关注`java.util.concurrent.locks.Lock.tryLock()`方法，该方法是非阻塞地尝试获取锁，并返回一个布尔值表示是否成功获取。若未检查其返回值，程序无法得知是否成功获得了锁，可能导致并发错误。
 DESC
 	level: "info",
-	risk: "API误用",
+	risk: "api-misuse",
 	name: "weak",
 }
 

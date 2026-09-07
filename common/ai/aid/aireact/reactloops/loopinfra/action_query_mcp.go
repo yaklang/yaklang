@@ -59,11 +59,11 @@ var loopAction_QueryMCPServers = &reactloops.LoopAction{
 		offset, limit := parseMCPQueryOffsetLimit(action, defaultMCPServerQueryLimit)
 		loopInfraActionStart(loop, loopInfraNodeQueryMCPServers,
 			fmt.Sprintf("查询 MCP 服务器: keyword=%q offset=%d limit=%d / Query MCP servers: keyword=%q offset=%d limit=%d", keyword, offset, limit, keyword, offset, limit),
-			"查询 MCP 服务器 / Querying MCP Servers...")
+			"正在查询 MCP 服务器", "Querying MCP servers…")
 		feedback, pageCount, total, _, err := renderMCPServerQueryResult(keyword, offset, limit)
 		if err != nil {
 			log.Warnf("query_mcp_servers: query failed: %v", err)
-			loopInfraStatus(loop, "MCP 服务器查询失败 / MCP Server Query Failed")
+			loopInfraStatus(loop, "MCP 服务器查询失败", "MCP Server Query Failed")
 			loopInfraActionFinish(loop, loopInfraNodeQueryMCPServers,
 				"MCP 服务器查询失败 / MCP Server Query Failed",
 				utils.ShrinkTextBlock(err.Error(), 800))
@@ -74,7 +74,7 @@ var loopAction_QueryMCPServers = &reactloops.LoopAction{
 		if invoker != nil {
 			invoker.AddToTimeline("query_mcp_servers", fmt.Sprintf("已查询 MCP 服务器 %d/%d (offset=%d)", pageCount, total, offset))
 		}
-		loopInfraStatus(loop, "MCP 服务器查询完成 / MCP Server Query Complete")
+		loopInfraStatus(loop, "MCP 服务器查询完成", "MCP Server Query Complete")
 		loopInfraActionFinish(loop, loopInfraNodeQueryMCPServers,
 			fmt.Sprintf("MCP 服务器查询完成: %d/%d / MCP Server Query Complete: %d/%d", pageCount, total, pageCount, total))
 		operator.Feedback(feedback)
@@ -127,11 +127,11 @@ var loopAction_QueryMCPTools = &reactloops.LoopAction{
 		offset, limit := parseMCPQueryOffsetLimit(action, defaultMCPToolQueryLimit)
 		loopInfraActionStart(loop, loopInfraNodeQueryMCPTools,
 			fmt.Sprintf("查询 MCP 工具: server=%s offset=%d limit=%d / Query MCP tools: server=%s offset=%d limit=%d", serverName, offset, limit, serverName, offset, limit),
-			"查询 MCP 工具 / Querying MCP Tools...")
+			"正在查询 MCP 工具", "Querying MCP tools…")
 		feedback, pageCount, total, _, err := renderMCPToolQueryResult(serverName, offset, limit)
 		if err != nil {
 			log.Warnf("query_mcp_tools: query failed: %v", err)
-			loopInfraStatus(loop, "MCP 工具查询失败 / MCP Tool Query Failed")
+			loopInfraStatus(loop, "MCP 工具查询失败", "MCP Tool Query Failed")
 			loopInfraActionFinish(loop, loopInfraNodeQueryMCPTools,
 				"MCP 工具查询失败 / MCP Tool Query Failed",
 				utils.ShrinkTextBlock(err.Error(), 800))
@@ -142,7 +142,7 @@ var loopAction_QueryMCPTools = &reactloops.LoopAction{
 		if invoker != nil {
 			invoker.AddToTimeline("query_mcp_tools", fmt.Sprintf("已查询 MCP 工具 %d/%d (offset=%d)", pageCount, total, offset))
 		}
-		loopInfraStatus(loop, "MCP 工具查询完成 / MCP Tool Query Complete")
+		loopInfraStatus(loop, "MCP 工具查询完成", "MCP Tool Query Complete")
 		loopInfraActionFinish(loop, loopInfraNodeQueryMCPTools,
 			fmt.Sprintf("MCP 工具查询完成: %d/%d / MCP Tool Query Complete: %d/%d", pageCount, total, pageCount, total))
 		operator.Feedback(feedback)

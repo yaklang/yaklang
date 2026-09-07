@@ -41,7 +41,6 @@ const auditReactiveDataTpl = `## 当前审计状态
 {{ .Selection }}
 {{ else if .HasOpenFileFocus }}**前端打开文件**: {{ .FocusFilePath }}（优先审计此文件及其关联脚本）
 {{ end }}
-**审计进度**: 已执行 {{ .IterationCount }} 次操作
 {{ if .NoteFiles }}**已写出审计笔记文件（{{ .NoteFileCount }} 个）**:
 {{ .NoteFiles }}{{ else }}尚未写出任何审计笔记（建议先写 skill_audit_notes.md）{{ end }}
 {{ if .FeedbackMessages }}
@@ -97,13 +96,13 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 			}
 		}
 
-		reactloops.EmitStatus(loop, "AI Skill 安全审计启动 / Starting AI Skill security audit")
+		reactloops.EmitStatusI18n(loop, "正在准备检查这个技能", "Preparing to review this skill")
 		r.AddToTimeline("[SKILL_AUDIT_START]", "AI Skill 安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
 		// ── Phase 1: 目录探索（委托给 dir_explore loop）──
 		log.Infof("[SkillAudit] Starting Phase 1 (Recon via dir_explore)")
 		reactloops.EmitActionLog(loop, skillAuditPhase1NodeID, "Phase 1：Skill 目录探索 / Phase 1: Skill directory exploration")
-		reactloops.EmitStatus(loop, "Phase 1：目录探索中 / Phase 1: Directory exploration...")
+		reactloops.EmitStatusI18n(loop, "正在了解技能的结构和内容", "Understanding the skill structure and contents")
 		r.AddToTimeline("[PHASE1_START]", "Phase 1：Skill 目录探索")
 
 		auditDirPath := skillAuditDir(state)
@@ -177,7 +176,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 		}
 
 		log.Infof("[SkillAudit] Phase 1 complete. skill=%s path=%s", state.SkillName, state.SkillPath)
-		reactloops.EmitStatus(loop, "Phase 1 完成 / Phase 1 complete")
+		reactloops.EmitStatusI18n(loop, "已经了解整体结构，正在深入检查", "The overall structure is clear; starting the detailed review")
 		reactloops.EmitActionLog(loop, skillAuditPhase1NodeID,
 			fmt.Sprintf("完成: skill=%s, path=%s, recon_files=%d",
 				state.SkillName, state.SkillPath, len(state.GetReconNoteFiles())))
@@ -188,7 +187,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 		// ── Phase 2: 静态安全分析 ──
 		log.Infof("[SkillAudit] Starting Phase 2 (Static security analysis)")
 		reactloops.EmitActionLog(loop, skillAuditPhase2NodeID, "Phase 2：静态安全分析 / Phase 2: Static security analysis")
-		reactloops.EmitStatus(loop, "Phase 2：静态分析中 / Phase 2: Static analysis...")
+		reactloops.EmitStatusI18n(loop, "正在排查潜在风险", "Checking for potential risks")
 		r.AddToTimeline("[PHASE2_START]", "Phase 2：AI Skill 静态安全分析")
 
 		analysisLoop, err := buildPhase2StaticAnalysisLoop(r, state, auditDirPath)
@@ -202,14 +201,14 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 		}
 
 		log.Infof("[SkillAudit] Phase 2 complete. risk=%s", state.RiskLevel)
-		reactloops.EmitStatus(loop, "Phase 2 完成 / Phase 2 complete")
+		reactloops.EmitStatusI18n(loop, "风险检查已完成，正在整理结论", "The risk review is complete; organizing the findings")
 		reactloops.EmitActionLog(loop, skillAuditPhase2NodeID,
 			fmt.Sprintf("完成: risk=%s, audit_notes=%d", state.RiskLevel, len(state.GetAuditNoteFiles())))
 
 		// ── Phase 3: 报告生成 ──
 		log.Infof("[SkillAudit] Starting Phase 3 (Report generation)")
 		reactloops.EmitActionLog(loop, skillAuditReportNodeID, "Phase 3：安全报告生成 / Phase 3: Security report generation")
-		reactloops.EmitStatus(loop, "Phase 3：报告生成中 / Phase 3: Generating report...")
+		reactloops.EmitStatusI18n(loop, "正在整理审计报告", "Preparing the audit report")
 		r.AddToTimeline("[PHASE3_START]", "Phase 3：安全报告生成")
 
 		reportPath := filepath.Join(auditDirPath, "skill_security_report.md")
@@ -248,7 +247,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 		if reportPath == "" {
 			reportPath = filepath.Join(auditDirPath, "skill_security_report.md")
 		}
-		reactloops.EmitStatus(loop, "审计完成 / Audit complete")
+		reactloops.EmitStatusI18n(loop, "审计完成", "Audit complete")
 		reactloops.EmitActionLog(loop, skillAuditReportNodeID,
 			fmt.Sprintf("完成: report=%s, risk=%s", reportPath, state.RiskLevel))
 
@@ -307,7 +306,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 
 		// Reactive data: current progress snapshot
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-			iterCount := loop.GetCurrentIterationIndex()
 			noteFilesList := ""
 			for _, f := range noteFiles {
 				noteFilesList += "  - " + f + "\n"
@@ -315,7 +313,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			vars := map[string]any{
 				"Nonce":            nonce,
 				"SkillPath":        state.SkillPath,
-				"IterationCount":   iterCount,
 				"NoteFiles":        noteFilesList,
 				"NoteFileCount":    len(noteFiles),
 				"FeedbackMessages": feedbacker.String(),
@@ -330,15 +327,15 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			if state.HasFrontendFocus() {
 				focusPath := reactloops.ResolveFocusFilePath(state.GetFocusFilePath(), state.GetSelection())
 				if state.GetSelection() != nil && strings.TrimSpace(state.GetSelection().Content) != "" {
-					reactloops.EmitStatus(loop, "选中片段优先分析 / Selection-first static analysis")
+					reactloops.EmitStatusI18n(loop, "选中片段优先分析", "Selection-first static analysis")
 					r.AddToTimeline("[SKILL_AUDIT_FOCUS]",
 						fmt.Sprintf("Phase2 选中片段优先: %s", utils.ShrinkTextBlock(state.GetSelection().Content, 200)))
 				} else if focusPath != "" {
-					reactloops.EmitStatus(loop, "打开文件优先审计 / Open-file focused analysis")
+					reactloops.EmitStatusI18n(loop, "打开文件优先审计", "Open-file focused analysis")
 					r.AddToTimeline("[SKILL_AUDIT_FOCUS]", "Phase2 优先审计打开文件: "+focusPath)
 				}
 			} else {
-				reactloops.EmitStatus(loop, "静态安全分析就绪 / Static security analysis ready")
+				reactloops.EmitStatusI18n(loop, "静态安全分析就绪", "Static security analysis ready")
 			}
 			log.Infof("[SkillAudit/Phase2] Static analysis started. skill_path=%s focus=%v", state.SkillPath, state.HasFrontendFocus())
 			op.Continue()

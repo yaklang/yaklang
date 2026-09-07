@@ -4,15 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
 	mcpclient "github.com/yaklang/yaklang/common/mcp/mcp-go/client"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -306,7 +310,7 @@ func TestGRPC_StartMcpServer_ProjectDatabaseTools(t *testing.T) {
 	req := &ypb.StartMcpServerRequest{
 		Host: "127.0.0.1",
 		Port: 0,
-		Tool: []string{"project_database"},
+		Tool: []string{"project_database", "httpflow", "port_scan", "risk"},
 	}
 
 	stream, err := client.StartMcpServer(ctx, req)
@@ -429,6 +433,57 @@ func TestGRPC_StartMcpServer_ProjectDatabaseTools(t *testing.T) {
 	currentProject := switchData["current_project"].(map[string]any)
 	require.Equal(t, float64(idB), currentProject["Id"])
 
+	_, err = client.SetCurrentProject(clientCtx, &ypb.SetCurrentProjectRequest{
+		Id:   idA,
+		Type: yakit.TypeProject,
+	})
+	require.NoError(t, err)
+
+	urlA := "https://" + projectNameA + ".example"
+	urlB := "https://" + projectNameB + ".example"
+	hostA := projectNameA + ".local"
+	hostB := projectNameB + ".local"
+	riskTitleA := "risk-" + projectNameA
+	riskTitleB := "risk-" + projectNameB
+
+	currentA, err := client.GetCurrentProjectEx(clientCtx, &ypb.GetCurrentProjectExRequest{Type: yakit.TypeProject})
+	require.NoError(t, err)
+	require.Equal(t, idA, currentA.GetId(), "gRPC SetCurrentProject should make A the current project")
+	require.NotEmpty(t, currentA.GetDatabasePath())
+	seedMCPProjectFile(t, currentA.GetDatabasePath(), urlA, hostA, riskTitleA)
+
+	projectBPath := jsonMapString(createBData["project"], "DatabasePath", "databasePath")
+	if projectBPath == "" {
+		detailB, detailErr := client.QueryProjectDetail(clientCtx, &ypb.QueryProjectDetailRequest{Id: idB})
+		require.NoError(t, detailErr)
+		projectBPath = detailB.GetDatabasePath()
+	}
+	seedMCPProjectFile(t, projectBPath, urlB, hostB, riskTitleB)
+
+	queryReq := rawmcp.CallToolRequest{}
+	queryReq.Params.Name = "query_http_flow"
+	queryReq.Params.Arguments = map[string]any{}
+	queryResult, err := mcpClient.CallTool(clientCtx, queryReq)
+	require.NoError(t, err)
+	requireMCPHTTPFlowURL(t, queryResult, urlA)
+	requireMCPPortHost(t, mcpClient, clientCtx, hostA)
+	requireMCPRiskTitle(t, mcpClient, clientCtx, riskTitleA)
+
+	// Simulate the frontend switching projects after MCP has already started.
+	// The existing MCP connection must resolve the newly active database on its
+	// next tool call without restarting the MCP server.
+	_, err = client.SetCurrentProject(clientCtx, &ypb.SetCurrentProjectRequest{
+		Id:   idB,
+		Type: yakit.TypeProject,
+	})
+	require.NoError(t, err)
+
+	queryResult, err = mcpClient.CallTool(clientCtx, queryReq)
+	require.NoError(t, err)
+	requireMCPHTTPFlowURL(t, queryResult, urlB)
+	requireMCPPortHost(t, mcpClient, clientCtx, hostB)
+	requireMCPRiskTitle(t, mcpClient, clientCtx, riskTitleB)
+
 	contextReq := rawmcp.CallToolRequest{}
 	contextReq.Params.Name = "get_current_database_context"
 	contextReq.Params.Arguments = map[string]any{}
@@ -438,6 +493,310 @@ func TestGRPC_StartMcpServer_ProjectDatabaseTools(t *testing.T) {
 	currentProject = contextData["current_project"].(map[string]any)
 	require.Equal(t, float64(idB), currentProject["Id"])
 	require.NotEmpty(t, contextData["current_project_db_path"])
+}
+
+func TestGRPC_StartMcpServer_FollowsProjectSwitchFromDefault(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	testCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	originalProject, err := client.GetCurrentProject(testCtx, &ypb.Empty{})
+	require.NoError(t, err)
+	defaultProject, err := client.GetDefaultProject(testCtx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.Greater(t, defaultProject.GetId(), int64(0))
+
+	var (
+		defaultFlowID   uint
+		testProjectID   int64
+		testProjectPath string
+	)
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cleanupCancel()
+
+		// Delete the default-database fixture explicitly because the default
+		// project itself is persistent and must never be removed by a test.
+		if defaultProject.GetId() > 0 {
+			_, switchErr := client.SetCurrentProject(cleanupCtx, &ypb.SetCurrentProjectRequest{
+				Id:   defaultProject.GetId(),
+				Type: yakit.TypeProject,
+			})
+			if switchErr != nil {
+				t.Errorf("cleanup: switch to default project failed: %v", switchErr)
+			}
+		}
+		if defaultFlowID > 0 {
+			defaultDB := consts.GetGormProjectDatabase()
+			if deleteErr := defaultDB.Unscoped().Delete(&schema.HTTPFlow{}, defaultFlowID).Error; deleteErr != nil {
+				t.Errorf("cleanup: delete default HTTP flow fixture failed: %v", deleteErr)
+			}
+			var remaining int
+			if countErr := defaultDB.Unscoped().Model(&schema.HTTPFlow{}).Where("id = ?", defaultFlowID).Count(&remaining).Error; countErr != nil {
+				t.Errorf("cleanup: verify default HTTP flow fixture failed: %v", countErr)
+			} else if remaining != 0 {
+				t.Errorf("cleanup: default HTTP flow fixture still exists: id=%d", defaultFlowID)
+			}
+		}
+		if testProjectID > 0 {
+			_, deleteErr := client.DeleteProject(cleanupCtx, &ypb.DeleteProjectRequest{
+				Id:            testProjectID,
+				IsDeleteLocal: true,
+				Type:          yakit.TypeProject,
+			})
+			if deleteErr != nil {
+				t.Errorf("cleanup: delete temporary project failed: %v", deleteErr)
+			}
+			if _, lookupErr := yakit.GetProjectByID(consts.GetGormProfileDatabase(), testProjectID); lookupErr == nil {
+				t.Errorf("cleanup: temporary project record still exists: id=%d", testProjectID)
+			}
+			if testProjectPath != "" {
+				for i := 0; i < 10; i++ {
+					_ = os.Remove(testProjectPath)
+					if _, statErr := os.Stat(testProjectPath); os.IsNotExist(statErr) {
+						break
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+				if _, statErr := os.Stat(testProjectPath); !os.IsNotExist(statErr) {
+					// Windows can keep a previous-generation SQLite handle open after
+					// SetCurrentProject; the profile record is already gone above.
+					t.Logf("cleanup: temporary project database file still locked: path=%s err=%v", testProjectPath, statErr)
+				}
+			}
+		}
+		if originalProject != nil && originalProject.GetId() > 0 {
+			_, restoreErr := client.SetCurrentProject(cleanupCtx, &ypb.SetCurrentProjectRequest{
+				Id:   originalProject.GetId(),
+				Type: yakit.TypeProject,
+			})
+			if restoreErr != nil {
+				t.Errorf("cleanup: restore original project failed: %v", restoreErr)
+			}
+		}
+	})
+
+	_, err = client.SetCurrentProject(testCtx, &ypb.SetCurrentProjectRequest{
+		Id:   defaultProject.GetId(),
+		Type: yakit.TypeProject,
+	})
+	require.NoError(t, err)
+
+	marker := "mcp-follow-project-" + utils.RandStringBytes(10)
+	defaultURL := "https://default.example/" + marker
+	projectURL := "https://project.example/" + marker
+	defaultFlow := newMCPProjectHTTPFlow(defaultURL)
+	require.NoError(t, yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), defaultFlow))
+	defaultFlowID = defaultFlow.ID
+	require.Greater(t, defaultFlowID, uint(0))
+
+	testProject, err := client.NewProject(testCtx, &ypb.NewProjectRequest{
+		ProjectName: "mcp_follow_project_" + utils.RandStringBytes(8),
+		Description: "temporary MCP project-switch regression fixture",
+		Type:        yakit.TypeProject,
+	})
+	require.NoError(t, err)
+	require.Greater(t, testProject.GetId(), int64(0))
+	testProjectID = testProject.GetId()
+	testProjectRecord, err := yakit.GetProjectByID(consts.GetGormProfileDatabase(), testProject.GetId())
+	require.NoError(t, err)
+	require.NotEmpty(t, testProjectRecord.DatabasePath)
+	testProjectPath = testProjectRecord.DatabasePath
+
+	testProjectDB, err := consts.CreateProjectDatabase(testProjectRecord.DatabasePath)
+	require.NoError(t, err)
+	require.NoError(t, yakit.InsertHTTPFlow(testProjectDB, newMCPProjectHTTPFlow(projectURL)))
+	require.NoError(t, testProjectDB.Close())
+
+	stream, err := client.StartMcpServer(testCtx, &ypb.StartMcpServerRequest{
+		Host: "127.0.0.1",
+		Port: 0,
+		Tool: []string{"project_database", "httpflow"},
+	})
+	require.NoError(t, err)
+
+	var serverURL string
+	for i := 0; i < 5; i++ {
+		resp, recvErr := stream.Recv()
+		require.NoError(t, recvErr)
+		if resp.GetServerUrl() != "" {
+			serverURL = resp.GetServerUrl()
+		}
+		if resp.GetStatus() == "running" {
+			break
+		}
+	}
+	require.NotEmpty(t, serverURL)
+
+	mcpClient, err := mcpclient.NewSSEMCPClient(serverURL)
+	require.NoError(t, err)
+	defer mcpClient.Close()
+	require.NoError(t, mcpClient.Start(testCtx))
+
+	initRequest := rawmcp.InitializeRequest{}
+	initRequest.Params.ProtocolVersion = rawmcp.LATEST_PROTOCOL_VERSION
+	initRequest.Params.ClientInfo = rawmcp.Implementation{
+		Name:    "test-mcp-project-follow-client",
+		Version: "1.0.0",
+	}
+	_, err = mcpClient.Initialize(testCtx, initRequest)
+	require.NoError(t, err)
+
+	// MCP starts while default is active: only the default fixture is visible.
+	requireMCPHTTPFlowSelection(t, mcpClient, testCtx, marker, defaultURL, projectURL)
+
+	// Simulate Yakit's frontend switching to the newly created project.
+	_, err = client.SetCurrentProject(testCtx, &ypb.SetCurrentProjectRequest{
+		Id:   testProject.GetId(),
+		Type: yakit.TypeProject,
+	})
+	require.NoError(t, err)
+	requireMCPHTTPFlowSelection(t, mcpClient, testCtx, marker, projectURL, defaultURL)
+
+	// The pre-existing MCP switch tool must continue to use the same shared
+	// project state and can switch the running MCP connection back to default.
+	switchResult := callMCPSwitchProject(t, mcpClient, testCtx, defaultProject.GetId())
+	switchData := mustExtractToolTextJSON(t, switchResult)
+	currentProject := switchData["current_project"].(map[string]any)
+	require.Equal(t, float64(defaultProject.GetId()), currentProject["Id"])
+	requireMCPHTTPFlowSelection(t, mcpClient, testCtx, marker, defaultURL, projectURL)
+
+	// And switching through the MCP tool in the other direction remains valid.
+	callMCPSwitchProject(t, mcpClient, testCtx, testProject.GetId())
+	requireMCPHTTPFlowSelection(t, mcpClient, testCtx, marker, projectURL, defaultURL)
+}
+
+func newMCPProjectHTTPFlow(url string) *schema.HTTPFlow {
+	return &schema.HTTPFlow{
+		Url:        url,
+		Path:       "/",
+		Method:     "GET",
+		StatusCode: 200,
+		SourceType: schema.HTTPFlow_SourceType_MITM,
+		Request:    "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+		Response:   "HTTP/1.1 200 OK\r\n\r\n",
+	}
+}
+
+func callMCPSwitchProject(t *testing.T, client mcpclient.MCPClient, ctx context.Context, projectID int64) *rawmcp.CallToolResult {
+	t.Helper()
+	req := rawmcp.CallToolRequest{}
+	req.Params.Name = "switch_current_project_database"
+	req.Params.Arguments = map[string]any{"id": projectID}
+	result, err := client.CallTool(ctx, req)
+	require.NoError(t, err)
+	return result
+}
+
+func requireMCPHTTPFlowSelection(
+	t *testing.T,
+	client mcpclient.MCPClient,
+	ctx context.Context,
+	marker, expectedURL, excludedURL string,
+) {
+	t.Helper()
+	req := rawmcp.CallToolRequest{}
+	req.Params.Name = "query_http_flow"
+	req.Params.Arguments = map[string]any{"keyword": marker}
+	result, err := client.CallTool(ctx, req)
+	require.NoError(t, err)
+
+	payload := mustExtractToolTextJSON(t, result)
+	flows, ok := payload["flows"].([]any)
+	require.True(t, ok)
+	require.Len(t, flows, 1)
+	flow, ok := flows[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, expectedURL, flow["url"])
+	require.NotEqual(t, excludedURL, flow["url"])
+}
+
+func insertMCPProjectData(db *gorm.DB, url, host, riskTitle string) error {
+	if err := yakit.InsertHTTPFlow(db, newMCPProjectHTTPFlow(url)); err != nil {
+		return err
+	}
+	if err := db.Create(&schema.Port{Host: host, Port: 443, Proto: "tcp", State: "open"}).Error; err != nil {
+		return err
+	}
+	return db.Create(&schema.Risk{
+		Hash:     utils.CalcSha1(riskTitle),
+		Host:     host,
+		Title:    riskTitle,
+		Severity: "high",
+	}).Error
+}
+
+func jsonMapString(v any, keys ...string) string {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, key := range keys {
+		if s, ok := m[key].(string); ok && s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func seedMCPProjectFile(t *testing.T, path, url, host, riskTitle string) {
+	t.Helper()
+	require.NotEmpty(t, path)
+	db, err := consts.CreateProjectDatabase(path)
+	require.NoError(t, err)
+	require.NoError(t, insertMCPProjectData(db, url, host, riskTitle))
+	_ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);").Error
+	if sqlDB := db.DB(); sqlDB != nil {
+		require.NoError(t, sqlDB.Close())
+		return
+	}
+	require.NoError(t, db.Close())
+}
+
+func requireMCPHTTPFlowURL(t *testing.T, result *rawmcp.CallToolResult, expected string) {
+	t.Helper()
+	payload := mustExtractToolTextJSON(t, result)
+	flows, ok := payload["flows"].([]any)
+	require.True(t, ok)
+	require.Len(t, flows, 1)
+	flow, ok := flows[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, expected, flow["url"])
+}
+
+func requireMCPPortHost(t *testing.T, client mcpclient.MCPClient, ctx context.Context, expected string) {
+	t.Helper()
+	req := rawmcp.CallToolRequest{}
+	req.Params.Name = "query_ports"
+	req.Params.Arguments = map[string]any{
+		"all":        true,
+		"pagination": map[string]any{"page": 1, "limit": 10},
+	}
+	result, err := client.CallTool(ctx, req)
+	require.NoError(t, err)
+	ports := mustExtractToolJSONArray(t, result)
+	require.Len(t, ports, 1)
+	require.Equal(t, expected, ports[0]["Host"])
+}
+
+func requireMCPRiskTitle(t *testing.T, client mcpclient.MCPClient, ctx context.Context, expected string) {
+	t.Helper()
+	req := rawmcp.CallToolRequest{}
+	req.Params.Name = "query_risks"
+	req.Params.Arguments = map[string]any{
+		"pagination": map[string]any{"page": 1, "limit": 10},
+	}
+	result, err := client.CallTool(ctx, req)
+	require.NoError(t, err)
+	payload := mustExtractToolTextJSON(t, result)
+	risks, ok := payload["Data"].([]any)
+	require.True(t, ok)
+	require.Len(t, risks, 1)
+	risk, ok := risks[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, expected, risk["Title"])
 }
 
 func TestGRPC_StartMcpServer_WithAIToolFramework(t *testing.T) {

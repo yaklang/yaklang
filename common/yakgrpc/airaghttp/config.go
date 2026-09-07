@@ -7,7 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // AIServiceConfig AI 服务配置 (一个具体模型的接入参数)
@@ -93,12 +93,12 @@ type RAGServerConfig struct {
 // 关键词: rag-server default config, port 9093
 func NewDefaultConfig() *RAGServerConfig {
 	return &RAGServerConfig{
-		Host:         "0.0.0.0",
-		Port:         9093,
-		RoutePrefix:  "/api/rag-server",
-		AuthToken:    "",
-		Concurrent:   3,
-		Timeout:      180,
+		Host:          "0.0.0.0",
+		Port:          9093,
+		RoutePrefix:   "/api/rag-server",
+		AuthToken:     "",
+		Concurrent:    3,
+		Timeout:       180,
 		MaxIteration:  1,
 		Language:      "zh",
 		Title:         DefaultTitle,

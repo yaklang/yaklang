@@ -201,5 +201,113 @@ func TestStallHeartbeat_HardAbortDisabledWhenZero(t *testing.T) {
 	}
 }
 
+// TestStallHeartbeat_InflightToolDoesNotFire 验证: 主循环 iteration 不推进,
+// 但有工具正在执行时, stall heartbeat 不报警、不 hard abort.
+//
+// 历史背景: Phase2 类别子 Agent 卡在 fast_context 的全仓 grep 上, iteration
+// 停在 1, 30 分钟后 LOOP_STALL_HARD_ABORT 误杀整个子 Agent.
+//
+// 关键词: stall heartbeat tool in-flight 旁路
+func TestStallHeartbeat_InflightToolDoesNotFire(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	invoker := newTimelineCapturingInvoker(ctx)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	task := aicommon.NewStatefulTaskBase("task-tool-inflight", "tool inflight", ctx, nil, true)
+	loop.SetCurrentTask(task)
+
+	loop.recordIterationTick()
+	loop.SetLastIterationTickAtForTest(time.Now().Add(-2 * time.Minute).UnixNano())
+	loop.BeginToolActivity()
+	defer loop.EndToolActivity()
+
+	stop := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{},
+		20*time.Millisecond, 60*time.Millisecond, 80*time.Millisecond)
+	defer stop()
+
+	time.Sleep(250 * time.Millisecond)
+	for _, e := range invoker.Entries() {
+		require.NotEqual(t, "[LOOP_STALL_DETECTED]", e.Tag, "must not fire while a tool is in-flight")
+		require.NotEqual(t, "[LOOP_STALL_HARD_ABORT]", e.Tag, "must not hard-abort while a tool is in-flight")
+	}
+	select {
+	case <-task.GetContext().Done():
+		t.Fatal("task ctx must not be cancelled while a tool is in-flight")
+	default:
+	}
+}
+
+// TestStallHeartbeat_InflightToolEndRestoresStall 验证: 工具结束后,
+// stall heartbeat 恢复对过期 iteration 的报警.
+func TestStallHeartbeat_InflightToolEndRestoresStall(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	invoker := newTimelineCapturingInvoker(ctx)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	task := aicommon.NewStatefulTaskBase("task-tool-inflight-end", "tool inflight end", ctx, nil, true)
+	loop.SetCurrentTask(task)
+
+	loop.recordIterationTick()
+	loop.SetLastIterationTickAtForTest(time.Now().Add(-2 * time.Minute).UnixNano())
+	loop.BeginToolActivity()
+
+	stop := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{},
+		20*time.Millisecond, 60*time.Millisecond, 0)
+	defer stop()
+
+	time.Sleep(120 * time.Millisecond)
+	for _, e := range invoker.Entries() {
+		require.NotEqual(t, "[LOOP_STALL_DETECTED]", e.Tag, "must not fire while tool in-flight")
+	}
+
+	loop.EndToolActivity()
+	require.Eventually(t, func() bool {
+		for _, e := range invoker.Entries() {
+			if e.Tag == "[LOOP_STALL_DETECTED]" {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 20*time.Millisecond, "expected stall after tool activity ends")
+}
+
+// TestStallHeartbeat_SubAgentInflightToolBypassesParent 验证: 父 loop
+// iteration 过期, 子 Agent 自己的 iteration 也过期, 但子 Agent 有 in-flight
+// 工具时, 父 loop 的 stall 旁路仍然生效.
+func TestStallHeartbeat_SubAgentInflightToolBypassesParent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	invoker := newTimelineCapturingInvoker(ctx)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	task := aicommon.NewStatefulTaskBase("task-parent-wait-grep", "parent wait grep", ctx, nil, true)
+	loop.SetCurrentTask(task)
+
+	registry := NewProgressRegistry()
+	loop.SetSubAgentProgressRegistry(registry)
+	handle := NewSubAgentHandle("sub-fast-context", "fast-context", nil, time.Now().Add(-20*time.Minute))
+	registry.Register(handle)
+	subLoop := &ReActLoop{}
+	subLoop.SetLastIterationTickAtForTest(time.Now().Add(-15 * time.Minute).UnixNano())
+	subLoop.BeginToolActivity()
+	handle.SubLoop = subLoop
+
+	loop.SetLastIterationTickAtForTest(time.Now().Add(-20 * time.Minute).UnixNano())
+
+	stop := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{},
+		20*time.Millisecond, 60*time.Millisecond, 80*time.Millisecond)
+	defer stop()
+
+	time.Sleep(250 * time.Millisecond)
+	for _, e := range invoker.Entries() {
+		require.NotEqual(t, "[LOOP_STALL_DETECTED]", e.Tag,
+			"parent must not stall while nested sub-agent has an in-flight tool")
+		require.NotEqual(t, "[LOOP_STALL_HARD_ABORT]", e.Tag,
+			"parent must not hard-abort while nested sub-agent has an in-flight tool")
+	}
+}
+
 // Ensure NewMockInvoker compiles in this file even when unused locally.
 var _ = mockcfg.NewMockInvoker

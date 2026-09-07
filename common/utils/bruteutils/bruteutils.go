@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -40,8 +40,9 @@ func (b *BruteItem) Result() *BruteItemResult {
 	}
 }
 
+// String 返回脱敏表示：密码只保留不可逆摘要，绝不输出明文。
 func (b *BruteItem) String() string {
-	return fmt.Sprintf("%s:%s@%v", b.Username, b.Password, b.Target)
+	return fmt.Sprintf("%s:%s@%v", b.Username, RedactPassword(b.Password), b.Target)
 }
 
 type targetProcessing struct {
@@ -63,6 +64,9 @@ func (t *targetProcessing) Finish() {
 type BruteUtil struct {
 	processes            sync.Map
 	TargetTaskConcurrent int
+	// targetsConcurrent 记录 WithTargetsConcurrent / NewMultiTargetBruteUtil
+	// 设置的目标级并发上限（供流式调度器映射全局并发）。
+	targetsConcurrent int
 
 	targetsSwg *utils.SizedWaitGroup
 
@@ -122,16 +126,21 @@ type BruteItemResult struct {
 
 	// 爆破结果的 banner 依据，额外信息
 	ExtraInfo []byte
+
+	// 账户锁定信号：协议层识别到"因连续失败被锁定"的明确特征时置位，
+	// 调度器将按锁定预算短路该目标，避免持续撞击延长锁定期。
+	// （真实 telnet 设备语料：Protection of brute force attack!!
+	// Lockout remaining: TELNET[ppp0] N seconds）
+	AccountLocked bool
 }
 
+// String 返回脱敏表示：密码只保留不可逆摘要，绝不输出明文。
 func (r *BruteItemResult) String() string {
 	result := "FAIL"
 	if r.Ok {
 		result = "OK"
-	} else {
-		result = "FAIL"
 	}
-	return fmt.Sprintf("[%v]: %v://%v:%v@%v", result, r.Type, r.Username, r.Password, r.Target)
+	return fmt.Sprintf("[%v]: %v://%v:%s@%v", result, r.Type, r.Username, RedactPassword(r.Password), r.Target)
 }
 
 func (r *BruteItemResult) Show() {
@@ -146,12 +155,13 @@ type (
 func NewMultiTargetBruteUtil(targetsConcurrent, minDelay, maxDelay int, callback BruteCallback) (*BruteUtil, error) {
 	delayer, err := utils.NewDelayWaiter(int32(minDelay), int32(maxDelay))
 	if err != nil {
-		return nil, errors.Errorf("create delayer failed: %s", err)
+		return nil, fmt.Errorf("create delayer failed: %s", err)
 	}
 	// first is 0 delay
 	delayer.Wait()
 	return &BruteUtil{
 		TargetTaskConcurrent: 1,
+		targetsConcurrent:    targetsConcurrent,
 		targetList:           list.New(),
 		targetsSwg:           utils.NewSizedWaitGroup(targetsConcurrent),
 		callback:             callback,
@@ -211,7 +221,7 @@ func (b *BruteUtil) run(ctx context.Context) error {
 	for {
 		target, err := b.popFirstTarget()
 		if err != nil {
-			log.Error("finished poping target from target list")
+			log.Info("finished popping target from target list")
 			break
 		}
 
@@ -262,7 +272,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 
 	process, err := b.GetProcessingByTarget(target)
 	if err != nil {
-		return errors.Errorf("start processing target failed: %s", err)
+		return fmt.Errorf("start processing target failed: %s", err)
 	}
 	defer func() {
 		process.Swg.Wait()
@@ -283,7 +293,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 	//    2. 检查目标指纹
 	if b.beforeBruteCallback != nil {
 		if !b.beforeBruteCallback(target) {
-			return errors.Errorf("pre-checking target[%s] failed", target)
+			return fmt.Errorf("pre-checking target[%s] failed", target)
 		}
 	}
 
@@ -414,6 +424,7 @@ type OptionsAction func(util *BruteUtil)
 func WithTargetsConcurrent(targetsConcurrent int) OptionsAction {
 	return func(util *BruteUtil) {
 		util.targetsSwg = utils.NewSizedWaitGroup(targetsConcurrent)
+		util.targetsConcurrent = targetsConcurrent
 	}
 }
 
@@ -428,7 +439,7 @@ func WithTargetTasksConcurrent(targetTasksConcurrent int) OptionsAction {
 func WithDelayerWaiter(minDelay, maxDelay int) (OptionsAction, error) {
 	dlr, err := utils.NewDelayWaiter(int32(minDelay), int32(maxDelay))
 	if err != nil {
-		return nil, errors.Errorf("delay waiter build failed: %s", err)
+		return nil, fmt.Errorf("delay waiter build failed: %s", err)
 	}
 	return func(util *BruteUtil) {
 		util.delayer = dlr
@@ -480,11 +491,12 @@ func WithBeforeBruteCallback(c func(string) bool) OptionsAction {
 func NewMultiTargetBruteUtilEx(options ...OptionsAction) (*BruteUtil, error) {
 	delayer, err := utils.NewDelayWaiter(0, 0)
 	if err != nil {
-		return nil, errors.Errorf("init delay waiter failed: %s", err)
+		return nil, fmt.Errorf("init delay waiter failed: %s", err)
 	}
 
 	bu := &BruteUtil{
 		TargetTaskConcurrent: 1,
+		targetsConcurrent:    200,
 		targetsSwg:           utils.NewSizedWaitGroup(200),
 		OkToStop:             false,
 		FinishingThreshold:   0,
@@ -581,26 +593,6 @@ func FileToDictList(fileName string) []string {
 	return lines
 }
 
-func (b *BruteUtil) StreamBruteContext(
-	ctx context.Context, typeStr string, target, users, pass []string,
-	resultCallback BruteItemResultCallback,
-) error {
-	ch, err := BruteItemStreamWithContext(ctx, typeStr, target, users, pass)
-	if err != nil {
-		return err
-	}
-	b.SetResultCallback(resultCallback)
-	log.Infof("brute task with target[%v] user[%v] password[%v]", len(target), len(users), len(pass))
-	for item := range ch {
-		b.Feed(item)
-	}
-	err = b.RunWithContext(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func autoSetFinishedByConnectionError(err error, result *BruteItemResult) *BruteItemResult {
 	switch true {
 	case utils.IContains(err.Error(), "connect: connection refused"):
@@ -616,6 +608,10 @@ func autoSetFinishedByConnectionError(err error, result *BruteItemResult) *Brute
 	case utils.IContains(err.Error(), "no reachable servers"):
 		fallthrough
 	case utils.IContains(err.Error(), "protocol error"):
+		fallthrough
+	case utils.IContains(err.Error(), "rdp tls handshake"):
+		fallthrough
+	case utils.IContains(err.Error(), "rdp x224"):
 		fallthrough
 	case utils.IContains(err.Error(), "i/o timeout"):
 		result.Finished = true

@@ -21,6 +21,7 @@ func TestCoordinator_SyncPing(t *testing.T) {
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := aid.NewCoordinator(
 		"test",
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -214,7 +215,7 @@ func (c *SSEMCPClient) handleSSEEvent(event, data string) {
 	case "endpoint":
 		endpoint, err := url.Parse(data)
 		if err != nil {
-			fmt.Printf("Error parsing endpoint URL: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "MCP SSE client: error parsing endpoint URL: %v\n", err)
 			return
 		}
 		if endpoint.Host == "" {
@@ -223,7 +224,7 @@ func (c *SSEMCPClient) handleSSEEvent(event, data string) {
 			endpoint.User = c.baseURL.User
 		} else {
 			if endpoint.Host != c.baseURL.Host {
-				fmt.Printf("Endpoint origin does not match connection origin\n")
+				_, _ = fmt.Fprintln(os.Stderr, "MCP SSE client: endpoint origin does not match connection origin")
 				return
 			}
 		}
@@ -243,7 +244,7 @@ func (c *SSEMCPClient) handleSSEEvent(event, data string) {
 		}
 
 		if err := json.Unmarshal([]byte(data), &baseMessage); err != nil {
-			fmt.Printf("Error unmarshaling message: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "MCP SSE client: error unmarshaling message: %v\n", err)
 			return
 		}
 

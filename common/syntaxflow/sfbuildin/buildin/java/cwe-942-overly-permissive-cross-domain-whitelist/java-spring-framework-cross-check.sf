@@ -2,7 +2,7 @@ desc(
 	title_zh: "检测Java Spring Framework跨域白名单过于宽松"
 	title: "Check Java Spring Framework Overly Permissive Cross-Domain Whitelist"
 	type:config
-	risk:"不安全配置",
+	risk:"security-misconfiguration"
 	desc: <<<DESC
 ### 漏洞描述
 1. **风险原理**
@@ -130,7 +130,7 @@ registry.addMapping("/**") // 对所有路径生效
 ```
 这种方式更加推荐，因为它提供了更精细的控制，并且避免了在多个地方重复配置。始终确保只允许来自可信域的跨域请求，并根据需要配置允许的 HTTP 方法、Header 和凭证信息。
 SOLUTION
-	risk: "不安全配置",
+	risk: "security-misconfiguration",
 	desc: <<<DESC
 ### 漏洞描述
 1. **风险原理**

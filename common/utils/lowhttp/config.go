@@ -140,6 +140,7 @@ type LowhttpExecConfig struct {
 
 	RandomJA3FingerPrint bool
 	ClientHelloSpec      *utls.ClientHelloSpec
+	TLSFingerprint       string
 
 	Tags []string
 
@@ -968,7 +969,9 @@ func WithRedirectHandler(redirectHandler func(bool, []byte, []byte) bool) Lowhtt
 	}
 }
 
-// WithSession 指定 session 标识；cookie jar 在池中跨请求复用，调用方负责 RemoveCookiejar 或 poc.RemoveSession。
+// WithSession 指定 session 标识；cookie jar 在有界 LRU 池中跨请求复用。
+// 调用方仍应在确定不再使用时调用 RemoveCookiejar 或 poc.RemoveSession，
+// 以便及时释放 cookie；池达到容量时会自动淘汰最久未使用的 session。
 func WithSession(session string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Session = session
@@ -1022,6 +1025,12 @@ func WithRandomJA3FingerPrint(b bool) LowhttpOpt {
 func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ClientHelloSpec = spec
+	}
+}
+
+func WithTLSFingerprint(name string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.TLSFingerprint = name
 	}
 }
 

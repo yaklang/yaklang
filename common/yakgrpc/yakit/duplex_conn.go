@@ -3,6 +3,7 @@ package yakit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,10 +62,13 @@ var (
 	ServerPushType_Fuzzer       = "fuzzer_server_push"
 	ServerPushType_WebFuzzerTab = "web_fuzzer_tab"
 	ServerPushType_Project      = "project"
+	ServerPushType_AISession    = "ai_session"
 	ServerPushType_OpenAPIParse = "openapi_parse"
 
 	ProjectPushActionPromptEnter = "prompt_enter"
 	ProjectPushActionAutoEnter   = "auto_enter"
+	AISessionPushActionStarted   = "started"
+	AISessionPushActionFinished  = "finished"
 	ServerPushType_SlowInsertSQL = "httpflow_slow_insert_sql"
 	ServerPushType_SlowQuerySQL  = "httpflow_slow_query_sql"
 	ServerPushType_SlowRuleHook  = "mitm_slow_rule_hook"
@@ -279,6 +283,28 @@ type ProjectPush struct {
 	ID          int64  `json:"id"`
 	ProjectName string `json:"project_name,omitempty"`
 	Type        string `json:"type,omitempty"`
+}
+
+type AISessionPush struct {
+	Action    string `json:"action"`
+	SessionID string `json:"sessionId"`
+	IsRunning bool   `json:"isRunning"`
+}
+
+// BroadcastAISessionChanged is primarily an invalidation signal. The renderer
+// queries title, source and start params from the durable row; IsRunning is a
+// lifecycle hint applied immediately so the history spinner is not RPC-bound.
+func BroadcastAISessionChanged(action, sessionID string) {
+	action = strings.TrimSpace(action)
+	sessionID = strings.TrimSpace(sessionID)
+	if action == "" || sessionID == "" {
+		return
+	}
+	BroadcastData(ServerPushType_AISession, &AISessionPush{
+		Action:    action,
+		SessionID: sessionID,
+		IsRunning: action == AISessionPushActionStarted,
+	})
 }
 
 func BroadcastWebFuzzerTab(openFlag bool, data ...*ypb.FuzzerConfig) {

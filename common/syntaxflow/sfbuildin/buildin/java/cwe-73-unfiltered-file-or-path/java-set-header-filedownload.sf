@@ -1,4 +1,5 @@
 desc(
+	risk: "path-traversal"
 	title: "Audit Java SetHeader for File Download Position Config"
 	title_zh: "审计Java SetHeader中文件下载位置配置点"
 	type: config
@@ -54,7 +55,7 @@ check $flag;
 $flag<getCall><getCallee> as $sink;
 check $sink;
 alert $sink for {
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "sink",
 	title: "Java SetHeader File Download Position Vulnerability Was Detected",
 	title_zh: "检测到Java SetHeader文件下载位置漏洞",

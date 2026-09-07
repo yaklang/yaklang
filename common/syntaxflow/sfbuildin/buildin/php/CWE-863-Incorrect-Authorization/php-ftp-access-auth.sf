@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP未验证FTP参数"
 	level: "low"
 	type: vul
-	risk: "unsafe-ftp-parameter-validation"
+	risk: "ftp-parameter-validation"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -192,7 +192,7 @@ return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
 - 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
 DESC
 	level: "high",
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "high",
 	message: "检测到PHP未验证FTP参数注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -246,7 +246,7 @@ return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
 - 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
 DESC
 	level: "mid",
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "mid",
 	message: "检测到PHP FTP参数过滤不充分，可能存在潜在绕过风险。",
 	solution: <<<SOLUTION
@@ -374,7 +374,7 @@ return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
 DESC
 	level: "low",
 	title: "Potential FTP Access Control Bypass",
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "low",
 	message: "检测到PHP FTP访问控制潜在绕过风险。",
 }

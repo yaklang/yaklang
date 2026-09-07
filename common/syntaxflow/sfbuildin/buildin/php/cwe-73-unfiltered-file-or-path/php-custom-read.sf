@@ -2,7 +2,7 @@
 desc(
 	title: "Check PHP Unfiltered Directory Reading Vulnerability"
 	title_zh: "检测PHP未过滤目录读取漏洞"
-	risk: "审计（Audit）"
+	risk: "audit-check"
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述
@@ -110,7 +110,7 @@ readDirSafe($_GET["path"]);
 3. **权限控制**
 确保执行文件操作的进程拥有最小必要的权限，限制其对敏感目录的访问。
 SOLUTION
-	risk: "路径遍历",
+	risk: "path-traversal",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

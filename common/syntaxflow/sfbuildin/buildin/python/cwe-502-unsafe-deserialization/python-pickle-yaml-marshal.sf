@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Python不安全反序列化漏洞"
 	type: vuln
 	level: high
-	risk: "不安全反序列化"
+	risk: "deserialization"
 	desc: <<<DESC
 ## 漏洞原理
 
@@ -50,7 +50,7 @@ alert $hit for {
 	title_zh: "unsafe deserialize",
 	level: "high",
 	type: "vuln",
-	risk: "不安全反序列化",
+	risk: "deserialization",
 	message: "对用户可达的字节或文本执行了不安全的反序列化操作（pickle/yaml/marshal）。",
 	name: "sink",
 }

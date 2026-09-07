@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -63,6 +64,11 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 	if frame == nil {
 		report.Error = utils.Error("syntaxflow frame is nil")
 		return report
+	}
+
+	// Source-mode rules: verify on raw files via sfpattern (no SSA compile).
+	if sfvm.FrameIsSourceMode(frame) {
+		return runSourceVerifyWithFrame(frame, cfg)
 	}
 
 	rule := frame.GetRule()
@@ -130,6 +136,90 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 
 	report.Passed = true
 	return report
+}
+
+func runSourceVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyReport {
+	report := &EmbeddedVerifyReport{}
+	rule := frame.GetRule()
+	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
+	if err != nil {
+		report.Error = err
+		return report
+	}
+	report.PositiveTestCount = len(verifyFs)
+	if len(verifyFs) == 0 && cfg.requirePositive {
+		report.Error = utils.Errorf("no positive filesystem found in source rule: %s", rule.RuleName)
+		return report
+	}
+	for _, f := range verifyFs {
+		result, err := sfpattern.ExecFrameOnFS(frame, f.GetVirtualFs())
+		if err != nil {
+			report.Error = utils.Errorf("sfpattern positive verify failed: %v", err)
+			return report
+		}
+		if err := checkSourcePositiveResult(f, rule, result, cfg); err != nil {
+			report.Error = err
+			return report
+		}
+	}
+
+	negativeFs, err := frame.ExtractNegativeFilesystemAndLanguage()
+	if err != nil {
+		report.Error = err
+		return report
+	}
+	report.NegativeTestCount = len(negativeFs)
+	if len(negativeFs) == 0 && cfg.requireNegative {
+		report.Error = utils.Errorf("no negative filesystem found in source rule: %s", rule.RuleName)
+		return report
+	}
+	if cfg.verifyNegative {
+		for _, f := range negativeFs {
+			result, err := sfpattern.ExecFrameOnFS(frame, f.GetVirtualFs())
+			if err != nil {
+				// No match / path miss is success for negative cases.
+				if strings.Contains(err.Error(), "no file") || strings.Contains(err.Error(), "file filter failed") {
+					continue
+				}
+				report.Error = utils.Errorf("sfpattern negative verify failed: %v", err)
+				return report
+			}
+			if sfpattern.HasAlert(result) {
+				report.Error = utils.Errorf("source negative verify: unexpected alert count=%d", sfpattern.AlertCount(result))
+				return report
+			}
+		}
+	}
+	report.Passed = true
+	return report
+}
+
+func checkSourcePositiveResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *sfvm.SFFrameResult, cfg config) (errs error) {
+	_ = cfg
+	if result == nil {
+		return utils.Error("sfpattern result is nil")
+	}
+	if len(result.Errors) > 0 {
+		return utils.Errorf("sfpattern errors: %v", strings.Join(result.Errors, "; "))
+	}
+	alertCount := sfpattern.AlertCount(result)
+	if alertCount <= 0 {
+		return utils.Errorf("alert symbol table is empty")
+	}
+	ret := verifyFs.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin")
+	if ret > 0 && alertCount < ret {
+		return utils.Errorf("alert symbol table is less than alert_min config: %v actual got: %v", ret, alertCount)
+	}
+	maxNum := verifyFs.GetExtraInfoInt("alert_max", "vuln_max", "alertMax", "vulnMax")
+	if maxNum > 0 && alertCount > maxNum {
+		return utils.Errorf("alert symbol table is more than alert_max config: %v actual got: %v", maxNum, alertCount)
+	}
+	num := verifyFs.GetExtraInfoInt("alert_exact", "alertExact", "vulnExact", "alert_num", "vulnNum")
+	if num > 0 && alertCount != num {
+		return utils.Errorf("alert symbol table is not equal alert_exact config: %v, actual got: %v", num, alertCount)
+	}
+	_ = rule
+	return nil
 }
 
 func checkWithFS(fs fi.FileSystem, handler func(ssaapi.Programs) error, opt ...ssaconfig.Option) error {

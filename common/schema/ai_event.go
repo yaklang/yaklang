@@ -141,7 +141,7 @@ const (
 	EVENT_TOOL_CALL_START           = "tool_call_start"           // tool call start event, used to emit the tool call start information
 	EVENT_TOOL_CALL_STATUS          = "tool_call_status"          // tool call status event, used to emit the tool call status information
 	EVENT_TOOL_CALL_USER_CANCEL     = "tool_call_user_cancel"     // tool call user cancel event, used to emit the tool call user cancel information
-	EVENT_TOOL_CALL_DONE            = "tool_call_done"            // tool call end event, used to emit the tool call end information
+	EVENT_TOOL_CALL_DONE            = "tool_call_done"            // tool-call protocol lifecycle completion; execution outcome is carried by tool_call_result
 	EVENT_TOOL_CALL_ERROR           = "tool_call_error"           // tool call error event, used to emit the tool call error information
 	EVENT_TOOL_CALL_SUMMARY         = "tool_call_summary"         // tool call summary event, used to emit the tool call summary information
 	EVENT_TOOL_CALL_DECISION        = "tool_call_decision"        // tool call decision event, used to emit the tool call decision information
@@ -167,7 +167,8 @@ const (
 	TOOL_CALL_STATUS_RUNNING string = "running"
 	// TOOL_CALL_STATUS_PROCESSING_PARAMS indicates invoke parameters are being generated or resolved.
 	TOOL_CALL_STATUS_PROCESSING_PARAMS string = "processing_params"
-	// TOOL_CALL_STATUS_DONE marks a successful completion (also emitted via EVENT_TOOL_CALL_DONE).
+	// TOOL_CALL_STATUS_DONE marks protocol lifecycle completion (also emitted via
+	// EVENT_TOOL_CALL_DONE). It does not classify the tool's execution outcome.
 	TOOL_CALL_STATUS_DONE string = "done"
 	// TOOL_CALL_STATUS_CANCELLED marks a user-initiated cancellation (also emitted via EVENT_TOOL_CALL_USER_CANCEL).
 	TOOL_CALL_STATUS_CANCELLED string = "cancelled"

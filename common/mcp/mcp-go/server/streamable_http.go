@@ -84,6 +84,11 @@ type streamableHTTPEventStream struct {
 }
 
 func (s *streamableHTTPEventStream) Close() {
+	// The HTTP handler must not return while a dispatcher is still writing to
+	// its ResponseWriter. Serialize close with Send so either the current frame
+	// finishes first, or later sends observe the closed stream and stop.
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	s.closeOnce.Do(func() {
 		close(s.done)
 	})
@@ -94,17 +99,29 @@ func (s *streamableHTTPEventStream) Send(message interface{}) error {
 	if err != nil {
 		return err
 	}
+	frame := make([]byte, 0, len("data: ")+len(eventData)+2)
+	frame = append(frame, "data: "...)
+	frame = append(frame, eventData...)
+	frame = append(frame, '\n', '\n')
+	return s.writeFrame(frame)
+}
 
+func (s *streamableHTTPEventStream) writeFrame(frame []byte) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	return s.writeFrameLocked(frame)
+}
+
+// writeFrameLocked is the only code path that writes to this stream's
+// ResponseWriter. The caller must hold s.writeMu.
+func (s *streamableHTTPEventStream) writeFrameLocked(frame []byte) error {
 	select {
 	case <-s.done:
 		return fmt.Errorf("stream closed")
 	default:
 	}
 
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-
-	if _, err := fmt.Fprintf(s.writer, "data: %s\n\n", eventData); err != nil {
+	if _, err := s.writer.Write(frame); err != nil {
 		return err
 	}
 	s.flusher.Flush()
@@ -282,16 +299,22 @@ func (s *StreamableHTTPServer) handleGet(
 		done:    make(chan struct{}),
 	}
 
+	// Publish the stream while holding its write lock, then prime it before
+	// unlocking. A concurrent notification can discover the stream immediately,
+	// but cannot overtake or race the priming frame.
+	stream.writeMu.Lock()
 	session.streams.Store(streamID, stream)
+	primeErr := stream.writeFrameLocked([]byte(": connected\n\n"))
+	stream.writeMu.Unlock()
+	if primeErr != nil {
+		session.streams.Delete(streamID)
+		stream.Close()
+		return
+	}
 	defer func() {
 		session.streams.Delete(streamID)
 		stream.Close()
 	}()
-
-	stream.writeMu.Lock()
-	_, _ = fmt.Fprint(w, ": connected\n\n")
-	flusher.Flush()
-	stream.writeMu.Unlock()
 
 	select {
 	case <-r.Context().Done():

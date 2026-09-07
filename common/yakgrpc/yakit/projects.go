@@ -137,6 +137,18 @@ func GetExportFile(projectName, suffix string) string {
 	return outputFile
 }
 
+func closeCreatedProjectDB(db *gorm.DB) {
+	if db == nil {
+		return
+	}
+	_ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);").Error
+	if sqlDB := db.DB(); sqlDB != nil {
+		_ = sqlDB.Close()
+		return
+	}
+	_ = db.Close()
+}
+
 func CreateProjectFile(name, Type string) (string, error) {
 	switch Type {
 	case TypeProject:
@@ -146,7 +158,7 @@ func CreateProjectFile(name, Type string) (string, error) {
 		if err != nil {
 			return "", utils.Errorf("create project database failed: %s", err)
 		}
-		defer projectDatabase.Close()
+		closeCreatedProjectDB(projectDatabase)
 
 		return pathName, nil
 	case TypeSSAProject:
@@ -156,7 +168,7 @@ func CreateProjectFile(name, Type string) (string, error) {
 		if err != nil {
 			return "", utils.Errorf("create ssa project database failed: %s", err)
 		}
-		defer ssaProjectDatabase.Close()
+		closeCreatedProjectDB(ssaProjectDatabase)
 		return pathName, nil
 	case TypeFile:
 		return "", nil

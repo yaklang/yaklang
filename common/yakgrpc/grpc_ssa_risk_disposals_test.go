@@ -52,6 +52,16 @@ func prepareTestData(t *testing.T) (client ypb.YakClient, taskId string, riskIds
 		createRisk("ssadb://prog3/1", "medium", "weak-crypto"),
 	}
 
+	// The 5 risks created above would otherwise leak into the shared SSA
+	// database and break unfiltered counts (e.g. TestSSARiskFeedbackToOnline
+	// asserts on the total number of SSA risks). Always clean them up once
+	// the test finishes, even on failure.
+	t.Cleanup(func() {
+		_ = yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskId},
+		})
+	})
+
 	return client, taskId, riskIds
 }
 

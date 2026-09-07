@@ -104,7 +104,7 @@ func init() {
 						srcParts = append(srcParts, k+":"+utils.InterfaceToString(bySrc[k]))
 					}
 					reconLog := loop.Get(keyReconLog)
-					if ytoken.CalcTokenCount(reconLog) > 3500 {
+					if ytoken.TokenCountExceeds(reconLog, 3500) {
 						reconLog = reconLog[len(reconLog)-3500:]
 					}
 					pathFailureHint := strings.TrimSpace(loop.Get(keyPathFailureRecoveryHint))

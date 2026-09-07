@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang使用不安全随机源（math/rand）"
 	type: vuln
 	level: mid
-	risk: "不安全加密"
+	risk: "weak-randomness"
 	desc: <<<DESC
 该规则检测 `math/rand` 在安全相关场景中的使用。`math/rand` 为伪随机生成器，输出可预测，
 不适用于 token、验证码、会话ID、密钥等安全用途。
@@ -31,7 +31,7 @@ alert $mid for {
 	title: "Golang Insecure Random Source Detected",
 	title_zh: "检测到Golang使用不安全随机源",
 	message: "检测到 math/rand 调用，若用于安全场景（token/密钥/会话ID）会导致可预测风险。",
-	risk: "不安全加密",
+	risk: "weak-randomness",
 	desc: <<<DESC
 `math/rand` 输出可预测，不应用于安全敏感随机值生成。
 DESC

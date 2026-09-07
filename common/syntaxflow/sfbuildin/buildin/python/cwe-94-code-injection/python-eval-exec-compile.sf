@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Python eval/exec/compile代码注入漏洞"
 	type: audit
 	level: high
-	risk: "代码注入"
+	risk: "code-injection"
 	desc: <<<DESC
 该规则用于检测Python代码中因使用`eval()`、`exec()`和`compile()`等动态代码执行函数而引发的代码注入漏洞。当这些函数处理来自不可信来源的用户输入时，攻击者可通过构造恶意输入直接执行任意Python代码，导致远程代码执行（RCE）。常见触发场景包括Web应用接收用户提交的表达式或代码字符串后未经验证直接传入上述函数。漏洞影响涵盖服务器完全控制、敏感数据泄露、横向移动及持久化后门植入等严重后果。
 DESC
@@ -25,7 +25,7 @@ alert $sink for {
 	title_zh: "eval exec compile",
 	level: "high",
 	type: "audit",
-	risk: "代码注入",
+	risk: "code-injection",
 	message: "检测到 eval/exec/compile 处理了可能受用户影响的输入，存在代码注入风险。",
 	name: "sink",
 }

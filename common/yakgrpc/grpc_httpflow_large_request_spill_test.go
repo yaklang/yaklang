@@ -15,6 +15,7 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFlow_LargeRequest_Spill(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -33,13 +34,15 @@ func TestGRPCMUSTPASS_HTTPFlow_LargeRequest_Spill(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, flow.IsTooLargeRequest)
 	require.NotEmpty(t, flow.TooLargeRequestBodyFile)
-	defer os.Remove(flow.TooLargeRequestBodyFile)
-	defer os.Remove(flow.TooLargeRequestHeaderFile)
+	t.Cleanup(func() {
+		_ = os.Remove(flow.TooLargeRequestBodyFile)
+		_ = os.Remove(flow.TooLargeRequestHeaderFile)
+	})
 
 	flow.CalcHash()
 	db := consts.GetGormProjectDatabase()
 	require.NoError(t, yakit.InsertHTTPFlow(db, flow))
-	defer yakit.DeleteHTTPFlowByID(db, int64(flow.ID))
+	t.Cleanup(func() { _ = yakit.DeleteHTTPFlowByID(db, int64(flow.ID)) })
 
 	list, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
 		Keyword:    token,
@@ -56,7 +59,8 @@ func TestGRPCMUSTPASS_HTTPFlow_LargeRequest_Spill(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, byID.IsTooLargeRequest)
 	require.NotEmpty(t, byID.TooLargeRequestBodyFile)
-	require.Contains(t, string(byID.Request), "request too large")
+	require.Contains(t, string(byID.Request), "{{file(")
+	require.NotContains(t, string(byID.Request), "request too large")
 	require.Less(t, len(byID.Request), len(body))
 
 	stream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{

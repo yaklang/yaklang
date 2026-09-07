@@ -3,7 +3,9 @@ package test
 import (
 	"bytes"
 	"context"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -60,6 +62,64 @@ func execBatchTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) 
 	return w1.String(), w2.String()
 }
 
+func execBatchHTTPToolResult(t *testing.T, params aitool.InvokeParams) map[string]any {
+	t.Helper()
+	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	result, err := getBatchDoHTTPRequestTool(t).Callback(context.Background(), params, nil, stdout, stderr)
+	assert.NilError(t, err)
+	semantic := utils.InterfaceToGeneralMap(result)
+	assert.Assert(t, len(semantic) > 0, "missing semantic RESULT; stdout=%s stderr=%s", stdout.String(), stderr.String())
+	return semantic
+}
+
+func TestBatchDoHTTPRequest_ResultSeparatesStatusesAndTransportErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/missing":
+			w.WriteHeader(http.StatusNotFound)
+		case "/broken":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+		_, _ = w.Write([]byte("oracle"))
+	}))
+	defer server.Close()
+
+	result := execBatchHTTPToolResult(t, aitool.InvokeParams{
+		"base-url":   server.URL,
+		"paths":      "/ok\n/missing\n/broken",
+		"concurrent": 3,
+		"timeout":    5,
+	})
+	assert.Equal(t, utils.InterfaceToInt(result["request_count"]), 3)
+	assert.Equal(t, utils.InterfaceToInt(result["request_completed_count"]), 3)
+	assert.Equal(t, utils.InterfaceToInt(result["response_received_count"]), 3)
+	assert.Equal(t, utils.InterfaceToInt(result["transport_error_count"]), 0)
+	distribution := utils.InterfaceToGeneralMap(result["status_code_distribution"])
+	assert.Equal(t, utils.InterfaceToInt(distribution["200"]), 1)
+	assert.Equal(t, utils.InterfaceToInt(distribution["404"]), 1)
+	assert.Equal(t, utils.InterfaceToInt(distribution["500"]), 1)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NilError(t, err)
+	refusedBase := "http://" + listener.Addr().String()
+	assert.NilError(t, listener.Close())
+	refused := execBatchHTTPToolResult(t, aitool.InvokeParams{
+		"base-url": refusedBase,
+		"paths":    "/refused",
+		"timeout":  1,
+	})
+	assert.Equal(t, utils.InterfaceToInt(refused["response_received_count"]), 0)
+	assert.Equal(t, utils.InterfaceToInt(refused["transport_error_count"]), 1)
+	items := utils.InterfaceToSliceInterface(refused["items"])
+	assert.Equal(t, len(items), 1)
+	item := utils.InterfaceToGeneralMap(items[0])
+	assert.Equal(t, utils.InterfaceToBoolean(item["request_sent"]), true)
+	assert.Equal(t, utils.InterfaceToBoolean(item["response_received"]), false)
+	assert.Assert(t, utils.InterfaceToString(item["transport_error"]) != "")
+}
+
 func TestBatchDoHTTPRequest_MetadataContainsIntentHints(t *testing.T) {
 	aiTool := loadBatchDoHTTPRequestAITool(t)
 
@@ -93,7 +153,7 @@ func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 2"), "should show 2 paths")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "should show 2 successful requests")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "should show 2 received responses")
 	assert.Assert(t, strings.Contains(stdout, "/path1"), "path1 should appear")
 	assert.Assert(t, strings.Contains(stdout, "/path2"), "path2 should appear")
 	assert.Assert(t, strings.Contains(stdout, "request #1 packet") || strings.Contains(stdout, "request #2 packet"), "each generated batch request packet should be printed")
@@ -137,7 +197,7 @@ func TestBatchDoHTTPRequest_SingleHeader(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "header_received"), "server should receive the custom header")
-	assert.Assert(t, strings.Contains(stdout, "Success: 1"), "request with header should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 1"), "request with header should receive a response")
 }
 
 // Test 4: Multiple custom headers via multi-line headers parameter
@@ -162,7 +222,7 @@ func TestBatchDoHTTPRequest_MultipleHeaders(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "both_headers_found"), "server should receive both custom headers")
-	assert.Assert(t, strings.Contains(stdout, "Success: 1"), "request with multiple headers should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 1"), "request with multiple headers should receive a response")
 }
 
 // Test 5: Exclude status codes
@@ -253,7 +313,7 @@ func TestBatchDoHTTPRequest_DelaySequential(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "forcing sequential execution"), "should indicate sequential mode")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "should complete requests successfully")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "should receive both responses")
 }
 
 // Test 9: Keyword matching
@@ -335,7 +395,7 @@ func TestBatchDoHTTPRequest_ConcurrentMode(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "concurrent batch requests"), "should indicate concurrent mode")
-	assert.Assert(t, strings.Contains(stdout, "Success: 3"), "all 3 requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 3"), "all 3 requests should receive responses")
 }
 
 // Test 13: Error handling for unreachable host
@@ -459,7 +519,7 @@ func TestBatchDoHTTPRequest_MultiplePaths(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "users_list"), "users endpoint should respond")
 	assert.Assert(t, strings.Contains(stdout, "posts_list"), "posts endpoint should respond")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both requests should receive responses")
 }
 
 // Test 19: Empty paths validation
@@ -479,6 +539,13 @@ func TestBatchDoHTTPRequest_EmptyPathsValidation(t *testing.T) {
 			strings.Contains(combined, "at least one") ||
 			strings.Contains(combined, "Error"),
 		"should report error for empty paths")
+}
+
+func TestBatchDoHTTPRequest_MissingRequestIsProtocolFailure(t *testing.T) {
+	result, err := getBatchDoHTTPRequestTool(t).InvokeWithParams(aitool.InvokeParams{})
+	assert.ErrorContains(t, err, "at least one of")
+	assert.Equal(t, result.Success, false)
+	assert.Assert(t, result.Data == nil, "a failed invocation must not expose a result envelope")
 }
 
 // Test 20: Custom headers (non-curl style)
@@ -523,7 +590,7 @@ func TestBatchDoHTTPRequest_PacketMode(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "packet_path:/pkt_a"), "packet mode should substitute path_a")
 	assert.Assert(t, strings.Contains(stdout, "packet_path:/pkt_b"), "packet mode should substitute path_b")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both packet mode requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both packet mode requests should receive responses")
 }
 
 // Test 22: Full URLs in paths (no base-url needed)
@@ -545,7 +612,7 @@ func TestBatchDoHTTPRequest_FullUrlsInPaths(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "fullurl_path:/full_a"), "full URL path_a should work")
 	assert.Assert(t, strings.Contains(stdout, "fullurl_path:/full_b"), "full URL path_b should work")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both full URL requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both full URL requests should receive responses")
 }
 
 // Test 23: Newline-separated paths
@@ -561,7 +628,7 @@ func TestBatchDoHTTPRequest_NewlinePaths(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 3"), "should parse 3 paths from newlines")
-	assert.Assert(t, strings.Contains(stdout, "Success: 3"), "all 3 newline-separated paths should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 3"), "all 3 newline-separated paths should receive responses")
 }
 
 // Test 24: Exclude size ranges
@@ -643,7 +710,7 @@ func TestBatchDoHTTPRequest_PathCommasPreserved(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 2"), "should only split paths by newlines")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both newline-separated requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both newline-separated requests should receive responses")
 	assert.Assert(t, strings.Contains(stdout, "/user/limit/4/order1?order=id,1,2,3"), "comma-containing query should remain intact")
 	assert.Assert(t, strings.Contains(stdout, "/user/limit/4/order2?order=id,4,5,6"), "second comma-containing query should remain intact")
 }
@@ -669,7 +736,7 @@ func TestBatchDoHTTPRequest_PacketBaseHost(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "basehost_ok:/bh_test"), "base-host should route request correctly")
-	assert.Assert(t, strings.Contains(stdout, "Success: 1"), "packet mode with base-host should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 1"), "packet mode with base-host should receive a response")
 }
 
 // Test 29: Full URLs in paths with custom headers (regression test for shared-params fix)
@@ -693,7 +760,7 @@ func TestBatchDoHTTPRequest_FullUrlWithHeaders(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "fullurl_header_ok"), "custom headers should be applied to full URL paths")
-	assert.Assert(t, strings.Contains(stdout, "Success: 1"), "full URL with headers should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 1"), "full URL with headers should receive a response")
 }
 
 // Test 30: Full URLs in paths with body and content-type
@@ -740,7 +807,7 @@ func TestBatchDoHTTPRequest_PrefixWithSlashPaths(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "/api/v2/users"), "prefix should handle paths with leading slash")
 	assert.Assert(t, strings.Contains(stdout, "/api/v2/admin"), "prefix should handle paths without leading slash")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both prefixed requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both prefixed requests should receive responses")
 }
 
 // Test 32: AI passes "paths" as a JSON ARRAY.
@@ -764,7 +831,7 @@ func TestBatchDoHTTPRequest_PathsAsArray(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 2"), "array-form paths should be split into 2")
 	assert.Assert(t, strings.Contains(stdout, "arr_path:/arr_a"), "first array path should be requested")
 	assert.Assert(t, strings.Contains(stdout, "arr_path:/arr_b"), "second array path should be requested")
-	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both array-form paths should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both array-form paths should receive responses")
 }
 
 // Test 33: AI passes "headers" as a JSON OBJECT (regression for schema friction).
@@ -840,7 +907,7 @@ func TestBatchDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "batch_special_form_ok"), "batch structured form values should survive quotes, spaces, #, and an inner &")
-	assert.Assert(t, strings.Contains(stdout, "Success: 1"), "batch request should complete successfully")
+	assert.Assert(t, strings.Contains(stdout, "Responses: 1"), "batch request should receive a response")
 	assert.Assert(t, strings.Contains(stdout, "request #1 packet"), "batch request packet should be visible to the AI")
 	assert.Assert(t, strings.Contains(stdout, "a=asdf%27+abc+%22+%23%26tail"), "printed batch packet should show the final encoded form value")
 }
@@ -875,7 +942,7 @@ func TestBatchDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDef
 	execution, ok := result.Data.(*aitool.ToolExecutionResult)
 	assert.Assert(t, ok, "InvokeWithParams should return a ToolExecutionResult")
 	assert.Assert(t, strings.Contains(execution.CombinedOutput, "batch_react_form_result_visible"), "ReAct-visible combined output should contain batch responses")
-	assert.Assert(t, strings.Contains(execution.CombinedOutput, "Success: 2"), "ReAct-visible combined output should contain the batch summary")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "Responses: 2"), "ReAct-visible observations should contain the batch summary")
 	assert.Assert(t, strings.Contains(execution.CombinedOutput, "request #"), "ReAct-visible combined output should contain generated request packets")
 }
 

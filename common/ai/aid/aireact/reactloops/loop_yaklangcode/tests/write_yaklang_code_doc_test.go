@@ -15,6 +15,7 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -104,7 +105,7 @@ func mockedYaklangGrepSamples(t *testing.T, i aicommon.AICallerConfigIf, req *ai
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 
 		rsp := i.NewAIResponse()
 
@@ -633,7 +634,7 @@ func mockedYaklangSemanticSearch(t *testing.T, i aicommon.AICallerConfigIf, req 
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"semantic_search_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 
 		rsp := i.NewAIResponse()
 

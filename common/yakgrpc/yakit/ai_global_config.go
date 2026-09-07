@@ -127,11 +127,13 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				continue
 			}
 			result = append(result, &ypb.AIModelConfig{
-				ProviderId:  model.GetProviderId(),
-				Provider:    providerCfg,
-				ModelName:   model.GetModelName(),
-				ExtraParams: cloneKVPairs(model.GetExtraParams()),
-				IsOnline:    model.GetIsOnline(),
+				ProviderId:             model.GetProviderId(),
+				Provider:               providerCfg,
+				ModelName:              model.GetModelName(),
+				ExtraParams:            cloneKVPairs(model.GetExtraParams()),
+				IsOnline:               model.GetIsOnline(),
+				ProbedExtendedEfforts:  cloneStringSlice(model.GetProbedExtendedEfforts()),
+				EffortProbed:           model.GetEffortProbed(),
 			})
 		}
 		return result
@@ -194,10 +196,12 @@ func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 			continue
 		}
 		cloned = append(cloned, &ypb.AIModelConfig{
-			ProviderId:  model.GetProviderId(),
-			Provider:    cloneThirdPartyConfig(model.GetProvider()),
-			ModelName:   model.GetModelName(),
-			ExtraParams: cloneKVPairs(model.GetExtraParams()),
+			ProviderId:             model.GetProviderId(),
+			Provider:               cloneThirdPartyConfig(model.GetProvider()),
+			ModelName:              model.GetModelName(),
+			ExtraParams:            cloneKVPairs(model.GetExtraParams()),
+			ProbedExtendedEfforts:  cloneStringSlice(model.GetProbedExtendedEfforts()),
+			EffortProbed:           model.GetEffortProbed(),
 		})
 	}
 	return cloned
@@ -259,6 +263,15 @@ func kvPairsFromMap(m map[string]string) []*ypb.KVPair {
 		pairs = append(pairs, &ypb.KVPair{Key: k, Value: v})
 	}
 	return pairs
+}
+
+func cloneStringSlice(s []string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+	out := make([]string, len(s))
+	copy(out, s)
+	return out
 }
 
 func cloneKVPairs(kvs []*ypb.KVPair) []*ypb.KVPair {

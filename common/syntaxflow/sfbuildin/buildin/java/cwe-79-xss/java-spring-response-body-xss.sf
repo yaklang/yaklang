@@ -2,7 +2,7 @@ desc(
 	title_zh: "检测Java SpringBoot RestController XSS漏洞"
 	title: "Check Java SpringBoot RestController XSS Vulnerability"
 	type: vuln
-	risk: XSS
+	risk: ""
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -135,7 +135,7 @@ return "Your input: " + input; // 未对输入进行转义
 DESC
 	level: "high",
 	type: "vuln",
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	name: "withoutCall",
 	message: "检测到Java SpringBoot RestController XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -207,7 +207,7 @@ DESC
 	type: "vuln",
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	name: "unsafeFilteredSink",
 	message: "检测到Java SpringBoot RestController XSS漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 }
@@ -247,7 +247,7 @@ DESC
 	solution: <<<SOLUTION
 无需特别修复，但需要审计人员对当前代码逻辑进行分析，确保过滤机制存在且无法被绕过。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "filteredSink",
 }
 

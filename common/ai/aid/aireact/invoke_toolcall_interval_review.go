@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,30 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type intervalReviewOutputGuard struct {
+	prevStdout []byte
+	prevStderr []byte
+}
+
+func (g *intervalReviewOutputGuard) outputChanged(stdout, stderr []byte) bool {
+	if g == nil {
+		return false
+	}
+	if bytes.Equal(g.prevStdout, stdout) && bytes.Equal(g.prevStderr, stderr) {
+		return false
+	}
+	g.prevStdout = append([]byte(nil), stdout...)
+	g.prevStderr = append([]byte(nil), stderr...)
+	return true
+}
+
+func intervalReviewToolName(tool *aitool.Tool) string {
+	if tool == nil {
+		return ""
+	}
+	return tool.Name
+}
 
 func normalizeIntervalReviewFieldContent(reader io.Reader) (string, bool) {
 	raw, err := io.ReadAll(utils.UTF8Reader(reader))
@@ -243,6 +268,7 @@ func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AISta
 	// context. Keep local fallbacks for direct handler callers and old tests.
 	fallbackStartTime := time.Now()
 	var fallbackReviewCount int
+	var outputGuard intervalReviewOutputGuard
 
 	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 		startTime := fallbackStartTime
@@ -253,6 +279,14 @@ func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AISta
 		} else {
 			fallbackReviewCount++
 			reviewCount = fallbackReviewCount
+		}
+
+		if outputGuard.outputChanged(stdoutSnapshot, stderrSnapshot) {
+			log.Infof(
+				"interval review #%d: skip AI for tool [%s] (stdout/stderr still changing)",
+				reviewCount, intervalReviewToolName(tool),
+			)
+			return true, nil
 		}
 
 		return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(ctx, task, emitter, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)

@@ -7,8 +7,10 @@ func compiledScanNodeCapabilityKeys() []string {
 		"yak.execute",
 		"hids",
 		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 	}
 }

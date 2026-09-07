@@ -1,0 +1,205 @@
+{
+  "schema_version": "yaklang_risk_type_taxonomy.v1",
+  "version": "2026.08.31.2",
+  "categories": [
+    {
+      "id": "injection",
+      "display_name": "注入攻击",
+      "order": 1,
+      "risk_types": [
+        {"name":"sql-injection","display_name":"SQL 注入","aliases":["SQL注入","SQL 注入","sqli-inject","sqli","sql_injection"],"order":1},
+        {"name":"command-injection","display_name":"命令注入","aliases":["Command Injection","命令注入","操作系统命令注入","操作系统命令注入（用户输入驱动）","用户可控输入流入命令执行入口，可导致任意操作系统命令执行。"],"order":2},
+        {"name":"command-execution","display_name":"命令执行","aliases":["命令执行","远程命令执行","rce-command"],"order":3},
+        {"name":"code-injection","display_name":"代码注入","aliases":["Code Injection","代码注入"],"order":4},
+        {"name":"code-execution","display_name":"代码执行","aliases":["代码执行","rce-code"],"order":5},
+        {"name":"remote-code-execution","display_name":"远程代码执行（RCE）","aliases":["rce","远程代码执行","远程代码执行（RCE）"],"order":6},
+        {"name":"groovy-code-execution","display_name":"Groovy Shell 代码执行","aliases":["Groovy-Shell代码执行","Groovy-Shell代码执行漏洞"],"order":7},
+        {"name":"dynamic-code-loading","display_name":"动态代码加载","aliases":["任意代码加载"],"order":8},
+        {"name":"ssti","display_name":"服务端模板注入（SSTI）","aliases":["服务器端模板注入","服务器端模板注入（SSTI）","服务端模板注入","服务端模板注入（SSTI）"],"order":9},
+        {"name":"template-injection","display_name":"模板注入","aliases":["模板注入"],"order":10},
+        {"name":"template-object-injection","display_name":"模板对象注入","aliases":["模板对象注入"],"order":11},
+        {"name":"template-object-file-read","display_name":"模板对象注入与本地文件读取","aliases":["模板对象注入/本地文件读取"],"order":12},
+        {"name":"el-injection","display_name":"EL 表达式注入","aliases":["EL表达式注入"],"order":13},
+        {"name":"spel-injection","display_name":"SpEL 表达式注入","aliases":["SPEL表达式注入"],"order":14},
+        {"name":"ldap-injection","display_name":"LDAP 注入","aliases":["ldap","LDAP注入"],"order":15},
+        {"name":"xpath-injection","display_name":"XPath 注入","aliases":["XPath注入"],"order":16},
+        {"name":"json-injection","display_name":"JSON 注入","aliases":["json_injection","JSON注入"],"order":17},
+        {"name":"crlf-injection","display_name":"CRLF 注入","aliases":["crlf","CRLF注入"],"order":18},
+        {"name":"log-forging","display_name":"日志伪造","aliases":["日志伪造"],"order":19},
+        {"name":"format-string","display_name":"格式化字符串漏洞","aliases":["格式化字符串漏洞"],"order":20},
+        {"name":"deserialization","display_name":"不安全反序列化","aliases":["Insecure Deserialization","不安全反序列化","反序列化","反序列化漏洞","反序列化（Unserialize）"],"order":21},
+        {"name":"variable-overwrite","display_name":"变量覆盖","aliases":["变量覆盖","变量覆盖（Variable Coverage）"],"order":22},
+        {"name":"reflection-abuse","display_name":"不安全反射","order":23},
+        {"name":"prompt-injection","display_name":"提示词注入","order":24},
+        {"name":"tool-poisoning","display_name":"工具描述投毒","order":25}
+      ]
+    },
+    {
+      "id": "web-security",
+      "display_name": "Web 安全",
+      "order": 2,
+      "risk_types": [
+        {"name":"xss","display_name":"跨站脚本（XSS）","aliases":["XSS","跨站脚本（XSS）"],"order":1},
+        {"name":"xss-information-exposure","display_name":"跨站脚本与敏感信息泄露","aliases":["跨站脚本（XSS）/ 敏感信息泄露"],"order":2},
+        {"name":"xxe","display_name":"XML 外部实体注入（XXE）","aliases":["XXE","XML外部实体（XXE）","XML 外部实体注入（XXE）"],"order":3},
+        {"name":"xml-entity-processing","display_name":"XML 外部实体与实体扩展","aliases":["XML 外部实体注入（XXE）/ 实体扩展"],"order":4},
+        {"name":"ssrf","display_name":"服务端请求伪造（SSRF）","aliases":["服务端请求伪造（SSRF）"],"order":5},
+        {"name":"ssrf-outbound-request","display_name":"SSRF 与非预期外连","aliases":["服务端请求伪造（SSRF）/ 非预期外连"],"order":6},
+        {"name":"csrf","display_name":"跨站请求伪造（CSRF）","aliases":["跨站请求伪造（CSRF）"],"order":7},
+        {"name":"open-redirect","display_name":"开放重定向","aliases":["开放重定向","开放重定向（Open Redirect）","URL重定向","url-redirect"],"order":8},
+        {"name":"cors","display_name":"跨域资源共享（CORS）","aliases":["CORS","跨域资源共享（CORS）"],"order":9},
+        {"name":"clickjacking","display_name":"点击劫持","aliases":["点击劫持"],"order":10},
+        {"name":"insecure-content-loading","display_name":"不安全内容加载","aliases":["不安全内容加载"],"order":11},
+        {"name":"csp-misconfiguration","display_name":"内容安全策略配置不当","order":12}
+      ]
+    },
+    {
+      "id": "files-paths",
+      "display_name": "文件与路径",
+      "order": 3,
+      "risk_types": [
+        {"name":"path-traversal","display_name":"路径遍历","aliases":["路径穿越","路径遍历","文件路径穿越","目录穿越","目录遍历"],"order":1},
+        {"name":"potential-path-traversal","display_name":"疑似路径遍历","aliases":["疑似目录穿越"],"order":2},
+        {"name":"path-manipulation","display_name":"路径操纵","aliases":["路径操纵"],"order":3},
+        {"name":"path-traversal-file-read","display_name":"路径遍历与任意文件读取","aliases":["路径遍历 / 任意文件读取"],"order":4},
+        {"name":"path-traversal-file-write","display_name":"路径遍历与任意文件写入","aliases":["任意文件写入/目录穿越"],"order":5},
+        {"name":"arbitrary-file-write","display_name":"任意文件写入","aliases":["任意文件写入"],"order":6},
+        {"name":"arbitrary-file-delete","display_name":"任意文件删除","aliases":["任意文件删除"],"order":7},
+        {"name":"file-upload","display_name":"文件上传风险","aliases":["任意文件上传","文件上传","文件上传漏洞"],"order":8},
+        {"name":"file-include","display_name":"文件包含","aliases":["文件包含"],"order":9},
+        {"name":"file-operation","display_name":"文件操作检查","aliases":["文件操作"],"order":10},
+        {"name":"symlink-toctou","display_name":"符号链接与检查使用竞态","aliases":["符号链接竞争 / 检查时与使用时竞态"],"order":11}
+      ]
+    },
+    {
+      "id": "identity-access",
+      "display_name": "身份与访问控制",
+      "order": 4,
+      "risk_types": [
+        {"name":"authentication-bypass","display_name":"身份认证绕过","aliases":["auth-bypass","认证绕过","身份验证绕过","身份认证被绕过"],"order":1},
+        {"name":"improper-authentication","display_name":"身份认证不当","aliases":["身份认证缺陷","身份验证不当"],"order":2},
+        {"name":"authorization-bypass","display_name":"授权绕过","aliases":["授权绕过","权限绕过"],"order":3},
+        {"name":"access-control","display_name":"访问控制缺陷","aliases":["访问控制缺陷"],"order":4},
+        {"name":"ftp-parameter-validation","display_name":"FTP 访问参数校验","aliases":["unsafe-ftp-parameter-validation"],"order":5},
+        {"name":"dns-security-decision","display_name":"安全决策依赖 DNS 查询","aliases":["DNS查询依赖"],"order":6},
+        {"name":"ip-spoofing","display_name":"IP 地址伪造","aliases":["IP伪造"],"order":7},
+        {"name":"session-fixation","display_name":"会话固定","aliases":["固定会话漏洞","会话固定攻击","会话固定（Session Fixation）"],"order":8},
+        {"name":"session-hijacking","display_name":"会话劫持","aliases":["会话劫持"],"order":9},
+        {"name":"session-security","display_name":"会话安全","aliases":["会话安全问题"],"order":10},
+        {"name":"cookie-security","display_name":"Cookie 安全配置","aliases":["cookie security","Cookie安全配置缺陷"],"order":11},
+        {"name":"session-cleartext","display_name":"会话劫持与明文传输","aliases":["会话劫持/敏感信息明文传输"],"order":12}
+      ]
+    },
+    {
+      "id": "sensitive-data",
+      "display_name": "敏感信息与凭据",
+      "order": 5,
+      "risk_types": [
+        {"name":"information-exposure","display_name":"信息泄露","aliases":["信息泄露","信息泄露（Information Exposure）","敏感信息泄露"],"order":1},
+        {"name":"sql-information-exposure","display_name":"SQL 信息泄露","order":2},
+        {"name":"sensitive-query-exposure","display_name":"GET 请求敏感信息泄露","aliases":["敏感信息GET泄露","敏感数据通过 GET 请求泄露"],"order":3},
+        {"name":"hardcoded-credentials","display_name":"硬编码凭据","aliases":["Hardcoded Credentials","硬编码凭据","硬编码凭据（Hardcoded Credentials）"],"order":4},
+        {"name":"hardcoded-password","display_name":"硬编码密码","aliases":["hardcodedpassword","硬编码密码"],"order":5},
+        {"name":"hardcoded-key","display_name":"硬编码密钥","aliases":["硬编码密钥"],"order":6},
+        {"name":"weak-password","display_name":"弱密码","aliases":["弱密码"],"order":7}
+      ]
+    },
+    {
+      "id": "crypto-transport",
+      "display_name": "加密与传输",
+      "order": 6,
+      "risk_types": [
+        {"name":"insecure-cryptography","display_name":"不安全加密","aliases":["不安全加密"],"order":1},
+        {"name":"weak-cryptography","display_name":"弱加密","aliases":["Weak Cryptography","弱加密","弱加密漏洞","弱加密（Risky Crypt）","risky-crypt"],"order":2},
+        {"name":"weak-cryptographic-algorithm","display_name":"弱加密算法","aliases":["不安全加密算法","使用弱加密算法","弱加密算法"],"order":3},
+        {"name":"insufficient-key-size","display_name":"密钥长度不足","aliases":["密钥长度不足"],"order":4},
+        {"name":"weak-hash","display_name":"弱哈希算法","aliases":["弱哈希算法"],"order":5},
+        {"name":"weak-integrity","display_name":"弱完整性校验","aliases":["弱完整性 / 易碰撞"],"order":6},
+        {"name":"weak-randomness","display_name":"弱随机数","aliases":["弱随机数","不安全的随机数","可预测随机数"],"order":7},
+        {"name":"certificate-validation","display_name":"证书校验不当","aliases":["Improper Certificate Validation","证书验证绕过"],"order":8},
+        {"name":"insecure-tls","display_name":"不安全 TLS 配置","aliases":["不安全的TLS配置"],"order":9},
+        {"name":"cleartext-transmission","display_name":"明文传输","aliases":["明文传输"],"order":10},
+        {"name":"cleartext-cookie","display_name":"Cookie 明文传输","aliases":["敏感Cookie明文传输"],"order":11},
+        {"name":"man-in-the-middle","display_name":"中间人攻击","aliases":["中间人攻击"],"order":12}
+      ]
+    },
+    {
+      "id": "memory-safety",
+      "display_name": "内存安全",
+      "order": 7,
+      "risk_types": [
+        {"name":"buffer-overflow","display_name":"缓冲区溢出","aliases":["缓冲区溢出","缓冲区溢出（Buffer Overflow）"],"order":1},
+        {"name":"integer-overflow","display_name":"整数溢出或回绕","aliases":["整数溢出或回绕"],"order":2},
+        {"name":"use-after-free","display_name":"释放后使用","aliases":["释放后使用"],"order":3},
+        {"name":"null-dereference","display_name":"空指针解引用","aliases":["空指针","空指针解引用"],"order":4},
+        {"name":"memory-leak","display_name":"内存泄漏","aliases":["内存泄漏"],"order":5},
+        {"name":"unsafe-implementation","display_name":"不安全实现","aliases":["不安全实现"],"order":6}
+      ]
+    },
+    {
+      "id": "resources",
+      "display_name": "资源与可用性",
+      "order": 8,
+      "risk_types": [
+        {"name":"denial-of-service","display_name":"拒绝服务","aliases":["DDOS","ddos"],"order":1},
+        {"name":"resource-leak","display_name":"资源泄漏","aliases":["资源泄漏"],"order":2},
+        {"name":"resource-cleanup","display_name":"资源清理不当","aliases":["资源未清理"],"order":3}
+      ]
+    },
+    {
+      "id": "configuration",
+      "display_name": "安全配置",
+      "order": 9,
+      "risk_types": [
+        {"name":"security-misconfiguration","display_name":"安全配置不当","aliases":["安全配置错误","不安全配置"],"order":1},
+        {"name":"configuration-information-exposure","display_name":"配置不当与信息泄露","aliases":["配置不当 / 敏感信息暴露"],"order":2}
+      ]
+    },
+    {
+      "id": "dependencies",
+      "display_name": "组件与依赖",
+      "order": 10,
+      "risk_types": [
+        {"name":"sca","display_name":"软件成分分析（SCA）","aliases":["软件成分分析（SCA）"],"order":1}
+      ]
+    },
+    {
+      "id": "code-quality",
+      "display_name": "代码质量",
+      "order": 11,
+      "risk_types": [
+        {"name":"code-style","display_name":"代码风格","aliases":["代码风格"],"order":1},
+        {"name":"best-practice","display_name":"最佳实践检查","aliases":["Best-Practice"],"order":2},
+        {"name":"api-abuse","display_name":"API 滥用","order":3},
+        {"name":"api-misuse","display_name":"API 误用","aliases":["API误用"],"order":4},
+        {"name":"error-handling","display_name":"错误处理不当","aliases":["错误处理","错误处理不当","错误处理（Error Handling）"],"order":5},
+        {"name":"exception-handling","display_name":"异常处理","aliases":["异常处理"],"order":6},
+        {"name":"input-validation","display_name":"输入校验不当","aliases":["输入校验不当"],"order":7},
+        {"name":"data-integrity","display_name":"数据完整性","aliases":["数据完整性"],"order":8},
+        {"name":"unicode-direction-control","display_name":"Unicode 方向控制符","order":9},
+        {"name":"unsafe-shell-expansion","display_name":"不安全 Shell 展开","order":10}
+      ]
+    },
+    {
+      "id": "audit",
+      "display_name": "审计与辅助分析",
+      "order": 12,
+      "risk_types": [
+        {"name":"security-check","display_name":"安全检查","aliases":["Security"],"order":1,"review_required":true},
+        {"name":"audit-check","display_name":"审计检查","aliases":["审计（Audit）"],"order":2},
+        {"name":"information","display_name":"信息提示","aliases":["信息"],"order":3},
+        {"name":"archive-operation","display_name":"压缩文件操作","aliases":["zip operator"],"order":4},
+        {"name":"deserialization-flow","display_name":"不安全反序列化链路","aliases":["不安全反序列化链路"],"order":5},
+        {"name":"encoded-payload-execution","display_name":"编码载荷执行","order":6}
+      ]
+    },
+    {
+      "id": "review-required",
+      "display_name": "待核实类型",
+      "order": 13,
+      "risk_types": [
+        {"name":"misplaced-severity","display_name":"风险类型待核实","aliases":["Moderate","中等"],"order":1,"review_required":true}
+      ]
+    }
+  ]
+}

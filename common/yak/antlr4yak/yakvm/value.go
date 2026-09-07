@@ -32,55 +32,68 @@ type Value struct {
 	ExtraInfo map[string]interface{}
 }
 
-const cachedRunesKey = "yakvm_cached_runes"
-
 func (v *Value) GetLiteral() string {
-	if v.Literal == "" {
-		switch ret := v.Value.(type) {
-		case bool:
-			v.Literal = strconv.FormatBool(ret)
-		case int:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case int8:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case int16:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case int32:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case int64:
-			v.Literal = strconv.FormatInt(ret, 10)
-		case uint8: // byte
-			v.Literal = string([]byte{ret})
-		case uint:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case uint16:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case uint32:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case uint64:
-			v.Literal = strconv.FormatInt(int64(ret), 10)
-		case float64:
-			v.Literal = strconv.FormatFloat(ret, 'f', 4, 64)
-		case float32:
-			v.Literal = strconv.FormatFloat(float64(ret), 'f', 4, 32)
-		case []byte:
-			v.Literal = strconv.Quote(string(ret))
-		case string:
-			v.Literal = strconv.Quote(ret)
-		default:
-			if v.Value != nil && v.NativeCallable() {
-				funcIns := runtime.FuncForPC(reflect.ValueOf(v.Value).Pointer())
-				funcName := funcIns.Name()
-				if funcName != "" {
-					v.Literal = funcName
-				}
-			}
-			if v.Literal == "" {
-				v.Literal = fmt.Sprint(ret)
+	if v.Literal != "" {
+		return v.Literal
+	}
+
+	var literal string
+	switch ret := v.Value.(type) {
+	case bool:
+		literal = strconv.FormatBool(ret)
+	case int:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case int8:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case int16:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case int32:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case int64:
+		literal = strconv.FormatInt(ret, 10)
+	case uint8: // byte
+		literal = string([]byte{ret})
+	case uint:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case uint16:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case uint32:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case uint64:
+		literal = strconv.FormatInt(int64(ret), 10)
+	case float64:
+		literal = strconv.FormatFloat(ret, 'f', 4, 64)
+	case float32:
+		literal = strconv.FormatFloat(float64(ret), 'f', 4, 32)
+	case []byte:
+		literal = strconv.Quote(string(ret))
+	case string:
+		literal = strconv.Quote(ret)
+	default:
+		if v.Value != nil && v.NativeCallable() {
+			if funcIns := runtime.FuncForPC(reflect.ValueOf(v.Value).Pointer()); funcIns != nil {
+				literal = funcIns.Name()
 			}
 		}
+		if literal == "" {
+			literal = fmt.Sprint(ret)
+		}
 	}
-	return v.Literal
+	return literal
+}
+
+// memberLiteral is used only to describe a derived member value. Avoid
+// formatting the caller's live Go object: concurrent method calls may mutate
+// that object, and its stable type is both cheaper and more useful in errors.
+func (v *Value) memberLiteral(member string) string {
+	prefix := v.Literal
+	if prefix == "" {
+		prefix = v.TypeVerbose
+	}
+	if prefix == "" {
+		prefix = "value"
+	}
+	return prefix + "." + member
 }
 
 func (v *Value) AddExtraInfo(key string, info interface{}) {
@@ -108,21 +121,43 @@ func ChannelValueListToValue(op *Value) *Value {
 	return op
 }
 
-func cacheRunes(val *Value) []rune {
+const (
+	frameRuneCacheMaxEntries = 16
+	frameRuneCacheMaxBytes   = 256 << 10
+)
+
+func (v *Frame) clearRuneCache() {
+	v.runeCache = nil
+	v.runeCacheBytes = 0
+}
+
+func (v *Frame) cacheRunes(val *Value) []rune {
 	if val == nil {
 		return nil
 	}
-	if cached := val.GetExtraInfo(cachedRunesKey); cached != nil {
-		if runes, ok := cached.([]rune); ok {
-			return runes
-		}
+	if runes, ok := v.runeCache[val]; ok {
+		return runes
 	}
 	s, ok := val.Value.(string)
 	if !ok {
 		return nil
 	}
 	runes := []rune(s)
-	val.AddExtraInfo(cachedRunesKey, runes)
+	// Account for the retained string bytes and rune backing array. Very large
+	// values are deliberately not cached: conversion still succeeds, but a
+	// long-lived Trace/Inline frame cannot retain them after the operation.
+	cost := len(s) + cap(runes)*4
+	if cost > frameRuneCacheMaxBytes {
+		return runes
+	}
+	if v.runeCache == nil {
+		v.runeCache = make(map[*Value][]rune, frameRuneCacheMaxEntries)
+	} else if len(v.runeCache) >= frameRuneCacheMaxEntries || v.runeCacheBytes+cost > frameRuneCacheMaxBytes {
+		clear(v.runeCache)
+		v.runeCacheBytes = 0
+	}
+	v.runeCache[val] = runes
+	v.runeCacheBytes += cost
 	return runes
 }
 
@@ -134,7 +169,7 @@ func (v *Frame) getValueForLeftIterableCall(args []*Value) *Value {
 	iterableValueType := reflect.TypeOf(iterableValue.Value)
 	if iterableValueType.Kind() == reflect.String {
 		if _, ok := iterableValue.Value.(string); ok {
-			runes := cacheRunes(iterableValue)
+			runes := v.cacheRunes(iterableValue)
 			if argsLength != 1 {
 				panic("left slice call args must be 1")
 			}

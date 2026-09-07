@@ -109,7 +109,7 @@ registry.addResourceHandler("/static/**")
 #### 5. 审计和审查
 定期审查应用的Spring配置和资源处理程序的设置，确保没有引入新的不安全配置。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "swaggerVariable",
 }
 
@@ -175,7 +175,7 @@ DESC
 	title: "Resource Handler Location",
 	title_zh: "资源处理程序位置",
 	message: "检测到Spring应用的ResourceHandlerRegistry配置可能存在敏感信息泄露风险，需进一步审查。",
-	risk: "敏感信息泄露",
+	risk: "information-exposure",
 	name: "params",
 }
 

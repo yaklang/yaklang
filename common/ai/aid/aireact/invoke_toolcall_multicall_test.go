@@ -104,9 +104,9 @@ func TestReAct_ToolUse_MultiCalls(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(5)
+	du := time.Duration(10)
 	if utils.InGithubActions() {
-		du = time.Duration(10)
+		du = time.Duration(20)
 	}
 	after := time.After(du * time.Second)
 

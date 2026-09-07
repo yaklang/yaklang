@@ -1,7 +1,7 @@
 desc(
 	title: "Detect Java TransformerFactory Unsafe Use"
 	title_zh: "检测 Java TransformerFactory 不安全使用"
-	risk: XXE
+	risk: "xxe"
 	type: vuln
 	desc: <<<DESC
 ### 漏洞描述
@@ -180,7 +180,7 @@ e.printStackTrace();
 - 远程代码执行（在特定配置下）。
 DESC
 	level: "high",
-	risk: "XML外部实体（XXE）",
+	risk: "xxe",
 	name: "vuln",
 }
 

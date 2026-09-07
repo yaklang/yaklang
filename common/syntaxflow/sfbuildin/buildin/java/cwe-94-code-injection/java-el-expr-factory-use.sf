@@ -1,4 +1,5 @@
 desc(
+	risk: "el-injection"
 	title: "Audit Java EL Expression Factory Use"
 	type: audit
 	level: low
@@ -111,7 +112,7 @@ ValueExpression expression = factory.createValueExpression(context, fullExpressi
 #### 3. 升级和使用安全的 EL 实现
 确保使用的 EL 实现是最新且已修复已知漏洞的版本。一些框架或库可能提供更安全的表达式处理方式。
 SOLUTION
-	risk: "EL表达式注入",
+	risk: "el-injection",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

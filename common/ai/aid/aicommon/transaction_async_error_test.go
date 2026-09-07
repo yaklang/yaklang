@@ -32,6 +32,27 @@ func TestMergePostHandlerAndCallbackError_ValidationOnly(t *testing.T) {
 	assert.Equal(t, parseErr, merged)
 }
 
+func TestNormalizeTransactionPostHandlerError_ActionResolution(t *testing.T) {
+	t.Run("missing action with no model output is reported as empty response", func(t *testing.T) {
+		rsp := NewUnboundAIResponse()
+		err := fmt.Errorf(`action resolution failed: requested="<missing>"; matcher=exact registered action or alias; available_actions=[finish]; reason=no non-empty @action was emitted`)
+
+		normalized := normalizeTransactionPostHandlerError(rsp, err)
+		require.Error(t, normalized)
+		assert.Contains(t, normalized.Error(), "ai model returned empty response")
+		assert.Contains(t, normalized.Error(), `requested="<missing>"`)
+	})
+
+	t.Run("unsupported non-empty action is not mislabeled as empty response", func(t *testing.T) {
+		rsp := NewUnboundAIResponse()
+		err := fmt.Errorf(`action resolution failed: requested="save_evidence"; matcher=exact registered action or alias; available_actions=[finish]; reason=no registered action or alias matched`)
+
+		normalized := normalizeTransactionPostHandlerError(rsp, err)
+		assert.Equal(t, err, normalized)
+		assert.NotContains(t, normalized.Error(), "ai model returned empty response")
+	})
+}
+
 func TestCallAITransaction_AsyncCallbackErrorSurfacesOverParseFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

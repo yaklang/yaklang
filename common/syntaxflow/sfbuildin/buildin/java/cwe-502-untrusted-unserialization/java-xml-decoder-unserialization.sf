@@ -1,4 +1,5 @@
 desc(
+	risk: "deserialization"
 	title_zh: "检测Java XMLDecoder反序列化漏洞"
 	title: "Check Java XMLDecoder Unserialization Vulnerability"
 	type:vul
@@ -178,7 +179,7 @@ decoder.close();
 #### 5. 考虑使用更安全的替代方案
 替代 `XMLDecoder` 处理结构化数据，可以考虑使用更安全的序列化格式（如JSON）配合安全的解析库，并对接收的数据进行严格的schema校验和内容过滤。
 SOLUTION
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	name: "high",
 }
 
@@ -209,7 +210,7 @@ DESC
 3. 考虑替换为更安全的序列化机制（如JSON），并在必要时结合模式校验以增强安全性。
 4. 如果发现过滤逻辑不足以应对新威胁，请及时升级或增强防护措施。
 SOLUTION
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	name: "low",
 }
 

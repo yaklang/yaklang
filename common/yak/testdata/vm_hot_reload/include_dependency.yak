@@ -1,0 +1,4 @@
+includeBase = 40
+includeAdder = func(value) {
+    return includeBase + value
+}

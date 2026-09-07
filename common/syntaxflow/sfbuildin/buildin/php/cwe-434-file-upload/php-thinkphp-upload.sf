@@ -1,4 +1,5 @@
 desc(
+	risk: "file-upload"
 	title: "Detect PHP ThinkPHP Unsafe File Upload Vulnerability"
 	title_zh: "检测PHP ThinkPHP框架不安全文件上传漏洞"
 	type: vul
@@ -177,7 +178,7 @@ return json(['savename' => $savename]);
 DESC
 	level: "high",
 	message: "检测到PHP ThinkPHP框架未对上传文件进行严格校验，攻击者可以上传恶意脚本文件，可能导致服务器端任意代码执行。",
-	risk: "文件上传漏洞",
+	risk: "file-upload",
 	name: "high",
 }
 $sink<dataflow(include=<<<CODE
@@ -267,7 +268,7 @@ DESC
 	title: "Insecure File Type Detection in ThinkPHP",
 	name: "mid",
 	message: "检测到PHP ThinkPHP框架未对上传文件类型进行严格校验，可能存在绕过风险，请进一步审查代码安全性。",
-	risk: "文件上传漏洞",
+	risk: "file-upload",
 }
 
 // 低风险：潜在的文件存储路径配置问题（这里假设ThinkPHP的putFile也可能涉及路径问题）
@@ -300,7 +301,7 @@ DESC
 #### 4. 日志与监控
 记录上传路径相关日志并定期审核，及时发现异常配置或行为。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "low",
 	message: "检测到ThinkPHP框架中可能存在的文件存储路径配置问题，建议确认路径设置是否符合安全规范。",
 }

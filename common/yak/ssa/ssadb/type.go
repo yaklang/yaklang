@@ -145,8 +145,12 @@ func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	}
 	// Native-SQL fast path (see GetIrCodeItemById comment). Same result as the
 	// GORM First() path; falls back to GORM on any native error.
-	if native := nativeGetIrTypeItemById(db, progName, id); native != nil {
+	native, err := nativeGetIrTypeItemByIdErr(db, progName, id)
+	if native != nil {
 		return native
+	}
+	if nativeContextErr(err) {
+		return nil
 	}
 	// check cache
 	ir := &IrType{}

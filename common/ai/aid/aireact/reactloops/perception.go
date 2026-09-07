@@ -184,7 +184,7 @@ func (p *PerceptionState) FormatForContext() string {
 		buf.WriteString(fmt.Sprintf("Keywords: %s\n", strings.Join(p.Keywords, ", ")))
 	}
 	result := buf.String()
-	if aicommon.MeasureTokens(result) > perceptionMaxContextTokens {
+	if aicommon.TokenCountExceeds(result, perceptionMaxContextTokens) {
 		result = aicommon.ShrinkTextBlockByTokens(result, perceptionMaxContextTokens)
 	}
 	return result
@@ -307,14 +307,14 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 		userInput = aicommon.ShrinkTextBlockByTokens(userInput, 4000)
 	}
 	buf.WriteString(fmt.Sprintf("User Goal: %s\n", userInput))
-	buf.WriteString(fmt.Sprintf("Loop: %s, iteration %d/%d\n", r.loopName, r.currentIterationIndex, r.maxIterations))
+	buf.WriteString(fmt.Sprintf("Loop: %s\n", r.loopName))
 	buf.WriteString(fmt.Sprintf("Trigger: %s\n", trigger))
 
 	recentActions := r.GetLastNAction(5)
 	if len(recentActions) > 0 {
 		buf.WriteString("Recent Actions:\n")
 		for _, a := range recentActions {
-			buf.WriteString(fmt.Sprintf("  - [iter %d] %s (%s)\n", a.IterationIndex, a.ActionName, a.ActionType))
+			buf.WriteString(fmt.Sprintf("  - %s (%s)\n", a.ActionName, a.ActionType))
 		}
 	}
 
@@ -628,7 +628,7 @@ func formatPerceptionKnowledgeContext(query string, knowledgeBases []string, con
 	buf.WriteString(content)
 
 	result := buf.String()
-	if aicommon.MeasureTokens(result) > perceptionKnowledgeMaxContextTokens {
+	if aicommon.TokenCountExceeds(result, perceptionKnowledgeMaxContextTokens) {
 		result = aicommon.ShrinkTextBlockByTokens(result, perceptionKnowledgeMaxContextTokens)
 	}
 	return strings.TrimSpace(result)

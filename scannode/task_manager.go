@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,20 +12,55 @@ import (
 )
 
 type TaskManager struct {
-	tasks        *sync.Map
+	mu           sync.RWMutex
+	byAttempt    map[string]*Task
+	byTaskID     map[string]string
+	bySubtask    map[string]map[string]struct{}
 	stateMu      sync.Mutex
 	shuttingDown bool
 }
 
 func newTaskManager() *TaskManager {
-	return &TaskManager{tasks: new(sync.Map)}
+	return &TaskManager{
+		byAttempt: make(map[string]*Task),
+		byTaskID:  make(map[string]string),
+		bySubtask: make(map[string]map[string]struct{}),
+	}
 }
 
 func (t *TaskManager) Add(taskID string, task *Task) bool {
+	if task == nil {
+		return false
+	}
+	task.TaskId = taskID
+	if strings.TrimSpace(task.AttemptID) == "" {
+		task.AttemptID = taskID
+	}
+	_, loaded, accepted := t.LoadOrStoreAttempt(task)
+	if !accepted || loaded {
+		return false
+	}
+	task.MarkRunning()
+	return true
+}
+
+// LoadOrStoreAttempt atomically claims AttemptID as the primary execution
+// identity. The subtask/task indexes are secondary lookup paths used by cancel
+// and legacy progress reporting; they never replace an existing attempt.
+func (t *TaskManager) LoadOrStoreAttempt(task *Task) (actual *Task, loaded bool, accepted bool) {
+	if t == nil || task == nil || strings.TrimSpace(task.AttemptID) == "" {
+		return nil, false, false
+	}
 	t.stateMu.Lock()
 	defer t.stateMu.Unlock()
 	if t.shuttingDown {
-		return false
+		return nil, false, false
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if existing, ok := t.byAttempt[task.AttemptID]; ok {
+		return existing, true, true
 	}
 	now := time.Now().UTC()
 	task.StartTimestamp = now.Unix()
@@ -32,9 +68,20 @@ func (t *TaskManager) Add(taskID string, task *Task) bool {
 	if ok {
 		task.DeadlineTimestamp = ddl.Unix()
 	}
-	task.MarkRunningAt(now)
-	t.tasks.Store(taskID, task)
-	return true
+	task.MarkClaimedAt(now)
+	t.byAttempt[task.AttemptID] = task
+	if task.TaskId != "" {
+		t.byTaskID[task.TaskId] = task.AttemptID
+	}
+	if task.SubtaskID != "" {
+		attempts := t.bySubtask[task.SubtaskID]
+		if attempts == nil {
+			attempts = make(map[string]struct{})
+			t.bySubtask[task.SubtaskID] = attempts
+		}
+		attempts[task.AttemptID] = struct{}{}
+	}
+	return task, false, true
 }
 
 func (t *TaskManager) BeginShutdown() {
@@ -43,12 +90,13 @@ func (t *TaskManager) BeginShutdown() {
 	}
 	t.stateMu.Lock()
 	t.shuttingDown = true
-	t.tasks.Range(func(_, value any) bool {
-		if task, ok := value.(*Task); ok && task != nil && task.Cancel != nil {
+	t.mu.RLock()
+	for _, task := range t.byAttempt {
+		if task != nil && task.Cancel != nil {
 			task.Cancel()
 		}
-		return true
-	})
+	}
+	t.mu.RUnlock()
 	t.stateMu.Unlock()
 }
 
@@ -71,28 +119,101 @@ func (t *TaskManager) WaitForEmpty(ctx context.Context) error {
 }
 
 func (t *TaskManager) Remove(taskID string) {
-	t.tasks.Delete(taskID)
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	attemptID := t.byTaskID[taskID]
+	t.removeAttemptLocked(attemptID)
+	t.mu.Unlock()
+}
+
+func (t *TaskManager) RemoveAttempt(attemptID string) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.removeAttemptLocked(attemptID)
+	t.mu.Unlock()
+}
+
+func (t *TaskManager) removeAttemptLocked(attemptID string) {
+	task := t.byAttempt[attemptID]
+	if task == nil {
+		return
+	}
+	delete(t.byAttempt, attemptID)
+	if task.TaskId != "" && t.byTaskID[task.TaskId] == attemptID {
+		delete(t.byTaskID, task.TaskId)
+	}
+	if attempts := t.bySubtask[task.SubtaskID]; attempts != nil {
+		delete(attempts, attemptID)
+		if len(attempts) == 0 {
+			delete(t.bySubtask, task.SubtaskID)
+		}
+	}
 }
 
 func (t *TaskManager) GetTaskById(taskID string) (*Task, error) {
-	ins, ok := t.tasks.Load(taskID)
-	if ok {
-		return ins.(*Task), nil
+	if t != nil {
+		t.mu.RLock()
+		attemptID := t.byTaskID[taskID]
+		task := t.byAttempt[attemptID]
+		t.mu.RUnlock()
+		if task != nil {
+			return task, nil
+		}
 	}
 	return nil, utils.Errorf("no existed task: %s", taskID)
 }
 
+func (t *TaskManager) GetTaskByAttemptID(attemptID string) (*Task, error) {
+	if t != nil {
+		t.mu.RLock()
+		task := t.byAttempt[attemptID]
+		t.mu.RUnlock()
+		if task != nil {
+			return task, nil
+		}
+	}
+	return nil, utils.Errorf("no existed attempt: %s", attemptID)
+}
+
+func (t *TaskManager) TasksBySubtask(subtaskID string) []*Task {
+	if t == nil {
+		return nil
+	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	attempts := t.bySubtask[subtaskID]
+	result := make([]*Task, 0, len(attempts))
+	for attemptID := range attempts {
+		if task := t.byAttempt[attemptID]; task != nil {
+			result = append(result, task)
+		}
+	}
+	return result
+}
+
 func (t *TaskManager) Count() int {
-	count := 0
-	t.tasks.Range(func(_, _ interface{}) bool {
-		count++
-		return true
-	})
-	return count
+	if t == nil {
+		return 0
+	}
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.byAttempt)
 }
 
 func (t *TaskManager) Touch(taskID string) {
 	task, err := t.GetTaskById(taskID)
+	if err != nil {
+		return
+	}
+	task.Touch()
+}
+
+func (t *TaskManager) TouchAttempt(attemptID string) {
+	task, err := t.GetTaskByAttemptID(attemptID)
 	if err != nil {
 		return
 	}
@@ -112,18 +233,15 @@ func (t *TaskManager) ActiveAttemptHeartbeats(now time.Time) []node.ActiveAttemp
 		now = time.Now().UTC()
 	}
 
-	items := make([]node.ActiveAttemptHeartbeat, 0)
-	t.tasks.Range(func(_, value interface{}) bool {
-		task, ok := value.(*Task)
-		if !ok {
-			return true
-		}
+	t.mu.RLock()
+	items := make([]node.ActiveAttemptHeartbeat, 0, len(t.byAttempt))
+	for _, task := range t.byAttempt {
 		item, ok := task.activeAttemptHeartbeat(now)
 		if ok {
 			items = append(items, item)
 		}
-		return true
-	})
+	}
+	t.mu.RUnlock()
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].AttemptID == items[j].AttemptID {
 			return items[i].SubtaskID < items[j].SubtaskID
@@ -168,6 +286,13 @@ func (t *Task) CancelReason() string {
 
 func (t *Task) MarkRunning() {
 	t.MarkRunningAt(time.Now().UTC())
+}
+
+func (t *Task) MarkClaimedAt(now time.Time) {
+	t.statusMu.Lock()
+	t.status = "claimed"
+	t.statusMu.Unlock()
+	t.TouchAt(now)
 }
 
 func (t *Task) MarkRunningAt(now time.Time) {
@@ -236,7 +361,12 @@ func (t *Task) activeAttemptHeartbeat(now time.Time) (node.ActiveAttemptHeartbea
 	}
 	status := t.Status()
 	if status == "" {
-		status = "running"
+		status = "claimed"
+	}
+	switch status {
+	case "claimed", "running", "cancel_requested":
+	default:
+		return node.ActiveAttemptHeartbeat{}, false
 	}
 	completedUnits, totalUnits := t.Progress()
 	return node.ActiveAttemptHeartbeat{

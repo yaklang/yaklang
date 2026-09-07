@@ -1,7 +1,7 @@
 package yaklib
 
 import (
-	"github.com/dop251/goja_nodejs/console"
+	"github.com/yaklang/goja/nodejs/console"
 	"github.com/yaklang/yaklang/common/log"
 )
 

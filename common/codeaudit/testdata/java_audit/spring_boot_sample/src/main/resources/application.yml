@@ -1,0 +1,11 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+spring:
+  datasource:
+    password: SuperSecret123
+server:
+  error:
+    include-stacktrace: always

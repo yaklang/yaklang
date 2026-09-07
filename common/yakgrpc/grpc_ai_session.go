@@ -71,6 +71,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			StartParams:       startParams,
 			Source:            item.Source,
 			IMSourceMeta:      imMeta,
+			IsRunning:         s.isAISessionRunning(item.SessionID),
 		})
 	}
 
@@ -84,6 +85,17 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 		Total: int64(pag.TotalRecord),
 		Data:  respData,
 	}, nil
+}
+
+func (s *Server) isAISessionRunning(sessionID string) bool {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return false
+	}
+	if manager := s.currentAIReActScheduler(); manager != nil && manager.isSessionReserved(sessionID) {
+		return true
+	}
+	return isAIReActSessionBusy(sessionID)
 }
 
 func (s *Server) UpdateAISessionTitle(ctx context.Context, req *ypb.UpdateAISessionTitleRequest) (*ypb.DbOperateMessage, error) {
@@ -154,6 +166,21 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 	projectDB := s.GetProjectDatabase()
 
 	if req.GetDeleteAll() {
+		attachedScheduleUUIDs, err := yakit.QueryAllAttachedAIReActScheduleUUIDs(projectDB)
+		if err != nil {
+			return nil, err
+		}
+		if manager := s.currentAIReActScheduler(); manager != nil {
+			if err := manager.cancelSessionExecutionsAndWait(ctx, nil, true); err != nil {
+				return nil, err
+			}
+		}
+		for _, scheduleUUID := range attachedScheduleUUIDs {
+			s.cancelAIReActScheduleExecution(scheduleUUID)
+		}
+		if _, err := yakit.DeleteAllAttachedAIReActSchedules(projectDB); err != nil {
+			return nil, err
+		}
 		deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForAllSessions(projectDB)
 		if err != nil {
 			return nil, err
@@ -202,6 +229,21 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			EffectRows:   0,
 			ExtraMessage: "no session matched",
 		}, nil
+	}
+	attachedScheduleUUIDs, err := yakit.QueryAttachedAIReActScheduleUUIDs(projectDB, targetSessionIDs)
+	if err != nil {
+		return nil, err
+	}
+	if manager := s.currentAIReActScheduler(); manager != nil {
+		if err := manager.cancelSessionExecutionsAndWait(ctx, targetSessionIDs, false); err != nil {
+			return nil, err
+		}
+	}
+	for _, scheduleUUID := range attachedScheduleUUIDs {
+		s.cancelAIReActScheduleExecution(scheduleUUID)
+	}
+	if _, err := yakit.DeleteAttachedAIReActSchedules(projectDB, targetSessionIDs); err != nil {
+		return nil, err
 	}
 
 	deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForSessions(projectDB, targetSessionIDs)

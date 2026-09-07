@@ -1,4 +1,5 @@
 desc(
+	risk: "reflection-abuse"
 	title: "Audit Java Unsafe Reflection for Class.forName"
 	type: audit
 	level: low
@@ -113,7 +114,7 @@ thread.join();
 #### 4. 代码重构
 考虑是否可以将动态加载类的需求通过其他更安全的设计模式实现，例如使用工厂模式、策略模式等，避免直接使用反射和用户输入。
 SOLUTION
-	risk: "远程代码执行",
+	risk: "reflection-abuse",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

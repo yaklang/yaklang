@@ -190,6 +190,9 @@ type singleFileBuilder struct {
 	// topLevelFuncShells maps each module-level funcdef AST node to its SSA function shell,
 	// pre-created before bodies are built so later-defined callees resolve in earlier defs.
 	topLevelFuncShells map[*pythonparser.FuncdefContext]*ssa.Function
+	// includeDepth counts nested on-demand module builds active on this file
+	// builder (python import fallback, see ensurePythonModuleBuilt).
+	includeDepth int
 }
 
 type staticLoopControlState uint8

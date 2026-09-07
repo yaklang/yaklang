@@ -1017,8 +1017,8 @@ var nodeIdMapper = map[string]*I18n{
 		En: "plan and execute failed",
 	},
 	"re_act_fail": {
-		Zh: "ReAct 任务执行失败",
-		En: "ReAct Task Execution Failed",
+		Zh: "ReAct 任务执行中断",
+		En: "ReAct Task Execution Interrupted",
 	},
 	"re_act_success": {
 		Zh: "ReAct 任务执行成功",

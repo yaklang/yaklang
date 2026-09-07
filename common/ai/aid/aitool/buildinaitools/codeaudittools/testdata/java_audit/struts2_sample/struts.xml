@@ -1,0 +1,4 @@
+<constant name="struts.devMode" value="true" />
+<package name="default" namespace="/" extends="struts-default">
+  <action name="index" class="com.example.IndexAction"/>
+</package>

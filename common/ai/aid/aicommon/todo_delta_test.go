@@ -213,9 +213,36 @@ func TestSessionTodoDeltaValidationReportsConcreteFailedOperation(t *testing.T) 
 		Current:    &current,
 	})
 	require.ErrorContains(t, err, "CURRENT[todo-1]")
-	require.ErrorContains(t, err, "after add/update/close are applied")
+	require.ErrorContains(t, err, "immutable closed history")
+	require.ErrorContains(t, err, "use todo_delta.add with a new id")
 	require.ErrorContains(t, err, "open todo ids: []")
 	require.NotContains(t, err.Error(), "another operation failed")
+}
+
+func TestClosedTodoValidationExplainsNewIDContinuation(t *testing.T) {
+	store := NewVerificationTodoStore()
+	scope := VerificationTodoScope{TaskID: "task"}
+	current := "old"
+	require.Empty(t, FormatTodoDeltaValidationError(store.ApplyTodoDelta(scope, &TodoDelta{
+		Add: []TodoAdd{{ID: "old", Text: "wait for prerequisite"}}, CurrentSet: true, Current: &current,
+	})))
+	require.Empty(t, FormatTodoDeltaValidationError(store.ApplyTodoDelta(scope, &TodoDelta{
+		Close: []TodoClose{{ID: "old", Outcome: TodoOutcomeDeferred, Reason: "prerequisite was unavailable"}},
+	})))
+
+	for name, delta := range map[string]*TodoDelta{
+		"add":     {Add: []TodoAdd{{ID: "old", Text: "resume"}}},
+		"update":  {Update: []TodoUpdate{{ID: "old", Text: "resume"}}},
+		"close":   {Close: []TodoClose{{ID: "old", Outcome: TodoOutcomeResolved, Reason: "force done"}}},
+		"current": {CurrentSet: true, Current: &current},
+	} {
+		t.Run(name, func(t *testing.T) {
+			errText := FormatTodoDeltaValidationError(store.Clone().ApplyTodoDelta(scope, delta))
+			require.Contains(t, errText, "outcome=deferred")
+			require.Contains(t, errText, "use todo_delta.add with a new id")
+			require.Contains(t, errText, "set that new id current")
+		})
+	}
 }
 
 func TestCanonicalTodoRestoreAdvancesGeneratedIDCounter(t *testing.T) {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,7 +17,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
 
-var cloneSSAGitRepository = yakgit.Clone
+var (
+	cloneSSAGitRepository = yakgit.Clone
+	// ssaGitCloneSleep is replaced in tests to avoid real backoff delays.
+	ssaGitCloneSleep = time.Sleep
+)
 
 func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	c.Processf(0, "parse info: %s", c.GetCodeSourceKind())
@@ -136,7 +142,18 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	log.Info("git clone workspace: ", local)
 
 	opts := make([]yakgit.Option, 0)
-	opts = append(opts, yakgit.WithBranch(codeSource.GetCodeSourceBranch()))
+	// Prefer a shallow tip clone for scan throughput. Servers that reject
+	// `shallow` (e.g. minimal test git daemons) fall back to a full clone below.
+	shallowOpts := append([]yakgit.Option{},
+		yakgit.WithDepth(1),
+		yakgit.WithSingleBranch(true),
+		yakgit.WithNoFetchTags(true),
+		yakgit.WithRecuriveSubmodule(false),
+	)
+	opts = append(opts, shallowOpts...)
+	if branch := strings.TrimSpace(codeSource.GetCodeSourceBranch()); branch != "" {
+		opts = append(opts, yakgit.WithBranch(branch))
+	}
 	if proxyURL := codeSource.GetCodeSourceProxyURL(); proxyURL != "" {
 		proxyUser, proxyPassword := codeSource.GetCodeSourceProxyAuth()
 		opts = append(opts, yakgit.WithProxy(proxyURL, proxyUser, proxyPassword))
@@ -145,7 +162,15 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	opts = append(opts, authOpts...)
 	opts = append(opts, yakgit.WithContext(codeSource.GetContext()))
 	opts = append(opts, yakgit.WithHTTPOptions(poc.WithRetryTimes(10)))
-	if err := cloneSSAGitRepository(codeSource.GetCodeSourceURL(), local, opts...); err != nil {
+	report := func(format string, args ...any) {
+		process(0, format, args...)
+	}
+	if err := cloneSSAGitRepositoryPreferShallow(
+		codeSource.GetCodeSourceURL(),
+		local,
+		opts,
+		report,
+	); err != nil {
 		return nil, ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
 	}
 

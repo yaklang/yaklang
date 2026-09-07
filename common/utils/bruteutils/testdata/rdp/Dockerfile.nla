@@ -1,0 +1,25 @@
+# RDP NLA（CredSSP/NTLMv2）爆破测试靶机。
+# 构建与运行（见 rdp_real_test.go 头部注释）：
+#   docker build -t yak-rdp-nla:24.04 --build-arg BASE=ubuntu:24.04 -f Dockerfile.nla .
+#   docker run -d --rm --name yak-rdp-nla -p 33389:3389 yak-rdp-nla:24.04
+# 内置账户：rdpuser/RdpPass123! 与 unicode用户/密码🔐123（Unicode 正反案例）。
+ARG BASE=ubuntu:24.04
+FROM ${BASE}
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xrdp xorgxrdp xfce4-session xfce4-terminal dbus-x11 x11-xserver-utils \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash rdpuser \
+ && echo 'rdpuser:RdpPass123!' | chpasswd \
+ && useradd -m -s /bin/bash unicode用户 \
+ && echo 'unicode用户:密码🔐123' | chpasswd \
+ && echo 'startxfce4' > /home/rdpuser/.xsession \
+ && echo 'startxfce4' > '/home/unicode用户/.xsession' \
+ && chmod +x /home/rdpuser/.xsession '/home/unicode用户/.xsession'
+
+# NLA-only：X.224 协商强制 HYBRID(CredSSP)，TLS 用包自带自签证书
+RUN sed -i -E '/^(#|;)?security=/d' /etc/xrdp/xrdp.ini \
+ && sed -i '0,/\[Globals\]/s//\[Globals\]\nsecurity=nla/' /etc/xrdp/xrdp.ini
+EXPOSE 3389
+CMD ["/bin/sh", "-c", "rm -f /var/run/xrdp/xrdp.pid /var/run/xrdp/xrdp-sesman.pid; /usr/sbin/xrdp-sesman; exec /usr/sbin/xrdp --nodaemon"]

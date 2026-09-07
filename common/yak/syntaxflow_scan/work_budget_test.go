@@ -126,11 +126,12 @@ func TestStartScan_WorkBudget_BailIsPartialNotFatal(t *testing.T) {
 }
 
 func TestEffectiveRuleWorkLimitAutoScale(t *testing.T) {
-	require.Equal(t, int64(200_000), effectiveRuleWorkLimit(200_000, 100_000),
+	defaultLimit := ssaconfig.DefaultScanRuleWorkLimit
+	require.Equal(t, defaultLimit, effectiveRuleWorkLimit(defaultLimit, 100_000),
 		"small projects keep the CLI default")
-	require.Equal(t, int64(600_000), effectiveRuleWorkLimit(200_000, 1_000_000),
+	require.Equal(t, defaultLimit*3, effectiveRuleWorkLimit(defaultLimit, 1_000_000),
 		"large projects scale by source lines")
-	require.Equal(t, int64(1_000_000), effectiveRuleWorkLimit(200_000, 5_000_000),
+	require.Equal(t, int64(1_000_000), effectiveRuleWorkLimit(defaultLimit, 20_000_000),
 		"auto-scale is capped")
 	require.Equal(t, int64(5_000), effectiveRuleWorkLimit(5_000, 5_000_000),
 		"non-default explicit limits are never auto-scaled")

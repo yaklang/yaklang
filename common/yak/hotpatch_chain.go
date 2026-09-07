@@ -207,7 +207,7 @@ func buildHotPatchTagEnv(ctx context.Context, code string) *antlr4yak.Engine {
 		return nil
 	}
 	engine := NewScriptEngine(1)
-	codeEnv, err := engine.ExecuteExWithContext(ctx, code, make(map[string]interface{}))
+	codeEnv, err := engine.ExecuteWithoutCacheWithContext(ctx, code, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("load hotPatch code error: %s", err)
 		return nil

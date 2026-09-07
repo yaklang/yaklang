@@ -1,4 +1,5 @@
 desc(
+	risk: "ip-spoofing"
 	title_zh: "检测Java中通过不可信请求头导致的IP伪造漏洞"
 	title: "Detect Java IP Spoofing Vulnerability via Untrusted Headers"
 	type: vuln
@@ -104,7 +105,7 @@ public boolean isValidIpAddress(String ip) {
 
 通过以上措施，可以有效防止攻击者利用伪造的请求头实现 IP 欺骗，从而保障系统的安全性。
 SOLUTION
-	risk: "IP伪造",
+	risk: "ip-spoofing",
 }
 
 desc(

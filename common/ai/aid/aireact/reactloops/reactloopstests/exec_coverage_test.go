@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
@@ -677,7 +678,7 @@ func TestExec_WithAITagFieldProcessing(t *testing.T) {
 			prompt := req.GetPrompt()
 			if aiCallCount == 1 {
 				// 第一次调用：从prompt中提取nonce并返回带正确nonce的AITag
-				nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+				nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 
 				// 调试输出
 				t.Logf("Extracted nonce: '%s' from prompt", nonceStr)

@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP变量覆盖漏洞"
 	type: audit
 	level: low
-	risk: '变量覆盖（Variable Coverage）'
+	risk: "variable-overwrite"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -123,7 +123,7 @@ print_r($user_data);
 #### 4. 限制变量作用域
 在使用可能引入外部输入的函数时，限制变量的作用域，例如在函数内部使用局部变量，避免覆盖全局变量。
 SOLUTION
-	risk: "变量覆盖",
+	risk: "variable-overwrite",
 	name: "high",
 	message: "检测到PHP变量覆盖漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -184,7 +184,7 @@ echo $id;
 - 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
 DESC
 	message: "检测到PHP变量覆盖漏洞，但可能存在过滤函数，需进一步审计确认。",
-	risk: "变量覆盖",
+	risk: "variable-overwrite",
 	name: "middle",
 }
 $sink - $high - $middle  as $low;
@@ -204,7 +204,7 @@ alert $low for {
 `extract`, `parse_str`, `import_request_variables`。
 DESC
 	level: "low",
-	risk: "信息",
+	risk: "information",
 	name: "low",
 	message: "检测到PHP变量覆盖相关函数，但已存在过滤机制。",
 	solution: <<<SOLUTION

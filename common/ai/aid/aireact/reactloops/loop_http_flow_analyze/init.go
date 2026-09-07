@@ -38,10 +38,6 @@ func init() {
 				reactloops.WithOutputExample(outputExample),
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFlowAnalyze),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-					currentIter := loop.GetCurrentIterationIndex()
-					maxIter := loop.GetMaxIterations()
-					isLastIteration := currentIter+1 >= maxIter
-
 					renderMap := map[string]any{
 						"Nonce":                nonce,
 						"UserInput":            loop.GetCurrentTask().GetUserInput(),
@@ -51,7 +47,6 @@ func init() {
 						"LastMatchSummary":     loop.Get("last_match_summary"),
 						"CurrentFlow":          loop.Get("current_flow"),
 						"FeedbackMessages":     feedbacker.String(),
-						"IsLastIteration":      isLastIteration,
 						"DispatchedFuzzTasks":  buildDispatchedFuzzTasksPrompt(loop),
 						"SavedQueries":         buildSavedQueriesPrompt(loop),
 						"SavedMatches":         buildSavedMatchesPrompt(loop),

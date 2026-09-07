@@ -40,6 +40,15 @@ const (
 	CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE = "auto_select_knowledge_base"
 
 	USER_FREE_INPUT_UUID = "user_free_input_uuid"
+	USER_INPUT_SOURCE    = "user_input_source"
+
+	USER_INPUT_SOURCE_KEY       = "source"
+	USER_INPUT_SOURCE_SCHEDULE  = "schedule"
+	USER_INPUT_SCHEDULE_CONTEXT = "scheduled_task_context"
+	USER_INPUT_SCHEDULE_UUID    = "uuid"
+	USER_INPUT_SCHEDULE_NAME    = "name"
+	USER_INPUT_SCHEDULED_AT     = "scheduled_at"
+	USER_INPUT_SCHEDULE_TRIGGER = "trigger"
 )
 
 type ContextProviderEntry struct {
@@ -436,7 +445,7 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 			}
 
 			content := detailBuilder.String()
-			if MeasureTokens(content) > maxInlineKnowledgeBaseTokens {
+			if TokenCountExceeds(content, maxInlineKnowledgeBaseTokens) {
 				filePath := consts.TempAIFileFast("knowledge-bases-*.txt", content)
 				if emitter != nil && filePath != "" {
 					emitter.EmitPinFilename(filePath)
@@ -663,7 +672,7 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 	})
 
 	result := buf.String()
-	if MeasureTokens(result) > r.maxTokens {
+	if TokenCountExceeds(result, r.maxTokens) {
 		shrinkSize := int(float64(r.maxTokens) * 0.8)
 		result = ShrinkTextBlockByTokens(result, shrinkSize)
 		log.Warnf("context provider result exceeded maxTokens (%d), shrunk to %d tokens", r.maxTokens, shrinkSize)

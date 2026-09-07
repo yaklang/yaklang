@@ -31,6 +31,26 @@ func TestEvidenceStore_ApplyOperationsAtMetadataAndLegacyUnmarshal(t *testing.T)
 	require.Equal(t, int64(1), legacy.Items[0].UpdatedUnix)
 }
 
+func TestBuildSessionEvidenceUpsert_StableFallbackAndValidation(t *testing.T) {
+	first, err := BuildSessionEvidenceUpsert("", "  confirmed result\r\nwith details  ")
+	require.NoError(t, err)
+	second, err := BuildSessionEvidenceUpsert("", "confirmed result\nwith details")
+	require.NoError(t, err)
+	require.Equal(t, first.ID, second.ID)
+	require.Regexp(t, `^saved_[0-9a-f]{16}$`, first.ID)
+	require.Equal(t, "add", first.Op)
+	require.Equal(t, "confirmed result\nwith details", first.Content)
+
+	explicit, err := BuildSessionEvidenceUpsert("api-auth:v2", "401 confirmed")
+	require.NoError(t, err)
+	require.Equal(t, "api-auth:v2", explicit.ID)
+
+	_, err = BuildSessionEvidenceUpsert("bad id with spaces", "content")
+	require.ErrorContains(t, err, "invalid session evidence id")
+	_, err = BuildSessionEvidenceUpsert("valid-id", "  ")
+	require.ErrorContains(t, err, "content is required")
+}
+
 func TestRenderSessionEvidenceFrozenOpen_SplitByFrozenTime(t *testing.T) {
 	store := &EvidenceStore{
 		Items: []EvidenceItem{

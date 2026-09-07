@@ -78,9 +78,30 @@ func (s *sseSession) Close() {
 }
 
 func (sess *sseSession) writeMessageEvent(eventData []byte) (err error) {
+	// Assemble the complete event before taking the session lock. All endpoint,
+	// message, and keep-alive frames ultimately pass through writeFrameLocked,
+	// which prevents concurrent ResponseWriter use and frame interleaving. TCP is
+	// still free to split a frame across packets, as required by stream semantics.
+	frame := make([]byte, 0, len("event: message\ndata: ")+len(eventData)+2)
+	frame = append(frame, "event: message\ndata: "...)
+	frame = append(frame, eventData...)
+	frame = append(frame, '\n', '\n')
+	return sess.writeFrame(frame)
+}
+
+func (sess *sseSession) writeKeepAlive() error {
+	return sess.writeFrame([]byte(":keepalive\n\n"))
+}
+
+func (sess *sseSession) writeFrame(frame []byte) error {
 	sess.mu.Lock()
 	defer sess.mu.Unlock()
+	return sess.writeFrameLocked(frame)
+}
 
+// writeFrameLocked is the only code path that writes to the SSE
+// ResponseWriter. The caller must hold sess.mu.
+func (sess *sseSession) writeFrameLocked(frame []byte) (err error) {
 	select {
 	case <-sess.done:
 		return fmt.Errorf("session closed")
@@ -92,23 +113,6 @@ func (sess *sseSession) writeMessageEvent(eventData []byte) (err error) {
 			err = fmt.Errorf("sse write: %v", r)
 		}
 	}()
-
-	// Assemble the complete SSE frame in a single buffer before writing.
-	// http.ResponseWriter wraps a bufio.Writer (default 4 KiB). If we call
-	// fmt.Fprintf with a large payload the runtime may auto-flush mid-write,
-	// sending the "event: message\ndata: " prefix and part of the JSON in one
-	// TCP chunk and the rest (including the mandatory "\n\n" terminator) in a
-	// later chunk. SSE clients that feed each received chunk directly to a JSON
-	// parser will then see a truncated / incomplete string and report errors like
-	// "Unterminated string" – a symptom visible especially with multi-byte UTF-8
-	// content (Chinese characters, etc.) that exceeds the buffer boundary.
-	//
-	// Writing the entire frame atomically ensures the SSE event is always
-	// delivered as a coherent unit.
-	frame := make([]byte, 0, len("event: message\ndata: ")+len(eventData)+2)
-	frame = append(frame, "event: message\ndata: "...)
-	frame = append(frame, eventData...)
-	frame = append(frame, '\n', '\n')
 
 	if _, werr := sess.writer.Write(frame); werr != nil {
 		return werr
@@ -279,15 +283,21 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 		endpointBase,
 		sessionID,
 	)
-	// Register the session before sending the endpoint event to the client.
-	// The client extracts the sessionId from this event and may immediately POST
-	// its first JSON-RPC request (e.g. "initialize") to /message. If the session
-	// is stored only after flushing, a fast round-trip can reach handleMessage
-	// before the session exists, producing an intermittent
-	// "Invalid session ID" rejection.
+	endpointFrame := []byte(fmt.Sprintf("event: endpoint\ndata: %s\r\n\r\n", messageEndpoint))
+
+	// Register while holding the session write lock, then write and flush the
+	// endpoint event before unlocking. A client may POST immediately after
+	// receiving the endpoint: it will find the session, but its response write
+	// cannot overtake or race the endpoint frame.
+	session.mu.Lock()
 	s.sessions.Store(sessionID, session)
-	fmt.Fprintf(w, "event: endpoint\ndata: %s\r\n\r\n", messageEndpoint)
-	flusher.Flush()
+	endpointErr := session.writeFrameLocked(endpointFrame)
+	session.mu.Unlock()
+	if endpointErr != nil {
+		s.sessions.Delete(sessionID)
+		session.Close()
+		return
+	}
 	defer s.sessions.Delete(sessionID)
 
 	// Send periodic SSE keep-alive comments to prevent client body timeouts.
@@ -302,16 +312,9 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 			session.Close()
 			return
 		case <-ticker.C:
-			session.mu.Lock()
-			select {
-			case <-session.done:
-				session.mu.Unlock()
+			if err := session.writeKeepAlive(); err != nil {
 				session.Close()
 				return
-			default:
-				_, _ = session.writer.Write([]byte(":keepalive\n\n"))
-				session.flusher.Flush()
-				session.mu.Unlock()
 			}
 		}
 	}

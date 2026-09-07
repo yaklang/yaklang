@@ -123,7 +123,7 @@ strncpy(buffer, user_input, sizeof(buffer) - 1);
 buffer[sizeof(buffer) - 1] = '\0';
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 1.规则目的
 该规则用于审计C语言中用户输入相关的函数调用，帮助识别可能的输入点，便于进一步的安全审查。

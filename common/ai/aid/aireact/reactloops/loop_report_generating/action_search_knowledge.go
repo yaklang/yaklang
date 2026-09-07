@@ -77,7 +77,7 @@ var searchKnowledgeAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 
 			// 限制内容大小
 			const maxContentTokens = 30 * 1024
-			if ytoken.CalcTokenCount(resultContent) > maxContentTokens {
+			if ytoken.TokenCountExceeds(resultContent, maxContentTokens) {
 				resultContent = resultContent[:maxContentTokens] + "\n\n[... results truncated ...]"
 				log.Warnf("search_knowledge: results truncated to %d tokens", maxContentTokens)
 			}

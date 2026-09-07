@@ -97,10 +97,11 @@ func (m *MockedAIConfig) GetContextProviderManager() *aicommon.ContextProviderMa
 func (m *MockedAIConfig) AppendRelatedRuntimeID(string) {}
 
 func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
-	return ""
+	return m.TodoState.GetSessionEvidenceRendered()
 }
 
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
+	m.TodoState.ApplySessionEvidenceOps(ops)
 }
 
 func (m *MockedAIConfig) GetVerificationTodoRendered(scope aicommon.VerificationTodoScope) string {
@@ -162,6 +163,22 @@ func (m *MockedAIConfig) GetContext() context.Context {
 
 func (m *MockedAIConfig) GetBrowserSessionTracker() aicommon.BrowserSessionTracker {
 	return nil
+}
+
+func (m *MockedAIConfig) AppendReportedRisk(risk *schema.Risk) bool {
+	return false
+}
+
+func (m *MockedAIConfig) GetReportedRisksRendered() string {
+	return ""
+}
+
+func (m *MockedAIConfig) GetReportedRisks() string {
+	return ""
+}
+
+func (m *MockedAIConfig) SetReportedRisks(json string) {
+	// no-op
 }
 
 func (m *MockedAIConfig) CallAIResponseConsumptionCallback(current int) {

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
@@ -50,7 +52,7 @@ type Debugger struct {
 	once         sync.Once
 	startWG      sync.WaitGroup  // 用于等待程序启动
 	started      bool            // 表示程序是否已经启动
-	finished     bool            // 表示程序是否已经结束
+	finished     atomic.Bool     // 表示程序是否已经结束
 	wg           sync.WaitGroup  // 多个异步函数同时执行时回调断点,阻塞执行
 	initFunc     func(*Debugger) // 初始化函数
 	callbackFunc func(*Debugger) // 断点回调函数
@@ -99,7 +101,7 @@ type Debugger struct {
 	// 视为可见线程，保证 threads 列表与"程序已停止(AllThreadsStopped)"语义一致且稳定。
 	pausedThreads map[int]struct{}
 	pausedMu      sync.Mutex
-	rootThreadID  int
+	rootThreadID  atomic.Int64
 
 	// Reference,用于存储帧,作用域,变量引用的信息
 	Reference *Reference
@@ -147,11 +149,9 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 
 	debugger := &Debugger{
 		started:          false,
-		finished:         false,
-		StackTraces:      map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
+		StackTraces:      make(map[int]*vmstack.Stack),
 		ThreadStackTrace: make(map[int]*DebuggerState, 0),
 		pausedThreads:    make(map[int]struct{}),
-		rootThreadID:     int(vm.ThreadIDCount),
 		vm:               vm,
 		startWG:          sync.WaitGroup{},
 		wg:               sync.WaitGroup{},
@@ -213,9 +213,14 @@ func (g *Debugger) Init(codes []*Code) {
 
 	hasSet := false
 	sourceCodeFilePath := ""
-	var (
-		currentBundle *switchBundle
-	)
+	// Opcodes normally select their source bundle below. Empty/comment-only
+	// sources have no opcode to do that, and in-memory debugging may also omit a
+	// file path, so install a usable default bundle before scanning.
+	currentBundle := NewSwitchBundle()
+	g.switchBundleMap[""] = currentBundle
+	g.currentLinesFirstCodeStateMap = currentBundle.linesFirstCodeStateMap
+	g.currentBreakPointMap = currentBundle.breakpointMap
+	g.currentObserveBreakPointMap = currentBundle.observeBreakPointMap
 
 	for state, codes := range g.codes {
 		for index, code := range codes {
@@ -243,7 +248,7 @@ func (g *Debugger) Init(codes []*Code) {
 		}
 	}
 
-	if !hasSet {
+	if !hasSet && len(codes) != 0 {
 		panic(errors.New("debugger init error: can't find source code in opcodes"))
 	}
 }
@@ -316,12 +321,12 @@ func (g *Debugger) WaitGroupDone() {
 }
 
 func (g *Debugger) Finished() bool {
-	return g.finished
+	return g.finished.Load()
 }
 
 func (g *Debugger) SetFinished() {
 	g.description = "The program is finished"
-	g.finished = true
+	g.finished.Store(true)
 }
 
 func (g *Debugger) CurrentCodeIndex() int {
@@ -753,8 +758,11 @@ func (g *Debugger) StepIn() error {
 
 func (g *Debugger) StepOut() error {
 	stackTrace := g.CurrentStackTrace()
+	if stackTrace == nil {
+		return utils.Errorf("Can't not step out")
+	}
 	stackLen := stackTrace.Len()
-	if stackTrace != nil && stackLen > 0 {
+	if stackLen > 0 {
 		// 不会用到frame,所以设置为nil
 		g.stepoutState = &DebuggerState{
 			lineIndex: g.linePointer,
@@ -767,9 +775,66 @@ func (g *Debugger) StepOut() error {
 }
 
 func (g *Debugger) CurrentStackTracePop() {
-	stackTrace := g.CurrentStackTrace()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.stackTracePopLocked(g.frame)
+}
+
+// StackTracePopForFrame removes the call stack entry owned by frame. Async
+// completion must not select the stack through Debugger.frame: another VM
+// thread may have become the debugger's most recently observed frame.
+func (g *Debugger) StackTracePopForFrame(frame *Frame) {
+	// Async frames finish outside ShouldCallback, while another VM thread may be
+	// updating the debugger's current frame and per-thread stack under g.lock.
+	// Use the same lock here so selecting and popping a stack is one operation.
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.stackTracePopLocked(frame)
+}
+
+func (g *Debugger) stackTracePopLocked(frame *Frame) {
+	if frame == nil {
+		return
+	}
+	stackTrace := g.StackTraces[frame.ThreadID]
 	if stackTrace != nil && stackTrace.Len() > 0 {
 		stackTrace.Pop()
+	}
+}
+
+// StackTracePopExpected pairs a synchronous call-site push with its caller.
+// Direct API executions and cross-VM calls that intentionally did not push a
+// caller state are no-ops instead of consuming an unrelated outer call.
+func (g *Debugger) StackTracePopExpected(caller *Frame) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if caller == nil {
+		return
+	}
+	stackTrace := g.StackTraces[caller.ThreadID]
+	if stackTrace == nil || stackTrace.Len() == 0 {
+		return
+	}
+	state, ok := stackTrace.Peek().(*DebuggerState)
+	if !ok || state.frame != caller {
+		return
+	}
+	stackTrace.Pop()
+}
+
+func (g *Debugger) cleanupFinishedThreadLocked(frame *Frame) {
+	if frame == nil || int64(frame.ThreadID) == g.rootThreadID.Load() {
+		return
+	}
+	// Only an independent execution owns its thread entry. Ordinary nested
+	// synchronous frames share their parent's ID and leave cleanup to that root.
+	if !frame.ownsThreadID {
+		return
+	}
+	stackTrace := g.StackTraces[frame.ThreadID]
+	if stackTrace == nil || stackTrace.Len() == 0 {
+		delete(g.StackTraces, frame.ThreadID)
+		delete(g.ThreadStackTrace, frame.ThreadID)
 	}
 }
 
@@ -809,19 +874,81 @@ func (g *Debugger) HandleForBreakPoint() {
 	g.Callback()
 }
 
-func (g *Debugger) HandleForNormallyFinished() {
+func (g *Debugger) handleForNormallyFinishedLocked() {
+	if !g.finished.CompareAndSwap(false, true) {
+		return
+	}
+	g.description = "The program is finished"
 	g.SetStopReason("finished")
-	g.Callback()
+	g.callbackLockedNoPanic()
+}
+
+func (g *Debugger) HandleForNormallyFinished() {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.handleForNormallyFinishedLocked()
+}
+
+func (g *Debugger) handleForPanicLocked(vmPanic *VMPanic) {
+	if !g.finished.CompareAndSwap(false, true) {
+		return
+	}
+	g.SetVMPanic(vmPanic)
+	g.SetDescription("panic")
+	g.SetStopReason("exception")
+	g.callbackLockedNoPanic()
 }
 
 func (g *Debugger) HandleForPanic(vmPanic *VMPanic) {
-	if !g.Finished() {
-		g.SetFinished()
-		g.SetVMPanic(vmPanic)
-		g.SetDescription("panic")
-		g.SetStopReason("exception")
-		g.Callback()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.handleForPanicLocked(vmPanic)
+}
+
+// HandleFrameExit serializes terminal state with debugger-thread cleanup.
+// Synchronous call-stack pushes are popped at their caller boundary; this
+// method only releases the independent per-thread entry after callbacks have
+// inspected the final state.
+func (g *Debugger) HandleFrameExit(frame *Frame, vmPanic *VMPanic, normallyFinished bool) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	defer g.cleanupFinishedThreadLocked(frame)
+
+	if vmPanic != nil {
+		g.handleForPanicLocked(vmPanic)
+		return
 	}
+	// Context cancellation can make a root frame finish after debugger init but
+	// before its first opcode reaches ShouldCallback. Bind that root here as a
+	// fallback so program-start waiters are released by the terminal callback.
+	if normallyFinished && frame != nil && frame.parent == nil {
+		g.rootThreadID.CompareAndSwap(0, int64(frame.ThreadID))
+	}
+	if normallyFinished && frame != nil && int64(frame.ThreadID) == g.rootThreadID.Load() {
+		g.handleForNormallyFinishedLocked()
+	}
+}
+
+func (g *Debugger) callbackLockedNoPanic() {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			// A debugger adapter failure must not replace the VM panic or recurse
+			// through the terminal callback indefinitely.
+			log.Errorf("yakvm debugger terminal callback panic: %v", recovered)
+		}
+	}()
+	g.Callback()
+}
+
+func debuggerTracksCallInCurrentVM(frame *Frame, callable *Value) bool {
+	if frame == nil || frame.vm == nil || !frame.vm.sandboxMode || callable == nil {
+		return true
+	}
+	function, ok := callable.Value.(*Function)
+	if !ok || function.defineFrame == nil || function.defineFrame.vm == nil {
+		return true
+	}
+	return function.defineFrame.vm == frame.vm
 }
 
 func (g *Debugger) ShouldCallback(frame *Frame) {
@@ -829,13 +956,19 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
+	codeIndex := frame.codePointer
+	g.UpdateByFrame(frame)
+	// A debugger is normally created before its root execution receives a
+	// thread ID. Bind lazily, but do not let an async or cross-VM child that
+	// happens to run first steal root visibility and normal-finish ownership.
+	if frame.parent == nil {
+		g.rootThreadID.CompareAndSwap(0, int64(frame.ThreadID))
+	}
+
 	if !g.started {
 		g.started = true
 		g.StartWGDone()
 	}
-
-	codeIndex := frame.codePointer
-	g.UpdateByFrame(frame)
 
 	state, stateName := g.State(), g.StateName()
 	code := g.GetCode(state, codeIndex)
@@ -848,9 +981,9 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	stackTrace := g.CurrentStackTrace()
 
 	if code.Opcode == OpCall {
-		v := frame.peekN(code.Unary)
+		v := frame.peekN(frame.effectiveCallArgCount(code))
 		// 如果同步调用yak函数，则push stepIn栈
-		if v != nil && v.IsYakFunction() {
+		if v != nil && v.IsYakFunction() && debuggerTracksCallInCurrentVM(frame, v) {
 			defer func() {
 				if stackTrace != nil {
 					stackTrace.Push(&DebuggerState{
@@ -881,7 +1014,7 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 			} else {
 				g.description = fmt.Sprintf("Runtime error: %v", r)
 			}
-			g.HandleForPanic(NewVMPanic(r))
+			g.handleForPanicLocked(NewVMPanic(r))
 		}
 	}()
 
@@ -1048,7 +1181,7 @@ func (g *Debugger) markThreadResumed(threadID int) {
 
 func (g *Debugger) isThreadVisible(threadID int) bool {
 	// 根线程(主协程)始终可见；其余线程仅在当前挂起于回调时可见。
-	if threadID == g.rootThreadID {
+	if int64(threadID) == g.rootThreadID.Load() {
 		return true
 	}
 	g.pausedMu.Lock()

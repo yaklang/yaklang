@@ -175,7 +175,29 @@ func TestHotPatchTemplate(t *testing.T) {
 	require.Len(t, gots, 1)
 	checkYpbHotPatchTemplate(t, 0, gots[0])
 
-	// clear tags
+	// keep tags: update without Data.Tags keeps the existing tags
+	updateResp, err = local.UpdateHotPatchTemplate(ctx, &ypb.UpdateHotPatchTemplateRequest{
+		Condition: &ypb.HotPatchTemplateRequest{
+			Name: []string{names[0]},
+		},
+		Data: &ypb.HotPatchTemplate{
+			Name: "renamed-" + names[0],
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), updateResp.GetMessage().EffectRows)
+	names[0] = "renamed-" + names[0]
+
+	queryResp, err = local.QueryHotPatchTemplate(ctx, &ypb.HotPatchTemplateRequest{
+		Name: []string{names[0]},
+	})
+	require.NoError(t, err)
+
+	gots = queryResp.GetData()
+	require.Len(t, gots, 1)
+	checkYpbHotPatchTemplate(t, 0, gots[0])
+
+	// clear tags: Data carries only empty tags, which the legacy frontend uses to clear
 	clearedTag := tagsList[0][0]
 	updateResp, err = local.UpdateHotPatchTemplate(ctx, &ypb.UpdateHotPatchTemplateRequest{
 		Condition: &ypb.HotPatchTemplateRequest{

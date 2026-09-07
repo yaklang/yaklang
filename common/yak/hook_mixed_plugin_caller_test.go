@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -308,6 +310,7 @@ aaa`)
 }
 
 func TestMixCaller_LoadHotPatch(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
 	caller, err := NewMixPluginCaller()
 	require.NoError(t, err)
 	caller.SetLoadPluginTimeout(1)
@@ -318,7 +321,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	s = "%s"
 }
-`, ksuid.New().String(), ksuid.New().String())
+`, ksuid.New().String(), ksuid.New().String()) + "\n// " + strings.Repeat("hot-reload-revision-", 20)
 	checkCallerLoads := func(funcName string, wantLength int, hashes ...string) {
 		res, ok := caller.callers.table.Load(funcName)
 		require.True(t, ok)
@@ -333,6 +336,8 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	// load hot patch
 	err = caller.LoadHotPatch(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, code)
 	require.NoError(t, err)
+	_, cached := antlr4yak.HaveYakcCache(code)
+	require.False(t, cached, "MITM hot reload must not persist unique source revisions")
 	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 1, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName))
 
@@ -342,12 +347,14 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	s = "%s"
 }
-`, ksuid.New().String())
+`, ksuid.New().String()) + "\n// " + strings.Repeat("ordinary-plugin-cache-padding-", 20)
 	err = caller.LoadPluginEx(utils.TimeoutContextSeconds(2), &schema.YakScript{
 		ScriptName: pluginName,
 		Content:    pluginCode,
 	})
 	require.NoError(t, err)
+	_, cached = antlr4yak.HaveYakcCache(pluginCode)
+	require.True(t, cached, "ordinary MITM plugin must retain yakc caching")
 	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 2, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName), utils.CalcSha1(pluginCode, HOOK_MirrorHTTPFlow, pluginName))
 
@@ -356,12 +363,14 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	s = "%s"	
 }
-`, ksuid.New().String())
+`, ksuid.New().String()) + "\n// " + strings.Repeat("ordinary-plugin-reload-cache-padding-", 20)
 	err = caller.LoadPluginEx(utils.TimeoutContextSeconds(2), &schema.YakScript{
 		ScriptName: pluginName,
 		Content:    reloadPluginCode,
 	})
 	require.NoError(t, err)
+	_, cached = antlr4yak.HaveYakcCache(reloadPluginCode)
+	require.True(t, cached, "ordinary MITM plugin reload must retain yakc caching")
 	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 2, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName), utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName))
 
@@ -373,9 +382,11 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	s = "%s"
 }
-`, ksuid.New().String(), ksuid.New().String())
+`, ksuid.New().String(), ksuid.New().String()) + "\n// " + strings.Repeat("hot-reload-revision-reload-", 20)
 	err = caller.LoadHotPatch(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, reloadHotPatchCode)
 	require.NoError(t, err)
+	_, cached = antlr4yak.HaveYakcCache(reloadHotPatchCode)
+	require.False(t, cached, "MITM hot reload revision must not persist yakc cache")
 	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(reloadHotPatchCode, HOOK_HijackHTTPRequest, HotPatchScriptName))
 	// because hot patch mirrorHTTPFlow caller remove first then add, so it should be second
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 2, utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName), utils.CalcSha1(reloadHotPatchCode, HOOK_MirrorHTTPFlow, HotPatchScriptName))

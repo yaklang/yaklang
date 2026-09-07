@@ -4,6 +4,92 @@ import (
 	"fmt"
 )
 
+// canBindDirectFunctionInPlace recognizes the compiler's single-value direct
+// assignment shape:
+//
+//	OpPush(function), OpList(1), OpPushLeftRef, OpList(1), OpAssign
+//
+// OpPush has already copied the compiled Function template for this Frame, and
+// none of the intervening structural opcodes can publish that copy. It is
+// therefore safe to attach the first bind name to this private instance. Other
+// paths (aliases, calls, container reads and multi-assignments) deliberately
+// return false so prepareAssignedFunction keeps copying before it changes
+// observable function metadata.
+func (v *Frame) canBindDirectFunctionInPlace(function *Function) bool {
+	const prefixLength = 4
+	if v.codePointer < prefixLength || v.codePointer >= len(v.codes) {
+		return false
+	}
+
+	functionPush := v.codes[v.codePointer-prefixLength]
+	rightList := v.codes[v.codePointer-3]
+	leftRef := v.codes[v.codePointer-2]
+	leftList := v.codes[v.codePointer-1]
+	if functionPush == nil || functionPush.Opcode != OpPush || functionPush.Op1 == nil ||
+		rightList == nil || rightList.Opcode != OpList || rightList.Unary != 1 ||
+		leftRef == nil || leftRef.Opcode != OpPushLeftRef ||
+		leftList == nil || leftList.Opcode != OpList || leftList.Unary != 1 {
+		return false
+	}
+
+	template, ok := functionPush.Op1.Value.(*Function)
+	return ok && function != template && function.uuid == template.uuid
+}
+
+// prepareAssignedFunction keeps Function immutable after it has been published
+// through a Value. Scope and the first useful anonymous bind name belong to the
+// assignment result, not to a shared RHS function that another frame may call
+// or alias concurrently.
+func (v *Frame) prepareAssignedFunction(left, right *Value) *Value {
+	leftValues := left.ValueList()
+	rightValues := right.ValueList()
+	if len(leftValues) == 0 || len(rightValues) == 0 {
+		return right
+	}
+
+	rightValue := rightValues[0]
+	function, ok := rightValue.Value.(*Function)
+	if !ok {
+		return right
+	}
+
+	scope := function.scope
+	needsCopy := scope == nil
+	if scope == nil {
+		scope = v.CurrentScope()
+	}
+
+	bindName := ""
+	if function.name == "anonymous" && function.anonymousFunctionBindName == "" {
+		if leftValue, err := leftValues[0].ConvertToLeftValue(); err == nil && leftValue.IsLeftValueRef() {
+			if name, ok := v.CurrentScope().symtbl.GetNameByVariableId(leftValue.SymbolId); ok {
+				bindName = name
+				if !needsCopy && v.canBindDirectFunctionInPlace(function) {
+					function.anonymousFunctionBindName = bindName
+					return right
+				}
+				needsCopy = true
+			}
+		}
+	}
+	if !needsCopy {
+		return right
+	}
+
+	assignedFunction := function.Copy(scope)
+	if bindName != "" {
+		assignedFunction.anonymousFunctionBindName = bindName
+	}
+	assignedValue := *rightValue
+	assignedValue.Value = assignedFunction
+
+	assignedValues := append([]*Value(nil), rightValues...)
+	assignedValues[0] = &assignedValue
+	assignedList := *right
+	assignedList.Value = assignedValues
+	return &assignedList
+}
+
 func (v *Frame) assign(left, right *Value) {
 	if !(left.IsValueList() && right.IsValueList()) {
 		panic("BUG: assign: left and right must be value list")

@@ -63,7 +63,12 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			}
 
 			invoker := loop.GetInvoker()
-			loop.LoadingStatus(fmt.Sprintf("searching persistent memory: %s (mode: %s)", query, searchMode))
+			loop.UserStatus(
+				"正在回顾相关信息",
+				"Reviewing relevant information",
+				aicommon.WithStatusCode("answer.memory.searching"),
+				aicommon.WithStatusDetail(fmt.Sprintf("正在回顾与「%s」相关的内容", query), fmt.Sprintf("Reviewing information about %q", query)),
+			)
 
 			memTriage := loop.GetMemoryTriage()
 			if utils.IsNil(memTriage) {

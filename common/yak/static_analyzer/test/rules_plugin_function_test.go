@@ -80,6 +80,27 @@ func TestScoreRulesDefineFunction(t *testing.T) {
 }
 
 func TestRulesDefineFunction(t *testing.T) {
+	t.Run("context-menu requires at least one hook", func(t *testing.T) {
+		check(t, `a = 1`, []string{
+			rules.AtLeastOneContextMenuHook(),
+		}, "context-menu")
+	})
+
+	t.Run("context-menu accepts explicit hooks", func(t *testing.T) {
+		check(t, `
+handleOneHTTPFlow = func(ctx, flow) { return flow }
+handleHTTPPacket = func(ctx, request, response) { return request }
+`, []string{}, "context-menu")
+	})
+
+	t.Run("context-menu validates hook parameter count", func(t *testing.T) {
+		check(t, `
+handleMultiHTTPFlows = func(flows) { return flows }
+`, []string{
+			rules.InvalidFunctionParameterCount("handleMultiHTTPFlows", 2, 1),
+		}, "context-menu")
+	})
+
 	t.Run("test no implement define function in codec", func(t *testing.T) {
 		check(t,
 			`a = 1

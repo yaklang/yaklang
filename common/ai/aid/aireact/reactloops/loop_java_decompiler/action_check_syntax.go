@@ -56,7 +56,7 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				startLine = fmt.Sprintf("检查语法: 目录 %s", dirPath)
 			}
 			reactloops.EmitActionLog(loop, nodeID, startLine)
-			reactloops.EmitStatus(loop, "检查语法中 / Checking Syntax...")
+			reactloops.EmitStatusI18n(loop, "检查语法中", "Checking Syntax...")
 
 			var filesToCheck []string
 			if filePath != "" {
@@ -84,7 +84,7 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 
 			if len(filesToCheck) == 0 {
 				log.Warnf("[check_syntax] no Java files found")
-				reactloops.EmitStatus(loop, "未找到 Java 文件 / No Java Files Found")
+				reactloops.EmitStatusI18n(loop, "未找到 Java 文件", "No Java Files Found")
 				finishLine := "完成: 未找到可检查的 Java 文件"
 				reactloops.EmitActionLog(loop, nodeID, finishLine)
 				invoker.AddToTimeline("check_syntax_no_files", `【未找到Java文件】指定的位置没有找到任何Java文件
@@ -157,10 +157,12 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 
 			if filesWithIssues == 0 {
 				finishLine = fmt.Sprintf("完成: %d 个文件全部通过语法检查", len(filesToCheck))
-				reactloops.EmitStatus(loop, fmt.Sprintf(
-					"语法检查通过 (%d 个文件) / Syntax Check Passed (%d files)",
-					len(filesToCheck), len(filesToCheck),
-				))
+				reactloops.EmitStatusI18n(
+					loop,
+					fmt.Sprintf("%d 个文件已通过语法检查", len(filesToCheck)),
+					fmt.Sprintf("%d files passed the syntax check", len(filesToCheck)),
+				)
+
 				feedbackMsg = fmt.Sprintf("All %d Java files passed basic syntax checks.", len(filesToCheck))
 				invoker.AddToTimeline("check_syntax_success", fmt.Sprintf("所有 %d 个Java文件语法检查通过，可以继续下一步操作", len(filesToCheck)))
 			} else {
@@ -168,10 +170,12 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				summary, ref := reactloops.SpillLongContent(loop, "syntax_check_report", fullReport)
 				reference = ref
 				finishLine = fmt.Sprintf("完成: %d/%d 个文件存在语法问题", filesWithIssues, len(filesToCheck))
-				reactloops.EmitStatus(loop, fmt.Sprintf(
-					"发现语法问题 (%d/%d) / Syntax Issues Found (%d/%d)",
-					filesWithIssues, len(filesToCheck), filesWithIssues, len(filesToCheck),
-				))
+				reactloops.EmitStatusI18n(
+					loop,
+					fmt.Sprintf("%d/%d 个文件存在语法问题", filesWithIssues, len(filesToCheck)),
+					fmt.Sprintf("Syntax issues found in %d/%d files", filesWithIssues, len(filesToCheck)),
+				)
+
 				feedbackMsg = fmt.Sprintf("Found issues in %d/%d Java files.\n\n%s",
 					filesWithIssues, len(filesToCheck), summary)
 				invoker.AddToTimeline("check_syntax_issues_found", fmt.Sprintf(`【发现语法错误】在 %d/%d 个文件中发现语法问题

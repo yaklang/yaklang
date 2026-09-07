@@ -33,6 +33,7 @@ func (s *Server) CheckLicense(ctx context.Context, r *ypb.CheckLicenseRequest) (
 	}
 
 	lic := r.GetLicenseActivation()
+	xlic.EnsureInitialized()
 	rsp, err := xlic.Machine.VerifyLicense(lic)
 	if err != nil {
 		return nil, err

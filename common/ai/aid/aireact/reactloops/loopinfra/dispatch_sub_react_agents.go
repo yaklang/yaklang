@@ -48,7 +48,7 @@ func handleDispatchSubReactAgents(
 
 	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(jobs))
 
-	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
+	loopInfraStatus(loop, "子 Agent 正在执行", "Sub-agents are running…")
 
 	// Pause the verification watchdog while sub-agents are running. This is a
 	// double-insurance alongside the sub-agent progress bypass in

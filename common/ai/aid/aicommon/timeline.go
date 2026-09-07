@@ -801,10 +801,19 @@ func (m *Timeline) createEmergencySummary(item *TimelineItem, id int64) string {
 	var summary string
 	switch v := item.value.(type) {
 	case *aitool.ToolResult:
-		if v.Success {
-			summary = fmt.Sprintf("[%s] tool:%s success", timeStr, v.Name)
-		} else {
-			summary = fmt.Sprintf("[%s] tool:%s failed", timeStr, v.Name)
+		executionStatus, detail := v.GetExecutionStatus()
+		switch {
+		case !v.Success:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-error", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusFailed:
+			summary = fmt.Sprintf("[%s] tool:%s execution-failed", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusSucceeded:
+			summary = fmt.Sprintf("[%s] tool:%s execution-succeeded", timeStr, v.Name)
+		default:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-completed; execution-outcome-unknown", timeStr, v.Name)
+		}
+		if detail != "" {
+			summary += " (" + detail + ")"
 		}
 	case *UserInteraction:
 		summary = fmt.Sprintf("[%s] user-interaction stage:%v", timeStr, v.Stage)
@@ -1037,18 +1046,25 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 	result := header + body + footer
 	// Tokenizers can merge differently across concatenation boundaries. Keep a
 	// final guard so the public contract remains a hard upper bound.
-	if MeasureTokens(result) > tokenLimit {
+	if resultTokens := MeasureTokens(result); resultTokens > tokenLimit {
+		originalBody := body
 		bodyBudget := tokenLimit - baseTokens
-		for bodyBudget > 0 && MeasureTokens(result) > tokenLimit {
-			bodyBudget--
-			body = strings.TrimSpace(ShrinkTextBlockByTokens(body, bodyBudget))
+		for bodyBudget > 0 && resultTokens > tokenLimit {
+			// Remove the measured overflow in one step. The previous one-token
+			// decrement re-encoded the complete body once per excess token.
+			bodyBudget -= max(1, resultTokens-tokenLimit)
+			if bodyBudget <= 0 {
+				return ""
+			}
+			body = strings.TrimSpace(ShrinkTextBlockByTokens(originalBody, bodyBudget))
 			if body == "" {
 				return ""
 			}
 			result = header + body + footer
+			resultTokens = MeasureTokens(result)
 		}
 	}
-	if MeasureTokens(result) > tokenLimit {
+	if ytoken.TokenCountExceeds(result, tokenLimit) {
 		return ""
 	}
 	return result

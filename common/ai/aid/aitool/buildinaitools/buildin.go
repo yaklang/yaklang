@@ -8,8 +8,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/codeaudittools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/notifytools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/scheduletools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/ssatools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
@@ -35,6 +37,7 @@ func GetBasicBuildInTools() []*aitool.Tool {
 	}
 
 	tools := []*aitool.Tool{nowTime}
+	tools = append(tools, scheduletools.CreateScheduleTools()...)
 	return lo.Filter(tools, func(item *aitool.Tool, index int) bool {
 		if utils.IsNil(item) {
 			log.Errorf("tool is nil")
@@ -94,6 +97,9 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	} else {
 		tools = append(tools, ssaToolsList...)
 	}
+
+	// Add code audit tools from codeaudittools package (Java static security audit)
+	tools = append(tools, codeaudittools.CreateCodeAuditTools()...)
 
 	// Add IM notify tools (send_im_message / configure_im_credentials) from notifytools package
 	tools = append(tools, notifytools.CreateNotifySendTools()...)

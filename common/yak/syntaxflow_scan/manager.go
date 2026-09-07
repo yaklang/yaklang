@@ -275,7 +275,11 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
+		existingTargets := config.QueryTargets
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		if len(existingTargets) > 0 {
+			config.QueryTargets = append(existingTargets, config.QueryTargets...)
+		}
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -287,16 +291,41 @@ func (m *scanManager) initByConfig() error {
 			log.Errorf("SyntaxFlow Scan Init Program By ProjectId By %d Failed", config.GetProjectID())
 		}
 		config.Programs = append(config.Programs, prog)
+		existingTargets := config.QueryTargets
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		if len(existingTargets) > 0 {
+			config.QueryTargets = append(existingTargets, config.QueryTargets...)
+		}
 		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
+		}
+	} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+	}
+
+	// Source query targets never populate BaseInfo.ProgramNames, but task
+	// persistence and progress reporting use program names. Keep them aligned
+	// so SaveTask does not record an empty program for a completed source scan.
+	if len(config.QueryTargets) > 0 && len(config.GetProgramNames()) == 0 {
+		names := make([]string, 0, len(config.QueryTargets))
+		for _, target := range config.QueryTargets {
+			if target == nil {
+				continue
+			}
+			if name := target.GetProgramName(); name != "" {
+				names = append(names, name)
+			}
+		}
+		if len(names) > 0 && config.Config != nil {
+			config.Config.SetProgramName(names[0])
 		}
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
 		db := consts.GetGormProfileDatabase()
 		db = yakit.FilterSyntaxFlowRule(db, filter)
+		db = yakit.ApplySyntaxFlowRuleModeFilter(db, config.GetRuleFilterMode())
 		// get all rule name
 		var ruleNames []string
 		err := db.Pluck("rule_name", &ruleNames).Error
@@ -310,7 +339,34 @@ func (m *scanManager) initByConfig() error {
 	}
 
 	// log.Errorf("config: %v", config.Config.GetRuleInput())
-	if input := config.GetRuleInput(); len(input) != 0 {
+	if config.IsTaskLocalRuleInput() {
+		parsedRules, libraries, err := loadTaskLocalSyntaxFlowRules(config.SyntaxFlowRule)
+		if err != nil {
+			return err
+		}
+		modeFilter := config.GetRuleFilterMode()
+		if len(modeFilter) == 0 {
+			// Source/SSA query targets must never execute mixed-mode rules:
+			// a snapshot can contain both backends, and an SSA rule against
+			// a raw PatternRoot can allocate unbounded result objects.
+			if len(config.QueryTargets) > 0 && len(config.Programs) == 0 {
+				modeFilter = []string{string(schema.SFR_MODE_SOURCE)}
+			} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
+				modeFilter = []string{string(schema.SFR_MODE_SSA)}
+			}
+		}
+		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, modeFilter)
+		parsedRules = filterTaskLocalSyntaxFlowRulesByNames(parsedRules, config.SyntaxFlowRule)
+		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
+		for _, rule := range parsedRules {
+			ruleCh <- rule
+		}
+		close(ruleCh)
+		m.ruleChan = ruleCh
+		m.rulesCount = int64(len(parsedRules))
+		m.kind = ruleInputResultKind(true)
+		m.ctx = ssaapi.WithTaskLocalSyntaxFlowRuleLibraries(m.ctx, libraries)
+	} else if input := config.GetRuleInput(); len(input) != 0 {
 		// start debug mode scan task (use provided rule inputs)
 		rules := make([]*schema.SyntaxFlowRule, 0, len(input))
 		for _, rinput := range input {
@@ -328,7 +384,7 @@ func (m *scanManager) initByConfig() error {
 		close(ruleCh)
 		m.ruleChan = ruleCh
 		m.rulesCount = int64(len(rules))
-		m.kind = schema.SFResultKindDebug
+		m.kind = ruleInputResultKind(false)
 	} else if config.GetRuleFilter() != nil {
 		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
@@ -390,8 +446,7 @@ func (m *scanManager) ScanNewTask() error {
 	if m.Config == nil {
 		return utils.Errorf("Start SyntaxFlow Scan Failed:config is nil")
 	}
-	programs := m.Config.Programs
-	if len(programs) == 0 {
+	if len(m.Config.Programs) == 0 && len(m.Config.QueryTargets) == 0 {
 		return utils.Errorf("Start SyntaxFlow Scan Failed:programs is empty")
 	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING

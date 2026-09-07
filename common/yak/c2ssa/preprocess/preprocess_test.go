@@ -14,6 +14,14 @@ func TestApplyDefineLineObject(t *testing.T) {
 	require.Equal(t, "1", tables.Object["A"])
 }
 
+func TestApplyDefineLine_SpacedParenIsObjectMacro(t *testing.T) {
+	tables := NewMacroTables()
+	ApplyDefineLine("#define __ASSERT_VOID_CAST (void)", &tables, false)
+	_, isFn := tables.Function["__ASSERT_VOID_CAST"]
+	require.False(t, isFn, "space before '(' must not make a function-like macro")
+	require.Equal(t, "(void)", tables.Object["__ASSERT_VOID_CAST"])
+}
+
 func TestCollectObjectMacroFromProjectHeaders(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	require.NoError(t, fs.WriteFile("include/a.h", []byte("#define A 1\n"), 0o644))

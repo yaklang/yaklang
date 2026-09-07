@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -199,10 +200,10 @@ func TestReAct_SyncUserIntervention_PromptContainsHistoryForAI(t *testing.T) {
 			history[1].UserInput == userInput
 	}, time.Second, 20*time.Millisecond)
 
-	userQueryBlock := aicommon.MustExtractAITagBlock(t, prompt, "USER_QUERY")
+	userQueryBlock := aicommon_testutil.MustExtractAITagBlock(t, prompt, "USER_QUERY")
 	require.Equal(t, userInput, userQueryBlock.Body)
 
-	prevUserInputBlock := aicommon.MustExtractAITagBlock(t, prompt, "PREV_USER_INPUT")
+	prevUserInputBlock := aicommon_testutil.MustExtractAITagBlock(t, prompt, "PREV_USER_INPUT")
 	require.Equal(t, strings.TrimSpace(ins.config.FormatUserInputHistory()), prevUserInputBlock.Body)
 	require.NotContains(t, userQueryBlock.Body, content)
 }

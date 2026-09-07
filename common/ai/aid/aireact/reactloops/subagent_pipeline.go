@@ -327,6 +327,14 @@ func finalizeSubAgents(executed []*ExecutedSubAgent, opts SubAgentOptions) []*Su
 		if e == nil {
 			continue
 		}
+		// 如果子 Agent task 被用户取消，触发 CancelTask 注册的 asyncDeferCallback，
+		// 发送取消确认消息。此时子 Agent loop 已经退出（或因构建失败从未启动），
+		// 实现"取消完成再发返回消息"。统一在此处触发，覆盖所有退出路径
+		// （正常退出 / failedExecuted / panic recover）。
+		if e.Task != nil && e.Task.IsUserCancelled() {
+			e.Task.CallAsyncDeferCallback(e.ExecErr)
+		}
+
 		results = append(results, BuildSubAgentResult(e, opts))
 		// 注销 progress handle（幂等）。
 		if e.Handle != nil && opts.ParentLoop != nil {
@@ -373,6 +381,10 @@ func BuildSubAgentResult(executed *ExecutedSubAgent, opts SubAgentOptions) *SubA
 	if execErr != nil {
 		status = "failed"
 		record.Error = execErr.Error()
+	}
+	if subTask != nil && subTask.IsUserCancelled() {
+		status = "cancelled"
+		record.Error = ""
 	}
 	record.Status = status
 

@@ -5,8 +5,16 @@ import "github.com/yaklang/antlr/v4"
 // GetPythonParserSerializedATN returns the serialized ATN for the Python parser.
 // This is used for caching parser state to improve performance.
 // Similar to GetJavaParserSerializedATN in java/parser/utils.go
+//
+// It must go through PythonParserInit (sync.Once): pythonparserParserInit
+// reassigns the package-level atn / decisionToDFA / PredictionContextCache, so
+// calling it directly rebuilds the shared static state on every use. That both
+// races with in-flight parsers and splits the (ATN, DFA, context cache) triple
+// across parsers, which breaks the atn.stateMu guard the ANTLR runtime relies
+// on to serialize shared-cache mutation and can abort the process with
+// "fatal error: concurrent map read and map write".
 func GetPythonParserSerializedATN() []int32 {
-	pythonparserParserInit()
+	PythonParserInit()
 	return PythonParserParserStaticData.serializedATN
 }
 
@@ -34,4 +42,3 @@ func (p *PythonParser) SetInterpreter(atn *antlr.ATN, decisionToDFA []*antlr.DFA
 	// do nothing, just to override the method
 	p.Interpreter = antlr.NewParserATNSimulator(p, atn, decisionToDFA, predictionContextCache)
 }
-

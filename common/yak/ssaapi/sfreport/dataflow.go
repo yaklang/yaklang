@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/lib/pq"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -30,6 +30,20 @@ type DataflowDetailLevel string
 const (
 	DataflowDetailMinimal DataflowDetailLevel = "minimal"
 	DataflowDetailFull    DataflowDetailLevel = "full"
+)
+
+const (
+	// maxDataFlowPathCount bounds how many entry-to-sink paths are
+	// materialized per risk. Data flow sub-graphs can be combinatorial DAGs;
+	// without a cap a single risk can keep the scan CPU-bound for hours while
+	// enumerating all simple paths.
+	maxDataFlowPathCount = 256
+	// maxDataFlowPathLength bounds a single path so path copies stay small.
+	maxDataFlowPathLength = 1024
+	// maxDataFlowVisitBudget bounds total DFS steps regardless of graph
+	// topology (including dense cyclic graphs whose cycle-hits never emit a
+	// path), so the function always terminates with bounded work.
+	maxDataFlowVisitBudget = 200_000
 )
 
 // MarshalDataFlowPath serializes a DataFlowPath according to the given detail level.
@@ -184,7 +198,7 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, minimal bool, values ...*ssa
 }
 
 func computeDataFlowPaths(nodes []*NodeInfo, edges []*EdgeInfo) [][]string {
-	adj := make(map[string][]string)
+	adj := make(map[string][]string, len(edges))
 	for _, e := range edges {
 		if e == nil {
 			continue
@@ -206,40 +220,44 @@ func computeDataFlowPaths(nodes []*NodeInfo, edges []*EdgeInfo) [][]string {
 		return nil
 	}
 
-	hasOutgoing := make(map[string]bool)
-	for _, e := range edges {
-		if e != nil {
-			hasOutgoing[e.FromNodeID] = true
-		}
-	}
-
-	var paths [][]string
-	visited := make(map[string]bool)
+	paths := make([][]string, 0, 8)
+	visited := make(map[string]struct{}, len(nodes))
+	steps := 0
 
 	var dfs func(nodeID string, current []string)
 	dfs = func(nodeID string, current []string) {
-		if visited[nodeID] {
+		if len(paths) >= maxDataFlowPathCount {
 			return
 		}
-		visited[nodeID] = true
+		if steps >= maxDataFlowVisitBudget {
+			return
+		}
+		if _, ok := visited[nodeID]; ok {
+			return
+		}
+
+		steps++
+		visited[nodeID] = struct{}{}
 		current = append(current, nodeID)
 
 		neighbors := adj[nodeID]
-		isSink := !hasOutgoing[nodeID]
-		if isSink || len(neighbors) == 0 {
+		if len(neighbors) == 0 || len(current) >= maxDataFlowPathLength {
 			pathCopy := make([]string, len(current))
 			copy(pathCopy, current)
 			paths = append(paths, pathCopy)
 		} else {
 			for _, next := range neighbors {
+				if len(paths) >= maxDataFlowPathCount {
+					break
+				}
 				dfs(next, current)
 			}
 		}
 
-		visited[nodeID] = false
+		delete(visited, nodeID)
 	}
 
-	dfs(entryNodeID, []string{})
+	dfs(entryNodeID, make([]string, 0, 16))
 	return paths
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // DeleteMemoryVectorArtifacts removes HNSW graph nodes and RAG documents for the given entities.
@@ -161,4 +162,89 @@ func getOrCreateRAGStore(
 	cache[collectionName] = store
 	exists[collectionName] = true
 	return store, true, nil
+}
+
+// BatchCleanupMemories 批量物理删除指定 session 内的记忆及其所有索引数据。
+//
+// 针对单 session 攒批场景优化：HNSW 只加载一次 → 批量 Delete → 只 SaveGraph 一次；
+// RAG 批量收集 docIDs 一次性删除；DB 一条 DELETE WHERE memory_id IN (...)。
+//
+// 适用于 TTL 过期清理和低价值淘汰等自动清理场景。
+func BatchCleanupMemories(ctx context.Context, db *gorm.DB, sessionID string, memoryIDs []string) error {
+	if len(memoryIDs) == 0 || db == nil || sessionID == "" {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	memoryIDs = uniqueNonEmptyStrings(memoryIDs)
+	if len(memoryIDs) == 0 {
+		return nil
+	}
+
+	// 1. 查询 DB 获取完整实体（用于收集 RAG docIDs）
+	midtermMode := strings.HasPrefix(sessionID, MidtermSessionPrefix)
+	entityTable := "ai_memory_entities_v1"
+	if midtermMode {
+		entityTable = "ai_midterm_archive_entities_v1"
+	}
+
+	var entities []schema.AIMemoryEntity
+	if err := db.Table(entityTable).
+		Where("memory_id IN (?) AND session_id = ?", memoryIDs, sessionID).
+		Find(&entities).Error; err != nil {
+		return utils.Errorf("query entities for cleanup failed: %v", err)
+	}
+
+	// 2. HNSW: 加载一次 backend → 批量 Delete → 只 SaveGraph 一次
+	backend, err := NewAIMemoryHNSWBackend(
+		WithHNSWSessionID(sessionID),
+		WithHNSWDatabase(db),
+		WithHNSWAutoSave(false),
+		WithHNSWMidtermMode(midtermMode),
+	)
+	if err != nil {
+		log.Warnf("BatchCleanupMemories: HNSW backend init failed: %v", err)
+	} else {
+		for _, mid := range memoryIDs {
+			_ = backend.Delete(mid)
+		}
+		if err := backend.SaveGraph(); err != nil {
+			log.Warnf("BatchCleanupMemories: HNSW save graph failed: %v", err)
+		}
+	}
+
+	// 3. RAG: 批量收集 docIDs 一次性删除
+	var allDocIDs []string
+	for i := range entities {
+		allDocIDs = append(allDocIDs, entities[i].DocumentQuestionHashIDs()...)
+	}
+	allDocIDs = uniqueNonEmptyStrings(allDocIDs)
+	if len(allDocIDs) > 0 {
+		store, ok, err := getOrCreateRAGStore(make(map[string]*vectorstore.SQLiteVectorStoreHNSW), make(map[string]bool), db, sessionID)
+		if err != nil {
+			log.Warnf("BatchCleanupMemories: RAG store init failed: %v", err)
+		} else if ok {
+			if err := store.Delete(allDocIDs...); err != nil {
+				log.Warnf("BatchCleanupMemories: RAG delete failed: %v", err)
+			}
+		}
+	}
+
+	// 4. DB: 一条 DELETE 批量删除
+	if err := db.Table(entityTable).
+		Where("memory_id IN (?) AND session_id = ?", memoryIDs, sessionID).
+		Delete(nil).Error; err != nil {
+		return utils.Errorf("batch delete memory entities failed: %v", err)
+	}
+
+	log.Infof("BatchCleanupMemories: cleaned up %d memories for session %s", len(memoryIDs), sessionID)
+	return nil
 }

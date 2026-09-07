@@ -119,7 +119,7 @@ func (c *Coordinator) collectTaskSummaries(builder *strings.Builder, task *AiTas
 
 	toolResults := task.GetAllToolCallResults()
 	if len(toolResults) > 0 {
-		builder.WriteString(fmt.Sprintf("%s- Tool Calls: %d (success: %d, failed: %d)\n",
+		builder.WriteString(fmt.Sprintf("%s- Tool Calls: %d (completed: %d, protocol-failed: %d)\n",
 			indent, len(toolResults), task.GetSuccessCallCount(), task.GetFailCallCount()))
 	}
 

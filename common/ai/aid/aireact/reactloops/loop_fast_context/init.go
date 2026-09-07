@@ -80,8 +80,6 @@ func init() {
 						"Nonce":            nonce,
 						"Query":            loop.Get(loopVarUserQuery),
 						"WorkDir":          loop.Get(loopVarWorkDir),
-						"Iteration":        loop.GetCurrentIterationIndex() + 1,
-						"MaxIterations":    loop.GetMaxIterations(),
 						"SearchRounds":     loop.Get(loopVarSearchRounds),
 						"LocationCount":    len(listFileIndex(loop)),
 						"FeedbackMessages": feedbacker.String(),

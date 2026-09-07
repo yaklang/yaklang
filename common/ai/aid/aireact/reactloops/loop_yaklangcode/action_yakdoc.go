@@ -23,7 +23,7 @@ func yakdocActions(r aicommon.AIInvokeRuntime) []reactloops.ReActLoopOption {
 }
 
 func yakdocEmitStart(loop *reactloops.ReActLoop) {
-	reactloops.EmitStatus(loop, "查询 Yaklang 文档中 / Querying Yaklang Document...")
+	reactloops.EmitStatusI18n(loop, "查询 Yaklang 文档中", "Querying Yaklang Document...")
 }
 
 func yakdocHandleSuccess(

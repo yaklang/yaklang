@@ -26,6 +26,7 @@ var ActionMagicKey = "@action"
 type Action struct {
 	// meta data
 	name            string
+	observedAction  string
 	mu              sync.Mutex
 	params          aitool.InvokeParams
 	generalParamKey string
@@ -221,6 +222,31 @@ func (a *Action) GetStringSlice(key string, defaults ...[]string) []string {
 
 func (a *Action) ActionType() string {
 	return a.GetString("@action")
+}
+
+// ObservedActionType returns the raw non-empty @action value seen by the
+// parser, even when it was rejected because it did not match an allowed action
+// or alias. ActionType intentionally remains the admitted/canonical value.
+func (a *Action) ObservedActionType() string {
+	if a == nil {
+		return ""
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.observedAction
+}
+
+func (a *Action) observeActionType(value string) {
+	if a == nil {
+		return
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	a.mu.Lock()
+	a.observedAction = value
+	a.mu.Unlock()
 }
 
 func (a *Action) GetBool(key string, defaults ...bool) bool {
@@ -663,6 +689,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			}
 		}()
 		setStart := func(hitName string) {
+			action.observeActionType(hitName)
 			action.SetName(hitName)
 			action.Set(ActionMagicKey, hitName)
 		}
@@ -675,17 +702,21 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 				return
 			}
 			if utils.InterfaceToString(key) == "@action" {
-				value := utils.InterfaceToString(data)
-				if utils.StringArrayContains(actionNames, value) {
-					setStart(value)
-				} else if mapData, ok := data.(map[string]any); ok {
+				if mapData, ok := data.(map[string]any); ok {
 					for _, v := range mapData {
-						if utils.StringArrayContains(actionNames, utils.InterfaceToString(v)) {
-							value = utils.InterfaceToString(v)
-							setStart(value)
+						candidate := utils.InterfaceToString(v)
+						action.observeActionType(candidate)
+						if utils.StringArrayContains(actionNames, candidate) {
+							setStart(candidate)
 							return
 						}
 					}
+					return
+				}
+				value := utils.InterfaceToString(data)
+				action.observeActionType(value)
+				if utils.StringArrayContains(actionNames, value) {
+					setStart(value)
 				}
 			} else {
 				keyString := utils.InterfaceToString(key)
@@ -711,6 +742,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 				return
 			}
 			targetString := dataParams.GetString("@action")
+			action.observeActionType(targetString)
 			if targetString != "" {
 				if utils.StringArrayContains(actionNames, targetString) {
 					fixParams(data)
@@ -719,7 +751,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			} else {
 				target := dataParams.GetObject("@action")
 				for _, v := range target {
-					if utils.StringArrayContains(actionNames, utils.InterfaceToString(v)) {
+					candidate := utils.InterfaceToString(v)
+					action.observeActionType(candidate)
+					if utils.StringArrayContains(actionNames, candidate) {
 						fixParams(data)
 						return
 					}
@@ -864,10 +898,11 @@ func NewSimpleAction(name string, params aitool.InvokeParams) *Action {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	return &Action{
-		name:         name,
-		params:       params,
-		barrier:      utils.NewCondBarrierContext(ctx),
-		streamFinish: ctx,
-		parseFinish:  ctx,
+		name:           name,
+		observedAction: name,
+		params:         params,
+		barrier:        utils.NewCondBarrierContext(ctx),
+		streamFinish:   ctx,
+		parseFinish:    ctx,
 	}
 }

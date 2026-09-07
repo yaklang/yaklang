@@ -1,7 +1,6 @@
 package scannode
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -18,8 +17,6 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/minio/minio-go/v7"
-	minioCreds "github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,12 +31,61 @@ type SSAArtifactUploadConfig struct {
 	Bucket   string
 	Region   string
 	UseSSL   bool
+	// TLSVerify is retained for input compatibility. Object-store TLS is
+	// verified by default; use AllowInsecureTLS only for an explicitly trusted
+	// development endpoint, or configure TLSCAFile for a private CA.
+	TLSVerify        bool
+	AllowInsecureTLS bool
+	TLSCAFile        string
+	AllowHTTP        bool
+	VirtualHostStyle bool
 
-	STSAccessKey    string
-	STSSecretKey    string
-	STSSessionToken string
+	// These exported string fields preserve the pre-existing Go API for callers
+	// that build or inspect configs with dynamic strings. String, GoString, and
+	// JSON formatting on the containing config redact them; request signing
+	// converts them to the internal redacting value.
+	STSAccessKey    string `json:"-"`
+	STSSecretKey    string `json:"-"`
+	STSSessionToken string `json:"-"`
 	STSExpiresAt    int64
 }
+
+func (cfg *SSAArtifactUploadConfig) accessKeySecret() secretValue {
+	if cfg == nil {
+		return ""
+	}
+	return newSecretValue(cfg.STSAccessKey)
+}
+
+func (cfg *SSAArtifactUploadConfig) secretKeySecret() secretValue {
+	if cfg == nil {
+		return ""
+	}
+	return newSecretValue(cfg.STSSecretKey)
+}
+
+func (cfg *SSAArtifactUploadConfig) sessionTokenSecret() secretValue {
+	if cfg == nil {
+		return ""
+	}
+	return newSecretValue(cfg.STSSessionToken)
+}
+
+func (cfg *SSAArtifactUploadConfig) setSTSCredentials(accessKey, secretKey, sessionToken string) {
+	if cfg == nil {
+		return
+	}
+	cfg.STSAccessKey = accessKey
+	cfg.STSSecretKey = secretKey
+	cfg.STSSessionToken = sessionToken
+}
+
+func (cfg SSAArtifactUploadConfig) String() string {
+	return fmt.Sprintf("SSAArtifactUploadConfig{ObjectKey:%q Codec:%q Endpoint:%q Bucket:%q Region:%q UseSSL:%t TLSVerify:%t AllowInsecureTLS:%t TLSCAFile:%q AllowHTTP:%t VirtualHostStyle:%t STSAccessKey:[REDACTED] STSSecretKey:[REDACTED] STSSessionToken:[REDACTED] STSExpiresAt:%d}",
+		cfg.ObjectKey, cfg.Codec, cfg.Endpoint, cfg.Bucket, cfg.Region, cfg.UseSSL, cfg.TLSVerify, cfg.AllowInsecureTLS, cfg.TLSCAFile, cfg.AllowHTTP, cfg.VirtualHostStyle, cfg.STSExpiresAt)
+}
+
+func (cfg SSAArtifactUploadConfig) GoString() string { return cfg.String() }
 
 // ssaUploadMetrics accumulates upload-phase observability data across the
 // collector's lifetime. All fields are accessed under the collector's mutex.
@@ -90,15 +136,17 @@ type SSAArtifactCollector struct {
 	hasData bool
 	initErr error
 
-	continuousEnabled  bool
-	continuousCodec    string
-	continuousProvider ssaUploadConfigProvider
-	continuousStarted  bool
-	continuousInput    chan []byte
-	continuousDone     chan struct{}
-	continuousClosed   bool
-	continuousErr      error
-	continuousBuild    *SSAArtifactBuildResult
+	continuousEnabled       bool
+	continuousCodec         string
+	continuousProvider      ssaUploadConfigProvider
+	continuousStarted       bool
+	continuousInput         chan []byte
+	continuousDone          chan struct{}
+	continuousClosed        bool
+	continuousErr           error
+	continuousBuild         *SSAArtifactBuildResult
+	continuousFlushInterval time.Duration
+	uploadCtx               context.Context
 
 	uploadMetrics ssaUploadMetrics
 }
@@ -106,6 +154,9 @@ type SSAArtifactCollector struct {
 const (
 	defaultSSAMultipartPartSizeBytes = 16 * 1024 * 1024
 	minSSAMultipartPartSizeBytes     = 5 * 1024 * 1024
+	maxSSAMultipartPartSizeBytes     = 128 * 1024 * 1024
+	defaultSSAMultipartConcurrency   = 2
+	maxSSAMultipartConcurrency       = 2
 )
 
 type ssaUploadConfigProvider func(force bool) (*SSAArtifactUploadConfig, error)
@@ -119,6 +170,14 @@ func normalizeArtifactCodec(codec string) string {
 }
 
 func (c *SSAArtifactCollector) EnableContinuousUpload(codec string, provider ssaUploadConfigProvider) error {
+	return c.EnableContinuousUploadWithFlushInterval(codec, provider, 0)
+}
+
+func (c *SSAArtifactCollector) EnableContinuousUploadWithFlushInterval(
+	codec string,
+	provider ssaUploadConfigProvider,
+	flushInterval time.Duration,
+) error {
 	if c == nil {
 		return utils.Errorf("collector is nil")
 	}
@@ -130,6 +189,7 @@ func (c *SSAArtifactCollector) EnableContinuousUpload(codec string, provider ssa
 	c.continuousEnabled = true
 	c.continuousCodec = normalizeArtifactCodec(codec)
 	c.continuousProvider = provider
+	c.continuousFlushInterval = flushInterval
 	return nil
 }
 
@@ -144,6 +204,11 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 		codec = "zstd"
 	}
 	provider := c.continuousProvider
+	ctx := c.uploadCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	flushInterval := c.continuousFlushInterval
 	taskID := c.taskID
 	programName := c.programName
 	reportType := c.reportType
@@ -159,7 +224,7 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 	c.mu.Unlock()
 
 	go func() {
-		build, err := runContinuousSegmentedUpload(codec, provider, taskID, programName, reportType, input, func(uploadMs int64) {
+		build, err := runContinuousSegmentedUpload(ctx, codec, flushInterval, provider, taskID, programName, reportType, input, func(uploadMs int64) {
 			c.recordUploadMs(uploadMs)
 			c.recordSegment()
 		})
@@ -167,7 +232,7 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 		c.continuousBuild = build
 		c.continuousErr = err
 		if build != nil {
-			c.setUploadBytes(uint64(build.UncompressedSize), uint64(build.CompressedSize))
+			c.setUploadBytesLocked(uint64(build.UncompressedSize), uint64(build.CompressedSize))
 		}
 		close(done)
 		c.mu.Unlock()
@@ -199,6 +264,8 @@ func (c *SSAArtifactCollector) enqueueContinuousPayload(payload []byte) error {
 	select {
 	case input <- payload:
 		return nil
+	case <-c.uploadContext().Done():
+		return c.uploadContext().Err()
 	case <-done:
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -209,12 +276,27 @@ func (c *SSAArtifactCollector) enqueueContinuousPayload(payload []byte) error {
 	}
 }
 
+func (c *SSAArtifactCollector) uploadContext() context.Context {
+	if c == nil || c.uploadCtx == nil {
+		return context.Background()
+	}
+	return c.uploadCtx
+}
+
 func NewSSAArtifactCollector(taskID, runtimeID, subTaskID string) *SSAArtifactCollector {
+	return NewSSAArtifactCollectorWithContext(context.Background(), taskID, runtimeID, subTaskID)
+}
+
+func NewSSAArtifactCollectorWithContext(ctx context.Context, taskID, runtimeID, subTaskID string) *SSAArtifactCollector {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	c := &SSAArtifactCollector{
 		taskID:    taskID,
 		runtimeID: runtimeID,
 		subTaskID: subTaskID,
 		startedAt: time.Now(),
+		uploadCtx: ctx,
 	}
 	if err := c.initSpoolLocked(); err != nil {
 		c.initErr = err
@@ -263,9 +345,16 @@ func (c *SSAArtifactCollector) setUploadBytes(raw, compressed uint64) {
 		return
 	}
 	c.mu.Lock()
+	c.setUploadBytesLocked(raw, compressed)
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) setUploadBytesLocked(raw, compressed uint64) {
+	if c == nil {
+		return
+	}
 	c.uploadMetrics.RawBytes = raw
 	c.uploadMetrics.CompressedBytes = compressed
-	c.mu.Unlock()
 }
 
 func (c *SSAArtifactCollector) snapshotUploadMetrics() ssaUploadMetrics {
@@ -376,8 +465,15 @@ func (c *SSAArtifactCollector) HasData() bool {
 }
 
 func (c *SSAArtifactCollector) FinalizeUploadWithProvider(codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
+	return c.FinalizeUploadWithProviderContext(context.Background(), codec, provider)
+}
+
+func (c *SSAArtifactCollector) FinalizeUploadWithProviderContext(ctx context.Context, codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
 	if c == nil {
 		return nil, utils.Errorf("collector is nil")
+	}
+	if ctx == nil {
+		ctx = c.uploadContext()
 	}
 	c.mu.Lock()
 	hasData := c.hasData
@@ -429,11 +525,15 @@ func (c *SSAArtifactCollector) FinalizeUploadWithProvider(codec string, provider
 			_ = c.partsFile.Sync()
 		}
 		c.mu.Unlock()
-		return c.BuildAndUploadCompressedArtifactWithProvider(codec, provider)
+		return c.BuildAndUploadCompressedArtifactWithProviderContext(ctx, codec, provider)
 	}
 
 	if continuousEnabled && started && done != nil {
-		<-done
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 		c.mu.Lock()
 		err := c.continuousErr
 		base := c.continuousBuild
@@ -468,7 +568,7 @@ func (c *SSAArtifactCollector) FinalizeUploadWithProvider(codec string, provider
 		return result, nil
 	}
 
-	return c.BuildAndUploadCompressedArtifactWithProvider(codec, provider)
+	return c.BuildAndUploadCompressedArtifactWithProviderContext(ctx, codec, provider)
 }
 
 const (
@@ -500,7 +600,10 @@ func readSSASegmentFlushInterval() time.Duration {
 	return time.Duration(sec) * time.Second
 }
 
-func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte, onSegment func(uploadMs int64)) (*SSAArtifactBuildResult, error) {
+func runContinuousSegmentedUpload(ctx context.Context, codec string, customFlushInterval time.Duration, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte, onSegment func(uploadMs int64)) (*SSAArtifactBuildResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if provider == nil {
 		return nil, utils.Errorf("empty upload config provider")
 	}
@@ -508,15 +611,23 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 	if err != nil {
 		return nil, err
 	}
-	if err := validateSSAUploadConfig(baseCfg); err != nil {
+	if _, err := validateSSAUploadConfig(baseCfg); err != nil {
 		return nil, err
 	}
+	session, err := newSSAObjectStoreUploadSession(provider, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
 	segmentPrefix, manifestKey := deriveSSAContinuousObjectKeys(strings.TrimSpace(baseCfg.ObjectKey))
 	segmentMaxBytes := readSSASegmentMaxBytes()
 	if segmentMaxBytes <= 0 {
 		segmentMaxBytes = defaultSSASegmentMaxBytes
 	}
-	flushInterval := readSSASegmentFlushInterval()
+	flushInterval := customFlushInterval
+	if flushInterval <= 0 {
+		flushInterval = readSSASegmentFlushInterval()
+	}
 	if flushInterval <= 0 {
 		flushInterval = time.Duration(defaultSSASegmentFlushSec) * time.Second
 	}
@@ -573,7 +684,7 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 		}
 		segmentKey := ppath.Join(segmentPrefix, fmt.Sprintf("segment-%06d.ndjson.%s", seq, codecExt(uploadCodec)))
 		uploadStart := time.Now()
-		if err := uploadSSAArtifactFileWithObjectKey(compPath, compressedSize, segmentKey, provider); err != nil {
+		if _, err := session.uploadFile(ctx, compPath, compressedSize, segmentKey); err != nil {
 			return err
 		}
 		uploadMS := time.Since(uploadStart).Milliseconds()
@@ -608,6 +719,8 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 loop:
 	for {
 		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		case chunk, ok := <-input:
 			if !ok {
 				if err := flushSegment(); err != nil {
@@ -664,7 +777,7 @@ loop:
 	if err != nil {
 		return nil, err
 	}
-	if err := uploadSSAArtifactBytesWithObjectKey(manifestRaw, manifestKey, provider); err != nil {
+	if _, err := session.uploadBytes(ctx, manifestRaw, manifestKey); err != nil {
 		return nil, err
 	}
 	log.Infof("ssa artifact manifest uploaded task=%s key=%s segments=%d total_raw=%d total_compressed=%d",
@@ -747,9 +860,9 @@ func compressSSAArtifactFile(rawPath, compressedPath, codec string) (int64, stri
 	return st.Size(), hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func uploadSSAArtifactFileWithObjectKey(path string, size int64, objectKey string, provider ssaUploadConfigProvider) error {
+func uploadSSAArtifactFileWithObjectKey(ctx context.Context, path string, size int64, objectKey string, provider ssaUploadConfigProvider) error {
 	tmp := &SSAArtifactCollector{}
-	return tmp.UploadBySTSWithProvider(path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
+	return tmp.UploadBySTSWithProviderContext(ctx, path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
 		cfg, err := provider(force)
 		if err != nil {
 			return nil, err
@@ -760,7 +873,7 @@ func uploadSSAArtifactFileWithObjectKey(path string, size int64, objectKey strin
 	})
 }
 
-func uploadSSAArtifactBytesWithObjectKey(payload []byte, objectKey string, provider ssaUploadConfigProvider) error {
+func uploadSSAArtifactBytesWithObjectKey(ctx context.Context, payload []byte, objectKey string, provider ssaUploadConfigProvider) error {
 	tmpFile, err := os.CreateTemp("", "ssa-manifest-*.json")
 	if err != nil {
 		return err
@@ -774,7 +887,7 @@ func uploadSSAArtifactBytesWithObjectKey(payload []byte, objectKey string, provi
 	if err := tmpFile.Close(); err != nil {
 		return err
 	}
-	return uploadSSAArtifactFileWithObjectKey(path, int64(len(payload)), objectKey, provider)
+	return uploadSSAArtifactFileWithObjectKey(ctx, path, int64(len(payload)), objectKey, provider)
 }
 
 func (c *SSAArtifactCollector) BuildCompressedArtifact(codec string) (*SSAArtifactBuildResult, error) {
@@ -882,8 +995,15 @@ func (c *SSAArtifactCollector) BuildCompressedArtifact(codec string) (*SSAArtifa
 }
 
 func (c *SSAArtifactCollector) BuildAndUploadCompressedArtifactWithProvider(codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
+	return c.BuildAndUploadCompressedArtifactWithProviderContext(context.Background(), codec, provider)
+}
+
+func (c *SSAArtifactCollector) BuildAndUploadCompressedArtifactWithProviderContext(ctx context.Context, codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
 	if provider == nil {
 		return nil, utils.Errorf("empty upload config provider")
+	}
+	if ctx == nil {
+		ctx = c.uploadContext()
 	}
 	c.mu.Lock()
 	if c.initErr != nil {
@@ -926,211 +1046,84 @@ func (c *SSAArtifactCollector) BuildAndUploadCompressedArtifactWithProvider(code
 		_ = in.Close()
 		return nil, err
 	}
-	if err := validateSSAUploadConfig(cfg); err != nil {
+	if _, err := validateSSAUploadConfig(cfg); err != nil {
 		_ = in.Close()
 		return nil, err
 	}
-	baseBucket := strings.TrimSpace(cfg.Bucket)
-	baseObjectKey := strings.TrimSpace(cfg.ObjectKey)
-	uploadOpts := minio.PutObjectOptions{ContentType: "application/octet-stream"}
-	partSize := readSSAMultipartPartSize()
+	objectKey := strings.TrimSpace(cfg.ObjectKey)
 	actualCodec := normalizeArtifactCodec(codec)
-
-	var (
-		uploadID string
-		core     *minio.Core
-	)
-	for attempt := 0; attempt < 2; attempt++ {
-		curCfg, e := provider(attempt == 1)
-		if e != nil {
-			_ = in.Close()
-			return nil, e
-		}
-		if strings.TrimSpace(curCfg.Bucket) != baseBucket || strings.TrimSpace(curCfg.ObjectKey) != baseObjectKey {
-			_ = in.Close()
-			return nil, utils.Errorf("upload target changed during sts refresh")
-		}
-		client, e := buildSSAUploadClient(curCfg)
-		if e != nil {
-			_ = in.Close()
-			return nil, e
-		}
-		tmpCore := &minio.Core{Client: client}
-		uid, e := tmpCore.NewMultipartUpload(context.Background(), baseBucket, baseObjectKey, uploadOpts)
-		if e == nil {
-			core = tmpCore
-			uploadID = uid
-			break
-		}
-		if !isSSACredentialError(e) || attempt > 0 {
-			_ = in.Close()
-			return nil, e
-		}
-	}
-	if uploadID == "" || core == nil {
+	session, err := newSSAObjectStoreUploadSession(provider, c.recordRetry)
+	if err != nil {
 		_ = in.Close()
-		return nil, utils.Errorf("new multipart upload failed")
+		return nil, err
 	}
-	abort := true
-	defer func() {
-		if abort {
-			_ = core.AbortMultipartUpload(context.Background(), baseBucket, baseObjectKey, uploadID)
-		}
-	}()
+	defer session.Close()
 
-	pr, pw := io.Pipe()
+	pipeReader, pipeWriter := io.Pipe()
 	compressErrCh := make(chan error, 1)
 	go func() {
-		defer close(compressErrCh)
-		defer func() {
-			_ = in.Close()
-		}()
+		defer in.Close()
 		var copyErr error
 		switch actualCodec {
 		case "zstd":
-			zw, err := zstd.NewWriter(pw, zstd.WithEncoderLevel(zstd.SpeedDefault))
-			if err != nil {
-				_ = pw.CloseWithError(err)
-				compressErrCh <- err
+			writer, writerErr := zstd.NewWriter(pipeWriter, zstd.WithEncoderLevel(zstd.SpeedDefault))
+			if writerErr != nil {
+				_ = pipeWriter.CloseWithError(writerErr)
+				compressErrCh <- writerErr
 				return
 			}
-			_, copyErr = io.Copy(zw, in)
-			if closeErr := zw.Close(); copyErr == nil {
+			_, copyErr = io.Copy(writer, in)
+			if closeErr := writer.Close(); copyErr == nil {
 				copyErr = closeErr
 			}
 		case "gzip":
-			gw := gzip.NewWriter(pw)
-			_, copyErr = io.Copy(gw, in)
-			if closeErr := gw.Close(); copyErr == nil {
+			writer := gzip.NewWriter(pipeWriter)
+			_, copyErr = io.Copy(writer, in)
+			if closeErr := writer.Close(); copyErr == nil {
 				copyErr = closeErr
 			}
 		case "identity":
-			_, copyErr = io.Copy(pw, in)
+			_, copyErr = io.Copy(pipeWriter, in)
 		default:
 			copyErr = utils.Errorf("unsupported artifact codec: %s", actualCodec)
 		}
 		if copyErr != nil {
-			_ = pw.CloseWithError(copyErr)
-			compressErrCh <- copyErr
-			return
+			_ = pipeWriter.CloseWithError(copyErr)
+		} else {
+			_ = pipeWriter.Close()
 		}
-		compressErrCh <- nil
-		_ = pw.Close()
+		compressErrCh <- copyErr
 	}()
 
-	defer pr.Close()
-	buf := make([]byte, partSize)
-	partNo := 1
-	var (
-		completeParts    []minio.CompletePart
-		compressedSize   int64
-		compressedHasher = sha256.New()
-	)
-
-	for {
-		n, readErr := io.ReadFull(pr, buf)
-		if n > 0 {
-			chunk := buf[:n]
-			_, _ = compressedHasher.Write(chunk)
-			compressedSize += int64(n)
-
-			var part minio.ObjectPart
-			var partErr error
-			for attempt := 0; attempt < 2; attempt++ {
-				curCfg, e := provider(attempt == 1)
-				if e != nil {
-					return nil, e
-				}
-				if strings.TrimSpace(curCfg.Bucket) != baseBucket || strings.TrimSpace(curCfg.ObjectKey) != baseObjectKey {
-					return nil, utils.Errorf("upload target changed during sts refresh")
-				}
-				client, e := buildSSAUploadClient(curCfg)
-				if e != nil {
-					return nil, e
-				}
-				core = &minio.Core{Client: client}
-				part, partErr = core.PutObjectPart(
-					context.Background(),
-					baseBucket,
-					baseObjectKey,
-					uploadID,
-					partNo,
-					bytes.NewReader(chunk),
-					int64(n),
-					minio.PutObjectPartOptions{},
-				)
-				if partErr == nil {
-					break
-				}
-				if !isSSACredentialError(partErr) || attempt > 0 {
-					return nil, partErr
-				}
-			}
-			completeParts = append(completeParts, minio.CompletePart{
-				PartNumber:     part.PartNumber,
-				ETag:           part.ETag,
-				ChecksumCRC32:  part.ChecksumCRC32,
-				ChecksumCRC32C: part.ChecksumCRC32C,
-				ChecksumSHA1:   part.ChecksumSHA1,
-				ChecksumSHA256: part.ChecksumSHA256,
-			})
-			partNo++
-		}
-
-		if readErr == io.EOF {
-			break
-		}
-		if readErr == io.ErrUnexpectedEOF {
-			break
-		}
-		if readErr != nil {
-			return nil, readErr
-		}
+	uploadStart := time.Now()
+	stats, uploadErr := session.upload(ctx, pipeReader, -1, objectKey)
+	_ = pipeReader.CloseWithError(uploadErr)
+	compressErr := <-compressErrCh
+	uploadMS := time.Since(uploadStart).Milliseconds()
+	c.recordUploadMs(uploadMS)
+	if uploadErr != nil {
+		return nil, uploadErr
 	}
-	if compressErr := <-compressErrCh; compressErr != nil {
+	if compressErr != nil {
 		return nil, compressErr
 	}
+	log.Infof("ssa artifact stream uploaded task=%s key=%s raw=%d stored=%d sha256=%s parts=%d request_id=%s duration_ms=%d",
+		c.taskID, objectKey, uncompressedSize, stats.Bytes, stats.SHA256, stats.Parts, stats.RequestID, uploadMS)
 
-	if len(completeParts) == 0 {
-		return nil, utils.Errorf("no multipart parts uploaded")
-	}
-
-	for attempt := 0; attempt < 2; attempt++ {
-		curCfg, e := provider(attempt == 1)
-		if e != nil {
-			return nil, e
-		}
-		if strings.TrimSpace(curCfg.Bucket) != baseBucket || strings.TrimSpace(curCfg.ObjectKey) != baseObjectKey {
-			return nil, utils.Errorf("upload target changed during sts refresh")
-		}
-		client, e := buildSSAUploadClient(curCfg)
-		if e != nil {
-			return nil, e
-		}
-		core = &minio.Core{Client: client}
-		_, err = core.CompleteMultipartUpload(context.Background(), baseBucket, baseObjectKey, uploadID, completeParts, uploadOpts)
-		if err == nil {
-			abort = false
-			return &SSAArtifactBuildResult{
-				ObjectKey:        baseObjectKey,
-				Codec:            actualCodec,
-				ArtifactPath:     "",
-				ArtifactFormat:   spec.SSAArtifactFormatPartsNDJSONV1,
-				UncompressedSize: uncompressedSize,
-				CompressedSize:   compressedSize,
-				SHA256:           hex.EncodeToString(compressedHasher.Sum(nil)),
-				ProgramName:      programName,
-				ReportType:       reportType,
-				RiskCount:        riskCount,
-				FileCount:        fileCount,
-				FlowCount:        flowCount,
-			}, nil
-		}
-		if !isSSACredentialError(err) || attempt > 0 {
-			return nil, err
-		}
-	}
-	return nil, utils.Errorf("complete multipart upload failed")
+	return &SSAArtifactBuildResult{
+		ObjectKey:        objectKey,
+		Codec:            actualCodec,
+		ArtifactPath:     "",
+		ArtifactFormat:   spec.SSAArtifactFormatPartsNDJSONV1,
+		UncompressedSize: uncompressedSize,
+		CompressedSize:   stats.Bytes,
+		SHA256:           stats.SHA256,
+		ProgramName:      programName,
+		ReportType:       reportType,
+		RiskCount:        riskCount,
+		FileCount:        fileCount,
+		FlowCount:        flowCount,
+	}, nil
 }
 
 func readSSAMultipartPartSize() int64 {
@@ -1142,270 +1135,80 @@ func readSSAMultipartPartSize() int64 {
 	if err != nil || mb <= 0 {
 		return defaultSSAMultipartPartSizeBytes
 	}
-	size := mb * 1024 * 1024
-	if size < minSSAMultipartPartSizeBytes {
+	if mb >= maxSSAMultipartPartSizeBytes/(1024*1024) {
+		return maxSSAMultipartPartSizeBytes
+	}
+	if mb <= minSSAMultipartPartSizeBytes/(1024*1024) {
 		return minSSAMultipartPartSizeBytes
 	}
+	size := mb * 1024 * 1024
 	return size
 }
 
-func isSSACredentialError(err error) bool {
-	if err == nil {
-		return false
+func readSSAMultipartConcurrency() int {
+	raw := strings.TrimSpace(os.Getenv("SCANNODE_SSA_MULTIPART_CONCURRENCY"))
+	if raw == "" {
+		return defaultSSAMultipartConcurrency
 	}
-	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	if msg == "" {
-		return false
+	concurrency, err := strconv.Atoi(raw)
+	if err != nil {
+		return defaultSSAMultipartConcurrency
 	}
-	keys := []string{
-		"expiredtoken",
-		"token expired",
-		"signaturedoesnotmatch",
-		"invalidtoken",
-		"accessdenied",
-		"sts credentials expired",
+	if concurrency < 1 {
+		return 1
 	}
-	for _, key := range keys {
-		if strings.Contains(msg, key) {
-			return true
-		}
+	if concurrency > maxSSAMultipartConcurrency {
+		return maxSSAMultipartConcurrency
 	}
-	return false
-}
-
-func validateSSAUploadConfig(cfg *SSAArtifactUploadConfig) error {
-	if cfg == nil {
-		return utils.Errorf("empty upload config")
-	}
-	endpoint := strings.TrimSpace(cfg.Endpoint)
-	bucket := strings.TrimSpace(cfg.Bucket)
-	objectKey := strings.TrimSpace(cfg.ObjectKey)
-	if endpoint == "" || bucket == "" || objectKey == "" {
-		return utils.Errorf("upload config missing endpoint/bucket/object_key")
-	}
-	accessKey := strings.TrimSpace(cfg.STSAccessKey)
-	secretKey := strings.TrimSpace(cfg.STSSecretKey)
-	if accessKey == "" || secretKey == "" {
-		return utils.Errorf("sts credentials missing")
-	}
-	return nil
-}
-
-func buildSSAUploadClient(cfg *SSAArtifactUploadConfig) (*minio.Client, error) {
-	if err := validateSSAUploadConfig(cfg); err != nil {
-		return nil, err
-	}
-	return minio.New(strings.TrimSpace(cfg.Endpoint), &minio.Options{
-		Creds:  minioCreds.NewStaticV4(strings.TrimSpace(cfg.STSAccessKey), strings.TrimSpace(cfg.STSSecretKey), strings.TrimSpace(cfg.STSSessionToken)),
-		Secure: cfg.UseSSL,
-		Region: strings.TrimSpace(cfg.Region),
-	})
+	return concurrency
 }
 
 func (c *SSAArtifactCollector) UploadBySTS(cfg *SSAArtifactUploadConfig, artifactPath string, size int64) error {
-	return c.UploadBySTSWithProvider(artifactPath, size, func(force bool) (*SSAArtifactUploadConfig, error) {
+	return c.UploadBySTSContext(context.Background(), cfg, artifactPath, size)
+}
+
+func (c *SSAArtifactCollector) UploadBySTSContext(ctx context.Context, cfg *SSAArtifactUploadConfig, artifactPath string, size int64) error {
+	return c.UploadBySTSWithProviderContext(ctx, artifactPath, size, func(force bool) (*SSAArtifactUploadConfig, error) {
 		_ = force
 		return cfg, nil
 	})
 }
 
 func (c *SSAArtifactCollector) UploadBySTSWithProvider(artifactPath string, size int64, provider ssaUploadConfigProvider) error {
+	return c.UploadBySTSWithProviderContext(context.Background(), artifactPath, size, provider)
+}
+
+func (c *SSAArtifactCollector) UploadBySTSWithProviderContext(ctx context.Context, artifactPath string, size int64, provider ssaUploadConfigProvider) error {
 	if provider == nil {
 		return utils.Errorf("empty upload config provider")
+	}
+	if ctx == nil {
+		ctx = c.uploadContext()
 	}
 	cfg, err := provider(false)
 	if err != nil {
 		return err
 	}
-	if err := validateSSAUploadConfig(cfg); err != nil {
+	if _, err := validateSSAUploadConfig(cfg); err != nil {
 		return err
 	}
-	f, err := os.Open(artifactPath)
+	session, err := newSSAObjectStoreUploadSession(provider, c.recordRetry)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer session.Close()
 
-	if size <= 0 {
-		if st, err := f.Stat(); err == nil {
-			size = st.Size()
-		}
+	uploadStart := time.Now()
+	stats, err := session.uploadFile(ctx, artifactPath, size, strings.TrimSpace(cfg.ObjectKey))
+	uploadMS := time.Since(uploadStart).Milliseconds()
+	c.recordUploadMs(uploadMS)
+	if err != nil {
+		log.Warnf("upload_attempt_failed task=%s key=%s duration_ms=%d error=%q", c.taskID, cfg.ObjectKey, uploadMS, err.Error())
+		return err
 	}
-
-	if size <= 0 {
-		return utils.Errorf("artifact size invalid")
-	}
-	partSize := readSSAMultipartPartSize()
-	if size <= partSize {
-		for attempt := 0; attempt < 2; attempt++ {
-			if attempt > 0 {
-				c.recordRetry()
-			}
-			uploadStart := time.Now()
-			cfg, err := provider(attempt == 1)
-			if err != nil {
-				return err
-			}
-			client, err := buildSSAUploadClient(cfg)
-			if err != nil {
-				return err
-			}
-			if _, err := f.Seek(0, io.SeekStart); err != nil {
-				return err
-			}
-			info, err := client.PutObject(context.Background(),
-				strings.TrimSpace(cfg.Bucket),
-				strings.TrimSpace(cfg.ObjectKey),
-				f,
-				size,
-				minio.PutObjectOptions{ContentType: "application/octet-stream"})
-			uploadMs := time.Since(uploadStart).Milliseconds()
-			c.recordUploadMs(uploadMs)
-			if err == nil {
-				log.Infof("upload_attempt task=%s attempt=%d key=%s duration_ms=%d", c.taskID, attempt, cfg.ObjectKey, uploadMs)
-				if info.Size > 0 && info.Size != size {
-					return utils.Errorf("uploaded size mismatch expect=%d got=%d", size, info.Size)
-				}
-				return nil
-			}
-			log.Warnf("upload_attempt_failed task=%s attempt=%d key=%s duration_ms=%d error=%q", c.taskID, attempt, cfg.ObjectKey, uploadMs, err.Error())
-			if !isSSACredentialError(err) || attempt > 0 {
-				return err
-			}
-		}
-		return utils.Errorf("upload failed")
-	}
-
-	baseBucket := strings.TrimSpace(cfg.Bucket)
-	baseObjectKey := strings.TrimSpace(cfg.ObjectKey)
-	uploadOpts := minio.PutObjectOptions{ContentType: "application/octet-stream"}
-	var (
-		uploadID string
-		core     *minio.Core
-	)
-	for attempt := 0; attempt < 2; attempt++ {
-		curCfg, e := provider(attempt == 1)
-		if e != nil {
-			return e
-		}
-		if strings.TrimSpace(curCfg.Bucket) != baseBucket || strings.TrimSpace(curCfg.ObjectKey) != baseObjectKey {
-			return utils.Errorf("upload target changed during sts refresh")
-		}
-		client, e := buildSSAUploadClient(curCfg)
-		if e != nil {
-			return e
-		}
-		tmpCore := &minio.Core{Client: client}
-		uid, e := tmpCore.NewMultipartUpload(context.Background(), baseBucket, baseObjectKey, uploadOpts)
-		if e == nil {
-			core = tmpCore
-			uploadID = uid
-			break
-		}
-		if !isSSACredentialError(e) || attempt > 0 {
-			return e
-		}
-	}
-	if uploadID == "" || core == nil {
-		return utils.Errorf("new multipart upload failed")
-	}
-	abort := true
-	defer func() {
-		if abort {
-			_ = core.AbortMultipartUpload(context.Background(), baseBucket, baseObjectKey, uploadID)
-		}
-	}()
-
-	buf := make([]byte, partSize)
-	partNo := 1
-	var completeParts []minio.CompletePart
-	for {
-		n, readErr := io.ReadFull(f, buf)
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil && readErr != io.ErrUnexpectedEOF {
-			return readErr
-		}
-		if n <= 0 {
-			if readErr == io.ErrUnexpectedEOF {
-				break
-			}
-			continue
-		}
-
-		var part minio.ObjectPart
-		var partErr error
-		for attempt := 0; attempt < 2; attempt++ {
-			curCfg, e := provider(attempt == 1)
-			if e != nil {
-				return e
-			}
-			if strings.TrimSpace(curCfg.Bucket) != baseBucket || strings.TrimSpace(curCfg.ObjectKey) != baseObjectKey {
-				return utils.Errorf("upload target changed during sts refresh")
-			}
-			client, e := buildSSAUploadClient(curCfg)
-			if e != nil {
-				return e
-			}
-			core = &minio.Core{Client: client}
-			part, partErr = core.PutObjectPart(
-				context.Background(),
-				baseBucket,
-				baseObjectKey,
-				uploadID,
-				partNo,
-				bytes.NewReader(buf[:n]),
-				int64(n),
-				minio.PutObjectPartOptions{},
-			)
-			if partErr == nil {
-				break
-			}
-			if !isSSACredentialError(partErr) || attempt > 0 {
-				return partErr
-			}
-		}
-		completeParts = append(completeParts, minio.CompletePart{
-			PartNumber:     part.PartNumber,
-			ETag:           part.ETag,
-			ChecksumCRC32:  part.ChecksumCRC32,
-			ChecksumCRC32C: part.ChecksumCRC32C,
-			ChecksumSHA1:   part.ChecksumSHA1,
-			ChecksumSHA256: part.ChecksumSHA256,
-		})
-		partNo++
-		if readErr == io.ErrUnexpectedEOF {
-			break
-		}
-	}
-	if len(completeParts) == 0 {
-		return utils.Errorf("no multipart parts uploaded")
-	}
-
-	for attempt := 0; attempt < 2; attempt++ {
-		curCfg, e := provider(attempt == 1)
-		if e != nil {
-			return e
-		}
-		if strings.TrimSpace(curCfg.Bucket) != baseBucket || strings.TrimSpace(curCfg.ObjectKey) != baseObjectKey {
-			return utils.Errorf("upload target changed during sts refresh")
-		}
-		client, e := buildSSAUploadClient(curCfg)
-		if e != nil {
-			return e
-		}
-		core = &minio.Core{Client: client}
-		_, err = core.CompleteMultipartUpload(context.Background(), baseBucket, baseObjectKey, uploadID, completeParts, uploadOpts)
-		if err == nil {
-			abort = false
-			return nil
-		}
-		if !isSSACredentialError(err) || attempt > 0 {
-			return err
-		}
-	}
-	return utils.Errorf("complete multipart upload failed")
+	log.Infof("upload_attempt task=%s key=%s bytes=%d sha256=%s parts=%d request_id=%s duration_ms=%d",
+		c.taskID, cfg.ObjectKey, stats.Bytes, stats.SHA256, stats.Parts, stats.RequestID, uploadMS)
+	return nil
 }
 
 func (c *SSAArtifactCollector) BuildReadyEvent(result *SSAArtifactBuildResult, totalLines int64, riskCountHint int64) *spec.SSAArtifactReadyEvent {

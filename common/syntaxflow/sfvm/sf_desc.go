@@ -2,6 +2,8 @@ package sfvm
 
 import (
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type SFDescKeyType string
@@ -23,6 +25,16 @@ const (
 	SFDescKeyType_Reference SFDescKeyType = "reference"
 	SFDescKeyType_Message   SFDescKeyType = "message"
 	SFDescKeyType_Name      SFDescKeyType = "name"
+	// SFDescKeyType_Mode selects execution backend: "source" → sfpattern (no SSA);
+	// empty / other → default sfvm on SSA.
+	SFDescKeyType_Mode SFDescKeyType = "mode"
+)
+
+const (
+	// RuleModeSource marks rules that scan source files without SSA IR (sfpattern).
+	RuleModeSource = "source"
+	// RuleModeSSA marks rules that run on SSA IR (default).
+	RuleModeSSA = "ssa"
 )
 
 func ValidDescItemKeyType(key string) SFDescKeyType {
@@ -55,9 +67,95 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 		return SFDescKeyType_Reference
 	case "message", "msg":
 		return SFDescKeyType_Message
+	case "mode", "engine", "exec_mode":
+		return SFDescKeyType_Mode
 	default:
 		return SFDescKeyType_Unknown
 	}
+}
+
+// IsSourceMode reports whether a mode string selects the sfpattern source scanner.
+func IsSourceMode(mode string) bool {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case RuleModeSource, "pattern", "sfpattern":
+		return true
+	default:
+		return false
+	}
+}
+
+// AppendRuleTag appends tag if not already present (pipe-separated).
+func AppendRuleTag(existing, tag string) string {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return existing
+	}
+	if existing == "" {
+		return tag
+	}
+	for _, part := range strings.Split(existing, "|") {
+		if strings.EqualFold(strings.TrimSpace(part), tag) {
+			return existing
+		}
+	}
+	return existing + "|" + tag
+}
+
+// RuleHasSourceMode reports whether a rule is tagged for source scanning.
+func RuleHasSourceMode(tag string, extra map[string]string) bool {
+	for _, part := range strings.Split(tag, "|") {
+		p := strings.TrimSpace(part)
+		if IsSourceMode(p) || strings.EqualFold(p, RuleModeSource) {
+			return true
+		}
+	}
+	if extra != nil {
+		if IsSourceMode(extra["mode"]) || IsSourceMode(extra["engine"]) || IsSourceMode(extra["exec_mode"]) {
+			return true
+		}
+	}
+	return false
+}
+
+// RuleIsSourceMode reports whether rule should run via sfpattern.
+func RuleIsSourceMode(rule *schema.SyntaxFlowRule, extra map[string]string) bool {
+	if rule != nil {
+		switch schema.ValidRuleMode(rule.Mode) {
+		case schema.SFR_MODE_SOURCE:
+			return true
+		case schema.SFR_MODE_SSA:
+			return false
+		}
+	}
+	return RuleHasSourceMode(ruleTag(rule), extra)
+}
+
+func ruleTag(rule *schema.SyntaxFlowRule) string {
+	if rule == nil {
+		return ""
+	}
+	return rule.Tag
+}
+
+// FrameIsSourceMode reports whether a compiled frame should run via sfpattern.
+func FrameIsSourceMode(frame *SFFrame) bool {
+	if frame == nil {
+		return false
+	}
+	rule := frame.GetRule()
+	if rule == nil {
+		return false
+	}
+	extra := map[string]string{}
+	for _, info := range frame.VerifyFsInfo {
+		if info == nil {
+			continue
+		}
+		for k, v := range info.rawDesc {
+			extra[k] = v
+		}
+	}
+	return RuleIsSourceMode(rule, extra)
 }
 
 // GetSupplyInfoDescKeyType 拿到所有desc item中，

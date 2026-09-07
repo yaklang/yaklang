@@ -59,9 +59,9 @@ func TestBuildToolCallReasonPrompt_IncludesRecentSteps(t *testing.T) {
 	prompt := buildToolCallReasonPrompt(tool, nil, task)
 
 	require.Contains(t, prompt, "Recent steps")
-	require.Contains(t, prompt, "- bash: success")
-	require.Contains(t, prompt, "- do_http_request: success")
-	require.Contains(t, prompt, "- grep: failed (no matches found)")
+	require.Contains(t, prompt, "- bash: completed")
+	require.Contains(t, prompt, "- do_http_request: completed")
+	require.Contains(t, prompt, "- grep: protocol-error (no matches found)")
 }
 
 func TestBuildRecentToolCallSummary_MaxItems(t *testing.T) {
@@ -127,7 +127,7 @@ func TestBuildRecentToolCallSummary_TruncatesLongError(t *testing.T) {
 	task.PushToolCallResult(&aitool.ToolResult{ID: 1, Name: "fail_tool", Success: false, Error: longErr})
 
 	summary := buildRecentToolCallSummary(task, 5)
-	require.Contains(t, summary, "fail_tool: failed")
+	require.Contains(t, summary, "fail_tool: protocol-error")
 	require.Contains(t, summary, "...")
 	require.Less(t, len(summary), 200)
 }

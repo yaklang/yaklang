@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Weak Encryption - Insufficient Key Size"
 	title_zh: "检测Java弱加密 - 密钥长度不足"
 	type: security
-	risk: '弱加密（Risky Crypt）'
+	risk: "weak-cryptography"
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
@@ -102,7 +102,7 @@ KeyPair keyPair = keyPairGenerator.generateKeyPair();
 3. **考虑使用更强的算法**
 对于需要更高性能或安全性的场景，可以考虑使用椭圆曲线密码学（ECC）等算法，其在相同的安全级别下通常使用更短的密钥长度。同时确保使用的ECC曲线也是安全的。
 SOLUTION
-	risk: "弱加密",
+	risk: "weak-cryptography",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -68,6 +69,19 @@ func (s *MCPServer) getProfileDatabase() *gorm.DB {
 		return s.profileDBProvider()
 	}
 	return s.profileDB
+}
+
+// getProjectDatabase resolves the project database at call time. Yakit can
+// switch projects while an MCP server is still running, so tool handlers must
+// not retain the handle that was current when the MCP server started.
+func (s *MCPServer) getProjectDatabase() *gorm.DB {
+	if s == nil {
+		return nil
+	}
+	if s.projectDBProvider != nil {
+		return s.projectDBProvider()
+	}
+	return s.projectDB
 }
 
 func marshalMCPHistoryValue(value any) (string, error) {
@@ -191,10 +205,14 @@ func (s *MCPServer) ServeHTTPCompat(addr, baseURL string) (err error) {
 }
 
 func (s *MCPServer) ServeStdio() (err error) {
+	return s.ServeStdioWithIO(os.Stdin, os.Stdout)
+}
+
+func (s *MCPServer) ServeStdioWithIO(stdin io.Reader, stdout io.Writer) (err error) {
 	if err = s.ensureLocalClient(); err != nil {
 		return err
 	}
-	return server.ServeStdio(s.server)
+	return server.ServeStdioWithIO(s.server, stdin, stdout)
 }
 
 func (s *MCPServer) closeBridgeClients() {

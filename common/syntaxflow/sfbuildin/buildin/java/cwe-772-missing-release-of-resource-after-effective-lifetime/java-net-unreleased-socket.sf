@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java Socket资源未释放"
 	title: "Check Java Socket Unreleased Resource"
-	risk:"资源泄漏",
+	risk:"resource-leak"
 	reference: <<<REFERENCE
 [CWE-772](https://cwe.mitre.org/data/definitions/772.html)
 [Java Socket 文档](https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html)
@@ -136,7 +136,7 @@ System.err.println("处理客户端连接时出错: " + e.getMessage());
 并且，确保在应用程序关闭时或不再需要监听时，正确关闭 `ServerSocket` 以及关联的线程池。
 ```
 SOLUTION
-	risk: "资源泄漏",
+	risk: "resource-leak",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

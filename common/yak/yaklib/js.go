@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dop251/goja"
-	"github.com/dop251/goja/ast"
-	"github.com/dop251/goja/parser"
-	"github.com/dop251/goja_nodejs/buffer"
-	"github.com/dop251/goja_nodejs/console"
-	"github.com/dop251/goja_nodejs/require"
 	"github.com/samber/lo"
+	"github.com/yaklang/goja"
+	"github.com/yaklang/goja/ast"
+	"github.com/yaklang/goja/nodejs/buffer"
+	"github.com/yaklang/goja/nodejs/console"
+	"github.com/yaklang/goja/nodejs/require"
+	"github.com/yaklang/goja/parser"
 	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -36,7 +36,7 @@ var (
 )
 
 var JSExports = map[string]interface{}{
-	"PoweredBy":            "github.com/dop251/goja",
+	"PoweredBy":            "github.com/yaklang/goja",
 	"New":                  _jsNewEngine,
 	"Run":                  _run,
 	"CallFunctionFromCode": _jsCallFuncFromCode,

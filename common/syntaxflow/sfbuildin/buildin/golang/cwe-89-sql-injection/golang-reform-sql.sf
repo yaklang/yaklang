@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Reform SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -56,7 +56,7 @@ log.Fatal(http.ListenAndServe(":8080", nil))
 DESC
 	rule_id: "b06e92a2-0ff3-40a0-966e-7f0e4fe05480"
 	title_zh: "检测Golang Reform SQL注入漏洞"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用 Reform 提供的参数化查询方法
@@ -238,7 +238,7 @@ DESC
 	type: "vuln",
 	title: "Golang Reform SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang Reform SQL注入漏洞",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "high",
 	message: "检测到Golang Reform SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }

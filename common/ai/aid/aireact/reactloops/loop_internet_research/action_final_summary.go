@@ -34,7 +34,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 		toolOpts,
 		streamFields,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-			loop.LoadingStatus("validating final summary parameters")
+			loop.UserStatus("正在确认研究结论是否完整", "Checking that the research conclusions are complete", aicommon.WithStatusCode("research.report.validating"))
 			summary := action.GetString("summary")
 			if summary == "" {
 				return utils.Error("summary is required")
@@ -42,7 +42,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			loop.LoadingStatus("generating final research report")
+			loop.UserStatus("正在整理研究报告", "Preparing the research report", aicommon.WithStatusCode("research.report.writing"))
 
 			summary := action.GetString("summary")
 			if summary == "" {

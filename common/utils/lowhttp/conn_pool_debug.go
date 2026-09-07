@@ -91,46 +91,71 @@ func (l *LowHttpConnPool) recordH2Tombstone(t h2ConnTombstone) {
 	l.h2Tombstones.push(t)
 }
 
-// EnableConnPoolDebug turns the periodic connection-pool status printer on
-// (true) or off (false).  When turned on, the first subsequent call to
-// getIdleConn will spawn a background goroutine that logs pool state every 5
-// seconds until the pool's context is cancelled.
+// EnableConnPoolDebug turns the periodic connection-pool status printer on or
+// off. Disabling stops the goroutine immediately; enabling can start it again.
 func (l *LowHttpConnPool) EnableConnPoolDebug(on bool) {
+	if l == nil {
+		return
+	}
 	if on {
 		atomic.StoreInt32(&l.debugEnabled, 1)
+		l.startDebugPrinter()
 	} else {
 		atomic.StoreInt32(&l.debugEnabled, 0)
 	}
+	l.notifyDebugPrinter()
 }
 
-// startDebugPrinter is called on every getIdleConn invocation.  At most one
-// printer goroutine is ever started (guarded by debugOnce).  The goroutine
-// exits automatically when the pool's context is cancelled.
-func (l *LowHttpConnPool) startDebugPrinter() {
-	if atomic.LoadInt32(&l.debugEnabled) == 0 {
-		return // debug not enabled, fast-exit without consuming the once
+func (l *LowHttpConnPool) notifyDebugPrinter() {
+	if l == nil || l.debugNotify == nil {
+		return
 	}
-	l.debugOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			log.Infof("[connpool-debug] printer started (interval=5s)")
-			for {
-				select {
-				case <-l.ctx.Done():
-					log.Infof("[connpool-debug] printer stopped (pool context cancelled)")
-					return
-				case <-ticker.C:
-					if atomic.LoadInt32(&l.debugEnabled) == 0 {
-						// Debug was disabled at runtime; keep goroutine alive so
-						// it resumes if re-enabled without a new once.Do call.
-						continue
-					}
-					l.debugState()
-				}
+	select {
+	case l.debugNotify <- struct{}{}:
+	default:
+	}
+}
+
+// startDebugPrinter is called on enable and on every getIdleConn invocation.
+// The CAS permits at most one printer while allowing a stopped printer to be
+// restarted later.
+func (l *LowHttpConnPool) startDebugPrinter() {
+	if l == nil || atomic.LoadInt32(&l.debugEnabled) == 0 {
+		return
+	}
+	if !atomic.CompareAndSwapInt32(&l.debugRunning, 0, 1) {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		defer func() {
+			atomic.StoreInt32(&l.debugRunning, 0)
+			// Close the enable/exit race: if debug was re-enabled while the
+			// old goroutine was stopping, make sure a replacement is started.
+			if atomic.LoadInt32(&l.debugEnabled) == 1 && !l.contextDone() {
+				l.startDebugPrinter()
 			}
 		}()
-	})
+		log.Infof("[connpool-debug] printer started (interval=5s)")
+		for {
+			select {
+			case <-l.ctx.Done():
+				log.Infof("[connpool-debug] printer stopped (pool context cancelled)")
+				return
+			case <-l.debugNotify:
+				if atomic.LoadInt32(&l.debugEnabled) == 0 {
+					log.Infof("[connpool-debug] printer stopped (disabled)")
+					return
+				}
+			case <-ticker.C:
+				if atomic.LoadInt32(&l.debugEnabled) == 0 {
+					return
+				}
+				l.debugState()
+			}
+		}
+	}()
 }
 
 // debugState snapshots the pool and emits a structured log entry describing

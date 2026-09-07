@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/contextmenu"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
@@ -13,6 +14,18 @@ func init() {
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeMitm, MitmGetTypeSSAOpt)
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeCodec, CodecSSAOpt)
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypePortScan, ProtScanSSAOpt)
+	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeContextMenu, ContextMenuSSAOpt)
+}
+
+func ContextMenuSSAOpt() []ssaconfig.Option {
+	return []ssaconfig.Option{
+		ssaapi.WithDefineFunc(map[string]any{
+			contextmenu.HookHistorySingle: func(*contextmenu.ActionContext, *schema.HTTPFlow) any { return nil },
+			contextmenu.HookHistoryMulti:  func(*contextmenu.ActionContext, []*schema.HTTPFlow) any { return nil },
+			contextmenu.HookHTTPPacket:    func(*contextmenu.ActionContext, []byte, []byte) any { return nil },
+		}),
+		ssaapi.WithExternInfo("plugin-type:context-menu"),
+	}
 }
 
 func MitmGetTypeSSAOpt() []ssaconfig.Option {

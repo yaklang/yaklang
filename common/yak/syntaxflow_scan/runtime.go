@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
 	"github.com/yaklang/yaklang/common/schema"
-	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	sfvm "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -125,8 +125,8 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
-	// 语言匹配检查
-	if !m.Config.GetScanIgnoreLanguage() {
+	// 语言匹配检查（source 模式规则按文件 glob 过滤，不强制语言对齐）
+	if !m.Config.GetScanIgnoreLanguage() && !sfvm.RuleIsSourceMode(rule, nil) {
 		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
 			m.markRuleSkipped()
 			return
@@ -176,9 +176,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 				targetName, baseWorkLimit, workLimit, totalLines)
 		}
 	}
-	var workBudget *sf.RuleWorkBudget
+	var workBudget *sfvm.RuleWorkBudget
 	if workLimit > 0 {
-		workBudget = sf.NewRuleWorkBudget(workLimit, ruleCancel)
+		workBudget = sfvm.NewRuleWorkBudget(workLimit, ruleCancel)
 	}
 
 	// 将查询逻辑包装到函数中
@@ -190,6 +190,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
 				m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, f, info)
+			}),
+			ssaapi.QueryWithSourceResultCallback(func(batch *ssaapi.SyntaxFlowResult) {
+				if batch != nil {
+					m.notifyResult(batch)
+				}
 			}),
 			ssaapi.QueryWithSave(m.kind),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
@@ -304,6 +309,19 @@ func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 			Result: res,
 		})
 	}
+}
+
+// notifyDone 在任务真正结束后补发一次终态结果回调。source 流式批处理会在
+// 规则完成计数之前同步触发 notifyResult，导致调用方只能看到 executing；
+// 这里在 Stop() 之前显式补发 done，保证结果回调一定能收到终态。
+func (m *scanManager) notifyDone() {
+	if m == nil || m.Config == nil || m.Config.resultCallback == nil {
+		return
+	}
+	m.Config.resultCallback(&ScanResult{
+		TaskID: m.taskID,
+		Status: m.status,
+	})
 }
 
 func (m *scanManager) saveReport() {

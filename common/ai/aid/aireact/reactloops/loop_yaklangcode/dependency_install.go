@@ -53,7 +53,7 @@ func ensureDependencies(
 			if s := createDocumentSearcher(""); s != nil {
 				holder.setGrep(s)
 				loop.Set("aikb_available", "true")
-				reactloops.EmitStatus(loop, "Yaklang 代码知识库就绪 / Yaklang code KB ready")
+				reactloops.EmitStatusI18n(loop, "Yaklang 代码知识库就绪", "Yaklang code KB ready")
 			} else {
 				log.Warnf("yaklang-aikb installed but grep searcher rebuild failed")
 			}
@@ -75,7 +75,7 @@ func ensureDependencies(
 			} else if ragSys != nil {
 				holder.setRAG(ragSys)
 				loop.Set("aikb_available", "true")
-				reactloops.EmitStatus(loop, "Yaklang 语义知识库就绪 / Yaklang semantic KB ready")
+				reactloops.EmitStatusI18n(loop, "Yaklang 语义知识库就绪", "Yaklang semantic KB ready")
 			}
 		}
 	}
@@ -98,7 +98,11 @@ func installThirdpartyBinWithProgress(
 		return true
 	}
 
-	reactloops.EmitStatus(loop, fmt.Sprintf("准备下载 %s ... / Preparing to download %s ...", displayName, name))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("准备下载 %s …", displayName),
+		fmt.Sprintf("Preparing to download %s…", name),
+	)
 
 	lastPct := -1.0
 	opts := &thirdparty_bin.InstallOptions{
@@ -109,18 +113,23 @@ func installThirdpartyBinWithProgress(
 				return
 			}
 			lastPct = progress
-			reactloops.EmitStatus(loop, fmt.Sprintf(
-				"下载 %s %.0f%% / Downloading %s %.0f%%",
-				displayName, progress*100, name, progress*100,
-			))
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("正在下载 %s，进度 %.0f%%", displayName, progress*100),
+				fmt.Sprintf("Downloading %s: %.0f%%", name, progress*100),
+			)
+
 		},
 	}
 
 	if err := thirdparty_bin.Install(name, opts); err != nil {
 		log.Warnf("auto-install %s failed: %v (degraded mode)", name, err)
-		reactloops.EmitStatus(loop, fmt.Sprintf(
-			"%s 下载失败, 降级运行 / %s download failed, running in degraded mode", displayName, name,
-		))
+		reactloops.EmitStatusI18n(
+			loop,
+			fmt.Sprintf("%s 下载失败，将以兼容模式继续", displayName),
+			fmt.Sprintf("%s download failed; continuing in compatibility mode", name),
+		)
+
 		return false
 	}
 
@@ -161,7 +170,7 @@ func ensureYakSkillsInstalled(r aicommon.AIInvokeRuntime, loop *reactloops.ReAct
 		return
 	}
 	if !alreadyInstalled {
-		reactloops.EmitStatus(loop, "Yak 技能包就绪 / Yak skills pack ready")
+		reactloops.EmitStatusI18n(loop, "Yak 技能包就绪", "Yak skills pack ready")
 	}
 	log.Infof("yak-skills refreshed into skill loader from: %s", skillsDir)
 }

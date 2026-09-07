@@ -17,11 +17,13 @@ func newEngineForTerminalTest(t *testing.T) *AIEngine {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
+	epm := aicommon.NewEndpointManagerContext(ctx)
 	return &AIEngine{
-		ctx:           ctx,
-		cancel:        cancel,
-		activeTasks:   make(map[string]aicommon.AITaskState),
-		taskEndpoints: make(map[string]*aicommon.Endpoint),
+		ctx:              ctx,
+		cancel:           cancel,
+		activeTasks:      make(map[string]aicommon.AITaskState),
+		allTasksEndpoint: epm.CreateEndpoint(),
+		taskEndpoints:    make(map[string]*aicommon.Endpoint),
 	}
 }
 
@@ -68,18 +70,27 @@ func TestProcessOutputEventAcceptsMixedTaskMetadata(t *testing.T) {
 func TestWaitTaskFinishByTaskNameFastPath(t *testing.T) {
 	e := newEngineForTerminalTest(t)
 	e.activeTasks["task-aborted"] = aicommon.AITaskState_Aborted
+	e.activeTasks["task-skipped"] = aicommon.AITaskState_Skipped
 
 	cases := []struct {
 		name    string
 		taskID  string
 		wantErr error // nil means expect a non-nil error (guards), only checked when set
+		wantNil bool
 	}{
-		{"aborted returns ErrAITaskAborted", "task-aborted", ErrAITaskAborted},
-		{"empty taskID errors", "", nil},
+		{"aborted returns ErrAITaskAborted", "task-aborted", ErrAITaskAborted, false},
+		{"skipped returns successfully", "task-skipped", nil, true},
+		{"empty taskID errors", "", nil, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := e.WaitTaskFinishByTaskName(tc.taskID)
+			if tc.wantNil {
+				if err != nil {
+					t.Fatalf("expected nil, got %v", err)
+				}
+				return
+			}
 			if tc.wantErr != nil {
 				if !errors.Is(err, tc.wantErr) {
 					t.Fatalf("expected %v, got %v", tc.wantErr, err)
@@ -90,6 +101,138 @@ func TestWaitTaskFinishByTaskNameFastPath(t *testing.T) {
 				t.Fatal("expected error, got nil")
 			}
 		})
+	}
+}
+
+// TestProcessOutputEventSkippedReleasesWaiter covers the real Stop path:
+// ReAct emits a skipped status change, AIEngine releases SendMsg, and skipped
+// no longer counts as active work that can hold the next queued turn hostage.
+func TestProcessOutputEventSkippedReleasesWaiter(t *testing.T) {
+	e := newEngineForTerminalTest(t)
+	taskID := "task-user-stopped"
+	e.activeTasks[taskID] = aicommon.AITaskState_Processing
+
+	epm := aicommon.NewEndpointManagerContext(e.ctx)
+	e.taskEndpoints[taskID] = epm.CreateEndpoint()
+	errCh := make(chan error, 1)
+	go func() { errCh <- e.WaitTaskFinishByTaskName(taskID) }()
+	time.Sleep(20 * time.Millisecond)
+
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_status_changed",
+		Content: []byte(`{
+			"react_task_id":"task-user-stopped",
+			"react_task_now_status":"skipped",
+			"react_task_old_status":"processing"
+		}`),
+	})
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("skipped Stop task returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("skipped Stop task did not release SendMsg waiter")
+	}
+	if e.hasActiveTasks() {
+		t.Fatal("skipped Stop task still counted as active")
+	}
+}
+
+func TestWaitTaskFinishDrainsQueuedTaskAfterCurrentTaskIsSkipped(t *testing.T) {
+	e := newEngineForTerminalTest(t)
+	e.activeTasks["task-current"] = aicommon.AITaskState_Processing
+	e.activeTasks["task-queued"] = aicommon.AITaskState_Queueing
+
+	done := make(chan error, 1)
+	go func() { done <- e.WaitTaskFinish() }()
+	time.Sleep(20 * time.Millisecond)
+
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_status_changed",
+		Content: []byte(`{
+			"react_task_id":"task-current",
+			"react_task_now_status":"skipped",
+			"react_task_old_status":"processing"
+		}`),
+	})
+	select {
+	case err := <-done:
+		t.Fatalf("queue drain returned while queued task was still active: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_status_changed",
+		Content: []byte(`{
+			"react_task_id":"task-queued",
+			"react_task_now_status":"completed",
+			"react_task_old_status":"processing"
+		}`),
+	})
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("queue drain returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("queue drain did not return after every task became terminal")
+	}
+}
+
+func TestWaitTaskFinishUsesFreshEndpointForNextTaskGeneration(t *testing.T) {
+	e := newEngineForTerminalTest(t)
+	complete := func(taskID string) {
+		t.Helper()
+		e.processOutputEvent(&schema.AiOutputEvent{
+			Type:   schema.EVENT_TYPE_STRUCTURED,
+			NodeId: "react_task_status_changed",
+			Content: []byte(`{
+				"react_task_id":"` + taskID + `",
+				"react_task_now_status":"completed",
+				"react_task_old_status":"processing"
+			}`),
+		})
+	}
+	create := func(taskID string) {
+		t.Helper()
+		e.processOutputEvent(&schema.AiOutputEvent{
+			Type:   schema.EVENT_TYPE_STRUCTURED,
+			NodeId: "react_task_created",
+			Content: []byte(`{
+				"react_task_id":"` + taskID + `",
+				"react_task_status":"processing"
+			}`),
+		})
+	}
+	waitAndAssertBlocked := func(taskID string) chan error {
+		t.Helper()
+		done := make(chan error, 1)
+		go func() { done <- e.WaitTaskFinish() }()
+		select {
+		case err := <-done:
+			t.Fatalf("task generation %s reused a released endpoint: %v", taskID, err)
+		case <-time.After(50 * time.Millisecond):
+		}
+		return done
+	}
+
+	create("task-generation-1")
+	done1 := waitAndAssertBlocked("task-generation-1")
+	complete("task-generation-1")
+	if err := <-done1; err != nil {
+		t.Fatalf("first task generation: %v", err)
+	}
+
+	create("task-generation-2")
+	done2 := waitAndAssertBlocked("task-generation-2")
+	complete("task-generation-2")
+	if err := <-done2; err != nil {
+		t.Fatalf("second task generation: %v", err)
 	}
 }
 

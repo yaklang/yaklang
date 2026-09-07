@@ -1,4 +1,5 @@
 desc(
+	risk: "weak-cryptography"
 	title: "Detect Golang Weak Encryption Using AES-CBC Mode"
 	title_zh: "检测Golang使用AES-CBC弱加密模式"
 	type: vuln
@@ -170,7 +171,7 @@ SOLUTION
    - 攻击者可篡改加密数据而不触发异常
    - 通过侧信道攻击（如时序分析）恢复密钥或明文
 DESC
-	risk: "弱加密漏洞",
+	risk: "weak-cryptography",
 }
 
 desc(

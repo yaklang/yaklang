@@ -795,15 +795,13 @@ func renderItemTypeVerbose(item *TimelineItem) string {
 	}
 	switch v := item.value.(type) {
 	case *aitool.ToolResult:
-		status := "ok"
-		if !v.Success {
-			status = "fail"
-		}
 		name := strings.TrimSpace(v.Name)
 		if name == "" {
 			name = "unknown"
 		}
-		return fmt.Sprintf("tool/%s %s", name, status)
+		// ToolResult.Success is protocol completion, not execution outcome. Keep
+		// the header neutral; result/error details are rendered in the body.
+		return fmt.Sprintf("tool/%s", name)
 	case *UserInteraction:
 		stage := string(v.Stage)
 		if stage == "" {

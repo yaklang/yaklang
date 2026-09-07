@@ -563,6 +563,16 @@ func (b *FunctionBuilder) CreateVariableHeadEx(name string, isLocal bool, pos ..
 
 // --------------- `f.freeValue`
 
+// freeValueMap returns the builder's free-value map, creating it on first
+// use. b.Function may be a function rebuilt from DB (compile-unit spill +
+// lazy reload) whose FreeValues was never initialized.
+func (b *FunctionBuilder) freeValueMap() map[*Variable]int64 {
+	if b.FreeValues == nil {
+		b.FreeValues = make(map[*Variable]int64)
+	}
+	return b.FreeValues
+}
+
 func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	scope := b.CurrentBlock.ScopeTable
 	headScope := scope.GetHead()
@@ -573,7 +583,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 			return freeValue
 		} else {
 			freeValue := NewParam(name, true, b)
-			b.FreeValues[variable.(*Variable)] = freeValue.GetId()
+			b.freeValueMap()[variable.(*Variable)] = freeValue.GetId()
 			return freeValue
 		}
 	}
@@ -581,7 +591,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	freeValue := NewParam(name, true, b)
 	v := b.CreateVariableHead(name)
 	headScope.AssignVariable(v, freeValue)
-	b.FreeValues[v] = freeValue.GetId()
+	b.freeValueMap()[v] = freeValue.GetId()
 
 	// b.WriteVariable(variable, freeValue)
 	return freeValue

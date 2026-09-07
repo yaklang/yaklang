@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java Path Traversal Vulnerability"
 	type: vuln
 	level: low
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -101,5 +101,5 @@ SOLUTION
 	level: "low",
 	name: "output",
 	message: "检测到Java文件下载功能中filename参数未进行充分验证，可能存在路径遍历风险。",
-	risk: "路径遍历",
+	risk: "path-traversal",
 }

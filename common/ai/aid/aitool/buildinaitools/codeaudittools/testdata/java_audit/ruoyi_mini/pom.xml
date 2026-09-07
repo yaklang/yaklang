@@ -1,0 +1,10 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.ruoyi</groupId>
+  <artifactId>ruoyi</artifactId>
+  <version>4.7.0</version>
+  <modules>
+    <module>ruoyi-admin</module>
+    <module>ruoyi-auth</module>
+  </modules>
+</project>

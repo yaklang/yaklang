@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang CORS配置错误漏洞(beego)"
 	type: vuln
 	level: high
-	risk: "跨域资源共享（CORS）"
+	risk: "cors"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -93,7 +93,7 @@ alert $high for {
 	title: "Golang CORS Misconfiguration Vulnerability Was Detected",
 	title_zh: "检测到Golang CORS配置错误漏洞",
 	level: "high",
-	risk: "CORS",
+	risk: "cors",
 	name: "high",
 	message: "检测到Golang Beego框架中的CORS配置错误漏洞，服务端反射了未验证的`Origin`头，可能导致敏感数据泄露和跨站攻击。",
 	solution: <<<SOLUTION

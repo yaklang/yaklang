@@ -238,7 +238,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	// 阻塞运行服务器
 	log.Infof("Starting MCP HTTP server on: %s", urlStr)
 	go func() {
-		err := utils.WaitConnect(hostPort, 3)
+		err := utils.WaitConnect(hostPort, 15)
 		if err != nil {
 			log.Errorf("Failed to wait for MCP server to start: %v", err)
 			return

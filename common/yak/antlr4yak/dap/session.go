@@ -23,6 +23,14 @@ import (
 // Flags for convertVariableWithOpts option.
 type convertVariableFlags uint8
 
+func pretty(v interface{}) string {
+	s, err := json.MarshalIndent(v, "", "\t")
+	if err != nil {
+		return fmt.Sprintf("%#v", v)
+	}
+	return string(s)
+}
+
 const (
 	UnsupportedCommand int = 9999
 	InternalError      int = 8888

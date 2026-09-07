@@ -758,6 +758,7 @@ service Yak {
   rpc CheckHahValidAiConfig(Empty) returns (GeneralResponse);
   rpc ListAiModel(ListAiModelRequest) returns (ListAiModelResponse);
   rpc AIConfigHealthCheck(AIConfigHealthCheckRequest) returns (AIConfigHealthCheckResponse);
+  rpc ProbeReasoningEffort(ProbeReasoningEffortRequest) returns (ProbeReasoningEffortResponse);
   rpc GetAIGlobalConfig(Empty) returns (AIGlobalConfig);
   rpc SetAIGlobalConfig(AIGlobalConfig) returns (Empty);
   rpc ListAIProviders(Empty) returns (ListAIProvidersResponse);
@@ -932,6 +933,16 @@ service Yak {
   rpc GetRandomAIMaterials(GetRandomAIMaterialsRequest) returns (GetRandomAIMaterialsResponse);
   rpc ExportAILogs(ExportAILogsRequest) returns (ExportAILogsResponse);
 
+  // AI ReAct recurring schedules
+  rpc CreateAIReActSchedule(CreateAIReActScheduleRequest) returns (AIReActSchedule);
+  rpc UpdateAIReActSchedule(UpdateAIReActScheduleRequest) returns (AIReActSchedule);
+  rpc DeleteAIReActSchedule(DeleteAIReActScheduleRequest) returns (DbOperateMessage);
+  rpc GetAIReActSchedule(GetAIReActScheduleRequest) returns (AIReActSchedule);
+  rpc QueryAIReActSchedules(QueryAIReActSchedulesRequest) returns (QueryAIReActSchedulesResponse);
+  rpc SetAIReActScheduleEnabled(SetAIReActScheduleEnabledRequest) returns (AIReActSchedule);
+  rpc PreviewAIReActScheduleTimes(PreviewAIReActScheduleTimesRequest) returns (PreviewAIReActScheduleTimesResponse);
+  rpc RunAIReActScheduleNow(RunAIReActScheduleNowRequest) returns (Empty);
+
   // AI Memory CRUD
   rpc CreateAIMemoryEntity(CreateAIMemoryEntityRequest) returns (Empty);
   rpc UpdateAIMemoryEntity(AIMemoryEntity) returns (DbOperateMessage);
@@ -1090,6 +1101,16 @@ service Yak {
   rpc UpdateAIReActRecommendedSkill(UpdateAIReActRecommendedSkillRequest) returns (AIReActRecommendedSkill);
   // 将推荐技能完整恢复为随当前版本发布的内置默认内容。
   rpc ResetAIReActRecommendedSkill(ResetAIReActRecommendedSkillRequest) returns (AIReActRecommendedSkill);
+
+  // Context-menu plugins are discovered statically and executed on demand.
+  rpc QueryContextMenuActions(QueryContextMenuActionsRequest) returns (QueryContextMenuActionsResponse);
+  rpc SetContextMenuActionBinding(SetContextMenuActionBindingRequest) returns (ContextMenuAction);
+  rpc ExecuteContextMenuAction(ExecuteContextMenuActionRequest) returns (stream ContextMenuActionEvent);
+
+  // Upload GUI-local bytes into the currently connected engine's temporary
+  // filesystem. Returned paths are engine paths and can be used by file
+  // Fuzztags in both local and remote-engine modes.
+  rpc UploadToTemporaryFile(stream UploadToTemporaryFileRequest) returns (UploadToTemporaryFileResponse);
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
@@ -2300,6 +2321,10 @@ message AIStartParams {
 
   // 执行策略集合。用于承载 multi-agent / goal mode 等顶层运行策略。
   AIExecutionStrategy Strategy = 48;
+
+  // 为 true 时禁用 Memory Triage（智能记忆处理），不创建 AIMemory 实例，
+  // 跳过 embedding/DB/AI 调用。适用于轻量级或无状态会话。
+  bool DisableMemoryTriage = 49;
 }
 
 message AIExecutionStrategy {
@@ -2417,6 +2442,8 @@ message AISession {
   string Source = 10;
   // source=im 时的结构化 IM 元数据（平台/会话类型/可读标题等）；其它来源为空。
   IMSourceMeta IMSourceMeta = 11;
+  // 当前会话是否正在执行。包含交互式 ReAct 与计划任务的预留/运行阶段。
+  bool IsRunning = 12;
 }
 
 message QueryAISessionRequest {
@@ -2470,6 +2497,110 @@ message DeleteAISessionFilter {
 message DeleteAISessionRequest {
   DeleteAISessionFilter Filter = 1;
   bool DeleteAll = 2;
+}
+
+message AIReActScheduleSpec {
+  // RFC 5545 recurrence rule, for example RRULE:FREQ=DAILY;INTERVAL=1.
+  string RRule = 1;
+  // IANA timezone, for example Asia/Shanghai.
+  string Timezone = 2;
+  // First eligible occurrence as a Unix timestamp in seconds.
+  int64 StartAt = 3;
+}
+
+message AIReActSchedulePayload {
+  string Prompt = 1;
+  AIStartParams StartParams = 2;
+  repeated AttachedResourceInfo AttachedResourceInfos = 3;
+  string FocusModeLoop = 4;
+}
+
+message AIReActSchedule {
+  int64 Id = 1;
+  string UUID = 2;
+  string Name = 3;
+  // active | paused | completed
+  string Status = 4;
+  // continue_session | new_session_per_run
+  string TargetMode = 5;
+  string TargetSessionID = 6;
+  AIReActSchedulePayload Payload = 7;
+  AIReActScheduleSpec Schedule = 8;
+  int64 NextRunAt = 9;
+  int64 LastRunAt = 10;
+  int64 MisfireGraceSeconds = 11;
+  int64 MaxRuntimeSeconds = 12;
+  string PauseReason = 13;
+  string LastError = 14;
+  int64 CreatedAt = 15;
+  int64 UpdatedAt = 16;
+  // The user's original scheduling request before task-prompt normalization.
+  string OriginalRequest = 17;
+  // The chat in which this schedule was created. Informational for isolated runs.
+  string CreatedFromSessionID = 18;
+  // succeeded | failed | skipped | cancelled | interrupted | needs_attention
+  string LastOutcome = 19;
+  // Stable machine-readable reason, e.g. session_busy or scheduler_capacity.
+  string LastSkipReason = 20;
+  int64 LastStartedAt = 21;
+  int64 LastFinishedAt = 22;
+}
+
+message CreateAIReActScheduleRequest {
+  AIReActSchedule Schedule = 1;
+}
+
+message UpdateAIReActScheduleRequest {
+  AIReActSchedule Schedule = 1;
+}
+
+message DeleteAIReActScheduleRequest {
+  string UUID = 1;
+}
+
+message GetAIReActScheduleRequest {
+  string UUID = 1;
+}
+
+message AIReActScheduleFilter {
+  repeated string UUIDs = 1;
+  repeated string Status = 2;
+  string Keyword = 3;
+  repeated string TargetSessionIDs = 4;
+  repeated string TargetModes = 5;
+  repeated string CreatedFromSessionIDs = 6;
+}
+
+message QueryAIReActSchedulesRequest {
+  Paging Pagination = 1;
+  AIReActScheduleFilter Filter = 2;
+}
+
+message QueryAIReActSchedulesResponse {
+  Paging Pagination = 1;
+  repeated AIReActSchedule Data = 2;
+  int64 Total = 3;
+  reserved 4;
+}
+
+message SetAIReActScheduleEnabledRequest {
+  string UUID = 1;
+  bool Enabled = 2;
+}
+
+message PreviewAIReActScheduleTimesRequest {
+  AIReActScheduleSpec Schedule = 1;
+  int32 Count = 2;
+  // Preview strictly after this Unix timestamp. Zero means now minus one second.
+  int64 AfterTimestamp = 3;
+}
+
+message PreviewAIReActScheduleTimesResponse {
+  repeated int64 Timestamps = 1;
+}
+
+message RunAIReActScheduleNowRequest {
+  string UUID = 1;
 }
 
 message AIForgeFilter {
@@ -7045,6 +7176,8 @@ message FuzzerResponse {
   string FixContentType = 60;
   bool IsSetContentTypeOptions = 61;
   repeated RandomChunkedResponse RandomChunkedData = 62;
+  // 与 http_flows / web_fuzzer_response 对齐的唯一键，下载 body 用它而不是 RuntimeID。
+  string HiddenIndex = 64;
 }
 
 enum ChunkedDataDirection {
@@ -7108,6 +7241,8 @@ message GetHTTPFlowBodyByIdRequest {
   // 未设 = 返回完整 body（multipart 时现场流式重建完整 body）。
   // 用 optional 以区分「未设」与「part 0」。
   optional int32 PartIndex = 6;
+  // WebFuzzer 单条结果：按 HiddenIndex 定位 HTTPFlow，避免 RuntimeId 命中任务内其它 hop。
+  string HiddenIndex = 7;
 }
 
 message MITMExtractAggregateFlowFilterRow {
@@ -9187,6 +9322,18 @@ message AIConfigHealthCheckResponse{
   bool Success = 9;
 }
 
+message ProbeReasoningEffortRequest{
+  ThirdPartyApplicationConfig Config = 1;
+  string Model = 2;
+}
+
+message ProbeReasoningEffortResponse{
+  bool XhighSupported = 1;
+  bool MaxSupported = 2;
+  string XhighErrorMessage = 3;
+  string MaxErrorMessage = 4;
+}
+
 message AIProvider {
   int64 Id = 1;
   ThirdPartyApplicationConfig Config = 2;
@@ -9231,6 +9378,12 @@ message AIModelConfig {
   string ModelName = 3;
   repeated KVPair ExtraParams = 4;
   bool   IsOnline = 5;
+  // 探测到的扩展思考强度（如 ["xhigh","max"]）；为空且 EffortProbed=true 表示探测过但不支持。
+  // 前端据此动态显示 xhigh/max 下拉选项，无需用户手动配置。
+  repeated string ProbedExtendedEfforts = 6;
+  // 是否已对 xhigh/max 做过探测。false=未探测（首次操作下拉框时触发）；
+  // true=已探测（ProbedExtendedEfforts 即最终结果，不再重复探测）。
+  bool EffortProbed = 7;
 }
 
 message AIGlobalConfig {
@@ -9508,7 +9661,10 @@ message SingleManualHijackControlMessage{
   // request is forwarded, so the renderer never loads the full file.
   bool IsLargeRequestFileChunk = 12;
   int32 LargeRequestPartIndex = 13;
-  string LargeRequestFilename = 14;
+  // Field 14 previously carried the GUI-local replacement filename. File
+  // replacement changes bytes only; multipart filename/MIME remain those of
+  // the intercepted request, so this field must not be reused.
+  reserved 14;
   bytes LargeRequestFileData = 15;
   bool LargeRequestFileStart = 16;
   bool LargeRequestFileEOF = 17;
@@ -10031,4 +10187,95 @@ message MITMPipelineStats {
 
   int64 DatabaseWriteQueueDepth = 25;
   int64 DatabaseWriteQueueCapacity = 26;
+}
+
+message QueryContextMenuActionsRequest {
+  // Empty means all scenes. Otherwise use history-single, history-multi or http-packet.
+  string Scene = 1;
+  bool IncludeDisabled = 2;
+}
+
+message QueryContextMenuActionsResponse {
+  repeated ContextMenuAction Actions = 1;
+  // Enabled non-core plugin UUIDs in the requested Scene; zero when Scene is empty.
+  int64 EnabledCustomPluginCount = 2;
+  // Per-Scene custom plugin limit.
+  int64 MaxCustomPluginCount = 3;
+}
+
+message ContextMenuAction {
+  string PluginUUID = 1;
+  string PluginName = 2;
+  string ActionID = 3;
+  string HookName = 4;
+  bool Enabled = 5;
+  bool Locked = 6;
+  int64 Sort = 7;
+  string Shortcut = 8;
+  string ResultMode = 9;
+  bool AskBeforeRun = 10;
+  repeated YakScriptParam Params = 11;
+  bool IsCorePlugin = 12;
+  // Scene is one of history-single, history-multi or http-packet. ActionID may
+  // be a first-class hook or a legacy CODEC capability identifier.
+  string Scene = 13;
+  string PluginType = 14;
+  string ExecutionType = 15;
+  string Help = 16;
+  string HeadImg = 17;
+  bool SupportsResultMode = 18;
+  bool IsAIPlugin = 19;
+}
+
+message SetContextMenuActionBindingRequest {
+  string PluginUUID = 1;
+  string ActionID = 2;
+  bool Enabled = 3;
+  int64 Sort = 4;
+  string Shortcut = 5;
+  string ResultMode = 6;
+  bool AskBeforeRun = 7;
+}
+
+message ExecuteContextMenuActionRequest {
+  string PluginUUID = 1;
+  string ActionID = 2;
+  string Source = 3;
+  string Trigger = 4;
+  string HttpsState = 5;
+  repeated int64 HTTPFlowIDs = 6;
+  bytes Request = 7;
+  bytes Response = 8;
+  bool HasRequest = 9;
+  bool HasResponse = 10;
+  repeated ExecParamItem Params = 11;
+  string PacketRevision = 12;
+}
+
+message ContextMenuPacketActionResult {
+  bytes Request = 1;
+  bytes Response = 2;
+  bool ReplaceRequest = 3;
+  bool ReplaceResponse = 4;
+  bool RequireConfirmation = 5;
+  string PacketRevision = 6;
+}
+
+message ContextMenuActionEvent {
+  string RuntimeID = 1;
+  string Status = 2;
+  string Reason = 3;
+  string ResultMode = 4;
+  string PluginName = 5;
+  ExecResult Result = 6;
+  ContextMenuPacketActionResult PacketResult = 7;
+}
+
+message UploadToTemporaryFileRequest {
+  bytes Data = 1;
+}
+
+message UploadToTemporaryFileResponse {
+  string FileName = 1;
+  int64 Size = 2;
 }

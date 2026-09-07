@@ -1,6 +1,8 @@
 package aid
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -13,7 +15,7 @@ const (
 	planEvidenceAINodeID  = "plan-evidence"
 )
 
-func outputEvidenceAction(task *AiTask) reactloops.ReActLoopOption {
+func outputEvidenceAction(_ *AiTask) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"output_evidence",
 		"Append key newly verified runtime evidence into the shared EVIDENCE document. Evidence is optional in normal verification, but this action is for deliberate evidence delivery when you have reusable findings worth preserving.",
@@ -36,14 +38,15 @@ func outputEvidenceAction(task *AiTask) reactloops.ReActLoopOption {
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			evidence := aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString(planEvidenceFieldName))
-			merged, changed := appendTaskPlanEvidence(task, evidence)
-			if changed {
-				log.Infof("task loop: output_evidence merged, length=%d", len(merged))
-				loop.GetInvoker().AddToTimeline("evidence_appended",
-					"EVIDENCE appended successfully. Consider whether confirmed vulnerabilities need to be saved via cybersecurity-risk tool.")
-			} else {
-				log.Infof("task loop: output_evidence received no new evidence")
+			evidenceOp, err := reactloops.SaveSessionEvidence(loop.GetConfig(), "", evidence)
+			if err != nil {
+				op.Fail(utils.Wrap(err, "output_evidence failed"))
+				return
 			}
+			idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
+			log.Infof("task loop: output_evidence saved to Session Evidence Store, id=%s", evidenceOp.ID)
+			loop.GetInvoker().AddToTimeline("session_evidence_saved",
+				fmt.Sprintf("%s\n%s", idMarker, evidenceOp.Content))
 			op.Continue()
 		},
 	)

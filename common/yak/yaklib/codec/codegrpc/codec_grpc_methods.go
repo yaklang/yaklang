@@ -379,7 +379,7 @@ func decodeDataCandidates(text []byte, preferred outputType) [][]byte {
 	return out
 }
 
-func trySymmetricDecrypt(key string, keyType string, iv string, ivType string, blockSize int, inputText []byte, decrypt func([]byte, []byte, []byte) ([]byte, error), paddingType string) ([]byte, error) {
+func trySymmetricDecrypt(key string, keyType string, iv string, ivType string, blockSize int, inputText []byte, decrypt func([]byte, []byte, []byte) ([]byte, error), paddingType string, needUnpadding bool) ([]byte, error) {
 	keyCandidates := decodeDataCandidates([]byte(key), keyType)
 	ivCandidates := decodeDataCandidates([]byte(iv), ivType)
 
@@ -391,11 +391,14 @@ func trySymmetricDecrypt(key string, keyType string, iv string, ivType string, b
 				lastErr = err
 				continue
 			}
-			dec, err = unPadding(paddingType, dec)
-			if err == nil {
-				return dec, nil
+			if needUnpadding {
+				dec, err = unPadding(paddingType, dec)
+				if err != nil {
+					lastErr = err
+					continue
+				}
 			}
-			lastErr = err
+			return dec, nil
 		}
 	}
 	if lastErr == nil {
@@ -464,14 +467,19 @@ func getHash(hashFunc string) hash.Hash {
 // { Name = "kdfMode", Type = "select", DefaultValue = "Openssl", Options = ["Openssl", "PBKDF2"], Required = true ,Label = "密钥派生算法-KDF"},
 // { Name = "hashFunc", Type = "select",DefaultValue = "MD5", Options = ["MD5","SHA-1", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希"},
 // { Name = "noSalt", Type = "checkbox", Required = true , Label = "不加盐值"},
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "base64", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) AESEncryptKDF(password string, kdfMode string, hashFunc string, noSalt bool, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 16)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 16)
+		if err != nil {
+			return err
+		}
 	}
 
 	hashHandle := getHash(hashFunc)
@@ -510,7 +518,7 @@ func (flow *CodecExecFlow) AESEncryptKDF(password string, kdfMode string, hashFu
 // { Name = "password", Type = "input", Required = true,Label = "密码" },
 // { Name = "kdfMode", Type = "select", DefaultValue = "Openssl", Options = ["Openssl", "PBKDF2"], Required = true ,Label = "密钥派生算法-KDF"},
 // { Name = "hashFunc", Type = "select",DefaultValue = "MD5", Options = ["MD5","SHA-1", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希"},
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "base64", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
@@ -535,9 +543,12 @@ func (flow *CodecExecFlow) AESDecryptKDF(password string, kdfMode string, hashFu
 	if err != nil {
 		return err
 	}
-	cipherText, err = unPadding(paddingType, cipherText)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	if !codec.IsStreamMode(mode) {
+		cipherText, err = unPadding(paddingType, cipherText)
+		if err != nil {
+			return err
+		}
 	}
 	flow.Text = cipherText
 	return nil
@@ -554,20 +565,22 @@ func (flow *CodecExecFlow) AESDecryptKDF(password string, kdfMode string, hashFu
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 16)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 16)
+		if err != nil {
+			return err
+		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) {
-		decodeIV = decodeKey // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	data, err := codec.AESEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -585,15 +598,17 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 16, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.AESDec(decodeKey, text, decodeIV, mode)
-	}, paddingType)
+	}, paddingType, needUnpadding)
 	if err != nil {
 		return err
 	}
@@ -688,15 +703,17 @@ func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce strin
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 16)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 16)
+		if err != nil {
+			return err
+		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) {
-		decodeIV = decodeKey // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	data, err := codec.SM4Enc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -716,9 +733,11 @@ func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivT
 // ]
 func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 16, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.SM4Dec(decodeKey, text, decodeIV, mode)
-	}, paddingType)
+	}, paddingType, needUnpadding)
 	if err != nil {
 		return err
 	}
@@ -732,20 +751,22 @@ func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true , Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 8)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 8)
+		if err != nil {
+			return err
+		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) {
-		decodeIV = decodeKey // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	data, err := codec.DESEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -759,15 +780,17 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true , Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.DESDec(decodeKey, text, decodeIV, mode)
-	}, paddingType)
+	}, paddingType, needUnpadding)
 	if err != nil {
 		return err
 	}
@@ -781,20 +804,22 @@ func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true ,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 8)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 8)
+		if err != nil {
+			return err
+		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) && len(decodeKey) == 24 {
-		decodeIV = decodeKey[:8] // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	data, err := codec.TripleDesEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -808,15 +833,17 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true , Label = "Mode"},
 // { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.TripleDesDec(decodeKey, text, decodeIV, mode)
-	}, paddingType)
+	}, paddingType, needUnpadding)
 	if err != nil {
 		return err
 	}

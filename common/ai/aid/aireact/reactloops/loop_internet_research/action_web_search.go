@@ -33,7 +33,7 @@ func makeWebSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption 
 		"web_search",
 		desc, toolOpts,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-			loop.LoadingStatus("validating web search parameters")
+			loop.UserStatus("正在确认搜索方向", "Confirming the search direction", aicommon.WithStatusCode("research.search.preparing"))
 			searchQuery := action.GetString("search_query")
 			if searchQuery == "" {
 				return utils.Error("search_query is required for web search")
@@ -79,7 +79,12 @@ func makeWebSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption 
 			userQuery := loop.Get("user_query")
 			emitter := loop.GetEmitter()
 
-			loop.LoadingStatus(fmt.Sprintf("searching internet: %s", searchQuery))
+			loop.UserStatus(
+				"正在查找最新资料",
+				"Searching for up-to-date information",
+				aicommon.WithStatusCode("research.searching"),
+				aicommon.WithStatusDetail(fmt.Sprintf("本轮关注：%s", searchQuery), fmt.Sprintf("Current focus: %s", searchQuery)),
+			)
 			log.Infof("internet research: searching for '%s' with max_results=%d", searchQuery, maxResults)
 
 			params := aitool.InvokeParams{
@@ -106,7 +111,7 @@ func makeWebSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption 
 
 			log.Infof("internet research: web_search tool returned %d bytes for '%s'", len(content), searchQuery)
 
-			loop.LoadingStatus("recording search results")
+			loop.UserStatus("正在整理已找到的资料", "Organizing the sources found so far", aicommon.WithStatusCode("research.organizing"))
 			feedNewKnowledge(content, userQuery)
 
 			iteration := loop.GetCurrentIterationIndex()
@@ -157,7 +162,7 @@ Time: %s
 				time.Now().Format("15:04:05"), searchCount, searchQuery, len(content))
 			loop.Set("search_history", searchHistory)
 
-			loop.LoadingStatus("evaluating search progress")
+			loop.UserStatus("正在判断现有资料是否足够", "Checking whether the available sources are sufficient", aicommon.WithStatusCode("research.evaluating"))
 			evalResult := evaluateNextSearch(ctx, invoker, loop, userQuery, searchQuery, content, searchCount)
 			if evalResult.Finished {
 				log.Infof("internet research finished, summary: %s", evalResult.Summary)

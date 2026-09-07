@@ -3,8 +3,10 @@ package yak
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,9 +51,14 @@ func (s *testEventSync) signal(name string) {
 	})
 }
 
-func (s *testEventSync) wait(name string) {
+func (s *testEventSync) wait(t *testing.T, name string) {
+	t.Helper()
 	ch, _ := s.get(name)
-	<-ch
+	select {
+	case <-ch:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for test event %q", name)
+	}
 }
 
 func newTestHookEngine(t *testing.T, script string, globals map[string]any) *antlr4yak.Engine {
@@ -174,6 +181,20 @@ beforeRequest = func(isHttps, originReq, req) {
 	}
 }
 
+func TestMutateHookCallerDoesNotPersistHotReloadCache(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
+	code := `
+beforeRequest = func(isHttps, originReq, req) {
+    return req
+}
+// ` + strings.Repeat("hot-reload-revision-", 20)
+
+	hookBefore, _, _, _, _, _ := MutateHookCaller(context.Background(), code, nil)
+	require.NotNil(t, hookBefore)
+	_, cached := antlr4yak.HaveYakcCache(code)
+	require.False(t, cached, "web fuzzer hot reload must not persist unique source revisions")
+}
+
 // 并发调用多层嵌套子函数(A→B→C)，验证context逐层传递正确
 func TestConcurrentEngineCall_DeepNestedCalls(t *testing.T) {
 	scriptEngine := NewScriptEngine(1)
@@ -264,14 +285,14 @@ beforeRequest = func(isHttps, originReq, req) {
 }
 `, map[string]any{
 		"signal": func(name string) { syncer.signal(name) },
-		"wait":   func(name string) { syncer.wait(name) },
+		"wait":   func(name string) { syncer.wait(t, name) },
 	})
 
 	fastResultCh := invokeBeforeRequestAsync(engine, "fast")
-	syncer.wait("fast-entered")
+	syncer.wait(t, "fast-entered")
 
 	slowResultCh := invokeBeforeRequestAsync(engine, "slow")
-	syncer.wait("slow-entered")
+	syncer.wait(t, "slow-entered")
 
 	// 此时 slow 的 frame 已经入栈，fast 继续执行 eval 必须仍然读取到自己的 localValue。
 	syncer.signal("allow-fast-eval")
@@ -304,14 +325,14 @@ beforeRequest = func(isHttps, originReq, req) {
 }
 `, map[string]any{
 		"signal": func(name string) { syncer.signal(name) },
-		"wait":   func(name string) { syncer.wait(name) },
+		"wait":   func(name string) { syncer.wait(t, name) },
 	})
 
 	fastResultCh := invokeBeforeRequestAsync(engine, "fast")
-	syncer.wait("fast-entered")
+	syncer.wait(t, "fast-entered")
 
 	slowResultCh := invokeBeforeRequestAsync(engine, "slow")
-	syncer.wait("slow-entered")
+	syncer.wait(t, "slow-entered")
 
 	// 先让 fast 返回；旧实现里这里会把 slow 的 frame 从共享栈顶错误弹掉。
 	syncer.signal("allow-fast-return")
@@ -324,4 +345,65 @@ beforeRequest = func(isHttps, originReq, req) {
 	slowResult := <-slowResultCh
 	require.NoError(t, slowResult.err)
 	require.Equal(t, "slow", slowResult.result)
+}
+
+func TestMutateHookCallerCancellationStopsAllHookKinds(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	before, after, mirror, retry, failure, mock := MutateHookCaller(ctx, `
+beforeRequest = func(isHttps, originReq, req) { for {} }
+afterRequest = func(isHttps, originReq, req, originRsp, rsp) { for {} }
+mirrorHTTPFlow = func(req, rsp) { for {} }
+retryHandler = func(req, rsp, retry) { for {} }
+customFailureChecker = func(rsp, fail) { for {} }
+mockHTTPRequest = func(isHttps, url, req, mockResponse) { for {} }
+`, nil)
+	require.NotNil(t, before)
+	require.NotNil(t, after)
+	require.NotNil(t, mirror)
+	require.NotNil(t, retry)
+	require.NotNil(t, failure)
+	require.NotNil(t, mock)
+
+	done := make(chan string, 6)
+	go func() {
+		before(false, nil, []byte("request"))
+		done <- "before"
+	}()
+	go func() {
+		after(false, nil, nil, nil, []byte("response"))
+		done <- "after"
+	}()
+	go func() {
+		mirror(nil, nil, map[string]string{})
+		done <- "mirror"
+	}()
+	go func() {
+		retry(false, 0, nil, nil, func(...[]byte) {})
+		done <- "retry"
+	}()
+	go func() {
+		failure(false, nil, nil, func(string) {})
+		done <- "failure"
+	}()
+	go func() {
+		mock(false, "http://example.invalid", nil, func(interface{}) {})
+		done <- "mock"
+	}()
+
+	// Give every hook a chance to enter Yak execution before canceling the
+	// stream context that owns this hot patch.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	returned := make(map[string]bool, 6)
+	timer := time.NewTimer(2 * time.Second)
+	defer timer.Stop()
+	for len(returned) < 6 {
+		select {
+		case name := <-done:
+			returned[name] = true
+		case <-timer.C:
+			t.Fatalf("hot hooks did not stop after cancellation: returned=%v", returned)
+		}
+	}
 }

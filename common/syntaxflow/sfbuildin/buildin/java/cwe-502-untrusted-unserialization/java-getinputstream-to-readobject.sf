@@ -3,7 +3,7 @@ desc(
 	title: "Check Java Native Deserialization Vulnerability"
 	type: audit
 	lang: java
-	risk: '反序列化漏洞',
+	risk: "deserialization"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -202,7 +202,7 @@ ObjectInputFilter.Config.setObjectInputFilter(this, filter);
 6. **最小化权限**
 运行应用程序的服务应具有最小的权限，即使发生RCE，也能限制攻击者对系统的进一步损害。
 SOLUTION
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -330,7 +330,7 @@ ObjectInputFilter.Config.setObjectInputFilter(this, filter);
 6. **最小化权限**
 运行应用程序的服务应具有最小的权限，即使发生RCE，也能限制攻击者对系统的进一步损害。
 SOLUTION
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

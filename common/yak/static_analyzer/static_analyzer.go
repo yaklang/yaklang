@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	"github.com/yaklang/yaklang/common/yak/contextmenu"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -32,7 +33,7 @@ const (
 // YaklangScriptChecking 对 Yaklang 插件代码做静态分析检查（导出名为 ssa.YaklangScriptChecking）
 // 参数:
 //   - code: 待检查的源码
-//   - pluginType: 插件类型，可选值为 "yak"、"mitm"、"port-scan"、"codec"、"syntaxflow"
+//   - pluginType: 插件类型，可选值为 "yak"、"mitm"、"port-scan"、"codec"、"context-menu"、"syntaxflow"
 //
 // 返回值:
 //   - 静态分析结果列表，正常代码返回空列表
@@ -71,7 +72,7 @@ func init() {
 	ssaapi.RegisterExport("SyntaxFlowRuleChecking", SyntaxFlowRuleChecking)
 }
 
-// plugin type : "yak" "mitm" "port-scan" "codec" "syntaxflow"
+// plugin type : "yak" "mitm" "port-scan" "codec" "context-menu" "syntaxflow"
 
 func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
 	var results []*result.StaticAnalyzeResult
@@ -107,7 +108,7 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 
 	// compiler
 	switch codeTyp {
-	case "yak", "mitm", "port-scan", "codec":
+	case "yak", "mitm", "port-scan", "codec", "context-menu":
 		// Yaklang 编译
 		yaklangStart := time.Now()
 		newEngine := yaklang.New()
@@ -206,6 +207,26 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 		log.Error("静态分析失败：未知的代码类型")
 	}
 	return results
+}
+
+// GetContextMenuCapabilities returns the actions explicitly implemented by a
+// context-menu plugin. It only inspects hook definitions and never executes
+// plugin code.
+func GetContextMenuCapabilities(code string) ([]string, error) {
+	prog, err := SSAParse(code, contextmenu.PluginType)
+	if err != nil {
+		return nil, err
+	}
+
+	capabilities := make([]string, 0, len(contextmenu.KnownActions()))
+	for _, actionID := range contextmenu.KnownActions() {
+		hookName, _ := contextmenu.HookForAction(actionID)
+		handlers := prog.Ref(hookName).Filter(func(v *ssaapi.Value) bool { return v.IsFunction() })
+		if len(handlers) == 1 && len(handlers[0].GetParameters()) == contextmenu.ExpectedParameterCount(actionID) {
+			capabilities = append(capabilities, actionID)
+		}
+	}
+	return capabilities, nil
 }
 
 func GetPluginSSAOpt(plugin string) []ssaconfig.Option {

@@ -54,6 +54,16 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentInput(raw sf.IFileFilterConten
 
 	if i.FileName() != nil {
 		text := i.FileName().GetText()
+		// A fileName that is a single regexpLiteral (e.g. ${/.*\.java$/}) is
+		// parsed as fileName because nameFilter includes regexpLiteral; strip the
+		// surrounding slashes and compile it as a path regex so the pattern is
+		// usable by sfpattern's compilePathMatcher.
+		if strings.HasPrefix(text, "/") && strings.HasSuffix(text, "/") && len(text) >= 2 {
+			inner := text[1 : len(text)-1]
+			if reIns, err := regexp.Compile(inner); err == nil {
+				return reIns.String(), nil
+			}
+		}
 		return text, nil
 	} else if i.RegexpLiteral() != nil {
 		reg := i.RegexpLiteral().GetText()
@@ -66,6 +76,19 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentInput(raw sf.IFileFilterConten
 		return text, nil
 	}
 	return "", utils.Error("file filter content input is not identifier or regexp literal")
+}
+
+// isFileFilterMethod reports whether a field-call name is a chained file-filter
+// method (regexp family). Only these are intercepted in $a.regexp(...) form;
+// xpath/jsonpath keep their member-access meaning.
+func isFileFilterMethod(name string) bool {
+	switch strings.ToLower(name) {
+	case "regexp", "re", "pattern_regex", "pattern-regex", "patternregex",
+		"pattern_regex_not", "pattern-regex-not", "patternregexnot",
+		"pattern_not_regex", "pattern-not-regex", "patternnotregex", "not_regexp", "not_re":
+		return true
+	}
+	return false
 }
 
 func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterContentMethodContext, fileInput string) error {
@@ -89,7 +112,24 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterConte
 	switch m {
 	case "xpath":
 		y.EmitFileFilterXpath(fileInput, paramMap, paramList)
-	case "regexp", "re":
+	case "regexp", "re", "pattern_regex", "pattern-regex", "patternregex":
+		// pattern_regex: Semgrep pattern-regex compatible alias of regexp/re.
+		y.EmitFileFilterReg(fileInput, paramMap, paramList)
+	case "pattern_regex_not", "pattern-regex-not", "patternregexnot":
+		// pattern_regex_not: first param is positive, remaining are negative
+		// (Semgrep pattern-regex + pattern-not-regex in one call).
+		if paramMap == nil {
+			paramMap = make(map[string]string)
+		}
+		paramMap["__sf_pattern_not_list"] = "1"
+		y.EmitFileFilterReg(fileInput, paramMap, paramList)
+	case "pattern_not_regex", "pattern-not-regex", "patternnotregex", "not_regexp", "not_re":
+		// Negative content regex (Semgrep pattern-not-regex). Marked for backends;
+		// sfpattern treats hits as candidates for set-difference / post-filter.
+		if paramMap == nil {
+			paramMap = make(map[string]string)
+		}
+		paramMap["__sf_pattern_not"] = "1"
 		y.EmitFileFilterReg(fileInput, paramMap, paramList)
 	case "jsonpath", "json":
 		y.EmitFileFilterJsonPath(fileInput, paramMap, paramList)

@@ -64,6 +64,22 @@ func TestProgressRegistry_LastActivityAtWithSubLoop(t *testing.T) {
 	require.True(t, activity.Equal(tickTime), "LastActivityAt should read from SubLoop.lastIterationTickAt")
 }
 
+// TestProgressRegistry_LastActivityAtWithInflightTool 验证: 子 loop
+// iteration 已过期, 但有 in-flight 工具时 LastActivityAt 视为"现在".
+func TestProgressRegistry_LastActivityAtWithInflightTool(t *testing.T) {
+	startedAt := time.Now().Add(-20 * time.Minute)
+	handle := NewSubAgentHandle("sub-task-inflight", "fast-context", nil, startedAt)
+	loop := &ReActLoop{}
+	loop.SetLastIterationTickAtForTest(time.Now().Add(-15 * time.Minute).UnixNano())
+	loop.BeginToolActivity()
+	handle.SubLoop = loop
+
+	activity := handle.LastActivityAt()
+	require.False(t, activity.IsZero())
+	require.WithinDuration(t, time.Now(), activity, 2*time.Second,
+		"in-flight tool should make LastActivityAt look current")
+}
+
 // TestProgressRegistry_AggregateLastActivityAt 验证 AggregateLastActivityAt
 // 返回所有活跃子 Agent 中最近的活动时间.
 //

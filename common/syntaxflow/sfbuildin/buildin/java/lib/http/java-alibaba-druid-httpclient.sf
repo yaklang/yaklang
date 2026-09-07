@@ -131,7 +131,7 @@ System.out.println("Apache HttpClient GET Response: " + result.toString());
 #### 3. 审查现有使用
 对现存代码中使用`HttpClientUtils`的部分进行全面审计，特别是检查其在复杂网络环境下的行为表现，例如SSL/TLS配置、代理支持和连接池管理能力。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }
 
 

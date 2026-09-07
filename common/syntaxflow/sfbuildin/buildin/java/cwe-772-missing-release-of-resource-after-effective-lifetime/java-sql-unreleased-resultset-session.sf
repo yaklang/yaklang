@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java java.sql Statement查询结果集ResultSet资源未释放"
 	title: "Check Java java.sql Statement ResultSet Unreleased Resource"
-	risk:"资源泄漏",
+	risk:"resource-leak"
 	level:high
 	reference: <<<REFERENCE
 [CWE-772](https://cwe.mitre.org/data/definitions/772.html)
@@ -105,7 +105,7 @@ alert $weak for {
 	message: "检测到java.sql.ResultSet未释放资源",
 	title: "Unreleased ResultSet Resource",
 	title_zh: "未释放的ResultSet资源",
-	risk: "资源泄漏",
+	risk: "resource-leak",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

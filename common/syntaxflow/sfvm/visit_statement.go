@@ -134,6 +134,12 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			y.rule.Solution = value
 		case SFDescKeyType_Rule_Id:
 			y.rule.RuleId = value
+		case SFDescKeyType_Mode:
+			extraDesc.rawDesc["mode"] = value
+			y.rule.Mode = schema.ValidRuleMode(value)
+			if y.rule.Mode == schema.SFR_MODE_SOURCE {
+				y.rule.Tag = AppendRuleTag(y.rule.Tag, RuleModeSource)
+			}
 		default:
 			if strings.Contains(key, "://") {
 				haveFileSystem = true

@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
@@ -65,6 +66,16 @@ type AICallerConfigIf interface {
 	ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem
 
 	GetBrowserSessionTracker() BrowserSessionTracker
+
+	// Reported risks: session-level "已报告漏洞清单" accumulator.
+	// AppendReportedRisk is called from toolcall_invoke.go FeedBacker when a
+	// json-risk message is emitted, adding a compact summary to the store.
+	// GetReportedRisksRendered returns the markdown block for prompt injection.
+	// GetReportedRisks / SetReportedRisks are for DB persistence.
+	AppendReportedRisk(risk *schema.Risk) bool
+	GetReportedRisksRendered() string
+	GetReportedRisks() string
+	SetReportedRisks(json string)
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
@@ -82,6 +93,7 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 					isStream = true
 					resp.EmitReasonStream(reader)
 				}),
+
 				aispec.WithModelInfoCallback(func(provider, model string) {
 					resp.SetModelInfo(provider, model) // not update config model info, just set for response
 				}),
@@ -126,6 +138,23 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			// 关键词: AIChatToAICallbackType tier 上报, WithModelUsageType, GetModelTier
 			if tier := strings.TrimSpace(req.GetModelTier()); tier != "" {
 				optList = append(optList, aispec.WithModelUsageType(tier))
+			}
+			// Inject extra aispec options from the request (e.g. WithTools for
+			// functioncall mode). These are appended after all built-in options
+			// so they can override or supplement the default configuration.
+			if extraOpts := req.GetExtraSpecOpts(); len(extraOpts) > 0 {
+				optList = append(optList, extraOpts...)
+			}
+			// When the request enables tool_call arguments streaming
+			// (functioncall mode), wire the arguments reader into the same
+			// output channel as regular content so downstream consumers can
+			// parse it via ExtractActionFromStream. Non-functioncall callers
+			// are unaffected — arguments stay only in ToolCallCallback.
+			if req.IsToolCallArgumentsStreamEnabled() {
+				optList = append(optList, aispec.WithToolCallArgumentsStreamHandler(func(reader io.Reader) {
+					isStream = true
+					resp.EmitOutputStream(reader)
+				}))
 			}
 			output, err := cb(
 				req.GetPrompt(),

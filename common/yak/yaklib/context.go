@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/contextmenu"
 )
 
 // Seconds 返回一个超时时间为 d 秒的 Context 接口（即上下文接口）
@@ -165,12 +166,16 @@ func _withValue(parent context.Context, key, val any) context.Context {
 }
 
 var ContextExports = map[string]interface{}{
-	"Seconds":            _seconds,
-	"New":                _newContext,
-	"Background":         _background,
-	"WithCancel":         _withCancel,
-	"WithTimeout":        _withTimeout,
-	"WithTimeoutSeconds": _withTimeoutSeconds,
-	"WithDeadline":       _withDeadline,
-	"WithValue":          _withValue,
+	"Seconds":             _seconds,
+	"New":                 _newContext,
+	"Background":          _background,
+	"WithCancel":          _withCancel,
+	"WithTimeout":         _withTimeout,
+	"WithTimeoutSeconds":  _withTimeoutSeconds,
+	"WithDeadline":        _withDeadline,
+	"WithValue":           _withValue,
+	"NewPacketResult":     contextmenu.NewPacketResult,
+	"ReplaceRequest":      contextmenu.WithRequest,
+	"ReplaceResponse":     contextmenu.WithResponse,
+	"RequireConfirmation": contextmenu.WithConfirmation,
 }

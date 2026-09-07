@@ -220,6 +220,9 @@ type AIMemoryEntity struct {
 
 	// C.O.R.E. P.A.C.T. 向量，用于快速过滤和排序
 	CorePactVector FloatArray `json:"core_pact_vector" gorm:"type:text"`
+
+	// 自动清理相关字段
+	ExpiresAt *time.Time `json:"expires_at" gorm:"index"` // 过期时间，nil=不过期
 }
 
 func (a *AIMemoryEntity) TableName() string {

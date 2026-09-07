@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -393,10 +395,42 @@ func (f *fileSystemAction) FormatPath(params *ypb.RequestYakURLParams) (string, 
 		absPath = fs.Join(wd, path)
 		dirname, filename = fs.PathSplit(absPath)
 	}
+	if remapped := f.remapSSAProgramLocalPath(absPath, path); remapped != "" {
+		absPath = remapped
+		dirname, filename = fs.PathSplit(absPath)
+	}
 	if params.GetUrl() != nil {
 		params.Url.Path = absPath
 	}
 	return absPath, dirname, filename, nil
+}
+
+func (f *fileSystemAction) remapSSAProgramLocalPath(absPath, rawPath string) string {
+	if f == nil || f.fs == nil {
+		return ""
+	}
+	if _, ok := f.fs.(*filesys.LocalFs); !ok {
+		return ""
+	}
+	if absPath != "" {
+		if info, err := f.fs.Stat(absPath); err == nil && info != nil {
+			return ""
+		}
+	}
+	leaf := rawPath
+	if absPath != "" {
+		if _, name := f.fs.PathSplit(absPath); name != "" {
+			leaf = name
+		}
+	}
+	resolved := yakit.ResolveCodeSourceLocalPath(leaf)
+	if resolved == "" {
+		resolved = yakit.ResolveCodeSourceLocalPath(rawPath)
+	}
+	if resolved == "" || resolved == absPath {
+		return ""
+	}
+	return resolved
 }
 
 func (f *fileSystemAction) FormatPathRaw(path string) (string, error) {

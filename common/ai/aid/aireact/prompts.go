@@ -442,12 +442,6 @@ func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
 	dynamicData["ToolUsage"] = tool.Usage
 	dynamicData["ParamNames"] = paramNames
 	dynamicData["OriginalQuery"] = originalQuery
-	dynamicData["CurrentIteration"] = 0
-	dynamicData["MaxIterations"] = 0
-	if loop != nil {
-		dynamicData["CurrentIteration"] = loop.GetCurrentIterationIndex()
-		dynamicData["MaxIterations"] = loop.GetMaxIterations()
-	}
 	dynamicData["ToolSchema"] = toolSchema
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
@@ -492,12 +486,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(
 	dynamicData["Payload"] = payload
 	dynamicData["TodoSnapshot"] = pm.react.RenderVerificationTodoSnapshot()
 	dynamicData["EnhanceData"] = enhanceData
-	dynamicData["IterationIndex"] = 0
-	dynamicData["MaxIterations"] = 0
-	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-		dynamicData["IterationIndex"] = currentLoop.GetCurrentIterationIndex()
-		dynamicData["MaxIterations"] = currentLoop.GetMaxIterations()
-	}
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials, "verification-dynamic", verificationDynamicTemplate, dynamicData,
@@ -748,8 +736,6 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	}
 	dynamicData["IsBlueprint"] = true
 	dynamicData["ExtraPrompt"] = extraPrompt
-	dynamicData["CurrentIteration"] = pm.react.currentIteration
-	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
 	return pm.assemblePromptWithDynamicSection(
 		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
 	)
@@ -925,7 +911,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	dynamicData["StderrSnapshot"] = aicommon.ShrinkTextBlockByTokens(string(stderrSnapshot), intervalReviewStderrTokens)
 	dynamicData["CallExpectations"] = aicommon.ShrinkTextBlockByTokens(callExpectations, intervalReviewCallExpectationTokens)
 	dynamicData["ExtraPrompt"] = aicommon.ShrinkTextBlockByTokens(
-		strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)),
+		buildIntervalReviewExtraPrompt(pm),
 		intervalReviewExtraInstructionTokens,
 	)
 	dynamicData["TaskGoal"] = taskGoal
@@ -957,7 +943,9 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	}
 	recentTimeline := ""
 	if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
-		recentTimeline = pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens)
+		recentTimeline = stripLoopStallFromIntervalReviewTimeline(
+			pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens),
+		)
 	}
 	if recentTimeline == "" {
 		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
@@ -975,6 +963,43 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 		return "", fmt.Errorf("interval review prompt exceeds %d-token hard limit: %d", intervalReviewMaxPromptTokens, tokens)
 	}
 	return prompt, nil
+}
+
+func buildIntervalReviewExtraPrompt(pm *PromptManager) string {
+	if pm == nil || pm.react == nil || pm.react.config == nil {
+		return ""
+	}
+	return strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt))
+}
+
+func stripLoopStallFromIntervalReviewTimeline(dump string) string {
+	if dump == "" || !strings.Contains(dump, "LOOP_STALL") {
+		return dump
+	}
+	const (
+		header = "<|TIMELINE_RECENT|>"
+		footer = "<|TIMELINE_RECENT_END|>"
+	)
+	body := dump
+	if i := strings.Index(dump, header); i >= 0 {
+		body = dump[i+len(header):]
+		if j := strings.LastIndex(body, footer); j >= 0 {
+			body = body[:j]
+		}
+	}
+	parts := strings.Split(strings.TrimSpace(body), "\n\n")
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" || strings.Contains(part, "LOOP_STALL_DETECTED") || strings.Contains(part, "LOOP_STALL_HARD_ABORT") {
+			continue
+		}
+		kept = append(kept, part)
+	}
+	if len(kept) == 0 {
+		return header + "\n(no recent Timeline items)\n" + footer
+	}
+	return header + "\n" + strings.Join(kept, "\n\n") + "\n" + footer
 }
 
 // formatDuration formats a duration into a human-readable string.

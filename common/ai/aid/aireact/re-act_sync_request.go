@@ -214,7 +214,7 @@ func (r *ReAct) HandleSyncTypeCancelTaskEvent(event *ypb.AIInputEvent) error {
 		return nil
 	}
 	getTaskById := func(taskId string) aicommon.AIStatefulTask {
-		for _, task := range r.RuntimeTasks {
+		for _, task := range r.GetRuntimeTasks() {
 			if task.GetId() == taskId {
 				return task
 			}
@@ -224,6 +224,10 @@ func (r *ReAct) HandleSyncTypeCancelTaskEvent(event *ypb.AIInputEvent) error {
 	targetTask := getTaskById(targetTaskId)
 	if targetTask == nil {
 		sendError(errors.New("no task to cancel"))
+		return nil
+	}
+	if targetTask.IsFinished() {
+		sendError(errors.New("task already finished"))
 		return nil
 	}
 
@@ -334,7 +338,11 @@ func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent
 
 func (r *ReAct) HandleSyncTypeReactCancelCurrentTaskEvent(event *ypb.AIInputEvent) error {
 	// 中断当前正在执行的任务
-	currentTask := r.GetCurrentTask()
+	currentTask := r.getProcessingRuntimeTask()
+	if currentTask == nil {
+		// Pure-invoker callers and legacy tests may not populate RuntimeTasks.
+		currentTask = r.GetCurrentTask()
+	}
 	if currentTask == nil {
 		r.EmitError("no current task to cancel")
 		return nil

@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-db-cursor-execute"
-	risk: "SQL 注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 标记 DB-API 风格的 cursor.execute、executemany、executescript 等调用。若 SQL 文本或参数拼接自用户输入，易导致 SQL 注入。
 DESC
@@ -26,7 +26,7 @@ alert $output for {
 	title_zh: "数据库游标执行",
 	level: "info",
 	type: "audit",
-	risk: "SQL 注入",
+	risk: "sql-injection",
 	message: "检测到数据库 execute 类 API，请确认 SQL 已参数化且未拼接不可信输入。",
 	name: "output",
 }

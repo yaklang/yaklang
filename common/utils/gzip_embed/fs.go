@@ -27,7 +27,11 @@ type PreprocessingEmbed struct {
 	cacheFile      map[string][]byte
 	sourceFileName string
 	cachedHash     string // 缓存的哈希值
+	decode         DecodeFunc
 }
+
+// DecodeFunc 在读取嵌入式 tar.gz 原始字节后、解压前执行，用于支持 XOR/自定义编码。
+type DecodeFunc func([]byte) ([]byte, error)
 
 func NewEmptyPreprocessingEmbed() *PreprocessingEmbed {
 	return &PreprocessingEmbed{
@@ -38,11 +42,17 @@ func NewEmptyPreprocessingEmbed() *PreprocessingEmbed {
 // NewPreprocessingEmbed create a CompressFS instance
 // fs is embed.FS instance, compressDirs is a map, key is virtual dir, value is compress file name
 func NewPreprocessingEmbed(fs *embed.FS, fileName string, cache bool) (*PreprocessingEmbed, error) {
+	return NewPreprocessingEmbedWithDecode(fs, fileName, cache, nil)
+}
+
+// NewPreprocessingEmbedWithDecode 允许对嵌入的压缩资源做自定义解码（例如 XOR）。
+func NewPreprocessingEmbedWithDecode(fs *embed.FS, fileName string, cache bool, decode DecodeFunc) (*PreprocessingEmbed, error) {
 	cfs := &PreprocessingEmbed{
 		FS:             fs,
 		cacheFile:      map[string][]byte{},
 		sourceFileName: fileName,
 		EnableCache:    cache,
+		decode:         decode,
 	}
 	if cache {
 		err := cfs.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
@@ -60,8 +70,22 @@ func NewPreprocessingEmbed(fs *embed.FS, fileName string, cache bool) (*Preproce
 	return cfs, nil
 }
 
+// NewPreprocessingEmbedWithXORKey 使用固定 XOR key 解码嵌入的压缩资源。
+func NewPreprocessingEmbedWithXORKey(fs *embed.FS, fileName string, cache bool, key []byte) (*PreprocessingEmbed, error) {
+	return NewPreprocessingEmbedWithDecode(fs, fileName, cache, func(raw []byte) ([]byte, error) {
+		if len(key) == 0 {
+			return raw, nil
+		}
+		out := make([]byte, len(raw))
+		for i, b := range raw {
+			out[i] = b ^ key[i%len(key)]
+		}
+		return out, nil
+	})
+}
+
 func (c *PreprocessingEmbed) scanFile(h func(header *tar.Header, reader io.Reader) (error, bool)) error {
-	fp, err := c.FS.Open(c.sourceFileName)
+	fp, err := c.openSource()
 	if err != nil {
 		return utils.Errorf("open file %s failed: %v", c.sourceFileName, err)
 	}
@@ -94,6 +118,26 @@ func (c *PreprocessingEmbed) scanFile(h func(header *tar.Header, reader io.Reade
 		}
 	}
 	return nil
+}
+
+func (c *PreprocessingEmbed) openSource() (io.ReadCloser, error) {
+	fp, err := c.FS.Open(c.sourceFileName)
+	if err != nil {
+		return nil, err
+	}
+	if c.decode == nil {
+		return fp, nil
+	}
+	defer fp.Close()
+	raw, err := io.ReadAll(fp)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.decode(raw)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
 // ReadFile override embed.FS.ReadFile, if file is compress file, return decompress data

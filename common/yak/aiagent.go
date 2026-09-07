@@ -199,7 +199,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 					return nil
 				})
 
-				_, err = engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
+				executedEngine, err := engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
 					"RUNTIME_ID":   runtimeId,
 					"CTX":          ctx,
 					"PLUGIN_NAME":  aiTool.Name + ".yak",
@@ -210,7 +210,17 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 					stderr.Write([]byte(err.Error()))
 					return nil, err
 				}
-				return "", nil
+				// RESULT is the explicit semantic result channel for Yak-backed AI
+				// tools (also used by other Yak execution paths). Log output remains
+				// captured separately as stdout/stderr observations. Do not fall back
+				// to lowercase `result`: many scripts use that name as a loop-local
+				// value, especially concurrent HTTP batches.
+				if executedEngine != nil {
+					if result, ok := executedEngine.GetVar("RESULT"); ok {
+						return result, nil
+					}
+				}
+				return nil, nil
 			}))
 		if err != nil {
 			log.Errorf(`at.NewFromMCPTool(tool): %v`, err)

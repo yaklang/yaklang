@@ -18,7 +18,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
 		if mustProcessMentionedInfo && hasAttachedKnowledgeBaseResource(attachedResources) {
-			loop.LoadingStatus("开始处理用户提及的数据（@ Mentionup） / Start to process user-mentioned data (@ Mentionup)")
+			loop.UserStatus("开始处理用户提及的数据（@ Mentionup）", "Start to process user-mentioned data (@ Mentionup)")
 			err := ProcessAttachedData(r, loop, task, operator, attachedResources)
 			if err != nil {
 				log.Errorf("failed to process attached data: %v", err)
@@ -43,7 +43,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		if config.GetConfigBool("DisableIntentRecognition") {
 			log.Infof("intent recognition disabled via config, skipping")
 		} else {
-			loop.LoadingStatus("开始意图识别 / Start intent recognition")
+			loop.UserStatus("开始意图识别", "Start intent recognition")
 			userInput := task.GetUserInput()
 			capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), userInput)
 
@@ -53,7 +53,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			needsDeepIntent := false
 
 			if scale.IsMicroOrSmall() {
-				loop.LoadingStatus("快速意图识别 / Fast intent recognition")
+				loop.UserStatus("快速意图识别", "Fast intent recognition")
 				result := FastIntentMatch(r, userInput)
 				if result != nil {
 					applyCapabilityMatchesToFastMatchResult(result, capabilityNameMatches)
@@ -70,7 +70,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 
 			if needsDeepIntent {
-				loop.LoadingStatus("深度意图识别 / Deep intent recognition")
+				loop.UserStatus("深度意图识别", "Deep intent recognition")
 				log.Infof("invoking deep intent recognition (scale=%s)", scale.String())
 				deepResult := executeDeepIntentRecognition(r, loop, task)
 				if deepResult != nil {

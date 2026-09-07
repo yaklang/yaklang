@@ -96,7 +96,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 				forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-code-sample", "reason"))
 			}
 
-			reactloops.EmitStatus(loop, "开始分析用户需求... / Analyzing user requirements...")
+			reactloops.EmitStatusI18n(loop, "开始分析用户需求...", "Analyzing user requirements...")
 			step1Result, err := r.InvokeSpeedPriorityLiteForge(
 				task.GetContext(),
 				"analyze-requirement-and-search",
@@ -130,8 +130,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 		if pinned := BuildPinnedAPISection(pinnedLibs); pinned != "" {
 			loop.Set("pinned_apis", pinned)
 			loop.Set("pinned_libraries", strings.Join(pinnedLibs, ","))
-			reactloops.EmitStatus(loop, fmt.Sprintf("已锁定核心库 API: %s / Pinned core library APIs: %s",
-				strings.Join(pinnedLibs, ", "), strings.Join(pinnedLibs, ", ")))
+			libraries := strings.Join(pinnedLibs, ", ")
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("已锁定核心库 API：%s", libraries),
+				fmt.Sprintf("Pinned core library APIs: %s", libraries),
+			)
+
 			log.Infof("pinned core library APIs for libs: %v (%d bytes)", pinnedLibs, len(pinned))
 		}
 		if dsl := BuildPinnedDSLSection(); dsl != "" {
@@ -161,7 +166,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 			// Step 2.1: Grep
 			if docSearcher != nil && len(searchPatterns) > 0 {
 				log.Infof("init task step 2.1: grep searching code samples with %d patterns", len(searchPatterns))
-				reactloops.EmitStatus(loop, "开始搜索相关代码样例... / Searching for relevant code examples...")
+				reactloops.EmitStatusI18n(loop, "开始搜索相关代码样例...", "Searching for relevant code examples...")
 
 				patternTotal := 0
 				for _, pattern := range searchPatterns {
@@ -192,10 +197,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 					}
 
 					searchedCount++
-					reactloops.EmitStatus(loop, fmt.Sprintf(
-						"Grep 搜索 %d/%d / Grep search %d/%d",
-						searchedCount, patternTotal, searchedCount, patternTotal,
-					))
+					reactloops.EmitStatusI18n(
+						loop,
+						fmt.Sprintf("Grep 搜索 %d/%d", searchedCount, patternTotal),
+						fmt.Sprintf("Grep search %d/%d", searchedCount, patternTotal),
+					)
 
 					hits := GrepResultsToSampleHits(pattern, results, grepMaxHitsPerPattern)
 					allHits = append(allHits, hits...)
@@ -232,10 +238,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 
 						log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
 						searchedQuestions++
-						reactloops.EmitStatus(loop, fmt.Sprintf(
-							"语义搜索 %d/%d / Semantic search %d/%d",
-							searchedQuestions, questionTotal, searchedQuestions, questionTotal,
-						))
+						reactloops.EmitStatusI18n(
+							loop,
+							fmt.Sprintf("语义搜索 %d/%d", searchedQuestions, questionTotal),
+							fmt.Sprintf("Semantic search %d/%d", searchedQuestions, questionTotal),
+						)
 
 						results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
 						if err != nil {
@@ -291,7 +298,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 				searchQuery := searchQueryBuilder.String()
 
 				ctx := task.GetContext()
-				reactloops.EmitStatus(loop, "压缩样例中 / Compressing samples...")
+				reactloops.EmitStatusI18n(loop, "压缩样例中", "Compressing samples...")
 				initialSamples = FinalizeSearchResults(ctx, allHits, searchQuery, r)
 				log.Infof("initial samples finalized, hit count: %d, final size: %d bytes", len(allHits), len(initialSamples))
 
@@ -305,7 +312,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 					loop.Set("init_search_manifest", manifest.JSON())
 					loop.Set("init_samples_ready", "true")
 
-					reactloops.EmitStatus(loop, "样例准备完成 / Samples ready")
+					reactloops.EmitStatusI18n(loop, "样例准备完成", "Samples ready")
 					summary, reference := reactloops.SpillLongContent(loop, "init_yaklang_samples", initialSamples)
 					reactloops.EmitActionLog(loop, "yaklang-init-search",
 						fmt.Sprintf("初始化代码样例: %s (%d 条命中) / Init code samples: %s (%d hits)",

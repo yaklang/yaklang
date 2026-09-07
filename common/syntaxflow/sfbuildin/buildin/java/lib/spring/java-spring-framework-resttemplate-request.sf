@@ -186,5 +186,5 @@ throw new SecurityException("URL is not whitelisted");
 #### 4. 考虑使用更安全的HTTP客户端库
 如Apache HttpClient或OkHttp，这些库提供了更丰富的安全特性和配置选项。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }

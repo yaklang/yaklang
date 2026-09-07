@@ -333,7 +333,7 @@
 *. 每次信息收集后及时调用 `output_facts` 记录发现
 *. 确保 FACTS 中的每条事实都是具体、可验证的
 *. 在确信信息足够后调用 `finish_exploration`
-*. 如果到最后一轮迭代仍未调用 `finish_exploration`，系统会自动结束并基于已有信息生成计划
+*. 当事实足以支撑可执行计划时立即调用 `finish_exploration`；不要等待或猜测宿主的执行边界
 {{ end }}
 
 # 用户诉求

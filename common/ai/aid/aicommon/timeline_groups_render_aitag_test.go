@@ -470,7 +470,7 @@ func TestGroupByMinutes_Boundary_MixedTypesInBucket(t *testing.T) {
 	blocks := tl.GroupByMinutes(3).GetBlocks()
 	require.Len(t, blocks, 1)
 	body := blocks[0].Render()
-	require.Contains(t, body, "[tool/a ok]")
+	require.Contains(t, body, "[tool/a]")
 	require.Contains(t, body, "[user/free_input]")
 	require.Contains(t, body, "[text/note]")
 

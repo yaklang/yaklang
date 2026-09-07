@@ -214,6 +214,7 @@ if action == "format" {
     }
     yakit.Info("=== Formatted %s ===", str.ToUpper(fromFmt))
     yakit.Info("%s", output)
+    RESULT = output
     return
 }
 
@@ -231,3 +232,4 @@ if err != nil {
 
 yakit.Info("=== Converted %s -> %s ===", str.ToUpper(fromFmt), str.ToUpper(toFmt))
 yakit.Info("%s", output)
+RESULT = output

@@ -58,17 +58,23 @@ func NewSubAgentHandle(subTaskID, identifier string, subTask aicommon.AIStateful
 
 // LastActivityAt 返回该子 Agent 最近一次有进展的时间戳.
 //
-// 优先读 SubLoop.GetLastIterationTickAt() (原子读, 无锁), 它由子 Agent 的
-// 主循环每轮 iteration 推进; fallback 到 StartedAt (子 Agent 刚启动,
-// 子 loop 还没 tick 过).
+// 优先: 子 loop 有 in-flight 工具时视为"现在" (全仓 grep 不会推进
+// iteration, 但仍算有进度). 其次读 lastObservedActivityNano (iteration
+// tick 与工具活动的较新值). fallback 到 StartedAt.
 //
-// 关键词: LastActivityAt, 子 Agent 进度时间戳, lastIterationTickAt 原子读
+// 关键词: LastActivityAt, 子 Agent 进度时间戳, 工具 in-flight 旁路
 func (h *SubAgentHandle) LastActivityAt() time.Time {
 	if h == nil {
 		return time.Time{}
 	}
 	if h.SubLoop != nil {
-		if tick := h.SubLoop.GetLastIterationTickAt(); tick > 0 {
+		// 子 Agent 正在跑工具时, iteration 不会前进, 但必须算作"还在动",
+		// 否则父 loop 的 stall 旁路会在 10 分钟后失效, 30 分钟 hard abort
+		// 误杀整个类别扫描 (Phase2 + fast_context + 全仓 grep).
+		if h.SubLoop.HasInflightToolActivity() {
+			return time.Now()
+		}
+		if tick := h.SubLoop.lastObservedActivityNano(); tick > 0 {
 			return time.Unix(0, tick)
 		}
 	}

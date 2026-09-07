@@ -1,7 +1,7 @@
 desc(
 	title_zh: "审计Java J2EE 使用socket"
 	title: "Audit Java J2EE Usage of Socket"
-	risk:"代码风格",
+	risk:"code-style"
 	reference: <<<REFERENCE
 [CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 [Java Socket Documentation](http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html)
@@ -149,7 +149,7 @@ resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCod
 对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
 SOLUTION
 	name: "weak",
-	risk: "代码风格",
+	risk: "code-style",
 }
 
 

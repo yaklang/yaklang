@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -60,40 +61,49 @@ var (
 
 const mitmRequestHijackAtTimingKey = "yakit_mitm_request_hijack_at_unix_ms"
 
-const storedMITMBareRequestTruncateNotice = "[[yakit: original request body truncated for storage, original=%s, limit=%s]]"
+// wrapMITMV2ExtraIncomingConn preserves the generic extra-connection contract:
+// an arbitrary injected net.Conn is still a normal proxy frontend connection.
+// Only producers that explicitly implement minimartian.TransparentConn may
+// provide an original destination and bypass frontend SOCKS5 detection.
+func wrapMITMV2ExtraIncomingConn(conn net.Conn, strongHostLocalAddr string) (*minimartian.WrapperedConn, error) {
+	if conn == nil {
+		return nil, utils.Error("mitm: extra incoming connection is nil")
+	}
 
-// truncateMITMBareRequestForStorage bounds the original request snapshot that
-// is persisted to project KV after a request is modified. Large-request spill
-// sidecars protect the normal HTTPFlow request, but the bare/original request
-// is stored independently and must not bypass the same global body limit.
-func truncateMITMBareRequestForStorage(packet []byte) (stored []byte, truncated bool, originalBodyLen, limit int) {
+	transparentConn, ok := conn.(minimartian.TransparentConn)
+	if !ok {
+		return minimartian.NewWrapperedConnWithStrongLocalHost(conn, strongHostLocalAddr, nil), nil
+	}
+
+	originalAddr := transparentConn.OriginalDestination()
+	if originalAddr == nil {
+		return nil, utils.Error("mitm: transparent incoming connection has no original destination")
+	}
+	originalDestination := originalAddr.String()
+	targetHost, targetPort, err := utils.ParseStringToHostPort(originalDestination)
+	if err != nil {
+		return nil, utils.Errorf("mitm: transparent incoming connection has invalid original destination %q: %v", originalDestination, err)
+	}
+	if targetHost == "" || targetPort <= 0 {
+		return nil, utils.Errorf("mitm: transparent incoming connection has invalid original destination %q", originalDestination)
+	}
+
+	return minimartian.NewWrapperedConnWithStrongLocalHostAndOriginalDestination(
+		conn,
+		strongHostLocalAddr,
+		originalDestination,
+		nil,
+	), nil
+}
+
+// prepareMITMBareRequestForStorage stores original requests with the same
+// fuzzable representation used by MITM and HTTPFlow. No bytes are truncated:
+// editor-facing bodies above D become engine sidecars. Inline binary bodies
+// are measured after their exact {{unquote}} expansion.
+func prepareMITMBareRequestForStorage(packet []byte) (stored []byte, externalized bool, originalBodyLen, limit int, err error) {
 	limit = yakit.GetMaxHTTPFlowRequestBodyInDBBytes()
-	if len(packet) == 0 || limit <= 0 {
-		return packet, false, 0, limit
-	}
-
-	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
-	originalBodyLen = len(body)
-	if originalBodyLen <= limit {
-		return packet, false, originalBodyLen, limit
-	}
-
-	notice := []byte(fmt.Sprintf(
-		storedMITMBareRequestTruncateNotice,
-		utils.ByteSize(uint64(originalBodyLen)),
-		utils.ByteSize(uint64(limit)),
-	))
-	keep := limit - len(notice)
-	if keep < 0 {
-		// The UI currently configures this value in MiB, so the notice normally
-		// fits. Keep the hard storage bound even for an unusually tiny limit.
-		keep = 0
-		notice = notice[:limit]
-	}
-	bodyForStorage := make([]byte, keep+len(notice))
-	copy(bodyForStorage, body[:keep])
-	copy(bodyForStorage[keep:], notice)
-	return lowhttp.ReplaceHTTPPacketBody([]byte(header), bodyForStorage, false), true, originalBodyLen, limit
+	stored, externalized, originalBodyLen, err = yakit.PrepareFuzzableHTTPRequestForStorage(packet)
+	return stored, externalized, originalBodyLen, limit, err
 }
 
 func cacheModifiedPlainResponseBytes(req *http.Request, plainResponse []byte) {
@@ -224,23 +234,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 	feedbackToUser := feedbackFactory(s.GetProjectDatabase(), execFeedback, false, "")
 
-	getPlainRequestBytes := func(req *http.Request) []byte {
-		if req != nil && httpctx.GetRequestTooLarge(req) {
-			if cached := httpctx.GetRequestDisplayPacket(req); len(cached) > 0 {
-				return cached
-			}
-		}
-		var plainRequest []byte
-		if httpctx.GetRequestIsModified(req) {
-			plainRequest = httpctx.GetHijackedRequestBytes(req)
-		} else {
-			plainRequest = httpctx.GetPlainRequestBytes(req)
-			if len(plainRequest) <= 0 {
-				plainRequest = decodeAndCachePlainRequestBytesIfStorable(req, httpctx.GetBareRequestBytes(req))
-			}
-		}
-		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
-	}
+	getPlainRequestBytes := getMITMDisplayRequestBytes
 	firstReq, err := stream.Recv()
 	if err != nil {
 		return utils.Errorf("recv first req failed: %s", err)
@@ -543,7 +537,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 	hijackListFeedback := func(action string, resp ...*ypb.SingleManualHijackInfoMessage) {
 		for _, message := range resp { // utf8 check
-			if lowhttp.IsMultipartFormDataRequest(message.Request) || !utf8.Valid(message.Request) {
+			if !utf8.Valid(message.Request) {
+				// Multipart conversion evaluates every part independently, so only
+				// invalid UTF-8 part bodies become editable {{unquote}} values.
 				message.Request = lowhttp.ConvertHTTPRequestToFuzzTag(message.Request)
 			}
 
@@ -1029,7 +1025,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				return nil
 			}
 			httpctx.AppendMatchedRule(req, rules...)
-			if packetModified(rsp, rspHooked) {
+			// 规则在 FixHTTPResponse 规范化后的报文上匹配/替换, 因此判定基准是规范化报文
+			// 而非原始报文: 未命中时 Hook 返回的规范化报文与基准一致, 不会误判为规则修改。
+			ruleHookBaseline, _, err := lowhttp.FixHTTPResponse(rsp)
+			if err != nil {
+				ruleHookBaseline = rsp
+			}
+			if packetModified(ruleHookBaseline, rspHooked) {
 				httpctx.SetResponseModified(req, "yakit.rule.hook")
 				httpctx.SetHijackedResponseBytes(req, rspHooked)
 				rsp = rspHooked
@@ -1055,10 +1057,23 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		taskInfo.Status = Hijack_Status_Response
-		taskInfo.Request = httpctx.GetRequestBytes(req)
+		// Keep the same bounded editor representation when the task moves from
+		// request hijacking to response hijacking. Restoring RequestBytes here
+		// reintroduced the complete upload; hijackListFeedback would then turn
+		// invalid UTF-8 into a multi-times-larger {{unquote}} packet and could
+		// exceed the gRPC send limit.
+		displayReq := getMITMDisplayRequestBytes(req)
+		if len(displayReq) == 0 {
+			displayReq = yakit.PrepareLargeHTTPFlowRequest(req, lowhttp.DeletePacketEncoding(httpctx.GetRequestBytes(req)))
+		}
+		taskInfo.Request = displayReq
 		taskInfo.Response = rsp
 		if viewReq, _, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok {
-			taskInfo.Request = viewReq
+			if httpctx.GetRequestTooLarge(req) && len(displayReq) > 0 {
+				taskInfo.Request = displayReq
+			} else {
+				taskInfo.Request = viewReq
+			}
 		}
 		if viewRsp, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Response); ok && st != nil {
 			taskInfo.Response = viewRsp
@@ -1472,6 +1487,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 		sendPacket := taskInfo.Request
+		largeRequestBodyFile := httpctx.GetRequestTooLargeBodyFile(originReqIns)
+		sendPacketIsMultipartSpill := yakit.IsMultipartSpillRequestPacket(sendPacket)
+		sendPacketIsFlatSpill := yakit.IsFlatSpillRequestPacket(sendPacket)
 		largeRequestReplacements := newManualLargeRequestReplacementStore()
 		defer largeRequestReplacements.close()
 		notifyLargeRequestReplacementError := func(err error) {
@@ -1523,11 +1541,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 				if controlReq.GetIsLargeRequestFileChunk() {
 					replaceBody := controlReq.GetLargeRequestReplaceBody()
-					if replaceBody && !yakit.IsFlatSpillRequestPacket(sendPacket) {
+					if replaceBody && !sendPacketIsFlatSpill {
 						notifyLargeRequestReplacementError(utils.Error("current request is not an oversized non-multipart body"))
 						continue
 					}
-					if !replaceBody && !yakit.IsMultipartSpillRequestPacket(sendPacket) {
+					if !replaceBody && !sendPacketIsMultipartSpill {
 						notifyLargeRequestReplacementError(utils.Error("current request is not an oversized multipart skeleton"))
 						continue
 					}
@@ -1586,40 +1604,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						break
 					}
 					pipelineTracker.persistFinished(flow, persisted)
+					if !persisted {
+						yakit.CleanupPreparedLargeHTTPFlowRequest(originReqIns)
+					}
 					return nil
 				}
 
 				if controlReq.GetForward() {
-					if largeRequestReplacements.hasActive() {
-						notifyLargeRequestReplacementError(utils.Error("large request replacement upload is still in progress"))
-						continue
-					}
-					if largeRequestReplacements.hasCompleted() {
-						var (
-							current []byte
-							err     error
-						)
-						if yakit.IsMultipartSpillRequestPacket(sendPacket) {
-							current, err = rebuildMultipartRequest(sendPacket)
-						} else {
-							current, err = rebuildFlatRequest(sendPacket)
-						}
-						if err != nil {
-							notifyLargeRequestReplacementError(err)
-							continue
-						}
-						if _, err := yakit.RefreshPreparedLargeHTTPFlowRequest(originReqIns, current); err != nil {
-							notifyLargeRequestReplacementError(utils.Wrap(err, "refresh replaced request spill"))
-							continue
-						}
-						if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
-							if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
-								current = encoded
-							}
-						}
-						setModifiedRequest("user.large-request-file-replacement", current)
-						return current
-					}
+					// Forward is an explicit "send original" action. Uploaded
+					// replacements and editor state are applied only by SendPacket.
+					// The deferred replacement-store cleanup discards any abandoned
+					// upload without changing the wire request or HTTPFlow semantics.
 					return req
 				}
 
@@ -1631,21 +1626,29 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					// 这里是用户自定义的请求
 					current := controlReq.GetRequest()
 					taskInfo.Request = current // use for front ,should not render fuzztag
-					if bytes.Contains(current, []byte{'{', '{'}) || bytes.Contains(current, []byte{'}', '}'}) {
-						// 在这可能包含 fuzztag
-						result := mutate.MutateQuick(current)
-						if len(result) > 0 {
-							current = []byte(result[0])
-						}
-					}
 
 					requestModified := packetModified(sendPacket, current)
 					// 没改动且没有替换文件时，保持 forward 行为（避免因重新压缩导致“被修改”误判）
 					if !requestModified && !largeRequestReplacements.hasCompleted() {
 						return req
 					}
-					largeRequestRebuilt := false
-					if yakit.IsMultipartSpillRequestPacket(current) {
+
+					// The packet contains the file-compatible resource tag syntax. The
+					// original sidecar/manifest context supplies replacement mapping;
+					// no MITM-specific fuzztag dialect is involved.
+					current, resourceCount, err := renderMITMV2SubmittedRequest(
+						current,
+						largeRequestBodyFile,
+						sendPacketIsMultipartSpill,
+						largeRequestReplacements,
+					)
+					if err != nil {
+						notifyLargeRequestReplacementError(err)
+						continue
+					}
+
+					largeRequestRebuilt := resourceCount > 0
+					if resourceCount == 0 && yakit.IsMultipartSpillRequestPacket(current) {
 						rebuilt, err := rebuildMultipartRequest(current)
 						if err != nil {
 							notifyLargeRequestReplacementError(err)
@@ -1653,7 +1656,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						}
 						current = rebuilt
 						largeRequestRebuilt = true
-					} else if yakit.IsFlatSpillRequestPacket(current) {
+					} else if resourceCount == 0 && yakit.IsFlatSpillRequestPacket(current) {
 						rebuilt, err := rebuildFlatRequest(current)
 						if err != nil {
 							notifyLargeRequestReplacementError(err)
@@ -1661,9 +1664,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						}
 						current = rebuilt
 						largeRequestRebuilt = true
-					} else if largeRequestReplacements.hasCompleted() {
+					} else if resourceCount == 0 && largeRequestReplacements.hasCompleted() {
 						notifyLargeRequestReplacementError(utils.Error("large request replacement marker was removed from the edited request"))
 						continue
+					} else if sendPacketIsMultipartSpill || sendPacketIsFlatSpill {
+						// The user may replace the generated file tag with literal body
+						// data. It is still a completed edit of a spilled request and the
+						// HTTPFlow snapshot must be refreshed to match the wire packet.
+						largeRequestRebuilt = true
 					}
 					if largeRequestRebuilt {
 						if _, err := yakit.RefreshPreparedLargeHTTPFlowRequest(originReqIns, current); err != nil {
@@ -1711,7 +1719,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 
-		plainRequest := getPlainRequestBytes(req)
+		plainRequest := getMITMPlainRequestBytes(req)
 		hasMirrorHTTPFlowHooks := hotPatchPipeline.HasMirrorHTTPFlowHooks()
 		plainResponse := getMITMMirrorPlainResponseBytes(req, hasMirrorHTTPFlowHooks)
 		responseOverSize := false
@@ -1786,18 +1794,22 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					log.Warnf("drop filtered HTTP stream flow failed: %v", err)
 				}
 			}
+			yakit.CleanupPreparedLargeHTTPFlowRequest(req)
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
 			// 存储KV，将flow ID作为key，bare request和bare response作为value
 			if httpctx.GetRequestIsModified(req) {
-				bareReq := httpctx.GetBareRequestBytes(req)
-				bareReq, truncated, originalBodyLen, limit := truncateMITMBareRequestForStorage(bareReq)
-				if truncated {
+				bareReq, externalized, originalBodyLen, limit, prepareErr := prepareMITMBareRequestForStorage(httpctx.GetBareRequestBytes(req))
+				if prepareErr != nil {
+					log.Errorf("prepare original MITM request for storage failed: %v", prepareErr)
+					bareReq = nil
+				}
+				if externalized {
 					sendLogged(&ypb.MITMV2Response{
 						HaveNotification: true,
 						NotificationContent: []byte(fmt.Sprintf(
-							"原始请求 Body 大小为 %s，超过全局转储数据包大小 %s，HTTP History 中的原始请求仅保存截断内容",
+							"原始请求 Body 大小为 %s，已按转储上限 %s 保存为可发送的文件资源引用",
 							utils.ByteSize(uint64(originalBodyLen)),
 							utils.ByteSize(uint64(limit)),
 						)),
@@ -1807,7 +1819,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 				if len(bareReq) > 0 && id > 0 {
 					keyStr := strconv.FormatUint(uint64(id), 10) + "_request"
-					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
+					if err := yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP); err != nil {
+						// The sidecar was created specifically for this KV snapshot.
+						// If persistence fails there is no Flow deletion path left to
+						// own it, so release it immediately.
+						yakit.CleanupFuzzableHTTPRequestResources(bareReq)
+						log.Errorf("save original MITM request failed: %v", err)
+					}
 				}
 			}
 
@@ -1850,6 +1868,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			) // , !responseOverSize)
 		}
 		if flowErr != nil {
+			yakit.CleanupPreparedLargeHTTPFlowRequest(req)
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, flowErr)
 			return
 		}
@@ -2023,6 +2042,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 			if err != nil {
 				yakit.ReleaseHTTPFlowPersistResources(flow)
+				yakit.CleanupPreparedLargeHTTPFlowRequest(req)
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else {
 				if needUpdate {
@@ -2047,6 +2067,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				}
 			}
 			yakit.ReleaseHTTPFlowPersistResources(flow)
+			yakit.CleanupPreparedLargeHTTPFlowRequest(req)
 		}
 	}
 	// 核心 MITM 服务器
@@ -2065,18 +2086,37 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	go func() {
 		for {
 			select {
-			case conn := <-extraIncome.OutputChannel():
-				wrapperConnChan <- minimartian.NewWrapperedConnWithStrongLocalHost(conn, publicIP.String(), nil)
+			case conn, ok := <-extraIncome.OutputChannel():
+				if !ok {
+					return
+				}
+				if conn == nil {
+					continue
+				}
+				wrapped, wrapErr := wrapMITMV2ExtraIncomingConn(conn, publicIP.String())
+				if wrapErr != nil {
+					log.Errorf("wrap mitm extra incoming connection failed: %v", wrapErr)
+					_ = conn.Close()
+					continue
+				}
+				select {
+				case wrapperConnChan <- wrapped:
+				case <-streamCtx.Done():
+					_ = conn.Close()
+					return
+				}
 			case <-streamCtx.Done():
 				return
 			}
 		}
 	}()
 
+	if randomJA3 {
+		opts = append(opts, crep.MITM_RandomJA3(true))
+	}
 	opts = append(opts,
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
-		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_SetSNI(sni, overwriteSNI),
 		crep.MITM_SetSNIMapping(sniMapping),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),

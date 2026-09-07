@@ -15,7 +15,6 @@ import (
 	"os/user"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	ws "github.com/gorilla/websocket"
@@ -251,7 +250,7 @@ func InGithubActions() bool {
 
 func InTestcase() bool {
 	if len(os.Args) > 0 {
-		if strings.HasSuffix(strings.ToLower(os.Args[1]), ".test") {
+		if strings.HasSuffix(strings.ToLower(os.Args[0]), ".test") {
 			return true
 		}
 	}
@@ -267,7 +266,7 @@ func InTestcase() bool {
 }
 
 func Debug(f func()) {
-	if InDebugMode() || testing.Testing() {
+	if InDebugMode() || InTestcase() {
 		f()
 	}
 }

@@ -99,13 +99,13 @@ var readJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			invoker := loop.GetInvoker()
 			startLine := fmt.Sprintf("读取 Java 文件: %s", filePath)
 			reactloops.EmitActionLog(loop, nodeID, startLine)
-			reactloops.EmitStatus(loop, "读取文件中 / Reading File...")
+			reactloops.EmitStatusI18n(loop, "读取文件中", "Reading File...")
 
 			fs := filesys.NewLocalFs()
 			content, err := fs.ReadFile(filePath)
 			if err != nil {
 				log.Errorf("[read_java_file] failed to read %s: %v", filePath, err)
-				reactloops.EmitStatus(loop, "读取失败 / Read Failed")
+				reactloops.EmitStatusI18n(loop, "读取失败", "Read Failed")
 				r.AddToTimeline("read_file_failed", fmt.Sprintf(`【读取文件失败】无法读取文件内容：%s
 
 【错误信息】：%v
@@ -143,7 +143,7 @@ var readJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			qualityLevel := getQualityLevel(analysis)
 			finishLine := fmt.Sprintf("完成: %s (%d 行, %d 字节, 质量 %s)",
 				filepath.Base(filePath), len(lines), len(contentStr), qualityLevel)
-			reactloops.EmitStatus(loop, "读取完成 / Read Complete")
+			reactloops.EmitStatusI18n(loop, "读取完成", "Read Complete")
 
 			reference := fmt.Sprintf("文件: %s\n行数: %d\n质量: %s\n分析:\n%s\n\n预览:\n%s",
 				savedPath, len(lines), qualityLevel, formatAnalysis(analysis), preview)

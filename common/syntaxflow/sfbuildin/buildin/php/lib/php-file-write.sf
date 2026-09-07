@@ -125,7 +125,7 @@ if (file_put_contents($filePath, $content) === false) {
 ```
 通过以上措施，可以有效防止任意文件写入漏洞的发生，保障系统的安全性。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则描述
 #### 1. 规则目的

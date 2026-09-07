@@ -5,17 +5,28 @@ import (
 	"os"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// EmitStatus 发送瞬时状态（状态栏覆盖显示）
-// message 格式必须为双语：中文 / English
-// 示例: "查询流量中 / Querying Flows..."
+// EmitStatus 发送瞬时状态（状态栏覆盖显示）。历史双语字符串会拆分为
+// value（默认中文）与 value_i18n。
+// Deprecated: 仅供外部旧调用兼容；生产代码应使用 EmitStatusI18n。
 func EmitStatus(loop *ReActLoop, message string) {
 	if loop == nil || message == "" {
 		return
 	}
-	loop.LoadingStatus(message)
+	zh, en := aicommon.SplitLegacyStatusI18n(message)
+	loop.UserStatus(zh, en)
+}
+
+// EmitStatusI18n emits a product-facing status with structured metadata while
+// retaining a Chinese string value for legacy clients.
+func EmitStatusI18n(loop *ReActLoop, zh, en string, options ...aicommon.StatusOption) {
+	if loop == nil || (zh == "" && en == "") {
+		return
+	}
+	loop.UserStatus(zh, en, options...)
 }
 
 // emitProgress 发送进度状态（带百分比和计数）
@@ -31,11 +42,13 @@ func EmitProgress(loop *ReActLoop, current, total int, actionZh, actionEn string
 		percent = 100
 	}
 
-	message := fmt.Sprintf("%s %d%% (%d/%d) / %s %d%% (%d/%d)",
-		actionZh, percent, current, total,
-		actionEn, percent, current, total)
-
-	EmitStatus(loop, message)
+	EmitStatusI18n(
+		loop,
+		fmt.Sprintf("%s %d%%（%d/%d）", actionZh, percent, current, total),
+		fmt.Sprintf("%s %d%% (%d/%d)", actionEn, percent, current, total),
+		aicommon.WithStatusCode("progress"),
+		aicommon.WithStatusProgress(int64(current), int64(total), "item"),
+	)
 }
 
 // EmitActionLog 输出 Action 的累积日志

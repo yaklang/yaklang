@@ -2,7 +2,7 @@ desc(
 	title_zh: "检测Java cn.hutool.captcha验证码不受控资源消耗漏洞"
 	title: "Check Java cn.hutool.captcha Uncontrolled Resource Consumption Vulnerability"
 	type: vuln
-	risk:DDOS
+	risk:"denial-of-service"
 	reference: <<<REFERENCE
 [CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
 REFERENCE
@@ -111,7 +111,7 @@ throw new RuntimeException(e);
 2. **优先使用预定义的或服务内部控制的固定尺寸**
 如果业务场景允许，尽量避免让用户直接控制验证码的尺寸，而是使用应用程序内部预定义的安全固定尺寸。
 SOLUTION
-	risk: "DDOS",
+	risk: "denial-of-service",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -143,7 +143,7 @@ $result - $mid as $low;
 alert $low for {
 	level: "low",
 	message: "发现可能存在Java cn.hutool.captcha验证码拒绝服务漏洞。",
-	risk: "DDOS",
+	risk: "denial-of-service",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

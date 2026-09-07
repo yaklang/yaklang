@@ -3,13 +3,13 @@ package aibalance
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
 func TestEnableThinkingConfig_Aibalance(t *testing.T) {
-	t.Run("thinking true sets pointer", func(t *testing.T) {
+	t.Run("thinking true sets ThinkingLevel=high", func(t *testing.T) {
 		client := &GatewayClient{}
 		client.LoadOption(
 			aispec.WithType("aibalance"),
@@ -17,13 +17,10 @@ func TestEnableThinkingConfig_Aibalance(t *testing.T) {
 			aispec.WithModel("memfit-qwen3.5-plus-free"),
 			aispec.WithEnableThinking(true),
 		)
-		require.NotNil(t, client.config.EnableThinking)
-		if !*client.config.EnableThinking {
-			t.Fatalf("expected EnableThinking=true")
-		}
+		assert.Equal(t, "high", client.config.ThinkingLevel)
 	})
 
-	t.Run("thinking false sets pointer", func(t *testing.T) {
+	t.Run("thinking false sets ThinkingLevel=none", func(t *testing.T) {
 		client := &GatewayClient{}
 		client.LoadOption(
 			aispec.WithType("aibalance"),
@@ -31,22 +28,17 @@ func TestEnableThinkingConfig_Aibalance(t *testing.T) {
 			aispec.WithModel("memfit-qwen3.5-plus-free"),
 			aispec.WithEnableThinking(false),
 		)
-		require.NotNil(t, client.config.EnableThinking)
-		if *client.config.EnableThinking {
-			t.Fatalf("expected EnableThinking=false")
-		}
+		assert.Equal(t, "none", client.config.ThinkingLevel)
 	})
 
-	t.Run("no thinking option leaves nil", func(t *testing.T) {
+	t.Run("no thinking option leaves empty", func(t *testing.T) {
 		client := &GatewayClient{}
 		client.LoadOption(
 			aispec.WithType("aibalance"),
 			aispec.WithAPIKey("test-key"),
 			aispec.WithModel("memfit-qwen3.5-plus-free"),
 		)
-		if client.config.EnableThinking != nil {
-			t.Fatalf("expected EnableThinking=nil, got %v", client.config.EnableThinking)
-		}
+		assert.Empty(t, client.config.ThinkingLevel)
 	})
 }
 
@@ -58,45 +50,34 @@ func TestEnableThinkingConfig_Tongyi(t *testing.T) {
 			aispec.WithModel("qwen3.5-plus"),
 			aispec.WithEnableThinking(true),
 		)
-		require.NotNil(t, config.EnableThinking)
-		if !*config.EnableThinking {
-			t.Fatalf("expected EnableThinking=true")
-		}
+		assert.Equal(t, "high", config.ThinkingLevel)
 	})
 
-	t.Run("tongyi no thinking option leaves nil", func(t *testing.T) {
+	t.Run("tongyi no thinking option leaves empty", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
 			aispec.WithType("tongyi"),
 			aispec.WithAPIKey("test-key"),
 			aispec.WithModel("qwen3.5-plus"),
 		)
-		if config.EnableThinking != nil {
-			t.Fatalf("expected EnableThinking=nil")
-		}
+		assert.Empty(t, config.ThinkingLevel)
 	})
 }
 
 func TestEnableThinkingConfig_GenericDefault(t *testing.T) {
-	t.Run("no type still sets pointer", func(t *testing.T) {
+	t.Run("no type still sets ThinkingLevel=high", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
 			aispec.WithEnableThinking(true),
 		)
-		require.NotNil(t, config.EnableThinking)
-		if !*config.EnableThinking {
-			t.Fatalf("expected EnableThinking=true")
-		}
+		assert.Equal(t, "high", config.ThinkingLevel)
 	})
 
-	t.Run("openai type sets pointer", func(t *testing.T) {
+	t.Run("openai type sets ThinkingLevel=high", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
 			aispec.WithType("openai"),
 			aispec.WithAPIKey("test-key"),
 			aispec.WithEnableThinking(true),
 		)
-		require.NotNil(t, config.EnableThinking)
-		if !*config.EnableThinking {
-			t.Fatalf("expected EnableThinking=true")
-		}
+		assert.Equal(t, "high", config.ThinkingLevel)
 	})
 }
 
@@ -107,11 +88,8 @@ func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 			aispec.WithAPIKey("test-key"),
 			aispec.WithEnableThinking(true),
 		)
-		require.NotNil(t, config.EnableThinking)
-		if !*config.EnableThinking {
-			t.Fatalf("expected EnableThinking=true")
-		}
-		m := aispec.ThinkingExtraBodyForProvider(config.Type, config.Model, config.BaseURL, config.Domain, *config.EnableThinking)
+		assert.Equal(t, "high", config.ThinkingLevel)
+		m := aispec.ThinkingExtraBodyForProvider(config.Type, config.Model, config.BaseURL, config.Domain, "", config.ThinkingLevel)
 		inner, ok := m["thinking"].(map[string]any)
 		if !ok {
 			t.Fatalf("expected thinking map, got %T", m["thinking"])
@@ -128,9 +106,6 @@ func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 			aispec.WithModel("deepseek-ai/DeepSeek-V4-Flash"),
 			aispec.WithEnableThinking(true),
 		)
-		require.NotNil(t, config.EnableThinking)
-		if !*config.EnableThinking {
-			t.Fatalf("expected EnableThinking=true")
-		}
+		assert.Equal(t, "high", config.ThinkingLevel)
 	})
 }

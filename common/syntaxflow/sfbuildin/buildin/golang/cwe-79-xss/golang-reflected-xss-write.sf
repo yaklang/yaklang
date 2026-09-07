@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Reflected XSS Vulnerability"
 	type: audit
 	level: mid
-	risk: "跨站脚本（XSS）"
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -111,7 +111,7 @@ $func<getCallee()>?(* #{
 
 alert $mid for {
 	title: "Golang Reflected XSS Vulnerability Was Detected",
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	title_zh: "检测到Golang反射型XSS漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

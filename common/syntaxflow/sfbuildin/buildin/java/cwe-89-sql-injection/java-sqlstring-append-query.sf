@@ -1,4 +1,5 @@
 desc(
+	risk: "sql-injection"
 	title: "Check Java SQL String Append Query"
 	type: audit
 	level: low
@@ -131,7 +132,7 @@ int id = Integer.parseInt(userInput);
 #### 4. 代码审查和安全培训
 开发团队应定期进行代码安全审查，特别关注涉及数据库操作的代码段。同时，为开发人员提供SQL Injection等常见Web安全漏洞的培训，提高其安全编码意识。
 SOLUTION
-	risk: "SQL注入",
+	risk: "sql-injection",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

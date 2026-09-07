@@ -1,0 +1,107 @@
+workerCount = 64
+
+starts = make(chan bool)
+results = make(chan string, workerCount)
+cases = [
+    [],
+    [1],
+    [1, 2, 3],
+    [1, 2, 3, 4, 5, 6, 7, 8],
+]
+
+countAndSum = func(values...) {
+    total = 0
+    for value in values {
+        total += value
+    }
+    return sprintf("%d:%d", len(values), total)
+}
+
+// Every worker executes this same ellipsis+call Code pair with a different
+// expanded length. Argument count must therefore be Frame state, not Code state.
+invoke = func(values) {
+    return countAndSum(100, values...)
+}
+
+worker = func(id, values) {
+    <-starts
+    results <- sprintf("%d=%s", id, invoke(values))
+}
+
+for i := 0; i < workerCount; i++ {
+    go worker(i, cases[i % len(cases)])
+}
+for i := 0; i < workerCount; i++ {
+    starts <- true
+}
+
+seen = make(map[string]bool)
+for i := 0; i < workerCount; i++ {
+    value = <-results
+    seen[value] = true
+}
+waitAllAsyncCallFinish()
+
+assert len(seen) == workerCount, "ellipsis results crossed frames: %v" % seen
+expectedSuffixes = ["1:100", "2:101", "4:106", "9:136"]
+for i := 0; i < workerCount; i++ {
+    expected = sprintf("%d=%s", i, expectedSuffixes[i % len(expectedSuffixes)])
+    assert seen[expected], "missing ellipsis result %s" % expected
+}
+
+// Exercise the other expansion representations without mutating the following
+// call opcode. Strings expand by rune, bytes by byte.
+assert countAndSum("\x01\x02"...) == "2:3", "string ellipsis failed"
+assert countAndSum(b"\x01\x02\x03"...) == "3:6", "bytes ellipsis failed"
+countOnly = func(values...) {
+    return len(values)
+}
+assert countOnly("汉字"...) == 2, "unicode string ellipsis must expand by rune"
+assert countAndSum(10, [1, 2]...)~ == "3:13", "wavy ellipsis call failed"
+
+deferredResults = make(chan string, 1)
+deferredSink = func(values...) {
+    total = 0
+    for value in values {
+        total += value
+    }
+    deferredResults <- sprintf("%d:%d", len(values), total)
+}
+runDeferred = func(values) {
+    defer deferredSink(values...)
+}
+runDeferred([1, 2, 3, 4])
+deferredValue = <-deferredResults
+assert deferredValue == "4:10", "deferred ellipsis call failed: %s" % deferredValue
+
+// The go form rewrites the call after ellipsis to OpAsyncCall. Concurrent
+// launchers exercise the same Code with empty and differently sized slices.
+asyncResults = make(chan string, workerCount)
+asyncSink = func(id, values...) {
+    total = 0
+    for value in values {
+        total += value
+    }
+    asyncResults <- sprintf("%d=%d:%d", id, len(values), total)
+}
+launch = func(id, values) {
+    go asyncSink(id, values...)
+}
+
+for i := 0; i < workerCount; i++ {
+    go launch(i, cases[i % len(cases)])
+}
+
+asyncSeen = make(map[string]bool)
+for i := 0; i < workerCount; i++ {
+    value = <-asyncResults
+    asyncSeen[value] = true
+}
+waitAllAsyncCallFinish()
+
+assert len(asyncSeen) == workerCount, "async ellipsis results crossed frames: %v" % asyncSeen
+asyncExpectedSuffixes = ["0:0", "1:1", "3:6", "8:36"]
+for i := 0; i < workerCount; i++ {
+    expected = sprintf("%d=%s", i, asyncExpectedSuffixes[i % len(asyncExpectedSuffixes)])
+    assert asyncSeen[expected], "missing async ellipsis result %s" % expected
+}

@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Path Traversal Vulnerability"
 	title_zh: "检测Java路径穿越漏洞"
 	type: vuln
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -194,7 +194,7 @@ return;
 #### 4. 使用白名单验证
 如果可能，不要接受用户输入的完整文件名或路径，而是让用户选择预定义的安全文件列表中的文件（白名单方式）。
 SOLUTION
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "high",
 }
 
@@ -291,7 +291,7 @@ return;
 #### 4. 使用白名单验证
 如果可能，不要接受用户输入的完整文件名或路径，而是让用户选择预定义的安全文件列表中的文件（白名单方式）。
 SOLUTION
-	risk: "路径穿越",
+	risk: "path-traversal",
 }
 
 

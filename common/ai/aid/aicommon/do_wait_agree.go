@@ -74,13 +74,15 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					"interactive_id": interactiveId,
 				})
 				endOnce := utils.NewOnce()
-				endNormally := func(score float64, level string, reason string) {
+				endNormally := func(score float64, level string, reason string, requiresUser ...bool) {
 					endOnce.Do(func() {
+						needsUser := len(requiresUser) > 0 && requiresUser[0]
 						c.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_END, "ai-reviewer", map[string]any{
 							"score":          score,
 							"reason":         reason,
 							"interactive_id": interactiveId,
 							"level":          level,
+							"requires_user":  needsUser,
 						})
 					})
 				}
@@ -141,7 +143,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					reason := riskResult.GetString("reason")
 					// 高风险升级人工: 此后由外部 (用户 Feed) 释放, 视为真人工决定.
 					endpoint.SetApprovalMeta(ApprovalSourceHuman, true, "ai_high_risk_escalated_to_human")
-					endNormally(score, "high", reason)
+					endNormally(score, "high", reason, true)
 				}
 			}()
 		}()

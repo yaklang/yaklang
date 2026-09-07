@@ -132,7 +132,7 @@ log.error("Failed to delete file: " + path.toString(), e);
 }
 ```
 SOLUTION
-	risk: "任意文件删除",
+	risk: "arbitrary-file-delete",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

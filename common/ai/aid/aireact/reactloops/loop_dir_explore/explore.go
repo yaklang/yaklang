@@ -27,7 +27,6 @@ const exploreReactiveDataTpl = `## 当前探索状态
 <|EXPLORE_STATUS_{{ .Nonce }}|>
 [路径规范] 所有工具调用必须使用绝对路径，禁止使用相对路径
 目标目录: {{ .TargetPath }}
-探索进度: 已执行 {{ .IterationCount }} 次操作
 {{ if .NoteFiles }}已写出探索文件（{{ .NoteFileCount }} / 建议至少 3 个）:
 {{ .NoteFiles }}{{ else }}尚未写出任何探索文件（建议至少写出 3 个：dir_structure.md / entry_points.md / tech_stack.md）{{ end }}
 {{ if .FeedbackMessages }}
@@ -206,7 +205,6 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 		reactloops.WithOutputExample(exploreOutputExample),
 
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-			iterCount := loop.GetCurrentIterationIndex()
 			noteFileList := state.getNoteFiles()
 			noteFiles := ""
 			for _, f := range noteFileList {
@@ -218,7 +216,6 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 			return utils.RenderTemplate(exploreReactiveDataTpl, map[string]any{
 				"Nonce":            nonce,
 				"TargetPath":       state.TargetPath,
-				"IterationCount":   iterCount,
 				"NoteFiles":        noteFiles,
 				"NoteFileCount":    len(noteFileList),
 				"ExploreWorkDir":   exploreWorkDir,

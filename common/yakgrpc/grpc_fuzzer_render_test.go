@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_RenderDangerousFuzztag(t *testing.T) {
 	token1 := utils.RandStringBytes(16)
 	fileName, err := utils.SaveTempFile(token1, "fuzztag-test-file")
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(fileName) })
 	// create a codec script to test
 	token2 := utils.RandStringBytes(16)
 	scriptName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("codec", fmt.Sprintf(`
@@ -32,7 +34,9 @@ func TestGRPCMUSTPASS_HTTPFuzzer_RenderDangerousFuzztag(t *testing.T) {
 	pass := false
 
 	// create a debug server
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	serverCtx, stopServer := context.WithCancel(context.Background())
+	t.Cleanup(stopServer)
+	host, port := utils.DebugMockHTTPHandlerFuncContext(serverCtx, func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		sBody := string(body)
@@ -48,7 +52,8 @@ Host: %s
 
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-	ctx, _ := context.WithTimeout(context.Background(), 80*time.Second)
+	ctx, cancelFuzzer := context.WithTimeout(context.Background(), 80*time.Second)
+	t.Cleanup(cancelFuzzer)
 
 	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
 		Request:   packet,

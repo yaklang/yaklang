@@ -2,8 +2,32 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"testing"
 )
+
+func TestSmokeNodeMaxRunningJobsFlag(t *testing.T) {
+	flags := flag.NewFlagSet("test", flag.ContinueOnError)
+	maximum := smokeNodeMaxRunningJobsFlag(flags)
+	if err := flags.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	if *maximum != 1 {
+		t.Fatalf("default max-running-jobs = %d, want 1", *maximum)
+	}
+	if err := flags.Parse([]string{"--max-running-jobs", "0"}); err != nil {
+		t.Fatal(err)
+	}
+	if *maximum != 0 {
+		t.Fatalf("explicit max-running-jobs = %d, want unlimited 0", *maximum)
+	}
+}
+
+func TestSmokeNodeMaxRunningJobsRejectsOverflow(t *testing.T) {
+	if _, err := smokeNodeMaxRunningJobs(uint64(^uint32(0)) + 1); err == nil {
+		t.Fatal("expected uint32 overflow to be rejected")
+	}
+}
 
 func TestHostDockerEndpoint(t *testing.T) {
 	t.Parallel()

@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -99,11 +98,28 @@ func (v *Frame) CheckExit() error {
 }
 
 func (v *Frame) execExWithContinueOption(isContinue bool) {
+	v.executionDepth++
+	isOutermostExecution := v.executionDepth == 1
+	defer func() {
+		v.executionDepth--
+	}()
+
+	// These caches and pending decoder state belong to one execution segment.
+	// Clear them on every exit path, including panic and context cancellation,
+	// so retained Trace frames cannot keep values from earlier Inline runs.
+	defer v.clearRuneCache()
+	defer v.clearPendingCallArgCount()
+	if !isContinue {
+		v.clearPendingCallArgCount()
+	}
 	if !isContinue {
 		v.codePointer = 0
 	}
 	// 设置线程ID
-	v.ThreadID = int(v.vm.ThreadIDCount)
+	if v.ThreadID == 0 {
+		v.ThreadID = v.vm.nextThreadID()
+		v.ownsThreadID = true
+	}
 
 	// 退出代码 // -1代表异常，0代表代码执行到最后，1代表通过panic、return等方式退出
 	v.exitCode = ErrorExit
@@ -162,18 +178,22 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 				return
 			}
 			debugger := v.vm.debugger
+			if debugger == nil {
+				return
+			}
 			if vmPanic != nil {
 				log.Error(vmPanic)
-				if debugger != nil {
+			}
+			if !isOutermostExecution {
+				// Recursive Exec is used for Yak defer blocks. A panic remains a
+				// real debugger terminal event, but the shared Frame has not exited
+				// yet and must not be marked normally finished or cleaned up.
+				if vmPanic != nil {
 					debugger.HandleForPanic(vmPanic)
 				}
-			} else if v.parent == nil { // 程序正常退出
-				if debugger != nil {
-					debugger.SetFinished()
-					debugger.HandleForNormallyFinished()
-				}
+				return
 			}
-			debugger.CurrentStackTracePop()
+			debugger.HandleFrameExit(v, vmPanic, v.parent == nil)
 		}
 	}()
 
@@ -332,10 +352,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		if c.Op1 != nil {
 			wavy = c.Op1.Bool()
 		}
-		// 增加线程ID
-		atomic.AddUint64(&v.vm.ThreadIDCount, 1)
-
-		args := v.popArgN(c.Unary)
+		args := v.popArgN(v.consumeCallArgCount(c))
 		callableValue := v.pop()
 		v.asyncCall(callableValue, wavy, args)
 	case OpAssign:
@@ -423,29 +440,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		case LUA:
 			assignArgs := v.popArgN(2)
 			leftValues := assignArgs[1]
-			rightValues := assignArgs[0]
-			rightVal := rightValues.Value
-			leftVal := leftValues.Value
-
-			if v, ok := rightVal.([]*Value); ok && len(v) > 0 {
-				rightVal = v[0].Value
-			}
-			if _, ok := rightVal.(*Function); ok {
-				if rightVal.(*Function).scope == nil {
-					rightVal.(*Function).scope = v.CurrentScope()
-				}
-				if val, ok := leftVal.([]*Value); ok && len(val) > 0 {
-					lv, err := val[0].ConvertToLeftValue()
-					if err == nil {
-						if lv.IsLeftValueRef() {
-							funcName, ok := v.CurrentScope().symtbl.GetNameByVariableId(lv.SymbolId)
-							if ok {
-								rightVal.(*Function).anonymousFunctionBindName = funcName
-							}
-						}
-					}
-				}
-			}
+			rightValues := v.prepareAssignedFunction(leftValues, assignArgs[0])
 			if c.Unary == 0 {
 				v.luaGlobalAssign(leftValues, rightValues)
 			} else {
@@ -457,29 +452,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		default:
 			assignArgs := v.popArgN(2)
 			leftValues := assignArgs[1]
-			rightValues := assignArgs[0]
-			rightVal := rightValues.Value
-			leftVal := leftValues.Value
-
-			if v, ok := rightVal.([]*Value); ok && len(v) > 0 {
-				rightVal = v[0].Value
-			}
-			if rv, ok := rightVal.(*Function); ok {
-				if rv.scope == nil {
-					rv.scope = v.CurrentScope()
-				}
-				if val, ok := leftVal.([]*Value); ok && len(val) > 0 {
-					lv, err := val[0].ConvertToLeftValue()
-					if err == nil {
-						if lv.IsLeftValueRef() {
-							funcName, ok := v.CurrentScope().symtbl.GetNameByVariableId(lv.SymbolId)
-							if ok {
-								rightVal.(*Function).anonymousFunctionBindName = funcName
-							}
-						}
-					}
-				}
-			}
+			rightValues := v.prepareAssignedFunction(leftValues, assignArgs[0])
 			// if leftVal
 			v.assign(leftValues, rightValues)
 			return
@@ -667,15 +640,18 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 		if c.Op1.IsYakFunction() {
-			fun := c.Op1.Value.(*Function)
+			// Code and its function Value are immutable after compilation. Every
+			// execution gets its own scope-bearing function instance; mutating the
+			// template here races when one cached Engine serves concurrent hooks.
+			// The private instance retains its defining frame because a Function can
+			// later be exported into a sandbox VM, which uses that frame to execute
+			// against the original libraries and lexical environment.
+			fun := c.Op1.Value.(*Function).Copy(v.scope)
 			fun.defineFrame = v
-
-			if c.Unary == 1 {
-				c.Op1 = NewAutoValue(fun.Copy(v.scope))
-			} else if c.Unary == 0 {
-				// check(v.scope)
-				fun.scope = v.scope
-			}
+			instance := *c.Op1
+			instance.Value = fun
+			v.push(&instance)
+			return
 		}
 		v.push(c.Op1)
 		return
@@ -1193,10 +1169,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 	case OpCall:
+		argCount := v.consumeCallArgCount(c)
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
-			args := make([]*Value, c.Unary)
-			i := c.Unary - 1
+			args := make([]*Value, argCount)
+			i := argCount - 1
 			for i >= 0 {
 				arg := v.pop()
 				if arg.TypeVerbose == "ref" {
@@ -1290,7 +1267,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			// funName, ok := symbolTable.GetNameByVariableId(idValue.Int())
 			return
 		case LUA:
-			args := v.popArgN(c.Unary)
+			args := v.popArgN(argCount)
 			callableValue := v.pop()
 			v.callLua(callableValue, args)
 		case YAK:
@@ -1301,7 +1278,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if c.Op1 != nil {
 				wavy = c.Op1.Bool()
 			}
-			args := v.popArgN(c.Unary)
+			args := v.popArgN(argCount)
 			callableValue := v.pop()
 			v.call(callableValue, wavy, args)
 		}
@@ -1381,14 +1358,14 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			memberName := args[0].AsString()
 			value, ok := m.Get(memberName)
 			if ok {
-				literal := fmt.Sprintf("%s.%s", iterableValue.GetLiteral(), memberName)
+				literal := iterableValue.memberLiteral(memberName)
 				v.push(NewValue(fmt.Sprintf("%T", value), value, literal))
 				return
 			}
 		}
 
 		if iterableValueType.Kind() == reflect.String {
-			if runes := cacheRunes(iterableValue); runes != nil {
+			if runes := v.cacheRunes(iterableValue); runes != nil {
 				iterableValueRF = reflect.ValueOf(runes)
 			} else {
 				panic("cannot convert string to []byte/rune")
@@ -1878,7 +1855,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 				member := callerReflectValue.MapIndex(reflect.ValueOf(memberNameV.Value))
 				if member.IsValid() {
-					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
+					literal := caller.memberLiteral(memberName)
 					value := NewValue(member.Type().String(), member.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -1926,7 +1903,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				}
 				fun := callerReflectValue.MethodByName(newMemberName)
 				if fun.IsValid() {
-					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
+					literal := caller.memberLiteral(memberName)
 					value := NewValue(fun.Type().String(), fun.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -1942,7 +1919,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				isOrderedMap = true
 				value, ok := m.Get(memberName)
 				if ok {
-					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
+					literal := caller.memberLiteral(memberName)
 					v.push(NewValue(fmt.Sprintf("%T", value), value, literal))
 					return
 				}
@@ -1965,10 +1942,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				}
 				member := getMember()
 				if member.IsValid() {
-					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
+					literal := caller.memberLiteral(memberName)
 
 					calleeValue := member.Interface()
-					calleeValue = v.execHijackMapMemberCallHandler(caller.GetLiteral(), memberName, calleeValue)
+					if caller.Literal != "" {
+						calleeValue = v.execHijackMapMemberCallHandler(caller.Literal, memberName, calleeValue)
+					}
 					value := NewValue(member.Type().String(), calleeValue, literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -2019,7 +1998,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				}
 				// 这里可能拿到结构体指针的方法
 				if member.CanInterface() {
-					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
+					literal := caller.memberLiteral(memberName)
 					value := NewValue(member.Type().String(), member.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -2077,21 +2056,24 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		// AutoConvertReflectValueByType()
 		arrayRaw := v.pop()
 		code := v.peekNextCode()
+		if code == nil || (code.Opcode != OpCall && code.Opcode != OpAsyncCall) {
+			panic("BUG: ellipsis must be followed by a call")
+		}
 
 		if arrayRaw.IsBytes() {
 			d := arrayRaw.Bytes()
 			for _, r := range d {
 				v.push(NewValue("byte", r, fmt.Sprintf("%c", r)))
 			}
-			code.Unary = c.Unary + len(d) - 1
+			v.setPendingCallArgCount(code, c.Unary+len(d)-1)
 			return
 		}
 		if arrayRaw.IsString() {
-			if runes := cacheRunes(arrayRaw); runes != nil {
+			if runes := v.cacheRunes(arrayRaw); runes != nil {
 				for _, r := range runes {
 					v.push(NewValue("char", r, fmt.Sprintf("%c", r)))
 				}
-				code.Unary = c.Unary + len(runes) - 1
+				v.setPendingCallArgCount(code, c.Unary+len(runes)-1)
 				return
 			}
 		}
@@ -2100,7 +2082,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			for i := 0; i < refV.Len(); i++ {
 				v.push(NewValue("char", refV.Index(i).Interface(), fmt.Sprint(refV.Index(i).Interface())))
 			}
-			code.Unary = c.Unary + refV.Len() - 1
+			v.setPendingCallArgCount(code, c.Unary+refV.Len()-1)
 		}
 	case OpExit:
 		val := v.pop()

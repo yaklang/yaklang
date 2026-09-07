@@ -139,6 +139,9 @@ func GetLogger(name string) *Logger {
 			Logger: golog.New(),
 			name:   name,
 		}
+		if IsMCPStdioLogging() {
+			logger.SetOutput(os.Stderr)
+		}
 		logger.Handle(func(l *golog.Log) bool {
 			line := -1
 			if logger.vmRuntimeInfoGetter != nil {

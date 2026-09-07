@@ -181,7 +181,7 @@ func TestBeforeSaveHookStripsNUL_IrNamePool(t *testing.T) {
 }
 
 func TestBeforeSaveHookStripsNUL_UpsertIrCode(t *testing.T) {
-	// UpsertIrCode uses db.Where().Assign().FirstOrCreate() which also
+	// UpsertIrCode goes through SaveIrCodeBatch → CreateInBatches, which still
 	// triggers BeforeSave. Verify the hook covers this path.
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)

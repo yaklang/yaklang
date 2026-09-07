@@ -309,8 +309,8 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 			}
 			continue
 		}
-		if state.findClosed(item.ID) != nil {
-			results = append(results, todoDeltaFailure(operation, "todo id already exists as closed history and cannot be reopened"))
+		if closed := state.findClosed(item.ID); closed != nil {
+			results = append(results, todoDeltaFailure(operation, state.closedTodoRecoveryHint(closed)))
 			continue
 		}
 		state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Text, CreatedAt: revision, UpdatedAt: revision})
@@ -320,7 +320,11 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 		operation := TodoOperation{Op: "update", ID: item.ID, Content: item.Text}
 		open := state.findOpen(item.ID)
 		if open == nil {
-			results = append(results, todoDeltaFailure(operation, "todo is not open in current task scope; open todo ids: "+state.openIDSummary()))
+			if closed := state.findClosed(item.ID); closed != nil {
+				results = append(results, todoDeltaFailure(operation, state.closedTodoRecoveryHint(closed)))
+			} else {
+				results = append(results, todoDeltaFailure(operation, "todo is not open in current task scope; open todo ids: "+state.openIDSummary()))
+			}
 			continue
 		}
 		if open.Text == item.Text {
@@ -334,7 +338,11 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 		operation := TodoOperation{Op: string(item.Outcome), ID: item.ID, Reason: item.Reason, Refs: append([]string(nil), item.Refs...)}
 		openIndex, open := state.openIndex(item.ID)
 		if open == nil {
-			results = append(results, todoDeltaFailure(operation, "todo is not open in current task scope; open todo ids: "+state.openIDSummary()))
+			if closed := state.findClosed(item.ID); closed != nil {
+				results = append(results, todoDeltaFailure(operation, state.closedTodoRecoveryHint(closed)))
+			} else {
+				results = append(results, todoDeltaFailure(operation, "todo is not open in current task scope; open todo ids: "+state.openIDSummary()))
+			}
 			continue
 		}
 		state.OpenTodos = append(state.OpenTodos[:openIndex], state.OpenTodos[openIndex+1:]...)
@@ -356,7 +364,11 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 		if _, generatedThisRound := generatedAddIDs[current]; current != "" && generatedThisRound {
 			results = append(results, todoDeltaFailure(operation, "same-round current requires an explicit todo_delta.add.id; generated IDs cannot be referenced by prediction"))
 		} else if current != "" && state.findOpen(current) == nil {
-			results = append(results, todoDeltaFailure(operation, "current must reference an open TODO in the current task scope after add/update/close are applied; open todo ids: "+state.openIDSummary()))
+			if closed := state.findClosed(current); closed != nil {
+				results = append(results, todoDeltaFailure(operation, state.closedTodoRecoveryHint(closed)))
+			} else {
+				results = append(results, todoDeltaFailure(operation, "current must reference an open TODO in the current task scope after add/update/close are applied; open todo ids: "+state.openIDSummary()))
+			}
 		} else if state.CurrentTodoID == current {
 			results = append(results, todoDeltaNoOp(operation, "current focus already matches"))
 		} else {
@@ -378,6 +390,17 @@ func (s *TodoScopeState) openIDSummary() string {
 		}
 	}
 	return "[" + strings.Join(ids, ", ") + "]"
+}
+
+func (s *TodoScopeState) closedTodoRecoveryHint(item *TodoClosedItem) string {
+	if item == nil {
+		return "todo is not open in current task scope; open todo ids: " + s.openIDSummary()
+	}
+	return fmt.Sprintf(
+		"todo id is immutable closed history (outcome=%s) and cannot be reopened or selected; preserve it, then use todo_delta.add with a new id and set that new id current to continue the unfinished work; open todo ids: %s",
+		item.Outcome,
+		s.openIDSummary(),
+	)
 }
 
 func todoDeltaSuccess(operation TodoOperation) VerificationTodoApplyResult {

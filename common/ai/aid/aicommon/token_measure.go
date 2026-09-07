@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"math"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/ytoken"
@@ -115,6 +116,25 @@ func shrinkByTokens(text string, limit int, keepTail bool) string {
 // MeasureTokens returns the token count of text.
 func MeasureTokens(text string) int {
 	return ytoken.CalcTokenCount(text)
+}
+
+// TokenCountExceeds is the allocation-light form for hard budget checks. It
+// stops tokenization as soon as the limit is crossed and skips it entirely
+// when the input byte length already proves the text fits.
+func TokenCountExceeds(text string, tokenLimit int) bool {
+	return ytoken.TokenCountExceeds(text, tokenLimit)
+}
+
+// TokenCountExceeds64 is the int64 budget variant. The range guard keeps the
+// int conversion safe on every architecture supported by Go.
+func TokenCountExceeds64(text string, tokenLimit int64) bool {
+	if tokenLimit < 0 {
+		return true
+	}
+	if tokenLimit > int64(math.MaxInt) {
+		return false
+	}
+	return ytoken.TokenCountExceeds(text, int(tokenLimit))
 }
 
 // ShrinkByTokens truncates text to fit within tokenLimit tokens (head only).

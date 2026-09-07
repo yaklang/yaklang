@@ -11,6 +11,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -93,7 +94,7 @@ func mockYaklangFinalizeDirectlyAnswer(t *testing.T, i aicommon.AICallerConfigIf
 	if !(strings.Contains(prompt, "Yaklang") || strings.Contains(prompt, "代码生成") || strings.Contains(prompt, "write_yaklang_code")) {
 		return nil, false
 	}
-	nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "directly_answer"}
 
@@ -113,7 +114,7 @@ func mockYaklangModifyCodeResponse(t *testing.T, i aicommon.AICallerConfigIf, pr
 	if !utils.MatchAllOfSubString(prompt, `"modify_code"`, `"require_tool"`, `"@action"`) {
 		return nil, false
 	}
-	nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 2, "modify_end_line": 2, "modify_code_reason": "replace line b"}
 
@@ -135,7 +136,7 @@ func mockYaklangWriteCodeResponse(t *testing.T, i aicommon.AICallerConfigIf, pro
 	if !utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
 		return nil, false
 	}
-	nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
 
@@ -217,7 +218,7 @@ func mockedYaklangWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicomm
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
 

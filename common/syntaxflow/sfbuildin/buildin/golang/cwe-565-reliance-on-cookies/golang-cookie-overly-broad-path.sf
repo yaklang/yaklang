@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Cookie路径过宽漏洞"
 	type: audit
 	level: high
-	risk: "跨站请求伪造（CSRF）"
+	risk: "cookie-security"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -159,7 +159,7 @@ DESC
 	title: "Golang Cookie Overly Broad Path Vulnerability Was Detected",
 	title_zh: "检测到Golang Cookie路径设置过宽漏洞",
 	message: "检测到Golang Cookie路径设置过宽漏洞，可能导致会话固定攻击",
-	risk: "会话固定攻击",
+	risk: "cookie-security",
 	name: "high",
 }
 

@@ -22,6 +22,20 @@ func TestGetAllToolsReturnsSliceCopy(t *testing.T) {
 	}
 }
 
+func TestCreateScheduleToolIsEnabledByDefault(t *testing.T) {
+	manager := NewToolManager()
+	tools, err := manager.GetEnableTools()
+	if err != nil {
+		t.Fatalf("get enabled tools: %v", err)
+	}
+	for _, tool := range tools {
+		if tool != nil && tool.Name == "create_ai_react_schedule" {
+			return
+		}
+	}
+	t.Fatal("create_ai_react_schedule must be visible to a normal ReAct chat")
+}
+
 func TestAllAIToolsSnapshotDoesNotAliasCallers(t *testing.T) {
 	original := getAllAIToolsSnapshot()
 	defer publishAllAITools(original)

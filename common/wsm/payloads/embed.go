@@ -5,22 +5,54 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"sync"
 )
 
-//go:embed behinder/static/*
-var Payloads embed.FS
+// payloads.tar.gz 由构建期的 gzip-embed 生成（见 init.go 的 go:generate），
+// 内容是 behinder/static、yakshell/static、yakshell/encrypt、godzilla/static
+// 四个明文目录，条目路径保持与源码目录一致，因此二进制内不再出现明文 payload，
+// 开发者仍然可以直接编辑原始脚本文件。
+//
+//go:embed payloads.tar.gz
+var payloadsFS embed.FS
 
-//go:embed yakshell/static/*
-var YakPayloads embed.FS
+const payloadXorKey = "yaklang-payload-v1"
 
-//go:embed yakshell/encrypt/*
-var YakEncrypt embed.FS
+// payload 在压缩包内的目录布局，与源码目录保持一致。
+const (
+	behinderStaticDir  = "behinder/static"
+	yakshellStaticDir  = "yakshell/static"
+	yakshellEncryptDir = "yakshell/encrypt"
+	godzillaStaticDir  = "godzilla/static"
+)
 
-//go:embed godzilla/static/payload_test.dll
-var CshrapPayload []byte
+// FS 是所有 wsm payload 的统一文件系统，路径相对 common/wsm/payloads 目录。
+var FS = mustNewPayloadFS(&payloadsFS, "payloads.tar.gz")
+
+func mustNewPayloadFS(fs *embed.FS, fileName string) *gzip_embed.PreprocessingEmbed {
+	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(fs, fileName, true, []byte(payloadXorKey))
+	if err != nil {
+		panic(fmt.Sprintf("init payload fs %s failed: %v", fileName, err))
+	}
+	return ins
+}
+
+// ReadGodzillaPayload 读取打包在 payloads.tar.gz 中的 Godzilla 静态 payload。
+func ReadGodzillaPayload(name string) ([]byte, error) {
+	return FS.ReadFile(godzillaStaticDir + "/" + name)
+}
+
+// CshrapPayload 是 Godzilla ASPX payload 在内存中恢复后的原始字节。
+var CshrapPayload = func() []byte {
+	raw, err := ReadGodzillaPayload("payload_test.dll")
+	if err != nil {
+		panic(fmt.Sprintf("restore csharp payload failed: %v", err))
+	}
+	return raw
+}()
 
 type Payload string
 
@@ -79,7 +111,7 @@ func GetHexYakPayload(filename string) (string, error) {
 		}
 	}
 
-	file, err := YakPayloads.ReadFile(fmt.Sprintf("yakshell/static/%s.txt", handleFile(filename)))
+	file, err := FS.ReadFile(fmt.Sprintf("%s/%s.txt", yakshellStaticDir, handleFile(filename)))
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +133,7 @@ func GetHexYakPayload(filename string) (string, error) {
 }
 
 func init() {
-	dirs, err := Payloads.ReadDir("behinder/static")
+	dirs, err := FS.ReadDir(behinderStaticDir)
 	if err != nil {
 		panic(err)
 	}
@@ -120,7 +152,7 @@ func init() {
 		payloadType := Payload(strings.Split(fileName, ".")[0])
 
 		// https://github.com/golang/go/issues/45230
-		raw, err := Payloads.ReadFile(fmt.Sprintf("behinder/static/%s", i.Name()))
+		raw, err := FS.ReadFile(behinderStaticDir + "/" + i.Name())
 		if err != nil {
 			panic(err)
 		}
@@ -144,7 +176,7 @@ func init() {
 	}
 
 	//将加密方式加入
-	dir, err := YakEncrypt.ReadDir("yakshell/encrypt")
+	dir, err := FS.ReadDir(yakshellEncryptDir)
 	if err != nil {
 		panic(err)
 	}
@@ -161,7 +193,7 @@ func init() {
 			script = ypb.ShellScript_ASPX.String()
 		}
 		enryptType := strings.Split(fileName, ".")[0]
-		file, err := YakEncrypt.ReadFile(fmt.Sprintf("yakshell/encrypt/%s", entry.Name()))
+		file, err := FS.ReadFile(yakshellEncryptDir + "/" + entry.Name())
 		if err != nil {
 			panic(err)
 		}

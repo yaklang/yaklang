@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang路径穿越漏洞"
 	type: audit
 	level: low
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -158,7 +158,7 @@ func main() {
 - **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
 DESC
 	level: "low",
-	risk: "路径穿越",
+	risk: "path-traversal",
 	type: "vuln",
 	title: "Detect Golang Path Traversal Vulnerability",
 	title_zh: "检测Golang路径穿越漏洞",

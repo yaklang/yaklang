@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-user-input"
-	risk: "输入校验不当"
+	risk: "input-validation"
 	desc: <<<DESC
 标记常见不可信输入来源：Flask/Django 的 request 取值、input()、sys.argv 等。可与命令执行、SQL、路径类 sink 规则通过数据流组合分析。
 DESC
@@ -41,7 +41,7 @@ alert $output for {
 	title_zh: "用户输入点",
 	level: "info",
 	type: "audit",
-	risk: "输入校验不当",
+	risk: "input-validation",
 	message: "可能存在用户可控的输入来源。",
 	name: "output",
 }

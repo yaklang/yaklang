@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -46,17 +47,24 @@ type SessionSnapshotBackgroundProcess struct {
 }
 
 type SessionSnapshotExecution struct {
-	TaskName          string `json:"task_name"`
-	Status            string `json:"status"`
-	StartedAt         int64  `json:"started_at"`
-	EndedAt           int64  `json:"ended_at"`
-	ToolCallSuccess   int    `json:"tool_call_success"`
-	ToolCallFailed    int    `json:"tool_call_failed"`
-	ToolCallTotal     int    `json:"tool_call_total"`
-	ExecutionMinutes  int    `json:"execution_minutes"`
-	HTTPFlowCount     int    `json:"http_flow_count"`
-	RiskCount         int    `json:"risk_count"`
-	ModifiedFileCount int    `json:"modified_file_count"`
+	TaskName  string `json:"task_name"`
+	Status    string `json:"status"`
+	StartedAt int64  `json:"started_at"`
+	EndedAt   int64  `json:"ended_at"`
+	// Legacy wire names retained for frontend compatibility. These count
+	// protocol-completed and protocol-failed calls, not execution outcomes.
+	ToolCallSuccess   int `json:"tool_call_success"`
+	ToolCallFailed    int `json:"tool_call_failed"`
+	ToolCallTotal     int `json:"tool_call_total"`
+	ExecutionMinutes  int `json:"execution_minutes"`
+	HTTPFlowCount     int `json:"http_flow_count"`
+	RiskCount         int `json:"risk_count"`
+	ModifiedFileCount int `json:"modified_file_count"`
+
+	// RiskLevelCount 按风险等级分别统计本次会话产生的风险（跨全部 callToolID 聚合）。
+	// 使用值类型：可随 stats 一起值拷贝，序列化时字段恒定存在，前端无需处理 null。
+	// RiskCount 保留为旧前端兼容字段，始终等于 RiskLevelCount.Total。
+	RiskLevelCount yakit.RiskLevelCount `json:"risk_level_count"`
 }
 
 type SessionSnapshotPerception struct {
@@ -539,16 +547,27 @@ func (c *Config) refreshSessionSnapshotRuntimeCountsLocked(state *sessionSnapsho
 		return
 	}
 	httpTotal := 0
-	riskTotal := 0
+	runtimeIDs := make([]string, 0, len(state.execution.callToolIDs))
 	for callToolID := range state.execution.callToolIDs {
 		httpTotal += yakit.CountHTTPFlowByRuntimeID(db, callToolID)
-		riskTotal += func() int {
-			count, _ := yakit.CountRiskByRuntimeId(db, callToolID)
-			return count
-		}()
+		if id := strings.TrimSpace(callToolID); id != "" {
+			runtimeIDs = append(runtimeIDs, id)
+		}
 	}
 	state.execution.stats.HTTPFlowCount = httpTotal
-	state.execution.stats.RiskCount = riskTotal
+
+	// 整体重置后再回填：callToolIDs 集合可能已缩小，累参加重会残留上一轮的等级计数。
+	// 一次 GROUP BY 查询完成多 runtime 的分级统计，避开 N 次 count。
+	riskLevel := yakit.RiskLevelCount{}
+	if len(runtimeIDs) > 0 {
+		if result, err := yakit.CountRiskByRuntimeIds(db, runtimeIDs...); err != nil {
+			log.Warnf("refresh session snapshot risk level count failed: %v", err)
+		} else if result != nil {
+			riskLevel = *result
+		}
+	}
+	state.execution.stats.RiskLevelCount = riskLevel
+	state.execution.stats.RiskCount = int(riskLevel.Total)
 }
 
 func (c *Config) prepareSessionSnapshotEndedAtForEmitLocked(state *sessionSnapshotState) {

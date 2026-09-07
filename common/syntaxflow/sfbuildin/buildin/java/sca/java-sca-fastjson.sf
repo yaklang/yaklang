@@ -139,7 +139,7 @@ Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连�
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
 DESC
 	name: "vuln_1_2_47",
-	risk: "软件成分分析（SCA）",
+	risk: "sca",
 }
 
 $ver in (,1.2.68] as $vuln_1_2_68;
@@ -207,7 +207,7 @@ DESC
 	level: "critical",
 	message: "SCA: com.alibaba.fastjson <= 1.2.68 RCE Mid to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
-	risk: "软件成分分析（SCA）",
+	risk: "sca",
 	name: "vuln_1_2_68",
 }
 
@@ -276,7 +276,7 @@ Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连�
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
 DESC
 	level: "critical",
-	risk: "软件成分分析（SCA）",
+	risk: "sca",
 	name: "vuln_1_2_80",
 }
 

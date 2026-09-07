@@ -166,7 +166,7 @@ SOLUTION
 DESC
 	level: "info",
 	message: "发现Golang代码中使用了 io/ioutil 包的 ReadAll 或 ReadFile 方法，可能存在性能问题或使用了废弃功能。",
-	risk: "信息",
+	risk: "information",
 	name: "output",
 }
 

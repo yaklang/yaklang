@@ -29,6 +29,7 @@ func TestCoordinator_ReportGenerationAfterPlanExecution(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"generate a report after plan execution test",
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			select {
@@ -207,6 +208,7 @@ func TestCoordinator_DefaultReportGenerationEnabled(t *testing.T) {
 
 		ins, err := aid.NewCoordinator(
 			"verify default report generation is enabled",
+			testAIRetryWaitOption(),
 			aicommon.WithEventInputChanx(inputChan),
 			aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 				select {

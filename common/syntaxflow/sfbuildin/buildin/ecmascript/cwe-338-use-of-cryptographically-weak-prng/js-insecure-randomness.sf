@@ -3,7 +3,7 @@ desc(
 	title_zh: "安全敏感场景中使用了不安全的伪随机数生成器"
 	type: vuln
 	level: low
-	risk: "弱随机数"
+	risk: "weak-randomness"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -155,7 +155,7 @@ alert $insecureRandom for {
 	title: "Insecure randomness: Math.random() used in security-sensitive context",
 	title_zh: "不安全随机数：Math.random() 用于安全敏感场景（密码/Token/密钥等）",
 	message: "检测到 Math.random() 的输出流入了安全敏感场景（如密码、Session Token、API Key、密钥等）。Math.random() 是密码学不安全的伪随机数生成器，攻击者可以通过预测其输出值伪造 Token 或直接登录账户。请改用 crypto.randomBytes()（Node.js）或 window.crypto.getRandomValues()（浏览器）生成密码学安全的随机数。",
-	risk: "不安全的随机数",
+	risk: "weak-randomness",
 	name: "insecureRandom",
 }
 

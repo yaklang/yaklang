@@ -1,0 +1,10 @@
+[
+  "ai.code_workspace.v1",
+  "ai.runtime.host.v1",
+  "ai.session.bind_epoch.v1",
+  "ai.session.turn_lifecycle.v1",
+  "hids",
+  "ssa.rule_snapshot.execution.v2",
+  "ssa.rule_sync.export",
+  "yak.execute"
+]

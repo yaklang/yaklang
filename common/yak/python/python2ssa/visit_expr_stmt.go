@@ -217,6 +217,14 @@ func (b *singleFileBuilder) assignToTarget(target assignTarget, value ssa.Value)
 	} else if target.varName != "" {
 		variable := b.createVar(target.varName)
 		b.AssignVariable(variable, value)
+		// Module-level assignments are module exports: publish to the
+		// per-module virtual library so `from mod import NAME` binds the real
+		// value (defs publish via syncPythonVirtualModuleExport already —
+		// plain assignments had no equivalent, leaving them invisible to
+		// bindImportedName until the whole project finished).
+		if b.Function != nil && b.Function.IsMain() {
+			b.syncPythonVirtualModuleExport(target.varName, value.GetType(), value)
+		}
 	}
 }
 
@@ -774,6 +782,25 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 			}
 		}
 	}
+	// Need-driven fallback (missing edge / later batch): compile the imported
+	// module file on demand so its real exports are visible now — the Any
+	// placeholder would only be patched after the whole project finishes.
+	// Runs before resolvePythonSubmoduleImport: that path fabricates an
+	// ExternLib for ANY `from pkg import name`, and for a module that exists
+	// but has not compiled yet the on-demand build provides the real value.
+	if value == nil || isPythonImportPlaceholderValue(value) {
+		b.ensurePythonModuleBuilt(packagePath)
+		if value == nil || isPythonImportPlaceholderValue(value) {
+			// For `from . import name` the module IS the imported name
+			// (packagePath is only dots): resolve the submodule file instead.
+			if strings.HasPrefix(packagePath, ".") {
+				b.ensurePythonModuleBuilt(sourceName)
+			}
+		}
+		if value2 := b.lookupPyImportedValue(prog, lib, bindingName); value2 != nil {
+			value = value2
+		}
+	}
 	if value == nil || isPythonImportPlaceholderValue(value) {
 		if sub := b.resolvePythonSubmoduleImport(bindingName, sourceName, packagePath); sub != nil {
 			value = sub
@@ -813,6 +840,23 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 		b.AssignVariable(b.createVar(bindingName), value)
 	}
 	return value
+}
+
+// lookupPyImportedValue re-runs the import binding machinery after the
+// on-demand module fallback compiled the target file: ImportValueFromLib +
+// ReadImportValue resolves the name against the module's virtual library
+// (whose export map the nested build just populated) — the same path a
+// correctly-ordered import takes at the tail of bindImportedName. Returns
+// nil when the name is still unknown, and the caller falls through to the
+// placeholder.
+func (b *singleFileBuilder) lookupPyImportedValue(prog, lib *ssa.Program, bindingName string) ssa.Value {
+	if err := prog.ImportValueFromLib(lib, bindingName); err != nil {
+		return nil
+	}
+	if imported, ok := prog.ReadImportValue(bindingName); ok && imported != nil {
+		return imported
+	}
+	return nil
 }
 
 // VisitImportStmt visits an import_stmt node.

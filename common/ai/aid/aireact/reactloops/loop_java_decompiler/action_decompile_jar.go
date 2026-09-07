@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/javajive/classparser/jarwar"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/javajive/classparser/jarwar"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -71,7 +71,7 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			outputDir, err := filepath.Abs(outputDir)
 			if err != nil {
 				log.Errorf("[decompile_jar] failed to resolve output path: %v", err)
-				reactloops.EmitStatus(loop, "路径解析失败 / Path Resolution Failed")
+				reactloops.EmitStatusI18n(loop, "路径解析失败", "Path Resolution Failed")
 				loop.GetInvoker().AddToTimeline("decompile_path_error", fmt.Sprintf(`【路径解析失败】无法获取输出目录的绝对路径
 
 【错误详情】：%v
@@ -100,12 +100,12 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			invoker := loop.GetInvoker()
 			startLine := fmt.Sprintf("反编译 JAR: %s -> %s", jarPath, outputDir)
 			reactloops.EmitActionLog(loop, nodeID, startLine)
-			reactloops.EmitStatus(loop, "反编译中 / Decompiling...")
+			reactloops.EmitStatusI18n(loop, "反编译中", "Decompiling...")
 
 			err = os.MkdirAll(outputDir, 0755)
 			if err != nil {
 				log.Errorf("[decompile_jar] failed to create output directory %s: %v", outputDir, err)
-				reactloops.EmitStatus(loop, "目录创建失败 / Failed to Create Output Directory")
+				reactloops.EmitStatusI18n(loop, "目录创建失败", "Failed to Create Output Directory")
 				invoker.AddToTimeline("decompile_mkdir_error", fmt.Sprintf(`【目录创建失败】无法创建输出目录：%s
 
 【错误详情】：%v
@@ -139,7 +139,7 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			decompileDuration := time.Since(decompileStartTime)
 			if err != nil {
 				log.Errorf("[decompile_jar] decompilation failed: %v", err)
-				reactloops.EmitStatus(loop, "反编译失败 / Decompilation Failed")
+				reactloops.EmitStatusI18n(loop, "反编译失败", "Decompilation Failed")
 				invoker.AddToTimeline("decompile_execution_error", fmt.Sprintf(`【反编译失败】JAR文件反编译过程中遇到错误
 
 【错误详情】：%v
@@ -170,7 +170,7 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				return
 			}
 
-			reactloops.EmitStatus(loop, "创建备份中 / Creating Backups...")
+			reactloops.EmitStatusI18n(loop, "创建备份中", "Creating Backups...")
 			backupCount := 0
 			filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
 				if err == nil && !info.IsDir() && filepath.Ext(path) == ".java" {
@@ -185,7 +185,7 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				return nil
 			})
 
-			reactloops.EmitStatus(loop, "检查语法中 / Checking Syntax...")
+			reactloops.EmitStatusI18n(loop, "检查语法中", "Checking Syntax...")
 			checkStartTime := time.Now()
 			totalFiles := 0
 			filesWithIssues := 0
@@ -196,10 +196,12 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				if err == nil && !info.IsDir() && filepath.Ext(path) == ".java" {
 					totalFiles++
 					if totalFiles%100 == 0 {
-						reactloops.EmitStatus(loop, fmt.Sprintf(
-							"已扫描 %d 个 Java 文件 / Scanned %d Java Files",
-							totalFiles, totalFiles,
-						))
+						reactloops.EmitStatusI18n(
+							loop,
+							fmt.Sprintf("已扫描 %d 个 Java 文件", totalFiles),
+							fmt.Sprintf("Scanned %d Java files", totalFiles),
+						)
+
 					}
 
 					relPath, _ := filepath.Rel(outputDir, path)
@@ -253,10 +255,11 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 
 			finishLine := fmt.Sprintf("完成: %d 个 Java 文件, %d 个潜在问题, 输出目录 %s",
 				totalFiles, filesWithIssues, outputDir)
-			reactloops.EmitStatus(loop, fmt.Sprintf(
-				"反编译完成 (%d 个文件) / Decompile Complete (%d files)",
-				totalFiles, totalFiles,
-			))
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("反编译完成，共 %d 个文件", totalFiles),
+				fmt.Sprintf("Decompilation complete with %d files", totalFiles),
+			)
 
 			var reference string
 			if len(compilationErrors) > 0 {

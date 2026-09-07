@@ -32,3 +32,30 @@ func TestInferActionTypeFromPayload_UsesFinalAnswerTagAsFallback(t *testing.T) {
 	action := aicommon.NewSimpleAction("", nil)
 	require.Equal(t, "directly_answer", inferActionTypeFromPayload(action, "## final answer"))
 }
+
+func TestActionTypeResolutionError_ExplainsRequestedAvailableAndReason(t *testing.T) {
+	err := actionTypeResolutionError(
+		"save_evidence",
+		[]string{"finish", "require_tool"},
+		"a non-empty @action value did not match",
+	)
+	require.ErrorContains(t, err, `requested="save_evidence"`)
+	require.ErrorContains(t, err, "matcher=exact registered action or alias")
+	require.ErrorContains(t, err, "available_actions=[finish require_tool]")
+	require.ErrorContains(t, err, "reason=a non-empty @action value did not match")
+}
+
+func TestActionTypeResolutionError_DistinguishesMissingAction(t *testing.T) {
+	err := actionTypeResolutionError("", []string{"finish"}, "no non-empty @action value was found")
+	require.ErrorContains(t, err, `requested="<missing>"`)
+	require.ErrorContains(t, err, "reason=no non-empty @action value was found")
+}
+
+func TestRequiredRegisteredLoopActionError_ReportsRegistrySnapshot(t *testing.T) {
+	_, err := requireRegisteredLoopAction("__missing_action_for_test__", "test capability enabled")
+	require.Error(t, err)
+	require.ErrorContains(t, err, `requested="__missing_action_for_test__"`)
+	require.ErrorContains(t, err, `enabled_by="test capability enabled"`)
+	require.ErrorContains(t, err, "registered_actions=")
+	require.ErrorContains(t, err, "no action is registered under the requested key")
+}

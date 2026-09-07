@@ -110,12 +110,12 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 
 			startLine := fmt.Sprintf("对比备份: %s", filepath.Base(filePath))
 			reactloops.EmitActionLog(loop, nodeID, startLine)
-			reactloops.EmitStatus(loop, "对比文件中 / Comparing Files...")
+			reactloops.EmitStatusI18n(loop, "对比文件中", "Comparing Files...")
 
 			originalContent, err := os.ReadFile(backupPath)
 			if err != nil {
 				log.Errorf("[compare_with_backup] failed to read backup %s: %v", backupPath, err)
-				reactloops.EmitStatus(loop, "读取备份失败 / Failed to Read Backup")
+				reactloops.EmitStatusI18n(loop, "读取备份失败", "Failed to Read Backup")
 				invoker.AddToTimeline("compare_read_backup_error", fmt.Sprintf(`【备份文件读取失败】无法读取备份文件内容
 
 【错误详情】：%v
@@ -143,7 +143,7 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			modifiedContent, err := os.ReadFile(filePath)
 			if err != nil {
 				log.Errorf("[compare_with_backup] failed to read file %s: %v", filePath, err)
-				reactloops.EmitStatus(loop, "读取文件失败 / Failed to Read File")
+				reactloops.EmitStatusI18n(loop, "读取文件失败", "Failed to Read File")
 				invoker.AddToTimeline("compare_read_file_error", fmt.Sprintf(`【文件读取失败】无法读取当前文件内容
 
 【错误详情】：%v
@@ -171,7 +171,7 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			diffResult, err := yakdiff.Diff(originalContent, modifiedContent)
 			if err != nil {
 				log.Errorf("[compare_with_backup] failed to generate diff for %s: %v", filePath, err)
-				reactloops.EmitStatus(loop, "差异生成失败 / Diff Generation Failed")
+				reactloops.EmitStatusI18n(loop, "差异生成失败", "Diff Generation Failed")
 				invoker.AddToTimeline("compare_diff_error", fmt.Sprintf(`【差异生成失败】无法生成文件差异对比
 
 【错误详情】：%v
@@ -201,7 +201,7 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 
 			if strings.TrimSpace(diffResult) == "" {
 				finishLine = fmt.Sprintf("完成: %s 与备份完全相同", filepath.Base(filePath))
-				reactloops.EmitStatus(loop, "无差异 / No Differences")
+				reactloops.EmitStatusI18n(loop, "无差异", "No Differences")
 				feedbackMsg = fmt.Sprintf("No differences found for %s (identical to backup).", filepath.Base(filePath))
 				invoker.AddToTimeline("compare_no_changes", fmt.Sprintf(`【文件对比完成】文件与备份完全相同：%s
 
@@ -230,10 +230,12 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 
 				finishLine = fmt.Sprintf("完成: %s 变更 +%d/-%d 行",
 					filepath.Base(filePath), addedLines, removedLines)
-				reactloops.EmitStatus(loop, fmt.Sprintf(
-					"发现差异 (+%d/-%d) / Changes Found (+%d/-%d)",
-					addedLines, removedLines, addedLines, removedLines,
-				))
+				reactloops.EmitStatusI18n(
+					loop,
+					fmt.Sprintf("已发现差异：+%d/-%d 行", addedLines, removedLines),
+					fmt.Sprintf("Changes found: +%d/-%d lines", addedLines, removedLines),
+				)
+
 				feedbackMsg = fmt.Sprintf("Changes in %s: +%d/-%d lines.\n\n%s",
 					filepath.Base(filePath), addedLines, removedLines, summary)
 				invoker.AddToTimeline("compare_changes_found", fmt.Sprintf(`【文件对比完成】发现文件修改：%s

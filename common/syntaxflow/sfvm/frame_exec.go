@@ -1130,7 +1130,14 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		newVal := RemoveValues(value, vs)
+		// Type-aware dispatch: pattern hits (SimpleValue) use overlap-based
+		// removal (Semgrep pattern-not-regex); SSA values keep ID-based removal.
+		var newVal Values
+		if RegionAllSimpleHits(value) && RegionAllSimpleHits(vs) {
+			newVal = RegionNotOverlap(value, vs)
+		} else {
+			newVal = RemoveValues(value, vs)
+		}
 		s.pushStack(newVal)
 		s.debugSubLog("<< push")
 		return true, nil
@@ -1163,6 +1170,14 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 
+		// Type-aware dispatch: pattern hits (SimpleValue) use overlap-based
+		// intersection (Semgrep AND of multiple pattern-regex); SSA values
+		// keep ID-based intersection.
+		if RegionAllSimpleHits(value) && RegionAllSimpleHits(vs) {
+			s.pushStack(RegionOverlap(value, vs))
+			return true, nil
+		}
+
 		var buf bytes.Buffer
 		var vals []ValueOperator
 		_ = value.Recursive(func(operator ValueOperator) error {
@@ -1182,6 +1197,46 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			s.debugSubLog("intersection:%v", buf.String())
 			s.pushStack(NewValues(vals))
 		}
+		return true, nil
+	case OpInsideRef:
+		s.debugSubLog("fetch: %v", i.UnaryStr)
+		vs, ok := s.GetSymbol(i)
+		if vs == nil || !ok {
+			s.debugLog("cannot find $%v", i.UnaryStr)
+			value := s.stack.Pop()
+			if value == nil {
+				return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+			}
+			s.pushStack(NewEmptyValues())
+			return true, nil
+		}
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
+		s.pushStack(RegionContained(value, vs))
+		s.debugSubLog("<< push")
+		return true, nil
+	case OpNotInsideRef:
+		s.debugSubLog("fetch: %v", i.UnaryStr)
+		vs, ok := s.GetSymbol(i)
+		if vs == nil || !ok {
+			s.debugLog("cannot find $%v", i.UnaryStr)
+			value := s.stack.Pop()
+			if value == nil {
+				return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+			}
+			s.pushStack(NewEmptyValues())
+			return true, nil
+		}
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
+		s.pushStack(RegionNotContained(value, vs))
+		s.debugSubLog("<< push")
 		return true, nil
 	case OpNativeCall:
 		ruleLabel := ""
@@ -1228,7 +1283,10 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
 		name := i.UnaryStr
-		if name == "" {
+		// Chained context search ($a.regexp(...)) has no path pattern; the
+		// SimpleValue hits carry their own file. Only reject empty names for
+		// non-hit values (e.g. PatternRoot).
+		if name == "" && !RegionAllSimpleHits(value) {
 			return true, utils.Errorf("file filter failed: file name is empty")
 		}
 		paramList := i.Values
@@ -1236,6 +1294,8 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		strOpcode := opcode2strMap[i.OpCode]
 		var res Values
 		var err error
+		// When feed root is sfvm.PatternRoot (from sfpattern.NewRoot), FileFilter
+		// runs sfpattern regexp matching — no SSA Program involved.
 		if trackErr := s.track("value-op:FileFilter", func() error {
 			done := s.startValueOpTiming("FileFilter")
 			defer done()

@@ -1,4 +1,5 @@
 desc(
+	risk: "groovy-code-execution"
 	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞"
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability"
 	type:"vuln"
@@ -65,7 +66,7 @@ $sink #{
 }-> as $high;
 
 alert $high for {
-	risk: "Groovy-Shell代码执行漏洞",
+	risk: "groovy-code-execution",
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞",
 	solution: <<<SOLUTION
@@ -226,7 +227,7 @@ alert $low for {
 - 建议开发团队进一步审查过滤机制的有效性，确保其能够抵御复杂的攻击手段。
 DESC
 	level: "low",
-	risk: "Groovy-Shell代码执行漏洞",
+	risk: "groovy-code-execution",
 	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability with Data Flow Filtering",
 	title_zh: "检测带数据流过滤的Java Servlet Groovy Shell代码注入漏洞",

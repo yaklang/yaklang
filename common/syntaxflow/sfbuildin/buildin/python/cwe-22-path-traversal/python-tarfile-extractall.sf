@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Python tarfile模块路径遍历漏洞"
 	type: audit
 	level: mid
-	risk: "路径遍历"
+	risk: "path-traversal"
 	desc: <<<DESC
 该规则用于检测Python代码中`tarfile`模块的`extract()`或`extractall()`方法的不安全调用。当使用`tarfile`解压归档文件时，如果未对归档内文件路径进行校验，攻击者可能构造包含恶意路径（如`../`）的压缩包，导致文件被解压到目标目录之外的位置，造成任意文件写入或覆盖。这种攻击方式与ZipSlip类似，属于典型的路径遍历（Path Traversal）漏洞。受影响的场景包括：服务端接收用户上传的tar压缩包并直接解压、自动化处理外部来源的归档文件等。漏洞可能导致敏感文件被覆盖、远程代码执行或系统控制权丢失。
 DESC
@@ -28,7 +28,7 @@ alert $func for {
 	title_zh: "tarfile extract",
 	level: "mid",
 	type: "audit",
-	risk: "路径遍历",
+	risk: "path-traversal",
 	message: "检测到 tarfile.extract/extractall，归档路径或解压目标可能受用户影响，存在路径遍历风险。",
 	name: "sink",
 }

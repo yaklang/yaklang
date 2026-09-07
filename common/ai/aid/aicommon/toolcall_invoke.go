@@ -335,7 +335,7 @@ func (a *ToolCaller) invoke(
 	toolCallErr := func(err error) (*aitool.ToolResult, error) {
 		reportError(err)
 		res := newToolCallRes()
-		res.Error = fmt.Sprintf("tool execution failed: %v", err)
+		res.Error = fmt.Sprintf("tool invocation protocol failed: %v", err)
 		return res, err
 	}
 
@@ -430,6 +430,7 @@ func (a *ToolCaller) invoke(
 	)
 	runtimeCfg := &aitool.ToolRuntimeConfig{
 		RuntimeID:             a.callToolId,
+		ProjectDatabase:       a.config.GetDB(),
 		BrowserSessionTracker: browserTracker,
 		FeedBacker: func(result *ypb.ExecResult) error {
 			// 处理 risk 消息
@@ -439,6 +440,10 @@ func (a *ToolCaller) invoke(
 				boundRisksMu.Lock()
 				boundRisks = append(boundRisks, risk)
 				boundRisksMu.Unlock()
+				// Append a compact summary to the session-level reported-risks
+				// store so the model sees a "已报告漏洞清单" in every subsequent
+				// prompt and avoids duplicate cybersecurity-risk calls.
+				a.config.AppendReportedRisk(risk)
 			}
 			httpFlow, _ := handleHTTPFlowMessage(result)
 			if httpFlow != nil {
@@ -455,6 +460,16 @@ func (a *ToolCaller) invoke(
 			e.EmitYakitExecResult(result)
 			return nil
 		},
+	}
+	if sessionProvider, ok := a.config.(interface{ GetPersistentSessionID() string }); ok {
+		runtimeCfg.PersistentSessionID = sessionProvider.GetPersistentSessionID()
+	}
+	if statefulTask, ok := a.task.(AIStatefulTask); ok && statefulTask != nil {
+		runtimeCfg.CurrentTaskUserInput = statefulTask.GetOriginUserInput()
+	} else if a.invokeRuntime != nil {
+		if currentTask := a.invokeRuntime.GetCurrentTask(); currentTask != nil {
+			runtimeCfg.CurrentTaskUserInput = currentTask.GetOriginUserInput()
+		}
 	}
 	// When the runtime is bound to a server-authorized target (Focus release or
 	// conversation-audit session), route tool-emitted risks to the platform
@@ -494,7 +509,7 @@ func (a *ToolCaller) invoke(
 		if execResult != nil {
 			execResult.Success = false
 			if execResult.Error == "" {
-				execResult.Error = fmt.Sprintf("tool execution cancelled: %v", execErr)
+				execResult.Error = fmt.Sprintf("tool invocation cancelled: %v", execErr)
 			}
 		}
 	}
@@ -516,16 +531,15 @@ func (a *ToolCaller) invoke(
 	}
 	if execResult != nil && !invokeCancelled {
 		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
-			if execErr == nil {
-				execErr = checkpointErr
-			} else {
-				execErr = errors.Join(execErr, checkpointErr)
-			}
+			// The callback has already produced a result envelope. Checkpoint
+			// persistence is an infrastructure observation and must not rewrite
+			// protocol completion into a tool failure.
+			log.Warnf("failed to persist completed tool result checkpoint: %v", checkpointErr)
 		}
 	}
 
 	// Some failures happen outside the tool callback (for example JSON Schema
-	// validation, artifact finalization, or checkpoint persistence). Those paths can
+	// validation or cancellation). Those paths can
 	// return a ToolResult and an error without passing through WithErrorCallback.
 	// Always report the final aggregated error here so the UI receives tool_call_error
 	// instead of a silent done card. The caller's handler is guarded by sync.Once, so
@@ -695,7 +709,10 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 				RuntimeId       string `json:"RuntimeId"`
 				Severity        string `json:"Severity"`
 				Title           string `json:"Title"`
+				TitleVerbose    string `json:"TitleVerbose"`
 				Url             string `json:"Url"`
+				Parameter       string `json:"Parameter"`
+				Payload         string `json:"Payload"`
 			}
 
 			var riskData riskJSON
@@ -717,6 +734,8 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 				RiskTypeVerbose: riskData.RiskTypeVerbose,
 				RuntimeId:       riskData.RuntimeId,
 				Severity:        riskData.Severity,
+				Parameter:       riskData.Parameter,
+				Payload:         riskData.Payload,
 			}
 			risk.ID = riskData.Id
 			risk.CreatedAt = time.Unix(riskData.CreatedAt, 0)

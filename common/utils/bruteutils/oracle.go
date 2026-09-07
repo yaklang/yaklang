@@ -1,3 +1,11 @@
+//go:build !yakslim
+
+// Oracle 认证依赖 go-ora 的完整 TNS/TTC/O5LOGON 协议栈。
+// 任务要求："对无法安全实现的复杂认证机制，宁可保留窄范围、经过审计的依赖，
+// 也不要使用不完整的自研密码学实现"——在多版本 Oracle 真实环境完成
+// 最小探针的兼容验证之前，默认构建保留 go-ora。
+// yakslim 构建通过本标签排除 go-ora（oracle 不可用），用于验证
+// 核心调度器与最小探针集合不依赖数据库驱动。
 package bruteutils
 
 import (

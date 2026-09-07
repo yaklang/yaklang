@@ -254,6 +254,49 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 			}()
 			defer removeConns(uidStr, originConn)
 
+			// Transparently injected connections (for example MITMv2's TUN
+			// input) already carry their original upstream target. They are not
+			// frontend proxy connections and must never be interpreted as a
+			// SOCKS5 greeting merely because their payload starts with 0x05.
+			originalDestination := ""
+			if wrapped != nil {
+				originalDestination = wrapped.GetOriginalDestination()
+			}
+			if originalDestination != "" {
+				targetHost, targetPort, err := utils.ParseStringToHostPort(originalDestination)
+				if err != nil {
+					log.Errorf("parse transparent connection target %q failed: %v", originalDestination, err)
+					return
+				}
+				if targetHost == "" || targetPort <= 0 {
+					log.Errorf("transparent connection target %q is invalid", originalDestination)
+					return
+				}
+
+				handledConnection, protocol, err := detectTunnelPayloadProtocol(originConn)
+				if err != nil {
+					log.Errorf("detect transparent connection protocol failed: %s", err)
+					return
+				}
+				if protocol == tunnelPayloadProtocolUnknown {
+					if err := p.handleRawTunnel(subCtx, handledConnection, targetHost, targetPort, wrapped.GetStrongHostLocalAddr()); err != nil {
+						log.Errorf("forward transparent raw tunnel failed: %s", err)
+					}
+					return
+				}
+
+				proxyContext, err := CreateProxyHandleContext(subCtx, handledConnection)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				defer releaseProxyHandleContext(proxyContext)
+				applyWrapperToSession(proxyContext.Session(), wrapped)
+				sessionBindConnectTo(proxyContext.Session(), PROTO_TUNNEL, targetHost, targetPort)
+				p.handleLoop(protocol == tunnelPayloadProtocolTLS, handledConnection, proxyContext)
+				return
+			}
+
 			handledConnection, isS5, firstByte, err := IsSocks5HandleShake(originConn)
 			if err != nil {
 				log.Errorf("check socks5 handle shake failed: %s", err)
@@ -269,31 +312,8 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				releaseProxyHandleContext(proxyContext)
 			}()
 
-			// Apply metaInfo and strongHostMode from wrapperedConn to session
-			if wrapped != nil {
-				session := proxyContext.Session()
-				if wrapped.IsStrongHostMode() {
-					session.Set("StrongHostMode", true)
-					// Get localAddr from WrapperedConn (required for strong host mode)
-					localAddr := wrapped.GetStrongHostLocalAddr()
-					if localAddr != "" {
-						session.Set("StrongHostLocalAddr", localAddr)
-					}
-				}
-
-				if wrapped.isListened {
-					session.Set(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn, true)
-				}
-
-				metaInfo := wrapped.GetMetaInfo()
-				if len(metaInfo) > 0 {
-					session.Set("ConnMetaInfo", metaInfo)
-					// Also set individual meta info keys for easy access
-					for k, v := range metaInfo {
-						session.Set("ConnMetaInfo_"+k, v)
-					}
-				}
-			}
+			// Apply metaInfo and strongHostMode from wrapperedConn to session.
+			applyWrapperToSession(proxyContext.Session(), wrapped)
 
 			if isS5 {
 				dstHost, dstPort, err := s5config.ServerConnect(handledConnection)
@@ -301,46 +321,54 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 					log.Errorf("server s5 connect failed: %s", err)
 					return
 				}
+				strongHostLocalAddr := strongHostLocalAddrFromCtx(proxyContext)
 				releaseProxyHandleContext(proxyContext)
 				proxyContext = nil
-				handledConnection, isTls, err = IsTlsHandleShake(handledConnection)
+				var protocol tunnelPayloadProtocol
+				handledConnection, protocol, err = detectTunnelPayloadProtocol(handledConnection)
 				if err != nil {
-					log.Errorf("check tls handle shake failed: %s", err)
+					log.Errorf("detect socks5 tunnel protocol failed: %s", err)
 					return
 				}
+				if protocol == tunnelPayloadProtocolUnknown {
+					if err := p.handleRawTunnel(subCtx, handledConnection, dstHost, dstPort, strongHostLocalAddr); err != nil {
+						log.Errorf("forward socks5 raw tunnel failed: %s", err)
+					}
+					return
+				}
+				isTls = protocol == tunnelPayloadProtocolTLS
 				proxyContext, err = CreateProxyHandleContext(subCtx, handledConnection)
 				if err != nil {
 					log.Error(err)
 					return
 				}
-				// Re-apply metaInfo after recreating context
-				if wrapped != nil {
-					session := proxyContext.Session()
-					if wrapped.IsStrongHostMode() {
-						session.Set("StrongHostMode", true)
-						// Get localAddr from WrapperedConn (required for strong host mode)
-						localAddr := wrapped.GetStrongHostLocalAddr()
-						if localAddr != "" {
-							session.Set("StrongHostLocalAddr", localAddr)
-						}
-					}
-
-					if wrapped.isListened {
-						session.Set(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn, true)
-					}
-
-					metaInfo := wrapped.GetMetaInfo()
-					if len(metaInfo) > 0 {
-						session.Set("ConnMetaInfo", metaInfo)
-						for k, v := range metaInfo {
-							session.Set("ConnMetaInfo_"+k, v)
-						}
-					}
-				}
+				// Re-apply metadata after recreating the SOCKS5 context.
+				applyWrapperToSession(proxyContext.Session(), wrapped)
 				sessionBindConnectTo(proxyContext.Session(), PROTO_S5, dstHost, dstPort)
 			}
 			p.handleLoop(isTls, handledConnection, proxyContext)
 		}(uid, conn, wrappedConn)
+	}
+}
+
+func applyWrapperToSession(session *Session, wrapped *WrapperedConn) {
+	if session == nil || wrapped == nil {
+		return
+	}
+	if wrapped.IsStrongHostMode() {
+		session.Set("StrongHostMode", true)
+		if localAddr := wrapped.GetStrongHostLocalAddr(); localAddr != "" {
+			session.Set("StrongHostLocalAddr", localAddr)
+		}
+	}
+	if wrapped.isListened {
+		session.Set(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn, true)
+	}
+	if metaInfo := wrapped.GetMetaInfo(); len(metaInfo) > 0 {
+		session.Set("ConnMetaInfo", metaInfo)
+		for key, value := range metaInfo {
+			session.Set("ConnMetaInfo_"+key, value)
+		}
 	}
 }
 
@@ -369,9 +397,9 @@ func GetDialDetectionAddr(ctx *Context, conn net.Conn) string {
 	connectedHost := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 	connectedPort := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	if connectedHost == "" || connectedPort == 0 {
-		// Transparent hijack (e.g. TUN) entry has no upstream target yet.
-		// conn.RemoteAddr() is the client's source, not the server; probing it
-		// blocks the real client<->mitm TLS handshake (webfuzzer HTTPS over TUN).
+		// A legacy transparent entry may have no explicit upstream target.
+		// conn.RemoteAddr() is the client's source, not the server, so it must
+		// never be used as a fallback probe address.
 		return ""
 	}
 	return utils.HostPort(connectedHost, connectedPort)
@@ -517,11 +545,12 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 
 	log.Debugf("mitm: completed MITM for connection: %s", req.Host)
 
-	var isTLS bool
-	conn, isTLS, err = IsTlsHandleShake(conn)
+	var protocol tunnelPayloadProtocol
+	conn, protocol, err = detectTunnelPayloadProtocol(conn)
 	if err != nil {
 		return err
 	}
+	isTLS := protocol == tunnelPayloadProtocolTLS
 	// 22 is the TLS handshake.
 	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS))
 	if parsedConnectedToPort == 0 {
@@ -531,6 +560,9 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 			parsedConnectedToPort = 80
 		}
 		session.Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
+	}
+	if protocol == tunnelPayloadProtocolUnknown {
+		return p.handleRawTunnel(req.Context(), conn, parsedConnectedToHost, parsedConnectedToPort, strongHostLocalAddrFromCtx(ctx))
 	}
 
 	// https://tools.ietf.org/html/rfc5246#section-6.2.1

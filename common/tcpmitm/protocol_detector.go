@@ -2,6 +2,8 @@ package tcpmitm
 
 import (
 	"bytes"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // Protocol represents a detected protocol type.
@@ -75,22 +77,10 @@ func (pd *ProtocolDetector) Detect(data []byte) Protocol {
 		return ProtocolSSH
 	}
 
-	// HTTP methods
-	httpMethods := [][]byte{
-		[]byte("GET "),
-		[]byte("POST "),
-		[]byte("PUT "),
-		[]byte("DELETE "),
-		[]byte("HEAD "),
-		[]byte("OPTIONS "),
-		[]byte("PATCH "),
-		[]byte("CONNECT "),
-		[]byte("TRACE "),
-	}
-	for _, method := range httpMethods {
-		if bytes.HasPrefix(data, method) {
-			return ProtocolHTTP
-		}
+	// HTTP request. Keep this shared with tunnel protocol dispatch so unknown
+	// binary protocols receive tcpmitm's default transparent-forward behavior.
+	if utils.IsHTTPRequestPrefix(data) {
+		return ProtocolHTTP
 	}
 
 	// HTTP response

@@ -1,14 +1,15 @@
 package schema
 
 const (
-	// "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
-	SCRIPT_TYPE_SYNTAXFLOW string = "syntaxflow"
-	SCRIPT_TYPE_NASL       string = "nasl"
-	SCRIPT_TYPE_NUCLEI     string = "nuclei"
-	SCRIPT_TYPE_MITM       string = "mitm"
-	SCRIPT_TYPE_PORT_SCAN  string = "port-scan"
-	SCRIPT_TYPE_CODEC      string = "codec"
-	SCRIPT_TYPE_YAK        string = "yak"
+	// "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "context-menu" | "yak"
+	SCRIPT_TYPE_SYNTAXFLOW   string = "syntaxflow"
+	SCRIPT_TYPE_NASL         string = "nasl"
+	SCRIPT_TYPE_NUCLEI       string = "nuclei"
+	SCRIPT_TYPE_MITM         string = "mitm"
+	SCRIPT_TYPE_PORT_SCAN    string = "port-scan"
+	SCRIPT_TYPE_CODEC        string = "codec"
+	SCRIPT_TYPE_CONTEXT_MENU string = "context-menu"
+	SCRIPT_TYPE_YAK          string = "yak"
 )
 
 type ScriptOrRule interface {

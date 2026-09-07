@@ -1048,6 +1048,39 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 		}
 		require.Equal(t, 2, count, "should only have 2 messages")
 	})
+	t.Run("by hidden index", func(t *testing.T) {
+		token := utils.RandStringBytes(8)
+		hiddenIndex := uuid.NewString()
+		url := "http://" + token + ".com/a.bin"
+		flow, err := yakit.CreateHTTPFlow(
+			yakit.CreateHTTPFlowWithURL(url),
+			yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token+".com\r\n\r\n")),
+			yakit.CreateHTTPFlowWithResponseRaw([]byte("HTTP/1.1 200 OK\r\nContent-Length: 8\r\nContent-Type: application/octet-stream\r\n\r\n"+token)),
+		)
+		require.NoError(t, err)
+		flow.HiddenIndex = hiddenIndex
+		err = yakit.InsertHTTPFlow(db, flow)
+		require.NoError(t, err)
+		defer yakit.DeleteHTTPFlowByID(db, int64(flow.ID))
+
+		count := 0
+		stream, err := client.GetHTTPFlowBodyById(ctx, &ypb.GetHTTPFlowBodyByIdRequest{HiddenIndex: hiddenIndex})
+		require.NoError(t, err)
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			count++
+			if count == 1 {
+				require.Equal(t, "a.bin", msg.GetFilename())
+			} else if count == 2 {
+				require.Equal(t, token, string(msg.GetData()))
+				require.True(t, msg.GetEOF())
+			}
+		}
+		require.Equal(t, 2, count, "should only have 2 messages")
+	})
 	t.Run("get risk body", func(t *testing.T) {
 		target := uuid.NewString()
 		content := uuid.NewString()

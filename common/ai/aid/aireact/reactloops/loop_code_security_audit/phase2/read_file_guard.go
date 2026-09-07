@@ -114,7 +114,11 @@ func emitPhase2CategoryBanner(loop *reactloops.ReActLoop, category model.VulnCat
 	}
 	bilingual := fmt.Sprintf("%s / Category %s (%s)", title, category.Name, category.ID)
 	reactloops.EmitActionLog(loop, util.ScanNodeID, bilingual)
-	reactloops.EmitStatus(loop, fmt.Sprintf("审计类别：%s (%s) / Category: %s", category.Name, category.ID, category.ID))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("审计类别：%s（%s）", category.Name, category.ID),
+		fmt.Sprintf("Category: %s", category.ID),
+	)
 
 	emitter := loop.GetEmitter()
 	if emitter == nil {

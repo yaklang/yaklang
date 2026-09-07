@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,6 +56,83 @@ func execTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) (stdo
 		t.Logf("tool execution error (may be expected): %v", err)
 	}
 	return w1.String(), w2.String()
+}
+
+func execHTTPToolResult(t *testing.T, params aitool.InvokeParams) map[string]any {
+	t.Helper()
+	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	result, err := getDoHTTPRequestTool(t).Callback(context.Background(), params, nil, stdout, stderr)
+	assert.NilError(t, err)
+	semantic := utils.InterfaceToGeneralMap(result)
+	assert.Assert(t, len(semantic) > 0, "missing semantic RESULT; stdout=%s stderr=%s", stdout.String(), stderr.String())
+	return semantic
+}
+
+func TestDoHTTPRequest_ResultSeparatesHTTPStatusFromTransport(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/missing":
+			w.WriteHeader(http.StatusNotFound)
+		case "/broken":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+		_, _ = w.Write([]byte("oracle"))
+	}))
+	defer server.Close()
+
+	for _, status := range []int{http.StatusOK, http.StatusNotFound, http.StatusInternalServerError} {
+		path := map[int]string{http.StatusOK: "/ok", http.StatusNotFound: "/missing", http.StatusInternalServerError: "/broken"}[status]
+		result := execHTTPToolResult(t, aitool.InvokeParams{"url": server.URL + path, "timeout": 5})
+		assert.Equal(t, utils.InterfaceToBoolean(result["request_built"]), true)
+		assert.Equal(t, utils.InterfaceToBoolean(result["request_sent"]), true)
+		assert.Equal(t, utils.InterfaceToBoolean(result["response_received"]), true)
+		assert.Equal(t, utils.InterfaceToInt(result["status_code"]), status)
+		assert.Equal(t, result["transport_error"], nil)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NilError(t, err)
+	refusedURL := "http://" + listener.Addr().String() + "/refused"
+	assert.NilError(t, listener.Close())
+	result := execHTTPToolResult(t, aitool.InvokeParams{"url": refusedURL, "timeout": 1})
+	assert.Equal(t, utils.InterfaceToBoolean(result["request_sent"]), true)
+	assert.Equal(t, utils.InterfaceToBoolean(result["response_received"]), false)
+	assert.Assert(t, utils.InterfaceToString(result["transport_error"]) != "")
+}
+
+func TestDoHTTPRequest_HTTPAndTransportOutcomesStillCompleteInvocationProtocol(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("server-side failure"))
+	}))
+	defer server.Close()
+
+	tool := getDoHTTPRequestTool(t)
+	for _, target := range []string{server.URL, func() string {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		assert.NilError(t, err)
+		url := "http://" + listener.Addr().String()
+		assert.NilError(t, listener.Close())
+		return url
+	}()} {
+		result, err := tool.InvokeWithParams(aitool.InvokeParams{"url": target, "timeout": 1})
+		assert.NilError(t, err)
+		assert.Equal(t, result.Success, true)
+		execution, ok := result.Data.(*aitool.ToolExecutionResult)
+		assert.Assert(t, ok)
+		semantic := utils.InterfaceToGeneralMap(execution.Result)
+		assert.Assert(t, len(semantic) > 0)
+		assert.Assert(t, !strings.Contains(result.String(), "tool/do_http_request ok"))
+	}
+}
+
+func TestDoHTTPRequest_MissingRequestIsProtocolFailure(t *testing.T) {
+	result, err := getDoHTTPRequestTool(t).InvokeWithParams(aitool.InvokeParams{})
+	assert.ErrorContains(t, err, "either 'url'")
+	assert.Equal(t, result.Success, false)
+	assert.Assert(t, result.Data == nil, "a failed invocation must not expose a result envelope")
 }
 
 func TestDoHTTPRequest_BasicURL(t *testing.T) {

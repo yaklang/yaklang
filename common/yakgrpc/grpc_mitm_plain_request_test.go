@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"runtime"
 	"testing"
 
@@ -107,6 +108,57 @@ func TestDecodeAndCachePlainRequestBytesIfStorablePreservesOwnership(t *testing.
 		require.Equal(t, expected, httpctx.GetBareRequestBytes(req))
 		require.Equal(t, expected, httpctx.GetPlainRequestBytes(req))
 	})
+}
+
+func TestMITMMirrorPlainRequestDoesNotCreateHistorySidecarBeforeSaveDecision(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
+	previousLimit := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(64 * 1024)
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(previousLimit) })
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/filtered-upload", nil)
+	packet := makePlainRequestPacket(64*1024 + 1)
+	httpctx.SetPlainRequestBytes(req, packet)
+
+	plain := getMITMPlainRequestBytes(req)
+	require.Equal(t, packet, plain)
+	require.False(t, httpctx.GetRequestTooLarge(req), "mirror/filter inspection must not create History resources")
+	entries, err := os.ReadDir(consts.GetDefaultYakitBaseTempDir())
+	if !os.IsNotExist(err) {
+		require.NoError(t, err)
+		for _, entry := range entries {
+			require.NotContains(t, entry.Name(), "large-request-", "no Flow has been accepted for persistence yet")
+		}
+	}
+
+	display := getMITMDisplayRequestBytes(req)
+	require.Contains(t, string(display), "{{file(")
+	require.True(t, httpctx.GetRequestTooLarge(req), "the UI/History path still prepares the bounded representation")
+	t.Cleanup(func() { yakit.CleanupPreparedLargeHTTPFlowRequest(req) })
+}
+
+func TestFilteredMITMRequestReleasesPreviouslyPreparedDisplaySidecar(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
+	previousLimit := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(64 * 1024)
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(previousLimit) })
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/response-filtered-upload", nil)
+	httpctx.SetPlainRequestBytes(req, makePlainRequestPacket(64*1024+1))
+	display := getMITMDisplayRequestBytes(req)
+	require.Contains(t, string(display), "{{file(")
+	headerFile := httpctx.GetRequestTooLargeHeaderFile(req)
+	bodyFile := httpctx.GetRequestTooLargeBodyFile(req)
+	t.Cleanup(func() { yakit.CleanupPreparedLargeHTTPFlowRequest(req) })
+	require.FileExists(t, headerFile)
+	require.FileExists(t, bodyFile)
+
+	// This is the terminal action taken by the response-filtered branch: no
+	// HTTPFlow takes ownership, so the previously displayed resource is released.
+	yakit.CleanupPreparedLargeHTTPFlowRequest(req)
+	require.NoFileExists(t, headerFile)
+	require.NoFileExists(t, bodyFile)
+	require.False(t, httpctx.GetRequestTooLarge(req))
 }
 
 func BenchmarkCachePlainRequestBytesIfStorable(b *testing.B) {

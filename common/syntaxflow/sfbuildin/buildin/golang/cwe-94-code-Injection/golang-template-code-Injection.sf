@@ -2,7 +2,7 @@ desc(
 	title: "Check Go Server-Side Template Injection Vulnerability"
 	type: audit
 	level: high
-	risk: ""
+	risk: "template-injection"
 	desc: <<<DESC
 该规则用于检测Go语言中是否存在服务器端模板注入（Server-Side Template Injection, SSTI）漏洞。攻击者可通过向应用程序输入恶意模板表达式，利用未过滤的模板引擎执行任意代码，从而导致系统被完全控制。此漏洞常见于使用`text/template`或`html/template`包且未对用户输入进行严格过滤的场景，例如通过`ParseGlob`加载模板文件时未做安全校验。触发条件通常为用户可控的模板路径参数（如`templates/*.html`）未经过滤，攻击者可构造特殊路径（如`*.html`）绕过白名单机制，最终在服务端执行任意Go代码。潜在影响包括数据泄露、服务器被接管、横向渗透等，危害等级高。建议在解析模板前对用户输入进行严格的白名单过滤与转义处理。
 DESC
@@ -29,7 +29,7 @@ $tmpl( * #{until: `*.ParseGlob`}->.ParseGlob as $sink)
 $sink(* #->?{have: /\*/} as $high) 
 
 alert $high for {
-	risk: "模板注入",
+	risk: "template-injection",
 	desc: <<<DESC
 代码中使用了 Go 语言的 text/template 包，并通过 ParseGlob 方法动态加载模板文件。攻击者可以控制模板文件名或内容，从而注入恶意模板代码执行任意服务器端逻辑，导致远程代码执行。
 DESC

@@ -1,0 +1,22 @@
+◆ memfit  local isolated agent
+test-model · YOLO · /workspace/yaklang
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history · ^O details
+
+You
+  activity-flow
+
+Memfit
+  activity flow complete
+
+✓ Completed · <elapsed> · test-model
+
+› ✓ Thinking ▾
+      先识别用户意图，再选择最小范围的工具。
+  ✓ Intent ▸ · inspect repository
+  ✓ Understanding   · README contains project context
+  ✓ Read ▸ · 文件读取 · README.md
+  ✓ Observation ▸ · Project purpose confirmed
+╭─ Message ──────────────────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰────────────────────────────────────────────────────────────────────────────────
+○ Ready                          test-model · YOLO · click/Ctrl+O details · /help

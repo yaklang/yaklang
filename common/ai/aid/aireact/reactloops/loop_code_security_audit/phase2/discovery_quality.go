@@ -36,7 +36,8 @@ func EvaluateDiscoveryQuality(category model.VulnCategory, candidateCount, attem
 // isFlowCentricCategory marks categories that typically need source+sink pairing.
 func isFlowCentricCategory(categoryID string) bool {
 	switch categoryID {
-	case "xss_injection", "path_traversal", "auth_bypass", "xxe_ssrf":
+	case "xss_injection", "path_traversal", "auth_bypass", "xxe_ssrf",
+		"expression_injection", "header_injection", "race_condition":
 		return true
 	default:
 		return false
@@ -67,17 +68,31 @@ func FormatDeepDiscoveryGuidance(category model.VulnCategory, quality DiscoveryQ
 
 // BuildFastContextQuery builds a structured default query (parent may override).
 func BuildFastContextQuery(category model.VulnCategory) string {
-	if isFlowCentricCategory(category.ID) {
+	switch {
+	case isFlowCentricCategory(category.ID):
 		return fmt.Sprintf(
 			"【%s / %s】数据流型发现：分别搜索 (1) 用户可控输入来源 (2) 未编码输出/渲染 Sink；"+
 				"结合技术栈推导多组 grep pattern；必要时 read_file 打开 recon_report 确认模块目录后再搜。",
 			category.Name, category.ID,
 		)
+	case category.ID == "memory_safety":
+		return fmt.Sprintf(
+			"【%s / %s】内存安全发现：搜索协议编解码、memcpy/realloc、length 字段解析、free 后引用、"+
+				"对象池/引用计数；关注攻击者可控 size/offset；宁多勿少。",
+			category.Name, category.ID,
+		)
+	case category.ID == "resource_exhaustion":
+		return fmt.Sprintf(
+			"【%s / %s】资源耗尽发现：搜索无界嵌套解析、按 length 分配、ReadAll/DirectMemory、"+
+				"gzip/zip 解压；确认是否缺少 maxDepth/maxFrameSize。",
+			category.Name, category.ID,
+		)
+	default:
+		return fmt.Sprintf(
+			"【%s / %s】定位所有典型 Sink 与相关数据流文件；覆盖框架变体；宁多勿少。",
+			category.Name, category.ID,
+		)
 	}
-	return fmt.Sprintf(
-		"【%s / %s】定位所有典型 Sink 与相关数据流文件；覆盖框架变体；宁多勿少。",
-		category.Name, category.ID,
-	)
 }
 
 // BumpFastContextAttempt increments per-category fast_context call count on scan state.

@@ -166,7 +166,7 @@ var listFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			invoker := loop.GetInvoker()
 			startLine := fmt.Sprintf("列出 Java 文件: %s", dirPath)
 			reactloops.EmitActionLog(loop, nodeID, startLine)
-			reactloops.EmitStatus(loop, "枚举文件中 / Listing Files...")
+			reactloops.EmitStatusI18n(loop, "枚举文件中", "Listing Files...")
 
 			fs := filesys.NewLocalFs()
 			var javaFiles []string
@@ -183,10 +183,12 @@ var listFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 							javaFiles = append(javaFiles, path)
 						}
 						if len(javaFiles)%100 == 0 {
-							reactloops.EmitStatus(loop, fmt.Sprintf(
-								"已发现 %d 个 Java 文件 / Found %d Java Files",
-								len(javaFiles), len(javaFiles),
-							))
+							reactloops.EmitStatusI18n(
+								loop,
+								fmt.Sprintf("已发现 %d 个 Java 文件", len(javaFiles)),
+								fmt.Sprintf("Found %d Java files", len(javaFiles)),
+							)
+
 						}
 					}
 					return nil
@@ -220,14 +222,14 @@ var listFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 
 【警告】：部分文件可能已列出，但遍历未完成！`, dirPath, err))
 				if len(javaFiles) == 0 {
-					reactloops.EmitStatus(loop, "枚举失败 / Listing Failed")
+					reactloops.EmitStatusI18n(loop, "枚举失败", "Listing Failed")
 					op.Fail("failed to list files: " + err.Error())
 					return
 				}
 			}
 
 			if len(javaFiles) == 0 {
-				reactloops.EmitStatus(loop, "未找到 Java 文件 / No Java Files Found")
+				reactloops.EmitStatusI18n(loop, "未找到 Java 文件", "No Java Files Found")
 				finishLine := fmt.Sprintf("完成: 目录 %s 中未找到 Java 文件", dirPath)
 				reactloops.EmitActionLog(loop, nodeID, finishLine)
 				invoker.AddToTimeline("list_files_empty", fmt.Sprintf(`【未找到 Java 文件】目录中没有 Java 文件：%s
@@ -264,10 +266,12 @@ var listFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			summary, reference := reactloops.SpillLongContent(loop, "java_file_list", fullList)
 
 			finishLine := fmt.Sprintf("完成: 找到 %d 个 Java 文件 (%s)", len(javaFiles), dirPath)
-			reactloops.EmitStatus(loop, fmt.Sprintf(
-				"枚举完成 (%d 个文件) / Listing Complete (%d files)",
-				len(javaFiles), len(javaFiles),
-			))
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("文件枚举完成，共 %d 个文件", len(javaFiles)),
+				fmt.Sprintf("File listing complete with %d files", len(javaFiles)),
+			)
+
 			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
 
 			feedbackMsg := fmt.Sprintf("Found %d Java files in %s", len(javaFiles), dirPath)

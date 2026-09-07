@@ -15,31 +15,31 @@ const Phase_PlanReady = "plan_ready"
 // runPlanPhaseThroughReview runs plan loop, user review, and persists plan_ready state.
 // It does not execute subtasks.
 func (c *Coordinator) runPlanPhaseThroughReview() error {
-	c.planLoadingStatus("创建任务规划 / Creating Plan...")
+	c.planUserStatus("正在梳理任务目标", "Understanding the task goals", aicommon.WithStatusCode("plan.understanding"))
 	c.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {
-		c.planLoadingStatus("任务规划创建失败 / Plan Creation Failed")
+		c.planUserStatus("暂时没能整理出执行方案", "Unable to prepare an execution plan", aicommon.WithStatusCode("plan.failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("create planRequest failed: %v", err)
 		return utils.Errorf("coordinator: create planRequest failed: %v", err)
 	}
 
-	c.planLoadingStatus("任务规划中... / Waiting AI to Generate Plan...")
+	c.planUserStatus("正在整理执行方案", "Preparing the execution plan", aicommon.WithStatusCode("plan.generating"))
 	c.EmitInfo("start to invoke plan request")
 	rsp, err := planReq.Invoke()
 	if err != nil {
-		c.planLoadingStatus("任务规划失败 / Plan Generation Failed")
+		c.planUserStatus("暂时没能整理出执行方案", "Unable to prepare an execution plan", aicommon.WithStatusCode("plan.failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("invoke planRequest failed(first): %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 	}
 	rsp, err = planReq.ensurePlanExecutableDAG(rsp)
 	if err != nil {
-		c.planLoadingStatus("任务规划依赖校验失败 / Plan DAG Validation Failed")
+		c.planUserStatus("步骤之间存在冲突，正在重新整理", "Some steps conflict and need to be reorganized", aicommon.WithStatusCode("plan.order_failed"), aicommon.WithStatusState(aicommon.StatusStateRecovering))
 		c.EmitError("validate generated plan executable DAG failed: %v", err)
 		return err
 	}
 
-	c.planLoadingStatus("任务规划等待用户审查 / Waiting User to Review Plan...")
+	c.planUserStatus("执行方案已经准备好，等你确认", "The execution plan is ready for your review", aicommon.WithStatusCode("plan.awaiting_review"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
 	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 
@@ -48,39 +48,39 @@ func (c *Coordinator) runPlanPhaseThroughReview() error {
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.GetId(), params)
 	if params == nil {
-		c.planLoadingStatus("用户审查失败 / User Review Failed")
+		c.planUserStatus("没有收到有效的确认结果", "No valid review response was received", aicommon.WithStatusCode("plan.review_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("user review params is nil, plan failed")
 		return utils.Errorf("coordinator: user review params is nil")
 	}
 
-	c.planLoadingStatus("处理用户审查结果 / Processing User Review...")
+	c.planUserStatus("正在根据你的意见调整方案", "Updating the plan based on your feedback", aicommon.WithStatusCode("plan.revising"))
 	c.EmitInfo("start to handle review plan response")
 	rsp, err = planReq.handleReviewPlanResponse(rsp, params)
 	if err != nil {
-		c.planLoadingStatus("处理审查结果失败 / Review Processing Failed")
+		c.planUserStatus("暂时没能应用这次调整", "Unable to apply the requested changes", aicommon.WithStatusCode("plan.revision_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("handle review plan response failed: %v", err)
 		return utils.Errorf("coordinator: handle review plan response failed: %v", err)
 	}
 	rsp, err = planReq.ensurePlanExecutableDAG(rsp)
 	if err != nil {
-		c.planLoadingStatus("任务规划依赖校验失败 / Plan DAG Validation Failed")
+		c.planUserStatus("正在重新校对步骤顺序", "Rechecking the order of the steps", aicommon.WithStatusCode("plan.reordering"), aicommon.WithStatusState(aicommon.StatusStateRecovering))
 		c.EmitError("validate reviewed plan executable DAG failed: %v", err)
 		return err
 	}
 
 	if rsp.RootTask == nil {
-		c.planLoadingStatus("任务计划无效 / Invalid Task Plan")
+		c.planUserStatus("执行方案还不够完整", "The execution plan is incomplete", aicommon.WithStatusCode("plan.invalid"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("root aiTask is nil, plan failed")
 		return utils.Errorf("coordinator: root aiTask is nil")
 	}
 
-	c.planLoadingStatus("初始化任务队列 / Initializing Task Queue...")
+	c.planUserStatus("正在准备执行计划", "Preparing to execute the plan", aicommon.WithStatusCode("plan.preparing"))
 	root := rsp.RootTask
 	c.rootTask = root
 	c.ContextProvider.StoreRootTask(root)
 	c.savePlanAndExecState(Phase_PlanReady, nil)
 	if len(root.Subtasks) <= 0 {
-		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
+		c.planUserStatus("执行方案中没有可推进的步骤", "The plan has no actionable steps", aicommon.WithStatusCode("plan.empty"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
 	}
@@ -99,7 +99,7 @@ func (c *Coordinator) runPlanPhaseThroughReview() error {
 }
 
 func (c *Coordinator) runExecuteRoot(startTaskID string) error {
-	c.planLoadingStatus("执行任务中 / Executing Tasks...")
+	c.planUserStatus("正在推进任务", "Working through the task", aicommon.WithStatusCode("plan.executing"))
 	c.EmitInfo("start to create runtime")
 	c.ensureSessionSnapshotEmitHandler()
 	if c.rootTask != nil {
@@ -117,7 +117,7 @@ func (c *Coordinator) runExecuteRoot(startTaskID string) error {
 	rt := c.createRuntime()
 	c.runtime = rt
 	if err := rt.Invoke(c.rootTask, startTaskID); err != nil {
-		c.planLoadingStatus("任务执行失败 / Task Execution Failed")
+		c.planUserStatus("任务推进时遇到问题", "A problem occurred while executing the task", aicommon.WithStatusCode("plan.execution_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		return err
 	}
 	return nil
@@ -142,18 +142,18 @@ func (c *Coordinator) tryRecoverAndExecute(startTaskID string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		c.planLoadingStatus("恢复执行失败 / Recovery Failed")
+		c.planUserStatus("暂时没能恢复之前的进度", "Unable to restore the previous progress", aicommon.WithStatusCode("plan.recovery_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		if isPlanExecutableDAGValidationError(err) {
 			c.recordPlanDAGValidationFailure(err, 0)
 		}
 		c.EmitError("recover plan-and-exec failed: %v", err)
 		return false, utils.Errorf("coordinator: recover plan-and-exec failed: %v", err)
 	}
-	c.planLoadingStatus("恢复执行 / Recovering Execution...")
+	c.planUserStatus("正在恢复之前的进度", "Restoring the previous progress", aicommon.WithStatusCode("plan.recovering"), aicommon.WithStatusState(aicommon.StatusStateRecovering))
 	c.rootTask = recoveredRoot
 	c.ContextProvider.StoreRootTask(recoveredRoot)
 	if len(recoveredRoot.Subtasks) <= 0 {
-		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
+		c.planUserStatus("没有找到可以继续的步骤", "No actionable steps were found", aicommon.WithStatusCode("plan.empty"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("no subtasks found in recovered task tree")
 		return false, utils.Errorf("coordinator: no subtasks found in recovered task tree")
 	}
@@ -164,20 +164,20 @@ func (c *Coordinator) tryRecoverAndExecute(startTaskID string) (bool, error) {
 }
 
 func (c *Coordinator) runReportAndFinishPhases() error {
-	c.planLoadingStatus("生成执行结果 / Generating Results...")
+	c.planUserStatus("正在汇总任务成果", "Summarizing the task results", aicommon.WithStatusCode("plan.summarizing"))
 	if c.ResultHandler != nil {
 		c.ResultHandler(c)
 	} else if c.GenerateReport {
-		c.planLoadingStatus("进入报告生成专注模式 / Entering Report Generation Focus Mode...")
+		c.planUserStatus("正在整理最终报告", "Preparing the final report", aicommon.WithStatusCode("plan.report"))
 		c.EmitInfo("start report generation via focus mode loop")
 		if err := c.generateReportViaFocusMode(); err != nil {
-			c.planLoadingStatus("报告生成失败 / Report Generation Failed")
+			c.planUserStatus("暂时没能完成最终报告", "Unable to complete the final report", aicommon.WithStatusCode("plan.report_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 			c.EmitError("report generation via focus mode failed: %v", err)
 			return utils.Errorf("coordinator: report generation failed: %v", err)
 		}
 	}
 
-	c.planLoadingStatus("执行完成 / Execution Completed")
+	c.planUserStatus("任务已经处理完成", "The task has been completed", aicommon.WithStatusCode("plan.completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 	c.EmitInfo("coordinator run finished")
 	c.Wait()
 	return nil
@@ -185,8 +185,7 @@ func (c *Coordinator) runReportAndFinishPhases() error {
 
 // RunPlanOnly executes the plan loop and user review, then persists plan_ready without running subtasks.
 func (c *Coordinator) RunPlanOnly() error {
-	c.planLoadingStatus("初始化 / Initializing...")
-	defer c.planLoadingStatus("任务规划阶段结束 / Plan Phase Finished")
+	c.planUserStatus("正在准备任务规划", "Preparing task planning", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
@@ -196,7 +195,7 @@ func (c *Coordinator) RunPlanOnly() error {
 		return err
 	}
 
-	c.planLoadingStatus("计划已就绪 / Plan Ready")
+	c.planUserStatus("执行方案已经准备好，等你开始", "The execution plan is ready to start", aicommon.WithStatusCode("plan.ready"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
 	c.EmitInfo("plan phase completed, awaiting execution")
 	c.Wait()
 	return nil
@@ -204,25 +203,24 @@ func (c *Coordinator) RunPlanOnly() error {
 
 // RunExecuteApprovedPlan executes an in-memory approved plan without running the plan loop.
 func (c *Coordinator) RunExecuteApprovedPlan() error {
-	c.planLoadingStatus("初始化 / Initializing...")
-	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
+	c.planUserStatus("正在准备执行计划", "Preparing to execute the plan", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
 	c.emitBaseCapabilityInventory()
 
 	if c.rootTask == nil {
-		c.planLoadingStatus("无已批准计划 / No Approved Plan")
+		c.planUserStatus("没有找到已确认的执行方案", "No approved execution plan was found", aicommon.WithStatusCode("plan.not_found"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("no approved plan found for execution")
 		return utils.Errorf("coordinator: no approved plan to execute for %s", c.GetRuntimeId())
 	}
 	if len(c.rootTask.Subtasks) <= 0 {
-		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
+		c.planUserStatus("执行方案中没有可推进的步骤", "The plan has no actionable steps", aicommon.WithStatusCode("plan.empty"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
 	}
 	if err := c.validatePlanExecutableDAG(c.rootTask); err != nil {
-		c.planLoadingStatus("任务规划依赖校验失败 / Plan DAG Validation Failed")
+		c.planUserStatus("步骤之间存在冲突，暂时无法执行", "Some plan steps conflict and cannot be executed", aicommon.WithStatusCode("plan.order_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.recordPlanDAGValidationFailure(err, 0)
 		return utils.Errorf("coordinator: approved plan executable DAG validation failed: %v", err)
 	}
@@ -235,8 +233,7 @@ func (c *Coordinator) RunExecuteApprovedPlan() error {
 
 // RunExecuteOnly executes a previously approved plan (plan_ready in DB) without re-running plan loop.
 func (c *Coordinator) RunExecuteOnly() error {
-	c.planLoadingStatus("初始化 / Initializing...")
-	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
+	c.planUserStatus("正在恢复执行方案", "Restoring the execution plan", aicommon.WithStatusCode("plan.recovering"), aicommon.WithStatusState(aicommon.StatusStateRecovering))
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
@@ -247,7 +244,7 @@ func (c *Coordinator) RunExecuteOnly() error {
 		return err
 	}
 	if !recovered {
-		c.planLoadingStatus("无已批准计划 / No Approved Plan")
+		c.planUserStatus("没有找到可以继续的执行方案", "No execution plan is available to continue", aicommon.WithStatusCode("plan.not_found"), aicommon.WithStatusState(aicommon.StatusStateError))
 		c.EmitError("no approved plan found for execution")
 		return utils.Errorf("coordinator: no approved plan to execute for %s", c.GetRuntimeId())
 	}

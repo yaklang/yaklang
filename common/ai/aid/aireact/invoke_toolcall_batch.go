@@ -483,11 +483,10 @@ func (r *ReAct) ExecuteToolBatch(
 	works := make([]toolBatchWork, len(request.Calls))
 	baseArtifactOrdinal := len(task.GetAllToolCallResults())
 	loop := toolBatchLoop(task)
-	directAdmissionFailed := false
 
-	// Resolve and preflight the complete direct batch before emitting any card
-	// or starting any callback. Mutators receive private copies and run in model
-	// order, so a failure guarantees zero tool execution for the entire batch.
+	// Resolve and preflight every child before emitting cards or callbacks.
+	// Calls in a batch are declared mutually independent, so one rejected child
+	// remains visible in its own outcome without cancelling valid siblings.
 	for i := range request.Calls {
 		if err := ctx.Err(); err != nil {
 			return result, err
@@ -521,7 +520,6 @@ func (r *ReAct) ExecuteToolBatch(
 		if call.Mode != aicommon.ToolCallModeDirect && call.Mode != aicommon.ToolCallModeRequire {
 			result.Outcomes[i].Stage = aicommon.ToolCallStageValidationFailed
 			result.Outcomes[i].Err = fmt.Errorf("unsupported tool call mode %q", call.Mode)
-			directAdmissionFailed = true
 			works[i] = work
 			continue
 		}
@@ -529,9 +527,6 @@ func (r *ReAct) ExecuteToolBatch(
 		if resolveErr != nil {
 			result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 			result.Outcomes[i].Err = resolveErr
-			if call.Mode == aicommon.ToolCallModeDirect {
-				directAdmissionFailed = true
-			}
 			works[i] = work
 			continue
 		}
@@ -544,9 +539,6 @@ func (r *ReAct) ExecuteToolBatch(
 			if allow, guardMessage := reactloops.CheckToolInvokeGuard(loop, call.ToolName, guardParams); !allow {
 				result.Outcomes[i].Stage = aicommon.ToolCallStageValidationFailed
 				result.Outcomes[i].Err = utils.Error(guardMessage)
-				if call.Mode == aicommon.ToolCallModeDirect {
-					directAdmissionFailed = true
-				}
 				works[i] = work
 				continue
 			}
@@ -567,20 +559,9 @@ func (r *ReAct) ExecuteToolBatch(
 					call.ToolName,
 					validationErrors,
 				)
-				directAdmissionFailed = true
 			}
 		}
 		works[i] = work
-	}
-
-	if directAdmissionFailed {
-		for i := range result.Outcomes {
-			if result.Outcomes[i].Err == nil {
-				result.Outcomes[i].Stage = aicommon.ToolCallStageCancelled
-				result.Outcomes[i].Err = fmt.Errorf("tool batch admission failed before execution")
-			}
-		}
-		return result, nil
 	}
 
 	paramConcurrency := r.config.GetConfigInt(
@@ -726,6 +707,9 @@ func (r *ReAct) ExecuteToolBatch(
 
 			outcome := &result.Outcomes[i]
 			outcome.Result = toolResult
+			if toolResult != nil {
+				outcome.ExecutionStatus, _ = toolResult.GetExecutionStatus()
+			}
 			outcome.DirectlyAnswer = directlyAnswer
 			outcome.Err = callErr
 			if toolResult != nil {
@@ -769,7 +753,7 @@ func (r *ReAct) ExecuteToolBatch(
 		}
 		task.PushToolCallResult(outcome.Result)
 		r.config.Timeline.PushToolResult(outcome.Result)
-		r.EmitInfo("Tool batch child completed: %s", outcome.Result.Name)
+		r.EmitInfo("Tool batch child invocation settled: %s", outcome.Result.Name)
 	}
 	if err := ctx.Err(); err != nil {
 		return result, err

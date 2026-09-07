@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -50,12 +50,12 @@ func (i *extTestInvoker) AddToTimeline(entry, content string) {
 type extTestConfig struct {
 	*mock.MockedAIConfig
 
-	mu               sync.Mutex
-	feedParams       aitool.InvokeParams // 用户回复 (Feed 传入)
-	fed              bool
-	submitCpErr      error
-	emitInteractIDs  []string
-	endpointManager  *aicommon.EndpointManager
+	mu              sync.Mutex
+	feedParams      aitool.InvokeParams // 用户回复 (Feed 传入)
+	fed             bool
+	submitCpErr     error
+	emitInteractIDs []string
+	endpointManager *aicommon.EndpointManager
 }
 
 // GetEndpointManager 返回可控的 EndpointManager (由测试构造), 覆盖 BaseInteractiveHandler.
@@ -97,7 +97,6 @@ func (c *extTestConfig) SubmitCheckpointRequest(checkpoint *schema.AiCheckpoint,
 	return c.submitCpErr
 }
 
-
 func newExtTestConfig(ctx context.Context, feedParams aitool.InvokeParams) *extTestConfig {
 	base, ok := mock.NewMockedAIConfig(ctx).(*mock.MockedAIConfig)
 	_ = base
@@ -105,9 +104,9 @@ func newExtTestConfig(ctx context.Context, feedParams aitool.InvokeParams) *extT
 	// 用 NewMockedAIConfig 作为底座, 但 GetEndpointManager/Feed/DoWaitAgree/SubmitCheckpointRequest
 	// 都由 extTestConfig 重写, 所以 BaseInteractiveHandler 的对应方法不会被调用.
 	cfg := &extTestConfig{
-		MockedAIConfig:   base,
-		feedParams:       feedParams,
-		endpointManager:  aicommon.NewEndpointManagerContext(ctx),
+		MockedAIConfig:  base,
+		feedParams:      feedParams,
+		endpointManager: aicommon.NewEndpointManagerContext(ctx),
 	}
 	// EndpointManager 在 CreateEndpoint 时会调用 config.AcquireId / GetRuntimeId / GetDB /
 	// CreateReviewCheckpoint. 让它走通: 用 cfg 自身的 AcquireId/GetRuntimeId (来自 MockedAIConfig),
@@ -199,6 +198,20 @@ func TestRequestIterationExtension_ExtensionCapReached(t *testing.T) {
 	require.False(t, agreed)
 	assert.Equal(t, 0, delta)
 	assert.False(t, cfg.fed, "Feed must not be called when extension cap reached")
+}
+
+func TestRequestIterationExtensionDoesNotBlockNonInteractiveFocus(t *testing.T) {
+	ctx := context.Background()
+	cfg := newExtTestConfig(ctx, aitool.InvokeParams{"suggestion": "+5"})
+	loop, task := newExtTestLoop(t, cfg)
+	loop.allowUserInteract = func() bool { return false }
+
+	agreed, delta, err := loop.requestIterationExtension(task, 11, 10)
+	require.NoError(t, err)
+	require.False(t, agreed)
+	assert.Equal(t, 0, delta)
+	assert.False(t, cfg.fed, "non-interactive Focus must not create a blocking extension review")
+	assert.Equal(t, 0, loop.getIterationExtensionCount())
 }
 
 // TestRequestIterationExtension_Plus10 验证用户选择 +10: delta=10.

@@ -69,7 +69,12 @@ func makeKnowledgeSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				ctx = task.GetContext()
 			}
 
-			loop.LoadingStatus(fmt.Sprintf("searching knowledge base: %s", searchQuery))
+			loop.UserStatus(
+				"正在查找相关知识",
+				"Searching the relevant knowledge",
+				aicommon.WithStatusCode("answer.knowledge.searching"),
+				aicommon.WithStatusDetail(fmt.Sprintf("正在查找与「%s」相关的内容", searchQuery), fmt.Sprintf("Looking for information about %q", searchQuery)),
+			)
 
 			var enhancePlans []string
 			if mode == "keyword" {

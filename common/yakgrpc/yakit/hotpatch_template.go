@@ -102,7 +102,12 @@ func UpdateHotPatchTemplate(db *gorm.DB, name, content, typ string, tags []strin
 	if typ != "" { // disallow empty type to avoid clearing the type
 		m["type"] = typ
 	}
-	m["tags"] = schema.StringSlice(normalizeHotPatchTemplateTags(tags)) // allow empty tags to clear the tags
+	normalizedTags := normalizeHotPatchTemplateTags(tags)
+	if len(normalizedTags) > 0 { // disallow empty tags to avoid clearing the tags
+		m["tags"] = schema.StringSlice(normalizedTags)
+	} else if len(m) == 0 { // only Data.Tags is set (and empty): treat as clearing the tags
+		m["tags"] = schema.StringSlice(normalizedTags)
+	}
 	db = db.Updates(m)
 	return db.RowsAffected, db.Error
 }

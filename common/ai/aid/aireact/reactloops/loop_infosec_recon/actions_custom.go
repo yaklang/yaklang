@@ -85,7 +85,7 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, "开始: recon_register_seed / Start: recon_register_seed")
-			reactloops.EmitStatus(loop, "注册侦察种子中 / Registering recon seed...")
+			reactloops.EmitStatusI18n(loop, "注册侦察种子中", "Registering recon seed...")
 
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
@@ -122,7 +122,7 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			}
 			r.AddToTimeline("infosec_seed", fmt.Sprintf("seed=%s workdir=%s", seed, wd))
 			op.Feedback(fmt.Sprintf("Registered seed URL. Pool file: %s", filepath.Join(wd, poolFileName)))
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: recon_register_seed / Done: recon_register_seed (seed=%s)", seed))
 			op.Continue()
 		},
@@ -140,7 +140,7 @@ func apiPoolMergeAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, "开始: api_pool_merge / Start: api_pool_merge")
-			reactloops.EmitStatus(loop, "整理 API 池中 / Merging API pool...")
+			reactloops.EmitStatusI18n(loop, "整理 API 池中", "Merging API pool...")
 
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
@@ -195,7 +195,7 @@ func apiPoolMergeAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			}
 			r.AddToTimeline("api_pool_merge", fmt.Sprintf("added %d endpoints (errors: %d)", added, len(mergeErrs)))
 			op.Feedback(fmt.Sprintf("Merged into pool: +%d new entries. Total entries: %d. Parse errors: %d", added, len(pool.Entries), len(mergeErrs)))
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: api_pool_merge (+%d) / Done: api_pool_merge (+%d)", added, added))
 			op.Continue()
 		},
@@ -227,7 +227,7 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("开始: %s / Start: %s", ToolCrawlJsCollector, ToolCrawlJsCollector))
-			reactloops.EmitStatus(loop, "JS 爬取分析中 / Running JS crawl analysis...")
+			reactloops.EmitStatusI18n(loop, "JS 爬取分析中", "Running JS crawl analysis...")
 
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
@@ -308,7 +308,7 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			r.AddToTimeline(ToolCrawlJsCollector+"_done", timelineEntry)
 			appendInfosecReconLog(loop, "=== "+ToolCrawlJsCollector+" ===\n"+summary)
 			op.Feedback(feedback)
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("完成: %s / Done: %s", ToolCrawlJsCollector, ToolCrawlJsCollector))
 			op.Continue()
 		},
@@ -336,7 +336,7 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("开始: %s / Start: %s", ToolJsStaticExtractAI, ToolJsStaticExtractAI))
-			reactloops.EmitStatus(loop, "JS 静态分析中 / Running JS static analysis...")
+			reactloops.EmitStatusI18n(loop, "JS 静态分析中", "Running JS static analysis...")
 
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
@@ -428,7 +428,7 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			r.AddToTimeline(ToolJsStaticExtractAI+"_done", fmt.Sprintf("added %d from js static", totalAdded))
 			op.Feedback(fmt.Sprintf("JS static pass done: +%d pool entries (total %d). Resolved via %s.", totalAdded, len(pool.Entries), pathSource))
 			op.Feedback("[Next] " + ToolJsStaticExtractAI + " 已完成。请根据 API 池摘要、ReconLog 与本轮反馈决定下一步（如 probe_api_candidates）；勿对已成功分析的 paths 无意义重复调用。")
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("完成: %s (+%d) / Done: %s (+%d)", ToolJsStaticExtractAI, totalAdded, ToolJsStaticExtractAI, totalAdded))
 			op.Continue()
 		},
@@ -448,7 +448,7 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, "开始: probe_api_candidates / Start: probe_api_candidates")
-			reactloops.EmitStatus(loop, "探测 API 候选中 / Probing API candidates...")
+			reactloops.EmitStatusI18n(loop, "探测 API 候选中", "Probing API candidates...")
 
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
@@ -483,7 +483,7 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			_, verified, _, _ := PoolStats(pool)
 			r.AddToTimeline("probe_api", fmt.Sprintf("probed %d entries; verified count=%d", n, verified))
 			op.Feedback(fmt.Sprintf("Probed %d URLs this batch. Verified entries in pool: %d / %d", n, verified, len(pool.Entries)))
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: probe_api_candidates (%d probed) / Done: probe_api_candidates (%d probed)", n, n))
 			op.Continue()
 		},

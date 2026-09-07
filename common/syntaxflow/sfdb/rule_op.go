@@ -85,15 +85,25 @@ func MigrateSyntaxFlowWithDB(db *gorm.DB, hash string, i *schema.SyntaxFlowRule)
 	if db == nil {
 		return utils.Errorf("profile db is nil")
 	}
+	if i == nil {
+		return utils.Errorf("syntax flow rule is nil")
+	}
 
 	if hash == "" {
 		hash = i.CalcHash()
 	}
 
+	// Never cascade-create Groups through rule Create/Updates. Shared group
+	// names (language/severity/purpose) race under concurrent scan import and
+	// produce UNIQUE constraint failed: syntax_flow_groups.group_name spam.
+	groups := i.Groups
+	i.Groups = nil
+	defer func() { i.Groups = groups }()
+
 	var rules []schema.SyntaxFlowRule
 	if err := db.Where("rule_name = ?", i.RuleName).Find(&rules).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			return db.Create(i).Error
+			return createSyntaxFlowRuleWithoutGroups(db, i)
 		}
 		return err
 	}
@@ -111,10 +121,22 @@ func MigrateSyntaxFlowWithDB(db *gorm.DB, hash string, i *schema.SyntaxFlowRule)
 		if err := db.Where("rule_name = ?", i.RuleName).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
 			return err
 		}
-		return db.Create(i).Error
+		return createSyntaxFlowRuleWithoutGroups(db, i)
 	} else {
-		return db.Create(i).Error
+		return createSyntaxFlowRuleWithoutGroups(db, i)
 	}
+}
+
+func createSyntaxFlowRuleWithoutGroups(db *gorm.DB, i *schema.SyntaxFlowRule) error {
+	silent := db.New().LogMode(false)
+	if err := silent.Create(i).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			// Concurrent migrate of the same rule_name/hash: treat as already present.
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
@@ -236,8 +258,20 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
-	rule.Language = language
-	rule.Tag = strings.Join(tags, "|")
+	// Prefer filename language only when valid; keep desc(language) otherwise
+	// (e.g. source-*.sf under buildin/source/ must not wipe language: general).
+	if language != "" {
+		rule.Language = language
+	}
+	contentTag := rule.Tag
+	merged := ""
+	for _, t := range tags {
+		merged = sfvm.AppendRuleTag(merged, t)
+	}
+	for _, t := range strings.Split(contentTag, "|") {
+		merged = sfvm.AppendRuleTag(merged, t)
+	}
+	rule.Tag = merged
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {

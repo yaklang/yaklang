@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -85,7 +86,7 @@ func (m *yakRunnerModifyMock) callback(t *testing.T, i aicommon.AICallerConfigIf
 
 	if utils.MatchAnyOfSubString(prompt, "modify_code", "GEN_CODE", "yak_code") {
 		m.modifyAttempts++
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		partial := `// timeout was 60`
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 1, "modify_end_line": 1, "modify_code_reason": "修正 synscan 超时参数"}
@@ -110,12 +111,12 @@ func (m *yakRunnerModifyMock) callback(t *testing.T, i aicommon.AICallerConfigIf
 }
 
 type yakRunnerScenarioResult struct {
-	timeline         string
-	taskFailed       bool
-	taskCompleted    bool
-	codeChangeEvents []*ypb.AIOutputEvent
+	timeline          string
+	taskFailed        bool
+	taskCompleted     bool
+	codeChangeEvents  []*ypb.AIOutputEvent
 	pinFilenameEvents []*ypb.AIOutputEvent
-	modifyAttempts   int
+	modifyAttempts    int
 }
 
 type yakRunnerAICallback func(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error)

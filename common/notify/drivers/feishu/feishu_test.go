@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/notify"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestIsExpectedLCDisconnect(t *testing.T) {
@@ -185,12 +186,12 @@ func TestFrameRoundTrip(t *testing.T) {
 		Headers: hdr,
 		Payload: []byte(`{"event":{"message":{"message_id":"om_123"}}}`),
 	}
-	b, err := original.Marshal()
+	b, err := proto.Marshal(original)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
 	got := &Frame{}
-	if err := got.Unmarshal(b); err != nil {
+	if err := proto.Unmarshal(b, got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if FrameType(got.Method) != FrameTypeData {
@@ -790,7 +791,7 @@ func TestDispatchByType(t *testing.T) {
 		f := &Frame{
 			Payload: []byte(cardPayload),
 		}
-		f.Headers = append(f.Headers, Header{Key: HeaderType, Value: string(MessageTypeCard)})
+		f.Headers = append(f.Headers, &Header{Key: HeaderType, Value: string(MessageTypeCard)})
 		c.dispatchByType(string(MessageTypeCard), f, func(m *notify.InboundMessage) { got = m })
 		if got == nil || !got.IsCardAction {
 			t.Fatalf("should route to card action, got=%v", got)
@@ -803,7 +804,7 @@ func TestDispatchByType(t *testing.T) {
 		f := &Frame{
 			Payload: []byte(cardPayload),
 		}
-		f.Headers = append(f.Headers, Header{Key: HeaderType, Value: string(MessageTypeEvent)})
+		f.Headers = append(f.Headers, &Header{Key: HeaderType, Value: string(MessageTypeEvent)})
 		c.dispatchByType(string(MessageTypeEvent), f, func(m *notify.InboundMessage) { got = m })
 		if got == nil || !got.IsCardAction {
 			t.Fatalf("event frame card payload should route to card action, got=%v", got)
@@ -827,7 +828,7 @@ func TestDispatchByType(t *testing.T) {
 func TestDispatchEventUsesMessageCreateTimeBeforeFrameTimestamp(t *testing.T) {
 	payload := `{"event":{"sender":{"sender_id":{"open_id":"ou_a"}},"message":{"message_id":"om_m","chat_id":"oc_d","chat_type":"p2p","message_type":"text","create_time":"1783591964916","content":"{\"text\":\"hi\"}"}}}`
 	f := &Frame{Payload: []byte(payload)}
-	f.Headers = append(f.Headers, Header{Key: HeaderTimestamp, Value: "1783613557000"})
+	f.Headers = append(f.Headers, &Header{Key: HeaderTimestamp, Value: "1783613557000"})
 
 	c := New()
 	var got *notify.InboundMessage

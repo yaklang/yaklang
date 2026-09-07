@@ -70,7 +70,12 @@ func grepFilesBatchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 				ctx = task.GetContext()
 			}
 
-			loop.LoadingStatus(fmt.Sprintf("grep_files_batch: %d parallel searches", len(searches)))
+			loop.UserStatus(
+				fmt.Sprintf("正在并行查找相关实现（%d 项）", len(searches)),
+				fmt.Sprintf("Searching for relevant implementation across %d queries", len(searches)),
+				aicommon.WithStatusCode("context.searching"),
+				aicommon.WithStatusProgress(0, int64(len(searches)), "search"),
+			)
 			batchResult := runGrepBatch(loop, invoker, ctx, searches)
 
 			count := utils.InterfaceToInt(loop.Get(loopVarSearchRounds))

@@ -40,6 +40,21 @@ type SessionPromptState struct {
 	// sessionEvidenceState keeps the frozen evidence snapshot used to render
 	// frozen/open evidence blocks under a timeline frozen cutoff.
 	sessionEvidenceState *SessionEvidenceRenderState
+
+	// reportedRiskStore is the session-level "已报告漏洞清单" accumulator.
+	// Each time a risk is emitted via cybersecurity-risk (or any risk-emitting
+	// tool), the FeedBacker callback calls AppendReportedRisk to append a
+	// compact summary. The rendered block is injected into the timeline-open
+	// prompt section (after PlanContext) so the model sees a machine-readable
+	// list of already-reported vulnerabilities and avoids duplicate calls to
+	// cybersecurity-risk.
+	//
+	// This store is **shared** across parent and sub-agents via ForkForSubAgent
+	// (pointer aliasing, not copy). Both parent and child see the same list, and
+	// a risk reported by a sub-agent is immediately visible to the parent.
+	//
+	// 关键词: reportedRiskStore, ReportedRiskStore, 已报告漏洞清单, 去重, 共享
+	reportedRiskStore *ReportedRiskStore
 }
 
 func NewSessionPromptState() *SessionPromptState {
@@ -70,6 +85,11 @@ func (s *SessionPromptState) ForkForSubAgent() *SessionPromptState {
 	}
 
 	forked.evidenceJSON = s.evidenceJSON
+	// reportedRiskStore is shared (pointer-aliased) between parent and child:
+	// risks reported by a sub-agent are immediately visible to the parent and
+	// vice versa. The store is internally thread-safe (sync.Mutex), so
+	// concurrent access from parent and child agents is safe.
+	forked.reportedRiskStore = s.reportedRiskStore
 	// todoJSON intentionally left empty: sub agents do not inherit the
 	// parent's global TODO list.
 
@@ -217,7 +237,7 @@ func (s *SessionPromptState) GetSessionEvidenceFrozenOpenBlocks(frozenTimeUnix i
 
 	blocks := RenderSessionEvidenceFrozenOpen(s.sessionEvidenceState, store, frozenTimeUnix)
 	rendered := renderSessionEvidencePromptBlocks(blocks, openNonce)
-	for MeasureTokens(joinSessionEvidencePromptBlocks(rendered)) > sessionEvidenceTokenBudget && len(store.Items) > 1 {
+	for len(store.Items) > 1 && TokenCountExceeds(joinSessionEvidencePromptBlocks(rendered), sessionEvidenceTokenBudget) {
 		trimmed := store.Items[0]
 		store.Items = store.Items[1:]
 		pruneSessionEvidenceFrozenItem(s.sessionEvidenceState, trimmed.ID)
@@ -234,7 +254,7 @@ func shrinkEvidenceStoreWithStateToTokenBudget(store *EvidenceStore, state *Sess
 	}
 	for len(store.Items) > 1 {
 		rendered := store.Render()
-		if MeasureTokens(rendered) <= budget {
+		if !TokenCountExceeds(rendered, budget) {
 			return
 		}
 		trimmed := store.Items[0]
@@ -402,4 +422,72 @@ func (s *SessionPromptState) ActiveVerificationTodoItemsByScope(scope Verificati
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
 	return store.ActiveTodoItemsByScope(scope)
+}
+
+// getOrCreateReportedRiskStore lazily initializes the shared store.
+func (s *SessionPromptState) getOrCreateReportedRiskStore() *ReportedRiskStore {
+	if s.reportedRiskStore == nil {
+		s.reportedRiskStore = NewReportedRiskStore()
+	}
+	return s.reportedRiskStore
+}
+
+// GetReportedRisks returns the raw serialized ReportedRiskStore JSON (no
+// quoting). Suitable for DB persistence callers.
+func (s *SessionPromptState) GetReportedRisks() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	if s.reportedRiskStore == nil {
+		return ""
+	}
+	return s.reportedRiskStore.Marshal()
+}
+
+// SetReportedRisks replaces the in-memory reported-risks state with the given
+// JSON payload. Used during session restore from DB.
+func (s *SessionPromptState) SetReportedRisks(json string) {
+	if s == nil {
+		return
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.reportedRiskStore = UnmarshalReportedRiskStore(json)
+}
+
+// AppendReportedRisk extracts a compact summary from the given risk and
+// appends it to the reported-risks store if it is not a duplicate (same
+// target + type + parameter). Returns true if a new entry was added.
+//
+// Called from toolcall_invoke.go FeedBacker callback whenever a json-risk
+// message is emitted by a tool (e.g. cybersecurity-risk). The store is
+// shared across parent and sub-agents, so a risk reported by any agent
+// is visible to all.
+func (s *SessionPromptState) AppendReportedRisk(risk *schema.Risk) bool {
+	if s == nil || risk == nil {
+		return false
+	}
+	s.m.Lock()
+	store := s.getOrCreateReportedRiskStore()
+	s.m.Unlock()
+	return store.AppendFromRisk(risk)
+}
+
+// GetReportedRisksRendered returns the markdown block ready for prompt
+// injection into the timeline-open section. Returns empty string when no
+// risks have been reported yet, so the prompt template naturally skips the
+// block.
+func (s *SessionPromptState) GetReportedRisksRendered() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	store := s.reportedRiskStore
+	s.m.RUnlock()
+	if store == nil {
+		return ""
+	}
+	return store.Render()
 }

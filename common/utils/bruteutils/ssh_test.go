@@ -1,17 +1,19 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/crypto/ssh"
+	"context"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/crypto/ssh"
 )
 
 func TestSSHClientConnecting(t *testing.T) {
 	t.Skip()
 
-	client, err := sshDial(`tcp`, "xxx:22", &ssh.ClientConfig{
+	client, err := sshDial(context.Background(), "xxx:22", &ssh.ClientConfig{
 		User:            `admin`,
 		Auth:            []ssh.AuthMethod{ssh.Password("admin@123")},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),

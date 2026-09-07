@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,7 +35,7 @@ func mockedYaklangYakdocFlow(t *testing.T, i aicommon.AICallerConfigIf, req *aic
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"yakdoc_function_details"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 
 		if !stat.yakdocDone {

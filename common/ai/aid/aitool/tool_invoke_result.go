@@ -12,7 +12,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// ToolResult 表示工具调用的结果
+// ToolResult represents the tool-call protocol result.
+//
+// Success is a legacy wire field. It means that invocation/validation/callback
+// protocol completed and produced a result envelope; it does NOT assert that a
+// command exited with zero, an HTTP response was 2xx, or the user's goal was
+// achieved. Consumers must inspect Data (normally ToolExecutionResult.Result)
+// for execution semantics.
 type ToolResult struct {
 	ID          int64  `json:"id"`
 	Name        string `json:"name"`
@@ -96,6 +102,8 @@ func (t *ToolResult) dumpTimelineParams(buf io.Writer) {
 
 func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
 	buf := bytes.NewBuffer(nil)
+	executionStatus, _ := t.GetExecutionStatus()
+	fmt.Fprintf(buf, "execution_status: %s\n", executionStatus)
 
 	if t.ShrinkResult != "" { // shrink result preface
 		buf.WriteString(t.ShrinkResult)
@@ -108,80 +116,86 @@ func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
 			buf.WriteByte('\n')
 		}
 	} else {
-		// 处理工具执行结果
+		// Render semantic execution facts before observation logs. A model must
+		// not infer execution success from the wording of stdout/stderr.
 		switch ret := t.Data.(type) {
 		case string:
 			if ret == "" {
-				buf.WriteString("no output\n")
-			} else if strings.HasPrefix(ret, "COMBINED OUTPUT:") {
-				// Data already has framework packaging (COMBINED OUTPUT / RESULT / HINT),
+				buf.WriteString("execution_result: null\n")
+			} else if strings.HasPrefix(ret, "RESULT:") || strings.HasPrefix(ret, "OBSERVATIONS:") || strings.HasPrefix(ret, "COMBINED OUTPUT:") {
+				// Data already has framework packaging (RESULT / OBSERVATIONS / ARTIFACT),
 				// no need for an extra "data:" prefix that just duplicates semantics.
 				buf.WriteString(ret)
 				if !strings.HasSuffix(ret, "\n") {
 					buf.WriteByte('\n')
 				}
 			} else {
-				buf.WriteString("data:\n")
+				buf.WriteString("execution_result:\n")
 				buf.WriteString(ret)
 				if !strings.HasSuffix(ret, "\n") {
 					buf.WriteByte('\n')
 				}
 			}
 		case *ToolExecutionResult:
-			// 优先使用 CombinedOutput；兼容旧消费者回退到 stdout/stderr
+			result := utils.InterfaceToString(ret.Result)
+			if result != "" {
+				buf.WriteString(fmt.Sprintf("execution_result:\n%v\n", result))
+			} else {
+				buf.WriteString("execution_result: null\n")
+			}
+
+			// Prefer CombinedOutput; retain stdout/stderr fallback for historical
+			// envelopes. These are observations, not an outcome verdict.
 			combined := ret.CombinedOutput
 			if combined == "" {
 				combined = ret.Stdout + ret.Stderr
 			}
 			if combined != "" {
-				buf.WriteString(fmt.Sprintf("output: \n%v\n", combined))
-			}
-
-			// 处理结果
-			result := utils.InterfaceToString(ret.Result)
-			if result != "" {
-				buf.WriteString(fmt.Sprintf("result: \n%v\n", result))
-			}
-
-			// 如果没有任何输出，显示提示信息
-			if combined == "" && result == "" {
-				buf.WriteString("no output\n")
+				buf.WriteString(fmt.Sprintf("observations:\n%v\n", combined))
 			}
 		default:
-			// 处理其他类型的数据
+			// Handle legacy map envelopes without treating log fields as verdicts.
 			rawMap := utils.InterfaceToGeneralMap(t.Data)
 			if len(rawMap) > 0 {
-				// 处理标准输出
+				if result, ok := rawMap["result"]; ok {
+					buf.WriteString(fmt.Sprintf("execution_result:\n%v\n", utils.InterfaceToString(result)))
+				} else {
+					executionFields := make(map[string]any, len(rawMap))
+					for key, value := range rawMap {
+						if key != "stdout" && key != "stderr" && key != "combined_output" {
+							executionFields[key] = value
+						}
+					}
+					if len(executionFields) == 0 {
+						buf.WriteString("execution_result: null\n")
+					} else {
+						buf.WriteString(fmt.Sprintf("execution_result: %s\n", utils.Jsonify(executionFields)))
+					}
+				}
+
+				observationParts := bytes.NewBuffer(nil)
 				if stdout := utils.MapGetString(rawMap, "stdout"); stdout != "" {
-					buf.WriteString(fmt.Sprintf("stdout: \n%v\n", stdout))
+					observationParts.WriteString(fmt.Sprintf("stdout:\n%v\n", stdout))
 				}
-				delete(rawMap, "stdout")
-
-				// 处理标准错误
 				if stderr := utils.MapGetString(rawMap, "stderr"); stderr != "" {
-					buf.WriteString(fmt.Sprintf("stderr: \n%v\n", stderr))
+					observationParts.WriteString(fmt.Sprintf("stderr:\n%v\n", stderr))
 				}
-				delete(rawMap, "stderr")
-
-				// 处理结果
-				if result := utils.MapGetString(rawMap, "result"); result != "" {
-					buf.WriteString(fmt.Sprintf("result: \n%v\n", result))
-				}
-				delete(rawMap, "result")
-
-				// 处理额外信息
-				if len(rawMap) > 0 {
-					buf.WriteString(fmt.Sprintf("extra: %s\n", utils.Jsonify(rawMap)))
+				if observationParts.Len() > 0 {
+					buf.WriteString("observations:\n")
+					buf.Write(observationParts.Bytes())
 				}
 			} else {
-				buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
+				buf.WriteString(fmt.Sprintf("execution_result: %s\n", utils.Jsonify(t.Data)))
 			}
 		}
 	}
 
-	// 处理错误信息
+	// Error is reserved for invocation/protocol failures. Domain execution
+	// errors belong in ToolExecutionResult.Result.
 	if t.Error != "" {
-		buf.WriteString(fmt.Sprintf("err: %s\n", t.Error))
+		buf.WriteString(fmt.Sprintf("protocol_error: %s\n", t.Error))
+	} else if !t.Success {
+		buf.WriteString("protocol_error: tool call did not complete\n")
 	}
 
 	_, _ = writer.Write(buf.Bytes())
@@ -215,10 +229,7 @@ func (t *ToolResult) StringWithoutID() string {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteString(fmt.Sprintf("tool_name: %#v\n", t.Name))
 	buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
-	buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
-	if t.Error != "" {
-		buf.WriteString(fmt.Sprintf("err: %s\n", t.Error))
-	}
+	t.dumpTimelineResult(buf)
 	return buf.String()
 }
 
@@ -249,6 +260,46 @@ func (t *ToolResult) QuoteParams() string {
 }
 
 func (t *ToolResult) Dump() string {
-	bytes, _ := json.Marshal(t)
-	return string(bytes)
+	type observations struct {
+		Stdout         string `json:"stdout,omitempty"`
+		Stderr         string `json:"stderr,omitempty"`
+		CombinedOutput string `json:"combined_output,omitempty"`
+	}
+	type dumpView struct {
+		ID                int64               `json:"id,omitempty"`
+		Name              string              `json:"name"`
+		Description       string              `json:"description,omitempty"`
+		Param             any                 `json:"param,omitempty"`
+		ExecutionResult   any                 `json:"execution_result"`
+		ExecutionStatus   ToolExecutionStatus `json:"execution_status"`
+		Observations      *observations       `json:"observations,omitempty"`
+		ProtocolCompleted bool                `json:"protocol_completed"`
+		ProtocolError     string              `json:"protocol_error,omitempty"`
+		ToolCallID        string              `json:"call_tool_id,omitempty"`
+	}
+
+	view := dumpView{
+		ID:                t.ID,
+		Name:              t.Name,
+		Description:       t.Description,
+		Param:             t.Param,
+		ExecutionResult:   t.Data,
+		ExecutionStatus:   ToolExecutionStatusUnknown,
+		ProtocolCompleted: t.Success,
+		ProtocolError:     t.Error,
+		ToolCallID:        t.ToolCallID,
+	}
+	view.ExecutionStatus, _ = t.GetExecutionStatus()
+	if execution, ok := t.Data.(*ToolExecutionResult); ok {
+		view.ExecutionResult = execution.Result
+		if execution.Stdout != "" || execution.Stderr != "" || execution.CombinedOutput != "" {
+			view.Observations = &observations{
+				Stdout:         execution.Stdout,
+				Stderr:         execution.Stderr,
+				CombinedOutput: execution.CombinedOutput,
+			}
+		}
+	}
+	raw, _ := json.Marshal(view)
+	return string(raw)
 }

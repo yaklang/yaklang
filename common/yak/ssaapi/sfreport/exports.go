@@ -40,6 +40,10 @@ func convertSingleResultToSSAResultPartsJSONPayload(result *ssaapi.SyntaxFlowRes
 var Exports = map[string]interface{}{
 	"NewReport": NewReport,
 
+	"ConvertSyntaxFlowResultToReport": ConvertSyntaxFlowResultToReport,
+	"ReportTypeFromString":            ReportTypeFromString,
+
+	"SarifReportType":      SarifReportType,
 	"IRifyReportType":      IRifyReportType,
 	"IRifyFullReportType":  IRifyFullReportType,
 	"IRifyReactReportType": IRifyReactReportType,

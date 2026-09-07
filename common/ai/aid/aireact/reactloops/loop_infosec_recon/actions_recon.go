@@ -45,7 +45,7 @@ func makeReconRequireAction(
 					invoker.AddToTimeline(actionName+"_intent", thought)
 				}
 				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("开始: %s / Start: %s", actionName, targetToolName))
-				reactloops.EmitStatus(loop, "执行侦察工具中 / Executing recon tool...")
+				reactloops.EmitStatusI18n(loop, "执行侦察工具中", "Executing recon tool...")
 
 				result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, targetToolName)
 				if err != nil {
@@ -80,7 +80,7 @@ func makeReconRequireAction(
 				appendInfosecReconLog(loop, entry)
 				invoker.AddToTimeline(actionName+"_result", fmt.Sprintf("[%s] %s\n\n%s", targetToolName, thoughtHint, utils.ShrinkString(content, 4096)))
 				op.Feedback(fmt.Sprintf("%s completed (%d bytes).", actionName, len(content)))
-				reactloops.EmitStatus(loop, "完成 / Complete")
+				reactloops.EmitStatusI18n(loop, "完成", "Complete")
 				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", actionName, len(content), targetToolName, len(content)))
 				op.Continue()
 			},
@@ -108,7 +108,7 @@ func makeToolForwardAction(
 					ctx = task.GetContext()
 				}
 				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("开始: %s / Start: %s", actionName, targetToolName))
-				reactloops.EmitStatus(loop, "执行侦察工具中 / Executing recon tool...")
+				reactloops.EmitStatusI18n(loop, "执行侦察工具中", "Executing recon tool...")
 
 				params := action.GetParams()
 				result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)
@@ -126,7 +126,7 @@ func makeToolForwardAction(
 				appendInfosecReconLog(loop, entry)
 				invoker.AddToTimeline(fmt.Sprintf("%s_result", actionName), utils.ShrinkString(content, 4096))
 				op.Feedback(fmt.Sprintf("%s completed (%d bytes)", targetToolName, len(content)))
-				reactloops.EmitStatus(loop, "完成 / Complete")
+				reactloops.EmitStatusI18n(loop, "完成", "Complete")
 				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", actionName, len(content), targetToolName, len(content)))
 				op.Continue()
 			},
@@ -160,7 +160,7 @@ var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			}
 			query := action.GetString("query")
 			reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("开始: %s / Start: %s", query, query))
-			reactloops.EmitStatus(loop, "联网搜索中 / Searching the web...")
+			reactloops.EmitStatusI18n(loop, "联网搜索中", "Searching the web...")
 
 			params := aitool.InvokeParams{"query": query}
 			result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, "web_search", params)
@@ -178,7 +178,7 @@ var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			appendInfosecReconLog(loop, fmt.Sprintf("=== web_search: %s ===\n%s", query, utils.ShrinkString(content, 4096)))
 			invoker.AddToTimeline("web_search_result", utils.ShrinkString(content, 2048))
 			op.Feedback(fmt.Sprintf("web_search completed for: '%s' (%d bytes)", query, len(content)))
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", query, len(content), query, len(content)))
 			op.Continue()
 		},

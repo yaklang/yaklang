@@ -12,6 +12,9 @@ Required Parameters:
 Optional Parameters:
   timeout         (int)     Timeout in seconds. Command is killed on timeout.
                             Default: 10.
+  accepted-exit-codes (string) Comma-separated accepted exit codes. Default: "0".
+                            This only affects exit_code_accepted; the raw code is preserved.
+  accepted_exit_codes (string) Deprecated underscore alias; it must also be a comma-separated string.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -19,8 +22,50 @@ yakit.AutoInitYakit()
 // 解析命令行参数：超时时间和要执行的PowerShell命令
 timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the PowerShell command, default 10, timeout cannot be zero and below"), cli.setDefault(10))
 command := cli.String("command", cli.setRequired(true), cli.setHelp("the PowerShell command or script you want to execute"))
+acceptedExitCodesRaw := cli.String("accepted-exit-codes", cli.setRequired(false), cli.setDefault("0"), cli.setHelp("comma-separated accepted process exit codes"))
+acceptedExitCodesCompat := cli.String("accepted_exit_codes", cli.setRequired(false), cli.setDefault(""), cli.setHelp("deprecated underscore alias; must be a comma-separated string"))
 
 cli.check()
+
+if acceptedExitCodesCompat != "" {
+    if acceptedExitCodesRaw == "0" {
+        acceptedExitCodesRaw = acceptedExitCodesCompat
+    } else {
+        yakit.Info("Ignoring deprecated accepted_exit_codes because accepted-exit-codes is also set")
+    }
+}
+
+acceptedExitCodes = []
+acceptedExitCodeSet = {}
+for _, rawCode := range str.Split(acceptedExitCodesRaw, ",") {
+    codeText = str.TrimSpace(rawCode)
+    if codeText == "" || !str.MatchAllOfRegexp(codeText, `^-?\d+$`) {
+        continue
+    }
+    code = parseInt(codeText)
+    normalizedCodeText = sprint(code)
+    if !acceptedExitCodeSet[normalizedCodeText] {
+        acceptedExitCodeSet[normalizedCodeText] = true
+        acceptedExitCodes = append(acceptedExitCodes, code)
+    }
+}
+if len(acceptedExitCodes) == 0 {
+    acceptedExitCodes = [0]
+    acceptedExitCodeSet["0"] = true
+}
+
+RESULT = {
+    "shell": "powershell",
+    "process_started": false,
+    "process_completed": false,
+    "timed_out": false,
+    "exit_code": nil,
+    "exit_code_available": false,
+    "accepted_exit_codes": acceptedExitCodes,
+    "exit_code_accepted": false,
+    "duration_ms": 0,
+    "termination_reason": "not_started",
+}
 
 yakit.Info("Executing PowerShell command: %v", command)
 
@@ -31,6 +76,7 @@ if timeoutSeconds <= 0 {
 
 // 创建带超时的上下文，保护系统资源
 ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSeconds) + "s")~)
+defer cancel()
 
 // 构建PowerShell命令执行器，使用Windows PowerShell
 // 使用 -NoProfile 避免加载用户配置文件，-ExecutionPolicy Bypass 允许执行脚本
@@ -38,6 +84,8 @@ ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprin
 cmd, err := exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command %s" % command)
 if err != nil {
     yakit.Error("Failed to create PowerShell command: %v", err)
+    RESULT["termination_reason"] = "command_create_error"
+    RESULT["process_error"] = sprint(err)
     return
 }
 
@@ -48,9 +96,38 @@ cmd.Stdout = stdoutbuf
 cmd.Stderr = stderrbuf
 
 // 执行命令并处理结果
+startedAt = time.Now()
 err = cmd.Run()
+elapsedMs = time.Since(startedAt).Milliseconds()
+timedOut = ctx.Err() != nil || (err != nil && elapsedMs >= timeoutSeconds * 1000 - 20)
+exitCode = nil
+exitCodeAvailable = false
+if cmd.ProcessState != nil {
+    RESULT["process_started"] = true
+    RESULT["process_completed"] = true
+    processExitCode = cmd.ProcessState.ExitCode()
+    if processExitCode >= 0 {
+        exitCode = processExitCode
+        exitCodeAvailable = true
+    }
+}
+RESULT["duration_ms"] = elapsedMs
+RESULT["timed_out"] = timedOut
+RESULT["exit_code"] = exitCode
+RESULT["exit_code_available"] = exitCodeAvailable
+if exitCodeAvailable {
+    RESULT["exit_code_accepted"] = acceptedExitCodeSet[sprint(exitCode)] == true
+}
+if timedOut {
+    RESULT["termination_reason"] = "timeout"
+} elif exitCodeAvailable {
+    RESULT["termination_reason"] = "exit"
+} else {
+    RESULT["termination_reason"] = "start_or_signal_error"
+}
 if err != nil {
-    yakit.Error("PowerShell command execution failed: %v", err)
+    RESULT["process_error"] = sprint(err)
+    yakit.Info("PowerShell process ended with an execution error: %v", err)
 }
 
 toUtf8 = (s)=>{
@@ -73,5 +150,6 @@ if stderrbuf.Len() > 0 {
     yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
 }
 if count <= 0 {
-    yakit.Info("No output found, PowerShell command execution failed or output is empty")
+    yakit.Info("No stdout/stderr observations were produced by the PowerShell process")
 }
+yakit.Info("PowerShell process observation: exit_code=%v, available=%v, accepted=%v, timed_out=%v", exitCode, exitCodeAvailable, RESULT["exit_code_accepted"], timedOut)

@@ -1,4 +1,5 @@
 desc(
+	risk: "api-abuse"
 	title: "Check Java Zip Unchecked Return Value"
 	title_zh: "检测Java Zip未检查返回值的API"
 	type:security

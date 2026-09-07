@@ -480,6 +480,10 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 	}
 
 	cs := h2Conn.http2StreamPool.Get().(*http2ClientStream)
+	// A stream returned by sync.Pool may contain state from its previous
+	// request. Zero it before initialization so protocol flags and callbacks
+	// can never bleed into the next stream.
+	*cs = http2ClientStream{}
 	cs.h2Conn = h2Conn
 	cs.ID = 0 // assigned later in doRequest under frWriteMutex to guarantee wire order
 	cs.resp = new(http.Response)
@@ -837,8 +841,21 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
 	resp := *cs.resp
 	responsePacket := cs.respPacket
-	cs.h2Conn.http2StreamPool.Put(cs) // gc
+	cs.recycle()
 	return resp, responsePacket, err
+}
+
+// recycle drops every request-owned reference before returning the stream to
+// sync.Pool. Without the reset, an idle HTTP/2 connection can retain the most
+// recent request, response, packet buffers, callbacks, and configuration until
+// the pool entry is reused or a GC cycle discards it.
+func (cs *http2ClientStream) recycle() {
+	if cs == nil || cs.h2Conn == nil || cs.h2Conn.http2StreamPool == nil {
+		return
+	}
+	pool := cs.h2Conn.http2StreamPool
+	*cs = http2ClientStream{}
+	pool.Put(cs)
 }
 
 // releaseSlot removes a stream from the connection without affecting other
@@ -866,7 +883,7 @@ func (cs *http2ClientStream) abort() {
 	}
 	cs.resetStream(http2.ErrCodeCancel)
 	cs.releaseSlot()
-	cs.h2Conn.http2StreamPool.Put(cs)
+	cs.recycle()
 }
 
 func (cs *http2ClientStream) resetStream(code http2.ErrCode) {

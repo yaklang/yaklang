@@ -131,7 +131,7 @@ e.printStackTrace();
 #### 4. 最小权限原则
 为数据库用户配置最小必要的权限，限制其只能访问和操作所需的数据表和功能。即使发生SQL注入，也能限制攻击者能够造成的损害范围。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "output",
 }
 

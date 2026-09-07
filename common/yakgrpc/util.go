@@ -8,27 +8,24 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
-	"github.com/yaklang/gorm"
 	"github.com/pkg/errors"
-	"github.com/segmentio/ksuid"
+	"github.com/yaklang/gorm"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -190,8 +187,10 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 
 var (
 	localClient         ypb.YakClient
+	localClientInitErr  error
 	initLocalClientOnce sync.Once
 	ciClient            ypb.YakClient
+	ciClientInitErr     error
 	ciClientOnce        sync.Once
 )
 
@@ -228,9 +227,22 @@ func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
 	return newLocalClientEx(local)
 }
 
+func newLocalGRPCListener() (net.Listener, string, error) {
+	// Bind immediately instead of probing an available port and reopening it
+	// later. Server initialization can start other listeners, so the probe/reopen
+	// pattern lets those listeners (or another process) claim the gRPC port.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, "", err
+	}
+	return listener, listener.Addr().String(), nil
+}
+
 func NewLocalClientForceNew() (ypb.YakClient, error) {
-	port := utils.GetRandomAvailableTCPPort()
-	addr := utils.HostPort("127.0.0.1", port)
+	lis, addr, err := newLocalGRPCListener()
+	if err != nil {
+		return nil, err
+	}
 	grpcTrans := grpc.NewServer(
 		grpc.MaxRecvMsgSize(100*1024*1024),
 		grpc.MaxSendMsgSize(100*1024*1024),
@@ -241,15 +253,11 @@ func NewLocalClientForceNew() (ypb.YakClient, error) {
 	)
 	s, err := newServerEx(opts...)
 	if err != nil {
+		_ = lis.Close()
 		log.Errorf("build yakit server failed: %s", err)
 		return nil, err
 	}
 	ypb.RegisterYakServer(grpcTrans, s)
-	var lis net.Listener
-	lis, err = net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
 	go func() {
 		defer func() {
 			if profileDatabasePath != "" {
@@ -259,9 +267,8 @@ func NewLocalClientForceNew() (ypb.YakClient, error) {
 				os.Remove(projectDatabasePath)
 			}
 		}()
-		err = grpcTrans.Serve(lis)
-		if err != nil {
-			log.Error(err)
+		if serveErr := grpcTrans.Serve(lis); serveErr != nil {
+			log.Error(serveErr)
 		}
 	}()
 	time.Sleep(1 * time.Second)
@@ -275,66 +282,7 @@ func NewLocalClientForceNew() (ypb.YakClient, error) {
 	}, err
 }
 
-func NewLocalClientAndServerWithTempDatabase(t *testing.T) (ypb.YakClient, *Server, error) {
-	var port int
-	var addr string
-	netx.UnsetProxyFromEnv()
-
-	port = utils.GetRandomAvailableTCPPort()
-	addr = utils.HostPort("127.0.0.1", port)
-	grpcTrans := grpc.NewServer(
-		grpc.MaxRecvMsgSize(100*1024*1024),
-		grpc.MaxSendMsgSize(100*1024*1024),
-	)
-	profileDatabasePath := path.Join(os.TempDir(), fmt.Sprintf("%s.db", ksuid.New().String()))
-	projectDatabasePath := path.Join(os.TempDir(), fmt.Sprintf("%s.db", ksuid.New().String()))
-	s, err := newServerEx(WithInitFacadeServer(true), WithProfileDatabasePath(profileDatabasePath), WithProjectDatabasePath(projectDatabasePath))
-	if err != nil {
-		log.Errorf("build yakit server failed: %s", err)
-		return nil, nil, err
-	}
-	ypb.RegisterYakServer(grpcTrans, s)
-	var lis net.Listener
-	lis, err = net.Listen("tcp", addr)
-	if err != nil {
-		return nil, nil, err
-	}
-	t.Cleanup(func() {
-		os.Remove(profileDatabasePath)
-		os.Remove(projectDatabasePath)
-	})
-	go func() {
-		defer func() {
-
-		}()
-		err = grpcTrans.Serve(lis)
-		if err != nil {
-			log.Error(err)
-		}
-	}()
-	time.Sleep(1 * time.Second)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-	))
-	client := &Client{
-		YakClient: ypb.NewYakClient(conn),
-		server:    s,
-	}
-	return client, s, err
-}
-
-func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
-	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
 func newLocalClientEx(local bool) (ypb.YakClient, error) {
-	var port int
-	var addr string
 	netx.UnsetProxyFromEnv()
 
 	dialServer := func(addr string, server *Server) (ypb.YakClient, error) {
@@ -349,15 +297,17 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 	}
 
 	if local || !utils.InGithubActions() {
-		var finalErr error
 		initLocalClientOnce.Do(func() {
 			yaklang.Import("test", map[string]any{
 				"callhook": func(name string) any {
 					return callHook(name)
 				},
 			})
-			port = utils.GetRandomAvailableTCPPort()
-			addr = utils.HostPort("127.0.0.1", port)
+			lis, listenAddr, err := newLocalGRPCListener()
+			if err != nil {
+				localClientInitErr = err
+				return
+			}
 			grpcTrans := grpc.NewServer(
 				grpc.MaxRecvMsgSize(100*1024*1024),
 				grpc.MaxSendMsgSize(100*1024*1024),
@@ -368,17 +318,12 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 			)
 			s, err := newServerEx(opts...)
 			if err != nil {
+				_ = lis.Close()
 				log.Errorf("build yakit server failed: %s", err)
-				finalErr = err
+				localClientInitErr = err
 				return
 			}
 			ypb.RegisterYakServer(grpcTrans, s)
-			var lis net.Listener
-			lis, err = net.Listen("tcp", addr)
-			if err != nil {
-				finalErr = err
-				return
-			}
 			go func() {
 				defer func() {
 					if profileDatabasePath != "" {
@@ -388,30 +333,27 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 						os.Remove(projectDatabasePath)
 					}
 				}()
-				err = grpcTrans.Serve(lis)
-				if err != nil {
-					log.Error(err)
+				if serveErr := grpcTrans.Serve(lis); serveErr != nil {
+					log.Error(serveErr)
 				}
 			}()
 			time.Sleep(1 * time.Second)
-			localClient, finalErr = dialServer(addr, s)
+			localClient, localClientInitErr = dialServer(listenAddr, s)
 		})
-		if finalErr != nil {
-			return nil, finalErr
+		if localClientInitErr != nil {
+			return nil, localClientInitErr
 		}
 		return localClient, nil
 	} else {
-		addr = utils.HostPort("127.0.0.1", 8087)
-		var finalErr error
 		ciClientOnce.Do(func() {
-			ciClient, finalErr = dialServer(addr, nil)
+			ciClient, ciClientInitErr = dialServer(utils.HostPort("127.0.0.1", 8087), nil)
 			// Keep package-level localClient in sync so legacy tests that still
 			// reference localClient work under GITHUB_ACTIONS (external yak grpc).
-			if finalErr == nil {
+			if ciClientInitErr == nil {
 				localClient = ciClient
 			}
 		})
-		return ciClient, finalErr
+		return ciClient, ciClientInitErr
 	}
 }
 

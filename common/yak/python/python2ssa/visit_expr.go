@@ -908,9 +908,16 @@ func (b *singleFileBuilder) VisitNumber(raw *pythonparser.NumberContext) interfa
 		}
 	}
 
-	// Handle imaginary number
+	// Handle imaginary number: Python "3j" / "2.5J" is a complex literal whose
+	// real part is 0. SSA consts have no complex kind (NumberType covers int /
+	// float / complex), so parse the magnitude and keep the number type —
+	// downstream arithmetic and type checks still see a valid number.
 	if imagToken := raw.IMAG_NUMBER(); imagToken != nil {
-		// TODO: Handle imaginary numbers
+		text := strings.TrimRight(strings.TrimSpace(imagToken.GetText()), "jJ")
+		var magnitude float64
+		if _, err := fmt.Sscanf(text, "%f", &magnitude); err == nil {
+			return b.EmitConstInst(magnitude)
+		}
 		return b.EmitConstInst(0)
 	}
 

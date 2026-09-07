@@ -2,7 +2,6 @@ package reactloops
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -422,7 +421,6 @@ func (r *ReActLoop) buildVerificationWatchdogPayload(task aicommon.AIStatefulTas
 		return "Verification watchdog triggered because MaybeVerifyUserSatisfaction has been idle for too long."
 	}
 	payload := "Verification watchdog triggered because MaybeVerifyUserSatisfaction has been idle for too long."
-	payload += fmt.Sprintf("\nCurrent iteration: %d.", r.GetCurrentIterationIndex())
 	if last := r.GetLastAction(); last != nil {
 		payload += "\nLast action: " + last.ActionType + "."
 	}

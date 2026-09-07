@@ -11,7 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/urfavecli"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type yamlSourceContext struct {
@@ -26,8 +26,37 @@ func NewYamlSourceFromFile(file string) (InputSourceContext, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to load Yaml file '%s': inner error: \n'%v'", ysc.FilePath, err.Error())
 	}
+	results = normalizeYamlMaps(results).(map[interface{}]interface{})
 
 	return &MapInputSource{valueMap: results}, nil
+}
+
+// yaml.v3 decodes mappings nested behind interface{} as map[string]interface{}.
+// MapInputSource historically traverses map[interface{}]interface{}, so normalize
+// both forms recursively while retaining yaml.v3's scalar decoding semantics.
+func normalizeYamlMaps(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		normalized := make(map[interface{}]interface{}, len(typed))
+		for key, child := range typed {
+			normalized[key] = normalizeYamlMaps(child)
+		}
+		return normalized
+	case map[interface{}]interface{}:
+		normalized := make(map[interface{}]interface{}, len(typed))
+		for key, child := range typed {
+			normalized[normalizeYamlMaps(key)] = normalizeYamlMaps(child)
+		}
+		return normalized
+	case []interface{}:
+		normalized := make([]interface{}, len(typed))
+		for index, child := range typed {
+			normalized[index] = normalizeYamlMaps(child)
+		}
+		return normalized
+	default:
+		return value
+	}
 }
 
 // NewYamlSourceFromFlagFunc creates a new Yaml InputSourceContext from a provided flag name and source context.

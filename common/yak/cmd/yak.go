@@ -486,7 +486,7 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "disable-reverse-server",
-			Usage: "关闭反连服务器",
+			Usage: "关闭反连服务器（反连服务现在默认按需启动，保留该参数以兼容旧命令行）",
 		},
 		cli.StringFlag{
 			Name:  "common-name",
@@ -642,10 +642,8 @@ var startGRPCServerCommand = cli.Command{
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
 		reverse_port := c.Int("reverse-port")
-		init_reverse := c.Bool("disable-reverse-server")
 		s, err := yakgrpc.NewServer(
 			yakgrpc.WithReverseServerPort(reverse_port),
-			yakgrpc.WithInitFacadeServer(!init_reverse),
 			yakgrpc.WithStartCacheLog(),
 		)
 		if err != nil {
@@ -731,6 +729,8 @@ var startGRPCServerCommand = cli.Command{
 				return err
 			}
 		}
+		s.StartAIReActScheduler()
+		defer s.StopAIReActScheduler()
 
 		actualAddress := lis.Addr().String()
 		log.Infof("yak grpc listener ready on: %s", actualAddress)
@@ -1393,6 +1393,7 @@ func main() {
 	app.Commands = append(app.Commands, cliGroup("RAG Server", yakcmds.RAGServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("AI Viz Server", yakcmds.VizServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Hot Patch Validators", yakcmds.HotPatchValidatorCommands...)...)
+	app.Commands = append(app.Commands, *yakcmds.MemfitWorkerCommand)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

@@ -41,8 +41,8 @@ func TestNormalizeToolResultDataHardTokenLimit(t *testing.T) {
 	require.LessOrEqual(t, ytoken.CalcTokenCount(data), ToolResultTokenLimit)
 	require.LessOrEqual(t, ytoken.CalcTokenCount(toolResult.String()), ToolResultTokenLimit)
 	require.Greater(t, ytoken.CalcTokenCount(data), 14000, "preview should fill most of the 16K budget")
-	require.Contains(t, data, "COMBINED-HEAD")
-	require.Contains(t, data, "RESULT-TAIL")
+	require.Contains(t, data, "RESULT-HEAD")
+	require.Contains(t, data, "COMBINED-TAIL")
 	require.Contains(t, data, hint)
 	require.NotContains(t, data, "COMBINED-MIDDLE-SENTINEL")
 	require.NotContains(t, data, "RESULT-MIDDLE-SENTINEL")
@@ -249,10 +249,10 @@ func TestNormalizeToolResultDataDeduplicatesExactCombinedAndResult(t *testing.T)
 	toolResult := &aitool.ToolResult{Name: "dedupe", Success: true}
 	normalizeToolResultData(toolResult, result, result, "ARTIFACT:\n/path")
 	data := toolResult.Data.(string)
-	// When combined == result, the RESULT section is omitted entirely (no "RESULT:" tag),
-	// so the result string appears exactly once (only in COMBINED OUTPUT).
+	// When observations equal the result, emit the semantic RESULT exactly once.
 	require.Equal(t, 1, strings.Count(data, result))
-	require.NotContains(t, data, "RESULT:")
+	require.Contains(t, data, "RESULT:")
+	require.NotContains(t, data, "OBSERVATIONS:")
 }
 
 func TestToolArtifactFailureNeverFallsBackToOversizedInlineData(t *testing.T) {
@@ -270,9 +270,9 @@ func TestToolArtifactFailureNeverFallsBackToOversizedInlineData(t *testing.T) {
 	tool, err := aitool.New("artifact-failure", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
 	err = b.finalize(&ToolCaller{}, tool, "call-failure", "", nil, toolResult, 0, "")
-	require.Error(t, err)
-	require.False(t, toolResult.Success)
-	require.Contains(t, toolResult.Error, "artifact_persist_failed")
+	require.NoError(t, err)
+	require.True(t, toolResult.Success, "artifact persistence is not invocation protocol completion")
+	require.Empty(t, toolResult.Error)
 	require.Contains(t, toolResult.Data.(string), "artifact_persist_failed")
 	require.LessOrEqual(t, ytoken.CalcTokenCount(toolResult.Data.(string)), ToolResultTokenLimit)
 	require.LessOrEqual(t, ytoken.CalcTokenCount(toolResult.String()), ToolResultTokenLimit)
@@ -306,15 +306,19 @@ func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
 	}{
 		{
 			name: "distinct_result",
-			data: "COMBINED OUTPUT:\npreview\n\nRESULT:\nresult\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
+			data: "RESULT:\nresult\n\nOBSERVATIONS:\npreview\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
 		},
 		{
-			name: "combined_equals_result_omits_result_section",
-			data: "COMBINED OUTPUT:\nsame compact bytes\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
+			name: "combined_equals_result_keeps_only_result",
+			data: "RESULT:\nsame compact bytes\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
 		},
 		{
-			name: "empty_result_omits_result_section",
-			data: "COMBINED OUTPUT:\nstdout only\n\nHINT:\nartifact_persist_failed: historical fixture",
+			name: "empty_result_keeps_only_observations",
+			data: "OBSERVATIONS:\nstdout only\n\nHINT:\nartifact_persist_failed: historical fixture",
+		},
+		{
+			name: "legacy_combined_output_checkpoint",
+			data: "COMBINED OUTPUT:\nlegacy preview\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
 		},
 	}
 	for _, tc := range canonicalData {
@@ -356,12 +360,17 @@ func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
 
 func TestCanonicalToolResultDataRequiresFrameworkTailEnvelope(t *testing.T) {
 	require.True(t, isCanonicalToolResultData(
-		"COMBINED OUTPUT:\nplain\n\nARTIFACT:\n- combined: /tmp/combined_output.txt\n- result: /tmp/result.txt",
+		"RESULT:\nsemantic\n\nOBSERVATIONS:\nplain\n\nARTIFACT:\n- combined: /tmp/combined_output.txt\n- result: /tmp/result.json",
 	))
 	require.True(t, isCanonicalToolResultData(
-		"COMBINED OUTPUT:\nplain\n\nHINT:\nartifact_persist_failed: disk unavailable. This is a bounded preview; omitted content is unrecoverable.",
+		"OBSERVATIONS:\nplain\n\nHINT:\nartifact_persist_failed: disk unavailable. This is a bounded preview; omitted content is unrecoverable.",
+	))
+	require.True(t, isCanonicalToolResultData(
+		"COMBINED OUTPUT:\nlegacy\n\nARTIFACT:\n- combined: /tmp/combined_output.txt\n- result: /tmp/result.txt",
 	))
 	for _, rawToolString := range []string{
+		"RESULT:\nordinary text without a framework tail",
+		"OBSERVATIONS:\nordinary text without a framework tail",
 		"COMBINED OUTPUT:\nthis is ordinary tool text",
 		"COMBINED OUTPUT:\nordinary text mentions\n\nARTIFACT:\nwithout framework paths",
 		"COMBINED OUTPUT:\nordinary text\n\nARTIFACT:\n- combined: /tmp/only-one-path",
@@ -440,7 +449,8 @@ func TestToolArtifactLateFinalizeFailureDoesNotLeaveGhostArtifactHint(t *testing
 	tool, err := aitool.New("late-persist", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
 	err = b.finalize(&ToolCaller{}, tool, "late-call", "", nil, toolResult, 0, "")
-	require.Error(t, err)
+	require.NoError(t, err, "artifact persistence is an observation failure after protocol completion")
+	require.True(t, toolResult.Success)
 	data := toolResult.Data.(string)
 	require.Contains(t, data, "HINT:\nartifact_persist_failed:")
 	require.NotContains(t, data, "\n\nARTIFACT:\n")
@@ -495,8 +505,10 @@ func TestLegacyTimelineToolResultMigratesToArtifactAndCanonicalData(t *testing.T
 	result := item.GetValue().(*aitool.ToolResult)
 	data, ok := result.Data.(string)
 	require.True(t, ok)
-	require.Contains(t, data, "COMBINED OUTPUT:\nLEGACY-HEAD")
+	require.Contains(t, data, "RESULT:\n")
+	require.Contains(t, data, "OBSERVATIONS:\nLEGACY-HEAD")
 	require.Contains(t, data, "result-tail")
+	require.Less(t, strings.Index(data, "RESULT:\n"), strings.Index(data, "OBSERVATIONS:\n"))
 	require.Contains(t, data, "ARTIFACT:\n- combined:")
 	require.NotContains(t, data, "LEGACY-MIDDLE-SENTINEL")
 	require.LessOrEqual(t, ytoken.CalcTokenCount(data), ToolResultTokenLimit)

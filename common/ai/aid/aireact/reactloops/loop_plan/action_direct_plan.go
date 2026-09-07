@@ -22,7 +22,7 @@ var generateDirectPlan = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				}
 			}
 
-			reactloops.EmitStatus(loop, "正在直接生成任务计划... / Generating direct plan...")
+			reactloops.EmitStatusI18n(loop, "正在直接生成任务计划...", "Generating direct plan...")
 			planData := generateDirectPlanFromUserInput(loop, task)
 			if planData == "" {
 				op.Fail("failed to generate direct plan from user input")

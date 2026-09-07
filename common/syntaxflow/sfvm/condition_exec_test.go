@@ -140,3 +140,41 @@ func TestNormalizeConditionAgainstSource_DerivesMaskFromAnchorBitVector(t *testi
 	require.NoError(t, err)
 	require.Equal(t, []bool{true, false, true}, mask)
 }
+
+type predRecorder struct {
+	*bitVectorValue
+	preds []string
+}
+
+func (v *predRecorder) AppendPredecessor(op ValueOperator, _ ...AnalysisContextOption) error {
+	if v == nil || utils.IsNil(op) {
+		return nil
+	}
+	v.preds = append(v.preds, op.String())
+	return nil
+}
+
+func TestAttachFilterConditionPredecessors_MapsCondOntoKeptSource(t *testing.T) {
+	a := &predRecorder{bitVectorValue: newBitVectorValue("call-a")}
+	b := &predRecorder{bitVectorValue: newBitVectorValue("call-b")}
+	c := &predRecorder{bitVectorValue: newBitVectorValue("call-c")}
+	source := NewValues([]ValueOperator{a, b, c})
+
+	cond := newBitVectorValue("use")
+	bits := utils.NewBitVector()
+	bits.Set(0)
+	bits.Set(2)
+	cond.SetAnchorBitVector(bits)
+
+	scope := anchorScopeState{anchorWidth: len(source), source: source}
+	mask, err := buildFilterMask(scope, NewValues([]ValueOperator{cond}))
+	require.NoError(t, err)
+	require.Equal(t, []bool{true, false, true}, mask)
+
+	frame := &SFFrame{}
+	frame.attachFilterConditionPredecessors(scope, source, NewValues([]ValueOperator{cond}), mask)
+
+	require.Equal(t, []string{"use"}, a.preds)
+	require.Empty(t, b.preds)
+	require.Equal(t, []string{"use"}, c.preds)
+}

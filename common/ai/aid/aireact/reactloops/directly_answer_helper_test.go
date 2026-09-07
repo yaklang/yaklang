@@ -177,3 +177,37 @@ func TestRejectDuplicateDirectlyAnswerAllowsLaterNoDeltaWhenFirstHadTodoDelta(t 
 	require.NoError(t, err)
 	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, second))
 }
+
+func TestInvalidClosedTodoDeltaCannotBypassDuplicateDirectlyAnswer(t *testing.T) {
+	loop, invoker, cfg, task := newTodoGateTestLoop(t, nil)
+	setCurrentTodo(t, cfg, task, "deferred_old")
+	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{
+		Close: []aicommon.TodoClose{{
+			ID:      "deferred_old",
+			Outcome: aicommon.TodoOutcomeDeferred,
+			Reason:  "external prerequisite was unavailable",
+		}},
+	})
+	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
+
+	first, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report one"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, first)
+
+	second, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"report two","todo_delta":{"update":[{"id":"deferred_old","text":"resume it"}],"current":"deferred_old"}}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	validateTodoDeltaBeforeActionVerifier(loop, second)
+
+	_, present := second.LookupCanonicalParam("todo_delta")
+	require.False(t, present, "invalid delta must be removed before duplicate-answer verification")
+	verifierErr := loopAction_DirectlyAnswer.ActionVerifier(loop, second)
+	require.Error(t, verifierErr)
+	require.Contains(t, verifierErr.Error(), "already delivered")
+	timeline := strings.Join(invoker.timeline, "\n")
+	require.Contains(t, timeline, "TODO_DELTA_ERROR")
+	require.Contains(t, timeline, "use todo_delta.add with a new id")
+}

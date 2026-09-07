@@ -79,6 +79,25 @@ func (r *ReAct) updateRuntimeTasks() {
 	r.RuntimeTasks = newRuntimeTasks
 }
 
+// getProcessingRuntimeTask returns the queue-owned root task. ReAct sub-loops
+// temporarily publish their own task through SetCurrentTask, so GetCurrentTask
+// may point at an intent or other nested task while a user presses Stop. The
+// runtime task list is the stable owner of the queued root task. It also holds
+// sub-agent tasks, which must be ignored because cancelling a child does not
+// cancel the queue-owned root context.
+func (r *ReAct) getProcessingRuntimeTask() aicommon.AIStatefulTask {
+	r.UpdateRuntimeTaskMutex.Lock()
+	defer r.UpdateRuntimeTaskMutex.Unlock()
+
+	for index := len(r.RuntimeTasks) - 1; index >= 0; index-- {
+		task := r.RuntimeTasks[index]
+		if task != nil && !task.IsSubAgent() && task.GetStatus() == aicommon.AITaskState_Processing {
+			return task
+		}
+	}
+	return nil
+}
+
 // processReActFromQueue 处理队列中的下一个任务
 func (r *ReAct) processReActFromQueue() {
 	if r.taskQueue.IsEmpty() {
@@ -116,6 +135,8 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 		r.processRecoveryTask(task)
 		return
 	}
+	restoreExecutionPolicy := r.applyTaskExecutionPolicy(task)
+	defer restoreExecutionPolicy()
 
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
@@ -159,8 +180,36 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	skipStatusFallback.SetTo(skipStatus)
 }
 
+// applyTaskExecutionPolicy keeps unattended policy scoped to the scheduled
+// task even when it is delivered into an already-open interactive ReAct
+// session. The original chat settings are restored before its next turn.
+func (r *ReAct) applyTaskExecutionPolicy(task aicommon.AIStatefulTask) func() {
+	if r == nil || r.config == nil || task == nil || task.GetInputSource() != aicommon.USER_INPUT_SOURCE_SCHEDULE {
+		return func() {}
+	}
+	previousAgreePolicy := r.config.AgreePolicy
+	previousAllowRequire := r.config.AllowRequireForUserInteract
+	previousAllowPlanInteract := r.config.AllowPlanUserInteract
+	r.config.AgreePolicy = aicommon.AgreePolicyYOLO
+	r.config.AllowRequireForUserInteract = false
+	r.config.AllowPlanUserInteract = false
+	return func() {
+		r.config.AgreePolicy = previousAgreePolicy
+		r.config.AllowRequireForUserInteract = previousAllowRequire
+		r.config.AllowPlanUserInteract = previousAllowPlanInteract
+	}
+}
+
 func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 	parsedQuery, focus, loopOptions := r.selectLoopForTask(task)
+	if task.GetInputSource() == aicommon.USER_INPUT_SOURCE_SCHEDULE {
+		parsedQuery = fmt.Sprintf(`<scheduled_task_context>
+This turn was triggered unattended by scheduled task %q (uuid=%s, scheduled_at=%s, trigger=%s).
+Execute the durable task now. Do not ask the user for approval or clarification; make the safest reasonable unattended decision within existing permissions.
+</scheduled_task_context>
+
+%s`, task.GetScheduleName(), task.GetScheduleUUID(), task.GetScheduledAt(), task.GetScheduleTrigger(), parsedQuery)
+	}
 	task.SetUserInput(parsedQuery)
 	return r.ExecuteLoopTask(focus, task, loopOptions...)
 }
@@ -672,7 +721,11 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		cfg.SetBrowserSessionTracker(invoker)
 	}
 
-	if cfg.MemoryTriage != nil {
+	if cfg.DisableMemoryTriage {
+		invoker.memoryTriage = aicommon.NewNoOpMemoryTriage()
+		invoker.config.MemoryTriage = invoker.memoryTriage
+		log.Infof("memory triage disabled (no-op) for invoker instance")
+	} else if cfg.MemoryTriage != nil {
 		invoker.memoryTriage = cfg.MemoryTriage
 	} else {
 		memoryTriageId := cfg.MemoryTriageId

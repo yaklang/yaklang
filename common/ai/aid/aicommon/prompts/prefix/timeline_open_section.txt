@@ -41,3 +41,5 @@ OS/Arch: {{ .OSArch }}
 {{ .CurrentTime }}{{ end }}
 
 {{ if .PlanContext }}{{ .PlanContext }}{{ end }}
+{{ if .ReportedRisks }}
+{{ .ReportedRisks }}{{ end }}

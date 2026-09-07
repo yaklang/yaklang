@@ -115,7 +115,7 @@ SOLUTION
 DESC
 	level: "info",
 	title: "Unvalidated File Write Operation",
-	risk: "信息",
+	risk: "information",
 	name: "output",
 	message: "发现未验证的文件写入操作，需进一步审计以确认是否存在路径遍历等风险。",
 }

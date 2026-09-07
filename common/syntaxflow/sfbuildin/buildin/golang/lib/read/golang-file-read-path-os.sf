@@ -176,7 +176,7 @@ alert $output for {
    确保只有授权用户才能访问特定文件。
 
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 漏洞描述
 

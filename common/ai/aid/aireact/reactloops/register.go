@@ -82,6 +82,13 @@ func GetLoopAction(name string) (*LoopAction, bool) {
 	return actions.Get(name)
 }
 
+// GetRegisteredActionNames returns the process-wide action registry snapshot.
+// It is primarily used by startup diagnostics so a missing required action is
+// reported with both the requested action and the registrations actually seen.
+func GetRegisteredActionNames() []string {
+	return actions.Keys()
+}
+
 type LoopFactory func(r aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error)
 
 func RegisterLoopFactory(

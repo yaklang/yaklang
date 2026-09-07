@@ -48,7 +48,7 @@ func bindAttachedHTTPFuzzRequestToLoop(
 		if loop.GetInvoker() != nil {
 			loop.GetInvoker().AddToTimeline("http_request_bootstrap", "Initialized from attached HTTP packet resource.")
 		}
-		reactloops.EmitStatus(loop, "已加载附加 HTTP 数据包 / Loaded Attached HTTP Packet")
+		reactloops.EmitStatusI18n(loop, "已加载附加 HTTP 数据包", "Loaded Attached HTTP Packet")
 		return true
 	}
 	return false

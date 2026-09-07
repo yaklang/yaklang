@@ -2,7 +2,7 @@ package format
 
 // Options controls how static analyze results are formatted for AI feedback or copy.
 type Options struct {
-	// PluginType is passed to static analysis (yak, mitm, port-scan, codec, syntaxflow).
+	// PluginType is passed to static analysis (yak, mitm, port-scan, codec, context-menu, syntaxflow).
 	PluginType string
 	// LineBase shifts displayed line numbers (0-based editor offset).
 	LineBase int
@@ -20,11 +20,11 @@ type Options struct {
 
 func defaultOptions() Options {
 	return Options{
-		PluginType:            "yak",
-		IncludeHints:          true,
-		IncludeCodeContext:    true,
-		HintLabel:             "AI助手提示: ",
-		TruncateMoreMessage:   "There are other errors, it's better to fix the critical issues above first before fixing others",
+		PluginType:          "yak",
+		IncludeHints:        true,
+		IncludeCodeContext:  true,
+		HintLabel:           "AI助手提示: ",
+		TruncateMoreMessage: "There are other errors, it's better to fix the critical issues above first before fixing others",
 	}
 }
 

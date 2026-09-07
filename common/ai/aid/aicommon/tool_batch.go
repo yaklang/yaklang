@@ -104,18 +104,22 @@ const (
 	ToolCallStageValidationFailed ToolCallStage = "validation_failed"
 	ToolCallStageInvokeFailed     ToolCallStage = "invoke_failed"
 	ToolCallStageCancelled        ToolCallStage = "cancelled"
-	ToolCallStageDone             ToolCallStage = "done"
+	// ToolCallStageDone is a lifecycle state: the callback settled and returned
+	// a protocol-complete ToolResult. Inspect ExecutionStatus/Result for actual
+	// execution semantics and the task verifier for goal satisfaction.
+	ToolCallStageDone ToolCallStage = "done"
 )
 
 type ToolCallOutcome struct {
-	Index          int                `json:"index"`
-	CallID         string             `json:"call_id,omitempty"`
-	RequestedTool  string             `json:"requested_tool"`
-	FinalTool      string             `json:"final_tool,omitempty"`
-	Stage          ToolCallStage      `json:"stage"`
-	Result         *aitool.ToolResult `json:"result,omitempty"`
-	Err            error              `json:"-"`
-	DirectlyAnswer bool               `json:"directly_answer,omitempty"`
+	Index           int                        `json:"index"`
+	CallID          string                     `json:"call_id,omitempty"`
+	RequestedTool   string                     `json:"requested_tool"`
+	FinalTool       string                     `json:"final_tool,omitempty"`
+	Stage           ToolCallStage              `json:"stage"`
+	ExecutionStatus aitool.ToolExecutionStatus `json:"execution_status,omitempty"`
+	Result          *aitool.ToolResult         `json:"result,omitempty"`
+	Err             error                      `json:"-"`
+	DirectlyAnswer  bool                       `json:"directly_answer,omitempty"`
 }
 
 type ToolBatchResult struct {

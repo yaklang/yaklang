@@ -141,7 +141,7 @@ $content = fread($handle, filesize($config_file));
 fclose($handle);
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 该规则用于审计PHP代码中是否存在不安全的文件读取函数使用。文件读取函数如`file_get_contents`、`file`、`readfile`、`fgetss`、`fgets`、`fread`、`fgetc`、`stream_get_line`、`fscanf`和`fopen`等，如果未对输入进行严格的验证和过滤，可能会被恶意用户利用来读取服务器上的敏感文件，导致信息泄露。

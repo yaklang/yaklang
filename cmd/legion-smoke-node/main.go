@@ -59,6 +59,7 @@ func runDistYak(args []string) error {
 func runNode(args []string) error {
 	flags := flag.NewFlagSet("legion-smoke-node", flag.ContinueOnError)
 	apiURL := flags.String("api-url", "http://127.0.0.1:8080", "Legion platform HTTP API base URL")
+	runtimeAPIURL := flags.String("runtime-api-url", strings.TrimSpace(os.Getenv("LEGION_RUNTIME_API_URL")), "Container-facing Legion platform HTTP API base URL for Runtime Host commands")
 	enrollmentToken := flags.String("enrollment-token", "", "Legion node enrollment token")
 	nodeID := flags.String("id", "", "Legacy node ID fallback; canonical node_id is assigned by platform")
 	displayName := flags.String("name", "smoke-node", "Display name reported to Legion")
@@ -68,6 +69,11 @@ func runNode(args []string) error {
 	runtimeHost := flags.Bool("runtime-host", environmentBool("LEGION_RUNTIME_HOST"), "Allow this node to run AI session containers using its local Docker Engine")
 	runtimeNetwork := flags.String("runtime-network", environmentValue("LEGION_RUNTIME_NETWORK", "bridge"), "Fixed local Docker network for AI session containers")
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
+	ruleSnapshotCacheDir := flags.String(
+		"rule-snapshot-cache-dir",
+		strings.TrimSpace(os.Getenv("LEGION_RULE_SNAPSHOT_CACHE_DIR")),
+		"Immutable rule snapshot bundle cache directory",
+	)
 	version := flags.String("version", "smoke", "Node version")
 	engineReleaseID := flags.String("engine-release-id", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_ID")), "Installed unified Yaklang release ID")
 	engineDigest := flags.String("engine-digest", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_SHA256")), "Installed Yaklang Node binary SHA-256")
@@ -76,6 +82,7 @@ func runNode(args []string) error {
 		node.DefaultHeartbeatInterval,
 		"Heartbeat interval",
 	)
+	maxRunningJobs := smokeNodeMaxRunningJobsFlag(flags)
 	pprofAddr := flags.String("pprof-addr", "", "Optional pprof HTTP listen address, e.g. 127.0.0.1:18080")
 	heapMonitorInterval := flags.Duration(
 		"heap-monitor-interval",
@@ -118,6 +125,10 @@ func runNode(args []string) error {
 		"Optional host identity instance_id override for isolated local testing",
 	)
 	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	resolvedMaxRunningJobs, err := smokeNodeMaxRunningJobs(*maxRunningJobs)
+	if err != nil {
 		return err
 	}
 	if err := initializeAISessionCapabilities(*kind, syncAISessionCapabilities); err != nil {
@@ -170,10 +181,12 @@ func runNode(args []string) error {
 		postBootstrapHook = buildAISessionRegisterHook()
 	}
 
-	scanNodeOptions := []scannode.ScanNodeOption{}
+	scanNodeOptions := []scannode.ScanNodeOption{
+		scannode.WithRuleSnapshotCacheDir(*ruleSnapshotCacheDir),
+	}
 	if *runtimeHost && strings.TrimSpace(*kind) != "ai_session" {
 		scanNodeOptions = append(scanNodeOptions, scannode.WithRuntimeHost(scannode.RuntimeHostConfig{
-			Enabled: true, PlatformAPIBaseURL: *apiURL, EnrollmentToken: *enrollmentToken,
+			Enabled: true, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
 			AgentInstallationID: *agentInstallationID, Network: *runtimeNetwork,
 			EngineReleaseID: *engineReleaseID, EngineDigest: *engineDigest,
 		}))
@@ -192,6 +205,7 @@ func runNode(args []string) error {
 		EngineReleaseID:      hostEngineValue(*kind, *engineReleaseID),
 		EngineDigest:         hostEngineValue(*kind, *engineDigest),
 		HeartbeatInterval:    *heartbeatInterval,
+		MaxRunningJobs:       resolvedMaxRunningJobs,
 		HostIdentityProvider: hostIdentityProvider,
 		PostBootstrapHook:    postBootstrapHook,
 	}, scanNodeOptions...)
@@ -209,6 +223,21 @@ func runNode(args []string) error {
 	scanNode.Shutdown()
 	<-done
 	return nil
+}
+
+func smokeNodeMaxRunningJobsFlag(flags *flag.FlagSet) *uint64 {
+	return flags.Uint64(
+		"max-running-jobs",
+		1,
+		"Maximum concurrent jobs; zero means unlimited",
+	)
+}
+
+func smokeNodeMaxRunningJobs(value uint64) (uint32, error) {
+	if value > uint64(^uint32(0)) {
+		return 0, fmt.Errorf("max-running-jobs exceeds uint32 range")
+	}
+	return uint32(value), nil
 }
 
 func environmentBool(name string) bool {

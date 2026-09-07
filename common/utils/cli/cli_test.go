@@ -319,3 +319,16 @@ func TestCliIntWithLargeDefault(t *testing.T) {
 
 	test.Equal(largeDefault, result, "Large default value should be parsed correctly")
 }
+
+func TestPeekStringSliceDoesNotRegisterMetadata(t *testing.T) {
+	app := NewCliApp()
+	app.SetArgs([]string{"--proxy", "http://127.0.0.1:8080,socks5://127.0.0.1:1080"})
+	registeredBefore := len(app.extraParams)
+
+	for i := 0; i < 1000; i++ {
+		got := app.PeekStringSlice("proxy")
+		assert.Equal(t, []string{"http://127.0.0.1:8080", "socks5://127.0.0.1:1080"}, got)
+	}
+
+	assert.Len(t, app.extraParams, registeredBefore)
+}

@@ -28,11 +28,11 @@ type ClientConfig struct {
 }
 
 // Headers Frame.Headers
-type Headers []Header
+type Headers []*Header
 
 func (h Headers) GetString(key string) string {
 	for _, header := range h {
-		if header.Key == key {
+		if header != nil && header.Key == key {
 			return header.Value
 		}
 	}
@@ -42,7 +42,7 @@ func (h Headers) GetString(key string) string {
 
 func (h Headers) GetInt(key string) int {
 	for _, header := range h {
-		if header.Key == key {
+		if header != nil && header.Key == key {
 			if val, err := strconv.Atoi(header.Value); err == nil {
 				return val
 			}
@@ -53,7 +53,7 @@ func (h Headers) GetInt(key string) int {
 }
 
 func (h *Headers) Add(key, value string) {
-	header := Header{
+	header := &Header{
 		Key:   key,
 		Value: value,
 	}

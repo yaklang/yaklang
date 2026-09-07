@@ -28,6 +28,7 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"test",
+		testAIRetryWaitOption(),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {

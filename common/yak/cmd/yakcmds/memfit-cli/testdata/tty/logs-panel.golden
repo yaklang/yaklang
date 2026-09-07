@@ -1,0 +1,22 @@
+◆ memfit  local isolated agent
+test-model · YOLO · /workspace/yaklang
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history
+
+
+Session
+  State   Ready
+  Worker  PID 4242
+  Model   test-model
+  Review  YOLO
+  Queue   empty
+  Project /workspace/yaklang
+
+Worker diagnostics · 3
+  WARN    provider:42 · worker retry is available
+  EVENT   structured retry detail
+  WORKER  erase-attempt stayed plain text
+
+╭─ Message ────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────
+○ Ready            test-model · YOLO · click/Ctrl+O details · /help

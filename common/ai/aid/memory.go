@@ -440,8 +440,6 @@ func (m *PromptContextProvider) CurrentTaskInfoDynamic() string {
 		"Progress":                m.Progress(),
 		"CurrentTaskUserInput":    currentTask.GetUserInput(),
 		"ToolCallCount":           currentTask.ToolCallCount(),
-		"TaskContinueCount":       currentTask.TaskContinueCount(),
-		"TaskMaxContinue":         m.TaskMaxContinue(),
 		"SingleLineStatusSummary": currentTask.SingleLineStatusSummary(),
 		"SharedEvidenceContext":   m.SharedEvidenceContext(),
 	})

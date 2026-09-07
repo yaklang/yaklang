@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测 Java SAXReader 未安全使用"
 	type: vuln
 	level: warning
-	risk:XXE
+	risk:"xxe"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -168,7 +168,7 @@ XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时，�
 - 在一些特定条件下可能导致任意代码执行（通过引用包含恶意代码的文件）
 DESC
 	name: "vulnCall",
-	risk: "XML外部实体（XXE）",
+	risk: "xxe",
 }
 
 desc(

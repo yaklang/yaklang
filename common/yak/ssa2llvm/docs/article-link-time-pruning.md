@@ -378,7 +378,7 @@ panic: yaklib module was pruned at link time but is still reachable: ssafront
 
 ```
 elfsplit: 2 start-up path(s) reach code that would be pruned:
-  common/yak/yaklib.init -> github.com/dop251/goja.New -> .modtext.ssafront
+  common/yak/yaklib.init -> github.com/yaklang/goja.New -> .modtext.ssafront
   common/cybertunnel/tpb.file_tunnel_proto_init
     -> google.golang.org/protobuf/internal/filetype.Builder.Build -> .modtext.sharednet
 ```

@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-dynamic-import"
-	risk: "任意代码加载"
+	risk: "dynamic-code-loading"
 	desc: <<<DESC
 标记 __import__、importlib.import_module、importlib.util.find_spec 等动态导入。若模块名来自用户或外部输入，可能加载非预期模块并触发导入期副作用。
 DESC
@@ -26,7 +26,7 @@ alert $output for {
 	title_zh: "动态导入",
 	level: "info",
 	type: "audit",
-	risk: "任意代码加载",
+	risk: "dynamic-code-loading",
 	message: "检测到动态导入 API，请确认模块名来源可信且经过白名单约束。",
 	name: "output",
 }

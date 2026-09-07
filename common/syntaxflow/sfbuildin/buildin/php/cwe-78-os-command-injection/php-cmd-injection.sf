@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP命令注入漏洞"
 	type: audit
 	level: mid
-	risk:'远程代码执行（RCE）'
+	risk:"command-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -117,7 +117,7 @@ system("cat " . $filename);
 - **拒绝服务：** 攻击者可以执行例如 `fork bomb` 等命令导致服务器资源耗尽，造成拒绝服务。
 DESC
 	level: "high",
-	risk: "命令注入",
+	risk: "command-injection",
 	name: "high",
 	message: "检测到PHP未过滤命令执行漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -178,7 +178,7 @@ system("cat " . $filename);
 DESC
 	level: "mid",
 	message: "检测到PHP部分过滤命令执行漏洞，可能存在过滤函数，需进一步审计确认。",
-	risk: "命令注入",
+	risk: "command-injection",
 	name: "mid",
 }
 $sink - $mid - $high as $low
@@ -200,7 +200,7 @@ DESC
 	title: "Filtered PHP Command Execution",
 	name: "low",
 	message: "发现PHP命令执行相关函数调用，但已包含一定过滤机制，建议进一步审查。",
-	risk: "信息",
+	risk: "information",
 }
 desc(
 	lang: 'php'

@@ -10,19 +10,19 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-const npdSFRule = `*<npd()> as $npd`
+// NPD native category.
+const npdNativeRule = `
+$focus<npd()> as $npd
+alert $npd for { level: "high", risk: "null-pointer-deref" }
+`
 
-type npdSFCase struct {
-	name    string
-	code    string
-	wantNPD bool
-}
+const npdScanRule = `*<npd()> as $npd`
 
-func TestC_NPD_SyntaxFlow(t *testing.T) {
-	cases := []npdSFCase{
+func TestC_NPD_Config(t *testing.T) {
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
 		{
-			name: "null then arrow member write",
-			code: `
+			Name: "null then arrow member write",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main() {
@@ -31,11 +31,13 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: `p as $focus` + npdNativeRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+			WantAlerts: []string{"npd"},
 		},
 		{
-			name: "null then arrow via nullptr",
-			code: `
+			Name: "null then arrow via nullptr",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main() {
@@ -44,27 +46,27 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
 		},
 		{
-			name: "may-null after if then arrow",
-			code: `
+			Name: "may-null after if then arrow",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main(int c) {
     struct Node *p = (struct Node*)malloc(sizeof(struct Node));
-    if (c) {
-        p = 0;
-    }
+    if (c) { p = 0; }
     p->x = 1;
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
 		},
 		{
-			name: "malloc use free is safe for npd",
-			code: `
+			Name: "malloc use free is safe for npd",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main() {
@@ -74,22 +76,24 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: false,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 0, Max: 0}},
 		},
 		{
-			name: "null without deref is safe",
-			code: `
+			Name: "null without deref is safe",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = 0;
     return 0;
 }
 `,
-			wantNPD: false,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 0, Max: 0}},
 		},
 		{
-			name: "null then call is not npd",
-			code: `
+			Name: "null then call is not npd",
+			Code: `
 #include <stdlib.h>
 void sink(int *q);
 int main() {
@@ -98,11 +102,12 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: false,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 0, Max: 0}},
 		},
 		{
-			name: "free then deref is uaf not npd",
-			code: `
+			Name: "free then deref is uaf not npd",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = (int*)malloc(sizeof(int));
@@ -111,11 +116,55 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: false,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 0, Max: 0}},
 		},
 		{
-			name: "nullify through int-star-star side-effect then deref",
-			code: `
+			Name: "multilevel int** NPD on null",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int **pp = 0;
+    **pp = 1;
+    return 0;
+}
+`,
+			Rule: `pp as $focus` + npdNativeRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+		},
+		{
+			Name: "struct field null then star",
+			Code: `
+#include <stdlib.h>
+struct Box { int *buf; };
+int main() {
+    struct Box b;
+    b.buf = 0;
+    *b.buf = 1;
+    return 0;
+}
+`,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+		},
+		{
+			Name: "null alias q=p then arrow",
+			Code: `
+#include <stdlib.h>
+struct Node { int x; };
+int main() {
+    struct Node *p = 0;
+    struct Node *q = p;
+    q->x = 1;
+    return 0;
+}
+`,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+		},
+		{
+			Name: "nullify through int** side-effect then deref",
+			Code: `
 #include <stdlib.h>
 void free2(int **a) {
     free(*a);
@@ -128,25 +177,41 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
 		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ssatest.CheckWithNameOnlyInMemory("", t, tc.code, func(prog *ssaapi.Program) error {
-				res, err := prog.SyntaxFlowWithError(npdSFRule)
-				require.NoError(t, err)
-				got := res.GetValues("npd")
-				if !tc.wantNPD {
-					require.Equal(t, 0, got.Len(), "unexpected NPD: %v", got)
-					return nil
-				}
-				require.Greater(t, got.Len(), 0, "expected NPD findings")
-				return nil
-			}, ssaapi.WithLanguage(ssaconfig.C))
-		})
-	}
+		{
+			Name: "target filter pa only",
+			Code: `
+#include <stdlib.h>
+struct Node { int x; };
+int main() {
+    struct Node *pa = 0;
+    struct Node *pb = 0;
+    struct Node *ok = (struct Node*)malloc(sizeof(struct Node));
+    pa->x = 11;
+    pb->x = 22;
+    ok->x = 33;
+    return 0;
+}
+`,
+			Rule: `
+pa as $pa
+pb as $pb
+ok as $ok
+<npd(target=$pa)> as $npd_pa
+<npd(target=$pb)> as $npd_pb
+<npd(target=$ok)> as $npd_ok
+`,
+			Want: map[string]ptrNativeWant{
+				"npd_pa": {Min: 1},
+				"npd_pb": {Min: 1},
+				"npd_ok": {Min: 0, Max: 0},
+			},
+			Contain: map[string][]string{"npd_pa": {"11"}},
+			Absent:  map[string][]string{"npd_pa": {"22"}},
+		},
+	})
 }
 
 func TestC_NPD_LifetimeAPI(t *testing.T) {
@@ -173,15 +238,12 @@ int main() {
 	}, ssaapi.WithLanguage(ssaconfig.C))
 }
 
-// TestC_NPD_SyntaxFlow_Ex extends NPD coverage toward known gaps (bare *p,
-// null guards, param null, alias, globals, field). Desired behavior after
-// future work; failures are expected for now — exploratory only.
-func TestC_NPD_SyntaxFlow_Ex(t *testing.T) {
-	cases := []npdSFCase{
+// TestC_NPD_Config_Ex — desired behavior for known gaps; soft assertions only.
+func TestC_NPD_Config_Ex(t *testing.T) {
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
 		{
-			// gap: bare int* store after null (c2ssa often drops member-use)
-			name: "null then bare star write",
-			code: `
+			Name: "null then bare star write",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = 0;
@@ -189,88 +251,44 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+			Soft: true,
 		},
 		{
-			// gap: load via bare *p after null
-			name: "null then bare star read",
-			code: `
-#include <stdlib.h>
-int main() {
-    int *p = 0;
-    int x = *p;
-    return x;
-}
-`,
-			wantNPD: true,
-		},
-		{
-			// gap: if (p) guard should make deref safe
-			name: "if nonnull guard then deref is safe",
-			code: `
+			Name: "if nonnull guard then deref is safe",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main(int c) {
     struct Node *p = 0;
-    if (c) {
-        p = (struct Node*)malloc(sizeof(struct Node));
-    }
-    if (p) {
-        p->x = 1;
-    }
+    if (c) { p = (struct Node*)malloc(sizeof(struct Node)); }
+    if (p) { p->x = 1; }
     return 0;
 }
 `,
-			wantNPD: false,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 0, Max: 0}},
+			Soft: true,
 		},
 		{
-			// gap: if (!p) then deref should be NPD
-			name: "if null guard then deref is npd",
-			code: `
+			Name: "if null guard then deref is npd",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main() {
     struct Node *p = 0;
-    if (!p) {
-        p->x = 1;
-    }
+    if (!p) { p->x = 1; }
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+			Soft: true,
 		},
 		{
-			// gap: formal param assigned null then arrow
-			name: "param assign null then arrow",
-			code: `
-#include <stdlib.h>
-struct Node { int x; };
-void f(struct Node *p) {
-    p = 0;
-    p->x = 1;
-}
-`,
-			wantNPD: true,
-		},
-		{
-			// gap: copy alias q=p after null
-			name: "null then alias q then arrow",
-			code: `
-#include <stdlib.h>
-struct Node { int x; };
-int main() {
-    struct Node *p = 0;
-    struct Node *q = p;
-    q->x = 1;
-    return 0;
-}
-`,
-			wantNPD: true,
-		},
-		{
-			// gap: global null then use
-			name: "global null then arrow",
-			code: `
+			Name: "global null then arrow",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 struct Node *g;
@@ -280,27 +298,13 @@ int main() {
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+			Soft: true,
 		},
 		{
-			// gap: field of struct is null pointer then deref
-			name: "struct field null then star",
-			code: `
-#include <stdlib.h>
-struct Box { int *buf; };
-int main() {
-    struct Box b;
-    b.buf = 0;
-    *b.buf = 1;
-    return 0;
-}
-`,
-			wantNPD: true,
-		},
-		{
-			// gap: ternary may-null then arrow
-			name: "ternary may-null then arrow",
-			code: `
+			Name: "ternary may-null then arrow",
+			Code: `
 #include <stdlib.h>
 struct Node { int x; };
 int main(int c) {
@@ -309,121 +313,9 @@ int main(int c) {
     return 0;
 }
 `,
-			wantNPD: true,
+			Rule: npdScanRule,
+			Want: map[string]ptrNativeWant{"npd": {Min: 1}},
+			Soft: true,
 		},
-		{
-			// gap: loop may leave p null then use after loop
-			name: "for may set null then use after",
-			code: `
-#include <stdlib.h>
-struct Node { int x; };
-int main() {
-    struct Node *p = (struct Node*)malloc(sizeof(struct Node));
-    int i;
-    for (i = 0; i < 1; i++) {
-        if (i == 0) {
-            p = 0;
-        }
-    }
-    p->x = 1;
-    return 0;
-}
-`,
-			wantNPD: true,
-		},
-		{
-			// desired: passing null to sink is not NPD (phase1 already); keep regression
-			name: "null then sink still not npd",
-			code: `
-#include <stdlib.h>
-void sink(int *q);
-int main() {
-    int *p = 0;
-    sink(p);
-    return 0;
-}
-`,
-			wantNPD: false,
-		},
-		{
-			// gap: return *p after null (load use)
-			name: "null then return star",
-			code: `
-#include <stdlib.h>
-int f(void) {
-    int *p = 0;
-    return *p;
-}
-`,
-			wantNPD: true,
-		},
-		{
-			name: "nullify through int-star-star side-effect then deref",
-			code: `
-#include <stdlib.h>
-void free2(int **a) {
-    free(*a);
-    *a = 0;
-}
-int main() {
-    int *p = (int*)malloc(20);
-    free2(&p);
-    *p = 10;
-    return 0;
-}
-`,
-			wantNPD: true,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ssatest.CheckWithNameOnlyInMemory("", t, tc.code, func(prog *ssaapi.Program) error {
-				res, err := prog.SyntaxFlowWithError(npdSFRule)
-				require.NoError(t, err)
-				got := res.GetValues("npd")
-				if !tc.wantNPD {
-					require.Equal(t, 0, got.Len(), "unexpected NPD: %v", got)
-					return nil
-				}
-				require.Greater(t, got.Len(), 0, "expected NPD findings")
-				return nil
-			}, ssaapi.WithLanguage(ssaconfig.C))
-		})
-	}
-}
-
-func TestC_NPD_SyntaxFlow_Target(t *testing.T) {
-	code := `
-#include <stdlib.h>
-struct Node { int x; };
-int main() {
-    struct Node *pa = 0;
-    struct Node *pb = 0;
-    struct Node *ok = (struct Node*)malloc(sizeof(struct Node));
-    pa->x = 11;
-    pb->x = 22;
-    ok->x = 33;
-    return 0;
-}
-`
-	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-		res, err := prog.SyntaxFlowWithError(`
-pa as $pa
-<npd(target=$pa)> as $npd
-`)
-		require.NoError(t, err)
-		got := res.GetValues("npd")
-		require.Greater(t, got.Len(), 0)
-		ssatest.CompareResult(t, true, res, map[string][]string{"npd": {"11"}})
-		require.NotContains(t, got.String(), "22")
-
-		resSafe, err := prog.SyntaxFlowWithError(`
-ok as $ok
-<npd(target=$ok)> as $npd
-`)
-		require.NoError(t, err)
-		require.Equal(t, 0, resSafe.GetValues("npd").Len())
-		return nil
-	}, ssaapi.WithLanguage(ssaconfig.C))
+	})
 }

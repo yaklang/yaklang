@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java异常抛出时资源未清理漏洞"
 	type: "Code Vulnerability"
 	severity: "Medium"
-	risk: "Moderate"
+	risk: "resource-cleanup"
 	cwe: "CWE-460"
 	desc: <<<DESC
 ### 漏洞描述
@@ -133,7 +133,7 @@ alert $throw for {
 	title: "Java Improper Cleanup on Thrown Exception Vulnerability Was Detected",
 	title_zh: "检测到Java异常抛出时资源未清理漏洞",
 	level: "mid",
-	risk: "资源未清理",
+	risk: "resource-cleanup",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

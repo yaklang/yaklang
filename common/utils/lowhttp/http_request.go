@@ -393,6 +393,7 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 		var buf bytes.Buffer
 		fixedBody := multipart.NewWriter(&buf)
 		fixedBody.SetBoundary(boundary)
+		converted := false
 		for {
 			part, err := reader.NextRawPart()
 			if err != nil {
@@ -408,22 +409,110 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 			if err != nil {
 				log.Errorf("copy multipart-stream failed: %s", err)
 			}
-			if utf8.Valid(body) {
+			if !bodyNeedsUnquote(body) {
 				w.Write(body)
 			} else {
-				w.Write([]byte(ToUnquoteFuzzTag(body)))
+				converted = true
+				w.Write([]byte(ToUnquoteFuzzTagForce(body)))
 			}
 		}
 		fixedBody.Close()
+		if !converted {
+			return i
+		}
 		body = buf.Bytes()
 		return ReplaceHTTPPacketBody([]byte(header), body, false)
 	}
 
-	if utf8.Valid(body) {
+	if !bodyNeedsUnquote(body) {
 		return i
 	}
-	body = []byte(ToUnquoteFuzzTag(body))
+	body = []byte(ToUnquoteFuzzTagForce(body))
 	return ReplaceHTTPPacketBody([]byte(header), body, false)
+}
+
+func bodyNeedsUnquote(body []byte) bool {
+	// The editor representation follows the bytes, not the declared MIME.
+	// Multipart callers invoke this for each part independently so one invalid
+	// file part does not turn otherwise safe text fields into binary chips.
+	return !utf8.Valid(body)
+}
+
+// MeasureFuzzTagBodySize returns the editor-facing size of one HTTP body or
+// multipart part body. Invalid UTF-8 is represented by one forced unquote tag;
+// valid UTF-8 remains byte-for-byte inline, regardless of its declared MIME.
+func MeasureFuzzTagBodySize(body []byte) (int, bool) {
+	binary := bodyNeedsUnquote(body)
+	if !binary {
+		return len(body), false
+	}
+	return UnquoteFuzzTagSize(body, true), true
+}
+
+type fuzzTagBodyCountingWriter struct {
+	n int
+}
+
+func (w *fuzzTagBodyCountingWriter) Write(p []byte) (int, error) {
+	w.n += len(p)
+	return len(p), nil
+}
+
+// MeasureHTTPRequestFuzzTagBodySize returns the exact body size that
+// ConvertHTTPRequestToFuzzTag would expose to a text editor, without allocating
+// the expanded binary representation. The second result reports whether any
+// body/part requires an unquote tag.
+func MeasureHTTPRequestFuzzTagBodySize(i []byte) (int, bool, error) {
+	var boundary string
+	_, body := SplitHTTPHeadersAndBodyFromPacket(i, func(line string) {
+		k, v := SplitHTTPHeader(strings.TrimSpace(line))
+		if !strings.EqualFold(k, "content-type") {
+			return
+		}
+		ctVal, params, _ := mime.ParseMediaType(v)
+		if ctVal == "multipart/form-data" && params != nil {
+			boundary = params["boundary"]
+		}
+	})
+
+	if boundary == "" {
+		size, binary := MeasureFuzzTagBodySize(body)
+		return size, binary, nil
+	}
+
+	reader := multipart.NewReader(bytes.NewReader(body))
+	counter := &fuzzTagBodyCountingWriter{}
+	writer := multipart.NewWriter(counter)
+	if err := writer.SetBoundary(boundary); err != nil {
+		return 0, false, err
+	}
+	converted := false
+	for {
+		part, err := reader.NextRawPart()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, false, err
+		}
+		if _, err := writer.CreatePart(part.Header); err != nil {
+			return 0, false, err
+		}
+		partBody, err := io.ReadAll(part)
+		if err != nil {
+			return 0, false, err
+		}
+		partSize, binary := MeasureFuzzTagBodySize(partBody)
+		converted = converted || binary
+		counter.n += partSize
+	}
+	if err := writer.Close(); err != nil {
+		return 0, false, err
+	}
+	if !converted {
+		return len(body), false, nil
+	}
+	return counter.n, true, nil
 }
 
 const (
@@ -432,7 +521,18 @@ const (
 )
 
 func ToUnquoteFuzzTag(i []byte) string {
-	if utf8.Valid(i) {
+	return toUnquoteFuzzTag(i, false)
+}
+
+// ToUnquoteFuzzTagForce encodes bytes even when they happen to be valid UTF-8.
+// It is used when a caller explicitly needs to preserve an existing binary
+// editor/Fuzztag representation, such as after saving a HEX edit.
+func ToUnquoteFuzzTagForce(i []byte) string {
+	return toUnquoteFuzzTag(i, true)
+}
+
+func toUnquoteFuzzTag(i []byte, force bool) string {
+	if !force && utf8.Valid(i) {
 		return string(i)
 	}
 
@@ -448,6 +548,11 @@ func ToUnquoteFuzzTag(i []byte) string {
 				buf.WriteString(`\x7d`)
 			case '{':
 				buf.WriteString(`\x7b`)
+			case '`':
+				// History/exported tags are commonly embedded in a Yak raw
+				// string. A literal backtick would terminate that source
+				// string; unquote("\\x60") preserves the original byte.
+				buf.WriteString(`\x60`)
 			case '\\':
 				buf.WriteString(`\\`)
 			case '"':
@@ -461,6 +566,29 @@ func ToUnquoteFuzzTag(i []byte) string {
 	}
 	buf.WriteString(`")}}`)
 	return buf.String()
+}
+
+// UnquoteFuzzTagSize returns len(ToUnquoteFuzzTag(i)), or the forced variant
+// when force is true, without allocating the encoded string. The representation
+// has 15 bytes of fixed syntax; each source byte contributes 1, 2, or 4 bytes.
+func UnquoteFuzzTagSize(i []byte, force bool) int {
+	if !force && utf8.Valid(i) {
+		return len(i)
+	}
+	size := len("{{unquote(\"\")}}")
+	for _, b := range i {
+		switch {
+		case b < printableMin || b > printableMax:
+			size += 4
+		case b == '(' || b == ')' || b == '{' || b == '}' || b == '`':
+			size += 4
+		case b == '\\' || b == '"':
+			size += 2
+		default:
+			size++
+		}
+	}
+	return size
 }
 
 //func FixHTTPRequest(raw []byte) []byte {

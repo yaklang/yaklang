@@ -1,0 +1,401 @@
+// Crawler / SPA guidance black-box benchmark.
+//
+// This runner starts a controlled local site with several SPA shells and an SSR
+// site, then drives the real agent entry point through aim.InvokeReAct. It checks
+// that URL tasks choose direct HTTP and/or simple_crawler according to the goal,
+// never repeat either tool without new evidence, and keep actual HTTP traffic
+// bounded.
+//
+// Run from the repository root:
+//   yak common/aiengine/aibenchmark/crawler-spa-guidance-benchmark.yak
+//
+// Optional:
+//   --case unknown-react --provider aibalance --model memfit-standard-free
+//   --api-key-env AIBALANCE_API_KEY --output /tmp/crawler-benchmark.json
+
+caseName = cli.String("case", cli.setDefault(""), cli.setHelp("只运行指定 case；留空运行全部"))
+providerName = cli.String("provider", cli.setDefault("aibalance"), cli.setHelp("AI provider"))
+modelName = cli.String("model", cli.setDefault("memfit-standard-free"), cli.setHelp("AI model"))
+aiDomain = cli.String("domain", cli.setDefault("https://aibalance.yaklang.com/"), cli.setHelp("AI provider domain"))
+apiKeyEnv = cli.String("api-key-env", cli.setDefault("AIBALANCE_API_KEY"), cli.setHelp("API key 环境变量名；空值时使用已有 provider 配置"))
+timeoutSec = cli.Int("timeout", cli.setDefault(120), cli.setHelp("每个 case 的硬超时秒数"))
+maxIteration = cli.Int("max-iteration", cli.setDefault(6), cli.setHelp("每个 case 的最大 ReAct 迭代数"))
+postEvidenceWaitSec = cli.Int("post-evidence-wait", cli.setDefault(8), cli.setHelp("满足最小观测后继续观察重复调用的秒数"))
+outputPath = cli.String("output", cli.setDefault(""), cli.setHelp("可选 JSON 报告路径"))
+skillPath = cli.String("skill", cli.setDefault("common/ai/aid/aireact/skills/web-crawler/SKILL.md"), cli.setHelp("候选 web-crawler SKILL.md；作为附件确保测试当前源码而非本地旧副本"))
+cli.check()
+
+func clean(value) {
+    if value == nil || value == undefined {
+        return ""
+    }
+    return str.TrimSpace(sprintf("%v", value))
+}
+
+func parseEventContent(content) {
+    if len(content) == 0 {
+        return {}
+    }
+    raw = str.TrimSpace(string(content))
+    if !str.HasPrefix(raw, "{") {
+        return {}
+    }
+    try {
+        value = json.loads(raw)
+        if value != nil && value != undefined {
+            return value
+        }
+    } catch err {
+    }
+    return {}
+}
+
+func toolCount(counts, name) {
+    value = counts[name]
+    if value == nil || value == undefined {
+        return 0
+    }
+    return int(value)
+}
+
+oracleRequests = []
+oracleLock = sync.NewLock()
+
+func startMockSites() {
+    serverCtx, cancelServer = context.WithCancel(context.Background())
+    port = os.GetRandomAvailableTCPPort()
+    baseURL = "http://" + str.HostPort("127.0.0.1", port)
+
+    go func {
+        serveErr = httpserver.Serve("127.0.0.1", port,
+            httpserver.context(serverCtx),
+            httpserver.handler(func(w, req) {
+                oracleLock.Lock()
+                oracleRequests = append(oracleRequests, {
+                    "method": req.Method,
+                    "path": req.URL.Path,
+                    "at": time.Now().UnixMilli(),
+                })
+                oracleLock.Unlock()
+
+                path = req.URL.Path
+                if str.HasSuffix(path, ".js") {
+                    w.Header().Set("Content-Type", "application/javascript")
+                    w.Write(`history.pushState({}, "", "/dashboard"); fetch("/api/v1/me");`)
+                    return
+                }
+                if str.HasPrefix(path, "/api/") {
+                    w.Header().Set("Content-Type", "application/json")
+                    w.Write(`{"ok":true}`)
+                    return
+                }
+
+                w.Header().Set("Content-Type", "text/html; charset=utf-8")
+                switch path {
+                case "/spa/react":
+                    w.Write(`<!doctype html><html><head><title>React Console</title></head><body>
+<div id="root"></div><script>window.webpackChunkconsole=[]</script>
+<script src="/assets/runtime.aa.js"></script><script src="/assets/app.bb.js"></script></body></html>`)
+                case "/spa/vue":
+                    w.Write(`<!doctype html><html><head><title>Vue Console</title></head><body>
+<div id="app" data-v-app></div><script type="module" src="/assets/index-vue.js"></script></body></html>`)
+                case "/spa/angular":
+                    w.Write(`<!doctype html><html><head><title>Angular Console</title></head><body>
+<app-root ng-version="17"><router-outlet></router-outlet></app-root>
+<script src="/runtime.angular.js"></script><script src="/main.angular.js"></script></body></html>`)
+                case "/spa/next":
+                    w.Write(`<!doctype html><html><head><title>Next Console</title></head><body>
+<div id="__next"></div><script id="__NEXT_DATA__">{}</script>
+<script src="/_next/static/chunks/main.js"></script></body></html>`)
+                case "/spa/nuxt":
+                    w.Write(`<!doctype html><html><head><title>Nuxt Console</title></head><body>
+<div id="__nuxt"></div><script>window.__NUXT__={}</script>
+<script type="module" src="/_nuxt/entry.js"></script></body></html>`)
+                case "/spa/sveltekit":
+                    w.Write(`<!doctype html><html><head><title>Svelte Console</title></head><body>
+<div id="svelte" data-sveltekit-preload-data="hover"></div>
+<script type="module" src="/assets/index-svelte.js"></script></body></html>`)
+                case "/ssr/docs":
+                    w.Write(`<!doctype html><html><head><title>Server Documentation</title></head><body>
+<main><h1>Documentation</h1><p>The useful content is present in the original response.</p>
+<a href="/ssr/guide">Guide</a><a href="/api/openapi.json">OpenAPI</a>
+<form action="/ssr/search"><input name="q"></form></main></body></html>`)
+                case "/ssr/guide":
+                    w.Write(`<!doctype html><html><body><main><h1>Guide</h1><a href="/ssr/docs">Docs</a></main></body></html>`)
+                case "/ssr/search":
+                    w.Write(`<!doctype html><html><body><main>Search</main></body></html>`)
+                default:
+                    w.WriteHeader(404)
+                    w.Write("not found")
+                }
+            }),
+        )
+        if serveErr != nil && serverCtx.Err() == nil {
+            log.error("mock site server stopped unexpectedly: %v", serveErr)
+        }
+    }
+    os.WaitConnect(str.HostPort("127.0.0.1", port), 5)~
+    return {"url": baseURL, "cancel": cancelServer}
+}
+
+func oracleOffset() {
+    oracleLock.Lock()
+    defer oracleLock.Unlock()
+    return len(oracleRequests)
+}
+
+func oracleRequestCountSince(offset) {
+    oracleLock.Lock()
+    defer oracleLock.Unlock()
+    return len(oracleRequests) - offset
+}
+
+func makeUnknownTargetCase(name, path) {
+    return {
+        "name": name,
+        "path": path,
+        // Keep the natural-language goal short enough to exercise the fast
+        // intent path; the URL, required observations and stop condition remain
+        // explicit. The attached candidate SKILL.md supplies detailed routing.
+        "prompt": `快速测试未知网站 {{URL}}：读取原始 HTTP 基线并盘点服务端可见入口；每类观察最多一次，信息足够后停止。`,
+        "min_calls": {"do_http_request": 1, "simple_crawler": 1},
+        "max_calls": {"do_http_request": 1, "simple_crawler": 1},
+        "allowed_tools": ["do_http_request", "simple_crawler"],
+        "max_total_calls": 2,
+        "max_http_requests": 12,
+        "result_contains": ["=== Rendering Assessment ==="],
+    }
+}
+
+cases = [
+    {
+        "name": "exact-response-fast-path",
+        "path": "/ssr/docs",
+        "prompt": `读取 {{URL}} 的原始 HTTP 状态、Content-Type 和标题；结果足够后停止。`,
+        "min_calls": {"do_http_request": 1},
+        "max_calls": {"do_http_request": 1, "simple_crawler": 0},
+        "allowed_tools": ["do_http_request"],
+        "max_total_calls": 1,
+        "max_http_requests": 2,
+        "result_contains": ["200 OK"],
+    },
+    {
+        "name": "server-map-crawler-path",
+        "path": "/ssr/docs",
+        "prompt": `使用 simple_crawler 对 {{URL}} 做一次有界爬取，盘点服务端可见入口和表单；拿到结果后停止，不做浏览器渲染。`,
+        "min_calls": {"simple_crawler": 1},
+        "max_calls": {"do_http_request": 0, "simple_crawler": 1},
+        "allowed_tools": ["simple_crawler"],
+        "max_total_calls": 1,
+        "max_http_requests": 10,
+        "result_contains": ["=== Crawl Summary ===", "no strong client-rendering dependency detected"],
+    },
+    makeUnknownTargetCase("unknown-react", "/spa/react"),
+    makeUnknownTargetCase("unknown-vue", "/spa/vue"),
+    makeUnknownTargetCase("unknown-angular", "/spa/angular"),
+    makeUnknownTargetCase("unknown-next", "/spa/next"),
+    makeUnknownTargetCase("unknown-nuxt", "/spa/nuxt"),
+    makeUnknownTargetCase("unknown-sveltekit", "/spa/sveltekit"),
+    makeUnknownTargetCase("unknown-ssr", "/ssr/docs"),
+]
+
+mockSites = startMockSites()
+defer mockSites["cancel"]()
+
+aiConfigOptions = [ai.domain(aiDomain), ai.model(modelName)]
+apiKey = os.Getenv(apiKeyEnv)
+if str.TrimSpace(apiKey) != "" {
+    aiConfigOptions = append(aiConfigOptions, ai.apiKey(apiKey))
+}
+
+results = []
+failed = 0
+selected = 0
+
+for caseConfig in cases {
+    if caseName != "" && caseConfig["name"] != caseName {
+        continue
+    }
+    selected++
+    targetURL = mockSites["url"] + caseConfig["path"]
+    prompt = str.ReplaceAll(caseConfig["prompt"], "{{URL}}", targetURL)
+    counts = {}
+    doneCounts = {}
+    callNames = {}
+    doneCallIDs = {}
+    toolResults = {}
+    evidenceReady = false
+    cancelScheduled = false
+    eventLock = sync.NewLock()
+    requestOffset = oracleOffset()
+    startedAt = time.Now()
+    benchCtx, benchCancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSec) + "s")~)
+
+    opts = [
+        aim.sessionID(str.RandStr(16)),
+        aim.context(benchCtx),
+        aim.timeout(timeoutSec),
+        aim.maxIteration(maxIteration),
+        aim.language("zh"),
+        aim.yoloMode(),
+        aim.allowUserInteract(false),
+        aim.includeToolNames("do_http_request", "simple_crawler"),
+        aim.attachedFilePath(skillPath),
+        aim.aiConfig(providerName, aiConfigOptions...),
+        aim.qualityPriorityAIConfig(providerName, aiConfigOptions...),
+        aim.speedPriorityAIConfig(providerName, aiConfigOptions...),
+        aim.onEvent(func(react, event) {
+            eventType = string(event.Type)
+            payload = parseEventContent(event.Content)
+            callID = clean(payload["call_tool_id"])
+            shouldScheduleCancel = false
+            eventLock.Lock()
+            if eventType == "tool_call_start" {
+                toolInfo = payload["tool"]
+                if toolInfo != nil && toolInfo != undefined {
+                    toolName = clean(toolInfo["name"])
+                    if toolName != "" {
+                        counts[toolName] = toolCount(counts, toolName) + 1
+                        callNames[callID] = toolName
+                    }
+                }
+            } else if eventType == "tool_call_result" {
+                toolName = clean(callNames[callID])
+                if toolName != "" {
+                    toolResults[toolName] = clean(toolResults[toolName]) + "\n" + clean(payload["result"])
+                }
+            } else if (eventType == "tool_call_done" || eventType == "tool_call_error") && !(callID in doneCallIDs) {
+                doneCallIDs[callID] = true
+                toolName = clean(callNames[callID])
+                if eventType == "tool_call_done" && toolName != "" {
+                    doneCounts[toolName] = toolCount(doneCounts, toolName) + 1
+                }
+
+                allRequiredDone = true
+                for requiredTool, requiredCount in caseConfig["min_calls"] {
+                    if toolCount(doneCounts, requiredTool) < int(requiredCount) {
+                        allRequiredDone = false
+                    }
+                }
+                if allRequiredDone {
+                    evidenceReady = true
+                    if !cancelScheduled {
+                        cancelScheduled = true
+                        shouldScheduleCancel = true
+                    }
+                }
+            }
+            eventLock.Unlock()
+
+            // Tool-call count is the benchmark target, not prose generation.
+            // Keep a grace window after the required calls settle so an
+            // unnecessary repeated call is still observed, then stop cleanly.
+            if shouldScheduleCancel {
+                go func {
+                    time.sleep(postEvidenceWaitSec)
+                    benchCancel()
+                }
+            }
+        }),
+    ]
+
+    log.info("running crawler guidance benchmark case=%s target=%s", caseConfig["name"], targetURL)
+    invokeErr = aim.InvokeReAct(prompt, opts...)
+    benchCancel()
+    durationMS = time.Now().Sub(startedAt).Milliseconds()
+    httpRequests = oracleRequestCountSince(requestOffset)
+
+    eventLock.Lock()
+    directCalls = toolCount(counts, "do_http_request")
+    crawlerCalls = toolCount(counts, "simple_crawler")
+    totalCalls = 0
+    for _, count in counts {
+        totalCalls += int(count)
+    }
+    eventLock.Unlock()
+
+    reasons = []
+    if invokeErr != nil && !evidenceReady {
+        reasons = append(reasons, "InvokeReAct error: " + sprint(invokeErr))
+    }
+    if !evidenceReady {
+        reasons = append(reasons, "required tool calls did not complete")
+    }
+    for toolName, expectedMin in caseConfig["min_calls"] {
+        actual = toolCount(counts, toolName)
+        if actual < int(expectedMin) {
+            reasons = append(reasons, sprintf("%s calls=%d, want >= %d", toolName, actual, expectedMin))
+        }
+    }
+    for toolName, expectedMax in caseConfig["max_calls"] {
+        actual = toolCount(counts, toolName)
+        if actual > int(expectedMax) {
+            reasons = append(reasons, sprintf("%s calls=%d, want <= %d", toolName, actual, expectedMax))
+        }
+    }
+    for toolName, actualCount in counts {
+        if !(toolName in caseConfig["allowed_tools"]) {
+            reasons = append(reasons, sprintf("unexpected tool %s calls=%d", toolName, actualCount))
+        }
+    }
+    combinedResults = ""
+    for _, toolResult in toolResults {
+        combinedResults += "\n" + clean(toolResult)
+    }
+    for expectedToken in caseConfig["result_contains"] {
+        if !str.Contains(combinedResults, expectedToken) {
+            reasons = append(reasons, sprintf("tool results missing %q", expectedToken))
+        }
+    }
+    if totalCalls > int(caseConfig["max_total_calls"]) {
+        reasons = append(reasons, sprintf("total tool calls=%d, want <= %d", totalCalls, caseConfig["max_total_calls"]))
+    }
+    if httpRequests > int(caseConfig["max_http_requests"]) {
+        reasons = append(reasons, sprintf("HTTP requests=%d, want <= %d", httpRequests, caseConfig["max_http_requests"]))
+    }
+
+    passed = len(reasons) == 0
+    if !passed {
+        failed++
+    }
+    result = {
+        "name": caseConfig["name"],
+        "target": targetURL,
+        "passed": passed,
+        "duration_ms": durationMS,
+        "tool_calls": counts,
+        "total_tool_calls": totalCalls,
+        "http_requests": httpRequests,
+        "failure_reasons": reasons,
+    }
+    results = append(results, result)
+    log.info("case=%s passed=%v direct=%d crawler=%d total=%d HTTP=%d duration=%dms",
+        caseConfig["name"], passed, directCalls, crawlerCalls, totalCalls, httpRequests, durationMS)
+    for reason in reasons {
+        log.error("  %s", reason)
+    }
+}
+
+if selected == 0 {
+    die("no benchmark case matched --case=" + caseName)
+}
+
+report = {
+    "benchmark": "crawler-spa-guidance",
+    "provider": providerName,
+    "model": modelName,
+    "selected_cases": selected,
+    "passed_cases": selected - failed,
+    "failed_cases": failed,
+    "results": results,
+}
+reportJSON = json.dumps(report)
+if outputPath != "" {
+    file.Save(outputPath, reportJSON)~
+    log.info("benchmark report saved: %s", outputPath)
+}
+println(reportJSON)
+
+if failed > 0 {
+    die(sprintf("crawler SPA guidance benchmark failed: %d/%d case(s)", failed, selected))
+}

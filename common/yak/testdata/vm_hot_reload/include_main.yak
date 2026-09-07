@@ -1,0 +1,2 @@
+include "testdata/vm_hot_reload/include_dependency.yak"
+assert includeAdder(2) == 42, "included closure returned stale or incorrect data"

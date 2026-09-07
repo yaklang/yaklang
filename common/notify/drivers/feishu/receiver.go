@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/notify"
 	"github.com/yaklang/yaklang/common/notify/internal/httpclient"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"google.golang.org/protobuf/proto"
 )
 
 // imMessagePayload 飞书 im.message.receive_v1 事件的 payload（精简）。
@@ -245,7 +246,7 @@ func isExpectedLCDisconnect(err error) bool {
 //     需按 message_id 缓存分包、收齐所有 seq 后拼接成完整 payload 再 dispatch。
 func (c *Client) handleLCFrame(data []byte, client *lowhttp.WebsocketClient, handler func(*notify.InboundMessage)) {
 	f := &Frame{}
-	if err := f.Unmarshal(data); err != nil {
+	if err := proto.Unmarshal(data, f); err != nil {
 		log.Debugf("feishu: drop malformed frame: %v", err)
 		return
 	}
@@ -873,7 +874,7 @@ func (c *Client) writeACK(client *lowhttp.WebsocketClient, origFrame *Frame) {
 	// 复制原 frame，保留飞书用于关联 ACK 的关键字段（SeqID/LogID/Service/Method/Headers）。
 	ackFrame := *origFrame
 	ackFrame.Payload = p
-	b, err := ackFrame.Marshal()
+	b, err := proto.Marshal(&ackFrame)
 	if err != nil {
 		log.Debugf("feishu: marshal ack frame failed: %v", err)
 		return
@@ -889,7 +890,7 @@ func (c *Client) writeACK(client *lowhttp.WebsocketClient, origFrame *Frame) {
 // writePing 发心跳 ping Frame（protobuf 编码），带上 serviceID。
 func (c *Client) writePing(client *lowhttp.WebsocketClient, serviceID int32) {
 	f := NewPingFrame(serviceID)
-	b, err := f.Marshal()
+	b, err := proto.Marshal(f)
 	if err == nil {
 		// 串行化写，避免与 ACK 并发写损坏帧（对齐官方 SDK writeMessage 的 c.mu）。
 		c.wsWriteMu.Lock()

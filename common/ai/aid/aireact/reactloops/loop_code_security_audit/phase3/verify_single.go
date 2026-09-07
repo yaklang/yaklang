@@ -24,7 +24,6 @@ const phase3SingleFindingReactiveDataTpl = `## 当前验证任务（子 Agent {{
 {{ end }}
 
 **全局进度**: 已验证 {{ .GlobalVerifiedCount }}/{{ .GlobalTotalFindings }} 个 finding
-**当前迭代**: {{ .IterationCount }}
 
 **技术栈**: {{ .TechStack }}
 **入口点**: {{ .EntryPoints }}
@@ -101,7 +100,6 @@ func buildSingleFindingVerifyLoop(
 				"GlobalTotalFindings": len(state.GetFindings()),
 				"GlobalVerifiedCount": len(state.GetVerifiedVulns()),
 				"FeedbackMessages":    feedbacker.String(),
-				"IterationCount":      loop.GetCurrentIterationIndex(),
 				"ReconOutline":        state.GetReconOutline(),
 				"ReconFileHint":       reconFileHint,
 				"TechStack":           state.TechStack,

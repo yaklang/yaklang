@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -166,7 +167,7 @@ func TestGenerateDeepThinkPlanPrompt_UsesTaskLocalGoal(t *testing.T) {
 	prompt, err := fixture.taskA.GenerateDeepThinkPlanPrompt("go deeper")
 	require.NoError(t, err)
 
-	currentTask := aicommon.MustExtractAITagBlock(t, prompt, "CURRENT_TASK").Body
+	currentTask := aicommon_testutil.MustExtractAITagBlock(t, prompt, "CURRENT_TASK").Body
 	require.Contains(t, currentTask, "input-from-task-A")
 	require.NotContains(t, currentTask, "input-from-task-B")
 }
@@ -182,6 +183,8 @@ func TestGenerateToolCallResponsePrompt_UsesTaskLocalContinueState(t *testing.T)
 
 	require.Contains(t, prompt, "当前任务可以继续")
 	require.NotContains(t, prompt, "当前任务已经超过了最大执行次数")
+	require.Contains(t, prompt, "execution_status=failed")
+	require.Contains(t, prompt, "调用协议结束、工具执行结果、当前任务验收")
 	require.Contains(t, prompt, "--- 当前任务 ---")
 	require.Contains(t, prompt, "input-from-task-A")
 	require.NotContains(t, prompt, "input-from-task-B")
@@ -195,4 +198,12 @@ func TestGenerateTaskSummaryPrompt_Timeline(t *testing.T) {
 
 	require.Contains(t, prompt, "alpha_tool")
 	require.True(t, strings.Contains(prompt, "input-from-task-A"))
+	require.Contains(t, prompt, "工具调用是否结束、工具执行是否成功、用户任务是否满足")
+	require.Contains(t, prompt, "所有未终结的 TODO")
+}
+
+func TestToolDecisionPromptDoesNotExposeIterationLimit(t *testing.T) {
+	require.NotContains(t, __prompt_ToolResultToDecisionPromptTemplate, "超过了最大执行次数")
+	require.NotContains(t, __prompt_ToolResultToDecisionPromptTemplate, "单任务的继续执行次数限制")
+	require.Contains(t, __prompt_ToolResultToDecisionPromptTemplate, "不要推测或提及任何内部迭代次数")
 }

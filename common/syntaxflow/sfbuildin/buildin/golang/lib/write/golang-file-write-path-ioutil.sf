@@ -162,7 +162,7 @@ func cleanAndWrite(baseDir, userPath string, data []byte) error {
 }
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 1.规则目的
 该规则用于审计Golang代码中使用ioutil包进行文件写入的操作。文件写入操作可能因不正确的路径限制而导致路径穿越漏洞，使得攻击者可以访问或修改服务器上的任意文件。规则通过检测`ioutil.WriteFile`和`ioutil.WriteAll`函数的调用，来识别潜在的不安全文件写入路径。

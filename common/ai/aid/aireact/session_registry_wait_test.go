@@ -36,3 +36,38 @@ func TestWaitRunningSession(t *testing.T) {
 	react.config.EventLoopStartHook()
 	<-done
 }
+
+func TestIsSessionBusyDistinguishesIdleAndActiveReAct(t *testing.T) {
+	const sessionID = "scheduled-busy-session-test"
+	react, err := NewReAct(aicommon.WithPersistentSessionId(sessionID))
+	require.NoError(t, err)
+	registerRunningSession(sessionID, react)
+	t.Cleanup(func() { unregisterRunningSession(sessionID) })
+
+	require.False(t, IsSessionBusy(sessionID), "an idle registered chat stream is not busy")
+	task := aicommon.NewStatefulTaskBase("active-task", "work", nil, nil, true)
+	react.setCurrentTask(task)
+	require.True(t, IsSessionBusy(sessionID))
+	react.setCurrentTask(nil)
+	require.False(t, IsSessionBusy(sessionID))
+	react.SetCurrentPlanExecutionTask(task)
+	require.True(t, IsSessionBusy(sessionID), "a detached plan execution also owns the chat")
+	task.SetStatus(aicommon.AITaskState_Completed)
+	require.False(t, IsSessionBusy(sessionID))
+}
+
+func TestSessionStartReservationIsBusyAndExclusive(t *testing.T) {
+	const sessionID = "session-start-reservation"
+	release, ok := TryBeginSessionStart(sessionID)
+	require.True(t, ok)
+	require.True(t, IsSessionStarting(sessionID))
+	require.True(t, IsSessionBusy(sessionID))
+	_, ok = TryBeginSessionStart(sessionID)
+	require.False(t, ok)
+	release()
+	require.False(t, IsSessionStarting(sessionID))
+
+	secondRelease, ok := TryBeginSessionStart(sessionID)
+	require.True(t, ok)
+	secondRelease()
+}

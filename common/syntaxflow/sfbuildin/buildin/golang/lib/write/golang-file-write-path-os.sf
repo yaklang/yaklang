@@ -135,7 +135,7 @@ func safeJoin(basePath, filePath string) (string, error) {
 ```
 在写入文件之前，使用`safeJoin`函数验证并拼接路径，确保文件写入操作的安全性。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 该规则用于审计Golang程序中未经验证的文件写入操作，这些操作可能导致路径穿越漏洞。攻击者可能利用此漏洞写入任意文件，从而导致敏感信息泄露、程序稳定性受损或恶意代码执行。

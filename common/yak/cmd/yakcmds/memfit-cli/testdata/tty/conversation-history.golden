@@ -1,0 +1,22 @@
+  echo: first line / 第二行 🌏
+
+✓ Completed · <elapsed> · test-model
+
+╭─ History · 1 line back · PgDn latest
+│ You
+│   first line
+│   第二行 🌏
+│
+│ ✓ Thinking
+│   checking…
+│
+│ Memfit
+│   echo: first line / 第二行 🌏
+│
+│ ✓ Completed · <elapsed> · test-model
+│
+╰─ lines 1–12/12
+╭─ Message ────────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────────
+↑ History · 1 line back                              PgDn latest · YOLO

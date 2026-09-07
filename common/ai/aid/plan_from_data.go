@@ -106,7 +106,7 @@ func (c *Coordinator) ReviewPlanThroughUser(ctx context.Context, planPayload str
 		return nil, utils.Error("plan response is nil")
 	}
 
-	c.planLoadingStatus("任务规划等待用户审查 / Waiting User to Review Plan...")
+	c.planUserStatus("执行方案已经准备好，等你确认", "The execution plan is ready for your review", aicommon.WithStatusCode("plan.awaiting_review"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
 
 	planReq, err := c.createPlanRequest(planPayload)
 	if err != nil {
@@ -124,11 +124,11 @@ func (c *Coordinator) ReviewPlanThroughUser(ctx context.Context, planPayload str
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.GetId(), params)
 	if params == nil {
-		c.planLoadingStatus("用户审查失败 / User Review Failed")
+		c.planUserStatus("没有收到有效的确认结果", "No valid review response was received", aicommon.WithStatusCode("plan.review_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		return nil, utils.Errorf("coordinator: user review params is nil")
 	}
 
-	c.planLoadingStatus("处理用户审查结果 / Processing User Review...")
+	c.planUserStatus("正在根据你的意见调整方案", "Updating the plan based on your feedback", aicommon.WithStatusCode("plan.revising"))
 	approved, err := planReq.handleReviewPlanResponse(rsp, params)
 	if err != nil {
 		return nil, err

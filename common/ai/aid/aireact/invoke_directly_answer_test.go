@@ -218,11 +218,11 @@ func TestReAct_DirectlyAnswer_ChecksCurrentTaskTodo(t *testing.T) {
 					// finish 是被 TODO 闸门拦截的唯一终结器: 此时仍有 open TODO
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"try finish","cumulative_summary":"summary"}`)
 				case 3:
-					// checkpoint 后仍有开放 TODO，finish 被拒绝，但不重复插入 checkpoint。
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm finish","cumulative_summary":"summary"}`)
-				case 4:
-					// finish 可在同轮携带 todo_delta；先关闭 TODO，再放行收口。
+					// finish 可在同轮携带 todo_delta；先关闭 TODO，再进入完成审计。
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish","todo_delta":{"close":[{"id":"current_open_todo","outcome":"resolved","reason":"最终答复已生成并完成当前任务要求","refs":[]}]}} ,"human_readable_thought":"close todo and finish","cumulative_summary":"todo updated"}`)
+				case 4:
+					// 完成审计 checkpoint 后再次 finish，确认所有工作已终结。
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm audited finish","cumulative_summary":"summary"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}
@@ -431,10 +431,11 @@ func TestReAct_DirectlyAnswer_PrefersCurrentTaskTodoOverSessionTodo(t *testing.T
 					// 当前任务仍有 open TODO, finish 被拦
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"try finish","cumulative_summary":"summary"}`)
 				case 3:
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm finish","cumulative_summary":"summary"}`)
-				case 4:
-					// 当前任务 TODO 已关闭, 兄弟任务 TODO 不拦, finish 放行
+					// 当前任务 TODO 已关闭，兄弟任务 TODO 不拦；进入完成审计。
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish","todo_delta":{"close":[{"id":"current_blocking_todo","outcome":"resolved","reason":"当前任务要求已完成并生成最终答复","refs":[]}]}} ,"human_readable_thought":"close current todo and finish","cumulative_summary":"todo updated"}`)
+				case 4:
+					// 完成审计 checkpoint 后再次 finish，确认所有工作已终结。
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm audited finish","cumulative_summary":"summary"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}

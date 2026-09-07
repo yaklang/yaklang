@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang文件权限配置过宽（OpenFile）"
 	type: vuln
 	level: mid
-	risk: "安全配置错误"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 该规则检测 `os.OpenFile` 第四个权限参数使用过宽模式（如 0777、0666）。
 文件权限过宽可能导致敏感数据被任意读取或篡改。
@@ -28,7 +28,7 @@ alert $mid for {
 	title: "Golang File Permission Too Broad",
 	title_zh: "检测到文件权限配置过宽",
 	message: "检测到 OpenFile 使用过宽权限（如 0666/0777），可能引发敏感文件访问风险。",
-	risk: "安全配置错误",
+	risk: "security-misconfiguration",
 	desc: <<<DESC
 过宽文件权限会让非预期主体读取或写入文件内容，造成数据泄露或完整性破坏。
 DESC

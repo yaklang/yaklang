@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-weak-random"
-	risk: "可预测随机数"
+	risk: "weak-randomness"
 	desc: <<<DESC
 标记 random 模块的 PRNG 相关调用。标准库 random 非密码学安全，不可用于密钥、令牌、会话 ID 等安全场景。
 DESC
@@ -29,7 +29,7 @@ alert $output for {
 	title_zh: "random 伪随机调用",
 	level: "info",
 	type: "audit",
-	risk: "可预测随机数",
+	risk: "weak-randomness",
 	message: "检测到 random 模块调用；非密码学安全，勿用于密钥或令牌生成。",
 	name: "output",
 }

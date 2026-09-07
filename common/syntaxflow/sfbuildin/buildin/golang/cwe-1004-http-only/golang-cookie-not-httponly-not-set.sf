@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Cookie HTTPOnly标志缺失"
 	type: audit
 	level: high
-	risk: "跨站脚本（XSS）"
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -154,7 +154,7 @@ DESC
 	title: "Golang Cookie HTTPOnly Not Set Vulnerability Was Detected",
 	title_zh: "检测到Golang Cookie未设置HTTPOnly漏洞",
 	message: "检测到Golang Cookie未设置HTTPOnly标志，可能导致会话劫持漏洞",
-	risk: "会话劫持",
+	risk: "session-hijacking",
 	name: "high",
 }
 

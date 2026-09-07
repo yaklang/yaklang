@@ -101,6 +101,28 @@ func WithAllowToolCall(b ...bool) ReActLoopOption {
 	})
 }
 
+// WithFunctionCallMode toggles native functioncall (tool_calls) mode for the
+// ReAct loop. When enabled, each LoopAction is converted to an aispec.Tool and
+// injected via aispec.WithTools; the model responds with tool_calls deltas
+// instead of text-based @action JSON. This lets the model service set
+// stop_reason="tool_calls" and naturally reduce thinking on subsequent calls.
+//
+// Mutually exclusive with the text-based action JSON contract: when enabled,
+// the model will ONLY output tool_calls, not @action JSON.
+//
+// This mode is enabled by default in NewReActLoop. Pass false to disable it:
+//
+//	reactloops.WithFunctionCallMode(false)
+func WithFunctionCallMode(b ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(b) > 0 {
+			r.functionCallMode = b[0]
+		} else {
+			r.functionCallMode = true
+		}
+	}
+}
+
 func WithToolsGetter(getter func() []*aitool.Tool) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.toolsGetter = getter

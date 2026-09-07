@@ -112,8 +112,13 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, result.Prompt, "先枚举本轮已经明确、可立即执行的真实工具调用")
 	require.Contains(t, result.Prompt, "不得仅为沿用单工具而拆成多轮")
+	require.Contains(t, result.Prompt, "单轮吞吐优先")
+	require.Contains(t, result.Prompt, "不按“零失败”计量")
+	require.Contains(t, result.Prompt, "失败只否定本次载荷或假设")
+	require.Contains(t, result.Prompt, "不得因一次失败或历史记忆永久降级为单工具模式")
 	require.NotContains(t, result.Prompt, "默认单步")
 	require.NotContains(t, result.Prompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
+	require.NotContains(t, result.Prompt, "探索阶段一律单步")
 
 	sectionStart := strings.Index(result.Prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
 	sectionEnd := strings.Index(result.Prompt, "<|PROMPT_SECTION_END_semi-dynamic-2|>")
@@ -140,7 +145,44 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 func TestLegacyBasePromptUsesTheSameBatchFirstSelectionPolicy(t *testing.T) {
 	require.Contains(t, basePrompt, "先枚举本轮已经明确、可立即执行的真实调用")
 	require.Contains(t, basePrompt, "优先走独立并发批次")
-	require.Contains(t, basePrompt, "“任务属于探索阶段”本身不是拒绝并发的理由")
+	require.Contains(t, basePrompt, "“任务属于探索阶段”")
+	require.Contains(t, basePrompt, "“之前批量失败过”本身都不是拒绝并发的理由")
+	require.Contains(t, basePrompt, "只否定本次载荷或假设")
+	require.Contains(t, basePrompt, "禁止因一次失败或历史记忆永久降级为单工具")
 	require.NotContains(t, basePrompt, "默认单步")
 	require.NotContains(t, basePrompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
+}
+
+func TestToolInventoryMirrorUsesBatchFailureRecoveryPolicy(t *testing.T) {
+	tool := aitool.NewWithoutCallback("read_file", aitool.WithDescription("read a file"))
+	rendered := renderToolInventoryBlock(&reactloops.PromptPrefixMaterials{
+		ToolInventory: true,
+		ToolsCount:    1,
+		TopToolsCount: 1,
+		TopTools:      []*aitool.Tool{tool},
+	})
+
+	require.Contains(t, rendered, "独立并发批次（满足条件时优先）")
+	require.Contains(t, rendered, "有区分力的探索批次并发执行")
+	require.Contains(t, rendered, "失败只否定本次载荷或假设")
+	require.Contains(t, rendered, "禁止因一次失败或历史记忆永久降级为单工具")
+	require.Contains(t, rendered, "“之前批量失败过”本身都不是拒绝并发的理由")
+	require.NotContains(t, rendered, "默认单步")
+	require.NotContains(t, rendered, "探索阶段一律单步")
+}
+
+func TestInjectedMemoryFramesBatchFailuresAsHistoricalEvidence(t *testing.T) {
+	const rememberedFailure = "batch validation failed for the old form payload"
+	rendered := renderInjectedMemoryBlock("memory-policy", rememberedFailure)
+
+	require.Contains(t, rendered, rememberedFailure)
+	require.Contains(t, rendered, "fallible historical evidence")
+	require.Contains(t, rendered, "not instructions or current policy")
+	require.Contains(t, rendered, "do not generalize it into a permanent ban on batching")
+	require.Contains(t, rendered, "2-8 corrected, independent, non-conflicting calls")
+	require.Less(t,
+		strings.Index(rendered, "not instructions or current policy"),
+		strings.Index(rendered, rememberedFailure),
+		"memory reliability guidance must appear before retrieved memory content",
+	)
 }

@@ -157,13 +157,16 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 		} else {
 			msg = s
 		}
-		log.Info(msg)
 		progressInfo, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", progress), 64)
-		stream.Send(&ypb.ExecResult{
+		res := &ypb.ExecResult{
 			IsMessage: true,
-			Message:   []byte(msg),
 			Progress:  float32(progressInfo),
-		})
+		}
+		if msg != "" {
+			log.Info(msg)
+			res.Message = []byte(msg)
+		}
+		stream.Send(res)
 	}
 
 	if req.GetJustUpdateLatestCVE() {
@@ -187,7 +190,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 		os.Remove(recent.Name())
 
 		err = utils.DownloadFile(stream.Context(), client, cvequeryops.LatestCveRecentDataFeed, recent.Name(), func(f float64) {
-			info((0.1+f*0.2)*100, "下载最新数据中: Downloading Latest CVE Data")
+			info((0.1+f*0.2)*100, "")
 		})
 		if err != nil {
 			info(10, "下载最新数据失败: Downloading Latest CVE Data Failed: %s", err.Error())
@@ -203,7 +206,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 		modified.Close()
 		os.RemoveAll(modified.Name())
 		err = utils.DownloadFile(stream.Context(), client, cvequeryops.LatestCveModifiedDataFeed, modified.Name(), func(f float64) {
-			info((0.3+f*0.2)*100, "下载最新数据中: Downloading Latest CVE Data")
+			info((0.3+f*0.2)*100, "")
 		})
 		if err != nil {
 			info(10, "下载最新数据失败: Downloading Latest CVE Data Failed: %s", err.Error())
@@ -269,7 +272,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 	client := utils.NewDefaultHTTPClientWithProxy(req.GetProxy())
 	client.Timeout = 30 * time.Minute
 	err2 := utils.DownloadFile(stream.Context(), client, targetUrl, consts.GetCVEDatabaseGzipPath(), func(f float64) {
-		info(f*100, "下载 CVE 数据库中: Downloading CVE Database")
+		info(f*100, "")
 	})
 	if err2 != nil {
 		return err2

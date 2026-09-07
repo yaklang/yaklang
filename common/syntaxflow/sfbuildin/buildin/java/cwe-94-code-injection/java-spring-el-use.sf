@@ -1,4 +1,5 @@
 desc(
+	risk: "information"
 	title: "Audit Java Spring EL Use"
 	type: audit
 	level: middle
@@ -98,7 +99,7 @@ System.out.println(result);
 #### 5. 升级Spring Framework版本
 确保使用的Spring Framework版本没有已知的SpEL相关的安全漏洞。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 该规则用于审计Java代码中Spring Expression Language (SpEL) 的使用情况，特别是关注 `SpelExpressionParser` 的实例化和 `parseExpression` 方法的调用。旨在识别可能存在的EL表达式注入风险点，从而防止攻击者通过构造恶意表达式执行任意代码或访问敏感信息。此规则作为审计类规则，用于辅助人工或自动化工具识别潜在的EL注入入口。
@@ -154,7 +155,7 @@ System.out.println(result);
 #### 5. 升级Spring Framework版本
 确保使用的Spring Framework版本没有已知的SpEL相关的安全漏洞。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 该规则用于审计Java代码中Spring Expression Language (SpEL) 的使用情况，特别是关注 `SpelExpressionParser` 的实例化和 `parseExpression` 方法的调用。旨在识别可能存在的EL表达式注入风险点，从而防止攻击者通过构造恶意表达式执行任意代码或访问敏感信息。此规则作为审计类规则，用于辅助人工或自动化工具识别潜在的EL注入入口。

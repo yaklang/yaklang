@@ -147,22 +147,31 @@ func (s *Server) DeleteAllLocalPlugins(ctx context.Context, req *ypb.Empty) (*yp
 
 func (s *Server) DeleteLocalPluginsByWhere(ctx context.Context, req *ypb.DeleteLocalPluginsByWhereRequest) (*ypb.Empty, error) {
 	var scriptName []string
+	var pluginUUIDs []string
 	db := yakit.DeleteYakScript(s.GetProfileDatabase(), req)
 	res := yakit.YieldYakScripts(db, context.Background())
 	for v := range res {
 		scriptName = append(scriptName, v.ScriptName)
+		pluginUUIDs = append(pluginUUIDs, v.Uuid)
 	}
-	for _, v := range funk.ChunkStrings(scriptName, 100) {
-		err := yakit.DeletePluginGroupByScriptName(s.GetProfileDatabase(), v)
-		if err != nil {
-			log.Error(err)
+	err := utils.GormTransaction(s.GetProfileDatabase(), func(tx *gorm.DB) error {
+		if err := yakit.DisableContextMenuBindingsByPluginUUIDs(tx, pluginUUIDs...); err != nil {
+			return err
 		}
+		for _, names := range funk.ChunkStrings(scriptName, 100) {
+			if err := yakit.DeletePluginGroupByScriptName(tx, names); err != nil {
+				log.Error(err)
+			}
 
-		db1 := bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase().Model(&schema.YakScript{}), "script_name", v)
-		err = db1.Unscoped().Delete(&schema.YakScript{}).Error
-		if err != nil {
-			log.Error(db.Error)
+			db1 := bizhelper.ExactQueryStringArrayOr(tx.Model(&schema.YakScript{}), "script_name", names)
+			if err := db1.Unscoped().Delete(&schema.YakScript{}).Error; err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &ypb.Empty{}, nil

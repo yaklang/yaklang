@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang缺少SameSite属性漏洞"
 	type: audit
 	level: low
-	risk: "跨站请求伪造（CSRF）"
+	risk: "cookie-security"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -149,7 +149,7 @@ DESC
 	title: "Golang Cookie Missing SameSite Attribute Vulnerability Was Found",
 	title_zh: "发现Golang Cookie缺少SameSite属性漏洞",
 	message: "检测到Golang Cookie未设置SameSite属性，可能增加CSRF攻击风险，建议审计确认",
-	risk: "Cookie安全配置缺陷",
+	risk: "cookie-security",
 	name: "low",
 }
 

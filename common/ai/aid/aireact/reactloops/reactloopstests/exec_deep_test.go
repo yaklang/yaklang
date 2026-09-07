@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,7 +29,7 @@ func TestExec_CreateMirrors_SingleAITag(t *testing.T) {
 
 			if aiCallCount == 1 {
 				// 第一次调用：从prompt中提取nonce并返回带正确nonce的AITag
-				nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+				nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 
 				// 调试输出
 				t.Logf("Extracted nonce: '%s' from prompt", nonceStr)
@@ -558,7 +559,7 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 			// 检查是否是reactloops的调用（包含AITag模板）
 			if utils.MatchAllOfSubString(prompt, "write_code", "@action", "GEN_CODE") {
 				// 提取nonce
-				nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+				nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 
 				// 生成一个很长的代码响应（>5KB）
 				var longCode strings.Builder

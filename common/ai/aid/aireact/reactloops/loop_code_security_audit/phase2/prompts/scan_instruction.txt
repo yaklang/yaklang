@@ -10,6 +10,8 @@ Phase 2 的目标是**尽可能广地覆盖可疑点并提交 finding**；精确
 - **阶段B**：只要 source→sink 数据流**看起来可疑**就应 `add_finding`（confidence 4–6 表示待 Phase3 复核）；不要因「防护可能有效」而沉默
 - **同一文件多个难度/入口**：low/medium/high 等变体分别提交 finding，不要只报一个代表性文件
 - **mark_file_done 前**：凡 audit_summary 写到漏洞/风险/疑似，必须先 `add_finding`
+- **覆盖面**：除经典 Web 注入外，基础设施项目务必覆盖表达式注入、内存安全、解析器 DoS、CRLF、竞态等类别专属 Sink；不要因为「不是 SQLi/XSS」就跳过当前分配类别
+- **语言侧重**：严格遵循 ReactiveData 中的「语言画像与本类侧重点」——C/C++ 主攻内存/解析器；Java/PHP/Go 等主攻网络入口与鉴权注入；主攻类深挖，低优先类无信号勿硬搜
 
 ## 工具白名单（代码强制）
 

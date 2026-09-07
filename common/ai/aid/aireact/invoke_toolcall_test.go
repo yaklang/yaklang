@@ -603,7 +603,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
 			// 工具调用过一次后(toolExecutionSucceeded 已置位), 主循环再次决策
 			// 时主动 finish 收口. Phase 1 工具不存在/未成功时仍返回 require_tool,
-			// 让 LOOP1 能检测到 TOOL_EXECUTION_ERROR; Phase 2 工具成功后 finish.
+			// 让 LOOP1 能检测到 protocol failure; Phase 2 工具成功后 finish.
 			if toolExecutionSucceeded.IsSet() {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
@@ -683,7 +683,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 	// 第一次尝试：工具不存在，应该失败
 	// Note: After recent code changes, tool execution failure no longer aborts the task.
 	// Instead, it records the error and allows AI to retry.
-	// We detect tool execution error events to verify the tool was not found.
+	// We detect protocol failure events to verify the tool was not found.
 	fmt.Printf("Phase 1: Attempting to call non-existent tool '%s'\n", toolName)
 	in <- &ypb.AIInputEvent{
 		IsFreeInput: true,
@@ -699,12 +699,13 @@ LOOP1:
 		case e := <-out:
 			fmt.Println(e.String())
 
-			// Detect tool execution error (tool not found)
+			// Detect protocol failure (tool not found). Timeline rendering is free to
+			// normalize the legacy title, so assert the model-visible semantic text.
 			if e.NodeId == "timeline_item" {
 				content := string(e.GetContent())
-				if strings.Contains(content, "TOOL_EXECUTION_ERROR") && strings.Contains(content, toolName) {
+				if strings.Contains(content, "invocation protocol failed") && strings.Contains(content, toolName) {
 					toolExecutionErrorDetected = true
-					fmt.Printf("✓ Detected tool execution error for '%s'\n", toolName)
+					fmt.Printf("✓ Detected tool invocation protocol failure for '%s'\n", toolName)
 					// Once we detect the error, we can break out of the loop
 					// The AI will keep retrying since verification returns false
 					break LOOP1
@@ -723,11 +724,11 @@ LOOP1:
 		}
 	}
 
-	// Verify that tool execution error was detected
+	// Verify that tool invocation protocol failure was detected.
 	if !toolExecutionErrorDetected {
-		t.Fatal("Phase 1 failed: expected tool execution error for non-existent tool, but none was detected")
+		t.Fatal("Phase 1 failed: expected tool invocation protocol failure for non-existent tool, but none was detected")
 	}
-	fmt.Println("✓ Phase 1 completed: Tool execution error detected as expected")
+	fmt.Println("✓ Phase 1 completed: Tool invocation protocol failure detected as expected")
 
 	// 创建工具
 	fmt.Printf("\nPhase 2: Creating tool '%s'\n", toolName)

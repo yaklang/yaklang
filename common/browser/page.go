@@ -14,29 +14,54 @@ import (
 )
 
 type BrowserPage struct {
-	page    *rod.Page
-	browser *BrowserInstance
-	refMap  *RefMap
-	timeout time.Duration
-	mouse   *rod.Mouse
+	page     *rod.Page
+	rootPage *rod.Page
+	browser  *BrowserInstance
+	refMap   *RefMap
+	timeout  time.Duration
+	mouse    *rod.Mouse
 
 	dialogMu      sync.Mutex
 	pendingDialog *JavaScriptDialog
+
+	tapMu sync.Mutex
+	tap   *networkTap
 }
 
 func newBrowserPage(page *rod.Page, browser *BrowserInstance, timeout time.Duration) *BrowserPage {
 	bp := &BrowserPage{
-		page:    page,
-		browser: browser,
-		refMap:  NewRefMap(),
-		timeout: timeout,
-		mouse:   page.Mouse,
+		page:     page,
+		rootPage: page,
+		browser:  browser,
+		refMap:   NewRefMap(),
+		timeout:  timeout,
+		mouse:    page.Mouse,
 	}
 	enableJavaScriptDialogWatcher(page, bp)
 	return bp
 }
 
+func (p *BrowserPage) rootRod() *rod.Page {
+	if p == nil {
+		return nil
+	}
+	if p.rootPage != nil {
+		return p.rootPage
+	}
+	return p.page
+}
+
+func (p *BrowserPage) useRootSession() {
+	root := p.rootRod()
+	if root == nil {
+		return
+	}
+	p.page = root
+	p.mouse = root.Mouse
+}
+
 func (p *BrowserPage) Navigate(urlStr string) error {
+	p.useRootSession()
 	timedPage := p.page.Timeout(p.timeout)
 	err := timedPage.Navigate(urlStr)
 	if err != nil {
@@ -61,6 +86,7 @@ func (p *BrowserPage) Navigate(urlStr string) error {
 }
 
 func (p *BrowserPage) NavigateAndWait(urlStr string, waitSelector string) error {
+	p.useRootSession()
 	timedPage := p.page.Timeout(p.timeout)
 	err := timedPage.Navigate(urlStr)
 	if err != nil {
@@ -326,8 +352,53 @@ func (p *BrowserPage) SetCookies(cookies []*proto.NetworkCookieParam) error {
 	return p.page.SetCookies(cookies)
 }
 
+func cookieRequestURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if strings.Contains(raw, "://") {
+		return raw
+	}
+	return "http://" + raw
+}
+
+// SetCookie sets one cookie via CDP using scalar args so Yak callers do not
+// have to pass []*proto.NetworkCookieParam (maps become []interface{} and fail).
+func (p *BrowserPage) SetCookie(name, value, rawURL string) error {
+	if p == nil {
+		return fmt.Errorf("set cookie: empty page")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("set cookie: empty name")
+	}
+	sess := p.rootRod()
+	if sess == nil {
+		return fmt.Errorf("set cookie: empty page")
+	}
+	u := cookieRequestURL(rawURL)
+	if u == "" && sess != nil {
+		if info, err := sess.Info(); err == nil && info != nil {
+			u = info.URL
+		}
+	}
+	param := &proto.NetworkCookieParam{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		HTTPOnly: true,
+		URL:      u,
+	}
+	return sess.SetCookies([]*proto.NetworkCookieParam{param})
+}
+
 func (p *BrowserPage) Close() error {
-	return p.page.Close()
+	root := p.rootRod()
+	if root == nil {
+		return fmt.Errorf("close page: empty page")
+	}
+	return root.Close()
 }
 
 func (p *BrowserPage) clickBySelector(selector string) error {
@@ -360,6 +431,16 @@ func (p *BrowserPage) clickByRef(ref string) error {
 		return fmt.Errorf("ref %s not found, run Snapshot() first", ref)
 	}
 
+	if entry.BackendNodeID > 0 {
+		if el, err := p.refToElement(ref); err == nil && el != nil && el.element != nil {
+			if err := el.element.Timeout(p.timeout).Click(proto.InputMouseButtonLeft, 1); err == nil {
+				return nil
+			} else {
+				log.Debugf("element click for ref %s: %v", ref, err)
+			}
+		}
+	}
+
 	x, y, err := p.resolveElementCenter(entry)
 	if err != nil {
 		return fmt.Errorf("resolve element center for ref %s: %w", ref, err)
@@ -376,6 +457,13 @@ func (p *BrowserPage) fillByRef(ref string, text string) error {
 	entry, ok := p.refMap.Get(ref)
 	if !ok {
 		return fmt.Errorf("ref %s not found, run Snapshot() first", ref)
+	}
+
+	if entry.BackendNodeID == 0 && (entry.CoordX != 0 || entry.CoordY != 0) {
+		if err := p.dispatchClick(entry.CoordX, entry.CoordY); err != nil {
+			return fmt.Errorf("focus coord fill for ref %s: %w", ref, err)
+		}
+		return p.page.InsertText(text)
 	}
 
 	nodeID := proto.DOMBackendNodeID(entry.BackendNodeID)
@@ -416,6 +504,9 @@ func (p *BrowserPage) resolveElementCenterBySelectorOfRef(selectorOrRef string) 
 }
 
 func (p *BrowserPage) resolveElementCenter(entry *RefEntry) (float64, float64, error) {
+	if entry != nil && entry.BackendNodeID == 0 && (entry.CoordX != 0 || entry.CoordY != 0) {
+		return entry.CoordX, entry.CoordY, nil
+	}
 	nodeID := proto.DOMBackendNodeID(entry.BackendNodeID)
 
 	box, err := proto.DOMGetBoxModel{BackendNodeID: nodeID}.Call(p.page)

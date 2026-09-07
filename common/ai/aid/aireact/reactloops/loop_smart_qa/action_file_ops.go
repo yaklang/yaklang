@@ -29,7 +29,10 @@ func makeToolForwardAction(
 					ctx = task.GetContext()
 				}
 
-				loop.LoadingStatus(fmt.Sprintf("calling tool: %s", targetToolName))
+				loop.UserStatus(
+					fmt.Sprintf("正在调用工具「%s」", targetToolName),
+					fmt.Sprintf("Calling tool %q", targetToolName),
+				)
 
 				params := action.GetParams()
 				result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)

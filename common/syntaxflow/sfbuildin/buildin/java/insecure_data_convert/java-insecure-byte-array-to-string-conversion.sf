@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java不安全的字节数组到字符串转换"
 	type: Vulnerability
 	severity: Medium
-	risk: "数据完整性"
+	risk: "data-integrity"
 	desc: <<<DESC
 ### 漏洞描述
 

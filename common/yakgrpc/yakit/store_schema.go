@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,11 +17,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/yaklang/gorm"
 	"github.com/pkg/errors"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -68,6 +67,8 @@ func GetDefaultScriptFileNameByType(t string) (string, error) {
 		return "nuclei.yaml", nil
 	case "codec":
 		return "codec.yak", nil
+	case "context-menu":
+		return "context_menu.yak", nil
 	case "port-scan":
 		return "handle.yak", nil
 	case "mitm":
@@ -450,8 +451,7 @@ func LoadYakitThirdpartySourceScripts(
 	// client := utils.NewDefaultHTTPClient()
 	// Create a custom http(s) client with your config
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyFromEnvironment,
+		Proxy: http.ProxyFromEnvironment,
 	}
 	if len(proxy) > 0 {
 		u, err := url.Parse(proxy[0])
@@ -550,6 +550,8 @@ func YakScriptLocalType(dirName string) string {
 		typeStr = "yak"
 	case "yak_codec":
 		typeStr = "codec"
+	case "yak_context_menu":
+		typeStr = "context-menu"
 	case "yak_portscan":
 		typeStr = "port-scan"
 	default:

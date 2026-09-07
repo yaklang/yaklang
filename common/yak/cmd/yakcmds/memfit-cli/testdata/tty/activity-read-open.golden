@@ -1,0 +1,25 @@
+◆ memfit  local isolated agent
+test-model · YOLO · /workspace/yaklang
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history · ^O details
+
+You
+  activity-flow
+
+Memfit
+  activity flow complete
+
+✓ Completed · <elapsed> · test-model
+
+  ✓ Thinking ▸
+  ✓ Intent ▸ · inspect repository
+  ✓ Understanding   · README contains project context
+› ✓ Read ▾ · 文件读取 · README.md
+      Why: Read the project overview before answering
+      Result:
+      # Yaklang
+      Yaklang is a security-oriented language.
+  ✓ Observation ▸ · Project purpose confirmed
+╭─ Message ──────────────────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰────────────────────────────────────────────────────────────────────────────────
+○ Ready                          test-model · YOLO · click/Ctrl+O details · /help

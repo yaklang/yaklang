@@ -3,7 +3,7 @@ desc(
 	title_zh: "Electron allowRunningInsecureContent 被启用"
 	type: vuln
 	level: error
-	risk: "不安全内容加载"
+	risk: "insecure-content-loading"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -122,7 +122,7 @@ new BrowserWindow({ webPreferences: { allowRunningInsecureContent: false } });
 new BrowserWindow({ webPreferences: {} });
 ```
 SOLUTION
-	risk: "代码注入",
+	risk: "code-injection",
 	name: "enabledInsecureContent",
 }
 

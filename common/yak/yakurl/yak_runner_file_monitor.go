@@ -32,6 +32,9 @@ func handlerFileMonitor(ctx context.Context, request *ypb.DuplexConnectionReques
 	switch op {
 	case OP_NEW_MONITOR:
 		path := gjson.Get(string(data), "path").String()
+		if resolved := yakit.ResolveCodeSourceLocalPath(path); resolved != "" {
+			path = resolved
+		}
 		m, err := filesys.WatchPath(ctx, path, eventsHandler)
 		if err != nil {
 			return err

@@ -1,6 +1,7 @@
 package bruteutils
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -31,8 +32,13 @@ func handleSSHError(result *BruteItemResult, target string, err error) {
 	}
 }
 
-func sshDial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	conn, err := defaultDialer.DialTCPContext(utils.TimeoutContext(defaultTimeout), network, addr)
+func sshDial(ctx context.Context, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	dialCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	conn, err := defaultDialer.DialTCPContext(dialCtx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
@@ -70,9 +76,10 @@ var sshAuth = &DefaultServiceAuthInfo{
 			Timeout:           10 * time.Second,
 		}
 
-		client, err := sshDial("tcp", target, config)
+		client, err := sshDial(i.Context, target, config)
 		if err != nil {
-			log.Errorf("ssh: %v conn failed: %s try %v:%v", i.Target, err, i.Username, i.Password)
+			// 注意：日志中绝不携带密码
+			log.Debugf("ssh: %v conn failed: %s try user %v", i.Target, err, i.Username)
 			handleSSHError(result, target, err)
 			return result
 		}

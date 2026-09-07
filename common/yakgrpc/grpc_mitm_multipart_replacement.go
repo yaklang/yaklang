@@ -5,7 +5,10 @@ import (
 	"os"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type manualLargeRequestReplacementTarget struct {
@@ -144,4 +147,58 @@ func (s *manualLargeRequestReplacementStore) close() {
 	for target := range s.completed {
 		s.discard(target)
 	}
+}
+
+// renderMITMSubmittedRequest is the common execution boundary for a manually
+// edited request in both MITM generations. Generated request-resource tags and
+// user-authored Fuzztags are expanded once on the engine, then Content-Length
+// is recalculated from the concrete wire body.
+func renderMITMSubmittedRequest(packet []byte) ([]byte, error) {
+	results, err := mutate.FuzzTagExec(packet, mutate.Fuzz_WithEnableDangerousTag(), mutate.Fuzz_WithResultLimit(1))
+	if err != nil {
+		return nil, utils.Wrap(err, "render MITM request fuzztag")
+	}
+	if len(results) == 0 {
+		return nil, utils.Error("render MITM request fuzztag produced no packet")
+	}
+	rendered := []byte(results[0])
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rendered)
+	if header == "" {
+		return nil, utils.Error("rendered MITM request has no HTTP headers")
+	}
+	return lowhttp.ReplaceHTTPPacketBodyEx([]byte(header), body, false, true), nil
+}
+
+// renderMITMV2SubmittedRequest is the single execution boundary for a manual
+// SendPacket action. It points file tags at completed replacement uploads,
+// renders them through the existing fuzztag engine
+// as WebFuzzer, and fixes Content-Length after expansion. Forward actions
+// intentionally bypass this function and return the original wire request.
+func renderMITMV2SubmittedRequest(
+	packet []byte,
+	bodyFile string,
+	multipart bool,
+	replacements *manualLargeRequestReplacementStore,
+) ([]byte, int, error) {
+	multipartPaths := map[int]string{}
+	bodyPath := ""
+	if replacements != nil {
+		multipartPaths = replacements.multipartPaths()
+		bodyPath = replacements.bodyPath()
+	}
+	rewritten, resourceCount, err := yakit.RewriteLargeRequestFileFuzzTags(
+		packet,
+		bodyFile,
+		multipart,
+		bodyPath,
+		multipartPaths,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	rendered, err := renderMITMSubmittedRequest(rewritten)
+	if err != nil {
+		return nil, 0, err
+	}
+	return rendered, resourceCount, nil
 }

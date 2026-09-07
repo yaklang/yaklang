@@ -173,9 +173,10 @@ func parseFunctionDefine(directive string) (name string, fm functionMacro, ok bo
 		return "", fm, false, nil
 	}
 	name = rest[start:i]
-	for i < len(rest) && unicode.IsSpace(rune(rest[i])) {
-		i++
-	}
+	// ISO C: function-like only when '(' immediately follows the name (no space).
+	// "#define __ASSERT_VOID_CAST (void)" is object-like; treating it as
+	// CAST(void) with an empty body expands CAST(0) to nothing and turns
+	// glibc assert() into the invalid ternary "? :".
 	if i >= len(rest) || rest[i] != '(' {
 		return "", fm, false, nil
 	}

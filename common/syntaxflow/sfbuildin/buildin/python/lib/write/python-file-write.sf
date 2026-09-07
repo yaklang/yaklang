@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-file-write"
-	risk: "任意文件写入"
+	risk: "arbitrary-file-write"
 	desc: <<<DESC
 标记 open 写模式、write/writelines、Path.write_text/write_bytes 等写入行为。若路径或写入内容受外部输入影响，可能导致任意位置写入或覆盖敏感文件。
 DESC
@@ -28,7 +28,7 @@ alert $output for {
 	title_zh: "文件写入",
 	level: "info",
 	type: "audit",
-	risk: "任意文件写入",
+	risk: "arbitrary-file-write",
 	message: "检测到文件写入相关 API，请确认目标路径与写入内容来源可信。",
 	name: "output",
 }

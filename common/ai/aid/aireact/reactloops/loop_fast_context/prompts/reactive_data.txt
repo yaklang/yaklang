@@ -2,7 +2,6 @@
 <|FASTCONTEXT_STATUS_{{ .Nonce }}|>
 **查询**: {{ .Query }}
 **工作目录**: {{ .WorkDir }}
-**迭代**: {{ .Iteration }} / {{ .MaxIterations }}
 **搜索轮次**: {{ .SearchRounds }}
 **已定位文件数**: {{ .LocationCount }}
 

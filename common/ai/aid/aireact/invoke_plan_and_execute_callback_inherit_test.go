@@ -96,10 +96,10 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 
 			// Inner: subtask ReAct loop → require tool (first iteration)
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 内层
-			// 子任务在工具执行完毕后 (prompt 中出现 "tool/<name> ok" 标记) 再次进入
+			// 子任务在工具协议执行完毕后 (prompt 中出现中性 "tool/<name>" 标记) 再次进入
 			// 主决策时, 主动 finish 收口子任务.
 			case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool") &&
-				strings.Contains(prompt, "tool/mock_callback_inherit_tool ok"):
+				strings.Contains(prompt, "tool/mock_callback_inherit_tool"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "finish",
   "human_readable_thought": "mocked: subtask tool done"

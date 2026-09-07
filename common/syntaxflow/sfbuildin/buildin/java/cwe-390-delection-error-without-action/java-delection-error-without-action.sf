@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java空Catch块"
 	type: "Code Vulnerability"
 	severity: "low"
-	risk: "错误处理（Error Handling）"
+	risk: "error-handling"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -187,7 +187,7 @@ Socket.setSocketImplFactory(new SocketHookFactory());
 - 导致系统状态不一致，可能引发数据丢失或损坏。
 DESC
 	level: "low",
-	risk: "错误处理",
+	risk: "error-handling",
 	name: "no_instruction_catch_body",
 	message: "检测到Java代码中存在空Catch块，从数据源（source）到污染汇聚点（sink）间没有发现任何过滤函数信息。",
 }
@@ -285,7 +285,7 @@ DESC
 	level: "low",
 	title: "Java Non-empty Catch Block Without Handling Exception Vulnerability Was Detected",
 	message: "检测到Java代码中非空Catch块未对异常进行任何处理，可能存在潜在的安全隐患。",
-	risk: "错误处理",
+	risk: "error-handling",
 	name: "unuse_exception",
 }
 

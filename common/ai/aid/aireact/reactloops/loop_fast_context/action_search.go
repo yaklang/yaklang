@@ -35,7 +35,12 @@ func makeIndexSearchAction(
 					params = forceParams(params)
 				}
 
-				loop.LoadingStatus(fmt.Sprintf("index search: %s", targetToolName))
+				loop.UserStatus(
+					"正在定位相关实现",
+					"Locating the relevant implementation",
+					aicommon.WithStatusCode("context.locating"),
+					aicommon.WithStatusDetail("正在从项目中筛选最相关的位置", "Finding the most relevant locations in the project"),
+				)
 				result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)
 				if err != nil {
 					log.Warnf("[FastContext] %s failed: %v", targetToolName, err)

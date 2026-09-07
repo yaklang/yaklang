@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测 Python 反射型 XSS（未转义响应输出）"
 	type: audit
 	level: low
-	risk: "跨站脚本（XSS）"
+	risk: "xss"
 	desc: <<<DESC
 该规则用于检测 Python Web 应用（如 Flask、Django）中将用户可控输入未经 HTML 转义或过滤，直接传入模板渲染或 HTTP 响应构造函数的场景，可能导致反射型跨站脚本（XSS）漏洞。
 
@@ -47,7 +47,7 @@ alert $low for {
 	title_zh: "Python 反射型 XSS（未转义输出）",
 	level: "low",
 	type: "audit",
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	message: "检测到用户可控输入可能未经转义即传入模板渲染或 HTTP 响应构造函数，存在反射型 XSS 风险。",
 	name: "sink",
 	solution: <<<SOLUTION

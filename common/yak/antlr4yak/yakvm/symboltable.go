@@ -107,20 +107,30 @@ func NewSymbolTable() *SymbolTable {
 }
 
 func (s *SymbolTable) IsNew() bool {
-	return s.Verbose == "root" && (s.currentSymbolIndex == 0)
+	requireSymbolMutex.RLock()
+	defer requireSymbolMutex.RUnlock()
+	return s.Verbose == "root" && s.currentSymbolIndex == 0
 }
 func (s *SymbolTable) GetTableCount() int {
+	symbolTableMutex.RLock()
+	defer symbolTableMutex.RUnlock()
 	return s.tableCount
 }
 func (s *SymbolTable) SetIdIsInited(id int) {
+	symbolTableMutex.Lock()
+	defer symbolTableMutex.Unlock()
 	s.InitedId[id] = struct{}{}
 }
 func (s *SymbolTable) IdIsInited(id int) bool {
+	symbolTableMutex.RLock()
+	defer symbolTableMutex.RUnlock()
 	_, ok := s.InitedId[id]
 	return ok
 }
 
 func (s *SymbolTable) GetNameByVariableId(id int) (string, bool) {
+	symbolMutex.RLock()
+	defer symbolMutex.RUnlock()
 	for name, i := range s.symbolToId {
 		if i == id {
 			return name, true
@@ -136,7 +146,10 @@ func (s *SymbolTable) GetSymbolByVariableName(name string) (int, bool) {
 	if s == nil {
 		return 0, false
 	}
+	symbolMutex.RLock()
 	i, ok := s.symbolToId[name]
+	parent := s.parent
+	symbolMutex.RUnlock()
 	//if s.IsRoot {
 	// 如果定义域是根节点
 	//if ok {
@@ -148,13 +161,15 @@ func (s *SymbolTable) GetSymbolByVariableName(name string) (int, bool) {
 	if ok {
 		return i, true
 	}
-	return s.parent.GetSymbolByVariableName(name)
+	return parent.GetSymbolByVariableName(name)
 }
 
 func (s *SymbolTable) GetLocalSymbolByVariableName(name string) (int, bool) {
 	if s == nil {
 		return 0, false
 	}
+	symbolMutex.RLock()
+	defer symbolMutex.RUnlock()
 	i, ok := s.symbolToId[name]
 	return i, ok
 }
@@ -206,9 +221,9 @@ func (s *SymbolTable) GetLocalSymbolByVariableName(name string) (int, bool) {
 //}
 
 var (
-	symbolMutex        = new(sync.Mutex)
-	symbolTableMutex   = new(sync.Mutex)
-	requireSymbolMutex = new(sync.Mutex)
+	symbolMutex        = new(sync.RWMutex)
+	symbolTableMutex   = new(sync.RWMutex)
+	requireSymbolMutex = new(sync.RWMutex)
 )
 
 func (s *SymbolTable) requireId(target *SymbolTable) int {
@@ -257,13 +272,13 @@ func (s *SymbolTable) CreateSubSymbolTable(verbose ...string) *SymbolTable {
 		parent:     s,
 		InitedId:   make(map[int]struct{}),
 	}
-	s.children = append(s.children, sub)
 	root, err := s.GetRoot()
 	if err != nil {
 		panic(err)
 	}
 	symbolTableMutex.Lock()
 	defer symbolTableMutex.Unlock()
+	s.children = append(s.children, sub)
 	root.tableCount++
 	root.idToSymbolTable[root.tableCount] = sub
 	sub.index = root.tableCount
@@ -295,6 +310,8 @@ func (s *SymbolTable) MustRoot() *SymbolTable {
 }
 
 func (s *SymbolTable) GetTableIndex() int {
+	symbolTableMutex.RLock()
+	defer symbolTableMutex.RUnlock()
 	return s.tableCount
 }
 
@@ -307,5 +324,7 @@ func (s *SymbolTable) GetSymbolTableById(id int) *SymbolTable {
 	if err != nil {
 		panic(err)
 	}
+	symbolTableMutex.RLock()
+	defer symbolTableMutex.RUnlock()
 	return root.idToSymbolTable[id]
 }

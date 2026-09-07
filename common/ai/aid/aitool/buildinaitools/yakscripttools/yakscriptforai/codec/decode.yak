@@ -237,5 +237,6 @@ if err != nil {
     }
     return
 }
+RESULT = result
 yakit.Info("=== Decode Result (type: %s) ===", tn)
 yakit.Info("%s", string(result))

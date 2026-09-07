@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang HTTP目录遍历漏洞"
 	type: vuln
 	level: high
-	risk: "访问控制缺陷"
+	risk: "access-control"
 	desc: <<<DESC
 # 漏洞描述
 该规则用于检测Golang程序中使用`http.Dir`时可能存在的目录遍历漏洞。当应用程序将用户可控路径（如`/`）传递给`http.Dir`函数时，攻击者可通过构造特殊URL访问服务器文件系统中的任意文件，从而导致敏感信息泄露或系统被入侵。
@@ -55,7 +55,7 @@ alert $high for {
 	title: "Path Traversal via Absolute Root Directory Access",
 	title_zh: "通过绝对根目录访问导致的路径遍历漏洞",
 	message: "Dangerous usage of absolute root directory in http.Dir()",
-	risk: "访问控制缺陷",
+	risk: "access-control",
 	desc: <<<DESC
 The application uses http.Dir("/") to serve static files, allowing direct access to the root directory of the file system. This can lead to unauthorized access to sensitive files outside the intended web root, enabling path traversal attacks.
 DESC

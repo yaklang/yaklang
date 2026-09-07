@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -61,7 +62,7 @@ func (pr *planRequest) ensurePlanExecutableDAG(rsp *PlanResponse) (*PlanResponse
 			if attempt >= maxPlanDAGValidationRepairAttempts {
 				return nil, utils.Errorf("coordinator: plan executable DAG validation failed after %d repair attempts: %v", maxPlanDAGValidationRepairAttempts, err)
 			}
-			pr.cod.planLoadingStatus("任务计划依赖无效，正在请求 AI 修正 / Invalid Plan DAG, Asking AI to Repair...")
+			pr.cod.planUserStatus("步骤之间存在冲突，正在重新整理", "Some steps conflict and are being reorganized", aicommon.WithStatusCode("plan.reordering"), aicommon.WithStatusState(aicommon.StatusStateRecovering))
 			pr.cod.EmitInfo("request AI to repair invalid plan executable DAG: %v", err)
 			repaired, repairErr := pr.generateNewPlan("incomplete", reason, current)
 			if repairErr != nil {

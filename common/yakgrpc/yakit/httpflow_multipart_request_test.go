@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -74,16 +73,12 @@ func TestSpillMultipartFilesIfNeeded_SingleFile(t *testing.T) {
 
 	res, err := spillMultipartFilesIfNeeded(packet)
 	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(res.HeaderFile, res.BodyFile) })
 	require.True(t, res.IsTooLarge, "oversized multipart with file part should spill")
 	require.NotEmpty(t, res.HeaderFile)
 	require.NotEmpty(t, res.BodyFile)
 	require.NotEmpty(t, res.MultipartDir)
 	require.Len(t, res.Manifest, 1)
-	defer func() {
-		_ = os.RemoveAll(res.MultipartDir)
-		_ = os.Remove(res.HeaderFile)
-		_ = os.Remove(res.BodyFile)
-	}()
 
 	// Skeleton stored packet contains the placeholder, not the file bytes.
 	require.Contains(t, string(res.StoredPacket), multipartSkeletonMarker)
@@ -127,8 +122,8 @@ func TestSpillMultipartFilesIfNeeded_SingleFile(t *testing.T) {
 func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
 	const limit = 64 * 1024
 	withGlobalMaxContentLength(t, limit)
-	f1 := bytes.Repeat([]byte("A"), limit/2)
-	f2 := bytes.Repeat([]byte("B"), limit/2)
+	f1 := bytes.Repeat([]byte("A"), 40*1024)
+	f2 := bytes.Repeat([]byte("B"), 30*1024)
 	f3 := bytes.Repeat([]byte("C"), 1024)
 	packet, _ := buildMultipartRequest(t,
 		map[string]string{"token": "abc", "case": "safe"},
@@ -144,15 +139,12 @@ func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
 
 	res, err := spillMultipartFilesIfNeeded(packet)
 	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(res.HeaderFile, res.BodyFile) })
 	require.True(t, res.IsTooLarge)
-	require.Len(t, res.Manifest, 3)
-	defer func() {
-		_ = os.RemoveAll(res.MultipartDir)
-		_ = os.Remove(res.HeaderFile)
-		_ = os.Remove(res.BodyFile)
-	}()
+	require.Len(t, res.Manifest, 1)
+	require.Equal(t, "file1", res.Manifest[0].FieldName, "the largest remaining part should collapse first")
 
-	// Each file part has its own disk file, named by its parse-order index.
+	// Only the selected part has a sidecar file, named by physical part index.
 	seenIndexes := map[int]bool{}
 	for _, m := range res.Manifest {
 		require.True(t, strings.HasPrefix(m.File, "part-"+strconv.Itoa(m.Index)+"-"),
@@ -207,11 +199,8 @@ func TestRebuildMultipartRequestPacket_WithReplacement(t *testing.T) {
 
 	spill, err := spillMultipartFilesIfNeeded(packet)
 	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
 	require.True(t, spill.IsTooLarge)
-	defer func() {
-		_ = os.RemoveAll(spill.MultipartDir)
-		_ = os.Remove(spill.HeaderFile)
-	}()
 
 	replacement := []byte("replacement-file-content")
 	replacementPath := filepath.Join(t.TempDir(), "replacement.bin")
@@ -273,8 +262,15 @@ func TestRefreshPreparedLargeHTTPFlowRequest_PersistsReplacement(t *testing.T) {
 	require.NoError(t, err)
 
 	originalSkeleton := PrepareLargeHTTPFlowRequest(req, packet)
+	t.Cleanup(func() { CleanupPreparedLargeHTTPFlowRequest(req) })
 	require.True(t, httpctx.GetRequestTooLarge(req))
-	require.Contains(t, string(originalSkeleton), fmt.Sprintf("part=0, file=paper.pdf, size=%d", len(original)))
+	originalPaths := fileFuzzTagPaths(originalSkeleton)
+	require.Len(t, originalPaths, 1)
+	require.Contains(t, string(originalSkeleton), `filename="paper.pdf"`)
+	require.Contains(t, string(originalSkeleton), "Content-Type: application/pdf")
+	originalInfo, err := os.Stat(originalPaths[0])
+	require.NoError(t, err)
+	require.Equal(t, int64(len(original)), originalInfo.Size())
 	originalHeaderFile := httpctx.GetRequestTooLargeHeaderFile(req)
 	originalBodyFile := httpctx.GetRequestTooLargeBodyFile(req)
 	originalSidecarDir := filepath.Dir(originalBodyFile)
@@ -290,14 +286,18 @@ func TestRefreshPreparedLargeHTTPFlowRequest_PersistsReplacement(t *testing.T) {
 
 	refreshedSkeleton, err := RefreshPreparedLargeHTTPFlowRequest(req, rebuilt)
 	require.NoError(t, err)
-	require.Contains(t, string(refreshedSkeleton), fmt.Sprintf("part=0, file=paper.pdf, size=%d", len(replacement)))
-	require.NotContains(t, string(refreshedSkeleton), fmt.Sprintf("size=%d", len(original)))
+	refreshedPaths := fileFuzzTagPaths(refreshedSkeleton)
+	require.Len(t, refreshedPaths, 1)
+	require.Contains(t, string(refreshedSkeleton), `filename="paper.pdf"`)
+	require.Contains(t, string(refreshedSkeleton), "Content-Type: application/pdf")
+	refreshedInfo, err := os.Stat(refreshedPaths[0])
+	require.NoError(t, err)
+	require.Equal(t, int64(len(replacement)), refreshedInfo.Size())
 	require.NoFileExists(t, originalHeaderFile)
 	require.NoDirExists(t, originalSidecarDir)
 
 	refreshedHeaderFile := httpctx.GetRequestTooLargeHeaderFile(req)
 	refreshedBodyFile := httpctx.GetRequestTooLargeBodyFile(req)
-	t.Cleanup(func() { removeLargeRequestSpillFiles(refreshedHeaderFile, refreshedBodyFile) })
 	require.NotEqual(t, originalHeaderFile, refreshedHeaderFile)
 	require.NotEqual(t, originalBodyFile, refreshedBodyFile)
 
@@ -336,6 +336,7 @@ func TestRefreshPreparedLargeHTTPFlowRequest_ReplacementBelowThresholdBecomesInl
 	require.NoError(t, err)
 
 	originalSkeleton := PrepareLargeHTTPFlowRequest(req, packet)
+	t.Cleanup(func() { CleanupPreparedLargeHTTPFlowRequest(req) })
 	originalHeaderFile := httpctx.GetRequestTooLargeHeaderFile(req)
 	originalBodyFile := httpctx.GetRequestTooLargeBodyFile(req)
 	originalSidecarDir := filepath.Dir(originalBodyFile)
@@ -374,9 +375,7 @@ func TestRefreshPreparedLargeHTTPFlowRequest_ReplacementBelowThresholdBecomesInl
 	require.Equal(t, replacement, parts["filename"].body)
 }
 
-func TestSpillMultipartFilesIfNeeded_TextOnlyNotSpilled(t *testing.T) {
-	// Oversized multipart but no file parts: must NOT skeletonize; fall back
-	// to flat spill is handled by the caller, so here IsTooLarge is false.
+func TestSpillMultipartFilesIfNeeded_TextOnlyCollapsesPart(t *testing.T) {
 	const limit = 64 * 1024
 	withGlobalMaxContentLength(t, limit)
 	big := bytes.Repeat([]byte("z"), limit+512)
@@ -384,8 +383,16 @@ func TestSpillMultipartFilesIfNeeded_TextOnlyNotSpilled(t *testing.T) {
 
 	res, err := spillMultipartFilesIfNeeded(packet)
 	require.NoError(t, err)
-	require.False(t, res.IsTooLarge, "text-only multipart should not skeletonize")
-	require.Empty(t, res.MultipartDir)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(res.HeaderFile, res.BodyFile) })
+	require.True(t, res.IsTooLarge)
+	require.Len(t, res.Manifest, 1)
+	require.Empty(t, res.Manifest[0].Filename)
+	require.Equal(t, "blob", res.Manifest[0].FieldName)
+
+	_, skeletonBody := lowhttp.SplitHTTPPacketFast(res.StoredPacket)
+	rebuilt := readAll(t, rebuildMultipartBodyToReader(skeletonBody, res.MultipartDir))
+	parts := parseMultipartParts(t, rebuilt, boundaryFromBodyPacket(t, packet))
+	require.Equal(t, big, parts["blob"].body)
 }
 
 func TestSpillMultipartFilesIfNeeded_SmallMultipartNotSpilled(t *testing.T) {
@@ -426,14 +433,10 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_MultipartRoute(t *testing.T) {
 
 	res, err := spillLargeHTTPFlowRequestIfNeeded(packet)
 	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(res.HeaderFile, res.BodyFile) })
 	require.True(t, res.IsTooLarge)
 	require.NotEmpty(t, res.BodyFile)
 	require.NotEmpty(t, res.HeaderFile)
-	defer func() {
-		_ = os.RemoveAll(multipartSidecarDirFromBodyFile(res.BodyFile))
-		_ = os.Remove(res.BodyFile)
-		_ = os.Remove(res.HeaderFile)
-	}()
 
 	// The stored packet is the skeleton (placeholder present), not flat notice.
 	require.Contains(t, string(res.StoredPacket), multipartSkeletonMarker)
@@ -448,18 +451,20 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_MultipartRoute(t *testing.T) {
 	require.Equal(t, fileContent, parts["up"].body)
 }
 
-func TestCleanupMultipartSidecar_DerivesFromBodyFile(t *testing.T) {
-	// For a multipart spill the body file is the first part file inside the
-	// sidecar dir; cleanup removes that dir (and all parts inside).
+func TestCleanupMultipartSidecar_RejectsUnownedLookalike(t *testing.T) {
+	// A directory name ending in -parts is not ownership proof. Only a sidecar
+	// under Yakit's temp root, with the exact generated names and a manifest
+	// binding the part file, may be removed.
 	partsDir := t.TempDir()
 	partsDir = filepath.Join(filepath.Dir(partsDir), "large-request-body-test-parts")
 	require.NoError(t, os.MkdirAll(partsDir, 0o755))
-	bodyFile := filepath.Join(partsDir, "part-0-yak.bin.txt")
+	bodyFile := filepath.Join(partsDir, "part-0-data.txt")
 	require.NoError(t, os.WriteFile(bodyFile, []byte("x"), 0o644))
 	require.DirExists(t, partsDir)
 
 	cleanupMultipartSidecar(bodyFile)
-	require.NoDirExists(t, partsDir)
+	require.DirExists(t, partsDir)
+	require.FileExists(t, bodyFile)
 }
 
 func TestCleanupMultipartSidecar_FlatBodyFileNoop(t *testing.T) {

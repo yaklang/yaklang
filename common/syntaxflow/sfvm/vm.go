@@ -101,6 +101,12 @@ func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, 
 		if err != nil {
 			return nil, false, utils.Errorf("SyntaxFlow compile error: %v", err)
 		}
+		// Propagate compiled opcodes onto the caller's rule so later Load hits
+		// the fast path in-process. Task-local scans intentionally keep these
+		// rules out of the profile DB (see sf_query GetFrame).
+		if rule != nil && frame != nil && frame.rule != nil && frame.rule.OpCodes != "" {
+			rule.OpCodes = frame.rule.OpCodes
+		}
 		// compile only with rule.Content will lose original rule schema info
 		// so set it back here
 		newFrame := newSfFrameEx(s.vars, rule.Content, frame.Codes, rule, s.config)

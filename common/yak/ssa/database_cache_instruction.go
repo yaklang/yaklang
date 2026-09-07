@@ -914,22 +914,27 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 	saveStep := func() error {
 		saveErr = utils.GormTransaction(s.db, func(tx *gorm.DB) error {
 			// Separate insert and upsert paths:
-			// - Insert path: batch all IrCodes and use CreateInBatches for speed
-			// - Upsert path: individual FirstOrCreate (cannot batch upsert)
+			// - Insert path: batch CreateInBatches for speed
+			// - Upsert path: SaveIrCodeBatch (delete+bulk insert) — avoids
+			//   per-row FirstOrCreate SELECT that can miss the (program_name,
+			//   code_id) index on large Postgres IR tables.
 			var insertBatch []*ssadb.IrCode
+			var upsertBatch []*ssadb.IrCode
 			for _, record := range records {
 				if record == nil || record.IrCode == nil {
 					continue
 				}
 				if record.UpdateExisting {
-					if err := ssadb.UpsertIrCode(tx, record.IrCode); err != nil {
-						return err
-					}
+					upsertBatch = append(upsertBatch, record.IrCode)
 					continue
 				}
 				insertBatch = append(insertBatch, record.IrCode)
 			}
-			// Batch insert using CreateInBatches for performance
+			if len(upsertBatch) > 0 {
+				if err := ssadb.SaveIrCodeBatch(tx, upsertBatch); err != nil {
+					return err
+				}
+			}
 			if len(insertBatch) > 0 {
 				batchSize := saveIrCodeInsertBatchSize
 				if len(insertBatch) < batchSize {

@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Python Jinja2 from_string SSTI漏洞"
 	type: audit
 	level: high
-	risk: "服务端模板注入（SSTI）"
+	risk: "ssti"
 	desc: <<<DESC
 ## 漏洞原理
 
@@ -47,7 +47,7 @@ alert $sink for {
 	title_zh: "Jinja2 from_string 模板注入漏洞",
 	level: "high",
 	type: "audit",
-	risk: "模板注入",
+	risk: "template-injection",
 	message: "检测到 Jinja2 from_string 使用了用户可达的模板源，存在模板注入风险。",
 	name: "sink",
 	solution: <<<SOLUTION

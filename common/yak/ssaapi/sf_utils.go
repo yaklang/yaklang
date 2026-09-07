@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -85,7 +86,40 @@ func valueOperatorToSSAValue(value sfvm.ValueOperator) (*Value, bool) {
 		}
 		return prog.NewConstValue(g.String(), nil), true
 	}
+	if sv, ok := value.(*sfvm.SimpleValue); ok {
+		if sv == nil || sv.IsEmpty() {
+			return nil, true
+		}
+		return simpleValueToSSAValue(sv), true
+	}
 	return nil, false
+}
+
+// simpleValueToSSAValue wraps an sfpattern hit as a const Value.
+// When the hit carries a full-file editor (sfpattern regexp hits), the range
+// anchors to the real match offsets inside the whole file so risks get the
+// actual file path / line numbers / code context — same behavior as SSA mode.
+// sfpattern match offsets are BYTE offsets; the memedit position system is
+// rune-based, so convert byte → rune before resolving the range.
+// Otherwise it falls back to a snippet-only editor (match text only).
+func simpleValueToSSAValue(sv *sfvm.SimpleValue) *Value {
+	prog := NewTmpProgram("")
+	text := sv.String()
+	path := sv.Path()
+	if ed := sv.FileEditor(); ed != nil {
+		start, end := sv.Start(), sv.End()
+		if offsetMap := ed.GetRuneOffsetMap(); offsetMap != nil {
+			if rs, ok := offsetMap.ByteOffsetToRuneIndex(start); ok {
+				start = rs
+			}
+			if re, ok := offsetMap.ByteOffsetToRuneIndex(end); ok {
+				end = re
+			}
+		}
+		return prog.NewConstValue(text, ed.GetRangeOffset(start, end))
+	}
+	ed := memedit.NewMemEditorWithFileUrl(text, path)
+	return prog.NewConstValue(text, ed.GetFullRange())
 }
 
 // IsCfgCtxURLDisplayString matches the stable text form of [CfgCtxValue.String] (used when bridging to const).

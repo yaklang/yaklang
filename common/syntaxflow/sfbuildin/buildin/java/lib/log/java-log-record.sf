@@ -95,7 +95,7 @@ logger.info("User login attempt with username: {}", username);
 log4j.rootLogger=ERROR, console
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 该规则用于检测Java应用程序中的日志记录方法。日志记录是应用程序中重要的调试和监控工具，但不当的日志记录可能导致信息泄露或其他安全问题。
