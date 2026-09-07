@@ -361,7 +361,11 @@ func (m *aiSessionRuntimeManager) Bind(
 	}()
 	bindIssuedAt, bindIssuedAtValid := aiSessionBindIssuedAt(command)
 	bindEpoch := command.GetBindEpoch()
-	attachmentTask := isLegionAttachmentTarget(command.GetResultContext().GetTargetUrl())
+	runtimeOptions, err := decodeYakRuntimeOptions(command.GetRuntimeOptionSnapshotJson(), true)
+	if err != nil {
+		return ref, fmt.Errorf("decode Bind runtime options: %w", err)
+	}
+	attachmentTask := isLegionAttachmentTarget(command.GetResultContext().GetTargetUrl()) || isAttachmentWorkspace(runtimeOptions.SourceWorkspace)
 	var attachmentBindDigest [sha256.Size]byte
 	if attachmentTask {
 		// Compare the complete server request, including its immutable resource,
@@ -392,6 +396,11 @@ func (m *aiSessionRuntimeManager) Bind(
 			cancel()
 			return ref, fmt.Errorf("ai session owner mismatch: %s", pending.ref.OwnerUserID)
 		}
+		if ref.CommandID == pending.ref.CommandID && bindEpoch == pending.ref.BindEpoch {
+			m.mu.Unlock()
+			cancel()
+			return ref, fmt.Errorf("%w: original bind is still preparing", errAISessionBindRetry)
+		}
 		if bindEpoch == 0 || bindEpoch <= pending.ref.BindEpoch {
 			m.mu.Unlock()
 			cancel()
@@ -416,6 +425,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		attachmentReplay := existing.bindCommandID == ref.CommandID && (existing.attachmentTask || attachmentTask)
 		if attachmentReplay && (existing.attachmentTask != attachmentTask || existing.attachmentBindDigest != attachmentBindDigest) {
 			m.mu.Unlock()
+			cancel()
 			// Treat a changed replay as fenced so the handler does not terminate
 			// the original authorized runtime with a bind-failed event.
 			return ref, fmt.Errorf("%w: attachment Bind command_id cannot be replayed with a different payload", errAISessionBindFenced)
@@ -448,6 +458,10 @@ func (m *aiSessionRuntimeManager) Bind(
 				// Keep the original sink and all of its contract and published-result
 				// accounting. Rebinding only the contract would lose prior reports.
 				m.mu.Unlock()
+				defer cancel()
+				if err := m.publishWorkspaceReady(ctx, existing, publisher); err != nil {
+					return ref, err
+				}
 				return ref, nil
 			}
 			if err := bindAIFocusCodeWorkspaceEvidence(options.ResultSink, existing.codeWorkspace); err != nil {
@@ -2094,6 +2108,9 @@ func validateLegionLogAnalysisTaskBind(
 ) error {
 	result := command.GetResultContext()
 	releaseID := strings.TrimSpace(result.GetFocusReleaseId())
+	if len(options.SessionMCPServers) > 0 || strings.TrimSpace(options.ForgeName) != "" || len(options.RiskJudgementScope) > 0 {
+		return fmt.Errorf("attachment workspace does not allow ExtraMCP, Forge, or risk judgement scope")
+	}
 	releasePrefix := legionLogAnalysisFocusName + "@" + legionLogAnalysisFocusVersion + "+"
 	if strings.TrimSpace(command.GetProjectId()) != "" ||
 		!strings.EqualFold(strings.TrimSpace(result.GetFocusMode()), legionLogAnalysisFocusName) ||

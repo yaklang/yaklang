@@ -111,14 +111,16 @@ func testAttachmentTaskBinding(t *testing.T, body string) aiSessionBinding {
 		ExecutionMode:             "single_run", AuthorizedFocusReleaseID: command.ResultContext.FocusReleaseId,
 		AuthorizedTargetURL: testAttachmentTaskTarget, LegionResultRuntime: runtime,
 		PlatformBearerToken: "synthetic-node-token",
+		PlatformAPIBaseURL:  "https://platform.invalid",
+		NodeSessionID:       "synthetic-node-session",
 		HTTPClient: &http.Client{Transport: runtimeHostRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-			if request.URL.String() != "https://download.invalid/attachment-log-1" || request.Method != http.MethodGet {
+			if request.URL.String() != "https://platform.invalid/v1/ai/attachments/attachment-log-1/download?node_session_id=synthetic-node-session" || request.Method != http.MethodGet {
 				return nil, fmt.Errorf("unexpected synthetic attachment request: %s %s", request.Method, request.URL)
 			}
 			if request.Header.Get("Authorization") != "Bearer synthetic-node-token" {
 				return nil, errors.New("missing synthetic node authorization")
 			}
-			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+			return &http.Response{StatusCode: http.StatusOK, ContentLength: int64(len(body)), Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
 		})},
 	}
 }
@@ -588,31 +590,69 @@ func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection
 	}
 }
 
-func TestBuildYakAIEngineOptionsDoesNotInlineAttachmentWorkspaceFiles(t *testing.T) {
-	t.Parallel()
-
+func testAttachmentWorkspaceBinding(t *testing.T) aiSessionBinding {
+	t.Helper()
+	binding := testAttachmentTaskBinding(t, testAttachmentTaskContent)
 	workspace := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindAttachments)
-	runtimeOptions, err := json.Marshal(yakRuntimeOptions{SourceWorkspace: &workspace})
+	target, err := legionCodeWorkspaceSentinel(workspace.WorkspaceID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	options, err := mergedYakRuntimeOptions(binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.SourceWorkspace = &workspace
+	options.FocusTargetURL = target
+	binding.AuthorizedTargetURL = target
+	binding.RuntimeOptionSnapshotJSON, err = json.Marshal(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := binding.LegionResultRuntime.(*legionServerFocusRuntime)
+	runtime.authorized, err = normalizeServerFocusURL(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime.attachmentResourceID = ""
+	runtime.workspace = &legionCodeWorkspaceRuntime{spec: workspace}
+	return binding
+}
+
+func TestBuildYakAIEngineOptionsAttachmentWorkspaceRejectsExtraMCP(t *testing.T) {
+	for _, source := range []string{"provider", "runtime"} {
+		t.Run(source, func(t *testing.T) {
+			binding := testAttachmentWorkspaceBinding(t)
+			payload := yakRuntimeOptions{SessionMCPServers: []sessionMCPServer{{Name: "untrusted", URL: "https://forbidden.invalid"}}}
+			if source == "runtime" {
+				options, err := mergedYakRuntimeOptions(binding)
+				if err != nil {
+					t.Fatal(err)
+				}
+				options.SessionMCPServers = payload.SessionMCPServers
+				binding.RuntimeOptionSnapshotJSON, _ = json.Marshal(options)
+			} else {
+				binding.ProviderPolicySnapshotJSON, _ = json.Marshal(payload)
+			}
+			if _, err := buildYakAIEngineOptions(context.Background(), binding, noopAISessionRuntimeEmitter{}); err == nil || !strings.Contains(err.Error(), "MCP") {
+				t.Fatalf("workspace accepted ambient MCP: %v", err)
+			}
+		})
+	}
+}
+
+func TestBuildYakAIEngineOptionsDoesNotInlineAttachmentWorkspaceFiles(t *testing.T) {
+	t.Parallel()
+
+	binding := testAttachmentWorkspaceBinding(t)
 	requested := false
 	client := &http.Client{Transport: aiRuntimeRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		requested = true
 		return nil, errors.New("attachment workspace bytes must not be requested by prompt assembly")
 	})}
-	options, err := buildYakAIEngineOptions(context.Background(), aiSessionBinding{
-		Ref:                       aiSessionCommandRef{SessionID: "ai-session-workspace"},
-		RuntimeOptionSnapshotJSON: runtimeOptions,
-		Attachments: []aiSessionAttachmentRef{{
-			AttachmentID: "aiatt_large", Filename: "large.log", SizeBytes: 5 << 30,
-			SHA256: strings.Repeat("a", 64),
-		}},
-		PlatformBearerToken: "node-session-token",
-		PlatformAPIBaseURL:  "https://platform.example",
-		NodeSessionID:       "node-session-workspace",
-		HTTPClient:          client,
-	}, noopAISessionRuntimeEmitter{})
+	binding.HTTPClient = client
+	binding.Attachments = []aiSessionAttachmentRef{{AttachmentID: "aiatt_large", Filename: "large.log", SizeBytes: 5 << 30, SHA256: strings.Repeat("a", 64)}}
+	options, err := buildYakAIEngineOptions(context.Background(), binding, noopAISessionRuntimeEmitter{})
 	if err != nil {
 		t.Fatalf("build attachment workspace engine options: %v", err)
 	}
