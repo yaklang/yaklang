@@ -27,6 +27,7 @@ type rulePlanOperation struct {
 type cachedRulePlan struct {
 	document yaml.MapSlice
 	plan     *rulePlan
+	clone    *ruleClonePlan
 	err      error
 }
 
@@ -112,7 +113,7 @@ func instantiateRuleDocument(path string, document yaml.MapSlice) (*Node, error)
 	}
 	if cached == nil {
 		plan, err := compileRulePlan("root", document)
-		cached = &cachedRulePlan{document, plan, err}
+		cached = &cachedRulePlan{document: document, plan: plan, clone: compileRuleClone(document), err: err}
 		rulePlanCache.Store(path, cached)
 	}
 	if cached.err != nil {
@@ -122,7 +123,7 @@ func instantiateRuleDocument(path string, document yaml.MapSlice) (*Node, error)
 	defaults.SetItems(ConfigItem{"endian", "big"}, ConfigItem{"parser", "default"})
 	ctx := &NodeContext{BaseKV{&configStore{}}}
 	ctx.SetItem(ctxParserRuntimeMap, newParserRuntimeMap())
-	root := cached.plan.instantiate(defaults, cloneRuleDocumentValue(document), ctx, NewNodeBatch(cached.plan.nodes))
+	root := cached.plan.instantiate(defaults, cached.clone.clone(), ctx, NewNodeBatch(cached.plan.nodes))
 	ctx.SetItem("root", root)
 	root.Cfg.SetItem("isRoot", true)
 	return root, nil

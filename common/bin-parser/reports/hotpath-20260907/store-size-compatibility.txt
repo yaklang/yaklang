@@ -1,0 +1,1 @@
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	2.051s
