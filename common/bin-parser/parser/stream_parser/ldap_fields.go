@@ -19,6 +19,7 @@ type ldapFieldsReader struct {
 	at, end int
 	err     error
 	fields  []tlsCertificateField
+	items   int
 }
 type ldapFieldsElement struct{ start, index, content, end int }
 
@@ -182,7 +183,7 @@ func (r *ldapFieldsReader) controls(info map[string]any) {
 }
 func decodeLDAPFields(wire []byte, profile string) ([]tlsCertificateField, map[string]any, error) {
 	if profile != "bind-request" {
-		return nil, nil, fmt.Errorf("ldap-fields: unknown explicit profile")
+		return decodeLDAPOperationFields(wire, profile)
 	}
 	if len(wire) == 0 || len(wire) > ldapFieldsMaxBytes {
 		return nil, nil, fmt.Errorf("ldap-fields: 1..1048576 byte boundary required")
@@ -246,7 +247,7 @@ func decodeLDAPFields(wire []byte, profile string) ([]tlsCertificateField, map[s
 	return r.fields, info, nil
 }
 func parseLDAPFields(node *base.Node, process func(*base.Node) (func(bool), error), profile string) error {
-	if profile != "bind-request" {
+	if profile != "bind-request" && ldapOperationTag(profile) == 0 {
 		return fmt.Errorf("ldap-fields: unknown explicit profile")
 	}
 	return parseCertificateFieldTree(node, process, func(wire []byte) ([]tlsCertificateField, map[string]any, error) {

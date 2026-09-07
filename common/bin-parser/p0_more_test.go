@@ -13,6 +13,7 @@ func TestP0RoadmapCovered(t *testing.T) {
 	// or proxy semantics. Validate that narrower contract unconditionally:
 	// changing its catalog status to "new" must not bypass the scope checks.
 	requireP0WPADRetrievalScope(t)
+	coveredScopes := requireP0MessageScopes(t)
 	var leftover []string
 	for _, item := range ProtocolRoadmap {
 		if item.Priority == priP0 && (item.Status == stTodo || item.Status == stPartial) {
@@ -27,6 +28,9 @@ func TestP0RoadmapCovered(t *testing.T) {
 		}
 		for _, r := range ProtocolRoadmap {
 			if r.Name == item.Name && r.Priority == priP0 {
+				if coveredScopes[item.Name] {
+					continue
+				}
 				if item.Name == "WPAD proxy" {
 					// The explicit behavior/scope contract above has passed;
 					// the catalog must still advertise partial support.

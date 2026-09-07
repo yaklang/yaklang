@@ -402,6 +402,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseTDSFields(invocation.node, invocation.operator, profile)
 		},
+		"parseSMB3TransformFields": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smb3-transform: structured generation is unsupported")
+			}
+			return parseSMB3TransformFields(invocation.node, invocation.operator)
+		},
 		"parseLDAPFields": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("ldap-fields: structured generation is unsupported")
