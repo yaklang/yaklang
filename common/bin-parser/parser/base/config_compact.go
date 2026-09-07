@@ -12,7 +12,7 @@ type compactConfigWrite struct {
 var compactConfigKeys = [...]string{
 	"", CfgOptionFuns, "endian", "parser", "unit", "isTerminal", "type", "list",
 	"node result", "parent", "length", "element index", "last node", "isList",
-	"isRoot", "package-child", "operator", "out", "import", "ref-type", "is ref type",
+	"isRoot", "package-child", "operator", "out", "import", "ref-type", "node",
 	"consumed bits", "delimiter", "del", "delimiter-optional", "length-from-field",
 	"length-for-field", "length-for-start-field", "inList", "temp root", "stop-value", "exception-plan",
 }
@@ -59,7 +59,7 @@ func compactConfigKey(key string) uint8 {
 		return 18
 	case "ref-type":
 		return 19
-	case "is ref type":
+	case "node":
 		return 20
 	case "consumed bits":
 		return 21
