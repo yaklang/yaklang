@@ -1,5 +1,22 @@
 # scannode
 
+## Legion professional task source failures
+
+Source preparation runs before AI execution. A failure emits
+`source.workspace.failed` with code `source_workspace_materialize_failed`,
+followed by `ai.session.failed` with code `ai_session_bind_failed`. Both carry
+the same actionable Chinese message; the event names, codes and payload fields
+remain compatible with existing Legion consumers.
+
+Messages distinguish recognized DNS, timeout, connection, source-access,
+local-permission, capacity, trust, source-identity and invalid-ZIP failures.
+For network failures, check connectivity and the configured source proxy from
+the executing Node; an operator's browser or Provider connectivity does not
+prove that the Node can fetch the source. Uploading a source ZIP can bypass a
+Git endpoint connectivity problem. Unknown causes use a generic source-check
+message. Raw errors, repository URLs, credentials and local paths are never
+copied into either message.
+
 ## Legion HIDS
 
 - Linux HIDS packaging, host-readiness checks, desired spec validation, and degraded-host behavior are documented in `../docs/legion-linux-hids-readiness.md`.
