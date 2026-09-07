@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Ocamllint Tempfile"
-	title_zh: "Ocamllint Tempfile"
+	title: "检测到 OCaml 临时文件使用"
+	title_zh: "检测到 OCaml 临时文件使用"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-ocamllint-tempfile"
 	risk: "symlink-toctou"
 	desc: <<<DESC
 ### 规则说明
-Filename.temp_file might lead to race conditions, since the file could be altered or replaced by a symlink before being opened.
+该规则用于检测 OCaml 临时文件使用 相关的风险模式，属于 符号链接 TOCTOU 类问题。
 
 ### 风险类型
 符号链接 TOCTOU（symlink-toctou）
@@ -18,13 +18,10 @@ Filename.temp_file might lead to race conditions, since the file could be altere
 临时文件或路径在检查与使用之间可能被替换为符号链接，导致任意文件读写。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition
+- CWE-367
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -44,7 +41,7 @@ ${*.mli}.pattern_regex(/(?:Filename\.temp_file)/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Ocamllint Tempfile",
-	title_zh: "Ocamllint Tempfile",
-	message: "Ocamllint Tempfile detected.",
+	title: "检测到 OCaml 临时文件使用",
+	title_zh: "检测到 OCaml 临时文件使用",
+	message: "检测到 OCaml 临时文件使用",
 }

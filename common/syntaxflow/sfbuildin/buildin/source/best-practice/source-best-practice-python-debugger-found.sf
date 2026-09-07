@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Python Debugger Found"
-	title_zh: "Python Debugger Found"
+	title: "检测到 Python 调试器残留"
+	title_zh: "检测到 Python 调试器残留"
 	type: audit
 	level: middle
 	rule_id: "source-best-practice-python-debugger-found"
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-Importing the python debugger; did you mean to leave this in?
+该规则用于检测 Python 调试器残留 相关的风险模式，属于 最佳实践 类问题。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -18,10 +18,7 @@ Importing the python debugger; did you mean to leave this in?
 代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -39,7 +36,7 @@ NEG
 ${*.py}.pattern_regex(/(?:import\s+pdb)|(?:pdb\.set_trace\(\))/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Python Debugger Found",
-	title_zh: "Python Debugger Found",
-	message: "Python Debugger Found detected.",
+	title: "检测到 Python 调试器残留",
+	title_zh: "检测到 Python 调试器残留",
+	message: "检测到 Python 调试器残留",
 }

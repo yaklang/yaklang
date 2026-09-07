@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Aws Fsx Lustre Encrypted With Cmk"
+	title: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密"
 	title_zh: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
 	type: vuln
 	level: middle
@@ -9,7 +9,7 @@ desc(
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-Ensure FSX Lustre file system is encrypted at rest using KMS CMKs. CMKs gives you control over the encryption key in terms of access and rotation.
+该规则用于检测 AWS FSx Lustre 文件系统未使用 KMS CMK 加密 相关的风险模式，属于 安全配置不当 类问题。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -18,13 +18,10 @@ Ensure FSX Lustre file system is encrypted at rest using KMS CMKs. CMKs gives yo
 安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: context-aware regex — fsx resource blocks are dropped when they contain a `kms_key_id` assignment (pattern-not-inside approximation via overlap removal).
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
+- CWE-200
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -56,7 +53,7 @@ ${*.tf}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s
 $b - $k as $hit
 alert $hit for {
 	level: "middle",
-	title: "Aws Fsx Lustre Encrypted With Cmk",
+	title: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
 	title_zh: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
-	message: "Ensure FSX Lustre file system is encrypted at rest using KMS CMKs.",
+	message: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
 }

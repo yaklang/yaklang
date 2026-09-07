@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "Detect Go TLS InsecureSkipVerify"
-	title_zh: "检测 Go TLS InsecureSkipVerify",
+	title: "检测 Go TLS 跳过证书校验"
+	title_zh: "检测 Go TLS 跳过证书校验",
 	type: vuln
 	level: high
 	rule_id: "source-go-insecure-skip-verify"
 	risk: "certificate-validation"
 	desc: <<<DESC
 ### 规则说明
-检测 Detect Go TLS InsecureSkipVerify 相关的风险模式。
+该规则用于检测 Go TLS 跳过证书校验 相关的风险模式，属于 证书校验缺失 类问题。
 
 ### 风险类型
 证书校验缺失（certificate-validation）
@@ -18,7 +18,7 @@ desc(
 未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -40,7 +40,7 @@ NEG
 ${*.go}.pattern_regex(/InsecureSkipVerify\s*:\s*true/) as $hit
 alert $hit for {
 	level: "high",
-	title: "TLS InsecureSkipVerify",
-	title_zh: "TLS InsecureSkipVerify",
-	message: "TLS certificate verification disabled",
+	title: "检测 Go TLS 跳过证书校验",
+	title_zh: "检测 Go TLS 跳过证书校验",
+	message: "检测 Go TLS 跳过证书校验",
 }

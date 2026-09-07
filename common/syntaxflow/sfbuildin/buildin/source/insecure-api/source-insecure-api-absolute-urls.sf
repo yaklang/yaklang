@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Absolute URLs"
-	title_zh: "检测到Absolute URLs",
+	title: "检测到绝对 URL"
+	title_zh: "检测到绝对 URL",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-absolute-urls"
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-Using absolute URLs to Salesforce Pages is bug prone. Different sandboxes and production environments will have different instance names (like "na10", "na15" etc.). Code using absolute URLs will only work when it runs in the corresponding salesforce instances. It will break as soon as it is deployed in another one. Thus only relative URLs, i.e. without the domain and subdomain names, should be used when pointing to a salesforce page.
+该规则用于检测 绝对 URL 相关的风险模式，属于 最佳实践 类问题。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -18,13 +18,7 @@ Using absolute URLs to Salesforce Pages is bug prone. Different sandboxes and pr
 代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: original paths.exclude ['*Test*', '*test*'] not applied (SF path filter limitation).
-
-### 参考
-- CWE: -
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -46,7 +40,7 @@ ${*.cls}.pattern_regex(/(http|https):\/\/.*(salesforce|force|visualforce)\.com\.
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Absolute URLs",
-	title_zh: "检测到Absolute URLs",
-	message: "Absolute URLs",
+	title: "检测到绝对 URL",
+	title_zh: "检测到绝对 URL",
+	message: "检测到绝对 URL",
 }

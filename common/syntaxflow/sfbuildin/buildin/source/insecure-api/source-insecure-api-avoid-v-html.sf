@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Avoid V Html"
-	title_zh: "检测到Avoid V Html",
+	title: "检测到使用 v-html"
+	title_zh: "检测到使用 v-html",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-avoid-v-html"
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-Dynamically rendering arbitrary HTML on your website can be very dangerous because it can easily lead to XSS vulnerabilities. Only use HTML interpolation on trusted content and never on user-provided content.
+该规则用于检测 使用 v-html 相关的风险模式，属于 跨站脚本（XSS） 类问题。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -18,10 +18,10 @@ Dynamically rendering arbitrary HTML on your website can be very dangerous becau
 未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+- CWE-79
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -43,7 +43,7 @@ ${*.vue}.pattern_regex(/<[^<>]*v-html=/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Avoid V Html",
-	title_zh: "检测到Avoid V Html",
-	message: "Avoid V Html",
+	title: "检测到使用 v-html",
+	title_zh: "检测到使用 v-html",
+	message: "检测到使用 v-html",
 }

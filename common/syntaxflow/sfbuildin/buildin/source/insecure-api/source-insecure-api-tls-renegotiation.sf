@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Tls Renegotiation"
-	title_zh: "Tls Renegotiation"
+	title: "检测到不安全的 TLS 重协商"
+	title_zh: "检测到不安全的 TLS 重协商"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-tls-renegotiation"
 	risk: "insecure-tls"
 	desc: <<<DESC
 ### 规则说明
-Checks for cases where java applications are allowing unsafe renegotiation. This leaves the application vulnerable to a man-in-the-middle attack where chosen plain text is injected as prefix to a TLS connection.
+该规则用于检测 不安全的 TLS 重协商 相关的风险模式，属于 不安全的 TLS 配置 类问题。
 
 ### 风险类型
 不安全的 TLS 配置（insecure-tls）
@@ -18,13 +18,10 @@ Checks for cases where java applications are allowing unsafe renegotiation. This
 使用旧版 TLS/SSL 或关闭强制 HTTPS，通信可能被降级或窃听。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-319: Cleartext Transmission of Sensitive Information
+- CWE-319
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +39,7 @@ NEG
 ${*.java}.pattern_regex(/(?:java\.lang\.System\.setProperty\("sun\.security\.ssl\.allowUnsafeRenegotiation",\s+true\);)/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Tls Renegotiation",
-	title_zh: "Tls Renegotiation",
-	message: "Tls Renegotiation detected.",
+	title: "检测到不安全的 TLS 重协商",
+	title_zh: "检测到不安全的 TLS 重协商",
+	message: "检测到不安全的 TLS 重协商",
 }

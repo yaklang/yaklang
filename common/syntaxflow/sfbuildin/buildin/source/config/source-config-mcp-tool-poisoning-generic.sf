@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "MCP Tool Poisoning Generic"
-	title_zh: "检测到MCP Tool Poisoning Generic",
+	title: "检测到 MCP 工具投毒"
+	title_zh: "检测到 MCP 工具投毒",
 	type: vuln
 	level: critical
 	rule_id: "source-config-mcp-tool-poisoning-generic"
 	risk: "tool-poisoning"
 	desc: <<<DESC
 ### 规则说明
-MCP tool docstring contains suspicious directives that may indicate tool poisoning. Attackers can embed hidden instructions in tool descriptions to manipulate LLM behavior, exfiltrate data, or access sensitive files. Review the tool description for hidden instructions or social engineering.
+该规则用于检测 MCP 工具投毒 相关的风险模式，属于 工具描述投毒 类问题。
 
 ### 风险类型
 工具描述投毒（tool-poisoning）
@@ -18,10 +18,10 @@ MCP tool docstring contains suspicious directives that may indicate tool poisoni
 AI 工具或配置描述被注入恶意指令，可能诱导工具执行危险操作。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-77: Improper Neutralization of Special Elements used in a Command ('Command Injection')
+- CWE-77
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -50,7 +50,7 @@ ${*.py}.pattern_regex(/"""[^"]*ignore previous instructions[^"]*"""/) as $p7
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 as $hit
 alert $hit for {
 	level: "critical",
-	title: "MCP Tool Poisoning Generic",
-	title_zh: "检测到MCP Tool Poisoning Generic",
-	message: "MCP Tool Poisoning Generic",
+	title: "检测到 MCP 工具投毒",
+	title_zh: "检测到 MCP 工具投毒",
+	message: "检测到 MCP 工具投毒",
 }

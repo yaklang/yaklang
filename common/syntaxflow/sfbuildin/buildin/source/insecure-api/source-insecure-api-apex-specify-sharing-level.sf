@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Apex Specify Sharing Level"
+	title: "检测到 Apex 类未显式声明共享级别"
 	title_zh: "检测到 Apex 类未显式声明共享级别",
 	type: vuln
 	level: middle
@@ -9,7 +9,7 @@ desc(
 	risk: "access-control"
 	desc: <<<DESC
 ### 规则说明
-Every Apex class should have an explicit sharing mode declared. Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced. Use the `inherited sharing` keyword on an Apex class to run the class in the sharing mode of the class that called it.
+该规则用于检测 Apex 类未显式声明共享级别 相关的风险模式，属于 访问控制缺陷 类问题。
 
 ### 风险类型
 访问控制缺陷（access-control）
@@ -18,17 +18,14 @@ Every Apex class should have an explicit sharing mode declared. Use the `with sh
 资源或接口的访问权限设置不当，可能允许越权访问。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-284: Improper Access Control
+- CWE-284
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 按最小权限原则配置访问控制，并验证所有请求的授权状态。
-
-推荐修复：
-Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced.
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS
@@ -46,7 +43,7 @@ ${*.apex}.pattern_regex_not(/(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Apex Specify Sharing Level",
+	title: "检测到 Apex 类未显式声明共享级别",
 	title_zh: "检测到 Apex 类未显式声明共享级别",
-	message: "Apex class does not explicitly declare a sharing level.",
+	message: "检测到 Apex 类未显式声明共享级别",
 }

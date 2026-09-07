@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Skill Md Base64 Payload Generic"
-	title_zh: "检测到Skill Md Base64 Payload Generic",
+	title: "检测到 Skill 文档包含 Base64 载荷"
+	title_zh: "检测到 Skill 文档包含 Base64 载荷",
 	type: vuln
 	level: middle
 	rule_id: "source-config-skill-md-base64-payload-generic"
 	risk: "encoded-payload-execution"
 	desc: <<<DESC
 ### 规则说明
-SKILL.md or AGENT.md instructs the agent to decode and execute a base64 (or hex) blob, which is a common encoding-evasion pattern used to smuggle malicious instructions past human review. Document the content in plain text or remove the encoded payload, and audit the decoded value before reintroducing it.
+该规则用于检测 Skill 文档包含 Base64 载荷 相关的风险模式，属于 编码载荷执行 类问题。
 
 ### 风险类型
 编码载荷执行（encoded-payload-execution）
@@ -18,10 +18,10 @@ SKILL.md or AGENT.md instructs the agent to decode and execute a base64 (or hex)
 攻击者可通过编码或混淆载荷绕过过滤并执行恶意代码。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-506: Embedded Malicious Code
+- CWE-506
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -60,7 +60,7 @@ $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 +
 alert $hit for {
 	risk: "encoded-payload-execution",
 	level: "middle",
-	title: "Skill Md Base64 Payload Generic",
-	title_zh: "检测到Skill Md Base64 Payload Generic",
-	message: "Skill Md Base64 Payload Generic",
+	title: "检测到 Skill 文档包含 Base64 载荷",
+	title_zh: "检测到 Skill 文档包含 Base64 载荷",
+	message: "检测到 Skill 文档包含 Base64 载荷",
 }

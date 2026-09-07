@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Args"
-	title_zh: "Args"
+	title: "检测到 std::env::args 使用"
+	title_zh: "检测到 std::env::args 使用"
 	type: vuln
 	level: low
 	rule_id: "source-insecure-api-args"
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-args should not be used for security operations. From the docs: "The first element is traditionally the path of the executable, but it can be set to arbitrary text, and might not even exist. This means this property should not be relied upon for security purposes."
+该规则用于检测 std::env::args 使用 相关的风险模式，属于 敏感信息泄露 类问题。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -18,13 +18,10 @@ args should not be used for security operations. From the docs: "The first eleme
 应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
+- CWE-807
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +39,7 @@ NEG
 ${*.rs}.pattern_regex(/(?:std::env::args\(\))/) as $hit
 alert $hit for {
 	level: "low",
-	title: "Args",
-	title_zh: "Args",
-	message: "Args detected.",
+	title: "检测到 std::env::args 使用",
+	title_zh: "检测到 std::env::args 使用",
+	message: "检测到 std::env::args 使用",
 }

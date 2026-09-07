@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "File Disclosure"
-	title_zh: "File Disclosure"
+	title: "检测到静态文件泄露配置"
+	title_zh: "检测到静态文件泄露配置"
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-file-disclosure"
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-Special requests can determine whether a file exists on a filesystem that's outside the Rails app's root directory. To fix this, set config.serve_static_assets = false.
+该规则用于检测 静态文件泄露配置 相关的风险模式，属于 敏感信息泄露 类问题。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -18,20 +18,14 @@ Special requests can determine whether a file exists on a filesystem that's outs
 应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')
+- CWE-22
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
-
-推荐修复：
-To fix this, set config.serve_static_assets = false.
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*.rb}.pattern_regex(/(?:config\.serve_static_assets\s+=\s+true)/) as $hit
 alert $hit for {
 	level: "high",
-	title: "File Disclosure",
-	title_zh: "File Disclosure",
-	message: "File Disclosure detected.",
+	title: "检测到静态文件泄露配置",
+	title_zh: "检测到静态文件泄露配置",
+	message: "检测到静态文件泄露配置",
 }

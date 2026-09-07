@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Global Access Modifiers"
-	title_zh: "检测到Global Access Modifiers",
+	title: "检测到全局访问修饰符"
+	title_zh: "检测到全局访问修饰符",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-global-access-modifiers"
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-Global classes, methods, and variables should be avoided (especially in managed packages) as they can never be deleted or changed in signature. Always check twice if something needs to be global.
+该规则用于检测 全局访问修饰符 相关的风险模式，属于 最佳实践 类问题。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -18,13 +18,10 @@ Global classes, methods, and variables should be avoided (especially in managed 
 代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: original paths.exclude ['*Test*', '*test*'] not applied (SF path filter limitation).
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-284: Improper Access Control
+- CWE-284
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -46,7 +43,7 @@ ${*.cls}.pattern_regex_not(/global [A-Za-z0-9_]{3,}/, /\/\/(\s+([a-zA-Z]+\s+)+)[
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Global Access Modifiers",
-	title_zh: "检测到Global Access Modifiers",
-	message: "Global Access Modifiers",
+	title: "检测到全局访问修饰符",
+	title_zh: "检测到全局访问修饰符",
+	message: "检测到全局访问修饰符",
 }

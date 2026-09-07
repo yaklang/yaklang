@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Spring Actuator Fully Enabled"
-	title_zh: "Spring Actuator Fully Enabled"
+	title: "检测到 Spring Actuator 完全开放"
+	title_zh: "检测到 Spring Actuator 完全开放"
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-spring-actuator-fully-enabled"
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-Spring Boot Actuator is fully enabled. This exposes sensitive endpoints such as /actuator/env, /actuator/logfile, /actuator/heapdump and others. Unless you have Spring Security enabled or another means to protect these endpoints, this functionality is available without authentication, causing a significant security risk.
+该规则用于检测 Spring Actuator 完全开放 相关的风险模式，属于 敏感信息泄露 类问题。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -18,13 +18,10 @@ Spring Boot Actuator is fully enabled. This exposes sensitive endpoints such as 
 应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
+- CWE-200
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -42,7 +39,7 @@ NEG
 ${*.properties}.pattern_regex(/(?:management\.endpoints\.web\.exposure\.include=\*)/) as $hit
 alert $hit for {
 	level: "high",
-	title: "Spring Actuator Fully Enabled",
-	title_zh: "Spring Actuator Fully Enabled",
-	message: "Spring Actuator Fully Enabled detected.",
+	title: "检测到 Spring Actuator 完全开放",
+	title_zh: "检测到 Spring Actuator 完全开放",
+	message: "检测到 Spring Actuator 完全开放",
 }

@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Avoid Ssh Insecure Ignore Host Key"
-	title_zh: "Avoid Ssh Insecure Ignore Host Key"
+	title: "检测到 SSH 忽略主机密钥校验"
+	title_zh: "检测到 SSH 忽略主机密钥校验"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-avoid-ssh-insecure-ignore-host-key"
 	risk: "certificate-validation"
 	desc: <<<DESC
 ### 规则说明
-Disabled host key verification detected. This allows man-in-the-middle attacks. Use the 'golang.org/x/crypto/ssh/knownhosts' package to do host key verification. See https://skarlso.github.io/2019/02/17/go-ssh-with-host-key-verification/ to learn more about the problem and how to fix it.
+该规则用于检测 SSH 忽略主机密钥校验 相关的风险模式，属于 证书校验缺失 类问题。
 
 ### 风险类型
 证书校验缺失（certificate-validation）
@@ -18,20 +18,14 @@ Disabled host key verification detected. This allows man-in-the-middle attacks. 
 未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-322: Key Exchange without Entity Authentication
+- CWE-322
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
-
-推荐修复：
-Use the 'golang.org/x/crypto/ssh/knownhosts' package to do host key verification.
 SOLUTION
 	alert_min: 1
 	"file://pos.go": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*.go}.pattern_regex(/(?:ssh\.InsecureIgnoreHostKey\(\))/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Avoid Ssh Insecure Ignore Host Key",
-	title_zh: "Avoid Ssh Insecure Ignore Host Key",
-	message: "Avoid Ssh Insecure Ignore Host Key detected.",
+	title: "检测到 SSH 忽略主机密钥校验",
+	title_zh: "检测到 SSH 忽略主机密钥校验",
+	message: "检测到 SSH 忽略主机密钥校验",
 }

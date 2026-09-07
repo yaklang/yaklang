@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Unirest Http Request"
-	title_zh: "Unirest Http Request"
+	title: "检测到 Unirest 明文 HTTP 请求"
+	title_zh: "检测到 Unirest 明文 HTTP 请求"
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-unirest-http-request"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
 ### 规则说明
-Checks for requests sent via Unirest to http:// URLS. This is dangerous because the server is attempting to connect to a website that does not encrypt traffic with TLS. Instead, send requests only to https:// URLS.
+该规则用于检测 Unirest 明文 HTTP 请求 相关的风险模式，属于 明文传输 类问题。
 
 ### 风险类型
 明文传输（cleartext-transmission）
@@ -18,20 +18,14 @@ Checks for requests sent via Unirest to http:// URLS. This is dangerous because 
 敏感数据通过 HTTP 等明文通道传输，可能被网络窃听。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 
 ### 参考
-- CWE: CWE-319: Cleartext Transmission of Sensitive Information
+- CWE-319
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 改用 HTTPS/TLS 传输，并确保所有敏感请求都走加密通道。
-
-推荐修复：
-Instead, send requests only to https:// URLS.
 SOLUTION
 	alert_min: 1
 	"file://pos.java": <<<POS
@@ -45,7 +39,7 @@ NEG
 ${*.java}.pattern_regex(/(?:Unirest\.(?:get|post)\(\s*["\'][hH][tT][tT][pP]:\/\/[^"\']*["\']\s*\))/) as $hit
 alert $hit for {
 	level: "middle",
-	title: "Unirest Http Request",
-	title_zh: "Unirest Http Request",
-	message: "Unirest Http Request detected.",
+	title: "检测到 Unirest 明文 HTTP 请求",
+	title_zh: "检测到 Unirest 明文 HTTP 请求",
+	message: "检测到 Unirest 明文 HTTP 请求",
 }

@@ -1,7 +1,7 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Localhost Base Url"
+	title: "检测到 baseURL 配置为 localhost"
 	title_zh: "检测到 baseURL 配置为 localhost",
 	type: vuln
 	level: middle
@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-The 'baseURL' is set to localhost. This may cause links to not work if deployed.
+该规则用于检测 baseURL 配置为 localhost 相关的风险模式，属于 最佳实践 类问题。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -18,13 +18,7 @@ The 'baseURL' is set to localhost. This may cause links to not work if deployed.
 代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: context-aware regex — localhost/127.0.0.1 hits are kept only inside `baseURL = "..."` regions (pattern-inside).
-
-### 参考
-- CWE: -
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -48,7 +42,7 @@ ${/(^|\/)(config|hugo)\.(toml|yaml|yml|json)$/}.pattern_regex(/.*(localhost|127\
 $t inside $c as $hit
 alert $hit for {
 	level: "middle",
-	title: "Localhost Base Url",
+	title: "检测到 baseURL 配置为 localhost",
 	title_zh: "检测到 baseURL 配置为 localhost",
-	message: "The 'baseURL' is set to localhost. This may cause links to not work if deployed.",
+	message: "检测到 baseURL 配置为 localhost",
 }

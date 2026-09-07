@@ -1,15 +1,15 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Python37 Compatibility Multiprocess2"
-	title_zh: "Python37 Compatibility Multiprocess2"
+	title: "检测到 Python 3.7 不兼容的 multiprocessing.Process.kill 用法"
+	title_zh: "检测到 Python 3.7 不兼容的 multiprocessing.Process.kill 用法"
 	type: compatibility
 	level: high
 	rule_id: "source-compatibility-python37-compatibility-multiprocess2"
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-multiprocessing.Process.kill() is only available on Python 3.7+ and is therefore not backwards compatible. Instead, use terminate().
+该规则用于检测 Python 3.7 不兼容的 multiprocessing.Process.kill 用法 相关的风险模式，属于 代码规范与兼容性 类问题。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -18,17 +18,11 @@ multiprocessing.Process.kill() is only available on Python 3.7+ and is therefore
 使用了已废弃、不兼容或不符合规范的模式，可能导致后续维护困难或运行环境差异。
 
 ### 检测方式
-Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
-
-### 补充说明
-Note: source-mode regex approximation of a safe-literal pattern.
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
-
-推荐修复：
-Instead, use terminate().
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS
@@ -42,7 +36,7 @@ NEG
 ${*.py}.pattern_regex(/(?:multiprocessing\.Process\.kill\(\))/) as $hit
 alert $hit for {
 	level: "high",
-	title: "Python37 Compatibility Multiprocess2",
-	title_zh: "Python37 Compatibility Multiprocess2",
-	message: "Python37 Compatibility Multiprocess2 detected.",
+	title: "检测到 Python 3.7 不兼容的 multiprocessing.Process.kill 用法",
+	title_zh: "检测到 Python 3.7 不兼容的 multiprocessing.Process.kill 用法",
+	message: "检测到 Python 3.7 不兼容的 multiprocessing.Process.kill 用法",
 }
