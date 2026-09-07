@@ -8,15 +8,30 @@ desc(
 	rule_id: "source-insecure-api-unirest-http-request"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
-Migrated from rule `unirest-http-request` (problem-based-packs/insecure-transport/java-stdlib/unirest-http-request.yaml).
-Original message: Checks for requests sent via Unirest to http:// URLS. This is dangerous because the server is attempting to connect to a website that does not encrypt traffic with TLS. Instead, send requests only to https:// URLS.
-CWE: CWE-319: Cleartext Transmission of Sensitive Information
-References:
-- https://kong.github.io/unirest-java/#requests
+### 规则说明
+Checks for requests sent via Unirest to http:// URLS. This is dangerous because the server is attempting to connect to a website that does not encrypt traffic with TLS. Instead, send requests only to https:// URLS.
+
+### 风险类型
+明文传输（cleartext-transmission）
+
+### 影响
+敏感数据通过 HTTP 等明文通道传输，可能被网络窃听。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-319: Cleartext Transmission of Sensitive Information
 DESC
 	solution: <<<SOLUTION
-Preferred replacement: https://
+### 修复建议
+改用 HTTPS/TLS 传输，并确保所有敏感请求都走加密通道。
+
+推荐修复：
+Instead, send requests only to https:// URLS.
 SOLUTION
 	alert_min: 1
 	"file://pos.java": <<<POS

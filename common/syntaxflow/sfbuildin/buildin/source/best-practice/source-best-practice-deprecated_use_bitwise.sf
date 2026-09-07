@@ -8,14 +8,27 @@ desc(
 	rule_id: "source-best-practice-deprecated_use_bitwise"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from rule `deprecated_use_bitwise` (elixir/lang/best-practice/deprecated-use-bitwise.yaml).
-Original message: The syntax `use Bitwise` is already deprecated. Please use `import Bitwise` instead.
-References:
-- https://github.com/elixir-lang/elixir/commit/f1b9d3e818e5bebd44540f87be85979f24b9abfc
+### 规则说明
+The syntax `use Bitwise` is already deprecated. Please use `import Bitwise` instead.
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
-Preferred fix: import Bitwise
+### 修复建议
+按官方推荐方式改写，并补充必要的安全配置。
+
+推荐修复：
+import Bitwise
 SOLUTION
 	alert_min: 1
 	"file://pos.ex": <<<POS

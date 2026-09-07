@@ -8,16 +8,24 @@ desc(
 	rule_id: "source-config-hooks-wget-pipe-bash-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from rule `hooks-wget-pipe-bash-generic` (upstream/ai/ai-best-practices/hooks-wget-pipe-bash/hooks-wget-pipe-bash.yaml).
-Original message: Remote script is fetched and piped directly to a shell interpreter. In Claude Code and Cursor hooks, this enables remote code execution from untrusted sources. Download the script first, inspect it, then execute it separately.
+### 规则说明
+Remote script is fetched and piped directly to a shell interpreter. In Claude Code and Cursor hooks, this enables remote code execution from untrusted sources. Download the script first, inspect it, then execute it separately.
 
-CWE: CWE-829: Inclusion of Functionality from Untrusted Control Sphere
-References:
-- https://docs.anthropic.com/en/docs/claude-code/hooks
-- https://cursor.com/docs/agent/hooks
+### 风险类型
+安全配置不当（security-misconfiguration）
+
+### 影响
+安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: CWE-829: Inclusion of Functionality from Untrusted Control Sphere
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS

@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-template-explicit-unescape"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from rule `template-explicit-unescape` (upstream/javascript/express/security/audit/xss/ejs/explicit-unescape.yaml).
-Original message: Detected an explicit unescape in an EJS template, using '<%- ... %>' If external data can reach these locations, your application is exposed to a cross-site scripting (XSS) vulnerability. Use '<%= ... %>' to escape this data. If you need escaping, ensure no external data can reach this location.
+### 规则说明
+Detected an explicit unescape in an EJS template, using '<%- ... %>' If external data can reach these locations, your application is exposed to a cross-site scripting (XSS) vulnerability. Use '<%= ... %>' to escape this data. If you need escaping, ensure no external data can reach this location.
 
-CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
-References:
-- http://www.managerjs.com/blog/2015/05/will-ejs-escape-save-me-from-xss-sorta/
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+
+推荐修复：
+Use '<%= ... %>' to escape this data.
 SOLUTION
 	alert_min: 1
 	"file://pos.ejs": <<<POS

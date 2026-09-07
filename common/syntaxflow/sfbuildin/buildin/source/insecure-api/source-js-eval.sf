@@ -8,10 +8,21 @@ desc(
 	rule_id: "source-js-eval"
 	risk: "code-injection"
 	desc: <<<DESC
-Flags eval(...) in JS/TS sources which enables code injection.
+### 规则说明
+检测 Detect JavaScript eval Usage 相关的风险模式。
+
+### 风险类型
+代码注入（code-injection）
+
+### 影响
+不可信输入被直接用于动态代码执行，可能导致任意代码执行。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Avoid eval; use JSON.parse or safer interpreters for structured data.
+### 修复建议
+避免动态执行不可信代码，使用安全的解析和求值方式。
 SOLUTION
 	alert_min: 1
 	"file://app.js": <<<POS

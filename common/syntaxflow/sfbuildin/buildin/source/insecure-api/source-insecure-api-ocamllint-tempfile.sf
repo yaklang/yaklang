@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-ocamllint-tempfile"
 	risk: "symlink-toctou"
 	desc: <<<DESC
-Migrated from rule `ocamllint-tempfile` (ocaml/lang/security/tempfile.yaml).
-Original message: Filename.temp_file might lead to race conditions, since the file could be altered or replaced by a symlink before being opened.
-CWE: CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition
-References:
-- https://v2.ocaml.org/api/Filename.html
+### 规则说明
+Filename.temp_file might lead to race conditions, since the file could be altered or replaced by a symlink before being opened.
+
+### 风险类型
+符号链接 TOCTOU（symlink-toctou）
+
+### 影响
+临时文件或路径在检查与使用之间可能被替换为符号链接，导致任意文件读写。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+使用安全的临时文件 API，避免基于路径的检查后使用。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

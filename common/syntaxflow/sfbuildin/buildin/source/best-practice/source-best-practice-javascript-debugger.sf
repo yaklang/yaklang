@@ -8,12 +8,24 @@ desc(
 	rule_id: "source-best-practice-javascript-debugger"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from rule `javascript-debugger` (javascript/lang/best-practice/leftover_debugging.yaml).
-Original message: found debugger call; should this be in production code?
+### 规则说明
+found debugger call; should this be in production code?
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+按官方推荐方式改写，并补充必要的安全配置。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

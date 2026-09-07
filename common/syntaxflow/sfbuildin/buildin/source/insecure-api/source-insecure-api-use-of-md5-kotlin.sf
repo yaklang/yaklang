@@ -8,15 +8,30 @@ desc(
 	rule_id: "source-insecure-api-use-of-md5-kotlin"
 	risk: "weak-hash"
 	desc: <<<DESC
-Migrated from rule `use-of-md5` (kotlin/lang/security/use-of-md5.yaml).
-Original message: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.
-CWE: CWE-328: Use of Weak Hash
-References:
-- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+### 规则说明
+Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.
+
+### 风险类型
+弱哈希算法（weak-hash）
+
+### 影响
+使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-328: Use of Weak Hash
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+改用 SHA-256/SHA-3 或针对口令使用 bcrypt/Argon2 等专用算法。
+
+推荐修复：
+Use SHA256 or SHA3 instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.kt": <<<POS

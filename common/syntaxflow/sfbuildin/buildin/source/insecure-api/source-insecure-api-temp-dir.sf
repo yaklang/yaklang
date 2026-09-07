@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-temp-dir"
 	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from rule `temp-dir` (rust/lang/security/temp-dir.yml).
-Original message: temp_dir should not be used for security operations. From the docs: 'The temporary directory may be shared among users, or between processes with different privileges; thus, the creation of any files or directories in the temporary directory must use a secure method to create a uniquely named file. Creating a file or directory with a fixed or predictable name may result in “insecure temporary file” security vulnerabilities.'
-CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
-References:
-- https://doc.rust-lang.org/stable/std/env/fn.temp_dir.html
+### 规则说明
+temp_dir should not be used for security operations. From the docs: 'The temporary directory may be shared among users, or between processes with different privileges; thus, the creation of any files or directories in the temporary directory must use a secure method to create a uniquely named file. Creating a file or directory with a fixed or predictable name may result in “insecure temporary file” security vulnerabilities.'
+
+### 风险类型
+敏感信息泄露（information-exposure）
+
+### 影响
+应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
 SOLUTION
 	alert_min: 1
 	"file://pos.rs": <<<POS

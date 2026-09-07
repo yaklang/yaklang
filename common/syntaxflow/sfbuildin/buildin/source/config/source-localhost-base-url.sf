@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-localhost-base-url"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from rule `localhost-base-url` (upstream/generic/hugo/best-practice/localhost-base-url.yaml).
-Original message: The 'baseURL' is set to localhost. This may cause links to not work if deployed.
+### 规则说明
+The 'baseURL' is set to localhost. This may cause links to not work if deployed.
 
-CWE: -
-References:
-- https://gohugo.io/
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — localhost/127.0.0.1 hits are kept only inside `baseURL = "..."` regions (pattern-inside).
+
+### 参考
+- CWE: -
 DESC
 	solution: <<<SOLUTION
-Set baseURL to the production domain instead of localhost.
+### 修复建议
+按官方推荐方式改写，并补充必要的安全配置。
 SOLUTION
 	alert_min: 1
 	"file://hugo.toml": <<<POS

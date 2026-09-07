@@ -8,15 +8,24 @@ desc(
 	rule_id: "source-insecure-api-use-assert-class"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from rule `use-assert-class` (upstream/apex/lang/best-practice/ncino/tests/UseAssertClass.yaml).
-Original message: Assert methods in the System class have been replaced with the Assert class: https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_class_System_Assert.htm
+### 规则说明
+Assert methods in the System class have been replaced with the Assert class: https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_class_System_Assert.htm
 
-CWE: -
-References:
-- https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_class_System_Assert.htm
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: -
 DESC
 	solution: <<<SOLUTION
-Follow the framework's secure configuration guidance; remove or replace the flagged pattern.
+### 修复建议
+按官方推荐方式改写，并补充必要的安全配置。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

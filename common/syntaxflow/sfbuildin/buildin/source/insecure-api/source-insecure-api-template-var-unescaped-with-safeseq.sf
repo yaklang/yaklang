@@ -8,15 +8,24 @@ desc(
 	rule_id: "source-insecure-api-template-var-unescaped-with-safeseq"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from rule `template-var-unescaped-with-safeseq` (upstream/python/django/security/audit/xss/template-var-unescaped-with-safeseq.yaml).
-Original message: Detected a template variable where autoescaping is explicitly disabled with '| safeseq' filter. This allows rendering of raw HTML in this segment. Ensure no user data is rendered here, otherwise this is a cross-site scripting (XSS) vulnerability. If you must do this, use `mark_safe` in your Python code.
+### 规则说明
+Detected a template variable where autoescaping is explicitly disabled with '| safeseq' filter. This allows rendering of raw HTML in this segment. Ensure no user data is rendered here, otherwise this is a cross-site scripting (XSS) vulnerability. If you must do this, use `mark_safe` in your Python code.
 
-CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
-References:
-- https://docs.djangoproject.com/en/3.0/ref/templates/builtins/#safeseq
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS

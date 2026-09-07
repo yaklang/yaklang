@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-current-exe"
 	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from rule `current-exe` (rust/lang/security/current-exe.yml).
-Original message: current_exe should not be used for security operations. From the docs: "The output of this function should not be trusted for anything that might have security implications. Basically, if users can run the executable, they can change the output arbitrarily."
-CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
-References:
-- https://doc.rust-lang.org/stable/std/env/fn.current_exe.html#security
+### 规则说明
+current_exe should not be used for security operations. From the docs: "The output of this function should not be trusted for anything that might have security implications. Basically, if users can run the executable, they can change the output arbitrarily."
+
+### 风险类型
+敏感信息泄露（information-exposure）
+
+### 影响
+应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
 SOLUTION
 	alert_min: 1
 	"file://pos.rs": <<<POS

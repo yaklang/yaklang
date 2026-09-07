@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-aws-fsx-lustre-filesystem-encrypted-with-cmk"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from rule `aws-fsx-lustre-filesystem-encrypted-with-cmk` (upstream/terraform/aws/security/aws-fsx-lustre-files-ystem.yaml).
-Original message: Ensure FSX Lustre file system is encrypted at rest using KMS CMKs. CMKs gives you control over the encryption key in terms of access and rotation.
+### 规则说明
+Ensure FSX Lustre file system is encrypted at rest using KMS CMKs. CMKs gives you control over the encryption key in terms of access and rotation.
 
-CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
-References:
-- https://owasp.org/Top10/A01_2021-Broken_Access_Control
+### 风险类型
+安全配置不当（security-misconfiguration）
+
+### 影响
+安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — fsx resource blocks are dropped when they contain a `kms_key_id` assignment (pattern-not-inside approximation via overlap removal).
+
+### 参考
+- CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
 DESC
 	solution: <<<SOLUTION
-Set `kms_key_id` on the aws_fsx_lustre_file_system resource to encrypt at rest with a KMS CMK.
+### 修复建议
+按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
 SOLUTION
 	alert_min: 1
 	"file://pos.tf": <<<POS

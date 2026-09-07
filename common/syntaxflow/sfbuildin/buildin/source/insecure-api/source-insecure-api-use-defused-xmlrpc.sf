@@ -8,16 +8,30 @@ desc(
 	rule_id: "source-insecure-api-use-defused-xmlrpc"
 	risk: "xxe"
 	desc: <<<DESC
-Migrated from rule `use-defused-xmlrpc` (python/lang/security/use-defused-xmlrpc.yaml).
-Original message: Detected use of xmlrpc. xmlrpc is not inherently safe from vulnerabilities. Use defusedxml.xmlrpc instead.
-CWE: CWE-776: Improper Restriction of Recursive Entity References in DTDs ('XML Entity Expansion')
-References:
-- https://pypi.org/project/defusedxml/
-- https://docs.python.org/3/library/xml.html#xml-vulnerabilities
+### 规则说明
+Detected use of xmlrpc. xmlrpc is not inherently safe from vulnerabilities. Use defusedxml.xmlrpc instead.
+
+### 风险类型
+XML 外部实体注入（XXE）（xxe）
+
+### 影响
+解析不可信 XML 时允许外部实体，可能读取本地文件或发起 SSRF。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-776: Improper Restriction of Recursive Entity References in DTDs ('XML Entity Expansion')
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+禁用外部实体和 DTD，使用安全的 XML 解析配置。
+
+推荐修复：
+Use defusedxml.xmlrpc instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

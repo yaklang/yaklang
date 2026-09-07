@@ -8,15 +8,24 @@ desc(
 	rule_id: "source-config-ai-hidden-unicode-generic"
 	risk: "unicode-direction-control"
 	desc: <<<DESC
-Migrated from rule `ai-config-hidden-unicode-generic` (upstream/ai/ai-best-practices/ai-config-hidden-unicode/ai-config-hidden-unicode.yaml).
-Original message: Invisible or zero-width Unicode character detected in AI coding assistant config file. These characters can be used in "Rules File Backdoor" attacks to inject hidden malicious instructions that are invisible to developers but interpreted by AI assistants. Remove all zero-width and bidirectional override characters from this file.
+### 规则说明
+Invisible or zero-width Unicode character detected in AI coding assistant config file. These characters can be used in "Rules File Backdoor" attacks to inject hidden malicious instructions that are invisible to developers but interpreted by AI assistants. Remove all zero-width and bidirectional override characters from this file.
 
-CWE: CWE-116: Improper Encoding, Escaping, or Output
-References:
-- https://www.pillar.security/blog/new-vulnerability-in-github-copilot-and-cursor-how-hackers-can-weaponize-code-agents
+### 风险类型
+Unicode 双向控制字符（unicode-direction-control）
+
+### 影响
+源码中隐藏双向控制字符，可能使显示内容与真实执行逻辑不一致，形成混淆攻击。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: CWE-116: Improper Encoding, Escaping, or Output
 DESC
 	solution: <<<SOLUTION
-Remove all zero-width and bidirectional override characters from AI assistant configuration files and review the visible instructions for unexpected content.
+### 修复建议
+移除隐藏 Unicode 控制字符，并使用可显示隐藏字符的编辑器审查源码。
 SOLUTION
 	alert_min: 1
 	"file://pos.cursorrules": <<<POS

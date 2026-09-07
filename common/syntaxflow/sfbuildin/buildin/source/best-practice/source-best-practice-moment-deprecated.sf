@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-best-practice-moment-deprecated"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from rule `moment-deprecated` (typescript/lang/best-practice/moment-deprecated.yaml).
-Original message: Moment is a legacy project in maintenance mode. Consider using libraries that are actively supported, e.g. `dayjs`.
-References:
-- https://momentjs.com/docs/#/-project-status/
-- https://day.js.org/
+### 规则说明
+Moment is a legacy project in maintenance mode. Consider using libraries that are actively supported, e.g. `dayjs`.
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+按官方推荐方式改写，并补充必要的安全配置。
+
+推荐修复：
+Consider using libraries that are actively supported, e.g. `dayjs`.
 SOLUTION
 	alert_min: 1
 	"file://pos.ts": <<<POS

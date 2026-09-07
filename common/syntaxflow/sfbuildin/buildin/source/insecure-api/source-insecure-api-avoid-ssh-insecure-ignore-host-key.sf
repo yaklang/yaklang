@@ -8,16 +8,30 @@ desc(
 	rule_id: "source-insecure-api-avoid-ssh-insecure-ignore-host-key"
 	risk: "certificate-validation"
 	desc: <<<DESC
-Migrated from rule `avoid-ssh-insecure-ignore-host-key` (go/lang/security/audit/crypto/insecure_ssh.yaml).
-Original message: Disabled host key verification detected. This allows man-in-the-middle attacks. Use the 'golang.org/x/crypto/ssh/knownhosts' package to do host key verification. See https://skarlso.github.io/2019/02/17/go-ssh-with-host-key-verification/ to learn more about the problem and how to fix it.
-CWE: CWE-322: Key Exchange without Entity Authentication
-References:
-- https://skarlso.github.io/2019/02/17/go-ssh-with-host-key-verification/
-- https://gist.github.com/Skarlso/34321a230cf0245018288686c9e70b2d
+### 规则说明
+Disabled host key verification detected. This allows man-in-the-middle attacks. Use the 'golang.org/x/crypto/ssh/knownhosts' package to do host key verification. See https://skarlso.github.io/2019/02/17/go-ssh-with-host-key-verification/ to learn more about the problem and how to fix it.
+
+### 风险类型
+证书校验缺失（certificate-validation）
+
+### 影响
+未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-322: Key Exchange without Entity Authentication
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
+
+推荐修复：
+Use the 'golang.org/x/crypto/ssh/knownhosts' package to do host key verification.
 SOLUTION
 	alert_min: 1
 	"file://pos.go": <<<POS

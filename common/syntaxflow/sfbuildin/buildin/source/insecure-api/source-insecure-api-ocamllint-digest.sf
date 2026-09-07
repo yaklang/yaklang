@@ -8,15 +8,30 @@ desc(
 	rule_id: "source-insecure-api-ocamllint-digest"
 	risk: "weak-hash"
 	desc: <<<DESC
-Migrated from rule `ocamllint-digest` (ocaml/lang/security/digest.yaml).
-Original message: Digest uses MD5 and should not be used for security purposes. Consider using SHA256 instead.
-CWE: CWE-328: Use of Weak Hash (4.12)
-References:
-- https://v2.ocaml.org/api/Digest.html
+### 规则说明
+Digest uses MD5 and should not be used for security purposes. Consider using SHA256 instead.
+
+### 风险类型
+弱哈希算法（weak-hash）
+
+### 影响
+使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-328: Use of Weak Hash (4.12)
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+改用 SHA-256/SHA-3 或针对口令使用 bcrypt/Argon2 等专用算法。
+
+推荐修复：
+Consider using SHA256 instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

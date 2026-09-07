@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-ocamllint-filenameconcat"
 	risk: "path-traversal"
 	desc: <<<DESC
-Migrated from rule `ocamllint-filenameconcat` (ocaml/lang/security/filenameconcat.yaml).
-Original message: When attacker supplied data is passed to Filename.concat directory traversal attacks might be possible.
-CWE: CWE-35: Path Traversal
-References:
-- https://v2.ocaml.org/api/Filename.html
+### 规则说明
+When attacker supplied data is passed to Filename.concat directory traversal attacks might be possible.
+
+### 风险类型
+路径遍历（path-traversal）
+
+### 影响
+用户输入未校验即用于文件路径，可能读取或写入任意文件。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-35: Path Traversal
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+规范化路径并校验其位于允许目录内，避免直接拼接用户输入。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

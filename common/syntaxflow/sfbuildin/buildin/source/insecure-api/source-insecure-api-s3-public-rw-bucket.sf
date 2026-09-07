@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-insecure-api-s3-public-rw-bucket"
 	risk: "access-control"
 	desc: <<<DESC
-Migrated from rule `s3-public-rw-bucket` (terraform/lang/security/s3-public-rw-bucket.yaml).
-Original message: S3 bucket with public read-write access detected.
-CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
-References:
-- https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket#acl
-- https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
+### 规则说明
+S3 bucket with public read-write access detected.
+
+### 风险类型
+访问控制缺陷（access-control）
+
+### 影响
+资源或接口的访问权限设置不当，可能允许越权访问。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+按最小权限原则配置访问控制，并验证所有请求的授权状态。
 SOLUTION
 	alert_min: 1
 	"file://pos.tf": <<<POS

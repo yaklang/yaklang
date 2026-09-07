@@ -8,10 +8,21 @@ desc(
 	rule_id: "source-python-pickle-load"
 	risk: "deserialization"
 	desc: <<<DESC
-Flags pickle.load / loads which can execute code when deserializing untrusted data.
+### 规则说明
+检测 Detect Python pickle.load Usage 相关的风险模式。
+
+### 风险类型
+不安全反序列化（deserialization）
+
+### 影响
+反序列化不可信数据可能触发任意代码执行或对象注入。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Prefer json or other safe formats; never unpickle untrusted bytes.
+### 修复建议
+避免反序列化不可信输入，使用安全的数据格式，并校验数据来源与类型。
 SOLUTION
 	alert_min: 1
 	"file://ser.py": <<<POS

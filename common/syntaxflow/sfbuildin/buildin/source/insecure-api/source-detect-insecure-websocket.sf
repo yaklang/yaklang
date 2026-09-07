@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-detect-insecure-websocket"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
-Migrated from rule `detect-insecure-websocket` (upstream/javascript/lang/security/detect-insecure-websocket.yaml).
-Original message: Insecure WebSocket Detected. WebSocket Secure (wss) should be used for all WebSocket connections.
+### 规则说明
+Insecure WebSocket Detected. WebSocket Secure (wss) should be used for all WebSocket connections.
 
-CWE: CWE-319: Cleartext Transmission of Sensitive Information
-References:
-- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+### 风险类型
+明文传输（cleartext-transmission）
+
+### 影响
+敏感数据通过 HTTP 等明文通道传输，可能被网络窃听。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — ws:// hits are dropped when inside ws://localhost.* / ws://127.0.0.1.* regions (pattern-not-inside).
+
+### 参考
+- CWE: CWE-319: Cleartext Transmission of Sensitive Information
 DESC
 	solution: <<<SOLUTION
-Use wss:// (WebSocket Secure) for all WebSocket connections.
+### 修复建议
+改用 HTTPS/TLS 传输，并确保所有敏感请求都走加密通道。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

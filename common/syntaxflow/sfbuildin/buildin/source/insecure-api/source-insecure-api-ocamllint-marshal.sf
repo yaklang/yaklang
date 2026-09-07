@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-ocamllint-marshal"
 	risk: "deserialization"
 	desc: <<<DESC
-Migrated from rule `ocamllint-marshal` (ocaml/lang/security/marshal.yaml).
-Original message: Marshaling is currently not type-safe and can lead to insecure behaviour when untrusted data is marshalled. Marshalling can lead to out-of-bound reads as well.
-CWE: CWE-502: Deserialization of Untrusted Data
-References:
-- https://eternal.red/2021/secure-ocaml-sandbox/
+### 规则说明
+Marshaling is currently not type-safe and can lead to insecure behaviour when untrusted data is marshalled. Marshalling can lead to out-of-bound reads as well.
+
+### 风险类型
+不安全反序列化（deserialization）
+
+### 影响
+反序列化不可信数据可能触发任意代码执行或对象注入。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-502: Deserialization of Untrusted Data
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+避免反序列化不可信输入，使用安全的数据格式，并校验数据来源与类型。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

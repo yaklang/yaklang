@@ -8,10 +8,21 @@ desc(
 	rule_id: "source-java-md5"
 	risk: "weak-cryptography"
 	desc: <<<DESC
-Flags MessageDigest.getInstance("MD5") which is cryptographically broken for security uses.
+### 规则说明
+检测 Detect Java MD5 MessageDigest 相关的风险模式。
+
+### 风险类型
+弱加密算法（weak-cryptography）
+
+### 影响
+使用 CBC、PKCS5Padding 等易受攻击的加密模式或弱算法。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Use SHA-256 or stronger algorithms; prefer password hashing APIs (bcrypt/argon2) for passwords.
+### 修复建议
+改用经过验证的安全算法和模式，如 AES-GCM。
 SOLUTION
 	alert_min: 1
 	"file://Hash.java": <<<POS

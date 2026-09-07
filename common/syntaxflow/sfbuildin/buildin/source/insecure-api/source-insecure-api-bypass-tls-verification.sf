@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-insecure-api-bypass-tls-verification"
 	risk: "certificate-validation"
 	desc: <<<DESC
-Migrated from rule `bypass-tls-verification` (problem-based-packs/insecure-transport/js-node/bypass-tls-verification.yaml).
-Original message: Checks for setting the environment variable NODE_TLS_REJECT_UNAUTHORIZED to 0, which disables TLS verification. This should only be used for debugging purposes. Setting the option rejectUnauthorized to false bypasses verification against the list of trusted CAs, which also leads to insecure transport. These options lead to vulnerability to MTM attacks, and should not be used.
-CWE: CWE-319: Cleartext Transmission of Sensitive Information
-References:
-- https://nodejs.org/api/https.html#https_https_request_options_callback
-- https://stackoverflow.com/questions/20433287/node-js-request-cert-has-expired#answer-29397100
+### 规则说明
+Checks for setting the environment variable NODE_TLS_REJECT_UNAUTHORIZED to 0, which disables TLS verification. This should only be used for debugging purposes. Setting the option rejectUnauthorized to false bypasses verification against the list of trusted CAs, which also leads to insecure transport. These options lead to vulnerability to MTM attacks, and should not be used.
+
+### 风险类型
+证书校验缺失（certificate-validation）
+
+### 影响
+未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-319: Cleartext Transmission of Sensitive Information
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

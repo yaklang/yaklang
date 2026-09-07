@@ -8,15 +8,30 @@ desc(
 	rule_id: "source-insecure-api-ssl-mode-no-verify"
 	risk: "certificate-validation"
 	desc: <<<DESC
-Migrated from rule `ssl-mode-no-verify` (ruby/lang/security/ssl-mode-no-verify.yaml).
-Original message: Detected SSL that will accept an unverified connection. This makes the connections susceptible to man-in-the-middle attacks. Use 'OpenSSL::SSL::VERIFY_PEER' instead.
-CWE: CWE-295: Improper Certificate Validation
-References:
-- https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures
+### 规则说明
+Detected SSL that will accept an unverified connection. This makes the connections susceptible to man-in-the-middle attacks. Use 'OpenSSL::SSL::VERIFY_PEER' instead.
+
+### 风险类型
+证书校验缺失（certificate-validation）
+
+### 影响
+未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-295: Improper Certificate Validation
 DESC
 	solution: <<<SOLUTION
-Preferred replacement: VERIFY_PEER
+### 修复建议
+启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
+
+推荐修复：
+Use 'OpenSSL::SSL::VERIFY_PEER' instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

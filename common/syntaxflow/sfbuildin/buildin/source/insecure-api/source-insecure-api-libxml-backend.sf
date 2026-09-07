@@ -8,16 +8,30 @@ desc(
 	rule_id: "source-insecure-api-libxml-backend"
 	risk: "xxe"
 	desc: <<<DESC
-Migrated from rule `libxml-backend` (ruby/rails/security/audit/xxe/libxml-backend.yaml).
-Original message: This application is using LibXML as the XML backend. LibXML can be vulnerable to XML External Entities (XXE) vulnerabilities. Use the built-in Rails XML parser, REXML, instead.
-CWE: CWE-611: Improper Restriction of XML External Entity Reference
-References:
-- https://www.stackhawk.com/blog/rails-xml-external-entities-xxe-guide-examples-and-prevention/
-- https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+### 规则说明
+This application is using LibXML as the XML backend. LibXML can be vulnerable to XML External Entities (XXE) vulnerabilities. Use the built-in Rails XML parser, REXML, instead.
+
+### 风险类型
+XML 外部实体注入（XXE）（xxe）
+
+### 影响
+解析不可信 XML 时允许外部实体，可能读取本地文件或发起 SSRF。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-611: Improper Restriction of XML External Entity Reference
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+禁用外部实体和 DTD，使用安全的 XML 解析配置。
+
+推荐修复：
+Use the built-in Rails XML parser, REXML, instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS
