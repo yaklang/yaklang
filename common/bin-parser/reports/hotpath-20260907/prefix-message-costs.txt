@@ -1,0 +1,17 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusStages/Projection         	    6903	     96612 ns/op	   38068 B/op	     802 allocs/op
+BenchmarkCurrentCorpusStages/Serialization      	    2184	    263026 ns/op	  112721 B/op	    2620 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/4/CQLOptions4Fields         	   20580	     29328 ns/op	   27300 B/op	     244 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/6/CQLSupported4Fields       	   13198	     45611 ns/op	   46114 B/op	     367 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/8/CQLStartup4Fields         	   15772	     36914 ns/op	   35937 B/op	     288 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/12/CQLOptions5InitialFields 	   19453	     30534 ns/op	   27308 B/op	     244 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/14/CQLSupported5InitialFields         	   10000	     55197 ns/op	   60129 B/op	     467 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/16/CQLStartup5InitialFields           	   14299	     42089 ns/op	   45800 B/op	     363 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-cassandra/20/CassandraInternodeInitiateFields   	   19833	     30429 ns/op	   29731 B/op	     263 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-memcached/4/MemcachedStatsRequestFields         	   33933	     17575 ns/op	   15432 B/op	     164 allocs/op
+BenchmarkCurrentCorpusMessageCosts/ndpi-memcached/6/MemcachedStatsResponseFields        	    2624	    227025 ns/op	  303108 B/op	    1985 allocs/op
+BenchmarkCurrentCorpusMessageCosts/gen-memcache-bin/4/MemcachedBinaryGetRequestFields   	   25064	     24001 ns/op	   23985 B/op	     197 allocs/op
+BenchmarkCurrentCorpusMessageCosts/pr5023-gen-memcache-bin/4/MemcachedBinaryGetRequestFields         	   24283	     23784 ns/op	   23986 B/op	     197 allocs/op
+PASS
