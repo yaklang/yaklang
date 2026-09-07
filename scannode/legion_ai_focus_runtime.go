@@ -73,7 +73,7 @@ type legionServerFocusRuntime struct {
 	sink           aiFocusAssetResultSink
 	workspace      *legionCodeWorkspaceRuntime
 	inputWorkspace *inputresolver.Workspace
-	inputEvidence func([]aicommon.EvidenceOperation) // protected by mu; scoped to this runtime configuration
+	inputEvidence  func([]aicommon.EvidenceOperation) // protected by mu; scoped to this runtime configuration
 	emitEvent      func(string, []byte)
 	// A source workspace belongs to one server-authorized Focus Run. The
 	// capability surface is dormant between Turns and is activated only while
