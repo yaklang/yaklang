@@ -105,3 +105,20 @@ Functional acceptance is complete; CI remains a separate final handoff gate.
 Historical evidence stays partial because its original retry budget was
 exceeded and some temporary follow-up artifacts no longer exist. This does not
 relabel those attempts as clean runs or claim deployed/production acceptance.
+
+## Final compatibility review: search continuation
+
+The legacy log Focus passes `offset` and consumes `complete`, `next_path`,
+`next_offset`, `results` and `byte_offset`. The generic bridge previously
+ignored the cursor, so a result-limited query could repeatedly return the
+first page. A real Bind/resolver capability regression fails before this
+correction and passes for both source.search and input.search afterwards.
+
+SearchFrom validates exact-file cursors, aligns UTF-8 offsets, retains absolute
+byte positions and access ranges, and returns a progressing continuation after
+a result limit. The legacy bridge uses results while the generic tool keeps
+matches, avoiding duplicate snippet payloads. Resumed results omit unknown
+absolute line numbers. Three-page, invalid-range, directory-cursor, UTF-8,
+file-transition and EOF checks pass under race alongside existing boundaries.
+The affected real large-file Run is repeated on this frozen source; its final
+evidence and CI state are recorded with the paired PR acceptance bundle.

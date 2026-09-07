@@ -234,7 +234,13 @@ func (r *legionServerFocusRuntime) executeInputCapability(capability string, par
 	case "input.read", serverFocusCapabilitySourceRead:
 		return w.Read(r.ctx, focusRuntimeString(params, "path"), int64(utils.InterfaceToInt(params["offset"])), int64(utils.InterfaceToInt(params["max_bytes"])))
 	case "input.search", serverFocusCapabilitySourceSearch:
-		return w.Search(r.ctx, focusRuntimeString(params, "path"), focusRuntimeRawString(params, "query"), utils.InterfaceToBoolean(params["case_sensitive"]), utils.InterfaceToInt(params["limit"]))
+		result, err := w.SearchFrom(r.ctx, focusRuntimeString(params, "path"), focusRuntimeRawString(params, "query"), utils.InterfaceToBoolean(params["case_sensitive"]), utils.InterfaceToInt(params["limit"]), int64(utils.InterfaceToInt(params["offset"])))
+		if err == nil && capability == serverFocusCapabilitySourceSearch {
+			// Retain the legacy response key without duplicating snippets in prompts.
+			result["results"] = result["matches"]
+			delete(result, "matches")
+		}
+		return result, err
 	case "output.write":
 		return w.WriteOutput(r.ctx, focusRuntimeString(params, "path"), focusRuntimeRawString(params, "content"))
 	default:
