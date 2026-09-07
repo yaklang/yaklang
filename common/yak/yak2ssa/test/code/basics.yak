@@ -1,0 +1,41 @@
+// Declarations & control flow: var/const, if/else, for/in, for/range,
+// switch, functions (def/func/fn keywords), closures
+a = 1
+b := 2
+c = a + b * 3
+
+if a > 1 {
+    println("big")
+} else if a == 1 {
+    println("one")
+} else {
+    println("small")
+}
+
+for i := 0; i < 10; i++ {
+    println(i)
+}
+
+for _, v in [1, 2, 3] {
+    println(v)
+}
+
+m = {"key": "value", "n": 1}
+for k, v = range m {
+    println(k, v)
+}
+
+switch a {
+case 1:
+    println("case1")
+default:
+    println("other")
+}
+
+def add(x, y) {
+    return x + y
+}
+
+f = func(a) {
+    return add(a, 1)
+}
