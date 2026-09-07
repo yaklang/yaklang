@@ -45,6 +45,18 @@ prior 30-second runs completed 95,171 and 165,151 executions without failure.
 `curl.go` (self-assignment), `exec_test.go` (copying a TLS config mutex), and
 `http_response_fix_badcase_test.go` (unreachable code).
 
+An additional full `-race ./common/utils/lowhttp/...` run exposed existing H1
+streaming-buffer races in PoC downloads and a test-variable race in
+`TestWithStreamHandler_BAD2`. Both were reproduced independently at
+`af595e3c76`; the full package race run is therefore not claimed to pass.
+
+CI also exposed an immediate-exit assertion in the H1 cancellation test:
+the server observed disconnect before the client goroutines finished exiting.
+The test now synchronizes on server readiness and waits up to three seconds
+for zero remaining connection goroutines. It still fails on a real leak and
+also requires the canceled request to return an error. The cancellation tests
+are repeated with `-race -count=100 -cpu=1,2,4` to exercise scheduling variation.
+
 ## Performance comparison
 
 The benchmark uses a local TLS HTTP/2 server, a warmed pool, repeated request
