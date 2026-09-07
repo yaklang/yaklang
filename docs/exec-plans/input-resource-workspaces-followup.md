@@ -101,7 +101,8 @@ rebase. The full parser race timing assertion also fails on prior source
 (8.44 s vs the existing 3 s limit, no goroutine leak); full non-race and focused
 race checks pass. Do not claim the entire parser race package passed.
 
-Functional acceptance is complete; CI remains a separate final handoff gate.
+The parser-fix acceptance passed at that source. Later compatibility fixes
+require their own affected runtime acceptance; CI is a separate handoff gate.
 Historical evidence stays partial because its original retry budget was
 exceeded and some temporary follow-up artifacts no longer exist. This does not
 relabel those attempts as clean runs or claim deployed/production acceptance.
@@ -138,3 +139,27 @@ regression proves the former ignored budget and the corrected cross-page
 match; managed-input and resolver boundary race checks pass. No timeout was
 extended and no incomplete scan is labelled complete. The final Provider Run
 and CI are separate handoff gates in the acceptance bundle.
+
+## Retaining observed input evidence across Focus actions
+
+Run `aitr_93654fdcc09b481eb7bff720b5cd4835` completed on 3942fe8ff,
+with bounded searches, nonzero continuation, actual tail access and cleanup.
+Its report nevertheless retracted the observed tail event. The legacy Focus
+retains read metadata but exposes raw feedback for only the next action;
+later actions could no longer substantiate an earlier observation. This Run
+is a content-acceptance failure, not a successful analysis.
+
+The generic managed-input capability now records successful requested reads
+in the existing session evidence store. Each observation contains manifest,
+workspace, logical path, file digest, read range and at most 8 KiB of original
+head/tail bytes. Omitted bytes are explicit; UTF-8 boundaries and absolute
+offsets remain accurate. Contents are labelled untrusted data, not instructions
+or proof of whole-file analysis. No credential, download URL or host path is
+recorded. Stable identities deduplicate the generic and compatibility aliases.
+The existing session evidence retention budget applies; this is a bounded
+working context, not a permanent archive of every byte ever read.
+
+A non-log real Bind/resolver regression fails before the change and verifies
+retention after later actions, bounded excerpts, original UTF-8 byte positions,
+retry deduplication and no evidence update after a denied read. Final Provider
+content acceptance and the final commit CI remain pending.

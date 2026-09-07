@@ -232,7 +232,11 @@ func (r *legionServerFocusRuntime) executeInputCapability(capability string, par
 	case "input.list", serverFocusCapabilitySourceList:
 		return w.List(r.ctx, focusRuntimeString(params, "path"))
 	case "input.read", serverFocusCapabilitySourceRead:
-		return w.Read(r.ctx, focusRuntimeString(params, "path"), int64(utils.InterfaceToInt(params["offset"])), int64(utils.InterfaceToInt(params["max_bytes"])))
+		result, err := w.Read(r.ctx, focusRuntimeString(params, "path"), int64(utils.InterfaceToInt(params["offset"])), int64(utils.InterfaceToInt(params["max_bytes"])))
+		if err == nil {
+			r.rememberInputRead(result)
+		}
+		return result, err
 	case "input.search", serverFocusCapabilitySourceSearch:
 		result, err := w.SearchPage(r.ctx, focusRuntimeString(params, "path"), focusRuntimeRawString(params, "query"), utils.InterfaceToBoolean(params["case_sensitive"]), utils.InterfaceToInt(params["limit"]), int64(utils.InterfaceToInt(params["offset"])), int64(utils.InterfaceToInt(params["max_scan_bytes"])))
 		if err == nil && capability == serverFocusCapabilitySourceSearch {
@@ -284,7 +288,16 @@ func managedInputTools(runtime *legionServerFocusRuntime) ([]aicommon.ConfigOpti
 	}
 	manager := buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool { return tools }, buildinaitools.WithOnlyTools(tools...))
 	return []aicommon.ConfigOption{aicommon.WithAiToolManager(manager), aicommon.WithDisallowMCPServers(true),
-		aicommon.WithShowForgeListInPrompt(false), aicommon.WithEnablePlanAndExec(false), aicommon.WithEnableDetachedPlan(false)}, nil
+		aicommon.WithShowForgeListInPrompt(false), aicommon.WithEnablePlanAndExec(false), aicommon.WithEnableDetachedPlan(false),
+		func(cfg *aicommon.Config) error {
+			// Initialize before installing the callback; later concurrent reads use
+			// the existing thread-safe, token-bounded session evidence store.
+			cfg.GetSessionPromptState()
+			runtime.mu.Lock()
+			runtime.inputEvidence = cfg.ApplySessionEvidenceOps
+			runtime.mu.Unlock()
+			return nil
+		}}, nil
 }
 
 func inputFailureCode(err error) string {
