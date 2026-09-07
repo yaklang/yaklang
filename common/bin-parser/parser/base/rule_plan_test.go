@@ -91,3 +91,11 @@ func TestRulePlanConfigOrderAndCacheReplacement(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Changed", next.Children[0].Children[0].Name)
 }
+
+func TestRulePlanEmptyDocumentReplacementPreservesOrigin(t *testing.T) {
+	for _, document := range []yaml.MapSlice{nil, {}, nil, {}} {
+		n, err := instantiateRuleDocument(t.Name(), document)
+		require.NoError(t, err)
+		require.Equal(t, document, n.Origin)
+	}
+}
