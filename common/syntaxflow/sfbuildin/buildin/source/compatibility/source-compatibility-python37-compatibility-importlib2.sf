@@ -6,11 +6,11 @@ desc(
 	type: compatibility
 	level: high
 	rule_id: "source-compatibility-python37-compatibility-importlib2"
-	risk: "Compatibility"
+	risk: "code-style"
 	desc: <<<DESC
-Migrated from Semgrep rule `python37-compatibility-importlib2` (python/lang/compatibility/python37.yaml).
+Migrated from rule `python37-compatibility-importlib2` (python/lang/compatibility/python37.yaml).
 Original message: Found 'importlib.resources', which is a module only available on Python 3.7+. This does not work in lower versions, and therefore is not backwards compatible. Use importlib_resources instead for older Python versions.
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-insecure-api-no-bidi-characters"
 	risk: "unicode-direction-control"
 	desc: <<<DESC
-Migrated from Semgrep rule `no-bidi-characters` (/tmp/semgrep-rules/solidity/security/no-bidi-characters.yaml).
+Migrated from rule `no-bidi-characters` (upstream/solidity/security/no-bidi-characters.yaml).
 Original message: The code must not contain any of Unicode Direction Control Characters
 
 CWE: CWE-837: Improper Enforcement of a Single, Unique Action

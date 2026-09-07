@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-insecure-api-avoid-v-html"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `avoid-v-html` (/tmp/semgrep-rules/javascript/vue/security/audit/xss/templates/avoid-v-html.yaml).
+Migrated from rule `avoid-v-html` (upstream/javascript/vue/security/audit/xss/templates/avoid-v-html.yaml).
 Original message: Dynamically rendering arbitrary HTML on your website can be very dangerous because it can easily lead to XSS vulnerabilities. Only use HTML interpolation on trusted content and never on user-provided content.
 
 CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')

@@ -6,11 +6,11 @@ desc(
 	type: maintainability
 	level: middle
 	rule_id: "source-maintainability-bokeh-deprecated-apis"
-	risk: "Maintainability"
+	risk: "code-style"
 	desc: <<<DESC
-Migrated from Semgrep rule `bokeh-deprecated-apis` (python/bokeh/maintainability/deprecated/deprecated_apis.yaml).
+Migrated from rule `bokeh-deprecated-apis` (python/bokeh/maintainability/deprecated/deprecated_apis.yaml).
 Original message: These APIs are deprecated in Bokeh see https://docs.bokeh.org/en/latest/docs/releases.html#api-deprecations
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

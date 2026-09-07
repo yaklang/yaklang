@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: low
 	rule_id: "source-insecure-api-temp-dir"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from Semgrep rule `temp-dir` (rust/lang/security/temp-dir.yml).
+Migrated from rule `temp-dir` (rust/lang/security/temp-dir.yml).
 Original message: temp_dir should not be used for security operations. From the docs: 'The temporary directory may be shared among users, or between processes with different privileges; thus, the creation of any files or directories in the temporary directory must use a secure method to create a uniquely named file. Creating a file or directory with a fixed or predictable name may result in “insecure temporary file” security vulnerabilities.'
 CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
 References:
 - https://doc.rust-lang.org/stable/std/env/fn.temp_dir.html
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

@@ -6,11 +6,11 @@ desc(
 	type: portability
 	level: middle
 	rule_id: "source-portability-prefer-write-in-binary-mode"
-	risk: "Portability"
+	risk: "code-style"
 	desc: <<<DESC
-Migrated from Semgrep rule `prefer-write-in-binary-mode` (ocaml/lang/portability/crlf-support.yaml).
+Migrated from rule `prefer-write-in-binary-mode` (ocaml/lang/portability/crlf-support.yaml).
 Original message: 'open_out' behaves differently on Windows and on Unix-like systems with respect to line endings. To get the same behavior everywhere, use 'open_out_bin' or 'open_out_gen [Open_binary]'. If you really want LF-to-CRLF translations to take place when running on Windows, use 'open_out_gen [Open_text]'.
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Preferred fix: open_out_bin

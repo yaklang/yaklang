@@ -6,13 +6,12 @@ desc(
 	type: maintainability
 	level: low
 	rule_id: "source-maintainability-detect-huggingface"
-	risk: "Maintainability"
+	risk: "code-style"
 	desc: <<<DESC
-Migrated from Semgrep rule `detect-huggingface` (ai/python/detect-huggingface.yaml).
+Migrated from rule `detect-huggingface` (ai/python/detect-huggingface.yaml).
 Original message: Possibly found usage of AI: HuggingFace
 References:
-- https://semgrep.dev/blog/2024/detecting-shadow-ai
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

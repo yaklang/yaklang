@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-unirest-http-request"
-	risk: "Security"
+	risk: "cleartext-transmission"
 	desc: <<<DESC
-Migrated from Semgrep rule `unirest-http-request` (problem-based-packs/insecure-transport/java-stdlib/unirest-http-request.yaml).
+Migrated from rule `unirest-http-request` (problem-based-packs/insecure-transport/java-stdlib/unirest-http-request.yaml).
 Original message: Checks for requests sent via Unirest to http:// URLS. This is dangerous because the server is attempting to connect to a website that does not encrypt traffic with TLS. Instead, send requests only to https:// URLS.
 CWE: CWE-319: Cleartext Transmission of Sensitive Information
 References:
 - https://kong.github.io/unirest-java/#requests
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Preferred replacement: https://

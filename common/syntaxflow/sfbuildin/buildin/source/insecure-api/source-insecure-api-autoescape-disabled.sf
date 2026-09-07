@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-insecure-api-autoescape-disabled"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `autoescape-disabled` (/tmp/semgrep-rules/java/lang/security/audit/xss/jsf/autoescape-disabled.yaml).
+Migrated from rule `autoescape-disabled` (upstream/java/lang/security/audit/xss/jsf/autoescape-disabled.yaml).
 Original message: Detected an element with disabled HTML escaping. If external data can reach this, this is a cross-site scripting (XSS) vulnerability. Ensure no external data can reach here, or remove 'escape=false' from this element.
 
 CWE: CWE-150: Improper Neutralization of Escape, Meta, or Control Sequences

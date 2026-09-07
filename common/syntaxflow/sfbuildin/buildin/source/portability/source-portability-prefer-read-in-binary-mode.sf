@@ -6,11 +6,11 @@ desc(
 	type: portability
 	level: middle
 	rule_id: "source-portability-prefer-read-in-binary-mode"
-	risk: "Portability"
+	risk: "code-style"
 	desc: <<<DESC
-Migrated from Semgrep rule `prefer-read-in-binary-mode` (ocaml/lang/portability/crlf-support.yaml).
+Migrated from rule `prefer-read-in-binary-mode` (ocaml/lang/portability/crlf-support.yaml).
 Original message: 'open_in' behaves differently on Windows and on Unix-like systems with respect to line endings. To get the same behavior everywhere, use 'open_in_bin' or 'open_in_gen [Open_binary]'. If you really want CRLF-to-LF translations to take place when running on Windows, use 'open_in_gen [Open_text]'.
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Preferred fix: open_in_bin

@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-force-ssl-false"
-	risk: "Security"
+	risk: "insecure-tls"
 	desc: <<<DESC
-Migrated from Semgrep rule `force-ssl-false` (ruby/lang/security/force-ssl-false.yaml).
+Migrated from rule `force-ssl-false` (ruby/lang/security/force-ssl-false.yaml).
 Original message: Checks for configuration setting of force_ssl to false. Force_ssl forces usage of HTTPS, which could lead to network interception of unencrypted application traffic. To fix, set config.force_ssl = true.
 CWE: CWE-311: Missing Encryption of Sensitive Data
 References:
 - https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_force_ssl.rb
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Preferred replacement: = true

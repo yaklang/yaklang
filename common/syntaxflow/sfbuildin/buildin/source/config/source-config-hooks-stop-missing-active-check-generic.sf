@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-config-hooks-stop-missing-active-check-generic"
 	risk: "denial-of-service"
 	desc: <<<DESC
-Migrated from Semgrep rule `hooks-stop-missing-active-check-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-stop-missing-active-check/hooks-stop-missing-active-check.yaml).
+Migrated from rule `hooks-stop-missing-active-check-generic` (upstream/ai/ai-best-practices/hooks-stop-missing-active-check/hooks-stop-missing-active-check.yaml).
 Original message: Stop hook outputs a "block" decision. Ensure you check stop_hook_active first and exit 0 if true, otherwise the hook will cause an infinite loop by blocking its own stop attempts.
 
 CWE: CWE-835: Loop with Unreachable Exit Condition

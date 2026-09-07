@@ -6,9 +6,9 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-apex-specify-sharing-level"
-	risk: "Security"
+	risk: "access-control"
 	desc: <<<DESC
-Migrated from Semgrep rule `specify-sharing-level` (/tmp/semgrep-rules/apex/lang/security/ncino/sharing/SpecifySharingLevel.yaml).
+Migrated from rule `specify-sharing-level` (upstream/apex/lang/security/ncino/sharing/SpecifySharingLevel.yaml).
 Original message: Every Apex class should have an explicit sharing mode declared. Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced. Use the `inherited sharing` keyword on an Apex class to run the class in the sharing mode of the class that called it.
 
 CWE: CWE-284: Improper Access Control

@@ -6,13 +6,13 @@ desc(
 	type: audit
 	level: low
 	rule_id: "source-best-practice-avoid-yum-update"
-	risk: "Best Practice"
+	risk: "best-practice"
 	desc: <<<DESC
-Migrated from Semgrep rule `avoid-yum-update` (dockerfile/best-practice/avoid-yum-update.yaml).
+Migrated from rule `avoid-yum-update` (dockerfile/best-practice/avoid-yum-update.yaml).
 Original message: Packages in base images should be up-to-date, removing the need for 'yum update'. If packages are out-of-date, consider contacting the base image maintainer.
 References:
 - https://github.com/hadolint/hadolint/wiki/DL3031
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

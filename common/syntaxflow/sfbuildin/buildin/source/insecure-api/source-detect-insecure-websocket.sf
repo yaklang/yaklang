@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-detect-insecure-websocket"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
-Migrated from Semgrep rule `detect-insecure-websocket` (/tmp/semgrep-rules/javascript/lang/security/detect-insecure-websocket.yaml).
+Migrated from rule `detect-insecure-websocket` (upstream/javascript/lang/security/detect-insecure-websocket.yaml).
 Original message: Insecure WebSocket Detected. WebSocket Secure (wss) should be used for all WebSocket connections.
 
 CWE: CWE-319: Cleartext Transmission of Sensitive Information

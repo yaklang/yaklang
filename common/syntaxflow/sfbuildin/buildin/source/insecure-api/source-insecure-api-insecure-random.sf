@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-insecure-random"
-	risk: "Security"
+	risk: "weak-randomness"
 	desc: <<<DESC
-Migrated from Semgrep rule `insecure-random` (scala/lang/security/audit/insecure-random.yaml).
+Migrated from rule `insecure-random` (scala/lang/security/audit/insecure-random.yaml).
 Original message: Flags the use of a predictable random value from `scala.util.Random`. This can lead to vulnerabilities when used in security contexts, such as in a CSRF token, password reset token, or any other secret value. To fix this, use java.security.SecureRandom instead.
 CWE: CWE-330: Use of Insufficiently Random Values
 References:
 - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: low
 	rule_id: "source-insecure-api-args-os"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from Semgrep rule `args-os` (rust/lang/security/args-os.yml).
+Migrated from rule `args-os` (rust/lang/security/args-os.yml).
 Original message: args_os should not be used for security operations. From the docs: "The first element is traditionally the path of the executable, but it can be set to arbitrary text, and might not even exist. This means this property should not be relied upon for security purposes."
 CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
 References:
 - https://doc.rust-lang.org/stable/std/env/fn.args_os.html
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

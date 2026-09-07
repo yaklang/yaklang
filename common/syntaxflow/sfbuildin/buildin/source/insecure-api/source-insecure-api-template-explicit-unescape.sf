@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-insecure-api-template-explicit-unescape"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `template-explicit-unescape` (/tmp/semgrep-rules/javascript/express/security/audit/xss/ejs/explicit-unescape.yaml).
+Migrated from rule `template-explicit-unescape` (upstream/javascript/express/security/audit/xss/ejs/explicit-unescape.yaml).
 Original message: Detected an explicit unescape in an EJS template, using '<%- ... %>' If external data can reach these locations, your application is exposed to a cross-site scripting (XSS) vulnerability. Use '<%= ... %>' to escape this data. If you need escaping, ensure no external data can reach this location.
 
 CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')

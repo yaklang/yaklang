@@ -6,9 +6,9 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-config-visualforce-page-api-version"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from Semgrep rule `visualforce-page-api-version` (/tmp/semgrep-rules/generic/visualforce/security/ncino/xml/VisualForceAPIVersion.yaml).
+Migrated from rule `visualforce-page-api-version` (upstream/generic/visualforce/security/ncino/xml/VisualForceAPIVersion.yaml).
 Original message: Visualforce Pages must use API version 55 or higher for required use of the cspHeader attribute set to true.
 
 CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting (XSS)')

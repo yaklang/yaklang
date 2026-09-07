@@ -6,16 +6,16 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-use-defused-xml"
-	risk: "Security"
+	risk: "xxe"
 	desc: <<<DESC
-Migrated from Semgrep rule `use-defused-xml` (python/lang/security/use-defused-xml.yaml).
+Migrated from rule `use-defused-xml` (python/lang/security/use-defused-xml.yaml).
 Original message: The Python documentation recommends using `defusedxml` instead of `xml` because the native Python `xml` library is vulnerable to XML External Entity (XXE) attacks. These attacks can leak confidential data and "XML bombs" can cause denial of service.
 CWE: CWE-611: Improper Restriction of XML External Entity Reference
 References:
 - https://docs.python.org/3/library/xml.html
 - https://github.com/tiran/defusedxml
 - https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

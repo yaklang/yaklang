@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-ocamllint-digest"
-	risk: "Security"
+	risk: "weak-hash"
 	desc: <<<DESC
-Migrated from Semgrep rule `ocamllint-digest` (ocaml/lang/security/digest.yaml).
+Migrated from rule `ocamllint-digest` (ocaml/lang/security/digest.yaml).
 Original message: Digest uses MD5 and should not be used for security purposes. Consider using SHA256 instead.
 CWE: CWE-328: Use of Weak Hash (4.12)
 References:
 - https://v2.ocaml.org/api/Digest.html
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

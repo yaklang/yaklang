@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-unquoted-command-substitution-in-command"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from Semgrep rule `unquoted-command-substitution-in-command` (/tmp/semgrep-rules/bash/lang/correctness/unquoted-expansion.yaml).
+Migrated from rule `unquoted-command-substitution-in-command` (upstream/bash/lang/correctness/unquoted-expansion.yaml).
 Original message: The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable. You should surround it with double quotes to avoid splitting the result.
 
 CWE: -

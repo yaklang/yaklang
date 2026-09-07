@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-insecure-api-debug-template-tag"
 	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from Semgrep rule `debug-template-tag` (/tmp/semgrep-rules/python/django/security/audit/templates/debug-template-tag.yaml).
+Migrated from rule `debug-template-tag` (upstream/python/django/security/audit/templates/debug-template-tag.yaml).
 Original message: Detected a debug template tag in a Django template. This dumps debugging information to the page when debug mode is enabled. Showing debug information to users is dangerous because it may reveal information about your environment that malicious actors can use to gain access to the system. Remove the debug tag.
 
 CWE: CWE-489: Active Debug Code

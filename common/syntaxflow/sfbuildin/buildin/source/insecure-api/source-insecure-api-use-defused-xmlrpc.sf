@@ -6,15 +6,15 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-use-defused-xmlrpc"
-	risk: "Security"
+	risk: "xxe"
 	desc: <<<DESC
-Migrated from Semgrep rule `use-defused-xmlrpc` (python/lang/security/use-defused-xmlrpc.yaml).
+Migrated from rule `use-defused-xmlrpc` (python/lang/security/use-defused-xmlrpc.yaml).
 Original message: Detected use of xmlrpc. xmlrpc is not inherently safe from vulnerabilities. Use defusedxml.xmlrpc instead.
 CWE: CWE-776: Improper Restriction of Recursive Entity References in DTDs ('XML Entity Expansion')
 References:
 - https://pypi.org/project/defusedxml/
 - https://docs.python.org/3/library/xml.html#xml-vulnerabilities
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

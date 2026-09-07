@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-use-of-md5-kotlin"
-	risk: "Security"
+	risk: "weak-hash"
 	desc: <<<DESC
-Migrated from Semgrep rule `use-of-md5` (kotlin/lang/security/use-of-md5.yaml).
+Migrated from rule `use-of-md5` (kotlin/lang/security/use-of-md5.yaml).
 Original message: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.
 CWE: CWE-328: Use of Weak Hash
 References:
 - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

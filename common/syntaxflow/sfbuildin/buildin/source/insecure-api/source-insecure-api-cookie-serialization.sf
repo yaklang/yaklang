@@ -6,15 +6,15 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-cookie-serialization"
-	risk: "Security"
+	risk: "deserialization"
 	desc: <<<DESC
-Migrated from Semgrep rule `cookie-serialization` (ruby/lang/security/cookie-serialization.yaml).
+Migrated from rule `cookie-serialization` (ruby/lang/security/cookie-serialization.yaml).
 Original message: Checks if code allows cookies to be deserialized using Marshal. If the attacker can craft a valid cookie, this could lead to remote code execution. The hybrid check is just to warn users to migrate to :json for best practice.
 CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')
 References:
 - https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_cookie_serialization.rb
 - https://robertheaton.com/2013/07/22/how-to-hack-a-rails-app-using-its-secret-token/
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

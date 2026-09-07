@@ -6,15 +6,15 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-s3-public-rw-bucket"
-	risk: "Security"
+	risk: "access-control"
 	desc: <<<DESC
-Migrated from Semgrep rule `s3-public-rw-bucket` (terraform/lang/security/s3-public-rw-bucket.yaml).
+Migrated from rule `s3-public-rw-bucket` (terraform/lang/security/s3-public-rw-bucket.yaml).
 Original message: S3 bucket with public read-write access detected.
 CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
 References:
 - https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket#acl
 - https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

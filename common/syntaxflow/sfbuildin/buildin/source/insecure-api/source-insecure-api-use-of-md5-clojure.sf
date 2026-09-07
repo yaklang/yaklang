@@ -6,15 +6,15 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-use-of-md5-clojure"
-	risk: "Security"
+	risk: "weak-hash"
 	desc: <<<DESC
-Migrated from Semgrep rule `use-of-md5` (clojure/lang/security/use-of-md5.yaml).
+Migrated from rule `use-of-md5` (clojure/lang/security/use-of-md5.yaml).
 Original message: MD5 hash algorithm detected. This is not collision resistant and leads to easily-cracked password hashes. Replace with current recommended hashing algorithms.
 CWE: CWE-328: Use of Weak Hash
 References:
 - https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
 - https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

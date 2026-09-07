@@ -6,15 +6,15 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-insecure-api-file-disclosure"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from Semgrep rule `file-disclosure` (ruby/lang/security/file-disclosure.yaml).
+Migrated from rule `file-disclosure` (ruby/lang/security/file-disclosure.yaml).
 Original message: Special requests can determine whether a file exists on a filesystem that's outside the Rails app's root directory. To fix this, set config.serve_static_assets = false.
 CWE: CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')
 References:
 - https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_file_disclosure.rb
 - https://groups.google.com/g/rubyonrails-security/c/23fiuwb1NBA/m/MQVM1-5GkPMJ
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Preferred replacement: = false
