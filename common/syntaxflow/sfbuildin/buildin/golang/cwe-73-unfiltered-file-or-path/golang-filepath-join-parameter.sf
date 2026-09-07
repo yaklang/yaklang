@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang外部参数参与的文件路径拼接"
 	type: audit
 	level: low
-	risk: "路径穿越"
+	risk: "path-traversal"
 	rule_id: "db4c6369-d6df-4f14-946f-6275f7c53f5f"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -44,7 +44,7 @@ alert $low for {
 	title: "External Parameters Reach Filepath Join And File Operation",
 	title_zh: "检测到外部参数经文件路径拼接后进入文件操作",
 	message: "函数参数参与 `filepath.Join` 后直接进入文件访问或删除操作，且未看到充分的边界校验。",
-	risk: "路径穿越",
+	risk: "path-traversal",
 	desc: <<<DESC
 该规则用于识别 service/DAO/工具层中不经过 HTTP 入口也会出现的通用路径穿越模式：函数参数先参与 `filepath.Join`，随后被用于 `os.Stat`、`os.Remove`、`os.Open` 等文件操作，但中间没有看到可靠的目录边界校验。
 DESC

@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Beego ORM动态过滤查询风险"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	rule_id: "2ed31e6b-e189-47c9-9907-477b7b6257d1"
 	solution: <<<SOLUTION
 ### 修复建议
