@@ -81,6 +81,7 @@ message BootstrapResponse {
   google.protobuf.Timestamp expires_at = 6;
   string node_id = 7;
   bool runtime_host_capacity_accepted = 8;
+  bool resource_policy_required = 9;
 }
 
 message ActiveAttemptHeartbeat {
@@ -127,4 +128,16 @@ message NodeLog {
   LogLevel level = 2;
   string message = 3;
   map<string, string> attributes = 4;
+}
+
+// NodeResourcePolicy is administrator-owned desired host admission configuration.
+// Zero max_running_jobs means unlimited. Existing workloads are never terminated.
+message NodeResourcePolicy {
+  uint64 system_reserved_cpu_millicores = 1;
+  uint64 system_reserved_memory_bytes = 2;
+  uint32 max_running_jobs = 3;
+}
+
+message NodeHeartbeatResponse {
+  NodeResourcePolicy resource_policy = 1;
 }

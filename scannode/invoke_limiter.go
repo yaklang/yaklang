@@ -42,6 +42,8 @@ func (l *invokeLimiter) capacity() uint32 {
 	if l == nil {
 		return 0
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.maximum
 }
 
