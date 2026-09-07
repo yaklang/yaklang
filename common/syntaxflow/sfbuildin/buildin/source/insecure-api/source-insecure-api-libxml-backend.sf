@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Libxml Backend"
+	title_zh: "Libxml Backend"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-libxml-backend"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `libxml-backend` (ruby/rails/security/audit/xxe/libxml-backend.yaml).
+Original message: This application is using LibXML as the XML backend. LibXML can be vulnerable to XML External Entities (XXE) vulnerabilities. Use the built-in Rails XML parser, REXML, instead.
+CWE: CWE-611: Improper Restriction of XML External Entity Reference
+References:
+- https://www.stackhawk.com/blog/rails-xml-external-entities-xxe-guide-examples-and-prevention/
+- https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+ActiveSupport::XmlMini.backend = "LibXML"
+POS
+	"safefile://pos.rb": <<<NEG
+ActiveSupport::XmlMini.backend = "Nokogiri"
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:ActiveSupport::XmlMini\.backend\s+=\s+"LibXML")/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Libxml Backend",
+	title_zh: "Libxml Backend",
+	message: "Libxml Backend detected.",
+}

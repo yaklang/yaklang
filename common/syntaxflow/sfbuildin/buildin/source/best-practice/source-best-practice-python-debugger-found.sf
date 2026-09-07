@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Python Debugger Found"
+	title_zh: "Python Debugger Found"
+	type: audit
+	level: middle
+	rule_id: "source-best-practice-python-debugger-found"
+	risk: "Best Practice"
+	desc: <<<DESC
+Migrated from Semgrep rule `python-debugger-found` (python/lang/best-practice/pdb.yaml).
+Original message: Importing the python debugger; did you mean to leave this in?
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import pdb
+POS
+	"safefile://pos.py": <<<NEG
+import logging
+NEG
+)
+
+${*.py}.pattern_regex(/(?:import\s+pdb)|(?:pdb\.set_trace\(\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Python Debugger Found",
+	title_zh: "Python Debugger Found",
+	message: "Python Debugger Found detected.",
+}

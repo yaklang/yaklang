@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Avoid Dnf Update"
+	title_zh: "Avoid Dnf Update"
+	type: audit
+	level: low
+	rule_id: "source-best-practice-avoid-dnf-update"
+	risk: "Best Practice"
+	desc: <<<DESC
+Migrated from Semgrep rule `avoid-dnf-update` (dockerfile/best-practice/avoid-dnf-update.yaml).
+Original message: Packages in base images should be up-to-date, removing the need for 'dnf update'. If packages are out-of-date, consider contacting the base image maintainer.
+References:
+- https://github.com/hadolint/hadolint/wiki/DL3039
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://Dockerfile": <<<POS
+dnf update
+POS
+	"safefile://Dockerfile": <<<NEG
+dnf install
+NEG
+)
+
+${Dockerfile}.pattern_regex(/(?:dnf\s+update)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Avoid Dnf Update",
+	title_zh: "Avoid Dnf Update",
+	message: "Avoid Dnf Update detected.",
+}

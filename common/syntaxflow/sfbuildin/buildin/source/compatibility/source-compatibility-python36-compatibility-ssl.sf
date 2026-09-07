@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Python36 Compatibility Ssl"
+	title_zh: "Python36 Compatibility Ssl"
+	type: compatibility
+	level: high
+	rule_id: "source-compatibility-python36-compatibility-ssl"
+	risk: "Compatibility"
+	desc: <<<DESC
+Migrated from Semgrep rule `python36-compatibility-ssl` (python/lang/compatibility/python36.yaml).
+Original message: this function is only available on Python 3.6+
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+ssl.get_ciphers()
+POS
+	"safefile://pos.py": <<<NEG
+ssl.get_protocol_name()
+NEG
+)
+
+${*.py}.pattern_regex(/(?:ssl\.get_ciphers\(\))/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python36 Compatibility Ssl",
+	title_zh: "Python36 Compatibility Ssl",
+	message: "Python36 Compatibility Ssl detected.",
+}

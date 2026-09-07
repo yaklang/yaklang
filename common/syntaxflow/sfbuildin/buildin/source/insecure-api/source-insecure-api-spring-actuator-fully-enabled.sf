@@ -1,0 +1,39 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Spring Actuator Fully Enabled"
+	title_zh: "Spring Actuator Fully Enabled"
+	type: vuln
+	level: high
+	rule_id: "source-insecure-api-spring-actuator-fully-enabled"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `spring-actuator-fully-enabled` (java/spring/security/audit/spring-actuator-fully-enabled.yaml).
+Original message: Spring Boot Actuator is fully enabled. This exposes sensitive endpoints such as /actuator/env, /actuator/logfile, /actuator/heapdump and others. Unless you have Spring Security enabled or another means to protect these endpoints, this functionality is available without authentication, causing a significant security risk.
+CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
+References:
+- https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready-features.html#production-ready-endpoints-exposing-endpoints
+- https://medium.com/walmartglobaltech/perils-of-spring-boot-actuators-misconfiguration-185c43a0f785
+- https://blog.maass.xyz/spring-actuator-security-part-1-stealing-secrets-using-spring-actuators
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Original paths.include: ['*properties'].
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.properties": <<<POS
+management.endpoints.web.exposure.include=*
+POS
+	"safefile://pos.properties": <<<NEG
+management.endpoints.web.exposure.include=health
+NEG
+)
+
+${*.properties}.pattern_regex(/(?:management\.endpoints\.web\.exposure\.include=\*)/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Spring Actuator Fully Enabled",
+	title_zh: "Spring Actuator Fully Enabled",
+	message: "Spring Actuator Fully Enabled detected.",
+}

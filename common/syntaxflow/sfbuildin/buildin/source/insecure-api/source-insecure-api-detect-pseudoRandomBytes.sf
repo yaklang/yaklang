@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Detect PseudoRandomBytes"
+	title_zh: "Detect PseudoRandomBytes"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-detect-pseudoRandomBytes"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `detect-pseudoRandomBytes` (javascript/lang/security/detect-pseudoRandomBytes.yaml).
+Original message: Detected usage of crypto.pseudoRandomBytes, which does not produce secure random numbers.
+CWE: CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)
+References:
+- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.js": <<<POS
+crypto.pseudoRandomBytes
+POS
+	"safefile://pos.js": <<<NEG
+crypto.randomBytes
+NEG
+)
+
+${*.js}.pattern_regex(/(?:crypto\.pseudoRandomBytes)/) as $p0
+${*.ts}.pattern_regex(/(?:crypto\.pseudoRandomBytes)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Detect PseudoRandomBytes",
+	title_zh: "Detect PseudoRandomBytes",
+	message: "Detect PseudoRandomBytes detected.",
+}

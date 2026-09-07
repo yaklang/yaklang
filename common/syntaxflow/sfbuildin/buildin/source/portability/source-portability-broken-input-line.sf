@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Broken Input Line"
+	title_zh: "Broken Input Line"
+	type: portability
+	level: middle
+	rule_id: "source-portability-broken-input-line"
+	risk: "Portability"
+	desc: <<<DESC
+Migrated from Semgrep rule `broken-input-line` (ocaml/lang/portability/crlf-support.yaml).
+Original message: 'input_line' leaves a '\r' (CR) character when reading lines from a Windows text file, whose lines end in "\r\n" (CRLF). This is a problem for any Windows file that is being read either on a Unix-like platform or on Windows in binary mode. If the code already takes care of removing any trailing '\r' after reading the line, add a '(* nosemgrep *)' comment to disable this warning.
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+input_line
+POS
+	"safefile://pos.ml": <<<NEG
+In_channel.input_all
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:input_line)/) as $p0
+${*.mli}.pattern_regex(/(?:input_line)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Broken Input Line",
+	title_zh: "Broken Input Line",
+	message: "Broken Input Line detected.",
+}

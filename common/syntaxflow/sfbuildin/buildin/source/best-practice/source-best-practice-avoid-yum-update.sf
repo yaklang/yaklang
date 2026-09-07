@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Avoid Yum Update"
+	title_zh: "Avoid Yum Update"
+	type: audit
+	level: low
+	rule_id: "source-best-practice-avoid-yum-update"
+	risk: "Best Practice"
+	desc: <<<DESC
+Migrated from Semgrep rule `avoid-yum-update` (dockerfile/best-practice/avoid-yum-update.yaml).
+Original message: Packages in base images should be up-to-date, removing the need for 'yum update'. If packages are out-of-date, consider contacting the base image maintainer.
+References:
+- https://github.com/hadolint/hadolint/wiki/DL3031
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://Dockerfile": <<<POS
+yum update
+POS
+	"safefile://Dockerfile": <<<NEG
+yum install
+NEG
+)
+
+${Dockerfile}.pattern_regex(/(?:yum\s+update)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Avoid Yum Update",
+	title_zh: "Avoid Yum Update",
+	message: "Avoid Yum Update detected.",
+}

@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Use of MD5 in Kotlin"
+	title_zh: "Kotlin 中使用 MD5"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-use-of-md5-kotlin"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `use-of-md5` (kotlin/lang/security/use-of-md5.yaml).
+Original message: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use SHA256 or SHA3 instead.
+CWE: CWE-328: Use of Weak Hash
+References:
+- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.kt": <<<POS
+java.security.MessageDigest.getInstance("MD5")
+POS
+	"safefile://pos.kt": <<<NEG
+MessageDigest.getInstance("SHA-256")
+NEG
+)
+
+${*.kt}.pattern_regex(/(?:java\.security\.MessageDigest\.getInstance\("MD5"\))|(?:org\.apache\.commons\.codec\.digest\.DigestUtils\.getMd5Digest\(\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Use of MD5 in Kotlin",
+	title_zh: "Kotlin 中使用 MD5",
+	message: "Use of MD5 detected.",
+}

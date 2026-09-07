@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Detect Generic Ai Gem"
+	title_zh: "Detect Generic Ai Gem"
+	type: maintainability
+	level: low
+	rule_id: "source-maintainability-detect-generic-ai-gem"
+	risk: "Maintainability"
+	desc: <<<DESC
+Migrated from Semgrep rule `detect-generic-ai-gem` (ai/generic/detect-generic-ai-gem.yaml).
+Original message: Possibly found usage of AI: Gemini
+References:
+- https://semgrep.dev/blog/2024/detecting-shadow-ai
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.txt": <<<POS
+google/generative-ai
+POS
+	"safefile://pos.txt": <<<NEG
+hello world
+NEG
+)
+
+${*}.pattern_regex(/(?:google\/generative\-ai)|(?:GoogleGenerativeAI)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Detect Generic Ai Gem",
+	title_zh: "Detect Generic Ai Gem",
+	message: "Detect Generic Ai Gem detected.",
+}

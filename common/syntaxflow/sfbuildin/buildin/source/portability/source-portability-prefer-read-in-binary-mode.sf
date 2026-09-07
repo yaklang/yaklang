@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Prefer Read In Binary Mode"
+	title_zh: "Prefer Read In Binary Mode"
+	type: portability
+	level: middle
+	rule_id: "source-portability-prefer-read-in-binary-mode"
+	risk: "Portability"
+	desc: <<<DESC
+Migrated from Semgrep rule `prefer-read-in-binary-mode` (ocaml/lang/portability/crlf-support.yaml).
+Original message: 'open_in' behaves differently on Windows and on Unix-like systems with respect to line endings. To get the same behavior everywhere, use 'open_in_bin' or 'open_in_gen [Open_binary]'. If you really want CRLF-to-LF translations to take place when running on Windows, use 'open_in_gen [Open_text]'.
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred fix: open_in_bin
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+open_in
+POS
+	"safefile://pos.ml": <<<NEG
+In_channel.with_open_bin
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:open_in)/) as $p0
+${*.mli}.pattern_regex(/(?:open_in)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Prefer Read In Binary Mode",
+	title_zh: "Prefer Read In Binary Mode",
+	message: "Prefer Read In Binary Mode detected.",
+}

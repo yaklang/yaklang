@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Detect Generic Ai Anthprop"
+	title_zh: "Detect Generic Ai Anthprop"
+	type: maintainability
+	level: low
+	rule_id: "source-maintainability-detect-generic-ai-anthprop"
+	risk: "Maintainability"
+	desc: <<<DESC
+Migrated from Semgrep rule `detect-generic-ai-anthprop` (ai/generic/detect-generic-ai-anthprop.yaml).
+Original message: Possibly found usage of AI: Anthropic
+References:
+- https://semgrep.dev/blog/2024/detecting-shadow-ai
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.txt": <<<POS
+anthropic
+POS
+	"safefile://pos.txt": <<<NEG
+hello world
+NEG
+)
+
+${*}.pattern_regex(/(?:anthropic)|(?:Anthropic)|(?:claude)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Detect Generic Ai Anthprop",
+	title_zh: "Detect Generic Ai Anthprop",
+	message: "Detect Generic Ai Anthprop detected.",
+}

@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Detect Tensorflow"
+	title_zh: "Detect Tensorflow"
+	type: maintainability
+	level: low
+	rule_id: "source-maintainability-detect-tensorflow"
+	risk: "Maintainability"
+	desc: <<<DESC
+Migrated from Semgrep rule `detect-tensorflow` (ai/python/detect-tensorflow.yaml).
+Original message: Possibly found usage of AI tooling: Tensorflow
+References:
+- https://semgrep.dev/blog/2024/detecting-shadow-ai
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import tensorflow
+POS
+	"safefile://pos.py": <<<NEG
+import json
+NEG
+)
+
+${*.py}.pattern_regex(/(?:import\s+tensorflow)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Detect Tensorflow",
+	title_zh: "Detect Tensorflow",
+	message: "Detect Tensorflow detected.",
+}

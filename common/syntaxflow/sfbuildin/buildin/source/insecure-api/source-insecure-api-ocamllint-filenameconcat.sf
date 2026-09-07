@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Ocamllint Filenameconcat"
+	title_zh: "Ocamllint Filenameconcat"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-ocamllint-filenameconcat"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `ocamllint-filenameconcat` (ocaml/lang/security/filenameconcat.yaml).
+Original message: When attacker supplied data is passed to Filename.concat directory traversal attacks might be possible.
+CWE: CWE-35: Path Traversal
+References:
+- https://v2.ocaml.org/api/Filename.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+Filename.concat
+POS
+	"safefile://pos.ml": <<<NEG
+Filename.quote_command
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:Filename\.concat)/) as $p0
+${*.mli}.pattern_regex(/(?:Filename\.concat)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Ocamllint Filenameconcat",
+	title_zh: "Ocamllint Filenameconcat",
+	message: "Ocamllint Filenameconcat detected.",
+}

@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Current Exe"
+	title_zh: "Current Exe"
+	type: vuln
+	level: low
+	rule_id: "source-insecure-api-current-exe"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `current-exe` (rust/lang/security/current-exe.yml).
+Original message: current_exe should not be used for security operations. From the docs: "The output of this function should not be trusted for anything that might have security implications. Basically, if users can run the executable, they can change the output arbitrarily."
+CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
+References:
+- https://doc.rust-lang.org/stable/std/env/fn.current_exe.html#security
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rs": <<<POS
+std::env::current_exe()
+POS
+	"safefile://pos.rs": <<<NEG
+std::env::current_dir()
+NEG
+)
+
+${*.rs}.pattern_regex(/(?:std::env::current_exe\(\))/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Current Exe",
+	title_zh: "Current Exe",
+	message: "Current Exe detected.",
+}

@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Python37 Compatibility Importlib3"
+	title_zh: "Python37 Compatibility Importlib3"
+	type: compatibility
+	level: high
+	rule_id: "source-compatibility-python37-compatibility-importlib3"
+	risk: "Compatibility"
+	desc: <<<DESC
+Migrated from Semgrep rule `python37-compatibility-importlib3` (python/lang/compatibility/python37.yaml).
+Original message: Found usage of 'importlib.abc.ResourceReader'. This module is only available on Python 3.7+ and is therefore not backwards compatible. Instead, use another loader.
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import importlib.abc.ResourceReader
+POS
+	"safefile://pos.py": <<<NEG
+import importlib.abc
+NEG
+)
+
+${*.py}.pattern_regex(/(?:import\s+importlib\.abc\.ResourceReader)/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python37 Compatibility Importlib3",
+	title_zh: "Python37 Compatibility Importlib3",
+	message: "Python37 Compatibility Importlib3 detected.",
+}

@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Args"
+	title_zh: "Args"
+	type: vuln
+	level: low
+	rule_id: "source-insecure-api-args"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `args` (rust/lang/security/args.yml).
+Original message: args should not be used for security operations. From the docs: "The first element is traditionally the path of the executable, but it can be set to arbitrary text, and might not even exist. This means this property should not be relied upon for security purposes."
+CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
+References:
+- https://doc.rust-lang.org/stable/std/env/fn.args.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rs": <<<POS
+std::env::args()
+POS
+	"safefile://pos.rs": <<<NEG
+std::env::vars()
+NEG
+)
+
+${*.rs}.pattern_regex(/(?:std::env::args\(\))/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Args",
+	title_zh: "Args",
+	message: "Args detected.",
+}

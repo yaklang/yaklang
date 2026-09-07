@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "JavaScript Debugger"
+	title_zh: "JavaScript Debugger"
+	type: audit
+	level: middle
+	rule_id: "source-best-practice-javascript-debugger"
+	risk: "Best Practice"
+	desc: <<<DESC
+Migrated from Semgrep rule `javascript-debugger` (javascript/lang/best-practice/leftover_debugging.yaml).
+Original message: found debugger call; should this be in production code?
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.js": <<<POS
+debugger;
+POS
+	"safefile://pos.js": <<<NEG
+console.log
+NEG
+)
+
+${*.js}.pattern_regex(/(?:debugger;)/) as $p0
+${*.ts}.pattern_regex(/(?:debugger;)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "JavaScript Debugger",
+	title_zh: "JavaScript Debugger",
+	message: "JavaScript Debugger detected.",
+}

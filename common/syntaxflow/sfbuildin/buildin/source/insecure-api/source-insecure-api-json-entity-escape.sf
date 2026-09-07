@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Json Entity Escape"
+	title_zh: "Json Entity Escape"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-json-entity-escape"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `json-entity-escape` (ruby/lang/security/json-entity-escape.yaml).
+Original message: Checks if HTML escaping is globally disabled for JSON output. This could lead to XSS.
+CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+References:
+- https://owasp.org/Top10/A03_2021-Injection
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+ActiveSupport.escape_html_entities_in_json = false
+POS
+	"safefile://pos.rb": <<<NEG
+ActiveSupport.escape_html_entities_in_json = true
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:ActiveSupport\.escape_html_entities_in_json\s+=\s+false)|(?:config\.active_support\.escape_html_entities_in_json\s+=\s+false)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Json Entity Escape",
+	title_zh: "Json Entity Escape",
+	message: "Json Entity Escape detected.",
+}
