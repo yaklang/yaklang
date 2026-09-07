@@ -181,6 +181,12 @@ func (w *Workspace) Read(ctx context.Context, name string, offset, limit int64) 
 // A single huge line cannot grow the heap, and access events record the bytes
 // actually examined even when a match limit or cancellation ends the scan.
 func (w *Workspace) Search(ctx context.Context, selection, query string, caseSensitive bool, limit int) (map[string]any, error) {
+	return w.SearchFrom(ctx, selection, query, caseSensitive, limit, 0)
+}
+
+// SearchFrom resumes an exact input file using its original byte offset. A
+// result limit returns a cursor rather than silently restarting at byte zero.
+func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, caseSensitive bool, limit int, requestedOffset int64) (map[string]any, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if err := w.check(ctx); err != nil {
@@ -189,6 +195,18 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 	selection, err := inputSelection(selection)
 	if err != nil {
 		return nil, err
+	}
+	if requestedOffset < 0 {
+		return nil, fail("input_range_invalid", "")
+	}
+	if requestedOffset > 0 {
+		resource, err := w.resource(selection)
+		if err != nil {
+			return nil, err
+		}
+		if uint64(requestedOffset) > resource.SizeBytes {
+			return nil, fail("input_range_invalid", resource.ResourceId)
+		}
 	}
 	if query == "" || !utf8.ValidString(query) || len(query) > 1024 || strings.ContainsRune(query, '\x00') || strings.ContainsRune(query, '\n') {
 		return nil, fail("input_query_invalid", "")
@@ -204,17 +222,28 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 	results := make([]map[string]any, 0)
 	var total int64
 	truncated := false
+	nextPath := ""
+	var nextOffset int64
 	for _, resource := range w.manifest.Resources {
 		if !selected(resource.RelativePath, selection) {
 			continue
 		}
 		if len(results) >= limit {
 			truncated = true
+			nextPath = resource.RelativePath
 			break
 		}
 		file, err := w.open(resource)
 		if err != nil {
 			return nil, err
+		}
+		startOffset, err := alignInputUTF8ReadOffset(file, requestedOffset, int64(resource.SizeBytes))
+		if err == nil {
+			_, err = file.Seek(startOffset, io.SeekStart)
+		}
+		if err != nil {
+			file.Close()
+			return nil, fail("input_read_failed", resource.ResourceId)
 		}
 		reader := bufio.NewReaderSize(file, 64<<10)
 		var scanned int64
@@ -223,8 +252,12 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 		scanErr := func() error {
 			defer file.Close()
 			defer func() {
-				w.event("input.file.access", Event{ResourceID: resource.ResourceId, Path: resource.RelativePath,
-					Operation: "search", BytesRead: scanned, EndOffset: scanned, StartLine: 1, EndLine: line})
+				event := Event{ResourceID: resource.ResourceId, Path: resource.RelativePath,
+					Operation: "search", Offset: startOffset, BytesRead: scanned, EndOffset: startOffset + scanned}
+				if startOffset == 0 {
+					event.StartLine, event.EndLine = 1, line
+				}
+				w.event("input.file.access", event)
 			}()
 			for {
 				if err := w.check(ctx); err != nil {
@@ -247,15 +280,23 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 						searchFrom = matchEnd
 						continue
 					}
-					offset := previous - int64(len(tail)) + int64(index)
+					offset := startOffset + previous - int64(len(tail)) + int64(index)
 					end := index + 512
 					if end > len(text) {
 						end = len(text)
 					}
-					results = append(results, map[string]any{"path": resource.RelativePath, "resource_id": resource.ResourceId,
-						"line": line, "offset": offset, "content": strings.ToValidUTF8(text[index:end], "�")})
+					result := map[string]any{"path": resource.RelativePath, "resource_id": resource.ResourceId,
+						"offset": offset, "byte_offset": offset, "content": strings.ToValidUTF8(text[index:end], "�")}
+					// Do not present a resumed fragment's local line as an absolute line.
+					if startOffset == 0 {
+						result["line"] = line
+					}
+					results = append(results, result)
 					if len(results) >= limit {
-						truncated = uint64(scanned) < resource.SizeBytes
+						truncated = uint64(startOffset+scanned) < resource.SizeBytes
+						if truncated {
+							nextPath, nextOffset = resource.RelativePath, startOffset+scanned
+						}
 						return nil
 					}
 					break
@@ -284,8 +325,17 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 		if scanErr != nil {
 			return nil, scanErr
 		}
+		if truncated {
+			break
+		}
 	}
-	return map[string]any{"path": selection, "query": query, "matches": results, "count": len(results), "scanned_bytes": total, "truncated": truncated}, nil
+	response := map[string]any{"path": selection, "query": query, "matches": results,
+		"count": len(results), "scanned_bytes": total, "scan_start_offset": requestedOffset,
+		"truncated": truncated, "complete": !truncated}
+	if truncated {
+		response["next_path"], response["next_offset"] = nextPath, nextOffset
+	}
+	return response, nil
 }
 
 // WriteOutput exposes a bounded writable capability, never an input mutation.
