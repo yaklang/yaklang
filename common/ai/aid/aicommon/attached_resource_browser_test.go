@@ -23,6 +23,8 @@ func TestAttachedBrowserResourceData(t *testing.T) {
 	require.Contains(t, browserResource.ToAttachData(nil), "device-1")
 	require.Contains(t, browserResource.ToAttachData(nil), "do not use use_browser")
 	require.Contains(t, browserResource.ToAttachData(nil), "method browser.tabs")
+	require.Contains(t, browserResource.ToAttachData(nil), "domain=transform")
+	require.Contains(t, browserResource.ToAttachData(nil), "The Agent must not persist a Profile itself")
 }
 
 func TestAttachedBrowserResourcePromotesBridgeTools(t *testing.T) {

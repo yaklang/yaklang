@@ -44,9 +44,6 @@ type Server struct {
 	browserBridge  *browser.ExtensionBridgeManager
 	browserTasks   chan struct{}
 	runtimeForges  *aiforge.RuntimeForgeRegistry
-
-	browserTransformAdapterMu sync.Mutex
-	browserTransformAdapter   *browserTransformExternalAdapter
 }
 
 type ServerOpts func(config *ServerConfig)
@@ -247,19 +244,11 @@ func (s *Server) CloseBrowserExtensionBridge() error {
 	if s == nil {
 		return nil
 	}
-	adapterErr := s.closeBrowserTransformAdapter()
 	if s.browserBridge == nil {
-		return adapterErr
+		return nil
 	}
 	browser.SetActiveExtensionBridgeManager(nil)
-	bridgeErr := s.browserBridge.Close()
-	if adapterErr != nil {
-		if bridgeErr != nil {
-			return fmt.Errorf("close browser transform adapter: %v; close browser extension bridge: %w", adapterErr, bridgeErr)
-		}
-		return adapterErr
-	}
-	return bridgeErr
+	return s.browserBridge.Close()
 }
 
 var YakitProfileTables = schema.ProfileTables
