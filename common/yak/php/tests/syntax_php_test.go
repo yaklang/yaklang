@@ -42,7 +42,12 @@ var syntaxNonASTAssets = map[string]struct{}{
 func phpFixtureParseBudget() time.Duration {
 	raw := strings.TrimSpace(os.Getenv("YAK_PHP_FIXTURE_PARSE_BUDGET_SEC"))
 	if raw == "" {
-		return 30 * time.Second
+		// 90s: HTML-heavy fixtures that interleave alternative syntax
+		// (if(): ?>html<?php endif;) across inline <?= blocks — e.g.
+		// pfsense/status_dhcp_leases.php — need full-context (LL) prediction
+		// and can take 20-50s depending on machine state, so a tighter budget
+		// flakes. The budget still catches pathological regressions (hangs).
+		return 90 * time.Second
 	}
 	sec, err := strconv.Atoi(raw)
 	if err != nil || sec <= 0 {
