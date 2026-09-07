@@ -92,10 +92,8 @@ func (s *Server) isAISessionRunning(sessionID string) bool {
 	if sessionID == "" {
 		return false
 	}
-	if manager := s.currentAIReActScheduler(); manager != nil && manager.isSessionReserved(sessionID) {
-		return true
-	}
-	return isAIReActSessionBusy(sessionID)
+	runtime := s.getReActSessionRuntime()
+	return runtime != nil && runtime.IsSessionBusy(sessionID)
 }
 
 func (s *Server) UpdateAISessionTitle(ctx context.Context, req *ypb.UpdateAISessionTitleRequest) (*ypb.DbOperateMessage, error) {
@@ -170,11 +168,11 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		if err != nil {
 			return nil, err
 		}
-		if manager := s.currentAIReActScheduler(); manager != nil {
-			if err := manager.cancelSessionExecutionsAndWait(ctx, nil, true); err != nil {
-				return nil, err
-			}
+		quiescence, err := s.getReActSessionRuntime().QuiesceAll(ctx)
+		if err != nil {
+			return nil, err
 		}
+		defer quiescence.Release()
 		for _, scheduleUUID := range attachedScheduleUUIDs {
 			s.cancelAIReActScheduleExecution(scheduleUUID)
 		}
@@ -234,11 +232,11 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 	if err != nil {
 		return nil, err
 	}
-	if manager := s.currentAIReActScheduler(); manager != nil {
-		if err := manager.cancelSessionExecutionsAndWait(ctx, targetSessionIDs, false); err != nil {
-			return nil, err
-		}
+	quiescence, err := s.getReActSessionRuntime().QuiesceSessions(ctx, targetSessionIDs)
+	if err != nil {
+		return nil, err
 	}
+	defer quiescence.Release()
 	for _, scheduleUUID := range attachedScheduleUUIDs {
 		s.cancelAIReActScheduleExecution(scheduleUUID)
 	}

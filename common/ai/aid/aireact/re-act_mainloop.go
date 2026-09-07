@@ -68,10 +68,7 @@ func (r *ReAct) updateRuntimeTasks() {
 	newRuntimeTasks := make([]aicommon.AIStatefulTask, 0)
 
 	for _, task := range r.RuntimeTasks {
-		if task.GetStatus() == aicommon.AITaskState_Completed {
-			continue
-		}
-		if task.GetStatus() == aicommon.AITaskState_Aborted {
+		if task.IsFinished() {
 			continue
 		}
 		newRuntimeTasks = append(newRuntimeTasks, task)
@@ -111,8 +108,11 @@ func (r *ReAct) processReActFromQueue() {
 
 	// 从队列获取下一个任务
 	log.Infof("start to get first task from queue for ReAct instance: %s", r.config.Id)
+	finishHandoff := r.beginTaskQueueHandoff()
+	defer finishHandoff()
 	nextTask := r.taskQueue.GetFirst()
 	if nextTask == nil {
+		finishHandoff()
 		return
 	}
 
@@ -120,6 +120,7 @@ func (r *ReAct) processReActFromQueue() {
 	r.setCurrentTask(nextTask)
 	r.persistTaskUserInput(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)
+	finishHandoff()
 	if r.config.DebugEvent {
 		log.Infof("Processing task from queue: %s", nextTask.GetId())
 	}
@@ -717,6 +718,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory
 		wg:                   new(sync.WaitGroup),
+		lifecycleWG:          new(sync.WaitGroup),
 		pureInvokerMode:      true,
 	}
 	// Inherit parent tracker when passed via ConvertConfigToOptions; otherwise

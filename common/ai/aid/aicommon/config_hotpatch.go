@@ -22,7 +22,9 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 			return
 		}
 		validator := make(chan struct{})
+		c.hotPatchLoopWG.Add(1)
 		go func() {
+			defer c.hotPatchLoopWG.Done()
 			for {
 				select {
 				case <-validator:
@@ -52,6 +54,17 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 		case <-ctx.Done():
 		}
 	})
+}
+
+// WaitHotPatchLoopStopped waits until the hot-patch consumer has completely
+// exited. Session lifecycle owners use it before deleting persistent session
+// data, because a final hot-patch may still emit and persist config events while
+// the main input loop is already stopping.
+func (c *Config) WaitHotPatchLoopStopped() {
+	if c == nil {
+		return
+	}
+	c.hotPatchLoopWG.Wait()
 }
 
 func (c *Config) SimpleInfoMap() map[string]interface{} {

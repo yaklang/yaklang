@@ -164,4 +164,40 @@ func TestStartAIReActFrontendStreamCancelReleasesFreeInput(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 	require.False(t, aireact.IsSessionBusy(sessionID))
 	require.False(t, aireact.IsSessionStarting(sessionID))
+	require.False(t, server.getReActSessionRuntime().IsSessionBusy(sessionID))
+}
+
+func TestStartAIReActReturnsWhenRuntimeConnectionStops(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	connection := &imConnectionStub{done: make(chan struct{})}
+	runtime := &imRuntimeStub{connection: connection}
+	server := &Server{reActRuntime: runtime}
+	stream := newCancelableAIReActServerStream(ctx, &ypb.AIInputEvent{
+		IsStart: true,
+		Params:  &ypb.AIStartParams{TimelineSessionID: "runtime-stopped"},
+	})
+
+	streamDone := make(chan error, 1)
+	go func() { streamDone <- server.StartAIReAct(stream) }()
+	require.Eventually(t, func() bool {
+		runtime.mu.Lock()
+		defer runtime.mu.Unlock()
+		return len(runtime.requests) == 1
+	}, time.Second, 10*time.Millisecond)
+	require.NoError(t, connection.Close())
+	select {
+	case err := <-streamDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("gRPC adapter remained blocked in Recv after the runtime connection stopped")
+	}
+}
+
+func TestStartAIReActRejectsNilFirstMessage(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	server := &Server{}
+	stream := newCancelableAIReActServerStream(ctx, nil)
+	require.ErrorContains(t, server.StartAIReAct(stream), "first msg is not a start/config message")
 }

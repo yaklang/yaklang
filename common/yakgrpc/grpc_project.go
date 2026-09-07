@@ -48,6 +48,9 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 		switch req.GetType() {
 		case yakit.TypeProject:
 			s.stopAIReActScheduler()
+			if err := s.retireReActSessionRuntime(ctx); err != nil {
+				return nil, utils.Errorf("stop AI ReAct runtime before closing project: %s", err)
+			}
 			consts.GetGormProjectDatabase().Close()
 		case yakit.TypeSSAProject:
 			consts.GetGormSSAProjectDataBase().Close()
@@ -100,9 +103,13 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	switch req.GetType() {
 	case yakit.TypeProject:
 		s.stopAIReActScheduler()
+		if stopErr := s.retireReActSessionRuntime(ctx); stopErr != nil {
+			return nil, utils.Errorf("stop AI ReAct runtime before switching project: %s", stopErr)
+		}
 		consts.SetDefaultYakitProjectDatabaseName(path)
 		err = consts.SetGormProjectDatabase(path)
 		if err == nil {
+			s.resetReActSessionRuntimeAfterProjectSwitch()
 			s.StartAIReActScheduler()
 		}
 	case yakit.TypeSSAProject:

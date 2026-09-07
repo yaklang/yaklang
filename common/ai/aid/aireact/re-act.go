@@ -101,7 +101,12 @@ type ReAct struct {
 	artifacts            *filesys.RelLocalFs
 
 	wg           *sync.WaitGroup
+	lifecycleWG  *sync.WaitGroup
 	memoryTriage aicommon.MemoryTriage
+
+	taskHandoffMu      sync.Mutex
+	taskHandoffs       int
+	taskHandoffVersion uint64
 
 	midtermRecallMutex           sync.Mutex
 	pendingMidtermTimelineRecall bool
@@ -238,6 +243,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory
 		wg:                   new(sync.WaitGroup),
+		lifecycleWG:          new(sync.WaitGroup),
 		browserSessionIDs:    make(map[string]struct{}),
 	}
 
@@ -492,6 +498,209 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) (ret error) {
 	return nil
 }
 
+// SendInputEventAndWaitAccepted synchronously dispatches config hot-patches and
+// admits plain free-input events into the ReAct task queue. Session coordinators
+// use this narrower entry point both to preserve the event loop's
+// "hot-patch before following input" order and to make "check session idle ->
+// enqueue task" atomic with respect to an external reservation. Other event
+// kinds retain the asynchronous event-loop behavior of SendInputEvent.
+func (r *ReAct) SendInputEventAndWaitAccepted(event *ypb.AIInputEvent) (ret error) {
+	defer func() {
+		if retErr := recover(); retErr != nil {
+			ret = utils.Errorf("SendInputEventAndWaitAccepted panic: %v", retErr)
+		}
+	}()
+	if event == nil {
+		return fmt.Errorf("input event is nil")
+	}
+	if r == nil || r.config == nil {
+		return fmt.Errorf("re-act runtime is nil")
+	}
+	if err := r.config.GetContext().Err(); err != nil {
+		return err
+	}
+
+	// Preserve Config.StartEventLoopEx's precedence rule: a hot-patch is
+	// converted and queued before the loop receives the following input. Without
+	// doing this synchronously, a directly-admitted free input could overtake a
+	// hot-patch still waiting in EventInputChan.
+	if event.GetIsConfigHotpatch() {
+		hotPatchOptions := r.config.ProcessHotPatchMessage(event)
+		r.config.PersistSessionStartParamsFromHotpatch(event)
+		for _, option := range hotPatchOptions {
+			r.config.HotPatchOptionChan.SafeFeed(option)
+		}
+		return nil
+	}
+
+	// Interactive and sync messages retain Config.processInputEvent's existing
+	// asynchronous execution behavior.
+	if !event.GetIsFreeInput() || event.GetIsInteractiveMessage() || event.GetIsSyncMessage() {
+		return r.SendInputEvent(event)
+	}
+	if r.config.InputEventManager != nil {
+		r.config.InputEventManager.CallMirrorOfAIInputEvent(event)
+	}
+	return r.handleFreeValue(event)
+}
+
+// CancelTaskByUserInputUUID cancels the root task admitted from a particular
+// input event. A transport-independent session owner uses it to stop only its
+// task when it is attached to a ReAct runtime owned by somebody else.
+func (r *ReAct) CancelTaskByUserInputUUID(inputUUID string) bool {
+	inputUUID = strings.TrimSpace(inputUUID)
+	if r == nil || inputUUID == "" {
+		return false
+	}
+	cancelTask := func(task aicommon.AIStatefulTask) bool {
+		if task == nil || task.IsFinished() {
+			return false
+		}
+		r.CancelTask(task, &ypb.AIInputEvent{})
+		return true
+	}
+	for _, task := range r.GetRuntimeTasks() {
+		if task != nil && task.GetUserInputUUID() == inputUUID && cancelTask(task) {
+			return true
+		}
+	}
+	for _, task := range r.GetQueueingTasks() {
+		if task == nil || task.GetUserInputUUID() != inputUUID {
+			continue
+		}
+		if r.taskQueue.RemoveTask(task.GetId()) && cancelTask(task) {
+			return true
+		}
+	}
+	// The queue processor may have moved the task between the two snapshots.
+	for _, task := range r.GetRuntimeTasks() {
+		if task != nil && task.GetUserInputUUID() == inputUUID && cancelTask(task) {
+			return true
+		}
+	}
+	return false
+}
+
+// CancelTaskByUserInputUUIDAndWait retries cancellation across the queue to
+// runtime hand-off, then waits until processReActTask's deferred persistence and
+// cleanup have finished. A single lookup is insufficient because dequeue hooks
+// run after removing the task from the queue and before runtime publication.
+func (r *ReAct) CancelTaskByUserInputUUIDAndWait(ctx context.Context, inputUUID string) error {
+	inputUUID = strings.TrimSpace(inputUUID)
+	if r == nil || inputUUID == "" {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		_, versionBefore := r.taskQueueHandoffState()
+		r.CancelTaskByUserInputUUID(inputUUID)
+		handoffActive, versionAfter := r.taskQueueHandoffState()
+		if !handoffActive && versionBefore == versionAfter {
+			break
+		}
+		if !handoffActive {
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+	return r.WaitTaskByUserInputUUIDStopped(ctx, inputUUID)
+}
+
+func (r *ReAct) hasTaskByUserInputUUID(inputUUID string) bool {
+	for _, task := range r.GetRuntimeTasks() {
+		if task != nil && task.GetUserInputUUID() == inputUUID {
+			return true
+		}
+	}
+	for _, task := range r.GetQueueingTasks() {
+		if task != nil && task.GetUserInputUUID() == inputUUID {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *ReAct) beginTaskQueueHandoff() func() {
+	if r == nil {
+		return func() {}
+	}
+	r.taskHandoffMu.Lock()
+	r.taskHandoffs++
+	r.taskHandoffVersion++
+	r.taskHandoffMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			r.taskHandoffMu.Lock()
+			if r.taskHandoffs > 0 {
+				r.taskHandoffs--
+			}
+			r.taskHandoffVersion++
+			r.taskHandoffMu.Unlock()
+		})
+	}
+}
+
+func (r *ReAct) hasTaskQueueHandoff() bool {
+	hasHandoff, _ := r.taskQueueHandoffState()
+	return hasHandoff
+}
+
+func (r *ReAct) taskQueueHandoffState() (bool, uint64) {
+	if r == nil {
+		return false, 0
+	}
+	r.taskHandoffMu.Lock()
+	hasHandoff := r.taskHandoffs > 0
+	version := r.taskHandoffVersion
+	r.taskHandoffMu.Unlock()
+	return hasHandoff, version
+}
+
+// WaitTaskByUserInputUUIDStopped waits for a task to leave both the queue and
+// the runtime list. A terminal status event is emitted before processReActTask's
+// deferred persistence and cleanup have returned, so observing that event alone
+// is not sufficient for session deletion safety.
+func (r *ReAct) WaitTaskByUserInputUUIDStopped(ctx context.Context, inputUUID string) error {
+	inputUUID = strings.TrimSpace(inputUUID)
+	if r == nil || inputUUID == "" {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// Require two consecutive absent observations as a final stability check.
+	// processReActFromQueue also publishes an explicit hand-off marker while a
+	// task is between the queue and runtime lists, because dequeue hooks may block
+	// long enough that time-based polling alone cannot safely bridge that window.
+	absentOnce := false
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if r.hasTaskByUserInputUUID(inputUUID) || r.hasTaskQueueHandoff() {
+			absentOnce = false
+		} else if absentOnce {
+			return nil
+		} else {
+			absentOnce = true
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
 // AddToTimeline 添加条目到时间线
 func (r *ReAct) AddToTimeline(entryType, content string) {
 	r.addToTimelineWithPromptProjection(entryType, content, "")
@@ -548,7 +757,13 @@ func (r *ReAct) getTimelineTotal() int {
 func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
 	closeDoneOnce := new(sync.Once)
 	r.queueProcessor.Do(func() {
+		if r.lifecycleWG != nil {
+			r.lifecycleWG.Add(1)
+		}
 		go func() {
+			if r.lifecycleWG != nil {
+				defer r.lifecycleWG.Done()
+			}
 			defer func() {
 				closeDoneOnce.Do(func() {
 					close(done)
@@ -657,6 +872,9 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 // startEventLoop starts the background event processing loop
 func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 	doneOnce := new(sync.Once)
+	if r.lifecycleWG != nil {
+		r.lifecycleWG.Add(1)
+	}
 	if !r.pureInvokerMode {
 		r.config.InputEventManager.SetFreeInputCallback(r.handleFreeValue)
 	}
@@ -670,6 +888,9 @@ func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 			})
 		},
 		func() {
+			if r.lifecycleWG != nil {
+				r.lifecycleWG.Done()
+			}
 			r.UnRegisterReActSyncEvent()
 			r.CloseTrackedBrowserSessions()
 			doneOnce.Do(func() {
@@ -692,6 +913,19 @@ func (r *ReAct) Wait() {
 		return
 	}
 	r.wg.Wait()
+}
+
+// WaitLifecycleStopped waits for the long-lived input and task-queue loops to
+// exit after their context is cancelled. It is separate from Wait so existing
+// AIEngine/ReAct callers keep the original Wait behavior.
+func (r *ReAct) WaitLifecycleStopped() {
+	if r == nil || r.lifecycleWG == nil {
+		return
+	}
+	r.lifecycleWG.Wait()
+	if r.config != nil {
+		r.config.WaitHotPatchLoopStopped()
+	}
 }
 
 // loadMCPServers loads AI tools from enabled MCP servers asynchronously

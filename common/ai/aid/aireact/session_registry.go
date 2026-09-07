@@ -58,6 +58,19 @@ func IsSessionStarting(sessionID string) bool {
 	return ok
 }
 
+// EnumerateStartingSessions returns session IDs currently protected by the
+// process-wide creation reservation. It lets lifecycle coordinators avoid
+// deleting session data while a ReAct owned elsewhere is still being built.
+func EnumerateStartingSessions() []string {
+	sessionStartState.Lock()
+	defer sessionStartState.Unlock()
+	ids := make([]string, 0, len(sessionStartState.starting))
+	for sessionID := range sessionStartState.starting {
+		ids = append(ids, sessionID)
+	}
+	return ids
+}
+
 func registerRunningSession(sessionID string, react *ReAct) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" || react == nil {

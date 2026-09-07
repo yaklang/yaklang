@@ -38,6 +38,12 @@ type Server struct {
 
 	aiReActSchedulerMu sync.Mutex
 	aiReActScheduler   *aiReActScheduler
+
+	reActRuntimeMu sync.Mutex
+	reActRuntime   ReActSessionRuntime
+	// reActRuntimeRetired keeps a quiesced runtime installed while the project
+	// database is closed or changing, so no caller can create against the old DB.
+	reActRuntimeRetired bool
 }
 
 type ServerOpts func(config *ServerConfig)
