@@ -6,9 +6,9 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-config-hooks-relative-script-path"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from Semgrep rule `hooks-relative-script-path-bash` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-relative-script-path/hooks-relative-script-path.yaml).
+Migrated from rule `hooks-relative-script-path-bash` (upstream/ai/ai-best-practices/hooks-relative-script-path/hooks-relative-script-path.yaml).
 Original message: Relative path used for script invocation in hook. Use absolute paths or environment variables like $CLAUDE_PROJECT_DIR, $CURSOR_PROJECT_DIR, or $HOME to ensure the correct script is executed regardless of working directory.
 
 CWE: CWE-426: Untrusted Search Path

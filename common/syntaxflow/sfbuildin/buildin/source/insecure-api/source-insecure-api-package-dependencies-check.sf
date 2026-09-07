@@ -6,9 +6,9 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-package-dependencies-check"
-	risk: "Security Misconfiguration"
+	risk: "sca"
 	desc: <<<DESC
-Migrated from Semgrep rule `package-dependencies-check` (/tmp/semgrep-rules/json/npm/security/package-dependencies-check.yml).
+Migrated from rule `package-dependencies-check` (upstream/json/npm/security/package-dependencies-check.yml).
 Original message: Package dependencies with variant versions may lead to dependency hijack and confusion attacks. Better to specify an exact version or use package-lock.json for a specific version of the package.
 
 CWE: CWE-427: Uncontrolled Search Path Element

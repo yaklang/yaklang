@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-tls-renegotiation"
-	risk: "Security"
+	risk: "insecure-tls"
 	desc: <<<DESC
-Migrated from Semgrep rule `tls-renegotiation` (problem-based-packs/insecure-transport/java-stdlib/tls-renegotiation.yaml).
+Migrated from rule `tls-renegotiation` (problem-based-packs/insecure-transport/java-stdlib/tls-renegotiation.yaml).
 Original message: Checks for cases where java applications are allowing unsafe renegotiation. This leaves the application vulnerable to a man-in-the-middle attack where chosen plain text is injected as prefix to a TLS connection.
 CWE: CWE-319: Cleartext Transmission of Sensitive Information
 References:
 - https://www.oracle.com/java/technologies/javase/tlsreadme.html
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

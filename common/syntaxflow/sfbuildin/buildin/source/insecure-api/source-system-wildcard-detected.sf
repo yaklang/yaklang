@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-system-wildcard-detected"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from Semgrep rule `system-wildcard-detected` (/tmp/semgrep-rules/python/lang/security/audit/system-wildcard-detected.yaml).
+Migrated from rule `system-wildcard-detected` (upstream/python/lang/security/audit/system-wildcard-detected.yaml).
 Original message: Detected use of the wildcard character in a system call that spawns a shell. This subjects the wildcard to normal shell expansion, which can have unintended consequences if there exist any non-standard file names. Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
 
 CWE: CWE-155: Improper Neutralization of Wildcards or Matching Symbols

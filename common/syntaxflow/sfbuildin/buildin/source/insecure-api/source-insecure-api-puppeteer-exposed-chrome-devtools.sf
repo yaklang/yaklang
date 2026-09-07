@@ -6,9 +6,9 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-puppeteer-exposed-chrome-devtools"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from Semgrep rule `puppeteer-exposed-chrome-devtools` (/tmp/semgrep-rules/javascript/puppeteer/security/audit/puppeteer-exposed-chrome-devtools.yaml).
+Migrated from rule `puppeteer-exposed-chrome-devtools` (upstream/javascript/puppeteer/security/audit/puppeteer-exposed-chrome-devtools.yaml).
 Original message: Remote debugging protocol does not perform any authentication, so exposing it too widely can be a security risk.
 
 CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')

@@ -6,11 +6,11 @@ desc(
 	type: portability
 	level: middle
 	rule_id: "source-portability-not-portable-tmp-string"
-	risk: "Portability"
+	risk: "code-style"
 	desc: <<<DESC
-Migrated from Semgrep rule `not-portable-tmp-string` (ocaml/lang/portability/slash-tmp.yaml).
+Migrated from rule `not-portable-tmp-string` (ocaml/lang/portability/slash-tmp.yaml).
 Original message: You should probably use Filename.get_temp_dirname().
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

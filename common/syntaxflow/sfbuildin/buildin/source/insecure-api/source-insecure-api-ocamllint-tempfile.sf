@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-ocamllint-tempfile"
-	risk: "Security"
+	risk: "symlink-toctou"
 	desc: <<<DESC
-Migrated from Semgrep rule `ocamllint-tempfile` (ocaml/lang/security/tempfile.yaml).
+Migrated from rule `ocamllint-tempfile` (ocaml/lang/security/tempfile.yaml).
 Original message: Filename.temp_file might lead to race conditions, since the file could be altered or replaced by a symlink before being opened.
 CWE: CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition
 References:
 - https://v2.ocaml.org/api/Filename.html
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

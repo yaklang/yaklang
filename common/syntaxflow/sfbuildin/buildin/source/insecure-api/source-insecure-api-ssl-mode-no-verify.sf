@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-ssl-mode-no-verify"
-	risk: "Security"
+	risk: "certificate-validation"
 	desc: <<<DESC
-Migrated from Semgrep rule `ssl-mode-no-verify` (ruby/lang/security/ssl-mode-no-verify.yaml).
+Migrated from rule `ssl-mode-no-verify` (ruby/lang/security/ssl-mode-no-verify.yaml).
 Original message: Detected SSL that will accept an unverified connection. This makes the connections susceptible to man-in-the-middle attacks. Use 'OpenSSL::SSL::VERIFY_PEER' instead.
 CWE: CWE-295: Improper Certificate Validation
 References:
 - https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Preferred replacement: VERIFY_PEER

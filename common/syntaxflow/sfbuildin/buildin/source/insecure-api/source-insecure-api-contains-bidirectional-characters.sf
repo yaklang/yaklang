@@ -6,9 +6,9 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-contains-bidirectional-characters"
-	risk: "Security"
+	risk: "unicode-direction-control"
 	desc: <<<DESC
-Migrated from Semgrep rule `contains-bidirectional-characters` (/tmp/semgrep-rules/generic/unicode/security/bidi.yml).
+Migrated from rule `contains-bidirectional-characters` (upstream/generic/unicode/security/bidi.yml).
 Original message: This code contains bidirectional (bidi) characters. While this is useful for support of right-to-left languages such as Arabic or Hebrew, it can also be used to trick language parsers into executing code in a manner that is different from how it is displayed in code editing and review tools.
 
 CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')

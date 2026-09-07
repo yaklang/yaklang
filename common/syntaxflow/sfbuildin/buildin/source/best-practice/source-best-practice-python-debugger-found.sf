@@ -6,11 +6,11 @@ desc(
 	type: audit
 	level: middle
 	rule_id: "source-best-practice-python-debugger-found"
-	risk: "Best Practice"
+	risk: "best-practice"
 	desc: <<<DESC
-Migrated from Semgrep rule `python-debugger-found` (python/lang/best-practice/pdb.yaml).
+Migrated from rule `python-debugger-found` (python/lang/best-practice/pdb.yaml).
 Original message: Importing the python debugger; did you mean to leave this in?
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

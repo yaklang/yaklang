@@ -6,15 +6,15 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-bypass-tls-verification"
-	risk: "Security"
+	risk: "certificate-validation"
 	desc: <<<DESC
-Migrated from Semgrep rule `bypass-tls-verification` (problem-based-packs/insecure-transport/js-node/bypass-tls-verification.yaml).
+Migrated from rule `bypass-tls-verification` (problem-based-packs/insecure-transport/js-node/bypass-tls-verification.yaml).
 Original message: Checks for setting the environment variable NODE_TLS_REJECT_UNAUTHORIZED to 0, which disables TLS verification. This should only be used for debugging purposes. Setting the option rejectUnauthorized to false bypasses verification against the list of trusted CAs, which also leads to insecure transport. These options lead to vulnerability to MTM attacks, and should not be used.
 CWE: CWE-319: Cleartext Transmission of Sensitive Information
 References:
 - https://nodejs.org/api/https.html#https_https_request_options_callback
 - https://stackoverflow.com/questions/20433287/node-js-request-cert-has-expired#answer-29397100
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

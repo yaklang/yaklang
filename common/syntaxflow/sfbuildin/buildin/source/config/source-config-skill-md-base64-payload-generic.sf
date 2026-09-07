@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-config-skill-md-base64-payload-generic"
 	risk: "encoded-payload-execution"
 	desc: <<<DESC
-Migrated from Semgrep rule `skill-md-base64-payload-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-base64-payload/skill-md-base64-payload.yaml).
+Migrated from rule `skill-md-base64-payload-generic` (upstream/ai/ai-best-practices/skill-md-base64-payload/skill-md-base64-payload.yaml).
 Original message: SKILL.md or AGENT.md instructs the agent to decode and execute a base64 (or hex) blob, which is a common encoding-evasion pattern used to smuggle malicious instructions past human review. Document the content in plain text or remove the encoded payload, and audit the decoded value before reintroducing it.
 
 CWE: CWE-506: Embedded Malicious Code

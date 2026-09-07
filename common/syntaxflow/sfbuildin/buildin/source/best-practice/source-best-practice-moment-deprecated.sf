@@ -6,14 +6,14 @@ desc(
 	type: audit
 	level: low
 	rule_id: "source-best-practice-moment-deprecated"
-	risk: "Best Practice"
+	risk: "best-practice"
 	desc: <<<DESC
-Migrated from Semgrep rule `moment-deprecated` (typescript/lang/best-practice/moment-deprecated.yaml).
+Migrated from rule `moment-deprecated` (typescript/lang/best-practice/moment-deprecated.yaml).
 Original message: Moment is a legacy project in maintenance mode. Consider using libraries that are actively supported, e.g. `dayjs`.
 References:
 - https://momentjs.com/docs/#/-project-status/
 - https://day.js.org/
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.

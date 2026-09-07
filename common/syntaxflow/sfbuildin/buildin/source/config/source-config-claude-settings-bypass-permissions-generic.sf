@@ -8,7 +8,7 @@ desc(
 	rule_id: "source-config-claude-settings-bypass-permissions-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from Semgrep rule `claude-settings-bypass-permissions-generic` (/tmp/semgrep-rules/ai/ai-best-practices/claude-settings-bypass-permissions/claude-settings-bypass-permissions.yaml).
+Migrated from rule `claude-settings-bypass-permissions-generic` (upstream/ai/ai-best-practices/claude-settings-bypass-permissions/claude-settings-bypass-permissions.yaml).
 Original message: Dangerous permission bypass detected in Claude Code or Cursor settings. Settings like "bypassPermissions", "allowUnsandboxedCommands: true", or "enableWeakerNestedSandbox: true" disable critical security controls that protect against malicious tool use. Remove these settings or set them to false to maintain proper sandboxing and permission checks.
 
 CWE: CWE-862: Missing Authorization

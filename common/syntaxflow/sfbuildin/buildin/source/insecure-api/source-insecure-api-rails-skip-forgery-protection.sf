@@ -6,14 +6,14 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-rails-skip-forgery-protection"
-	risk: "Security"
+	risk: "csrf"
 	desc: <<<DESC
-Migrated from Semgrep rule `rails-skip-forgery-protection` (ruby/rails/security/audit/rails-skip-forgery-protection.yaml).
+Migrated from rule `rails-skip-forgery-protection` (ruby/rails/security/audit/rails-skip-forgery-protection.yaml).
 Original message: This call turns off CSRF protection allowing CSRF attacks against the application
 CWE: CWE-352: Cross-Site Request Forgery (CSRF)
 References:
 - https://api.rubyonrails.org/classes/ActionController/RequestForgeryProtection/ClassMethods.html#method-i-skip_forgery_protection
-Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
 Review this occurrence and replace it with a safer alternative.
