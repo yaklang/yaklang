@@ -905,26 +905,39 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 		// Preserve the existing zero-copy behavior of aligned composites.
 		return byts[byteStart:byteEnd], nil
 	}
-	if byteStart > uint64(len(byts)) {
-		// The only valid position beyond the buffer is the zero-width span
-		// immediately after a pending writer octet.
-		byts = nil
-	} else {
-		needsPending := byteEnd > uint64(len(byts))
-		byts = byts[byteStart:min(byteEnd, uint64(len(byts)))]
-		if needsPending {
-			// Append only to the field window, never copy the preceding input.
-			byts = append(byts, writer.PreByte<<(8-writer.PreByteLen))
+	bitLength := resPoint[1] - resPoint[0]
+	// Numeric and string leaves can consume an aligned immutable window without
+	// creating a reader or a temporary byte slice. Returned byte values still own
+	// their storage, including a non-nil empty slice for a zero-width leaf.
+	if !isByte && resPoint[0]%8 == 0 && bitLength%8 == 0 && byteEnd <= uint64(len(byts)) {
+		window := byts[byteStart:byteEnd]
+		typ := node.Cfg.GetString(CfgType)
+		switch typ {
+		case "string":
+			return string(window), nil
+		case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "bytes":
+			return ConvertToVar(window, uint64(len(window)), endian, typ), nil
 		}
 	}
-	reader := base.NewBitReader(bytes.NewBuffer(byts))
-	if _, err := reader.ReadBits(resPoint[0] % 8); err != nil {
-		return nil, fmt.Errorf("read bits error: %w", err)
+	buf := make([]byte, (bitLength+7)/8)
+	// A final partial octet is right aligned, matching BitReader.ReadBits. Read
+	// the pending writer octet without appending to or mutating the buffer.
+	octet := func(index uint64) byte {
+		if index < uint64(len(byts)) {
+			return byts[index]
+		}
+		return writer.PreByte << (8 - writer.PreByteLen)
 	}
-	buf, err := reader.ReadBits(resPoint[1] - resPoint[0])
-	if err != nil {
-		return nil, fmt.Errorf("read bits error: %w", err)
+	for i := uint64(0); i < uint64(len(buf)); i++ {
+		at := resPoint[0] + i*8
+		width := min(uint64(8), resPoint[1]-at)
+		value := uint16(octet(at/8)) << 8
+		if at%8+width > 8 {
+			value |= uint16(octet(at/8 + 1))
+		}
+		buf[i] = byte(value>>(16-at%8-width)) & byte((uint16(1)<<width)-1)
 	}
+
 	if isByte {
 		return buf, nil
 	} else {
