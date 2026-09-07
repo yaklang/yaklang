@@ -14,7 +14,7 @@ var compactConfigKeys = [...]string{
 	"node result", "parent", "length", "element index", "last node", "isList",
 	"isRoot", "package-child", "operator", "out", "import", "ref-type", "node",
 	"consumed bits", "delimiter", "del", "delimiter-optional", "length-from-field",
-	"length-for-field", "length-for-start-field", "inList", "temp root", "stop-value", "exception-plan",
+	"length-for-field", "length-for-start-field", "inList", "temp root", "stop-value", "exception-plan", "additionInfo",
 }
 
 // Keep this a compile-time string switch: there is no global registry, lock,
@@ -83,6 +83,8 @@ func compactConfigKey(key string) uint8 {
 		return 30
 	case "exception-plan":
 		return 31
+	case "additionInfo":
+		return 32
 	}
 	return 0
 }
@@ -165,8 +167,8 @@ func (s *configStore) expandLocked() {
 	s.configStoreLegacy = legacy
 	s.writes = nil
 	s.prefix = nil
-	s.positions = [32]uint16{}
-	s.order = [32]uint8{}
+	s.positions = [33]uint16{}
+	s.order = [33]uint8{}
 	s.orderLen = 0
 	s.historyCount = 0
 }
