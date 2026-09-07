@@ -9,33 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
-
-// Validate canonical rule and alert risk types without imposing an alert
-// identity scheme. Legacy aliases remain readable but cannot enter built-ins.
-func builtinRiskTypeErrors(rule *schema.SyntaxFlowRule) []string {
-	var errors []string
-	check := func(field, value string) {
-		if value != "" && !sfrisk.IsCanonical(value) {
-			errors = append(errors, fmt.Sprintf("%s: noncanonical or review-required risk type %q", field, value))
-		}
-	}
-	check("rule", rule.RiskType)
-	for variable, alert := range rule.AlertDesc {
-		if alert == nil {
-			continue
-		}
-		check("alert["+variable+"]", alert.RiskType)
-		if !rule.AllowIncluded && alert.RiskType == "" && rule.RiskType == "" {
-			errors = append(errors, fmt.Sprintf("alert[%s]: missing effective risk type", variable))
-		}
-	}
-	return errors
-}
 
 // Run default and gzip_embed builds against their actual embedded resource set.
 func TestBuiltinRiskTypeTaxonomy(t *testing.T) {
