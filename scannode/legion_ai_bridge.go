@@ -1134,6 +1134,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		failureErr := err
 		if strings.Contains(err.Error(), "prepare source workspace") ||
 			strings.Contains(err.Error(), "source_workspace") {
+			message := sourceWorkspaceFailureMessage(err)
 			if publishErr := b.ensureAIPublisher().PublishEvent(
 				ctx,
 				ref,
@@ -1141,12 +1142,12 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 				"source.workspace.failed",
 				mustJSON(map[string]string{
 					"code":    "source_workspace_materialize_failed",
-					"message": "source workspace could not be materialized",
+					"message": message,
 				}),
 			); publishErr != nil {
 				return publishErr
 			}
-			failureErr = fmt.Errorf("source workspace materialization failed")
+			failureErr = errors.New(message)
 		}
 		if publishErr := b.publishAISessionCommandFailure(ctx, ref, "ai_session_bind_failed", failureErr); publishErr != nil {
 			return publishErr
