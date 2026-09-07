@@ -1,0 +1,26 @@
+// Strings, slices, maps, error handling, concurrency primitives
+name = sprintf("hello %v", "world")
+parts = name.Split(" ")
+nums = [1, 2, 3]
+nums = append(nums, 4)
+m = {"key": "value", "n": 1}
+m["NewKey"] = 2
+r = {"Ok": true, "Msg": "done"}
+
+if len(parts) > 0 {
+    println(parts[0])
+}
+
+err = error("boom")
+if err != nil {
+    println(err.Error())
+}
+
+go func() {
+    println("async")
+}()
+
+ch = make(chan string, 1)
+ch <- "ping"
+v = <-ch
+println(v)
