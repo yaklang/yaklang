@@ -1,0 +1,19 @@
+--- FAIL: TestRulePlanEmptyDocumentReplacementPreservesOrigin (0.00s)
+    rule_plan_test.go:99: 
+        	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/base/rule_plan_test.go:99
+        	Error:      	Not equal: 
+        	            	expected: orderedyaml.MapSlice{}
+        	            	actual  : orderedyaml.MapSlice(nil)
+        	            	
+        	            	Diff:
+        	            	--- Expected
+        	            	+++ Actual
+        	            	@@ -1,3 +1,2 @@
+        	            	-(orderedyaml.MapSlice) {
+        	            	-}
+        	            	+(orderedyaml.MapSlice) <nil>
+        	            	 
+        	Test:       	TestRulePlanEmptyDocumentReplacementPreservesOrigin
+FAIL
+FAIL	github.com/yaklang/yaklang/common/bin-parser/parser/base	0.734s
+FAIL

@@ -84,6 +84,35 @@ def freeze(artifacts, candidate):
     metadata.write_text(json.dumps(result, indent=2)+'\n')
 
 
+def append_freeze(artifacts, candidate, label):
+    metadata = artifacts/'freeze.json'
+    result = json.loads(metadata.read_text())
+    if not result.get('complete') or any(s['label'] == label for s in result['stages']):
+        raise RuntimeError('incomplete freeze or duplicate stage label')
+    with (artifacts/('freeze-before-'+label+'.json')).open('x') as f:
+        f.write(metadata.read_text())
+    sha = command(['git', 'rev-parse', candidate])
+    source = artifacts/'source'
+    if command(['git', 'status', '--porcelain'], source):
+        raise RuntimeError('freeze source is dirty')
+    subprocess.run(['git', 'switch', '--detach', sha], cwd=source, check=True)
+    patch, binary = artifacts/(label+'.patch'), artifacts/(label+'.test')
+    if binary.exists():
+        raise RuntimeError('binary already exists')
+    with patch.open('xb') as f:
+        subprocess.run(['git', 'diff', '--binary', BASE, sha], cwd=REPO, stdout=f, check=True)
+    with (artifacts/(label+'-build.txt')).open('x') as f:
+        subprocess.run(['go', 'test', '-c', '-o', str(binary), './common/bin-parser'], cwd=source, stdout=f, stderr=subprocess.STDOUT, check=True)
+    result['stages'].append({'label': label, 'commit': sha,
+                            'git_tree': command(['git', 'rev-parse', sha+'^{tree}']),
+                            'binary': str(binary), 'binary_sha256': digest(binary),
+                            'patch_sha256': digest(patch),
+                            'manifest_sha256': digest(source/'common/bin-parser/testdata/protocol-corpus/manifest.json')})
+    result['script_sha256'] = digest(__file__)
+    metadata.write_text(json.dumps(result, indent=2)+'\n')
+    print('frozen', label, sha, flush=True)
+
+
 def run(artifacts, mode, tag, rounds):
     frozen = json.loads((artifacts/'freeze.json').read_text())
     if not frozen.get('complete'):
@@ -99,7 +128,7 @@ def run(artifacts, mode, tag, rounds):
         candidates = list(stages)[1:]
     elif mode == 'representatives':
         loads = REPRESENTATIVES
-        candidates = ['candidate']
+        candidates = [frozen['stages'][-1]['label']]
     else:
         loads, candidates = [], list(stages)
     rows = output/'runs.jsonl'
@@ -167,12 +196,16 @@ if __name__ == '__main__':
     parser.add_argument('mode', choices=['freeze', 'application', 'representatives', 'digests'])
     parser.add_argument('--artifacts', type=Path, required=True)
     parser.add_argument('--candidate', default='HEAD')
+    parser.add_argument('--label', help='append a new immutable stage to an existing freeze')
     parser.add_argument('--tag', default='formal')
     parser.add_argument('--rounds', type=int, default=5)
     args = parser.parse_args()
     if args.rounds < 5 and args.mode != 'freeze':
         parser.error('formal comparisons require at least five independent windows')
     if args.mode == 'freeze':
-        freeze(args.artifacts.resolve(), args.candidate)
+        if args.label:
+            append_freeze(args.artifacts.resolve(), args.candidate, args.label)
+        else:
+            freeze(args.artifacts.resolve(), args.candidate)
     else:
         run(args.artifacts.resolve(), args.mode, args.tag, args.rounds)
