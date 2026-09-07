@@ -58,7 +58,26 @@ func parseExactByteFieldTreeWithEndian(node *base.Node, process func(*base.Node)
 		return err
 	}
 	start := GetNodeResultPos(raw)[0]
+	if err := buildExactByteFieldTree(node, fields, info, start, bits, profile, endian); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+// Construct all public fields before publishing children/metadata.
+func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info map[string]any, start, bits uint64, profile, endian string) error {
+	var err error
 	staged := &base.Node{Name: node.Name, Origin: yaml.MapSlice{}, Cfg: base.NewConfigWithItems(node.Cfg, base.ConfigItem{Key: CfgEndian, Value: endian}), Ctx: node.Ctx}
+	var count func([]tlsCertificateField) int
+	count = func(fs []tlsCertificateField) int {
+		n := len(fs)
+		for _, f := range fs {
+			n += count(f.Children)
+		}
+		return n
+	}
+	batch := base.NewNodeBatch(count(fields))
 	var fill func(*base.Node, []tlsCertificateField) error
 	fill = func(parent *base.Node, fields []tlsCertificateField) error {
 		if len(fields) == 0 {
@@ -92,9 +111,9 @@ func parseExactByteFieldTreeWithEndian(node *base.Node, process func(*base.Node)
 			}
 			var child *base.Node
 			if f.Type == "" {
-				child = &base.Node{Name: f.Name, Origin: yaml.MapSlice{}, Cfg: base.NewConfigWithItems(parent.Cfg, items...), Ctx: node.Ctx}
+				child = batch.NewNode(f.Name, yaml.MapSlice{}, parent.Cfg, node.Ctx, items...)
 			} else {
-				child, err = base.NewNodeTreeWithConfigItems(parent.Cfg, f.Name, f.Type, node.Ctx, items...)
+				child, err = batch.NewNodeTreeWithConfigItems(parent.Cfg, f.Name, f.Type, node.Ctx, items...)
 				if err != nil {
 					return err
 				}
@@ -117,6 +136,5 @@ func parseExactByteFieldTreeWithEndian(node *base.Node, process func(*base.Node)
 	}
 	node.Children = staged.Children
 	node.Cfg.SetItem("additionInfo", info)
-	committed = true
 	return nil
 }
