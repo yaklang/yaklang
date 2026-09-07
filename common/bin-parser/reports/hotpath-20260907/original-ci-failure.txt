@@ -1,0 +1,9 @@
+https://github.com/yaklang/yaklang/actions/runs/34073269728/job/101595413526
+2026-09-07T01:43:16.6199875Z     p0_more_test.go:35: P0 catalog protocol "LDAP" is still partial
+2026-09-07T01:43:16.6203524Z     p0_more_test.go:35: P0 catalog protocol "MySQL" is still partial
+2026-09-07T01:43:16.6205136Z     p0_more_test.go:35: P0 catalog protocol "PostgreSQL" is still partial
+2026-09-07T01:43:16.6206639Z     p0_more_test.go:35: P0 catalog protocol "SMB3" is still partial
+2026-09-07T01:43:16.6207627Z --- FAIL: TestP0RoadmapCovered (0.03s)
+2026-09-07T01:43:16.6224070Z panic: test timed out after 1m0s
+2026-09-07T01:43:16.6229963Z FAIL: test_common_bin-parser (exit=2, attempt=1/1)
+2026-09-07T01:44:33.2823111Z     reason: panic: test timed out after 1m0s
