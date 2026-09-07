@@ -719,16 +719,20 @@ jobs:
                 {"package": "./common/yak/syntaxflow_scan/...", "timeout": "2m"}
               ]
 
-          - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
+          - name: "Test SSA PHP / SSAAPI PHP"
             # TestAllSyntaxForPHP_G4 is CPU-bound and times out (~190s) when
-            # php/tests runs concurrently with the other packages on a 2-core
-            # runner; keep this suite serial.
-            package_workers: "1"
+            # php/tests runs concurrently with other packages on a 2-core runner.
             sync_rule: "1"
             test_configs: |
               [
                 {"package": "./common/yak/php/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"},
+                {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"}
+              ]
+
+          - name: "Test SFWeb / SFReport"
+            sync_rule: "1"
+            test_configs: |
+              [
                 {"package": "./common/sfweb/...", "timeout": "4m"},
                 {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
               ]
