@@ -133,12 +133,14 @@ type Config struct {
 }
 
 func NewEmptyConfig() *Config {
-	return &Config{
-		BaseKV: BaseKV{
-			&configStore{},
-		},
-	}
+	allocation := &struct {
+		config Config
+		store  configStore
+	}{}
+	allocation.config.data = &allocation.store
+	return &allocation.config
 }
+
 func (c *Config) SetItem(k string, v any) {
 	c.data.setConfigItem(k, v)
 }
