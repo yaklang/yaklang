@@ -94,7 +94,11 @@ func (b *legionJobBridge) handleDispatch(
 	if !b.admissions().BeginPrepare(reservation) {
 		return nakDelayedMessage(dispatchCapacityNakDelay), nil
 	}
-	release, acquired := b.agent.invokeLimiter.TryAcquire()
+	request := command.GetResourceRequest()
+	release, acquired := b.agent.invokeLimiter.TryAcquireResources(
+		request.GetCpuMillicores(),
+		request.GetMemoryBytes(),
+	)
 	if !acquired {
 		b.admissions().PrepareFailed(reservation)
 		if b.admissions().CapacityRetryExpired(reservation, time.Now().UTC()) {
@@ -213,7 +217,7 @@ func (b *legionJobBridge) publishCapacityExceeded(
 		ctx,
 		reservation.ref,
 		JobFailureCodeNodeCapacityExceeded,
-		"node execution slots are full and the dispatch admission deadline expired",
+		"node execution slots or host resources are full and the dispatch admission deadline expired",
 		dispatchFailureDetail(command),
 	)
 	if err != nil {
@@ -620,6 +624,9 @@ func validateDispatchCommand(
 	if err := validateRuleSnapshotRef(command.GetRuleSnapshot()); err != nil {
 		return err
 	}
+	if err := validateResourceRequest(command.GetResourceRequest()); err != nil {
+		return err
+	}
 	if err := validateDispatchExecutionKind(command.GetExecutionKind()); err != nil {
 		return err
 	}
@@ -648,6 +655,16 @@ func validatePluginBundleRef(ref *pluginv1.PluginBundleRef) error {
 	}
 	if strings.TrimSpace(ref.GetSchemaVersion()) != pluginBundleManifestSchemaVersion {
 		return fmt.Errorf("unsupported plugin bundle schema_version: %s", ref.GetSchemaVersion())
+	}
+	return nil
+}
+
+func validateResourceRequest(request *jobv1.ResourceRequest) error {
+	if request == nil {
+		return nil
+	}
+	if request.GetCpuMillicores() == 0 || request.GetMemoryBytes() == 0 {
+		return fmt.Errorf("dispatch resource_request requires positive cpu_millicores and memory_bytes")
 	}
 	return nil
 }
