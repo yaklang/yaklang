@@ -185,6 +185,7 @@ type Config struct {
 	HotPatchBroadcaster *chanx.Broadcaster[ConfigOption]
 	HotPatchOptionChan  *chanx.UnlimitedChan[ConfigOption]
 	StartHotPatchOnce   sync.Once
+	hotPatchLoopWG      sync.WaitGroup
 
 	// output Event Handle
 	EventHandler           func(e *schema.AiOutputEvent)
