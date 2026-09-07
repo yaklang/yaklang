@@ -117,8 +117,15 @@ for ((idx = 0; idx < count; idx++)); do
   excludes=$(jq -r ".[$idx].exclude_packages[]? // empty" "$TEST_CONFIG")
   [[ -z "$timeout" ]] && timeout="$TEST_TIMEOUT"
 
-  echo "----------------------------------------"
-  echo "config #$((idx + 1)): $pattern (timeout $timeout)"
+  echo "  config #$((idx + 1)): $pattern (timeout $timeout)"
+done
+
+# ---- collect every (package, entry) task ----
+tasklist="$TEST_LOG_DIR/.tasks.$$"
+: > "$tasklist"
+for ((idx = 0; idx < count; idx++)); do
+  pattern=$(jq -r ".[$idx].package" "$TEST_CONFIG")
+  excludes=$(jq -r ".[$idx].exclude_packages[]? // empty" "$TEST_CONFIG")
 
   pkglist="$TEST_LOG_DIR/.pkglist.$$"
   if ! list_test_pkgs "$pattern" > "$pkglist"; then
@@ -133,7 +140,7 @@ for ((idx = 0; idx < count; idx++)); do
     skip_this=0
     while IFS= read -r ex; do
       [[ -z "$ex" ]] && continue
-      prefix="${ex%/\.\.\.}"
+      prefix="${ex%/\...}"
       if [[ "$rel" == "$prefix" || "$rel" == "$prefix"/* ]]; then
         skip_this=1
         break
@@ -141,11 +148,51 @@ for ((idx = 0; idx < count; idx++)); do
     done <<< "$excludes"
     (( skip_this )) && continue
 
-    total_run=$((total_run + 1))
-    run_package "$rel" "$timeout" "$run_pat" "$skip_pat" "$parallel" "$retry" "$retry_delay" || rc=1
+    printf '%s|%s\n' "$rel" "$idx" >> "$tasklist"
   done < "$pkglist"
   rm -f "$pkglist"
 done
+rm -f "$TEST_LOG_DIR/.pkglist."*
+
+total_run=$(wc -l < "$tasklist" | tr -d ' ')
+
+failfile="$TEST_LOG_DIR/.failed.$$"
+: > "$failfile"
+
+run_entry_task() {
+  local rel="$1" idx="$2"
+  local timeout run_pat skip_pat parallel retry retry_delay
+  timeout=$(jq -r ".[$idx].timeout // empty" "$TEST_CONFIG")
+  run_pat=$(jq -r ".[$idx].run // empty" "$TEST_CONFIG")
+  skip_pat=$(jq -r ".[$idx].skip // empty" "$TEST_CONFIG")
+  parallel=$(jq -r ".[$idx].parallel // empty" "$TEST_CONFIG")
+  retry=$(jq -r ".[$idx].retry // empty" "$TEST_CONFIG")
+  retry_delay=$(jq -r ".[$idx].retry_delay // empty" "$TEST_CONFIG")
+  [[ -z "$timeout" ]] && timeout="$TEST_TIMEOUT"
+
+  run_package "$rel" "$timeout" "$run_pat" "$skip_pat" "$parallel" "$retry" "$retry_delay" \
+    || echo "$rel" >> "$failfile"
+}
+export -f run_entry_task
+export -f run_package
+export -f needs_race
+export TEST_CONFIG TEST_LOG_DIR TEST_TIMEOUT TEST_VERBOSE PACKAGE_PARALLEL failfile
+
+echo ""
+echo "=== running packages with PACKAGE_WORKERS=$PACKAGE_WORKERS ==="
+if (( PACKAGE_WORKERS > 1 )); then
+  xargs -n1 -P "$PACKAGE_WORKERS" bash -c 'run_entry_task "${1%%|*}" "${1##*|}"' _ < "$tasklist"
+else
+  while IFS='|' read -r rel idx; do
+    run_entry_task "$rel" "$idx" || rc=1
+  done < "$tasklist"
+fi
+rm -f "$tasklist"
+
+if [[ -s "$failfile" ]]; then
+  rc=1
+fi
+rm -f "$failfile"
 
 if (( total_run == 0 )); then
   echo "::error::no test packages were discovered from $TEST_CONFIG - refusing to report success"
