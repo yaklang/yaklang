@@ -12,7 +12,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
@@ -419,7 +418,10 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			return action.ActionType != "load_capability"
 		}),
 	}
-	preset = append(preset, auditopts.LoopAuxiliaryOpts()...)
+	preset = append(preset,
+		reactloops.WithDisableLoopPerception(true),
+		reactloops.WithDisablePeriodicVerification(true),
+	)
 	preset = append(preset,
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			vars := map[string]any{
