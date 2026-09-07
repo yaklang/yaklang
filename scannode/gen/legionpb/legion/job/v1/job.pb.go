@@ -306,7 +306,7 @@ type DispatchJobCommand struct {
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Script        *InlineScript          `protobuf:"bytes,8,opt,name=script,proto3" json:"script,omitempty"`
 	RuleSnapshot  *RuleSnapshotRef       `protobuf:"bytes,9,opt,name=rule_snapshot,json=ruleSnapshot,proto3" json:"rule_snapshot,omitempty"`
-	PluginBundle  *v11.PluginBundleRef   `protobuf:"bytes,10,opt,name=plugin_bundle,json=pluginBundle,proto3" json:"plugin_bundle,omitempty"`
+	PluginBundle  *v11.PluginBundleRef   `protobuf:"bytes,11,opt,name=plugin_bundle,json=pluginBundle,proto3" json:"plugin_bundle,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1507,8 +1507,7 @@ const file_legion_job_v1_job_proto_rawDesc = "" +
 	"\x06labels\x18\a \x03(\v2-.legion.job.v1.DispatchJobCommand.LabelsEntryR\x06labels\x123\n" +
 	"\x06script\x18\b \x01(\v2\x1b.legion.job.v1.InlineScriptR\x06script\x12C\n" +
 	"\rrule_snapshot\x18\t \x01(\v2\x1e.legion.job.v1.RuleSnapshotRefR\fruleSnapshot\x12F\n" +
-	"\rplugin_bundle\x18\n" +
-	" \x01(\v2!.legion.plugin.v1.PluginBundleRefR\fpluginBundle\x1a9\n" +
+	"\rplugin_bundle\x18\v \x01(\v2!.legion.plugin.v1.PluginBundleRefR\fpluginBundle\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x04\x10\x05\"\x90\x01\n" +

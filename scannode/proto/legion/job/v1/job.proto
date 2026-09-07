@@ -46,7 +46,7 @@ message DispatchJobCommand {
   map<string, string> labels = 7;
   InlineScript script = 8;
   RuleSnapshotRef rule_snapshot = 9;
-  legion.plugin.v1.PluginBundleRef plugin_bundle = 10;
+  legion.plugin.v1.PluginBundleRef plugin_bundle = 11;
 }
 
 message CancelJobCommand {
