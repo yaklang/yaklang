@@ -732,11 +732,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		if memoryTriageId == "" {
 			memoryTriageId = "default"
 		}
-		var err error
-		invoker.memoryTriage, err = aimem.NewAIMemory(memoryTriageId, aimem.WithInvoker(invoker))
-		if err != nil {
-			return nil, utils.Errorf("create memory triage failed: %v", err)
-		}
+		invoker.memoryTriage = aimem.NewAsyncAIMemory(cfg.GetContext(), memoryTriageId, aimem.WithInvoker(invoker))
 		invoker.config.MemoryTriage = invoker.memoryTriage
 	}
 

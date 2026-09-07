@@ -109,9 +109,12 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// memory management
-	memorySizeLimit int
-	currentMemories *omap.OrderedMap[string, *aicommon.MemoryEntity]
-	memoryTriage    aicommon.MemoryTriage
+	memorySizeLimit          int
+	currentMemories          *omap.OrderedMap[string, *aicommon.MemoryEntity]
+	memoryTriage             aicommon.MemoryTriage
+	memoryUpdateMu           sync.Mutex
+	fastMemorySearchMu       sync.Mutex
+	fastMemorySearchInFlight bool
 
 	// midterm archive memory: loaded/updated alongside regular memory,
 	// rendered together with InjectedMemory in the dynamic section.

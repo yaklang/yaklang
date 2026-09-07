@@ -11,45 +11,49 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReActLoop) fastLoadSearchMemoryWithoutAI(input string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		r._fastLoadSearchMemoryWithoutAI(input)
-	}()
-
-	select {
-	case <-done:
-		// 正常完成
-		log.Info("fast load search memory completed successfully")
-	case <-ctx.Done():
-		// 超时
-		log.Warn("fast load search memory timeout")
+// refreshFastMemoryAsync never delays an iteration and allows only one quick
+// search in flight per loop, even when the backend is still initializing.
+func (r *ReActLoop) refreshFastMemoryAsync(task aicommon.AIStatefulTask) {
+	if utils.IsNil(r.memoryTriage) || task.GetContext().Err() != nil {
+		return
 	}
+	r.fastMemorySearchMu.Lock()
+	if r.fastMemorySearchInFlight {
+		r.fastMemorySearchMu.Unlock()
+		return
+	}
+	r.fastMemorySearchInFlight = true
+	r.fastMemorySearchMu.Unlock()
+	input, taskID, ctx := task.GetUserInput(), task.GetId(), task.GetContext()
+	go func() {
+		defer func() {
+			r.fastMemorySearchMu.Lock()
+			r.fastMemorySearchInFlight = false
+			r.fastMemorySearchMu.Unlock()
+		}()
+		r.fastLoadSearchMemoryWithoutAI(ctx, input, taskID)
+	}()
 }
 
-func (r *ReActLoop) _fastLoadSearchMemoryWithoutAI(input string) {
+func (r *ReActLoop) fastLoadSearchMemoryWithoutAI(ctx context.Context, input, taskId string) {
 	if r.memoryTriage == nil {
 		return
 	}
 	emitter := r.GetEmitter()
 
-	var taskId string
-	if r.GetCurrentTask() != nil {
-		taskId = r.GetCurrentTask().GetId()
-	}
-
 	log.Info("start to handle searching memory for ReActLoop without AI")
 	pr, pw := utils.NewPipe()
+	defer pw.Close()
 	emitter.EmitSystemStreamEvent("fast-memory-fetch", time.Now(), pr, taskId)
 	pw.WriteString("快速检索记忆：Searching relevant memories quickly...")
 	emitter.EmitJSON(schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY, "memory-search-quickly", map[string]any{
 		"query": input,
 	})
 	searchResult, err := r.memoryTriage.SearchMemoryWithoutAI(input, r.memorySizeLimit)
+	if ctx.Err() != nil {
+		return
+	}
+	r.PushMemory(searchResult)
 	if err != nil {
 		aicommon.TypeWriterWrite(pw, "... 快速检索失败，Reason: "+err.Error(), 300)
 	} else {
@@ -64,7 +68,6 @@ func (r *ReActLoop) _fastLoadSearchMemoryWithoutAI(input string) {
 		}
 	}
 	pw.Close()
-	r.PushMemory(searchResult)
 	if strings.TrimSpace(r.GetCurrentMemoriesContent()) != "" {
 		log.Infof("memory updated via fast search memory - ========================== \n%v\n==========================", r.GetCurrentMemoriesContent())
 	}

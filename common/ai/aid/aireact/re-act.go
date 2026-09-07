@@ -267,11 +267,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		if memoryTriageId == "" {
 			memoryTriageId = "default"
 		}
-		var err error
-		react.memoryTriage, err = aimem.NewAIMemory(memoryTriageId, aimem.WithInvoker(react))
-		if err != nil {
-			return nil, utils.Errorf("create memory triage failed: %v", err)
-		}
+		react.memoryTriage = aimem.NewAsyncAIMemory(cfg.GetContext(), memoryTriageId, aimem.WithInvoker(react))
 		react.config.MemoryTriage = react.memoryTriage
 	}
 	memoryLoad := time.Now().Sub(memoryLoadStart)
@@ -283,13 +279,8 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	if cfg.TimelineArchiveStore == nil && strings.TrimSpace(cfg.PersistentSessionId) != "" {
 		midtermSessionID := aimem.PersistentSessionToMidtermMemorySessionID(cfg.PersistentSessionId)
-		midtermStore, err := aimem.NewAIMemoryForQuery(midtermSessionID, aimem.WithDatabase(cfg.GetDB()), aimem.WithMidtermArchiveMode())
-		if err != nil {
-			log.Warnf("create timeline archive store failed for session %s: %v", cfg.PersistentSessionId, err)
-		} else {
-			cfg.TimelineArchiveStore = midtermStore
-			log.Infof("timeline archive store ready for persistent session %s", cfg.PersistentSessionId)
-		}
+		cfg.TimelineArchiveStore = aimem.NewAsyncAIMemoryForQuery(cfg.GetContext(), midtermSessionID,
+			aimem.WithDatabase(cfg.GetDB()), aimem.WithMidtermArchiveMode())
 	}
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	if cfg.Timeline == nil {

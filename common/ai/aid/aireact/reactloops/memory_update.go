@@ -20,6 +20,8 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 	if utils.IsNil(result) {
 		return
 	}
+	r.memoryUpdateMu.Lock()
+	defer r.memoryUpdateMu.Unlock()
 	// When regular memory is updated, also refresh midterm archive memory in
 	// parallel. Both fire at the same trigger point; midterm queries are based
 	// on the perception snapshot, consumed from the invoker.

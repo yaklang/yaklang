@@ -34,8 +34,9 @@ type AIEngineConfig struct {
 	UserUsageCallback func(*aispec.ChatUsage)
 
 	// 执行配置
-	MaxIteration int    // 最大迭代次数，默认 10
-	SessionID    string // 会话 ID，用于持久化
+	MaxIteration         int    // 最大迭代次数，默认 10
+	SessionID            string // 会话 ID，用于持久化
+	AllowSyncInitContext bool   // 允许首轮同步增强上下文，默认 false
 
 	// Stateless 为 true 时,引擎不持久化会话历史/memory/timeline 到本地 DB。
 	// 每轮由服务端打包 ContextPackage 注入历史,turn 完销毁引擎实例。
@@ -139,6 +140,20 @@ func notifySessionID(config *AIEngineConfig) {
 }
 
 // ========== 基础配置选项 ==========
+
+// WithAllowSyncInitContext 设置是否在首轮响应前同步初始化增强上下文（导出名为 aim.allowSyncInitContext）。
+// 默认 false，先开始主循环；后续仍可按需发现能力、识别意图。
+// 记忆始终在后台加载，不受此选项影响。
+//
+// Example:
+// ```
+// aim.InvokeReAct("分析任务", aim.allowSyncInitContext(true))
+// ```
+func WithAllowSyncInitContext(allow bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AllowSyncInitContext = allow
+	}
+}
 
 // WithFocus 设置焦点，用于让引擎聚焦某个任务（导出名为 aim.focus）
 // 参数:

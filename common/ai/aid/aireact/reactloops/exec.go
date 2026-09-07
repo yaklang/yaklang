@@ -1061,10 +1061,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	stopStallHeartbeat := r.startStallHeartbeat(task.GetContext(), task)
 	defer stopStallHeartbeat()
 
-	if r.GetCurrentMemoriesContent() == "" {
-		r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
-	}
-
 	// When regular memory is updated, also refresh midterm archive memory in
 	// parallel. Both fire at the same trigger point; midterm queries are based
 	// on the perception snapshot, consumed from the invoker.
@@ -1077,7 +1073,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 			if err != nil {
 				log.Warnf("search memory failed: %v", err)
 			}
-			r.PushMemory(result)
+			if task.GetContext().Err() == nil {
+				r.PushMemory(result)
+			}
 		}
 	}()
 
@@ -1124,36 +1122,10 @@ LOOP:
 			break LOOP
 		}
 
-		waitMem := make(chan struct{})
-		go func() {
-			defer func() {
-				close(waitMem)
-			}()
-			r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
-		}()
-
-		r.UserStatus(
-			"正在回顾相关信息",
-			"Reviewing relevant context",
-			aicommon.WithStatusCode("context.recalling"),
-		)
-		select {
-		case <-task.GetContext().Done():
-			return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
-		case <-waitMem:
-			r.UserStatus(
-				"已经找到相关信息，正在继续",
-				"Relevant context found; continuing",
-				aicommon.WithStatusCode("context.ready"),
-			)
-		case <-time.After(200 * time.Millisecond):
-			r.UserStatus(
-				"已有信息足够，我会先继续处理",
-				"The available context is sufficient to continue",
-				aicommon.WithStatusCode("context.skipped"),
-				aicommon.WithStatusState(aicommon.StatusStateWarning),
-			)
+		if err := task.GetContext().Err(); err != nil {
+			return utils.Errorf("task context done before execute ReActLoop: %v", err)
 		}
+		r.refreshFastMemoryAsync(task)
 
 		r.UserStatus(
 			"正在推进下一步",
