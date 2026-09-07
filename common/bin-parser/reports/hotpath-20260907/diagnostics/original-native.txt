@@ -1,0 +1,16 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser
+BenchmarkNativeFieldDecoding/Memcached/stats-request         	 8737180	       412.2 ns/op	  16.98 MB/s	     640 B/op	       5 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/stats-request         	 8767095	       409.5 ns/op	  17.10 MB/s	     640 B/op	       5 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/stats-request         	 8748674	       412.2 ns/op	  16.98 MB/s	     640 B/op	       5 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/stats-response        	  443415	      8196 ns/op	  12.69 MB/s	   14194 B/op	     107 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/stats-response        	  447290	      8039 ns/op	  12.94 MB/s	   14194 B/op	     107 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/stats-response        	  447321	      8124 ns/op	  12.80 MB/s	   14194 B/op	     107 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/binary-get-request    	 1749060	      2049 ns/op	  13.18 MB/s	    4714 B/op	      14 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/binary-get-request    	 1741255	      2117 ns/op	  12.75 MB/s	    4714 B/op	      14 allocs/op
+BenchmarkNativeFieldDecoding/Memcached/binary-get-request    	 1718031	      2101 ns/op	  12.85 MB/s	    4714 B/op	      14 allocs/op
+BenchmarkNativeFieldTreeLong                                 	   10000	    326046 ns/op	  475952 B/op	    2969 allocs/op
+BenchmarkNativeFieldTreeLong                                 	   10000	    325385 ns/op	  475952 B/op	    2969 allocs/op
+BenchmarkNativeFieldTreeLong                                 	   10000	    326430 ns/op	  475957 B/op	    2969 allocs/op
+PASS

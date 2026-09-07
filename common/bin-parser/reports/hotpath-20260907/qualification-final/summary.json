@@ -1,0 +1,82 @@
+[
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1693982.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6494.0,
+      "workers": 1.0,
+      "B/op": 1397293.0,
+      "allocs/op": 14376.0
+    },
+    "range_ns": [
+      1690730.0,
+      1702709.0
+    ]
+  },
+  {
+    "label": "consumed_snapshot",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 843256.0,
+      "MB/s": 1.69,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 13045.0,
+      "workers": 1.0,
+      "B/op": 721059.0,
+      "allocs/op": 6481.0
+    },
+    "range_ns": [
+      840191.0,
+      847291.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 882223.0,
+      "MB/s": 1.61,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12469.0,
+      "workers": 10.0,
+      "B/op": 1419958.0,
+      "allocs/op": 14404.0
+    },
+    "range_ns": [
+      876314.0,
+      889323.0
+    ]
+  },
+  {
+    "label": "consumed_snapshot",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 466153.0,
+      "MB/s": 3.05,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23597.0,
+      "workers": 10.0,
+      "B/op": 739941.0,
+      "allocs/op": 6507.0
+    },
+    "range_ns": [
+      463226.0,
+      484146.0
+    ]
+  }
+]

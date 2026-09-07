@@ -1,0 +1,12 @@
+{
+  "mode": "qualification",
+  "rounds": 5,
+  "freeze_sha256": "ebbe7444143efbe7155515e778f100c02ece14c64b8e69565c7534c0560f57f1",
+  "script_sha256": "ff76c3ddebb7b93723fcecacdf9235cfd84b1bb11ebdb539e689bdf4baf602b1",
+  "environment": {
+    "GOGC": null,
+    "GOMEMLIMIT": null,
+    "GODEBUG": null
+  },
+  "started_utc": "2026-09-07T03:06:35.187598+00:00"
+}

@@ -1,0 +1,1178 @@
+[
+  {
+    "label": "p0",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1681443.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6542.0,
+      "workers": 1.0,
+      "B/op": 1397279.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 1670739.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6584.0,
+      "workers": 1.0,
+      "B/op": 1397287.0,
+      "allocs/op": 14376.0
+    },
+    "speedup": 1.0064067457574164,
+    "change_percent": -0.6365960665927983,
+    "original_samples_ns": [
+      1680417.0,
+      1705560.0,
+      1677205.0,
+      1681443.0,
+      1684972.0
+    ],
+    "candidate_samples_ns": [
+      1676599.0,
+      1670124.0,
+      1681273.0,
+      1667801.0,
+      1670739.0
+    ]
+  },
+  {
+    "label": "compact",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1681786.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6541.0,
+      "workers": 1.0,
+      "B/op": 1397295.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 1449953.0,
+      "MB/s": 0.98,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 7586.0,
+      "workers": 1.0,
+      "B/op": 1029611.0,
+      "allocs/op": 12815.0
+    },
+    "speedup": 1.1598900102279177,
+    "change_percent": -13.784928641337245,
+    "original_samples_ns": [
+      1690303.0,
+      1681786.0,
+      1673850.0,
+      1749071.0,
+      1675324.0
+    ],
+    "candidate_samples_ns": [
+      1451496.0,
+      1459938.0,
+      1449484.0,
+      1449953.0,
+      1434306.0
+    ]
+  },
+  {
+    "label": "windows",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1684758.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6529.0,
+      "workers": 1.0,
+      "B/op": 1397284.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 1390191.0,
+      "MB/s": 1.02,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 7913.0,
+      "workers": 1.0,
+      "B/op": 958738.0,
+      "allocs/op": 10905.0
+    },
+    "speedup": 1.2118895892722654,
+    "change_percent": -17.48423215678454,
+    "original_samples_ns": [
+      1691616.0,
+      1684758.0,
+      1686962.0,
+      1669659.0,
+      1680881.0
+    ],
+    "candidate_samples_ns": [
+      1390191.0,
+      1384786.0,
+      1394633.0,
+      1391239.0,
+      1377754.0
+    ]
+  },
+  {
+    "label": "rules",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1678456.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6554.0,
+      "workers": 1.0,
+      "B/op": 1397284.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 1343797.0,
+      "MB/s": 1.06,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 8186.0,
+      "workers": 1.0,
+      "B/op": 942717.0,
+      "allocs/op": 10459.0
+    },
+    "speedup": 1.2490398475364954,
+    "change_percent": -19.938503005142827,
+    "original_samples_ns": [
+      1687097.0,
+      1675141.0,
+      1678456.0,
+      1686159.0,
+      1674460.0
+    ],
+    "candidate_samples_ns": [
+      1348204.0,
+      1343797.0,
+      1341606.0,
+      1332045.0,
+      1381788.0
+    ]
+  },
+  {
+    "label": "node_batch",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1696600.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6484.0,
+      "workers": 1.0,
+      "B/op": 1397279.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 1291466.0,
+      "MB/s": 1.1,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 8517.0,
+      "workers": 1.0,
+      "B/op": 952612.0,
+      "allocs/op": 9027.0
+    },
+    "speedup": 1.3137008639793846,
+    "change_percent": -23.879170104915715,
+    "original_samples_ns": [
+      1696600.0,
+      1685903.0,
+      1683790.0,
+      1709618.0,
+      1731558.0
+    ],
+    "candidate_samples_ns": [
+      1358307.0,
+      1294025.0,
+      1291466.0,
+      1280658.0,
+      1286414.0
+    ]
+  },
+  {
+    "label": "native_bridge",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1683786.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6533.0,
+      "workers": 1.0,
+      "B/op": 1397293.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 1009679.0,
+      "MB/s": 1.41,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 10895.0,
+      "workers": 1.0,
+      "B/op": 907871.0,
+      "allocs/op": 8352.0
+    },
+    "speedup": 1.6676448653482938,
+    "change_percent": -40.0351944962127,
+    "original_samples_ns": [
+      1687655.0,
+      1683786.0,
+      1680598.0,
+      1681118.0,
+      1686424.0
+    ],
+    "candidate_samples_ns": [
+      1009679.0,
+      1010008.0,
+      1017304.0,
+      1001651.0,
+      1002893.0
+    ]
+  },
+  {
+    "label": "prefix",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1681587.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6541.0,
+      "workers": 1.0,
+      "B/op": 1397289.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 969238.0,
+      "MB/s": 1.47,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 11349.0,
+      "workers": 1.0,
+      "B/op": 793556.0,
+      "allocs/op": 8230.0
+    },
+    "speedup": 1.7349577709499628,
+    "change_percent": -42.361709504176716,
+    "original_samples_ns": [
+      1686728.0,
+      1681587.0,
+      1680115.0,
+      1679091.0,
+      1682345.0
+    ],
+    "candidate_samples_ns": [
+      969238.0,
+      977830.0,
+      968819.0,
+      976444.0,
+      961509.0
+    ]
+  },
+  {
+    "label": "rule_batch",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1676037.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6563.0,
+      "workers": 1.0,
+      "B/op": 1397291.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 959502.0,
+      "MB/s": 1.48,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 11464.0,
+      "workers": 1.0,
+      "B/op": 817839.0,
+      "allocs/op": 7626.0
+    },
+    "speedup": 1.7467780160958497,
+    "change_percent": -42.75174116084549,
+    "original_samples_ns": [
+      1694980.0,
+      1688383.0,
+      1676037.0,
+      1675281.0,
+      1674932.0
+    ],
+    "candidate_samples_ns": [
+      960885.0,
+      972238.0,
+      959502.0,
+      945673.0,
+      949931.0
+    ]
+  },
+  {
+    "label": "projection",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1679854.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6548.0,
+      "workers": 1.0,
+      "B/op": 1397288.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 914930.0,
+      "MB/s": 1.55,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12023.0,
+      "workers": 1.0,
+      "B/op": 815770.0,
+      "allocs/op": 7609.0
+    },
+    "speedup": 1.836046473500705,
+    "change_percent": -45.53514769735941,
+    "original_samples_ns": [
+      1688849.0,
+      1687847.0,
+      1679213.0,
+      1666377.0,
+      1679854.0
+    ],
+    "candidate_samples_ns": [
+      914930.0,
+      926275.0,
+      922749.0,
+      909008.0,
+      910355.0
+    ]
+  },
+  {
+    "label": "descriptors",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1690993.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6505.0,
+      "workers": 1.0,
+      "B/op": 1397285.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 880105.0,
+      "MB/s": 1.61,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12499.0,
+      "workers": 1.0,
+      "B/op": 791464.0,
+      "allocs/op": 6791.0
+    },
+    "speedup": 1.9213537021150886,
+    "change_percent": -47.95336231433247,
+    "original_samples_ns": [
+      1690993.0,
+      1694914.0,
+      1678849.0,
+      1753542.0,
+      1677431.0
+    ],
+    "candidate_samples_ns": [
+      880105.0,
+      882200.0,
+      890630.0,
+      876499.0,
+      862809.0
+    ]
+  },
+  {
+    "label": "clone_plan",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1678589.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6553.0,
+      "workers": 1.0,
+      "B/op": 1397285.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 876919.0,
+      "MB/s": 1.62,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12544.0,
+      "workers": 1.0,
+      "B/op": 791199.0,
+      "allocs/op": 6780.0
+    },
+    "speedup": 1.914189337897799,
+    "change_percent": -47.75856388907589,
+    "original_samples_ns": [
+      1690847.0,
+      1683978.0,
+      1678589.0,
+      1677863.0,
+      1671879.0
+    ],
+    "candidate_samples_ns": [
+      872549.0,
+      885755.0,
+      876919.0,
+      878481.0,
+      866600.0
+    ]
+  },
+  {
+    "label": "import_config",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1673995.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6571.0,
+      "workers": 1.0,
+      "B/op": 1397281.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 849171.0,
+      "MB/s": 1.67,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12954.0,
+      "workers": 1.0,
+      "B/op": 737258.0,
+      "allocs/op": 6525.0
+    },
+    "speedup": 1.9713285074502074,
+    "change_percent": -49.27278755312889,
+    "original_samples_ns": [
+      1684702.0,
+      1666309.0,
+      1676409.0,
+      1673230.0,
+      1673995.0
+    ],
+    "candidate_samples_ns": [
+      849393.0,
+      849171.0,
+      841697.0,
+      835764.0,
+      855931.0
+    ]
+  },
+  {
+    "label": "candidate",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1686219.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6523.0,
+      "workers": 1.0,
+      "B/op": 1397286.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 830195.0,
+      "MB/s": 1.71,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 13250.0,
+      "workers": 1.0,
+      "B/op": 720794.0,
+      "allocs/op": 6470.0
+    },
+    "speedup": 2.0311119676702463,
+    "change_percent": -50.7658850955896,
+    "original_samples_ns": [
+      1690725.0,
+      1686219.0,
+      1675216.0,
+      1671902.0,
+      1716901.0
+    ],
+    "candidate_samples_ns": [
+      838617.0,
+      833286.0,
+      830195.0,
+      824389.0,
+      823133.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 1690493.0,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6507.0,
+      "workers": 1.0,
+      "B/op": 1397276.0,
+      "allocs/op": 14376.0
+    },
+    "candidate": {
+      "ns/op": 829952.0,
+      "MB/s": 1.71,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 13254.0,
+      "workers": 1.0,
+      "B/op": 721059.0,
+      "allocs/op": 6481.0
+    },
+    "speedup": 2.036856348318939,
+    "change_percent": -50.90473607403284,
+    "original_samples_ns": [
+      1690493.0,
+      1706533.0,
+      1680621.0,
+      1690188.0,
+      1696154.0
+    ],
+    "candidate_samples_ns": [
+      839067.0,
+      832090.0,
+      829952.0,
+      820592.0,
+      824870.0
+    ]
+  },
+  {
+    "label": "p0",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 887804.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12390.0,
+      "workers": 10.0,
+      "B/op": 1419969.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 887045.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12401.0,
+      "workers": 10.0,
+      "B/op": 1420234.0,
+      "allocs/op": 14404.0
+    },
+    "speedup": 1.000855649938842,
+    "change_percent": -0.08549184279412758,
+    "original_samples_ns": [
+      897172.0,
+      884022.0,
+      887804.0,
+      882701.0,
+      909914.0
+    ],
+    "candidate_samples_ns": [
+      887045.0,
+      959502.0,
+      884867.0,
+      1037794.0,
+      882190.0
+    ]
+  },
+  {
+    "label": "compact",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 888764.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12377.0,
+      "workers": 10.0,
+      "B/op": 1419836.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 760531.0,
+      "MB/s": 1.87,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 14464.0,
+      "workers": 10.0,
+      "B/op": 1048985.0,
+      "allocs/op": 12841.0
+    },
+    "speedup": 1.1686098265553935,
+    "change_percent": -14.428239667673303,
+    "original_samples_ns": [
+      900981.0,
+      888764.0,
+      886103.0,
+      884158.0,
+      889734.0
+    ],
+    "candidate_samples_ns": [
+      797898.0,
+      769597.0,
+      760531.0,
+      756725.0,
+      759430.0
+    ]
+  },
+  {
+    "label": "windows",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 886368.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12410.0,
+      "workers": 10.0,
+      "B/op": 1419788.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 726535.0,
+      "MB/s": 1.96,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 15140.0,
+      "workers": 10.0,
+      "B/op": 977473.0,
+      "allocs/op": 10930.0
+    },
+    "speedup": 1.2199935309379453,
+    "change_percent": -18.032352250983784,
+    "original_samples_ns": [
+      886384.0,
+      884250.0,
+      886368.0,
+      881413.0,
+      889850.0
+    ],
+    "candidate_samples_ns": [
+      733560.0,
+      733143.0,
+      721877.0,
+      720431.0,
+      726535.0
+    ]
+  },
+  {
+    "label": "rules",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 888853.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12376.0,
+      "workers": 10.0,
+      "B/op": 1419791.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 724890.0,
+      "MB/s": 1.96,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 15175.0,
+      "workers": 10.0,
+      "B/op": 961475.0,
+      "allocs/op": 10484.0
+    },
+    "speedup": 1.2261901805791224,
+    "change_percent": -18.446582280759582,
+    "original_samples_ns": [
+      887302.0,
+      896333.0,
+      888853.0,
+      958459.0,
+      887684.0
+    ],
+    "candidate_samples_ns": [
+      757154.0,
+      736012.0,
+      718746.0,
+      724081.0,
+      724890.0
+    ]
+  },
+  {
+    "label": "node_batch",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 887303.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12397.0,
+      "workers": 10.0,
+      "B/op": 1419660.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 708289.0,
+      "MB/s": 2.01,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 15530.0,
+      "workers": 10.0,
+      "B/op": 973716.0,
+      "allocs/op": 9054.0
+    },
+    "speedup": 1.2527414657011473,
+    "change_percent": -20.17506984648987,
+    "original_samples_ns": [
+      889620.0,
+      886346.0,
+      880646.0,
+      901109.0,
+      887303.0
+    ],
+    "candidate_samples_ns": [
+      735819.0,
+      704261.0,
+      695834.0,
+      746223.0,
+      708289.0
+    ]
+  },
+  {
+    "label": "native_bridge",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 890525.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12352.0,
+      "workers": 10.0,
+      "B/op": 1419726.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 553062.0,
+      "MB/s": 2.57,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 19889.0,
+      "workers": 10.0,
+      "B/op": 929509.0,
+      "allocs/op": 8379.0
+    },
+    "speedup": 1.6101720964376507,
+    "change_percent": -37.89483731506695,
+    "original_samples_ns": [
+      890945.0,
+      879349.0,
+      881982.0,
+      890525.0,
+      891970.0
+    ],
+    "candidate_samples_ns": [
+      553984.0,
+      551534.0,
+      553062.0,
+      550458.0,
+      572611.0
+    ]
+  },
+  {
+    "label": "prefix",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 889606.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12365.0,
+      "workers": 10.0,
+      "B/op": 1419802.0,
+      "allocs/op": 14404.0
+    },
+    "candidate": {
+      "ns/op": 534972.0,
+      "MB/s": 2.66,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 20562.0,
+      "workers": 10.0,
+      "B/op": 812841.0,
+      "allocs/op": 8256.0
+    },
+    "speedup": 1.6629019836552192,
+    "change_percent": -39.86416458522088,
+    "original_samples_ns": [
+      890040.0,
+      888483.0,
+      882679.0,
+      889606.0,
+      990431.0
+    ],
+    "candidate_samples_ns": [
+      531771.0,
+      538480.0,
+      534972.0,
+      534052.0,
+      542098.0
+    ]
+  },
+  {
+    "label": "rule_batch",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 888823.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12376.0,
+      "workers": 10.0,
+      "B/op": 1420216.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 536302.0,
+      "MB/s": 2.65,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 20511.0,
+      "workers": 10.0,
+      "B/op": 838102.0,
+      "allocs/op": 7652.0
+    },
+    "speedup": 1.6573180782469579,
+    "change_percent": -39.66155241257259,
+    "original_samples_ns": [
+      884246.0,
+      967296.0,
+      881832.0,
+      888823.0,
+      896291.0
+    ],
+    "candidate_samples_ns": [
+      533406.0,
+      544536.0,
+      532221.0,
+      536302.0,
+      539644.0
+    ]
+  },
+  {
+    "label": "projection",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 887754.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12391.0,
+      "workers": 10.0,
+      "B/op": 1419733.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 509003.0,
+      "MB/s": 2.79,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 21611.0,
+      "workers": 10.0,
+      "B/op": 835770.0,
+      "allocs/op": 7635.0
+    },
+    "speedup": 1.7441036693300433,
+    "change_percent": -42.66395870928208,
+    "original_samples_ns": [
+      887754.0,
+      909348.0,
+      877099.0,
+      887530.0,
+      893186.0
+    ],
+    "candidate_samples_ns": [
+      507756.0,
+      528926.0,
+      504765.0,
+      509003.0,
+      514826.0
+    ]
+  },
+  {
+    "label": "descriptors",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 889859.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12362.0,
+      "workers": 10.0,
+      "B/op": 1419453.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 484661.0,
+      "MB/s": 2.93,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 22696.0,
+      "workers": 10.0,
+      "B/op": 811805.0,
+      "allocs/op": 6818.0
+    },
+    "speedup": 1.8360441628272133,
+    "change_percent": -45.53507915298941,
+    "original_samples_ns": [
+      878963.0,
+      889859.0,
+      884511.0,
+      907462.0,
+      890462.0
+    ],
+    "candidate_samples_ns": [
+      483058.0,
+      484661.0,
+      481892.0,
+      484932.0,
+      488462.0
+    ]
+  },
+  {
+    "label": "clone_plan",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 885667.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12420.0,
+      "workers": 10.0,
+      "B/op": 1420192.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 485311.0,
+      "MB/s": 2.93,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 22666.0,
+      "workers": 10.0,
+      "B/op": 811585.0,
+      "allocs/op": 6806.0
+    },
+    "speedup": 1.8249473018332574,
+    "change_percent": -45.20389717580083,
+    "original_samples_ns": [
+      880923.0,
+      888941.0,
+      883142.0,
+      885667.0,
+      890817.0
+    ],
+    "candidate_samples_ns": [
+      488453.0,
+      485311.0,
+      484790.0,
+      484539.0,
+      488096.0
+    ]
+  },
+  {
+    "label": "import_config",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 884583.0,
+      "MB/s": 1.61,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12435.0,
+      "workers": 10.0,
+      "B/op": 1419417.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 474695.0,
+      "MB/s": 2.99,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23173.0,
+      "workers": 10.0,
+      "B/op": 756395.0,
+      "allocs/op": 6551.0
+    },
+    "speedup": 1.8634765480993059,
+    "change_percent": -46.336861549453246,
+    "original_samples_ns": [
+      884583.0,
+      882908.0,
+      879624.0,
+      974813.0,
+      891732.0
+    ],
+    "candidate_samples_ns": [
+      473802.0,
+      474695.0,
+      473658.0,
+      476000.0,
+      480250.0
+    ]
+  },
+  {
+    "label": "candidate",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 884665.0,
+      "MB/s": 1.61,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12434.0,
+      "workers": 10.0,
+      "B/op": 1420356.0,
+      "allocs/op": 14404.0
+    },
+    "candidate": {
+      "ns/op": 470200.0,
+      "MB/s": 3.02,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23394.0,
+      "workers": 10.0,
+      "B/op": 739277.0,
+      "allocs/op": 6496.0
+    },
+    "speedup": 1.8814653339004679,
+    "change_percent": -46.84993754698106,
+    "original_samples_ns": [
+      881515.0,
+      884665.0,
+      881763.0,
+      891941.0,
+      891717.0
+    ],
+    "candidate_samples_ns": [
+      466215.0,
+      470200.0,
+      468842.0,
+      501488.0,
+      476278.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "original": {
+      "ns/op": 890172.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12357.0,
+      "workers": 10.0,
+      "B/op": 1419917.0,
+      "allocs/op": 14403.0
+    },
+    "candidate": {
+      "ns/op": 477259.0,
+      "MB/s": 2.98,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23048.0,
+      "workers": 10.0,
+      "B/op": 739410.0,
+      "allocs/op": 6507.0
+    },
+    "speedup": 1.8651759317267982,
+    "change_percent": -46.38575466314375,
+    "original_samples_ns": [
+      883204.0,
+      881056.0,
+      1181671.0,
+      890172.0,
+      891783.0
+    ],
+    "candidate_samples_ns": [
+      489610.0,
+      478882.0,
+      468706.0,
+      473373.0,
+      477259.0
+    ]
+  }
+]

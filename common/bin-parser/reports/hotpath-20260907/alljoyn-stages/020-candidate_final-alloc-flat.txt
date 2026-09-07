@@ -1,0 +1,47 @@
+File: candidate_final.test
+Type: alloc_space
+Time: Sep 7, 2026 at 12:09pm (CST)
+Showing nodes accounting for 812.49MB, 92.47% of 878.64MB total
+Dropped 237 nodes (cum <= 4.39MB)
+Showing top 40 nodes out of 115
+      flat  flat%   sum%        cum   cum%
+  154.01MB 17.53% 17.53%   239.02MB 27.20%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).consumeCode
+   54.50MB  6.20% 23.73%    85.01MB  9.67%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).consumeValue
+   53.01MB  6.03% 29.76%    53.51MB  6.09%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).consumeSymbolTable
+      50MB  5.69% 35.46%       50MB  5.69%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ConvertToYakNode
+   44.51MB  5.07% 40.52%   125.02MB 14.23%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setConfigItemLocked
+   43.16MB  4.91% 45.43%    48.66MB  5.54%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*operatorInvocation).library
+   38.01MB  4.33% 49.76%    38.01MB  4.33%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).AddExtraInfo (inline)
+   36.51MB  4.16% 53.91%    36.51MB  4.16%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).expandLocked
+   30.50MB  3.47% 57.39%    30.50MB  3.47%  github.com/yaklang/yaklang/common/bin-parser/parser/base.configWriteOption (inline)
+   22.50MB  2.56% 59.95%    22.50MB  2.56%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack.(*Stack).Push (inline)
+      21MB  2.39% 62.34%       21MB  2.39%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyConfig (inline)
+      21MB  2.39% 64.73%       21MB  2.39%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewStringValue (inline)
+   17.50MB  1.99% 66.72%   122.52MB 13.94%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).ForEach
+   15.12MB  1.72% 68.44%    15.12MB  1.72%  github.com/yaklang/antlr/v4.NewJPCMap2 (inline)
+      15MB  1.71% 70.15%       15MB  1.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.newStructNodeValue (inline)
+   14.04MB  1.60% 71.75%   306.56MB 34.89%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).Unmarshal
+      13MB  1.48% 73.22%   827.37MB 94.16%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode
+      13MB  1.48% 74.70%    30.50MB  3.47%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).consumeAny
+   11.50MB  1.31% 76.01%    11.50MB  1.31%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.newNodeValue (inline)
+   11.09MB  1.26% 77.28%    11.09MB  1.26%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*bitReaderBackup).appendChunk (inline)
+      10MB  1.14% 78.41%       11MB  1.25%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewFrame
+      10MB  1.14% 79.55%   162.03MB 18.44%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Node).Copy
+       9MB  1.02% 80.58%        9MB  1.02%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).compactSet
+       9MB  1.02% 81.60%        9MB  1.02%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewValue (inline)
+    8.50MB  0.97% 82.57%     8.50MB  0.97%  encoding/json.Unmarshal
+    8.50MB  0.97% 83.54%   827.87MB 94.22%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).call
+    8.50MB  0.97% 84.50%     8.50MB  0.97%  reflect.New
+    7.50MB  0.85% 85.36%     7.50MB  0.85%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ToMap.func2
+    7.50MB  0.85% 86.21%   733.87MB 83.52%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse
+    6.50MB  0.74% 86.95%     6.50MB  0.74%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ToMap.newStructNodeValue.func6
+       6MB  0.68% 87.63%       13MB  1.48%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse.func2
+       6MB  0.68% 88.32%        6MB  0.68%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).popReverseN (inline)
+    5.50MB  0.63% 88.94%     5.50MB  0.63%  github.com/yaklang/antlr/v4.NewATNConfig (inline)
+    4.50MB  0.51% 89.45%     4.50MB  0.51%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setLocked
+    4.50MB  0.51% 89.97%     4.50MB  0.51%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewAutoValue
+    4.50MB  0.51% 90.48%     4.50MB  0.51%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewBoolValue (inline)
+    4.50MB  0.51% 90.99%     4.50MB  0.51%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewValueRef
+    4.50MB  0.51% 91.50%     4.50MB  0.51%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Scope).CreateSubScope (inline)
+    4.50MB  0.51% 92.02%     4.50MB  0.51%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).memberLiteral
+       4MB  0.46% 92.47%   831.04MB 94.58%  reflect.Value.call

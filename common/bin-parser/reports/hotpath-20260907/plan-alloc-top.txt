@@ -1,0 +1,27 @@
+File: plan.test
+Type: alloc_space
+Time: Sep 7, 2026 at 10:14am (CST)
+Showing nodes accounting for 2.09GB, 87.82% of 2.38GB total
+Dropped 252 nodes (cum <= 0.01GB)
+Showing top 20 nodes out of 93
+      flat  flat%   sum%        cum   cum%
+    0.58GB 24.41% 24.41%     0.58GB 24.41%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).compactSet
+    0.34GB 14.09% 38.50%     0.34GB 14.09%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyConfig (inline)
+    0.12GB  5.01% 43.51%     0.21GB  9.02%  encoding/json.mapEncoder.encode
+    0.12GB  4.85% 48.36%     0.27GB 11.18%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields
+    0.11GB  4.68% 53.04%     0.11GB  4.68%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyNode (inline)
+    0.10GB  4.13% 57.17%     0.10GB  4.21%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func3 (inline)
+    0.09GB  3.98% 61.16%     0.09GB  3.98%  reflect.copyVal
+    0.09GB  3.92% 65.08%     0.09GB  3.92%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).expandLocked
+    0.07GB  3.10% 68.18%     0.09GB  3.92%  github.com/yaklang/yaklang/common/bin-parser.NodeToMap
+    0.07GB  2.99% 71.17%     0.29GB 12.01%  encoding/json.Marshal
+    0.07GB  2.81% 73.99%     0.79GB 33.30%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.parseExactByteFieldTreeWithEndian.func2
+    0.06GB  2.55% 76.54%     0.75GB 31.49%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setConfigItemLocked
+    0.05GB  2.12% 78.66%     0.05GB  2.12%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func2 (inline)
+    0.05GB  1.93% 80.59%     0.05GB  2.05%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewFrame
+    0.04GB  1.77% 82.36%     0.04GB  1.77%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).take
+    0.03GB  1.42% 83.78%     0.03GB  1.42%  github.com/yaklang/yaklang/common/bin-parser/parser/base.cloneRuleDocumentValue
+    0.03GB  1.31% 85.09%     0.05GB  1.97%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).text
+    0.02GB  1.01% 86.10%     0.03GB  1.40%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setLocked
+    0.02GB  0.95% 87.04%     0.09GB  3.70%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).options
+    0.02GB  0.78% 87.82%     0.02GB  0.78%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).group (inline)

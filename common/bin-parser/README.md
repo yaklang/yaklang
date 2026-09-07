@@ -343,3 +343,7 @@ GIOP／URL、新 WPAD／MIOP、Redfish-SSDP、非整字节 carrier 及静态索�
 最终冻结后执行一次 `go test ./common/bin-parser/... ./common/bin-parser/testdata/protocol-corpus/tools/generate -count=1 -timeout=20m -json`，退出码 0：736 项顶层测试通过，`TestP1DumpInventory` 和 `TestDumpP1CeilingCaps` 两个既有手动导出项跳过，无失败；主包 192.543 秒。58,416 条记录的封装检查用时 22.74 秒，16,827 条 IPX 记录的完整字段检查用时 37.82 秒，全部 10,161 个 SV ASDU 用时 21.86 秒。矩阵为 421 个直接解析合同、25 个识别合同、85 个预期拒绝、2 个结构容器；341 个名称中 306 个有字段级合同、21 个仅外层、14 个仅识别，字段级合同也有各自的部分实现边界。
 
 NCP、LAT、SEBEK 和配置兼容性定向竞态检查通过；解析器 `go vet` 和三项 PR #5023 重现工具测试通过。全量前后全部 1,604 项冻结摘要及原 59 份 companion 摘要一致；之后仅补录本 README 的结果，没有再改可执行代码、样本或合同，也没有重复全量。`go.mod`／`go.sum` 未修改，未提交或推送。本次全量完成了现有材料与明确合同的验证，不代表剩余协议或全部应用语义已实现。
+
+### 完整解析性能与 P0 消息范围验收（2026-09-07）
+
+本轮保留原公开调用链和完整输出，相对 `5b6cbe1f8` 测量；可执行 P0 范围、四项 `partial` 的能力边界和评分依据见 [P0_SCOPE.md](P0_SCOPE.md)。源码/程序冻结、正式窗口、全包与 race 验证、环境差异及撤回实验见 [本轮报告](reports/hotpath-20260907/README.md)。当前结果只描述离线解析，不能换算为真实持续无丢包带宽。

@@ -1,0 +1,5 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusApplicationFields 	    7386	    473384 ns/op	   3.00 MB/s	      1421 input-B/op	        11.00 messages/op	     23237 messages/s	         1.000 workers	  568643 B/op	    3054 allocs/op
+PASS

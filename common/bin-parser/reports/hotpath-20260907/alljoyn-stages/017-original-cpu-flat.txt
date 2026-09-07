@@ -1,0 +1,48 @@
+File: original.test
+Type: cpu
+Time: Sep 7, 2026 at 12:09pm (CST)
+Duration: 8.30s, Total samples = 7.27s (87.61%)
+Showing nodes accounting for 6.67s, 91.75% of 7.27s total
+Dropped 185 nodes (cum <= 0.04s)
+Showing top 40 nodes out of 139
+      flat  flat%   sum%        cum   cum%
+     1.38s 18.98% 18.98%      1.38s 18.98%  sync/atomic.(*Int32).Add (inline)
+     1.34s 18.43% 37.41%      3.91s 53.78%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).Get
+     1.29s 17.74% 55.16%      1.29s 17.74%  runtime.madvise
+     1.05s 14.44% 69.60%      1.10s 15.13%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).findLocked (inline)
+     0.45s  6.19% 75.79%      4.33s 59.56%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.calcNodeConsumedLength
+     0.17s  2.34% 78.13%      0.64s  8.80%  runtime.mallocgc
+     0.11s  1.51% 79.64%      0.11s  1.51%  runtime.kevent
+     0.10s  1.38% 81.02%      0.19s  2.61%  runtime.scanobject
+     0.07s  0.96% 81.98%      0.08s  1.10%  runtime.(*mspan).writeHeapBitsSmall
+     0.07s  0.96% 82.94%      0.07s  0.96%  runtime/internal/atomic.(*UnsafePointer).Load (inline)
+     0.06s  0.83% 83.77%      0.06s  0.83%  runtime.memclrNoHeapPointers
+     0.06s  0.83% 84.59%      0.06s  0.83%  runtime.memmove
+     0.06s  0.83% 85.42%      0.14s  1.93%  runtime.pcvalue
+     0.06s  0.83% 86.24%      0.93s 12.79%  sync.(*RWMutex).RLock (inline)
+     0.05s  0.69% 86.93%      0.05s  0.69%  memeqbody
+     0.04s  0.55% 87.48%      0.20s  2.75%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).consumeCode
+     0.04s  0.55% 88.03%      0.04s  0.55%  runtime.step
+     0.04s  0.55% 88.58%      0.55s  7.57%  sync.(*RWMutex).RUnlock
+     0.03s  0.41% 89.00%      0.04s  0.55%  runtime.bgsweep
+     0.02s  0.28% 89.27%      3.88s 53.37%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BaseKV).LookupItem (inline)
+     0.02s  0.28% 89.55%      0.08s  1.10%  runtime.deductAssistCredit
+     0.02s  0.28% 89.82%      0.04s  0.55%  runtime.funcInfo.entry (inline)
+     0.02s  0.28% 90.10%      0.07s  0.96%  runtime.gwrite
+     0.01s  0.14% 90.23%      0.11s  1.51%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).ForEach
+     0.01s  0.14% 90.37%      4.34s 59.70%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.parseLengthByLengthConfig
+     0.01s  0.14% 90.51%      0.13s  1.79%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*CodesMarshaller).consumeValue
+     0.01s  0.14% 90.65%      5.55s 76.34%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode
+     0.01s  0.14% 90.78%      5.55s 76.34%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption
+     0.01s  0.14% 90.92%      0.04s  0.55%  runtime.(*unwinder).resolveInternal
+     0.01s  0.14% 91.06%      0.06s  0.83%  runtime.findRunnable
+     0.01s  0.14% 91.20%      0.18s  2.48%  runtime.gcBgMarkWorker
+     0.01s  0.14% 91.33%      0.10s  1.38%  runtime.goschedImpl
+     0.01s  0.14% 91.47%      0.09s  1.24%  runtime.heapSetType
+     0.01s  0.14% 91.61%      0.05s  0.69%  runtime.recordForPanic
+     0.01s  0.14% 91.75%      0.04s  0.55%  runtime.runOneTimer
+         0     0% 91.75%      0.12s  1.65%  github.com/yaklang/yaklang/common/bin-parser.BenchmarkParserConsumedLength.func1
+         0     0% 91.75%      0.15s  2.06%  github.com/yaklang/yaklang/common/bin-parser.BenchmarkParserConsumedLength.func1.1
+         0     0% 91.75%      0.19s  2.61%  github.com/yaklang/yaklang/common/bin-parser/parser.ParseBinaryWithConfig
+         0     0% 91.75%      0.11s  1.51%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Config).SetItem (inline)
+         0     0% 91.75%      0.12s  1.65%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Node).Copy

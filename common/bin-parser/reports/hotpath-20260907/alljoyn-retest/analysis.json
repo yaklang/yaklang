@@ -1,0 +1,70 @@
+[
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "original": {
+      "ns/op": 631524783.0,
+      "MB/s": 0.0,
+      "B/op": 71503960.0,
+      "allocs/op": 1444472.0
+    },
+    "candidate": {
+      "ns/op": 674331817.0,
+      "MB/s": 0.0,
+      "B/op": 70339366.0,
+      "allocs/op": 1393919.0
+    },
+    "speedup": 0.9365193322918649,
+    "change_percent": 6.778361697327084,
+    "original_samples_ns": [
+      628514883.0,
+      632367475.0,
+      630368383.0,
+      631524783.0,
+      679207383.0
+    ],
+    "candidate_samples_ns": [
+      696069900.0,
+      674509867.0,
+      669622417.0,
+      668228767.0,
+      674331817.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "original": {
+      "ns/op": 596464674.0,
+      "MB/s": 0.0,
+      "B/op": 71508752.0,
+      "allocs/op": 1444488.0
+    },
+    "candidate": {
+      "ns/op": 650956217.0,
+      "MB/s": 0.0,
+      "B/op": 70348534.0,
+      "allocs/op": 1393945.0
+    },
+    "speedup": 0.9162900029572957,
+    "change_percent": 9.135753612124219,
+    "original_samples_ns": [
+      592891861.0,
+      596464674.0,
+      595680417.0,
+      600037278.0,
+      600940826.0
+    ],
+    "candidate_samples_ns": [
+      638736458.0,
+      650956217.0,
+      653673850.0,
+      693993225.0,
+      640391417.0
+    ]
+  }
+]

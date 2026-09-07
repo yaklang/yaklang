@@ -1,0 +1,1154 @@
+[
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationFields",
+    "samples": 5,
+    "median": {
+      "ns/op": 1225177.0,
+      "MB/s": 1.16,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 8978.0,
+      "workers": 1.0,
+      "B/op": 1175262.0,
+      "allocs/op": 9066.0
+    },
+    "range_ns": [
+      1204923.0,
+      1258381.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationFields",
+    "samples": 5,
+    "median": {
+      "ns/op": 468251.0,
+      "MB/s": 3.03,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23492.0,
+      "workers": 1.0,
+      "B/op": 568649.0,
+      "allocs/op": 3054.0
+    },
+    "range_ns": [
+      465832.0,
+      478857.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusEnvelopes",
+    "samples": 5,
+    "median": {
+      "ns/op": 14259241791.0,
+      "MB/s": 0.63,
+      "input-B/op": 8993088.0,
+      "messages/op": 58533.0,
+      "messages/s": 4105.0,
+      "workers": 1.0,
+      "B/op": 13271229840.0,
+      "allocs/op": 148082153.0
+    },
+    "range_ns": [
+      14175129166.0,
+      14373832750.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusEnvelopes",
+    "samples": 5,
+    "median": {
+      "ns/op": 8008014667.0,
+      "MB/s": 1.12,
+      "input-B/op": 8993088.0,
+      "messages/op": 58533.0,
+      "messages/s": 7309.0,
+      "workers": 1.0,
+      "B/op": 8766577232.0,
+      "allocs/op": 54458866.0
+    },
+    "range_ns": [
+      7962796833.0,
+      8075590750.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkNHRPClientList/32/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 3450743.0,
+      "MB/s": 0.12,
+      "B/op": 2267158.0,
+      "allocs/op": 48683.0
+    },
+    "range_ns": [
+      3412443.0,
+      3451782.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkNHRPClientList/4096/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 360003722.0,
+      "MB/s": 0.14,
+      "B/op": 221716624.0,
+      "allocs/op": 4946958.0
+    },
+    "range_ns": [
+      356857153.0,
+      365895657.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkNHRPClientList/32/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 3392266.0,
+      "MB/s": 0.12,
+      "B/op": 2210596.0,
+      "allocs/op": 45713.0
+    },
+    "range_ns": [
+      3366314.0,
+      3445662.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkNHRPClientList/4096/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 345579250.0,
+      "MB/s": 0.14,
+      "B/op": 216961914.0,
+      "allocs/op": 4631059.0
+    },
+    "range_ns": [
+      341945065.0,
+      350195574.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkDICOMPDVList/items",
+    "samples": 10,
+    "median": {
+      "ns/op": 38457224.0,
+      "MB/s": 0.33,
+      "B/op": 28360817.5,
+      "allocs/op": 459327.0
+    },
+    "range_ns": [
+      2354590.0,
+      76190094.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkDICOMPDVList/items",
+    "samples": 10,
+    "median": {
+      "ns/op": 38990556.5,
+      "MB/s": 0.325,
+      "B/op": 28620972.5,
+      "allocs/op": 429290.0
+    },
+    "range_ns": [
+      2330361.0,
+      76417913.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkDICOMUserInformation/items",
+    "samples": 25,
+    "median": {
+      "ns/op": 29414649.0,
+      "MB/s": 0.14,
+      "B/op": 18040489.0,
+      "allocs/op": 352344.0
+    },
+    "range_ns": [
+      6654091.0,
+      116774490.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkDICOMUserInformation/items",
+    "samples": 25,
+    "median": {
+      "ns/op": 28454509.0,
+      "MB/s": 0.15,
+      "B/op": 16968195.0,
+      "allocs/op": 297135.0
+    },
+    "range_ns": [
+      6444817.0,
+      110184069.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusIPX/direct",
+    "samples": 5,
+    "median": {
+      "ns/op": 598259.0,
+      "MB/s": 0.08,
+      "B/op": 468887.0,
+      "allocs/op": 5384.0
+    },
+    "range_ns": [
+      592756.0,
+      603002.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusIPX/standalone",
+    "samples": 5,
+    "median": {
+      "ns/op": 143972.0,
+      "MB/s": 0.35,
+      "B/op": 89788.0,
+      "allocs/op": 1891.0
+    },
+    "range_ns": [
+      142891.0,
+      148821.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusIPX/ethernet",
+    "samples": 5,
+    "median": {
+      "ns/op": 955024.0,
+      "MB/s": 0.07,
+      "B/op": 502711.0,
+      "allocs/op": 9331.0
+    },
+    "range_ns": [
+      951889.0,
+      978081.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusIPX/direct",
+    "samples": 5,
+    "median": {
+      "ns/op": 348940.0,
+      "MB/s": 0.14,
+      "B/op": 302223.0,
+      "allocs/op": 1968.0
+    },
+    "range_ns": [
+      346545.0,
+      366171.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusIPX/standalone",
+    "samples": 5,
+    "median": {
+      "ns/op": 132317.0,
+      "MB/s": 0.38,
+      "B/op": 82712.0,
+      "allocs/op": 1731.0
+    },
+    "range_ns": [
+      131398.0,
+      133169.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusIPX/ethernet",
+    "samples": 5,
+    "median": {
+      "ns/op": 880301.0,
+      "MB/s": 0.08,
+      "B/op": 453385.0,
+      "allocs/op": 8194.0
+    },
+    "range_ns": [
+      878011.0,
+      893464.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-only",
+    "samples": 5,
+    "median": {
+      "ns/op": 3817397.0,
+      "MB/s": 0.03,
+      "B/op": 1177742.0,
+      "allocs/op": 21651.0
+    },
+    "range_ns": [
+      3803329.0,
+      3980165.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-root-result",
+    "samples": 5,
+    "median": {
+      "ns/op": 3851453.0,
+      "MB/s": 0.03,
+      "B/op": 1190686.0,
+      "allocs/op": 22059.0
+    },
+    "range_ns": [
+      3836315.0,
+      3883048.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-root-and-repeated-field-results",
+    "samples": 5,
+    "median": {
+      "ns/op": 3876445.0,
+      "MB/s": 0.03,
+      "B/op": 1198407.0,
+      "allocs/op": 22300.0
+    },
+    "range_ns": [
+      3869987.0,
+      3914890.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-single-root-result-traversal",
+    "samples": 5,
+    "median": {
+      "ns/op": 3847065.0,
+      "MB/s": 0.03,
+      "B/op": 1190665.0,
+      "allocs/op": 22059.0
+    },
+    "range_ns": [
+      3838921.0,
+      3901895.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-only",
+    "samples": 5,
+    "median": {
+      "ns/op": 3803624.0,
+      "MB/s": 0.03,
+      "B/op": 1147257.0,
+      "allocs/op": 20487.0
+    },
+    "range_ns": [
+      3787722.0,
+      3810608.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-root-result",
+    "samples": 5,
+    "median": {
+      "ns/op": 3828918.0,
+      "MB/s": 0.03,
+      "B/op": 1155545.0,
+      "allocs/op": 20757.0
+    },
+    "range_ns": [
+      3818881.0,
+      3879280.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-root-and-repeated-field-results",
+    "samples": 5,
+    "median": {
+      "ns/op": 3893740.0,
+      "MB/s": 0.03,
+      "B/op": 1160365.0,
+      "allocs/op": 20910.0
+    },
+    "range_ns": [
+      3851804.0,
+      4043411.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-single-root-result-traversal",
+    "samples": 5,
+    "median": {
+      "ns/op": 3832058.0,
+      "MB/s": 0.03,
+      "B/op": 1155584.0,
+      "allocs/op": 20757.0
+    },
+    "range_ns": [
+      3819465.0,
+      3854988.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkParserConsumedLength/ordinary-184B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 5293576.0,
+      "MB/s": 0.03,
+      "B/op": 1676454.0,
+      "allocs/op": 30952.0
+    },
+    "range_ns": [
+      5286628.0,
+      5394314.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 629933833.0,
+      "MB/s": 0.0,
+      "B/op": 71515268.0,
+      "allocs/op": 1444509.0
+    },
+    "range_ns": [
+      628344050.0,
+      634227025.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkParserConsumedLength/ordinary-184B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 5285670.0,
+      "MB/s": 0.03,
+      "B/op": 1652297.0,
+      "allocs/op": 29778.0
+    },
+    "range_ns": [
+      5269710.0,
+      5382520.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 670222242.0,
+      "MB/s": 0.0,
+      "B/op": 70348628.0,
+      "allocs/op": 1393947.0
+    },
+    "range_ns": [
+      658279092.0,
+      687708350.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationFields",
+    "samples": 5,
+    "median": {
+      "ns/op": 625192.0,
+      "MB/s": 2.27,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 17595.0,
+      "workers": 10.0,
+      "B/op": 1176518.0,
+      "allocs/op": 9084.0
+    },
+    "range_ns": [
+      622226.0,
+      627863.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationFields",
+    "samples": 5,
+    "median": {
+      "ns/op": 267449.0,
+      "MB/s": 5.31,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 41129.0,
+      "workers": 10.0,
+      "B/op": 569724.0,
+      "allocs/op": 3072.0
+    },
+    "range_ns": [
+      266812.0,
+      268065.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusEnvelopes",
+    "samples": 5,
+    "median": {
+      "ns/op": 3832309166.0,
+      "MB/s": 2.35,
+      "input-B/op": 8993088.0,
+      "messages/op": 58533.0,
+      "messages/s": 15274.0,
+      "workers": 10.0,
+      "B/op": 13271710960.0,
+      "allocs/op": 148082617.0
+    },
+    "range_ns": [
+      3561632208.0,
+      3863990625.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusEnvelopes",
+    "samples": 5,
+    "median": {
+      "ns/op": 2058327771.0,
+      "MB/s": 4.37,
+      "input-B/op": 8993088.0,
+      "messages/op": 58533.0,
+      "messages/s": 28437.0,
+      "workers": 10.0,
+      "B/op": 8766813696.0,
+      "allocs/op": 54458710.0
+    },
+    "range_ns": [
+      2011138125.0,
+      2089649708.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkNHRPClientList/32/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 2694506.0,
+      "MB/s": 0.16,
+      "B/op": 2267724.0,
+      "allocs/op": 48684.0
+    },
+    "range_ns": [
+      2686821.0,
+      2739584.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkNHRPClientList/4096/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 248364065.0,
+      "MB/s": 0.2,
+      "B/op": 221724164.0,
+      "allocs/op": 4946974.0
+    },
+    "range_ns": [
+      247521939.0,
+      260436933.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkNHRPClientList/32/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 2662700.0,
+      "MB/s": 0.16,
+      "B/op": 2211152.0,
+      "allocs/op": 45714.0
+    },
+    "range_ns": [
+      2650225.0,
+      2727672.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkNHRPClientList/4096/legacy-false",
+    "samples": 5,
+    "median": {
+      "ns/op": 244696688.0,
+      "MB/s": 0.2,
+      "B/op": 216968558.0,
+      "allocs/op": 4631074.0
+    },
+    "range_ns": [
+      243748104.0,
+      245369982.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMPDVList/items-128",
+    "samples": 5,
+    "median": {
+      "ns/op": 1757616.0,
+      "MB/s": 0.44,
+      "B/op": 1902377.0,
+      "allocs/op": 30770.0
+    },
+    "range_ns": [
+      1746299.0,
+      1854367.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMPDVList/items-4096",
+    "samples": 5,
+    "median": {
+      "ns/op": 51125442.0,
+      "MB/s": 0.48,
+      "B/op": 54821442.0,
+      "allocs/op": 887887.0
+    },
+    "range_ns": [
+      50786311.0,
+      52603186.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMPDVList/items-128",
+    "samples": 5,
+    "median": {
+      "ns/op": 1763353.0,
+      "MB/s": 0.44,
+      "B/op": 1898641.0,
+      "allocs/op": 28509.0
+    },
+    "range_ns": [
+      1748414.0,
+      1769863.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMPDVList/items-4096",
+    "samples": 5,
+    "median": {
+      "ns/op": 52514476.0,
+      "MB/s": 0.47,
+      "B/op": 55345241.0,
+      "allocs/op": 830073.0
+    },
+    "range_ns": [
+      51906065.0,
+      55024391.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-128",
+    "samples": 5,
+    "median": {
+      "ns/op": 5468641.0,
+      "MB/s": 0.12,
+      "B/op": 3385687.0,
+      "allocs/op": 66501.0
+    },
+    "range_ns": [
+      5449222.0,
+      5725925.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-512",
+    "samples": 5,
+    "median": {
+      "ns/op": 12702468.0,
+      "MB/s": 0.17,
+      "B/op": 9669776.0,
+      "allocs/op": 189011.0
+    },
+    "range_ns": [
+      12632261.0,
+      12747765.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-1024",
+    "samples": 5,
+    "median": {
+      "ns/op": 22231170.0,
+      "MB/s": 0.19,
+      "B/op": 18041985.0,
+      "allocs/op": 352347.0
+    },
+    "range_ns": [
+      22177230.0,
+      22594352.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-2048",
+    "samples": 5,
+    "median": {
+      "ns/op": 42176138.0,
+      "MB/s": 0.2,
+      "B/op": 34867021.0,
+      "allocs/op": 679017.0
+    },
+    "range_ns": [
+      42026192.0,
+      42486922.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-4096",
+    "samples": 5,
+    "median": {
+      "ns/op": 81393234.0,
+      "MB/s": 0.2,
+      "B/op": 68499764.0,
+      "allocs/op": 1332345.0
+    },
+    "range_ns": [
+      81197405.0,
+      86744165.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-128",
+    "samples": 5,
+    "median": {
+      "ns/op": 5322096.0,
+      "MB/s": 0.13,
+      "B/op": 3213713.0,
+      "allocs/op": 58780.0
+    },
+    "range_ns": [
+      5312293.0,
+      5379361.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-512",
+    "samples": 5,
+    "median": {
+      "ns/op": 12235060.0,
+      "MB/s": 0.18,
+      "B/op": 9112042.0,
+      "allocs/op": 160939.0
+    },
+    "range_ns": [
+      12200560.0,
+      12381150.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-1024",
+    "samples": 5,
+    "median": {
+      "ns/op": 21385259.0,
+      "MB/s": 0.2,
+      "B/op": 16969753.0,
+      "allocs/op": 297138.0
+    },
+    "range_ns": [
+      21316107.0,
+      22189562.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-2048",
+    "samples": 5,
+    "median": {
+      "ns/op": 40552269.0,
+      "MB/s": 0.21,
+      "B/op": 32765934.0,
+      "allocs/op": 569535.0
+    },
+    "range_ns": [
+      40537794.0,
+      42396327.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkDICOMUserInformation/items-4096",
+    "samples": 5,
+    "median": {
+      "ns/op": 79015336.0,
+      "MB/s": 0.21,
+      "B/op": 64341354.0,
+      "allocs/op": 1114320.0
+    },
+    "range_ns": [
+      78611417.0,
+      80593573.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusIPX/direct",
+    "samples": 5,
+    "median": {
+      "ns/op": 466265.0,
+      "MB/s": 0.11,
+      "B/op": 468957.0,
+      "allocs/op": 5384.0
+    },
+    "range_ns": [
+      462219.0,
+      477776.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusIPX/standalone",
+    "samples": 5,
+    "median": {
+      "ns/op": 120226.0,
+      "MB/s": 0.42,
+      "B/op": 89803.0,
+      "allocs/op": 1891.0
+    },
+    "range_ns": [
+      117937.0,
+      124702.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusIPX/ethernet",
+    "samples": 5,
+    "median": {
+      "ns/op": 805356.0,
+      "MB/s": 0.08,
+      "B/op": 502769.0,
+      "allocs/op": 9332.0
+    },
+    "range_ns": [
+      800230.0,
+      811789.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusIPX/direct",
+    "samples": 5,
+    "median": {
+      "ns/op": 286818.0,
+      "MB/s": 0.17,
+      "B/op": 302271.0,
+      "allocs/op": 1968.0
+    },
+    "range_ns": [
+      285505.0,
+      309020.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusIPX/standalone",
+    "samples": 5,
+    "median": {
+      "ns/op": 110196.0,
+      "MB/s": 0.45,
+      "B/op": 82726.0,
+      "allocs/op": 1731.0
+    },
+    "range_ns": [
+      109952.0,
+      111491.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusIPX/ethernet",
+    "samples": 5,
+    "median": {
+      "ns/op": 742348.0,
+      "MB/s": 0.09,
+      "B/op": 453438.0,
+      "allocs/op": 8194.0
+    },
+    "range_ns": [
+      740529.0,
+      744102.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-only",
+    "samples": 5,
+    "median": {
+      "ns/op": 3438351.0,
+      "MB/s": 0.03,
+      "B/op": 1177922.0,
+      "allocs/op": 21651.0
+    },
+    "range_ns": [
+      3430758.0,
+      3450295.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-root-result",
+    "samples": 5,
+    "median": {
+      "ns/op": 3466564.0,
+      "MB/s": 0.03,
+      "B/op": 1190820.0,
+      "allocs/op": 22059.0
+    },
+    "range_ns": [
+      3461188.0,
+      3476865.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-root-and-repeated-field-results",
+    "samples": 5,
+    "median": {
+      "ns/op": 3493954.0,
+      "MB/s": 0.03,
+      "B/op": 1198568.0,
+      "allocs/op": 22300.0
+    },
+    "range_ns": [
+      3478392.0,
+      3503438.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-single-root-result-traversal",
+    "samples": 5,
+    "median": {
+      "ns/op": 3490022.0,
+      "MB/s": 0.03,
+      "B/op": 1190826.0,
+      "allocs/op": 22059.0
+    },
+    "range_ns": [
+      3459334.0,
+      3531915.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-only",
+    "samples": 5,
+    "median": {
+      "ns/op": 3441981.0,
+      "MB/s": 0.03,
+      "B/op": 1147422.0,
+      "allocs/op": 20487.0
+    },
+    "range_ns": [
+      3428300.0,
+      3444645.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-root-result",
+    "samples": 5,
+    "median": {
+      "ns/op": 3466142.0,
+      "MB/s": 0.03,
+      "B/op": 1155733.0,
+      "allocs/op": 20757.0
+    },
+    "range_ns": [
+      3455011.0,
+      3468761.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-root-and-repeated-field-results",
+    "samples": 5,
+    "median": {
+      "ns/op": 3491740.0,
+      "MB/s": 0.03,
+      "B/op": 1160490.0,
+      "allocs/op": 20910.0
+    },
+    "range_ns": [
+      3480533.0,
+      3639743.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkProtocolCorpusSVExecOut/parse-and-single-root-result-traversal",
+    "samples": 5,
+    "median": {
+      "ns/op": 3465963.0,
+      "MB/s": 0.03,
+      "B/op": 1155717.0,
+      "allocs/op": 20757.0
+    },
+    "range_ns": [
+      3463807.0,
+      3484557.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkParserConsumedLength/ordinary-184B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 4757400.0,
+      "MB/s": 0.04,
+      "B/op": 1676741.0,
+      "allocs/op": 30953.0
+    },
+    "range_ns": [
+      4749857.0,
+      4851235.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 592078639.0,
+      "MB/s": 0.0,
+      "B/op": 71511597.0,
+      "allocs/op": 1444491.0
+    },
+    "range_ns": [
+      590578201.0,
+      595186847.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkParserConsumedLength/ordinary-184B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 4768627.0,
+      "MB/s": 0.04,
+      "B/op": 1652547.0,
+      "allocs/op": 29779.0
+    },
+    "range_ns": [
+      4739155.0,
+      4972481.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup",
+    "samples": 5,
+    "median": {
+      "ns/op": 640667575.0,
+      "MB/s": 0.0,
+      "B/op": 70360820.0,
+      "allocs/op": 1393983.0
+    },
+    "range_ns": [
+      622481575.0,
+      679106942.0
+    ]
+  }
+]

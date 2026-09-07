@@ -1,0 +1,19 @@
+{
+  "mode": "representatives",
+  "rounds": 5,
+  "freeze_sha256": "c524e213e2bcd96f186de1bf04dbc77c6981805b2e46ff9573ee1081d64ebc69",
+  "script_sha256": "06d31db9495f4b08b7b21e01d82c6723036ef5b20f745acbc23d8f39b57d7ddf",
+  "environment": {
+    "GOGC": null,
+    "GOMEMLIMIT": null,
+    "GODEBUG": null
+  },
+  "selected_loads": [
+    "^BenchmarkParserConsumedLength$/^counts-1454B$/^AllJoynNS$/^DirectLookup$"
+  ],
+  "worker_counts": [
+    1,
+    10
+  ],
+  "started_utc": "2026-09-07T04:19:00.291850+00:00"
+}

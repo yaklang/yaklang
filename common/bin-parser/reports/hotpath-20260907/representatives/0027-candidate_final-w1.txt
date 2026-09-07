@@ -1,0 +1,7 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkProtocolCorpusIPX/direct         	    9820	    346545 ns/op	   0.14 MB/s	  302227 B/op	    1968 allocs/op
+BenchmarkProtocolCorpusIPX/standalone     	   27319	    132137 ns/op	   0.38 MB/s	   82712 B/op	    1731 allocs/op
+BenchmarkProtocolCorpusIPX/ethernet       	    4105	    880301 ns/op	   0.08 MB/s	  453385 B/op	    8194 allocs/op
+PASS

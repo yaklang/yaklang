@@ -1,0 +1,12 @@
+{
+  "mode": "application",
+  "rounds": 5,
+  "freeze_sha256": "ebbe7444143efbe7155515e778f100c02ece14c64b8e69565c7534c0560f57f1",
+  "script_sha256": "783f897455a9a52ee2b60d8fb9c60762ab22e87efc492123439ce04a4680ded7",
+  "environment": {
+    "GOGC": null,
+    "GOMEMLIMIT": null,
+    "GODEBUG": null
+  },
+  "started_utc": "2026-09-07T03:14:25.398001+00:00"
+}

@@ -1,0 +1,6 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkNHRPClientList/32/legacy-false         	    1029	   3445662 ns/op	   0.12 MB/s	 2210602 B/op	   45713 allocs/op
+BenchmarkNHRPClientList/4096/legacy-false       	       9	 345406634 ns/op	   0.14 MB/s	216962143 B/op	 4631060 allocs/op
+PASS
