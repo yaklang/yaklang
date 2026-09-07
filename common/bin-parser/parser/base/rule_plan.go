@@ -17,6 +17,7 @@ type rulePlan struct {
 	terminal   []ConfigItem
 	operations []rulePlanOperation
 	children   int
+	nodes      int
 }
 type rulePlanOperation struct {
 	index int
@@ -32,7 +33,7 @@ type cachedRulePlan struct {
 var rulePlanCache sync.Map
 
 func compileRulePlan(name string, value any) (*rulePlan, error) {
-	plan := &rulePlan{name: name}
+	plan := &rulePlan{name: name, nodes: 1}
 	if data, ok := value.(yaml.MapSlice); ok {
 		plan.operations = make([]rulePlanOperation, 0, len(data))
 		for i, item := range data {
@@ -45,6 +46,7 @@ func compileRulePlan(name string, value any) (*rulePlan, error) {
 					return nil, err
 				}
 				plan.children++
+				plan.nodes += op.child.nodes
 			}
 			plan.operations = append(plan.operations, op)
 		}
@@ -71,11 +73,11 @@ func compileRulePlan(name string, value any) (*rulePlan, error) {
 	return plan, nil
 }
 
-func (p *rulePlan) instantiate(parent *Config, origin any, ctx *NodeContext) *Node {
+func (p *rulePlan) instantiate(parent *Config, origin any, ctx *NodeContext, batch *nodeBatch) *Node {
 	if _, ok := origin.(yaml.MapSlice); !ok {
-		return NewEmptyNode(p.name, origin, NewConfigWithItems(parent, p.terminal...), ctx)
+		return batch.NewNode(p.name, origin, parent, ctx, p.terminal...)
 	}
-	node := NewEmptyNode(p.name, origin, NewConfig(parent), ctx)
+	node := batch.NewNode(p.name, origin, parent, ctx)
 	if p.children > 0 {
 		node.Children = make([]*Node, 0, p.children)
 	}
@@ -86,7 +88,7 @@ func (p *rulePlan) instantiate(parent *Config, origin any, ctx *NodeContext) *No
 			node.Cfg.SetItem(op.key, value)
 			continue
 		}
-		child := op.child.instantiate(node.Cfg, value, ctx)
+		child := op.child.instantiate(node.Cfg, value, ctx, batch)
 		node.Children = append(node.Children, child)
 		if p.name == "Package" {
 			child.Cfg.SetItem("package-child", true)
@@ -120,7 +122,7 @@ func instantiateRuleDocument(path string, document yaml.MapSlice) (*Node, error)
 	defaults.SetItems(ConfigItem{"endian", "big"}, ConfigItem{"parser", "default"})
 	ctx := &NodeContext{BaseKV{&configStore{}}}
 	ctx.SetItem(ctxParserRuntimeMap, newParserRuntimeMap())
-	root := cached.plan.instantiate(defaults, cloneRuleDocumentValue(document), ctx)
+	root := cached.plan.instantiate(defaults, cloneRuleDocumentValue(document), ctx, NewNodeBatch(cached.plan.nodes))
 	ctx.SetItem("root", root)
 	root.Cfg.SetItem("isRoot", true)
 	return root, nil

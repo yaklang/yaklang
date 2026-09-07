@@ -43,3 +43,22 @@ func BenchmarkCurrentCorpusStages(b *testing.B) {
 		}
 	})
 }
+
+// This diagnostic isolates each public parse, without the batch scheduler. The
+// original complete batch remains the performance acceptance workload.
+func BenchmarkCurrentCorpusMessageCosts(b *testing.B) {
+	for _, w := range currentCorpusWorks(b, true) {
+		b.Run(w.id+"/"+w.entry, func(b *testing.B) {
+			if _, err := currentCorpusParse(w, false); err != nil {
+				b.Fatal(err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := currentCorpusParse(w, false); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}

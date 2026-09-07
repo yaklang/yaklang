@@ -1,0 +1,65 @@
+diff --git a/common/bin-parser/parser/stream_parser/tls_certificate_tree.go b/common/bin-parser/parser/stream_parser/tls_certificate_tree.go
+index af1b365d4..3abf1bdfc 100644
+--- a/common/bin-parser/parser/stream_parser/tls_certificate_tree.go
++++ b/common/bin-parser/parser/stream_parser/tls_certificate_tree.go
+@@ -2,6 +2,7 @@ package stream_parser
+ 
+ import (
+ 	"fmt"
++	"github.com/yaklang/yaklang/common/utils"
+ 
+ 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+ 	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
+@@ -69,10 +70,14 @@ func parseExactByteFieldTreeWithEndian(node *base.Node, process func(*base.Node)
+ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info map[string]any, start, bits uint64, profile, endian string) error {
+ 	var err error
+ 	staged := &base.Node{Name: node.Name, Origin: yaml.MapSlice{}, Cfg: base.NewConfigWithItems(node.Cfg, base.ConfigItem{Key: CfgEndian, Value: endian}), Ctx: node.Ctx}
++	simple := true
+ 	var count func([]tlsCertificateField) int
+ 	count = func(fs []tlsCertificateField) int {
+ 		n := len(fs)
+ 		for _, f := range fs {
++			if f.Type != "" && !utils.StringArrayContains(baseType, f.Type) {
++				simple = false
++			}
+ 			n += count(f.Children)
+ 		}
+ 		return n
+@@ -92,7 +97,7 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
+ 			if f.Start < 0 || f.End < f.Start || uint64(f.End)*8 > bits {
+ 				return fmt.Errorf("tls-certificate: invalid field span")
+ 			}
+-			var local [6]base.ConfigItem
++			var local [8]base.ConfigItem
+ 			items := local[:0]
+ 			// An empty list has an observed zero-width result; ordinary empty
+ 			// containers do not. Preserve the original config replay order.
+@@ -109,6 +114,15 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
+ 			if parentIsList {
+ 				items = append(items, base.ConfigItem{Key: CfgElementIndex, Value: index})
+ 			}
++			// These fields have no reference-type transition. Fuse InitNode's
++			// repeated parent/last writes into their private construction, keeping
++			// the per-node replay sequence (including the repeated parent) intact.
++			if simple {
++				items = append(items, base.ConfigItem{Key: CfgParent, Value: parent})
++				if index == len(fields)-1 {
++					items = append(items, base.ConfigItem{Key: CfgLastNode, Value: true})
++				}
++			}
+ 			var child *base.Node
+ 			if f.Type == "" {
+ 				child = batch.NewNode(f.Name, yaml.MapSlice{}, parent.Cfg, node.Ctx, items...)
+@@ -128,8 +142,10 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
+ 	if err = fill(staged, fields); err != nil {
+ 		return err
+ 	}
+-	if err = InitNode(staged); err != nil {
+-		return err
++	if !simple {
++		if err = InitNode(staged); err != nil {
++			return err
++		}
+ 	}
+ 	for _, child := range staged.Children {
+ 		child.Cfg.SetItem(CfgParent, node)
