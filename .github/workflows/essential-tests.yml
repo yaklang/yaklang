@@ -720,7 +720,10 @@ jobs:
               ]
 
           - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
-            package_workers: "2"
+            # TestAllSyntaxForPHP_G4 is CPU-bound and times out (~190s) when
+            # php/tests runs concurrently with the other packages on a 2-core
+            # runner; keep this suite serial.
+            package_workers: "1"
             sync_rule: "1"
             test_configs: |
               [
