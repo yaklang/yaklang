@@ -28,6 +28,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -630,6 +631,50 @@ var syncRule = &cli.Command{
 			log.Infof("output rule info to %s done ", output)
 		}
 
+		return nil
+	},
+}
+
+var verifyBuiltinRisk = &cli.Command{
+	Name:    "verify-builtin-risk",
+	Aliases: []string{"verify-risk", "builtin-risk-check"},
+	Usage:   "verify built-in SyntaxFlow rules' risk types against the risk taxonomy",
+	UsageText: "yak verify-builtin-risk [--dir <rule-dir>] [--taxonomy <taxonomy.json>]",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "dir",
+			Usage: "rule directory containing .sf files",
+			Value: "common/syntaxflow/sfbuildin/buildin",
+		},
+		cli.StringFlag{
+			Name:  "taxonomy",
+			Usage: "risk taxonomy JSON file",
+			Value: "common/syntaxflow/sfrisk/taxonomy.json",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		dir := c.String("dir")
+		taxonomyFile := c.String("taxonomy")
+		data, err := os.ReadFile(taxonomyFile)
+		if err != nil {
+			return utils.Wrapf(err, "read risk taxonomy %s failed (pass --taxonomy)", taxonomyFile)
+		}
+		checker, err := sfrisk.NewChecker(data)
+		if err != nil {
+			return utils.Wrapf(err, "parse risk taxonomy %s failed", taxonomyFile)
+		}
+		result, err := sfbuildin.CheckBuiltinRiskTypes(dir, checker)
+		if err != nil {
+			return utils.Wrapf(err, "check built-in risk types failed")
+		}
+		log.Infof("inspected %d rules (%d libraries), %d alerts, %d risk types",
+			result.RuleCount, result.LibraryCount, result.AlertCount, len(result.CanonicalTypes))
+		if len(result.Violations) > 0 {
+			for _, violation := range result.Violations {
+				println(violation)
+			}
+			return utils.Errorf("built-in risk type check failed with %d violation(s)", len(result.Violations))
+		}
 		return nil
 	},
 }
@@ -2171,6 +2216,7 @@ var SSACompilerCommands = []*cli.Command{
 	syntaxFlowExport,              // export rule to file
 	syntaxFlowImport,              // import rule from file
 	syncRule,                      // sync rule from embed to database
+	verifyBuiltinRisk,             // verify builtin rule risk types from local files
 	// risk manage
 	ssaRisk, // export risk report
 

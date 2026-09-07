@@ -50,12 +50,19 @@ type Definition struct {
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
 
-var builtins, definitions = mustLoadTaxonomy()
+// Checker resolves risk type spellings against an explicit taxonomy payload.
+// The package-level helpers use the taxonomy embedded in this build; callers
+// that want to validate against a checkout file can build their own Checker.
+type Checker struct {
+	taxonomy    Taxonomy
+	definitions map[string]Definition
+}
 
-func mustLoadTaxonomy() (Taxonomy, map[string]Definition) {
-	taxonomy, err := ParseTaxonomy(taxonomyJSON)
+// NewChecker parses and validates a taxonomy payload and builds its lookup index.
+func NewChecker(data []byte) (*Checker, error) {
+	taxonomy, err := ParseTaxonomy(data)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	index := make(map[string]Definition)
 	for _, category := range taxonomy.Categories {
@@ -72,17 +79,32 @@ func mustLoadTaxonomy() (Taxonomy, map[string]Definition) {
 			}
 		}
 	}
-	return taxonomy, index
+	return &Checker{taxonomy: taxonomy, definitions: index}, nil
 }
 
-// GetTaxonomy returns a detached copy suitable for archive metadata.
-func GetTaxonomy() Taxonomy {
-	result := builtins
-	result.Categories = append([]Category(nil), builtins.Categories...)
+var defaultChecker = mustLoadDefaultChecker()
+
+func mustLoadDefaultChecker() *Checker {
+	checker, err := NewChecker(taxonomyJSON)
+	if err != nil {
+		panic(err)
+	}
+	return checker
+}
+
+// DefaultChecker returns the checker built from this package's embedded taxonomy.
+func DefaultChecker() *Checker {
+	return defaultChecker
+}
+
+// Taxonomy returns a detached copy suitable for archive metadata.
+func (c *Checker) Taxonomy() Taxonomy {
+	result := c.taxonomy
+	result.Categories = append([]Category(nil), c.taxonomy.Categories...)
 	for i := range result.Categories {
-		result.Categories[i].RiskTypes = append([]Type(nil), builtins.Categories[i].RiskTypes...)
+		result.Categories[i].RiskTypes = append([]Type(nil), c.taxonomy.Categories[i].RiskTypes...)
 		for j := range result.Categories[i].RiskTypes {
-			result.Categories[i].RiskTypes[j].Aliases = append([]string(nil), builtins.Categories[i].RiskTypes[j].Aliases...)
+			result.Categories[i].RiskTypes[j].Aliases = append([]string(nil), c.taxonomy.Categories[i].RiskTypes[j].Aliases...)
 		}
 	}
 	return result
@@ -90,16 +112,33 @@ func GetTaxonomy() Taxonomy {
 
 // Lookup resolves a reviewed spelling for display only. Unknown/custom values
 // remain unknown; callers must preserve their raw value rather than guess a type.
-func Lookup(raw string) (Definition, bool) {
-	definition, ok := definitions[strings.TrimSpace(raw)]
+func (c *Checker) Lookup(raw string) (Definition, bool) {
+	definition, ok := c.definitions[strings.TrimSpace(raw)]
 	return definition, ok
 }
 
 // IsCanonical accepts only an active authoring key, not a legacy alias or review
 // placeholder. Keep Lookup permissive for historical/custom rule consumers.
-func IsCanonical(raw string) bool {
-	definition, ok := definitions[raw]
+func (c *Checker) IsCanonical(raw string) bool {
+	definition, ok := c.definitions[raw]
 	return ok && definition.CanonicalName == raw && !definition.ReviewRequired
+}
+
+// GetTaxonomy returns a detached copy suitable for archive metadata.
+func GetTaxonomy() Taxonomy {
+	return defaultChecker.Taxonomy()
+}
+
+// Lookup resolves a reviewed spelling for display only. Unknown/custom values
+// remain unknown; callers must preserve their raw value rather than guess a type.
+func Lookup(raw string) (Definition, bool) {
+	return defaultChecker.Lookup(raw)
+}
+
+// IsCanonical accepts only an active authoring key, not a legacy alias or review
+// placeholder. Keep Lookup permissive for historical/custom rule consumers.
+func IsCanonical(raw string) bool {
+	return defaultChecker.IsCanonical(raw)
 }
 
 func ParseTaxonomy(data []byte) (Taxonomy, error) {

@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -48,6 +49,11 @@ func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin boo
 
 // GenerateRuleVersionsFromLocalFS 在 irify_exclude 模式下不可用
 func GenerateRuleVersionsFromLocalFS(dirs []string, baselinePath string) ([]sfdb.RuleInfo, error) {
+	return nil, ErrSyntaxFlowNotAvailable
+}
+
+// CheckBuiltinRiskTypes 在 irify_exclude 模式下不可用
+func CheckBuiltinRiskTypes(dir string, checker *sfrisk.Checker) (*BuiltinRiskCheckResult, error) {
 	return nil, ErrSyntaxFlowNotAvailable
 }
 
