@@ -176,7 +176,7 @@ func reusableBridgeName(name string) bool {
 		"parseCassandraFields",
 		"parseTNSFields",
 		"parseTDSFields",
-		"parseLDAPFields",
+		"parseLDAPFields", "parseSMB3TransformFields",
 		"parsePostgreSQLFields",
 		"parseMySQLFields",
 		"parseIMAPFields",

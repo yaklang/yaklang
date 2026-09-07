@@ -229,7 +229,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "Mount", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "SMB", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "NEGOTIATE/AndX/CLOSE/TRANSACTION/TRANS2"},
 	{Name: "SMB2", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "NEGOTIATE/SESSION_SETUP/TREE/CREATE/READ/WRITE/CLOSE/IOCTL"},
-	{Name: "SMB3", Family: "file", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "transform \\xfdSMB + session/nonce"},
+	{Name: "SMB3", Family: "file", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "P0 bounded Transform carrier and SMB 3.x NEGOTIATE fields; no decryption or session validation (P0_SCOPE.md)"},
 	{Name: "CIFS", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "see SMB"},
 	{Name: "SMB-Direct", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "AFP", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
@@ -240,7 +240,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "9P", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},
 
 	// --- 目录 / 认证 ---
-	{Name: "LDAP", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "SEQUENCE + bind/unbind/search tags"},
+	{Name: "LDAP", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "P0 explicit LDAPv3 bind request/response, unbind, search request/entry/done/reference fields (P0_SCOPE.md)"},
 	{Name: "LDAPS", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "CLDAP", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "Kerberos", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "APPLICATION tags AS/TGS/AP/ERROR + TCP record"},
@@ -277,9 +277,9 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "PsExec/SMB-svcctl", Family: "remote", Sources: src(srcPrivate), Status: stDone, Priority: priP0, Notes: "SVCCTL OpenSCManagerW opnum 15"},
 
 	// --- 数据库 ---
-	{Name: "MySQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "HandshakeV10 plugin data/name + OK/ERR/EOF/COM_QUERY"},
+	{Name: "MySQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "P0 V10/41, SSLRequest, classic commands, OK/ERR/EOF and explicit text-result profiles (P0_SCOPE.md)"},
 	{Name: "MariaDB", Family: "database", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
-	{Name: "PostgreSQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "startup/SSL/query/auth/error/ready"},
+	{Name: "PostgreSQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "P0 explicit startup/SSL/GSS, authentication and frontend/backend message profiles (P0_SCOPE.md)"},
 	{Name: "MSSQL TDS", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "header + PRELOGIN tokens/LOGIN7/BATCH"},
 	{Name: "Oracle TNS", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "header types 1-15 + CONNECT data"},
 	{Name: "MongoDB", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
