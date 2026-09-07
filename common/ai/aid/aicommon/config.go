@@ -362,6 +362,7 @@ type Config struct {
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
 	DisableEnhanceDirectlyAnswer       bool
 	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
+	AllowSyncInitContext               bool // 首轮同步增强上下文，默认 false；后续按需识别意图
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
@@ -706,7 +707,7 @@ func newConfig(ctx context.Context) *Config {
 		GoalMinIterations:                  DefaultGoalMinIterations,
 		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
-		EnableFunctionCallMode:            true, // 默认开启原生 functioncall 模式
+		EnableFunctionCallMode:             true,  // 默认开启原生 functioncall 模式
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
@@ -2586,6 +2587,23 @@ func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 	}
 }
 
+// WithAllowSyncInitContext opts into synchronous context enrichment before the
+// default loop's first response. It defaults to false; planning, PE tasks and
+// explicit capability discovery can still enrich context during execution.
+// Memory loading remains asynchronous regardless of this option.
+func WithAllowSyncInitContext(allow bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.AllowSyncInitContext = allow
+		c.m.Unlock()
+		c.SetConfig("AllowSyncInitContext", allow)
+		return nil
+	}
+}
+
 // WithDisableIntentRecognition disables intent recognition in loop_default's buildInitTask.
 // This is primarily used in test environments where the mock AI callback cannot handle
 // the intent recognition sub-loop (loop_intent), which would consume mock responses
@@ -4369,6 +4387,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.DisableIntentRecognition {
 		opts = append(opts, WithDisableIntentRecognition(true))
 	}
+	opts = append(opts, WithAllowSyncInitContext(i.AllowSyncInitContext))
 	if i.SyncPerceptionTrigger {
 		opts = append(opts, WithSyncPerceptionTrigger(true))
 	}

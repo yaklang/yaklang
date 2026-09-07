@@ -548,6 +548,15 @@ func (b *AIMemoryHNSWBackend) GetStats() map[string]interface{} {
 
 // Close 关闭后端，保存索引
 func (b *AIMemoryHNSWBackend) Close() error {
+	// Fast sessions can finish before any memories are added. There is no
+	// graph to persist in that case; exporting an empty graph reports an error.
+	b.graphMutex.RLock()
+	graph := b.graph.Load()
+	empty := graph == nil || graph.IsEmpty()
+	b.graphMutex.RUnlock()
+	if empty {
+		return nil
+	}
 	return b.SaveGraph()
 }
 

@@ -553,6 +553,7 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		// S3c: PersistentSessionId/MemoryTriageId 移到字面量后 append,以便
 		// 无状态模式短路(留空 → re-act.go 四个落盘分支跳过)。
 		aicommon.WithEnablePETaskAnalyze(true),
+		aicommon.WithAllowSyncInitContext(config.AllowSyncInitContext),
 
 		// 事件处理
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
