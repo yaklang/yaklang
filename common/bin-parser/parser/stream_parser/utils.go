@@ -796,8 +796,9 @@ func CalcNodeConsumedLength(node *base.Node) uint64 {
 // The result lookup also determines presence: a present nil result is not an
 // unparsed node, and an explicit consumed-bits value shadows its result span.
 func calcNodeConsumedLength(node *base.Node) uint64 {
-	if result, ok := node.Cfg.LookupItem(CfgNodeResult); ok {
-		if consumed, present := node.Cfg.LookupItem(CfgConsumedBits); present {
+	result, consumed, hasResult, hasConsumed := node.Cfg.LookupConsumedResult()
+	if hasResult {
+		if hasConsumed {
 			length, _ := base.InterfaceToUint64(consumed)
 			return length
 		}
