@@ -56,9 +56,6 @@ func TestH2DataWindowIncludesPadding(t *testing.T) {
 				reader := http2.NewFramer(io.Discard, &output)
 				if frame.Length > 0 {
 					ids := []uint32{0}
-					if state == "active" {
-						ids = append(ids, 1)
-					}
 					for _, id := range ids {
 						written, err := reader.ReadFrame()
 						if err != nil {

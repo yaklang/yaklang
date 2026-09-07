@@ -31,17 +31,21 @@ func newH2ReadLoopTestConn(t *testing.T, output io.Writer) *http2ClientConn {
 	client, peer := net.Pipe()
 	t.Cleanup(func() { client.Close(); peer.Close() })
 	conn := &http2ClientConn{
-		conn:            client,
-		mu:              new(sync.Mutex),
-		streams:         make(map[uint32]*http2ClientStream),
-		hDec:            hpack.NewDecoder(defaultHeaderTableSize, nil),
-		fr:              http2.NewFramer(output, nil),
-		frWriteMutex:    new(sync.Mutex),
-		closeCh:         make(chan struct{}),
-		idleTimeout:     time.Hour,
-		idleTimer:       time.NewTimer(time.Hour),
-		maxStreamsCount: 100,
-		http2StreamPool: &sync.Pool{New: func() any { return new(http2ClientStream) }},
+		conn:              client,
+		mu:                new(sync.Mutex),
+		streams:           make(map[uint32]*http2ClientStream),
+		hDec:              hpack.NewDecoder(4096, nil),
+		fr:                http2.NewFramer(output, nil),
+		frWriteMutex:      new(sync.Mutex),
+		closeCh:           make(chan struct{}),
+		idleTimeout:       time.Hour,
+		idleTimer:         time.NewTimer(time.Hour),
+		maxStreamsCount:   100,
+		headerListMaxSize: ^uint32(0),
+		initialWindowSize: 65535,
+		sendWindow:        65535,
+		maxFrameSize:      defaultMaxFrameSize,
+		http2StreamPool:   &sync.Pool{New: func() any { return new(http2ClientStream) }},
 	}
 	conn.streamsCond = sync.NewCond(conn.mu)
 	t.Cleanup(func() { conn.idleTimer.Stop() })

@@ -213,7 +213,7 @@ func (l *LowHttpConnPool) debugState() {
 		alt.mu.Lock()
 		active := alt.activeStreams
 		maxS := alt.maxStreamsCount
-		totalCreated := alt.currentStreamID / 2
+		totalCreated := atomic.LoadUint32(&alt.currentStreamID) / 2
 		closed := alt.closed
 		goAway := alt.readGoAway
 		full := alt.full
