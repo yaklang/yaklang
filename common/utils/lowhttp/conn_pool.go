@@ -858,16 +858,18 @@ func (pc *persistConn) readLoop() {
 		var ctxWatcherStop chan struct{}
 		if rc.option != nil && rc.option.Ctx != nil {
 			ctxWatcherStop = make(chan struct{})
-			go func(seq uint64, stop chan struct{}) {
+			// Capture this request's context before rc is replaced on connection
+			// reuse; the watcher may still be scheduled after stop is closed.
+			go func(requestCtx context.Context, seq uint64, stop chan struct{}) {
 				select {
-				case <-rc.option.Ctx.Done():
+				case <-requestCtx.Done():
 					if atomic.LoadUint64(&pc.reqSeq) != seq {
 						return
 					}
 					_ = pc.conn.Close()
 				case <-stop:
 				}
-			}(seq, ctxWatcherStop)
+			}(rc.option.Ctx, seq, ctxWatcherStop)
 		}
 		stopCtxWatcher := func() {
 			if ctxWatcherStop != nil {
