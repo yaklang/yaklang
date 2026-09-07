@@ -201,6 +201,10 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 		b.stopConsumer()
 		return
 	}
+	if !b.agent.node.IsRegistered() {
+		b.stopConsumer()
+		return
+	}
 	session, ok := b.agent.node.GetSessionState()
 	if !ok {
 		b.stopConsumer()

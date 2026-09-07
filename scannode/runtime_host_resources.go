@@ -70,6 +70,12 @@ func (c *runtimeHostResourceCollector) ValidateEnvelope(cpuMillicores, memoryByt
 }
 
 func (c *runtimeHostResourceCollector) snapshot(advance bool) (node.RuntimeHostCapacity, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.snapshotLocked(advance)
+}
+
+func (c *runtimeHostResourceCollector) snapshotLocked(advance bool) (node.RuntimeHostCapacity, error) {
 	logicalCPUs, memoryCapacity, memoryAvailable, err := c.source.Snapshot()
 	if err != nil {
 		return node.RuntimeHostCapacity{}, err
@@ -90,8 +96,6 @@ func (c *runtimeHostResourceCollector) snapshot(advance bool) (node.RuntimeHostC
 	if memoryAvailable > memoryCapacity {
 		memoryAvailable = memoryCapacity
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if advance {
 		c.sampleSequence++
 	}
