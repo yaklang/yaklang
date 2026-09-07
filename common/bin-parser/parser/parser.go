@@ -34,9 +34,14 @@ func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, k
 		return nil, err
 	}
 	setKnownInputLength(rootNode, data)
+	inputConfig := make(map[string]any, len(config))
 	for k, v := range config {
 		rootNode.Ctx.SetItem(k, v)
+		inputConfig[k] = v
 	}
+	// Snapshot the key/value association, retaining intentionally shared state
+	// objects (for example a caller-owned IPFIX template table).
+	rootNode.Ctx.SetItem(base.CtxInputConfig, inputConfig)
 	if err != nil {
 		return nil, err
 	}

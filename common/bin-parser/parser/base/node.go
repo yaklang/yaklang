@@ -28,6 +28,9 @@ const (
 	CfgNodeResult = "node result"
 	CfgLastNode   = "last node"
 	CfgOptionFuns = "options functions"
+	// CtxInputConfig carries only explicit caller settings through rule imports.
+	// Internal parser state and a rule's temporary setCtx values stay local.
+	CtxInputConfig = "__bin_parser_input_config"
 )
 
 type NodeValue struct {
@@ -198,8 +201,9 @@ func (n *Node) Copy() *Node {
 		Ctx:      n.Ctx,
 	}
 	for _, child := range n.Children {
-		child.Cfg.SetItem(CfgParent, res)
-		res.Children = append(res.Children, child.Copy())
+		copiedChild := child.Copy()
+		copiedChild.Cfg.SetItem(CfgParent, res)
+		res.Children = append(res.Children, copiedChild)
 	}
 	return res
 }

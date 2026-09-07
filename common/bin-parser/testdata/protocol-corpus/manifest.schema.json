@@ -52,12 +52,12 @@
           "notes": {"type": "string"},
           "representative_frame": {
             "type": ["object", "null"],
-            "required": ["number", "length_bytes", "hex_file"],
+            "required": ["number", "length_bytes", "sha256"],
             "additionalProperties": false,
             "properties": {
               "number": {"type": "integer", "minimum": 1},
               "length_bytes": {"type": "integer", "minimum": 1},
-              "hex_file": {"type": "string"}
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
             }
           },
           "frame_protocols": {"type": "array", "items": {"type": "string"}}

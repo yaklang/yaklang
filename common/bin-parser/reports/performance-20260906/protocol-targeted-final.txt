@@ -1,6 +1,0 @@
-Command (repository root):
-go test ./common/bin-parser ./common/bin-parser/parser/stream_parser -run '^(TestMemcached.*|TestProtocolCorpusMemcachedFields.*|TestCassandra.*|TestProtocolCorpusCassandraFields.*|TestProtocolCorpusSupplementalProfiles|TestProtocolCatalogRuleFilesExist|TestProtocolRoadmapIntegrity|TestProtocolCorpusContractReferencesExist|TestTNS.*|TestProtocolCorpusTNSFields.*|TestTDSFieldsBridgeTransactions|TestTLSCertificate.*)$' -count=1 -timeout=3m
-
-Exit code: 0
-ok  	github.com/yaklang/yaklang/common/bin-parser	1.519s
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	1.415s

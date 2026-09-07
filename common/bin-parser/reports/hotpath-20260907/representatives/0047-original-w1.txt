@@ -1,6 +1,0 @@
-goos: darwin
-goarch: arm64
-pkg: github.com/yaklang/yaklang/common/bin-parser
-BenchmarkParserConsumedLength/ordinary-184B/AllJoynNS/DirectLookup         	     680	   5308465 ns/op	   0.03 MB/s	 1676502 B/op	   30952 allocs/op
-BenchmarkParserConsumedLength/counts-1454B/AllJoynNS/DirectLookup          	       5	 629933833 ns/op	   0.00 MB/s	71517728 B/op	 1444519 allocs/op
-PASS

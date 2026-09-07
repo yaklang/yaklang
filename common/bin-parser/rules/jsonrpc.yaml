@@ -1,6 +1,11 @@
 Package:
   JSONRPC:
     operator: |
+      start = getCurrentPosition()
+      setCtx("json_end", 0)
+      setCtx("has_method", 0)
+      setCtx("has_result", 0)
+      setCtx("has_error", 0)
       this.ProcessSubNode("Brace")
       if getNodeResult("Brace").Value != 0x7b {
         panic("jsonrpc: expected object")
@@ -18,6 +23,27 @@ Package:
       if hm != 1 && hr != 1 && he != 1 {
         panic("jsonrpc: expected method or result")
       }
+      // Retain the legacy field layout, but do not let its permissive lexical
+      // scanning accept invalid JSON or invalid JSON-RPC field types.
+      text = string(getCtx("buffer").Bytes()[start:getCurrentPosition()])
+      value, err = decodeJSONText(text, 64)
+      if err != nil { panic(err) }
+      fields = value.Members
+      version = fields["jsonrpc"]
+      if version == nil || version.Kind != "string" || version.StringValue != "2.0" { panic("jsonrpc: invalid version") }
+      id = fields["id"]
+      if id != nil && id.Kind != "number" && id.Kind != "string" && id.Kind != "null" { panic("jsonrpc: invalid identifier type") }
+      method = fields["method"]
+      result = fields["result"]
+      fault = fields["error"]
+      if method != nil {
+        if method.Kind != "string" || result != nil || fault != nil { panic("jsonrpc: invalid request fields") }
+        params = fields["params"]
+        if params != nil && params.Kind != "array" && params.Kind != "object" { panic("jsonrpc: invalid parameter type") }
+      } else {
+        if id == nil || result == nil || fault != nil { panic("jsonrpc: unsupported response fields; use JSONRPC2 for structured errors") }
+      }
+      this.AddInfo("JSON Value", value)
     Brace: uint8
     Pairs:
       list: true

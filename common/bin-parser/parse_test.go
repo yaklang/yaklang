@@ -171,6 +171,8 @@ func TestLCPMessage(t *testing.T) {
 }
 
 func TestBaseProtocol(t *testing.T) {
+	previousLogLevel := log.GetLevel()
+	t.Cleanup(func() { log.SetLevel(previousLogLevel) })
 	log.SetLevel(log.DebugLevel)
 	type args struct {
 		data   string

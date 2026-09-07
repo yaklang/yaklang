@@ -123,7 +123,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 410,
-        "hex_file": "hex/ndpi-ntpv2.frame-1.hex"
+        "sha256": "f423cd3ee03170ddcf1d6a60c6a43a6927a34b78fcfc7ab5af3d38eb9c982c99"
       },
       "frame_protocols": [
         "eth",
@@ -153,7 +153,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/ndpi-ntpv3.frame-1.hex"
+        "sha256": "76a9b0da8e79bae40d3e3ecff72af6a0055be84dcef18963649ba3383b628e09"
       },
       "frame_protocols": [
         "eth",
@@ -183,7 +183,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/ndpi-ntpv4.frame-1.hex"
+        "sha256": "3d25d53c71948d16dd2765011202cd3df2fe72e299345c727288b79220af6003"
       },
       "frame_protocols": [
         "eth",
@@ -213,7 +213,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 94,
-        "hex_file": "hex/ndpi-hsrp2.frame-1.hex"
+        "sha256": "fddff59dd976395ebd0d8270a4282c25e18641a62e0173a8a3189af9d05885ad"
       },
       "frame_protocols": [
         "eth",
@@ -243,7 +243,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 122,
-        "hex_file": "hex/ndpi-ospfv2.frame-1.hex"
+        "sha256": "3497e526513e4498bf44df97de2471e1ae978775148e1c2453e4f68779da12e0"
       },
       "frame_protocols": [
         "eth",
@@ -272,7 +272,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 163,
-        "hex_file": "hex/ndpi-bgp-redist.frame-1.hex"
+        "sha256": "c1ef6c8d6679a451ccb4a6a79051e7f2888c95088f28325849931c84e046b46a"
       },
       "frame_protocols": [
         "chdlc",
@@ -301,7 +301,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 72,
-        "hex_file": "hex/ndpi-cip-io.frame-1.hex"
+        "sha256": "aebd685e7452a2840be88fd5e5456cdeb4f187d1546ca610dffbd49e402969e3"
       },
       "frame_protocols": [
         "eth",
@@ -333,7 +333,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 138,
-        "hex_file": "hex/ndpi-sctp.frame-1.hex"
+        "sha256": "5dd41f37df6ca820ca5888ce211f4e60c3dd131d881d69a9f66ca6648c0385ba"
       },
       "frame_protocols": [
         "eth",
@@ -363,7 +363,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 74,
-        "hex_file": "hex/ndpi-dns.frame-1.hex"
+        "sha256": "a0d78bcebb30d94970a2739cbdf5c67d097acc8b08f899b4aa8d911d22d815b8"
       },
       "frame_protocols": [
         "eth",
@@ -393,7 +393,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 65,
-        "hex_file": "hex/ndpi-rmcp.frame-1.hex"
+        "sha256": "c61147dad6a5434a9ff9f640a1a22b04069225f925b8011e812064eb0761da2e"
       },
       "frame_protocols": [
         "eth",
@@ -425,7 +425,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 300,
-        "hex_file": "hex/ndpi-gtp-prime.frame-1.hex"
+        "sha256": "48003c20d2b978a68fdd7c0ee4b3790052ad89b11d0b5af9476b4fb8078f93cd"
       },
       "frame_protocols": [
         "eth",
@@ -459,7 +459,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 333,
-        "hex_file": "hex/ndpi-kerberos-error.frame-1.hex"
+        "sha256": "47dd3dce33a93dd8684e99f9c22b4904f380440714e798d9028e8c2f41e1f7b7"
       },
       "frame_protocols": [
         "eth",
@@ -491,7 +491,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 79,
-        "hex_file": "hex/ndpi-websocket.frame-1.hex"
+        "sha256": "2c73ace24d61b2ac5b43b478eee844bda463e2473a10b2c5894d14a5daa8472b"
       },
       "frame_protocols": [
         "eth",
@@ -521,7 +521,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/ndpi-glbp.frame-1.hex"
+        "sha256": "a68dc0a372a1d97a8818288151b113da4d8fd7927c138209fe4c9e9f49336b6c"
       },
       "frame_protocols": [
         "eth",
@@ -551,7 +551,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 206,
-        "hex_file": "hex/ndpi-profinet-io.frame-1.hex"
+        "sha256": "0047e6c32a1aa30801ee896996b4b2c3a3eec316fc046d03b44346dbdc3432d4"
       },
       "frame_protocols": [
         "eth",
@@ -581,7 +581,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/ndpi-gtp.frame-1.hex"
+        "sha256": "08f273fc6dcff1e02aea007b8f336a2ec3fd9ae22d69c25984eb01b0e6efc9f4"
       },
       "frame_protocols": [
         "eth",
@@ -613,7 +613,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/ndpi-knxip.frame-1.hex"
+        "sha256": "c48a237340e9110f7d7e158b3687d4025b16a69c672d3b55e48facbaa41fe225"
       },
       "frame_protocols": [
         "eth",
@@ -643,7 +643,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 384,
-        "hex_file": "hex/ndpi-gre.frame-1.hex"
+        "sha256": "b5e742810dc8f1b308d6122b26dbe64e6763cce999fe689ced897a8e514ce79a"
       },
       "frame_protocols": [
         "eth",
@@ -679,7 +679,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/ndpi-dlep.frame-1.hex"
+        "sha256": "803a55785c4c8ffebdb443ad4e29860eea9c386669f354bd2e40219fa93f2f38"
       },
       "frame_protocols": [
         "eth",
@@ -709,7 +709,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 233,
-        "hex_file": "hex/ndpi-rtsp-http.frame-1.hex"
+        "sha256": "2341429ed12eefafa9fb31b42985734325353923d66a0cc2147f9c07ee87cf7c"
       },
       "frame_protocols": [
         "eth",
@@ -739,7 +739,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 289,
-        "hex_file": "hex/ndpi-gtp-c.frame-1.hex"
+        "sha256": "81bfad67074ee510c053b3e25bbacfdae8f3a4dedf6c4fc67a85d52a88b70989"
       },
       "frame_protocols": [
         "eth",
@@ -771,7 +771,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 114,
-        "hex_file": "hex/ndpi-someip-sd.frame-1.hex"
+        "sha256": "afe37cd1496b8dc6a253eccaf6579d2994cab5d1548094d48641239ee29a8cfe"
       },
       "frame_protocols": [
         "ppi",
@@ -804,7 +804,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 44,
-        "hex_file": "hex/ndpi-nat-pmp.frame-1.hex"
+        "sha256": "56daababdbe6cee27e20412c86f367db37e8dfd91255bad0273d94795206f389"
       },
       "frame_protocols": [
         "eth",
@@ -835,7 +835,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 370,
-        "hex_file": "hex/ndpi-someip-method.frame-1.hex"
+        "sha256": "4760414840a8598e04c53f48c60480881eef2cb8af47552aafa02ec50b79397e"
       },
       "frame_protocols": [
         "eth",
@@ -865,7 +865,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 156,
-        "hex_file": "hex/ndpi-rtcp-compound.frame-1.hex"
+        "sha256": "4c48e0e5f1c5e60f4c85177b853a7f4f31485a0844438e2daeaba6d514b8da3e"
       },
       "frame_protocols": [
         "sll",
@@ -895,7 +895,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 87,
-        "hex_file": "hex/ndpi-can.frame-1.hex"
+        "sha256": "2584f7d9f066ad98af6a846f5d4825c3cc52cbc513a12231145e97087ac841a6"
       },
       "frame_protocols": [
         "eth",
@@ -927,7 +927,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 848,
-        "hex_file": "hex/ndpi-ssdp.frame-1.hex"
+        "sha256": "e7a7f62cf1b5b497376538be3f261117b59cc1f1650bc46c025af213209c3bef"
       },
       "frame_protocols": [
         "eth",
@@ -957,7 +957,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/ndpi-bfd.frame-1.hex"
+        "sha256": "895ac2f0bc7a131d348dbf29f83637e5dbed96aaed143ca30cef02606f9e35b8"
       },
       "frame_protocols": [
         "eth",
@@ -990,7 +990,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 92,
-        "hex_file": "hex/ndpi-c1222.frame-1.hex"
+        "sha256": "40114503bd3fb2c177cf3b41db90443853a86b060697731e47f8eff8b05ccdf8"
       },
       "frame_protocols": [
         "eth",
@@ -1020,7 +1020,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 76,
-        "hex_file": "hex/ndpi-ldp.frame-1.hex"
+        "sha256": "1c77e8fd5e16b4c8c2e33886dc3ed109be1ed33ea4518abf73859cb2723223b8"
       },
       "frame_protocols": [
         "eth",
@@ -1050,7 +1050,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 88,
-        "hex_file": "hex/ndpi-pim.frame-1.hex"
+        "sha256": "3adf756c57a67979e080718456a4a3ebc40094e03d2f87b6fe1ef91f224faf7f"
       },
       "frame_protocols": [
         "eth",
@@ -1079,7 +1079,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 60,
-        "hex_file": "hex/ndpi-iec104.frame-3.hex"
+        "sha256": "0881d2947a1419377ffbfa9bdd43bc8d4b31d5e413130e55fe555d7334983b9e"
       },
       "frame_protocols": [
         "eth",
@@ -1109,7 +1109,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 58,
-        "hex_file": "hex/ndpi-melsec.frame-4.hex"
+        "sha256": "4fd0620d9c7a231aec0482f45b8d8b4538c7b9d68d03aafe18fba7f90f973988"
       },
       "frame_protocols": [
         "eth",
@@ -1139,7 +1139,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 186,
-        "hex_file": "hex/ndpi-sflow.frame-1.hex"
+        "sha256": "03be3ce8eb3446b5dec642411d23dfd452e87814732478aa8431abc30a6e5ac4"
       },
       "frame_protocols": [
         "eth",
@@ -1169,7 +1169,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 132,
-        "hex_file": "hex/ndpi-http2.frame-1.hex"
+        "sha256": "a275fb5f974347ab85ed9f47a0e511ad86570d13383ed5926c5ed76564d67702"
       },
       "frame_protocols": [
         "sll",
@@ -1199,7 +1199,7 @@
       "representative_frame": {
         "number": 2,
         "length_bytes": 132,
-        "hex_file": "hex/ndpi-mqtt.frame-2.hex"
+        "sha256": "333a9396b6cfbe7210f174a0aca86ae631d0c21a4a8378d796b712f897c53e16"
       },
       "frame_protocols": [
         "eth",
@@ -1229,7 +1229,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 138,
-        "hex_file": "hex/ndpi-wireguard.frame-1.hex"
+        "sha256": "16818ad974a667debe6203770c7e5e1b98877144cdc70f4782e72dbdb0e651c5"
       },
       "frame_protocols": [
         "eth",
@@ -1259,7 +1259,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/ndpi-bacnet.frame-1.hex"
+        "sha256": "2d6dfb1c66a0a8f526d4782707b354a0457f3fc8ecbb2edf29f1967031e16615"
       },
       "frame_protocols": [
         "eth",
@@ -1291,7 +1291,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/ndpi-modbus.frame-1.hex"
+        "sha256": "3fd4527640c42d40ad09caf1175282affb9bd9c64d6d367de34be99b1b2bba3f"
       },
       "frame_protocols": [
         "eth",
@@ -1322,7 +1322,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 176,
-        "hex_file": "hex/ndpi-mysql.frame-4.hex"
+        "sha256": "7102f0e4b9c0eed4f794683bec8978658408aaade3ef454a1bf913957451f9b4"
       },
       "frame_protocols": [
         "eth",
@@ -1352,7 +1352,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 91,
-        "hex_file": "hex/ndpi-kafka.frame-1.hex"
+        "sha256": "6567516170692ac3d044d60b40c9e76fef6b99b650f281d6fa51f3559e1e0b9c"
       },
       "frame_protocols": [
         "eth",
@@ -1382,7 +1382,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 107,
-        "hex_file": "hex/ndpi-amqp.frame-1.hex"
+        "sha256": "6db2b7a0fe8156cca5e5a37a6d444a4847bfa2bddac3a4eccd1fe690b31b154a"
       },
       "frame_protocols": [
         "eth",
@@ -1412,7 +1412,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 405,
-        "hex_file": "hex/ndpi-openvpn.frame-1.hex"
+        "sha256": "1836ef353371f58eaa7c91834e0df4cab3d385702fd7a6a4b7d525b4ed7de2db"
       },
       "frame_protocols": [
         "null",
@@ -1442,7 +1442,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 62,
-        "hex_file": "hex/ndpi-tftp.frame-3.hex"
+        "sha256": "07b699c70fe69e73c8c212a27459d1563af608dd39444c15e62229e3be021b83"
       },
       "frame_protocols": [
         "eth",
@@ -1472,7 +1472,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 126,
-        "hex_file": "hex/ndpi-vxlan.frame-1.hex"
+        "sha256": "52a743a3155df0c4f066ef72e5edcb5741fd29bdabc8293f821dd55666e9ff02"
       },
       "frame_protocols": [
         "eth",
@@ -1509,7 +1509,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 190,
-        "hex_file": "hex/ndpi-nntp.frame-4.hex"
+        "sha256": "20f61db4c8ec60033fbdce9ce02ae53251a470df2a01a606b5dcd5b7479eb00d"
       },
       "frame_protocols": [
         "eth",
@@ -1539,7 +1539,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 88,
-        "hex_file": "hex/ndpi-afp.frame-1.hex"
+        "sha256": "582220f368788eac060d0c474fc9f0041c21e31a79fa03ce5738c1840b8b9073"
       },
       "frame_protocols": [
         "eth",
@@ -1570,7 +1570,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 138,
-        "hex_file": "hex/ndpi-ipsec-ah.frame-5.hex"
+        "sha256": "fb675770794c6dfab71edc5941f59532ae6bccbf59e81a5832a4f4880908f6e4"
       },
       "frame_protocols": [
         "eth",
@@ -1601,7 +1601,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 75,
-        "hex_file": "hex/ndpi-ajp.frame-5.hex"
+        "sha256": "5f67b1399c35db49919d79f184ce5faef258490876fabc6acdba685571bb49c7"
       },
       "frame_protocols": [
         "eth",
@@ -1634,7 +1634,7 @@
       "representative_frame": {
         "number": 69,
         "length_bytes": 299,
-        "hex_file": "hex/ndpi-anydesk.frame-69.hex"
+        "sha256": "505a1db2453812c26b51fbb58ff5a3428756205eb1dc8d79f931fbe7662f133c"
       },
       "frame_protocols": [
         "eth",
@@ -1664,7 +1664,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 92,
-        "hex_file": "hex/ndpi-beckhoff-ads.frame-4.hex"
+        "sha256": "3435f51379271f22bc7ed81fce8c799bddcc51d191b6e52136852c0ab8096b3e"
       },
       "frame_protocols": [
         "eth",
@@ -1694,7 +1694,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 134,
-        "hex_file": "hex/ndpi-bittorrent.frame-1.hex"
+        "sha256": "920f400fc2fdfe3cf9968a49a0a429d53dcbf1686f75d13135d0a9d4ebaf5134"
       },
       "frame_protocols": [
         "eth",
@@ -1724,7 +1724,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 75,
-        "hex_file": "hex/ndpi-cassandra.frame-4.hex"
+        "sha256": "da12bc45b5d24861f8ea29de1d01e85f559d668493acc44b97199a8430b194ce"
       },
       "frame_protocols": [
         "eth",
@@ -1754,7 +1754,7 @@
       "representative_frame": {
         "number": 8,
         "length_bytes": 338,
-        "hex_file": "hex/ndpi-ceph.frame-8.hex"
+        "sha256": "f477a631f7c199cd0f8a29619e7c0cf07650336bdc97cefac8c3c9e6b8fb6d85"
       },
       "frame_protocols": [
         "eth",
@@ -1785,7 +1785,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 86,
-        "hex_file": "hex/ndpi-coap.frame-1.hex"
+        "sha256": "3286908de3e429ba1cc0bad5f1308fd489a4205008e82ea3a5c8ef8c2ad6d474"
       },
       "frame_protocols": [
         "eth",
@@ -1815,7 +1815,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1368,
-        "hex_file": "hex/ndpi-collectd.frame-1.hex"
+        "sha256": "213c2d40e080262e5dfefabfa27a56fca34e1f19baf41bc40c77380e3ec9da82"
       },
       "frame_protocols": [
         "eth",
@@ -1846,7 +1846,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 294,
-        "hex_file": "hex/ndpi-corba.frame-4.hex"
+        "sha256": "e575fcdaf5ce0fbe027915901be33095155bb7fce53ab041c5c10504be53a0fe"
       },
       "frame_protocols": [
         "eth",
@@ -1876,7 +1876,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 684,
-        "hex_file": "hex/ndpi-dcerpc.frame-1.hex"
+        "sha256": "0a334da89b54b86aae566ddf38981cf68cb9b8ce8c6eb274bbf2a312dc0eecd9"
       },
       "frame_protocols": [
         "eth",
@@ -1906,7 +1906,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 342,
-        "hex_file": "hex/ndpi-dhcp-boundary.frame-1.hex"
+        "sha256": "c301c5476c9347d2daa2423f0c802a1ff20143a85a09a76c98e95e474ca0da11"
       },
       "frame_protocols": [
         "eth",
@@ -1936,7 +1936,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 398,
-        "hex_file": "hex/ndpi-diameter.frame-1.hex"
+        "sha256": "e3aaa47ce3a651ee3cf7fe89f4029843bc2e42f3127f24110b53144b70b27f5b"
       },
       "frame_protocols": [
         "eth",
@@ -1967,7 +1967,7 @@
       "representative_frame": {
         "number": 9,
         "length_bytes": 45,
-        "hex_file": "hex/ndpi-dingtalk.frame-9.hex"
+        "sha256": "9e4d68207f0ba503f14cd3d8d705593b431f971d29cf56ee0b3e0c7b50e7b56f"
       },
       "frame_protocols": [
         "raw",
@@ -1996,7 +1996,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 75,
-        "hex_file": "hex/ndpi-dlms.frame-4.hex"
+        "sha256": "07bbca3844f438e6c06ab56550fe9c4d4dd5856bace4db600a0b9766d71e46cc"
       },
       "frame_protocols": [
         "eth",
@@ -2026,7 +2026,7 @@
       "representative_frame": {
         "number": 10,
         "length_bytes": 71,
-        "hex_file": "hex/ndpi-dnp3.frame-10.hex"
+        "sha256": "2e78e095dc4fd7da688c674a76e46623679304fa0287862b3cda0819c215ed05"
       },
       "frame_protocols": [
         "eth",
@@ -2057,7 +2057,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1294,
-        "hex_file": "hex/ndpi-doq.frame-1.hex"
+        "sha256": "6b75740d4df312913f748904f2d4bdfd07ca7cdfdac326c3e3f269d7e47a1d9d"
       },
       "frame_protocols": [
         "eth",
@@ -2088,7 +2088,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 229,
-        "hex_file": "hex/ndpi-drda-db2.frame-4.hex"
+        "sha256": "27fb2098dc8d654f13970ff43c4c94ff24dc1addece4faf43d0637068ddde15a"
       },
       "frame_protocols": [
         "eth",
@@ -2118,7 +2118,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 197,
-        "hex_file": "hex/ndpi-dtls.frame-1.hex"
+        "sha256": "3021c93792ab485c21bfefd5d11813415adbb2783c45c44b506323feacd263ba"
       },
       "frame_protocols": [
         "eth",
@@ -2148,7 +2148,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 124,
-        "hex_file": "hex/ndpi-elasticsearch.frame-4.hex"
+        "sha256": "ea2b8201b33550a3f03afad903ab9e4cd502e5c3095d2b7e1c29096c9d0a21d9"
       },
       "frame_protocols": [
         "eth",
@@ -2178,7 +2178,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 166,
-        "hex_file": "hex/ndpi-ipsec-esp.frame-5.hex"
+        "sha256": "87805c7ecc2c421ee21f404fcac3935aae766933c26d01805a111fa9c8e9316a"
       },
       "frame_protocols": [
         "eth",
@@ -2207,7 +2207,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 82,
-        "hex_file": "hex/ndpi-fastcgi.frame-4.hex"
+        "sha256": "2d365c2054d44bcdfca94e4d87a5bd909e15af4171f3379c00d8eb83df005948"
       },
       "frame_protocols": [
         "eth",
@@ -2237,7 +2237,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/ndpi-fins.frame-1.hex"
+        "sha256": "ec55655efcb433edf80f9457a694710008287331d79c32de8466e7936f5bbda7"
       },
       "frame_protocols": [
         "eth",
@@ -2267,7 +2267,7 @@
       "representative_frame": {
         "number": 7,
         "length_bytes": 93,
-        "hex_file": "hex/ndpi-fix.frame-7.hex"
+        "sha256": "2574f402cd282cff869ff6f62995fa195a54bf1cc291b859997ea875c875ef8f"
       },
       "frame_protocols": [
         "eth",
@@ -2297,7 +2297,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 86,
-        "hex_file": "hex/ndpi-ftp.frame-4.hex"
+        "sha256": "1bb270954d8042ae35aafa1d577a0acbc4baa7be70eb860742bc85b96c8faac9"
       },
       "frame_protocols": [
         "eth",
@@ -2327,7 +2327,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 135,
-        "hex_file": "hex/ndpi-git.frame-4.hex"
+        "sha256": "628a56ca1dec18871ff6afc48973f96e6d5575dcfc2e5de70696f16bb85c0c4b"
       },
       "frame_protocols": [
         "eth",
@@ -2357,7 +2357,7 @@
       "representative_frame": {
         "number": 314,
         "length_bytes": 356,
-        "hex_file": "hex/ndpi-gnutella.frame-314.hex"
+        "sha256": "84a5bd1c37e46e347fa29ba8a6874a4644d52ce21b022a7258ba632243f7d989"
       },
       "frame_protocols": [
         "eth",
@@ -2388,7 +2388,7 @@
       "representative_frame": {
         "number": 6,
         "length_bytes": 214,
-        "hex_file": "hex/ndpi-h323.frame-6.hex"
+        "sha256": "b12af04a44a5e70b6091286b69c06a5195ec12ee2b8e98024afa5039d781e066"
       },
       "frame_protocols": [
         "eth",
@@ -2420,7 +2420,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 55,
-        "hex_file": "hex/ndpi-hart-ip.frame-1.hex"
+        "sha256": "7ddc10ca5f753205af10bbd7d2a085ef568303aaa5544b02c9d1a3da7294c5d2"
       },
       "frame_protocols": [
         "eth",
@@ -2450,7 +2450,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 140,
-        "hex_file": "hex/ndpi-http.frame-4.hex"
+        "sha256": "ea247eab99e7b7d53bc2e2fbd32351c4e37ab62d5fcf268f418dbdc8f6786cce"
       },
       "frame_protocols": [
         "eth",
@@ -2480,7 +2480,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 108,
-        "hex_file": "hex/ndpi-imap.frame-4.hex"
+        "sha256": "8c08c46152a0cf3118366b1c44ce2228e4080bf78ed4b55c55c8dd9933f77aca"
       },
       "frame_protocols": [
         "eth",
@@ -2510,7 +2510,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 101,
-        "hex_file": "hex/ndpi-irc.frame-4.hex"
+        "sha256": "4702f6e634ba0ca732ede389b3ad5b32930559932adbe0e3c2725c8d26532634"
       },
       "frame_protocols": [
         "eth",
@@ -2540,7 +2540,7 @@
       "representative_frame": {
         "number": 12,
         "length_bytes": 1124,
-        "hex_file": "hex/ndpi-jsonrpc.frame-12.hex"
+        "sha256": "cee754812038c7ff343169f99ed0147e1f7de1ec6ed014a8859e5d239ceace16"
       },
       "frame_protocols": [
         "eth",
@@ -2571,7 +2571,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1253,
-        "hex_file": "hex/ndpi-kerberos-login.frame-1.hex"
+        "sha256": "d80857c664b14bc5ddc7a97df3ba1c800deac7e543dbdad3bdcd77a6fbb5b1f8"
       },
       "frame_protocols": [
         "eth",
@@ -2601,7 +2601,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 73,
-        "hex_file": "hex/ndpi-memcached.frame-4.hex"
+        "sha256": "f6dca12a0dea08739af0cd3402fa980a33059900bf97833bdcbec826d6e13958"
       },
       "frame_protocols": [
         "eth",
@@ -2631,7 +2631,7 @@
       "representative_frame": {
         "number": 6,
         "length_bytes": 317,
-        "hex_file": "hex/ndpi-mongodb.frame-6.hex"
+        "sha256": "7d74e0c885f3106e2d3fa8ed93bfcf7c680a490a5e1656fef3073d9130039800"
       },
       "frame_protocols": [
         "eth",
@@ -2663,7 +2663,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 256,
-        "hex_file": "hex/ndpi-mssql.frame-1.hex"
+        "sha256": "dc148d524b2fad109984b2013dc4a833fe6d668ee62facd6fe473b382984a231"
       },
       "frame_protocols": [
         "eth",
@@ -2693,7 +2693,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 365,
-        "hex_file": "hex/ndpi-nats.frame-5.hex"
+        "sha256": "99c537e0d7b39d43cef75501033cffec9650ce7beec474d5e7f9ada86ee6aaa0"
       },
       "frame_protocols": [
         "null",
@@ -2722,7 +2722,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1418,
-        "hex_file": "hex/ndpi-netflow-v9.frame-1.hex"
+        "sha256": "4b4490cba9cf51b44fd86fb9e2b63f058be2932530ac23b1ce051635f9209d0d"
       },
       "frame_protocols": [
         "eth",
@@ -2752,7 +2752,7 @@
       "representative_frame": {
         "number": 9,
         "length_bytes": 82,
-        "hex_file": "hex/ndpi-nfsv3.frame-9.hex"
+        "sha256": "cc9f1184f0eacc0724eba22a5fb8fd3585b0a54a300ab82462daf57f848d197d"
       },
       "frame_protocols": [
         "eth",
@@ -2782,7 +2782,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 112,
-        "hex_file": "hex/ndpi-opcua.frame-5.hex"
+        "sha256": "2668d7b98784ce4ed97cfcd0c3c248e15d0deaf9cfd9fe2082035875cd39d153"
       },
       "frame_protocols": [
         "null",
@@ -2811,7 +2811,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 286,
-        "hex_file": "hex/ndpi-openwire.frame-4.hex"
+        "sha256": "7665f3a367445ca105a3db831102b6c9958090e4ac2f83554b28b0bbec69f302"
       },
       "frame_protocols": [
         "null",
@@ -2840,7 +2840,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 266,
-        "hex_file": "hex/ndpi-oracle.frame-4.hex"
+        "sha256": "00ec4d5a5450abc62ffeb775c3df9f9cf7ff07a9fa968d440c513d8d82f2d8f6"
       },
       "frame_protocols": [
         "eth",
@@ -2870,7 +2870,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 101,
-        "hex_file": "hex/ndpi-pop3.frame-4.hex"
+        "sha256": "f180cde8e6d1ada7c4e7b0002ce1a19e4295918b8ede3ed77adfcfaaf5ebf1d8"
       },
       "frame_protocols": [
         "eth",
@@ -2900,7 +2900,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 222,
-        "hex_file": "hex/ndpi-pptp.frame-4.hex"
+        "sha256": "7b413951a35711ee26278594dd4f7c2c55796a3ea16950122d531ba3bedaafa4"
       },
       "frame_protocols": [
         "eth",
@@ -2930,7 +2930,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 63,
-        "hex_file": "hex/ndpi-rdp.frame-4.hex"
+        "sha256": "32da3d4e4e32d465f8133826744e5ade073ccdae0a8e7f0bd797d71fbf498ef3"
       },
       "frame_protocols": [
         "null",
@@ -2961,7 +2961,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 73,
-        "hex_file": "hex/ndpi-rmi.frame-4.hex"
+        "sha256": "a15a2eac67300b7e6baa9e2c9cb6ee49918aad6135904a19de9c20ab82d33dff"
       },
       "frame_protocols": [
         "eth",
@@ -2991,7 +2991,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 80,
-        "hex_file": "hex/ndpi-rsync.frame-4.hex"
+        "sha256": "e9df7f337a7667d16f95591af3ddfe7cb2bbb036b0d3d2c2ca33fdd7394b6b8c"
       },
       "frame_protocols": [
         "eth",
@@ -3021,7 +3021,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1486,
-        "hex_file": "hex/ndpi-rtp.frame-1.hex"
+        "sha256": "34d394f596c33e7adcd0cc2a0a005e8bf2f46eaf5a2313f354760383491d3f3c"
       },
       "frame_protocols": [
         "eth",
@@ -3051,7 +3051,7 @@
       "representative_frame": {
         "number": 6,
         "length_bytes": 87,
-        "hex_file": "hex/ndpi-s7comm.frame-6.hex"
+        "sha256": "c058f21945edb53370788fca3e3a535695b355d438ab717e8905c855b8448a14"
       },
       "frame_protocols": [
         "eth",
@@ -3083,7 +3083,7 @@
       "representative_frame": {
         "number": 9,
         "length_bytes": 271,
-        "hex_file": "hex/ndpi-s7comm-plus.frame-9.hex"
+        "sha256": "d39c521f5e9a63e47f8fa2aa6b684161cc7b3521a29ca5b29206fd34bd8f618d"
       },
       "frame_protocols": [
         "eth",
@@ -3115,7 +3115,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 509,
-        "hex_file": "hex/ndpi-sip.frame-1.hex"
+        "sha256": "01e28ef76694e622bfb932164fc53024424f72994a0d3af5a564096906d62229"
       },
       "frame_protocols": [
         "eth",
@@ -3145,7 +3145,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 191,
-        "hex_file": "hex/ndpi-smbv1.frame-1.hex"
+        "sha256": "25d06f8f2800d6cc78a4e36abb0a66100e7b92441ef810a2df91bdfc64d31abc"
       },
       "frame_protocols": [
         "eth",
@@ -3176,7 +3176,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 138,
-        "hex_file": "hex/ndpi-smtp.frame-4.hex"
+        "sha256": "398346c56cbf75ffcd74ec724ef96fb418888b43f9bdb487bc7357d80d3e59b8"
       },
       "frame_protocols": [
         "eth",
@@ -3206,7 +3206,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 85,
-        "hex_file": "hex/ndpi-snmp.frame-1.hex"
+        "sha256": "d801291882bf185b76919a26ca063754907a4e6592691b1cbe67d0b4c2ec0a27"
       },
       "frame_protocols": [
         "eth",
@@ -3231,13 +3231,13 @@
       "size_bytes": 12736,
       "packet_count": 60,
       "link_type": "Ethernet",
-      "display_filter": "tcp.stream == 0 \u0026\u0026 tcp.len == 21 \u0026\u0026 tcp.payload[0] == 0x05",
+      "display_filter": "tcp.stream == 0 && tcp.len == 21 && tcp.payload[0] == 0x05",
       "evidence_kind": "upstream-positive",
       "notes": "Select the complete SOCKS5 domain-name CONNECT request; the capture also contains SOCKS4 exchanges.",
       "representative_frame": {
         "number": 6,
         "length_bytes": 75,
-        "hex_file": "hex/ndpi-socks.frame-6.hex"
+        "sha256": "bbfda36599be70eb2969b2269d6a4394b4b1c4747fb7f3e2e02e77bdc793a327"
       },
       "frame_protocols": [
         "eth",
@@ -3267,7 +3267,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 87,
-        "hex_file": "hex/ndpi-ssh.frame-4.hex"
+        "sha256": "f7d4eb223445e3f6a28ccced15fa40b8f04f62548caeda62f84a86241274b492"
       },
       "frame_protocols": [
         "eth",
@@ -3297,7 +3297,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 164,
-        "hex_file": "hex/ndpi-stun.frame-3.hex"
+        "sha256": "61b14e5cdc98ed933a46b55aaf923359b2a86a27d8633d25cd941e153ed53616"
       },
       "frame_protocols": [
         "eth",
@@ -3329,7 +3329,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 703,
-        "hex_file": "hex/ndpi-syslog.frame-1.hex"
+        "sha256": "03ce621e26f19512cd7cacb0ce818d2a8bda1aca16ac82aab73ffdc62822c059"
       },
       "frame_protocols": [
         "eth",
@@ -3361,7 +3361,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 91,
-        "hex_file": "hex/ndpi-teamviewer.frame-4.hex"
+        "sha256": "12c18c48abf0b58ff24213bd8e28c815f8f08f0c0665ff0f23b50efa6dee4a20"
       },
       "frame_protocols": [
         "eth",
@@ -3391,7 +3391,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 93,
-        "hex_file": "hex/ndpi-telnet.frame-4.hex"
+        "sha256": "db006e28c151ebb35b21448159e17ed2889724a9f0c7832d18c3cc75139efe88"
       },
       "frame_protocols": [
         "eth",
@@ -3421,7 +3421,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 94,
-        "hex_file": "hex/ndpi-thrift.frame-4.hex"
+        "sha256": "4ea22c3df5fd3f7c9e8c7f844917870c5bacc39a75b2af43c2cd01b514a2b986"
       },
       "frame_protocols": [
         "eth",
@@ -3451,7 +3451,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 225,
-        "hex_file": "hex/ndpi-tls.frame-1.hex"
+        "sha256": "8aecb41eb04e5e48ee24db3992cd041ebc1bf4ba0a4b3ce122e882ccba7f72b1"
       },
       "frame_protocols": [
         "eth",
@@ -3481,7 +3481,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 66,
-        "hex_file": "hex/ndpi-vnc.frame-4.hex"
+        "sha256": "bafa4dfac31d67a3d1e9ba96fdf4b7e258567c426464b33d08b71d3e5ff35aba"
       },
       "frame_protocols": [
         "eth",
@@ -3511,7 +3511,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1292,
-        "hex_file": "hex/ndpi-radius-classification-boundary.frame-1.hex"
+        "sha256": "8137ff1527147bf8e097b9d65a11738522fba50a85ac0f7c1e0ce4d53f7cc3e8"
       },
       "frame_protocols": [
         "eth",
@@ -3541,7 +3541,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1280,
-        "hex_file": "hex/ndpi-quic-length-boundary.frame-1.hex"
+        "sha256": "cc7a67a2b1907c0d240495f58995c47ea7154fea1f7a373729f96f86139989b5"
       },
       "frame_protocols": [
         "ip",
@@ -3569,7 +3569,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/ndpi-tcp-measurement.frame-1.hex"
+        "sha256": "80dee6ca9207f4c8b4cf1c01133d19ef0d77c5b07c3162a931fcd5e44b9573f5"
       },
       "frame_protocols": [
         "eth",
@@ -3598,7 +3598,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1230,
-        "hex_file": "hex/ndpi-ppp.frame-1.hex"
+        "sha256": "89f53aa7f3bcf65279aa9b3a47f50f8ad5f238b427e16b2079d280fb22c29022"
       },
       "frame_protocols": [
         "ppp",
@@ -3628,7 +3628,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/ndpi-vrrp3.frame-1.hex"
+        "sha256": "41e6e4fb7ca1b0988d8701ba5526536e6c74a471905c4107931f90debf8402a3"
       },
       "frame_protocols": [
         "eth",
@@ -3659,7 +3659,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 92,
-        "hex_file": "hex/ndpi-netbios-services.frame-1.hex"
+        "sha256": "fb2877a1bdf5e4fd339ab2f298171989347aad6481754eb343e1b6eea432862d"
       },
       "frame_protocols": [
         "eth",
@@ -3690,7 +3690,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 264,
-        "hex_file": "hex/ndpi-dot.frame-4.hex"
+        "sha256": "4380b28912bcb89bc17d9aef6ad482ba659c83ff6dca49abc1c93ab2ad5c1fe2"
       },
       "frame_protocols": [
         "eth",
@@ -3721,7 +3721,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 571,
-        "hex_file": "hex/ndpi-doh.frame-4.hex"
+        "sha256": "b429adb7a29f34ba617aa5658d73f657931d318ef33a8c687195c68b1e5bcaba"
       },
       "frame_protocols": [
         "eth",
@@ -3751,7 +3751,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 118,
-        "hex_file": "hex/ndpi-ptpv2.frame-1.hex"
+        "sha256": "9b7d59e16caf9896b67ec8510d903a0636e4a008d03a420ab1d1df801a5cfc11"
       },
       "frame_protocols": [
         "eth",
@@ -3776,13 +3776,13 @@
       "size_bytes": 888,
       "packet_count": 1,
       "link_type": "Ethernet",
-      "display_filter": "ssdp \u0026\u0026 http.request.method == \"NOTIFY\"",
+      "display_filter": "ssdp && http.request.method == \"NOTIFY\"",
       "evidence_kind": "upstream-positive",
       "notes": "The upstream file named upnp.pcap is a WSD regression fixture; use the pinned SSDP announcement that carries UPnP NT, USN, SERVER, and LOCATION metadata.",
       "representative_frame": {
         "number": 1,
         "length_bytes": 848,
-        "hex_file": "hex/ndpi-upnp.frame-1.hex"
+        "sha256": "e7a7f62cf1b5b497376538be3f261117b59cc1f1650bc46c025af213209c3bef"
       },
       "frame_protocols": [
         "eth",
@@ -3812,7 +3812,7 @@
       "representative_frame": {
         "number": 8,
         "length_bytes": 362,
-        "hex_file": "hex/ndpi-soap.frame-8.hex"
+        "sha256": "272736ea5ad60160b370104ccb9ce86f2939534df35e7685d5c3e72e19a4bd11"
       },
       "frame_protocols": [
         "eth",
@@ -3843,7 +3843,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 571,
-        "hex_file": "hex/ndpi-smtps.frame-3.hex"
+        "sha256": "3d878bc7d3b7102bc6ab8121f26c81c3c0f1013d8c4622f6bcc4cac7a4eeeb88"
       },
       "frame_protocols": [
         "eth",
@@ -3873,7 +3873,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 157,
-        "hex_file": "hex/ndpi-http-connect.frame-5.hex"
+        "sha256": "7f4e545f140af4494e43f4db040e495cbc1a1aee4712527a0f27da66c4d53d93"
       },
       "frame_protocols": [
         "eth",
@@ -3906,7 +3906,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 122,
-        "hex_file": "hex/ndpi-protobuf.frame-4.hex"
+        "sha256": "3e900ecc71ce1faecf1b50398ec7e735928b2d27dbba9a6a776dbe7ac99e31ef"
       },
       "frame_protocols": [
         "eth",
@@ -3936,7 +3936,7 @@
       "representative_frame": {
         "number": 6,
         "length_bytes": 131,
-        "hex_file": "hex/ndpi-rtmp.frame-6.hex"
+        "sha256": "a57773feebb806866743743c121f84e8205502dbfe6bfd62a4f20156d3e88117"
       },
       "frame_protocols": [
         "eth",
@@ -3966,7 +3966,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 89,
-        "hex_file": "hex/ndpi-zabbix-agent.frame-4.hex"
+        "sha256": "8dbbf6471bcbb10727effdcd48665fe57b78ae9af7ad79144180c0befddd3952"
       },
       "frame_protocols": [
         "eth",
@@ -3996,7 +3996,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 222,
-        "hex_file": "hex/ndpi-webdav.frame-4.hex"
+        "sha256": "ab4e1bab024b99f1711a5339f3063f52360e4b79cefa4d4b9922fd3b6d7414f4"
       },
       "frame_protocols": [
         "eth",
@@ -4021,13 +4021,13 @@
       "size_bytes": 85580,
       "packet_count": 344,
       "link_type": "Ethernet",
-      "display_filter": "http.request.method == \"POST\" \u0026\u0026 ocsp.serialNumber",
+      "display_filter": "http.request.method == \"POST\" && ocsp.serialNumber",
       "evidence_kind": "upstream-positive",
       "notes": "Select the first complete DER OCSP request body so certificate identifier fields are executable parser evidence.",
       "representative_frame": {
         "number": 27,
         "length_bytes": 512,
-        "hex_file": "hex/ndpi-ocsp.frame-27.hex"
+        "sha256": "5923f698cb7fa254d56234cdd008e4185b4e0eebb943660c68f70ea5b9effa95"
       },
       "frame_protocols": [
         "eth",
@@ -4059,7 +4059,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 293,
-        "hex_file": "hex/ndpi-imaps.frame-4.hex"
+        "sha256": "bbae43ff018af82f4afa45db99b36ece49f26dc7f73aa261a87e1c959055c140"
       },
       "frame_protocols": [
         "eth",
@@ -4089,7 +4089,7 @@
       "representative_frame": {
         "number": 7,
         "length_bytes": 355,
-        "hex_file": "hex/ndpi-ipp.frame-7.hex"
+        "sha256": "b229e82f4df18385e5864376c289abebcbda585ca3d69b24f8b6596bcdb9bf14"
       },
       "frame_protocols": [
         "eth",
@@ -4121,7 +4121,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 64,
-        "hex_file": "hex/ndpi-citrix-ica.frame-4.hex"
+        "sha256": "96be8af5e31e33e98a554216acae665a4a3a552b15d7ba786600de05e3da338b"
       },
       "frame_protocols": [
         "eth",
@@ -4152,7 +4152,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 93,
-        "hex_file": "hex/ndpi-stomp.frame-4.hex"
+        "sha256": "9b4d289830e82897bf29d94a0a90425c1dc4962c46f620505a49d1fb44ea8c33"
       },
       "frame_protocols": [
         "eth",
@@ -4182,7 +4182,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 103,
-        "hex_file": "hex/ndpi-mgcp.frame-3.hex"
+        "sha256": "fd72c166c9c7fea290c39ab9a198a7a3b6559b6c69a2def2e901380c7022d72c"
       },
       "frame_protocols": [
         "eth",
@@ -4212,7 +4212,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/ndpi-skinny.frame-1.hex"
+        "sha256": "56605ccc9c5a52cc171ac1c6e7f6df6796ae2e31380c22a14f7ab3d587eb5bb3"
       },
       "frame_protocols": [
         "eth",
@@ -4243,7 +4243,7 @@
       "representative_frame": {
         "number": 21,
         "length_bytes": 376,
-        "hex_file": "hex/ndpi-t38.frame-21.hex"
+        "sha256": "94b29ec9ce773f306265fb3c86fe27fdc417bbfad03e56185b282a00c33f09e5"
       },
       "frame_protocols": [
         "eth",
@@ -4274,7 +4274,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 1362,
-        "hex_file": "hex/ndpi-mpeg-ts.frame-1.hex"
+        "sha256": "4896bb85c33d151d8e9f5ea099788e884826d2386ba70cc1871430220be17238"
       },
       "frame_protocols": [
         "eth",
@@ -4306,7 +4306,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 94,
-        "hex_file": "hex/ndpi-smpp.frame-4.hex"
+        "sha256": "767235d42c0c55dcc2e945af8f6e1bc5a2e25d0c951765b77c16505802e0ae05"
       },
       "frame_protocols": [
         "eth",
@@ -4336,7 +4336,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/ndpi-pfcp.frame-1.hex"
+        "sha256": "9ad79034432592e122053668e5d6e0e7f3d976a5dd596935afb356f949c8d646"
       },
       "frame_protocols": [
         "raw",
@@ -4365,7 +4365,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/ndpi-xdmcp.frame-1.hex"
+        "sha256": "70ee813ec7ffe6061f1dc9c64652983854a2c63a8a10b9e2402d913631aa0f72"
       },
       "frame_protocols": [
         "eth",
@@ -4395,7 +4395,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 71,
-        "hex_file": "hex/ndpi-srvloc.frame-1.hex"
+        "sha256": "b5db8de69323e375c95de03136e7c6429a7430e87087ab21f65584eded86dab6"
       },
       "frame_protocols": [
         "eth",
@@ -4425,7 +4425,7 @@
       "representative_frame": {
         "number": 7,
         "length_bytes": 221,
-        "hex_file": "hex/ndpi-iec61850-mms.frame-7.hex"
+        "sha256": "6f35843d1fb16ac83b264163d111abde6622e6c1326a9d018f0e918366b190c3"
       },
       "frame_protocols": [
         "eth",
@@ -4460,7 +4460,7 @@
       "representative_frame": {
         "number": 7,
         "length_bytes": 104,
-        "hex_file": "hex/ndpi-postgresql.frame-7.hex"
+        "sha256": "78603ca7f4825f95e56cf978c64f2efdf29f3df12bd7959e4efe3f363a77bef0"
       },
       "frame_protocols": [
         "eth",
@@ -4490,7 +4490,7 @@
       "representative_frame": {
         "number": 7,
         "length_bytes": 64,
-        "hex_file": "hex/ndpi-ftps.frame-7.hex"
+        "sha256": "ee5e62f68b76d782249f04f52c1af1e0fbab036571610b7424cfd331ee81293b"
       },
       "frame_protocols": [
         "eth",
@@ -4520,7 +4520,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 103,
-        "hex_file": "hex/ndpi-teredo.frame-1.hex"
+        "sha256": "a0936155c4ed37a746c69b482c91c8dbc0a4a73044c2d755a6dd6478492a6b6d"
       },
       "frame_protocols": [
         "eth",
@@ -4547,12 +4547,12 @@
       "size_bytes": 42349,
       "packet_count": 127,
       "link_type": "Ethernet",
-      "display_filter": "ipv6 \u0026\u0026 ip.proto == 41",
+      "display_filter": "ipv6 && ip.proto == 41",
       "evidence_kind": "upstream-positive",
       "representative_frame": {
         "number": 1,
         "length_bytes": 138,
-        "hex_file": "hex/ndpi-6in4.frame-1.hex"
+        "sha256": "5b8ff293c30427f3b1155abe6b48a2c393040d6ae398092ba5cf0395a685d33a"
       },
       "frame_protocols": [
         "eth",
@@ -4584,7 +4584,7 @@
       "representative_frame": {
         "number": 94,
         "length_bytes": 304,
-        "hex_file": "hex/ndpi-wechat.frame-94.hex"
+        "sha256": "be439720d5708b3385cd53ddc953071292ef5b6f1f2c724fd1a4ceb256c7d6cf"
       },
       "frame_protocols": [
         "eth",
@@ -4615,7 +4615,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 163,
-        "hex_file": "hex/ndpi-iqiyi.frame-1.hex"
+        "sha256": "f8abec38707de2e6b65ec2e86788a28591ddbd858f62d475b96808ba1da1686d"
       },
       "frame_protocols": [
         "raw",
@@ -4645,7 +4645,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 116,
-        "hex_file": "hex/ndpi-tencent-games.frame-4.hex"
+        "sha256": "147764a7aed8bfed8043daa852c9cc6c7ac76ab818ed88048330a2878c950bd5"
       },
       "frame_protocols": [
         "raw",
@@ -4675,7 +4675,7 @@
       "representative_frame": {
         "number": 11,
         "length_bytes": 54,
-        "hex_file": "hex/ndpi-netease-games.frame-11.hex"
+        "sha256": "bf72fea9c2aa0f86c07b868e2a160568a7256d9f029ad9eff43fb3d7f78c8772"
       },
       "frame_protocols": [
         "eth",
@@ -4705,7 +4705,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 71,
-        "hex_file": "hex/ndpi-rsh.frame-4.hex"
+        "sha256": "7eaded4123ead33cb666b689aeda657dfec01157b9cd8f3723e49d787262849b"
       },
       "frame_protocols": [
         "eth",
@@ -4735,7 +4735,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/wireshark-arp.frame-1.hex"
+        "sha256": "c00098b1fb717ad4abbbb2c954f08cfff4825e8ccda09205f6954e35eeac3d56"
       },
       "frame_protocols": [
         "fr",
@@ -4763,7 +4763,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 314,
-        "hex_file": "hex/wireshark-dhcp.frame-1.hex"
+        "sha256": "e4ded7a9174a18d369a96c58a16edf8e4878868b24026ced80faeb4397a2c140"
       },
       "frame_protocols": [
         "eth",
@@ -4793,7 +4793,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/wireshark-icmp-ascii.frame-1.hex"
+        "sha256": "8f1b11c8d519cd59ea2e40b759924601beff5175ede7d44df66b1dcb01f029b4"
       },
       "frame_protocols": [
         "eth",
@@ -4823,7 +4823,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 158,
-        "hex_file": "hex/wireshark-ikev1-certs.frame-1.hex"
+        "sha256": "0aa4829667a3564f64f9d9a9fe88542db7fdcd400436bf4b54964cb98f15a0da"
       },
       "frame_protocols": [
         "eth",
@@ -4853,7 +4853,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 298,
-        "hex_file": "hex/wireshark-ikev2-aes256cbc.frame-1.hex"
+        "sha256": "2578332d04aa92eb8d483d13b2070e77dd06cb523510a67ed228f86528508d87"
       },
       "frame_protocols": [
         "eth",
@@ -4883,7 +4883,7 @@
       "representative_frame": {
         "number": 21,
         "length_bytes": 132,
-        "hex_file": "hex/wireshark-mdns.frame-21.hex"
+        "sha256": "8de3cde79b5ed69ad4f8fe10f0d4e73352bb6230833e87814455715ccba5fa80"
       },
       "frame_protocols": [
         "eth",
@@ -4914,7 +4914,7 @@
       "representative_frame": {
         "number": 2,
         "length_bytes": 105,
-        "hex_file": "hex/wireshark-http3-qpack.frame-2.hex"
+        "sha256": "fc7ea83f98fc070232f6ddd2a72821093da63d60b370b7fb44d0305fd1d31ad4"
       },
       "frame_protocols": [
         "raw",
@@ -4964,7 +4964,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 33,
-        "hex_file": "hex/tcpdump-ipv4-invalid-length.frame-1.hex"
+        "sha256": "e84832e2afde63db3505e0e5a08cb24ebcfcf864feb41ebd6261419c85c18157"
       },
       "frame_protocols": [
         "eth",
@@ -4992,7 +4992,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 181,
-        "hex_file": "hex/tcpdump-radius.frame-1.hex"
+        "sha256": "dc5022ae51e2bfc596dcd1378e87ef2d0ea9809b84dae90daa63715498d182e9"
       },
       "frame_protocols": [
         "eth",
@@ -5023,7 +5023,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 296,
-        "hex_file": "hex/tcpdump-lldp.frame-3.hex"
+        "sha256": "64bdde5268c7deba93e9445dc02acaeeda5d2cf95c8bbcfebc322033eb35a343"
       },
       "frame_protocols": [
         "eth",
@@ -5046,12 +5046,12 @@
       "size_bytes": 4499,
       "packet_count": 26,
       "link_type": "RadioTap",
-      "display_filter": "radiotap \u0026\u0026 wlan",
+      "display_filter": "radiotap && wlan",
       "evidence_kind": "upstream-positive",
       "representative_frame": {
         "number": 1,
         "length_bytes": 170,
-        "hex_file": "hex/tcpdump-radiotap.frame-1.hex"
+        "sha256": "9e552b5b2888618c1ea0fd8e1766bebe0c2957e32a20cc28b6085262a2814e34"
       },
       "frame_protocols": [
         "radiotap",
@@ -5079,7 +5079,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 38,
-        "hex_file": "hex/tcpdump-pppoe.frame-1.hex"
+        "sha256": "e2a4e9a241bea2c63f115b5f671b88ec4a07b26ba0891a43445dbe78c9d6154e"
       },
       "frame_protocols": [
         "eth",
@@ -5107,7 +5107,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 39,
-        "hex_file": "hex/tcpdump-ipv6-short-header.frame-1.hex"
+        "sha256": "71d518c00be262af250ec5fab046f1ab0cd8f441b6eef6ffd02bc5df8b600c89"
       },
       "frame_protocols": [
         "eth",
@@ -5135,7 +5135,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/tcpdump-esp-truncated.frame-1.hex"
+        "sha256": "10cb8734b2c783f2013fce50b9393b6caf39a006f0f9065326e61d9f75177db7"
       },
       "frame_protocols": [
         "eth",
@@ -5166,7 +5166,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/tcpdump-lldp-tlv-boundary.frame-1.hex"
+        "sha256": "e75fef3fd0238a125ba95f32a1c9c6ed177560f59051c79098bbf0f62f27fdc4"
       },
       "frame_protocols": [
         "eth",
@@ -5194,7 +5194,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/tcpdump-snmp-length-boundary.frame-1.hex"
+        "sha256": "f3026627d38d96474d52dd4984fa51baa36a59cbf505ca281e42dda78f23b5ec"
       },
       "frame_protocols": [
         "eth",
@@ -5224,7 +5224,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 53,
-        "hex_file": "hex/tcpdump-bootp-packet-boundary.frame-1.hex"
+        "sha256": "636b464fe5925d3f0c3ac1be1c30e0c6c53600726c3b7910fe2a7a08cb2d8fad"
       },
       "frame_protocols": [
         "eth",
@@ -5254,7 +5254,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 55,
-        "hex_file": "hex/tcpdump-pim-header-boundary.frame-1.hex"
+        "sha256": "922fd5054b671b4f9b0d2522d97fc67551113cb0a1d507799799ef3a423803b8"
       },
       "frame_protocols": [
         "eth",
@@ -5283,7 +5283,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/tcpdump-tftp-packet-boundary.frame-1.hex"
+        "sha256": "789e98c9fd6027192ff9f1b1fc5b1a0b7bd463684358fc34d1ca559079978935"
       },
       "frame_protocols": [
         "sll",
@@ -5313,7 +5313,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 8,
-        "hex_file": "hex/tcpdump-radiotap-header-boundary.frame-1.hex"
+        "sha256": "3567323d6bdcdc5c6060945df6486344a8fae1e747e35ffcbc365f783df23ee0"
       },
       "frame_protocols": [
         "radiotap",
@@ -5341,7 +5341,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/tcpdump-tcp-header-boundary.frame-1.hex"
+        "sha256": "6f913a75b7fd1d529b6a48bbc08194194d0609606c4abf7e887568e0c8b74e0c"
       },
       "frame_protocols": [
         "eth",
@@ -5370,7 +5370,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 38,
-        "hex_file": "hex/tcpdump-udp-length-boundary.frame-1.hex"
+        "sha256": "c4cdcda947fa41034e134e7a04b6f0d02969842c40cb5de9bbe0ac6649979678"
       },
       "frame_protocols": [
         "eth",
@@ -5399,7 +5399,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 23,
-        "hex_file": "hex/tcpdump-unsupported-linktype.frame-1.hex"
+        "sha256": "e317901855ebe0f8e155b02777b3fc27ff15c2a633bb6810bf739d6d9e2b64f6"
       },
       "frame_protocols": [
         "user_dlt",
@@ -5426,7 +5426,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 207,
-        "hex_file": "hex/wireshark-http.frame-1.hex"
+        "sha256": "290348066ee571bebc32d91f52d0251cc68dd6e0f95a50754ba5ca0eb775b73f"
       },
       "frame_protocols": [
         "eth",
@@ -5457,7 +5457,7 @@
       "representative_frame": {
         "number": 5,
         "length_bytes": 68,
-        "hex_file": "hex/wireshark-usb-hid.frame-5.hex"
+        "sha256": "4044e9a360496dba7ad3446a8daaa52d2d8034ee76b29ceb7946b629ed72db96"
       },
       "frame_protocols": [
         "usb",
@@ -5484,7 +5484,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/wireshark-ipx-rip.frame-1.hex"
+        "sha256": "7852440f861231492397339fa9ac992f77437d895fc053693f3893f80cd75866"
       },
       "frame_protocols": [
         "eth",
@@ -5511,7 +5511,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 264,
-        "hex_file": "hex/ndpi-enip-cip.frame-1.hex"
+        "sha256": "3f4fe6e80bff5fc54340eb3dbd28ef6e7a3e921e19862aa18d5f22f05c17e4bb"
       },
       "frame_protocols": [
         "eth",
@@ -5543,7 +5543,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 64,
-        "hex_file": "hex/ndpi-umas.frame-4.hex"
+        "sha256": "86913b5d9d838f97ca914d98b56782ff52f3426caf0590848a08754b06712c75"
       },
       "frame_protocols": [
         "eth",
@@ -5575,7 +5575,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/ndpi-tristation.frame-1.hex"
+        "sha256": "583b4b27c1a1b23039fda0ed0e81cc4686ddd5fa97de783a6280bfdf0d9d39d3"
       },
       "frame_protocols": [
         "eth",
@@ -5606,7 +5606,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 84,
-        "hex_file": "hex/ndpi-c37118.frame-4.hex"
+        "sha256": "adb5a1926b3570d3e8c0321183bc27c7b651fbf8da30419f4f1cb630d70c1789"
       },
       "frame_protocols": [
         "eth",
@@ -5631,13 +5631,13 @@
       "size_bytes": 2140,
       "packet_count": 14,
       "link_type": "Ethernet",
-      "display_filter": "tcp.len \u003e 0 \u0026\u0026 tcp.payload[6:2] == 4d:72",
+      "display_filter": "tcp.len > 0 && tcp.payload[6:2] == 4d:72",
       "evidence_kind": "upstream-positive",
       "notes": "outside current 616-item roadmap; train real-time data protocol",
       "representative_frame": {
         "number": 4,
         "length_bytes": 198,
-        "hex_file": "hex/ndpi-trdp.frame-4.hex"
+        "sha256": "b1614fbfca4b9287a8d73d1a280c2c1acd23f35f82dbb7fdb7a6b0e8c6e193d0"
       },
       "frame_protocols": [
         "eth",
@@ -5668,7 +5668,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 55,
-        "hex_file": "hex/ndpi-ethersbus.frame-1.hex"
+        "sha256": "2cf95904dc163ddcd609c9ccfc4bacb9c7c6aae6c96b0a25d5b8c6f242d7a707"
       },
       "frame_protocols": [
         "eth",
@@ -5699,7 +5699,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 91,
-        "hex_file": "hex/ndpi-ethersio.frame-1.hex"
+        "sha256": "32dd93b959e008cc9df22b3c22f4e10049fcba935870fec8359588d8b01106c0"
       },
       "frame_protocols": [
         "eth",
@@ -5730,7 +5730,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 77,
-        "hex_file": "hex/ndpi-hislip.frame-4.hex"
+        "sha256": "410c610fe1d4e1f28bffc7f6ee2bb887cce7b8eca57d81a8e4584512ac550fcf"
       },
       "frame_protocols": [
         "eth",
@@ -5755,13 +5755,13 @@
       "size_bytes": 3496,
       "packet_count": 31,
       "link_type": "Ethernet",
-      "display_filter": "tcp.len \u003e 0",
+      "display_filter": "tcp.len > 0",
       "evidence_kind": "upstream-positive",
       "notes": "outside current 616-item roadmap; fuel-tank ICS",
       "representative_frame": {
         "number": 1,
         "length_bytes": 75,
-        "hex_file": "hex/ndpi-atg.frame-1.hex"
+        "sha256": "0b9d8c6566345ada6d7a9d227e9c4856f75895ce121a391968a9f554ee90fb66"
       },
       "frame_protocols": [
         "eth",
@@ -5792,7 +5792,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 101,
-        "hex_file": "hex/ndpi-egd.frame-1.hex"
+        "sha256": "35b7ca94bdc6757f42330aca94bf629af8a4394dd7377921703ffae503798c32"
       },
       "frame_protocols": [
         "eth",
@@ -5824,7 +5824,7 @@
       "representative_frame": {
         "number": 13,
         "length_bytes": 134,
-        "hex_file": "hex/ndpi-matter.frame-13.hex"
+        "sha256": "3ca4424e6ce42752e6139ae0ba3889441e4eb6dc377c066c3216e238c69ec42c"
       },
       "frame_protocols": [
         "sll",
@@ -5855,7 +5855,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/ndpi-meshtastic.frame-1.hex"
+        "sha256": "333250ad9a2188e00a28389d01fa04808b631bec2c4d1df661db2e40bd3004c1"
       },
       "frame_protocols": [
         "eth",
@@ -5885,7 +5885,7 @@
       "representative_frame": {
         "number": 6,
         "length_bytes": 88,
-        "hex_file": "hex/ndpi-xmpp-jabber.frame-6.hex"
+        "sha256": "a0aae874c27727c89e73b0f5bd7e4e53e6b16a7f83f9076ffff73c725dfea844"
       },
       "frame_protocols": [
         "eth",
@@ -5919,7 +5919,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 178,
-        "hex_file": "hex/ndpi-edonkey.frame-4.hex"
+        "sha256": "e6c1e6d105004d3fc593aa36fabbb11480c2b8cd984d80b58a96b9b7201e90a9"
       },
       "frame_protocols": [
         "eth",
@@ -5950,7 +5950,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 179,
-        "hex_file": "hex/ndpi-weibo.frame-1.hex"
+        "sha256": "d1acb024f73cd7d15d7ed13647ab36197eb12af96ac8f4d023f7a30502342be4"
       },
       "frame_protocols": [
         "eth",
@@ -5981,7 +5981,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 74,
-        "hex_file": "hex/ndpi-alicloud.frame-4.hex"
+        "sha256": "9c5dbc55fa50ca1401ea8b9fbfe05c192f905e5033f168bbae524a351fd03f55"
       },
       "frame_protocols": [
         "eth",
@@ -6012,7 +6012,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 136,
-        "hex_file": "hex/ndpi-xiaomi.frame-1.hex"
+        "sha256": "52da63471f6c6423386093466fcef3fb098b6cf9952c84768f751317b581f332"
       },
       "frame_protocols": [
         "eth",
@@ -6044,7 +6044,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 230,
-        "hex_file": "hex/ndpi-tuya.frame-1.hex"
+        "sha256": "49eea3572d76532ca27924e62c4592a36e3e906df8018d6832d5ae42c5da1976"
       },
       "frame_protocols": [
         "eth",
@@ -6074,7 +6074,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 85,
-        "hex_file": "hex/ws-knxip-datasec.frame-1.hex"
+        "sha256": "68534f5ab2976728dc19267d188573d11f0b599fa487685fdb723b116df063bb"
       },
       "frame_protocols": [
         "eth",
@@ -6105,7 +6105,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 134,
-        "hex_file": "hex/ws-opcua-signed.frame-4.hex"
+        "sha256": "537497f39b740ece0ce487415504433e74b89f048ff61ab4b68210b4da9d33bf"
       },
       "frame_protocols": [
         "eth",
@@ -6135,7 +6135,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 201,
-        "hex_file": "hex/ws-nfs.frame-1.hex"
+        "sha256": "3fadbf5e8929bb42ecd95beaac0795ad4151c315d95110969b7e8b8baa917e76"
       },
       "frame_protocols": [
         "fddi",
@@ -6166,7 +6166,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 68,
-        "hex_file": "hex/ws-git.frame-1.hex"
+        "sha256": "7803ede8455e9d2a52004a45de5ba0d676401ac1adf6f41836b9317a46a181ed"
       },
       "frame_protocols": [
         "eth",
@@ -6196,7 +6196,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 364,
-        "hex_file": "hex/ws-sip.frame-1.hex"
+        "sha256": "1e4f7714f3b36bd3e560e44dacbe6f326c0ee300d97c291d1de84dc888647eff"
       },
       "frame_protocols": [
         "raw",
@@ -6225,7 +6225,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 77,
-        "hex_file": "hex/ws-tftp.frame-1.hex"
+        "sha256": "523091429a403ff677f7e79c52e611d89e0a0b5875fc1d05b3710225189da01f"
       },
       "frame_protocols": [
         "tr",
@@ -6255,7 +6255,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 126,
-        "hex_file": "hex/ws-nvme-tcp.frame-1.hex"
+        "sha256": "7def93667476b8bac14ce94e52eb122a43733f96daccf46cdda080ebfe181148"
       },
       "frame_protocols": [
         "eth",
@@ -6285,7 +6285,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/ws-ipx-rip.frame-1.hex"
+        "sha256": "7852440f861231492397339fa9ac992f77437d895fc053693f3893f80cd75866"
       },
       "frame_protocols": [
         "eth",
@@ -6312,7 +6312,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 314,
-        "hex_file": "hex/ws-dhcp.frame-1.hex"
+        "sha256": "e4ded7a9174a18d369a96c58a16edf8e4878868b24026ced80faeb4397a2c140"
       },
       "frame_protocols": [
         "eth",
@@ -6342,7 +6342,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/ws-ntp.frame-1.hex"
+        "sha256": "41291ea4644dda6fa3a1188da3547518d7d4d88afeb79475a2901f0b6090b393"
       },
       "frame_protocols": [
         "eth",
@@ -6372,7 +6372,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/scapy-doip.frame-1.hex"
+        "sha256": "a2d8639543cc834233a8345b2b9aae13bdc4c553fddb18f8227dd18041425e60"
       },
       "frame_protocols": [
         "eth",
@@ -6403,7 +6403,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 45,
-        "hex_file": "hex/scapy-zigbee-join.frame-1.hex"
+        "sha256": "52e0a032a5192293167a63a3ef66cefd7d5c369d5263ca966d4c9e2c0030de5e"
       },
       "frame_protocols": [
         "wpan",
@@ -6432,7 +6432,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/scapy-zigbee-skke.frame-1.hex"
+        "sha256": "c4d2d3cefc169da7de224852c8ffffe33d95401bda99a82c4c78a79201e0a352"
       },
       "frame_protocols": [
         "wpan",
@@ -6463,7 +6463,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 158,
-        "hex_file": "hex/scapy-ipfix.frame-1.hex"
+        "sha256": "b3ff28a7639cbb74bafba2ab4775dad4b431f9e728fe15a1c26374798fb2ccf8"
       },
       "frame_protocols": [
         "eth",
@@ -6493,7 +6493,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 158,
-        "hex_file": "hex/scapy-netflowv9.frame-1.hex"
+        "sha256": "761c70d5342cc91c5883f3bb1ff92c8f5709dec8e764ff612f560a602d1a1b82"
       },
       "frame_protocols": [
         "eth",
@@ -6523,7 +6523,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 63,
-        "hex_file": "hex/scapy-pfcp.frame-1.hex"
+        "sha256": "e970f95f45ad7ca62897bd86febb692bb63dcc08a3cb4c4c7365cebbd2c101b5"
       },
       "frame_protocols": [
         "raw",
@@ -6553,7 +6553,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 739,
-        "hex_file": "hex/ndpi-dicom.frame-1.hex"
+        "sha256": "0057f6b7acd269574d933777411580b9f70e58c36cdc1146fa0e3770b950c85d"
       },
       "frame_protocols": [
         "null",
@@ -6583,7 +6583,7 @@
       "representative_frame": {
         "number": 13,
         "length_bytes": 222,
-        "hex_file": "hex/ndpi-hl7.frame-13.hex"
+        "sha256": "aaca0508cef29afe1e4455f415ba2cd8b9241e028613284c595d56f1ff8df3dd"
       },
       "frame_protocols": [
         "eth",
@@ -6613,7 +6613,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 97,
-        "hex_file": "hex/ws-knxip-securewrapper.frame-1.hex"
+        "sha256": "0de280302c017dfbb774cfbdea932bf42f1879e97925c87ad2066b98862d237c"
       },
       "frame_protocols": [
         "eth",
@@ -6643,7 +6643,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/ws-knxip-timernotify.frame-1.hex"
+        "sha256": "7ab677bd71edb192d56f46564c73c46f129264899fd261592b7f011f0b381ec8"
       },
       "frame_protocols": [
         "eth",
@@ -6668,12 +6668,12 @@
       "size_bytes": 21834,
       "packet_count": 98,
       "link_type": "Ethernet",
-      "display_filter": "tcp.len \u003e 0",
+      "display_filter": "tcp.len > 0",
       "evidence_kind": "upstream-positive",
       "representative_frame": {
         "number": 4,
         "length_bytes": 81,
-        "hex_file": "hex/ndpi-checkmk.frame-4.hex"
+        "sha256": "a40167cf611b841c5b8c00a0588f626ea1857a09d740f87b6fef69cc77376d59"
       },
       "frame_protocols": [
         "eth",
@@ -6703,7 +6703,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 108,
-        "hex_file": "hex/ndpi-iax2.frame-1.hex"
+        "sha256": "fad5f8b27bde11ddab70a18214d4d1c9f59bac9c189e4c98f15b297edd07ad76"
       },
       "frame_protocols": [
         "eth",
@@ -6733,7 +6733,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 226,
-        "hex_file": "hex/ndpi-steam.frame-1.hex"
+        "sha256": "a1c0e38a343e492b0e98764f8d0267eb4d62ad712b661756a31f365bf9a2a336"
       },
       "frame_protocols": [
         "eth",
@@ -6763,7 +6763,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/ndpi-genshin.frame-1.hex"
+        "sha256": "f22b78666410c34fe39eca0a6ef6c149ff57e055a5198a7a22ae8da9aaff1239"
       },
       "frame_protocols": [
         "eth",
@@ -6794,7 +6794,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 61,
-        "hex_file": "hex/ndpi-netbeui.frame-1.hex"
+        "sha256": "5639b0dec3e500501350501da24839ad54b3c8e0bd4d771347aab9c3c0054194"
       },
       "frame_protocols": [
         "eth",
@@ -6822,7 +6822,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 159,
-        "hex_file": "hex/iti-goose.frame-1.hex"
+        "sha256": "12ad1280e9c90f9288bc4bb74b86a35cc59992b131ba243693aa4088322b1012"
       },
       "frame_protocols": [
         "eth",
@@ -6850,7 +6850,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/iti-profinet-dcp.frame-1.hex"
+        "sha256": "0ec511319e08f3b9692420822073c2e173cc6c6771ffe1377c924c318aa27f53"
       },
       "frame_protocols": [
         "eth",
@@ -6880,7 +6880,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 79,
-        "hex_file": "hex/iti-tpkt.frame-1.hex"
+        "sha256": "bd8908872a33b8ce82cc1ed8e03a801f1885ecda3b824c3bc70177903cc285c1"
       },
       "frame_protocols": [
         "eth",
@@ -6913,7 +6913,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 85,
-        "hex_file": "hex/iti-cotp.frame-1.hex"
+        "sha256": "517183d0fea7d4df3deba0506481f75211ae46133a91576118f1e211df59b5cf"
       },
       "frame_protocols": [
         "eth",
@@ -6946,7 +6946,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/mrhenrike-ethercat.frame-1.hex"
+        "sha256": "c898760f94db359b42efc9f5ab9da26c2caf33b79f29de83716d7dfa19da2948"
       },
       "frame_protocols": [
         "eth",
@@ -6976,7 +6976,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 120,
-        "hex_file": "hex/mgadelha-sv.frame-1.hex"
+        "sha256": "bcae8ff600955a2c27404b1c60445fe707f6d9c7c2c989a0be7c0ab3218b349c"
       },
       "frame_protocols": [
         "eth",
@@ -7007,7 +7007,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/gen-ethernet-ii.frame-1.hex"
+        "sha256": "33fa18acff377a03d40f474424bcd5e2266abe8b8d99c33daaaae61006a8ab55"
       },
       "frame_protocols": [
         "eth",
@@ -7037,7 +7037,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 26,
-        "hex_file": "hex/gen-ethernet-8023.frame-1.hex"
+        "sha256": "12c8187ab04fc2298f6adbe2492b1fb868a5ac4a4925918df0b8b8463bb961c6"
       },
       "frame_protocols": [
         "eth",
@@ -7066,7 +7066,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/gen-ieee8021q.frame-1.hex"
+        "sha256": "5c5ea516f1524205a7f925285959dd9e9c6478c1fb8511bde8701e14a6020ff6"
       },
       "frame_protocols": [
         "eth",
@@ -7098,7 +7098,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/gen-qinq.frame-1.hex"
+        "sha256": "af5696526e0fd39c2e7dc5302db52ae1050a8eb1b00b041253b24ae06221f016"
       },
       "frame_protocols": [
         "eth",
@@ -7132,7 +7132,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/gen-rarp.frame-1.hex"
+        "sha256": "587ebc5dd088024573de823212345a6da039ed5eeb0771390ae61e2f7412c448"
       },
       "frame_protocols": [
         "eth",
@@ -7161,7 +7161,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 19,
-        "hex_file": "hex/gen-llc.frame-1.hex"
+        "sha256": "0e62dbfff5676f8cfb8b309ee92c2bd091c1d7b4b58d2b29ef92ea111fa44f93"
       },
       "frame_protocols": [
         "eth",
@@ -7190,7 +7190,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 124,
-        "hex_file": "hex/gen-lacp.frame-1.hex"
+        "sha256": "0c44b1e594345ac6f4967839339d8c5c33af892e120c070ef274f511d8b11bbb"
       },
       "frame_protocols": [
         "eth",
@@ -7220,7 +7220,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 23,
-        "hex_file": "hex/gen-eapol.frame-1.hex"
+        "sha256": "02e24ab7c8be8abd9651e95908457aba56dcebe32ff6ed12938b8844e8fb18dc"
       },
       "frame_protocols": [
         "eth",
@@ -7249,7 +7249,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 27,
-        "hex_file": "hex/gen-eap.frame-1.hex"
+        "sha256": "94a41f3e35c9c654863d1fb99667150dd75e5c39af9b90321f7dbecc91a1b981"
       },
       "frame_protocols": [
         "eth",
@@ -7278,7 +7278,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 22,
-        "hex_file": "hex/gen-ieee8021x.frame-1.hex"
+        "sha256": "d82de0422b714fd605d3312ce067d54ce5f838e6c87d6e1b3ae2c717aa6c3ce2"
       },
       "frame_protocols": [
         "eth",
@@ -7307,7 +7307,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 32,
-        "hex_file": "hex/gen-loopback.frame-1.hex"
+        "sha256": "b363bc181ef0d8cea4c2d6516f13475c485baa035b3d8e4c8b1cc1d33edf5cfe"
       },
       "frame_protocols": [
         "null",
@@ -7336,7 +7336,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 49,
-        "hex_file": "hex/gen-ieee80211.frame-1.hex"
+        "sha256": "2e95cc8c158e3dd0e8ce697bedf92e1fad1776847f28977236e2f0bfc187e422"
       },
       "frame_protocols": [
         "radiotap",
@@ -7365,7 +7365,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/gen-cdp.frame-1.hex"
+        "sha256": "2f3142db4cc17414a7864a20cd28e7b8d64351f7bc67e3c2b741577c687a2624"
       },
       "frame_protocols": [
         "eth",
@@ -7395,7 +7395,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/gen-icmpv6.frame-1.hex"
+        "sha256": "8710022f678bd190d3105d01d5bccce874dd5f4fc71268c1a73ee7bc1d9169c9"
       },
       "frame_protocols": [
         "eth",
@@ -7426,7 +7426,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 86,
-        "hex_file": "hex/gen-icmpv6-ndp.frame-1.hex"
+        "sha256": "8eef930350d170f7cd69b5971df9743ea1b80a85e10bfec492dd2c69cec58225"
       },
       "frame_protocols": [
         "eth",
@@ -7456,7 +7456,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/gen-icmpv6-mld.frame-1.hex"
+        "sha256": "be8bf6727bfbab4c7ad17a439d4b32469f8f7666c40e1de866be9fcbd8824a2b"
       },
       "frame_protocols": [
         "eth",
@@ -7486,7 +7486,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/gen-ipv6-hbh.frame-1.hex"
+        "sha256": "105f566474f62dba2180611eefba0702bfcc007840eb0d8c71d4c3eefdeba169"
       },
       "frame_protocols": [
         "eth",
@@ -7517,7 +7517,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 86,
-        "hex_file": "hex/gen-ipv6-routing.frame-1.hex"
+        "sha256": "717d5a75fff815c58ceaf4c8a749a8581261885776afcde755eee02b1e7c2779"
       },
       "frame_protocols": [
         "eth",
@@ -7548,7 +7548,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 94,
-        "hex_file": "hex/gen-ipv6-frag.frame-1.hex"
+        "sha256": "952062fd8cec50daaf066f55980e3dd557c036b75b0bf43af4c14fece69fccb4"
       },
       "frame_protocols": [
         "eth",
@@ -7579,7 +7579,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/gen-ipv6-dstopts.frame-1.hex"
+        "sha256": "ba773dbf2199a4802f8d41023a12a785eb6d9118f0d388e622a761efc1caea42"
       },
       "frame_protocols": [
         "eth",
@@ -7610,7 +7610,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/gen-igmp.frame-1.hex"
+        "sha256": "398444d6815483085f3d2b9dd753e25806317e0c4f11180e1a9bb3fca11d8b49"
       },
       "frame_protocols": [
         "eth",
@@ -7641,7 +7641,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/gen-ipip.frame-1.hex"
+        "sha256": "6f03595a2e0f8be1bb58996d54ef00838dbd4bb7c973415b64dd295a58b98a5f"
       },
       "frame_protocols": [
         "eth",
@@ -7672,7 +7672,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/gen-mpls.frame-1.hex"
+        "sha256": "f9b271549dfc9859b72b1b669af056b7faac44558d6532c232fb4f0445a8e6e9"
       },
       "frame_protocols": [
         "eth",
@@ -7702,7 +7702,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/gen-geneve.frame-1.hex"
+        "sha256": "e0f16b326c073ae17f001ed8414291b24234546cea0a73ecda609e3b9dbe0d03"
       },
       "frame_protocols": [
         "eth",
@@ -7735,7 +7735,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/gen-l2tp.frame-1.hex"
+        "sha256": "b59373a307d5f76ef6307362477c9d037e18e9a5188082376f2ec99e3a4eaca0"
       },
       "frame_protocols": [
         "eth",
@@ -7766,7 +7766,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/gen-6to4.frame-1.hex"
+        "sha256": "c9fc293a3515e66a60f0c74e0767aa344a06179803eaffc71f012766ed775bd8"
       },
       "frame_protocols": [
         "eth",
@@ -7797,7 +7797,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/gen-icmp-ts.frame-1.hex"
+        "sha256": "4fa7c1be7d1902fe10fd36bb54ec35ea3079c546720ebd87c4256d01b3f3f758"
       },
       "frame_protocols": [
         "eth",
@@ -7827,7 +7827,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/gen-rip.frame-1.hex"
+        "sha256": "5739ab173beaa4fa59703698f6b70e540d08272d2b4c3eb41ceeda67645ab9c5"
       },
       "frame_protocols": [
         "eth",
@@ -7858,7 +7858,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/gen-ripng.frame-1.hex"
+        "sha256": "b8b114f22403c30247c5a588ca5582cc8990fb755c321b140ce91d475df63fe9"
       },
       "frame_protocols": [
         "eth",
@@ -7889,7 +7889,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/gen-ospfv3.frame-1.hex"
+        "sha256": "cb2010ee8d133010e5f15fc998d8f67c856a5f3d41226349f23b6c21fa4e7da8"
       },
       "frame_protocols": [
         "eth",
@@ -7919,7 +7919,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 74,
-        "hex_file": "hex/gen-eigrp.frame-1.hex"
+        "sha256": "14350cd8d72441b740e3616216881ec84a617128e4ab9e403598b5f1c1698d1e"
       },
       "frame_protocols": [
         "eth",
@@ -7949,7 +7949,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/gen-rsvp.frame-1.hex"
+        "sha256": "0c01258f2d85b38bc1a5e0ee18888ab2183b6ec8639a4a7a6e43ab343d769dcb"
       },
       "frame_protocols": [
         "eth",
@@ -7979,7 +7979,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/gen-udplite.frame-1.hex"
+        "sha256": "97a426fca8157e61df753a97bb3b34b6da5e0ce81f0594ad5f988314d129d947"
       },
       "frame_protocols": [
         "eth",
@@ -8010,7 +8010,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 92,
-        "hex_file": "hex/gen-nbns.frame-1.hex"
+        "sha256": "a09b1e095f6b3e5e0dfd5292cc5bf87d64aeb0d63ddd7230bf1bf709d32b852d"
       },
       "frame_protocols": [
         "eth",
@@ -8041,7 +8041,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 92,
-        "hex_file": "hex/gen-nbt-ns.frame-1.hex"
+        "sha256": "5ad1229179e0af668bf148bb98f9b1e6ce2cbe7f4965d7af525ee12f461bb9da"
       },
       "frame_protocols": [
         "eth",
@@ -8072,7 +8072,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 129,
-        "hex_file": "hex/gen-nbt-dg.frame-1.hex"
+        "sha256": "8121aa44dedb9a90af771ccf228ef3e475ea603bb34aec2335aad2514df8e28a"
       },
       "frame_protocols": [
         "eth",
@@ -8104,7 +8104,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/gen-llmnr.frame-1.hex"
+        "sha256": "2056a345331de3779028444c65a027b35a7288e8d566c6392dff1835e7285588"
       },
       "frame_protocols": [
         "eth",
@@ -8135,7 +8135,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 74,
-        "hex_file": "hex/gen-llmnr-mdns.frame-1.hex"
+        "sha256": "aafd9e62f4552828fac22e3b2a1141edeed58ec22215690d70f923ae9cbaa15e"
       },
       "frame_protocols": [
         "eth",
@@ -8166,7 +8166,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 80,
-        "hex_file": "hex/gen-dhcpv6.frame-1.hex"
+        "sha256": "2e16e552034ac8b753da1a9bb4f8334245cbb48ee0232bcf72a6a67f91416b00"
       },
       "frame_protocols": [
         "eth",
@@ -8197,7 +8197,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 80,
-        "hex_file": "hex/gen-dhcpv6-reply.frame-1.hex"
+        "sha256": "aad817f2f98d234e685e9830b393ac9c44ed17b9efe5eab009668ad7e9543e2b"
       },
       "frame_protocols": [
         "eth",
@@ -8228,7 +8228,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/gen-ipv6-ra.frame-1.hex"
+        "sha256": "e17922e6755ed5e4bb1542504bb4ff48c6026e7cbfb0aca3cd9e917ca9ecd8b4"
       },
       "frame_protocols": [
         "eth",
@@ -8258,7 +8258,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/gen-sntp.frame-1.hex"
+        "sha256": "ed577f9ad9eff8dcddc0c12d31664a326e9d93a7b3e19028c072bc4f291f875b"
       },
       "frame_protocols": [
         "eth",
@@ -8289,7 +8289,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 114,
-        "hex_file": "hex/gen-netflow-v5.frame-1.hex"
+        "sha256": "4bcbc4493e9fd030a24e82867495d73aaed377f8483ed563b11965aa2a0f2ab7"
       },
       "frame_protocols": [
         "eth",
@@ -8320,7 +8320,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 102,
-        "hex_file": "hex/gen-snmpv3.frame-1.hex"
+        "sha256": "ec59b7529a106b626094cdeb8c11012bff75ea5be659eb9bf0ca90074889bdf3"
       },
       "frame_protocols": [
         "eth",
@@ -8351,7 +8351,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 67,
-        "hex_file": "hex/gen-socks4.frame-4.hex"
+        "sha256": "90b317b2667e0fa3a08837973f719867ae3b39d76b9bfc8c5e1a20175107a44a"
       },
       "frame_protocols": [
         "eth",
@@ -8382,7 +8382,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/gen-ldap.frame-4.hex"
+        "sha256": "e102e916b98707752e725bcfadab794fa57ae9b2486abec09de397c42bf36723"
       },
       "frame_protocols": [
         "eth",
@@ -8413,7 +8413,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/gen-cldap.frame-1.hex"
+        "sha256": "b95deac2c7a1c614c48ba92743aa4ec841e10d074547da6f81e3593756e62e7d"
       },
       "frame_protocols": [
         "eth",
@@ -8444,7 +8444,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 81,
-        "hex_file": "hex/gen-memcache-bin.frame-4.hex"
+        "sha256": "ce5a355e3480eea336f13d35f3cb81c281cf458c45a4e303f319998c505792bd"
       },
       "frame_protocols": [
         "eth",
@@ -8475,7 +8475,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 125,
-        "hex_file": "hex/gen-etcd.frame-4.hex"
+        "sha256": "1949dc007425da2660b123d43757500f484ebc3356107d3f1a070aacf122ab54"
       },
       "frame_protocols": [
         "eth",
@@ -8506,7 +8506,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 24,
-        "hex_file": "hex/gen-aoe.frame-1.hex"
+        "sha256": "52e5ea78141289a382113e64bf0324d8864d3095b5d764a2442cd7b7a158a420"
       },
       "frame_protocols": [
         "eth",
@@ -8535,7 +8535,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 188,
-        "hex_file": "hex/gen-minio-s3.frame-4.hex"
+        "sha256": "e33f170412a578af16cec90a04ca3eb31bbb3496e948bf0d9598092f03720526"
       },
       "frame_protocols": [
         "eth",
@@ -8566,7 +8566,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 110,
-        "hex_file": "hex/gen-docker-api.frame-4.hex"
+        "sha256": "55d68cd6b42bf2017ae85a110791e6442aa5418f5924a40444fd667d4c949de2"
       },
       "frame_protocols": [
         "eth",
@@ -8597,7 +8597,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/gen-jdwp.frame-4.hex"
+        "sha256": "5fe1a67e2d2aa5a2911713b448d6d91fdb82cb47554a520b75b1c93d84cc9610"
       },
       "frame_protocols": [
         "eth",
@@ -8628,7 +8628,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 200,
-        "hex_file": "hex/gen-jsonrpc.frame-4.hex"
+        "sha256": "363f8c6701464d3e6c02ac2df8afa2eea9a6be77a939f3a9ab9ad869eac8339b"
       },
       "frame_protocols": [
         "eth",
@@ -8660,7 +8660,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/gen-onc-rpc.frame-1.hex"
+        "sha256": "979e1de630f763965df259986081bc5260dd2ff012469869fbeb8ab03d290426"
       },
       "frame_protocols": [
         "eth",
@@ -8691,7 +8691,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/gen-rpc.frame-1.hex"
+        "sha256": "b81aa2006db426c8088a78dcfae0d6ae645d61586681975fdc24e22aad35547c"
       },
       "frame_protocols": [
         "eth",
@@ -8722,7 +8722,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 63,
-        "hex_file": "hex/gen-lpd.frame-4.hex"
+        "sha256": "895249e0e8d766035d9dfafcc478c57018cb5bdd9cf25ae8820a510fb3469142"
       },
       "frame_protocols": [
         "eth",
@@ -8753,7 +8753,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 75,
-        "hex_file": "hex/gen-ftp-data.frame-4.hex"
+        "sha256": "773d72d6632761e9866fab4c7e7455918862e1f088246df38c61fbd6071bc38e"
       },
       "frame_protocols": [
         "eth",
@@ -8785,7 +8785,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 325,
-        "hex_file": "hex/gen-sdp.frame-1.hex"
+        "sha256": "c3bf6ffcd3ae94d573ad342e33ab9a6ddeacf4239c0318e8f243f691e5f00b00"
       },
       "frame_protocols": [
         "eth",
@@ -8817,7 +8817,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 16,
-        "hex_file": "hex/gen-j1939.frame-1.hex"
+        "sha256": "c42dde43dbeabe4f5ffd102bde5fbca84a06f6d8d4bb27f213279487f7c38f0e"
       },
       "frame_protocols": [
         "can",
@@ -8845,7 +8845,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 102,
-        "hex_file": "hex/gen-wpad.frame-4.hex"
+        "sha256": "04576ee7581934ce8a808b9f7b1e2ecc67165b7508a3c909083568e2585c49ac"
       },
       "frame_protocols": [
         "eth",
@@ -8876,7 +8876,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 103,
-        "hex_file": "hex/gen-wpad-proxy.frame-4.hex"
+        "sha256": "c78ce9e6e4312cf421e5d60a3aba1e7968b20342b8867615a503868c4950f7b4"
       },
       "frame_protocols": [
         "eth",
@@ -8907,7 +8907,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 90,
-        "hex_file": "hex/gen-prometheus.frame-4.hex"
+        "sha256": "cfd7755c5cf9a329ccc8731da36595f24f71cbc32b58d055cfad1a2a0d84a901"
       },
       "frame_protocols": [
         "eth",
@@ -8938,7 +8938,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 118,
-        "hex_file": "hex/gen-redfish.frame-4.hex"
+        "sha256": "066cfb380645c3f74bf672a0e57a3e0f92f626942e8bd07a5de92a7ad79711e8"
       },
       "frame_protocols": [
         "eth",
@@ -8969,7 +8969,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 217,
-        "hex_file": "hex/gen-xmlrpc.frame-4.hex"
+        "sha256": "835bdd4cda0f4d7ba79a1a8694e730955aa0ed98fc7b47efcd24804d8246fe4f"
       },
       "frame_protocols": [
         "eth",
@@ -9001,7 +9001,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 106,
-        "hex_file": "hex/gen-ssl.frame-4.hex"
+        "sha256": "c968337b0ec8c8da24d50881b158d1635d8839d20378c7ff73a139f330001830"
       },
       "frame_protocols": [
         "eth",
@@ -9031,7 +9031,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 126,
-        "hex_file": "hex/gen-msrpc-epm.frame-4.hex"
+        "sha256": "cf8a8d8922c1a2908a7991bab486ea53f813605160bdf78c911bbafe83e369e6"
       },
       "frame_protocols": [
         "eth",
@@ -9062,7 +9062,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/gen-pppoe-session.frame-1.hex"
+        "sha256": "41ae94681de0677134d459be3662f43a06d99274bc183188df71b7e48e31fda3"
       },
       "frame_protocols": [
         "eth",
@@ -9094,7 +9094,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 26,
-        "hex_file": "hex/gen-lcp.frame-1.hex"
+        "sha256": "aa08b4e167e1093d2930fe6eaade0bc0fcc441ca02b3a140dd2ce8cda8153321"
       },
       "frame_protocols": [
         "eth",
@@ -9125,7 +9125,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 35,
-        "hex_file": "hex/gen-chap.frame-1.hex"
+        "sha256": "402f02726ff0554d99a65663e2c801e170b0ce09c134b01879560cf49ed45bd7"
       },
       "frame_protocols": [
         "eth",
@@ -9156,7 +9156,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 164,
-        "hex_file": "hex/gen-smb2.frame-4.hex"
+        "sha256": "b604e9930ed42dd82bbe686cc960b7ef62deed2602e26040a498a5c6f9f473dc"
       },
       "frame_protocols": [
         "eth",
@@ -9188,7 +9188,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 156,
-        "hex_file": "hex/gen-mariadb.frame-4.hex"
+        "sha256": "66870483ae37be74e8d851f0d3d273880465ecfc888600371d0a2fe612ed183c"
       },
       "frame_protocols": [
         "eth",
@@ -9219,7 +9219,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/gen-llc-valid.frame-1.hex"
+        "sha256": "7317be32ef2ab260e1436257995d17784df9dff2fd2b23434a5e2d8f5e566f35"
       },
       "frame_protocols": [
         "eth",
@@ -9248,7 +9248,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 29,
-        "hex_file": "hex/gen-ieee8021x-valid.frame-1.hex"
+        "sha256": "ac8a14157bfdd93436adea6b0eecc504424f731f02a861fe3a8512989f142bad"
       },
       "frame_protocols": [
         "eth",
@@ -9277,7 +9277,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 64,
-        "hex_file": "hex/gen-cdp-valid.frame-1.hex"
+        "sha256": "c44950f19ff4932716a2f5c768329ea5bc3ff02398d285ba62a9181e16ee0d56"
       },
       "frame_protocols": [
         "eth",
@@ -9306,7 +9306,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/gen-rsvp-valid.frame-1.hex"
+        "sha256": "d42e410c9d03a62c8174eca66f018908e3d8fa7e70cb3342d0e0e62dd154ca83"
       },
       "frame_protocols": [
         "eth",
@@ -9336,7 +9336,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 100,
-        "hex_file": "hex/gen-snmpv3-valid.frame-1.hex"
+        "sha256": "5c9835982ff017763f092716294eee44470155fb3febc29065b3b8865bcb8272"
       },
       "frame_protocols": [
         "eth",
@@ -9367,7 +9367,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 104,
-        "hex_file": "hex/gen-ssl-valid.frame-4.hex"
+        "sha256": "5c6ad51c5729d187b1f34d2abd02a2a2435e95b3a85094edeccd189f2f61d63c"
       },
       "frame_protocols": [
         "eth",
@@ -9398,7 +9398,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/gen-l2tp-valid.frame-1.hex"
+        "sha256": "2eb8c3a5165d3d3af792febff6744669a9e2bab49402f79a35dea9d3fce2c5db"
       },
       "frame_protocols": [
         "eth",
@@ -9423,13 +9423,13 @@
       "size_bytes": 140,
       "packet_count": 2,
       "link_type": "Ethernet",
-      "display_filter": "eth.type == 0x8035 \u0026\u0026 (arp.opcode == 3 || arp.opcode == 4)",
+      "display_filter": "eth.type == 0x8035 && (arp.opcode == 3 || arp.opcode == 4)",
       "evidence_kind": "generated-positive",
       "notes": "RARP request and reply, with the correct distinct EtherType and address fields.",
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/gen-rarp-valid.frame-1.hex"
+        "sha256": "add3047de2c91aaf857541bab9ff70a67df905f6ce66ad071349b0cf70ccf1f0"
       },
       "frame_protocols": [
         "eth",
@@ -9452,13 +9452,13 @@
       "size_bytes": 128,
       "packet_count": 1,
       "link_type": "Ethernet",
-      "display_filter": "ip.proto == 41 \u0026\u0026 ipv6.src == 2002:c000:201::1",
+      "display_filter": "ip.proto == 41 && ipv6.src == 2002:c000:201::1",
       "evidence_kind": "generated-positive",
       "notes": "Historical 6to4-format packet using documentation IPv4 addresses embedded in the 2002 prefix; no endpoint is contacted.",
       "representative_frame": {
         "number": 1,
         "length_bytes": 88,
-        "hex_file": "hex/gen-6to4-valid.frame-1.hex"
+        "sha256": "5bd0344cfdda6e40ccb18badf52892668a6c9e47ba3f7e2b2691862831869a9a"
       },
       "frame_protocols": [
         "eth",
@@ -9490,7 +9490,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/gen-udplite-valid.frame-1.hex"
+        "sha256": "2625ec2a085f5d2339b3a3a50aa1e068c7ffdf2adc182d4ef42b8a5c0cd64a47"
       },
       "frame_protocols": [
         "eth",
@@ -9521,7 +9521,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 119,
-        "hex_file": "hex/gen-cldap-valid.frame-1.hex"
+        "sha256": "813c0ff92caa373599e841d626c6cb657b85c324d8a47435cba0449ae0cf11d9"
       },
       "frame_protocols": [
         "eth",
@@ -9552,7 +9552,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 32,
-        "hex_file": "hex/gen-aoe-valid.frame-1.hex"
+        "sha256": "1464751ce66d77bea4a5309ba1a64fc005197f826af7e34c911e82028a279294"
       },
       "frame_protocols": [
         "eth",
@@ -9581,7 +9581,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 718,
-        "hex_file": "hex/ndpi-wsd-original.frame-1.hex"
+        "sha256": "22e8cddb98b9b524b3461f7ae3a1db02763873cd7b3bd7570bcad903c00a64c7"
       },
       "frame_protocols": [
         "eth",
@@ -9612,7 +9612,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 287,
-        "hex_file": "hex/google-http-ascii.frame-4.hex"
+        "sha256": "b8e9e4376642b47abccaad1428135bcc8427a36c35572fff5b2e9ca2b8fcafbf"
       },
       "frame_protocols": [
         "eth",
@@ -9644,7 +9644,7 @@
       "representative_frame": {
         "number": 23,
         "length_bytes": 91,
-        "hex_file": "hex/google-usb-engraver.frame-23.hex"
+        "sha256": "e05863588b3c846c8ecb67fef4eaec933f95b09d9e48ab06a2178be02d30dd72"
       },
       "frame_protocols": [
         "usb",
@@ -9672,7 +9672,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 68,
-        "hex_file": "hex/google-ipx-session.frame-1.hex"
+        "sha256": "22ff65a420aac05885af7732c55b6930087726377736733b01d94a1478cefc61"
       },
       "frame_protocols": [
         "eth",
@@ -9702,7 +9702,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/pr5023-gen-ethernet-ii.frame-1.hex"
+        "sha256": "33fa18acff377a03d40f474424bcd5e2266abe8b8d99c33daaaae61006a8ab55"
       },
       "frame_protocols": [
         "eth",
@@ -9732,7 +9732,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 26,
-        "hex_file": "hex/pr5023-gen-ethernet-8023.frame-1.hex"
+        "sha256": "12c8187ab04fc2298f6adbe2492b1fb868a5ac4a4925918df0b8b8463bb961c6"
       },
       "frame_protocols": [
         "eth",
@@ -9761,7 +9761,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/pr5023-gen-ieee8021q.frame-1.hex"
+        "sha256": "5c5ea516f1524205a7f925285959dd9e9c6478c1fb8511bde8701e14a6020ff6"
       },
       "frame_protocols": [
         "eth",
@@ -9793,7 +9793,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-qinq.frame-1.hex"
+        "sha256": "af5696526e0fd39c2e7dc5302db52ae1050a8eb1b00b041253b24ae06221f016"
       },
       "frame_protocols": [
         "eth",
@@ -9827,7 +9827,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/pr5023-gen-rarp.frame-1.hex"
+        "sha256": "587ebc5dd088024573de823212345a6da039ed5eeb0771390ae61e2f7412c448"
       },
       "frame_protocols": [
         "eth",
@@ -9856,7 +9856,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 19,
-        "hex_file": "hex/pr5023-gen-llc.frame-1.hex"
+        "sha256": "0e62dbfff5676f8cfb8b309ee92c2bd091c1d7b4b58d2b29ef92ea111fa44f93"
       },
       "frame_protocols": [
         "eth",
@@ -9885,7 +9885,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 124,
-        "hex_file": "hex/pr5023-gen-lacp.frame-1.hex"
+        "sha256": "0c44b1e594345ac6f4967839339d8c5c33af892e120c070ef274f511d8b11bbb"
       },
       "frame_protocols": [
         "eth",
@@ -9915,7 +9915,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 23,
-        "hex_file": "hex/pr5023-gen-eapol.frame-1.hex"
+        "sha256": "02e24ab7c8be8abd9651e95908457aba56dcebe32ff6ed12938b8844e8fb18dc"
       },
       "frame_protocols": [
         "eth",
@@ -9944,7 +9944,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 27,
-        "hex_file": "hex/pr5023-gen-eap.frame-1.hex"
+        "sha256": "94a41f3e35c9c654863d1fb99667150dd75e5c39af9b90321f7dbecc91a1b981"
       },
       "frame_protocols": [
         "eth",
@@ -9973,7 +9973,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 22,
-        "hex_file": "hex/pr5023-gen-ieee8021x.frame-1.hex"
+        "sha256": "d82de0422b714fd605d3312ce067d54ce5f838e6c87d6e1b3ae2c717aa6c3ce2"
       },
       "frame_protocols": [
         "eth",
@@ -10002,7 +10002,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 32,
-        "hex_file": "hex/pr5023-gen-loopback.frame-1.hex"
+        "sha256": "b363bc181ef0d8cea4c2d6516f13475c485baa035b3d8e4c8b1cc1d33edf5cfe"
       },
       "frame_protocols": [
         "null",
@@ -10031,7 +10031,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 49,
-        "hex_file": "hex/pr5023-gen-ieee80211.frame-1.hex"
+        "sha256": "2e95cc8c158e3dd0e8ce697bedf92e1fad1776847f28977236e2f0bfc187e422"
       },
       "frame_protocols": [
         "radiotap",
@@ -10060,7 +10060,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/pr5023-gen-cdp.frame-1.hex"
+        "sha256": "2f3142db4cc17414a7864a20cd28e7b8d64351f7bc67e3c2b741577c687a2624"
       },
       "frame_protocols": [
         "eth",
@@ -10090,7 +10090,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/pr5023-gen-icmpv6.frame-1.hex"
+        "sha256": "8710022f678bd190d3105d01d5bccce874dd5f4fc71268c1a73ee7bc1d9169c9"
       },
       "frame_protocols": [
         "eth",
@@ -10121,7 +10121,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 86,
-        "hex_file": "hex/pr5023-gen-icmpv6-ndp.frame-1.hex"
+        "sha256": "8eef930350d170f7cd69b5971df9743ea1b80a85e10bfec492dd2c69cec58225"
       },
       "frame_protocols": [
         "eth",
@@ -10151,7 +10151,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/pr5023-gen-icmpv6-mld.frame-1.hex"
+        "sha256": "be8bf6727bfbab4c7ad17a439d4b32469f8f7666c40e1de866be9fcbd8824a2b"
       },
       "frame_protocols": [
         "eth",
@@ -10181,7 +10181,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/pr5023-gen-ipv6-hbh.frame-1.hex"
+        "sha256": "105f566474f62dba2180611eefba0702bfcc007840eb0d8c71d4c3eefdeba169"
       },
       "frame_protocols": [
         "eth",
@@ -10212,7 +10212,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 86,
-        "hex_file": "hex/pr5023-gen-ipv6-routing.frame-1.hex"
+        "sha256": "717d5a75fff815c58ceaf4c8a749a8581261885776afcde755eee02b1e7c2779"
       },
       "frame_protocols": [
         "eth",
@@ -10243,7 +10243,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 94,
-        "hex_file": "hex/pr5023-gen-ipv6-frag.frame-1.hex"
+        "sha256": "952062fd8cec50daaf066f55980e3dd557c036b75b0bf43af4c14fece69fccb4"
       },
       "frame_protocols": [
         "eth",
@@ -10274,7 +10274,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/pr5023-gen-ipv6-dstopts.frame-1.hex"
+        "sha256": "ba773dbf2199a4802f8d41023a12a785eb6d9118f0d388e622a761efc1caea42"
       },
       "frame_protocols": [
         "eth",
@@ -10305,7 +10305,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/pr5023-gen-igmp.frame-1.hex"
+        "sha256": "398444d6815483085f3d2b9dd753e25806317e0c4f11180e1a9bb3fca11d8b49"
       },
       "frame_protocols": [
         "eth",
@@ -10336,7 +10336,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/pr5023-gen-ipip.frame-1.hex"
+        "sha256": "6f03595a2e0f8be1bb58996d54ef00838dbd4bb7c973415b64dd295a58b98a5f"
       },
       "frame_protocols": [
         "eth",
@@ -10367,7 +10367,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/pr5023-gen-mpls.frame-1.hex"
+        "sha256": "f9b271549dfc9859b72b1b669af056b7faac44558d6532c232fb4f0445a8e6e9"
       },
       "frame_protocols": [
         "eth",
@@ -10397,7 +10397,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/pr5023-gen-geneve.frame-1.hex"
+        "sha256": "e0f16b326c073ae17f001ed8414291b24234546cea0a73ecda609e3b9dbe0d03"
       },
       "frame_protocols": [
         "eth",
@@ -10430,7 +10430,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/pr5023-gen-l2tp.frame-1.hex"
+        "sha256": "b59373a307d5f76ef6307362477c9d037e18e9a5188082376f2ec99e3a4eaca0"
       },
       "frame_protocols": [
         "eth",
@@ -10461,7 +10461,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/pr5023-gen-6to4.frame-1.hex"
+        "sha256": "c9fc293a3515e66a60f0c74e0767aa344a06179803eaffc71f012766ed775bd8"
       },
       "frame_protocols": [
         "eth",
@@ -10492,7 +10492,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-icmp-ts.frame-1.hex"
+        "sha256": "4fa7c1be7d1902fe10fd36bb54ec35ea3079c546720ebd87c4256d01b3f3f758"
       },
       "frame_protocols": [
         "eth",
@@ -10522,7 +10522,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/pr5023-gen-rip.frame-1.hex"
+        "sha256": "5739ab173beaa4fa59703698f6b70e540d08272d2b4c3eb41ceeda67645ab9c5"
       },
       "frame_protocols": [
         "eth",
@@ -10553,7 +10553,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/pr5023-gen-ripng.frame-1.hex"
+        "sha256": "b8b114f22403c30247c5a588ca5582cc8990fb755c321b140ce91d475df63fe9"
       },
       "frame_protocols": [
         "eth",
@@ -10584,7 +10584,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/pr5023-gen-ospfv3.frame-1.hex"
+        "sha256": "cb2010ee8d133010e5f15fc998d8f67c856a5f3d41226349f23b6c21fa4e7da8"
       },
       "frame_protocols": [
         "eth",
@@ -10614,7 +10614,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 74,
-        "hex_file": "hex/pr5023-gen-eigrp.frame-1.hex"
+        "sha256": "14350cd8d72441b740e3616216881ec84a617128e4ab9e403598b5f1c1698d1e"
       },
       "frame_protocols": [
         "eth",
@@ -10644,7 +10644,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-rsvp.frame-1.hex"
+        "sha256": "0c01258f2d85b38bc1a5e0ee18888ab2183b6ec8639a4a7a6e43ab343d769dcb"
       },
       "frame_protocols": [
         "eth",
@@ -10674,7 +10674,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/pr5023-gen-udplite.frame-1.hex"
+        "sha256": "97a426fca8157e61df753a97bb3b34b6da5e0ce81f0594ad5f988314d129d947"
       },
       "frame_protocols": [
         "eth",
@@ -10705,7 +10705,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 92,
-        "hex_file": "hex/pr5023-gen-nbns.frame-1.hex"
+        "sha256": "a09b1e095f6b3e5e0dfd5292cc5bf87d64aeb0d63ddd7230bf1bf709d32b852d"
       },
       "frame_protocols": [
         "eth",
@@ -10736,7 +10736,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 92,
-        "hex_file": "hex/pr5023-gen-nbt-ns.frame-1.hex"
+        "sha256": "5ad1229179e0af668bf148bb98f9b1e6ce2cbe7f4965d7af525ee12f461bb9da"
       },
       "frame_protocols": [
         "eth",
@@ -10767,7 +10767,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 129,
-        "hex_file": "hex/pr5023-gen-nbt-dg.frame-1.hex"
+        "sha256": "8121aa44dedb9a90af771ccf228ef3e475ea603bb34aec2335aad2514df8e28a"
       },
       "frame_protocols": [
         "eth",
@@ -10799,7 +10799,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/pr5023-gen-llmnr.frame-1.hex"
+        "sha256": "2056a345331de3779028444c65a027b35a7288e8d566c6392dff1835e7285588"
       },
       "frame_protocols": [
         "eth",
@@ -10830,7 +10830,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 74,
-        "hex_file": "hex/pr5023-gen-llmnr-mdns.frame-1.hex"
+        "sha256": "aafd9e62f4552828fac22e3b2a1141edeed58ec22215690d70f923ae9cbaa15e"
       },
       "frame_protocols": [
         "eth",
@@ -10861,7 +10861,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 80,
-        "hex_file": "hex/pr5023-gen-dhcpv6.frame-1.hex"
+        "sha256": "2e16e552034ac8b753da1a9bb4f8334245cbb48ee0232bcf72a6a67f91416b00"
       },
       "frame_protocols": [
         "eth",
@@ -10892,7 +10892,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 80,
-        "hex_file": "hex/pr5023-gen-dhcpv6-reply.frame-1.hex"
+        "sha256": "aad817f2f98d234e685e9830b393ac9c44ed17b9efe5eab009668ad7e9543e2b"
       },
       "frame_protocols": [
         "eth",
@@ -10923,7 +10923,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/pr5023-gen-ipv6-ra.frame-1.hex"
+        "sha256": "e17922e6755ed5e4bb1542504bb4ff48c6026e7cbfb0aca3cd9e917ca9ecd8b4"
       },
       "frame_protocols": [
         "eth",
@@ -10953,7 +10953,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/pr5023-gen-sntp.frame-1.hex"
+        "sha256": "0b77163ffd112136257d856d1e25558408f9138c58a47da40b2f7cd1b14ddb8a"
       },
       "frame_protocols": [
         "eth",
@@ -10984,7 +10984,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 114,
-        "hex_file": "hex/pr5023-gen-netflow-v5.frame-1.hex"
+        "sha256": "4bcbc4493e9fd030a24e82867495d73aaed377f8483ed563b11965aa2a0f2ab7"
       },
       "frame_protocols": [
         "eth",
@@ -11015,7 +11015,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 102,
-        "hex_file": "hex/pr5023-gen-snmpv3.frame-1.hex"
+        "sha256": "ec59b7529a106b626094cdeb8c11012bff75ea5be659eb9bf0ca90074889bdf3"
       },
       "frame_protocols": [
         "eth",
@@ -11046,7 +11046,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 67,
-        "hex_file": "hex/pr5023-gen-socks4.frame-4.hex"
+        "sha256": "90b317b2667e0fa3a08837973f719867ae3b39d76b9bfc8c5e1a20175107a44a"
       },
       "frame_protocols": [
         "eth",
@@ -11077,7 +11077,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/pr5023-gen-ldap.frame-4.hex"
+        "sha256": "e102e916b98707752e725bcfadab794fa57ae9b2486abec09de397c42bf36723"
       },
       "frame_protocols": [
         "eth",
@@ -11108,7 +11108,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/pr5023-gen-cldap.frame-1.hex"
+        "sha256": "b95deac2c7a1c614c48ba92743aa4ec841e10d074547da6f81e3593756e62e7d"
       },
       "frame_protocols": [
         "eth",
@@ -11139,7 +11139,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 81,
-        "hex_file": "hex/pr5023-gen-memcache-bin.frame-4.hex"
+        "sha256": "ce5a355e3480eea336f13d35f3cb81c281cf458c45a4e303f319998c505792bd"
       },
       "frame_protocols": [
         "eth",
@@ -11170,7 +11170,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 125,
-        "hex_file": "hex/pr5023-gen-etcd.frame-4.hex"
+        "sha256": "1949dc007425da2660b123d43757500f484ebc3356107d3f1a070aacf122ab54"
       },
       "frame_protocols": [
         "eth",
@@ -11201,7 +11201,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 24,
-        "hex_file": "hex/pr5023-gen-aoe.frame-1.hex"
+        "sha256": "52e5ea78141289a382113e64bf0324d8864d3095b5d764a2442cd7b7a158a420"
       },
       "frame_protocols": [
         "eth",
@@ -11230,7 +11230,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 188,
-        "hex_file": "hex/pr5023-gen-minio-s3.frame-4.hex"
+        "sha256": "e33f170412a578af16cec90a04ca3eb31bbb3496e948bf0d9598092f03720526"
       },
       "frame_protocols": [
         "eth",
@@ -11261,7 +11261,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 110,
-        "hex_file": "hex/pr5023-gen-docker-api.frame-4.hex"
+        "sha256": "55d68cd6b42bf2017ae85a110791e6442aa5418f5924a40444fd667d4c949de2"
       },
       "frame_protocols": [
         "eth",
@@ -11292,7 +11292,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/pr5023-gen-jdwp.frame-4.hex"
+        "sha256": "5fe1a67e2d2aa5a2911713b448d6d91fdb82cb47554a520b75b1c93d84cc9610"
       },
       "frame_protocols": [
         "eth",
@@ -11323,7 +11323,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 200,
-        "hex_file": "hex/pr5023-gen-jsonrpc.frame-4.hex"
+        "sha256": "363f8c6701464d3e6c02ac2df8afa2eea9a6be77a939f3a9ab9ad869eac8339b"
       },
       "frame_protocols": [
         "eth",
@@ -11355,7 +11355,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/pr5023-gen-onc-rpc.frame-1.hex"
+        "sha256": "979e1de630f763965df259986081bc5260dd2ff012469869fbeb8ab03d290426"
       },
       "frame_protocols": [
         "eth",
@@ -11386,7 +11386,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/pr5023-gen-rpc.frame-1.hex"
+        "sha256": "b81aa2006db426c8088a78dcfae0d6ae645d61586681975fdc24e22aad35547c"
       },
       "frame_protocols": [
         "eth",
@@ -11417,7 +11417,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 63,
-        "hex_file": "hex/pr5023-gen-lpd.frame-4.hex"
+        "sha256": "895249e0e8d766035d9dfafcc478c57018cb5bdd9cf25ae8820a510fb3469142"
       },
       "frame_protocols": [
         "eth",
@@ -11448,7 +11448,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 75,
-        "hex_file": "hex/pr5023-gen-ftp-data.frame-4.hex"
+        "sha256": "773d72d6632761e9866fab4c7e7455918862e1f088246df38c61fbd6071bc38e"
       },
       "frame_protocols": [
         "eth",
@@ -11480,7 +11480,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 325,
-        "hex_file": "hex/pr5023-gen-sdp.frame-1.hex"
+        "sha256": "c3bf6ffcd3ae94d573ad342e33ab9a6ddeacf4239c0318e8f243f691e5f00b00"
       },
       "frame_protocols": [
         "eth",
@@ -11512,7 +11512,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 16,
-        "hex_file": "hex/pr5023-gen-j1939.frame-1.hex"
+        "sha256": "c42dde43dbeabe4f5ffd102bde5fbca84a06f6d8d4bb27f213279487f7c38f0e"
       },
       "frame_protocols": [
         "can",
@@ -11540,7 +11540,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 102,
-        "hex_file": "hex/pr5023-gen-wpad.frame-4.hex"
+        "sha256": "04576ee7581934ce8a808b9f7b1e2ecc67165b7508a3c909083568e2585c49ac"
       },
       "frame_protocols": [
         "eth",
@@ -11571,7 +11571,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 103,
-        "hex_file": "hex/pr5023-gen-wpad-proxy.frame-4.hex"
+        "sha256": "c78ce9e6e4312cf421e5d60a3aba1e7968b20342b8867615a503868c4950f7b4"
       },
       "frame_protocols": [
         "eth",
@@ -11602,7 +11602,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 90,
-        "hex_file": "hex/pr5023-gen-prometheus.frame-4.hex"
+        "sha256": "cfd7755c5cf9a329ccc8731da36595f24f71cbc32b58d055cfad1a2a0d84a901"
       },
       "frame_protocols": [
         "eth",
@@ -11633,7 +11633,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 118,
-        "hex_file": "hex/pr5023-gen-redfish.frame-4.hex"
+        "sha256": "066cfb380645c3f74bf672a0e57a3e0f92f626942e8bd07a5de92a7ad79711e8"
       },
       "frame_protocols": [
         "eth",
@@ -11664,7 +11664,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 217,
-        "hex_file": "hex/pr5023-gen-xmlrpc.frame-4.hex"
+        "sha256": "835bdd4cda0f4d7ba79a1a8694e730955aa0ed98fc7b47efcd24804d8246fe4f"
       },
       "frame_protocols": [
         "eth",
@@ -11696,7 +11696,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 106,
-        "hex_file": "hex/pr5023-gen-ssl.frame-4.hex"
+        "sha256": "c968337b0ec8c8da24d50881b158d1635d8839d20378c7ff73a139f330001830"
       },
       "frame_protocols": [
         "eth",
@@ -11726,7 +11726,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 126,
-        "hex_file": "hex/pr5023-gen-msrpc-epm.frame-4.hex"
+        "sha256": "cf8a8d8922c1a2908a7991bab486ea53f813605160bdf78c911bbafe83e369e6"
       },
       "frame_protocols": [
         "eth",
@@ -11757,7 +11757,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-pppoe-session.frame-1.hex"
+        "sha256": "41ae94681de0677134d459be3662f43a06d99274bc183188df71b7e48e31fda3"
       },
       "frame_protocols": [
         "eth",
@@ -11789,7 +11789,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 26,
-        "hex_file": "hex/pr5023-gen-lcp.frame-1.hex"
+        "sha256": "aa08b4e167e1093d2930fe6eaade0bc0fcc441ca02b3a140dd2ce8cda8153321"
       },
       "frame_protocols": [
         "eth",
@@ -11820,7 +11820,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 35,
-        "hex_file": "hex/pr5023-gen-chap.frame-1.hex"
+        "sha256": "402f02726ff0554d99a65663e2c801e170b0ce09c134b01879560cf49ed45bd7"
       },
       "frame_protocols": [
         "eth",
@@ -11851,7 +11851,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 164,
-        "hex_file": "hex/pr5023-gen-smb2.frame-4.hex"
+        "sha256": "b604e9930ed42dd82bbe686cc960b7ef62deed2602e26040a498a5c6f9f473dc"
       },
       "frame_protocols": [
         "eth",
@@ -11883,7 +11883,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 156,
-        "hex_file": "hex/pr5023-gen-mariadb.frame-4.hex"
+        "sha256": "12572e804e07b88b70b64a525d006097abfa13c9cec603b550985c7ba0f28a96"
       },
       "frame_protocols": [
         "eth",
@@ -11914,7 +11914,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/pr5023-gen-stp.frame-1.hex"
+        "sha256": "7317be32ef2ab260e1436257995d17784df9dff2fd2b23434a5e2d8f5e566f35"
       },
       "frame_protocols": [
         "eth",
@@ -11943,7 +11943,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/pr5023-gen-rstp.frame-1.hex"
+        "sha256": "4b1b16e1c5138d20668c5a75230cab079fd998647e01858c4fd7af232b32b9dc"
       },
       "frame_protocols": [
         "eth",
@@ -11972,7 +11972,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-ethernet-snap.frame-1.hex"
+        "sha256": "4161800c03d2afcd86e2159e12c9ff15bc0a27d39fd558f27888f9696deffff1"
       },
       "frame_protocols": [
         "eth",
@@ -12002,7 +12002,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 26,
-        "hex_file": "hex/pr5023-gen-snap.frame-1.hex"
+        "sha256": "12c8187ab04fc2298f6adbe2492b1fb868a5ac4a4925918df0b8b8463bb961c6"
       },
       "frame_protocols": [
         "eth",
@@ -12031,7 +12031,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 33,
-        "hex_file": "hex/pr5023-gen-pap.frame-1.hex"
+        "sha256": "be8ee8b4e261f6b688e129f927ea7140df968c344d86bb44431808f5bead1e1f"
       },
       "frame_protocols": [
         "eth",
@@ -12062,7 +12062,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 44,
-        "hex_file": "hex/pr5023-gen-linux-sll.frame-1.hex"
+        "sha256": "f0cb5faba6611ee969b381445ea4577ecbfe4588d5bebc3d5eebf5fe252da614"
       },
       "frame_protocols": [
         "sll",
@@ -12092,7 +12092,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/pr5023-gen-wep.frame-1.hex"
+        "sha256": "b091291d3ed54730ad7cf7080c122a8dcd8e3608cfdfd543fbfb086a05f15906"
       },
       "frame_protocols": [
         "radiotap",
@@ -12122,7 +12122,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 124,
-        "hex_file": "hex/pr5023-gen-slow-protocols.frame-1.hex"
+        "sha256": "0c44b1e594345ac6f4967839339d8c5c33af892e120c070ef274f511d8b11bbb"
       },
       "frame_protocols": [
         "eth",
@@ -12152,7 +12152,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-dccp.frame-1.hex"
+        "sha256": "f3368d24caae1a1ef2f2f95585f54490d50d00fc812621f3615bd25881a34025"
       },
       "frame_protocols": [
         "eth",
@@ -12182,7 +12182,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 94,
-        "hex_file": "hex/pr5023-gen-nbt-ss.frame-4.hex"
+        "sha256": "147ce206d5e681038499f09a369cffce22e360683f0ddc8dbf5fb0b7e473227e"
       },
       "frame_protocols": [
         "eth",
@@ -12213,7 +12213,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 96,
-        "hex_file": "hex/pr5023-gen-llmnr-resp.frame-1.hex"
+        "sha256": "863cb29dc323665c30d7fb4340908506a62689b0df8481bb5ccfdd764a834bc8"
       },
       "frame_protocols": [
         "eth",
@@ -12244,7 +12244,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 74,
-        "hex_file": "hex/pr5023-gen-tacacs-plus.frame-4.hex"
+        "sha256": "2694ae24bf6a8f4a61b41eb91b1c7be1b87f7c3781dfa6bad63c3cfcfba73355"
       },
       "frame_protocols": [
         "eth",
@@ -12275,7 +12275,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/pr5023-gen-redis.frame-4.hex"
+        "sha256": "411648abe920a9322fcda27124311daa0169206bfc2236115d0255b0f261d8d0"
       },
       "frame_protocols": [
         "eth",
@@ -12306,7 +12306,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/pr5023-gen-portmap.frame-1.hex"
+        "sha256": "e6bebeeaa2a5d031e56c42d68f6f31492802c8c5aa0136813ec7524dd1deafd1"
       },
       "frame_protocols": [
         "eth",
@@ -12337,7 +12337,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 82,
-        "hex_file": "hex/pr5023-gen-mount.frame-1.hex"
+        "sha256": "5556ceddadf33e4c0fcf5c024bcfbda18cc3e5c97a9fb3b09b5bca19789c397a"
       },
       "frame_protocols": [
         "eth",
@@ -12368,7 +12368,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 76,
-        "hex_file": "hex/pr5023-gen-bonjour.frame-1.hex"
+        "sha256": "dec4c591d0cebb377d7ebbfab829837375e80c6b73cf6c6668616be4148b2446"
       },
       "frame_protocols": [
         "eth",
@@ -12399,7 +12399,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 161,
-        "hex_file": "hex/pr5023-gen-acme.frame-4.hex"
+        "sha256": "d1fe540e3d5343f5c49f8daf20a8aa46ee11f574ed6e4fbbcf6c912a2f79898e"
       },
       "frame_protocols": [
         "eth",
@@ -12432,7 +12432,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 138,
-        "hex_file": "hex/pr5023-gen-k8s-api.frame-4.hex"
+        "sha256": "3d57c015c9c8aa82c01c9c9c38adcbc88421e27db11d049c1c00abbc35886726"
       },
       "frame_protocols": [
         "eth",
@@ -12463,7 +12463,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 158,
-        "hex_file": "hex/pr5023-gen-winrm-http.frame-4.hex"
+        "sha256": "60c2999a252db7d1d8adc14bacaa65f21609f47c98a4b4d1fe349aae13a16f00"
       },
       "frame_protocols": [
         "eth",
@@ -12495,7 +12495,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 158,
-        "hex_file": "hex/pr5023-gen-redfish-ssdp.frame-1.hex"
+        "sha256": "52df241614c9c289173ecf10317bd8e5a8a545d3b01ee817df40760fffb02ab6"
       },
       "frame_protocols": [
         "eth",
@@ -12526,7 +12526,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 72,
-        "hex_file": "hex/pr5023-gen-submission.frame-4.hex"
+        "sha256": "974cd95e264e3feda695222605e6be9946fccff61010125b2f95d3a6f2379a17"
       },
       "frame_protocols": [
         "eth",
@@ -12557,7 +12557,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 149,
-        "hex_file": "hex/pr5023-gen-ntlmssp.frame-4.hex"
+        "sha256": "dd956c61cff1d9e04368349a28737b5e124a35ae92f4adfbdf65695e1b3383fa"
       },
       "frame_protocols": [
         "eth",
@@ -12589,7 +12589,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 126,
-        "hex_file": "hex/pr5023-gen-spnego.frame-4.hex"
+        "sha256": "312ae31a1e55cb7f081ebce021d165a0daae1496e619d5b66ae643c49ed836fd"
       },
       "frame_protocols": [
         "eth",
@@ -12621,7 +12621,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 164,
-        "hex_file": "hex/pr5023-gen-smb3.frame-4.hex"
+        "sha256": "7e5ceac7ced123581ba9c2fee05d28f229b902eff08fcecbbb467bea9d42b558"
       },
       "frame_protocols": [
         "eth",
@@ -12653,7 +12653,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 103,
-        "hex_file": "hex/pr5023-gen-cifs.frame-4.hex"
+        "sha256": "f3c276492310579709ef61823046a9d453f523d8321688e59ff1ae048301f07a"
       },
       "frame_protocols": [
         "eth",
@@ -12685,7 +12685,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 73,
-        "hex_file": "hex/pr5023-gen-9p.frame-4.hex"
+        "sha256": "9a8eab5b8826ad6f6346bfab0f42b5064ee4898039555438be1e1562db054cc8"
       },
       "frame_protocols": [
         "eth",
@@ -12716,7 +12716,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-fcoe.frame-1.hex"
+        "sha256": "fa828e3e575c32696f761ab56af4c118e9146950804f32d2d9306a1c47aa7301"
       },
       "frame_protocols": [
         "eth",
@@ -12746,7 +12746,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 88,
-        "hex_file": "hex/pr5023-gen-tzsp.frame-1.hex"
+        "sha256": "900512458f66c985a012b6d9e61fe38ca1ce1585e340061b9e99730262e48e13"
       },
       "frame_protocols": [
         "eth",
@@ -12780,7 +12780,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/pr5023-gen-quake.frame-1.hex"
+        "sha256": "0be06d0e42c3445749305179f7487d73d707386b299d6122631a30ae93ce2100"
       },
       "frame_protocols": [
         "eth",
@@ -12812,7 +12812,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/pr5023-gen-powerlink.frame-1.hex"
+        "sha256": "2080c3ab25dd09f6e1755799c128818acad9e1a0991045992657cbbe53c539d8"
       },
       "frame_protocols": [
         "eth",
@@ -12841,7 +12841,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/pr5023-gen-ipcomp.frame-1.hex"
+        "sha256": "f024b534a97c8bf8f0396f06edb32ea6b82c8863c42734ea3bb904e54d36435f"
       },
       "frame_protocols": [
         "eth",
@@ -12872,7 +12872,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 36,
-        "hex_file": "hex/pr5023-gen-homeplug-av.frame-1.hex"
+        "sha256": "4eec3484ad9ab95a6d2bdd997e21cc4f4f10bbaf19be4de2fa7fe481a5183d53"
       },
       "frame_protocols": [
         "eth",
@@ -12901,7 +12901,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 81,
-        "hex_file": "hex/pr5023-gen-java-ser.frame-4.hex"
+        "sha256": "9e8de95ba161eda1d30055a0ea0c973c8520f870d8e6e9e6ffb216ef45a69557"
       },
       "frame_protocols": [
         "eth",
@@ -12932,7 +12932,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/pr5023-gen-jdwp-full.frame-4.hex"
+        "sha256": "f8be4f7d616372ba6dda9992ae5cf374c493bb039ed80dc85d6eb9c1afbf1cc1"
       },
       "frame_protocols": [
         "eth",
@@ -12963,7 +12963,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-gtpv2.frame-1.hex"
+        "sha256": "588f642f1912992d56a6dd7d9365878cc85f90819f1663292bbe11362ced5e3f"
       },
       "frame_protocols": [
         "eth",
@@ -12995,7 +12995,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-olsr.frame-1.hex"
+        "sha256": "c7c202c2475fde4f879a02ecbd7f0e6940b15e9df7c0dbbea81ef4ed091fc72a"
       },
       "frame_protocols": [
         "eth",
@@ -13026,7 +13026,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-nhrp.frame-1.hex"
+        "sha256": "71d67fdcac6f33831156d752ce53858470fa8bc5c7d69f27eff419ab36982a13"
       },
       "frame_protocols": [
         "eth",
@@ -13056,7 +13056,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 107,
-        "hex_file": "hex/pr5023-gen-zabbix.frame-4.hex"
+        "sha256": "bdfd2570d550550ed426873d4d02278e5d69a23f825cf9c58d44378c2afaa058"
       },
       "frame_protocols": [
         "eth",
@@ -13087,7 +13087,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-h225.frame-1.hex"
+        "sha256": "163660f6178980e1c27c9346954cd523913943dbb0b9102b0f97b7e9413cb355"
       },
       "frame_protocols": [
         "eth",
@@ -13118,7 +13118,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 45,
-        "hex_file": "hex/pr5023-gen-eth-8022.frame-1.hex"
+        "sha256": "206ed1677a96890be445955af3d6698f60bc4dde6a7e59e75b2974f8b8208cfa"
       },
       "frame_protocols": [
         "eth",
@@ -13148,7 +13148,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 86,
-        "hex_file": "hex/pr5023-gen-cfm.frame-1.hex"
+        "sha256": "f9649a1114333597319c9b04dc5ec9a3a44f4958ea46bfcb7aecb8024e824e13"
       },
       "frame_protocols": [
         "eth",
@@ -13177,7 +13177,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 64,
-        "hex_file": "hex/pr5023-gen-trill.frame-1.hex"
+        "sha256": "3227b1e826106268efde7cef1cec875a7cae5465aeaebe2c564b73634fc32f79"
       },
       "frame_protocols": [
         "eth",
@@ -13209,7 +13209,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/pr5023-gen-elmi.frame-1.hex"
+        "sha256": "797e99d790780257d6b7a19cd2828fbd1dda711ed0726f9fa96a6db8f37fbc05"
       },
       "frame_protocols": [
         "eth",
@@ -13238,7 +13238,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 80,
-        "hex_file": "hex/pr5023-gen-nvgre.frame-1.hex"
+        "sha256": "11eeb6e17f0a22c29f4c504e1063bfb4dec5b730d6b0eeefbe4a8552595bb211"
       },
       "frame_protocols": [
         "eth",
@@ -13272,7 +13272,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 78,
-        "hex_file": "hex/pr5023-gen-nat-t.frame-1.hex"
+        "sha256": "a3a33f068dc704209f0274661f92fddbfce5af7db9ee4450d08e653b95e39759"
       },
       "frame_protocols": [
         "eth",
@@ -13304,7 +13304,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/pr5023-gen-mip.frame-1.hex"
+        "sha256": "91d6f9445dc1f4e94dc215adf83de4e416368e7dfb852c168149ff5c6b5f3257"
       },
       "frame_protocols": [
         "eth",
@@ -13335,7 +13335,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/pr5023-gen-igrp.frame-1.hex"
+        "sha256": "c7b2ef0bd4604c366102e6da303b7be8868bc3dbafd4f2cb9e5e6c0223759c1c"
       },
       "frame_protocols": [
         "eth",
@@ -13365,7 +13365,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 38,
-        "hex_file": "hex/pr5023-gen-dvmrp.frame-1.hex"
+        "sha256": "781a71c5269bffa124777c011d9b665b671aede3ac89d76535f2d8db9d95be29"
       },
       "frame_protocols": [
         "eth",
@@ -13396,7 +13396,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 64,
-        "hex_file": "hex/pr5023-gen-msdp.frame-4.hex"
+        "sha256": "8aa217292eb86fbf0247381a91fb34b626171a33ecf6857ca9791fa4e6c642ec"
       },
       "frame_protocols": [
         "eth",
@@ -13428,7 +13428,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/pr5023-gen-rsync.frame-4.hex"
+        "sha256": "a09de7b8a904154a48c0fed3733626a90da8cffb4440041f125900d3111b4b5c"
       },
       "frame_protocols": [
         "eth",
@@ -13459,7 +13459,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/pr5023-gen-ncp.frame-1.hex"
+        "sha256": "f66b6cfed0a04078366e9f24aac858aca77f757d89046a933bbd5328d4debe1d"
       },
       "frame_protocols": [
         "eth",
@@ -13490,7 +13490,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 152,
-        "hex_file": "hex/pr5023-gen-ntlm.frame-4.hex"
+        "sha256": "f47d74da3af57200ad3c744bcf8e03dd4ed021f8c3e31d82c370615ec6664bbc"
       },
       "frame_protocols": [
         "eth",
@@ -13522,7 +13522,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 126,
-        "hex_file": "hex/pr5023-gen-gssapi-http.frame-4.hex"
+        "sha256": "312ae31a1e55cb7f081ebce021d165a0daae1496e619d5b66ae643c49ed836fd"
       },
       "frame_protocols": [
         "eth",
@@ -13554,7 +13554,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 74,
-        "hex_file": "hex/pr5023-gen-rlogin.frame-4.hex"
+        "sha256": "df61126ed944acba98e50ce7914a08dae0e0360b44cfea9b7e5f0ae71ecca803"
       },
       "frame_protocols": [
         "eth",
@@ -13585,7 +13585,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 63,
-        "hex_file": "hex/pr5023-gen-rmi.frame-4.hex"
+        "sha256": "34870a8e6971ef2ccba3a8f0b9739b63e49988cd4771a6f323a2159848db097c"
       },
       "frame_protocols": [
         "eth",
@@ -13616,7 +13616,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 70,
-        "hex_file": "hex/pr5023-gen-giop.frame-4.hex"
+        "sha256": "25be141609510c17ea8d057af1f1dede02428ceb77af6a601e11e3621d346693"
       },
       "frame_protocols": [
         "eth",
@@ -13647,7 +13647,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 58,
-        "hex_file": "hex/pr5023-gen-ipmi-rmcpplus.frame-1.hex"
+        "sha256": "f10426faf089b6a08b685fb940b2e93b9f6d57463d1d4ec881ed5941f2176ff7"
       },
       "frame_protocols": [
         "eth",
@@ -13679,7 +13679,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 101,
-        "hex_file": "hex/pr5023-gen-megaco.frame-1.hex"
+        "sha256": "9c266432539f9bd1bf83f3b0b181ecd4c8af5705fe532c373e48bcb8a034f392"
       },
       "frame_protocols": [
         "eth",
@@ -13710,7 +13710,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 93,
-        "hex_file": "hex/pr5023-gen-cmpp.frame-4.hex"
+        "sha256": "a507daeb4f35d389cc578b3e2dee7a924c08437fd65957da70a4bf79356f1249"
       },
       "frame_protocols": [
         "eth",
@@ -13741,7 +13741,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/pr5023-gen-quake2.frame-1.hex"
+        "sha256": "1d7a483930e5e428d3ca8cf70d46918b9e4e4a621b092b02b37f2432274fd897"
       },
       "frame_protocols": [
         "eth",
@@ -13772,7 +13772,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 56,
-        "hex_file": "hex/pr5023-gen-quake3.frame-1.hex"
+        "sha256": "34abb5bd19936ab13caec9425600c2132f1312a5faaf13aa564c7024e61d9bcd"
       },
       "frame_protocols": [
         "eth",
@@ -13803,7 +13803,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 118,
-        "hex_file": "hex/pr5023-gen-iscsi.frame-4.hex"
+        "sha256": "8c3a9446f02c145bf76260b5641108e4f0e3a784e38873254eee34b836db620e"
       },
       "frame_protocols": [
         "eth",
@@ -13834,7 +13834,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 22,
-        "hex_file": "hex/pr5023-gen-appletalk.frame-1.hex"
+        "sha256": "126ddc836a9547e140e92cb3e03848039f0d03ec21588cbee84d5d689432f2b7"
       },
       "frame_protocols": [
         "eth",
@@ -13864,7 +13864,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/pr5023-gen-lat.frame-1.hex"
+        "sha256": "a9fbe9c0229783a9569769560279b9a0508c72670ce2f2f9ec330874117424d8"
       },
       "frame_protocols": [
         "eth",
@@ -13893,7 +13893,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 185,
-        "hex_file": "hex/pr5023-gen-netntlmv2.frame-4.hex"
+        "sha256": "f68f36e0046e3f1f54ddabc766a1289a5310bb475f879a2bc67ac97a03758cb6"
       },
       "frame_protocols": [
         "eth",
@@ -13925,7 +13925,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 68,
-        "hex_file": "hex/pr5023-gen-x11.frame-4.hex"
+        "sha256": "06f5eda43d0d2691db8e70fb3178a9fba2149eebcb15fed22c5913dde4336ed0"
       },
       "frame_protocols": [
         "eth",
@@ -13956,7 +13956,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-alljoyn.frame-1.hex"
+        "sha256": "d4314ac2e6fbb3b7114c676f6d491123b98043d4acb957dbef0271731aab56ca"
       },
       "frame_protocols": [
         "eth",
@@ -13987,7 +13987,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 40,
-        "hex_file": "hex/pr5023-gen-aarp.frame-1.hex"
+        "sha256": "d9e72bca0c9608e1af3c5265f915a283c85add38a2f68544ad407de5c7f4b6eb"
       },
       "frame_protocols": [
         "eth",
@@ -14016,7 +14016,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 54,
-        "hex_file": "hex/pr5023-gen-fibre-channel.frame-1.hex"
+        "sha256": "fa828e3e575c32696f761ab56af4c118e9146950804f32d2d9306a1c47aa7301"
       },
       "frame_protocols": [
         "eth",
@@ -14046,7 +14046,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/pr5023-gen-mipv6.frame-1.hex"
+        "sha256": "34d4e2346ceb8a7c1f58b83a9f565c8322807cd6fa01465f207380970c5c5cce"
       },
       "frame_protocols": [
         "eth",
@@ -14076,7 +14076,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/pr5023-gen-vines.frame-1.hex"
+        "sha256": "d54d8e186cbf2e281b913f1eaf764b0e94984569eda8eb5f7a4c233a481c078e"
       },
       "frame_protocols": [
         "eth",
@@ -14105,7 +14105,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/pr5023-gen-sna.frame-1.hex"
+        "sha256": "f8271407eee55968c27decb8401d763f57f73b5a00024d846ab78eb77ea7738c"
       },
       "frame_protocols": [
         "eth",
@@ -14136,7 +14136,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 47,
-        "hex_file": "hex/pr5023-gen-slimp3.frame-1.hex"
+        "sha256": "30d8f2320b6674954a172714a0b367643fdfcb48e65baf45bee2a9c865c01a4f"
       },
       "frame_protocols": [
         "eth",
@@ -14167,7 +14167,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/pr5023-gen-sigcomp.frame-1.hex"
+        "sha256": "534476748f3eefa3986602f9b9a305dee641ccaec01fe2e80f04e03471bfc9e7"
       },
       "frame_protocols": [
         "eth",
@@ -14199,7 +14199,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/pr5023-gen-swipe.frame-1.hex"
+        "sha256": "12ee95ef6dada134bb9872bb11e6132fbc4d1e5419ee5c1586115c8b1104c1e7"
       },
       "frame_protocols": [
         "eth",
@@ -14230,7 +14230,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 25,
-        "hex_file": "hex/pr5023-gen-wsmp.frame-1.hex"
+        "sha256": "816fba2d356738729ed9e574c622b740486ebe603ae05037d9533cafd94c5ce9"
       },
       "frame_protocols": [
         "eth",
@@ -14259,7 +14259,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/pr5023-gen-vntag.frame-1.hex"
+        "sha256": "e94c42562c991fd0c4aacacdddee6fad224ddc70ee5f3a483a85bb5563720aff"
       },
       "frame_protocols": [
         "eth",
@@ -14290,7 +14290,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/pr5023-gen-pbb.frame-1.hex"
+        "sha256": "803dc51a96e632621922994ca14ff5f1a1d918c07d59327fa9ae8c00ccd2b7d4"
       },
       "frame_protocols": [
         "eth",
@@ -14322,7 +14322,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 57,
-        "hex_file": "hex/pr5023-gen-eoam.frame-1.hex"
+        "sha256": "a12188a2a2745e2e68bb873902053559758dcc9cc6fdf77a8328bbb58026304e"
       },
       "frame_protocols": [
         "eth",
@@ -14352,7 +14352,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 124,
-        "hex_file": "hex/pr5023-gen-lacp-marker.frame-1.hex"
+        "sha256": "901eb4e7cadccd4e5802a5a6c0f90b2f5681486590ccbbd6a1af1770d88486cd"
       },
       "frame_protocols": [
         "eth",
@@ -14382,7 +14382,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 73,
-        "hex_file": "hex/pr5023-gen-ucp.frame-4.hex"
+        "sha256": "edc4d94ef8d7dbfa44b46ea0517d9495287654de15df67fb3a1e61e1098ec477"
       },
       "frame_protocols": [
         "eth",
@@ -14413,7 +14413,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/pr5023-gen-decnet.frame-1.hex"
+        "sha256": "5f7c900ef0d489ee6626124880ca5a40bfb13f0cd5c4bf11e2a344b954e89d47"
       },
       "frame_protocols": [
         "eth",
@@ -14442,7 +14442,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 101,
-        "hex_file": "hex/pr5023-gen-sebek.frame-1.hex"
+        "sha256": "bcb511679d51c0f71a52357ba7f449edd6a89b9e0e30ba62b8c4ca6bb3623de4"
       },
       "frame_protocols": [
         "eth",
@@ -14473,7 +14473,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 185,
-        "hex_file": "hex/pr5023-gen-ntlm-v2.frame-4.hex"
+        "sha256": "f68f36e0046e3f1f54ddabc766a1289a5310bb475f879a2bc67ac97a03758cb6"
       },
       "frame_protocols": [
         "eth",
@@ -14505,7 +14505,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/pr5023-gen-xns.frame-1.hex"
+        "sha256": "885da5e9a50cfc03a99b6a5b3a94da021f5e756161bcc86ac6d1bf08485c9c2e"
       },
       "frame_protocols": [
         "eth",
@@ -14534,7 +14534,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 38,
-        "hex_file": "hex/pr5023-gen-tipc.frame-1.hex"
+        "sha256": "2bf4a432aaeaf994744c0aa7de9f03dd92e17d8d4533d8098eeb4f1e3c76e7d6"
       },
       "frame_protocols": [
         "eth",
@@ -14563,7 +14563,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 44,
-        "hex_file": "hex/pr5023-gen-isis.frame-1.hex"
+        "sha256": "e412319cc14e259ed297ff9d2543a056c00b96cf279138b358ae31de72adcd34"
       },
       "frame_protocols": [
         "eth",
@@ -14594,7 +14594,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/pr5023-gen-linux-sll2.frame-1.hex"
+        "sha256": "06953e8bbcfcd52fd32a91839c89a0fa4c53f8329fb4eb2c1056633bcb826566"
       },
       "frame_protocols": [
         "sll",
@@ -14624,7 +14624,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 36,
-        "hex_file": "hex/pr5023-gen-mmrp.frame-1.hex"
+        "sha256": "8c566170c4bd04c069b5a74ecf67fff71e9b39f0ae81adf5770171187850766f"
       },
       "frame_protocols": [
         "eth",
@@ -14653,7 +14653,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 36,
-        "hex_file": "hex/pr5023-gen-mvrp.frame-1.hex"
+        "sha256": "e421e6bcdb4f09a06541263e44d7d72a38dd60d9cca2b73ba0dbb88d0d92992f"
       },
       "frame_protocols": [
         "eth",
@@ -14682,7 +14682,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 36,
-        "hex_file": "hex/pr5023-gen-msrp.frame-1.hex"
+        "sha256": "9c8d9a495728d49ecbe5d345e3b2cfbf491df9979c382502088603df4a857cfb"
       },
       "frame_protocols": [
         "eth",
@@ -14711,7 +14711,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 48,
-        "hex_file": "hex/pr5023-gen-tdmoe.frame-1.hex"
+        "sha256": "0f2918686525d6fdf6226087689f9aff731a1f18b49cc416130b9959e9b381bc"
       },
       "frame_protocols": [
         "eth",
@@ -14740,7 +14740,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/pr5023-gen-xtp.frame-1.hex"
+        "sha256": "1852e00e6904b48f6a92dc881b296272d77c117293e58727d53fc6e97e6a167e"
       },
       "frame_protocols": [
         "eth",
@@ -14770,7 +14770,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 58,
-        "hex_file": "hex/pr5023-gen-xyplex.frame-1.hex"
+        "sha256": "f2b33a06a2199e56f6a77a2e40691ea0aeede9e9b8f39a628b9931f8eee23657"
       },
       "frame_protocols": [
         "eth",
@@ -14801,7 +14801,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 64,
-        "hex_file": "hex/pr5023-gen-mpls-pw.frame-1.hex"
+        "sha256": "951117b0be0f4152e74a06a0f75f5a9e135b21f5b47073cb12aafd2f1d8f2aad"
       },
       "frame_protocols": [
         "eth",
@@ -14835,7 +14835,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/pr5023-gen-macsec.frame-1.hex"
+        "sha256": "b68405035b3cf135ed2aaa598b6ec6d984e7d9fdd3b9dde210af261878dcdab3"
       },
       "frame_protocols": [
         "eth",
@@ -14867,7 +14867,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 126,
-        "hex_file": "hex/gen-nbt-ss-valid.frame-4.hex"
+        "sha256": "053652ae6cab06f8b8a24dfafb16f26d7247693608d625e5cc6cae116be99cf3"
       },
       "frame_protocols": [
         "eth",
@@ -14898,7 +14898,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 59,
-        "hex_file": "hex/gen-java-ser-valid.frame-4.hex"
+        "sha256": "5bb97cd5d81da9f243739732ff3489f2aa5f10f54da475b4b0666c5f43d26230"
       },
       "frame_protocols": [
         "eth",
@@ -14929,7 +14929,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 149,
-        "hex_file": "hex/gen-ntlmssp-valid.frame-4.hex"
+        "sha256": "5c6794280bf3aceaa49eb7d50dfa0ac1b20cc57f9d05e78b8924b8e035ea3ae3"
       },
       "frame_protocols": [
         "eth",
@@ -14961,7 +14961,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 172,
-        "hex_file": "hex/gen-ntlm-valid.frame-4.hex"
+        "sha256": "fe12fa6518bd74f0a8dcb7d085a7f5b711ccb3c71210f678385cfe1edf4fcc98"
       },
       "frame_protocols": [
         "eth",
@@ -14993,7 +14993,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 249,
-        "hex_file": "hex/gen-netntlmv2-valid.frame-4.hex"
+        "sha256": "a5d14983e0f45ac01ad3c5c6464339a6a237666190ed822514a2b3d7fa03ae7b"
       },
       "frame_protocols": [
         "eth",
@@ -15025,7 +15025,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 150,
-        "hex_file": "hex/gen-spnego-valid.frame-4.hex"
+        "sha256": "cb4e6016150f66c043a35dd4e3dc3cfd02938771645a91aca31f690ba9324b80"
       },
       "frame_protocols": [
         "eth",
@@ -15058,7 +15058,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 249,
-        "hex_file": "hex/gen-ntlm-v2-valid.frame-4.hex"
+        "sha256": "a5d14983e0f45ac01ad3c5c6464339a6a237666190ed822514a2b3d7fa03ae7b"
       },
       "frame_protocols": [
         "eth",
@@ -15090,7 +15090,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/gen-gtpv2-valid.frame-1.hex"
+        "sha256": "cf699ebaf42c21a9fbb47edc101fb7cc99e2699a54ea7ae802eda48dd1186345"
       },
       "frame_protocols": [
         "eth",
@@ -15118,11 +15118,11 @@
       "link_type": "Ethernet",
       "display_filter": "http.request.uri contains \"wsman\"",
       "evidence_kind": "generated-negative",
-      "notes": "Earlier HTTP-length-only companion retained byte-for-byte. Its Content-Length matches the eight-octet body, but \u003cs:Env/\u003e has an unbound namespace prefix and is not a SOAP Envelope/Body. HTTPExact can accept the envelope; strict WinRM rejects the XML. Namespace-qualified gen-winrm-identify-valid is a separate positive companion.",
+      "notes": "Earlier HTTP-length-only companion retained byte-for-byte. Its Content-Length matches the eight-octet body, but <s:Env/> has an unbound namespace prefix and is not a SOAP Envelope/Body. HTTPExact can accept the envelope; strict WinRM rejects the XML. Namespace-qualified gen-winrm-identify-valid is a separate positive companion.",
       "representative_frame": {
         "number": 4,
         "length_bytes": 158,
-        "hex_file": "hex/gen-winrm-http-valid.frame-4.hex"
+        "sha256": "1dc6b664454461c0c17d4a7668d3bdec8e1fa5e21c6a84f1a344209b80fda9a5"
       },
       "frame_protocols": [
         "eth",
@@ -15154,7 +15154,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/gen-quake-valid.frame-1.hex"
+        "sha256": "35d94b86d796a347149cb7e78bd5ffb0be472d52ec6ea11fd5ff969ce3fc747b"
       },
       "frame_protocols": [
         "eth",
@@ -15186,7 +15186,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 46,
-        "hex_file": "hex/gen-olsr-valid.frame-1.hex"
+        "sha256": "fc8cdf72c0f8c3923aedd07798d8442c503d1da8b752427e65f9c2c5e3a3a9f6"
       },
       "frame_protocols": [
         "eth",
@@ -15217,7 +15217,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 57,
-        "hex_file": "hex/gen-msdp-valid.frame-4.hex"
+        "sha256": "c42d03fa1e5bec04df1bbf46fa949e733a9d9225d068225c4579b2c9b8aa49bb"
       },
       "frame_protocols": [
         "eth",
@@ -15248,7 +15248,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 66,
-        "hex_file": "hex/gen-x11-valid.frame-4.hex"
+        "sha256": "db5c7e4c033b84a89eca44f6d4b43316cf18a44fa086fcddbca30868645237a2"
       },
       "frame_protocols": [
         "eth",
@@ -15279,7 +15279,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 118,
-        "hex_file": "hex/gen-iscsi-valid.frame-4.hex"
+        "sha256": "365b4b4989fadeeba2da7b19ee25a652f5f8df31684201d3923760a0e5ebd1d4"
       },
       "frame_protocols": [
         "eth",
@@ -15310,7 +15310,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 76,
-        "hex_file": "hex/gen-ucp-valid.frame-4.hex"
+        "sha256": "8fde0d745c59b56a1e2b0f3b06e7e8804af1525ed4e03e7dbeea1fd891840c07"
       },
       "frame_protocols": [
         "eth",
@@ -15341,7 +15341,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/gen-ipmi-rmcpplus-valid.frame-1.hex"
+        "sha256": "566fd33a474f26fc00aae3c84c8b1d51a66cd470379a0ea07cfe37d35c8b7ec8"
       },
       "frame_protocols": [
         "eth",
@@ -15374,7 +15374,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 68,
-        "hex_file": "hex/gen-ipcomp-valid.frame-1.hex"
+        "sha256": "a281e449b0d8e80aed492643dbd23ab8eb5786b562012680a823c348fc6167f4"
       },
       "frame_protocols": [
         "eth",
@@ -15408,7 +15408,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 90,
-        "hex_file": "hex/gen-nvgre-valid.frame-1.hex"
+        "sha256": "134f906b3e9591e8cb4fe762323f07ef0083775374c896120c9128d10b6b337a"
       },
       "frame_protocols": [
         "eth",
@@ -15444,7 +15444,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/gen-elmi-valid.frame-1.hex"
+        "sha256": "30d86626ad32dd413dcac67778899afae3994daa20967b18d610ec4c188a4a59"
       },
       "frame_protocols": [
         "eth",
@@ -15473,7 +15473,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/gen-eoam-valid.frame-1.hex"
+        "sha256": "c3074f1011844e39526bd2f88962f724509c4e05e27785e8ae2c87d64722f54c"
       },
       "frame_protocols": [
         "eth",
@@ -15503,7 +15503,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 38,
-        "hex_file": "hex/gen-mmrp-valid.frame-1.hex"
+        "sha256": "efcbe50d99e777f1f2c01cf8c8055268b89b7ab551280f3b552d5bb551359136"
       },
       "frame_protocols": [
         "eth",
@@ -15532,7 +15532,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 27,
-        "hex_file": "hex/gen-mvrp-valid.frame-1.hex"
+        "sha256": "2715c8690627931c8d86df279b237a144bc888d42902d56638a3bf9a4b23410c"
       },
       "frame_protocols": [
         "eth",
@@ -15561,7 +15561,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 125,
-        "hex_file": "hex/gen-msrp-valid.frame-1.hex"
+        "sha256": "132312f7caa6ef2e78cb3299054ca00e5d7c5fa789b7068ad633d76948714590"
       },
       "frame_protocols": [
         "eth",
@@ -15590,7 +15590,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/gen-isis-valid.frame-1.hex"
+        "sha256": "77b8a97c9fd29479d6e6db8a2fdab751a013633c5db002409ed1681de2f4fa35"
       },
       "frame_protocols": [
         "eth",
@@ -15621,7 +15621,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/gen-powerlink-valid.frame-1.hex"
+        "sha256": "1b45b676b2c1365d14927f184c83ddbede22bc9daa590cccf2cbe9846a52aaeb"
       },
       "frame_protocols": [
         "eth",
@@ -15650,7 +15650,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 88,
-        "hex_file": "hex/gen-mip-valid.frame-1.hex"
+        "sha256": "5c59233702e20e62efd63c7df6fd6f09a5aa36b02732419ef29782303d0bc36f"
       },
       "frame_protocols": [
         "eth",
@@ -15681,7 +15681,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 70,
-        "hex_file": "hex/gen-mipv6-valid.frame-1.hex"
+        "sha256": "bd58cbbfb80e290be20a92d82ee9b3574dadbdecafe2b481bc6fd41a340c5b22"
       },
       "frame_protocols": [
         "eth",
@@ -15711,7 +15711,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 68,
-        "hex_file": "hex/gen-dccp-valid.frame-1.hex"
+        "sha256": "1431d7fc7a5374ae17fb07bab275d9f82272d8a75efb835c3cb10cd31c67548d"
       },
       "frame_protocols": [
         "eth",
@@ -15742,7 +15742,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/gen-aarp-valid.frame-1.hex"
+        "sha256": "9d77801026c1502af6660d20cefbcae7308240d682bee03753397ee9ed33bd0d"
       },
       "frame_protocols": [
         "eth",
@@ -15771,7 +15771,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/gen-appletalk-valid.frame-1.hex"
+        "sha256": "1ca762723419fb5219ad0214ec6dbf0ddf183560e62e0c1f36b692f7ffcaead2"
       },
       "frame_protocols": [
         "eth",
@@ -15801,7 +15801,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 117,
-        "hex_file": "hex/gen-cfm-valid.frame-1.hex"
+        "sha256": "51aee046b5cc1257d8164e068ddc5b367037a5ce874cd6038f22e8825d5904a7"
       },
       "frame_protocols": [
         "eth",
@@ -15830,7 +15830,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 94,
-        "hex_file": "hex/gen-nhrp-valid.frame-1.hex"
+        "sha256": "3f22443a916691b4715ef9f3b9c7ad236fc253446a89b86a35cd3a97527496b9"
       },
       "frame_protocols": [
         "eth",
@@ -15860,7 +15860,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/gen-trill-valid.frame-1.hex"
+        "sha256": "dca122f7367ac54db888f8960f7ef4b0ead52ccdc24aabd89cfea1bc48f5ad61"
       },
       "frame_protocols": [
         "eth",
@@ -15895,7 +15895,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 88,
-        "hex_file": "hex/gen-igrp-valid.frame-1.hex"
+        "sha256": "5783af00c37da01f678d8b7f4f859ef188a6782767493e92e8627fe335eb3b85"
       },
       "frame_protocols": [
         "eth",
@@ -15925,7 +15925,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/gen-dvmrp-valid.frame-1.hex"
+        "sha256": "978b6be50d3ec52f789e3c168433e83ae635069163ee246a3f61d3ca574437a9"
       },
       "frame_protocols": [
         "eth",
@@ -15956,7 +15956,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 52,
-        "hex_file": "hex/gen-xns-valid.frame-1.hex"
+        "sha256": "b358d0042d8cc6d02c1a4590f25747cfa28821d4bd65e4117c3262783e65251c"
       },
       "frame_protocols": [
         "eth",
@@ -15986,7 +15986,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 25,
-        "hex_file": "hex/gen-decnet-valid.frame-1.hex"
+        "sha256": "5602182b749f43f9eed581f6b0ce6469483c770a900c537651f121ab761fc6b9"
       },
       "frame_protocols": [
         "eth",
@@ -16015,7 +16015,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 43,
-        "hex_file": "hex/gen-tipc-valid.frame-1.hex"
+        "sha256": "9165e6c6a2ffb57b5c49c31ffdd4ca61fa152de4143f862397a470eb8bb940e1"
       },
       "frame_protocols": [
         "eth",
@@ -16045,7 +16045,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 60,
-        "hex_file": "hex/gen-slimp3-valid.frame-1.hex"
+        "sha256": "2ea15e531f35f99f11b223a720d773e9696b28584a8d4b7e2e4b33cde0c25a6b"
       },
       "frame_protocols": [
         "eth",
@@ -16076,7 +16076,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 30,
-        "hex_file": "hex/gen-tdmoe-valid.frame-1.hex"
+        "sha256": "0cb51bd62868fcc340a843cef2bf5b3bffc9c4b2bfed548c6f9095ed2e45fc64"
       },
       "frame_protocols": [
         "eth",
@@ -16106,7 +16106,7 @@
       "representative_frame": {
         "number": 3,
         "length_bytes": 102,
-        "hex_file": "hex/gen-nat-t-valid.frame-3.hex"
+        "sha256": "25c7740c941388164480dfca37ebd2fc94409e9669688c937908b6b1f20e295d"
       },
       "frame_protocols": [
         "eth",
@@ -16138,7 +16138,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 42,
-        "hex_file": "hex/gen-macsec-valid.frame-1.hex"
+        "sha256": "6960f5ae01f5d0ad8a3c9abe189f86c9176d76447378e2c10492f265361fcf73"
       },
       "frame_protocols": [
         "eth",
@@ -16170,7 +16170,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 22,
-        "hex_file": "hex/gen-wsmp-valid.frame-1.hex"
+        "sha256": "8043de1f177c193c36d322eee90413b6a38944081a13c42f10bbadce6fe362bb"
       },
       "frame_protocols": [
         "eth",
@@ -16199,7 +16199,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 67,
-        "hex_file": "hex/gen-alljoyn-valid.frame-1.hex"
+        "sha256": "c9ed3edb3c4b7f7ce2b2c0960f310bf672d85c9a2084f076d6a479f5ce6c30cd"
       },
       "frame_protocols": [
         "eth",
@@ -16230,7 +16230,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 64,
-        "hex_file": "hex/gen-fcoe-valid.frame-1.hex"
+        "sha256": "8ecebda57b3455b408e795ba0879c8ea2e4711f92f6a11349b71319176a8bca8"
       },
       "frame_protocols": [
         "eth",
@@ -16261,7 +16261,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 85,
-        "hex_file": "hex/gen-giop-valid.frame-4.hex"
+        "sha256": "c083eca603311d9b27bb0db27d736e0003225c094c08e3f459280ef1f775bb45"
       },
       "frame_protocols": [
         "eth",
@@ -16292,7 +16292,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 163,
-        "hex_file": "hex/gen-redfish-ssdp-valid.frame-1.hex"
+        "sha256": "cef258ef9f03922f6c9013e304289cd4af36276724d6b00f35ef39896a78cc09"
       },
       "frame_protocols": [
         "eth",
@@ -16323,7 +16323,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 49,
-        "hex_file": "hex/gen-ncp-valid.frame-1.hex"
+        "sha256": "b91db66d691ba75b6543f23897156616997a0e941345a8fb1009c07587f33825"
       },
       "frame_protocols": [
         "eth",
@@ -16354,7 +16354,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 93,
-        "hex_file": "hex/gen-sebek-valid.frame-1.hex"
+        "sha256": "306d55c0019c51f8c03fdddc34c976f496e6480e5de52924d49522762c168951"
       },
       "frame_protocols": [
         "eth",
@@ -16385,7 +16385,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 22,
-        "hex_file": "hex/gen-lat-valid.frame-1.hex"
+        "sha256": "1c0b4b0a7a2125a6e6cc0ac8b5fd83b1b8429d9503e0add285b57bca02a55a42"
       },
       "frame_protocols": [
         "eth",
@@ -16414,7 +16414,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 41,
-        "hex_file": "hex/gen-vines-valid.frame-1.hex"
+        "sha256": "c02849df5522543bd0d774b3671a452fbb43c111ed9e9651b15a3cef2d86a9f7"
       },
       "frame_protocols": [
         "eth",
@@ -16444,7 +16444,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 51,
-        "hex_file": "hex/gen-sigcomp-valid.frame-1.hex"
+        "sha256": "a9cadf15c08eea19026fb8e8e6ad2077bdd4b0566fd1140542b003f4ba9ee75e"
       },
       "frame_protocols": [
         "eth",
@@ -16476,7 +16476,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 185,
-        "hex_file": "hex/gen-megaco-valid.frame-1.hex"
+        "sha256": "c01d10276ee73a5e02bee81153cdbf5f4138c0c6d1d5f7ba6e747b43f84ee574"
       },
       "frame_protocols": [
         "eth",
@@ -16507,7 +16507,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 61,
-        "hex_file": "hex/gen-swipe-valid.frame-1.hex"
+        "sha256": "cdf1880e43e2d2bf86532bd65e6ed3a3496c99012943b0c69c7a1c254ae57be4"
       },
       "frame_protocols": [
         "eth",
@@ -16538,7 +16538,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 33,
-        "hex_file": "hex/gen-sna-valid.frame-1.hex"
+        "sha256": "5f2ad85121d2de2a2419d333a2e60bc48527804214f2e0621e7b5851d8ae9041"
       },
       "frame_protocols": [
         "eth",
@@ -16570,7 +16570,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 62,
-        "hex_file": "hex/gen-h225-valid.frame-1.hex"
+        "sha256": "a71ad2865fa29b829869dc2b7010a4b5caadac567116c23045c80b4085453c03"
       },
       "frame_protocols": [
         "eth",
@@ -16601,7 +16601,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 50,
-        "hex_file": "hex/gen-xyplex-valid.frame-1.hex"
+        "sha256": "a6d7be5242993e4cfc723aae0a8d3dd13b3204505bf1a72e5b1ff620830cd82f"
       },
       "frame_protocols": [
         "eth",
@@ -16632,7 +16632,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 66,
-        "hex_file": "hex/gen-xtp-valid.frame-1.hex"
+        "sha256": "c6115ce682cccf60d5cbf3fa288d0d7a49ead0b8e21a7d35f282a140d47cce05"
       },
       "frame_protocols": [
         "eth",
@@ -16662,7 +16662,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 129,
-        "hex_file": "hex/gen-cifs-valid.frame-4.hex"
+        "sha256": "97111dcf3fe1f60fcf9d4a3928e568623979fe6ce6998b49824456d070f0d273"
       },
       "frame_protocols": [
         "eth",
@@ -16694,7 +16694,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 111,
-        "hex_file": "hex/gen-rmi-valid.frame-4.hex"
+        "sha256": "e5ea307206d180686fcd419e089303563beeecf9d7ffb7a5dada5453c174a3bf"
       },
       "frame_protocols": [
         "eth",
@@ -16725,7 +16725,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 162,
-        "hex_file": "hex/gen-smb3-valid.frame-1.hex"
+        "sha256": "09396fd58ffc088ca81bb677ace2440011041499f5de90ddaca8cf633634aaab"
       },
       "frame_protocols": [
         "eth",
@@ -16757,7 +16757,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 360,
-        "hex_file": "hex/gen-winrm-identify-valid.frame-4.hex"
+        "sha256": "4bda20b2c33ec014718409550f949cffa1e6138816d0a3a585780e4f72d18dac"
       },
       "frame_protocols": [
         "eth",
@@ -16789,7 +16789,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 150,
-        "hex_file": "hex/gen-gssapi-valid.frame-1.hex"
+        "sha256": "731e2fc8f15e2ea20b9bcc3735d1db043a33f4390c109e8873f7320badafc67d"
       },
       "frame_protocols": [
         "eth",
@@ -16822,7 +16822,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 110,
-        "hex_file": "hex/gen-docker-api-valid.frame-1.hex"
+        "sha256": "d966537624f08b14833efb56ed529d1348d08a067f53e35255d3020ef75d3696"
       },
       "frame_protocols": [
         "eth",
@@ -16847,13 +16847,13 @@
       "size_bytes": 516,
       "packet_count": 4,
       "link_type": "Ethernet",
-      "display_filter": "tcp.port == 6443 \u0026\u0026 tcp.len \u003e 0",
+      "display_filter": "tcp.port == 6443 && tcp.len > 0",
       "evidence_kind": "generated-positive",
       "notes": "Independent core/v1 ListNamespace request with limit, timeoutSeconds, allowWatchBookmarks and percent-encoded label/field selectors. Three setup records and one complete request are accounted separately. ListOptions conversion preserves opaque selectors/resourceVersion and original query occurrences; it does not evaluate selectors, server feature gates, authorization, cluster state or a TLS/session exchange.",
       "representative_frame": {
         "number": 4,
         "length_bytes": 266,
-        "hex_file": "hex/gen-k8s-list-options-valid.frame-4.hex"
+        "sha256": "f86b7b96dd0c8f8942372f74d83e23e85ff06c906dc823be4a29e31709a0f893"
       },
       "frame_protocols": [
         "eth",
@@ -16884,7 +16884,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 484,
-        "hex_file": "hex/gen-acme-jws-valid.frame-1.hex"
+        "sha256": "b797d722e6c8c44c7cf962ff9d2d468703e45fc501a50c1d842cec2066ba0edd"
       },
       "frame_protocols": [
         "eth",
@@ -16917,7 +16917,7 @@
       "representative_frame": {
         "number": 4,
         "length_bytes": 130,
-        "hex_file": "hex/gen-etcd-version-valid.frame-4.hex"
+        "sha256": "a5d3e4e39f9d784398a0e00378385f32e7eb701392cb1b56358f6d52953ecfa6"
       },
       "frame_protocols": [
         "eth",
@@ -16948,7 +16948,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 413,
-        "hex_file": "hex/gen-minio-s3-valid.frame-1.hex"
+        "sha256": "0fad0fc61175e27937da31540914b389bc61e0a785016b6d0d58c52fcf9e70d6"
       },
       "frame_protocols": [
         "eth",
@@ -16979,7 +16979,7 @@
       "representative_frame": {
         "number": 1,
         "length_bytes": 118,
-        "hex_file": "hex/gen-redfish-valid.frame-1.hex"
+        "sha256": "f3b95a9f0c55c476607675634c65304f0b63d650aff12f27053f79b13616986a"
       },
       "frame_protocols": [
         "eth",

@@ -122,11 +122,15 @@ func validateProtocolCorpusSourceManifest(source protocolCorpusSourceSpec, manif
 				problems = append(problems, fmt.Sprintf("capture %q field roadmap_name differs: sources=%s manifest=%s", id, formatProtocolCorpusOptionalString(sourceCapture.RoadmapName), formatProtocolCorpusOptionalString(manifestCapture.RoadmapName)))
 			}
 			problems = appendProtocolCorpusStringMismatch(problems, "capture", id, "display_filter", sourceCapture.DisplayFilter, manifestCapture.DisplayFilter)
+			problems = appendProtocolCorpusStringMismatch(problems, "capture", id, "decode_as", strings.Join(sourceCapture.DecodeAs, "\n"), strings.Join(manifestCapture.DecodeAs, "\n"))
 			problems = appendProtocolCorpusStringMismatch(problems, "capture", id, "evidence_kind", sourceCapture.EvidenceKind, manifestCapture.EvidenceKind)
 			problems = appendProtocolCorpusStringMismatch(problems, "capture", id, "notes", sourceCapture.Notes, manifestCapture.Notes)
 			problems = appendProtocolCorpusStringMismatch(problems, "capture", id, "source_sha256", sourceCapture.SourceSHA256, manifestCapture.SHA256)
 			if repository, exists := sourceRepositories[sourceCapture.RepositoryID]; exists {
 				wantSourceURL := "https://raw.githubusercontent.com/" + repository.Repository + "/" + repository.Commit + "/" + sourceCapture.UpstreamPath
+				if repository.Origin == "generated" {
+					wantSourceURL = "generated://scapy/" + repository.Commit + "/" + sourceCapture.ID
+				}
 				if manifestCapture.SourceURL != wantSourceURL {
 					problems = append(problems, fmt.Sprintf("capture %q field source_url is not derived exactly from its source repository: got=%q want=%q", id, manifestCapture.SourceURL, wantSourceURL))
 				}
@@ -176,7 +180,6 @@ func sortedProtocolCorpusKeys[A, B any](left map[string]A, right map[string]B) [
 
 func validateProtocolCorpusArtifactInventory(corpusDir string, manifest protocolCorpusManifest) error {
 	captureFiles, captureErr := collectProtocolCorpusArtifacts(corpusDir, "captures")
-	hexFiles, hexErr := collectProtocolCorpusArtifacts(corpusDir, "hex")
 	licenseFiles, licenseErr := collectProtocolCorpusArtifacts(corpusDir, "licenses")
 
 	var problems []string
@@ -185,7 +188,6 @@ func validateProtocolCorpusArtifactInventory(corpusDir string, manifest protocol
 		err  error
 	}{
 		{name: "capture", err: captureErr},
-		{name: "hex", err: hexErr},
 		{name: "license", err: licenseErr},
 	} {
 		if item.err != nil {
@@ -194,12 +196,8 @@ func validateProtocolCorpusArtifactInventory(corpusDir string, manifest protocol
 	}
 
 	captureReferences := make([]string, 0, len(manifest.Captures))
-	hexReferences := make([]string, 0, len(manifest.Captures))
 	for _, capture := range manifest.Captures {
 		captureReferences = append(captureReferences, capture.CaptureFile)
-		if capture.RepresentativeFrame != nil {
-			hexReferences = append(hexReferences, capture.RepresentativeFrame.HexFile)
-		}
 	}
 	licenseReferences := make([]string, 0, len(manifest.Repositories))
 	for _, repository := range manifest.Repositories {
@@ -207,7 +205,6 @@ func validateProtocolCorpusArtifactInventory(corpusDir string, manifest protocol
 	}
 
 	problems = append(problems, validateProtocolCorpusArtifactSet("capture", "captures", captureFiles, captureReferences, ".pcap", ".pcapng", ".cap")...)
-	problems = append(problems, validateProtocolCorpusArtifactSet("representative hex", "hex", hexFiles, hexReferences, ".hex")...)
 	problems = append(problems, validateProtocolCorpusArtifactSet("license", "licenses", licenseFiles, licenseReferences)...)
 	return protocolCorpusProblems(problems)
 }
@@ -340,20 +337,6 @@ func TestProtocolCorpusArtifactInventoryFailsClosed(t *testing.T) {
 			},
 		},
 		{
-			name: "orphan hex",
-			want: "orphan representative hex artifact",
-			mutation: func(t *testing.T, corpusDir string, _ *protocolCorpusManifest) {
-				writeProtocolCorpusTestArtifact(t, corpusDir, "hex/orphan.hex")
-			},
-		},
-		{
-			name: "stray hex extension",
-			want: "orphan representative hex artifact",
-			mutation: func(t *testing.T, corpusDir string, _ *protocolCorpusManifest) {
-				writeProtocolCorpusTestArtifact(t, corpusDir, "hex/stray.txt")
-			},
-		},
-		{
 			name: "orphan license",
 			want: "orphan license artifact",
 			mutation: func(t *testing.T, corpusDir string, _ *protocolCorpusManifest) {
@@ -365,20 +348,6 @@ func TestProtocolCorpusArtifactInventoryFailsClosed(t *testing.T) {
 			want: "capture artifact \"captures/repo/sample.pcap\" is referenced 2 times",
 			mutation: func(_ *testing.T, _ string, manifest *protocolCorpusManifest) {
 				manifest.Captures = append(manifest.Captures, protocolCorpusCapture{ID: "duplicate", CaptureFile: "captures/repo/sample.pcap"})
-			},
-		},
-		{
-			name: "duplicate hex reference",
-			want: "representative hex artifact \"hex/sample.hex\" is referenced 2 times",
-			mutation: func(t *testing.T, corpusDir string, manifest *protocolCorpusManifest) {
-				writeProtocolCorpusTestArtifact(t, corpusDir, "captures/repo/second.pcapng")
-				manifest.Captures = append(manifest.Captures, protocolCorpusCapture{
-					ID:          "duplicate-hex",
-					CaptureFile: "captures/repo/second.pcapng",
-					RepresentativeFrame: &protocolCorpusFrame{
-						HexFile: "hex/sample.hex",
-					},
-				})
 			},
 		},
 		{
@@ -409,16 +378,12 @@ func newProtocolCorpusInventoryFixture(t *testing.T) (string, protocolCorpusMani
 	t.Helper()
 	corpusDir := t.TempDir()
 	writeProtocolCorpusTestArtifact(t, corpusDir, "captures/repo/sample.pcap")
-	writeProtocolCorpusTestArtifact(t, corpusDir, "hex/sample.hex")
 	writeProtocolCorpusTestArtifact(t, corpusDir, "licenses/repo.txt")
 	return corpusDir, protocolCorpusManifest{
 		Repositories: []protocolCorpusRepository{{ID: "repo", LicenseFile: "licenses/repo.txt"}},
 		Captures: []protocolCorpusCapture{{
 			ID:          "sample",
 			CaptureFile: "captures/repo/sample.pcap",
-			RepresentativeFrame: &protocolCorpusFrame{
-				HexFile: "hex/sample.hex",
-			},
 		}},
 	}
 }

@@ -1,5 +1,0 @@
-goos: darwin
-goarch: arm64
-pkg: github.com/yaklang/yaklang/common/bin-parser
-BenchmarkCurrentCorpusEnvelopes-10    	       2	1934506938 ns/op	   4.65 MB/s	   8993088 input-B/op	     58533 messages/op	     30257 messages/s	        10.00 workers	8766832192 B/op	54458758 allocs/op
-PASS

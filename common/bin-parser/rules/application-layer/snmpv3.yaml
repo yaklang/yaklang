@@ -1,0 +1,222 @@
+endian: big
+Package:
+  SNMPv3:
+    operator: |
+      this.ProcessSubNode("Tag")
+      this.ProcessSubNode("Length")
+      if getNodeResult("Tag").Value != 0x30 { panic("snmpv3: expected message SEQUENCE") }
+      length = getNodeResult("Length").Value
+      if length != this.GetMaxLength() - this.Length() { panic("snmpv3: message length mismatch") }
+      this.GetSubNode("Message").SetMaxLength(length)
+      this.ProcessSubNode("Message")
+    Tag: uint8
+    Length: BERLength
+    Message:
+      operator: |
+        this.ProcessSubNode("Version")
+        if getNodeResult("Version/Value").Value != 3 { panic("snmpv3: version must be 3") }
+        this.ProcessSubNode("Header Data")
+        this.ProcessSubNode("Parameters")
+        this.ProcessSubNode("Scoped PDU")
+        if this.Length() != this.GetMaxLength() { panic("snmpv3: trailing message data") }
+      Version: BERUnsigned
+      Header Data:
+        operator: |
+          this.ProcessSubNode("Tag")
+          this.ProcessSubNode("Length")
+          if getNodeResult("Tag").Value != 0x30 { panic("snmpv3: expected header SEQUENCE") }
+          this.GetSubNode("Fields").SetMaxLength(getNodeResult("Length").Value)
+          this.ProcessSubNode("Fields")
+        Tag: uint8
+        Length: BERLength
+        Fields:
+          operator: |
+            this.ProcessSubNode("Message ID")
+            this.ProcessSubNode("Maximum Size")
+            this.ProcessSubNode("Message Flags")
+            this.ProcessSubNode("Message Model")
+            if getNodeResult("Message Model/Value").Value != 3 { panic("snmpv3: unsupported message model") }
+            if this.Length() != this.GetMaxLength() { panic("snmpv3: header length mismatch") }
+          Message ID: BERUnsigned
+          Maximum Size: BERUnsigned
+          Message Flags: BEROctets
+          Message Model: BERUnsigned
+      Parameters:
+        operator: |
+          this.ProcessSubNode("Tag")
+          this.ProcessSubNode("Length")
+          if getNodeResult("Tag").Value != 4 { panic("snmpv3: expected parameter OCTET STRING") }
+          this.GetSubNode("USM").SetMaxLength(getNodeResult("Length").Value)
+          this.ProcessSubNode("USM")
+        Tag: uint8
+        Length: BERLength
+        USM:
+          operator: |
+            this.ProcessSubNode("Tag")
+            this.ProcessSubNode("Length")
+            if getNodeResult("Tag").Value != 0x30 { panic("snmpv3: expected USM SEQUENCE") }
+            if getNodeResult("Length").Value != this.GetMaxLength() - this.Length() { panic("snmpv3: USM length mismatch") }
+            this.ProcessSubNode("Engine ID")
+            this.ProcessSubNode("Engine Boots")
+            this.ProcessSubNode("Engine Time")
+            this.ProcessSubNode("User Name")
+            this.ProcessSubNode("Authentication Parameters")
+            this.ProcessSubNode("Privacy Parameters")
+            if this.Length() != this.GetMaxLength() { panic("snmpv3: trailing USM data") }
+          Tag: uint8
+          Length: BERLength
+          Engine ID: BEROctets
+          Engine Boots: BERUnsigned
+          Engine Time: BERUnsigned
+          User Name: BEROctets
+          Authentication Parameters: BEROctets
+          Privacy Parameters: BEROctets
+      Scoped PDU:
+        operator: |
+          this.ProcessSubNode("Tag")
+          this.ProcessSubNode("Length")
+          tag = getNodeResult("Tag").Value
+          length = getNodeResult("Length").Value
+          if length != this.GetMaxLength() - this.Length() { panic("snmpv3: scoped PDU length mismatch") }
+          if tag == 4 {
+            if length > 0 {
+              this.GetSubNode("Encrypted PDU").SetMaxLength(length)
+              this.ProcessSubNode("Encrypted PDU")
+            }
+            return
+          }
+          if tag != 0x30 { panic("snmpv3: invalid scoped PDU tag") }
+          this.ProcessSubNode("Context Engine ID")
+          this.ProcessSubNode("Context Name")
+          this.ProcessSubNode("PDU")
+        Tag: uint8
+        Length: BERLength
+        Encrypted PDU: raw
+        Context Engine ID: BEROctets
+        Context Name: BEROctets
+        PDU:
+          operator: |
+            this.ProcessSubNode("PDU Type")
+            this.ProcessSubNode("Length")
+            kind = getNodeResult("PDU Type").Value
+            if kind < 0xa0 || kind > 0xa8 || kind == 0xa4 { panic("snmpv3: unsupported PDU type") }
+            if getNodeResult("Length").Value != this.GetMaxLength() - this.Length() { panic("snmpv3: PDU length mismatch") }
+            this.ProcessSubNode("Request ID")
+            this.ProcessSubNode("Error Status")
+            this.ProcessSubNode("Error Index")
+            this.ProcessSubNode("Variable Bindings")
+          PDU Type: uint8
+          Length: BERLength
+          Request ID: BERUnsigned
+          Error Status: BERUnsigned
+          Error Index: BERUnsigned
+          Variable Bindings:
+            operator: |
+              this.ProcessSubNode("Tag")
+              this.ProcessSubNode("Length")
+              if getNodeResult("Tag").Value != 0x30 { panic("snmpv3: expected varbind SEQUENCE") }
+              length = getNodeResult("Length").Value
+              if length != this.GetMaxLength() - this.Length() { panic("snmpv3: varbind length mismatch") }
+              if length > 0 {
+                this.GetSubNode("Bindings").SetMaxLength(length)
+                this.ProcessSubNode("Bindings")
+              }
+            Tag: uint8
+            Length: BERLength
+            Bindings:
+              list: true
+              Binding: VarBinding
+              operator: |
+                for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+BERLength:
+  list: true
+  Octet: uint8
+  operator: |
+    first = this.NewElement().Process().Value
+    if first < 128 { return }
+    count = first & 127
+    if count == 0 || count > 4 { panic("snmpv3: unsupported BER length width") }
+    for i = range count { this.NewElement().Process() }
+  out: |
+    result = 0
+    for index, octet = range data.Value {
+      if index == 0 {
+        if octet.Value < 128 { return octet.Value }
+      } else { result = (result << 8) + octet.Value }
+    }
+    return result
+
+BERUnsigned:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Tag").Value != 2 { panic("snmpv3: expected INTEGER") }
+    length = getNodeResult("Length").Value
+    if length < 1 || length > 5 { panic("snmpv3: invalid INTEGER length") }
+    this.ProcessSubNode("Value")
+  Tag: uint8
+  Length: BERLength
+  Value:
+    list: true
+    Octet: uint8
+    operator: |
+      count = getNodeResult("../Length").Value
+      for i = range count { this.NewElement().Process() }
+    out: |
+      result = 0
+      for _, octet = range data.Value { result = (result << 8) + octet.Value }
+      return result
+
+BEROctets:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Tag").Value != 4 { panic("snmpv3: expected OCTET STRING") }
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength() - this.Length() { panic("snmpv3: octet string length exceeds input") }
+    if length > 0 {
+      this.GetSubNode("Octets").SetMaxLength(length)
+      this.ProcessSubNode("Octets")
+    }
+  Tag: uint8
+  Length: BERLength
+  Octets: raw
+
+VarBinding:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Tag").Value != 0x30 { panic("snmpv3: expected binding SEQUENCE") }
+    this.GetSubNode("Fields").SetMaxLength(getNodeResult("Length").Value)
+    this.ProcessSubNode("Fields")
+  Tag: uint8
+  Length: BERLength
+  Fields:
+    operator: |
+      this.ProcessSubNode("OID")
+      this.ProcessSubNode("Value")
+      if this.Length() != this.GetMaxLength() { panic("snmpv3: binding length mismatch") }
+    OID:
+      operator: |
+        this.ProcessSubNode("Tag")
+        this.ProcessSubNode("Length")
+        if getNodeResult("Tag").Value != 6 { panic("snmpv3: expected OBJECT IDENTIFIER") }
+        this.GetSubNode("Encoded OID").SetMaxLength(getNodeResult("Length").Value)
+        this.ProcessSubNode("Encoded OID")
+      Tag: uint8
+      Length: BERLength
+      Encoded OID: raw
+    Value:
+      operator: |
+        this.ProcessSubNode("Type")
+        this.ProcessSubNode("Length")
+        length = getNodeResult("Length").Value
+        if length > this.GetMaxLength() - this.Length() { panic("snmpv3: value length exceeds input") }
+        if length > 0 {
+          this.GetSubNode("Encoded Value").SetMaxLength(length)
+          this.ProcessSubNode("Encoded Value")
+        }
+      Type: uint8
+      Length: BERLength
+      Encoded Value: raw

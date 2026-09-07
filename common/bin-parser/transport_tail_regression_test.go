@@ -126,3 +126,25 @@ func TestTransportBoundedRecognizedPayloadTailIsPreserved(t *testing.T) {
 		})
 	}
 }
+
+func TestEthernetFrameTrailerRequiresExplicitCaptureBoundary(t *testing.T) {
+	// A short IPv4/TCP packet can carry padding or a capture-retained FCS.
+	// Neither is part of the TCP payload, and opaque nonzero bytes must survive.
+	header := make([]byte, 34)
+	binary.BigEndian.PutUint16(header[12:], 0x0800)
+	header[14] = 0x45
+	header[23] = 6
+	binary.BigEndian.PutUint16(header[16:], 40)
+	frame := append(header, tcpSegment(nil)...)
+	trailer := []byte{0, 0, 0xde, 0xad, 0xbe, 0xef}
+	withTrailer := append(bytes.Clone(frame), trailer...)
+	node := protocolCorpusRequireBoundedRuleParse(t, withTrailer, "ethernet", "Ethernet")
+	protocolCorpusRequireValue(t, node, "Frame Trailer", trailer)
+	require.Nil(t, protocolCorpusFindNode(node, "Remaining Payload"))
+
+	stream := bytes.NewReader(append(bytes.Clone(frame), []byte("next frame")...))
+	parsed, err := parser.ParseBinary(stream, "ethernet", "Ethernet")
+	require.NoError(t, err)
+	require.Equal(t, len("next frame"), stream.Len())
+	require.Nil(t, protocolCorpusFindNode(parsed, "Frame Trailer"))
+}

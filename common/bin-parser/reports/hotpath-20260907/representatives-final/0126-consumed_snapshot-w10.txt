@@ -1,8 +1,0 @@
-goos: darwin
-goarch: arm64
-pkg: github.com/yaklang/yaklang/common/bin-parser
-BenchmarkProtocolCorpusSVExecOut/parse-only-10         	    1038	   3420591 ns/op	   0.03 MB/s	 1147417 B/op	   20487 allocs/op
-BenchmarkProtocolCorpusSVExecOut/parse-and-root-result-10         	    1033	   3445243 ns/op	   0.03 MB/s	 1155687 B/op	   20757 allocs/op
-BenchmarkProtocolCorpusSVExecOut/parse-root-and-repeated-field-results-10         	    1035	   3463708 ns/op	   0.03 MB/s	 1160479 B/op	   20910 allocs/op
-BenchmarkProtocolCorpusSVExecOut/parse-and-single-root-result-traversal-10        	    1035	   3563416 ns/op	   0.03 MB/s	 1155732 B/op	   20757 allocs/op
-PASS

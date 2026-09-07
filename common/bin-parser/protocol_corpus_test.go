@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/csv"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,7 +61,7 @@ type protocolCorpusCapture struct {
 type protocolCorpusFrame struct {
 	Number      int    `json:"number"`
 	LengthBytes int    `json:"length_bytes"`
-	HexFile     string `json:"hex_file"`
+	SHA256      string `json:"sha256"`
 }
 
 type protocolCorpusSourceSpec struct {
@@ -247,14 +246,10 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 			if len(capture.FrameProtocols) == 0 {
 				t.Fatalf("representative frame has no recorded protocol hierarchy")
 			}
-			hexText := strings.TrimSpace(string(readProtocolCorpusFile(t, corpusDir, capture.RepresentativeFrame.HexFile)))
-			hexFrame, err := hex.DecodeString(hexText)
-			if err != nil {
-				t.Fatalf("decode representative hex: %v", err)
+			if len(frame) != capture.RepresentativeFrame.LengthBytes {
+				t.Fatalf("representative frame length does not match packet %d", capture.RepresentativeFrame.Number)
 			}
-			if len(hexFrame) != capture.RepresentativeFrame.LengthBytes || !bytes.Equal(hexFrame, frame) {
-				t.Fatalf("representative frame bytes do not match packet %d", capture.RepresentativeFrame.Number)
-			}
+			assertProtocolCorpusHash(t, fmt.Sprintf("%s frame %d", capture.ID, capture.RepresentativeFrame.Number), frame, capture.RepresentativeFrame.SHA256)
 		})
 		evidenceCounts[capture.EvidenceKind]++
 		totalPackets += capture.PacketCount

@@ -1,0 +1,155 @@
+# RFC 1798 search requests, including the request user field. The commonly
+# observed LDAP-style envelope without that field is accepted as well.
+endian: big
+Package:
+  CLDAP:
+    operator: |
+      this.ProcessSubNode("Sequence Tag")
+      if getNodeResult("Sequence Tag").Value != 0x30 { panic("cldap: expected message SEQUENCE") }
+      this.ProcessSubNode("Message Length")
+      length = getNodeResult("Message Length").Value
+      if length != this.GetMaxLength() - this.Length() { panic("cldap: message length mismatch") }
+      this.GetSubNode("Message").SetMaxLength(length)
+      this.ProcessSubNode("Message")
+    Sequence Tag: uint8
+    Message Length: CLDAPLength
+    Message:
+      operator: |
+        value = this.ProcessSubNode("Message ID")
+        if value.Child("Tag").Value != 2 { panic("cldap: expected integer message ID") }
+        this.ProcessSubNode("First Tag")
+        tag = getNodeResult("First Tag").Value
+        if tag == 4 {
+          this.ProcessSubNode("User Length")
+          length = getNodeResult("User Length").Value
+          if length > this.GetMaxLength()-this.Length() { panic("cldap: user length exceeds message") }
+          if length > 0 { this.GetSubNode("User").SetMaxLength(length); this.ProcessSubNode("User") }
+          this.ProcessSubNode("Operation Tag")
+          tag = getNodeResult("Operation Tag").Value
+        }
+        if tag != 0x63 { panic("cldap: operation is not a search request") }
+        this.ProcessSubNode("Search Length")
+        length = getNodeResult("Search Length").Value
+        if length != this.GetMaxLength()-this.Length() { panic("cldap: search length mismatch") }
+        this.GetSubNode("Search").SetMaxLength(length)
+        this.ProcessSubNode("Search")
+      Message ID: CLDAPNumber
+      First Tag: uint8
+      User Length: CLDAPLength
+      User: string
+      Operation Tag: uint8
+      Search Length: CLDAPLength
+      Search:
+        operator: |
+          this.ProcessSubNode("Base Object")
+          scope = this.ProcessSubNode("Scope")
+          aliases = this.ProcessSubNode("Alias Mode")
+          size = this.ProcessSubNode("Size Limit")
+          time = this.ProcessSubNode("Time Limit")
+          types = this.ProcessSubNode("Types Only")
+          if scope.Child("Tag").Value != 10 || scope.Child("Value").Value > 2 { panic("cldap: invalid search scope") }
+          if aliases.Child("Tag").Value != 10 || aliases.Child("Value").Value > 3 { panic("cldap: invalid alias mode") }
+          if size.Child("Tag").Value != 2 || time.Child("Tag").Value != 2 { panic("cldap: expected integer limits") }
+          if types.Child("Tag").Value != 1 || types.Child("Length").Value != 1 { panic("cldap: expected boolean types-only") }
+          this.ProcessSubNode("Filter")
+          this.ProcessSubNode("Attributes Tag")
+          if getNodeResult("Attributes Tag").Value != 0x30 { panic("cldap: expected attribute SEQUENCE") }
+          this.ProcessSubNode("Attributes Length")
+          length = getNodeResult("Attributes Length").Value
+          if length != this.GetMaxLength()-this.Length() { panic("cldap: attribute length mismatch") }
+          if length > 0 {
+            this.GetSubNode("Attributes").SetMaxLength(length)
+            this.ProcessSubNode("Attributes")
+          }
+        Base Object: CLDAPString
+        Scope: CLDAPNumber
+        Alias Mode: CLDAPNumber
+        Size Limit: CLDAPNumber
+        Time Limit: CLDAPNumber
+        Types Only: CLDAPNumber
+        Filter: CLDAPFilter
+        Attributes Tag: uint8
+        Attributes Length: CLDAPLength
+        Attributes:
+          list: true
+          Attribute: CLDAPString
+          operator: |
+            for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+CLDAPLength:
+  list: true
+  Octet: uint8
+  operator: |
+    first = this.NewElement().Process().Value
+    if first < 128 { return }
+    count = first & 127
+    if count == 0 || count > 4 { panic("cldap: invalid BER length width") }
+    for i = range count { this.NewElement().Process() }
+  out: |
+    result = 0
+    for index, octet = range data.Value {
+      if index == 0 {
+        if octet.Value < 128 { return octet.Value }
+      } else { result = (result << 8) + octet.Value }
+    }
+    return result
+CLDAPNumber:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length < 1 || length > 4 { panic("cldap: invalid scalar width") }
+    this.GetSubNode("Value").SetMaxLength(length)
+    this.ProcessSubNode("Value")
+  Tag: uint8
+  Length: CLDAPLength
+  Value:
+    type: raw
+    out: |
+      result = 0
+      for _, octet = range data.Value { result = (result << 8) + octet }
+      return result
+CLDAPString:
+  operator: |
+    this.ProcessSubNode("Tag")
+    if getNodeResult("Tag").Value != 4 { panic("cldap: expected OCTET STRING") }
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength()-this.Length() { panic("cldap: string length exceeds input") }
+    if length > 0 { this.GetSubNode("Value").SetMaxLength(length); this.ProcessSubNode("Value") }
+  Tag: uint8
+  Length: CLDAPLength
+  Value: string
+CLDAPFilter:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length == 0 || length > this.GetMaxLength()-this.Length() { panic("cldap: invalid filter length") }
+    kind = getNodeResult("Type").Value
+    if kind == 0x87 {
+      this.GetSubNode("Present Attribute").SetMaxLength(length)
+      this.ProcessSubNode("Present Attribute")
+    } elif kind == 0xa3 || kind == 0xa5 || kind == 0xa6 || kind == 0xa8 {
+      this.GetSubNode("Assertion").SetMaxLength(length)
+      this.ProcessSubNode("Assertion")
+    } elif kind == 0xa0 || kind == 0xa1 || kind == 0xa2 {
+      this.GetSubNode("Children").SetMaxLength(length)
+      this.ProcessSubNode("Children")
+      if kind == 0xa2 && len(this.GetSubNode("Children").GetChildren()) != 1 { panic("cldap: NOT requires one filter") }
+    } else { panic("cldap: unsupported filter type") }
+  Type: uint8
+  Length: CLDAPLength
+  Present Attribute: string
+  Assertion:
+    operator: |
+      this.ProcessSubNode("Attribute Description")
+      this.ProcessSubNode("Assertion Value")
+      if this.Length() != this.GetMaxLength() { panic("cldap: assertion length mismatch") }
+    Attribute Description: CLDAPString
+    Assertion Value: CLDAPString
+  Children:
+    list: true
+    Filter: CLDAPFilter
+    operator: |
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }

@@ -1,0 +1,123 @@
+# PROFINET DCP Identify and Set messages, including the RT frame identifier.
+# Unknown blocks retain their declared bytes; they are not interpreted as
+# known device properties. Field layout: Wireshark 4.4.8 packet-pn-dcp.c.
+endian: big
+Package:
+  ProfinetDCP:
+    operator: |
+      this.ProcessSubNode("Frame ID")
+      frame = getNodeResult("Frame ID").Value
+      if frame < 0xfefd || frame > 0xfeff { panic("dcp: unexpected frame identifier") }
+      this.ProcessSubNode("Service ID")
+      this.ProcessSubNode("Service Type")
+      service = getNodeResult("Service ID").Value
+      kind = getNodeResult("Service Type").Value
+      if service != 4 && service != 5 { panic("dcp: unsupported service") }
+      if kind != 0 && kind != 1 { panic("dcp: unsupported service type") }
+      if service == 4 && frame != 0xfefd { panic("dcp: Set frame identifier mismatch") }
+      if service == 5 && ((kind == 0 && frame != 0xfefe) || (kind == 1 && frame != 0xfeff)) { panic("dcp: Identify frame identifier mismatch") }
+      this.ProcessSubNode("Transaction ID")
+      if service == 5 && kind == 0 { this.ProcessSubNode("Response Delay") } else { this.ProcessSubNode("Reserved") }
+      this.ProcessSubNode("Data Length")
+      length = getNodeResult("Data Length").Value
+      if length > this.GetMaxLength() - this.Length() { panic("dcp: data length exceeds input") }
+      if length > 0 { this.GetSubNode("Blocks").SetMaxLength(length); this.ProcessSubNode("Blocks") }
+      remaining = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && remaining > 0 { this.GetSubNode("Link Padding").SetMaxLength(remaining); this.ProcessSubNode("Link Padding") }
+    Frame ID: uint16
+    Service ID: uint8
+    Service Type: uint8
+    Transaction ID: uint32
+    Response Delay: uint16
+    Reserved: uint16
+    Data Length: uint16
+    Blocks:
+      list: true
+      Block: DCPBlock
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+    Link Padding: raw
+
+DCPBlock:
+  operator: |
+    this.ProcessSubNode("Option")
+    this.ProcessSubNode("Suboption")
+    this.ProcessSubNode("Block Length")
+    length = getNodeResult("Block Length").Value
+    if length + (length & 1) > this.GetMaxLength() - this.Length() { panic("dcp: block length exceeds data") }
+    if length > 0 { this.GetSubNode("Body").SetMaxLength(length); this.ProcessSubNode("Body") }
+    if (length & 1) != 0 { this.ProcessSubNode("Block Padding") }
+  Option: uint8
+  Suboption: uint8
+  Block Length: uint16
+  Body:
+    operator: |
+      option = getNodeResult("../Option").Value
+      suboption = getNodeResult("../Suboption").Value
+      length = this.GetMaxLength()
+      if option == 5 && suboption == 4 {
+        if length != 3 { panic("dcp: invalid response block length") }
+        this.ProcessSubNode("Response Option")
+        this.ProcessSubNode("Response Suboption")
+        this.ProcessSubNode("Block Error")
+        return
+      }
+      if (option == 1 && (suboption == 1 || suboption == 2)) || (option == 2 && suboption >= 1 && suboption <= 5) {
+        if length < 2 { panic("dcp: missing block info or qualifier") }
+        if getNodeResult("../../../Service ID").Value == 4 && getNodeResult("../../../Service Type").Value == 0 {
+          this.ProcessSubNode("Block Qualifier")
+        } else { this.ProcessSubNode("Block Info") }
+        if option == 1 && suboption == 1 {
+          if length != 8 { panic("dcp: invalid MAC block length") }
+          this.ProcessSubNode("MAC Address")
+        }
+        if option == 1 && suboption == 2 {
+          if length != 14 { panic("dcp: invalid IP block length") }
+          this.ProcessSubNode("IP Address")
+          this.ProcessSubNode("Subnet Mask")
+          this.ProcessSubNode("Gateway")
+        }
+        if option == 2 && suboption == 1 && length > 2 { this.GetSubNode("Device Vendor").SetMaxLength(length-2); this.ProcessSubNode("Device Vendor") }
+        if option == 2 && suboption == 2 && length > 2 { this.GetSubNode("Station Name").SetMaxLength(length-2); this.ProcessSubNode("Station Name") }
+        if option == 2 && suboption == 3 {
+          if length != 6 { panic("dcp: invalid device ID block length") }
+          this.ProcessSubNode("Vendor ID")
+          this.ProcessSubNode("Device ID")
+        }
+        if option == 2 && suboption == 4 {
+          if length != 4 { panic("dcp: invalid device role block length") }
+          this.ProcessSubNode("Device Role")
+          this.ProcessSubNode("Role Reserved")
+        }
+        if option == 2 && suboption == 5 {
+          if (length & 1) != 0 { panic("dcp: invalid device option list length") }
+          if length > 2 { this.GetSubNode("Device Options").SetMaxLength(length-2); this.ProcessSubNode("Device Options") }
+        }
+        return
+      }
+      this.GetSubNode("Uninterpreted Block").SetMaxLength(length)
+      this.ProcessSubNode("Uninterpreted Block")
+    Block Info: uint16
+    Block Qualifier: uint16
+    MAC Address: raw,6
+    IP Address: raw,4
+    Subnet Mask: raw,4
+    Gateway: raw,4
+    Device Vendor: raw
+    Station Name: raw
+    Vendor ID: uint16
+    Device ID: uint16
+    Device Role: uint8
+    Role Reserved: uint8
+    Device Options:
+      list: true
+      Device Option:
+        Option: uint8
+        Suboption: uint8
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+    Response Option: uint8
+    Response Suboption: uint8
+    Block Error: uint8
+    Uninterpreted Block: raw
+  Block Padding: uint8

@@ -1,3 +1,0 @@
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	1.101s
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	5.347s
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser	1.541s

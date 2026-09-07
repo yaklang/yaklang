@@ -1,0 +1,84 @@
+# TRDP 1.x MD request/reply and PD data, header CRC and four-byte alignment.
+# Dataset semantics depend on a separate communication-ID dictionary.
+endian: big
+Package:
+  TRDPMessage: TRDPMessage
+  TRDPMessages:
+    list: true
+    Message: TRDPMessage
+    operator: |
+      if !this.HasMaxLength() { panic("trdp: message sequence requires a boundary") }
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+TRDPMessage:
+  operator: |
+    start = getCurrentPosition()
+    for name in ["Sequence Counter", "Version Major", "Version Minor", "Message Type", "Communication ID", "ETB Topology Counter", "Operational Topology Counter", "Dataset Length"] {
+      this.ProcessSubNode(name)
+    }
+    if getNodeResult("Version Major").Value != 1 { panic("trdp: unsupported protocol version") }
+    kind = getNodeResult("Message Type").Value
+    if kind not in ["Mr", "Mp", "Pd"] { panic("trdp: unsupported message type") }
+    headerLength = 116
+    if kind == "Pd" { headerLength = 40 }
+    length = getNodeResult("Dataset Length").Value
+    limit = getCtx("trdpDatasetLimit")
+    if !hasCtx("trdpDatasetLimit") { limit = 16777216 }
+    if limit <= 0 || length > limit { panic("trdp: dataset exceeds configured limit") }
+    padding = (4-(length%4))%4
+    size = headerLength+length+padding
+    if this.HasMaxLength() && size > this.GetMaxLength() { panic("trdp: truncated message") }
+    this.SetMaxLength(size)
+    if kind == "Pd" {
+      for name in ["Reserved", "Reply Communication ID", "Reply IP Address"] { this.ProcessSubNode(name) }
+      if getNodeResult("Reserved").Value != 0 { panic("trdp: nonzero reserved PD field") }
+      if getNodeResult("Communication ID").Value == 0 {
+        if getCtx("trdpAllowZeroCommunicationID") != true { panic("trdp: zero PD communication ID") }
+        this.AddInfo("Noncanonical Zero Communication ID", true)
+      }
+    } else {
+      for name in ["Reply Status", "Session ID", "Reply Timeout", "Source URI", "Destination URI"] { this.ProcessSubNode(name) }
+    }
+    # Only the already-parsed, byte-aligned header participates in the CRC.
+    # start is absolute, so the same calculation works inside a TCP packet.
+    header = getCtx("buffer").Bytes()[start:start+headerLength-4]
+    crc = 0xffffffff
+    for octet in header {
+      crc = crc ^ int(octet)
+      for bit = 0; bit < 8; bit++ {
+        if crc & 1 != 0 { crc = (crc >> 1) ^ 0xedb88320 } else { crc = crc >> 1 }
+      }
+    }
+    crc = crc ^ 0xffffffff
+    this.ProcessSubNode("Header CRC")
+    if getNodeResult("Header CRC").Value != crc { panic("trdp: header CRC mismatch") }
+    this.AddInfo("Header CRC Valid", true)
+    if length > 0 {
+      this.GetSubNode("Dataset").SetMaxLength(length)
+      this.ProcessSubNode("Dataset")
+    }
+    if padding > 0 {
+      this.GetSubNode("Padding").SetMaxLength(padding)
+      this.ProcessSubNode("Padding")
+      for octet in getNodeResult("Padding").Value { if octet != 0 { panic("trdp: nonzero message padding") } }
+    }
+  Sequence Counter: uint32
+  Version Major: uint8
+  Version Minor: uint8
+  Message Type: string,2
+  Communication ID: uint32
+  ETB Topology Counter: uint32
+  Operational Topology Counter: uint32
+  Dataset Length: uint32
+  Reply Status: int32
+  Session ID: raw,16
+  Reply Timeout: uint32
+  Source URI: string,32
+  Destination URI: string,32
+  Reserved: uint32
+  Reply Communication ID: uint32
+  Reply IP Address: raw,4
+  Header CRC:
+    type: uint32
+    endian: little
+  Dataset: raw
+  Padding: raw

@@ -1,5 +1,5 @@
 // Command generate downloads pinned upstream captures and builds the protocol
-// corpus manifest, representative frame hex and coverage reports.
+// corpus manifest, representative frame digests and coverage reports.
 package main
 
 import (
@@ -13,14 +13,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"html"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -107,7 +105,7 @@ type manifestCapture struct {
 type representativeFrame struct {
 	Number      int    `json:"number"`
 	LengthBytes int    `json:"length_bytes"`
-	HexFile     string `json:"hex_file"`
+	SHA256      string `json:"sha256"`
 }
 
 type roadmapItem struct {
@@ -115,13 +113,6 @@ type roadmapItem struct {
 	Family   string
 	Status   string
 	Priority string
-}
-
-type familyStat struct {
-	Family        string
-	RoadmapTotal  int
-	CoveredUnique int
-	CaptureCount  int
 }
 
 type packetDataReader interface {
@@ -378,14 +369,9 @@ func prepareRepositories(corpusDir string, specs []repositorySpec, fetch bool) (
 
 func prepareCaptures(corpusDir string, specs []captureSpec, repoByID map[string]repositorySpec, roadmap map[string]roadmapItem, fetch bool) ([]manifestCapture, error) {
 	captureRoot := filepath.Join(corpusDir, "captures")
-	hexDir := filepath.Join(corpusDir, "hex")
 	if err := os.MkdirAll(captureRoot, 0o755); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(hexDir, 0o755); err != nil {
-		return nil, err
-	}
-	hexFiles := make(map[string][]byte, len(specs))
 
 	result := make([]manifestCapture, 0, len(specs))
 	for _, item := range specs {
@@ -445,11 +431,10 @@ func prepareCaptures(corpusDir string, specs []captureSpec, repoByID map[string]
 
 		var rep *representativeFrame
 		if frameNumber > 0 {
-			hexName := fmt.Sprintf("%s.frame-%d.hex", item.ID, frameNumber)
-			hexFiles[hexName] = []byte(hex.EncodeToString(frameBytes) + "\n")
+			frameDigest := sha256.Sum256(frameBytes)
 			rep = &representativeFrame{
 				Number: frameNumber, LengthBytes: len(frameBytes),
-				HexFile: filepath.ToSlash(filepath.Join("hex", hexName)),
+				SHA256: fmt.Sprintf("%x", frameDigest),
 			}
 		}
 
@@ -463,31 +448,7 @@ func prepareCaptures(corpusDir string, specs []captureSpec, repoByID map[string]
 			RepresentativeFrame: rep, FrameProtocols: protocols,
 		})
 	}
-	// Preserve the last complete inventory when validation of any input fails.
-	if err := removeGeneratedHex(hexDir); err != nil {
-		return nil, err
-	}
-	for name, data := range hexFiles {
-		if err := os.WriteFile(filepath.Join(hexDir, name), data, 0o644); err != nil {
-			return nil, err
-		}
-	}
 	return result, nil
-}
-
-func removeGeneratedHex(dir string) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".hex") {
-			if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func rawGitHubURL(repo repositorySpec, filePath string) string {
@@ -682,20 +643,7 @@ func writeReports(corpusDir string, roadmap []roadmapItem, captures []manifestCa
 			counts[*capture.RoadmapName]++
 		}
 	}
-	if err := writeCoverageCSV(filepath.Join(reportDir, "roadmap-material-coverage.csv"), roadmap, counts); err != nil {
-		return err
-	}
-	if err := writeOutsideCSV(filepath.Join(reportDir, "outside-roadmap-candidates.csv"), captures); err != nil {
-		return err
-	}
-	stats := familyStats(roadmap, captures)
-	if err := writeDistributionCSV(filepath.Join(reportDir, "family-distribution.csv"), stats); err != nil {
-		return err
-	}
-	if err := writeDistributionSVG(filepath.Join(reportDir, "protocol-material-distribution.svg"), stats); err != nil {
-		return err
-	}
-	return writeReportMarkdown(filepath.Join(reportDir, "REPORT.md"), roadmap, captures, stats)
+	return writeCoverageCSV(filepath.Join(reportDir, "roadmap-material-coverage.csv"), roadmap, counts)
 }
 
 func writeCoverageCSV(fileName string, roadmap []roadmapItem, counts map[string]int) error {
@@ -722,180 +670,12 @@ func writeCoverageCSV(fileName string, roadmap []roadmapItem, counts map[string]
 	return w.Error()
 }
 
-func writeOutsideCSV(fileName string, captures []manifestCapture) error {
-	f, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	w := csv.NewWriter(f)
-	defer w.Flush()
-	if err := w.Write([]string{"capture_id", "protocol", "source", "evidence_kind", "notes"}); err != nil {
-		return err
-	}
-	for _, capture := range captures {
-		if capture.RoadmapName == nil {
-			if err := w.Write([]string{capture.ID, capture.Protocol, capture.RepositoryID, capture.EvidenceKind, capture.Notes}); err != nil {
-				return err
-			}
-		}
-	}
-	return w.Error()
-}
-
-func familyStats(roadmap []roadmapItem, captures []manifestCapture) []familyStat {
-	byFamily := make(map[string]*familyStat)
-	for _, item := range roadmap {
-		stat := byFamily[item.Family]
-		if stat == nil {
-			stat = &familyStat{Family: item.Family}
-			byFamily[item.Family] = stat
-		}
-		stat.RoadmapTotal++
-	}
-	covered := make(map[string]struct{})
-	for _, capture := range captures {
-		if capture.RoadmapName == nil || capture.RoadmapFamily == nil {
-			continue
-		}
-		stat := byFamily[*capture.RoadmapFamily]
-		stat.CaptureCount++
-		key := *capture.RoadmapFamily + "\x00" + *capture.RoadmapName
-		if _, exists := covered[key]; !exists {
-			covered[key] = struct{}{}
-			stat.CoveredUnique++
-		}
-	}
-	stats := make([]familyStat, 0, len(byFamily))
-	for _, stat := range byFamily {
-		stats = append(stats, *stat)
-	}
-	sort.Slice(stats, func(i, j int) bool {
-		if stats[i].RoadmapTotal == stats[j].RoadmapTotal {
-			return stats[i].Family < stats[j].Family
-		}
-		return stats[i].RoadmapTotal > stats[j].RoadmapTotal
-	})
-	return stats
-}
-
-func writeDistributionCSV(fileName string, stats []familyStat) error {
-	f, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	w := csv.NewWriter(f)
-	defer w.Flush()
-	if err := w.Write([]string{"family", "roadmap_protocols", "protocols_with_collected_capture", "capture_files"}); err != nil {
-		return err
-	}
-	for _, stat := range stats {
-		if err := w.Write([]string{stat.Family, strconv.Itoa(stat.RoadmapTotal), strconv.Itoa(stat.CoveredUnique), strconv.Itoa(stat.CaptureCount)}); err != nil {
-			return err
-		}
-	}
-	return w.Error()
-}
-
-func writeDistributionSVG(fileName string, stats []familyStat) error {
-	const width, labelWidth, barWidth, top, rowHeight = 1180, 180, 760, 116, 32
-	height := top + len(stats)*rowHeight + 74
-	maxTotal := 1
-	for _, stat := range stats {
-		if stat.RoadmapTotal > maxTotal {
-			maxTotal = stat.RoadmapTotal
-		}
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-labelledby="title desc">`, width, height, width, height)
-	b.WriteString(`<title id="title">Protocol roadmap and collected authoritative material by family</title>`)
-	b.WriteString(`<desc id="desc">Horizontal bars compare all roadmap protocols with unique protocols that have at least one collected sample capture. Exact covered and total counts are printed on every row.</desc>`)
-	b.WriteString(`<rect width="100%" height="100%" fill="#FFFFFF"/>`)
-	b.WriteString(`<style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#171717}.title{font-size:22px;font-weight:650}.subtitle{font-size:13px;fill:#59636E}.label{font-size:13px}.count{font-size:12px;font-variant-numeric:tabular-nums}.legend{font-size:12px;fill:#59636E}</style>`)
-	b.WriteString(`<text class="title" x="28" y="36">616-item protocol roadmap: collected capture material</text>`)
-	b.WriteString(`<text class="subtitle" x="28" y="60">Blue is the unique protocol count with an authoritative PCAP; gray is the full roadmap family. Counts are capture availability, not parser correctness.</text>`)
-	b.WriteString(`<rect x="28" y="76" width="14" height="10" fill="#0072B2"/><text class="legend" x="49" y="86">collected protocol</text>`)
-	b.WriteString(`<rect x="190" y="76" width="14" height="10" fill="#D6DBE1"/><text class="legend" x="211" y="86">roadmap total</text>`)
-	for index, stat := range stats {
-		y := top + index*rowHeight
-		totalWidth := stat.RoadmapTotal * barWidth / maxTotal
-		coveredWidth := stat.CoveredUnique * barWidth / maxTotal
-		fmt.Fprintf(&b, `<text class="label" x="%d" y="%d" text-anchor="end">%s</text>`, labelWidth-12, y+14, html.EscapeString(stat.Family))
-		fmt.Fprintf(&b, `<rect x="%d" y="%d" width="%d" height="17" fill="#D6DBE1"/>`, labelWidth, y, totalWidth)
-		if coveredWidth > 0 {
-			fmt.Fprintf(&b, `<rect x="%d" y="%d" width="%d" height="17" fill="#0072B2"/>`, labelWidth, y, coveredWidth)
-		}
-		fmt.Fprintf(&b, `<text class="count" x="%d" y="%d">%d / %d protocols · %d captures</text>`, labelWidth+totalWidth+10, y+14, stat.CoveredUnique, stat.RoadmapTotal, stat.CaptureCount)
-	}
-	b.WriteString(`</svg>`)
-	return os.WriteFile(fileName, []byte(b.String()), 0o644)
-}
-
-func writeReportMarkdown(fileName string, roadmap []roadmapItem, captures []manifestCapture, stats []familyStat) error {
-	statusCounts := map[string]int{}
-	priorityCounts := map[string]int{}
-	sourceCaptures := map[string]int{}
-	sourcePackets := map[string]int{}
-	kindCounts := map[string]int{}
-	covered := map[string]struct{}{}
-	outside := 0
-	var totalBytes int64
-	for _, item := range roadmap {
-		statusCounts[item.Status]++
-		priorityCounts[item.Priority]++
-	}
-	for _, capture := range captures {
-		sourceCaptures[capture.RepositoryID]++
-		sourcePackets[capture.RepositoryID] += capture.PacketCount
-		kindCounts[capture.EvidenceKind]++
-		totalBytes += capture.SizeBytes
-		if capture.RoadmapName == nil {
-			outside++
-		} else {
-			covered[*capture.RoadmapName] = struct{}{}
-		}
-	}
-
-	var b strings.Builder
-	b.WriteString("# Protocol corpus evidence report\n\n")
-	b.WriteString("This report is generated from `sources.json`, the pinned capture bytes and `protocol_roadmap.go`. It reports material availability only; it does not promote any roadmap status.\n\n")
-	fmt.Fprintf(&b, "- Roadmap: **%d** protocols; %d `done`, %d `partial`, %d `todo`.\n", len(roadmap), statusCounts["done"], statusCounts["partial"], statusCounts["todo"])
-	fmt.Fprintf(&b, "- Corpus: **%d capture files**, **%d packets**, **%d bytes**.\n", len(captures), totalPackets(captures), totalBytes)
-	fmt.Fprintf(&b, "- Direct roadmap material: **%d unique protocols**; outside-roadmap candidates: **%d captures**.\n", len(covered), outside)
-	fmt.Fprintf(&b, "- Evidence classes: %d positive upstream, %d negative/boundary upstream, %d positive generated, %d negative/boundary generated, %d generated identification-only.\n\n", kindCounts["upstream-positive"], kindCounts["upstream-negative"], kindCounts["generated-positive"], kindCounts["generated-negative"], kindCounts["generated-identification"])
-
-	b.WriteString("## Source distribution\n\n| Source | Captures | Packets |\n| --- | ---: | ---: |\n")
-	sources := sortedKeys(sourceCaptures)
-	for _, source := range sources {
-		fmt.Fprintf(&b, "| `%s` | %d | %d |\n", source, sourceCaptures[source], sourcePackets[source])
-	}
-	b.WriteString("\n## Roadmap family distribution\n\n| Family | Roadmap protocols | With collected capture | Capture files |\n| --- | ---: | ---: | ---: |\n")
-	for _, stat := range stats {
-		fmt.Fprintf(&b, "| `%s` | %d | %d | %d |\n", stat.Family, stat.RoadmapTotal, stat.CoveredUnique, stat.CaptureCount)
-	}
-	b.WriteString("\n![Protocol material distribution. Every row prints collected protocol count over the full roadmap family count.](protocol-material-distribution.svg)\n\n")
-	b.WriteString("**Figure 1 | Authoritative capture material by roadmap family.** Blue marks unique roadmap protocols with at least one collected file; the gray extent is the full family backlog. Exact values are printed, so color is not the only encoding.\n\n")
-	b.WriteString("## Interpretation limits\n\n")
-	b.WriteString("A capture mapped to a roadmap item establishes available test material, not complete protocol coverage. A single PCAP may exercise only one PDU, direction or version. Negative captures are kept separately because malformed input and classification-boundary handling are part of parser robustness. `outside-roadmap-candidates.csv` records useful discoveries without pretending they were already among the 616 items.\n")
-	return os.WriteFile(fileName, []byte(b.String()), 0o644)
-}
-
 func totalPackets(captures []manifestCapture) int {
 	total := 0
 	for _, capture := range captures {
 		total += capture.PacketCount
 	}
 	return total
-}
-
-func sortedKeys(values map[string]int) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func ptr(value string) *string { return &value }
