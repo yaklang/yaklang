@@ -1,0 +1,858 @@
+--- FAIL: TestNodeToMapSinglePassSemantics (0.00s)
+    node_to_map_single_pass_test.go:93: 
+        	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:93
+        	Error:      	Not equal: 
+        	            	expected: map[string]interface {}{"bits":0x1c, "duplicate":0x74, "empty":[]interface {}{}, "list":[]interface {}{0x73, 0x74}, "raw":[]uint8{0x73, 0x74}}
+        	            	actual  : map[string]interface {}{"bits":0x1c, "duplicate":0x74, "empty":[]uint8{}, "list":map[string]interface {}{"item":0x74}, "raw":[]uint8{0x73, 0x74}}
+        	            	
+        	            	Diff:
+        	            	--- Expected
+        	            	+++ Actual
+        	            	@@ -3,7 +3,6 @@
+        	            	  (string) (len=9) "duplicate": (uint8) 116,
+        	            	- (string) (len=5) "empty": ([]interface {}) {
+        	            	+ (string) (len=5) "empty": ([]uint8) {
+        	            	  },
+        	            	- (string) (len=4) "list": ([]interface {}) (len=2) {
+        	            	-  (uint8) 115,
+        	            	-  (uint8) 116
+        	            	+ (string) (len=4) "list": (map[string]interface {}) (len=1) {
+        	            	+  (string) (len=4) "item": (uint8) 116
+        	            	  },
+        	Test:       	TestNodeToMapSinglePassSemantics
+--- FAIL: TestProtocolCorpusNodeToMapSinglePassApplication (0.01s)
+    --- FAIL: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/6 (0.00s)
+        node_to_map_single_pass_test.go:143: 
+            	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:60
+            	            				/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:143
+            	Error:      	Not equal: 
+            	            	expected: map[string]interface {}{"Body Length":0x34, "Flags":0x0, "Opcode":0x6, "Option Count":0x2, "Options":[]interface {}{map[string]interface {}{"Option Key":"COMPRESSION", "Option Key Length":0xb, "Option Value Count":0x2, "Values":[]interface {}{map[string]interface {}{"Option Value":"snappy", "Option Value Length":0x6}, map[string]interface {}{"Option Value":"lz4", "Option Value Length":0x3}}}, map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value Count":0x1, "Values":[]interface {}{map[string]interface {}{"Option Value":"3.3.1", "Option Value Length":0x5}}}}, "Stream":0x0, "Version":0x84}
+            	            	actual  : map[string]interface {}{"Body Length":0x34, "Flags":0x0, "Opcode":0x6, "Option Count":0x2, "Options":map[string]interface {}{"Option":map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value Count":0x1, "Values":map[string]interface {}{"Value":map[string]interface {}{"Option Value":"3.3.1", "Option Value Length":0x5}}}}, "Stream":0x0, "Version":0x84}
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -5,19 +5,4 @@
+            	            	  (string) (len=12) "Option Count": (uint64) 2,
+            	            	- (string) (len=7) "Options": ([]interface {}) (len=2) {
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	-   (string) (len=10) "Option Key": (string) (len=11) "COMPRESSION",
+            	            	-   (string) (len=17) "Option Key Length": (uint64) 11,
+            	            	-   (string) (len=18) "Option Value Count": (uint64) 2,
+            	            	-   (string) (len=6) "Values": ([]interface {}) (len=2) {
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=6) "snappy",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 6
+            	            	-    },
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=3) "lz4",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 3
+            	            	-    }
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	+ (string) (len=7) "Options": (map[string]interface {}) (len=1) {
+            	            	+  (string) (len=6) "Option": (map[string]interface {}) (len=4) {
+            	            	    (string) (len=10) "Option Key": (string) (len=11) "CQL_VERSION",
+            	            	@@ -25,4 +10,4 @@
+            	            	    (string) (len=18) "Option Value Count": (uint64) 1,
+            	            	-   (string) (len=6) "Values": ([]interface {}) (len=1) {
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	+   (string) (len=6) "Values": (map[string]interface {}) (len=1) {
+            	            	+    (string) (len=5) "Value": (map[string]interface {}) (len=2) {
+            	            	      (string) (len=12) "Option Value": (string) (len=5) "3.3.1",
+            	Test:       	TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/6
+    --- FAIL: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/8 (0.00s)
+        node_to_map_single_pass_test.go:143: 
+            	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:60
+            	            				/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:143
+            	Error:      	Not equal: 
+            	            	expected: map[string]interface {}{"Body Length":0x16, "Flags":0x0, "Opcode":0x1, "Option Count":0x1, "Options":[]interface {}{map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value":"3.3.1", "Option Value Length":0x5}}, "Stream":0x1, "Version":0x4}
+            	            	actual  : map[string]interface {}{"Body Length":0x16, "Flags":0x0, "Opcode":0x1, "Option Count":0x1, "Options":map[string]interface {}{"Option":map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value":"3.3.1", "Option Value Length":0x5}}, "Stream":0x1, "Version":0x4}
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -5,4 +5,4 @@
+            	            	  (string) (len=12) "Option Count": (uint64) 1,
+            	            	- (string) (len=7) "Options": ([]interface {}) (len=1) {
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	+ (string) (len=7) "Options": (map[string]interface {}) (len=1) {
+            	            	+  (string) (len=6) "Option": (map[string]interface {}) (len=4) {
+            	            	    (string) (len=10) "Option Key": (string) (len=11) "CQL_VERSION",
+            	Test:       	TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/8
+    --- FAIL: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/14 (0.00s)
+        node_to_map_single_pass_test.go:143: 
+            	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:60
+            	            				/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:143
+            	Error:      	Not equal: 
+            	            	expected: map[string]interface {}{"Body Length":0x66, "Flags":0x0, "Opcode":0x6, "Option Count":0x3, "Options":[]interface {}{map[string]interface {}{"Option Key":"PROTOCOL_VERSIONS", "Option Key Length":0x11, "Option Value Count":0x4, "Values":[]interface {}{map[string]interface {}{"Option Value":"3/v3", "Option Value Length":0x4}, map[string]interface {}{"Option Value":"4/v4", "Option Value Length":0x4}, map[string]interface {}{"Option Value":"5/v5", "Option Value Length":0x4}, map[string]interface {}{"Option Value":"6/v6-beta", "Option Value Length":0x9}}}, map[string]interface {}{"Option Key":"COMPRESSION", "Option Key Length":0xb, "Option Value Count":0x2, "Values":[]interface {}{map[string]interface {}{"Option Value":"snappy", "Option Value Length":0x6}, map[string]interface {}{"Option Value":"lz4", "Option Value Length":0x3}}}, map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value Count":0x1, "Values":[]interface {}{map[string]interface {}{"Option Value":"3.4.6", "Option Value Length":0x5}}}}, "Stream":0x0, "Version":0x85}
+            	            	actual  : map[string]interface {}{"Body Length":0x66, "Flags":0x0, "Opcode":0x6, "Option Count":0x3, "Options":map[string]interface {}{"Option":map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value Count":0x1, "Values":map[string]interface {}{"Value":map[string]interface {}{"Option Value":"3.4.6", "Option Value Length":0x5}}}}, "Stream":0x0, "Version":0x85}
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -5,42 +5,4 @@
+            	            	  (string) (len=12) "Option Count": (uint64) 3,
+            	            	- (string) (len=7) "Options": ([]interface {}) (len=3) {
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	-   (string) (len=10) "Option Key": (string) (len=17) "PROTOCOL_VERSIONS",
+            	            	-   (string) (len=17) "Option Key Length": (uint64) 17,
+            	            	-   (string) (len=18) "Option Value Count": (uint64) 4,
+            	            	-   (string) (len=6) "Values": ([]interface {}) (len=4) {
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=4) "3/v3",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 4
+            	            	-    },
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=4) "4/v4",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 4
+            	            	-    },
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=4) "5/v5",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 4
+            	            	-    },
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=9) "6/v6-beta",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 9
+            	            	-    }
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	-   (string) (len=10) "Option Key": (string) (len=11) "COMPRESSION",
+            	            	-   (string) (len=17) "Option Key Length": (uint64) 11,
+            	            	-   (string) (len=18) "Option Value Count": (uint64) 2,
+            	            	-   (string) (len=6) "Values": ([]interface {}) (len=2) {
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=6) "snappy",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 6
+            	            	-    },
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	-     (string) (len=12) "Option Value": (string) (len=3) "lz4",
+            	            	-     (string) (len=19) "Option Value Length": (uint64) 3
+            	            	-    }
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	+ (string) (len=7) "Options": (map[string]interface {}) (len=1) {
+            	            	+  (string) (len=6) "Option": (map[string]interface {}) (len=4) {
+            	            	    (string) (len=10) "Option Key": (string) (len=11) "CQL_VERSION",
+            	            	@@ -48,4 +10,4 @@
+            	            	    (string) (len=18) "Option Value Count": (uint64) 1,
+            	            	-   (string) (len=6) "Values": ([]interface {}) (len=1) {
+            	            	-    (map[string]interface {}) (len=2) {
+            	            	+   (string) (len=6) "Values": (map[string]interface {}) (len=1) {
+            	            	+    (string) (len=5) "Value": (map[string]interface {}) (len=2) {
+            	            	      (string) (len=12) "Option Value": (string) (len=5) "3.4.6",
+            	Test:       	TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/14
+    --- FAIL: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/16 (0.00s)
+        node_to_map_single_pass_test.go:143: 
+            	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:60
+            	            				/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:143
+            	Error:      	Not equal: 
+            	            	expected: map[string]interface {}{"Body Length":0x53, "Flags":0x0, "Opcode":0x1, "Option Count":0x3, "Options":[]interface {}{map[string]interface {}{"Option Key":"DRIVER_NAME", "Option Key Length":0xb, "Option Value":"DataStax Python Driver", "Option Value Length":0x16}, map[string]interface {}{"Option Key":"DRIVER_VERSION", "Option Key Length":0xe, "Option Value":"3.25.0", "Option Value Length":0x6}, map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value":"3.4.6", "Option Value Length":0x5}}, "Stream":0x1, "Version":0x5}
+            	            	actual  : map[string]interface {}{"Body Length":0x53, "Flags":0x0, "Opcode":0x1, "Option Count":0x3, "Options":map[string]interface {}{"Option":map[string]interface {}{"Option Key":"CQL_VERSION", "Option Key Length":0xb, "Option Value":"3.4.6", "Option Value Length":0x5}}, "Stream":0x1, "Version":0x5}
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -5,16 +5,4 @@
+            	            	  (string) (len=12) "Option Count": (uint64) 3,
+            	            	- (string) (len=7) "Options": ([]interface {}) (len=3) {
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	-   (string) (len=10) "Option Key": (string) (len=11) "DRIVER_NAME",
+            	            	-   (string) (len=17) "Option Key Length": (uint64) 11,
+            	            	-   (string) (len=12) "Option Value": (string) (len=22) "DataStax Python Driver",
+            	            	-   (string) (len=19) "Option Value Length": (uint64) 22
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	-   (string) (len=10) "Option Key": (string) (len=14) "DRIVER_VERSION",
+            	            	-   (string) (len=17) "Option Key Length": (uint64) 14,
+            	            	-   (string) (len=12) "Option Value": (string) (len=6) "3.25.0",
+            	            	-   (string) (len=19) "Option Value Length": (uint64) 6
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=4) {
+            	            	+ (string) (len=7) "Options": (map[string]interface {}) (len=1) {
+            	            	+  (string) (len=6) "Option": (map[string]interface {}) (len=4) {
+            	            	    (string) (len=10) "Option Key": (string) (len=11) "CQL_VERSION",
+            	Test:       	TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/16
+    --- FAIL: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-memcached/6 (0.00s)
+        node_to_map_single_pass_test.go:143: 
+            	Error Trace:	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:60
+            	            				/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/node_to_map_single_pass_test.go:143
+            	Error:      	Not equal: 
+            	            	expected: map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Response Terminator":"END", "Statistics":[]interface {}{map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"pid", "Statistic Prefix":"STAT", "Statistic Value":"8837", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"uptime", "Statistic Prefix":"STAT", "Statistic Value":"193", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"time", "Statistic Prefix":"STAT", "Statistic Value":"1534343744", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"version", "Statistic Prefix":"STAT", "Statistic Value":"1.4.15", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"libevent", "Statistic Prefix":"STAT", "Statistic Value":"2.0.21-stable", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"pointer_size", "Statistic Prefix":"STAT", "Statistic Value":"64", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"rusage_user", "Statistic Prefix":"STAT", "Statistic Value":"0.005382", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"rusage_system", "Statistic Prefix":"STAT", "Statistic Value":"0.006280", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"curr_connections", "Statistic Prefix":"STAT", "Statistic Value":"10", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"total_connections", "Statistic Prefix":"STAT", "Statistic Value":"13", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"connection_structures", "Statistic Prefix":"STAT", "Statistic Value":"11", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"reserved_fds", "Statistic Prefix":"STAT", "Statistic Value":"20", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cmd_get", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cmd_set", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cmd_flush", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cmd_touch", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"get_hits", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"get_misses", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"delete_misses", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"delete_hits", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"incr_misses", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"incr_hits", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"decr_misses", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"decr_hits", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cas_misses", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cas_hits", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"cas_badval", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"touch_hits", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"touch_misses", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"auth_cmds", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"auth_errors", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"bytes_read", "Statistic Prefix":"STAT", "Statistic Value":"21", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"bytes_written", "Statistic Prefix":"STAT", "Statistic Value":"2051", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"limit_maxbytes", "Statistic Prefix":"STAT", "Statistic Value":"67108864", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"accepting_conns", "Statistic Prefix":"STAT", "Statistic Value":"1", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"listen_disabled_num", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"threads", "Statistic Prefix":"STAT", "Statistic Value":"4", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"conn_yields", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"hash_power_level", "Statistic Prefix":"STAT", "Statistic Value":"16", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"hash_bytes", "Statistic Prefix":"STAT", "Statistic Value":"524288", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"hash_is_expanding", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"bytes", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"curr_items", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"total_items", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"expired_unfetched", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"evicted_unfetched", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"evictions", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}, map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"reclaimed", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}}}
+            	            	actual  : map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Response Terminator":"END", "Statistics":map[string]interface {}{"Statistic":map[string]interface {}{"Line Terminator":[]uint8{0xd, 0xa}, "Name Separator":[]uint8{0x20}, "Statistic Name":"reclaimed", "Statistic Prefix":"STAT", "Statistic Value":"0", "Value Separator":[]uint8{0x20}}}}
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -5,662 +5,4 @@
+            	            	  (string) (len=19) "Response Terminator": (string) (len=3) "END",
+            	            	- (string) (len=10) "Statistics": ([]interface {}) (len=48) {
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=3) "pid",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=4) "8837",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=6) "uptime",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=3) "193",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=4) "time",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=10) "1534343744",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=7) "version",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=6) "1.4.15",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=8) "libevent",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=13) "2.0.21-stable",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=12) "pointer_size",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "64",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "rusage_user",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=8) "0.005382",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=13) "rusage_system",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=8) "0.006280",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=16) "curr_connections",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "10",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=17) "total_connections",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "13",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=21) "connection_structures",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "11",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=12) "reserved_fds",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "20",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=7) "cmd_get",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=7) "cmd_set",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=9) "cmd_flush",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=9) "cmd_touch",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=8) "get_hits",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "get_misses",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=13) "delete_misses",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "delete_hits",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "incr_misses",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=9) "incr_hits",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "decr_misses",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=9) "decr_hits",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "cas_misses",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=8) "cas_hits",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "cas_badval",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "touch_hits",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=12) "touch_misses",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=9) "auth_cmds",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "auth_errors",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "bytes_read",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "21",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=13) "bytes_written",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=4) "2051",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=14) "limit_maxbytes",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=8) "67108864",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=15) "accepting_conns",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "1",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=19) "listen_disabled_num",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=7) "threads",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "4",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "conn_yields",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=16) "hash_power_level",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=2) "16",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "hash_bytes",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=6) "524288",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=17) "hash_is_expanding",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=5) "bytes",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=10) "curr_items",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=11) "total_items",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=17) "expired_unfetched",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=17) "evicted_unfetched",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	-   (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	            	-    00000000  0d 0a                                             |..|
+            	            	-   },
+            	            	-   (string) (len=14) "Name Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   },
+            	            	-   (string) (len=14) "Statistic Name": (string) (len=9) "evictions",
+            	            	-   (string) (len=16) "Statistic Prefix": (string) (len=4) "STAT",
+            	            	-   (string) (len=15) "Statistic Value": (string) (len=1) "0",
+            	            	-   (string) (len=15) "Value Separator": ([]uint8) (len=1) {
+            	            	-    00000000  20                                                | |
+            	            	-   }
+            	            	-  },
+            	            	-  (map[string]interface {}) (len=6) {
+            	            	+ (string) (len=10) "Statistics": (map[string]interface {}) (len=1) {
+            	            	+  (string) (len=9) "Statistic": (map[string]interface {}) (len=6) {
+            	            	    (string) (len=15) "Line Terminator": ([]uint8) (len=2) {
+            	Test:       	TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-memcached/6
+FAIL
+FAIL	github.com/yaklang/yaklang/common/bin-parser	0.590s
+FAIL
