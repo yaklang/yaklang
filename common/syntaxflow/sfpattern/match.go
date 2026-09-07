@@ -370,12 +370,14 @@ func DefaultLoadOptions() LoadOptions {
 	}
 	ext := map[string]struct{}{}
 	for _, e := range []string{
-		".java", ".kt", ".go", ".py", ".js", ".jsx", ".ts", ".tsx", ".vue",
+		".java", ".kt", ".kts", ".go", ".py", ".js", ".jsx", ".ts", ".tsx", ".vue",
 		".php", ".rb", ".rs", ".c", ".cc", ".cpp", ".h", ".hpp", ".cs",
 		".xml", ".yml", ".yaml", ".json", ".properties", ".env", ".ini",
 		".toml", ".conf", ".cfg", ".txt", ".md", ".gradle", ".sql",
 		".sh", ".bash", ".zsh", ".pem", ".key", ".crt", ".jsp", ".asp",
 		".aspx", ".html", ".htm", ".css", ".scss", ".tf", ".hcl",
+		".scala", ".sol", ".ml", ".mli", ".clj", ".cljs", ".cljc",
+		".ex", ".exs", ".cls", ".apex", ".trigger", ".lua",
 	} {
 		ext[e] = struct{}{}
 	}
