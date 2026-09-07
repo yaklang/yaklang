@@ -1067,14 +1067,20 @@ func (e *Emitter) EmitWarning(fmtlog string, items ...any) (*schema.AiOutputEven
 }
 
 func (e Emitter) EmitPlanExecFail(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {
-	return e.EmitJSON(schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION, "plan_exec_fail", fmt.Sprintf(fmtlog, items...))
+	return e.EmitJSON(schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION, "plan_exec_fail", map[string]any{
+		"message": fmt.Sprintf(fmtlog, items...),
+	})
 }
 
 func (e Emitter) EmitReActFail(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {
-	return e.EmitJSON(schema.EVENT_TYPE_FAIL_REACT, "re_act_fail", fmt.Sprintf(fmtlog, items...))
+	return e.EmitJSON(schema.EVENT_TYPE_FAIL_REACT, "re_act_fail", map[string]any{
+		"message": fmt.Sprintf(fmtlog, items...),
+	})
 }
 func (e Emitter) EmitReActSuccess(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {
-	return e.EmitJSON(schema.EVENT_TYPE_SUCCESS_REACT, "re_act_success", fmt.Sprintf(fmtlog, items...))
+	return e.EmitJSON(schema.EVENT_TYPE_SUCCESS_REACT, "re_act_success", map[string]any{
+		"message": fmt.Sprintf(fmtlog, items...),
+	})
 }
 
 func (e *Emitter) EmitError(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {

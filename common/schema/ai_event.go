@@ -597,6 +597,46 @@ func (e *AiOutputEvent) ToExecResult() *ypb.ExecResult {
 	}
 }
 
+// ExtractAIOutputDisplayMessage decodes AiOutputEvent.Content for UI/IM display.
+// EmitJSON often stores plain strings as JSON string values; consumers that treat
+// Content as raw text will see \u003c-style escapes instead of "<". This helper
+// unwraps JSON objects (message/content/...) and JSON string literals.
+func ExtractAIOutputDisplayMessage(content []byte, isJson bool) string {
+	raw := strings.TrimSpace(string(content))
+	if raw == "" {
+		return ""
+	}
+	if !isJson {
+		return raw
+	}
+
+	var obj map[string]any
+	if err := json.Unmarshal(content, &obj); err == nil {
+		for _, key := range []string{"message", "content", "value", "title", "reason", "error", "path", "filename", "payload"} {
+			if v, ok := obj[key]; ok {
+				if str := strings.TrimSpace(utils.InterfaceToString(v)); str != "" {
+					return str
+				}
+			}
+		}
+		return ""
+	}
+
+	var str string
+	if err := json.Unmarshal(content, &str); err == nil {
+		return strings.TrimSpace(str)
+	}
+	return raw
+}
+
+// DisplayMessage returns a human-readable message decoded from this event's Content.
+func (e *AiOutputEvent) DisplayMessage() string {
+	if e == nil {
+		return ""
+	}
+	return ExtractAIOutputDisplayMessage(e.Content, e.IsJson)
+}
+
 func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 	return &ypb.AIOutputEvent{
 		ID:                 int64(e.ID),
