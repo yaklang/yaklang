@@ -45,3 +45,21 @@ Sources: [LDAP RFC 4511](https://www.rfc-editor.org/rfc/rfc4511.html),
 [SMB2 Transform header](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/d6ce2327-a4c9-4793-be66-7b5bad2175fa).
 Database sources and the original record ledgers remain in
 `testdata/protocol-corpus/README.md`.
+
+## Score audit for this scope
+
+The existing cards continue to score the legacy YAML rule named by each card;
+new native message profiles do not silently receive full YAML-schema or
+exhaustive-branch credit. Recalculation with the existing rubric gives:
+
+| Card | Schema | Traffic | Tests | Branches | Stack | Total / grade | Credit boundary |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| LDAP | 20 | 20 | 16 | 14 | 10 | 80 / B | Existing Bind sample and legacy stack; new BER/filter/control profiles require their independent scope tests |
+| MySQL | 20 | 15 | 16 | 14 | 10 | 75 / B | Existing classic grammar and samples; no binary/prepared or arbitrary session credit |
+| PostgreSQL | 20 | 15 | 16 | 20 | 10 | 81 / B | Existing rule's branches and explicit startup/query samples; sixteen native profiles do not imply arbitrary session coverage |
+| SMB3 | 20 | 15 | 16 | 14 | 10 | 75 / B | Legacy Transform header grammar; retained ciphertext earns no decryption/session credit |
+
+`TestP0ScorecardsCovered` recalculates totals and grades from these dimensions.
+`TestP0RoadmapCovered` additionally runs the four executable message-scope
+ledgers; a historical grade alone is insufficient for completion. Catalog
+`partial` status and the fourteen existing deferrals remain unchanged.
