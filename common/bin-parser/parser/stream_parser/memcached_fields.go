@@ -37,6 +37,13 @@ func decodeMemcachedFields(wire []byte, profile string) ([]tlsCertificateField, 
 		info["Command"] = "stats"
 	case "stats-response":
 		var stats []map[string]any
+		// Reserve only a small, bounded number of observed lines. Even a
+		// malformed 1 MiB input must not trigger a speculative huge allocation.
+		reserve := min(64, max(0, bytes.Count(wire, []byte("\r\n"))-1))
+		if reserve > 0 {
+			fs = make([]tlsCertificateField, 0, reserve)
+			stats = make([]map[string]any, 0, reserve)
+		}
 		at := 0
 		for {
 			if bytes.Equal(wire[at:], []byte("END\r\n")) {
@@ -67,15 +74,15 @@ func decodeMemcachedFields(wire []byte, profile string) ([]tlsCertificateField, 
 				}
 			}
 			keyEnd, valueStart, end := at+5+sep, at+6+sep, at+n
-			ix := len(fs)
-			leaf("Statistic Prefix", "string", at, at+4)
-			leaf("Name Separator", "raw", at+4, at+5)
-			leaf("Statistic Name", "string", at+5, keyEnd)
-			leaf("Value Separator", "raw", keyEnd, valueStart)
-			leaf("Statistic Value", "string", valueStart, end)
-			leaf("Line Terminator", "raw", end, end+2)
-			children := append([]tlsCertificateField(nil), fs[ix:]...)
-			fs = append(fs[:ix], tlsCertificateField{Name: "Statistic", Start: at, End: end + 2, Children: children})
+			children := []tlsCertificateField{
+				tlsCertificateLeaf("Statistic Prefix", "string", at, at+4),
+				tlsCertificateLeaf("Name Separator", "raw", at+4, at+5),
+				tlsCertificateLeaf("Statistic Name", "string", at+5, keyEnd),
+				tlsCertificateLeaf("Value Separator", "raw", keyEnd, valueStart),
+				tlsCertificateLeaf("Statistic Value", "string", valueStart, end),
+				tlsCertificateLeaf("Line Terminator", "raw", end, end+2),
+			}
+			fs = append(fs, tlsCertificateField{Name: "Statistic", Start: at, End: end + 2, Children: children})
 			value := text(valueStart, end)
 			// Do not coerce unknown names or versions into metrics. This is optional,
 			// exact lexical evidence; overflow and non-numeric text remain unchanged.

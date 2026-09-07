@@ -1,0 +1,5 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser
+BenchmarkNativeFieldTreeLong 	   32636	    109276 ns/op	  165432 B/op	     403 allocs/op
+PASS

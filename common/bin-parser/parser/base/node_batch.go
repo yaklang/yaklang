@@ -61,3 +61,21 @@ func (b *nodeBatch) NewNodeTreeWithConfigItems(parent *Config, name string, data
 	}
 	return NewNodeTreeWithConfigItems(parent, name, data, ctx, items...)
 }
+
+// NewNodeTreeWithTypeItems avoids repeatedly boxing immutable builtin type
+// names when a decoder already supplies a string. Complex descriptions retain
+// the original grammar and error path.
+func (b *nodeBatch) NewNodeTreeWithTypeItems(parent *Config, name, typ string, ctx *NodeContext, items ...ConfigItem) (*Node, error) {
+	for i, candidate := range configPrefixTypes {
+		if i > 0 && candidate == typ {
+			// The value in this immutable prefix is the same string as the
+			// descriptor, shared only as an immutable scalar, never as a Node.
+			origin := configPrefixes[0][0][i].writes[3].value
+			var local [12]ConfigItem
+			ordered := append(local[:0], ConfigItem{CfgIsTerminal, true}, ConfigItem{CfgType, origin})
+			ordered = append(ordered, items...)
+			return b.NewNode(name, origin, parent, ctx, ordered...), nil
+		}
+	}
+	return b.NewNodeTreeWithConfigItems(parent, name, typ, ctx, items...)
+}
