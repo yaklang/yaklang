@@ -4280,7 +4280,7 @@
   {
     "rule_id": "source-secrets-huggingface-organization-api-token",
     "rule_name": "检测到 Huggingface Organization API Token",
-    "hash": "1024893bf99a243ad7abeb5a6b2d32b6a3c3a951366302c818a1c1bcdd736f00",
-    "version": "20260907.0004"
+    "hash": "f1365e484721c09a66aaae4bea25270067f3a0c01b3de4fac8ed3e0f958d656b",
+    "version": "20260907.0005"
   }
 ]
