@@ -720,6 +720,7 @@ jobs:
               ]
 
           - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
+            package_workers: "2"
             sync_rule: "1"
             test_configs: |
               [
@@ -754,6 +755,7 @@ jobs:
               ]
 
           - name: "Test AI Aid Test / RAG / Forge / AIHTTP"
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
