@@ -7,7 +7,16 @@ import "sync"
 // stores keep entries together; larger contexts acquire an index for lookup.
 // All stores remain independent; no parsed state or mutable values are pooled.
 type configStore struct {
-	mu      sync.RWMutex
+	mu           sync.RWMutex
+	writes       []compactConfigWrite
+	positions    [32]uint16
+	order        [32]uint8
+	orderLen     uint8
+	historyCount uint16
+	*configStoreLegacy
+}
+
+type configStoreLegacy struct {
 	entries []configEntry
 	inline  [8]configEntry
 	index   map[string]int
@@ -32,6 +41,7 @@ func configWriteOption(key string, value any) NodeConfigFun {
 }
 
 func (s *configStore) exposeReplayLocked() {
+	s.expandLocked()
 	i, ok := s.findLocked(CfgOptionFuns)
 	if !ok {
 		return
@@ -50,6 +60,9 @@ func (s *configStore) exposeReplayLocked() {
 }
 
 func (s *configStore) findLocked(key string) (int, bool) {
+	if s.configStoreLegacy == nil {
+		return 0, false
+	}
 	if s.index != nil {
 		i, ok := s.index[key]
 		return i, ok
@@ -77,6 +90,9 @@ func (s *configStore) Get(key string) (any, bool) {
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.configStoreLegacy == nil {
+		return s.compactGet(key)
+	}
 	if i, ok := s.findLocked(key); ok {
 		return s.entries[i].value, true
 	}
@@ -89,6 +105,10 @@ func (s *configStore) Has(key string) bool {
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.configStoreLegacy == nil {
+		_, ok := s.compactGet(key)
+		return ok
+	}
 	_, ok := s.findLocked(key)
 	return ok
 }
@@ -104,6 +124,10 @@ func (s *configStore) Set(key string, value any) {
 
 // setLocked is used only while the owning store is exclusively locked.
 func (s *configStore) setLocked(key string, value any) {
+	if s.compactSet(key, value, false, 4) {
+		return
+	}
+	s.expandLocked()
 	if i, ok := s.findLocked(key); ok {
 		s.entries[i].value = value
 		return
@@ -138,6 +162,10 @@ func (s *configStore) setConfigItem(key string, value any) {
 }
 
 func (s *configStore) setConfigItemLocked(key string, value any, reserve int) {
+	if s.compactSet(key, value, true, reserve) {
+		return
+	}
+	s.expandLocked()
 	s.setLocked(key, value)
 	if i, ok := s.findLocked(CfgOptionFuns); ok {
 		if journal, ok := s.entries[i].value.(*configReplay); ok {
@@ -173,6 +201,13 @@ func (s *configStore) inheritedItems() (items [3]configEntry, count int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, key := range [...]string{CfgEndian, "parser", "unit"} {
+		if s.configStoreLegacy == nil {
+			if v, ok := s.compactGet(key); ok {
+				items[count] = configEntry{key, v}
+				count++
+			}
+			continue
+		}
 		if i, ok := s.findLocked(key); ok {
 			items[count] = s.entries[i]
 			count++
@@ -187,6 +222,9 @@ func (s *configStore) replayHistoryLen() (count int, present, wellFormed bool) {
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.configStoreLegacy == nil {
+		return int(s.historyCount), s.positions[1] != 0, true
+	}
 	i, ok := s.findLocked(CfgOptionFuns)
 	if !ok {
 		return 0, false, true
@@ -213,6 +251,14 @@ func (s *configStore) replay(target *Config) {
 	func() {
 		s.mu.RLock()
 		defer s.mu.RUnlock()
+		if s.configStoreLegacy == nil {
+			for _, w := range s.writes {
+				if w.replay {
+					writes = append(writes, configEntry{compactConfigKeys[w.key], w.value})
+				}
+			}
+			return
+		}
 		if i, ok := s.findLocked(CfgOptionFuns); ok {
 			if journal, ok := s.entries[i].value.(*configReplay); ok {
 				writes = append([]configEntry(nil), journal.writes...)
@@ -237,6 +283,7 @@ func (s *configStore) Delete(key string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.expandLocked()
 	i, ok := s.findLocked(key)
 	if !ok {
 		return

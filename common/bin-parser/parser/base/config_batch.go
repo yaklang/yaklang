@@ -28,13 +28,7 @@ func NewConfigWithItems(parent *Config, items ...ConfigItem) *Config {
 	for capacity < count+len(items) {
 		capacity *= 2
 	}
-	if count+len(items)+1 > len(res.data.inline) {
-		storeCapacity := len(res.data.inline) * 2
-		for storeCapacity < count+len(items)+1 {
-			storeCapacity *= 2
-		}
-		res.data.entries = make([]configEntry, 0, storeCapacity)
-	}
+
 	for _, item := range inherited[:count] {
 		res.data.setConfigItemLocked(item.key, item.value, capacity)
 	}
