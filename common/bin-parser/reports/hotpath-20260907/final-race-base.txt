@@ -1,0 +1,3 @@
+# github.com/yaklang/yaklang/common/bin-parser/parser/base.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-707617070/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	7.233s

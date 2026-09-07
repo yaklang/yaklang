@@ -1,0 +1,610 @@
+[
+  {
+    "label": "original",
+    "commit": "5b6cbe1f8f7e7e505f8f3aaa542d4ac12f0d3741",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "p0",
+    "commit": "b6cfeef970f4810604439c6da0075802a2a03ec3",
+    "partitions": {
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "compact",
+    "commit": "8b15fd133ecfb7830e88d7909e7670961c4995e9",
+    "partitions": {
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "windows",
+    "commit": "93573afb198ead9e832f2f12644ced4fd2f42a15",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "rules",
+    "commit": "a70f37551a5c21084dc10162123241a9327a8c83",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "node_batch",
+    "commit": "7a008559ef7cd446fa92b0e11069f759d3c5c23d",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      }
+    }
+  },
+  {
+    "label": "native_bridge",
+    "commit": "6a26dad1aa07bcb612ed8f830a91d7a225bae624",
+    "partitions": {
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      }
+    }
+  },
+  {
+    "label": "prefix",
+    "commit": "27fca80fbf6c09a409f9a9ca0aaf4d992af391d3",
+    "partitions": {
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "rule_batch",
+    "commit": "cc4acef5959c1d9248da4bb4e77caef34294eb64",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "projection",
+    "commit": "93ddd19beb114fae98e42aaf616dd7c177f22325",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "descriptors",
+    "commit": "18152b70150969b072ec7b852b52d25b0b77e331",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "clone_plan",
+    "commit": "97494dd992286ab86598b436b8bc94a58119577b",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "import_config",
+    "commit": "69d3d823dd9ee7ee6a579cd1942ee801a859c212",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "candidate",
+    "commit": "379f6099bf72b9da7748c9be1f1fb78eab4bb48a",
+    "partitions": {
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "candidate_final",
+    "commit": "aa8d5b36cb858da5d0d15df350766c6e13278389",
+    "partitions": {
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  },
+  {
+    "label": "consumed_snapshot",
+    "commit": "35607643c484b3d13c8e6fb08320c6c527b2b896",
+    "partitions": {
+      "envelopes/0": {
+        "records": 14634,
+        "sha256": "a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b"
+      },
+      "envelopes/1": {
+        "records": 14633,
+        "sha256": "c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852"
+      },
+      "envelopes/2": {
+        "records": 14633,
+        "sha256": "8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb"
+      },
+      "envelopes/3": {
+        "records": 14633,
+        "sha256": "950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      },
+      "application/2": {
+        "records": 3,
+        "sha256": "1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e"
+      },
+      "application/3": {
+        "records": 2,
+        "sha256": "80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990"
+      },
+      "application/1": {
+        "records": 3,
+        "sha256": "5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35"
+      },
+      "application/0": {
+        "records": 3,
+        "sha256": "ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136"
+      }
+    }
+  }
+]

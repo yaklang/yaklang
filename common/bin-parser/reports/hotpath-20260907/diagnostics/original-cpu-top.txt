@@ -1,0 +1,48 @@
+File: original.test
+Type: cpu
+Time: Sep 7, 2026 at 12:25pm (CST)
+Duration: 3.91s, Total samples = 3.63s (92.88%)
+Showing nodes accounting for 3.47s, 95.59% of 3.63s total
+Dropped 64 nodes (cum <= 0.02s)
+Showing top 40 nodes out of 129
+      flat  flat%   sum%        cum   cum%
+     3.04s 83.75% 83.75%      3.04s 83.75%  syscall.syscall
+     0.08s  2.20% 85.95%      0.08s  2.20%  runtime.kevent
+     0.04s  1.10% 87.05%      0.04s  1.10%  runtime.madvise
+     0.03s  0.83% 87.88%      0.03s  0.83%  runtime.scanblock
+     0.03s  0.83% 88.71%      0.03s  0.83%  runtime/internal/atomic.(*Uint8).Load (inline)
+     0.02s  0.55% 89.26%      0.19s  5.23%  encoding/json.mapEncoder.encode
+     0.02s  0.55% 89.81%      0.02s  0.55%  runtime.(*sweepLocker).tryAcquire
+     0.02s  0.55% 90.36%      0.15s  4.13%  runtime.mallocgc
+     0.02s  0.55% 90.91%      0.02s  0.55%  runtime.markBits.setMarked (inline)
+     0.02s  0.55% 91.46%      0.02s  0.55%  runtime.memclrNoHeapPointers
+     0.02s  0.55% 92.01%      0.02s  0.55%  runtime.spanOf (inline)
+     0.01s  0.28% 92.29%      0.02s  0.55%  bytes.(*Buffer).Write
+     0.01s  0.28% 92.56%      0.19s  5.23%  encoding/json.(*encodeState).reflectValue
+     0.01s  0.28% 92.84%      0.06s  1.65%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setConfigItemLocked
+     0.01s  0.28% 93.11%      0.03s  0.83%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewBitReader
+     0.01s  0.28% 93.39%      0.06s  1.65%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewConfigWithItems
+     0.01s  0.28% 93.66%      0.06s  1.65%  runtime.(*mheap).allocSpan
+     0.01s  0.28% 93.94%      0.02s  0.55%  runtime.(*unwinder).resolveInternal
+     0.01s  0.28% 94.21%      0.06s  1.65%  runtime.findObject
+     0.01s  0.28% 94.49%      0.02s  0.55%  runtime.gcmarknewobject
+     0.01s  0.28% 94.77%      0.02s  0.55%  runtime.mapiternext
+     0.01s  0.28% 95.04%      0.07s  1.93%  runtime.scanobject
+     0.01s  0.28% 95.32%      0.05s  1.38%  runtime.wbBufFlush1
+     0.01s  0.28% 95.59%      0.03s  0.83%  runtime.wbMove
+         0     0% 95.59%      0.19s  5.23%  encoding/json.(*encodeState).marshal
+         0     0% 95.59%      0.20s  5.51%  encoding/json.Marshal
+         0     0% 95.59%      0.02s  0.55%  encoding/json.Unmarshal
+         0     0% 95.59%      0.17s  4.68%  encoding/json.arrayEncoder.encode
+         0     0% 95.59%      0.19s  5.23%  encoding/json.interfaceEncoder
+         0     0% 95.59%      0.17s  4.68%  encoding/json.sliceEncoder.encode
+         0     0% 95.59%      0.04s  1.10%  gcWriteBarrier
+         0     0% 95.59%      0.02s  0.55%  github.com/yaklang/yaklang/common/bin-parser.BenchmarkCurrentCorpusApplicationJSON
+         0     0% 95.59%      0.05s  1.38%  github.com/yaklang/yaklang/common/bin-parser.NodeToMap
+         0     0% 95.59%      0.02s  0.55%  github.com/yaklang/yaklang/common/bin-parser.benchmarkCurrentCorpus (inline)
+         0     0% 95.59%      0.02s  0.55%  github.com/yaklang/yaklang/common/bin-parser.benchmarkCurrentCorpusWithProjection
+         0     0% 95.59%      3.40s 93.66%  github.com/yaklang/yaklang/common/bin-parser.benchmarkCurrentCorpusWithProjection.func1
+         0     0% 95.59%      3.40s 93.66%  github.com/yaklang/yaklang/common/bin-parser.currentCorpusParseWithProjection
+         0     0% 95.59%      0.02s  0.55%  github.com/yaklang/yaklang/common/bin-parser.currentCorpusWorks
+         0     0% 95.59%      3.15s 86.78%  github.com/yaklang/yaklang/common/bin-parser/parser.ParseBinary
+         0     0% 95.59%      0.02s  0.55%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Config).SetItem (inline)

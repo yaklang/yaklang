@@ -1,0 +1,590 @@
+[
+  {
+    "label": "p0",
+    "workers": 1,
+    "baseline_median_ns": 1681443.0,
+    "candidate_median_ns": 1670739.0,
+    "speedup": 1.0064067457574164,
+    "baseline_samples": [
+      1680417.0,
+      1705560.0,
+      1677205.0,
+      1681443.0,
+      1684972.0
+    ],
+    "candidate_samples": [
+      1676599.0,
+      1670124.0,
+      1681273.0,
+      1667801.0,
+      1670739.0
+    ]
+  },
+  {
+    "label": "p0",
+    "workers": 10,
+    "baseline_median_ns": 887804.0,
+    "candidate_median_ns": 887045.0,
+    "speedup": 1.000855649938842,
+    "baseline_samples": [
+      897172.0,
+      884022.0,
+      887804.0,
+      882701.0,
+      909914.0
+    ],
+    "candidate_samples": [
+      887045.0,
+      959502.0,
+      884867.0,
+      1037794.0,
+      882190.0
+    ]
+  },
+  {
+    "label": "compact",
+    "workers": 1,
+    "baseline_median_ns": 1681786.0,
+    "candidate_median_ns": 1449953.0,
+    "speedup": 1.1598900102279177,
+    "baseline_samples": [
+      1690303.0,
+      1681786.0,
+      1673850.0,
+      1749071.0,
+      1675324.0
+    ],
+    "candidate_samples": [
+      1451496.0,
+      1459938.0,
+      1449484.0,
+      1449953.0,
+      1434306.0
+    ]
+  },
+  {
+    "label": "compact",
+    "workers": 10,
+    "baseline_median_ns": 888764.0,
+    "candidate_median_ns": 760531.0,
+    "speedup": 1.1686098265553935,
+    "baseline_samples": [
+      900981.0,
+      888764.0,
+      886103.0,
+      884158.0,
+      889734.0
+    ],
+    "candidate_samples": [
+      797898.0,
+      769597.0,
+      760531.0,
+      756725.0,
+      759430.0
+    ]
+  },
+  {
+    "label": "windows",
+    "workers": 1,
+    "baseline_median_ns": 1684758.0,
+    "candidate_median_ns": 1390191.0,
+    "speedup": 1.2118895892722654,
+    "baseline_samples": [
+      1691616.0,
+      1684758.0,
+      1686962.0,
+      1669659.0,
+      1680881.0
+    ],
+    "candidate_samples": [
+      1390191.0,
+      1384786.0,
+      1394633.0,
+      1391239.0,
+      1377754.0
+    ]
+  },
+  {
+    "label": "windows",
+    "workers": 10,
+    "baseline_median_ns": 886368.0,
+    "candidate_median_ns": 726535.0,
+    "speedup": 1.2199935309379453,
+    "baseline_samples": [
+      886384.0,
+      884250.0,
+      886368.0,
+      881413.0,
+      889850.0
+    ],
+    "candidate_samples": [
+      733560.0,
+      733143.0,
+      721877.0,
+      720431.0,
+      726535.0
+    ]
+  },
+  {
+    "label": "rules",
+    "workers": 1,
+    "baseline_median_ns": 1678456.0,
+    "candidate_median_ns": 1343797.0,
+    "speedup": 1.2490398475364954,
+    "baseline_samples": [
+      1687097.0,
+      1675141.0,
+      1678456.0,
+      1686159.0,
+      1674460.0
+    ],
+    "candidate_samples": [
+      1348204.0,
+      1343797.0,
+      1341606.0,
+      1332045.0,
+      1381788.0
+    ]
+  },
+  {
+    "label": "rules",
+    "workers": 10,
+    "baseline_median_ns": 888853.0,
+    "candidate_median_ns": 724890.0,
+    "speedup": 1.2261901805791224,
+    "baseline_samples": [
+      887302.0,
+      896333.0,
+      888853.0,
+      958459.0,
+      887684.0
+    ],
+    "candidate_samples": [
+      757154.0,
+      736012.0,
+      718746.0,
+      724081.0,
+      724890.0
+    ]
+  },
+  {
+    "label": "node_batch",
+    "workers": 1,
+    "baseline_median_ns": 1696600.0,
+    "candidate_median_ns": 1291466.0,
+    "speedup": 1.3137008639793846,
+    "baseline_samples": [
+      1696600.0,
+      1685903.0,
+      1683790.0,
+      1709618.0,
+      1731558.0
+    ],
+    "candidate_samples": [
+      1358307.0,
+      1294025.0,
+      1291466.0,
+      1280658.0,
+      1286414.0
+    ]
+  },
+  {
+    "label": "node_batch",
+    "workers": 10,
+    "baseline_median_ns": 887303.0,
+    "candidate_median_ns": 708289.0,
+    "speedup": 1.2527414657011473,
+    "baseline_samples": [
+      889620.0,
+      886346.0,
+      880646.0,
+      901109.0,
+      887303.0
+    ],
+    "candidate_samples": [
+      735819.0,
+      704261.0,
+      695834.0,
+      746223.0,
+      708289.0
+    ]
+  },
+  {
+    "label": "native_bridge",
+    "workers": 1,
+    "baseline_median_ns": 1683786.0,
+    "candidate_median_ns": 1009679.0,
+    "speedup": 1.6676448653482938,
+    "baseline_samples": [
+      1687655.0,
+      1683786.0,
+      1680598.0,
+      1681118.0,
+      1686424.0
+    ],
+    "candidate_samples": [
+      1009679.0,
+      1010008.0,
+      1017304.0,
+      1001651.0,
+      1002893.0
+    ]
+  },
+  {
+    "label": "native_bridge",
+    "workers": 10,
+    "baseline_median_ns": 890525.0,
+    "candidate_median_ns": 553062.0,
+    "speedup": 1.6101720964376507,
+    "baseline_samples": [
+      890945.0,
+      879349.0,
+      881982.0,
+      890525.0,
+      891970.0
+    ],
+    "candidate_samples": [
+      553984.0,
+      551534.0,
+      553062.0,
+      550458.0,
+      572611.0
+    ]
+  },
+  {
+    "label": "prefix",
+    "workers": 1,
+    "baseline_median_ns": 1681587.0,
+    "candidate_median_ns": 969238.0,
+    "speedup": 1.7349577709499628,
+    "baseline_samples": [
+      1686728.0,
+      1681587.0,
+      1680115.0,
+      1679091.0,
+      1682345.0
+    ],
+    "candidate_samples": [
+      969238.0,
+      977830.0,
+      968819.0,
+      976444.0,
+      961509.0
+    ]
+  },
+  {
+    "label": "prefix",
+    "workers": 10,
+    "baseline_median_ns": 889606.0,
+    "candidate_median_ns": 534972.0,
+    "speedup": 1.6629019836552192,
+    "baseline_samples": [
+      890040.0,
+      888483.0,
+      882679.0,
+      889606.0,
+      990431.0
+    ],
+    "candidate_samples": [
+      531771.0,
+      538480.0,
+      534972.0,
+      534052.0,
+      542098.0
+    ]
+  },
+  {
+    "label": "rule_batch",
+    "workers": 1,
+    "baseline_median_ns": 1676037.0,
+    "candidate_median_ns": 959502.0,
+    "speedup": 1.7467780160958497,
+    "baseline_samples": [
+      1694980.0,
+      1688383.0,
+      1676037.0,
+      1675281.0,
+      1674932.0
+    ],
+    "candidate_samples": [
+      960885.0,
+      972238.0,
+      959502.0,
+      945673.0,
+      949931.0
+    ]
+  },
+  {
+    "label": "rule_batch",
+    "workers": 10,
+    "baseline_median_ns": 888823.0,
+    "candidate_median_ns": 536302.0,
+    "speedup": 1.6573180782469579,
+    "baseline_samples": [
+      884246.0,
+      967296.0,
+      881832.0,
+      888823.0,
+      896291.0
+    ],
+    "candidate_samples": [
+      533406.0,
+      544536.0,
+      532221.0,
+      536302.0,
+      539644.0
+    ]
+  },
+  {
+    "label": "projection",
+    "workers": 1,
+    "baseline_median_ns": 1679854.0,
+    "candidate_median_ns": 914930.0,
+    "speedup": 1.836046473500705,
+    "baseline_samples": [
+      1688849.0,
+      1687847.0,
+      1679213.0,
+      1666377.0,
+      1679854.0
+    ],
+    "candidate_samples": [
+      914930.0,
+      926275.0,
+      922749.0,
+      909008.0,
+      910355.0
+    ]
+  },
+  {
+    "label": "projection",
+    "workers": 10,
+    "baseline_median_ns": 887754.0,
+    "candidate_median_ns": 509003.0,
+    "speedup": 1.7441036693300433,
+    "baseline_samples": [
+      887754.0,
+      909348.0,
+      877099.0,
+      887530.0,
+      893186.0
+    ],
+    "candidate_samples": [
+      507756.0,
+      528926.0,
+      504765.0,
+      509003.0,
+      514826.0
+    ]
+  },
+  {
+    "label": "descriptors",
+    "workers": 1,
+    "baseline_median_ns": 1690993.0,
+    "candidate_median_ns": 880105.0,
+    "speedup": 1.9213537021150886,
+    "baseline_samples": [
+      1690993.0,
+      1694914.0,
+      1678849.0,
+      1753542.0,
+      1677431.0
+    ],
+    "candidate_samples": [
+      880105.0,
+      882200.0,
+      890630.0,
+      876499.0,
+      862809.0
+    ]
+  },
+  {
+    "label": "descriptors",
+    "workers": 10,
+    "baseline_median_ns": 889859.0,
+    "candidate_median_ns": 484661.0,
+    "speedup": 1.8360441628272133,
+    "baseline_samples": [
+      878963.0,
+      889859.0,
+      884511.0,
+      907462.0,
+      890462.0
+    ],
+    "candidate_samples": [
+      483058.0,
+      484661.0,
+      481892.0,
+      484932.0,
+      488462.0
+    ]
+  },
+  {
+    "label": "clone_plan",
+    "workers": 1,
+    "baseline_median_ns": 1678589.0,
+    "candidate_median_ns": 876919.0,
+    "speedup": 1.914189337897799,
+    "baseline_samples": [
+      1690847.0,
+      1683978.0,
+      1678589.0,
+      1677863.0,
+      1671879.0
+    ],
+    "candidate_samples": [
+      872549.0,
+      885755.0,
+      876919.0,
+      878481.0,
+      866600.0
+    ]
+  },
+  {
+    "label": "clone_plan",
+    "workers": 10,
+    "baseline_median_ns": 885667.0,
+    "candidate_median_ns": 485311.0,
+    "speedup": 1.8249473018332574,
+    "baseline_samples": [
+      880923.0,
+      888941.0,
+      883142.0,
+      885667.0,
+      890817.0
+    ],
+    "candidate_samples": [
+      488453.0,
+      485311.0,
+      484790.0,
+      484539.0,
+      488096.0
+    ]
+  },
+  {
+    "label": "import_config",
+    "workers": 1,
+    "baseline_median_ns": 1673995.0,
+    "candidate_median_ns": 849171.0,
+    "speedup": 1.9713285074502074,
+    "baseline_samples": [
+      1684702.0,
+      1666309.0,
+      1676409.0,
+      1673230.0,
+      1673995.0
+    ],
+    "candidate_samples": [
+      849393.0,
+      849171.0,
+      841697.0,
+      835764.0,
+      855931.0
+    ]
+  },
+  {
+    "label": "import_config",
+    "workers": 10,
+    "baseline_median_ns": 884583.0,
+    "candidate_median_ns": 474695.0,
+    "speedup": 1.8634765480993059,
+    "baseline_samples": [
+      884583.0,
+      882908.0,
+      879624.0,
+      974813.0,
+      891732.0
+    ],
+    "candidate_samples": [
+      473802.0,
+      474695.0,
+      473658.0,
+      476000.0,
+      480250.0
+    ]
+  },
+  {
+    "label": "candidate",
+    "workers": 1,
+    "baseline_median_ns": 1686219.0,
+    "candidate_median_ns": 830195.0,
+    "speedup": 2.0311119676702463,
+    "baseline_samples": [
+      1690725.0,
+      1686219.0,
+      1675216.0,
+      1671902.0,
+      1716901.0
+    ],
+    "candidate_samples": [
+      838617.0,
+      833286.0,
+      830195.0,
+      824389.0,
+      823133.0
+    ]
+  },
+  {
+    "label": "candidate",
+    "workers": 10,
+    "baseline_median_ns": 884665.0,
+    "candidate_median_ns": 470200.0,
+    "speedup": 1.8814653339004679,
+    "baseline_samples": [
+      881515.0,
+      884665.0,
+      881763.0,
+      891941.0,
+      891717.0
+    ],
+    "candidate_samples": [
+      466215.0,
+      470200.0,
+      468842.0,
+      501488.0,
+      476278.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "baseline_median_ns": 1690493.0,
+    "candidate_median_ns": 829952.0,
+    "speedup": 2.036856348318939,
+    "baseline_samples": [
+      1690493.0,
+      1706533.0,
+      1680621.0,
+      1690188.0,
+      1696154.0
+    ],
+    "candidate_samples": [
+      839067.0,
+      832090.0,
+      829952.0,
+      820592.0,
+      824870.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "baseline_median_ns": 890172.0,
+    "candidate_median_ns": 477259.0,
+    "speedup": 1.8651759317267982,
+    "baseline_samples": [
+      883204.0,
+      881056.0,
+      1181671.0,
+      890172.0,
+      891783.0
+    ],
+    "candidate_samples": [
+      489610.0,
+      478882.0,
+      468706.0,
+      473373.0,
+      477259.0
+    ]
+  }
+]

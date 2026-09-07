@@ -1,0 +1,47 @@
+File: consumed_snapshot.test
+Type: alloc_space
+Time: Sep 7, 2026 at 12:25pm (CST)
+Showing nodes accounting for 2881.64MB, 96.69% of 2980.21MB total
+Dropped 184 nodes (cum <= 14.90MB)
+Showing top 40 nodes out of 74
+      flat  flat%   sum%        cum   cum%
+ 1335.20MB 44.80% 44.80%  1335.20MB 44.80%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewNodeBatch (inline)
+  238.21MB  7.99% 52.80%   431.78MB 14.49%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields
+  186.54MB  6.26% 59.05%   327.55MB 10.99%  encoding/json.mapEncoder.encode
+  152.03MB  5.10% 64.16%   157.53MB  5.29%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func3 (inline)
+     141MB  4.73% 68.89%      141MB  4.73%  reflect.copyVal
+  114.03MB  3.83% 72.71%   151.53MB  5.08%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.NodeToMap
+  113.36MB  3.80% 76.52%   440.91MB 14.79%  encoding/json.Marshal
+   75.08MB  2.52% 79.04%    75.08MB  2.52%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).take
+   61.51MB  2.06% 81.10%    61.51MB  2.06%  github.com/yaklang/yaklang/common/bin-parser/parser/base.cloneRuleDocumentValue
+   43.51MB  1.46% 82.56%    74.56MB  2.50%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).text
+   40.50MB  1.36% 83.92%    40.50MB  1.36%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.buildExactByteFieldTree.func2
+   36.04MB  1.21% 85.13%    36.04MB  1.21%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func2 (inline)
+   31.51MB  1.06% 86.19%    31.51MB  1.06%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).group (inline)
+   30.02MB  1.01% 87.19%   136.09MB  4.57%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).options
+   28.51MB  0.96% 88.15%   220.14MB  7.39%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeCassandraFields
+   27.54MB  0.92% 89.07%    27.54MB  0.92%  encoding/hex.EncodeToString (inline)
+   27.01MB  0.91% 89.98%    45.01MB  1.51%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.getNodeResultWithSettings
+   26.50MB  0.89% 90.87%    26.50MB  0.89%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyConfig (inline)
+      21MB   0.7% 91.57%  1748.72MB 58.68%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse
+   19.50MB  0.65% 92.23%    25.50MB  0.86%  os.statNolog
+   19.50MB  0.65% 92.88%    19.50MB  0.65%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).compactSet
+      19MB  0.64% 93.52%  2957.66MB 99.24%  github.com/yaklang/yaklang/common/bin-parser.currentCorpusParseWithProjection
+      18MB   0.6% 94.12%       18MB   0.6%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser._ConvertToVar
+   15.50MB  0.52% 94.65%    15.50MB  0.52%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).expandLocked
+      14MB  0.47% 95.12%    18.01MB   0.6%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*parserRuntimeMap).parser
+      14MB  0.47% 95.58%    17.50MB  0.59%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).OnRoot
+   10.01MB  0.34% 95.92%    16.51MB  0.55%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).initiate
+    6.50MB  0.22% 96.14%   514.49MB 17.26%  github.com/yaklang/yaklang/common/bin-parser/parser/base.instantiateRuleDocument
+    5.50MB  0.18% 96.32%   980.23MB 32.89%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.buildExactByteFieldTree
+    2.50MB 0.084% 96.41%  2345.22MB 78.69%  github.com/yaklang/yaklang/common/bin-parser/parser.ParseBinary
+       2MB 0.067% 96.47%  1737.72MB 58.31%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.execRegisteredNativeBridge
+       2MB 0.067% 96.54%    65.06MB  2.18%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse.func2
+       2MB 0.067% 96.61%  1739.72MB 58.38%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Operate
+    1.50MB  0.05% 96.66%   546.49MB 18.34%  github.com/yaklang/yaklang/common/bin-parser/parser/base.ParseRule
+       1MB 0.034% 96.69%    79.06MB  2.65%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Operate.func1
+         0     0% 96.69%   327.55MB 10.99%  encoding/json.(*encodeState).marshal
+         0     0% 96.69%   327.55MB 10.99%  encoding/json.(*encodeState).reflectValue
+         0     0% 96.69%   253.52MB  8.51%  encoding/json.arrayEncoder.encode
+         0     0% 96.69%   322.05MB 10.81%  encoding/json.interfaceEncoder
+         0     0% 96.69%   253.52MB  8.51%  encoding/json.sliceEncoder.encode

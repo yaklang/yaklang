@@ -1,0 +1,10 @@
+?   	github.com/yaklang/yaklang/common/bin-parser/internal/corpusutil	[no test files]
+?   	github.com/yaklang/yaklang/common/bin-parser/parser/ser_parser	[no test files]
+?   	github.com/yaklang/yaklang/common/bin-parser/rules	[no test files]
+?   	github.com/yaklang/yaklang/common/bin-parser/utils	[no test files]
+ok  	github.com/yaklang/yaklang/common/bin-parser	168.181s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser	2.946s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	0.594s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	5.840s
+ok  	github.com/yaklang/yaklang/common/bin-parser/protocol-impl	3.207s
+ok  	github.com/yaklang/yaklang/common/bin-parser/protocol-impl/msrdp	1.812s [no tests to run]

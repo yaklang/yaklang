@@ -1,0 +1,48 @@
+File: candidate_final.test
+Type: cpu
+Time: Sep 7, 2026 at 12:09pm (CST)
+Duration: 8.78s, Total samples = 7.70s (87.69%)
+Showing nodes accounting for 4.56s, 59.22% of 7.70s total
+Dropped 215 nodes (cum <= 0.04s)
+Showing top 40 nodes out of 142
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Node).Parse
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Operate
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ExecOperator
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOperatorProgram
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.execFreshOperator
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.execOperatorProgram
+         0     0%     0%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec (inline)
+     0.01s  0.13%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).call
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx (inline)
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).Call
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).NativeCall (inline)
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).nativeCall
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec (inline)
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).ExecYakCode.func1
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec (inline)
+         0     0%  0.13%      5.83s 75.71%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory
+         0     0%  0.13%      5.83s 75.71%  reflect.Value.Call
+         0     0%  0.13%      5.83s 75.71%  reflect.Value.call
+         0     0%  0.13%      5.82s 75.58%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ConvertToYakNode.func18
+         0     0%  0.13%      5.81s 75.45%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Operate.func1
+         0     0%  0.13%      5.81s 75.45%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse.func1
+         0     0%  0.13%      4.60s 59.74%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.getNodeLength
+     0.01s  0.13%  0.26%      4.60s 59.74%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.parseLengthByLengthConfig
+     0.48s  6.23%  6.49%      4.59s 59.61%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.calcNodeConsumedLength
+     1.38s 17.92% 24.42%      4.16s 54.03%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).Get
+     0.02s  0.26% 24.68%      4.11s 53.38%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BaseKV).LookupItem (inline)
+         0     0% 24.68%      3.81s 49.48%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ConvertToYakNode.func4
+         0     0% 24.68%      3.76s 48.83%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse.func2
+         0     0% 24.68%      2.01s 26.10%  runtime.systemstack
+     1.43s 18.57% 43.25%      1.58s 20.52%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).findLocked (inline)
+         0     0% 43.25%      1.24s 16.10%  runtime.(*mheap).alloc.func1
+         0     0% 43.25%      1.24s 16.10%  runtime.(*mheap).allocSpan
+     1.23s 15.97% 59.22%      1.23s 15.97%  runtime.madvise
+         0     0% 59.22%      1.23s 15.97%  runtime.sysUsed (inline)
+         0     0% 59.22%      1.23s 15.97%  runtime.sysUsedOS (inline)

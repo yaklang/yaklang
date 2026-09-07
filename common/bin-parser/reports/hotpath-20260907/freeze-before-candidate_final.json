@@ -1,0 +1,146 @@
+{
+  "created_utc": "2026-09-07T02:58:17.463671+00:00",
+  "platform": "macOS-14.1.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "go_version": "go version go1.22.12 darwin/arm64",
+  "go_env": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOEXPERIMENT": "",
+    "GOFLAGS": "",
+    "GOOS": "darwin",
+    "GOTOOLCHAIN": "auto",
+    "GOVERSION": "go1.22.12"
+  },
+  "stages": [
+    {
+      "label": "original",
+      "commit": "5b6cbe1f8f7e7e505f8f3aaa542d4ac12f0d3741",
+      "git_tree": "a78ed00f3ded0f65cc2d33fe2b9fe398f4193211",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/original.test",
+      "binary_sha256": "d44ad41bf4c19b03f004ceef0a4d40b8d7ba7818c0b63ba34769b10218178ea5",
+      "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "p0",
+      "commit": "b6cfeef970f4810604439c6da0075802a2a03ec3",
+      "git_tree": "ce6938b14a0218a7a5aaa448bffd988821cc9b10",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/p0.test",
+      "binary_sha256": "bf48ded48c51dce80de558dc1b54936b8a8b2cb35d240393dd5819597dcea69a",
+      "patch_sha256": "a11c77ba3b0101c08832fe5005a715e2abcca00bfdd188303184c0be350e730f",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "compact",
+      "commit": "8b15fd133ecfb7830e88d7909e7670961c4995e9",
+      "git_tree": "b1230e31ab8c0d85147734100f9799103691e475",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/compact.test",
+      "binary_sha256": "ca111254ac8e8303869a4d26d37f737fa67d1430123128f8133e734a19f52350",
+      "patch_sha256": "515ee4c7ecf297c5f9decbaba5d03c8898a6fbdcf01908aea38f6162c35ac209",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "windows",
+      "commit": "93573afb198ead9e832f2f12644ced4fd2f42a15",
+      "git_tree": "d56e1f5100937511f6d2c4624926d6ad020a9b4c",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/windows.test",
+      "binary_sha256": "b921c4ad800e5a3f0018c92362c439bda549d7f08da78ef5c561e00b69257748",
+      "patch_sha256": "12284cfd06d6d7dd83a148c85c85de4ae583746d65887c9ae5c3173242c8396d",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "rules",
+      "commit": "a70f37551a5c21084dc10162123241a9327a8c83",
+      "git_tree": "dc99b6ba7b42e4e8506865b267e432871f9460e0",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/rules.test",
+      "binary_sha256": "bef2d80faf311d106c0878b50c3096ddb41098291a12d96aeb1c5e3160d82ca8",
+      "patch_sha256": "6890526f3e55515efd88509e6c9831ada756887c6627ab8c174023fae7dc76e7",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "node_batch",
+      "commit": "7a008559ef7cd446fa92b0e11069f759d3c5c23d",
+      "git_tree": "629df710e5a3059d0aae15b7f10143aa92a16001",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/node_batch.test",
+      "binary_sha256": "e941b9246fd46fd384525d49aa5cfb05b27694cbdb654de5d1da6d2bb54cd988",
+      "patch_sha256": "7455c54d15e7f3c82d93dc1ec9c738e2d8d9b725e4f9c653b616b2da61147ee6",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "native_bridge",
+      "commit": "6a26dad1aa07bcb612ed8f830a91d7a225bae624",
+      "git_tree": "bbe333b51c83119ce85a6bbc8b23e2a860061826",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/native_bridge.test",
+      "binary_sha256": "a82f9486910a9492a32e38bb2e9500e6cfa0ebfd8d6cf72633f48b34b6a3df38",
+      "patch_sha256": "7fb3bf997675b89506bbfb5085b1d04bbe7f3c8e0d1d735b5554613838fcd68f",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "prefix",
+      "commit": "27fca80fbf6c09a409f9a9ca0aaf4d992af391d3",
+      "git_tree": "ce3c0d3d2dbbc7618f912081ba62e944ea76e5fe",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/prefix.test",
+      "binary_sha256": "2c12cebd374ff322c28ca0178e55d66aa6a775b1d1ab39346239b607ff29e37f",
+      "patch_sha256": "efff56c654dedf1d2597b2d27d5512ac03224c993c7622b6d657bc5a9bb77b12",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "rule_batch",
+      "commit": "cc4acef5959c1d9248da4bb4e77caef34294eb64",
+      "git_tree": "698ef0367f929cb11123d9f57fa5abc35b91c7ef",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/rule_batch.test",
+      "binary_sha256": "fa0dfcba9277161c8290b89e0192b0d67f939be92c4f6f26231cc8a1237a2a76",
+      "patch_sha256": "44f81d1ee48a1cb557644cca53845be89987b6458153238e39213f114eae9c1b",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "projection",
+      "commit": "93ddd19beb114fae98e42aaf616dd7c177f22325",
+      "git_tree": "1e8f5296e3adf93f9a88e93ea8f95b951b12d253",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/projection.test",
+      "binary_sha256": "552a1a4ff557a215a096fdf53d40ec76f755a4977cf62ae184287b0fe2dd4755",
+      "patch_sha256": "5173e7c0a85d90cc03a2052f24ad7abb918dd32a5e84512d62d2a14a9499385e",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "descriptors",
+      "commit": "18152b70150969b072ec7b852b52d25b0b77e331",
+      "git_tree": "3d710ec06ee9ce363ae39220fb69ac9d1af8d095",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/descriptors.test",
+      "binary_sha256": "0701ccb888856d593d93800c3441b3f07a38e4ca81cac5d44364cfec1a7cc86d",
+      "patch_sha256": "28c5f47cc72ae993a56a3c92e79424fe9539d1a257fa2f4cb08faad54fa8423c",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "clone_plan",
+      "commit": "97494dd992286ab86598b436b8bc94a58119577b",
+      "git_tree": "040966de63e29198eeb973cd283f8e819cb7a9d1",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/clone_plan.test",
+      "binary_sha256": "a79e35a5342f7c57091a15697d29e57d4031010898a8d468b3c27af328145e12",
+      "patch_sha256": "f2717b72601ea6781a2279a32be919024fad89693ef0b411d704209184554ab4",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "import_config",
+      "commit": "69d3d823dd9ee7ee6a579cd1942ee801a859c212",
+      "git_tree": "74fb5ae4bfc566aa1b7b688e745a08653532572d",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/import_config.test",
+      "binary_sha256": "27e9b3636ed7935032892a3c63dbfff52bff9d316c79c834655157601b2a8d0b",
+      "patch_sha256": "b6b94236b293a6fc6e707b4d49d7d42c4ecd4d90c78c601d705b7e1ebe6caa6f",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    },
+    {
+      "label": "candidate",
+      "commit": "379f6099bf72b9da7748c9be1f1fb78eab4bb48a",
+      "git_tree": "bc537c00601b8c22a09f7a5c99b525f44a0270ad",
+      "binary": "/Users/v1ll4n/Documents/Codex/artifacts/bin-parser-5013-20260907/candidate.test",
+      "binary_sha256": "f07dd9d6607890d4330b474714c7505c15a66ebd60a015b4208507a8dc7d1372",
+      "patch_sha256": "c6793231cf71a2cbc221cb9d4b0a8cfd589448bcf81102a6fbacda6630f00b1c",
+      "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+    }
+  ],
+  "script_sha256": "02ccbdf8a3cf8466b2a5357024c5231b39b9ced18d8c56682511be8facb2d462",
+  "original_archive_sha256": "6c44f91050f6a2a5fdf7f6c905a522b8aed3f2359f28ba345d02e7698ddbc8cd",
+  "complete": true
+}

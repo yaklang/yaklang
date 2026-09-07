@@ -1,0 +1,602 @@
+[
+  {
+    "label": "original",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 70,
+    "median": {
+      "ns/op": 1683065.5,
+      "MB/s": 0.84,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6535.5,
+      "workers": 1.0,
+      "B/op": 1397286.5,
+      "allocs/op": 14376.0
+    },
+    "range_ns": [
+      1666309.0,
+      1753542.0
+    ]
+  },
+  {
+    "label": "p0",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1670739.0,
+      "MB/s": 0.85,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 6584.0,
+      "workers": 1.0,
+      "B/op": 1397287.0,
+      "allocs/op": 14376.0
+    },
+    "range_ns": [
+      1667801.0,
+      1681273.0
+    ]
+  },
+  {
+    "label": "compact",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1449953.0,
+      "MB/s": 0.98,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 7586.0,
+      "workers": 1.0,
+      "B/op": 1029611.0,
+      "allocs/op": 12815.0
+    },
+    "range_ns": [
+      1434306.0,
+      1459938.0
+    ]
+  },
+  {
+    "label": "windows",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1390191.0,
+      "MB/s": 1.02,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 7913.0,
+      "workers": 1.0,
+      "B/op": 958738.0,
+      "allocs/op": 10905.0
+    },
+    "range_ns": [
+      1377754.0,
+      1394633.0
+    ]
+  },
+  {
+    "label": "rules",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1343797.0,
+      "MB/s": 1.06,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 8186.0,
+      "workers": 1.0,
+      "B/op": 942717.0,
+      "allocs/op": 10459.0
+    },
+    "range_ns": [
+      1332045.0,
+      1381788.0
+    ]
+  },
+  {
+    "label": "node_batch",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1291466.0,
+      "MB/s": 1.1,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 8517.0,
+      "workers": 1.0,
+      "B/op": 952612.0,
+      "allocs/op": 9027.0
+    },
+    "range_ns": [
+      1280658.0,
+      1358307.0
+    ]
+  },
+  {
+    "label": "native_bridge",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 1009679.0,
+      "MB/s": 1.41,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 10895.0,
+      "workers": 1.0,
+      "B/op": 907871.0,
+      "allocs/op": 8352.0
+    },
+    "range_ns": [
+      1001651.0,
+      1017304.0
+    ]
+  },
+  {
+    "label": "prefix",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 969238.0,
+      "MB/s": 1.47,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 11349.0,
+      "workers": 1.0,
+      "B/op": 793556.0,
+      "allocs/op": 8230.0
+    },
+    "range_ns": [
+      961509.0,
+      977830.0
+    ]
+  },
+  {
+    "label": "rule_batch",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 959502.0,
+      "MB/s": 1.48,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 11464.0,
+      "workers": 1.0,
+      "B/op": 817839.0,
+      "allocs/op": 7626.0
+    },
+    "range_ns": [
+      945673.0,
+      972238.0
+    ]
+  },
+  {
+    "label": "projection",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 914930.0,
+      "MB/s": 1.55,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12023.0,
+      "workers": 1.0,
+      "B/op": 815770.0,
+      "allocs/op": 7609.0
+    },
+    "range_ns": [
+      909008.0,
+      926275.0
+    ]
+  },
+  {
+    "label": "descriptors",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 880105.0,
+      "MB/s": 1.61,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12499.0,
+      "workers": 1.0,
+      "B/op": 791464.0,
+      "allocs/op": 6791.0
+    },
+    "range_ns": [
+      862809.0,
+      890630.0
+    ]
+  },
+  {
+    "label": "clone_plan",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 876919.0,
+      "MB/s": 1.62,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12544.0,
+      "workers": 1.0,
+      "B/op": 791199.0,
+      "allocs/op": 6780.0
+    },
+    "range_ns": [
+      866600.0,
+      885755.0
+    ]
+  },
+  {
+    "label": "import_config",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 849171.0,
+      "MB/s": 1.67,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12954.0,
+      "workers": 1.0,
+      "B/op": 737258.0,
+      "allocs/op": 6525.0
+    },
+    "range_ns": [
+      835764.0,
+      855931.0
+    ]
+  },
+  {
+    "label": "candidate",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 830195.0,
+      "MB/s": 1.71,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 13250.0,
+      "workers": 1.0,
+      "B/op": 720794.0,
+      "allocs/op": 6470.0
+    },
+    "range_ns": [
+      823133.0,
+      838617.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 1,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 829952.0,
+      "MB/s": 1.71,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 13254.0,
+      "workers": 1.0,
+      "B/op": 721059.0,
+      "allocs/op": 6481.0
+    },
+    "range_ns": [
+      820592.0,
+      839067.0
+    ]
+  },
+  {
+    "label": "original",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 70,
+    "median": {
+      "ns/op": 888143.5,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12385.5,
+      "workers": 10.0,
+      "B/op": 1419791.0,
+      "allocs/op": 14403.0
+    },
+    "range_ns": [
+      877099.0,
+      1181671.0
+    ]
+  },
+  {
+    "label": "p0",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 887045.0,
+      "MB/s": 1.6,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 12401.0,
+      "workers": 10.0,
+      "B/op": 1420234.0,
+      "allocs/op": 14404.0
+    },
+    "range_ns": [
+      882190.0,
+      1037794.0
+    ]
+  },
+  {
+    "label": "compact",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 760531.0,
+      "MB/s": 1.87,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 14464.0,
+      "workers": 10.0,
+      "B/op": 1048985.0,
+      "allocs/op": 12841.0
+    },
+    "range_ns": [
+      756725.0,
+      797898.0
+    ]
+  },
+  {
+    "label": "windows",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 726535.0,
+      "MB/s": 1.96,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 15140.0,
+      "workers": 10.0,
+      "B/op": 977473.0,
+      "allocs/op": 10930.0
+    },
+    "range_ns": [
+      720431.0,
+      733560.0
+    ]
+  },
+  {
+    "label": "rules",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 724890.0,
+      "MB/s": 1.96,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 15175.0,
+      "workers": 10.0,
+      "B/op": 961475.0,
+      "allocs/op": 10484.0
+    },
+    "range_ns": [
+      718746.0,
+      757154.0
+    ]
+  },
+  {
+    "label": "node_batch",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 708289.0,
+      "MB/s": 2.01,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 15530.0,
+      "workers": 10.0,
+      "B/op": 973716.0,
+      "allocs/op": 9054.0
+    },
+    "range_ns": [
+      695834.0,
+      746223.0
+    ]
+  },
+  {
+    "label": "native_bridge",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 553062.0,
+      "MB/s": 2.57,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 19889.0,
+      "workers": 10.0,
+      "B/op": 929509.0,
+      "allocs/op": 8379.0
+    },
+    "range_ns": [
+      550458.0,
+      572611.0
+    ]
+  },
+  {
+    "label": "prefix",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 534972.0,
+      "MB/s": 2.66,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 20562.0,
+      "workers": 10.0,
+      "B/op": 812841.0,
+      "allocs/op": 8256.0
+    },
+    "range_ns": [
+      531771.0,
+      542098.0
+    ]
+  },
+  {
+    "label": "rule_batch",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 536302.0,
+      "MB/s": 2.65,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 20511.0,
+      "workers": 10.0,
+      "B/op": 838102.0,
+      "allocs/op": 7652.0
+    },
+    "range_ns": [
+      532221.0,
+      544536.0
+    ]
+  },
+  {
+    "label": "projection",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 509003.0,
+      "MB/s": 2.79,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 21611.0,
+      "workers": 10.0,
+      "B/op": 835770.0,
+      "allocs/op": 7635.0
+    },
+    "range_ns": [
+      504765.0,
+      528926.0
+    ]
+  },
+  {
+    "label": "descriptors",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 484661.0,
+      "MB/s": 2.93,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 22696.0,
+      "workers": 10.0,
+      "B/op": 811805.0,
+      "allocs/op": 6818.0
+    },
+    "range_ns": [
+      481892.0,
+      488462.0
+    ]
+  },
+  {
+    "label": "clone_plan",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 485311.0,
+      "MB/s": 2.93,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 22666.0,
+      "workers": 10.0,
+      "B/op": 811585.0,
+      "allocs/op": 6806.0
+    },
+    "range_ns": [
+      484539.0,
+      488453.0
+    ]
+  },
+  {
+    "label": "import_config",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 474695.0,
+      "MB/s": 2.99,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23173.0,
+      "workers": 10.0,
+      "B/op": 756395.0,
+      "allocs/op": 6551.0
+    },
+    "range_ns": [
+      473658.0,
+      480250.0
+    ]
+  },
+  {
+    "label": "candidate",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 470200.0,
+      "MB/s": 3.02,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23394.0,
+      "workers": 10.0,
+      "B/op": 739277.0,
+      "allocs/op": 6496.0
+    },
+    "range_ns": [
+      466215.0,
+      501488.0
+    ]
+  },
+  {
+    "label": "candidate_final",
+    "workers": 10,
+    "name": "BenchmarkCurrentCorpusApplicationJSON",
+    "samples": 5,
+    "median": {
+      "ns/op": 477259.0,
+      "MB/s": 2.98,
+      "input-B/op": 1421.0,
+      "messages/op": 11.0,
+      "messages/s": 23048.0,
+      "workers": 10.0,
+      "B/op": 739410.0,
+      "allocs/op": 6507.0
+    },
+    "range_ns": [
+      468706.0,
+      489610.0
+    ]
+  }
+]

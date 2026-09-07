@@ -1,0 +1,4 @@
+package cwdcost
+import("os";"path/filepath";"testing")
+func TestWorkingDirectory(t *testing.T) { d,e:=os.Getwd(); t.Logf("PWD=%q Getwd=%q err=%v",os.Getenv("PWD"),d,e) }
+func BenchmarkPathMetadata(b *testing.B) { b.ReportAllocs(); for i:=0;i<b.N;i++ { if _,e:=filepath.Abs(filepath.Dir("application-layer/memcached_fields.yaml")); e!=nil {b.Fatal(e)} } }
