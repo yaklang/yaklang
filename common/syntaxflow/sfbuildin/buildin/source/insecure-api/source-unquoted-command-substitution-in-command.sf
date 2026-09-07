@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-unquoted-command-substitution-in-command"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from rule `unquoted-command-substitution-in-command` (upstream/bash/lang/correctness/unquoted-expansion.yaml).
-Original message: The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable. You should surround it with double quotes to avoid splitting the result.
+### 规则说明
+The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable. You should surround it with double quotes to avoid splitting the result.
 
-CWE: -
-References:
-- 
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — `$(...)` / backtick substitution hits are dropped inside double-quoted regions (pattern-not-inside) and excluded when preceded by `=` (assignment) or `$((` (arithmetic).
+
+### 参考
+- CWE: -
 DESC
 	solution: <<<SOLUTION
-Double-quote command substitutions in commands to prevent word splitting.
+### 修复建议
+对变量和命令替换使用双引号，避免依赖 IFS 进行隐式拆分。
 SOLUTION
 	alert_min: 1
 	"file://pos.bash": <<<POS

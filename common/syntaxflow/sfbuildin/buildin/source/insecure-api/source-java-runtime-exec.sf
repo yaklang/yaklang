@@ -8,10 +8,21 @@ desc(
 	rule_id: "source-java-runtime-exec"
 	risk: "command-injection"
 	desc: <<<DESC
-Flags Runtime.getRuntime().exec(...) which often leads to command injection when fed with untrusted input.
+### 规则说明
+检测 Detect Java Runtime.exec Usage 相关的风险模式。
+
+### 风险类型
+命令注入（command-injection）
+
+### 影响
+用户输入未经安全处理即拼接到系统命令中，可能导致任意命令执行。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Avoid shelling out; if required, use ProcessBuilder with argument lists and strict allowlists.
+### 修复建议
+避免拼接命令，使用参数化 API，并对输入进行白名单校验。
 SOLUTION
 	alert_min: 1
 	"file://Run.java": <<<POS

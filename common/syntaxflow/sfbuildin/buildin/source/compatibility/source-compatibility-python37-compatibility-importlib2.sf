@@ -8,12 +8,27 @@ desc(
 	rule_id: "source-compatibility-python37-compatibility-importlib2"
 	risk: "code-style"
 	desc: <<<DESC
-Migrated from rule `python37-compatibility-importlib2` (python/lang/compatibility/python37.yaml).
-Original message: Found 'importlib.resources', which is a module only available on Python 3.7+. This does not work in lower versions, and therefore is not backwards compatible. Use importlib_resources instead for older Python versions.
+### 规则说明
+Found 'importlib.resources', which is a module only available on Python 3.7+. This does not work in lower versions, and therefore is not backwards compatible. Use importlib_resources instead for older Python versions.
+
+### 风险类型
+代码规范与兼容性（code-style）
+
+### 影响
+使用了已废弃、不兼容或不符合规范的模式，可能导致后续维护困难或运行环境差异。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+
+推荐修复：
+Use importlib_resources instead for older Python versions.
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

@@ -8,16 +8,30 @@ desc(
 	rule_id: "source-insecure-api-use-of-md5-clojure"
 	risk: "weak-hash"
 	desc: <<<DESC
-Migrated from rule `use-of-md5` (clojure/lang/security/use-of-md5.yaml).
-Original message: MD5 hash algorithm detected. This is not collision resistant and leads to easily-cracked password hashes. Replace with current recommended hashing algorithms.
-CWE: CWE-328: Use of Weak Hash
-References:
-- https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+### 规则说明
+MD5 hash algorithm detected. This is not collision resistant and leads to easily-cracked password hashes. Replace with current recommended hashing algorithms.
+
+### 风险类型
+弱哈希算法（weak-hash）
+
+### 影响
+使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-328: Use of Weak Hash
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+改用 SHA-256/SHA-3 或针对口令使用 bcrypt/Argon2 等专用算法。
+
+推荐修复：
+Replace with current recommended hashing algorithms.
 SOLUTION
 	alert_min: 1
 	"file://pos.clj": <<<POS

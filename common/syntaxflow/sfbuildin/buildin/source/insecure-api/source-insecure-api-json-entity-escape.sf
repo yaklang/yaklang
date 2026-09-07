@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-json-entity-escape"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from rule `json-entity-escape` (ruby/lang/security/json-entity-escape.yaml).
-Original message: Checks if HTML escaping is globally disabled for JSON output. This could lead to XSS.
-CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
-References:
-- https://owasp.org/Top10/A03_2021-Injection
+### 规则说明
+Checks if HTML escaping is globally disabled for JSON output. This could lead to XSS.
+
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

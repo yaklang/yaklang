@@ -8,15 +8,30 @@ desc(
 	rule_id: "source-insecure-api-force-ssl-false"
 	risk: "insecure-tls"
 	desc: <<<DESC
-Migrated from rule `force-ssl-false` (ruby/lang/security/force-ssl-false.yaml).
-Original message: Checks for configuration setting of force_ssl to false. Force_ssl forces usage of HTTPS, which could lead to network interception of unencrypted application traffic. To fix, set config.force_ssl = true.
-CWE: CWE-311: Missing Encryption of Sensitive Data
-References:
-- https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_force_ssl.rb
+### 规则说明
+Checks for configuration setting of force_ssl to false. Force_ssl forces usage of HTTPS, which could lead to network interception of unencrypted application traffic. To fix, set config.force_ssl = true.
+
+### 风险类型
+不安全的 TLS 配置（insecure-tls）
+
+### 影响
+使用旧版 TLS/SSL 或关闭强制 HTTPS，通信可能被降级或窃听。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-311: Missing Encryption of Sensitive Data
 DESC
 	solution: <<<SOLUTION
-Preferred replacement: = true
+### 修复建议
+启用 TLS 1.2+，强制 HTTPS，并关闭不安全的协议版本。
+
+推荐修复：
+To fix, set config.force_ssl = true.
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

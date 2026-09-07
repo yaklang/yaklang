@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-insecure-api-apex-specify-sharing-level"
 	risk: "access-control"
 	desc: <<<DESC
-Migrated from rule `specify-sharing-level` (upstream/apex/lang/security/ncino/sharing/SpecifySharingLevel.yaml).
-Original message: Every Apex class should have an explicit sharing mode declared. Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced. Use the `inherited sharing` keyword on an Apex class to run the class in the sharing mode of the class that called it.
+### 规则说明
+Every Apex class should have an explicit sharing mode declared. Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced. Use the `inherited sharing` keyword on an Apex class to run the class in the sharing mode of the class that called it.
 
-CWE: CWE-284: Improper Access Control
-References:
-- https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta.apexcode/apex_classes_keywords_sharing.htm
-- https://cwe.mitre.org/data/definitions/284.html
+### 风险类型
+访问控制缺陷（access-control）
+
+### 影响
+资源或接口的访问权限设置不当，可能允许越权访问。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: CWE-284: Improper Access Control
 DESC
 	solution: <<<SOLUTION
-Declare `with sharing`, `without sharing`, or `inherited sharing` explicitly on every Apex class.
+### 修复建议
+按最小权限原则配置访问控制，并验证所有请求的授权状态。
+
+推荐修复：
+Use the `with sharing` or `without sharing` keywords on a class to specify whether sharing rules must be enforced.
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

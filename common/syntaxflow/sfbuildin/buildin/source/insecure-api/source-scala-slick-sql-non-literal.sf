@@ -8,17 +8,27 @@ desc(
 	rule_id: "source-scala-slick-sql-non-literal"
 	risk: "sql-injection"
 	desc: <<<DESC
-Migrated from rule `scala-slick-sql-non-literal` (upstream/scala/slick/security/scala-slick-sql-non-literal.yaml).
-Original message: Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized. Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
+### 规则说明
+Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized. Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
 
-CWE: CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')
-References:
-- https://scala-slick.org/doc/3.3.3/sql.html#splicing-literal-values
-- https://find-sec-bugs.github.io/bugs.htm#SCALA_SQL_INJECTION_SLICK
+### 风险类型
+SQL 注入（sql-injection）
+
+### 影响
+用户输入未参数化即拼接到 SQL 中，可能导致数据泄露或篡改。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — `#$` hits are kept only inside `sql"..."` strings (pattern) and inside `import slick...` regions (pattern-inside, AND of two contexts).
+
+### 参考
+- CWE: CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')
 DESC
 	solution: <<<SOLUTION
-Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
+### 修复建议
+使用参数化查询或 ORM，禁止拼接 SQL。
 SOLUTION
 	alert_min: 1
 	"file://pos.scala": <<<POS

@@ -8,17 +8,30 @@ desc(
 	rule_id: "source-insecure-api-cbc-padding-oracle"
 	risk: "weak-cryptography"
 	desc: <<<DESC
-Migrated from rule `cbc-padding-oracle` (java/lang/security/audit/cbc-padding-oracle.yaml).
-Original message: Using CBC with PKCS5Padding is susceptible to padding oracle attacks. A malicious actor could discern the difference between plaintext with valid or invalid padding. Further, CBC mode does not include any integrity checks. Use 'AES/GCM/NoPadding' instead.
-CWE: CWE-327: Use of a Broken or Risky Cryptographic Algorithm
-References:
-- https://capec.mitre.org/data/definitions/463.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#cipher-modes
-- https://find-sec-bugs.github.io/bugs.htm#CIPHER_INTEGRITY
+### 规则说明
+Using CBC with PKCS5Padding is susceptible to padding oracle attacks. A malicious actor could discern the difference between plaintext with valid or invalid padding. Further, CBC mode does not include any integrity checks. Use 'AES/GCM/NoPadding' instead.
+
+### 风险类型
+弱加密算法（weak-cryptography）
+
+### 影响
+使用 CBC、PKCS5Padding 等易受攻击的加密模式或弱算法。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-327: Use of a Broken or Risky Cryptographic Algorithm
 DESC
 	solution: <<<SOLUTION
-Preferred fix: "AES/GCM/NoPadding"
+### 修复建议
+改用经过验证的安全算法和模式，如 AES-GCM。
+
+推荐修复：
+Use 'AES/GCM/NoPadding' instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.java": <<<POS

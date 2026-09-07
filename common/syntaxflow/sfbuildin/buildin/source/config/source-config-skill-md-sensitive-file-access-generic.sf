@@ -8,16 +8,24 @@ desc(
 	rule_id: "source-config-skill-md-sensitive-file-access-generic"
 	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from rule `skill-md-sensitive-file-access-generic` (upstream/ai/ai-best-practices/skill-md-sensitive-file-access/skill-md-sensitive-file-access.yaml).
-Original message: SKILL.md or AGENT.md instructs the agent to read sensitive credential files such as ~/.ssh/id_rsa, ~/.aws/credentials, /etc/shadow, .env, or browser cookie stores. Agents that load this skill will treat the directive as authoritative and may exfiltrate the contents. Remove the file-access directive or scope it to user-supplied paths.
+### 规则说明
+SKILL.md or AGENT.md instructs the agent to read sensitive credential files such as ~/.ssh/id_rsa, ~/.aws/credentials, /etc/shadow, .env, or browser cookie stores. Agents that load this skill will treat the directive as authoritative and may exfiltrate the contents. Remove the file-access directive or scope it to user-supplied paths.
 
-CWE: CWE-538: Insertion of Sensitive Information into Externally-Accessible File or Directory
-References:
-- https://github.com/Agent-Threat-Rule/agent-threat-rules
-- https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
+### 风险类型
+敏感信息泄露（information-exposure）
+
+### 影响
+应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE: CWE-538: Insertion of Sensitive Information into Externally-Accessible File or Directory
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
 SOLUTION
 	alert_min: 1
 	"file://posSKILL.md": <<<POS

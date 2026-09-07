@@ -8,19 +8,30 @@ desc(
 	rule_id: "source-insecure-api-use-escapexml"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from rule `use-escapexml` (upstream/java/lang/security/audit/xss/jsp/use-escapexml.yaml).
-Original message: Detected an Expression Language segment that does not escape output. This is dangerous because if any data in this expression can be controlled externally, it is a cross-site scripting vulnerability. Instead, use the 'escapeXml' function from the JSTL taglib. See https://www.tutorialspoint.com/jsp/jstl_function_escapexml.htm for more information.
+### 规则说明
+Detected an Expression Language segment that does not escape output. This is dangerous because if any data in this expression can be controlled externally, it is a cross-site scripting vulnerability. Instead, use the 'escapeXml' function from the JSTL taglib. See https://www.tutorialspoint.com/jsp/jstl_function_escapexml.htm for more information.
 
-CWE: CWE-116: Improper Encoding or Escaping of Output
-References:
-- https://www.tutorialspoint.com/jsp/jstl_function_escapexml.htm
-- https://stackoverflow.com/a/4948856
-- https://stackoverflow.com/a/3180202
+### 风险类型
+跨站脚本（XSS）（xss）
 
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 False-positive hardening: drop JS template/string uses of ${...} (backtick templates and single-quoted JS strings).
+
+### 参考
+- CWE: CWE-116: Improper Encoding or Escaping of Output
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+
+推荐修复：
+Instead, use the 'escapeXml' function from the JSTL taglib.
 SOLUTION
 	alert_min: 1
 	"file://pos.jsp": <<<POS

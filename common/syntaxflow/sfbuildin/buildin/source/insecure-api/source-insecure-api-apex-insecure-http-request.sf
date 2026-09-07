@@ -8,16 +8,27 @@ desc(
 	rule_id: "source-insecure-api-apex-insecure-http-request"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
-Migrated from rule `insecure-http-request` (upstream/apex/lang/security/ncino/endpoints/InsecureHttpRequest.yaml).
-Original message: The software transmits sensitive or security-critical data in cleartext in a communication channel that can be sniffed by unauthorized actors.
+### 规则说明
+The software transmits sensitive or security-critical data in cleartext in a communication channel that can be sniffed by unauthorized actors.
 
-CWE: CWE-319: Cleartext Transmission of Sensitive Information
-References:
-- https://cwe.mitre.org/data/definitions/319.html
+### 风险类型
+明文传输（cleartext-transmission）
+
+### 影响
+敏感数据通过 HTTP 等明文通道传输，可能被网络窃听。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: original paths.exclude for *Test*/*test* is not yet applied by the source path filter.
+
+### 参考
+- CWE: CWE-319: Cleartext Transmission of Sensitive Information
 DESC
 	solution: <<<SOLUTION
-Use HTTPS for Apex callouts and validate TLS certificates. Remove cleartext HTTP endpoints and test callouts from production code.
+### 修复建议
+改用 HTTPS/TLS 传输，并确保所有敏感请求都走加密通道。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-rails-skip-forgery-protection"
 	risk: "csrf"
 	desc: <<<DESC
-Migrated from rule `rails-skip-forgery-protection` (ruby/rails/security/audit/rails-skip-forgery-protection.yaml).
-Original message: This call turns off CSRF protection allowing CSRF attacks against the application
-CWE: CWE-352: Cross-Site Request Forgery (CSRF)
-References:
-- https://api.rubyonrails.org/classes/ActionController/RequestForgeryProtection/ClassMethods.html#method-i-skip_forgery_protection
+### 规则说明
+This call turns off CSRF protection allowing CSRF attacks against the application
+
+### 风险类型
+跨站请求伪造（csrf）
+
+### 影响
+缺少 CSRF 防护时，攻击者可诱导用户执行非预期操作。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-352: Cross-Site Request Forgery (CSRF)
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+启用 CSRF 令牌校验，并验证请求来源。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

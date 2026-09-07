@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-detect-pseudoRandomBytes"
 	risk: "weak-randomness"
 	desc: <<<DESC
-Migrated from rule `detect-pseudoRandomBytes` (javascript/lang/security/detect-pseudoRandomBytes.yaml).
-Original message: Detected usage of crypto.pseudoRandomBytes, which does not produce secure random numbers.
-CWE: CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)
-References:
-- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+### 规则说明
+Detected usage of crypto.pseudoRandomBytes, which does not produce secure random numbers.
+
+### 风险类型
+弱随机数（weak-randomness）
+
+### 影响
+使用不安全的伪随机数生成器，可能导致令牌、密钥或安全决策可预测。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+使用密码学安全的随机数生成器。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

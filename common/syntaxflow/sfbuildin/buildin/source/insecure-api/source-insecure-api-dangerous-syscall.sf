@@ -8,15 +8,27 @@ desc(
 	rule_id: "source-insecure-api-dangerous-syscall"
 	risk: "unsafe-implementation"
 	desc: <<<DESC
-Migrated from rule `dangerous-syscall` (ruby/lang/security/dangerous-syscall.yaml).
-Original message: 'syscall' is essentially unsafe and unportable. The DL (https://apidock.com/ruby/Fiddle) library is preferred for safer and a bit more portable programming.
-CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')
-References:
-- https://owasp.org/Top10/A03_2021-Injection
+### 规则说明
+'syscall' is essentially unsafe and unportable. The DL (https://apidock.com/ruby/Fiddle) library is preferred for safer and a bit more portable programming.
+
+### 风险类型
+不安全实现（unsafe-implementation）
+
+### 影响
+使用了不安全或不稳定的底层调用，可能引入内存安全或逻辑风险。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+改用受控的安全 API，并补充必要的边界检查。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

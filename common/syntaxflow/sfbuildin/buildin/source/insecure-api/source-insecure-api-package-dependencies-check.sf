@@ -8,18 +8,27 @@ desc(
 	rule_id: "source-insecure-api-package-dependencies-check"
 	risk: "sca"
 	desc: <<<DESC
-Migrated from rule `package-dependencies-check` (upstream/json/npm/security/package-dependencies-check.yml).
-Original message: Package dependencies with variant versions may lead to dependency hijack and confusion attacks. Better to specify an exact version or use package-lock.json for a specific version of the package.
+### 规则说明
+Package dependencies with variant versions may lead to dependency hijack and confusion attacks. Better to specify an exact version or use package-lock.json for a specific version of the package.
 
-CWE: CWE-427: Uncontrolled Search Path Element
-References:
-- https://security.snyk.io/vuln/SNYK-JS-COLORS-2331906
-- https://medium.com/@alex.birsan/dependency-confusion-4a5d60fec610
-- https://cwe.mitre.org/data/definitions/427.html
+### 风险类型
+依赖与供应链风险（sca）
+
+### 影响
+依赖版本使用可变范围或存在已知漏洞，可能引入供应链攻击。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — dependency entries are kept only inside dependencies blocks and dropped inside `_shrinkwrap` blocks. Prerelease exact versions are excluded by the original negative regex.
+
+### 参考
+- CWE: CWE-427: Uncontrolled Search Path Element
 DESC
 	solution: <<<SOLUTION
-Pin dependencies to exact versions, or commit a lockfile and validate all dependency ranges before installation.
+### 修复建议
+固定依赖版本，使用锁文件，并定期扫描依赖漏洞。
 SOLUTION
 	alert_min: 1
 	"file://package.json": <<<POS

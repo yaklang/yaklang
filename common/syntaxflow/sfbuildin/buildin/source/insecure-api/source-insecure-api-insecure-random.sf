@@ -8,15 +8,30 @@ desc(
 	rule_id: "source-insecure-api-insecure-random"
 	risk: "weak-randomness"
 	desc: <<<DESC
-Migrated from rule `insecure-random` (scala/lang/security/audit/insecure-random.yaml).
-Original message: Flags the use of a predictable random value from `scala.util.Random`. This can lead to vulnerabilities when used in security contexts, such as in a CSRF token, password reset token, or any other secret value. To fix this, use java.security.SecureRandom instead.
-CWE: CWE-330: Use of Insufficiently Random Values
-References:
-- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+### 规则说明
+Flags the use of a predictable random value from `scala.util.Random`. This can lead to vulnerabilities when used in security contexts, such as in a CSRF token, password reset token, or any other secret value. To fix this, use java.security.SecureRandom instead.
+
+### 风险类型
+弱随机数（weak-randomness）
+
+### 影响
+使用不安全的伪随机数生成器，可能导致令牌、密钥或安全决策可预测。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-330: Use of Insufficiently Random Values
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+使用密码学安全的随机数生成器。
+
+推荐修复：
+To fix this, use java.security.SecureRandom instead.
 SOLUTION
 	alert_min: 1
 	"file://pos.scala": <<<POS

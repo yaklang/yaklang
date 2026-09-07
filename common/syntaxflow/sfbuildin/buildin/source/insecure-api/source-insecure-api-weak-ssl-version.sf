@@ -8,17 +8,30 @@ desc(
 	rule_id: "source-insecure-api-weak-ssl-version"
 	risk: "insecure-tls"
 	desc: <<<DESC
-Migrated from rule `weak-ssl-version` (python/lang/security/audit/weak-ssl-version.yaml).
-Original message: An insecure SSL version was detected. TLS versions 1.0, 1.1, and all SSL versions are considered weak encryption and are deprecated. Use 'ssl.PROTOCOL_TLSv1_2' or higher.
-CWE: CWE-326: Inadequate Encryption Strength
-References:
-- https://tools.ietf.org/html/rfc7568
-- https://tools.ietf.org/id/draft-ietf-tls-oldversions-deprecate-02.html
-- https://docs.python.org/3/library/ssl.html#ssl.PROTOCOL_TLSv1_2
+### 规则说明
+An insecure SSL version was detected. TLS versions 1.0, 1.1, and all SSL versions are considered weak encryption and are deprecated. Use 'ssl.PROTOCOL_TLSv1_2' or higher.
+
+### 风险类型
+不安全的 TLS 配置（insecure-tls）
+
+### 影响
+使用旧版 TLS/SSL 或关闭强制 HTTPS，通信可能被降级或窃听。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: source-mode regex approximation of a safe-literal pattern.
+
+### 参考
+- CWE: CWE-326: Inadequate Encryption Strength
 DESC
 	solution: <<<SOLUTION
-Review this occurrence and replace it with a safer alternative.
+### 修复建议
+启用 TLS 1.2+，强制 HTTPS，并关闭不安全的协议版本。
+
+推荐修复：
+Use 'ssl.PROTOCOL_TLSv1_2' or higher.
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

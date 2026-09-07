@@ -8,17 +8,30 @@ desc(
 	rule_id: "source-system-wildcard-detected"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from rule `system-wildcard-detected` (upstream/python/lang/security/audit/system-wildcard-detected.yaml).
-Original message: Detected use of the wildcard character in a system call that spawns a shell. This subjects the wildcard to normal shell expansion, which can have unintended consequences if there exist any non-standard file names. Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
+### 规则说明
+Detected use of the wildcard character in a system call that spawns a shell. This subjects the wildcard to normal shell expansion, which can have unintended consequences if there exist any non-standard file names. Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
 
-CWE: CWE-155: Improper Neutralization of Wildcards or Matching Symbols
-References:
-- https://www.defensecode.com/public/DefenseCode_Unix_WildCards_Gone_Wild.txt
-- https://github.com/PyCQA/bandit/blob/b1411bfb43795d3ffd268bef17a839dee954c2b1/bandit/plugins/injection_wildcard.py
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+Source 模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 补充说明
 Note: context-aware regex — wildcard hits are kept only inside os.system/os.popen*/subprocess(..., shell=True) call regions (pattern-either of pattern-inside, OR via union).
+
+### 参考
+- CWE: CWE-155: Improper Neutralization of Wildcards or Matching Symbols
 DESC
 	solution: <<<SOLUTION
-Avoid passing wildcards to shell-spawning system calls; use argument lists (e.g. subprocess.run([...])) instead of shell strings.
+### 修复建议
+对变量和命令替换使用双引号，避免依赖 IFS 进行隐式拆分。
+
+推荐修复：
+Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

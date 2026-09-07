@@ -2198,2089 +2198,2089 @@
   {
     "rule_id": "source-aws-fsx-lustre-filesystem-encrypted-with-cmk",
     "rule_name": "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
-    "hash": "f04b35e65afa9b53e060e82806f0c22bb9e8ca5e8e672d0cd9901098daa040ad",
-    "version": "20260907.0001"
+    "hash": "b4997df7b899b0d3b7974023d6e99fb11c294cfc98a46ae7ac50a3fdbcd83635",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-claude-settings-auto-enable-mcp-generic",
     "rule_name": "检测到Claude Settings Auto Enable MCP Generic",
-    "hash": "b88d72887a035a55c12ec7730425ace0897176f54269cae63bfce19a0cc8b160",
-    "version": "20260907.0001"
+    "hash": "b722ff787f0fb0b12624bed7928ba9b347e624accd0f2c59eaac6c37de6256a9",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-claude-settings-bypass-permissions-generic",
     "rule_name": "检测到Claude Settings Bypass Permissions Generic",
-    "hash": "9f36a77acffb0cab6e8765ab3420873a9dc22671ecc8b89b5c0edbf0ead17ef1",
-    "version": "20260907.0001"
+    "hash": "060ed3141e8b9da86a9e2aa151d9b28cd315fd3fb649d6733d1868b245cb7e9c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-claude-settings-env-url-override-generic",
     "rule_name": "检测到Claude Settings Env URL Override Generic",
-    "hash": "5fbe2de5a826b6998944fc46b5ffe08f47d0f29abaa15c5c62e582daadb605fa",
-    "version": "20260907.0001"
+    "hash": "c9b313d4a177a7316fa56619b32050507a349fd29fe09d9484cb558d292dd07c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-hooks-dns-exfiltration-generic",
     "rule_name": "检测到Hooks DNS Exfiltration Generic",
-    "hash": "c8b79fd499d9f82399d082bbb6e632058579213eb3c923829eb612ce6bd068c4",
-    "version": "20260907.0001"
+    "hash": "241bdd6003ad761cb68e10af9f55436cb6ffdc545b26aa6f63bcf055de12fce3",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-hooks-sensitive-file-access-bash",
     "rule_name": "检测到Hooks Sensitive File Access Bash",
-    "hash": "abbe0c3b0c097e5aa85eaf461203246cf9d387668cc2fa234de0aa3c651ebe6b",
-    "version": "20260907.0001"
+    "hash": "037ace6bd521fcc429fc78a9977add662bf6c7915be22b89168d3253bf067b54",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-hooks-stop-missing-active-check-generic",
     "rule_name": "检测到Hooks Stop Missing Active Check Generic",
-    "hash": "75c320a9a2690197096767a2f53e1978efc90ae3d1f2048c6ff1f2557a38117b",
-    "version": "20260907.0001"
+    "hash": "d4ecbae237d57b28f6e0cc4293106c2656d3788fd78b4cd4c42568c452d72727",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-hooks-unconditional-allow-generic",
     "rule_name": "检测到Hooks Unconditional Allow Generic",
-    "hash": "136ee280dd396962b4e3c0912778ccfe9d81874cf4168c7045eb056465ebb370",
-    "version": "20260907.0001"
+    "hash": "0edbe1fc3169ac59e719283d09b32ad2456270a3e351a2c64d515ea12220eda8",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-hooks-wget-pipe-bash-generic",
     "rule_name": "检测到Hooks Wget Pipe Bash Generic",
-    "hash": "54a015201102c4e35252f5815db2bd693c9321dfc7054bdb0f7524073763a271",
-    "version": "20260907.0001"
+    "hash": "cea7d6d6be6d4439cd1c0edb9828b8bc23372e4b5f58346436b9d431bbcf7e7b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-ide-settings-executable-path-generic",
     "rule_name": "检测到IDe Settings Executable PATh Generic",
-    "hash": "d1f476a78a663512973d082b8198e320f5271e3121ad7e55c4f34ca85ff3e5ab",
-    "version": "20260907.0001"
+    "hash": "9483d5260019637b4aaf533c4a898ef5b66a436ff3e8d53b5aba4ce9241c24d8",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-mcp-hardcoded-config-secret-generic",
     "rule_name": "检测到MCP Hardcoded Config Secret Generic",
-    "hash": "06a07a4ff350e24f753e92f26423a531ebf61c7fa2a5ea7ae63161d1924e1a2e",
-    "version": "20260907.0001"
+    "hash": "38b7d2664bf0b9a34053854a3063f0944a5d9b1f55ca20e548452d4a6318b71b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-mcp-tool-poisoning-generic",
     "rule_name": "检测到MCP Tool Poisoning Generic",
-    "hash": "6122dd916088d2266a9bed5db2fdfb6f289a9e2dcc2cef95ddf341e1f58cb762",
-    "version": "20260907.0001"
+    "hash": "5abde712b6a55a7dc2c9627ee9d6fdeaebfb512132fa403359095a56fc494dfe",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-skill-md-base64-payload-generic",
     "rule_name": "检测到Skill Md Base64 Payload Generic",
-    "hash": "69ba91d6cb1a5e3d8cf5d61e4a49e3f98e9dbc00a6a2669ac66ce7bc337b788a",
-    "version": "20260907.0001"
+    "hash": "c9d030c1c8ec39786c6939f5bb2bcafba83724c185423856e00eafe55e6e671e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-skill-md-data-exfiltration-generic",
     "rule_name": "检测到Skill Md Data Exfiltration Generic",
-    "hash": "47773489bd8ecf648bd4f1ee60f7e7e5109780e3b11b35209e92ad42f95ee49b",
-    "version": "20260907.0001"
+    "hash": "c1929ec1f79c994793d9ea4593a3642538fb3d962fa58b7ebd60f0ca6e432e55",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-skill-md-prompt-injection-generic",
     "rule_name": "检测到Skill Md Prompt Injection Generic",
-    "hash": "26815f7227ef03f52c29696e9ab54e4f89cc90211b63c214155d920b049f9b8a",
-    "version": "20260907.0001"
+    "hash": "ae587afba0bc5c0252bde38b0c0ad0b28ec3633a93e12b6d6d114bcea59981e0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-skill-md-sensitive-file-access-generic",
     "rule_name": "检测到Skill Md Sensitive File Access Generic",
-    "hash": "5aa64ccfda12da17079b6d61ca14d70f8e9515fe2fb7bba39ce9f43d67710863",
-    "version": "20260907.0001"
+    "hash": "1254b7c1f98957d8d2f8dcb45bc14dc903e8bf1139eea181bd7125060e60bb19",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-config-spring-datasource-password",
     "rule_name": "检测配置中的 Spring 数据源密码",
-    "hash": "a7be803ad13f469e3bfb7919a343e145889337758fe19b23b05b5e79e1821c78",
-    "version": "20260901.0002"
+    "hash": "5e155aae88b386f40607e6a8e46edaf2e82690afdf89e92e229a3323f4be0abd",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-gha-workflow-env-secret",
     "rule_name": "检测到 GitHub Actions 工作流级 env 暴露 Secret",
-    "hash": "f3143b37868cb709e596ef97df728940df215fb8aaed0298c5f79e989ef96a5c",
-    "version": "20260907.0001"
+    "hash": "dd168402e173859759c423ed5883cac95df35aaa0fc87974ed13438a784ef750",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-localhost-base-url",
     "rule_name": "检测到 baseURL 配置为 localhost",
-    "hash": "b7775b9411d2cb91b2b8ac429d577f4e4f658b7b30e1cfe971392a7e93dc84da",
-    "version": "20260907.0001"
+    "hash": "007f1f036043f4cf36df0f099d72ec5e8325a6002740fd1c0e52cae4267cd5b5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-detect-insecure-websocket",
     "rule_name": "检测到不安全的 WebSocket 连接",
-    "hash": "e7942d4b015784e144292fa390389e3772d01cdf7b82b8998e553e3478037ffa",
-    "version": "20260907.0001"
+    "hash": "09a93af3f42edf5b8b4df5ce4f9dc8ca19049a4fe1824757f6901c3bae03eaab",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-go-insecure-skip-verify",
     "rule_name": "检测 Go TLS InsecureSkipVerify",
-    "hash": "f66435d1ad7bdb8d1daa044d4009ec5069f6cc505da8f10d222183820587249e",
-    "version": "20260901.0002"
+    "hash": "c9f8f93e5566cc8b89aae2ba384ce475bf7d548e03663de811df2fd64c47ce32",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-insecure-api-absolute-urls",
     "rule_name": "检测到Absolute URLs",
-    "hash": "bfc42822608748c707ee83a4e3aeccf0d15efc42462a8488069cdf5e657b373e",
-    "version": "20260907.0001"
+    "hash": "be3ddf7aac9f1a3325be87761862aa174df960d5a58b4446b3167c525874219d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-autoescape-disabled",
     "rule_name": "检测到Autoescape Disabled",
-    "hash": "41c0d33569aeabdbcdb801d3e40d2f67e4d6dfcee08a724c20a3395c421c2483",
-    "version": "20260907.0001"
+    "hash": "d869cc3ad080a83a3af73b2a4fa582a8794001e24bc832c8d9a14bcd4d8a5895",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-avoid-v-html",
     "rule_name": "检测到Avoid V Html",
-    "hash": "b58046fb7e4572dc442d3a238ba75839c0058cb27964ca62afe4918991d7e187",
-    "version": "20260907.0001"
+    "hash": "7a021d85e3e1302172c3cd722561e48901673fed11570d89c6d1dd1fe8b6c009",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-debug-template-tag",
     "rule_name": "检测到Debug Template Tag",
-    "hash": "033c2f0e4c8be1d923f3d9d6a2a2bb881ba08e18def47e56445e3b57f92c140c",
-    "version": "20260907.0001"
+    "hash": "140702cf8bb8b5e3c721dffa76debbc1e39518d11d2c9d9884d7516202f5a5d3",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-dml-native-statements",
     "rule_name": "检测到Dml Native Statements",
-    "hash": "e18409d5ef960f73074d4d42971e2fec513f03f1952c78ec46819ab4c97b73d3",
-    "version": "20260907.0001"
+    "hash": "ad0295f5f1c9693480880b4f80a13f97dce80085c110af35291c428cbccb7a00",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-global-access-modifiers",
     "rule_name": "检测到Global Access Modifiers",
-    "hash": "3a44677c88b69ffc49a3bff58113a70f8c2aec8ca2988d57aaa4230967f79199",
-    "version": "20260907.0001"
+    "hash": "b67cb89383ae0a3bf0e88dbe132e187d39633fc8e75ea38c4fa0e161cbaef040",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-google-maps-apikeyleak",
     "rule_name": "检测到Google Maps APIkeyleak",
-    "hash": "962745e168cdcfa2674297d54f1ca50a1ddc6d6367f9f2937de00563c4ecab0d",
-    "version": "20260907.0001"
+    "hash": "cc6a6d7e911fbe699798e7ded128225e1850f58dbade3e1b4d16dcc543b3713c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-no-bidi-characters",
     "rule_name": "检测到No Bidi Characters",
-    "hash": "21806050844644c9ec088b0ce8a71995b4bdc2b8b5e76dbd13cad706e7531a08",
-    "version": "20260907.0001"
+    "hash": "00ff1fceacc49e17a7d7f4629f8cb6c3b48d338d1807222ed1a266773bde5f77",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-poetry-missing-solver-min-release-age",
     "rule_name": "检测到Poetry Missing Solver Min Release Age",
-    "hash": "b9d97f1d1e74992d219c878b3e3e4145be0b84974bc205f29711270a70ae66a9",
-    "version": "20260907.0001"
+    "hash": "f126e4b70132acd9750099526909b189ec6845e6f665d9321c1726999cafdb13",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-template-and-attributes",
     "rule_name": "检测到Template And Attributes",
-    "hash": "2ed96eaf4e4b09fad721392708b15610061c3127bad43bd7737d5a34b34b8d1f",
-    "version": "20260907.0001"
+    "hash": "6e3efadc9a6d3e95a750ba4d84a16ea662881d5499ae709084ebe6b60d2b633e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-template-autoescape-off",
     "rule_name": "检测到Template Autoescape Off",
-    "hash": "8bc4b46566ef74b7a139de1e6cd44cb83f30ca63440fc62b16c89854aea91db3",
-    "version": "20260907.0001"
+    "hash": "d072535b3f79cea1eccadf3ee4931ea3cfc1bb384ab0a71c9bb3c70ac982e4d9",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-template-explicit-unescape",
     "rule_name": "检测到Template Explicit Unescape",
-    "hash": "822717540144e17ac780f59e90179e6abba03f517db3b2d5e47935c28dc54bcb",
-    "version": "20260907.0001"
+    "hash": "406aa5cbe74e0498095ef90b6ddc4777911d9fb41dc3888b9709554c1402fdf0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-template-unescaped-with-safe",
     "rule_name": "检测到Template Unescaped With Safe",
-    "hash": "886fe7e832dd36cc46cc732625310b6ac19448b0eba8f920726d3cb21cd9c2a9",
-    "version": "20260907.0001"
+    "hash": "7d377cb8fadf9063b03011d566bef38ac64a7fcb7a149742e244061df35a81ff",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-template-var-unescaped-with-safeseq",
     "rule_name": "检测到Template Var Unescaped With Safeseq",
-    "hash": "353d8cd5e6455b99d92d75147f5f9179a4138f526ff411b28f930116421ccc89",
-    "version": "20260907.0001"
+    "hash": "d8b492b54e6b74fbf9573940d90ba962840ef82bb22b6e90990d298fd36ca4dc",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-unsafe-add-mask-workflow-command",
     "rule_name": "检测到Unsafe Add Mask Workflow Command",
-    "hash": "9bec0ac7f9995c553cf2dfb2bab1be8bb4f82e14504121d16b5c2da449896b3f",
-    "version": "20260907.0001"
+    "hash": "278c974d0a350a47b3b668afe5938b9b94b5de543771604e3634fe80bdd75e9d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-use-assert-class",
     "rule_name": "检测到Use Assert Class",
-    "hash": "3448fb78a178354710c81088721d3a85e37e48448757de5f927c8c43557d5d5f",
-    "version": "20260907.0001"
+    "hash": "5df10a0bafeabdb8fc0f3c9d22af525eb5ec55c2d2e7ac0b99f802cfca9cccac",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-use-escapexml",
     "rule_name": "检测到Use Escapexml",
-    "hash": "235d79929b4878344b701e5b91c57eab33cf567559c1cdc6f6445c4b10cf256d",
-    "version": "20260907.0001"
+    "hash": "6de728db68d7a3e87b0e5f61888219192b4e9f29588d471ea9fece83469b6475",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-use-jstl-escaping",
     "rule_name": "检测到Use JSTL Escaping",
-    "hash": "a97a36833dc585107ac20cc494fb46076406545621bd55d4e63235c42f3f79b2",
-    "version": "20260907.0001"
+    "hash": "509ee0490a1d2deb4d3833532094067552a4be46b9267664a822f848607e20a6",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-var-in-href",
     "rule_name": "检测到Var In Href",
-    "hash": "b06f2312dbd78cf4ca63395d7eb635a226bf1725cedbd112c0a187d40f24ccce",
-    "version": "20260907.0001"
+    "hash": "4372972131b006dc9389ed7672e89e0b8371b660b4ee7a87a6fdaf4985bc048c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-insecure-api-var-in-script-tag",
     "rule_name": "检测到Var In Script Tag",
-    "hash": "98b7015920ae2890fc9962f8e595299353607c2ce763376faf5955e2859fafc8",
-    "version": "20260907.0001"
+    "hash": "20fa0d28634e5e819502b33dfd18a60d3c8d3d581266459500cc84d081182732",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-java-md5",
     "rule_name": "检测 Java MD5 MessageDigest",
-    "hash": "d4585e09e6d01a868bc6811157ba2f31fc3cbc2991c8fbe9ae705e5bc383a85f",
-    "version": "20260901.0002"
+    "hash": "2313344d6660255eeca6a86683ccc1f75697589e2fb86000b8eedca499685f94",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-java-runtime-exec",
     "rule_name": "检测 Java Runtime.exec 调用",
-    "hash": "27bc3030b2370663a92ed92fc1fa74a1676f3b73227167e37e18251ab45f52d0",
-    "version": "20260901.0002"
+    "hash": "091fb3847ace2f924ed065233083a110a0057b62f77bf3a7a3178aa7321e35af",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-js-eval",
     "rule_name": "检测 JavaScript eval 调用",
-    "hash": "b460780839c4a281ec6e6c059f889d3fec73118c451338de060f2116766790b7",
-    "version": "20260901.0002"
+    "hash": "9377b23817905522b0c01872b5670d3f0e4b287775e229a6a6e233aca5d20619",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-python-eval",
     "rule_name": "检测 Python eval 调用",
-    "hash": "770aa4b309b76d73447ff9b0f7039c21ebabb0183547ce677e397f8bba30cad3",
-    "version": "20260901.0002"
+    "hash": "509577594dc29a5e3f4c145f726ec0be83245df58a3d053cc6455828cf0be0ac",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-python-os-system",
     "rule_name": "检测 Python os.system 调用",
-    "hash": "e15aa22fa0dbc70197da8e972ab90c4a75a1543340aee2efad0b5e40e2cc925c",
-    "version": "20260901.0002"
+    "hash": "47f46f057ab4102124e9977f964b8e2447bdf7d193916311d24be21cc4876414",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-python-pickle-load",
     "rule_name": "检测 Python pickle.load",
-    "hash": "3451052b21b8cc4bb2afb0f3eb20f941639697afad933eb133055c50327d16a2",
-    "version": "20260901.0002"
+    "hash": "7fe79ed46f63c23de9c7fe1bca7311778165bfa010c738d9136573b2401eb642",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-scala-slick-sql-non-literal",
     "rule_name": "检测到 Scala Slick SQL 非字面量拼接",
-    "hash": "1dbcaec8405dfd87f5924434ddcd929c85a8759da7ea17161dabbbcb292d6ae0",
-    "version": "20260907.0001"
+    "hash": "721ba8b9debb61db4b2e475c07eabab29def88f08778cf3a8da593dc241316d2",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-system-wildcard-detected",
     "rule_name": "检测到系统调用中的通配符注入",
-    "hash": "97030680823f92718b471bf37f030d38785f7055ff71ede7af154dfd33f0b47c",
-    "version": "20260907.0001"
+    "hash": "ef8672307892d17e9f29413419d06780c53db5986ea25efc73357b6ec2b74d96",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-unquoted-command-substitution-in-command",
     "rule_name": "检测到命令中未加引号的命令替换",
-    "hash": "a770e3a8c62a83ae8ecc8fcc50dcf895136dc7b9440e7078543abb4a74993199",
-    "version": "20260907.0001"
+    "hash": "4d3310efd9750ed74134e5ba57e7b5f0171cc784fa101763e21e5b5dd44e116c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-unquoted-variable-expansion-in-command",
     "rule_name": "检测到命令中未加引号的变量展开",
-    "hash": "4b2864f74ad84675a0d9429accdf7c596924387727f68bdf1aabcc1de1bc42c0",
-    "version": "20260907.0001"
+    "hash": "89779e4cc8429f1a36e6405a98fa0cc62880572cdc33763da4c15f51ce980d20",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-detected-artifactory-password",
     "rule_name": "检测到 Artifactory 密码",
-    "hash": "e531fafb65b338fc29e9ea7e1b846243e22c61200df5bb7ded80db4ccccfa000",
-    "version": "20260907.0001"
+    "hash": "a76224d04de8ce689f5f8e265fb43365a03fbb36c8eb7203f1c714cf6de4bd77",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secret-aws-akia",
     "rule_name": "检测 AWS Access Key ID",
-    "hash": "7cfe5325023d0f24e855a8349eb6c3051f94b8b1711157366112e078aac40e19",
-    "version": "20260901.0002"
+    "hash": "4838a2ee2304a1d708678ee9c1edd28bf57728cb51cfffec68a129b0d913e4e2",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-aws-secret-access-key",
     "rule_name": "检测 AWS Secret Access Key",
-    "hash": "217194f9b616e68aefa3a3d0e63a35a5fc6d626ade39ba0d4a0c1b30cc310048",
-    "version": "20260901.0002"
+    "hash": "8dd3077fd71fbd985a46778aa81eafb813bfa31c97c799b4df545f0c4f40616e",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-facebook-access-token",
     "rule_name": "检测 Facebook Access Token",
-    "hash": "441c2db4426599cd4ffab00a66ce8bce70f587b256610b947f6306384d0f613b",
-    "version": "20260901.0002"
+    "hash": "47a83233bb8854772853d2789b8407c9c36f317d9f030a0c160bbdad32c55960",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-github-pat",
     "rule_name": "检测 GitHub Personal Access Token",
-    "hash": "017dffdf2689ec0a7ee7be4e3c68aefcb952679e2975543af925807f8a84c7c2",
-    "version": "20260901.0002"
+    "hash": "33742e186787f7c75f3e95d0360ce9cdd330c64bb25a9835ef84ef323ad3be2a",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-gitlab-pat",
     "rule_name": "检测 GitLab PAT",
-    "hash": "8fc01ddc7310966b1734f8da603e79f24be279229b22f3bac93d87c5ad486e1f",
-    "version": "20260901.0002"
+    "hash": "2ade8489037e33cb66c64bc9134c883174c72bfb6c8815d4513d12681dc20987",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-google-api-key",
     "rule_name": "检测 Google API Key",
-    "hash": "be3078f8a4a6faf5ddd049aa9bb30e436db499cd368880067dc49b3b8970ddec",
-    "version": "20260901.0002"
+    "hash": "d31e336651e04c8f6a6a0ea35259da398c73084a4a7f3285e876d7afb2ff652a",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-heroku-api-key",
     "rule_name": "检测 Heroku API Key",
-    "hash": "2a593fbdb0213264d8816af2eb5cd192ffd1dc316d7ba2366bbdab1b34af6a7e",
-    "version": "20260901.0002"
+    "hash": "c54c83cafaf96927eb9ea59cc34a0a20bdbc39cde100264ae9a61313ddcfb1b9",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-jdbc-inline",
     "rule_name": "检测带内联凭据的 JDBC URL",
-    "hash": "e0e22f55846621533966cfd13d014e2fce6ef98dcf5f5c802c11ef4e8b816971",
-    "version": "20260901.0002"
+    "hash": "6faa2f89e61b2bf4e8e114637098462996cf991ab15544a54f13f9e479402d9c",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-jwt-literal",
     "rule_name": "检测硬编码 JWT",
-    "hash": "c5b4cd41d4dc00525a93efc8eeb57edf4bbba8ed1a1186e948b9a74f9b6781a4",
-    "version": "20260901.0002"
+    "hash": "ffa626fcac1f8e786eb098d39f8e0628e4b1357a388c698bc5183c8c560fed14",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-mailgun-api-key",
     "rule_name": "检测 Mailgun API Key",
-    "hash": "37cdb77e3272c5fadd5f50070d7cf99437de2ef020c04535a215af38c3c0750b",
-    "version": "20260901.0002"
+    "hash": "b4f1b2aa203b40034706a4f048a4fe5e204232a73702874879bcbf1073b1b111",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-npm-token",
     "rule_name": "检测 npm access token",
-    "hash": "2ca90f79022a8c2f22a0a3508900b09fd8993d46ed094ebafaf414e515a45fe1",
-    "version": "20260901.0002"
+    "hash": "987e23c51840c5e5aca795aa544a72d62614522634d25e6ac5dd03f791db9690",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-password-assignment",
     "rule_name": "检测硬编码密码赋值",
-    "hash": "285a07cc6a10257cc31258ba70d8aa37621f183be39ce63f809390f6796cfa76",
-    "version": "20260901.0002"
+    "hash": "78a704a076389c13a7c7778a64bf47b9264ec0119b3785c9c45a9952543cd4ad",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-pem-private-key",
     "rule_name": "检测 PEM 私钥块",
-    "hash": "c7dbdd9b197615825086094ba6fb8da53e007adfb6122a71d12b535945db3f52",
-    "version": "20260901.0002"
+    "hash": "5ed0b4edd043cbe31c008cc4f42f78a65222d9a77795ef4335399cdaef1405e5",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-private-key-block",
     "rule_name": "检测私钥 PEM 块",
-    "hash": "c719dc08de16c0c6d0f66b8299909d137669a61634389b073a34d57e80a02c4b",
-    "version": "20260901.0002"
+    "hash": "41fd8e30fe578d69cf3e6d3f52c40d693909d948a737899c09a33581218a47fc",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-sendgrid-api-key",
     "rule_name": "检测 SendGrid API Key",
-    "hash": "0739b90249e0f96be51475abd046ce80f40ee5c6ec68ad2d03355161623fc969",
-    "version": "20260901.0002"
+    "hash": "58bd3afa23d04315a45dd953cbca2fb7a843e2da02a5d4489b19deab3f4c63d3",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-slack-webhook",
     "rule_name": "检测 Slack Incoming Webhook",
-    "hash": "470b2246947cc01142fb5403530abc3214c1b9bf9ea720686df122ca6f9d44c2",
-    "version": "20260901.0002"
+    "hash": "40bd40714fbf65d4fd37b088ffdb620f94d6e4ec34c96a5a1048f455ad7727b9",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-slack",
     "rule_name": "检测 Slack Token / Webhook",
-    "hash": "529a0ed7c00af82cacc739aa902c8dff8db3f333b5721a69cebdb6c32ebeec03",
-    "version": "20260901.0002"
+    "hash": "8fa4e617fec3ab6541b812e346925e072fdca8c2f7c1ce0bebb11c0a4962cf6e",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-stripe",
     "rule_name": "检测 Stripe API Key",
-    "hash": "a4c708f29e039320bc1b0d2401f349cfd36194621da7f7c431e5f115de8d5f3a",
-    "version": "20260901.0002"
+    "hash": "5f0b8e337bcd61e907a7a5eaa8eb73d55dc18dedc2ad196da0dd4a0788c277c0",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secret-twilio-api-key",
     "rule_name": "检测 Twilio 风格 API Key",
-    "hash": "2358a28eba9b39f1817e73b82b4d486a89d5583927cc5295a9f7b0815ffe1599",
-    "version": "20260901.0002"
+    "hash": "3778a699fef46b5a3090754a8f7b7225f306c2d25554cf2589f23dfdc6a8b30d",
+    "version": "20260907.0001"
   },
   {
     "rule_id": "source-secrets-adafruit-api-key",
     "rule_name": "检测到Adafruit API Key",
-    "hash": "ff5f4c06c2dcf05da665baba65170169cbd30d7979671992dd11cefea00fdabb",
-    "version": "20260907.0001"
+    "hash": "dd9a7e9316ef529fa064096ec239190ddb324ee775f018386beee8fbb43a8bff",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-adobe-client-id",
     "rule_name": "检测到Adobe Client ID",
-    "hash": "d9630a1e3995473350eb36da156216e221ea72cee628ac869d2b9aa2c8897ec0",
-    "version": "20260907.0001"
+    "hash": "b733ab41bdcfa6e42b09a471ad8e09b8ccf1597d869575dc1cdf63e7bfc0d75c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-adobe-client-secret",
     "rule_name": "检测到Adobe Client Secret",
-    "hash": "3662bfb76be3709c9340517cc0ba60aa04d6270369f5b990a04d9102fb0e9fac",
-    "version": "20260907.0001"
+    "hash": "9bdaf4eb68735574dd3db688d17dc6f760cc14501a3fada2afcc8c3f5a85b2a0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-age-secret-key",
     "rule_name": "检测到Age Secret Key",
-    "hash": "81a20d70d7ce33c19334aaedd7814abee989c71bf93e3886b812230eac0b61f1",
-    "version": "20260907.0001"
+    "hash": "77d4d733664b27aa820dd20ee848dbb2fd1033c7b27028141e32a95748555509",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-airtable-api-key",
     "rule_name": "检测到AIrtable API Key",
-    "hash": "e950afce44afc53c25f2dd08b0c672bd021552a720d4d2859653887d96622640",
-    "version": "20260907.0001"
+    "hash": "3ff4aa0d52ce70f9ba8f8a1dbe6edcc22eb7ed2a26499ca9dc0b80b6a8d11287",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-algolia-api-key",
     "rule_name": "检测到Algolia API Key",
-    "hash": "f43db4e83159e9d322754482227252c83966acdf85c42f064d4884a39afe03f5",
-    "version": "20260907.0001"
+    "hash": "233efafe153394dc0e936c2c524a8c52a76fd7d0b11b7a8903a68c9d06095bdf",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-alibaba-access-key-id",
     "rule_name": "检测到Alibaba Access Key ID",
-    "hash": "707781a4bfac6bf1dec2d7d6936697b9e08b533502f7ebcfc8c8d90d400bbe54",
-    "version": "20260907.0001"
+    "hash": "8db3bde29862012663d5cd4a622f77f1a08b7d6731d1e8729a6be4f0da7b11d0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-alibaba-secret-key",
     "rule_name": "检测到Alibaba Secret Key",
-    "hash": "70452589d41cf7d84650885ca0cc62df5c9a7197e6897a693e5404ceb6cc7684",
-    "version": "20260907.0001"
+    "hash": "1643c02dd991a5ebe42e294cbafb5bbcef607ba944e5c8059929b37d34e8c29d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-asana-client-id",
     "rule_name": "检测到Asana Client ID",
-    "hash": "121f4fc38a07c40470b0b933ae2ac6455c9cb55f874c1f9c7dd8b6ef327b22b8",
-    "version": "20260907.0001"
+    "hash": "2c4d61dcc17634866d153ea4fea305381ea17b659fd87b97126404aae60c3a2f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-asana-client-secret",
     "rule_name": "检测到Asana Client Secret",
-    "hash": "7e88735592482331bdb11ec4b4e90f59c1c7a58a2bf1e61dad10c95820c367b3",
-    "version": "20260907.0001"
+    "hash": "ecc1ec4232783ab7ef048b8cae7d73e55ddd0665a962510b9bb8a306627f65c3",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-atlassian-api-token",
     "rule_name": "检测到Atlassian API Token",
-    "hash": "9be8390c6fc81314a8291784d2bb1c1a1301efa388bc2d25ca8f8080ab180ca8",
-    "version": "20260907.0001"
+    "hash": "8a760db11adb65c839e74b963eb0cfa9314852415b26463c4076c3f2d28f30da",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-authress-service-client-access-key",
     "rule_name": "检测到Authress Service Client Access Key",
-    "hash": "9706a27c9c6b8afb887edc364696e221d69c674c3b2f6c79914e93a72d2f6488",
-    "version": "20260907.0001"
+    "hash": "8e7412548ab942b27be14e8b211ec1fe398d2028347dee9118b69307a9e298ab",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-aws-access-token",
     "rule_name": "检测到AWS Access Token",
-    "hash": "bb4a67b9d7c4016899fe4b15004cfe43d3f1358dcb4c08952b4a28d7b8db3c05",
-    "version": "20260907.0001"
+    "hash": "d813861caf85eaf1d859cd2fc85846e2b290c7acfa9850e0932a23d263c4e2c7",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-beamer-api-token",
     "rule_name": "检测到Beamer API Token",
-    "hash": "02fa5fa3d4e9c42d18341d385dd123c29e0a16df0f55e30791506e252c843af5",
-    "version": "20260907.0001"
+    "hash": "5991cb9abb928103bbcef554c749dcfa574766fb80d7d3e6c8ec95fa43975a0d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-bitbucket-client-id",
     "rule_name": "检测到Bitbucket Client ID",
-    "hash": "7f26b702244d3526f8cf376a0f9b8f2a4f44faea10d60a1c9b955b65fa1f1621",
-    "version": "20260907.0001"
+    "hash": "c1342aa9dc5ac4521dd185013ca5952086e4d230e7fada472a690deaf197ca69",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-bitbucket-client-secret",
     "rule_name": "检测到Bitbucket Client Secret",
-    "hash": "af0869391a623ad8e192b536e43d3eb022c419878719fe0f93773b86f5ea6c82",
-    "version": "20260907.0001"
+    "hash": "8dec60976c3978d3bf484ad8c5dcfad10c7dd8e80cb1ec41dc3a0a41bd2a0f05",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-bittrex-access-key",
     "rule_name": "检测到Bittrex Access Key",
-    "hash": "a30d3b5b5f7989c4c395953734e6cf471e8d49518b0de9724806303e20e9b0b2",
-    "version": "20260907.0001"
+    "hash": "80bf0b39da2cd58cb75a7f4fae8fbe87d266605ed4d17d21d335ac9f7e6ba20c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-bittrex-secret-key",
     "rule_name": "检测到Bittrex Secret Key",
-    "hash": "cc8222bf7946162c69368a98fada4154b051c53930217ca8f22f7d4c799735c5",
-    "version": "20260907.0001"
+    "hash": "de67ca13564b1ebf8e95488a3688f7fa6507a444627e28fc0f468514850c61fb",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-clojars-api-token",
     "rule_name": "检测到Clojars API Token",
-    "hash": "c614fcc76d70ad628a3e919f3340984a5074abd5fdec1807bb66d4578164d092",
-    "version": "20260907.0001"
+    "hash": "672279bd395043fe06a0c521fe87564bdc4ab0035d5a9356ed71f65e493ee37b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-cloudflare-api-key",
     "rule_name": "检测到Cloudflare API Key",
-    "hash": "bd8081a5c90a98f0848463c8983b10ee937c37400c28630174634423de2c7519",
-    "version": "20260907.0001"
+    "hash": "c327e5635748200918d475e9085b63126b93c50f380ea322a8737a4d5c5080b5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-cloudflare-global-api-key",
     "rule_name": "检测到Cloudflare Global API Key",
-    "hash": "dacbe7f7e7b89b4d25c02785d831c46b23f95a9a639c4a8494253f23bec8788e",
-    "version": "20260907.0001"
+    "hash": "4e293112dae64cc9e3a0e11107cfc50526adff5aeece9097955313af67fa25c5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-cloudflare-origin-ca-key",
     "rule_name": "检测到Cloudflare Origin Ca Key",
-    "hash": "4cc8ad1500f6e7fe2b93bbfa7b6a1911b86109755cec6607be6fe8c63e17bca4",
-    "version": "20260907.0001"
+    "hash": "66d2c94d88aa0c8601ed41485ce53b24c153f41ccb2549fdcb09a43c8fe981bf",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-codecov-access-token",
     "rule_name": "检测到Codecov Access Token",
-    "hash": "5652ee056d97d5752b26a6d80bcf7af8be9cc4798c9ac96b66d284f8eb7c7559",
-    "version": "20260907.0001"
+    "hash": "5df8cd0915623d7f6a55914ee57c6f79d881bfa9af489ce35f53ba0cdbe2a758",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-coinbase-access-token",
     "rule_name": "检测到Coinbase Access Token",
-    "hash": "a265578280394685035ca763b57795bef21dd221243e557ed9f7b7743bdb6c1f",
-    "version": "20260907.0001"
+    "hash": "eeab845891ce88f1442830fa5527b78ccc38cc9a4dc0f19bbbe0573fcd49b7d1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-confluent-access-token",
     "rule_name": "检测到Confluent Access Token",
-    "hash": "908459e040ca21fd4163ee17b173e8b6adc683449bb0d7904e805ad463e18d01",
-    "version": "20260907.0001"
+    "hash": "841319ac0786df811e38078b1e2586fcd405430fc88fb80197ce2a85b28f381d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-confluent-secret-key",
     "rule_name": "检测到Confluent Secret Key",
-    "hash": "61de60fa2a549b0a3fd6a2b5571557d15e9a084c7f53569e99b73009feab1feb",
-    "version": "20260907.0001"
+    "hash": "70e42850a34aff33c823ba6bb650e83b556d6087dd199a58530836441e81db13",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-contentful-delivery-api-token",
     "rule_name": "检测到Contentful Delivery API Token",
-    "hash": "e8ada3bbcb656c2cd6113ce3d386bd128ea7c6b3e6cd65c0949cb919e10b005a",
-    "version": "20260907.0001"
+    "hash": "22356f98132eb9a94f5ca0ce7ec2d9cbb35f50a5de57fc6af0966a95878f947c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-databricks-api-token",
     "rule_name": "检测到Databricks API Token",
-    "hash": "f99a523418847fc9a8d21b5e4056959888aec7e0a0ce53bb17ce15bd4e0d589c",
-    "version": "20260907.0001"
+    "hash": "b77ebed8d858b28fad9fc898d4747f28b52569cf5f4122372096bf49fc0bec26",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-datadog-access-token",
     "rule_name": "检测到Datadog Access Token",
-    "hash": "a3234b58b71264ff5d20fc096d82bee782d5a51f4901405bfaaeb160f8157edf",
-    "version": "20260907.0001"
+    "hash": "cd5902608c166aca9e1a3b1f74fd6ecb4fb05157e25de17a942ba62d8156a549",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-defined-networking-api-token",
     "rule_name": "检测到Defined Networking API Token",
-    "hash": "642c3c946ac5366578184b476dcdd023994ca5d75605ae3e6cfbd49b3225ca43",
-    "version": "20260907.0001"
+    "hash": "49040523e20354e76524a9f4ee2dd43629eb74f219fe0ecde590ecf2a594707b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-amazon-mws-auth-token",
     "rule_name": "检测到Detected Amazon Mws Auth Token",
-    "hash": "6d75784272b765d4110f25d9da67fcadf06b7fd3672e8446b6f56f1026199ebb",
-    "version": "20260907.0001"
+    "hash": "d24d1650e3e8c2ab70e2b722ee07a167826412535dce7cf8f98cd7606a8dc259",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-artifactory-token",
     "rule_name": "检测到Detected Artifactory Token",
-    "hash": "e674eb9bc130997bb73b66573ac067cb9df3eee6c6ff26c0a62236ca583d8ca9",
-    "version": "20260907.0001"
+    "hash": "a54e9d47afcabe72b866ea81dec1d55129df46cdda39b9c70d93e0f508c3f53c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-aws-access-key-id-value",
     "rule_name": "检测到Detected AWS Access Key ID Value",
-    "hash": "3393e9e4feee610dc9b70ab467bdde980814e185112e9529949636fc58142ec1",
-    "version": "20260907.0001"
+    "hash": "b68896214e0be5ae1f9ed0ba0cd112e43a46d1e37a3f1b9c4b2e770e8f87f47b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-aws-appsync-graphql-key",
     "rule_name": "检测到Detected AWS Appsync Graphql Key",
-    "hash": "caeead92690b72152a8a17e9e0bed7056def3c3e100e3d9fbb737f248456d4e5",
-    "version": "20260907.0001"
+    "hash": "1562dbfe6509e301655a20578fba176fe3a22ed53dfd38ac8eaa893a66246afd",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-aws-secret-access-key",
     "rule_name": "检测到Detected AWS Secret Access Key",
-    "hash": "c41e8aa6363a0b6a0e51adbe0ba56f6c0b835ccbedc8fb9ff2330bd1d138ab79",
-    "version": "20260907.0001"
+    "hash": "b9fdd69de42eda9683383c36cf8a581456d7a3f51fd886f1e9f66b8311b9c606",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-bcrypt-hash",
     "rule_name": "检测到Detected Bcrypt Hash",
-    "hash": "089cd7f195ce1aeb750d445fba9c9fdeafc46eb47906ef10312a8f294ef6a48f",
-    "version": "20260907.0001"
+    "hash": "17601b820e4957983aea5fe6647ea3790ed6a199b78d07938b3feb422769e4b0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-codeclimate",
     "rule_name": "检测到Detected Codeclimate",
-    "hash": "0604ddd9643bb5e907bb36c94c450cbf84fa2492e9059d92f595beb3a6d002c3",
-    "version": "20260907.0001"
+    "hash": "d20f6b35eec8abe7cbf97086e8da8e72a616e2f25dd2b14d01ae9f2da31edb0d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-facebook-access-token",
     "rule_name": "检测到Detected Facebook Access Token",
-    "hash": "9dbc4d13bb0512c2c8de8a3ba8006b31bf5f6c744d7fb04a341eb73bad715de8",
-    "version": "20260907.0001"
+    "hash": "28c387d84e4a9e5f1174c483c912a6427a16ab6916611453767a2d0736ed9318",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-facebook-oauth",
     "rule_name": "检测到Detected Facebook OAuth",
-    "hash": "17719c59634e477b7abde64dfa15cd5dcf9bd9640eb3286136a623c3017a9fec",
-    "version": "20260907.0001"
+    "hash": "d67edfc0c5e095b21ff7a025ea3ebf6052f068154c3def7f9770d625ec3a87d2",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-google-api-key",
     "rule_name": "检测到Detected Google API Key",
-    "hash": "974c7fa71ca9536aa1588891a309255ac14a647f244295343a206aa70ca957e2",
-    "version": "20260907.0001"
+    "hash": "8ca66a27cc2f9f54cf12143abb5cc6b2ec7837dd839c5fa52eae30265b618650",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-google-cloud-api-key",
     "rule_name": "检测到Detected Google Cloud API Key",
-    "hash": "648d94c5bc50716fa52ce995e67e02ce13f9461d170ce4cc26706e1c4b77a900",
-    "version": "20260907.0001"
+    "hash": "5acdd735b6993255affe86764efdab11e6de099dfb442002dc60d37eb5ba1d14",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-google-gcm-service-account",
     "rule_name": "检测到Detected Google Gcm Service Account",
-    "hash": "bee6e8b544d188896afa10a64706721c23295ae0f67f8535cb9bc67eea72da25",
-    "version": "20260907.0001"
+    "hash": "2d89304eee8cbf7ce6f0873f0dc434953519e4896556dc46b69e481988f53a7b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-google-oauth-access-token",
     "rule_name": "检测到Detected Google OAuth Access Token",
-    "hash": "787dd7f616a4df79c42602dba4f12ff7cc379bbe150e0d616f06ce903775820c",
-    "version": "20260907.0001"
+    "hash": "3ed44683650c67a0a5581109c9a957229df3ff8c7cf93a87bace714b917222e8",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-google-oauth-url",
     "rule_name": "检测到Detected Google OAuth URL",
-    "hash": "43b80a7729dcb620bbae7a478d16856700b4140d7907d270b11dfb6070a22c9c",
-    "version": "20260907.0001"
+    "hash": "e17166cff0506566251637d2ffb3dcfb311bc8965a934c5b2b1f6c0d4734a2a4",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-heroku-api-key",
     "rule_name": "检测到Detected Heroku API Key",
-    "hash": "ae1e54de2bc8150da8610f7cfed99ad079fdfd831802f5fffff28394448a3a81",
-    "version": "20260907.0001"
+    "hash": "4ef7181c9f1e54508f2b245f604e840125c78823301ecb90ddf41295d272ab51",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-hockeyapp",
     "rule_name": "检测到Detected Hockeyapp",
-    "hash": "b3d0a1c03b8c993c1acef65edde5da3a3b62b5ab1bb68d2123dd52f49c5b8041",
-    "version": "20260907.0001"
+    "hash": "d51862d0567257e30224b5566735654156c614620a594e963bf8e3391da38c91",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-jwt-token",
     "rule_name": "检测到Detected JWT Token",
-    "hash": "33e4b1ddbb70292f98e109f1f3d95c14a1a98dea87332d33f7a7537ad6f3aca8",
-    "version": "20260907.0001"
+    "hash": "83df914bac0a268858a2172822f264a578ce4cb1221ba42503e03ef185bb18b4",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-kolide-api-key",
     "rule_name": "检测到Detected Kolide API Key",
-    "hash": "90a62eadc72edf36b7ef29fceec815688a8042b9f473cc45fec14249717d8125",
-    "version": "20260907.0001"
+    "hash": "8248818c6562e42f50f655e806f42638e48e5da847c46cc72048e603dba19f6b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-mailchimp-api-key",
     "rule_name": "检测到Detected Mailchimp API Key",
-    "hash": "c700bc7a94edae685af8ddc3cd3f50132ef2b93cfcc6cffb2cfa7f93db7d2f91",
-    "version": "20260907.0001"
+    "hash": "84220aa9b4bc352345d134cebf2941d4fe8c177a25d155262f9412653744417a",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-mailgun-api-key",
     "rule_name": "检测到Detected Mailgun API Key",
-    "hash": "e2561e9efa8cb8b7d12600e79250e8b901b0fdf181a37f2e21f4d4b829e99f40",
-    "version": "20260907.0001"
+    "hash": "10d930e401c9904a5a5ca45d014bcd7c37f89ed3d68348aef209c5b643e00081",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-onfido-live-api-token",
     "rule_name": "检测到Detected Onfido Live API Token",
-    "hash": "45ff11b7a171583200ffd79610bcf5b2ee20c8b8ec4d93d7abb33b5072ff9499",
-    "version": "20260907.0001"
+    "hash": "8fe92b2a4df34927d8221524be5473482c41fcdcaaa290a5d6a232518474d896",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-outlook-team",
     "rule_name": "检测到Detected Outlook Team",
-    "hash": "de5a402637be8f818892c3efd971399538b07da2a03b68f545cba26683ddf53c",
-    "version": "20260907.0001"
+    "hash": "13a0c58acff8641fe853a15b9396cbe2c650972fa65f0fcc03e8bbe623be8187",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-paypal-braintree-access-token",
     "rule_name": "检测到Detected Paypal Braintree Access Token",
-    "hash": "564641675d65165f77c200fac18aadd11660d34055d753adf3e5a6c0007dbb07",
-    "version": "20260907.0001"
+    "hash": "d881251c8be992017c9aa90043fd6bd3d784b0de49839d016fe64e7e3f311e93",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-pgp-private-key-block",
     "rule_name": "检测到Detected Pgp Private Key Block",
-    "hash": "b71df2e1827337e5fe62e0108103a9fcfe9ff1140dc326b88cab164273c3784a",
-    "version": "20260907.0001"
+    "hash": "7fea7668b56e7f6b511075affae5acd1e302e626273209373af53e43cda761dc",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-picatic-api-key",
     "rule_name": "检测到Detected Picatic API Key",
-    "hash": "e93fae2d0f489709a1011ed53cfeac0562f3e901dd703d0cc3a02b4a8cfb46ac",
-    "version": "20260907.0001"
+    "hash": "3f8fbe68df6cb5b82665fa2ecde2d33281575e7eb0b7402bd4fa1d6875e09f99",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-sauce-token",
     "rule_name": "检测到Detected Sauce Token",
-    "hash": "a78251f755f64ae7a289c7fb64a1a7ec7a671ef631f4b1a76eebdca67bfc9e90",
-    "version": "20260907.0001"
+    "hash": "973e6f0f5736eb6967bdc561c469a91500089506b7c3a5207175704f20f002ab",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-sendgrid-api-key",
     "rule_name": "检测到Detected Sendgrid API Key",
-    "hash": "e0d7df08579af65fdcdd17df7834eb51b95b294e114842eac8d271ae055f3cde",
-    "version": "20260907.0001"
+    "hash": "67ee664a8abf1235472a66ceecba39f0ccca13e0ff3002327e7d36b18da3330a",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-slack-token",
     "rule_name": "检测到Detected Slack Token",
-    "hash": "d95d2f06b154c0578aad839103339ccd72e60a7fab0acd17cb9dbcad8021718c",
-    "version": "20260907.0001"
+    "hash": "d7c290f6641d7001d56eb66fb3412f2bae1ae0361a4846e941e4820ac771c58c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-snyk-api-key",
     "rule_name": "检测到Detected Snyk API Key",
-    "hash": "5cd75ac9ee740ca6ed6155cb7ffef6960958ab429bce31f31bba5e84f4179354",
-    "version": "20260907.0001"
+    "hash": "3cff023116c2d92f64baaf5c76c6105970a6e39ba97e8f70f07ccf31cc3b7655",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-softlayer-api-key",
     "rule_name": "检测到Detected Softlayer API Key",
-    "hash": "9945d14370947a6098dc1ba97afc05ffcbe7cc3a7c2b5a0e0bc97036c8724756",
-    "version": "20260907.0001"
+    "hash": "f7dd32402eb53ee6ab0496c0bbea18cc5813fb782fa0b6387404df8fbfd4ded0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-sonarqube-docs-api-key",
     "rule_name": "检测到Detected Sonarqube Docs API Key",
-    "hash": "2eeb58c01df9ce3f679a55716c13f813727699d68d4c724009db9600b76c42f8",
-    "version": "20260907.0001"
+    "hash": "de8bfbf529944834972b82f85d11854afcd67e7f45b92ab545a20e76cb697207",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-square-access-token",
     "rule_name": "检测到Detected Square Access Token",
-    "hash": "f88eca80d697fe366ee05b0160dee9e8274b392feff59c19474c77a9596094a2",
-    "version": "20260907.0001"
+    "hash": "73fc20123287ea80b5f0753159bf18ffb532c05a76a8f9f6e10b0f7c0f48e56b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-square-oauth-secret",
     "rule_name": "检测到Detected Square OAuth Secret",
-    "hash": "9a0cffa4d110b3143074e7f2809f94b0f84aaedd74ed1e679a9fd86c3950fbbf",
-    "version": "20260907.0001"
+    "hash": "20b607e2edf535814ecbbc7b85346575c558d82ac77afc1765c1ce77df134287",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-ssh-password",
     "rule_name": "检测到Detected SSH Password",
-    "hash": "5991201f04c2d33f45793ce926be50c66e66103a7a1acc2f83508ec142e36aee",
-    "version": "20260907.0001"
+    "hash": "c4df9c66e8d36fdd2ab8ee988f30e959eedadfb716f3904670ae9b8bed431315",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-stripe-api-key",
     "rule_name": "检测到Detected Stripe API Key",
-    "hash": "ec8224a9c58e37a137910e3dca6ff6a97e4adccc61106466d6f11990d65f5e56",
-    "version": "20260907.0001"
+    "hash": "3a68191eb1cd6bd0022e3a2bebd1ae9d6a59e825eaee3615c85cac9ce3d0474a",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-stripe-restricted-api-key",
     "rule_name": "检测到Detected Stripe Restricted API Key",
-    "hash": "bfcaca0f620e160ab45d46f2a87a85c8f55ad3b6578a8956b584533ccfc0221e",
-    "version": "20260907.0001"
+    "hash": "6480b1fd96e984608798af8fab7b60ccf29f1f030639c0420968630be52e08e5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-telegram-bot-api-key",
     "rule_name": "检测到Detected Telegram Bot API Key",
-    "hash": "70f601869d5c6f246d895599a8994893ca1c6be8a484469a9dbdb099a0c9d849",
-    "version": "20260907.0001"
+    "hash": "c3253d8368cdd7754fa7feb7e78dca038972f07b6f9a60adbd3f24691c4ed23a",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-detected-twilio-api-key",
     "rule_name": "检测到Detected Twilio API Key",
-    "hash": "caeb718c1a27d18d788f744b98386834676cc8c71d7d4c3c981e5c3b39a362d9",
-    "version": "20260907.0001"
+    "hash": "3d504d62cf7122383613257130b3e04982a5c9bc55992af772c41b447fd8156f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-digitalocean-access-token",
     "rule_name": "检测到Digitalocean Access Token",
-    "hash": "a91e4f59a94d8a66d688cf9c09144a7c9c5372bb9fdf0276e99e206632ab2c8f",
-    "version": "20260907.0001"
+    "hash": "8c88e2753b5da4e86f5d45f1611c9150f55f498f366ca60da5104d13c5ac280f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-digitalocean-pat",
     "rule_name": "检测到Digitalocean PAT",
-    "hash": "4f45ec96f64bba44d0908f38a32053650a9f612e6897f0b5a8407d6201b550bb",
-    "version": "20260907.0001"
+    "hash": "012903bb280738fe341934e879393defd5f85c685835428017a4573e46b0d1fc",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-digitalocean-refresh-token",
     "rule_name": "检测到Digitalocean Refresh Token",
-    "hash": "0b62077258464be03998fbfcc8e0243d93f4dcb7cbddb3fd059f5e2b201239e0",
-    "version": "20260907.0001"
+    "hash": "7a447b992f359d8af23893f585cb1b3e5f7830aeb23bb725e32178b44e0dd7ea",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-discord-api-token",
     "rule_name": "检测到Discord API Token",
-    "hash": "6c8211662047ba80cad2b79eaf6725d10371b24b7deed3de9be6e634f37b7c8b",
-    "version": "20260907.0001"
+    "hash": "cb87347bb1c50c9831a14529f4dc2b0a4959d6278ebb80457dd02c6244c4af74",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-discord-client-id",
     "rule_name": "检测到Discord Client ID",
-    "hash": "192c5a597f00f9e512c096f32e745cbcbe3e1b231fb30deab866450bffdccb02",
-    "version": "20260907.0001"
+    "hash": "674afd32a2d5d3326cfa2a695e9b773e5ddd8c35108467d553abf59c9ff71c85",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-discord-client-secret",
     "rule_name": "检测到Discord Client Secret",
-    "hash": "df067e861af92b3af6058ccdf09ae701388972a942ff0475464f6edd24ef0f58",
-    "version": "20260907.0001"
+    "hash": "f7de6d85d8004550c6efb90469fb49dff4172891827e52e654cacc09c6aeee9f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-doppler-api-token",
     "rule_name": "检测到Doppler API Token",
-    "hash": "8e57556ee18bc949568f42ef645e06b5bca9705315573cda169b25d03bb0449f",
-    "version": "20260907.0001"
+    "hash": "e40a6de2a35cae6c2e633161fa42c16e754b4e9bfb7f3f6de7a3e1eaf4e92a9c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-droneci-access-token",
     "rule_name": "检测到Droneci Access Token",
-    "hash": "5600f0333e6c09a779b9c1ddbfe76090966dce2b16f8a0ba01e63ddade8bbe2f",
-    "version": "20260907.0001"
+    "hash": "f9f63a6b7a4a68bb67048f121e507eab6b556a77e40e5d8a979b2f155b2d8fe1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-dropbox-api-token",
     "rule_name": "检测到Dropbox API Token",
-    "hash": "bdf5072913164c92cdd273ac346bdfe11db48a7dd1bd8eedc60a3e800332e229",
-    "version": "20260907.0001"
+    "hash": "560710543b6d9ea5f4348dfbfef05c97660c724e1359e648566bfb4510f6bbd6",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-dropbox-long-lived-api-token",
     "rule_name": "检测到Dropbox Long Lived API Token",
-    "hash": "797b23ea08922c1b49f46a7d422d7f17aa9d9275be43b2b1765e91ba954ea6cd",
-    "version": "20260907.0001"
+    "hash": "ce969c8918b25aed1c1638771c350c6dda557afd6cd90f9d9398efe780fef429",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-dropbox-short-lived-api-token",
     "rule_name": "检测到Dropbox Short Lived API Token",
-    "hash": "29d97e1a600b9d95999fb1c5f604031e91cc299fb4bbb9003abc50bd5406cc6f",
-    "version": "20260907.0001"
+    "hash": "f5345ed147cd52574a537cd09b2b2a07120b6c7f5d2edb29b0f9d8cfd805b23f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-duffel-api-token",
     "rule_name": "检测到Duffel API Token",
-    "hash": "09ff621c7cc96513c4dea6097ccfa6da665332c553ff5058aefe0bfa410ab5bb",
-    "version": "20260907.0001"
+    "hash": "5d245948291d894a42f06c315eb35356464adcd045faa7a6de57564753647ca3",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-dynatrace-api-token",
     "rule_name": "检测到Dynatrace API Token",
-    "hash": "f246bc6c1c1256ab21c5d32544adf2a1cca42636dc955d010b14cf3481e96c26",
-    "version": "20260907.0001"
+    "hash": "82ef0fafe63ef0934f1645cfbd2221ef493984b583135a176cd81380e6270d8b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-easypost-api-token",
     "rule_name": "检测到Easypost API Token",
-    "hash": "094269545ae752d2081c9d55ce934ffb44bc483dd2b40cb212257d8b4b88841e",
-    "version": "20260907.0001"
+    "hash": "14daaf340edeb81b1979d67d4ba18686a621eeabe559beeb3c66b454f79d260f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-easypost-test-api-token",
     "rule_name": "检测到Easypost Test API Token",
-    "hash": "abcbfc6fb4a546cfc0efa75f300215df639b262dc93f8809f0307ea0dc02a7f8",
-    "version": "20260907.0001"
+    "hash": "d90cac29658daeff81396b34f94852ae2cb950894656846228ce65f3982ab4e9",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-etsy-access-token",
     "rule_name": "检测到Etsy Access Token",
-    "hash": "50ee94e3c83df5669500f50044876227e71aaee2c8e63b90e30c5212cfd3d808",
-    "version": "20260907.0001"
+    "hash": "437d39f6a2868f1eebdb86b9e612a0a946d2bda741c9231f37c671de6e87d431",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-facebook-access-token",
     "rule_name": "检测到Facebook Access Token",
-    "hash": "47585c95fd6c2195ea54110739ea655c68a03fb1c4cacb8804a53240f755b4d5",
-    "version": "20260907.0001"
+    "hash": "b78cbc0bb0c29be16290d0948691a6622edfdef7442d0e0d029845f38c895d5e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-facebook-page-access-token",
     "rule_name": "检测到Facebook Page Access Token",
-    "hash": "84485fe1f2aef846b13909dfc110f857f03e9d6e18a0e0af776603986eabf187",
-    "version": "20260907.0001"
+    "hash": "a5e68b451e963b714835e96440e269c05f782ad005b2eaf86a5b8e8b7345c756",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-facebook-secret",
     "rule_name": "检测到Facebook Secret",
-    "hash": "55a7c46ef34f9737e25c75fe1cbe680cf9ca35eb645e211765e746422ea69f96",
-    "version": "20260907.0001"
+    "hash": "1336735ec7b541293006ab1dfdf60ca3bde954fdf690811bfb0939a41d9ae6f1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-facebook",
     "rule_name": "检测到Facebook",
-    "hash": "37795b156fc22beccdcba5f432bdf0ed2fb84d5998a3c5385c4096c1929e0d57",
-    "version": "20260907.0001"
+    "hash": "69bafadc0288c8d74b136954f1c4f9d6a7aa99dc25424b8f7b38058b206c49ee",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-fastly-api-token",
     "rule_name": "检测到Fastly API Token",
-    "hash": "b121481bc8eecb8bbfdfbd17f32bd0b51ed7b3e6c89f757313435acc56f7d283",
-    "version": "20260907.0001"
+    "hash": "c50bd0d54bbd4c7a960ac2e0467ae92fb7e4ed341bd027ee48345670e4e5cc33",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-finicity-api-token",
     "rule_name": "检测到Finicity API Token",
-    "hash": "f0db9a29a68ea3ef496d4a7b4936cf72ebad2016920aedb1628050ca95ef4ed2",
-    "version": "20260907.0001"
+    "hash": "74292e617c216d091c68f3bec3167dcb5d1fc88172856d8309dbaab86af18ab8",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-finicity-client-secret",
     "rule_name": "检测到Finicity Client Secret",
-    "hash": "f49a07dbcd2eaad1e8f19cc0b3440c30aeaca6a0954547a169b93f607633f003",
-    "version": "20260907.0001"
+    "hash": "fc2677c9c0a6eed70f8ca49bd56ba504cec40c76de4bd3c67eaf886885cd940e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-finnhub-access-token",
     "rule_name": "检测到Finnhub Access Token",
-    "hash": "15b42f5fb4d65d47be5e6246041acd7b6049fa2daee047ae7a58f70aa1571618",
-    "version": "20260907.0001"
+    "hash": "e93cfe5b4dc0bfbcd5c9476a35125837630321b49784c7183299a4cc16e8b123",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-flickr-access-token",
     "rule_name": "检测到Flickr Access Token",
-    "hash": "5f77bb32a705c24feb926726ed82073fcf791755adb7e17541804260c87eb22f",
-    "version": "20260907.0001"
+    "hash": "67ad111a3e046c19456c13d217983133e6e3d7af814a350f815a277571b81367",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-flutterwave-encryption-key",
     "rule_name": "检测到Flutterwave Encryption Key",
-    "hash": "c276c141c9ee3651c358f2c8bc060039584eaf341afc900b795c551f1118125d",
-    "version": "20260907.0001"
+    "hash": "da97686d56c1483023d1034f1569b380c7445eb3262329d9fd894262d35426a0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-flutterwave-public-key",
     "rule_name": "检测到Flutterwave Public Key",
-    "hash": "449a00e95429ff42bb637b885ac66218bd012d210490ef1ca4fe0f4ab874bdee",
-    "version": "20260907.0001"
+    "hash": "63a23ff2c470052f7015fb93dbbd03583c4553e164dbcb553573288d522f8ea1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-flutterwave-secret-key",
     "rule_name": "检测到Flutterwave Secret Key",
-    "hash": "5254aee677de3ae9c81b0f732b8f40e3f5a58dd0042b5132ad7acc0857f2f56c",
-    "version": "20260907.0001"
+    "hash": "9cb4c35f65099561e4d4e8d9bdc2b5bf92c6670d0aa4356a05378f9fde72d43f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-frameio-api-token",
     "rule_name": "检测到Frameio API Token",
-    "hash": "7b5ca2e6edfc1ff88736230739edbfdb121f4cc0336764134482757d02fef99f",
-    "version": "20260907.0001"
+    "hash": "d69486062038b1eeefdd21345ec60fb9ebcb51211bd92ed294048413618e3e55",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-freshbooks-access-token",
     "rule_name": "检测到Freshbooks Access Token",
-    "hash": "1df10ec9614f02b0fbf590ef7add00e2ad46b5155ce5a439cf6dd2b35afd7f25",
-    "version": "20260907.0001"
+    "hash": "07f0f47be7982c0697d5fe4e7b029b37e2c13995e0e3b2a62a29f2211428af86",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-gcp-api-key",
     "rule_name": "检测到GCP API Key",
-    "hash": "b9ee0808b84e20df391feb606435f30443a97809e198788ae9663bd4f8780442",
-    "version": "20260907.0001"
+    "hash": "175bbb6dbf3d36e69d007a0992ffb88d37a7f3cb67d1e137189710efe8c668c1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-github-app-token",
     "rule_name": "检测到Github App Token",
-    "hash": "7f189fe1ea450cf0623dc5bbec9abfd44958e18f3b57b3b02df3b7f95242a61c",
-    "version": "20260907.0001"
+    "hash": "5cebbe9665c472977c8cefea891a63843a4afeb5e26d36051033dd14244b64aa",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-github-fine-grained-pat",
     "rule_name": "检测到Github Fine Grained PAT",
-    "hash": "be9a9e09efa63006f01998d302385eb082561af66ff0d3b9d5a3a1bcca3b9400",
-    "version": "20260907.0001"
+    "hash": "b36e21dfd2aae6a320d2d29cdee6e96635a911e6647075003a170800e3ebf94e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-github-oauth",
     "rule_name": "检测到Github OAuth",
-    "hash": "76b93b3824e5fb5573580d9d5ec13c9a1cd3e137ee2552882b7720eb852d1d2c",
-    "version": "20260907.0001"
+    "hash": "175acf5f79ae1db8b2108f46ab371c94ef4fb7b333f928f144f6439e4473a330",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-github-pat",
     "rule_name": "检测到Github PAT",
-    "hash": "ef3be8149dfdaa5de74e582803a28f386459e8fae933e75f5344debdfe19c822",
-    "version": "20260907.0001"
+    "hash": "44bf51f0856bfc68a4dcdc77245207f6cb22a75952340ce6ec425ac1fc263f6d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-github-refresh-token",
     "rule_name": "检测到Github Refresh Token",
-    "hash": "ebb78c0c9af740e5a573be1eee245620c42ce4eb03ca9a595c64207c39843411",
-    "version": "20260907.0001"
+    "hash": "2a2f2953ce6761929edb30f9d63c3d4f8808b1171402da5f235db38bf5a36648",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-gitlab-pat",
     "rule_name": "检测到Gitlab PAT",
-    "hash": "5af56a4d657bc906cc2c05f5b80b7fe9243c0b7c751b218b8d04e606a21a7c9b",
-    "version": "20260907.0001"
+    "hash": "146924b6d0650e8e017c9e6172bfbce374090dbfd9bcfa4e074cf44a730aefed",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-gitlab-ptt",
     "rule_name": "检测到Gitlab Ptt",
-    "hash": "e85d0bbe8550ce9d17aa0f898621f8a8a9b7a788318fa2e9e61ba2bedd942f92",
-    "version": "20260907.0001"
+    "hash": "e52d5d0ac89bdbf87f320d14d729557344e3a822f5e75118091c14824e5744a8",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-gitlab-rrt",
     "rule_name": "检测到Gitlab Rrt",
-    "hash": "3b773b78c90e58cea28135aa7c08c0720b66c45f8fb31928ff192d794ac8e397",
-    "version": "20260907.0001"
+    "hash": "a64bcb296ae9c0562eaf1b090830c09f438b5900880be79821f29efbba674a2a",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-gitter-access-token",
     "rule_name": "检测到Gitter Access Token",
-    "hash": "371a454ea07326d928b6c930701ff28f34b08ce04d97898bf005a76c733fddf0",
-    "version": "20260907.0001"
+    "hash": "5661ba34ee194f61ada420eaffb1a940aa3ce1e9feb9b74533fce2954f751240",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-gocardless-api-token",
     "rule_name": "检测到Gocardless API Token",
-    "hash": "1baf3488ff669c27b623092fe595a7bde3db4f699ffed24acf036477484e1d62",
-    "version": "20260907.0001"
+    "hash": "361b8baa219c0d27ab59348d4ff64d6ff75e79b06e1a6d022d31605ca19e255d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-grafana-api-key",
     "rule_name": "检测到Grafana API Key",
-    "hash": "2bcaa2f73fc958f514abcba9fd6493db63e9d50e6195df5ddbf71b8337110d03",
-    "version": "20260907.0001"
+    "hash": "074536903471a68c2d98fd4d7d72eac4edce3112f282edafcfc27b3553c80582",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-grafana-cloud-api-token",
     "rule_name": "检测到Grafana Cloud API Token",
-    "hash": "36b9baf804f35d6ec29b0f5c6e5a273256d3995d0af33a25ddf6daf15f931281",
-    "version": "20260907.0001"
+    "hash": "c33301c74119513191fb98c4a834041c219610a093b75080929cd833cd371014",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-grafana-service-account-token",
     "rule_name": "检测到Grafana Service Account Token",
-    "hash": "edac98ae369b085295cd41bece8aeb3aeff8e83580535c8d40be2d83b69d88ad",
-    "version": "20260907.0001"
+    "hash": "6f37237fe93c3ba4475c23077fb9f6cb53cf10fcc2bf5765e35140910c99e6a1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-harness-api-key",
     "rule_name": "检测到Harness API Key",
-    "hash": "b5394b7af4a2e7c8a43db67e7b9c48fa828bcbe63fef0c5c32b35dc559827c4f",
-    "version": "20260907.0001"
+    "hash": "91bfeb28675233e61acdb5a092a434dc4137f5b00bd157669741dcea1f50b2f9",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-hashicorp-tf-api-token",
     "rule_name": "检测到Hashicorp Tf API Token",
-    "hash": "b479003d5919c76e21a1ccdcc88bf56fe63475fe51c016901eedc82a739bc0a5",
-    "version": "20260907.0001"
+    "hash": "af4b6cc7d364a85255e26c77b7e62aeeee595a1926aac0e5acf97621d118cdfa",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-hashicorp-tf-password",
     "rule_name": "检测到Hashicorp Tf Password",
-    "hash": "55e06fdcf6216f7874df05f0216e5a13159f3e62f2c77c8c38b5c67b97ea8c75",
-    "version": "20260907.0001"
+    "hash": "607989c5e3e679f69eb4a288f48a3e5decf011ca52c0bd38b052792499125013",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-heroku-api-key",
     "rule_name": "检测到Heroku API Key",
-    "hash": "200d7fcf94e5515644943a7459dcd56d0427ff833faefb8d9822b0701ff9a65c",
-    "version": "20260907.0001"
+    "hash": "1e81976fb5a7ce8e368202ac9da1dd2996c58c9617d625a62a77b5ec5ac15844",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-hubspot-api-key",
     "rule_name": "检测到Hubspot API Key",
-    "hash": "a759161dd399848190bdcd6d3f72c89c1bc78304e182ecc652dd890c4358165b",
-    "version": "20260907.0001"
+    "hash": "4bebdd25e6e76c79a5ee8b74fe611ad2b04ed5df55cb9e2814b3f5499ea08b53",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-infracost-api-token",
     "rule_name": "检测到Infracost API Token",
-    "hash": "ef1f96547728e9c39d8f03ba61eec2aa3da64f5ac6ef62c3f31484891fea3f63",
-    "version": "20260907.0001"
+    "hash": "b2cbd872efc7fe66bf5ef221b48a0e10f8b0fd578b82304ff4120e781f30eaa1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-intercom-api-key",
     "rule_name": "检测到Intercom API Key",
-    "hash": "7b8092f4ee74d83562f8b2d1e67835f325acf6239b32e5995e67d231e34b2f04",
-    "version": "20260907.0001"
+    "hash": "8e0e40416f57ecbdbd76a09d278ff2ba7ed535b95dbcb7e650bef2d10558c0d5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-intra42-client-secret",
     "rule_name": "检测到Intra42 Client Secret",
-    "hash": "074eddd79f9c321d1b39c0b81f5d7e4c48b4abc2d5ad4450527f98024a573e2e",
-    "version": "20260907.0001"
+    "hash": "f8483541aaba8d5f0b3ce0986c2a0be0368c11381905afe969f52db611efb16e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-jfrog-api-key",
     "rule_name": "检测到Jfrog API Key",
-    "hash": "efae79a1ddb3be09741b1652e65dd9ed5d5fe73449b904510101f82f07c89292",
-    "version": "20260907.0001"
+    "hash": "a24547a6ebb4a76fc3947dafbae22efaf197f9cc428db3219a93dba6096ab5ee",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-jfrog-identity-token",
     "rule_name": "检测到Jfrog IDentity Token",
-    "hash": "b2f7262585dc8c5d13618755541b69f88e1f8ca78e76571ad08c91b3fd5fd23a",
-    "version": "20260907.0001"
+    "hash": "126bab42f523300b5c52ff3ecf64ea867142b4a72e887e119c4ea76f8031f7fd",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-jwt-base64",
     "rule_name": "检测到JWT Base64",
-    "hash": "ac41b669a60048c8c81c2fbd489fcd9d0ebdf6dc028f00c96122a54b64136630",
-    "version": "20260907.0001"
+    "hash": "93af086c8913b904012805bab1fd456d507a644d2b90266ef9fde3b4e5e13f46",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-jwt",
     "rule_name": "检测到JWT",
-    "hash": "ff9450aa71b557f29e679d02a931624a956d005c1dc58f5e7f6720a45885bb96",
-    "version": "20260907.0001"
+    "hash": "aeff43a25380168619d39908e11e28e06c54c098baedefab08b4d82f2b85938b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-kraken-access-token",
     "rule_name": "检测到Kraken Access Token",
-    "hash": "51106ccf3509b1bde96539a02c15c08720e6f280cc06e07ea1ce14f47e49bfb7",
-    "version": "20260907.0001"
+    "hash": "09b380c66fcded588aaa1bcd9c7b289ab09e49bc38dc44808e3dfc603058873b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-kucoin-access-token",
     "rule_name": "检测到Kucoin Access Token",
-    "hash": "279a5b548a0b2463da3f7f7bc9b5a99caeb28eb43fa197ac2aff9655fff03bd0",
-    "version": "20260907.0001"
+    "hash": "5781de663f404e3c0af40ccac65011c95116c1aba82c9eec4b65bf3d7df791fa",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-kucoin-secret-key",
     "rule_name": "检测到Kucoin Secret Key",
-    "hash": "83f03269c4bf935506de3d893962426e9cdc690841344e529cf840d5b5670ecc",
-    "version": "20260907.0001"
+    "hash": "5b55efc706bb24c11785cac9fec4b460cc1c9a6531636f379e64e1b3f3210e9f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-launchdarkly-access-token",
     "rule_name": "检测到Launchdarkly Access Token",
-    "hash": "1b790fa36bc0eea26681a521721752ed8b7f9242312317788fc3ebfc52f2f76f",
-    "version": "20260907.0001"
+    "hash": "f1aebead32f41ad037231e441050a85de55923cf7d39343742a913bb196983fc",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-linear-api-key",
     "rule_name": "检测到Linear API Key",
-    "hash": "5d71b08ed0407a4a8d020c3d5274e3d3308a1ad7f55ef71f512b2634812d414d",
-    "version": "20260907.0001"
+    "hash": "d6ebcab7feb8e0f556831ffbe2ce2aeb99e5c2eb0340dca64200384f5c22700d",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-linear-client-secret",
     "rule_name": "检测到Linear Client Secret",
-    "hash": "bf72a673150b781f5f0218c52e33bbab7d650e807222941f84bf009b535a9fc3",
-    "version": "20260907.0001"
+    "hash": "10f508c44b403b0bfb7321d118939fab633854d1b1338e7d3da30256edde8c9a",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-linkedin-client-id",
     "rule_name": "检测到Linkedin Client ID",
-    "hash": "401b34fdf38eb6c6afe8beefb789a1c47542dea85a72c19bc7ec78b5a7cf8b8d",
-    "version": "20260907.0001"
+    "hash": "67cf7c4c1cc90cf1d2fd18c95c7480beb4966348d1d327a3de54784f796b1eb1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-linkedin-client-secret",
     "rule_name": "检测到Linkedin Client Secret",
-    "hash": "61aaea0ae69a796208f549f82d9325e0838fe952261c5b29f7b1838ff5286970",
-    "version": "20260907.0001"
+    "hash": "e3039a14b388b9aeb94c8a5afcc13bccbda3a648b0077dafca2ba64ba5df4ab0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-lob-api-key",
     "rule_name": "检测到Lob API Key",
-    "hash": "42b408f5bbca03e6003b052351aa209b0cf138b0d719c12551413e33ba8f2b27",
-    "version": "20260907.0001"
+    "hash": "b18ecbcc59422598e2d08b746bc93c139697379e238a46cb069a3bf0331a9729",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-lob-pub-api-key",
     "rule_name": "检测到Lob Pub API Key",
-    "hash": "36f593774b178aa48680fca3b3e3f8dabf5d9a7bb6a747f6161ab8c6e454acec",
-    "version": "20260907.0001"
+    "hash": "64ca56581e23edc6b67864f054fbf5e0c38512d45a6cb4f1cc6179b542e46a57",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-mailchimp-api-key",
     "rule_name": "检测到Mailchimp API Key",
-    "hash": "f2d7e7f9eeb47bdb745bfaf4ac41cbfd6c895c8c30782e0222d46f7d66b7d324",
-    "version": "20260907.0001"
+    "hash": "27f09ba538cca977b5a2b7f9e91f0e4150a8028fe0b0ce6091c214caee38cc46",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-mailgun-private-api-token",
     "rule_name": "检测到Mailgun Private API Token",
-    "hash": "549e4f86d298680f07d4599b631c070f400cafb96d7d2259f609773b9dc3b7e8",
-    "version": "20260907.0001"
+    "hash": "c6926cf0a3f1a5fbf6d118c04f701914cfc80e7bb43e1e09b7a1088557b9119f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-mailgun-pub-key",
     "rule_name": "检测到Mailgun Pub Key",
-    "hash": "8be4d7ef28a9064240e69cb3a3a6bfba2bc8324aab7b57d6c0d11eb3503b6541",
-    "version": "20260907.0001"
+    "hash": "59ea87dacdd77dc41d95777d75aa94581a4ee030193728efb5028662979d2edf",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-mailgun-signing-key",
     "rule_name": "检测到Mailgun Signing Key",
-    "hash": "07ba37ec07d7ae095335b7fc98829af498911ce426db01af62944dbb3f87b10d",
-    "version": "20260907.0001"
+    "hash": "328434a7cb729c8f109cc5f9ae237369fd6bca4d63b29db627d8a2777edf8e47",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-mapbox-api-token",
     "rule_name": "检测到Mapbox API Token",
-    "hash": "0764548b6ca0d07cd090c15ac46b76ba0d47dc7403a3c4caba5b778cf0771c82",
-    "version": "20260907.0001"
+    "hash": "ab36ece24aefa962c765cee85b31f1caf88ec114002d04701a33127001404b53",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-mattermost-access-token",
     "rule_name": "检测到Mattermost Access Token",
-    "hash": "bedb48732693d06a3060747f44c97e54183a3da03a49da8b24e95d964e47ddb6",
-    "version": "20260907.0001"
+    "hash": "b78c2a856a66f589022951635f434c8b63a39acc7148f9eb2a55737f21658656",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-messagebird-api-token",
     "rule_name": "检测到Messagebird API Token",
-    "hash": "3e3840387547b9936be8b1ec96f31aaee3eec790716ca12353acf082445e7f8c",
-    "version": "20260907.0001"
+    "hash": "1d75b4d0ec02aefa7789e7c2e263af4adcc1655f3d91e77f9a5a8eab9d27b4d2",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-messagebird-client-id",
     "rule_name": "检测到Messagebird Client ID",
-    "hash": "480392d9b6ed2ccf022918792d51cbb6bfb8fe3546e81af7e3fd0635829e2015",
-    "version": "20260907.0001"
+    "hash": "d4aed75b40b0daf0820c9d5492f0650a51b9a6828678888b50c008cfe0888236",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-microsoft-teams-webhook",
     "rule_name": "检测到Microsoft Teams Webhook",
-    "hash": "98bba8af9d3139a3657efcfeb285bd57fd3a14d9a5254e12459e02571dbc466f",
-    "version": "20260907.0001"
+    "hash": "74087daafcadcf9ce28d223b420852784dbf21f8ff487056c30862770e23c992",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-netlify-access-token",
     "rule_name": "检测到Netlify Access Token",
-    "hash": "b35daa7a3d888fa3a63013def065e64e66eae4ea5c66649550da5dcee02344e6",
-    "version": "20260907.0001"
+    "hash": "3935002e6681cb499d25d6a009e0a80f9c1052ece70e0765ec2637af044835d1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-new-relic-browser-api-token",
     "rule_name": "检测到New Relic Browser API Token",
-    "hash": "6f96fb67370b01150bc1497a904275998e3a0399d61c49eae8117e493f92b7fd",
-    "version": "20260907.0001"
+    "hash": "e597f07a74af350eb13b8bf0368cf0f64cebc1d44a1512aa8224a0d9f3afa7af",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-new-relic-insert-key",
     "rule_name": "检测到New Relic Insert Key",
-    "hash": "32bc0bfdb6eed892e2714004f7a12cd6ccb33fe5de349959ad1f8ea43a050c38",
-    "version": "20260907.0001"
+    "hash": "fd238522ccba467c01888916cbd34a906d5ae463bbff8ab96b704c6e0e755caa",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-new-relic-user-api-id",
     "rule_name": "检测到New Relic User API ID",
-    "hash": "dbd703be518f2f28f0084547e01fc094a14c84ef49853d5116b1f6054322cbbb",
-    "version": "20260907.0001"
+    "hash": "0da8d6d9b97d33b3dc40063bede1c7347ecbad985d6fa69349f7aee5dcdcd709",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-new-relic-user-api-key",
     "rule_name": "检测到New Relic User API Key",
-    "hash": "fb9d0205125f14bb1cfb64079025a0b4d011c9f16f28c169894d9ba5d5360538",
-    "version": "20260907.0001"
+    "hash": "9c5005855788641280b4e521adce3460d199313918ee442ebb978de68b4aefd7",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-npm-access-token",
     "rule_name": "检测到Npm Access Token",
-    "hash": "b47edce771bcd9a5798640cffaeeabb7f628911c42898bdb18a6150574c780bf",
-    "version": "20260907.0001"
+    "hash": "0823f03810df4557eebcee32755f81db872c4e998b7a5345150e41c6ea098d2b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-nytimes-access-token",
     "rule_name": "检测到Nytimes Access Token",
-    "hash": "e754a8ba784ce424ac88ad20c49854a3ea632fc55ce95cf7b62285c5b979be33",
-    "version": "20260907.0001"
+    "hash": "4960fbd95d8cd4dc76f78d2381ad08256621b8da72834cf1450d5cd23461cc8e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-okta-access-token",
     "rule_name": "检测到Okta Access Token",
-    "hash": "406d4f045b409261272fcdbe1f88a7f613acbc028cd091a34050675c4de34ff7",
-    "version": "20260907.0001"
+    "hash": "92f33445b592fcb53f4369319c3b728d3dbe1616efe0260a575f8c3832726757",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-openai-api-key",
     "rule_name": "检测到Openai API Key",
-    "hash": "0ca24ba5c4d2d128772ae787cbfa24d73198b5d8b5b7bfc043a02ab598046e33",
-    "version": "20260907.0001"
+    "hash": "225cdd36aecf70758c3f489eb842c9a5bb953ef90b65fab8a49edd2929d6c0aa",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-plaid-api-token",
     "rule_name": "检测到Plaid API Token",
-    "hash": "cec7712e4ef47b982c17344ee784fb23540dda7c5c39e9088bb4b26d198b0c4a",
-    "version": "20260907.0001"
+    "hash": "aa22bfc69c62d0d21caf3838b37c9aa08c0507a3fb838c27335366d48fe91370",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-plaid-client-id",
     "rule_name": "检测到Plaid Client ID",
-    "hash": "f91335ec60f72de5d1a314671ad8fc6a1829993c413c2d25de86f6b3c7002804",
-    "version": "20260907.0001"
+    "hash": "980a1712a0237c0a328fca17eaca6164ae561f9ae8784b6ff61c767c9f905bda",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-plaid-secret-key",
     "rule_name": "检测到Plaid Secret Key",
-    "hash": "10c8bfd609c590e11ef07ec2f6ce1e6dd3c55d417ec1abd5f8d71ef88c5cf13a",
-    "version": "20260907.0001"
+    "hash": "184e6774965d703dc6c203f976562f3c8165a8292eff8dc88af90745749e08df",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-planetscale-api-token",
     "rule_name": "检测到Planetscale API Token",
-    "hash": "93c13eab5b451105f59bc2e987abbe06f8c2ba071b404f27a3864d4c9eed9d89",
-    "version": "20260907.0001"
+    "hash": "c4b1df69c8839ece86ce5ad39089ce771652deb33d263d968698e80dfc307fb1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-planetscale-oauth-token",
     "rule_name": "检测到Planetscale OAuth Token",
-    "hash": "9e0b91962b02c3300f497c91b8aa843995ddb113d9fbe356d395d1cec16c6206",
-    "version": "20260907.0001"
+    "hash": "1de6d9e8ecc3af3c53f8d925d5fd9282c2553450293095c8903d1b420aae7a5c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-planetscale-password",
     "rule_name": "检测到Planetscale Password",
-    "hash": "6bfd9a55e87af9aaf2d50044a88264e8fa17e6ffd38c70f6638c834fb831dffc",
-    "version": "20260907.0001"
+    "hash": "f3debcb544b2dd7a19dd75ae7efe4f1283f4b3d51dd4576e617c53817c58b4c2",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-postman-api-token",
     "rule_name": "检测到Postman API Token",
-    "hash": "4da64729293423cdf88949d2a55895292900a15060265965114c37fb6351ad08",
-    "version": "20260907.0001"
+    "hash": "53ae8a2eb3f10d65af3fb799f96fd3647347a3d34b413cef98dec0fddc23b7a4",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-prefect-api-token",
     "rule_name": "检测到Prefect API Token",
-    "hash": "7809025d18f7d1457ab2abddb00da56d89c96144e9e0a902303124b12f114d92",
-    "version": "20260907.0001"
+    "hash": "00d0401a3b5b4708d2fab303cfcee97cd36468fa7be211c0a29c03c1c9d3cbcf",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-private-key",
     "rule_name": "检测到Private Key",
-    "hash": "5947886154ec9810d7cdba2e741311cec468875c14dabcd09bbc4f1c772f8423",
-    "version": "20260907.0001"
+    "hash": "7681a05b94e499776a0e9d892f424481167699af647771e0d32e69b08bfcd6df",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-pulumi-api-token",
     "rule_name": "检测到Pulumi API Token",
-    "hash": "fecfc67b616e62f318225a0d3c7b60ff0e14d4b6f88fe1254a799d8cc2cb8847",
-    "version": "20260907.0001"
+    "hash": "72707e88c46b5cb9bde0d2cf53dd2612cac034894d3199e8203bf5ce0f5075be",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-pypi-upload-token",
     "rule_name": "检测到Pypi Upload Token",
-    "hash": "6b3b7b6f56b0c0a39d7718f9e62ea1feb750cd48140342f087a00fca5295afd0",
-    "version": "20260907.0001"
+    "hash": "0314c2ed399f54476668a467ce82b88ae38424f61cbbaed1649338945dac066c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-rapidapi-access-token",
     "rule_name": "检测到Rapidapi Access Token",
-    "hash": "d03c163789952f6df686e1cce69bb4becac8c4d67c57dd2f1957796bc99f3575",
-    "version": "20260907.0001"
+    "hash": "11060674362bb40920531edae9889270d72728b71a0fe271397c5ae49dcf3cc3",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-readme-api-token",
     "rule_name": "检测到Readme API Token",
-    "hash": "444f3b2f11e67bdcb545f681bb10997111d0a8172688edd9ae5abb1a3491595f",
-    "version": "20260907.0001"
+    "hash": "1664107345978d048ea8bfd8cbf5a2e90d7c57fbf06989f7af761c3ea263588c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-rubygems-api-token",
     "rule_name": "检测到Rubygems API Token",
-    "hash": "e359d91c46d481b4d8d0ba7e5163ab71322f5453f4981aa0f1e775beb945b2d8",
-    "version": "20260907.0001"
+    "hash": "2cc95e2d7437682a6632ab707e4e20d0e7ee8235d2e026bc5d1ec725f1cf0ed4",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-scalingo-api-token",
     "rule_name": "检测到Scalingo API Token",
-    "hash": "85b52ad4ce73fe96dab79911c32a068ca01bac46cd063faeb5e056e000e9f034",
-    "version": "20260907.0001"
+    "hash": "20059a52021d8c8ccf5fedb8d53d7a82be5d963216bb21f532796e6983c34aa4",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sendbird-access-id",
     "rule_name": "检测到Sendbird Access ID",
-    "hash": "2d6c8ef98b705bfd620e95d82f73fbdf508e5a1add491b4a005e215f6501042a",
-    "version": "20260907.0001"
+    "hash": "dafb1e97cc2f35173d24c4fe08c7b3938e41984e5c410a94af45e162a5e3a8dd",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sendbird-access-token",
     "rule_name": "检测到Sendbird Access Token",
-    "hash": "5b85ed3b3118366f3ac515ede04fd1f2f1c87c4b5134438b4a788a513b38c0cb",
-    "version": "20260907.0001"
+    "hash": "2cb08155b3f13a76e030c03a4df0cd4aea592581fc5a45ebde968e39b466a4ce",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sendgrid-api-token",
     "rule_name": "检测到Sendgrid API Token",
-    "hash": "51cae03c4b39a86f03b6f64ea41f9ec185ffd6f10ea571abbe22ed519605407e",
-    "version": "20260907.0001"
+    "hash": "2d12b7239a4c3b35dfddb1e164a12423ed25ee19a564c5748ba9c1291ac09866",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sendinblue-api-token",
     "rule_name": "检测到Sendinblue API Token",
-    "hash": "fe6319d28f63485a0ce542a849bf4aa5c1706e2aa56c62ae70a92da889bd9c2e",
-    "version": "20260907.0001"
+    "hash": "e1b91a9207f86401151daece7379f5b9e0218dc1bd1b2e841613067025d3bbea",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sentry-access-token",
     "rule_name": "检测到Sentry Access Token",
-    "hash": "e8f2b476fd791c61fecd6dddd71d5aea11cdb793ff83efea4c1699e7a4e0638c",
-    "version": "20260907.0001"
+    "hash": "d6904917eb1a13fc804ac120a70df0eecae9db68dfbda106a536e4b53dc718c5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-shippo-api-token",
     "rule_name": "检测到Shippo API Token",
-    "hash": "117514f343a4a056190bf3ef46226c9416b9d6c76ba6247ce0ce76f3d90e544b",
-    "version": "20260907.0001"
+    "hash": "911a53fa4c89c476745571e16ffa7c5e485b5c133fb0b88f529afb8c7acd2f7f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-shopify-access-token",
     "rule_name": "检测到Shopify Access Token",
-    "hash": "81ee2b670c31e659644ac60cb2eb435fa0475a90b6f760301f5d3563143af06d",
-    "version": "20260907.0001"
+    "hash": "f8d5da1bc6fb57908b9aeab46671fc03024c045d3cd2bd741036e007fffdca84",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-shopify-custom-access-token",
     "rule_name": "检测到Shopify Custom Access Token",
-    "hash": "b44651a5224192a6769265c3c069ceb4b37d2f3c07d01951c458ff0183638271",
-    "version": "20260907.0001"
+    "hash": "21aebe5f9921c280dbfa9c2929c0eafaa99b5f6a35d88f0b1adf5adb050187a1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-shopify-private-app-access-token",
     "rule_name": "检测到Shopify Private App Access Token",
-    "hash": "16d249c82ab60861ebde244fc6732040844fd82dfc0c61758ee4e959623b6743",
-    "version": "20260907.0001"
+    "hash": "14416ed87e93abb14b7d0bec04e066c877966dd0b097deefa06509ac9a1701b6",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-shopify-shared-secret",
     "rule_name": "检测到Shopify Shared Secret",
-    "hash": "280a3a0ae87ef7429387856f53e21f79848aea43a2d012ec0f094843121972f5",
-    "version": "20260907.0001"
+    "hash": "b50787a3da6f83a319e5d5883169db7445d55004f11d33e4e139991afc5b5685",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sidekiq-secret",
     "rule_name": "检测到Sidekiq Secret",
-    "hash": "e9e8a428ef3b07280bb5cc830a98daa3bd915889b77b7daec46b09b9a340ac36",
-    "version": "20260907.0001"
+    "hash": "fe59cd5f8010d5fd101556a1a873fb0300ffef3e2b65111e8c08c097754eafe0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sidekiq-sensitive-url",
     "rule_name": "检测到Sidekiq Sensitive URL",
-    "hash": "f5877df1482e4606bf6eabae08869633043cdddce3f3098fb71a33978056dff6",
-    "version": "20260907.0001"
+    "hash": "3ea9309a4ce390cdf7ffa0de6e13e8096d958d25729aa251685b6280ff7ea93b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-app-token",
     "rule_name": "检测到Slack App Token",
-    "hash": "38c8b67d073d74e9d0dec340b3a4f8a265c88f365959b1fedfa95627e0560d2e",
-    "version": "20260907.0001"
+    "hash": "dfad291b6f31bda6546a33966001eb250102f4cf18855a509e1cb6f14de87908",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-bot-token",
     "rule_name": "检测到Slack Bot Token",
-    "hash": "75086891bd0b1b9afc877ff27d1e55c2ba36a8cd3028c29fe1b4670484f9a50d",
-    "version": "20260907.0001"
+    "hash": "e17ca694714f232b38d3b2245bc852adeefe55d5073a7aac6edea4b8b3ea2ccf",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-config-access-token",
     "rule_name": "检测到Slack Config Access Token",
-    "hash": "c78f86cbcc232f01c8c038ea056ce5a4dd3317ea1424d1b15bc91375d6718e47",
-    "version": "20260907.0001"
+    "hash": "a4c9538561ddf772ea811aa08b7c40ee31b6422ecebeb08613522d8f6f44824c",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-config-refresh-token",
     "rule_name": "检测到Slack Config Refresh Token",
-    "hash": "94be3259cdeaf5534ca91f952f155d60f9b7ad62ea838c4f3d7b7d28a0f103cd",
-    "version": "20260907.0001"
+    "hash": "36b13d2bbd87422598704413fbb648264334412181bdc62ea6578d7a323bf386",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-legacy-bot-token",
     "rule_name": "检测到Slack Legacy Bot Token",
-    "hash": "647a326d35728bb0551ebcce65a92fa6b1baa433fe39b4b2ef5a30e8613dc2e9",
-    "version": "20260907.0001"
+    "hash": "bcbe39e66a04685ca457ec6c705b4daceeceebad0fdfc3d098acc0a1793e01ca",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-legacy-token",
     "rule_name": "检测到Slack Legacy Token",
-    "hash": "30eec3623d64755e1bec553e48880e1e7eca714b457db5cbc77e7629dd8bb41e",
-    "version": "20260907.0001"
+    "hash": "08c7514d0fbd86b2eaafdafe40eac19a6bebece04b9cf0c3a486d8c638c70116",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-legacy-workspace-token",
     "rule_name": "检测到Slack Legacy Workspace Token",
-    "hash": "85199e6cee569b26608b1f4b21076cda431fe3707c7d14f73a4301fd4773202f",
-    "version": "20260907.0001"
+    "hash": "503b60283503c40bc90594c8c6e640e5af916dac6f83c869cc259c1c11808d18",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-user-token",
     "rule_name": "检测到Slack User Token",
-    "hash": "482edd62c7791556a3bb988e6021433ea32000720406ec7196bd7a7b3da6a56e",
-    "version": "20260907.0001"
+    "hash": "8cd670f97c967e98fd0cacea8e30eee0d9745e0c2dc38ba2e21a6cd4d362d66e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-slack-webhook-url",
     "rule_name": "检测到Slack Webhook URL",
-    "hash": "dec89f6f250d19fe2c4e9d86daef29350d5bdc42b9c2c1336d124db155d0e532",
-    "version": "20260907.0001"
+    "hash": "fbae2f68027919a122f7359fd2c72f497eb16f381e826d25bfc3e51adb9cc1b6",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-snyk-api-token",
     "rule_name": "检测到Snyk API Token",
-    "hash": "b0baaf0778886cada530b39b53a92c65e7da33bb4a70d9bd83a523738e345d7e",
-    "version": "20260907.0001"
+    "hash": "432ce58b50e01649c442b97dedd75a2a4278eb1b91c47aec2ef443e2511909d0",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-square-access-token",
     "rule_name": "检测到Square Access Token",
-    "hash": "83f2f1ba628467a8108e2f833b5b4109a3653b611dc30386ce8fdc9ad946fefd",
-    "version": "20260907.0001"
+    "hash": "8b8c96c6ea219179b74a188f2a6d3290c1e6e45eb091b30d7eb597100117a9e1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-squarespace-access-token",
     "rule_name": "检测到Squarespace Access Token",
-    "hash": "8c6a7d60891559975381731c8fc71b5544bc7f7a9d6e520eee65282689b1b3d6",
-    "version": "20260907.0001"
+    "hash": "14633168e1e693c377eac06bab81f014698cad2a14cb14b1184eebbd73f3e7a5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-stripe-access-token",
     "rule_name": "检测到Stripe Access Token",
-    "hash": "8afbdad9c52503cac2a516197edb15e8176e8d0f0dbcb8745bb6676e63db9c5b",
-    "version": "20260907.0001"
+    "hash": "56c2767a60051a09b14010ca39afc7f2d1cfea2c3a8ed1622c62d7d228cbbc1f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sumologic-access-id",
     "rule_name": "检测到Sumologic Access ID",
-    "hash": "e30b3fe9598d3af0caab3ec9affdb7a0a049df48fc5f66ef95cea1ce500b30dc",
-    "version": "20260907.0001"
+    "hash": "f674c7dafcfe1cdd2387b5262ef0a8c55a800a731466d06cb08cfb4c76e97c51",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-sumologic-access-token",
     "rule_name": "检测到Sumologic Access Token",
-    "hash": "5faca482122dc2fd28d53971aeb4d3172ace3f80b64960b280c90783aa0f6d01",
-    "version": "20260907.0001"
+    "hash": "f8e813fc7e4cb5f6d873cd674c915856cd79f9d609ab1b3b80e86ddef1eb8d37",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-telegram-bot-api-token",
     "rule_name": "检测到Telegram Bot API Token",
-    "hash": "9a24858428cfa2e26de3db2b1c2c09d3f2cc05071fd65e32a6f264e6ba6be407",
-    "version": "20260907.0001"
+    "hash": "4971e8ba3f1230873f868081d83c20652d8253117e20ace3e6607ebd773cbe02",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-travisci-access-token",
     "rule_name": "检测到Travisci Access Token",
-    "hash": "85dcb6ebfa749ca11c3a5b3082bda53f148b0dbec1eaec2ff41be4de35a70587",
-    "version": "20260907.0001"
+    "hash": "32299808cf7bb639922f0dfd2a89b2806085ce8f1d79f94d03d936aa171400e8",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twilio-api-key",
     "rule_name": "检测到Twilio API Key",
-    "hash": "2cada7df397d8ad754e384850a9ccdda968a83ce94345ac79a3cb1cbe555fd27",
-    "version": "20260907.0001"
+    "hash": "5de73a6ea34685dc74b7c8962232f03e146b0e11c1d5b257177ad2d3e53b0849",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twitch-api-token",
     "rule_name": "检测到Twitch API Token",
-    "hash": "b856d8f79e2e569c3f5ddf2e7e67729096c5cea8c694344b6d40a1b2e7b0b45f",
-    "version": "20260907.0001"
+    "hash": "3dfbb70269af4c40a7b8a3d12611c1d9a624d4b92127dd00938917283d344fe5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twitter-access-secret",
     "rule_name": "检测到Twitter Access Secret",
-    "hash": "d4c9e40ad54b86f2ce533093c79021e4458342f7219f300e5431b680626220cc",
-    "version": "20260907.0001"
+    "hash": "7111fc9156573837ac4e5173f50b6e91f85127c5da1cd1b051e7c32474b9e33f",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twitter-access-token",
     "rule_name": "检测到Twitter Access Token",
-    "hash": "8779cb83985234e1c34c8023db725ba179b0bcac8ba122f8dc34d234c559a210",
-    "version": "20260907.0001"
+    "hash": "d47c07889dfb8591bd21c107c90fb462e18dd673baa9f09f0b18b562a2c217a7",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twitter-api-key",
     "rule_name": "检测到Twitter API Key",
-    "hash": "7b5ca8ec47201f7dcbda7ee58903b31bd5083c138aaa7b48f507f8f9c092a10e",
-    "version": "20260907.0001"
+    "hash": "cb57f3bb27a58b11f87e0f2759eec51e3fca33e07b8e542cabe7bb00b0b93388",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twitter-api-secret",
     "rule_name": "检测到Twitter API Secret",
-    "hash": "fdb52d508cba62b1f073de263a4239a5f6e03cfff8f6f11941b5d003387978ea",
-    "version": "20260907.0001"
+    "hash": "22772ad5820fc534d7a838dcc26f3d9e9d95af27038ab5dbc9f80d799beccf48",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-twitter-bearer-token",
     "rule_name": "检测到Twitter Bearer Token",
-    "hash": "bee0c98a277de23bbbb6e070776f5d2c6e6b4c643ead2b82eaf49689490ce425",
-    "version": "20260907.0001"
+    "hash": "13508e0906140b1d66ba25350833d37e4c81feec5f6eaf0f040d9f18b8aea0d1",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-typeform-api-token",
     "rule_name": "检测到Typeform API Token",
-    "hash": "2bf412ae8c22fb2c61f803822b6eb04e0e102d8cc7802291942e883c16d9962a",
-    "version": "20260907.0001"
+    "hash": "f8559c7884b08a22c087125b1958d4bfce8fd00d2fe60285b0d83a7794737b87",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-vault-batch-token",
     "rule_name": "检测到Vault Batch Token",
-    "hash": "86f1add89c88aa2ab4f27969591116863995ff2b57219fbdb0259e21311ed8a0",
-    "version": "20260907.0001"
+    "hash": "b741eb71d66d09a29946e95c64e46f739519e37db8937d11ee930cffa431a603",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-vault-service-token",
     "rule_name": "检测到Vault Service Token",
-    "hash": "b53d8907017fd95c0006193fa14e6ba75768a1a4cd41ecec42903a9e9e1c0c3e",
-    "version": "20260907.0001"
+    "hash": "dcde64c1589480bd687fddab3ceb6dfc816013d572a6ed162275ec129683bbef",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-yandex-access-token",
     "rule_name": "检测到Yandex Access Token",
-    "hash": "d42ac3b3c7497e36ad3f50b196b6153ca348308e4883939888bf6e1d90253214",
-    "version": "20260907.0001"
+    "hash": "8faaf68b1bbe4888718c545952144230e489c730c7412672fe03d07cde5eb8cc",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-yandex-api-key",
     "rule_name": "检测到Yandex API Key",
-    "hash": "5477aecfbf16d5546be33e613ed1ecfd81d62a959e52296ad7c9a5ce714176ce",
-    "version": "20260907.0001"
+    "hash": "2d9c81396415131852b59e55493b99cd2e4263b837f05a8241ba686dcaeef18e",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-yandex-aws-access-token",
     "rule_name": "检测到Yandex AWS Access Token",
-    "hash": "a50679c6e949f7ebaf5886503e4b1132c9272948b05e9a7d13e9323aeb698ce7",
-    "version": "20260907.0001"
+    "hash": "9f59c959fc54187918e1b17f5ed61a87b40708275f1c305651f300445dee363b",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-secrets-zendesk-secret-key",
     "rule_name": "检测到Zendesk Secret Key",
-    "hash": "844895abbf4fed6c57b32a6fd1be8755bd2d98852109781ec2384b73ce12b87a",
-    "version": "20260907.0001"
+    "hash": "e5e706764d74aa632afa66b04e23f35e49ebc8e92f085e69603788c9d64127a5",
+    "version": "20260907.0002"
   },
   {
     "rule_id": "source-best-practice-avoid-dnf-update",
     "rule_name": "Avoid Dnf Update",
-    "hash": "f941eac1449cf4ee85be39834a9c05e01a22fd94b92ff7cec1171e84bdaf08e3",
-    "version": "20260907.0002"
+    "hash": "a1ffc9c5fba7f09c533e4445b4980b68b296a7e89cea97fb4519acba215db3c2",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-best-practice-avoid-yum-update",
     "rule_name": "Avoid Yum Update",
-    "hash": "b1885746022f3120bb38825a5dc97168a9fc48de3a38ede104f86fb6cf396007",
-    "version": "20260907.0002"
+    "hash": "a14d89906dc06a95e39ca7ed25616ffdaeda5953720eb6b2ca4828a6cb1fb4f5",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-best-practice-deprecated_use_bitwise",
     "rule_name": "Deprecated Use Bitwise",
-    "hash": "ff45bdb5eec60b5ba4bb64a3deef864e966b3ea0158bd3d9580a44f7ab361aae",
-    "version": "20260907.0002"
+    "hash": "92ebfc899ba7feeab78884bc52cb06891d8f14c839e79d7d8718acefc6c86c18",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-best-practice-javascript-debugger",
     "rule_name": "JavaScript Debugger",
-    "hash": "a1d677997ecaf0a6d374b175b9a9df86e55172b1e328805a462bf4846ae6a5bc",
-    "version": "20260907.0002"
+    "hash": "658990974fe791c3b3a32307dd134274f79d01c1fa6cdc674701af462c24f93f",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-best-practice-moment-deprecated",
     "rule_name": "Moment Deprecated",
-    "hash": "4f608f0fc34e60f0692baa1832b1fe1181639ddb0f5967c1404b7cc42a4a1097",
-    "version": "20260907.0002"
+    "hash": "8d43006549c8307576e3c4787d599d7c8f0f0e18e023b82d4689ee8752ce3a0e",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-best-practice-python-debugger-found",
     "rule_name": "Python Debugger Found",
-    "hash": "8a970bf9cf07f308c47f6b72184643d9b31d8cfa2e5642110bd440fa16c98f09",
-    "version": "20260907.0002"
+    "hash": "e162a96eaf2b3a04ddd16b68ba6db493e881244868dc91ea8f6a31dcc6c7f3ae",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-compatibility-python36-compatibility-ssl",
     "rule_name": "Python36 Compatibility Ssl",
-    "hash": "9582a3f95a2f9af420c39fd0caf4373d7e023e9d5c201137ed06371a99ac2911",
-    "version": "20260907.0002"
+    "hash": "6eb36de1f2e942062a61bd0d456c6a5489ac8177df21bd698f9bf85af637fa1a",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-compatibility-python37-compatibility-importlib",
     "rule_name": "Python37 Compatibility Importlib",
-    "hash": "55a979082dfcec3ad647ba54a99671c976cc86473c65bfbf673817d261216f81",
-    "version": "20260907.0002"
+    "hash": "89ad84596b898b4e7566d72001d3e84eac1016fba3f56c8b69289d0f6d1cff8c",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-compatibility-python37-compatibility-importlib2",
     "rule_name": "Python37 Compatibility Importlib2",
-    "hash": "b77e1cf34acd357cf3061c3c52d5a960c3f2dfbb2c7bdf2338b7ab61c69f44e4",
-    "version": "20260907.0002"
+    "hash": "4718646bb03d2ab523b672b49ed24d44b7359937112a8f797f80675551078a5d",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-compatibility-python37-compatibility-importlib3",
     "rule_name": "Python37 Compatibility Importlib3",
-    "hash": "d200033db9d9439d6fbe9e206cb8cc942a0e0360bd6c0abf32a6cf72ae5c9c98",
-    "version": "20260907.0002"
+    "hash": "662cade266e8d728484383d224083a975a70e2d1c93090264d50690630405c3d",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-compatibility-python37-compatibility-multiprocess1",
     "rule_name": "Python37 Compatibility Multiprocess1",
-    "hash": "b2754a681ebf00b56194467284d54a13632bb3133def1811955378cd53984058",
-    "version": "20260907.0002"
+    "hash": "4f1501e3985e6f150bfc60e118ad8a180f96cc32863dd359676b16d903415a29",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-compatibility-python37-compatibility-multiprocess2",
     "rule_name": "Python37 Compatibility Multiprocess2",
-    "hash": "2d2affdd06d44797b9688c6a52a0876f64b73a3231dc1e854e935dbdc2901802",
-    "version": "20260907.0002"
+    "hash": "42947c9d4be01425e4513839a48122db0b9efa8e9e2dd42b901e3a4241779086",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-config-ai-hidden-unicode-generic",
     "rule_name": "检测到 AI 配置文件包含隐藏 Unicode 字符",
-    "hash": "012bf15aa083228296ec117fe25033179c1c512ca794673b1a0b7e6ee6617ef4",
-    "version": "20260907.0002"
+    "hash": "37332a944e5c622286b52dace7b291749ee0c00d89ca1f92070df4713d554473",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-config-hooks-relative-script-path",
     "rule_name": "检测到 Hook 使用相对脚本路径",
-    "hash": "b45ad2cdca8dce08ff943b04816467c7c82cb92cebdf3ca42e69b28f4c5ee605",
-    "version": "20260907.0002"
+    "hash": "76b30376758c7c894f418614996bef77363089f459516b2d607236d0ae3dd5ad",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-config-visualforce-page-api-version",
     "rule_name": "检测到 Visualforce API 版本低于 55",
-    "hash": "9de57dd68e2c7a674b9a7f89e11f0fc37b20396d455eeef2c9f093851b4683a6",
-    "version": "20260907.0002"
+    "hash": "e5b910b098e4851a6b20930aca91cd29bb5e2e08eb590dd7eda1b752d4d55811",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-apex-insecure-http-request",
     "rule_name": "检测到 Apex 明文 HTTP 请求",
-    "hash": "2208ff4f6be811d78a1fd159c390a734a52aac2c29600f7f2ce4a324257386c5",
-    "version": "20260907.0002"
+    "hash": "c024bdac11b077930a243e7c1f25cbf61e7dc3d5a8631a78f9f54eb71daab07b",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-apex-specify-sharing-level",
     "rule_name": "检测到 Apex 类未显式声明共享级别",
-    "hash": "5d228d0dd65b18239b957f0b8ac9b5e567d003689eb3ce680a2ee7c0fcfb159b",
-    "version": "20260907.0002"
+    "hash": "e013ebffcf763842ec4744c42cd42f4c098cd721920a3609dbe4818a7c9f4946",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-args",
     "rule_name": "Args",
-    "hash": "0b8534b126b2dd42ab1ddbc8d7e869268f54b736cb815ed6ca835a3624a7e80f",
-    "version": "20260907.0002"
+    "hash": "9e6b291ce0546d316fda5e7abbca3eae670f8d98c0bd6bcbee3d7f271e7f531a",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-args-os",
     "rule_name": "Args Os",
-    "hash": "27774aa8dcfc8c9a946b44a0a5fbdc3d0520cb71a92a8ca298936544fe42711d",
-    "version": "20260907.0002"
+    "hash": "f880df26d64715c07609e1702735f083eb5ef2351adabc38bedd76f1ced35e19",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-avoid-default-routes",
     "rule_name": "Avoid Default Routes",
-    "hash": "e43bd22c64baefad03504c2afd4bf8ed5e278761489072cbc706a64cde0784cb",
-    "version": "20260907.0002"
+    "hash": "8c13b9cbf387ea5f1c5ae3241c0e19658c76e25dd5f81884b198e580460fdc27",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-avoid-ssh-insecure-ignore-host-key",
     "rule_name": "Avoid Ssh Insecure Ignore Host Key",
-    "hash": "2f2f8e4995e7bbdd1300b6c7b087ce0737ed45ee65b35999370cacd5c7d90c6d",
-    "version": "20260907.0002"
+    "hash": "a25253c681a853ced874be6a86b8482045ed8234b521def8376a3ec06ae3c085",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-bypass-tls-verification",
     "rule_name": "Bypass Tls Verification",
-    "hash": "371278e1bde5e23fa0cbbaec5c54a89d6008c5803aadde26ef5cd6f06e1437be",
-    "version": "20260907.0002"
+    "hash": "b03ff67a59a6af682fd33df7e87edb20c8a2f3fec291431fd14a57797af0ca39",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-cbc-padding-oracle",
     "rule_name": "Cbc Padding Oracle",
-    "hash": "197970c9b7c3c7b1499ebde6a72dffa2a4138f54a6243922d1988154ec521bcf",
-    "version": "20260907.0002"
+    "hash": "9be0dce8df2d8570bd26006388d96d580cbd8d7331c49c840bf20d7ec43fd3db",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-contains-bidirectional-characters",
     "rule_name": "检测到双向控制字符",
-    "hash": "b6e5ea9da5241a4dcc8086f8671cc13b87c4f2d7a6163c5ca00192af7092c8b0",
-    "version": "20260907.0002"
+    "hash": "effed1ca1ac393c50f4d66357d4087ade54a911f46a2a60e118757c5f04ade33",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-cookie-serialization",
     "rule_name": "Cookie Serialization",
-    "hash": "1ba987bf5889d3fb6f0dfccd3279beb072a8d112c9f835986825ec2eaef2ad91",
-    "version": "20260907.0002"
+    "hash": "0856a915fcedac0664ec7c32797a7f5353154d77948794238532505227350ee3",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-current-exe",
     "rule_name": "Current Exe",
-    "hash": "30668b6c8787eb8b266bee1224a53ea8e23c95529b441bd16b74b614e65d31b8",
-    "version": "20260907.0002"
+    "hash": "37c62ec92b7f824876757abf4eda57b3c58ea628bf1f8df4e95fae44cf4a835e",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-dangerous-syscall",
     "rule_name": "Dangerous Syscall",
-    "hash": "8582ba2eb4af3f3826a1f3601488da41ef796a991125608cbd21c0b0aa61339c",
-    "version": "20260907.0002"
+    "hash": "bc7edf8c8f9a86a7a0037916b9ac964d41c761ca743dc6161dbc2befc3dcb84a",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-detect-pseudoRandomBytes",
     "rule_name": "Detect PseudoRandomBytes",
-    "hash": "352ba34eb1070bcb1c815a2b6d5972c5c60936a82e9034f39f7e27866e66a2cd",
-    "version": "20260907.0002"
+    "hash": "86a7f4687d76f9a12065d3ed7d16afb292015d1841a56c72de65661ef9e7bfc9",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-file-disclosure",
     "rule_name": "File Disclosure",
-    "hash": "64b27c7c43f7ee94d58c658a45f7bf7f9778b37ecbd06dab12465c036cc12848",
-    "version": "20260907.0002"
+    "hash": "ae9f96a62784617038993cb22bff52122dfc52638bf723b5e4ac390bafc29d15",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-force-ssl-false",
     "rule_name": "Force Ssl False",
-    "hash": "e80e5685145ea040031d900a07d94069f7262bebb29d33838b7d6caf992e6d8a",
-    "version": "20260907.0002"
+    "hash": "0229ed78642674dcf7eb430468fd31f0d89c50ae41f53f359cbbacef06ee5527",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-insecure-random",
     "rule_name": "Insecure Random",
-    "hash": "a633d75e3d97351222e8d584e67bab0c0ad00d0a472a228d9671271b2a90db09",
-    "version": "20260907.0002"
+    "hash": "dbe2481c28b05574d4832354a98590149d885275b329aefcd894c66e8a2161c2",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-insecure-resteasy-deserialization",
     "rule_name": "Insecure Resteasy Deserialization",
-    "hash": "f95a5a229891d3ad07fbcd52f75975a99ec2e7b592d894fb0b2133c7dd3c4356",
-    "version": "20260907.0002"
+    "hash": "d231bb86e1a1244a062f3cdfa8950b909d0ad87e1617794552a522137dcf9275",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-json-entity-escape",
     "rule_name": "Json Entity Escape",
-    "hash": "e74d892453e7c85ef06bd72bd263adf364d3212ca9cc0dd3f1964c37a6310b83",
-    "version": "20260907.0002"
+    "hash": "ea624b99e97d0d736b477d75f2ce68d2f82e8a60afb93150bd695643622c8a3e",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-libxml-backend",
     "rule_name": "Libxml Backend",
-    "hash": "87523b28d7113de922778a9e8e38a9f97fbb78c6aed23d74c70fcfb006bfbb5f",
-    "version": "20260907.0002"
+    "hash": "8c251a1a0df12fdc339c2243e941b12b342651d5aec70ee04a88b3681fbaadb0",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-ocamllint-digest",
     "rule_name": "Ocamllint Digest",
-    "hash": "011e5d0ecc7b4f52974cda564c143365b61a3ace3314c23f4ff2215cd900299f",
-    "version": "20260907.0002"
+    "hash": "8f45853794f5c9f953c4c7811eb7cf011c5a38ceab4913c2f155e7e9a8e0ec1b",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-ocamllint-filenameconcat",
     "rule_name": "Ocamllint Filenameconcat",
-    "hash": "a8bbf16068ab5d33f96db1d6d1bc2692966421014a24196f4959fb5feeb4b2b8",
-    "version": "20260907.0002"
+    "hash": "8905b48fe776974313b983271877dfc7b98c0f10cfa8873a0ff192259e2e3cad",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-ocamllint-marshal",
     "rule_name": "Ocamllint Marshal",
-    "hash": "bbef7722bd011b6177dcd4cbcdcc4e9d604f6657b01c4915179971faf775f806",
-    "version": "20260907.0002"
+    "hash": "b71382df2cfe7b625d9cfecc9b2f62d9fa7e82c6c25316feda4238d83ba52b0d",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-ocamllint-tempfile",
     "rule_name": "Ocamllint Tempfile",
-    "hash": "836006479e1a845fd217b349307102cb52f7ffa0c63200c3788597cdc8c5263b",
-    "version": "20260907.0002"
+    "hash": "d19a1abcbb32a22a41c13c87589ef71af4a2ea0d50ead2722a9d4df5f8b5ac9d",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-package-dependencies-check",
     "rule_name": "检测到 npm 依赖使用变体版本",
-    "hash": "7542a8a3604c1142f9b1f6d47950180fe02a11c251983d28c528f5d8ade1ad55",
-    "version": "20260907.0002"
+    "hash": "82fb165ccf74471e40a98ba0a2f5c32bc850638cd0af4e3ddfdc0d0dc7ea9178",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-playwright-exposed-chrome-devtools",
     "rule_name": "检测到 Playwright 暴露 Chrome 远程调试端口",
-    "hash": "0fbe11d420291537da784d846be733e6a2e44b1c676799921ef3b5f2b590c703",
-    "version": "20260907.0002"
+    "hash": "06ebde9d5db12f7d52a0d46ca0a22f25112f18eb0742a33b1d8cf889a8929520",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-puppeteer-exposed-chrome-devtools",
     "rule_name": "检测到 Puppeteer 暴露 Chrome 远程调试端口",
-    "hash": "16c7b631dbaec6629740f87d55ad7f6949c4757d18552795c1bad868ae1fbb91",
-    "version": "20260907.0002"
+    "hash": "272d8d45c349cd1d98a9a72eb4a91e670cf149d0a5095e2272efcc5e06bf23f3",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-rails-skip-forgery-protection",
     "rule_name": "Rails Skip Forgery Protection",
-    "hash": "64abfb0fcb9294db29c4098bfdda3fcf0e3bbdecdf183818cd52e3678a4255ba",
-    "version": "20260907.0002"
+    "hash": "d2207784cb7f5b18f74cd025841a80d7a3f6af3a0f119f9dda10e3a3b85e68b6",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-s3-public-rw-bucket",
     "rule_name": "S3 Public RW Bucket",
-    "hash": "692b4b7b5fd7d77b58683fe15f244035b273f0e43f6b33e233ce6188e792db80",
-    "version": "20260907.0002"
+    "hash": "21b8bbb471c1d39c920bdb88aa19c47c79f857ed42378022257a30483c2e191c",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-spring-actuator-fully-enabled",
     "rule_name": "Spring Actuator Fully Enabled",
-    "hash": "672a97bd7c695ead76f2c9e939e7d621cc4637826770c7e12dc13c244facb424",
-    "version": "20260907.0002"
+    "hash": "7eb7fb6615790ad5c3f52e02f5b8a484b91d2f385dc33e4a00d230976c74c216",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-ssl-mode-no-verify",
     "rule_name": "Ssl Mode No Verify",
-    "hash": "4dc1d9a771def723a22ebd8c47cc662cbb77ff412b9cf2bd3a3892f9103e6318",
-    "version": "20260907.0002"
+    "hash": "78290372eb1a6f45ba10aad0c60babb41ea772690b96d0e3f76ba96a6d80e7a8",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-temp-dir",
     "rule_name": "Temp Dir",
-    "hash": "2104d9812256aa21e347d8d7a1350ca5d32613e01238eb5d972f7a3510771e47",
-    "version": "20260907.0002"
+    "hash": "b2e6dc7cb59c8ff2e57f5208f5dd35e9cb8a0d09be18702cfaaca15261310484",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-tls-renegotiation",
     "rule_name": "Tls Renegotiation",
-    "hash": "efa729d94d070129b5d67c8a7140e29c110d0f1a6b6a5edb017a0f29cd504dc7",
-    "version": "20260907.0002"
+    "hash": "63a757f92c05ba4dabd8536784f0e7d197beb12e6da0b86b82fe37c6f69ea55d",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-unirest-http-request",
     "rule_name": "Unirest Http Request",
-    "hash": "97db60c763ed53ab64d7bf2a27e342c3f45145e805b112e1b5c72176b06af211",
-    "version": "20260907.0002"
+    "hash": "42ab1fed9e3df89192508a50142b19e1ca0842bc146bd983a307391e0891d9c4",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-use-defused-xml",
     "rule_name": "Use Defused Xml",
-    "hash": "eca56b4ee95a4303da75b3f4977aa3d0a96f7b4c0aacdbbdca6493b10828a241",
-    "version": "20260907.0002"
+    "hash": "9d750d1a4cf4dd5cb83ad4c84b0e4a65349a0a7f5552d36ed89624a85bb7959e",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-use-defused-xmlrpc",
     "rule_name": "Use Defused Xmlrpc",
-    "hash": "c4b7dcd942b2d93725386323cffe1f7f0fed99bc2cfaafd3a99245053469918c",
-    "version": "20260907.0002"
+    "hash": "ec6c359c7544035ddb3b0881266fae1b271492d87d26b034d65d57eddad63132",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-use-of-md5-clojure",
     "rule_name": "Clojure 中使用 MD5",
-    "hash": "b71010afada5a0fa65e6c39ca00f6353ad78b4228d512f36e67a5037ff7cf18a",
-    "version": "20260907.0002"
+    "hash": "67e2d3f7796a0e662f595441251fa2ed209f67170aecbdecca534315b412797f",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-use-of-md5-kotlin",
     "rule_name": "Kotlin 中使用 MD5",
-    "hash": "799124eaec3718c8082f85e2b6bed78be3429814533dfa602620cb7de891e4f7",
-    "version": "20260907.0002"
+    "hash": "56558828cf4927ebeeda1c0ce60c6082ead68a5e19872d5be8b187bd979b903f",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-insecure-api-weak-ssl-version",
     "rule_name": "Weak Ssl Version",
-    "hash": "646631ec69bda1955dfdc29ac003d2c424c9e88ee28c3a2877073519a9ed160b",
-    "version": "20260907.0002"
+    "hash": "9493932edf1223e46d8e29ad52a508e73ab13e21220cfa3af40ba172726f2adb",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-bokeh-deprecated-apis",
     "rule_name": "Bokeh Deprecated Apis",
-    "hash": "427a537ecf77eacb3f8806b08f83477c84d8ee789b5fa4fb4d3e2e0d2c7e2e88",
-    "version": "20260907.0002"
+    "hash": "e65ff42f66eff521d67587d98f419362684a4182d448374ea0d828109d39f2b8",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-gemini",
     "rule_name": "Detect Gemini",
-    "hash": "0c377965ebd6c03f3349be9b6fad119b3ae3eb46488325696935737ea7fd1bdd",
-    "version": "20260907.0002"
+    "hash": "b23ca88d2e4fdff6cd0031cd8dfa75bc652cff3e6045931a4088a6229ba8d0d5",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-anthprop",
     "rule_name": "Detect Generic Ai Anthprop",
-    "hash": "baced3493616e19562bce9095398d1d6885b5b4842d88bf7d5714c5362403447",
-    "version": "20260907.0002"
+    "hash": "f224d2708a2d32d90ccfb232f8e177d27e88965e296c3a6fe27fc0d1c98c6ada",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-api",
     "rule_name": "Detect Generic Ai Api",
-    "hash": "aad1a7cdb536cc7c9301099973fdcc1af88234cf904d0191ba1e19b65193e5fb",
-    "version": "20260907.0002"
+    "hash": "0490093509254ad9da8bfd30941141541af341e1ffd6a2657887dc5f9423e75b",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-gem",
     "rule_name": "Detect Generic Ai Gem",
-    "hash": "5b89677853ede6a848f1dd98ce734d2d7e1518b5759b3575a96b5910c7247003",
-    "version": "20260907.0002"
+    "hash": "b506c9acbc8a6ccd0f93e802d8f38c29a9609109a0913953fdfc994fa7193913",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-oai",
     "rule_name": "Detect Generic Ai Oai",
-    "hash": "e4961f5d1a6a2202026aa420d6f36961516134984d3d4d51d16740621feeb8b0",
-    "version": "20260907.0002"
+    "hash": "4d4623499ead23267efb58206d5a8a8ab493f55bf490124c596215a33c6968b7",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-huggingface",
     "rule_name": "Detect Huggingface",
-    "hash": "57c6fd4d788c99083d91235a5b021922cfc76f7c0d6783223fd7035171c71ea1",
-    "version": "20260907.0002"
+    "hash": "26f94689d0d230b94e0ef40ff395872f41ecb56dbcfc0dfbc22647aba1fa7dd7",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-maintainability-detect-tensorflow",
     "rule_name": "Detect Tensorflow",
-    "hash": "3f53ebdc649485730420ed80498c9c6e99c271e8ecbaeb527b11d2056bbb38b4",
-    "version": "20260907.0002"
+    "hash": "290d17310b031c5a25ec7733d46719c525b2bfc1a8e004bdcbb4e440222166c0",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-portability-broken-input-line",
     "rule_name": "Broken Input Line",
-    "hash": "0a1a755c0853b9f14d0785f2b208fbb9f74728b0c61f44a52dcfc112b286be0f",
-    "version": "20260907.0002"
+    "hash": "34d3d551e41da5cf3ee12a1471531923001d40fc8ea56711829829c8ada11351",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-portability-not-portable-tmp-string",
     "rule_name": "Not Portable Tmp String",
-    "hash": "720619ea9b6c92784d67bc17bc50609ca3a7013361c2de6b6f6ed8a7649b01ab",
-    "version": "20260907.0002"
+    "hash": "c8124cc88464d4d5308a44f5da4b4b679208d8249bf48e2978360fa486ff0154",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-portability-prefer-read-in-binary-mode",
     "rule_name": "Prefer Read In Binary Mode",
-    "hash": "2e1cf74df26a68be5f1c073cc73b21c415f201ff1d352db7cb8003e52ac218f2",
-    "version": "20260907.0002"
+    "hash": "17bfffcdc7a4a7df487abf38e4a3d18edf122e503b5769190e5df49bced0c9af",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-portability-prefer-write-in-binary-mode",
     "rule_name": "Prefer Write In Binary Mode",
-    "hash": "d5099418e11bf7b90cfb7eccc26cb1fa8caf1c031fe0b55eb2830249604fbd12",
-    "version": "20260907.0002"
+    "hash": "35d8bc45e3b9238de17dd92ecf5c78b3987120d365e3cd048010aec3dd8032b2",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-secrets-huggingface-access-token",
     "rule_name": "检测到 Huggingface Access Token",
-    "hash": "f1eeeeccdadb2e3dd4248ef81ac241bf992a8bc3f0c73f284c611a08109cc7d5",
-    "version": "20260907.0002"
+    "hash": "99c927d75912d65633ab58051e77d6032f98eac788ff4ddd20ce01895de0a2e2",
+    "version": "20260907.0003"
   },
   {
     "rule_id": "source-secrets-huggingface-organization-api-token",
     "rule_name": "检测到 Huggingface Organization API Token",
-    "hash": "d7c887c6ae8c9e6c703fbd9bc8241c63ab4d9d016d3283361619e51274735e98",
-    "version": "20260907.0002"
+    "hash": "c77d0a49af93b8338b972a60fcfa2de827226456d332e2596284751bd20bcb7e",
+    "version": "20260907.0003"
   }
 ]
