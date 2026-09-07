@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kataras/pio"
 	"github.com/yaklang/gorm"
@@ -67,9 +68,11 @@ type Risk struct {
 	TaskName            string  `json:"task_name"`
 	CveAccessVector     string  `json:"cve_access_vector"`
 	CveAccessComplexity string  `json:"cve_access_complexity"`
-	Tags                string  `json:"tags"`
-	TagsDescription     string  `json:"tags_description"`
-	SeverityScore       float64 `json:"severity_score"`
+	Tags                string    `json:"tags"`
+	VerifierUid            string    `json:"verifierUid"`        // 验证人
+	FixTime             time.Time `json:"fix_time"`        // 修复时间
+	FixSuggestion       string    `json:"fix_suggestion"`  // 修复建议
+	SeverityScore       float64   `json:"severity_score"`
 
 	// SyntaxFlow
 	ResultID    uint   `json:"result_id"`

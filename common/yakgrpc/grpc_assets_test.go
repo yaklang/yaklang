@@ -275,12 +275,14 @@ func TestBatchSetRiskTags(t *testing.T) {
 		mockClient := new(yaklib.OnlineClient)
 
 		mockey.Mock((*yaklib.OnlineClient).SetRiskTagsToOnline).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string, hashes []string, tags, tagsDescription, riskTypeVerbose, severity string, severityScore float64) error {
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string, hashes []string, tags, verifierUid, fixSuggestion, riskTypeVerbose, severity string, fixTime int64, severityScore float64) error {
 				assert.NotEmpty(t, hashes)
 				assert.Equal(t, "confirmed|verified", tags)
-				assert.Equal(t, `{"verifier":"admin"}`, tagsDescription)
+				assert.Equal(t, "123456", verifierUid)
+				assert.Equal(t, "upgrade dependency", fixSuggestion)
 				assert.Equal(t, "ssrf-patched", riskTypeVerbose)
 				assert.Equal(t, "critical", severity)
+				assert.Equal(t, int64(1757174400), fixTime)
 				assert.Equal(t, 9.5, severityScore)
 				return nil
 			}).Build()
@@ -298,7 +300,9 @@ func TestBatchSetRiskTags(t *testing.T) {
 		req := &ypb.BatchSetRiskTagsRequest{
 			Hashes:          []string{risk.Hash},
 			Tags:            "confirmed|verified",
-			TagsDescription: `{"verifier":"admin"}`,
+			VerifierUid:     "123456",
+			FixTime:         1757174400,
+			FixSuggestion:   "upgrade dependency",
 			RiskTypeVerbose: "ssrf-patched",
 			Severity:        "critical",
 			SeverityScore:   9.5,
@@ -313,7 +317,9 @@ func TestBatchSetRiskTags(t *testing.T) {
 		updated, err := yakit.GetRiskByIDOrHash(db, 0, risk.Hash)
 		require.NoError(t, err)
 		assert.Equal(t, "confirmed|verified", updated.Tags)
-		assert.Equal(t, `{"verifier":"admin"}`, updated.TagsDescription)
+		assert.Equal(t, "123456", updated.VerifierUid)
+		assert.True(t, updated.FixTime.Equal(time.Unix(1757174400, 0)))
+		assert.Equal(t, "upgrade dependency", updated.FixSuggestion)
 		assert.Equal(t, "ssrf-patched", updated.RiskTypeVerbose)
 		assert.Equal(t, "critical", updated.Severity)
 		assert.Equal(t, 9.5, updated.SeverityScore)
@@ -339,7 +345,9 @@ func TestRisksFromOnline(t *testing.T) {
 				Hash:            existingRisk.Hash,
 				Title:           existingRisk.Title,
 				Tags:            "new-tag",
-				TagsDescription: `{"verifier":"admin"}`,
+				VerifierUid:     "123456",
+				FixTime:         1757174400,
+				FixSuggestion:   "upgrade dependency",
 				Severity:        "critical",
 				RiskTypeVerbose: "ssrf-confirmed",
 				SeverityScore:   8.5,
@@ -415,7 +423,9 @@ func TestRisksFromOnline(t *testing.T) {
 		updated, err := yakit.GetRiskByIDOrHash(db, 0, existingRisk.Hash)
 		require.NoError(t, err)
 		assert.Equal(t, "new-tag", updated.Tags)
-		assert.Equal(t, `{"verifier":"admin"}`, updated.TagsDescription)
+		assert.Equal(t, "123456", updated.VerifierUid)
+		assert.True(t, updated.FixTime.Equal(time.Unix(1757174400, 0)))
+		assert.Equal(t, "upgrade dependency", updated.FixSuggestion)
 		assert.Equal(t, "critical", updated.Severity)
 		assert.Equal(t, "ssrf-confirmed", updated.RiskTypeVerbose)
 		assert.Equal(t, 8.5, updated.SeverityScore)

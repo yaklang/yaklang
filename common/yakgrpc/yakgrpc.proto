@@ -5550,13 +5550,15 @@ message RisksFromOnlineProgress {
 message BatchSetRiskTagsRequest {
   QueryRisksRequest Filter = 1;
   string Tags = 2;
-  string TagsDescription = 3;
-  repeated int64 Ids = 4;
-  repeated string Hashes = 5;
-  string Token = 6;
-  string RiskTypeVerbose = 7;
-  string Severity = 8;
-  double SeverityScore = 9;
+  string VerifierUid = 3;
+  int64 FixTime = 4;
+  string FixSuggestion = 5;
+  repeated int64 Ids = 6;
+  repeated string Hashes = 7;
+  string Token = 8;
+  string RiskTypeVerbose = 9;
+  string Severity = 10;
+  double SeverityScore = 11;
 }
 
 message BatchSetRiskTagsResponse {
