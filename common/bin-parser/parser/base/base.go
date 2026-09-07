@@ -77,7 +77,7 @@ func ParseRule(p string) (*Node, error) {
 		}
 		ruleDocumentCache.Store(p, ruleMap)
 	}
-	rootNode, err := NewNodeTree(cloneRuleDocumentValue(ruleMap).(yaml.MapSlice))
+	rootNode, err := instantiateRuleDocument(p, ruleMap)
 	if err != nil {
 		return nil, err
 	}
