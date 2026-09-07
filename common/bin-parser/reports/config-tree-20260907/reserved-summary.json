@@ -1,0 +1,423 @@
+{
+  "batchMessages": 11,
+  "batchInputBytes": 1421,
+  "candidate": "reserved",
+  "results": {
+    "baseline": {
+      "Fields/1": {
+        "rows": [
+          {
+            "ns": 1947014,
+            "bytes": 1443836,
+            "allocs": 23628,
+            "round": 1
+          },
+          {
+            "ns": 1913550,
+            "bytes": 1443857,
+            "allocs": 23628,
+            "round": 2
+          },
+          {
+            "ns": 1918913,
+            "bytes": 1443852,
+            "allocs": 23628,
+            "round": 3
+          }
+        ],
+        "medianNs": 1918913,
+        "minNs": 1913550,
+        "maxNs": 1947014,
+        "medianBytes": 1443852,
+        "medianAllocs": 23628,
+        "messagesPerSecond": 5732.412047862514,
+        "applicationInputMbps": 5.924187287281915
+      },
+      "Fields/10": {
+        "rows": [
+          {
+            "ns": 992038,
+            "bytes": 1445168,
+            "allocs": 23647,
+            "round": 1
+          },
+          {
+            "ns": 917153,
+            "bytes": 1445179,
+            "allocs": 23647,
+            "round": 2
+          },
+          {
+            "ns": 930676,
+            "bytes": 1445174,
+            "allocs": 23647,
+            "round": 3
+          }
+        ],
+        "medianNs": 930676,
+        "minNs": 917153,
+        "maxNs": 992038,
+        "medianBytes": 1445174,
+        "medianAllocs": 23647,
+        "messagesPerSecond": 11819.365708366822,
+        "applicationInputMbps": 12.214777215701275
+      },
+      "JSON/1": {
+        "rows": [
+          {
+            "ns": 2611098,
+            "bytes": 1665858,
+            "allocs": 28938,
+            "round": 1
+          },
+          {
+            "ns": 2403173,
+            "bytes": 1665860,
+            "allocs": 28938,
+            "round": 2
+          },
+          {
+            "ns": 2418543,
+            "bytes": 1665874,
+            "allocs": 28938,
+            "round": 3
+          }
+        ],
+        "medianNs": 2418543,
+        "minNs": 2403173,
+        "maxNs": 2611098,
+        "medianBytes": 1665860,
+        "medianAllocs": 28938,
+        "messagesPerSecond": 4548.192858262185,
+        "applicationInputMbps": 4.700350582974957
+      },
+      "JSON/10": {
+        "rows": [
+          {
+            "ns": 1242257,
+            "bytes": 1688583,
+            "allocs": 28966,
+            "round": 1
+          },
+          {
+            "ns": 1192295,
+            "bytes": 1685915,
+            "allocs": 28965,
+            "round": 2
+          },
+          {
+            "ns": 1195649,
+            "bytes": 1686601,
+            "allocs": 28965,
+            "round": 3
+          }
+        ],
+        "medianNs": 1195649,
+        "minNs": 1192295,
+        "maxNs": 1242257,
+        "medianBytes": 1686601,
+        "medianAllocs": 28965,
+        "messagesPerSecond": 9200.02442188301,
+        "applicationInputMbps": 9.507807057087824
+      }
+    },
+    "journal": {
+      "Fields/1": {
+        "rows": [
+          {
+            "ns": 1480410,
+            "bytes": 1346055,
+            "allocs": 10179,
+            "round": 1
+          },
+          {
+            "ns": 1491539,
+            "bytes": 1346070,
+            "allocs": 10179,
+            "round": 2
+          },
+          {
+            "ns": 1508716,
+            "bytes": 1346035,
+            "allocs": 10179,
+            "round": 3
+          }
+        ],
+        "medianNs": 1491539,
+        "minNs": 1480410,
+        "maxNs": 1508716,
+        "medianBytes": 1346055,
+        "medianAllocs": 10179,
+        "messagesPerSecond": 7374.93287134966,
+        "applicationInputMbps": 7.621657898318448
+      },
+      "Fields/10": {
+        "rows": [
+          {
+            "ns": 723751,
+            "bytes": 1347363,
+            "allocs": 10197,
+            "round": 1
+          },
+          {
+            "ns": 727778,
+            "bytes": 1347372,
+            "allocs": 10198,
+            "round": 2
+          },
+          {
+            "ns": 737176,
+            "bytes": 1347386,
+            "allocs": 10198,
+            "round": 3
+          }
+        ],
+        "medianNs": 727778,
+        "minNs": 723751,
+        "maxNs": 737176,
+        "medianBytes": 1347372,
+        "medianAllocs": 10198,
+        "messagesPerSecond": 15114.499201679633,
+        "applicationInputMbps": 15.620147902244915
+      },
+      "JSON/1": {
+        "rows": [
+          {
+            "ns": 1999962,
+            "bytes": 1568104,
+            "allocs": 15490,
+            "round": 1
+          },
+          {
+            "ns": 2005399,
+            "bytes": 1568109,
+            "allocs": 15490,
+            "round": 2
+          },
+          {
+            "ns": 2009028,
+            "bytes": 1568093,
+            "allocs": 15490,
+            "round": 3
+          }
+        ],
+        "medianNs": 2005399,
+        "minNs": 1999962,
+        "maxNs": 2009028,
+        "medianBytes": 1568104,
+        "medianAllocs": 15490,
+        "messagesPerSecond": 5485.192722246296,
+        "applicationInputMbps": 5.668697351499627
+      },
+      "JSON/10": {
+        "rows": [
+          {
+            "ns": 1001897,
+            "bytes": 1590596,
+            "allocs": 15517,
+            "round": 1
+          },
+          {
+            "ns": 999370,
+            "bytes": 1591642,
+            "allocs": 15517,
+            "round": 2
+          },
+          {
+            "ns": 1024680,
+            "bytes": 1591149,
+            "allocs": 15517,
+            "round": 3
+          }
+        ],
+        "medianNs": 1001897,
+        "minNs": 999370,
+        "maxNs": 1024680,
+        "medianBytes": 1591149,
+        "medianAllocs": 15517,
+        "messagesPerSecond": 10979.172509749005,
+        "applicationInputMbps": 11.346475735529701
+      }
+    },
+    "reserved": {
+      "Fields/1": {
+        "rows": [
+          {
+            "ns": 1319429,
+            "bytes": 1176136,
+            "allocs": 9077,
+            "round": 1
+          },
+          {
+            "ns": 1325686,
+            "bytes": 1176149,
+            "allocs": 9077,
+            "round": 2
+          },
+          {
+            "ns": 1399598,
+            "bytes": 1176139,
+            "allocs": 9077,
+            "round": 3
+          }
+        ],
+        "medianNs": 1325686,
+        "minNs": 1319429,
+        "maxNs": 1399598,
+        "medianBytes": 1176139,
+        "medianAllocs": 9077,
+        "messagesPerSecond": 8297.590832218188,
+        "applicationInputMbps": 8.57518296187785
+      },
+      "Fields/10": {
+        "rows": [
+          {
+            "ns": 640533,
+            "bytes": 1177437,
+            "allocs": 9096,
+            "round": 1
+          },
+          {
+            "ns": 643234,
+            "bytes": 1177429,
+            "allocs": 9096,
+            "round": 2
+          },
+          {
+            "ns": 711467,
+            "bytes": 1177427,
+            "allocs": 9096,
+            "round": 3
+          }
+        ],
+        "medianNs": 643234,
+        "minNs": 640533,
+        "maxNs": 711467,
+        "medianBytes": 1177429,
+        "medianAllocs": 9096,
+        "messagesPerSecond": 17101.086074430146,
+        "applicationInputMbps": 17.673195135829264
+      },
+      "JSON/1": {
+        "rows": [
+          {
+            "ns": 1825324,
+            "bytes": 1398163,
+            "allocs": 14387,
+            "round": 1
+          },
+          {
+            "ns": 1808243,
+            "bytes": 1398166,
+            "allocs": 14387,
+            "round": 2
+          },
+          {
+            "ns": 1883062,
+            "bytes": 1398167,
+            "allocs": 14387,
+            "round": 3
+          }
+        ],
+        "medianNs": 1825324,
+        "minNs": 1808243,
+        "maxNs": 1883062,
+        "medianBytes": 1398166,
+        "medianAllocs": 14387,
+        "messagesPerSecond": 6026.327380782809,
+        "applicationInputMbps": 6.227935424067179
+      },
+      "JSON/10": {
+        "rows": [
+          {
+            "ns": 913907,
+            "bytes": 1422218,
+            "allocs": 14415,
+            "round": 1
+          },
+          {
+            "ns": 935991,
+            "bytes": 1421754,
+            "allocs": 14415,
+            "round": 2
+          },
+          {
+            "ns": 921636,
+            "bytes": 1420902,
+            "allocs": 14415,
+            "round": 3
+          }
+        ],
+        "medianNs": 921636,
+        "minNs": 913907,
+        "maxNs": 935991,
+        "medianBytes": 1421754,
+        "medianAllocs": 14415,
+        "messagesPerSecond": 11935.297666323799,
+        "applicationInputMbps": 12.334587624615358
+      }
+    }
+  },
+  "gains": {
+    "Fields/1": {
+      "journalThroughputPercent": 28.653223281456274,
+      "batchAdditionalThroughputPercent": 12.510730293598925,
+      "totalThroughputPercent": 44.748681060220896,
+      "allocatedBytesReductionPercent": 18.54158182417589,
+      "allocationCountReductionPercent": 61.58371423734552
+    },
+    "Fields/10": {
+      "journalThroughputPercent": 27.879105991112674,
+      "batchAdditionalThroughputPercent": 13.143583827969296,
+      "totalThroughputPercent": 44.687003485512264,
+      "allocatedBytesReductionPercent": 18.526834830961537,
+      "allocationCountReductionPercent": 61.53423267222058
+    },
+    "JSON/1": {
+      "journalThroughputPercent": 20.60158601854294,
+      "batchAdditionalThroughputPercent": 9.865371846313309,
+      "totalThroughputPercent": 32.49938093182361,
+      "allocatedBytesReductionPercent": 16.069417598117486,
+      "allocationCountReductionPercent": 50.28336443430783
+    },
+    "JSON/10": {
+      "journalThroughputPercent": 19.338514837353536,
+      "batchAdditionalThroughputPercent": 8.708535690880126,
+      "totalThroughputPercent": 29.731151994930748,
+      "allocatedBytesReductionPercent": 15.70300266630934,
+      "allocationCountReductionPercent": 50.23303987571206
+    }
+  },
+  "digests": {
+    "baseline": [
+      "CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136",
+      "CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35",
+      "CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e",
+      "CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+    ],
+    "journal": [
+      "CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136",
+      "CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35",
+      "CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e",
+      "CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+    ],
+    "reserved": [
+      "CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136",
+      "CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35",
+      "CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e",
+      "CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb",
+      "CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+    ]
+  }
+}

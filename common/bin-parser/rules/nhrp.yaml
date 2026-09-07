@@ -1,0 +1,221 @@
+# RFC 2332 sections 5.1-5.3: bounded wire structures, not routing state.
+# https://www.rfc-editor.org/rfc/rfc2332.html
+endian: big
+Package:
+  NHRP:
+    operator: |
+      if !this.HasMaxLength() { panic("nhrp: explicit packet boundary required") }
+      total = this.GetMaxLength()
+      if total < 28 || total > 65535 { panic("nhrp: packet size outside 28..65535 bytes") }
+      start = getCurrentPosition()
+      this.ProcessSubNode("Address Family")
+      this.ProcessSubNode("Protocol Type")
+      // The SNAP field is ignored on receipt for short-form protocol IDs.
+      this.ProcessSubNode("Protocol SNAP")
+      this.ProcessSubNode("Hop Count")
+      if this.ProcessSubNode("Packet Length").Value != total { panic("nhrp: packet length mismatch") }
+      this.ProcessSubNode("Checksum")
+      end = this.ProcessSubNode("Extension Offset").Value
+      if end != 0 && (end < 28 || end > total-4) { panic("nhrp: invalid extension offset") }
+      if this.ProcessSubNode("Version").Value != 1 { panic("nhrp: unsupported version") }
+      kind = this.ProcessSubNode("Message Type").Value
+      if kind < 1 || kind > 7 { panic("nhrp: unsupported message type") }
+      if kind == 7 && end != 0 { panic("nhrp: error indication cannot contain extensions") }
+      for name in ["Source NBMA Type Length", "Source Subaddress Type Length"] {
+        if this.ProcessSubNode(name).Value & 128 != 0 { panic("nhrp: reserved address type bit") }
+      }
+      if end == 0 { end = total }
+      this.GetSubNode("Mandatory").SetMaxLength(end-20)
+      this.ProcessSubNode("Mandatory")
+      if end < total {
+        this.GetSubNode("Extensions").SetMaxLength(total-end)
+        this.ProcessSubNode("Extensions")
+      }
+      data = getCtx("buffer").Bytes()[start:start+total]
+      sum = 0
+      for i = 0; i < len(data); i += 2 {
+        sum += int(data[i]) << 8
+        if i+1 < len(data) { sum += int(data[i+1]) }
+      }
+      for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+      if sum != 65535 { panic("nhrp: checksum mismatch") }
+      this.AddInfo("Checksum Valid", true)
+      this.AddInfo("Association Validated", false)
+    Address Family: uint16
+    Protocol Type: uint16
+    Protocol SNAP: raw,5
+    Hop Count: uint8
+    Packet Length: uint16
+    Checksum: uint16
+    Extension Offset: uint16
+    Version: uint8
+    Message Type: uint8
+    Source NBMA Type Length: uint8
+    Source Subaddress Type Length: uint8
+    Mandatory: NHRPMandatory
+    Extensions: NHRPExtensions
+
+  NHRPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("nhrp: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("nhrp: empty carrier has no message") }
+      value, trial = this.TryProcessByType("NHRPMessage")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("NHRP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+NHRPMessage: "import:nhrp.yaml;node:NHRP"
+NHRPMandatory:
+  operator: |
+    source = this.ProcessSubNode("Source Protocol Length").Value
+    destination = this.ProcessSubNode("Destination Protocol Length").Value
+    kind = getNodeResult("../Message Type").Value
+    flags = 0
+    if kind == 7 {
+      this.ProcessSubNode("Unused")
+      this.ProcessSubNode("Error Code")
+      this.ProcessSubNode("Error Offset")
+    } else {
+      flags = this.ProcessSubNode("Flags").Value
+      this.ProcessSubNode("Request ID")
+    }
+    lengths = [getNodeResult("../Source NBMA Type Length").Value & 63, getNodeResult("../Source Subaddress Type Length").Value & 63, source, destination]
+    names = ["Source NBMA Address", "Source NBMA Subaddress", "Source Protocol Address", "Destination Protocol Address"]
+    for i, length = range lengths {
+      if length > 0 {
+        field = this.GetSubNode(names[i])
+        field.SetMaxLength(length)
+        field.Process()
+      }
+    }
+    rest = this.GetMaxLength()-this.Length()
+    count = 0
+    if rest > 0 {
+      if kind == 7 {
+        this.GetSubNode("Packet In Error").SetMaxLength(rest)
+        this.ProcessSubNode("Packet In Error")
+      } else {
+        this.GetSubNode("Clients").SetMaxLength(rest)
+        this.ProcessSubNode("Clients")
+        count = this.GetSubNode("Clients").GetInfo("Client Count")
+      }
+    }
+    if kind == 1 && count > 1 { panic("nhrp: resolution request allows at most one client") }
+    if kind >= 2 && kind <= 6 && count == 0 { panic("nhrp: message requires at least one client") }
+    if kind == 2 && flags & 4096 != 0 && count != 1 { panic("nhrp: unique reply requires one client") }
+    unique = (kind == 1 && flags & 4096 != 0) || (kind == 3 && flags & 32768 != 0)
+    if unique && count > 0 {
+      if count != 1 { panic("nhrp: unique request requires one client") }
+      if this.GetSubNode("Clients").GetInfo("First Prefix Length") != 255 { panic("nhrp: unique request requires host prefix") }
+    }
+  Source Protocol Length: uint8
+  Destination Protocol Length: uint8
+  Flags: uint16
+  Unused: uint16
+  Request ID: uint32
+  Error Code: uint16
+  Error Offset: uint16
+  Source NBMA Address: raw
+  Source NBMA Subaddress: raw
+  Source Protocol Address: raw
+  Destination Protocol Address: raw
+  Packet In Error: raw
+  Clients: NHRPClients
+
+NHRPClients:
+  list: true
+  Client: NHRPClient
+  operator: |
+    handled, err = tryParseNHRPClients(); if err != nil { panic(err) }; if handled { return }
+    count = 0
+    for this.Length() < this.GetMaxLength() {
+      if count >= 4096 { panic("nhrp: too many client entries") }
+      client = this.NewElement()
+      client.Process()
+      if count == 0 { this.AddInfo("First Prefix Length", client.GetSubNode("Prefix Length").Result().Value) }
+      count++
+    }
+    this.AddInfo("Client Count", count)
+
+NHRPClient:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Prefix Length")
+    // RFC 2332 unused fields are retained and ignored on reception.
+    this.ProcessSubNode("Unused")
+    this.ProcessSubNode("MTU")
+    this.ProcessSubNode("Holding Time")
+    address = this.ProcessSubNode("NBMA Type Length").Value
+    subaddress = this.ProcessSubNode("Subaddress Type Length").Value
+    if address & 128 != 0 || subaddress & 128 != 0 { panic("nhrp: reserved client address type bit") }
+    protocol = this.ProcessSubNode("Protocol Length").Value
+    this.ProcessSubNode("Preference")
+    names = ["NBMA Address", "NBMA Subaddress", "Protocol Address"]
+    for i, length = range [address & 63, subaddress & 63, protocol] {
+      if length > 0 {
+        field = this.GetSubNode(names[i])
+        field.SetMaxLength(length)
+        field.Process()
+      }
+    }
+  Code: uint8
+  Prefix Length: uint8
+  Unused: uint16
+  MTU: uint16
+  Holding Time: uint16
+  NBMA Type Length: uint8
+  Subaddress Type Length: uint8
+  Protocol Length: uint8
+  Preference: uint8
+  NBMA Address: raw
+  NBMA Subaddress: raw
+  Protocol Address: raw
+
+NHRPExtensions:
+  list: true
+  Extension: NHRPExtension
+  operator: |
+    count = 0
+    seen = make(map[int]bool)
+    ended = false
+    for this.Length() < this.GetMaxLength() {
+      if count >= 1024 { panic("nhrp: too many extensions") }
+      ext = this.NewElement()
+      ext.Process()
+      kind = int(ext.GetSubNode("Type").Result().Value)
+      // Vendor-private extensions may repeat with distinct vendor identities.
+      if kind != 8 && seen[kind] { panic("nhrp: duplicate extension type") }
+      seen[kind] = true
+      count++
+      if kind == 0 { ended = true; break }
+    }
+    if !ended { panic("nhrp: missing end of extensions") }
+    if this.Length() != this.GetMaxLength() { panic("nhrp: bytes after end of extensions") }
+
+NHRPExtension:
+  operator: |
+    this.ProcessSubNode("Compulsory")
+    this.ProcessSubNode("Unused")
+    kind = this.ProcessSubNode("Type").Value
+    length = this.ProcessSubNode("Length").Value
+    if kind == 0 {
+      if length != 0 { panic("nhrp: invalid end of extensions") }
+      return
+    }
+    if length == 0 { return }
+    if kind == 3 || kind == 4 || kind == 5 {
+      this.GetSubNode("Clients").SetMaxLength(length)
+      this.ProcessSubNode("Clients")
+      if kind == 3 && this.GetSubNode("Clients").GetInfo("Client Count") != 1 { panic("nhrp: responder extension requires one client") }
+    } else {
+      this.GetSubNode("Opaque Value").SetMaxLength(length)
+      this.ProcessSubNode("Opaque Value")
+    }
+  Compulsory: uint8,1bit
+  Unused: uint8,1bit
+  Type: uint16,14bit
+  Length: uint16
+  Clients: NHRPClients
+  Opaque Value: raw

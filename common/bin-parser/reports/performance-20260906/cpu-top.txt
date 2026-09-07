@@ -1,0 +1,23 @@
+File: binparser-current-20260906-v2.test
+Type: cpu
+Time: Sep 6, 2026 at 10:47pm (CST)
+Duration: 4.18s, Total samples = 3.85s (92.20%)
+Showing nodes accounting for 3.52s, 91.43% of 3.85s total
+Dropped 53 nodes (cum <= 0.02s)
+Showing top 15 nodes out of 144
+      flat  flat%   sum%        cum   cum%
+     2.75s 71.43% 71.43%      2.75s 71.43%  syscall.syscall
+     0.23s  5.97% 77.40%      0.23s  5.97%  runtime.kevent
+     0.12s  3.12% 80.52%      0.13s  3.38%  runtime.mapaccess2_faststr
+     0.06s  1.56% 82.08%      0.22s  5.71%  runtime.mallocgc
+     0.05s  1.30% 83.38%      0.06s  1.56%  runtime.findObject
+     0.05s  1.30% 84.68%      0.05s  1.30%  runtime.memclrNoHeapPointers
+     0.04s  1.04% 85.71%      0.04s  1.04%  runtime.madvise
+     0.04s  1.04% 86.75%      0.05s  1.30%  runtime.scanblock
+     0.04s  1.04% 87.79%      0.14s  3.64%  runtime.scanobject
+     0.03s  0.78% 88.57%      0.03s  0.78%  runtime.(*mspan).writeHeapBitsSmall
+     0.03s  0.78% 89.35%      0.03s  0.78%  runtime.typePointers.next
+     0.02s  0.52% 89.87%      0.02s  0.52%  aeshashbody
+     0.02s  0.52% 90.39%      0.18s  4.68%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BaseKV).SetItem
+     0.02s  0.52% 90.91%      0.02s  0.52%  runtime.(*spanSet).pop
+     0.02s  0.52% 91.43%      0.02s  0.52%  runtime.(*sweepLocked).sweep

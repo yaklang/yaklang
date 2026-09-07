@@ -17,6 +17,11 @@ func parseMustFail(t *testing.T, data []byte, rule string, keys ...string) {
 }
 
 func ntlmsspMessage(msgType uint32, body []byte) []byte {
+	if msgType == 1 && len(body) == 4 {
+		// NEGOTIATE_MESSAGE always carries both field descriptors. The flags
+		// used by these fixtures also require the eight-byte Version structure.
+		body = append(append(append([]byte(nil), body...), make([]byte, 16)...), []byte{10, 0, 0x61, 0x4a, 0, 0, 0, 15}...)
+	}
 	buf := make([]byte, 12+len(body))
 	copy(buf[:8], []byte("NTLMSSP\x00"))
 	binary.LittleEndian.PutUint32(buf[8:], msgType)
@@ -25,11 +30,12 @@ func ntlmsspMessage(msgType uint32, body []byte) []byte {
 }
 
 func ntlmsspChallenge(challenge []byte) []byte {
-	buf := make([]byte, 48)
+	buf := make([]byte, 56)
 	copy(buf[:8], []byte("NTLMSSP\x00"))
 	binary.LittleEndian.PutUint32(buf[8:], 2)
 	binary.LittleEndian.PutUint32(buf[20:], 0xe2088205)
 	copy(buf[24:32], challenge)
+	copy(buf[48:56], []byte{10, 0, 0x61, 0x4a, 0, 0, 0, 15})
 	return buf
 }
 
@@ -53,6 +59,8 @@ func TestNTLMSSPNegotiateAndEdges(t *testing.T) {
 	require.Equal(t, uint64(2), uintVal(t, c.Child("MessageType")))
 	require.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8}, bytesVal(t, c.Child("ServerChallenge")))
 	require.Equal(t, uint64(0xe2088205), uintVal(t, c.Child("NegotiateFlags")))
+	require.Equal(t, uint64(10), uintVal(t, mustChild(t, c, "Version", "ProductMajorVersion")))
+	require.Equal(t, uint64(19041), uintVal(t, mustChild(t, c, "Version", "ProductBuild")))
 
 	a := parseRule(t, ntlmsspAuth(), "application-layer.ntlm", "NTLMSSP")
 	require.Equal(t, uint64(3), uintVal(t, a.Child("MessageType")))
@@ -88,7 +96,7 @@ func TestNTLMSSPInsideSMB2SessionSetup(t *testing.T) {
 	wired := mustChild(t, eth, "IP", "TCP", "SMB2", "Session Setup Request", "NTLMSSP")
 	require.Equal(t, uint64(1), uintVal(t, wired.Child("MessageType")))
 
-	spnego := []byte{0x60, 0x0c, 0x06, 0x06, 0x2b, 0x06, 0x01, 0x05, 0x05, 0x02, 0xa0, 0x02, 0x04, 0x00}
+	spnego := spnegoNTLMInit()
 	body = make([]byte, 24)
 	binary.LittleEndian.PutUint16(body[0:], 25)
 	body[3] = 1
@@ -100,6 +108,7 @@ func TestNTLMSSPInsideSMB2SessionSetup(t *testing.T) {
 	sp := mustChild(t, smb, "Session Setup Request", "SPNEGO")
 	require.Equal(t, uint64(0x60), uintVal(t, sp.Child("Tag")))
 	require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x05, 0x05, 0x02}, bytesVal(t, sp.Child("OID")))
+	require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x02, 0x0a}, bytesVal(t, mustChild(t, sp, "Token", "SPNEGOInit", "MechOID")))
 }
 
 func kerberosAP(tag byte, body []byte) []byte {

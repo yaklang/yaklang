@@ -1,0 +1,12 @@
+ROUND 2 VARIANT chain
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser
+BenchmarkCurrentCorpusApplicationFields       	     318	   2363160 ns/op	   0.60 MB/s	      1421 input-B/op	        11.00 messages/op	      4655 messages/s	         1.000 workers	 1598369 B/op	   25612 allocs/op
+BenchmarkCurrentCorpusApplicationFields-4     	     547	   1279904 ns/op	   1.11 MB/s	      1421 input-B/op	        11.00 messages/op	      8594 messages/s	         4.000 workers	 1598849 B/op	   25618 allocs/op
+BenchmarkCurrentCorpusApplicationFields-10    	     615	   1109425 ns/op	   1.28 MB/s	      1421 input-B/op	        11.00 messages/op	      9915 messages/s	        10.00 workers	 1599790 B/op	   25630 allocs/op
+BenchmarkCurrentCorpusApplicationJSON         	     266	   2596697 ns/op	   0.55 MB/s	      1421 input-B/op	        11.00 messages/op	      4236 messages/s	         1.000 workers	 1820288 B/op	   30921 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-4       	     504	   1434714 ns/op	   0.99 MB/s	      1421 input-B/op	        11.00 messages/op	      7667 messages/s	         4.000 workers	 1827732 B/op	   30930 allocs/op
+BenchmarkCurrentCorpusApplicationJSON-10      	     528	   1277342 ns/op	   1.11 MB/s	      1421 input-B/op	        11.00 messages/op	      8612 messages/s	        10.00 workers	 1843754 B/op	   30950 allocs/op
+PASS
+EXIT 0

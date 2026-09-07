@@ -1,0 +1,72 @@
+# RFC 8555 sections 5, 6.2-6.5 outer JWS request structure:
+# https://www.rfc-editor.org/rfc/rfc8555.html#section-6.2
+# JWK structural members: RFC 7517/7518 and RFC 8037 section 2.
+# Bounded HTTP/1.1 POST, explicit Content-Length and identity content coding.
+# JSON/base64url-derived metadata is not assigned HTTP wire coordinates.
+# No signature/key/account/nonce freshness, operation schema, session or TLS
+# verification. No network operations. The target and protected URL are both
+# retained; without server URL context their equality is not proved.
+# Top-level extensions, crit/b64, non-object payloads, chunking, >256KiB JWS
+# and media-type parameters are outside this profile, not all ACME messages.
+# Resource URLs and Host+target use the shared 8192-byte HTTP(S) URI profile.
+Package:
+  ACMEJWSRequest: ACMEJWSRequestMessage
+  ACMEJWSRequestCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("acme: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("acme: byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("acme: empty carrier has no request") }
+      candidate, trial = this.TryProcessByType("ACMEJWSRequestFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed ACME Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+ACMEJWSRequestFrame: "import:application-layer/acme.yaml;node:ACMEJWSRequest"
+ACMEJWSRequestMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("acme: explicit request boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("acme: byte boundary required") }
+    if this.GetMaxLength() > 278528 { panic("acme: request exceeds 272KiB implementation profile") }
+    http = this.ProcessSubNode("HTTP")
+    request = http.Child("Message").Child("HTTP Request")
+    if request == nil { panic("acme: JWS request required, not response") }
+    if request.Child("Version").Value != "HTTP/1.1" || request.Child("Method").Value != "POST" { panic("acme: profile requires HTTP/1.1 POST") }
+    target = string(request.Child("Path").Value)
+    if !target.HasPrefix("/") || target.HasPrefix("//") || target.Contains("#") { panic("acme: origin-form request target required") }
+    hosts = 0; types = 0; lengths = 0; host = ""; agent = ""; headerBytes = 0; count = 0
+    for _, item = range request.Child("Headers").Children() {
+      line = string(item.Value)
+      headerBytes += len(line)+2; count++
+      if headerBytes > 16384 || count > 256 { panic("acme: HTTP fields exceed implementation profile") }
+      if len(line) == 0 { continue }
+      header = line.SplitN(":", 2)
+      name = header[0].Lower(); value = header[1].Trim(" \t")
+      if name == "host" { hosts++; host = value }
+      if name == "content-length" { lengths++ }
+      if name == "content-type" {
+        types++
+        if value.Lower() != "application/jose+json" { panic("acme: expected application/jose+json without parameters in this profile") }
+      }
+      if name == "user-agent" { agent = value }
+      if name == "transfer-encoding" || (name == "content-encoding" && value.Lower() != "identity") { panic("acme: transfer/content coding outside identity profile") }
+    }
+    if hosts != 1 || len(host) == 0 || types != 1 || lengths != 1 { panic("acme: one Host, Content-Type and Content-Length required") }
+    for _, octet = range []byte(host) {
+      if octet <= 32 || octet >= 127 || octet in []byte("/?#@\\") { panic("acme: invalid Host authority") }
+    }
+    hostInfo, err = decodeHTTPServiceURL("https://"+host+"/")
+    if err != nil { panic("acme: invalid Host authority: "+string(err)) }
+    targetInfo, err = decodeHTTPServiceURL("https://"+host+target)
+    if err != nil { panic("acme: invalid request target: "+string(err)) }
+    body = request.Child("Body")
+    if body == nil || body.Child("Octets") == nil { panic("acme: complete nonempty JWS body required") }
+    decoded, err = inspectACMEJWS(string(body.Child("Octets").Value))
+    if err != nil { panic(err) }
+    this.AddInfo("ACME JWS", decoded)
+    this.AddInfo("HTTP Target Matches Protected Path", target == decoded["URL Request Target"])
+    this.AddInfo("User-Agent Requirement Missing", len(agent) == 0)
+    this.AddInfo("HTTP Host", host)
+    this.AddInfo("Profile", "ACME bounded outer-JWS request")
+  HTTP: "import:application-layer/http.yaml;node:HTTPExact"

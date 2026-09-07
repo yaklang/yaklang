@@ -1,0 +1,52 @@
+# RFC 9113 and RFC 7541. Exact frame or explicitly initial ordered plaintext
+# direction. HPACK starts empty at the default 4096-byte limit; peer settings
+# changes and midstream dictionary snapshots are not inferred. Header strings
+# are metadata with compressed block ranges, not fabricated wire-span leaves.
+# No TCP/TLS reconstruction, HTTP semantic or connection-lifecycle validation.
+# Local limits: 1 MiB wire and expanded fields, 1024 frames/settings, 4096
+# headers, 65536 bytes per expanded name/value. Historical http2.yaml unchanged.
+endian: big
+unit: byte
+Package:
+  HTTP2FrameFields:
+    operator: |
+      err = parseHTTP2Fields("frame")
+      if err != nil { panic(err) }
+  HTTP2InitialClientStream:
+    operator: |
+      err = parseHTTP2Fields("client")
+      if err != nil { panic(err) }
+  HTTP2InitialServerStream:
+    operator: |
+      err = parseHTTP2Fields("server")
+      if err != nil { panic(err) }
+  HTTP2FrameFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("http2-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("HTTP2FrameExact", "HTTP2FrameFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed HTTP2 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  HTTP2InitialClientStreamCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("http2-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("HTTP2ClientExact", "HTTP2InitialClientStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed HTTP2 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  HTTP2InitialServerStreamCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("http2-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("HTTP2ServerExact", "HTTP2InitialServerStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed HTTP2 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+HTTP2FrameExact: "import:application-layer/http2_fields.yaml;node:HTTP2FrameFields"
+HTTP2ClientExact: "import:application-layer/http2_fields.yaml;node:HTTP2InitialClientStream"
+HTTP2ServerExact: "import:application-layer/http2_fields.yaml;node:HTTP2InitialServerStream"

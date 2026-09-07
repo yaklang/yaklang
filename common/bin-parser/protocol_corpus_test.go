@@ -16,6 +16,7 @@ import (
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/pcapgo"
+	"github.com/yaklang/yaklang/common/bin-parser/internal/corpusutil"
 )
 
 type protocolCorpusManifest struct {
@@ -51,6 +52,7 @@ type protocolCorpusCapture struct {
 	PacketCount         int                  `json:"packet_count"`
 	LinkType            string               `json:"link_type"`
 	DisplayFilter       string               `json:"display_filter"`
+	DecodeAs            []string             `json:"decode_as,omitempty"`
 	EvidenceKind        string               `json:"evidence_kind"`
 	Notes               string               `json:"notes"`
 	RepresentativeFrame *protocolCorpusFrame `json:"representative_frame"`
@@ -64,20 +66,36 @@ type protocolCorpusFrame struct {
 }
 
 type protocolCorpusSourceSpec struct {
-	Schema        string            `json:"$schema"`
-	SchemaVersion int               `json:"schema_version"`
-	Repositories  []json.RawMessage `json:"repositories"`
-	Captures      []struct {
-		ID            string  `json:"id"`
-		RepositoryID  string  `json:"repository_id"`
-		UpstreamPath  string  `json:"upstream_path"`
-		Protocol      string  `json:"protocol"`
-		RoadmapName   *string `json:"roadmap_name"`
-		DisplayFilter string  `json:"display_filter"`
-		EvidenceKind  string  `json:"evidence_kind"`
-		Notes         string  `json:"notes"`
-		AllowEmpty    bool    `json:"allow_empty"`
-	} `json:"captures"`
+	Schema        string                           `json:"$schema"`
+	SchemaVersion int                              `json:"schema_version"`
+	Repositories  []protocolCorpusSourceRepository `json:"repositories"`
+	Captures      []protocolCorpusSourceCapture    `json:"captures"`
+}
+
+type protocolCorpusSourceRepository struct {
+	ID            string `json:"id"`
+	Origin        string `json:"origin,omitempty"`
+	Recipe        string `json:"recipe,omitempty"`
+	Repository    string `json:"repository"`
+	Commit        string `json:"commit"`
+	License       string `json:"license"`
+	LicensePath   string `json:"license_path"`
+	LicenseSHA256 string `json:"license_sha256"`
+	Homepage      string `json:"homepage"`
+}
+
+type protocolCorpusSourceCapture struct {
+	ID            string   `json:"id"`
+	RepositoryID  string   `json:"repository_id"`
+	UpstreamPath  string   `json:"upstream_path"`
+	Protocol      string   `json:"protocol"`
+	RoadmapName   *string  `json:"roadmap_name"`
+	DisplayFilter string   `json:"display_filter"`
+	DecodeAs      []string `json:"decode_as,omitempty"`
+	EvidenceKind  string   `json:"evidence_kind"`
+	Notes         string   `json:"notes"`
+	AllowEmpty    bool     `json:"allow_empty"`
+	SourceSHA256  string   `json:"source_sha256"`
 }
 
 type protocolCorpusPacketReader interface {
@@ -86,6 +104,18 @@ type protocolCorpusPacketReader interface {
 
 func TestProtocolCorpusIntegrity(t *testing.T) {
 	const corpusDir = "testdata/protocol-corpus"
+
+	for _, pair := range []struct {
+		schema   string
+		instance string
+	}{
+		{schema: "source-spec.schema.json", instance: "sources.json"},
+		{schema: "manifest.schema.json", instance: "manifest.json"},
+	} {
+		if err := validateProtocolCorpusJSONSchemaFiles(corpusDir, pair.schema, pair.instance); err != nil {
+			t.Fatalf("validate %s against %s: %v", pair.instance, pair.schema, err)
+		}
+	}
 
 	var manifest protocolCorpusManifest
 	readProtocolCorpusJSON(t, filepath.Join(corpusDir, "manifest.json"), &manifest)
@@ -105,11 +135,17 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 	if manifest.RoadmapTotal != len(ProtocolRoadmap) || manifest.RoadmapTotal < 600 {
 		t.Fatalf("manifest roadmap total %d does not match %d in source", manifest.RoadmapTotal, len(ProtocolRoadmap))
 	}
-	if len(manifest.Repositories) != len(sourceSpec.Repositories) || len(manifest.Repositories) < 4 {
+	if len(manifest.Repositories) != len(sourceSpec.Repositories) || len(manifest.Repositories) < 3 {
 		t.Fatalf("manifest has %d source repositories, source spec has %d", len(manifest.Repositories), len(sourceSpec.Repositories))
 	}
 	if len(manifest.Captures) != len(sourceSpec.Captures) {
 		t.Fatalf("manifest has %d captures but source spec has %d", len(manifest.Captures), len(sourceSpec.Captures))
+	}
+	if err := validateProtocolCorpusSourceManifest(sourceSpec, manifest); err != nil {
+		t.Fatalf("sources.json and manifest.json differ: %v", err)
+	}
+	if err := validateProtocolCorpusArtifactInventory(corpusDir, manifest); err != nil {
+		t.Fatalf("corpus artifact inventory is inconsistent: %v", err)
 	}
 
 	roadmap := make(map[string]RoadmapItem, len(ProtocolRoadmap))
@@ -163,7 +199,16 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 				t.Fatalf("source URL is not pinned to repository commit %s", repository.Commit)
 			}
 			switch capture.EvidenceKind {
-			case "upstream-positive", "upstream-negative", "educational-challenge", "generated-positive":
+			case "upstream-positive", "upstream-negative", "generated-positive", "generated-negative":
+			case "generated-identification":
+				// This category preserves identifiable original bytes without
+				// promoting them to a structurally valid protocol message.
+				if _, exists := protocolCorpusClassifierSpecs[capture.ID]; !exists {
+					t.Fatalf("identification fixture has no explicit classifier contract")
+				}
+				if protocolCorpusIsPositive(capture) || strings.TrimSpace(capture.Notes) == "" {
+					t.Fatalf("identification fixture must stay non-positive with an explicit limitation")
+				}
 			default:
 				t.Fatalf("unknown evidence kind %q", capture.EvidenceKind)
 			}
@@ -220,10 +265,10 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 			t.Fatalf("source capture %q is absent from manifest", id)
 		}
 	}
-	if len(manifest.Captures) < 391 || totalPackets < 58000 || len(mappedProtocols) < 344 {
+	if len(manifest.Captures) < 510 || totalPackets < 58279 || len(mappedProtocols) < 341 {
 		t.Fatalf("corpus unexpectedly shrank: captures=%d packets=%d mapped_protocols=%d", len(manifest.Captures), totalPackets, len(mappedProtocols))
 	}
-	if evidenceCounts["upstream-positive"] < 155 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["educational-challenge"] != 3 || evidenceCounts["generated-positive"] < 168 {
+	if evidenceCounts["upstream-positive"] < 211 || evidenceCounts["upstream-negative"] < 16 || evidenceCounts["generated-positive"] < 73 || evidenceCounts["generated-negative"] < 11 {
 		t.Fatalf("corpus evidence classes unexpectedly shrank: %+v", evidenceCounts)
 	}
 
@@ -251,6 +296,10 @@ func readProtocolCorpusJSON(t *testing.T, fileName string, destination any) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {
 		t.Fatalf("decode %s: %v", fileName, err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		t.Fatalf("decode %s: trailing JSON value", fileName)
 	}
 }
 
@@ -289,7 +338,7 @@ func inspectProtocolCorpusCapture(t *testing.T, data []byte, representative *pro
 			t.Fatalf("open pcapng: %v", err)
 		}
 		packetReader = ngReader
-		linkType = ngReader.LinkType().String()
+		linkType = corpusutil.LinkTypeName(ngReader.LinkType())
 	} else {
 		pcapReader, err := pcapgo.NewReader(reader)
 		if err != nil {
@@ -303,7 +352,7 @@ func inspectProtocolCorpusCapture(t *testing.T, data []byte, representative *pro
 			}
 		}
 		packetReader = pcapReader
-		linkType = pcapReader.LinkType().String()
+		linkType = corpusutil.LinkTypeName(pcapReader.LinkType())
 	}
 
 	wantedFrame := 0

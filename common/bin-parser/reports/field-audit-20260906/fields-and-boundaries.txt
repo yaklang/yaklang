@@ -1,0 +1,321 @@
+=== RUN   TestProtocolCorpusCurrentFieldEvidence
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/LDAP
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/LDAP/BindAndCLDAPOriginalRecords
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/LDAP/CLDAPSearchEveryField
+=== NAME  TestProtocolCorpusCurrentFieldEvidence/LDAP
+    protocol_corpus_field_inventory_test.go:163: field audit: 5 pinned captures, 11 original records; not full protocol/session coverage
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/MySQL
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/MySQL/AllOriginalRecords
+=== NAME  TestProtocolCorpusCurrentFieldEvidence/MySQL
+    protocol_corpus_field_inventory_test.go:163: field audit: 3 pinned captures, 49 original records; not full protocol/session coverage
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/PostgreSQL
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/PostgreSQL/AllOriginalRecords
+=== NAME  TestProtocolCorpusCurrentFieldEvidence/PostgreSQL
+    protocol_corpus_field_inventory_test.go:163: field audit: 1 pinned captures, 88 original records; not full protocol/session coverage
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/SMB3
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/SMB3/OriginalEveryRecord
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/SMB3/CompanionEveryRecord
+=== NAME  TestProtocolCorpusCurrentFieldEvidence/SMB3
+    protocol_corpus_field_inventory_test.go:163: field audit: 4 pinned captures, 19 original records; not full protocol/session coverage
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Memcached
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/ndpi/ndpi-memcached.cap/frame-4
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/ndpi/ndpi-memcached.cap/frame-6
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/generated-local/gen-memcache-bin.pcap/frame-4
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/generated-pr5023/pr5023-gen-memcache-bin.pcap/frame-4
+=== NAME  TestProtocolCorpusCurrentFieldEvidence/Memcached
+    protocol_corpus_field_inventory_test.go:163: field audit: 3 pinned captures, 18 original records; not full protocol/session coverage
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-4-CQLOptions4Fields
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-6-CQLSupported4Fields
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-8-CQLStartup4Fields
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-12-CQLOptions5InitialFields
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-14-CQLSupported5InitialFields
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-16-CQLStartup5InitialFields
+=== RUN   TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-20-CassandraInternodeInitiateFields
+=== NAME  TestProtocolCorpusCurrentFieldEvidence/Cassandra
+    protocol_corpus_field_inventory_test.go:163: field audit: 1 pinned captures, 20 original records; not full protocol/session coverage
+--- PASS: TestProtocolCorpusCurrentFieldEvidence (0.27s)
+    --- PASS: TestProtocolCorpusCurrentFieldEvidence/LDAP (0.05s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/LDAP/BindAndCLDAPOriginalRecords (0.03s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/LDAP/CLDAPSearchEveryField (0.02s)
+    --- PASS: TestProtocolCorpusCurrentFieldEvidence/MySQL (0.03s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/MySQL/AllOriginalRecords (0.03s)
+    --- PASS: TestProtocolCorpusCurrentFieldEvidence/PostgreSQL (0.02s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/PostgreSQL/AllOriginalRecords (0.02s)
+    --- PASS: TestProtocolCorpusCurrentFieldEvidence/SMB3 (0.14s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/SMB3/OriginalEveryRecord (0.09s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/SMB3/CompanionEveryRecord (0.05s)
+    --- PASS: TestProtocolCorpusCurrentFieldEvidence/Memcached (0.01s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords (0.01s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/ndpi/ndpi-memcached.cap/frame-4 (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/ndpi/ndpi-memcached.cap/frame-6 (0.01s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/generated-local/gen-memcache-bin.pcap/frame-4 (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Memcached/OriginalRecords/generated-pr5023/pr5023-gen-memcache-bin.pcap/frame-4 (0.00s)
+    --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra (0.01s)
+        --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords (0.01s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-4-CQLOptions4Fields (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-6-CQLSupported4Fields (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-8-CQLStartup4Fields (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-12-CQLOptions5InitialFields (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-14-CQLSupported5InitialFields (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-16-CQLStartup5InitialFields (0.00s)
+            --- PASS: TestProtocolCorpusCurrentFieldEvidence/Cassandra/OriginalRecords/frame-20-CassandraInternodeInitiateFields (0.00s)
+=== RUN   TestCurrentFieldInventoryRejectsDrift
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/added-named-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/added-unmapped-dissector
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/added-negative-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/missing-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/renamed-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/duplicate-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/changed-path
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/changed-bytes
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/changed-record-count
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/changed-disposition
+=== RUN   TestCurrentFieldInventoryRejectsDrift/LDAP/lost-mapping
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/added-named-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/added-unmapped-dissector
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/added-negative-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/missing-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/renamed-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/duplicate-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/changed-path
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/changed-bytes
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/changed-record-count
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/changed-disposition
+=== RUN   TestCurrentFieldInventoryRejectsDrift/MySQL/lost-mapping
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/added-named-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/added-unmapped-dissector
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/added-negative-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/missing-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/renamed-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/duplicate-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-path
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-bytes
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-record-count
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-disposition
+=== RUN   TestCurrentFieldInventoryRejectsDrift/PostgreSQL/lost-mapping
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/added-named-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/added-unmapped-dissector
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/added-negative-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/missing-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/renamed-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/duplicate-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/changed-path
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/changed-bytes
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/changed-record-count
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/changed-disposition
+=== RUN   TestCurrentFieldInventoryRejectsDrift/SMB3/lost-mapping
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/added-named-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/added-unmapped-dissector
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/added-negative-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/missing-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/renamed-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/duplicate-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/changed-path
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/changed-bytes
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/changed-record-count
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/changed-disposition
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Memcached/lost-mapping
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/added-named-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/added-unmapped-dissector
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/added-negative-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/missing-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/renamed-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/duplicate-capture
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-path
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-bytes
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-record-count
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-disposition
+=== RUN   TestCurrentFieldInventoryRejectsDrift/Cassandra/lost-mapping
+--- PASS: TestCurrentFieldInventoryRejectsDrift (0.00s)
+    --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/added-named-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/added-unmapped-dissector (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/added-negative-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/missing-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/renamed-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/duplicate-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/changed-path (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/changed-bytes (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/changed-record-count (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/changed-disposition (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/LDAP/lost-mapping (0.00s)
+    --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/added-named-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/added-unmapped-dissector (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/added-negative-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/missing-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/renamed-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/duplicate-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/changed-path (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/changed-bytes (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/changed-record-count (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/changed-disposition (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/MySQL/lost-mapping (0.00s)
+    --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/added-named-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/added-unmapped-dissector (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/added-negative-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/missing-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/renamed-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/duplicate-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-path (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-bytes (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-record-count (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/changed-disposition (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/PostgreSQL/lost-mapping (0.00s)
+    --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3 (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/added-named-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/added-unmapped-dissector (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/added-negative-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/missing-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/renamed-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/duplicate-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/changed-path (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/changed-bytes (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/changed-record-count (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/changed-disposition (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/SMB3/lost-mapping (0.00s)
+    --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/added-named-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/added-unmapped-dissector (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/added-negative-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/missing-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/renamed-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/duplicate-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/changed-path (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/changed-bytes (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/changed-record-count (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/changed-disposition (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Memcached/lost-mapping (0.00s)
+    --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/added-named-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/added-unmapped-dissector (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/added-negative-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/missing-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/renamed-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/duplicate-capture (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-path (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-bytes (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-record-count (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/changed-disposition (0.00s)
+        --- PASS: TestCurrentFieldInventoryRejectsDrift/Cassandra/lost-mapping (0.00s)
+=== RUN   TestProtocolCorpusLDAPFieldsOriginalRecords
+--- PASS: TestProtocolCorpusLDAPFieldsOriginalRecords (0.01s)
+=== RUN   TestProtocolCorpusLDAPFieldsBoundariesAndIsolation
+=== RUN   TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-0
+=== PAUSE TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-0
+=== RUN   TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-1
+=== PAUSE TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-1
+=== RUN   TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-2
+=== PAUSE TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-2
+=== RUN   TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-3
+=== PAUSE TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-3
+=== CONT  TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-0
+=== CONT  TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-2
+=== CONT  TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-1
+=== CONT  TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-3
+--- PASS: TestProtocolCorpusLDAPFieldsBoundariesAndIsolation (0.04s)
+    --- PASS: TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-0 (0.00s)
+    --- PASS: TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-1 (0.00s)
+    --- PASS: TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-2 (0.00s)
+    --- PASS: TestProtocolCorpusLDAPFieldsBoundariesAndIsolation/cache-3 (0.00s)
+=== RUN   TestProtocolCorpusLDAPFieldsIntegerWidths
+--- PASS: TestProtocolCorpusLDAPFieldsIntegerWidths (0.00s)
+=== RUN   TestProtocolCorpusMySQLFieldsBoundariesAndIsolation
+=== RUN   TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-0
+=== PAUSE TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-0
+=== RUN   TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-1
+=== PAUSE TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-1
+=== RUN   TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-2
+=== PAUSE TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-2
+=== RUN   TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-3
+=== PAUSE TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-3
+=== CONT  TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-0
+=== CONT  TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-2
+=== CONT  TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-1
+=== CONT  TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-3
+--- PASS: TestProtocolCorpusMySQLFieldsBoundariesAndIsolation (0.28s)
+    --- PASS: TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-0 (0.00s)
+    --- PASS: TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-2 (0.00s)
+    --- PASS: TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-1 (0.00s)
+    --- PASS: TestProtocolCorpusMySQLFieldsBoundariesAndIsolation/cache-3 (0.00s)
+=== RUN   TestProtocolCorpusMySQLFieldsAllOriginalRecords
+--- PASS: TestProtocolCorpusMySQLFieldsAllOriginalRecords (0.02s)
+=== RUN   TestProtocolCorpusMySQLFieldsNestedFallback
+--- PASS: TestProtocolCorpusMySQLFieldsNestedFallback (0.01s)
+=== RUN   TestProtocolCorpusMySQLFieldsWideIntegers
+--- PASS: TestProtocolCorpusMySQLFieldsWideIntegers (0.00s)
+=== RUN   TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation
+=== RUN   TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-0
+=== PAUSE TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-0
+=== RUN   TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-1
+=== PAUSE TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-1
+=== RUN   TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-2
+=== PAUSE TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-2
+=== RUN   TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-3
+=== PAUSE TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-3
+=== CONT  TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-0
+=== CONT  TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-2
+=== CONT  TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-1
+=== CONT  TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-3
+--- PASS: TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation (0.23s)
+    --- PASS: TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-0 (0.00s)
+    --- PASS: TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-2 (0.00s)
+    --- PASS: TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-1 (0.00s)
+    --- PASS: TestProtocolCorpusPostgreSQLFieldsBoundariesAndIsolation/cache-3 (0.00s)
+=== RUN   TestProtocolCorpusPostgreSQLFieldsAllOriginalRecords
+--- PASS: TestProtocolCorpusPostgreSQLFieldsAllOriginalRecords (0.02s)
+=== RUN   TestProtocolCorpusPostgreSQLFieldsNestedFallback
+--- PASS: TestProtocolCorpusPostgreSQLFieldsNestedFallback (0.01s)
+=== RUN   TestProtocolCorpusPostgreSQLFieldsSignedValues
+--- PASS: TestProtocolCorpusPostgreSQLFieldsSignedValues (0.00s)
+=== RUN   TestProtocolCorpusSMB3Fields
+=== RUN   TestProtocolCorpusSMB3Fields/request-3.0
+    protocol_corpus_smb3_test.go:202: companion request-3.0 104 fe534d4240000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024000200010000007f000000000102030405460788090a0b0c0d0e0f000000000000000002020003
+=== RUN   TestProtocolCorpusSMB3Fields/request-3.0.2
+    protocol_corpus_smb3_test.go:202: companion request-3.0.2 104 fe534d4240000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024000200010000007f000000000102030405460788090a0b0c0d0e0f000000000000000000030203
+=== RUN   TestProtocolCorpusSMB3Fields/request-3.1.1-contexts
+    protocol_corpus_smb3_test.go:202: companion request-3.1.1-contexts 244 fe534d4240000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024000300010000007f000000000102030405460788090a0b0c0d0e0f70000000070000000003020311030000000000000200060000000000020002000100000001000900000000000100030001003141590000000000000003000c0000000000020000000100000001000300000000000600040000000000000000000000000007000c0000000000020000000000000001000200000000000800060000000000020002000100000005000400000000006e007300
+=== RUN   TestProtocolCorpusSMB3Fields/response-3.0
+    protocol_corpus_smb3_test.go:202: companion response-3.0 128 fe534d424000000000000000000001000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004100010000030000000102030405460788090a0b0c0d0e0f3f000000000001000000020000000400080706050403020100000000000000008000000000000000
+=== RUN   TestProtocolCorpusSMB3Fields/response-3.0.2
+    protocol_corpus_smb3_test.go:202: companion response-3.0.2 128 fe534d424000000000000000000001000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004100010002030000000102030405460788090a0b0c0d0e0f3f000000000001000000020000000400080706050403020100000000000000008000000000000000
+=== RUN   TestProtocolCorpusSMB3Fields/response-3.1.1-contexts
+    protocol_corpus_smb3_test.go:202: companion response-3.1.1-contexts 244 fe534d424000000000000000000001000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004100010011030600000102030405460788090a0b0c0d0e0f3f0000000000010000000200000004000807060504030201000000000000000080000000800000000200040000000000010002000000000001000900000000000100030001003141590000000000000003000c0000000000020000000100000001000300000000000600040000000000000000000000000007000c000000000002000000000000000100020000000000080004000000000001000200
+=== RUN   TestProtocolCorpusSMB3Fields/request-3.1.1-minimal
+    protocol_corpus_smb3_test.go:202: companion request-3.1.1-minimal 121 fe534d4240000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024000100010000007f000000000102030405460788090a0b0c0d0e0f6800000001000000110300000100090000000000010003000100314159
+--- PASS: TestProtocolCorpusSMB3Fields (0.01s)
+    --- PASS: TestProtocolCorpusSMB3Fields/request-3.0 (0.00s)
+    --- PASS: TestProtocolCorpusSMB3Fields/request-3.0.2 (0.00s)
+    --- PASS: TestProtocolCorpusSMB3Fields/request-3.1.1-contexts (0.00s)
+    --- PASS: TestProtocolCorpusSMB3Fields/response-3.0 (0.00s)
+    --- PASS: TestProtocolCorpusSMB3Fields/response-3.0.2 (0.00s)
+    --- PASS: TestProtocolCorpusSMB3Fields/response-3.1.1-contexts (0.00s)
+    --- PASS: TestProtocolCorpusSMB3Fields/request-3.1.1-minimal (0.00s)
+=== RUN   TestProtocolCorpusSMB3OriginalEveryRecord
+--- PASS: TestProtocolCorpusSMB3OriginalEveryRecord (0.04s)
+=== RUN   TestProtocolCorpusSMB3PrefixesAndBoundaries
+--- PASS: TestProtocolCorpusSMB3PrefixesAndBoundaries (0.33s)
+=== RUN   TestProtocolCorpusSMB3CompanionEveryRecord
+--- PASS: TestProtocolCorpusSMB3CompanionEveryRecord (0.05s)
+=== RUN   TestProtocolCorpusSMB3CompatibilityAndResources
+--- PASS: TestProtocolCorpusSMB3CompatibilityAndResources (0.00s)
+=== RUN   TestProtocolCorpusSMB3ContextReceiveRules
+--- PASS: TestProtocolCorpusSMB3ContextReceiveRules (0.01s)
+=== RUN   TestProtocolCorpusSMB3CountResourcesAndHeldSuccess
+--- PASS: TestProtocolCorpusSMB3CountResourcesAndHeldSuccess (0.03s)
+=== RUN   TestProtocolCorpusSMB3ImportsAndHeldReader
+--- PASS: TestProtocolCorpusSMB3ImportsAndHeldReader (0.05s)
+=== RUN   TestProtocolCorpusSMB3ContextIsolation
+--- PASS: TestProtocolCorpusSMB3ContextIsolation (0.00s)
+PASS
+ok  	github.com/yaklang/yaklang/common/bin-parser	2.225s

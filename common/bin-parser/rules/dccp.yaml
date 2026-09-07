@@ -1,0 +1,231 @@
+# RFC 4340 sections 5, 6, 7.7, 9, 11 and 13.
+# A bounded datagram is required. IPv4/IPv6 dispatch supplies pseudo-header
+# addresses; direct parsing without them does not validate the checksum.
+# No connection state, short-sequence reconstruction or CCID is inferred.
+endian: big
+Package:
+  DCCP:
+    operator: |
+      start = getCurrentPosition()
+      if !this.HasMaxLength() { panic("dccp: datagram boundary is required") }
+      size = this.GetMaxLength()
+      if size < 12 || size > 65535 { panic("dccp: datagram size is outside bounds") }
+      this.ProcessSubNode("Source Port")
+      this.ProcessSubNode("Destination Port")
+      header = this.ProcessSubNode("Data Offset").Value * 4
+      this.ProcessSubNode("CCVal")
+      coverage = this.ProcessSubNode("Checksum Coverage").Value
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Reserved")
+      kind = this.ProcessSubNode("Packet Type").Value
+      extended = this.ProcessSubNode("Extended Sequence Numbers").Value
+      if kind > 9 { panic("dccp: reserved packet type") }
+      if extended == 0 && kind != 2 && kind != 3 && kind != 4 { panic("dccp: packet type requires extended sequence numbers") }
+      fixed = 12
+      if extended == 1 { fixed = 16 }
+      if kind != 0 && kind != 2 {
+        fixed += 4
+        if extended == 1 { fixed += 4 }
+      }
+      if kind == 0 || kind == 1 || kind == 7 { fixed += 4 }
+      if header < fixed || header > size { panic("dccp: data offset outside packet header bounds") }
+      covered = size
+      if coverage != 0 { covered = header + (coverage-1)*4 }
+      if covered > size { panic("dccp: checksum coverage exceeds datagram") }
+      if extended == 1 {
+        this.ProcessSubNode("Sequence Reserved")
+        this.GetSubNode("Sequence Number").SetMaxLength(48, "bit")
+      } else { this.GetSubNode("Sequence Number").SetMaxLength(24, "bit") }
+      this.ProcessSubNode("Sequence Number")
+      if kind != 0 && kind != 2 {
+        if extended == 1 {
+          this.GetSubNode("Acknowledgement Reserved").SetMaxLength(16, "bit")
+          this.GetSubNode("Acknowledgement Number").SetMaxLength(48, "bit")
+        } else {
+          this.GetSubNode("Acknowledgement Reserved").SetMaxLength(8, "bit")
+          this.GetSubNode("Acknowledgement Number").SetMaxLength(24, "bit")
+        }
+        this.ProcessSubNode("Acknowledgement Reserved")
+        this.ProcessSubNode("Acknowledgement Number")
+      }
+      if kind == 0 || kind == 1 { this.ProcessSubNode("Service Code") }
+      if kind == 7 {
+        this.ProcessSubNode("Reset Code")
+        this.ProcessSubNode("Reset Data 1")
+        this.ProcessSubNode("Reset Data 2")
+        this.ProcessSubNode("Reset Data 3")
+      }
+      if header > fixed {
+        options = this.GetSubNode("Options")
+        options.SetMaxLength(header-fixed)
+        options.SetCfg("DCCP Packet Type", kind)
+        options.Process()
+      }
+      if size > header {
+        this.GetSubNode("Application Data").SetMaxLength(size-header)
+        this.ProcessSubNode("Application Data")
+      }
+      source = this.GetCfg("IP Source")
+      destination = this.GetCfg("IP Destination")
+      this.AddInfo("Checksum Validated", false)
+      this.AddInfo("Checksum Context Required", source == nil || destination == nil)
+      if source != nil || destination != nil {
+        if source == nil || destination == nil || len(source) != len(destination) || (len(source) != 4 && len(source) != 16) { panic("dccp: invalid pseudo-header addresses") }
+        data = getCtx("buffer").Bytes()[start:start+covered]
+        sum = 33 + size
+        for address in [source, destination] {
+          for i = 0; i < len(address); i += 2 { sum += (int(address[i]) << 8) + int(address[i+1]) }
+        }
+        for i = 0; i < len(data); i += 2 {
+          sum += int(data[i]) << 8
+          if i+1 < len(data) { sum += int(data[i+1]) }
+        }
+        for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+        if sum != 65535 { panic("dccp: checksum mismatch") }
+        this.AddInfo("Checksum Validated", true)
+      }
+      this.AddInfo("Connection State Validated", false)
+      crcCount, err = validateDCCPDataChecksums(getCtx("buffer").Bytes()[start:start+size])
+      if err != nil { panic(err) }
+      this.AddInfo("Data Checksum Validated", crcCount > 0)
+      this.AddInfo("Data Checksums Verified", crcCount)
+    Source Port: uint16
+    Destination Port: uint16
+    Data Offset: uint8
+    CCVal: uint8,4bit
+    Checksum Coverage: uint8,4bit
+    Checksum: uint16
+    Reserved: uint8,3bit
+    Packet Type: uint8,4bit
+    Extended Sequence Numbers: uint8,1bit
+    Sequence Reserved: uint8
+    Sequence Number: uint64
+    Acknowledgement Reserved: uint16
+    Acknowledgement Number: uint64
+    Service Code: uint32
+    Reset Code: uint8
+    Reset Data 1: uint8
+    Reset Data 2: uint8
+    Reset Data 3: uint8
+    Options:
+      list: true
+      Option: DCCPOption
+      operator: |
+        pending = false
+        for this.Length() < this.GetMaxLength() {
+          option = this.NewElement()
+          option.Process()
+          kind = option.GetSubNode("Option Type").Result().Value
+          if this.GetCfg("DCCP Packet Type") != 2 {
+            if pending && kind == 1 { panic("dccp: consecutive Mandatory options") }
+            pending = kind == 1
+          }
+          if option.GetInfo("Malformed Length") { return }
+        }
+        if pending { panic("dccp: trailing Mandatory option") }
+    Application Data: raw
+
+DCCPOption:
+  operator: |
+    kind = this.ProcessSubNode("Option Type").Value
+    this.AddInfo("Malformed Length", false)
+    this.AddInfo("Value Decoded", kind <= 2)
+    if kind < 32 { return }
+    remaining = this.GetMaxLength() - this.Length()
+    if remaining == 0 {
+      this.AddInfo("Malformed Length", true)
+      return
+    }
+    size = this.ProcessSubNode("Option Length").Value
+    if size < 2 || size-2 > this.GetMaxLength()-this.Length() {
+      // RFC 4340 5.8: preserve and stop at a nonsensical option length;
+      // it cannot consume application data or invent subsequent options.
+      this.AddInfo("Malformed Length", true)
+      remaining = this.GetMaxLength()-this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Ignored Option Tail").SetMaxLength(remaining)
+        this.ProcessSubNode("Ignored Option Tail")
+      }
+      return
+    }
+    this.SetMaxLength(size)
+    known = false
+    if ((kind == 32 || kind == 34) && size >= 4) || ((kind == 33 || kind == 35) && size >= 3) {
+      this.ProcessSubNode("Feature Number")
+      if size > 3 {
+        this.GetSubNode("Feature Values").SetMaxLength(size-3)
+        this.ProcessSubNode("Feature Values")
+      }
+      known = true
+    } elif kind == 37 && size >= 3 && size <= 8 {
+      this.GetSubNode("NDP Count").SetMaxLength(size-2)
+      this.ProcessSubNode("NDP Count")
+      known = true
+    } elif (kind == 38 || kind == 39) && size >= 3 {
+      this.GetSubNode("Ack Vector").SetMaxLength(size-2)
+      this.ProcessSubNode("Ack Vector")
+      this.AddInfo("Nonce Echo", kind-38)
+      known = true
+    } elif kind == 40 && size >= 3 {
+      this.GetSubNode("Data Dropped").SetMaxLength(size-2)
+      this.ProcessSubNode("Data Dropped")
+      known = true
+    } elif kind == 41 && size == 6 {
+      this.ProcessSubNode("Timestamp")
+      known = true
+    } elif kind == 42 && (size == 6 || size == 8 || size == 10) {
+      this.ProcessSubNode("Timestamp Echo")
+      if size > 6 {
+        this.GetSubNode("Elapsed Time").SetMaxLength(size-6)
+        this.ProcessSubNode("Elapsed Time")
+      }
+      known = true
+    } elif kind == 43 && (size == 4 || size == 6) {
+      this.GetSubNode("Elapsed Time").SetMaxLength(size-2)
+      this.ProcessSubNode("Elapsed Time")
+      known = true
+    } elif kind == 44 && size == 6 {
+      this.ProcessSubNode("Data Checksum")
+      known = true
+    } else if size > 2 {
+      this.GetSubNode("Option Data").SetMaxLength(size-2)
+      this.ProcessSubNode("Option Data")
+    }
+    this.AddInfo("Value Decoded", known)
+  Option Type: uint8
+  Option Length: uint8
+  Feature Number: uint8
+  Feature Values: raw
+  NDP Count: uint64
+  Ack Vector:
+    list: true
+    Run: DCCPAckRun
+    operator: |
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+  Data Dropped:
+    list: true
+    Block: DCCPDropBlock
+    operator: |
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+  Timestamp: uint32
+  Timestamp Echo: uint32
+  Elapsed Time: uint32
+  Data Checksum: uint32
+  Option Data: raw
+  Ignored Option Tail: raw
+
+DCCPAckRun:
+  State: uint8,2bit
+  Run Length: uint8,6bit
+
+DCCPDropBlock:
+  operator: |
+    dropped = this.ProcessSubNode("Drop Block").Value
+    if dropped == 1 {
+      this.ProcessSubNode("Drop Code")
+      this.GetSubNode("Drop Run Length").SetMaxLength(4, "bit")
+    } else { this.GetSubNode("Drop Run Length").SetMaxLength(7, "bit") }
+    this.ProcessSubNode("Drop Run Length")
+  Drop Block: uint8,1bit
+  Drop Code: uint8,3bit
+  Drop Run Length: uint8

@@ -1,0 +1,19 @@
+Projection of /tmp/binparser-prepared-verification-20260906.log (exit 0), top-level status and all-record worker counts only.
+--- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords (0.02s)
+--- PASS: TestProtocolCorpusCassandraFieldsIndependentLists (0.00s)
+--- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback (0.12s)
+--- PASS: TestProtocolCorpusContractReferencesExist (0.01s)
+--- PASS: TestProtocolCorpusMemcachedFieldsPackedCarrier (0.06s)
+--- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords (0.01s)
+--- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback (0.11s)
+    protocol_corpus_prepared_test.go:28: compared 14633 retained records
+    protocol_corpus_prepared_test.go:28: compared 14634 retained records
+    protocol_corpus_prepared_test.go:28: compared 14633 retained records
+    protocol_corpus_prepared_test.go:28: compared 14633 retained records
+--- PASS: TestProtocolCorpusPreparedEnvelopesEquivalent (0.04s)
+--- PASS: TestProtocolCorpusPreparedApplicationEquivalent (0.11s)
+--- PASS: TestProtocolCorpusSupplementalProfiles (0.05s)
+--- PASS: TestProtocolCorpusIntegrity (0.07s)
+--- PASS: TestProtocolCatalogRuleFilesExist (0.16s)
+--- PASS: TestProtocolRoadmapIntegrity (0.00s)
+PASS

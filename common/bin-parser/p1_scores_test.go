@@ -134,6 +134,27 @@ func TestP1CardsDoNotHardcodeGates(t *testing.T) {
 	}
 }
 
+func TestP1NativeSchemaRemainsUncredited(t *testing.T) {
+	// This is a limitation of the existing static evidence audit, not a claim
+	// that the native parser has no fields. Any future native-schema scoring
+	// needs its own executable evidence audit, not a ceiling exemption.
+	names := p1MustChildNames()
+	doc, err := os.ReadFile("P1_SCORES.md")
+	require.NoError(t, err)
+	for _, name := range []string{"IIOP/GIOP", "IIOP Locate", "RMI/JRMP", "JNDI", "RMI", "JMX"} {
+		sc, ok := ResolveP1Scorecard(name)
+		require.True(t, ok)
+		require.Zero(t, sc.Schema)
+		require.Zero(t, schemaCeiling(sc.Rule, sc.OpaqueRaw))
+		sc = deriveP1Gates(sc, failCount(sc.Rule), hasEthernetMustChild(sc, names), true)
+		require.True(t, sc.GatesOK())
+		require.Equal(t, 75, sc.Total())
+		require.Equal(t, "B", sc.Grade())
+		row := fmt.Sprintf("| %s | B | 75 | 0 | 25 | 20 | 20 | 10 | L2 |", name)
+		require.Contains(t, string(doc), row, "documented native score must remain conservative")
+	}
+}
+
 func TestP1DerivedGatesRejectFake(t *testing.T) {
 	fake := p1card("NoSuchProto", "no-such.yaml", 25, 25, 20, 20, 10, "L2", "handmade", "")
 	require.False(t, fake.G1)
@@ -202,6 +223,8 @@ func p1InventoryMarkdown() string {
 	b.WriteString("别名与主规则共用同一张卡（见 `AliasOf`）。样本来源包括 gopacket 测试帧、RFC 完整 PDU，以及 Ethernet+IP+L4 整帧断言。\n\n")
 	b.WriteString("G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gopacket serialize 的 Traffic ≤ 8。\n\n")
 	b.WriteString("`TestP1ScorecardsCovered` 用 YAML/`p1FailCases`/mustChild 扫描卡死 Schema/Tests/Traffic 上限：声称分不得高于 `schemaCeiling` / `testsCeiling` / `trafficCeiling`。G1–G4/G6–G8 由测试从规则文件、失败路径和以太网封装推导，`p1card` 不得写死为 true。\n\n")
+	b.WriteString("IIOP/GIOP 与 IIOP Locate 的原生 Go 字段树尚不在现有 YAML Schema 审计范围，Schema 暂不计分（0），总分为 75/B；这不是没有字段的声明，也不豁免静态上限。完整的原始捕获及新增 companion 有独立字段、位区间与字节边界测试。IDL 参数、Profile/Context 内容仍不展开，分片与 TCP 重组由调用方提供，ZIOP 尚不支持；评分不代表完整协议实现。\n\n")
+	b.WriteString("GSS-API 与 P0 SPNEGO 仅计共同的初始 token 子集（80/B）：Schema 15；`Optional Fields`（reqFlags/mechToken/mechListMIC 的 TLV 结构）和非 init `Octets`（含 NegTokenResp）未展开，长格式 BER 不支持，不作规范不透明豁免。`TestP1WiresharkAndRFCSamples/spnego/ntlm` 与 `/spnego/krb5` 各自在 Ethernet→IP→TCP/445→SMB2→Session Setup→SPNEGOInit 上断言 `MechOID`，支持流量 25；未覆盖每条显式错误分支，测试/分支为 16/14。此卡不代表所有 GSS-API 机制，也不提升 HTTP-only corpus 样本的 outer-only 覆盖。\n\n")
 	b.WriteString("| 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |\n")
 	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
 	for _, item := range ProtocolRoadmap {

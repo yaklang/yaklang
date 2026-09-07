@@ -223,7 +223,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				return op, err
 			}
 			return op, nil
-		})
+		}, operator.Mode)
 		if err != nil {
 			return fmt.Errorf("eval operator error: %w", err)
 		}

@@ -1,0 +1,16 @@
+# Excluded exploratory observations: the baseline and chain processes overlapped.
+# Values copied from observed tool output; these timings are not used in summary.json.
+# Each op: 11 messages, 1421 input bytes, 1 worker; benchtime=600ms, count=3.
+variant	path	ns/op	B/op	allocs/op
+baseline	Fields	2130276	1618228	26853
+baseline	Fields	2142490	1618196	26853
+baseline	Fields	2180424	1618238	26854
+baseline	JSON	2782405	1840226	32164
+baseline	JSON	2761638	1840253	32164
+baseline	JSON	2871421	1840249	32164
+chain	Fields	1965527	1598332	25611
+chain	Fields	1993691	1598393	25612
+chain	Fields	2055953	1598326	25611
+chain	JSON	2563689	1820412	30922
+chain	JSON	2657415	1820326	30922
+chain	JSON	2556809	1820296	30921

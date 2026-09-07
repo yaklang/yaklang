@@ -62,6 +62,16 @@ func legacyGIOPRequest() []byte {
 }
 
 func fullGIOPRequest() []byte {
+	message := legacyUnalignedGIOPRequest()
+	body := append([]byte(nil), message[12:65]...)
+	body = append(body, make([]byte, 7)...)
+	body = append(body, message[65:]...)
+	return giopRequest(body)
+}
+
+// Preserve the former positive bytes as a negative oracle: the stub starts at
+// message offset 65 rather than the required GIOP 1.2 eight-byte boundary.
+func legacyUnalignedGIOPRequest() []byte {
 	body := append([]byte(nil), legacyGIOPRequest()[12:]...)
 	body = append(body, 0, 0)
 	body = append(body, 0, 0, 0, 2)
@@ -75,14 +85,27 @@ func fullGIOPRequest() []byte {
 	return giopRequest(body)
 }
 
-func TestGIOPRequestOptionalTailAndStrictTruncation(t *testing.T) {
-	t.Run("legacy operation-only request", func(t *testing.T) {
-		node := parseGIOPSCTPExact(t, legacyGIOPRequest(), "application-layer.iiop", "GIOP")
+func completeEmptyGIOPRequest() []byte {
+	body := append([]byte(nil), legacyGIOPRequest()[12:]...)
+	body = append(body, 0, 0, 0, 0, 0, 0) // alignment and mandatory empty context sequence
+	return giopRequest(body)
+}
+
+func TestGIOPRequestRequiredTailAndStrictTruncation(t *testing.T) {
+	t.Run("legacy operation-only request is incomplete", func(t *testing.T) {
+		rejectGIOPSCTPExact(t, legacyGIOPRequest(), "application-layer.iiop", "GIOP")
+	})
+	t.Run("legacy unaligned stub is incomplete", func(t *testing.T) {
+		rejectGIOPSCTPExact(t, legacyUnalignedGIOPRequest(), "application-layer.iiop", "GIOP")
+	})
+	t.Run("empty body with mandatory context count", func(t *testing.T) {
+		node := parseGIOPSCTPExact(t, completeEmptyGIOPRequest(), "application-layer.iiop", "GIOP")
 		value, err := node.Result()
 		require.NoError(t, err)
 		request := mustChild(t, value, "GIOPRequest")
 		require.Equal(t, "_is_a\x00", strVal(t, request.Child("Operation")))
-		require.Nil(t, request.Child("Service Context Count"))
+		require.Equal(t, uint64(0), uintVal(t, request.Child("Service Context Count")))
+		require.Empty(t, bytesVal(t, request.Child("Stub Data")))
 	})
 
 	t.Run("aligned context and stub", func(t *testing.T) {

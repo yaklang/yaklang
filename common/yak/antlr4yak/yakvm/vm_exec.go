@@ -148,7 +148,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 			if ierr = recover(); ierr != nil {
 				if vmPanic, ok = ierr.(*VMPanic); !ok {
 					// go产生的panic需要套一层VMPanic
-					vmPanic = NewVMPanic(ierr)
+					vmPanic = v.newVMPanic(ierr)
 				}
 				v.panic(vmPanic)
 			}
@@ -298,7 +298,8 @@ var undefined = &Value{
 }
 
 func IsUndefined(v *Value) bool {
-	return v == undefined
+	// Bound nil values have private metadata, but retain sentinel semantics.
+	return v == undefined || (v != nil && v.TypeVerbose == "undefined" && v.Value == nil)
 }
 
 func GetUndefined() *Value {
@@ -1806,7 +1807,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 	case OpPanic:
 		val := v.pop()
-		panic(NewVMPanic(val.Value))
+		panic(v.newVMPanic(val.Value))
 	case OpRecover:
 		recovered := v.recover().GetData()
 		if recovered != nil && c.Op1 != nil && c.Op1.IsBool() && c.Op1.Bool() {
@@ -2086,7 +2087,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 	case OpExit:
 		val := v.pop()
-		panic(NewVMPanic(&VMPanicSignal{Info: val, AdditionalInfo: c.Op1.Value}))
+		panic(v.newVMPanic(&VMPanicSignal{Info: val, AdditionalInfo: c.Op1.Value}))
 	}
 }
 

@@ -1,0 +1,29 @@
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="Ethernet" records=56709 parsed=56708 rejected=0 truncated-record=1 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="FDDI" records=4 parsed=4 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="IEEE 802.15.4" records=1 parsed=1 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="IEEE 802.15.4 no FCS" records=54 parsed=54 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="Linux SLL" records=80 parsed=79 rejected=1 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="Linux SLL2" records=1 parsed=1 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="Null" records=492 parsed=492 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="PPP" records=1 parsed=1 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="RadioTap" records=30 parsed=29 rejected=1 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="Raw" records=277 parsed=277 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="SocketCAN" records=2 parsed=2 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="Token Ring" records=1 parsed=1 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="USB" records=10 parsed=0 rejected=0 truncated-record=0 explicit-container=10
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="USBPcap" records=860 parsed=860 rejected=0 truncated-record=0 explicit-container=0
+    protocol_corpus_all_packets_envelope_test.go:131: envelope link="UnknownLinkType" records=11 parsed=10 rejected=0 truncated-record=0 explicit-container=1
+    protocol_corpus_all_packets_envelope_test.go:161: validated 58533 packet records with 58533 bin-parser entries in 22.455s; this is envelope coverage, not per-packet application semantics
+--- PASS: TestProtocolCorpusAllPacketEnvelopes (22.45s)
+--- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords (0.01s)
+--- PASS: TestProtocolCorpusCassandraFieldsIndependentLists (0.00s)
+--- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback (0.12s)
+--- PASS: TestProtocolCorpusContractReferencesExist (0.01s)
+--- PASS: TestProtocolCorpusMemcachedFieldsPackedCarrier (0.05s)
+--- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords (0.01s)
+--- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback (0.11s)
+--- PASS: TestProtocolCorpusSupplementalProfiles (0.05s)
+--- PASS: TestProtocolCorpusIntegrity (0.06s)
+--- PASS: TestProtocolCatalogRuleFilesExist (0.16s)
+--- PASS: TestProtocolRoadmapIntegrity (0.00s)
+PASS

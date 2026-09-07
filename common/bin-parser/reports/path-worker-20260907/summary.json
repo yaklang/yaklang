@@ -1,0 +1,342 @@
+{
+  "stats": {
+    "short": {
+      "BenchmarkCurrentCorpusApplicationFields": {
+        "baseline": {
+          "ns": 2268815,
+          "min": 2156094,
+          "max": 2272071,
+          "bytes": 1618173,
+          "allocs": 26853,
+          "messages_s": 4848.345942705773,
+          "input_mbps": 5.010545152425385
+        },
+        "chain": {
+          "ns": 2055989,
+          "min": 1987953,
+          "max": 2363160,
+          "bytes": 1598326,
+          "allocs": 25611,
+          "messages_s": 5350.223177264081,
+          "input_mbps": 5.529212461739824
+        },
+        "worker": {
+          "ns": 2048176,
+          "min": 1947211,
+          "max": 2092425,
+          "bytes": 1442990,
+          "allocs": 23617,
+          "messages_s": 5370.632211294342,
+          "input_mbps": 5.550304270726734
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationFields-4": {
+        "baseline": {
+          "ns": 1182387,
+          "min": 1123552,
+          "max": 1291305,
+          "bytes": 1618682,
+          "allocs": 26859,
+          "messages_s": 9303.214598942648,
+          "input_mbps": 9.614449414616365
+        },
+        "chain": {
+          "ns": 1080239,
+          "min": 1051472,
+          "max": 1279904,
+          "bytes": 1598794,
+          "allocs": 25617,
+          "messages_s": 10182.931740105661,
+          "input_mbps": 10.523597092865561
+        },
+        "worker": {
+          "ns": 1059726,
+          "min": 1010990,
+          "max": 1499758,
+          "bytes": 1443459,
+          "allocs": 23623,
+          "messages_s": 10380.04163340335,
+          "input_mbps": 10.727301208048118
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationFields-10": {
+        "baseline": {
+          "ns": 1083467,
+          "min": 1038924,
+          "max": 1283671,
+          "bytes": 1619608,
+          "allocs": 26872,
+          "messages_s": 10152.593480004467,
+          "input_mbps": 10.492243880062798
+        },
+        "chain": {
+          "ns": 987421,
+          "min": 978354,
+          "max": 1109425,
+          "bytes": 1599729,
+          "allocs": 25630,
+          "messages_s": 11140.131716866463,
+          "input_mbps": 11.512819759757996
+        },
+        "worker": {
+          "ns": 970651,
+          "min": 925747,
+          "max": 1107272,
+          "bytes": 1444379,
+          "allocs": 23637,
+          "messages_s": 11332.60049183486,
+          "input_mbps": 11.711727490107155
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationJSON": {
+        "baseline": {
+          "ns": 2709297,
+          "min": 2590405,
+          "max": 2913828,
+          "bytes": 1840259,
+          "allocs": 32164,
+          "messages_s": 4060.0938176951436,
+          "input_mbps": 4.195922410868945
+        },
+        "chain": {
+          "ns": 2596697,
+          "min": 2511360,
+          "max": 2710527,
+          "bytes": 1820297,
+          "allocs": 30922,
+          "messages_s": 4236.150771537842,
+          "input_mbps": 4.3778692700765625
+        },
+        "worker": {
+          "ns": 2393000,
+          "min": 2365135,
+          "max": 2782247,
+          "bytes": 1665009,
+          "allocs": 28928,
+          "messages_s": 4596.7404931048895,
+          "input_mbps": 4.7505223568742165
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationJSON-4": {
+        "baseline": {
+          "ns": 1486212,
+          "min": 1411019,
+          "max": 1665143,
+          "bytes": 1846261,
+          "allocs": 32172,
+          "messages_s": 7401.366696002993,
+          "input_mbps": 7.648976054560184
+        },
+        "chain": {
+          "ns": 1434714,
+          "min": 1372910,
+          "max": 1584241,
+          "bytes": 1827732,
+          "allocs": 30930,
+          "messages_s": 7667.033290258546,
+          "input_mbps": 7.923530403969014
+        },
+        "worker": {
+          "ns": 1316719,
+          "min": 1310854,
+          "max": 1894689,
+          "bytes": 1671060,
+          "allocs": 28936,
+          "messages_s": 8354.098330775207,
+          "input_mbps": 8.63358089311387
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationJSON-10": {
+        "baseline": {
+          "ns": 1373289,
+          "min": 1300424,
+          "max": 1523381,
+          "bytes": 1860438,
+          "allocs": 32190,
+          "messages_s": 8009.967312051578,
+          "input_mbps": 8.277937127582032
+        },
+        "chain": {
+          "ns": 1277342,
+          "min": 1245871,
+          "max": 1422688,
+          "bytes": 1841204,
+          "allocs": 30949,
+          "messages_s": 8611.632593307038,
+          "input_mbps": 8.899730847337675
+        },
+        "worker": {
+          "ns": 1318692,
+          "min": 1206967,
+          "max": 1453746,
+          "bytes": 1686178,
+          "allocs": 28954,
+          "messages_s": 8341.59909971396,
+          "input_mbps": 8.620663505958936
+        }
+      }
+    },
+    "long": {
+      "BenchmarkCurrentCorpusApplicationFields": {
+        "baseline": {
+          "ns": 2164404,
+          "min": 2160496,
+          "max": 2166241,
+          "bytes": 1618204,
+          "allocs": 26853,
+          "messages_s": 5082.230489317151,
+          "input_mbps": 5.252254200232489
+        },
+        "chain": {
+          "ns": 1982336,
+          "min": 1971807,
+          "max": 1997190,
+          "bytes": 1598321,
+          "allocs": 25611,
+          "messages_s": 5549.0088461290115,
+          "input_mbps": 5.734648414799509
+        },
+        "worker": {
+          "ns": 1843286,
+          "min": 1838881,
+          "max": 1880915,
+          "bytes": 1442977,
+          "allocs": 23617,
+          "messages_s": 5967.603508082848,
+          "input_mbps": 6.16724697089871
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationFields-10": {
+        "baseline": {
+          "ns": 1047744,
+          "min": 1045845,
+          "max": 1048222,
+          "bytes": 1619542,
+          "allocs": 26872,
+          "messages_s": 10498.74778571865,
+          "input_mbps": 10.849978620731783
+        },
+        "chain": {
+          "ns": 944745,
+          "min": 942409,
+          "max": 950341,
+          "bytes": 1599667,
+          "allocs": 25630,
+          "messages_s": 11643.353497504617,
+          "input_mbps": 12.032876596330226
+        },
+        "worker": {
+          "ns": 902592,
+          "min": 900983,
+          "max": 903471,
+          "bytes": 1444267,
+          "allocs": 23635,
+          "messages_s": 12187.123307097781,
+          "input_mbps": 12.594837977735233
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationJSON": {
+        "baseline": {
+          "ns": 2680977,
+          "min": 2672273,
+          "max": 2727085,
+          "bytes": 1840202,
+          "allocs": 32164,
+          "messages_s": 4102.981860717194,
+          "input_mbps": 4.240245253875733
+        },
+        "chain": {
+          "ns": 2495514,
+          "min": 2482772,
+          "max": 2495652,
+          "bytes": 1820368,
+          "allocs": 30922,
+          "messages_s": 4407.909552901727,
+          "input_mbps": 4.5553741633988025
+        },
+        "worker": {
+          "ns": 2342921,
+          "min": 2337605,
+          "max": 2353319,
+          "bytes": 1665001,
+          "allocs": 28927,
+          "messages_s": 4694.993984005436,
+          "input_mbps": 4.852062873652163
+        }
+      },
+      "BenchmarkCurrentCorpusApplicationJSON-10": {
+        "baseline": {
+          "ns": 1320894,
+          "min": 1316277,
+          "max": 1330714,
+          "bytes": 1861311,
+          "allocs": 32191,
+          "messages_s": 8327.693213838505,
+          "input_mbps": 8.606292404992377
+        },
+        "chain": {
+          "ns": 1221416,
+          "min": 1218193,
+          "max": 1223160,
+          "bytes": 1842671,
+          "allocs": 30949,
+          "messages_s": 9005.940645938812,
+          "input_mbps": 9.307230296639311
+        },
+        "worker": {
+          "ns": 1184866,
+          "min": 1181231,
+          "max": 1210412,
+          "bytes": 1685254,
+          "allocs": 28954,
+          "messages_s": 9283.750229983812,
+          "input_mbps": 9.594333874041453
+        }
+      }
+    }
+  },
+  "digest": [
+    {
+      "variant": "baseline",
+      "exit_code": 0,
+      "partitions": [
+        "CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136",
+        "CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35",
+        "CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e",
+        "CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      ]
+    },
+    {
+      "variant": "chain",
+      "exit_code": 0,
+      "partitions": [
+        "CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136",
+        "CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35",
+        "CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e",
+        "CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      ]
+    },
+    {
+      "variant": "worker",
+      "exit_code": 0,
+      "partitions": [
+        "CURRENT_EXPORT_DIGEST workload=application worker=0 records=3 sha256=ffc47b27d18907cbfff669d9b1ffd45c6cb3bca09a44db51e2338daf69a77136",
+        "CURRENT_EXPORT_DIGEST workload=application worker=1 records=3 sha256=5d7cbdffa2be9fd23e70453264089c6e7b789c0dd15d61b575031cce6dfd4e35",
+        "CURRENT_EXPORT_DIGEST workload=application worker=2 records=3 sha256=1df0ba0436e29baef8dfe48f14c3491678b61b907a7691efb461f610a178573e",
+        "CURRENT_EXPORT_DIGEST workload=application worker=3 records=2 sha256=80bdec00f306ebd20d3aa22445f527cbb1ad1df45ed575acb5af92b7dabd7990",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=0 records=14634 sha256=a3cf2631f4ba2ae534955c575bed4d448570de0599b5512d581881016e608b8b",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=1 records=14633 sha256=c80528ab37a117ce260047a488063d5f042930157e753bbae7e168c1cd421852",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=2 records=14633 sha256=8624f4a8fb840df7a2b12dd79d0e19496930b04cf9d9dc63b5b045ea671aabcb",
+        "CURRENT_EXPORT_DIGEST workload=envelopes worker=3 records=14633 sha256=950d1d31b43a8b120b88684ae39f6c4439fc4990d22eb78ff8e9729cdece8c4f"
+      ]
+    }
+  ]
+}

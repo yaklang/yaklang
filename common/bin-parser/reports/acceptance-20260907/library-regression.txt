@@ -1,0 +1,623 @@
+$ go test ./common/bin-parser/... -count=1 -timeout=5m
+Exit code: 1
+
+?   	github.com/yaklang/yaklang/common/bin-parser/internal/corpusutil	[no test files]
+?   	github.com/yaklang/yaklang/common/bin-parser/parser/ser_parser	[no test files]
+?   	github.com/yaklang/yaklang/common/bin-parser/rules	[no test files]
+?   	github.com/yaklang/yaklang/common/bin-parser/utils	[no test files]
+--- FAIL: TestP0RoadmapCovered (0.02s)
+    p0_more_test.go:35: P0 catalog protocol "LDAP" is still partial
+    p0_more_test.go:35: P0 catalog protocol "MySQL" is still partial
+    p0_more_test.go:35: P0 catalog protocol "PostgreSQL" is still partial
+    p0_more_test.go:35: P0 catalog protocol "SMB3" is still partial
+Package:
+  CHAP:
+    Code: 1
+    Identifier: 3
+    Length: 34
+    Info:
+      Data:
+        Value Size: 16
+        Value: !!binary XDbiwu6DwznpeZNE6eyF0w==
+        Name: HiPer.att.net
+Data:
+  Value Size: {}
+  Value: {}
+  Name: {}
+CHAPResponse:
+  Value Size: {}
+  Value: {}
+  Name: {}
+CHAPSuccess:
+  Message: {}
+CHAPFailure:
+  Message: {}
+
+Code: 1
+Identifier: 3
+Length: 34
+Info:
+  Data:
+    Value Size: 16
+    Value: !!binary XDbiwu6DwznpeZNE6eyF0w==
+    Name: HiPer.att.net
+
+Package:
+  PAP:
+    Code: 1
+    Identifier: 0
+    Length: 14
+    Data:
+      Request:
+        Peer ID Length: 4
+        Peer ID: ixia
+        Password Length: 4
+        Password: ixia
+Request:
+  Peer ID Length: {}
+  Peer ID: {}
+  Password Length: {}
+  Password: {}
+Response:
+  Message Length: {}
+  Message: {}
+
+Code: 1
+Identifier: 0
+Length: 14
+Data:
+  Request:
+    Peer ID Length: 4
+    Peer ID: ixia
+    Password Length: 4
+    Password: ixia
+
+Package:
+  PPP:
+    Address: 255
+    Control: 3
+    Protocol: 49187
+    Information:
+      PAP:
+        Code: 1
+        Identifier: 0
+        Length: 14
+        Data:
+          Request:
+            Peer ID Length: 4
+            Peer ID: ixia
+            Password Length: 4
+            Password: ixia
+  PPPProtocol:
+    Protocol: {}
+    Information: {}
+IP: {}
+IPv6: {}
+PAP: {}
+CHAP: {}
+LCP: {}
+IPCP:
+  Code: {}
+  Identifier: {}
+  Length: {}
+  Options:
+    Option:
+      Type: {}
+      Length: {}
+      Value: {}
+Next Protocol Data:
+  Octet: {}
+PeekByte: {}
+
+Address: 255
+Control: 3
+Protocol: 49187
+Information:
+  PAP:
+    Code: 1
+    Identifier: 0
+    Length: 14
+    Data:
+      Request:
+        Peer ID Length: 4
+        Peer ID: ixia
+        Password Length: 4
+        Password: ixia
+
+Package:
+  GRE:
+    Flags And Version: 12417
+    Protocol Type: 34827
+    Checksum: {}
+    Reserved1: {}
+    Payload Length: 18
+    Call ID: 1
+    Key: {}
+    Sequence Number: 1
+    Acknowledgment Number: 4294967295
+    Payload:
+      PPP:
+        Address: 255
+        Control: 3
+        Protocol: 49185
+        Information:
+          LCP:
+            Code: 1
+            Identifier: 1
+            Length: 14
+            Info:
+              Options:
+                Option:
+                  Type: 3
+                  Length: 4
+                  MRU: {}
+                  ACCM: {}
+                  Auth Protocol: 49187
+                  Algorithm: {}
+                  Auth Data: {}
+                  Magic Number: {}
+                  Octets: {}
+                Option:
+                  Type: 5
+                  Length: 6
+                  MRU: {}
+                  ACCM: {}
+                  Auth Protocol: {}
+                  Algorithm: {}
+                  Auth Data: {}
+                  Magic Number: 255791484
+                  Octets: {}
+                Option:
+                  Type: {}
+                  Length: {}
+                  MRU: {}
+                  ACCM: {}
+                  Auth Protocol: {}
+                  Algorithm: {}
+                  Auth Data: {}
+                  Magic Number: {}
+                  Octets: {}
+IP: {}
+IPv6: {}
+ARP: {}
+PPP: {}
+EAPOL: {}
+Ethernet:
+  Destination: {}
+  Source: {}
+  Type: {}
+  Payload: {}
+Next Protocol Data:
+  Octet: {}
+PeekByte: {}
+
+Flags And Version: 12417
+Protocol Type: 34827
+Checksum: {}
+Reserved1: {}
+Payload Length: 18
+Call ID: 1
+Key: {}
+Sequence Number: 1
+Acknowledgment Number: 4294967295
+Payload:
+  PPP:
+    Address: 255
+    Control: 3
+    Protocol: 49185
+    Information:
+      LCP:
+        Code: 1
+        Identifier: 1
+        Length: 14
+        Info:
+          Options:
+            Option:
+              Type: 3
+              Length: 4
+              MRU: {}
+              ACCM: {}
+              Auth Protocol: 49187
+              Algorithm: {}
+              Auth Data: {}
+              Magic Number: {}
+              Octets: {}
+            Option:
+              Type: 5
+              Length: 6
+              MRU: {}
+              ACCM: {}
+              Auth Protocol: {}
+              Algorithm: {}
+              Auth Data: {}
+              Magic Number: 255791484
+              Octets: {}
+            Option:
+              Type: {}
+              Length: {}
+              MRU: {}
+              ACCM: {}
+              Auth Protocol: {}
+              Algorithm: {}
+              Auth Data: {}
+              Magic Number: {}
+              Octets: {}
+
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: ffffffffffff
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: 3066d0268abb
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0806
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Hardware type result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol type result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Hardware size result: 06
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol size result: 04
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Opcode result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Sender MAC address result: 3066d0268abb
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Sender IP address result: c0a80337
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Target MAC address result: 000000000000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Target IP address result: c0a80363
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 3066d026811b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: f84d8991af52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 04
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 05
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type of Service result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Total Length result: 0054
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Identification result: 6a11
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags And Fragment Offset result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Time to Live result: 40
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Checksum result: 99a5
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: c0a80316
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 6ef24442
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 08
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Code result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Checksum result: 9bfc
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Identifier result: 4779
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Sequence Number result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Echo Data result: 657fb59d00030e6708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 3066d026811b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: f84d8991af52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 04
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 05
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type of Service result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Total Length result: 010b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Identification result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags And Fragment Offset result: 4000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Time to Live result: 40
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol result: 06
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Checksum result: 62c6
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: c0a80316
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 77609c08
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source Port result: cea0
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination Port result: 370d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Sequence Number result: b485ff92
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Acknowledgement Number result: 1c6fdee6
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 08
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags result: 0108
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Window result: 0808
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Checksum result: 2352
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Urgent Pointer result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Kind result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Kind result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Kind result: 08
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 0a
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node TS Val result: 929a1507
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node TS Echo Reply result: 5619e69f
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node ContentType result: 47
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 4554
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 202f
+[33m[DBUG][0m 2026-09-07 01:14:54 [value:596] parse node TLS failed: parse node TLS error: parse node TLS error: parse child node error: parse node Record Layer error: eval operator error: Panic Stack:
+__yak_main__
+19 | }
+  20 | if l > 0 {
+  21 |   this.GetSubNode("Payload").SetMaxLength(l)
+  22 >   this.ProcessSubNode("Payload")
+                            ^~~~~~~~~~~
+  23 | }
+  24 |
+
+YakVM Panic: parse node Payload error: get node length error: node type raw,length 65912 over max size 1680
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node FirstWorld result: 474554
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Method result: 474554
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Path result: 2f
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Version result: 485454502f312e31
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 486f73743a20373664643164383362372e69716979692e636f6d3a3134303933
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 557365722d4167656e743a206375726c2f372e34382e30
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 436f6e74656e742d4c656e6774683a203332
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 436f6e6e656374696f6e3a2055706772616465
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 5365632d576562736f636b65742d4b65793a204f45692d724e56326c3443754264347a567a664c6a673d3d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 557067726164653a20776562736f636b6574
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:652] node Item result: 
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Octets result: 2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 3066d026811b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: f84d8991af52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 04
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 05
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type of Service result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Total Length result: 005c
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Identification result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags And Fragment Offset result: 4000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Time to Live result: 40
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol result: 06
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Checksum result: 75dd
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: c0a80316
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 01000001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source Port result: c75f
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination Port result: 01bb
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Sequence Number result: c2315707
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Acknowledgement Number result: 8c7aa682
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 08
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags result: 0108
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Window result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Checksum result: ad68
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Urgent Pointer result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Kind result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Kind result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Kind result: 08
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 0a
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node TS Val result: 858e40e3
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node TS Echo Reply result: c784a921
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node ContentType result: 17
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 0303
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 0023
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Payload result: 39aa76173aee3468a1e8402150499a9585259f6f799c7895d7d40be6879f4b63cdec72
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 3066d026811b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: f84d8991af52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 04
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 05
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type of Service result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Total Length result: 0055
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Identification result: edc1
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags And Fragment Offset result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Time to Live result: 40
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol result: 11
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Checksum result: 34de
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: c0a80316
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 771d1d1d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source Port result: fa0d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination Port result: 0035
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 0041
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Checksum result: 7b45
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node ID result: 1452
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags result: 0100
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Questions result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Answer RRs result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Authority RRs result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Additional RRs result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 11
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Text result: 636f70696c6f742d74656c656d65747279
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 11
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Text result: 67697468756275736572636f6e74656e74
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 03
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Text result: 636f6d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Class result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: f84d8991af52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: 3066d026811b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0800
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 04
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Length result: 05
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type of Service result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Total Length result: 0067
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Identification result: b950
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags And Fragment Offset result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Time to Live result: 75
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Protocol result: 11
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Header Checksum result: e46c
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: df050505
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: c0a80316
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source Port result: 0035
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination Port result: d28b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 0053
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Checksum result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node ID result: bc35
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flags result: 8180
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Questions result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Answer RRs result: 0002
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Authority RRs result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Additional RRs result: 0000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 0b
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Text result: 636c6f7564636f6e666967
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 09
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Text result: 6a6574627261696e73
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 03
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Text result: 636f6d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Count result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Class result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node PointerFlag result: 03
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Pointer result: 000c
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Class result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node TTL result: 00000013
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node RDLength result: 0004
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Address result: 3412ec15
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node PointerFlag result: 03
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Pointer result: 000c
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Class result: 0001
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node TTL result: 00000013
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node RDLength result: 0004
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Address result: 364dbb13
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: 3333ffa35b78
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: f84d8991af52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 86dd
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Version result: 06
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Traffic Class result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Flow Label result: 000000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Payload Length result: 0020
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Next Header result: 3a
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Hop Limit result: ff
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Source result: fe8000000000000000237c9bf9dd7b2d
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Destination result: ff0200000000000000000001ffa35b78
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 87
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Code result: 00
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Checksum result: 0c52
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Reserved result: 00000000
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Target Address result: fe8000000000000014ae6f6a11a35b78
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Type result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Length result: 01
+[33m[DBUG][0m 2026-09-07 01:14:54 [default-parser:577] node Link Layer result: f84d8991af52
+Version: 5
+NMethods: 1
+Methods:
+  Method: 0
+
+Version: 5
+Method: 0
+
+Version: 1
+ULen: 4
+UNAME: "\x01\x02\x03\x04"
+PLen: 4
+PASSWD: "\x01\x02\x03\x04"
+
+Version: 1
+Status: 0
+
+Version: 5
+Command: 1
+Reserved: 0
+AddressType: 3
+DstAddress:
+  Domain:
+    Length: 14
+    DomainName: www.google.com
+DstPort: 80
+
+Version: 5
+Reply: 0
+Reserved: 0
+AddressType: 1
+BndAddress:
+  IPV4: 0a000002
+BndPort: 80
+
+Current goroutine call stack:
+goroutine 6649 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x10273ffe0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x1023dec00?, 0x14001fde2b0?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x14000ea2931?, {0x1023dec00?, 0x14001fde2b0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000172500, 0x140019a1680, 0x78?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000172500, 0x140019a1680, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000172500, 0xb0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOutProgram.func2(0x14000172500)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/out_program.go:39 +0xc8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x14002027bc0, {0x102762ca0, 0x103c1eb40}, 0x0, 0x0, 0x140015edc00, {0x140015edba8, 0x1, 0x1013a0aa0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:416
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:412
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOutProgram(0x14000f13e00, {0x140023a4580, 0xab})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/out_program.go:36 +0x258
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ExecOut(0x14001411770)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/vm.go:877 +0x7e0
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Result(0x14001f16300, 0x14001411770)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/default-parser.go:696 +0x130
+github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Node).Result(0x14001411770)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/base/node.go:208 +0x4c
+gi
+Current goroutine call stack:
+goroutine 6652 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x10273ffe0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x1023dec00?, 0x14001aaa310?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x140008ea2a1?, {0x1023dec00?, 0x14001aaa310?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000a76000, 0x140014f00a0, 0x78?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000a76000, 0x140014f00a0, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000a76000, 0xb0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOutProgram.func2(0x14000a76000)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/out_program.go:39 +0xc8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x140022bc600, {0x102762ca0, 0x103c1eb40}, 0x0, 0x0, 0x140015edc00, {0x140015edba8, 0x1, 0x1013a0aa0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:416
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:412
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.evalOutProgram(0x140014eebe0, {0x140023a4a50, 0xab})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/out_program.go:36 +0x258
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ExecOut(0x140017d10e0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/vm.go:877 +0x7e0
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Result(0x140016dd500, 0x140017d10e0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/default-parser.go:696 +0x130
+github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Node).Result(0x140017d10e0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/base/node.go:208 +0x4c
+gi
+Current goroutine call stack:
+goroutine 6653 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic.func1()
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:59 +0x1c
+github.com/yaklang/yaklang/common/utils.Debug(0x10273ffe0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/utils/os_utils.go:270 +0x38
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.newVMPanic({0x1023dec00?, 0x14002d1ec10?}, 0x1)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:58 +0x80
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).newVMPanic(0x14003b732a8?, {0x1023dec00?, 0x14002d1ec10?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_panic.go:50 +0x40
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame)._execCode(0x14000ba5e00, 0x140026a5e50, 0x88?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:1810 +0x98e0
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execCode(0x14000ba5e00, 0x140026a5e50, 0x0)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:325 +0x70
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execExWithContinueOption(0x14000ba5e00, 0xb0?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:222 +0x3b4
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).execEx(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:67
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Frame).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/vm_exec.go:47
+github.com/yaklang/yaklang/common/yak/antlr4yak.(*Engine).SafeEvalInlineWithResult.func2(0x14000ba5e00)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/engine.go:541 +0xc8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).execWithFrameFactory(0x140022bd140, {0x102762ca0, 0x103c1eb40}, 0x0, 0x0, 0x140015edbc8, {0x140015edb98, 0x1, 0xd0?})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:505 +0x3f8
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:416
+github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*VirtualMachine).Exec(...)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/yakvm/virtual_machine.go:412
+github.com/yaklang/yaklang/common/yak/antlr4yak.(*Engine).SafeEvalInlineWithResult(0x140026a4690, {0x102762ca0, 0x103c1eb40}, {0x140023a4dc0, 0xab})
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/engine.go:538 +0x234
+github.com/yaklang/yaklang/common/yak/antlr4yak.(*Engine).ExecuteAsExpression(0x14002d05ba8?, {0x140023a4dc0?, 0x101ce4761?}, 0x4?)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/yak/antlr4yak/engine.go:582 +0xc4
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ExecOut(0x140016e8f00)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/vm.go:875 +0x7c4
+github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Result(0x140019ad140, 0x140016e8f00)
+	/Users/v1ll4n/.codex/worktrees/b7dd545e-9e11-4314-aab6-15ac18645d93/yaklang/common/bin-parser/parser/stream_parser/default-pars
+FAIL
+FAIL	github.com/yaklang/yaklang/common/bin-parser	193.302s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser	1.761s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	0.759s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	5.442s
+ok  	github.com/yaklang/yaklang/common/bin-parser/protocol-impl	2.069s
+ok  	github.com/yaklang/yaklang/common/bin-parser/protocol-impl/msrdp	2.541s [no tests to run]
+FAIL

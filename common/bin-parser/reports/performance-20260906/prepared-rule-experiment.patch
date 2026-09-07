@@ -1,0 +1,1090 @@
+diff --git a/common/bin-parser/parser/base/base.go b/common/bin-parser/parser/base/base.go
+--- a/common/bin-parser/parser/base/base.go
++++ b/common/bin-parser/parser/base/base.go
+@@ -63,26 +63,42 @@
+ 	root *Node
+ }
+ 
+-func ParseRule(p string) (*Node, error) {
+-	var ruleMap yaml.MapSlice
+-	if cached, ok := ruleDocumentCache.Load(p); ok {
+-		ruleMap = cached.(yaml.MapSlice)
+-	} else {
+-		ruleContent, err := rules.RuleFS.ReadFile(p)
+-		if err != nil {
+-			return nil, err
+-		}
+-		if err := yaml.Unmarshal(ruleContent, &ruleMap); err != nil {
+-			return nil, err
+-		}
+-		ruleDocumentCache.Store(p, ruleMap)
+-	}
+-	rootNode, err := NewNodeTree(cloneRuleDocumentValue(ruleMap).(yaml.MapSlice))
+-	if err != nil {
+-		return nil, err
+-	}
+-	if !rootNode.Cfg.Has("parser") {
+-		rootNode.Cfg.SetItem("parser", "default")
++func loadRuleDocument(p string) (yaml.MapSlice, error) {
++	var ruleMap yaml.MapSlice
++	if cached, ok := ruleDocumentCache.Load(p); ok {
++		ruleMap = cached.(yaml.MapSlice)
++	} else {
++		ruleContent, err := rules.RuleFS.ReadFile(p)
++		if err != nil {
++			return nil, err
++		}
++		if err := yaml.Unmarshal(ruleContent, &ruleMap); err != nil {
++			return nil, err
++		}
++		ruleDocumentCache.Store(p, ruleMap)
++	}
++	return ruleMap, nil
++}
++
++func newRuleNode(ruleMap yaml.MapSlice) (*Node, error) {
++	rootNode, err := NewNodeTree(cloneRuleDocumentValue(ruleMap).(yaml.MapSlice))
++	if err != nil {
++		return nil, err
++	}
++	if !rootNode.Cfg.Has("parser") {
++		rootNode.Cfg.SetItem("parser", "default")
++	}
++	return rootNode, nil
++}
++
++func ParseRule(p string) (*Node, error) {
++	ruleMap, err := loadRuleDocument(p)
++	if err != nil {
++		return nil, err
++	}
++	rootNode, err := newRuleNode(ruleMap)
++	if err != nil {
++		return nil, err
+ 	}
+ 	absDir, err := utils.GetFileAbsDir(p)
+ 	if err != nil {
+diff --git a/common/bin-parser/parser/base/rule_template.go b/common/bin-parser/parser/base/rule_template.go
+new file mode 100644
+--- /dev/null
++++ b/common/bin-parser/parser/base/rule_template.go
+@@ -0,0 +1,51 @@
++package base
++
++import (
++	"errors"
++
++	"github.com/yaklang/yaklang/common/utils"
++	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
++)
++
++// RuleTemplate retains only an immutable embedded document and its source
++// directory at preparation time. It never retains a parsed Node, input,
++// configuration, protocol state, reader, writer or evaluator.
++//
++// NewNode creates independent mutable state and is safe for concurrent calls.
++// Parser registration must still finish before parsing starts. Custom parsers
++// registered as shared instances keep their existing concurrency contract.
++type RuleTemplate struct {
++	document  yaml.MapSlice
++	directory string
++}
++
++// PrepareRule validates an embedded rule and resolves its top-level directory
++// once. Unlike ParseRule, later NewNode calls deliberately retain this directory
++// even if the process changes working directory. Imports keep ParseRule's
++// existing per-import behavior; this is not a recursive import cache.
++func PrepareRule(p string) (*RuleTemplate, error) {
++	document, err := loadRuleDocument(p)
++	if err != nil {
++		return nil, err
++	}
++	if _, err := newRuleNode(document); err != nil {
++		return nil, err
++	}
++	directory, err := utils.GetFileAbsDir(p)
++	if err != nil {
++		return nil, err
++	}
++	return &RuleTemplate{document: document, directory: directory}, nil
++}
++
++func (r *RuleTemplate) NewNode() (*Node, error) {
++	if r == nil || r.directory == "" {
++		return nil, errors.New("bin-parser: uninitialized rule template")
++	}
++	root, err := newRuleNode(r.document)
++	if err != nil {
++		return nil, err
++	}
++	root.Ctx.SetItem("path", r.directory)
++	return root, nil
++}
+diff --git a/common/bin-parser/parser/base/rule_template_test.go b/common/bin-parser/parser/base/rule_template_test.go
+new file mode 100644
+--- /dev/null
++++ b/common/bin-parser/parser/base/rule_template_test.go
+@@ -0,0 +1,90 @@
++package base
++
++import (
++	"os"
++	"os/exec"
++	"path/filepath"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
++)
++
++func TestRuleTemplateIsolation(t *testing.T) {
++	var document yaml.MapSlice
++	require.NoError(t, yaml.Unmarshal([]byte("metadata:\n  tags:\n    - original\n    - label: original\nPackage:\n  Message:\n    Value: uint8\n"), &document))
++	rule := "template-test/" + t.Name() + ".yaml"
++	ruleDocumentCache.Store(rule, document)
++	t.Cleanup(func() { ruleDocumentCache.Delete(rule) })
++	template, err := PrepareRule(rule)
++	require.NoError(t, err)
++	for worker := 0; worker < 16; worker++ {
++		t.Run(string(rune('a'+worker)), func(t *testing.T) {
++			t.Parallel()
++			for i := 0; i < 8; i++ {
++				n, err := template.NewNode()
++				require.NoError(t, err)
++				require.Equal(t, "metadata", n.Origin.(yaml.MapSlice)[0].Key)
++				require.Equal(t, "uint8", n.Children[0].Children[0].Origin.(yaml.MapSlice)[0].Value)
++				metadata := n.Cfg.GetItem("metadata").(yaml.MapSlice)
++				tags := metadata[0].Value.([]any)
++				require.Equal(t, "original", tags[0])
++				require.Equal(t, "original", tags[1].(yaml.MapSlice)[0].Value)
++				require.Equal(t, template.directory, n.Ctx.GetString("path"))
++				n.Origin.(yaml.MapSlice)[0].Key = "mutated"
++				n.Children[0].Children[0].Origin.(yaml.MapSlice)[0].Value = "uint16"
++				tags[0] = "mutated"
++				tags[1].(yaml.MapSlice)[0].Value = "mutated"
++				n.Ctx.SetItem("path", "mutated")
++				n.Children = nil
++			}
++		})
++	}
++}
++
++func TestRuleTemplateInvalid(t *testing.T) {
++	_, err := PrepareRule("not-a-real-rule.yaml")
++	require.Error(t, err)
++	for _, template := range []*RuleTemplate{nil, {}} {
++		n, err := template.NewNode()
++		require.ErrorContains(t, err, "uninitialized")
++		require.Nil(t, n)
++	}
++}
++
++// Change cwd only in a child process: no test or parser goroutine shares this
++// process-global mutation with the parent test suite.
++func TestRuleTemplateWorkingDirectorySnapshot(t *testing.T) {
++	const helper = "binparser-template-cwd-child"
++	if len(os.Args) > 1 && os.Args[len(os.Args)-1] == helper {
++		original, err := os.Getwd()
++		require.NoError(t, err)
++		first, second := t.TempDir(), t.TempDir()
++		t.Cleanup(func() { require.NoError(t, os.Chdir(original)) })
++		require.NoError(t, os.Chdir(first))
++		template, err := PrepareRule("application-layer/ntp.yaml")
++		require.NoError(t, err)
++		require.NoError(t, os.Chdir(second))
++		fresh, err := ParseRule("application-layer/ntp.yaml")
++		require.NoError(t, err)
++		current, err := os.Getwd()
++		require.NoError(t, err)
++		require.Equal(t, filepath.Join(current, "application-layer"), fresh.Ctx.GetString("path"))
++		for i := 0; i < 2; i++ {
++			n, err := template.NewNode()
++			require.NoError(t, err)
++			require.Equal(t, template.directory, n.Ctx.GetString("path"))
++			require.NotEqual(t, fresh.Ctx.GetString("path"), n.Ctx.GetString("path"))
++			n.Ctx.SetItem("path", "caller mutation")
++		}
++		next, err := PrepareRule("application-layer/ntp.yaml")
++		require.NoError(t, err)
++		require.Equal(t, fresh.Ctx.GetString("path"), next.directory)
++		return
++	}
++	executable, err := os.Executable()
++	require.NoError(t, err)
++	cmd := exec.Command(executable, "-test.run=^TestRuleTemplateWorkingDirectorySnapshot$", "-test.count=1", "--", helper)
++	output, err := cmd.CombinedOutput()
++	require.NoError(t, err, "%s", output)
++}
+diff --git a/common/bin-parser/parser/prepared.go b/common/bin-parser/parser/prepared.go
+new file mode 100644
+--- /dev/null
++++ b/common/bin-parser/parser/prepared.go
+@@ -0,0 +1,80 @@
++package parser
++
++import (
++	"errors"
++	"io"
++	"path"
++	"strings"
++
++	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
++)
++
++// PreparedRule amortizes top-level rule lookup and source-directory resolution
++// across independent messages. Mutable nodes, contexts, inputs and evaluators
++// are never shared. The top-level path is fixed at PrepareRule time; imports
++// retain their existing per-import path resolution. Recreate the handle when
++// a new top-level working-directory context is desired.
++//
++// Sharing a handle is safe with the default parser. Caller-owned session tables,
++// custom parser instances and other mutable config values retain their existing
++// synchronization requirements. A returned tree is still mutable and must not
++// be used concurrently without caller synchronization.
++type PreparedRule struct {
++	template *base.RuleTemplate
++}
++
++// PrepareRule uses the same dotted embedded-rule name as ParseBinary. It loads
++// and validates only that rule, not all possible imported rules or entry names.
++// No message is parsed and no operator is executed during preparation.
++func PrepareRule(rule string) (*PreparedRule, error) {
++	splits := strings.Split(rule, ".")
++	splits[len(splits)-1] += ".yaml"
++	template, err := base.PrepareRule(path.Join(splits...))
++	if err != nil {
++		return nil, err
++	}
++	return &PreparedRule{template: template}, nil
++}
++
++// ParseBinary preserves the input/entry behavior of ParseBinary, including the
++// opt-in InputBitLength contract. An ordinary bytes.Reader stays unbounded.
++func (r *PreparedRule) ParseBinary(data io.Reader, keys ...string) (*base.Node, error) {
++	return r.parse(data, nil, false, keys...)
++}
++
++// ParseBinaryWithConfig snapshots the config key/value associations per call,
++// just like ParseBinaryWithConfig; referenced session objects are not deep-copied.
++func (r *PreparedRule) ParseBinaryWithConfig(data io.Reader, config map[string]any, keys ...string) (*base.Node, error) {
++	return r.parse(data, config, true, keys...)
++}
++
++func (r *PreparedRule) parse(data io.Reader, config map[string]any, configured bool, keys ...string) (*base.Node, error) {
++	if r == nil || r.template == nil {
++		return nil, errors.New("bin-parser: uninitialized prepared rule")
++	}
++	root, err := r.template.NewNode()
++	if err != nil {
++		return nil, err
++	}
++	setKnownInputLength(root, data)
++	if configured {
++		inputConfig := make(map[string]any, len(config))
++		for key, value := range config {
++			root.Ctx.SetItem(key, value)
++			inputConfig[key] = value
++		}
++		root.Ctx.SetItem(base.CtxInputConfig, inputConfig)
++	}
++	reader := base.NewBitReader(data)
++	if len(keys) == 0 {
++		if err := root.Parse(reader); err != nil {
++			return nil, err
++		}
++		return root, nil
++	}
++	entry := strings.Join(keys, ".")
++	if err := root.ParseSubNode(reader, entry); err != nil {
++		return nil, err
++	}
++	return base.GetNodeByPath(root, "@"+entry), nil
++}
+diff --git a/common/bin-parser/parser/prepared_test.go b/common/bin-parser/parser/prepared_test.go
+new file mode 100644
+--- /dev/null
++++ b/common/bin-parser/parser/prepared_test.go
+@@ -0,0 +1,138 @@
++package parser
++
++import (
++	"bytes"
++	"fmt"
++	"io"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
++)
++
++type preparedValueSnapshot struct {
++	Name     string
++	List     bool
++	Value    any
++	Scope    any
++	Children []preparedValueSnapshot
++}
++
++func preparedSnapshot(v *base.NodeValue) preparedValueSnapshot {
++	s := preparedValueSnapshot{Name: v.Name, List: v.ListValue, Scope: v.Origin.Cfg.GetItem(base.CfgNodeResult)}
++	if v.IsValue() {
++		s.Value = v.Value
++	} else {
++		for _, child := range v.Children() {
++			s.Children = append(s.Children, preparedSnapshot(child))
++		}
++	}
++	return s
++}
++
++func TestPreparedRuleEquivalent(t *testing.T) {
++	for _, c := range []struct {
++		rule string
++		keys []string
++		wire []byte
++	}{
++		{"application-layer.ntp", []string{"NTP"}, newRuntimeIsolationNTPMessage(0x23, 0x10)},
++		{"application-layer.ntp", nil, newRuntimeIsolationNTPMessage(0xdc, 0x90)},
++		{"application-layer.memcached_fields", []string{"MemcachedStatsRequestFields"}, []byte("stats\r\n")},
++		{"application-layer.memcached_fields", []string{"MemcachedStatsResponseFields"}, []byte("STAT same 001\r\nSTAT same two words\r\nEND\r\n")},
++		{"application-layer.memcached_fields", []string{"MemcachedStatsResponseFieldsCarrier"}, []byte("STAT x 1\r\n")},
++		{"generic_routing_encapsulation", []string{"GRE"}, []byte{0, 0, 0x88, 0x0b, 0xff, 3, 0xc0, 0x23, 2, 1, 0, 9, 4, 'g', 'o', 'o', 'd'}},
++	} {
++		t.Run(c.rule+fmt.Sprint(c.keys), func(t *testing.T) {
++			prepared, err := PrepareRule(c.rule)
++			require.NoError(t, err)
++			for _, configured := range []bool{false, true} {
++				for _, bounded := range []bool{false, true} {
++					newReader := func() io.Reader {
++						if bounded {
++							return &runtimeIsolationBoundedReader{bytes.NewReader(c.wire)}
++						}
++						return bytes.NewReader(c.wire)
++					}
++					var want, got *base.Node
++					var wantErr, gotErr error
++					config := map[string]any{"path": "explicit caller path", "marker": "keep"}
++					if configured {
++						want, wantErr = ParseBinaryWithConfig(newReader(), c.rule, config, c.keys...)
++						got, gotErr = prepared.ParseBinaryWithConfig(newReader(), config, c.keys...)
++					} else {
++						want, wantErr = ParseBinary(newReader(), c.rule, c.keys...)
++						got, gotErr = prepared.ParseBinary(newReader(), c.keys...)
++					}
++					if wantErr != nil {
++						require.EqualError(t, gotErr, wantErr.Error())
++						require.Nil(t, got)
++						continue
++					}
++					require.NoError(t, gotErr)
++					wv, err := want.Result()
++					require.NoError(t, err)
++					gv, err := got.Result()
++					require.NoError(t, err)
++					require.Equal(t, preparedSnapshot(wv), preparedSnapshot(gv))
++					require.Equal(t, want.Cfg.GetItem("additionInfo"), got.Cfg.GetItem("additionInfo"))
++					require.Equal(t, want.Ctx.GetItem("path"), got.Ctx.GetItem("path"))
++					require.Equal(t, want.Ctx.Has(base.CtxInputConfig), got.Ctx.Has(base.CtxInputConfig))
++					require.NotSame(t, want.Ctx, got.Ctx)
++				}
++			}
++		})
++	}
++}
++
++func TestPreparedRuleErrorsAndBounds(t *testing.T) {
++	for _, rule := range []string{"", "no.such.rule", "../missing", "application-layer.ntp.yaml"} {
++		_, err := PrepareRule(rule)
++		require.Error(t, err, rule)
++	}
++	for _, prepared := range []*PreparedRule{nil, {}} {
++		_, err := prepared.ParseBinary(bytes.NewReader(nil))
++		require.ErrorContains(t, err, "uninitialized")
++		_, err = prepared.ParseBinaryWithConfig(bytes.NewReader(nil), nil)
++		require.ErrorContains(t, err, "uninitialized")
++	}
++	prepared, err := PrepareRule("application-layer.memcached_fields")
++	require.NoError(t, err)
++	for _, keys := range [][]string{{"MemcachedStatsRequestFields"}, {"missing"}, {"Package", "missing"}} {
++		for _, wire := range [][]byte{nil, []byte("stats\r"), []byte("stats\r\nextra"), []byte("stats\r\n")} {
++			_, want := ParseBinary(&runtimeIsolationBoundedReader{bytes.NewReader(wire)}, "application-layer.memcached_fields", keys...)
++			_, got := prepared.ParseBinary(&runtimeIsolationBoundedReader{bytes.NewReader(wire)}, keys...)
++			if want != nil {
++				require.EqualError(t, got, want.Error())
++			} else {
++				require.NoError(t, got)
++			}
++		}
++	}
++}
++
++func TestPreparedRuleConcurrentConfigIsolation(t *testing.T) {
++	prepared, err := PrepareRule("application-layer.ntp")
++	require.NoError(t, err)
++	for worker := 0; worker < 16; worker++ {
++		t.Run(fmt.Sprint(worker), func(t *testing.T) {
++			t.Parallel()
++			for i := 0; i < 8; i++ {
++				state := &struct{ Value int }{i}
++				config := map[string]any{"state": state, "marker": t.Name()}
++				n, err := prepared.ParseBinaryWithConfig(&runtimeIsolationBoundedReader{bytes.NewReader(newRuntimeIsolationNTPMessage(0x23, byte(i)))}, config, "NTP")
++				require.NoError(t, err)
++				config["marker"] = "caller changed map"
++				require.Equal(t, t.Name(), n.Ctx.GetString("marker"))
++				snapshot := n.Ctx.GetItem(base.CtxInputConfig).(map[string]any)
++				require.Equal(t, t.Name(), snapshot["marker"])
++				require.Same(t, state, snapshot["state"])
++				v, err := n.Result()
++				require.NoError(t, err)
++				require.NotNil(t, v)
++				n.Ctx.SetItem("path", "mutation")
++				n.Children = nil
++			}
++		})
++	}
++}
+diff --git a/common/bin-parser/protocol_corpus_current_benchmark_test.go b/common/bin-parser/protocol_corpus_current_benchmark_test.go
+--- a/common/bin-parser/protocol_corpus_current_benchmark_test.go
++++ b/common/bin-parser/protocol_corpus_current_benchmark_test.go
+@@ -23,187 +23,214 @@
+ 	id, rule, entry string
+ 	wire            []byte
+ 	rejection       string
+-}
+-
+-func currentCorpusWorks(tb testing.TB, application bool) []currentCorpusWork {
+-	tb.Helper()
+-	raw, e := os.ReadFile("testdata/protocol-corpus/manifest.json")
+-	if e != nil {
+-		tb.Fatal(e)
+-	}
+-	var manifest protocolCorpusManifest
+-	if e = json.Unmarshal(raw, &manifest); e != nil {
+-		tb.Fatal(e)
+-	}
+-	var works []currentCorpusWork
+-	for _, capture := range manifest.Captures {
+-		if application && capture.ID != "ndpi-memcached" && capture.ID != "gen-memcache-bin" && capture.ID != "pr5023-gen-memcache-bin" && capture.ID != "ndpi-cassandra" {
+-			continue
+-		}
+-		raw, e := os.ReadFile(filepath.Join("testdata/protocol-corpus", capture.CaptureFile))
+-		if e != nil {
+-			tb.Fatal(e)
+-		}
+-		if fmt.Sprintf("%x", sha256.Sum256(raw)) != capture.SHA256 {
+-			tb.Fatalf("digest mismatch %s", capture.ID)
+-		}
+-		reader, e := protocolCorpusEnvelopePacketReader(raw)
+-		if e != nil {
+-			tb.Fatal(e)
+-		}
+-		var container []byte
+-		if capture.ID == "tcpdump-unsupported-linktype" {
+-			container, e = protocolCorpusClassicPcapSingleRecord(raw)
+-			if e != nil {
+-				tb.Fatal(e)
+-			}
+-		}
+-		frame := 0
+-		for {
+-			wire, ci, e := reader.ReadPacketData()
+-			if e == io.EOF {
+-				break
+-			}
+-			if e != nil {
+-				tb.Fatal(e)
+-			}
+-			frame++
+-			id := fmt.Sprintf("%s/%d", capture.ID, frame)
+-			if application {
+-				entry, rule, offset := "", "application-layer.memcached_fields", 66
+-				switch capture.ID {
+-				case "ndpi-cassandra":
+-					entry = cassandraFieldsTestEntries[frame]
+-					rule = cassandraFieldsTestRule
+-				case "ndpi-memcached":
+-					if frame == 4 {
+-						entry = "MemcachedStatsRequestFields"
+-					}
+-					if frame == 6 {
+-						entry = "MemcachedStatsResponseFields"
+-					}
+-				default:
+-					offset = 54
+-					if frame == 4 {
+-						entry = "MemcachedBinaryGetRequestFields"
+-					}
+-				}
+-				if entry != "" {
+-					works = append(works, currentCorpusWork{id: id, rule: rule, entry: entry, wire: bytes.Clone(wire[offset:])})
+-				}
+-			} else {
+-				spec, e := protocolCorpusPacketEnvelopeSpec(capture, frame, wire, ci.CaptureLength, ci.Length, container)
+-				if e != nil {
+-					tb.Fatal(e)
+-				}
+-				works = append(works, currentCorpusWork{id: id, rule: "packet_envelope", entry: spec.entry, wire: bytes.Clone(spec.input), rejection: protocolCorpusEnvelopeRejectionContracts[capture.ID].errorContains})
+-			}
+-		}
+-		if frame != capture.PacketCount {
+-			tb.Fatalf("count mismatch %s", capture.ID)
+-		}
+-	}
+-	expected := 58533
+-	if application {
+-		expected = 11
+-	}
+-	if len(works) != expected {
+-		tb.Fatalf("workload changed: %d != %d; review benchmark manifest", len(works), expected)
+-	}
+-	return works
+-}
+-
+-func currentCorpusParse(w currentCorpusWork, export bool) (int, error) {
+-	return currentCorpusParseWithProjection(w, export, NodeToMap)
+-}
+-
+-func currentCorpusParseWithProjection(w currentCorpusWork, export bool, project func(*base.Node) any) (int, error) {
+-	reader := newProtocolCorpusBoundedReader(w.wire)
+-	n, e := parser.ParseBinary(reader, w.rule, w.entry)
+-	if w.rejection != "" {
+-		if e == nil || !strings.Contains(e.Error(), w.rejection) {
+-			return 0, fmt.Errorf("expected rejection %s: %v", w.id, e)
+-		}
+-		return 0, nil
+-	}
+-	if e != nil {
+-		return 0, fmt.Errorf("%s: %w", w.id, e)
+-	}
+-	if reader.Len() != 0 {
+-		return 0, fmt.Errorf("%s: unread bytes", w.id)
+-	}
+-	if !export {
+-		return 0, nil
+-	}
+-	// Cost of in-process structured evidence plus JSON serialization only.
+-	// No disk, RPC, database, model request or UI rendering is timed here.
+-	data, e := json.Marshal(map[string]any{"fields": project(n), "metadata": n.Cfg.GetItem("additionInfo")})
+-	return len(data), e
+-}
+-
+-func currentCorpusJSON(n *base.Node) ([]byte, error) {
+-	return json.Marshal(map[string]any{"fields": NodeToMap(n), "metadata": n.Cfg.GetItem("additionInfo")})
+-}
+-
+-func benchmarkCurrentCorpus(b *testing.B, application, export bool) {
+-	benchmarkCurrentCorpusWithProjection(b, application, export, NodeToMap)
+-}
+-
+-func benchmarkCurrentCorpusWithProjection(b *testing.B, application, export bool, project func(*base.Node) any) {
+-	works := currentCorpusWorks(b, application)
+-	var size int64
+-	warmed := map[string]bool{}
+-	for _, w := range works {
+-		size += int64(len(w.wire))
+-		key := w.rule + "/" + w.entry
+-		if !warmed[key] {
+-			if _, e := currentCorpusParseWithProjection(w, export, project); e != nil {
+-				b.Fatal(e)
+-			}
+-			warmed[key] = true
+-		}
+-	}
+-	workers := runtime.GOMAXPROCS(0)
+-	if workers > len(works) {
+-		workers = len(works)
+-	}
+-	b.ReportAllocs()
+-	b.SetBytes(size)
+-	b.ResetTimer()
+-	for round := 0; round < b.N; round++ {
+-		var wg sync.WaitGroup
+-		errs := make(chan error, workers)
+-		for worker := 0; worker < workers; worker++ {
+-			wg.Add(1)
+-			go func(worker int) {
+-				defer wg.Done()
+-				for i := worker; i < len(works); i += workers {
+-					if _, e := currentCorpusParseWithProjection(works[i], export, project); e != nil {
+-						errs <- e
+-						return
+-					}
+-				}
+-			}(worker)
+-		}
+-		wg.Wait()
+-		close(errs)
+-		for e := range errs {
+-			b.Fatal(e)
+-		}
+-	}
+-	b.StopTimer()
+-	b.ReportMetric(float64(b.N*len(works))/b.Elapsed().Seconds(), "messages/s")
+-	b.ReportMetric(float64(len(works)), "messages/op")
+-	b.ReportMetric(float64(size), "input-B/op")
+-	b.ReportMetric(float64(workers), "workers")
+-	// B/op and allocs/op describe a complete workload round, not one message.
+-}
+-func BenchmarkCurrentCorpusEnvelopes(b *testing.B) { benchmarkCurrentCorpus(b, false, false) }
+-func BenchmarkCurrentCorpusApplicationFields(b *testing.B) {
+-	benchmarkCurrentCorpus(b, true, false)
+-}
+-func BenchmarkCurrentCorpusApplicationJSON(b *testing.B) {
+-	benchmarkCurrentCorpus(b, true, true)
++	prepared        *parser.PreparedRule
++}
++
++func currentCorpusWorks(tb testing.TB, application bool) []currentCorpusWork {
++	tb.Helper()
++	raw, e := os.ReadFile("testdata/protocol-corpus/manifest.json")
++	if e != nil {
++		tb.Fatal(e)
++	}
++	var manifest protocolCorpusManifest
++	if e = json.Unmarshal(raw, &manifest); e != nil {
++		tb.Fatal(e)
++	}
++	var works []currentCorpusWork
++	for _, capture := range manifest.Captures {
++		if application && capture.ID != "ndpi-memcached" && capture.ID != "gen-memcache-bin" && capture.ID != "pr5023-gen-memcache-bin" && capture.ID != "ndpi-cassandra" {
++			continue
++		}
++		raw, e := os.ReadFile(filepath.Join("testdata/protocol-corpus", capture.CaptureFile))
++		if e != nil {
++			tb.Fatal(e)
++		}
++		if fmt.Sprintf("%x", sha256.Sum256(raw)) != capture.SHA256 {
++			tb.Fatalf("digest mismatch %s", capture.ID)
++		}
++		reader, e := protocolCorpusEnvelopePacketReader(raw)
++		if e != nil {
++			tb.Fatal(e)
++		}
++		var container []byte
++		if capture.ID == "tcpdump-unsupported-linktype" {
++			container, e = protocolCorpusClassicPcapSingleRecord(raw)
++			if e != nil {
++				tb.Fatal(e)
++			}
++		}
++		frame := 0
++		for {
++			wire, ci, e := reader.ReadPacketData()
++			if e == io.EOF {
++				break
++			}
++			if e != nil {
++				tb.Fatal(e)
++			}
++			frame++
++			id := fmt.Sprintf("%s/%d", capture.ID, frame)
++			if application {
++				entry, rule, offset := "", "application-layer.memcached_fields", 66
++				switch capture.ID {
++				case "ndpi-cassandra":
++					entry = cassandraFieldsTestEntries[frame]
++					rule = cassandraFieldsTestRule
++				case "ndpi-memcached":
++					if frame == 4 {
++						entry = "MemcachedStatsRequestFields"
++					}
++					if frame == 6 {
++						entry = "MemcachedStatsResponseFields"
++					}
++				default:
++					offset = 54
++					if frame == 4 {
++						entry = "MemcachedBinaryGetRequestFields"
++					}
++				}
++				if entry != "" {
++					works = append(works, currentCorpusWork{id: id, rule: rule, entry: entry, wire: bytes.Clone(wire[offset:])})
++				}
++			} else {
++				spec, e := protocolCorpusPacketEnvelopeSpec(capture, frame, wire, ci.CaptureLength, ci.Length, container)
++				if e != nil {
++					tb.Fatal(e)
++				}
++				works = append(works, currentCorpusWork{id: id, rule: "packet_envelope", entry: spec.entry, wire: bytes.Clone(spec.input), rejection: protocolCorpusEnvelopeRejectionContracts[capture.ID].errorContains})
++			}
++		}
++		if frame != capture.PacketCount {
++			tb.Fatalf("count mismatch %s", capture.ID)
++		}
++	}
++	expected := 58533
++	if application {
++		expected = 11
++	}
++	if len(works) != expected {
++		tb.Fatalf("workload changed: %d != %d; review benchmark manifest", len(works), expected)
++	}
++	return works
++}
++
++func currentCorpusParse(w currentCorpusWork, export bool) (int, error) {
++	reader := newProtocolCorpusBoundedReader(w.wire)
++	var n *base.Node
++	var e error
++	if w.prepared != nil {
++		n, e = w.prepared.ParseBinary(reader, w.entry)
++	} else {
++		n, e = parser.ParseBinary(reader, w.rule, w.entry)
++	}
++	if w.rejection != "" {
++		if e == nil || !strings.Contains(e.Error(), w.rejection) {
++			return 0, fmt.Errorf("expected rejection %s: %v", w.id, e)
++		}
++		return 0, nil
++	}
++	if e != nil {
++		return 0, fmt.Errorf("%s: %w", w.id, e)
++	}
++	if reader.Len() != 0 {
++		return 0, fmt.Errorf("%s: unread bytes", w.id)
++	}
++	if !export {
++		return 0, nil
++	}
++	// Cost of in-process structured evidence plus JSON serialization only.
++	// No disk, RPC, database, model request or UI rendering is timed here.
++	data, e := currentCorpusJSON(n)
++	return len(data), e
++}
++
++func currentCorpusJSON(n *base.Node) ([]byte, error) {
++	return json.Marshal(map[string]any{"fields": NodeToMap(n), "metadata": n.Cfg.GetItem("additionInfo")})
++}
++
++func prepareCurrentCorpusWorks(tb testing.TB, works []currentCorpusWork) {
++	tb.Helper()
++	prepared := map[string]*parser.PreparedRule{}
++	for i := range works {
++		rule := works[i].rule
++		if prepared[rule] == nil {
++			var err error
++			prepared[rule], err = parser.PrepareRule(rule)
++			if err != nil {
++				tb.Fatal(err)
++			}
++		}
++		works[i].prepared = prepared[rule]
++	}
++}
++
++func benchmarkCurrentCorpus(b *testing.B, application, export, prepared bool) {
++	works := currentCorpusWorks(b, application)
++	if prepared {
++		prepareCurrentCorpusWorks(b, works)
++	}
++	var size int64
++	warmed := map[string]bool{}
++	for _, w := range works {
++		size += int64(len(w.wire))
++		key := w.rule + "/" + w.entry
++		if !warmed[key] {
++			if _, e := currentCorpusParse(w, export); e != nil {
++				b.Fatal(e)
++			}
++			warmed[key] = true
++		}
++	}
++	workers := runtime.GOMAXPROCS(0)
++	if workers > len(works) {
++		workers = len(works)
++	}
++	b.ReportAllocs()
++	b.SetBytes(size)
++	b.ResetTimer()
++	for round := 0; round < b.N; round++ {
++		var wg sync.WaitGroup
++		errs := make(chan error, workers)
++		for worker := 0; worker < workers; worker++ {
++			wg.Add(1)
++			go func(worker int) {
++				defer wg.Done()
++				for i := worker; i < len(works); i += workers {
++					if _, e := currentCorpusParse(works[i], export); e != nil {
++						errs <- e
++						return
++					}
++				}
++			}(worker)
++		}
++		wg.Wait()
++		close(errs)
++		for e := range errs {
++			b.Fatal(e)
++		}
++	}
++	b.StopTimer()
++	b.ReportMetric(float64(b.N*len(works))/b.Elapsed().Seconds(), "messages/s")
++	b.ReportMetric(float64(len(works)), "messages/op")
++	b.ReportMetric(float64(size), "input-B/op")
++	b.ReportMetric(float64(workers), "workers")
++	// B/op and allocs/op describe a complete workload round, not one message.
++}
++func BenchmarkCurrentCorpusEnvelopes(b *testing.B) { benchmarkCurrentCorpus(b, false, false, false) }
++func BenchmarkCurrentCorpusApplicationFields(b *testing.B) {
++	benchmarkCurrentCorpus(b, true, false, false)
++}
++func BenchmarkCurrentCorpusApplicationJSON(b *testing.B) {
++	benchmarkCurrentCorpus(b, true, true, false)
++}
++func BenchmarkCurrentCorpusPreparedEnvelopes(b *testing.B) {
++	benchmarkCurrentCorpus(b, false, false, true)
++}
++func BenchmarkCurrentCorpusPreparedApplicationFields(b *testing.B) {
++	benchmarkCurrentCorpus(b, true, false, true)
++}
++func BenchmarkCurrentCorpusPreparedApplicationJSON(b *testing.B) {
++	benchmarkCurrentCorpus(b, true, true, true)
+ }
+ 
+ // Deliberate opt-in assessment, separate from correctness tests/full regressions.
+diff --git a/common/bin-parser/protocol_corpus_prepared_test.go b/common/bin-parser/protocol_corpus_prepared_test.go
+new file mode 100644
+--- /dev/null
++++ b/common/bin-parser/protocol_corpus_prepared_test.go
+@@ -0,0 +1,73 @@
++package bin_parser
++
++import (
++	"fmt"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++	"github.com/yaklang/yaklang/common/bin-parser/parser"
++	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
++)
++
++// Compare every retained envelope, not a representative-only sample. Full
++// NodeValue types/order, tree structure, bit spans, metadata and bytes remain
++// observable. This does not upgrade envelope coverage to application semantics.
++func TestProtocolCorpusPreparedEnvelopesEquivalent(t *testing.T) {
++	works := currentCorpusWorks(t, false)
++	prepareCurrentCorpusWorks(t, works)
++	for worker := 0; worker < 4; worker++ {
++		worker := worker
++		t.Run(fmt.Sprintf("worker-%d", worker), func(t *testing.T) {
++			t.Parallel()
++			count := 0
++			for i := worker; i < len(works); i += 4 {
++				currentCorpusRequirePreparedEquivalent(t, works[i])
++				count++
++			}
++			require.Equal(t, (len(works)+3-worker)/4, count)
++			t.Logf("compared %d retained records", count)
++		})
++	}
++}
++
++func TestProtocolCorpusPreparedApplicationEquivalent(t *testing.T) {
++	works := currentCorpusWorks(t, true)
++	prepareCurrentCorpusWorks(t, works)
++	for _, w := range works {
++		t.Run(w.id, func(t *testing.T) {
++			want, got := currentCorpusRequirePreparedEquivalent(t, w)
++			// Complete export bytes are compared in addition to tree/value shape.
++			plainJSON, err := currentCorpusJSON(want)
++			require.NoError(t, err)
++			preparedJSON, err := currentCorpusJSON(got)
++			require.NoError(t, err)
++			require.Equal(t, plainJSON, preparedJSON)
++		})
++	}
++}
++
++func currentCorpusRequirePreparedEquivalent(t *testing.T, w currentCorpusWork) (*base.Node, *base.Node) {
++	t.Helper()
++	a, b := newProtocolCorpusBoundedReader(w.wire), newProtocolCorpusBoundedReader(w.wire)
++	want, wantErr := parser.ParseBinary(a, w.rule, w.entry)
++	got, gotErr := w.prepared.ParseBinary(b, w.entry)
++	if w.rejection != "" {
++		require.ErrorContains(t, wantErr, w.rejection, w.id)
++		require.EqualError(t, gotErr, wantErr.Error(), w.id)
++		require.Nil(t, got)
++		require.Equal(t, a.Len(), b.Len(), w.id)
++		return nil, nil
++	}
++	require.NoError(t, wantErr, w.id)
++	require.NoError(t, gotErr, w.id)
++	require.Zero(t, a.Len(), w.id)
++	require.Zero(t, b.Len(), w.id)
++	wt, wv := dicomNativeSnapshot(t, want, w.wire)
++	gt, gv := dicomNativeSnapshot(t, got, w.wire)
++	require.Equal(t, wt, gt, w.id)
++	require.Equal(t, wv, gv, w.id)
++	require.Equal(t, want.Cfg.GetItem("additionInfo"), got.Cfg.GetItem("additionInfo"), w.id)
++	require.Equal(t, NodeToMap(want), NodeToMap(got), w.id)
++	require.Equal(t, want.Ctx.GetString("path"), got.Ctx.GetString("path"), w.id)
++	return want, got
++}
+diff --git a/common/bin-parser/utils.go b/common/bin-parser/utils.go
+--- a/common/bin-parser/utils.go
++++ b/common/bin-parser/utils.go
+@@ -98,7 +98,7 @@
+ 		for _, sub := range node.Children {
+ 			d := NodeToMap(sub)
+ 			if d != nil {
+-				res[sub.Name] = d
++				res[sub.Name] = NodeToMap(sub)
+ 			}
+ 		}
+ 		if len(res) == 0 {
+diff --git a/common/bin-parser/node_to_map_single_pass_test.go b/common/bin-parser/node_to_map_single_pass_test.go
+deleted file mode 100644
+--- a/common/bin-parser/node_to_map_single_pass_test.go
++++ /dev/null
+@@ -1,151 +0,0 @@
+-package bin_parser
+-
+-import (
+-	"bytes"
+-	"encoding/json"
+-	"fmt"
+-	"testing"
+-
+-	"github.com/stretchr/testify/require"
+-	"github.com/yaklang/yaklang/common/bin-parser/parser"
+-	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+-	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
+-)
+-
+-// Frozen pre-optimization traversal, deliberately retaining the repeated
+-// recursive call. It is a test-only oracle, never a runtime compatibility flag.
+-func nodeToMapRepeatedReference(node *base.Node) any {
+-	if node.Cfg.Has(stream_parser.CfgNodeResult) {
+-		if node.Cfg.GetBool(stream_parser.CfgIsList) && !stream_parser.NodeIsTerminal(node) && len(node.Children) == 0 {
+-			span := stream_parser.GetNodeResultPos(node)
+-			if span[0] == span[1] {
+-				value, err := stream_parser.ToMap(node)
+-				if err == nil && value != nil && value.IsList() {
+-					return []any{}
+-				}
+-			}
+-		}
+-		return stream_parser.GetResultByNode(node)
+-	}
+-	if node.Cfg.GetBool(stream_parser.CfgIsList) {
+-		res := []any{}
+-		for _, sub := range node.Children {
+-			d := nodeToMapRepeatedReference(sub)
+-			if d != nil {
+-				res = append(res, d)
+-			}
+-		}
+-		if len(res) == 0 {
+-			return nil
+-		}
+-		return res
+-	}
+-	res := map[string]any{}
+-	for _, sub := range node.Children {
+-		d := nodeToMapRepeatedReference(sub)
+-		if d != nil {
+-			res[sub.Name] = nodeToMapRepeatedReference(sub)
+-		}
+-	}
+-	if len(res) == 0 {
+-		return nil
+-	}
+-	return res
+-}
+-
+-func nodeMapRequireEquivalent(t *testing.T, n *base.Node) {
+-	t.Helper()
+-	want := nodeToMapRepeatedReference(n)
+-	got := NodeToMap(n)
+-	require.Equal(t, want, got) // Includes concrete numeric and byte-slice types.
+-	a, err := json.Marshal(map[string]any{"fields": want, "metadata": n.Cfg.GetItem("additionInfo")})
+-	require.NoError(t, err)
+-	b, err := currentCorpusJSON(n)
+-	require.NoError(t, err)
+-	require.Equal(t, a, b)
+-}
+-
+-func TestNodeToMapSinglePassSemantics(t *testing.T) {
+-	wire := []byte("stats\r\n")
+-	n := protocolCorpusRequireBoundedRuleParse(t, wire, "application-layer.memcached_fields", "MemcachedStatsRequestFields")
+-	container := func(name string, list bool, children ...*base.Node) *base.Node {
+-		v := base.NewEmptyNode(name, nil, base.NewEmptyConfig(), n.Ctx)
+-		v.Cfg.SetItem(stream_parser.CfgIsList, list)
+-		v.Cfg.SetItem("out", "panic(\"NodeToMap must not execute custom out\")")
+-		v.Children = children
+-		return v
+-	}
+-	leaf := func(name, typ string, from, to uint64) *base.Node {
+-		v := container(name, false)
+-		v.Cfg.SetItem(base.CfgIsTerminal, true)
+-		v.Cfg.SetItem(base.CfgType, typ)
+-		v.Cfg.SetItem(base.CfgNodeResult, [2]uint64{from, to})
+-		return v
+-	}
+-	empty := container("empty", true)
+-	empty.Cfg.SetItem(base.CfgNodeResult, [2]uint64{56, 56})
+-	dormant := container("dormant", true)
+-	raw := leaf("raw", "raw", 0, 16)
+-	list := container("list", true, leaf("item", "uint8", 0, 8), dormant, leaf("item", "uint8", 8, 16))
+-	root := container("root", false, leaf("duplicate", "uint8", 0, 8), leaf("duplicate", "uint8", 8, 16),
+-		raw, list, empty, dormant, leaf("bits", "uint8", 1, 6))
+-	want := map[string]any{"duplicate": uint8('t'), "raw": []byte("st"), "list": []any{uint8('s'), uint8('t')}, "empty": []any{}, "bits": uint8(28)}
+-	require.Equal(t, want, NodeToMap(root))
+-	nodeMapRequireEquivalent(t, root)
+-	require.Nil(t, NodeToMap(dormant))
+-	require.Nil(t, NodeToMap(container("empty-struct", false)))
+-	// Deep composite structure made the old traversal revisit a subtree
+-	// twice per struct level. This is an in-memory vector, not a corpus claim.
+-	for i := 0; i < 8; i++ {
+-		root = container(fmt.Sprintf("level-%d", i), false, root)
+-	}
+-	nodeMapRequireEquivalent(t, root)
+-	// A retained projection cannot be overwritten by a later projection.
+-	a := NodeToMap(list).([]any)
+-	b := NodeToMap(list).([]any)
+-	b[0] = uint8(0)
+-	require.Equal(t, uint8('s'), a[0])
+-	require.Equal(t, wire, NodeToBytes(n))
+-}
+-
+-func TestProtocolCorpusNodeToMapSinglePassEnvelopes(t *testing.T) {
+-	works := currentCorpusWorks(t, false)
+-	for worker := 0; worker < 4; worker++ {
+-		worker := worker
+-		t.Run(fmt.Sprintf("worker-%d", worker), func(t *testing.T) {
+-			t.Parallel()
+-			count := 0
+-			for i := worker; i < len(works); i += 4 {
+-				w := works[i]
+-				reader := newProtocolCorpusBoundedReader(w.wire)
+-				n, err := parser.ParseBinary(reader, w.rule, w.entry)
+-				if w.rejection != "" {
+-					require.ErrorContains(t, err, w.rejection, w.id)
+-					require.Nil(t, n, w.id)
+-				} else {
+-					require.NoError(t, err, w.id)
+-					require.Zero(t, reader.Len(), w.id)
+-					require.True(t, bytes.Equal(w.wire, NodeToBytes(n)), w.id)
+-					nodeMapRequireEquivalent(t, n)
+-				}
+-				count++
+-			}
+-			require.Equal(t, (len(works)+3-worker)/4, count)
+-			t.Logf("checked %d retained records", count)
+-		})
+-	}
+-}
+-
+-func TestProtocolCorpusNodeToMapSinglePassApplication(t *testing.T) {
+-	for _, w := range currentCorpusWorks(t, true) {
+-		t.Run(w.id, func(t *testing.T) {
+-			n := protocolCorpusRequireBoundedRuleParse(t, w.wire, w.rule, w.entry)
+-			nodeMapRequireEquivalent(t, n)
+-			require.Equal(t, w.wire, NodeToBytes(n))
+-		})
+-	}
+-}
+-
+-func BenchmarkCurrentCorpusApplicationJSONRepeatedReference(b *testing.B) {
+-	benchmarkCurrentCorpusWithProjection(b, true, true, nodeToMapRepeatedReference)
+-}

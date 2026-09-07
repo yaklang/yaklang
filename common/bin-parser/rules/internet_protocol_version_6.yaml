@@ -1,5 +1,22 @@
+endian: big
 Package:
   Internet Protocol Version 6:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 6 { panic("ipv6: version must be six") }
+      this.ProcessSubNode("Traffic Class")
+      this.ProcessSubNode("Flow Label")
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("Next Header")
+      this.ProcessSubNode("Hop Limit")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("Destination")
+      length = getNodeResult("Payload Length").Value
+      if length > this.GetMaxLength() - this.Length() { panic("ipv6: payload length exceeds input") }
+      if length > 0 {
+        this.GetSubNode("Payload").SetMaxLength(length)
+        this.ProcessSubNode("Payload")
+      }
     Version: uint8,4bit
     Traffic Class: uint8,8bit
     Flow Label: uint32,20bit
@@ -11,21 +28,157 @@ Package:
     Payload:
       unpack: true
       operator: |
-        protocol = getNodeResult("@Internet Protocol Version 6/Next Header").Value
-        var node 
+        protocol = getNodeResult("../Next Header").Value
+        dccpDestination = getNodeResult("../Destination").Value
+        dccpContextAvailable = true
+        for protocol == 0 || protocol == 43 || protocol == 44 || protocol == 60 {
+          var header
+          switch protocol {
+            case 0: header = this.NewSubNode("Hop By Hop Options")
+            case 43: header = this.NewSubNode("Routing Header")
+            case 44: header = this.NewSubNode("Fragment Header")
+            case 60: header = this.NewSubNode("Destination Options")
+          }
+          value = header.Process()
+          if protocol == 43 && value.Child("Segments Left").Value > 0 {
+            routingType = value.Child("Routing Type").Value
+            if routingType == 0 || routingType == 2 {
+              addresses = value.Child("Addresses").Children()
+              dccpDestination = addresses[len(addresses)-1].Value
+            } else { dccpContextAvailable = false }
+          }
+          if protocol == 44 && (value.Child("Fragment Offset").Value != 0 || value.Child("More Fragments").Value != 0) {
+            remaining = this.GetMaxLength() - this.Length()
+            if remaining > 0 {
+              fragment = this.NewSubNode("Fragment Data")
+              fragment.SetMaxLength(remaining)
+              fragment.Process()
+            }
+            return
+          }
+          protocol = value.Child("Next Header").Value
+        }
+        remaining = this.GetMaxLength() - this.Length()
+        if remaining == 0 {
+          if protocol != 59 { panic("ipv6: missing upper-layer data") }
+          return
+        }
+        var node
         switch protocol {
           case 6:
             node = this.NewSubNode("TCP")
           case 17:
             node = this.NewSubNode("UDP")
+          case 33:
+            node = this.NewSubNode("DCCP")
           case 58:
             node = this.NewSubNode("ICMPv6")
+          case 4:
+            node = this.NewSubNode("IPv4")
+          case 41:
+            node = this.NewSubNode("IPv6")
+          case 136:
+            node = this.NewSubNode("UDP-Lite")
+          case 89:
+            node = this.NewSubNode("OSPFv3")
           default:
             node = this.NewSubNode("Next Protocol Data")
         }
-        node.SetMaxLength(getNodeResult("@Internet Protocol Version 6/Payload Length").Value)
+        node.SetMaxLength(remaining)
+        if protocol == 136 || protocol == 33 {
+          node.SetCfg("IP Source", getNodeResult("../Source").Value)
+          node.SetCfg("IP Destination", getNodeResult("../Destination").Value)
+          if protocol == 33 {
+            if dccpContextAvailable { node.SetCfg("IP Destination", dccpDestination) } else {
+              node.SetCfg("IP Source", nil)
+              node.SetCfg("IP Destination", nil)
+            }
+          }
+        }
         node.Process()
+Hop By Hop Options: IPv6OptionsHeader
+Destination Options: IPv6OptionsHeader
+Routing Header: IPv6RoutingHeader
+Fragment Header:
+  Next Header: uint8
+  Reserved: uint8
+  Fragment Offset: uint16,13bit
+  Reserved Bits: uint8,2bit
+  More Fragments: uint8,1bit
+  Identification: uint32
+Fragment Data: raw
+IPv6OptionsHeader:
+  operator: |
+    this.ProcessSubNode("Next Header")
+    this.ProcessSubNode("Header Extension Length")
+    length = (getNodeResult("Header Extension Length").Value + 1) * 8
+    if length > this.GetMaxLength() { panic("ipv6: options header exceeds payload") }
+    this.GetSubNode("Options").SetMaxLength(length-2)
+    this.ProcessSubNode("Options")
+  Next Header: uint8
+  Header Extension Length: uint8
+  Options:
+    list: true
+    Option: IPv6Option
+    operator: |
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+IPv6Option:
+  operator: |
+    this.ProcessSubNode("Type")
+    kind = getNodeResult("Type").Value
+    if kind == 0 { return }
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength() - this.Length() { panic("ipv6: option length exceeds header") }
+    if kind == 5 {
+      if length != 2 { panic("ipv6: Router Alert length must be two") }
+      this.ProcessSubNode("Router Alert")
+    } elif length > 0 {
+      this.GetSubNode("Value").SetMaxLength(length)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint8
+  Length: uint8
+  Router Alert: uint16
+  Value: raw
+IPv6RoutingHeader:
+  operator: |
+    this.ProcessSubNode("Next Header")
+    this.ProcessSubNode("Header Extension Length")
+    this.ProcessSubNode("Routing Type")
+    this.ProcessSubNode("Segments Left")
+    length = (getNodeResult("Header Extension Length").Value + 1) * 8
+    if length > this.GetMaxLength() { panic("ipv6: routing header exceeds payload") }
+    kind = getNodeResult("Routing Type").Value
+    if kind == 0 || kind == 2 {
+      if (length-8) % 16 != 0 || (kind == 2 && length != 24) { panic("ipv6: routing address length mismatch") }
+      if getNodeResult("Segments Left").Value > (length-8)/16 { panic("ipv6: segments left exceeds address count") }
+      this.ProcessSubNode("Reserved")
+      if length > 8 {
+        this.GetSubNode("Addresses").SetMaxLength(length-8)
+        this.ProcessSubNode("Addresses")
+      }
+    } else {
+      this.GetSubNode("Type Specific Data").SetMaxLength(length-4)
+      this.ProcessSubNode("Type Specific Data")
+    }
+  Next Header: uint8
+  Header Extension Length: uint8
+  Routing Type: uint8
+  Segments Left: uint8
+  Reserved: uint32
+  Addresses:
+    list: true
+    Address: raw,16
+    operator: |
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+  Type Specific Data: raw
 TCP: "import:transmission_control_protocol.yaml;node:TCP"
 UDP: "import:user_datagram_protocol.yaml;node:UDP"
+DCCP: "import:dccp.yaml;node:DCCP"
 ICMPv6: "import:internet_control_message_protocol_v6.yaml;node:ICMPV6"
+IPv4: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+UDP-Lite: "import:udp_lite.yaml;node:UDPLite"
+OSPFv3: "import:ospfv3.yaml;node:OSPFv3"
 Next Protocol Data: string

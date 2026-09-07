@@ -1,0 +1,49 @@
+File: binparser-prepared-20260906.test
+Type: cpu
+Time: Sep 6, 2026 at 11:22pm (CST)
+Duration: 4.14s, Total samples = 3.81s (92.01%)
+Showing nodes accounting for 3.54s, 92.91% of 3.81s total
+Dropped 88 nodes (cum <= 0.02s)
+Showing top 25 nodes out of 159
+      flat  flat%   sum%        cum   cum%
+     2.41s 63.25% 63.25%      2.41s 63.25%  syscall.syscall
+     0.25s  6.56% 69.82%      0.25s  6.56%  runtime.kevent
+     0.15s  3.94% 73.75%      0.38s  9.97%  runtime.mallocgc
+     0.10s  2.62% 76.38%      0.11s  2.89%  runtime.mapaccess2_faststr
+     0.08s  2.10% 78.48%      0.08s  2.10%  runtime.madvise
+     0.06s  1.57% 80.05%      0.13s  3.41%  github.com/yaklang/yaklang/common/utils/omap.(*OrderedMap[go.shape.string,go.shape.interface {}]).Get
+     0.06s  1.57% 81.63%      0.15s  3.94%  runtime.scanobject
+     0.05s  1.31% 82.94%      0.06s  1.57%  runtime.findObject
+     0.05s  1.31% 84.25%      0.13s  3.41%  runtime.mapassign_faststr
+     0.05s  1.31% 85.56%      0.05s  1.31%  runtime.memclrNoHeapPointers
+     0.04s  1.05% 86.61%      0.10s  2.62%  gcWriteBarrier
+     0.04s  1.05% 87.66%      0.04s  1.05%  runtime.scanblock
+     0.03s  0.79% 88.45%      0.03s  0.79%  runtime.step
+     0.02s  0.52% 88.98%      0.02s  0.52%  runtime.(*mspan).heapBitsSmallForAddr
+     0.02s  0.52% 89.50%      0.02s  0.52%  runtime.(*mspan).writeHeapBitsSmall
+     0.02s  0.52% 90.03%      0.02s  0.52%  runtime.(*sweepLocked).sweep
+     0.02s  0.52% 90.55%      0.02s  0.52%  runtime.markBits.isMarked (inline)
+     0.02s  0.52% 91.08%      0.02s  0.52%  runtime.markBits.setMarked (inline)
+     0.01s  0.26% 91.34%      0.03s  0.79%  github.com/icza/bitio.NewReader
+     0.01s  0.26% 91.60%      0.03s  0.79%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BaseKV).GetBool
+     0.01s  0.26% 91.86%      0.04s  1.05%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BitReader).readSourceBits
+     0.01s  0.26% 92.13%      0.09s  2.36%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewConfig
+     0.01s  0.26% 92.39%      0.19s  4.99%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.getNodeResult
+     0.01s  0.26% 92.65%      0.18s  4.72%  github.com/yaklang/yaklang/common/utils/omap.(*OrderedMap[go.shape.string,go.shape.interface {}]).Set
+     0.01s  0.26% 92.91%      0.39s 10.24%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.(*Value).Call
+File: binparser-prepared-20260906.test
+Type: cpu
+Time: Sep 6, 2026 at 11:22pm (CST)
+Duration: 4.14s, Total samples = 3.81s (92.01%)
+Showing nodes accounting for 3.81s, 100% of 3.81s total
+----------------------------------------------------------+-------------
+      flat  flat%   sum%        cum   cum%   calls calls% + context 	 	 
+----------------------------------------------------------+-------------
+                                             2.41s   100% |   github.com/yaklang/yaklang/common/bin-parser/parser/base.ParseRule
+         0     0%     0%      2.41s 63.25%                | github.com/yaklang/yaklang/common/utils.GetFileAbsDir
+                                             2.41s   100% |   path/filepath.Abs
+----------------------------------------------------------+-------------
+                                             2.41s   100% |   os.statNolog.func1
+         0     0%     0%      2.41s 63.25%                | syscall.Stat
+                                             2.41s   100% |   syscall.syscall
+----------------------------------------------------------+-------------

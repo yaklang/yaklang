@@ -65,7 +65,7 @@ Package:
                 } else if src == 443 || dst == 443 {
                   typeNameList = ["TLS", "HTTP2Preface", "HTTP2", "HTTP"]
                 } else if src == 80 || dst == 80 || src == 8080 || dst == 8080 {
-                  typeNameList = ["HTTP2Preface", "HTTP2", "WebSocket", "HTTP", "TLS"]
+                  typeNameList = ["HTTP2Preface", "HTTP2", "WebSocket", "HTTP", "TLS", "JSONRPC2"]
                 } else if src == 1521 || dst == 1521 {
                   typeNameList = ["TNS"]
                 } else if src == 135 || dst == 135 {
@@ -92,6 +92,40 @@ Package:
                   typeNameList = ["VNC"]
                 } else if src == 27017 || dst == 27017 {
                   typeNameList = ["MongoDB"]
+                } else if src == 4880 || dst == 4880 {
+                  typeNameList = ["HiSLIP"]
+                } else if src == 17225 || dst == 17225 {
+                  typeNameList = ["TRDP"]
+                } else if src == 2575 || dst == 2575 || src == 6661 || dst == 6661 {
+                  typeNameList = ["HL7"]
+                } else if src == 104 || dst == 104 {
+                  typeNameList = ["DICOM"]
+                } else if src == 4712 || dst == 4712 {
+                  typeNameList = ["C37118"]
+                } else if src == 5222 || dst == 5222 {
+                  // Bare stanzas need explicit caller-owned stream context;
+                  // failed or fragmented candidates retain the entire payload.
+                  typeNameList = ["XMPP"]
+                } else if src == 5223 || dst == 5223 {
+                  // This port is not evidence of TLS or XML. Preserve unknown
+                  // binary traffic and incomplete records without a candidate
+                  // consuming a misleading short prefix.
+                  typeNameList = []string{}
+                  prefix,probe = this.TryProcessByType("XMPPTLSRecordHeader")
+                  tlsRecord = false
+                  if probe.OK {
+                    content = prefix.Value >> 32
+                    version = (prefix.Value >> 16) & 65535
+                    length = prefix.Value & 65535
+                    tlsRecord = content >= 20 && content <= 24 && version >= 0x0300 && version <= 0x0303 && (!bounded || length + 5 <= maximum)
+                  }
+                  err = probe.Recovery()
+                  if err != nil { panic(err) }
+                  if tlsRecord { typeNameList = ["TLS"] }
+                } else if src == 6556 || dst == 6556 {
+                  // Checkmk reports are EOF-delimited; individual TCP payloads
+                  // remain bytes until a caller supplies the reassembled report.
+                  typeNameList = []string{}
                 } else if src == 11211 || dst == 11211 {
                   typeNameList = ["Memcached"]
                 } else if src == 5672 || dst == 5672 {
@@ -114,8 +148,11 @@ Package:
                   typeNameList = ["FTPData", "TLS", "HTTP"]
                 } else if src == 111 || dst == 111 {
                   typeNameList = ["ONCRPC", "TLS", "HTTP"]
-                } else if src == 2809 || dst == 2809 {
-                  typeNameList = ["GIOP", "TLS", "HTTP"]
+                } else if src == 2809 || dst == 2809 || src == 683 || dst == 683 || src == 56899 || dst == 56899 {
+                  // 56899 is the endpoint in the pinned nDPI CORBA capture.
+                  // A port selects candidates, never proof of a valid PDU.
+                  // Segmented messages and unsupported ZIOP retain all bytes.
+                  typeNameList = ["GIOP", "GIOPStream"]
                 } else if src == 7001 || dst == 7001 {
                   typeNameList = ["T3", "TLS", "HTTP"]
                 } else if src == 873 || dst == 873 {
@@ -124,10 +161,20 @@ Package:
                   typeNameList = ["Zabbix", "TLS", "HTTP"]
                 } else if src == 6881 || dst == 6881 {
                   typeNameList = ["BitTorrent", "TLS", "HTTP"]
+                } else if src == 4662 || dst == 4662 || src == 7551 || dst == 7551 {
+                  // 7551 is the configurable client port in the pinned nDPI capture.
+                  typeNameList = ["EDonkey", "TLS", "HTTP", "SSH", "Redis", "MQTT", "FTP", "SMTP"]
+                  // A known family marker must not fall through to permissive
+                  // legacy candidates after a partial or unsupported message.
+                  prefix,probe = this.TryProcessByType("EDonkeyProtocolPrefix")
+                  knownFamily = probe.OK && (prefix.Value == 0xe3 || prefix.Value == 0xc5 || prefix.Value == 0xd4)
+                  err = probe.Recovery()
+                  if err != nil { panic(err) }
+                  if knownFamily { typeNameList = ["EDonkey"] }
                 } else if src == 4505 || dst == 4505 {
                   typeNameList = ["Salt", "TLS", "HTTP"]
                 } else if src == 8545 || dst == 8545 {
-                  typeNameList = ["JSONRPC", "TLS", "HTTP"]
+                  typeNameList = ["JSONRPC", "JSONRPC2", "TLS", "HTTP"]
                 } else if src == 9090 || dst == 9090 {
                   typeNameList = ["Thrift", "TLS", "HTTP"]
                 } else if src == 8088 || dst == 8088 {
@@ -177,6 +224,12 @@ Package:
                         tail.Process()
                     }
                 }
+DICOM: "import:application-layer/dicom.yaml;node:DICOM"
+C37118: "import:application-layer/c37118.yaml;node:C37118"
+XMPP: "import:application-layer/xmpp.yaml;node:XMPP"
+XMPPTLSRecordHeader: uint64,40bit
+EDonkey: "import:application-layer/edonkey.yaml;node:EDonkey"
+EDonkeyProtocolPrefix: uint8
 Option:
     operator: |
         this.ProcessSubNode("Kind")
@@ -257,6 +310,9 @@ SOCKS5Req: "import:application-layer/socks5.yaml;node:Request"
 PPTP: "import:application-layer/pptp.yaml;node:PPTP"
 VNC: "import:vnc.yaml;node:VNC"
 MongoDB: "import:mongodb.yaml;node:MongoDB"
+HiSLIP: "import:application-layer/hislip.yaml;node:HiSLIPMessages"
+TRDP: "import:application-layer/trdp.yaml;node:TRDPMessages"
+HL7: "import:application-layer/hl7.yaml;node:HL7Messages"
 Memcached: "import:memcached.yaml;node:Memcached"
 AMQP: "import:amqp.yaml;node:AMQP"
 Kafka: "import:kafka.yaml;node:Kafka"
@@ -268,12 +324,14 @@ TACACS: "import:tacacs.yaml;node:TACACS"
 FTPData: "import:ftp_data.yaml;node:FTPData"
 ONCRPC: "import:onc_rpc.yaml;node:ONCRPC"
 GIOP: "import:application-layer/iiop.yaml;node:GIOP"
+GIOPStream: "import:application-layer/iiop.yaml;node:GIOPStream"
 T3: "import:application-layer/t3.yaml;node:T3"
 Rsync: "import:rsync.yaml;node:Rsync"
 Zabbix: "import:zabbix.yaml;node:Zabbix"
 BitTorrent: "import:bittorrent.yaml;node:BitTorrent"
 Salt: "import:salt.yaml;node:Salt"
 JSONRPC: "import:jsonrpc.yaml;node:JSONRPC"
+JSONRPC2: "import:application-layer/jsonrpc_v2.yaml;node:JSONRPC2"
 Thrift: "import:thrift.yaml;node:Thrift"
 NetRemoting: "import:net_remoting.yaml;node:NetRemoting"
 Jenkins: "import:jenkins.yaml;node:Jenkins"

@@ -8,18 +8,23 @@ ndpi-coap,CoAP,ndpi,upstream-positive,outside current 616-item roadmap
 ndpi-tcp-measurement,High-rate TCP measurement,ndpi,upstream-positive,network measurement traffic outside current roadmap
 tcpdump-empty-pcapng,empty pcapng container,tcpdump,upstream-negative,
 tcpdump-unsupported-linktype,unsupported link type 160,tcpdump,upstream-negative,
-google-challenge-engraver,Google educational challenge USB HID engraver,google-challenges,educational-challenge,official 2022 Google USB reverse-engineering exercise capture
-ndpi-umas,Schneider UMAS,ndpi,upstream-positive,outside current 616-item roadmap; rare ICS PLC programming protocol
+wireshark-usb-hid,USB HID input report,wireshark-tests,upstream-positive,The selected frame carries a complete four-byte input report; the generic rule retains descriptor-dependent report data as opaque bytes.
+ndpi-umas,Schneider UMAS,ndpi,upstream-positive,Schneider UMAS service carried in Modbus function 0x5a.
 ndpi-tristation,Triconex TriStation,ndpi,upstream-positive,outside current 616-item roadmap; safety-PLC engineering traffic
 ndpi-c37118,IEEE C37.118 synchrophasor,ndpi,upstream-positive,outside current 616-item roadmap; power-grid synchrophasor
 ndpi-trdp,TRDP,ndpi,upstream-positive,outside current 616-item roadmap; train real-time data protocol
-ndpi-ethersbus,EtherS-Bus,ndpi,upstream-positive,outside current 616-item roadmap; rare ICS
-ndpi-ethersio,EtherSIO,ndpi,upstream-positive,outside current 616-item roadmap; rare ICS
+ndpi-ethersbus,EtherS-Bus,ndpi,upstream-positive,Saia EtherS-Bus datagrams.
+ndpi-ethersio,EtherSIO,ndpi,upstream-positive,Saia EtherS-IO datagrams.
 ndpi-hislip,HiSLIP,ndpi,upstream-positive,outside current 616-item roadmap; instrument control
 ndpi-atg,Veeder-Root ATG,ndpi,upstream-positive,outside current 616-item roadmap; fuel-tank ICS
+ndpi-egd,GE Ethernet Global Data,ndpi,upstream-positive,GE Ethernet Global Data over UDP; EGD is distinct from GE SRTP.
 ndpi-matter,Matter on/off,ndpi,upstream-positive,outside current 616-item roadmap; smart-home Matter
+ndpi-meshtastic,Meshtastic TCP framing,ndpi,upstream-positive,Meshtastic serial framing transported over TCP; this is not a LoRaWAN MAC capture.
 ndpi-weibo,Weibo,ndpi,upstream-positive,Chinese app traffic; Weibo is not a named 616-item but is CN-app material
+ndpi-alicloud,Alibaba Cloud framing,ndpi,upstream-positive,Alibaba Cloud length-prefixed TCP messages; no AliyunDrive or TLS claim.
 ndpi-xiaomi,Xiaomi IoT,ndpi,upstream-positive,outside named cn-vendor items; Chinese vendor IoT
 ndpi-tuya,Tuya smart-home,ndpi,upstream-positive,outside current 616-item roadmap; CN IoT
-ndpi-dicom,DICOM,ndpi,upstream-positive,outside current 616-item roadmap; medical imaging ICS-adjacent
+ndpi-dicom,DICOM,ndpi,upstream-positive,"Outside the current 616-item roadmap; DICOM Upper Layer association negotiation. All six retained TCP records are validated as four complete PDUs, including two segmented messages."
 ndpi-hl7,HL7,ndpi,upstream-positive,outside current 616-item roadmap; healthcare
+ndpi-wsd-original,WS-Discovery XML exchange,ndpi,upstream-positive,Original upstream bytes restored by the PR merge audit; source attribution is unchanged and validation category and representative bytes are pinned by the corpus matrix.
+google-usb-engraver,USB HID device records,google-samples,upstream-positive,Original upstream bytes restored by the PR merge audit; source attribution is unchanged and validation category and representative bytes are pinned by the corpus matrix.

@@ -1,0 +1,189 @@
+=== RUN   TestNodeToMapSinglePassSemantics
+--- PASS: TestNodeToMapSinglePassSemantics (0.01s)
+=== RUN   TestProtocolCorpusNodeToMapSinglePassEnvelopes
+=== RUN   TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-0
+=== PAUSE TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-0
+=== RUN   TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-1
+=== PAUSE TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-1
+=== RUN   TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-2
+=== PAUSE TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-2
+=== RUN   TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-3
+=== PAUSE TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-3
+=== CONT  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-0
+=== CONT  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-2
+=== CONT  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-3
+=== CONT  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-1
+=== NAME  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-0
+    node_to_map_single_pass_test.go:134: checked 14634 retained records
+=== NAME  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-2
+    node_to_map_single_pass_test.go:134: checked 14633 retained records
+=== NAME  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-3
+    node_to_map_single_pass_test.go:134: checked 14633 retained records
+=== NAME  TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-1
+    node_to_map_single_pass_test.go:134: checked 14633 retained records
+--- PASS: TestProtocolCorpusNodeToMapSinglePassEnvelopes (0.04s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-0 (6.94s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-2 (7.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-3 (7.01s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassEnvelopes/worker-1 (7.02s)
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/4
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/6
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/8
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/12
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/14
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/16
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/20
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-memcached/4
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-memcached/6
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/gen-memcache-bin/4
+=== RUN   TestProtocolCorpusNodeToMapSinglePassApplication/pr5023-gen-memcache-bin/4
+--- PASS: TestProtocolCorpusNodeToMapSinglePassApplication (0.01s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/4 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/6 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/8 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/12 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/14 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/16 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-cassandra/20 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-memcached/4 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/ndpi-memcached/6 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/gen-memcache-bin/4 (0.00s)
+    --- PASS: TestProtocolCorpusNodeToMapSinglePassApplication/pr5023-gen-memcache-bin/4 (0.00s)
+=== RUN   TestProtocolCorpusAllJoynFields
+=== RUN   TestProtocolCorpusAllJoynFields/record-1/AllJoynNS
+=== RUN   TestProtocolCorpusAllJoynFields/record-1/AllJoynNSCarrier
+=== RUN   TestProtocolCorpusAllJoynFields/record-2/AllJoynNS
+=== RUN   TestProtocolCorpusAllJoynFields/record-2/AllJoynNSCarrier
+=== RUN   TestProtocolCorpusAllJoynFields/record-3/AllJoynNS
+=== RUN   TestProtocolCorpusAllJoynFields/record-3/AllJoynNSCarrier
+--- PASS: TestProtocolCorpusAllJoynFields (0.03s)
+    --- PASS: TestProtocolCorpusAllJoynFields/record-1/AllJoynNS (0.01s)
+    --- PASS: TestProtocolCorpusAllJoynFields/record-1/AllJoynNSCarrier (0.00s)
+    --- PASS: TestProtocolCorpusAllJoynFields/record-2/AllJoynNS (0.00s)
+    --- PASS: TestProtocolCorpusAllJoynFields/record-2/AllJoynNSCarrier (0.00s)
+    --- PASS: TestProtocolCorpusAllJoynFields/record-3/AllJoynNS (0.01s)
+    --- PASS: TestProtocolCorpusAllJoynFields/record-3/AllJoynNSCarrier (0.01s)
+=== RUN   TestProtocolCorpusAllJoynOriginalAndCompanionEveryRecord
+--- PASS: TestProtocolCorpusAllJoynOriginalAndCompanionEveryRecord (0.11s)
+=== RUN   TestProtocolCorpusAllJoynShortPrefixesAndInvalidLengths
+--- PASS: TestProtocolCorpusAllJoynShortPrefixesAndInvalidLengths (1.34s)
+=== RUN   TestProtocolCorpusAllJoynVersionsFlagsAndEndpointCombinations
+--- PASS: TestProtocolCorpusAllJoynVersionsFlagsAndEndpointCombinations (0.13s)
+=== RUN   TestProtocolCorpusAllJoynDuplicatesAndStringOctets
+--- PASS: TestProtocolCorpusAllJoynDuplicatesAndStringOctets (0.01s)
+=== RUN   TestProtocolCorpusAllJoynResourceProfile
+--- PASS: TestProtocolCorpusAllJoynResourceProfile (1.52s)
+=== RUN   TestProtocolCorpusAllJoynBoundaryAndTransactions
+--- PASS: TestProtocolCorpusAllJoynBoundaryAndTransactions (0.02s)
+=== RUN   TestProtocolCorpusAllJoynStructuredGenerationUnsupported
+--- PASS: TestProtocolCorpusAllJoynStructuredGenerationUnsupported (0.00s)
+=== RUN   TestProtocolCorpusAllJoynConcurrentIsolation
+--- PASS: TestProtocolCorpusAllJoynConcurrentIsolation (0.06s)
+=== RUN   TestProtocolCorpusAllJoynHeldReaderOuterTransactions
+--- PASS: TestProtocolCorpusAllJoynHeldReaderOuterTransactions (0.46s)
+=== RUN   TestProtocolCorpusAllJoynLengthTrackingDifferential
+--- PASS: TestProtocolCorpusAllJoynLengthTrackingDifferential (8.03s)
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-4-CQLOptions4Fields
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-6-CQLSupported4Fields
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-8-CQLStartup4Fields
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-12-CQLOptions5InitialFields
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-14-CQLSupported5InitialFields
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-16-CQLStartup5InitialFields
+=== RUN   TestProtocolCorpusCassandraFieldsOriginalRecords/frame-20-CassandraInternodeInitiateFields
+--- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords (0.01s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-4-CQLOptions4Fields (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-6-CQLSupported4Fields (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-8-CQLStartup4Fields (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-12-CQLOptions5InitialFields (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-14-CQLSupported5InitialFields (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-16-CQLStartup5InitialFields (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsOriginalRecords/frame-20-CassandraInternodeInitiateFields (0.00s)
+=== RUN   TestProtocolCorpusCassandraFieldsIndependentLists
+--- PASS: TestProtocolCorpusCassandraFieldsIndependentLists (0.00s)
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLStartup4Fields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLOptions5InitialFields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLSupported5InitialFields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLStartup5InitialFields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CassandraInternodeInitiateFields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLOptions4Fields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLSupported4Fields
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-0
+=== PAUSE TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-0
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-1
+=== PAUSE TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-1
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-2
+=== PAUSE TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-2
+=== RUN   TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-3
+=== PAUSE TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-3
+=== CONT  TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-0
+=== CONT  TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-2
+=== CONT  TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-1
+=== CONT  TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-3
+--- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback (0.12s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLStartup4Fields (0.01s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLOptions5InitialFields (0.01s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLSupported5InitialFields (0.03s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLStartup5InitialFields (0.02s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CassandraInternodeInitiateFields (0.01s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLOptions4Fields (0.01s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/CQLSupported4Fields (0.02s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-0 (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-2 (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-1 (0.00s)
+    --- PASS: TestProtocolCorpusCassandraFieldsBoundariesAndFallback/cache-3 (0.00s)
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-0/AllJoynNS
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-0/AllJoynNSCarrier
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-0/UDP
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-1/AllJoynNS
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-1/AllJoynNSCarrier
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-1/UDP
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-2/AllJoynNS
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-2/AllJoynNSCarrier
+=== RUN   TestProtocolCorpusConsumedLengthPublicDifferential/fixture-2/UDP
+--- PASS: TestProtocolCorpusConsumedLengthPublicDifferential (0.11s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-0/AllJoynNS (0.00s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-0/AllJoynNSCarrier (0.01s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-0/UDP (0.01s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-1/AllJoynNS (0.01s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-1/AllJoynNSCarrier (0.01s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-1/UDP (0.01s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-2/AllJoynNS (0.02s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-2/AllJoynNSCarrier (0.02s)
+    --- PASS: TestProtocolCorpusConsumedLengthPublicDifferential/fixture-2/UDP (0.03s)
+=== RUN   TestProtocolCorpusMemcachedFieldsPackedCarrier
+--- PASS: TestProtocolCorpusMemcachedFieldsPackedCarrier (0.05s)
+=== RUN   TestProtocolCorpusMemcachedFieldsOriginalRecords
+=== RUN   TestProtocolCorpusMemcachedFieldsOriginalRecords/ndpi/ndpi-memcached.cap/frame-4
+=== RUN   TestProtocolCorpusMemcachedFieldsOriginalRecords/ndpi/ndpi-memcached.cap/frame-6
+=== RUN   TestProtocolCorpusMemcachedFieldsOriginalRecords/generated-local/gen-memcache-bin.pcap/frame-4
+=== RUN   TestProtocolCorpusMemcachedFieldsOriginalRecords/generated-pr5023/pr5023-gen-memcache-bin.pcap/frame-4
+--- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords (0.01s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords/ndpi/ndpi-memcached.cap/frame-4 (0.00s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords/ndpi/ndpi-memcached.cap/frame-6 (0.01s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords/generated-local/gen-memcache-bin.pcap/frame-4 (0.00s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsOriginalRecords/generated-pr5023/pr5023-gen-memcache-bin.pcap/frame-4 (0.00s)
+=== RUN   TestProtocolCorpusMemcachedFieldsBoundariesAndFallback
+=== RUN   TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-0
+=== PAUSE TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-0
+=== RUN   TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-1
+=== PAUSE TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-1
+=== RUN   TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-2
+=== PAUSE TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-2
+=== RUN   TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-3
+=== PAUSE TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-3
+=== CONT  TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-0
+=== CONT  TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-3
+=== CONT  TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-2
+=== CONT  TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-1
+--- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback (0.11s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-1 (0.02s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-3 (0.02s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-2 (0.02s)
+    --- PASS: TestProtocolCorpusMemcachedFieldsBoundariesAndFallback/cache-0 (0.02s)
+=== RUN   TestProtocolCorpusTLSCertificateInlineFramingAndBoundaries
+--- PASS: TestProtocolCorpusTLSCertificateInlineFramingAndBoundaries (0.00s)
+PASS

@@ -1,0 +1,275 @@
+# IEC 61850 SV and GOOSE fields observed in the pinned corpus.
+# Layout cross-check: Wireshark 4.4.8 SV/GOOSE ASN.1 dissectors.
+# Dataset-dependent sampled values stay explicit bytes, not invented channels.
+endian: big
+Package:
+  SampledValues:
+    operator: |
+      this.ProcessSubNode("APPID")
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      if length < 10 || length > this.GetMaxLength() { panic("iec61850: invalid frame length") }
+      this.ProcessSubNode("Reserved 1")
+      this.ProcessSubNode("Reserved 2")
+      this.GetSubNode("PDU").SetMaxLength(length - 8)
+      this.ProcessSubNode("PDU")
+      rest = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && rest > 0 { this.GetSubNode("Link Padding").SetMaxLength(rest); this.ProcessSubNode("Link Padding") }
+    APPID: uint16
+    Length: uint16
+    Reserved 1: uint16
+    Reserved 2: uint16
+    PDU: SVPDU
+    Link Padding: raw
+  GOOSE:
+    operator: |
+      this.ProcessSubNode("APPID")
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      if length < 10 || length > this.GetMaxLength() { panic("iec61850: invalid frame length") }
+      this.ProcessSubNode("Reserved 1")
+      this.ProcessSubNode("Reserved 2")
+      this.GetSubNode("PDU").SetMaxLength(length - 8)
+      this.ProcessSubNode("PDU")
+      rest = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && rest > 0 { this.GetSubNode("Link Padding").SetMaxLength(rest); this.ProcessSubNode("Link Padding") }
+    APPID: uint16
+    Length: uint16
+    Reserved 1: uint16
+    Reserved 2: uint16
+    PDU: GOOSEPDU
+    Link Padding: raw
+
+  # Link-layer dispatch is transactional. The direct entries still report
+  # malformed messages as errors; carriers retain their complete wire bytes.
+  SampledValuesCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("iec61850: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("iec61850: empty carrier has no message") }
+      value, trial = this.TryProcessByType("SVFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed IEC Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  GOOSECarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("iec61850: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("iec61850: empty carrier has no message") }
+      value, trial = this.TryProcessByType("GOOSEFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed IEC Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SVFrame: "import:iec61850.yaml;node:SampledValues"
+GOOSEFrame: "import:iec61850.yaml;node:GOOSE"
+
+SVPDU:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Tag").Value != 0x60 { panic("sv: expected savPdu") }
+    if getNodeResult("Length").Value != this.GetMaxLength() - this.Length() { panic("sv: PDU length mismatch") }
+    this.ProcessSubNode("ASDU Count")
+    if getNodeResult("ASDU Count/Tag").Value != 0x80 { panic("sv: expected ASDU count") }
+    count = getNodeResult("ASDU Count").Value
+    if count < 1 || count > 65535 { panic("sv: invalid ASDU count") }
+    this.ProcessSubNode("Sequence Tag")
+    this.ProcessSubNode("Sequence Length")
+    if getNodeResult("Sequence Tag").Value != 0xa2 { panic("sv: expected ASDU sequence") }
+    length = getNodeResult("Sequence Length").Value
+    if length != this.GetMaxLength() - this.Length() { panic("sv: sequence length mismatch") }
+    this.GetSubNode("ASDUs").SetMaxLength(length)
+    this.ProcessSubNode("ASDUs")
+  Tag: uint8
+  Length: IECLength
+  ASDU Count: IECNumber
+  Sequence Tag: uint8
+  Sequence Length: IECLength
+  ASDUs:
+    list: true
+    ASDU: SVASDU
+    operator: |
+      count = getNodeResult("../ASDU Count").Value
+      for i = range count { this.NewElement().Process() }
+      if this.Length() != this.GetMaxLength() { panic("sv: ASDU count does not consume sequence") }
+
+SVASDU:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Tag").Value != 0x30 { panic("sv: expected ASDU SEQUENCE") }
+    this.GetSubNode("Fields").SetMaxLength(getNodeResult("Length").Value)
+    this.ProcessSubNode("Fields")
+  Tag: uint8
+  Length: IECLength
+  Fields:
+    operator: |
+      previous = 0x7f
+      seen = 0
+      for this.Length() < this.GetMaxLength() {
+        next, probe = this.TryProcessByType("PeekByte")
+        if !probe.OK { probe.Recovery(); panic("sv: truncated ASDU field") }
+        probe.Recovery()
+        tag = next.Value
+        if tag <= previous || tag > 0x89 { panic("sv: duplicate, unordered or unknown ASDU field") }
+        previous = tag
+        seen = seen | (1 << (tag - 0x80))
+        if tag == 128 { this.ProcessSubNode("SV ID") }
+        if tag == 129 { this.ProcessSubNode("Dataset") }
+        if tag == 130 { this.ProcessSubNode("Sample Counter") }
+        if tag == 131 { this.ProcessSubNode("Configuration Revision") }
+        if tag == 132 { this.ProcessSubNode("Reference Time") }
+        if tag == 133 { this.ProcessSubNode("Sample Synchronization") }
+        if tag == 134 { this.ProcessSubNode("Sample Rate") }
+        if tag == 135 { this.ProcessSubNode("Sample Data") }
+        if tag == 136 { this.ProcessSubNode("Sample Mode") }
+        if tag == 137 { this.ProcessSubNode("Grandmaster Identity") }
+      }
+      if (seen & 173) != 173 { panic("sv: missing mandatory ASDU field") }
+    SV ID: IECBytes
+    Dataset: IECBytes
+    Sample Counter: IECNumber
+    Configuration Revision: IECNumber
+    Reference Time: IECBytes
+    Sample Synchronization: IECNumber
+    Sample Rate: IECNumber
+    Sample Data: IECBytes
+    Sample Mode: IECNumber
+    Grandmaster Identity: IECBytes
+
+GOOSEPDU:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Tag").Value != 0x61 { panic("goose: expected goosePdu") }
+    if getNodeResult("Length").Value != this.GetMaxLength() - this.Length() { panic("goose: PDU length mismatch") }
+    this.ProcessSubNode("Control Block Reference")
+    if getNodeResult("Control Block Reference/Tag").Value != 128 { panic("goose: unexpected Control Block Reference tag") }
+    this.ProcessSubNode("Time Allowed To Live")
+    if getNodeResult("Time Allowed To Live/Tag").Value != 129 { panic("goose: unexpected Time Allowed To Live tag") }
+    this.ProcessSubNode("Dataset")
+    if getNodeResult("Dataset/Tag").Value != 130 { panic("goose: unexpected Dataset tag") }
+    this.ProcessSubNode("GOOSE ID")
+    if getNodeResult("GOOSE ID/Tag").Value != 131 { panic("goose: unexpected GOOSE ID tag") }
+    this.ProcessSubNode("Timestamp")
+    if getNodeResult("Timestamp/Tag").Value != 132 { panic("goose: unexpected Timestamp tag") }
+    this.ProcessSubNode("State Number")
+    if getNodeResult("State Number/Tag").Value != 133 { panic("goose: unexpected State Number tag") }
+    this.ProcessSubNode("Sequence Number")
+    if getNodeResult("Sequence Number/Tag").Value != 134 { panic("goose: unexpected Sequence Number tag") }
+    this.ProcessSubNode("Simulation")
+    if getNodeResult("Simulation/Tag").Value != 135 { panic("goose: unexpected Simulation tag") }
+    this.ProcessSubNode("Configuration Revision")
+    if getNodeResult("Configuration Revision/Tag").Value != 136 { panic("goose: unexpected Configuration Revision tag") }
+    this.ProcessSubNode("Needs Commissioning")
+    if getNodeResult("Needs Commissioning/Tag").Value != 137 { panic("goose: unexpected Needs Commissioning tag") }
+    this.ProcessSubNode("Dataset Entry Count")
+    if getNodeResult("Dataset Entry Count/Tag").Value != 138 { panic("goose: unexpected Dataset Entry Count tag") }
+    this.ProcessSubNode("Data Tag")
+    this.ProcessSubNode("Data Length")
+    if getNodeResult("Data Tag").Value != 0xab { panic("goose: expected allData") }
+    length = getNodeResult("Data Length").Value
+    if length != this.GetMaxLength() - this.Length() { panic("goose: allData length mismatch") }
+    this.GetSubNode("Dataset Values").SetMaxLength(length)
+    this.ProcessSubNode("Dataset Values")
+  Tag: uint8
+  Length: IECLength
+  Control Block Reference: IECBytes
+  Time Allowed To Live: IECNumber
+  Dataset: IECBytes
+  GOOSE ID: IECBytes
+  Timestamp: IECBytes
+  State Number: IECNumber
+  Sequence Number: IECNumber
+  Simulation: IECNumber
+  Configuration Revision: IECNumber
+  Needs Commissioning: IECNumber
+  Dataset Entry Count: IECNumber
+  Data Tag: uint8
+  Data Length: IECLength
+  Dataset Values:
+    list: true
+    Value: GOOSEValue
+    operator: |
+      count = getNodeResult("../Dataset Entry Count").Value
+      if count > this.GetMaxLength() / 2 { panic("goose: dataset count exceeds available bytes") }
+      for i = range count { this.NewElement().Process() }
+      if this.Length() != this.GetMaxLength() { panic("goose: dataset entry count mismatch") }
+
+GOOSEValue:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    tag = getNodeResult("Tag").Value
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength() - this.Length() { panic("goose: value length exceeds input") }
+    if tag == 0x83 {
+      if length != 1 { panic("goose: BOOLEAN length must be one") }
+      this.ProcessSubNode("Boolean")
+      return
+    }
+    if tag == 0x84 {
+      if length < 1 { panic("goose: BIT STRING missing unused-bit count") }
+      this.ProcessSubNode("Unused Bits")
+      if getNodeResult("Unused Bits").Value > 7 { panic("goose: invalid unused-bit count") }
+      if length > 1 { this.GetSubNode("Bits").SetMaxLength(length-1); this.ProcessSubNode("Bits") }
+      return
+    }
+    if length > 0 { this.GetSubNode("Encoded Value").SetMaxLength(length); this.ProcessSubNode("Encoded Value") }
+  Tag: uint8
+  Length: IECLength
+  Boolean: uint8
+  Unused Bits: uint8
+  Bits: raw
+  Encoded Value: raw
+
+IECNumber:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length < 1 || length > 5 { panic("iec61850: invalid numeric field length") }
+    this.GetSubNode("Value").SetMaxLength(length)
+    this.ProcessSubNode("Value")
+  Tag: uint8
+  Length: IECLength
+  Value: uint64
+  out: |
+    return data.Value[2].Value
+
+IECBytes:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength() - this.Length() { panic("iec61850: field length exceeds input") }
+    if length > 0 { this.GetSubNode("Value").SetMaxLength(length); this.ProcessSubNode("Value") }
+  Tag: uint8
+  Length: IECLength
+  Value: raw
+  out: |
+    if len(data.Value) > 2 { return data.Value[2].Value }
+    return ""
+
+IECLength:
+  list: true
+  Octet: uint8
+  operator: |
+    first = this.NewElement().Process().Value
+    if first < 128 { return }
+    count = first & 127
+    if count == 0 || count > 4 { panic("iec61850: unsupported BER length width") }
+    for i = range count { this.NewElement().Process() }
+  out: |
+    result = 0
+    for index, octet = range data.Value {
+      if index == 0 {
+        if octet.Value < 128 { return octet.Value }
+      } else { result = (result << 8) + octet.Value }
+    }
+    return result
+
+PeekByte: uint8

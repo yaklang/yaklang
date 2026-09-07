@@ -1,0 +1,22 @@
+File: binparser-current-20260906-v2.test
+Type: alloc_space
+Time: Sep 6, 2026 at 10:47pm (CST)
+Showing nodes accounting for 2112.52MB, 84.84% of 2490.11MB total
+Dropped 287 nodes (cum <= 12.45MB)
+Showing top 15 nodes out of 91
+      flat  flat%   sum%        cum   cum%
+  737.74MB 29.63% 29.63%   737.74MB 29.63%  github.com/yaklang/yaklang/common/utils/omap.(*OrderedMap[go.shape.string,go.shape.interface {}]).Set
+  579.53MB 23.27% 52.90%  1311.76MB 52.68%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*Config).SetItem
+  118.51MB  4.76% 57.66%   118.51MB  4.76%  github.com/yaklang/yaklang/common/utils/omap.NewEmptyOrderedMap[go.shape.string,go.shape.interface {}] (inline)
+   97.51MB  3.92% 61.57%   179.01MB  7.19%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewBitReader
+   81.50MB  3.27% 64.85%    81.50MB  3.27%  github.com/icza/bitio.NewReader
+   80.75MB  3.24% 68.09%  1493.74MB 59.99%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.ExecOperator
+   74.50MB  2.99% 71.08%    74.50MB  2.99%  bytes.NewBuffer (inline)
+   56.50MB  2.27% 73.35%    56.50MB  2.27%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyNode (inline)
+   53.53MB  2.15% 75.50%   113.65MB  4.56%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields
+   53.51MB  2.15% 77.65%   353.03MB 14.18%  github.com/yaklang/yaklang/common/bin-parser.NodeToMap
+   51.51MB  2.07% 79.72%    84.51MB  3.39%  encoding/json.mapEncoder.encode
+      33MB  1.33% 81.04%       33MB  1.33%  reflect.copyVal
+   31.93MB  1.28% 82.33%   116.44MB  4.68%  encoding/json.Marshal
+   31.51MB  1.27% 83.59%    33.51MB  1.35%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func3 (inline)
+      31MB  1.24% 84.84%  1126.72MB 45.25%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.parseExactByteFieldTreeWithEndian.func2

@@ -47,7 +47,8 @@
           "packet_count": {"type": "integer", "minimum": 0},
           "link_type": {"type": "string"},
           "display_filter": {"type": "string"},
-          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "educational-challenge", "generated-positive"]},
+          "decode_as": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.]*==[0-9]+,[a-z][a-z0-9_.-]*$"}, "uniqueItems": true},
+          "evidence_kind": {"enum": ["upstream-positive", "upstream-negative", "generated-positive", "generated-negative", "generated-identification"]},
           "notes": {"type": "string"},
           "representative_frame": {
             "type": ["object", "null"],

@@ -228,14 +228,29 @@ Package:
 
   GTPv2:
     operator: |
+      if !this.HasMaxLength() || this.GetMaxLength() < 8 {
+        panic("gtpv2: complete message boundary is required")
+      }
       this.ProcessSubNode("Flags")
-      version = getNodeResult("Flags").Value >> 5
+      flags = getNodeResult("Flags").Value
+      version = flags >> 5
       if version != 2 {
         panic("gtpv2: version must be 2")
       }
       this.ProcessSubNode("Message Type")
       this.ProcessSubNode("Payload Length")
-      this.ProcessSubNode("TEID")
+      length = getNodeResult("Payload Length").Value
+      if length + 4 != this.GetMaxLength() {
+        panic("gtpv2: payload length does not match message boundary")
+      }
+      if flags & 0x08 != 0 {
+        if length < 8 {
+          panic("gtpv2: TEID flag requires the extended header")
+        }
+        this.ProcessSubNode("TEID")
+      } else if length < 4 {
+        panic("gtpv2: header is shorter than sequence fields")
+      }
       this.ProcessSubNode("Sequence Number")
       this.ProcessSubNode("Spare")
       remaining = this.GetMaxLength() - this.Length()
@@ -1239,6 +1254,7 @@ Package:
 
   IPX:
     operator: |
+      if !this.HasMaxLength() { panic("ipx: packet boundary is required") }
       this.ProcessSubNode("Checksum")
       this.ProcessSubNode("Length")
       length = getNodeResult("Length").Value
@@ -1253,6 +1269,7 @@ Package:
       this.ProcessSubNode("Source Network")
       this.ProcessSubNode("Source Node")
       this.ProcessSubNode("Source Socket")
+      this.AddInfo("Upper Layer Decoded", false)
       remaining = this.GetMaxLength() - this.Length()
       if remaining > 0 {
         this.GetSubNode("Payload").SetMaxLength(remaining)

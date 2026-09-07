@@ -1,0 +1,37 @@
+File: reserved.test
+Type: alloc_space
+Time: Sep 7, 2026 at 9:13am (CST)
+Showing nodes accounting for 2697.28MB, 94.17% of 2864.27MB total
+Dropped 275 nodes (cum <= 14.32MB)
+Showing top 30 nodes out of 96
+      flat  flat%   sum%        cum   cum%
+  678.76MB 23.70% 23.70%   733.28MB 25.60%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setConfigItemLocked
+  462.64MB 16.15% 39.85%   462.64MB 16.15%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyConfig (inline)
+  434.21MB 15.16% 55.01%  1453.07MB 50.73%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewConfigWithItems
+  112.05MB  3.91% 58.92%   231.22MB  8.07%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields
+  106.53MB  3.72% 62.64%   186.03MB  6.49%  encoding/json.mapEncoder.encode
+  105.51MB  3.68% 66.32%   105.51MB  3.68%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewEmptyNode (inline)
+   79.50MB  2.78% 69.10%    79.50MB  2.78%  reflect.copyVal
+   75.02MB  2.62% 71.72%    77.52MB  2.71%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func3 (inline)
+   61.74MB  2.16% 73.87%   247.77MB  8.65%  encoding/json.Marshal
+   58.02MB  2.03% 75.90%   208.52MB  7.28%  github.com/yaklang/yaklang/common/bin-parser.NodeToMap
+   54.53MB  1.90% 77.80%    54.53MB  1.90%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*configStore).setLocked
+   53.50MB  1.87% 79.67%    89.50MB  3.12%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewBitReader
+      48MB  1.68% 81.35%  1360.03MB 47.48%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.parseExactByteFieldTreeWithEndian.func2
+   45.50MB  1.59% 82.94%    45.50MB  1.59%  bytes.NewBuffer (inline)
+   41.66MB  1.45% 84.39%    41.66MB  1.45%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMemcachedFields.func2 (inline)
+   39.51MB  1.38% 85.77%    42.51MB  1.48%  github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.NewFrame
+   38.54MB  1.35% 87.12%    38.54MB  1.35%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).take
+      36MB  1.26% 88.37%       36MB  1.26%  github.com/icza/bitio.NewReader
+   27.51MB  0.96% 89.33%    27.51MB  0.96%  github.com/yaklang/yaklang/common/bin-parser/parser/base.cloneRuleDocumentValue
+   18.51MB  0.65% 89.98%    18.51MB  0.65%  github.com/yaklang/yaklang/common/bin-parser/parser/base.(*BitReader).readSourceBits
+   17.50MB  0.61% 90.59%    31.53MB  1.10%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).text
+   15.53MB  0.54% 91.13%    15.53MB  0.54%  encoding/hex.EncodeToString (inline)
+   15.50MB  0.54% 91.67%   374.58MB 13.08%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewNodeTree
+      15MB  0.52% 92.20%       15MB  0.52%  strings.genSplit
+   13.01MB  0.45% 92.65%    58.54MB  2.04%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*cassandraFieldsReader).options
+      12MB  0.42% 93.07%    99.56MB  3.48%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeCassandraFields
+       9MB  0.31% 93.38%  1218.50MB 42.54%  github.com/yaklang/yaklang/common/bin-parser/parser/base.NewNodeTreeWithConfigItems
+    8.50MB   0.3% 93.68%   363.57MB 12.69%  github.com/yaklang/yaklang/common/bin-parser/parser/base.newNodeTree
+    7.50MB  0.26% 93.94%  1863.10MB 65.05%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.(*DefParser).Parse
+    6.50MB  0.23% 94.17%  1336.87MB 46.67%  github.com/yaklang/yaklang/common/bin-parser.currentCorpusParseWithProjection

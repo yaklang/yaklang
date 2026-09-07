@@ -11,14 +11,44 @@ Package:
       this.ProcessSubNode("Length")
       flags = getNodeResult("Flags").Value
       length = getNodeResult("Length").Value
+      if (flags & 0xfe) != 0 { panic("nbss: reserved flag bits must be zero") }
       if (flags & 0x1) != 0 {
         length = length + 0x10000
       }
-      this.GetSubNode("Payload").SetMaxLength(length)
-      this.ProcessSubNode("Payload")
+      if this.HasMaxLength() && length != this.GetMaxLength() - this.Length() { panic("nbss: declared length differs from record boundary") }
+      this.SetMaxLength(length + this.Length())
+      if typ == 0x00 {
+        this.GetSubNode("Payload").SetMaxLength(length)
+        this.ProcessSubNode("Payload")
+        return
+      }
+      if typ == 0x81 {
+        if length != 68 { panic("nbss: session request must contain two encoded names") }
+        this.GetSubNode("Session Request").SetMaxLength(length)
+        this.ProcessSubNode("Session Request")
+        return
+      }
+      if typ == 0x82 || typ == 0x85 {
+        if length != 0 { panic("nbss: response or keep-alive must have no trailer") }
+        return
+      }
+      if typ == 0x83 {
+        if length != 1 { panic("nbss: negative response must contain one error code") }
+        this.ProcessSubNode("Error Code")
+        return
+      }
+      if length != 6 { panic("nbss: retarget response must contain address and port") }
+      this.ProcessSubNode("Retarget Address")
+      this.ProcessSubNode("Retarget Port")
     Type: uint8
     Flags: uint8
     Length: uint16
+    Session Request:
+      Called Name: NetBIOS Name
+      Calling Name: NetBIOS Name
+    Error Code: uint8
+    Retarget Address: raw,4
+    Retarget Port: uint16
     Payload:
       unpack: true
       operator: |
@@ -39,3 +69,15 @@ Package:
         }
 SMB2: "import:application-layer/smb2.yaml;node:SMB2"
 SMB: "import:application-layer/smb.yaml;node:SMB"
+NetBIOS Name:
+  operator: |
+    this.ProcessSubNode("Encoded Length")
+    if getNodeResult("Encoded Length").Value != 32 { panic("nbss: encoded NetBIOS name length must be 32") }
+    this.ProcessSubNode("Encoded Name")
+    encoded = getNodeResult("Encoded Name").Value
+    for octet in encoded { if octet < 0x41 || octet > 0x50 { panic("nbss: invalid first-level encoded name") } }
+    this.ProcessSubNode("Terminator")
+    if getNodeResult("Terminator").Value != 0 { panic("nbss: encoded name must terminate with zero") }
+  Encoded Length: uint8
+  Encoded Name: raw,32
+  Terminator: uint8

@@ -1,0 +1,30 @@
+# Passive bounded HTTP/1.1 Content-Length / UTF-8 SOAP 1.2 field profile.
+# DMTF DSP0226 1.1.1 sections 7.3, 11, Annex F; MS-WSMV 2.2.1 and 4.1.1.
+# https://www.dmtf.org/sites/default/files/standards/documents/DSP0226_1.1.1.pdf
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-wsmv/1c651dae-1f95-40b0-8d8d-ccd2793640e3
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-wsmv/51415c9a-66dc-4fa2-8866-4f0f54430cf7
+# https://www.w3.org/TR/soap12-part1/
+# Identify/IdentifyResponse and WS-Transfer Get/GetResponse only. XML extension
+# and resource schemas are NOT validated; attributes, namespace bindings and raw
+# spans are retained. SOAP faults, other actions, session correlation, HTTP
+# chunking, content coding, UTF-16, MIME and message protection are outside this
+# profile. No operation, endpoint, XPath or object representation is executed.
+# Both http Identify namespaces are explicit: MS-WSMV spells /identify/ whereas
+# DSP0226 spells /identity/. The input URI is retained; no https alias is guessed.
+endian: big
+unit: byte
+Package:
+  WinRMHTTP:
+    operator: |
+      err = parseWinRMRecord()
+      if err != nil { panic(err) }
+  WinRMHTTPCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("winrm: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("WinRMExact", "WinRMHTTP")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed WinRM Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+WinRMExact: "import:application-layer/winrm.yaml;node:WinRMHTTP"

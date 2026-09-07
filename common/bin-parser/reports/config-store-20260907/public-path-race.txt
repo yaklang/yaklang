@@ -1,0 +1,15 @@
+COMMAND go test -race ./common/bin-parser ./common/bin-parser/parser/... -run '^(Test.*(Concurrent|Isolation|Transaction|Rollback|Cache|Copy|Snapshot|ConfigStore).*|TestProtocolCorpusCurrentFieldEvidence|TestCurrentFieldInventoryRejectsDrift)$' -count=1 -timeout=3m
+# github.com/yaklang/yaklang/common/bin-parser/parser/base.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-1182563101/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+# github.com/yaklang/yaklang/common/bin-parser/parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-4222815441/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+# github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-4205404777/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+# github.com/yaklang/yaklang/common/bin-parser.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-370059331/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+?   	github.com/yaklang/yaklang/common/bin-parser/parser/ser_parser	[no test files]
+ok  	github.com/yaklang/yaklang/common/bin-parser	50.254s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser	2.685s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	3.964s
+ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	8.307s
+EXIT 0

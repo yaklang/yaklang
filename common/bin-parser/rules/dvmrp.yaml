@@ -1,0 +1,194 @@
+# RFC 1075 sections 3 and 3.1-3.13 define the experimental DVMRP v1
+# IGMP-carried header and tagged command stream implemented here:
+# https://www.rfc-editor.org/rfc/rfc1075.html
+#
+# The implementation was independently cross-checked against Wireshark's
+# pinned packet-dvmrp.c decoder.  That decoder also documents the distinct,
+# later version-3 wire format; this rule intentionally does not claim support
+# for the expired DVMRP-v3 draft.
+# https://gitlab.com/wireshark/wireshark/-/blob/e3bedc57ba41dc1535f147bcb3cf97c5dc62fb75/epan/dissectors/packet-dvmrp.c
+#
+# Every message requires an explicit boundary and is limited to RFC 1075's
+# 512-octet maximum.  Unknown command tags cannot be skipped because v1 has no
+# per-command length, so they are rejected rather than mislabeled as opaque.
+endian: big
+Package:
+  DVMRP: DVMRPMessage
+
+  # IPv4/IGMP dispatch is transactional.  A malformed or unsupported message
+  # is retained as the complete bounded payload, never as a partially decoded
+  # DVMRP tree.
+  DVMRPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("dvmrp: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("dvmrp: empty carrier has no message") }
+      value, trial = this.TryProcessByType("DVMRPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed DVMRP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+DVMRPFrame: "import:dvmrp.yaml;node:DVMRP"
+
+DVMRPMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("dvmrp: explicit message boundary required") }
+    total = this.GetMaxLength()
+    if total < 4 { panic("dvmrp: message is shorter than the fixed header") }
+    if total > 512 { panic("dvmrp: message exceeds the 512-byte RFC 1075 limit") }
+    if total % 2 != 0 { panic("dvmrp: command stream is not 16-bit aligned") }
+    start = getCurrentPosition()
+    if this.ProcessSubNode("Version").Value != 1 { panic("dvmrp: unsupported version") }
+    if this.ProcessSubNode("Type").Value != 3 { panic("dvmrp: invalid IGMP DVMRP type") }
+    subtype = this.ProcessSubNode("Code").Value
+    if subtype < 1 || subtype > 4 { panic("dvmrp: unsupported v1 subtype") }
+    this.ProcessSubNode("Checksum")
+    remaining = total-this.Length()
+    commandCount = 0
+    if remaining > 0 {
+      this.GetSubNode("Commands").SetMaxLength(remaining)
+      this.ProcessSubNode("Commands")
+      commandCount = this.GetSubNode("Commands").GetInfo("Command Count")
+    }
+    if this.Length() != total { panic("dvmrp: command stream did not consume its boundary") }
+
+    data = getCtx("buffer").Bytes()[start:start+total]
+    sum = 0
+    for i = 0; i < len(data); i += 2 {
+      sum += int(data[i]) << 8
+      if i+1 < len(data) { sum += int(data[i+1]) }
+    }
+    for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+    if sum != 65535 { panic("dvmrp: checksum mismatch") }
+
+    this.AddInfo("Checksum Valid", true)
+    this.AddInfo("Command Count", commandCount)
+  Version: uint8,4bit
+  Type: uint8,4bit
+  Code: uint8
+  Checksum: uint16
+  Commands: DVMRPV1Commands
+
+DVMRPV1Commands:
+  operator: |
+    subtype = getNodeResult("../Code").Value
+    count = 0
+    haveMetric = false
+    currentMetric = 0
+    currentInfinity = 16
+    for this.Length() < this.GetMaxLength() {
+      // A 512-octet packet can contain at most 254 two-octet commands after
+      // the fixed header.  Keep the explicit guard even though the enclosing
+      // byte limit independently enforces the same finite tree bound.
+      if count >= 254 { panic("dvmrp: too many commands") }
+      command = this.NewSubNode("DVMRPV1Command", "Command")
+      command.Process()
+      kind = command.GetInfo("Command Type")
+      allowed = false
+      switch subtype {
+        case 1: allowed = kind == 0 || kind == 2 || kind == 3 || kind == 4 || kind == 5 || kind == 6 || kind == 7
+        case 2: allowed = kind == 0 || kind == 2 || kind == 3 || kind == 5 || kind == 8
+        case 3: allowed = kind == 0 || kind == 2 || kind == 5 || kind == 9
+        case 4: allowed = kind == 0 || kind == 2 || kind == 5 || kind == 10
+      }
+      if !allowed { panic("dvmrp: command is incompatible with the message subtype") }
+      if kind == 4 {
+        haveMetric = true
+        currentMetric = command.GetInfo("Metric")
+      }
+      if kind == 6 {
+        candidate = command.GetInfo("Infinity")
+        if haveMetric && candidate < currentMetric { panic("dvmrp: infinity is less than the current metric") }
+        currentInfinity = candidate
+      }
+      if kind == 7 {
+        if !haveMetric { panic("dvmrp: destination command has no current metric") }
+        if currentMetric > currentInfinity { panic("dvmrp: current metric exceeds infinity") }
+      }
+      count++
+    }
+    this.AddInfo("Command Count", count)
+
+DVMRPV1Command:
+  operator: |
+    kind = this.ProcessSubNode("Command Type").Value
+    switch kind {
+      case 0:
+        this.ProcessSubNode("Ignored")
+      case 2:
+        if this.ProcessSubNode("Address Family").Value != 2 { panic("dvmrp: unsupported address family") }
+      case 3:
+        count = this.ProcessSubNode("Count").Value
+        if count > 1 { panic("dvmrp: subnet-mask count must be zero or one") }
+        if count == 1 {
+          mask = this.ProcessSubNode("Subnet Mask").Value
+          if mask & 0xff000000 != 0xff000000 || mask == 0xffffffff { panic("dvmrp: invalid subnet mask") }
+        }
+      case 4:
+        metric = this.ProcessSubNode("Metric").Value
+        if metric == 0 { panic("dvmrp: metric must be nonzero") }
+        this.AddInfo("Metric", metric)
+      case 5:
+        this.ProcessSubNode("Destination Unreachable")
+        this.ProcessSubNode("Split Horizon Concealed")
+        // RFC 1075 requires receivers to ignore unsupported flag bits.  They
+        // remain visible rather than being required to be zero.
+        this.ProcessSubNode("Flags Reserved")
+      case 6:
+        infinity = this.ProcessSubNode("Infinity").Value
+        if infinity == 0 { panic("dvmrp: infinity must be nonzero") }
+        this.AddInfo("Infinity", infinity)
+      case 7:
+        count = this.ProcessSubNode("Count").Value
+        if count == 0 { panic("dvmrp: destination-address count must be nonzero") }
+        for i = 0; i < count; i++ {
+          this.NewSubNode("DVMRPIPv4Address", "Destination Address").Process()
+        }
+      case 8:
+        count = this.ProcessSubNode("Count").Value
+        for i = 0; i < count; i++ {
+          this.NewSubNode("DVMRPIPv4Address", "Requested Destination Address").Process()
+        }
+      case 9:
+        count = this.ProcessSubNode("Count").Value
+        if count == 0 { panic("dvmrp: non-membership count must be nonzero") }
+        for i = 0; i < count; i++ {
+          this.NewSubNode("DVMRPNMREntry", "Non-Membership Entry").Process()
+        }
+      case 10:
+        count = this.ProcessSubNode("Count").Value
+        if count == 0 { panic("dvmrp: cancellation count must be nonzero") }
+        for i = 0; i < count; i++ {
+          address = this.NewSubNode("DVMRPMulticastAddress", "Multicast Address")
+          address.Process()
+        }
+      default:
+        panic("dvmrp: unsupported v1 command")
+    }
+    this.AddInfo("Command Type", kind)
+  Command Type: uint8
+  Ignored: uint8
+  Address Family: uint8
+  Count: uint8
+  Subnet Mask: uint32
+  Metric: uint8
+  Destination Unreachable: uint8,1bit
+  Split Horizon Concealed: uint8,1bit
+  Flags Reserved: uint8,6bit
+  Infinity: uint8
+
+DVMRPIPv4Address: uint32
+
+DVMRPMulticastAddress:
+  operator: |
+    address = this.ProcessSubNode("Address").Value
+    if address & 0xf0000000 != 0xe0000000 { panic("dvmrp: non-membership address is not multicast") }
+  Address: uint32
+
+DVMRPNMREntry:
+  operator: |
+    this.ProcessSubNode("Multicast Address")
+    this.ProcessSubNode("Hold Down Time")
+  Multicast Address: DVMRPMulticastAddress
+  Hold Down Time: uint32

@@ -1,0 +1,821 @@
+{
+  "environment": {
+    "base_revision": "0b3ed685b1b462dfc7eb342c2b754313a5e6f9c7",
+    "dirty_worktree": true,
+    "binary_sha256": "29ba128ec6ee48ba227b57336d312746ff69f21a0639ab7c414141bb6f34a80d",
+    "manifest_sha256": "870350c644462dffd3462ac8b71adcfff1fe725c19ace6d0d39765b1ab9181ca"
+  },
+  "exclusions": [
+    "envelopes-v2.txt first row: actual workers=4 but CPU-list position labelled 1; not part of either three-repetition aggregate. Replacement is envelopes-single.txt.",
+    "cpu8.txt application rows: exploratory 1x runs excluded from 600ms application comparison; formal measurements are in cpu8-10-application.txt.",
+    "Initial RSS process failed from repository root before opening the manifest; no workload was timed. rss-valid.txt uses the required package working directory."
+  ],
+  "runs": [
+    {
+      "source": "envelopes-v2.txt",
+      "index": 1,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 27087578292,
+      "iterations": 1,
+      "workers": 1,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484535400,
+      "allocations": 397518312
+    },
+    {
+      "source": "envelopes-v2.txt",
+      "index": 2,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 27134653666,
+      "iterations": 1,
+      "workers": 1,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484503776,
+      "allocations": 397518318
+    },
+    {
+      "source": "envelopes-v2.txt",
+      "index": 3,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 8923810417,
+      "iterations": 1,
+      "workers": 4,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484731128,
+      "allocations": 397518432
+    },
+    {
+      "source": "envelopes-v2.txt",
+      "index": 4,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 8879217667,
+      "iterations": 1,
+      "workers": 4,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484707776,
+      "allocations": 397518437
+    },
+    {
+      "source": "envelopes-v2.txt",
+      "index": 5,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 8841135375,
+      "iterations": 1,
+      "workers": 4,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484550096,
+      "allocations": 397517667
+    },
+    {
+      "source": "envelopes-single.txt",
+      "index": 0,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 27042700541,
+      "iterations": 1,
+      "workers": 1,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484428544,
+      "allocations": 397517976
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 0,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 2767286,
+      "iterations": 213,
+      "workers": 1,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2039123,
+      "allocations": 32403
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 1,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 2769722,
+      "iterations": 216,
+      "workers": 1,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2039132,
+      "allocations": 32403
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 2,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 2769202,
+      "iterations": 216,
+      "workers": 1,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2039148,
+      "allocations": 32403
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 3,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1600680,
+      "iterations": 398,
+      "workers": 4,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2039620,
+      "allocations": 32410
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 4,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1491116,
+      "iterations": 396,
+      "workers": 4,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2039545,
+      "allocations": 32409
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 5,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1508939,
+      "iterations": 399,
+      "workers": 4,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2039466,
+      "allocations": 32409
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 6,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 3864408,
+      "iterations": 153,
+      "workers": 1,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2512974,
+      "allocations": 45189
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 7,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 3845689,
+      "iterations": 154,
+      "workers": 1,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2513302,
+      "allocations": 45190
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 8,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 3850198,
+      "iterations": 153,
+      "workers": 1,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2513193,
+      "allocations": 45190
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 9,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2232520,
+      "iterations": 265,
+      "workers": 4,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2516553,
+      "allocations": 45197
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 10,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2234367,
+      "iterations": 266,
+      "workers": 4,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2517946,
+      "allocations": 45197
+    },
+    {
+      "source": "application-v2.txt",
+      "index": 11,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2237618,
+      "iterations": 262,
+      "workers": 4,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2518069,
+      "allocations": 45198
+    },
+    {
+      "source": "cpu8.txt",
+      "index": 0,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 6734509208,
+      "iterations": 1,
+      "workers": 8,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19485048416,
+      "allocations": 397518456
+    },
+    {
+      "source": "cpu8.txt",
+      "index": 1,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 6758497042,
+      "iterations": 1,
+      "workers": 8,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19485045576,
+      "allocations": 397518376
+    },
+    {
+      "source": "cpu8.txt",
+      "index": 2,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 6789641625,
+      "iterations": 1,
+      "workers": 8,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19485067952,
+      "allocations": 397518400
+    },
+    {
+      "source": "cpu10-envelopes.txt",
+      "index": 0,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 6824424125,
+      "iterations": 1,
+      "workers": 10,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19484956840,
+      "allocations": 397518036
+    },
+    {
+      "source": "cpu10-envelopes.txt",
+      "index": 1,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 6495438958,
+      "iterations": 1,
+      "workers": 10,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19485030152,
+      "allocations": 397518219
+    },
+    {
+      "source": "cpu10-envelopes.txt",
+      "index": 2,
+      "name": "BenchmarkCurrentCorpusEnvelopes",
+      "ns_per_round": 6513161417,
+      "iterations": 1,
+      "workers": 10,
+      "input_bytes": 8993088,
+      "messages": 58533,
+      "allocated_bytes": 19485022656,
+      "allocations": 397518166
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 0,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1376201,
+      "iterations": 514,
+      "workers": 8,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2040324,
+      "allocations": 32418
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 1,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1373799,
+      "iterations": 514,
+      "workers": 8,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2040096,
+      "allocations": 32418
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 2,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1363364,
+      "iterations": 522,
+      "workers": 8,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2040123,
+      "allocations": 32418
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 3,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1337115,
+      "iterations": 537,
+      "workers": 10,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2040393,
+      "allocations": 32422
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 4,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1341886,
+      "iterations": 534,
+      "workers": 10,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2040419,
+      "allocations": 32422
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 5,
+      "name": "BenchmarkCurrentCorpusApplicationFields",
+      "ns_per_round": 1357250,
+      "iterations": 525,
+      "workers": 10,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2040408,
+      "allocations": 32422
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 6,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2074047,
+      "iterations": 342,
+      "workers": 8,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2540352,
+      "allocations": 45214
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 7,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2078099,
+      "iterations": 350,
+      "workers": 8,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2531660,
+      "allocations": 45211
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 8,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2075144,
+      "iterations": 345,
+      "workers": 8,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2537172,
+      "allocations": 45213
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 9,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2044337,
+      "iterations": 357,
+      "workers": 10,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2538202,
+      "allocations": 45219
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 10,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2049377,
+      "iterations": 350,
+      "workers": 10,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2540237,
+      "allocations": 45220
+    },
+    {
+      "source": "cpu8-10-application.txt",
+      "index": 11,
+      "name": "BenchmarkCurrentCorpusApplicationJSON",
+      "ns_per_round": 2044440,
+      "iterations": 354,
+      "workers": 10,
+      "input_bytes": 1421,
+      "messages": 11,
+      "allocated_bytes": 2538298,
+      "allocations": 45219
+    }
+  ],
+  "summary": [
+    {
+      "name": "BenchmarkCurrentCorpusEnvelopes/1",
+      "n": 3,
+      "messages_per_round": 58533,
+      "input_bytes_per_round": 8993088,
+      "ns_per_round": {
+        "median": 27087578292,
+        "min": 27042700541,
+        "max": 27134653666
+      },
+      "messages_per_second": {
+        "median": 2160.879771865285,
+        "min": 2157.1309042850417,
+        "max": 2164.465782966346
+      },
+      "input_mbps": {
+        "median": 2.6560035461438067,
+        "min": 2.6513956981196873,
+        "max": 2.660411222278749
+      },
+      "allocated_bytes_per_message": {
+        "median": 332880.6617805341,
+        "min": 332879.3764884766,
+        "max": 332881.20205695933
+      },
+      "allocations_per_message": {
+        "median": 6791.353800420276,
+        "min": 6791.348060068679,
+        "max": 6791.353902926554
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusEnvelopes/4",
+      "n": 3,
+      "messages_per_round": 58533,
+      "input_bytes_per_round": 8993088,
+      "ns_per_round": {
+        "median": 8879217667,
+        "min": 8841135375,
+        "max": 8923810417
+      },
+      "messages_per_second": {
+        "median": 6592.134824843911,
+        "min": 6559.193580411985,
+        "max": 6620.529775566297
+      },
+      "input_mbps": {
+        "median": 8.10259492425618,
+        "min": 8.062105831265105,
+        "max": 8.137496028331089
+      },
+      "allocated_bytes_per_message": {
+        "median": 332884.1469940034,
+        "min": 332881.45312900416,
+        "max": 332884.54594843934
+      },
+      "allocations_per_message": {
+        "median": 6791.355850545846,
+        "min": 6791.342780995336,
+        "max": 6791.355935967745
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationFields/1",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 2769202,
+        "min": 2767286,
+        "max": 2769722
+      },
+      "messages_per_second": {
+        "median": 3972.2634896262534,
+        "min": 3971.5177191068274,
+        "max": 3975.01378607054
+      },
+      "input_mbps": {
+        "median": 4.105153759097386,
+        "min": 4.10438303916422,
+        "max": 4.107996065459082
+      },
+      "allocated_bytes_per_message": {
+        "median": 185375.63636363635,
+        "min": 185374.81818181818,
+        "max": 185377.0909090909
+      },
+      "allocations_per_message": {
+        "median": 2945.7272727272725,
+        "min": 2945.7272727272725,
+        "max": 2945.7272727272725
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationFields/4",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 1508939,
+        "min": 1491116,
+        "max": 1600680
+      },
+      "messages_per_second": {
+        "median": 7289.89044620094,
+        "min": 6872.079366269336,
+        "max": 7377.024993360677
+      },
+      "input_mbps": {
+        "median": 7.5337704174920255,
+        "min": 7.101981657795437,
+        "max": 7.6238200113203805
+      },
+      "allocated_bytes_per_message": {
+        "median": 185413.18181818182,
+        "min": 185406,
+        "max": 185420
+      },
+      "allocations_per_message": {
+        "median": 2946.2727272727275,
+        "min": 2946.2727272727275,
+        "max": 2946.3636363636365
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationJSON/1",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 3850198,
+        "min": 3845689,
+        "max": 3864408
+      },
+      "messages_per_second": {
+        "median": 2856.9959259238094,
+        "min": 2846.4903291784926,
+        "max": 2860.345701381469
+      },
+      "input_mbps": {
+        "median": 2.952575425991079,
+        "min": 2.9417183692819187,
+        "max": 2.956037266664049
+      },
+      "allocated_bytes_per_message": {
+        "median": 228472.0909090909,
+        "min": 228452.18181818182,
+        "max": 228482
+      },
+      "allocations_per_message": {
+        "median": 4108.181818181818,
+        "min": 4108.090909090909,
+        "max": 4108.181818181818
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationJSON/4",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 2234367,
+        "min": 2232520,
+        "max": 2237618
+      },
+      "messages_per_second": {
+        "median": 4923.094549821046,
+        "min": 4915.941863177718,
+        "max": 4927.167505778224
+      },
+      "input_mbps": {
+        "median": 5.087794440215059,
+        "min": 5.0804024636913,
+        "max": 5.092003655062441
+      },
+      "allocated_bytes_per_message": {
+        "median": 228904.18181818182,
+        "min": 228777.54545454544,
+        "max": 228915.36363636365
+      },
+      "allocations_per_message": {
+        "median": 4108.818181818182,
+        "min": 4108.818181818182,
+        "max": 4108.909090909091
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusEnvelopes/8",
+      "n": 3,
+      "messages_per_round": 58533,
+      "input_bytes_per_round": 8993088,
+      "ns_per_round": {
+        "median": 6758497042,
+        "min": 6734509208,
+        "max": 6789641625
+      },
+      "messages_per_second": {
+        "median": 8660.653342932987,
+        "min": 8620.92629226215,
+        "max": 8691.501962825738
+      },
+      "input_mbps": {
+        "median": 10.645074423042116,
+        "min": 10.596244687656839,
+        "max": 10.682991407085177
+      },
+      "allocated_bytes_per_message": {
+        "median": 332889.96661712194,
+        "min": 332889.91809748346,
+        "max": 332890.3003775648
+      },
+      "allocations_per_message": {
+        "median": 6791.355303845694,
+        "min": 6791.3548938205795,
+        "max": 6791.35626057096
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusEnvelopes/10",
+      "n": 3,
+      "messages_per_round": 58533,
+      "input_bytes_per_round": 8993088,
+      "ns_per_round": {
+        "median": 6513161417,
+        "min": 6495438958,
+        "max": 6824424125
+      },
+      "messages_per_second": {
+        "median": 8986.879988452773,
+        "min": 8576.98743921488,
+        "max": 9011.400211514389
+      },
+      "input_mbps": {
+        "median": 11.046049590022006,
+        "min": 10.542238096903159,
+        "max": 11.076188147590933
+      },
+      "allocated_bytes_per_message": {
+        "median": 332889.5265234996,
+        "min": 332888.4020979618,
+        "max": 332889.65458801016
+      },
+      "allocations_per_message": {
+        "median": 6791.351306100832,
+        "min": 6791.349085131465,
+        "max": 6791.352211572959
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationFields/8",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 1373799,
+        "min": 1363364,
+        "max": 1376201
+      },
+      "messages_per_second": {
+        "median": 8006.993745082068,
+        "min": 7993.018461692733,
+        "max": 8068.278170759973
+      },
+      "input_mbps": {
+        "median": 8.274864081281176,
+        "min": 8.260421261138452,
+        "max": 8.33819874956358
+      },
+      "allocated_bytes_per_message": {
+        "median": 185465.72727272726,
+        "min": 185463.27272727274,
+        "max": 185484
+      },
+      "allocations_per_message": {
+        "median": 2947.090909090909,
+        "min": 2947.090909090909,
+        "max": 2947.090909090909
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationFields/10",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 1341886,
+        "min": 1337115,
+        "max": 1357250
+      },
+      "messages_per_second": {
+        "median": 8197.41766439176,
+        "min": 8104.6233192116415,
+        "max": 8226.667115393964
+      },
+      "input_mbps": {
+        "median": 8.471658546255046,
+        "min": 8.375759808436175,
+        "max": 8.501886524345325
+      },
+      "allocated_bytes_per_message": {
+        "median": 185491.63636363635,
+        "min": 185490.27272727274,
+        "max": 185492.63636363635
+      },
+      "allocations_per_message": {
+        "median": 2947.4545454545455,
+        "min": 2947.4545454545455,
+        "max": 2947.4545454545455
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationJSON/8",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 2075144,
+        "min": 2074047,
+        "max": 2078099
+      },
+      "messages_per_second": {
+        "median": 5300.836953965604,
+        "min": 5293.29930864699,
+        "max": 5303.640660023616
+      },
+      "input_mbps": {
+        "median": 5.4781740447891805,
+        "min": 5.470384230972634,
+        "max": 5.481071547558951
+      },
+      "allocated_bytes_per_message": {
+        "median": 230652,
+        "min": 230150.9090909091,
+        "max": 230941.0909090909
+      },
+      "allocations_per_message": {
+        "median": 4110.272727272727,
+        "min": 4110.090909090909,
+        "max": 4110.363636363636
+      }
+    },
+    {
+      "name": "BenchmarkCurrentCorpusApplicationJSON/10",
+      "n": 3,
+      "messages_per_round": 11,
+      "input_bytes_per_round": 1421,
+      "ns_per_round": {
+        "median": 2044440,
+        "min": 2044337,
+        "max": 2049377
+      },
+      "messages_per_second": {
+        "median": 5380.446479231477,
+        "min": 5367.48485027401,
+        "max": 5380.71756271104
+      },
+      "input_mbps": {
+        "median": 5.560446870536675,
+        "min": 5.547051616174086,
+        "max": 5.560727022990828
+      },
+      "allocated_bytes_per_message": {
+        "median": 230754.36363636365,
+        "min": 230745.63636363635,
+        "max": 230930.63636363635
+      },
+      "allocations_per_message": {
+        "median": 4110.818181818182,
+        "min": 4110.818181818182,
+        "max": 4110.909090909091
+      }
+    }
+  ]
+}

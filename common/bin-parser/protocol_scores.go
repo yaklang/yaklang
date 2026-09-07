@@ -24,6 +24,16 @@ type ProtocolScorecard struct {
 	OpaqueRaw   string
 }
 
+// SPNEGO and the GSS-API scorecard count the same initial-token rule subset;
+// the separate native GSS-API corpus profile is not credited by this card.
+// The two existing p1_sample_test.go subtests each assert MechOID after the full
+// Ethernet/IP/TCP/445/SMB2/Session Setup path, independently supporting Traffic 25.
+// Optional fields are not a spec-opaque exemption: their TLV structure remains
+// unparsed. Not every explicit panic branch is covered, so Tests/Branches remain
+// below the exhaustive-coverage buckets even with the newer boundary tests.
+const spnegoScoreEvidence = "TestP1WiresharkAndRFCSamples/spnego/ntlm and /spnego/krb5 RFC 4178 initial tokens: each asserts MechOID through Ethernet+IP+TCP/445+SMB2 Session Setup; TestSPNEGOAndEdges; TestSPNEGONestedLengthValidation; TestSPNEGOAdditionalMechanismAndOpaqueOptionalFields; TestNTLMAndSPNEGOStreamAndMessageBoundaries/spnego"
+const spnegoUnparsedFields = "Optional Fields (reqFlags/mechToken/mechListMIC TLV structure) and non-init Octets (including NegTokenResp) remain unparsed; long-form BER unsupported; additional OID values retained as bytes"
+
 func (s ProtocolScorecard) GatesOK() bool {
 	return s.G1 && s.G2 && s.G3 && s.G4 && s.G5 && s.G6 && s.G7 && s.G8
 }
@@ -139,8 +149,8 @@ var P0Scorecards = []ProtocolScorecard{
 		"ntlm/challenge [MS-NLMP] 2.2.1.2 Target Name DOMAIN; ntlm/authenticate User Name Admin TCP/445; TestNTLMSSPNegotiateAndEdges", "Value"),
 	card("NTLMSSP", "application-layer/ntlm.yaml", 20, 25, 20, 20, 10, "L2",
 		"ntlm/challenge Target Name DOMAIN; ntlm/authenticate User Name Admin SMB2 Session Setup; TestNTLMSSPInsideSMB2SessionSetup", "Value"),
-	card("SPNEGO", "application-layer/spnego.yaml", 20, 15, 16, 14, 10, "L2",
-		"TestSPNEGOAndEdges RFC 4178 GSS-API 0x60 + SPNEGO OID", "NegToken blob"),
+	card("SPNEGO", "application-layer/spnego.yaml", 15, 25, 16, 14, 10, "L2",
+		spnegoScoreEvidence, spnegoUnparsedFields),
 	card("RADIUS", "application-layer/radius.yaml", 25, 25, 20, 20, 10, "L1",
 		"radius/user-name Wireshark radtest.pcap User-Name Admin; radius/nas-ip 127.0.0.1 UDP/1812; TestRADIUSAndEdges", ""),
 	card("SOCKS5", "application-layer/socks5.yaml", 20, 20, 16, 20, 10, "L2",
@@ -205,7 +215,7 @@ var P0Scorecards = []ProtocolScorecard{
 	card("NBT-NS response", "application-layer/nbns.yaml", 20, 15, 16, 20, 10, "L2",
 		"TestNBNSLLMNRAndEdges UDP/137", "RDATA"),
 	card("WPAD proxy", "application-layer/http.yaml", 20, 25, 20, 20, 10, "L1",
-		"TestTLSClientHelloJA3AndHTTPWPAD GET /wpad.dat", ""),
+		"TestTLSClientHelloJA3AndHTTPWPAD GET /wpad.dat; HTTP framing only; discovery, proxy use and configuration-body interpretation are not scored", ""),
 	alias("TNS", "Oracle TNS"),
 }
 

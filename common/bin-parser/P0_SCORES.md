@@ -6,6 +6,8 @@
 
 别名（CIFS、MSRPC、TNS、AS-REP / TGS、NTLM v1/v2）与主规则共用同一张卡。
 
+历史 `WPAD proxy` 计分卡仅评价 `HTTP GET /wpad.dat` 的 HTTP 封装，不评价 WPAD 发现、代理使用或配置正文语义。专用 WPAD 入口必须保留 `partial` 状态；P0 范围回归同时验证旧 HTTP／Ethernet 路径、专用字段／原始字节，以及未观察发现流程、未证明代理使用、未解析正文的元数据，不能以状态改名绕过这一边界。
+
 | 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Ethernet II | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `ethernet.yaml` |
@@ -39,7 +41,7 @@
 | Kerberos | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/kerberos.yaml` |
 | NTLM | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
 | NTLMSSP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ntlm.yaml` |
-| SPNEGO | B | 75 | 20 | 15 | 16 | 14 | 10 | L2 | `application-layer/spnego.yaml` |
+| SPNEGO | B | 80 | 15 | 25 | 16 | 14 | 10 | L2 | `application-layer/spnego.yaml` |
 | RADIUS | A | 100 | 25 | 25 | 20 | 20 | 10 | L1 | `application-layer/radius.yaml` |
 | SOCKS5 | B | 86 | 20 | 20 | 16 | 20 | 10 | L2 | `application-layer/socks5.yaml` |
 | SSH | B | 81 | 20 | 15 | 16 | 20 | 10 | L2 | `application-layer/ssh.yaml` |
@@ -77,6 +79,8 @@
 | WPAD proxy | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `application-layer/http.yaml` |
 
 67 个 P0：A 10 / B 57，最低 75（B）。IEEE 802.1Q / DHCP 为 L3 样本，流量维按标准记 8 分。802.1Q 的 Payload switch（IP / IPv6 / ARP / EAPOL / default）由 `TestVLANPayloadTypeArms` + ARP 内层测试覆盖。证据见 `protocol_scores.go` 的 `Evidence`；G6 失败路径在 `p0_fail_paths_test.go`。
+
+SPNEGO 与 P1 GSS-API 的评分共用 `spnego.yaml` 初始 token 子集的证据与得分（80/B）：Schema 15，不将该规则的 `Optional Fields`（reqFlags/mechToken/mechListMIC 的 TLV 结构）、非 init `Octets`（含 NegTokenResp）算作已解析，且不支持长格式 BER。`TestP1WiresharkAndRFCSamples/spnego/ntlm` 和 `/spnego/krb5` 分别在 Ethernet→IP→TCP/445→SMB2→Session Setup→SPNEGOInit 路径断言各自的 `MechOID`，因此流量维按既有整帧具名字段标准记 25；不是仅有 Type/Length 或孤立 payload。边界、额外 OID 与可选字段有回归，但尚未覆盖每条显式错误分支，测试/分支维保守记 16/14。独立的 corpus `gssapi.yaml/GSSAPIHTTP` 合同已解析 token 字段，缺少 NegotiationToken 的原始样本仍是负例，完整 token 由 `gen-gssapi-valid` 验证；tokenless 401 challenge 的 outer-only 响应不计为已解析 token 字段。评分不计入新原生规则的额外字段，也不表示所有 GSS-API 机制或协商结果已经实现和验证。
 
 ## 本轮扩展的非 P0
 
