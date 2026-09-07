@@ -847,7 +847,7 @@ jobs:
           # broken package only fails itself. Long-tail suites run several packages at
           # once (PACKAGE_WORKERS) to use the runner's second core.
           export TEST_RUNNER="./scripts/ci/test-run-pkg.sh"
-          export PACKAGE_WORKERS="${matrix.package_workers || '1'}"
+          export PACKAGE_WORKERS="${{ matrix.package_workers || '1' }}"
           mkdir -p "$TEST_BIN_DIR"
           ./scripts/ci/test-run-suite.sh
 
