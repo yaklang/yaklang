@@ -1,0 +1,44 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Visualforce Page API Version"
+	title_zh: "检测到 Visualforce API 版本低于 55",
+	type: vuln
+	level: middle
+	rule_id: "source-config-visualforce-page-api-version"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `visualforce-page-api-version` (/tmp/semgrep-rules/generic/visualforce/security/ncino/xml/VisualForceAPIVersion.yaml).
+Original message: Visualforce Pages must use API version 55 or higher for required use of the cspHeader attribute set to true.
+
+CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting (XSS)')
+References:
+- https://developer.salesforce.com/docs/atlas.en-us.api_meta.meta/api_meta/meta_pages.htm
+Note: context-aware regex — version hits are kept only inside `apiVersion` elements.
+DESC
+	solution: <<<SOLUTION
+Upgrade the Visualforce page API version to 55.0 or newer and explicitly set the required cspHeader attributes.
+SOLUTION
+	alert_min: 1
+	"file://pos.page-meta.xml": <<<POS
+<apiVersion>54.0</apiVersion>
+POS
+	"safefile://neg.page-meta.xml": <<<NEG
+<apiVersion>55.0</apiVersion>
+NEG
+)
+
+${*.page-meta.xml}.pattern_regex(/<apiVersion[\s\S]*?<\/apiVersion>/) as $ctx
+${*.page-meta.xml}.pattern_regex(/>[0-9][0-9]*\.[0-9]</) as $version
+${*.page-meta.xml}.pattern_regex(/>[1-4][0-9]\.[0-9]</) as $below50
+${*.page-meta.xml}.pattern_regex(/>5[0-4]\.[0-9]</) as $low2
+$version inside $ctx as $a
+$below50 inside $a as $b
+$low2 inside $a as $c
+$b + $c as $hit
+alert $hit for {
+	level: "middle",
+	title: "Visualforce Page API Version",
+	title_zh: "检测到 Visualforce API 版本低于 55",
+	message: "Visualforce page API version is below 55.",
+}

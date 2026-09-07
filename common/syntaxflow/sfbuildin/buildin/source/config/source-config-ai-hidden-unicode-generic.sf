@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "AI Config Hidden Unicode"
+	title_zh: "检测到 AI 配置文件包含隐藏 Unicode 字符",
+	type: vuln
+	level: high
+	rule_id: "source-config-ai-hidden-unicode-generic"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `ai-config-hidden-unicode-generic` (/tmp/semgrep-rules/ai/ai-best-practices/ai-config-hidden-unicode/ai-config-hidden-unicode.yaml).
+Original message: Invisible or zero-width Unicode character detected in AI coding assistant config file. These characters can be used in "Rules File Backdoor" attacks to inject hidden malicious instructions that are invisible to developers but interpreted by AI assistants. Remove all zero-width and bidirectional override characters from this file.
+
+CWE: CWE-116: Improper Encoding, Escaping, or Output
+References:
+- https://www.pillar.security/blog/new-vulnerability-in-github-copilot-and-cursor-how-hackers-can-weaponize-code-agents
+DESC
+	solution: <<<SOLUTION
+Remove all zero-width and bidirectional override characters from AI assistant configuration files and review the visible instructions for unexpected content.
+SOLUTION
+	alert_min: 1
+	"file://pos.cursorrules": <<<POS
+You are helpful.​
+POS
+	"safefile://neg.cursorrules": <<<NEG
+You are helpful.
+NEG
+)
+
+${*.cursorrules}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p0
+${*.mdc}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p1
+${*copilot-instructions*}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p2
+${*.windsurfrules}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p3
+${*CLAUDE.md}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p4
+${*AGENTS.md}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p5
+$p0 + $p1 + $p2 + $p3 + $p4 + $p5 as $hit
+alert $hit for {
+	level: "high",
+	title: "AI Config Hidden Unicode",
+	title_zh: "检测到 AI 配置文件包含隐藏 Unicode 字符",
+	message: "Invisible or zero-width Unicode character detected in an AI coding assistant config file.",
+}

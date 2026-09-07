@@ -1,0 +1,43 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Apex Insecure HTTP Request"
+	title_zh: "检测到 Apex 明文 HTTP 请求",
+	type: vuln
+	level: high
+	rule_id: "source-insecure-api-apex-insecure-http-request"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `insecure-http-request` (/tmp/semgrep-rules/apex/lang/security/ncino/endpoints/InsecureHttpRequest.yaml).
+Original message: The software transmits sensitive or security-critical data in cleartext in a communication channel that can be sniffed by unauthorized actors.
+
+CWE: CWE-319: Cleartext Transmission of Sensitive Information
+References:
+- https://cwe.mitre.org/data/definitions/319.html
+Note: original paths.exclude for *Test*/*test* is not yet applied by the source path filter.
+DESC
+	solution: <<<SOLUTION
+Use HTTPS for Apex callouts and validate TLS certificates. Remove cleartext HTTP endpoints and test callouts from production code.
+SOLUTION
+	alert_min: 1
+	"file://pos.cls": <<<POS
+HttpRequest req = new HttpRequest();
+req.setEndpoint('http://example.com/api');
+POS
+	"safefile://neg.cls": <<<NEG
+HttpRequest req = new HttpRequest();
+req.setEndpoint('https://example.com/api');
+NEG
+)
+
+${*}.pattern_regex(/http:\/\//) as $t
+${*}.pattern_regex(/\/\/.*/) as $comment
+${*}.pattern_regex(/\*.*/) as $glob
+$t not_inside $comment as $a
+$a not_inside $glob as $hit
+alert $hit for {
+	level: "high",
+	title: "Apex Insecure HTTP Request",
+	title_zh: "检测到 Apex 明文 HTTP 请求",
+	message: "Apex callout uses a cleartext HTTP endpoint.",
+}
