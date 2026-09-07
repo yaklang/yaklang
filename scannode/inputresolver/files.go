@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
@@ -21,6 +22,8 @@ import (
 
 const MaxReadBytes = 256 << 10
 const MaxSearchResults = 200
+const MaxSearchScanBytes = 128 << 20
+const maxSearchDuration = 4 * time.Second
 
 type File struct {
 	ResourceID   string `json:"resource_id"`
@@ -40,7 +43,7 @@ func (w *Workspace) Files() []File {
 func (w *Workspace) Info() map[string]any {
 	return map[string]any{"workspace_id": w.manifest.WorkspaceId,
 		"manifest_id": w.manifest.ManifestId, "inputs": w.Files(), "output_path": "outputs",
-		"max_read_bytes": MaxReadBytes, "max_search_results": MaxSearchResults}
+		"max_read_bytes": MaxReadBytes, "max_search_results": MaxSearchResults, "max_scan_bytes": MaxSearchScanBytes, "max_search_duration_ms": maxSearchDuration.Milliseconds()}
 }
 
 // Identity is for trusted event/result correlation, not model context.
@@ -187,6 +190,13 @@ func (w *Workspace) Search(ctx context.Context, selection, query string, caseSen
 // SearchFrom resumes an exact input file using its original byte offset. A
 // result limit returns a cursor rather than silently restarting at byte zero.
 func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, caseSensitive bool, limit int, requestedOffset int64) (map[string]any, error) {
+	return w.SearchPage(ctx, selection, query, caseSensitive, limit, requestedOffset, MaxSearchScanBytes)
+}
+
+// SearchPage bounds both scan work and elapsed time. Incomplete searches return
+// a cursor with query overlap, so the caller can continue without losing a
+// match across a page boundary. Parent cancellation still fails the operation.
+func (w *Workspace) SearchPage(ctx context.Context, selection, query string, caseSensitive bool, limit int, requestedOffset, maxScanBytes int64) (map[string]any, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if err := w.check(ctx); err != nil {
@@ -214,6 +224,17 @@ func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, cas
 	if limit <= 0 || limit > MaxSearchResults {
 		limit = MaxSearchResults
 	}
+	if maxScanBytes < 0 {
+		return nil, fail("input_range_invalid", "")
+	}
+	if maxScanBytes == 0 || maxScanBytes > MaxSearchScanBytes {
+		maxScanBytes = MaxSearchScanBytes
+	}
+	// A page must be larger than the maximum query overlap and UTF-8 alignment.
+	if maxScanBytes < 64<<10 {
+		maxScanBytes = 64 << 10
+	}
+	deadline := time.Now().Add(maxSearchDuration)
 	match := inputSearchMatcher(query, caseSensitive)
 	overlap := len(query) - 1
 	if !caseSensitive {
@@ -228,7 +249,7 @@ func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, cas
 		if !selected(resource.RelativePath, selection) {
 			continue
 		}
-		if len(results) >= limit {
+		if len(results) >= limit || total >= maxScanBytes || (total > 0 && !time.Now().Before(deadline)) {
 			truncated = true
 			nextPath = resource.RelativePath
 			break
@@ -245,10 +266,18 @@ func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, cas
 			file.Close()
 			return nil, fail("input_read_failed", resource.ResourceId)
 		}
-		reader := bufio.NewReaderSize(file, 64<<10)
+		reader := bufio.NewReaderSize(io.LimitReader(file, maxScanBytes-total), 64<<10)
 		var scanned int64
 		line := int64(1)
 		tail := ""
+		var nextClockCheck int64
+		continueAt := func(keep int) {
+			truncated = true
+			nextPath, nextOffset = resource.RelativePath, startOffset+scanned-int64(keep)
+			if nextOffset <= startOffset {
+				nextOffset = startOffset + 1
+			}
+		}
 		scanErr := func() error {
 			defer file.Close()
 			defer func() {
@@ -262,6 +291,13 @@ func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, cas
 			for {
 				if err := w.check(ctx); err != nil {
 					return err
+				}
+				if scanned > 0 && scanned >= nextClockCheck {
+					if !time.Now().Before(deadline) {
+						continueAt(len(tail))
+						return nil
+					}
+					nextClockCheck = scanned + 64<<10
 				}
 				fragment, readErr := reader.ReadSlice('\n')
 				previous := scanned
@@ -314,6 +350,9 @@ func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, cas
 					}
 				}
 				if readErr == io.EOF {
+					if uint64(startOffset+scanned) < resource.SizeBytes {
+						continueAt(overlap)
+					}
 					return nil
 				}
 				if readErr != nil && readErr != bufio.ErrBufferFull {
@@ -331,7 +370,7 @@ func (w *Workspace) SearchFrom(ctx context.Context, selection, query string, cas
 	}
 	response := map[string]any{"path": selection, "query": query, "matches": results,
 		"count": len(results), "scanned_bytes": total, "scan_start_offset": requestedOffset,
-		"truncated": truncated, "complete": !truncated}
+		"truncated": truncated, "complete": !truncated, "max_scan_bytes": maxScanBytes, "max_search_duration_ms": maxSearchDuration.Milliseconds()}
 	if truncated {
 		response["next_path"], response["next_offset"] = nextPath, nextOffset
 	}

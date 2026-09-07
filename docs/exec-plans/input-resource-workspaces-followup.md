@@ -122,3 +122,19 @@ absolute line numbers. Three-page, invalid-range, directory-cursor, UTF-8,
 file-transition and EOF checks pass under race alongside existing boundaries.
 The affected real large-file Run is repeated on this frozen source; its final
 evidence and CI state are recorded with the paired PR acceptance bundle.
+
+## Bounded search work within a Focus action
+
+The 5cbcba904 runtime Run `aitr_c8768a76e6ac4445a57617e2207f62a2`
+failed while one search action performed multiple full-file scans: the Yak
+Focus handler reached its existing 30-second deadline. Its failed terminal
+state, partial access ranges and successful cleanup remain retained.
+
+SearchPage now caps one call at 128 MiB and a four-second processing budget,
+returning complete=false and a progressing cursor. Parent cancellation still
+fails closed. A smaller requested max_scan_bytes is supported down to 64 KiB.
+Continuation retains query overlap at byte-budget boundaries. A real capability
+regression proves the former ignored budget and the corrected cross-page
+match; managed-input and resolver boundary race checks pass. No timeout was
+extended and no incomplete scan is labelled complete. The final Provider Run
+and CI are separate handoff gates in the acceptance bundle.
