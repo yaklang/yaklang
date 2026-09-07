@@ -683,6 +683,10 @@ type sessionMCPServer struct {
 	AllowedTools []string          `json:"allowed_tools"`
 }
 
+func isAttachmentWorkspace(spec *legionCodeWorkspaceSpec) bool {
+	return spec != nil && strings.EqualFold(strings.TrimSpace(spec.Kind), legionCodeWorkspaceKindAttachments)
+}
+
 func buildYakAIEngineOptions(
 	ctx context.Context,
 	binding aiSessionBinding,
@@ -692,17 +696,27 @@ func buildYakAIEngineOptions(
 	if err != nil {
 		return nil, fmt.Errorf("decode runtime options: %w", err)
 	}
-	attachmentTask := isLegionAttachmentTarget(binding.AuthorizedTargetURL) || isLegionAttachmentTarget(options.FocusTargetURL)
+	attachmentTask := isLegionAttachmentTarget(binding.AuthorizedTargetURL) || isLegionAttachmentTarget(options.FocusTargetURL) || isAttachmentWorkspace(options.SourceWorkspace)
 	if attachmentTask {
 		if binding.ProjectID != "" || binding.ExecutionMode != "single_run" || binding.LegionResultRuntime == nil || binding.LegionResultRuntime.AuthorizedTarget() != binding.AuthorizedTargetURL {
 			return nil, fmt.Errorf("attachment task requires a projectless single-run server resource binding")
 		}
 		focusMode, _, _ := strings.Cut(binding.AuthorizedFocusReleaseID, "@")
-		if err := validateAttachmentTaskRuntimeOptions(options, binding.AuthorizedTargetURL, focusMode, binding.AuthorizedFocusReleaseID); err != nil {
-			return nil, err
-		}
-		if err := validateAttachmentTaskPins(binding.Attachments); err != nil {
-			return nil, err
+		if isAttachmentWorkspace(options.SourceWorkspace) {
+			target, err := legionCodeWorkspaceSentinel(options.SourceWorkspace.WorkspaceID)
+			if err != nil || target != binding.AuthorizedTargetURL || target != options.FocusTargetURL || focusMode != legionLogAnalysisFocusName || options.FocusReleaseID != binding.AuthorizedFocusReleaseID {
+				return nil, fmt.Errorf("attachment workspace does not match the server resource binding")
+			}
+			if len(options.SessionMCPServers) > 0 || strings.TrimSpace(options.ForgeName) != "" || len(options.RiskJudgementScope) > 0 {
+				return nil, fmt.Errorf("attachment workspace does not allow ExtraMCP, Forge, or risk judgement scope")
+			}
+		} else {
+			if err := validateAttachmentTaskRuntimeOptions(options, binding.AuthorizedTargetURL, focusMode, binding.AuthorizedFocusReleaseID); err != nil {
+				return nil, err
+			}
+			if err := validateAttachmentTaskPins(binding.Attachments); err != nil {
+				return nil, err
+			}
 		}
 		// Immutable attachment Focus code owns stage/report execution. Do not
 		// expose the ordinary engine's tools, filesystem, search, or ambient MCP
