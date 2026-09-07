@@ -28,10 +28,11 @@ import (
 // table row can assert either "must report high" (true positive) or "must
 // report nothing" (negative/safe sample).
 type alertCounts struct {
-	Total int
-	High  int
-	Mid   int
-	Low   int
+	Total      int
+	High       int
+	Mid        int
+	Low        int
+	ByVariable map[string]int
 }
 
 // loadBuiltinRule reads a builtin rule straight from the embed FS by its
@@ -61,10 +62,11 @@ func runJavaBuiltinRule(t *testing.T, ruleContent, filename, code string) alertC
 	result, err := programs[0].SyntaxFlowWithError(ruleContent)
 	require.NoError(t, err)
 
-	c := alertCounts{}
+	c := alertCounts{ByVariable: map[string]int{}}
 	for _, variable := range result.GetAlertVariables() {
 		n := len(result.GetValues(variable))
 		c.Total += n
+		c.ByVariable[variable] = n
 		info, ok := result.GetAlertInfo(variable)
 		if !ok || info == nil {
 			continue
@@ -86,20 +88,20 @@ func runJavaBuiltinRule(t *testing.T, ruleContent, filename, code string) alertC
 //
 // Row semantics:
 //   - wantHigh > 0       : vulnerable sample must produce at least this many
-//                          high severity alerts (true positive).
+//     high severity alerts (true positive).
 //   - negative == true   : safe sample must produce NO alert at all.
 //   - allowZeroHigh == true: the sample is a KNOWN-UNCOVERED gap (the rule does
-//                            not yet reach this sink). It must not be reported
-//                            as high today; when the rule is extended to cover
-//                            it, flip the row to a positive wantHigh so the
-//                            coverage is locked in. Keeps the gap visible.
+//     not yet reach this sink). It must not be reported
+//     as high today; when the rule is extended to cover
+//     it, flip the row to a positive wantHigh so the
+//     coverage is locked in. Keeps the gap visible.
 //
 // Add one positive row + one paired negative row whenever a sink/source is
 // extended, so broader coverage cannot silently flag safe code.
 func TestJavaTruePositiveRegressionRules(t *testing.T) {
 	const cmdiRule = "java/cwe-78-os-command-injection/java-servlet-n-spring-direct-command-injection.sf"
 	const sqliRule = "java/cwe-89-sql-injection/java-execute-query-string-add-out-of-control.sf"
-	const xssRule  = "java/cwe-79-xss/java-servlet-xss.sf"
+	const xssRule = "java/cwe-79-xss/java-servlet-xss.sf"
 
 	cases := []struct {
 		name          string
@@ -272,8 +274,8 @@ public class SafePreparedStatement {
 		{
 			name:     "sqli_prepare_statement_concat_detected",
 			rulePath: sqliRule,
-			fileName:  "Basic19.java",
-			wantHigh:  1,
+			fileName: "Basic19.java",
+			wantHigh: 1,
 			code: `
 package securibench.micro.basic;
 import java.io.IOException;
