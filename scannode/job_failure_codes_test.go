@@ -19,6 +19,7 @@ func TestResolveJobFailureCodeKnownCodes(t *testing.T) {
 		{JobFailureCodeScriptExecutionPanic, JobFailureRetryPolicyTransient},
 		{JobFailureCodeStartedEventPublishFailed, JobFailureRetryPolicyTransient},
 		{JobFailureCodeAttemptMissingFromHeartbeat, JobFailureRetryPolicyReschedule},
+		{JobFailureCodeAttemptLeaseExpired, JobFailureRetryPolicyReschedule},
 		// Script-reported codes from Legion-owned yak scripts must resolve as
 		// known so prepareJobFailureForPublish forwards them verbatim.
 		{JobFailureCodeGitCloneError, JobFailureRetryPolicyTransient},

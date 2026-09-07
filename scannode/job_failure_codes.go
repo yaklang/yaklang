@@ -17,11 +17,11 @@ const (
 
 const (
 	// Node-reported JobFailed.error_code values emitted by scannode.
-	JobFailureCodeNodeCapacityExceeded    = "node_capacity_exceeded"
-	JobFailureCodeInvalidDispatchCommand  = "invalid_dispatch_command"
-	JobFailureCodeScriptExecutionFailed   = "script_execution_failed"
+	JobFailureCodeNodeCapacityExceeded      = "node_capacity_exceeded"
+	JobFailureCodeInvalidDispatchCommand    = "invalid_dispatch_command"
+	JobFailureCodeScriptExecutionFailed     = "script_execution_failed"
 	JobFailureCodeRuleSnapshotPrepareFailed = "rule_snapshot_prepare_failed"
-	JobFailureCodeScriptExecutionPanic    = "script_execution_panic"
+	JobFailureCodeScriptExecutionPanic      = "script_execution_panic"
 	JobFailureCodeStartedEventPublishFailed = "started_event_publish_failed"
 
 	// JobFailureCodeUnknownNodeReported is the canonical bucket for unrecognized
@@ -42,6 +42,7 @@ const (
 	// Platform-inferred codes: never emitted by scannode, documented here so
 	// Legion and yaklang share one registry for retry decisions.
 	JobFailureCodeAttemptMissingFromHeartbeat = "attempt_missing_from_heartbeat"
+	JobFailureCodeAttemptLeaseExpired         = "attempt_lease_expired"
 )
 
 const (
@@ -63,13 +64,14 @@ type jobFailureCodeSpec struct {
 // Git hosts (e.g. github.com) regularly drop connections mid-clone; the other
 // script codes describe deterministic input or environment problems.
 var jobFailureCodeRegistry = map[string]jobFailureCodeSpec{
-	JobFailureCodeNodeCapacityExceeded:      {policy: JobFailureRetryPolicyReschedule},
-	JobFailureCodeInvalidDispatchCommand:    {policy: JobFailureRetryPolicyNone},
-	JobFailureCodeScriptExecutionFailed:     {policy: JobFailureRetryPolicyNone},
-	JobFailureCodeRuleSnapshotPrepareFailed: {policy: JobFailureRetryPolicyTransient},
-	JobFailureCodeScriptExecutionPanic:      {policy: JobFailureRetryPolicyTransient},
-	JobFailureCodeStartedEventPublishFailed: {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeNodeCapacityExceeded:        {policy: JobFailureRetryPolicyReschedule},
+	JobFailureCodeInvalidDispatchCommand:      {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeScriptExecutionFailed:       {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeRuleSnapshotPrepareFailed:   {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeScriptExecutionPanic:        {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeStartedEventPublishFailed:   {policy: JobFailureRetryPolicyTransient},
 	JobFailureCodeAttemptMissingFromHeartbeat: {policy: JobFailureRetryPolicyReschedule},
+	JobFailureCodeAttemptLeaseExpired:         {policy: JobFailureRetryPolicyReschedule},
 
 	JobFailureCodeGitCloneError:          {policy: JobFailureRetryPolicyTransient},
 	JobFailureCodeNotFoundFileCanCompile: {policy: JobFailureRetryPolicyNone},
