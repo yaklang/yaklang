@@ -62,7 +62,7 @@ func TestProtocolCorpusContractReferencesExist(t *testing.T) {
 			validExactKeys[capture.ID+"/"+spec.Name] = struct{}{}
 			continue
 		}
-		if capture.EvidenceKind != "upstream-positive" || capture.RoadmapName == nil || capture.RepresentativeFrame == nil {
+		if !protocolCorpusIsPositive(capture) || capture.RoadmapName == nil || capture.RepresentativeFrame == nil {
 			continue
 		}
 		name := *capture.RoadmapName

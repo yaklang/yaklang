@@ -4,17 +4,21 @@ Package:
     operator: |
       this.ProcessSubNode("VersionType")
       vt = getNodeResult("VersionType").Value
-      if (vt >> 4) != 1 {
-        panic("pppoe: version must be 1")
+      if vt != 0x11 {
+        panic("pppoe: version and type must be 1")
       }
       this.ProcessSubNode("Code")
       this.ProcessSubNode("Session ID")
       this.ProcessSubNode("Length")
       l = getNodeResult("Length").Value
-      if l > 0 && l < 1048576 {
+      if l > this.GetMaxLength() - this.Length() { panic("pppoe: payload length exceeds input") }
+      if getNodeResult("Code").Value == 0 && (l < 2 || getNodeResult("Session ID").Value == 0) { panic("pppoe: invalid session header") }
+      if l > 0 {
         this.GetSubNode("Payload").SetMaxLength(l)
         this.ProcessSubNode("Payload")
       }
+      rest = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && rest > 0 { this.GetSubNode("Link Padding").SetMaxLength(rest); this.ProcessSubNode("Link Padding") }
       return
     VersionType: uint8
     Code: uint8
@@ -39,30 +43,17 @@ Package:
         list: true
         Tag: PPPoETag
         operator: |
-          for {
-            if this.GetMaxLength() < 4 {
-              break
-            }
-            res, op = this.TryProcessByType("PeekByte")
-            if !op.OK {
-              op.Recovery()
-              break
-            }
-            op.Recovery()
+          for this.Length() < this.GetMaxLength() {
+            if this.GetMaxLength() - this.Length() < 4 { panic("pppoe: truncated tag header") }
             ele = this.NewElement()
-            if ele.GetMaxLength() < 4 {
-              break
-            }
-            prev = this.Length()
             ele.Process()
-            if this.Length() <= prev {
-              break
-            }
             if ele.GetSubNode("Type").Result().Value == 0 {
+              if this.Length() != this.GetMaxLength() { panic("pppoe: bytes after end-of-list tag") }
               break
             }
           }
-PPP: "import:ppp.yaml;node:PPP"
+    Link Padding: raw
+PPP: "import:ppp.yaml;node:PPPProtocol"
 PPPoETag:
   operator: |
     this.ProcessSubNode("Type")
@@ -70,6 +61,7 @@ PPPoETag:
     t = getNodeResult("Type").Value
     l = getNodeResult("Length").Value
     if t == 0 {
+      if l != 0 { panic("pppoe: end-of-list tag length must be zero") }
       return
     }
     if t == 257 {

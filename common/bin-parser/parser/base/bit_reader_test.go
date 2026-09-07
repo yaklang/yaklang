@@ -34,6 +34,25 @@ func TestBitReader(t *testing.T) {
 		t.Fatal("read bits error")
 	}
 }
+
+func TestBitReaderDoesNotPrivatelyBufferTheFollowingMessage(t *testing.T) {
+	for _, width := range []uint64{1, 8, 16} {
+		source := bytes.NewReader([]byte{0xab, 0xcd, 0xef})
+		readerOnly := struct{ io.Reader }{source}
+		reader := NewBitReader(readerOnly)
+		_, err := reader.ReadBits(width)
+		require.NoError(t, err)
+		require.Equal(t, 3-int((width+7)/8), source.Len())
+	}
+	source := bytes.NewReader([]byte("onetwo"))
+	readerOnly := struct{ io.Reader }{source}
+	first, err := NewBitReader(readerOnly).ReadBits(24)
+	require.NoError(t, err)
+	require.Equal(t, "one", string(first))
+	second, err := NewBitReader(readerOnly).ReadBits(24)
+	require.NoError(t, err)
+	require.Equal(t, "two", string(second))
+}
 func TestMultiReader(t *testing.T) {
 	reader1 := bytes.NewReader([]byte("hello"))
 	reader2 := bytes.NewReader([]byte(" world"))

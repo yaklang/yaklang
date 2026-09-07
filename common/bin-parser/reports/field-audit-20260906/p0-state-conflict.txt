@@ -1,8 +1,0 @@
---- FAIL: TestP0RoadmapCovered (0.09s)
-    p0_more_test.go:35: P0 catalog protocol "LDAP" is still partial
-    p0_more_test.go:35: P0 catalog protocol "MySQL" is still partial
-    p0_more_test.go:35: P0 catalog protocol "PostgreSQL" is still partial
-    p0_more_test.go:35: P0 catalog protocol "SMB3" is still partial
-FAIL
-FAIL	github.com/yaklang/yaklang/common/bin-parser	0.840s
-FAIL

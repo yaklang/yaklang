@@ -1,0 +1,113 @@
+# RFC 5340 Appendix A.3. LSA bodies remain explicit typed bytes.
+endian: big
+Package:
+  OSPFv3:
+    operator: |
+      this.ProcessSubNode("Header")
+      if getNodeResult("Header/Version").Value != 3 { panic("ospfv3: version must be three") }
+      length = getNodeResult("Header/Packet Length").Value
+      if length < 16 || length > this.GetMaxLength() { panic("ospfv3: invalid packet length") }
+      this.SetMaxLength(length)
+      typ = getNodeResult("Header/Type").Value
+      switch typ {
+        case 1: this.ProcessSubNode("Hello")
+        case 2: this.ProcessSubNode("Database Description")
+        case 3: this.ProcessSubNode("Link State Requests")
+        case 4: this.ProcessSubNode("Link State Update")
+        case 5: this.ProcessSubNode("LSA Headers")
+        default: panic("ospfv3: unknown packet type")
+      }
+      if this.Length() != length { panic("ospfv3: packet body length mismatch") }
+    Header:
+      Version: uint8
+      Type: uint8
+      Packet Length: uint16
+      Router ID: raw,4
+      Area ID: raw,4
+      Checksum: uint16
+      Instance ID: uint8
+      Reserved: uint8
+    Hello:
+      operator: |
+        if this.GetMaxLength() < 20 || (this.GetMaxLength()-20) % 4 != 0 { panic("ospfv3: invalid hello or neighbor length") }
+        this.ProcessSubNode("Interface ID")
+        this.ProcessSubNode("Router Priority")
+        this.ProcessSubNode("Options")
+        this.ProcessSubNode("Hello Interval")
+        this.ProcessSubNode("Router Dead Interval")
+        this.ProcessSubNode("Designated Router")
+        this.ProcessSubNode("Backup Designated Router")
+        if this.Length() < this.GetMaxLength() { this.ProcessSubNode("Neighbors") }
+      Interface ID: uint32
+      Router Priority: uint8
+      Options: uint32,24bit
+      Hello Interval: uint16
+      Router Dead Interval: uint16
+      Designated Router: raw,4
+      Backup Designated Router: raw,4
+      Neighbors:
+        list: true
+        Neighbor: raw,4
+        operator: |
+          for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+    Database Description:
+      operator: |
+        this.ProcessSubNode("Reserved 1")
+        this.ProcessSubNode("Options")
+        this.ProcessSubNode("Interface MTU")
+        this.ProcessSubNode("Reserved 2")
+        this.ProcessSubNode("Flags")
+        this.ProcessSubNode("DD Sequence")
+        if this.Length() < this.GetMaxLength() { this.ProcessSubNode("LSA Headers") }
+      Reserved 1: uint8
+      Options: uint32,24bit
+      Interface MTU: uint16
+      Reserved 2: uint8
+      Flags: uint8
+      DD Sequence: uint32
+      LSA Headers: OSPFv3LSAHeaders
+    Link State Requests:
+      list: true
+      Request:
+        Reserved: uint16
+        LS Type: uint16
+        Link State ID: raw,4
+        Advertising Router: raw,4
+      operator: |
+        if this.GetMaxLength() % 12 != 0 { panic("ospfv3: truncated link-state request") }
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+    Link State Update:
+      operator: |
+        count = this.ProcessSubNode("LSA Count").Value
+        if count > (this.GetMaxLength()-this.Length())/20 { panic("ospfv3: LSA count exceeds body") }
+        if count > 0 { this.ProcessSubNode("LSAs") }
+      LSA Count: uint32
+      LSAs:
+        list: true
+        list-length-from-field: "../LSA Count"
+        LSA:
+          operator: |
+            this.ProcessSubNode("Header")
+            length = getNodeResult("Header/Length").Value
+            if length < 20 || length > this.GetMaxLength() { panic("ospfv3: invalid LSA length") }
+            if length > 20 {
+              this.GetSubNode("Body").SetMaxLength(length-20)
+              this.ProcessSubNode("Body")
+            }
+          Header: OSPFv3LSAHeader
+          Body: raw
+    LSA Headers: OSPFv3LSAHeaders
+OSPFv3LSAHeaders:
+  list: true
+  Header: OSPFv3LSAHeader
+  operator: |
+    if this.GetMaxLength() % 20 != 0 { panic("ospfv3: truncated LSA header") }
+    for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+OSPFv3LSAHeader:
+  LS Age: uint16
+  LS Type: uint16
+  Link State ID: raw,4
+  Advertising Router: raw,4
+  Sequence: uint32
+  Checksum: uint16
+  Length: uint16

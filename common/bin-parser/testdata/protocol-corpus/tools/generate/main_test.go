@@ -258,7 +258,7 @@ func TestRepresentativeSelectionPreservesDecodeAsArguments(t *testing.T) {
 	}
 }
 
-func TestPrepareCapturesRejectsUnmatchedFilterAndKeepsPriorHex(t *testing.T) {
+func TestPrepareCapturesRejectsPartialInventoryAndRecordsFrameDigest(t *testing.T) {
 	dir := t.TempDir()
 	spec := validDigestSpec()
 	repo := spec.Repositories[0]
@@ -278,45 +278,32 @@ func TestPrepareCapturesRejectsUnmatchedFilterAndKeepsPriorHex(t *testing.T) {
 	first.SourceSHA256 = digestHex(pcap.Bytes())
 	second.SourceSHA256 = first.SourceSHA256
 	captureDir := filepath.Join(dir, "captures", repo.ID)
-	hexDir := filepath.Join(dir, "hex")
-	for _, path := range []string{captureDir, hexDir} {
-		if err := os.MkdirAll(path, 0o755); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.MkdirAll(captureDir, 0o755); err != nil {
+		t.Fatal(err)
 	}
 	for _, id := range []string{first.ID, second.ID} {
 		if err := os.WriteFile(filepath.Join(captureDir, id+".pcap"), pcap.Bytes(), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	prior := []byte("preserve previous complete result\n")
-	priorPath := filepath.Join(hexDir, "prior.frame-1.hex")
-	if err := os.WriteFile(priorPath, prior, 0o644); err != nil {
-		t.Fatal(err)
-	}
 	installFixtureTshark(t, dir, "for arg do\n if [ \"$arg\" = 'no-match' ]; then exit 0; fi\ndone\nprintf '1\\teth\\n'\n")
-	_, err := prepareCaptures(dir, []captureSpec{first, second}, map[string]repositorySpec{repo.ID: repo}, nil, false)
+	partial, err := prepareCaptures(dir, []captureSpec{first, second}, map[string]repositorySpec{repo.ID: repo}, nil, false)
 	if err == nil || !strings.Contains(err.Error(), "matched no frame in second") {
 		t.Fatalf("unexpected filter validation: %v", err)
 	}
-	after, err := os.ReadFile(priorPath)
-	if err != nil || !bytes.Equal(prior, after) {
-		t.Fatalf("prior result lost: %q %v", after, err)
-	}
-	entries, err := os.ReadDir(hexDir)
-	if err != nil || len(entries) != 1 {
-		t.Fatalf("partial hex results published: %v %v", entries, err)
+	if partial != nil {
+		t.Fatalf("partial inventory published after invalid input: %+v", partial)
 	}
 	second.DisplayFilter = "frame"
 	result, err := prepareCaptures(dir, []captureSpec{first, second}, map[string]repositorySpec{repo.ID: repo}, nil, false)
 	if err != nil || len(result) != 2 {
 		t.Fatalf("valid complete inventory failed: %v", err)
 	}
-	if _, err := os.Stat(priorPath); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("stale generated hex retained: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, "hex")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("redundant hex directory generated: %v", err)
 	}
 	for _, capture := range result {
-		if capture.RepresentativeFrame == nil || capture.RepresentativeFrame.Number != 1 || capture.PacketCount != 1 {
+		if capture.RepresentativeFrame == nil || capture.RepresentativeFrame.Number != 1 || capture.RepresentativeFrame.LengthBytes != len(frame) || capture.RepresentativeFrame.SHA256 != digestHex(frame) || capture.PacketCount != 1 {
 			t.Fatalf("bad inventory result: %+v", capture)
 		}
 	}

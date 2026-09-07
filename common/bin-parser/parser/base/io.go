@@ -312,7 +312,23 @@ func (b *BitReader) ReadBits(n uint64) ([]byte, error) {
 	}
 	return buf, nil
 }
+
+// Preserve the caller's message boundary when it supplies only io.Reader.
+// bitio otherwise inserts a private buffered reader and can consume the next
+// message's bytes, which become inaccessible when this parser is discarded.
+// Callers wanting buffering can supply their own reusable bufio.Reader.
+type exactByteReader struct{ io.Reader }
+
+func (r exactByteReader) ReadByte() (byte, error) {
+	var single [1]byte
+	_, err := io.ReadFull(r.Reader, single[:])
+	return single[0], err
+}
+
 func NewBitReader(reader io.Reader) *BitReader {
+	if _, ok := reader.(io.ByteReader); !ok {
+		reader = exactByteReader{Reader: reader}
+	}
 	return &BitReader{
 		Reader: bitio.NewReader(reader),
 	}

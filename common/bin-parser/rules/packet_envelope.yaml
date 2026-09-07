@@ -1,5 +1,182 @@
 endian: big
 Package:
+  FDDI Envelope:
+    operator: |
+      this.ProcessSubNode("Frame Control")
+      this.ProcessSubNode("Destination")
+      this.ProcessSubNode("Source")
+      if this.GetMaxLength() > this.Length() {
+        this.GetSubNode("Payload").SetMaxLength(this.GetMaxLength() - this.Length())
+        this.ProcessSubNode("Payload")
+      }
+    Frame Control: uint8
+    Destination: raw,6
+    Source: raw,6
+
+    Payload: raw
+
+  Token Ring Envelope:
+    operator: |
+      this.ProcessSubNode("Access Control")
+      this.ProcessSubNode("Frame Control")
+      this.ProcessSubNode("Destination")
+      this.ProcessSubNode("Source First Byte")
+      this.ProcessSubNode("Source Remaining Bytes")
+      if (getNodeResult("Source First Byte").Value & 128) != 0 {
+        this.ProcessSubNode("Routing Control")
+        length = (getNodeResult("Routing Control").Value >> 8) & 31
+        if length < 2 || length > 30 || length % 2 != 0 {
+          panic("token ring: invalid routing information length")
+        }
+        if length > 2 {
+          this.GetSubNode("Route").SetMaxLength(length - 2)
+          this.ProcessSubNode("Route")
+        }
+      }
+      if this.GetMaxLength() > this.Length() {
+        this.GetSubNode("Payload").SetMaxLength(this.GetMaxLength() - this.Length())
+        this.ProcessSubNode("Payload")
+      }
+    Access Control: uint8
+    Frame Control: uint8
+    Destination: raw,6
+    Source First Byte: uint8
+    Source Remaining Bytes: raw,5
+    Routing Control: uint16
+    Route: raw
+    Payload: raw
+
+  SocketCAN Envelope:
+    operator: |
+      this.ProcessSubNode("Extended Flag")
+      this.ProcessSubNode("Remote Flag")
+      this.ProcessSubNode("Error Flag")
+      this.ProcessSubNode("Identifier")
+      this.ProcessSubNode("Data Length")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Length Code")
+      length = getNodeResult("Data Length").Value
+      if this.GetMaxLength() != 16 || length > 8 {
+        panic("socketcan: invalid classic CAN record length")
+      }
+      if length > 0 {
+        this.GetSubNode("Data").SetMaxLength(length)
+        this.ProcessSubNode("Data")
+      }
+      if length < 8 {
+        this.GetSubNode("Padding").SetMaxLength(8 - length)
+        this.ProcessSubNode("Padding")
+      }
+    Extended Flag: uint8,1bit
+    Remote Flag: uint8,1bit
+    Error Flag: uint8,1bit
+    Identifier: uint32,29bit
+    Data Length: uint8
+    Flags: uint8
+    Reserved: uint8
+    Length Code: uint8
+    Data: raw
+    Padding: raw
+
+  IEEE802154 Envelope:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Frame Control")
+      fc = getNodeResult("Frame Control").Value
+      version = (fc >> 12) & 3
+      destination = (fc >> 10) & 3
+      source = (fc >> 14) & 3
+      if version > 1 || destination == 1 || source == 1 {
+        panic("ieee802154: unsupported frame version or reserved address mode")
+      }
+      this.ProcessSubNode("Sequence Number")
+      if destination != 0 {
+        this.ProcessSubNode("Destination PAN")
+        if destination == 2 {
+          this.ProcessSubNode("Destination Short")
+        } else {
+          this.ProcessSubNode("Destination Extended")
+        }
+      }
+      if source != 0 {
+        if (fc & 64) == 0 || destination == 0 {
+          this.ProcessSubNode("Source PAN")
+        }
+        if source == 2 {
+          this.ProcessSubNode("Source Short")
+        } else {
+          this.ProcessSubNode("Source Extended")
+        }
+      }
+      remaining = this.GetMaxLength() - this.Length() - 0
+      if remaining < 0 {
+        panic("ieee802154: truncated frame")
+      }
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+    Frame Control: uint16
+    Sequence Number: uint8
+    Destination PAN: uint16
+    Destination Short: uint16
+    Destination Extended: raw,8
+    Source PAN: uint16
+    Source Short: uint16
+    Source Extended: raw,8
+    Payload: raw
+
+  IEEE802154 FCS Envelope:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Frame Control")
+      fc = getNodeResult("Frame Control").Value
+      version = (fc >> 12) & 3
+      destination = (fc >> 10) & 3
+      source = (fc >> 14) & 3
+      if version > 1 || destination == 1 || source == 1 {
+        panic("ieee802154: unsupported frame version or reserved address mode")
+      }
+      this.ProcessSubNode("Sequence Number")
+      if destination != 0 {
+        this.ProcessSubNode("Destination PAN")
+        if destination == 2 {
+          this.ProcessSubNode("Destination Short")
+        } else {
+          this.ProcessSubNode("Destination Extended")
+        }
+      }
+      if source != 0 {
+        if (fc & 64) == 0 || destination == 0 {
+          this.ProcessSubNode("Source PAN")
+        }
+        if source == 2 {
+          this.ProcessSubNode("Source Short")
+        } else {
+          this.ProcessSubNode("Source Extended")
+        }
+      }
+      remaining = this.GetMaxLength() - this.Length() - 2
+      if remaining < 0 {
+        panic("ieee802154: truncated frame")
+      }
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+      this.ProcessSubNode("Frame Check Sequence")
+    Frame Control: uint16
+    Sequence Number: uint8
+    Destination PAN: uint16
+    Destination Short: uint16
+    Destination Extended: raw,8
+    Source PAN: uint16
+    Source Short: uint16
+    Source Extended: raw,8
+    Payload: raw
+    Frame Check Sequence: uint16
+
   Ethernet Envelope:
     operator: |
       this.ProcessSubNode("Destination")

@@ -1,0 +1,65 @@
+# RFC 8926 version-zero header, typed options and bounded enclosed messages.
+endian: big
+Package:
+  Geneve:
+    operator: |
+      if !this.HasMaxLength() { panic("geneve: a datagram boundary is required") }
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 0 { panic("geneve: version must be zero") }
+      this.ProcessSubNode("Option Length")
+      this.ProcessSubNode("OAM")
+      this.ProcessSubNode("Critical Options")
+      this.ProcessSubNode("Reserved Flags")
+      this.ProcessSubNode("Protocol Type")
+      this.ProcessSubNode("VNI")
+      this.ProcessSubNode("Reserved")
+      length = getNodeResult("Option Length").Value * 4
+      if length > this.GetMaxLength() - this.Length() { panic("geneve: options exceed datagram") }
+      if length > 0 {
+        this.GetSubNode("Options").SetMaxLength(length)
+        this.ProcessSubNode("Options")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining == 0 { panic("geneve: missing enclosed message") }
+      kind = getNodeResult("Protocol Type").Value
+      var node
+      switch kind {
+        case 0x0800: node = this.NewSubNode("IPv4")
+        case 0x86dd: node = this.NewSubNode("IPv6")
+        case 0x6558: node = this.NewSubNode("Ethernet")
+        default: node = this.NewSubNode("Protocol Data")
+      }
+      node.SetMaxLength(remaining)
+      node.Process()
+    Version: uint8,2bit
+    Option Length: uint8,6bit
+    OAM: uint8,1bit
+    Critical Options: uint8,1bit
+    Reserved Flags: uint8,6bit
+    Protocol Type: uint16
+    VNI: uint32,24bit
+    Reserved: uint8
+    Options:
+      list: true
+      Option: GeneveOption
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+GeneveOption:
+  operator: |
+    this.ProcessSubNode("Class")
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value * 4
+    if length > this.GetMaxLength() - this.Length() { panic("geneve: option length exceeds options area") }
+    if (getNodeResult("Type").Value & 0x80) != 0 && getNodeResult("../../Critical Options").Value == 0 { panic("geneve: critical option flag missing") }
+    if length > 0 { this.GetSubNode("Data").SetMaxLength(length); this.ProcessSubNode("Data") }
+  Class: uint16
+  Type: uint8
+  Reserved: uint8,3bit
+  Length: uint8,5bit
+  Data: raw
+IPv4: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+Ethernet: "import:ethernet.yaml;node:Ethernet"
+Protocol Data: raw

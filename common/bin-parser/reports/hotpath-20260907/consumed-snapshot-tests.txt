@@ -1,4 +1,0 @@
-?   	github.com/yaklang/yaklang/common/bin-parser/parser/ser_parser	[no test files]
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser	0.790s
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser/base	1.233s
-ok  	github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser	4.926s

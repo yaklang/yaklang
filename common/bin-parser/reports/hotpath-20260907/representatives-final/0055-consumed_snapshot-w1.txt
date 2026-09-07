@@ -1,6 +1,0 @@
-goos: darwin
-goarch: arm64
-pkg: github.com/yaklang/yaklang/common/bin-parser
-BenchmarkDICOMPDVList/items-128         	    1533	   2335800 ns/op	   0.33 MB/s	 1898403 B/op	   28509 allocs/op
-BenchmarkDICOMPDVList/items-4096        	      45	  75659679 ns/op	   0.32 MB/s	55343518 B/op	  830071 allocs/op
-PASS

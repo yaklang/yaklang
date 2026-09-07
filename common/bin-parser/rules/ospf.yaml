@@ -2,10 +2,15 @@ endian: big
 Package:
   OSPF:
     operator: |
+      probe, op = this.TryProcessSubNode("Version")
+      if !op.OK { op.Recovery(); panic(op.Message) }
+      version = probe.Value
+      op.Recovery()
+      if version == 3 { this.ProcessByType("OSPFv3"); return }
       this.ProcessSubNode("Version")
       v = getNodeResult("Version").Value
-      if v != 2 && v != 3 {
-        panic("ospf: version must be 2 or 3")
+      if v != 2 {
+        panic("ospf: version must be two or three")
       }
       this.ProcessSubNode("Type")
       typ = getNodeResult("Type").Value
@@ -54,6 +59,7 @@ Package:
     Checksum: uint16
     AuType: uint16
     Authentication: raw,8
+OSPFv3: "import:ospfv3.yaml;node:OSPFv3"
 OSPFHello:
   operator: |
     this.ProcessSubNode("Network Mask")

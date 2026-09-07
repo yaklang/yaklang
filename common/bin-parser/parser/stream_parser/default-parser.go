@@ -32,6 +32,7 @@ const (
 	CfgDelimiterOptional   = "delimiter-optional"
 	CfgImport              = "import"
 	CfgNodeResult          = "node result"
+	CfgConsumedBits        = "consumed bits"
 	CfgLastNode            = "last node"
 	CfgElementIndex        = "element index"
 	CfgExceptionPlan       = "exception-plan"
@@ -137,6 +138,12 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 			return fmt.Errorf("new node by type error: %w", err)
 		}
 		*node = *typeNode
+		// Rebind children to the destination instance, not the temporary copy
+		// returned by ParseRefNode. Relative field paths and length accounting
+		// must see the instance attached to the actual parse tree.
+		if err := InitNode(node); err != nil {
+			return err
+		}
 		return d.Operate(operator, node)
 	}
 	if node.Name == "root" {
@@ -181,6 +188,18 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		//}
 		//*rootNode.Ctx = *node.Ctx
 
+		// Imported rules need the caller's protocol limits/session settings, but
+		// must keep their own type map, paths and transient rule variables.
+		if inputConfig, ok := node.Ctx.GetItem(base.CtxInputConfig).(map[string]any); ok {
+			for key, value := range inputConfig {
+				switch key {
+				case CfgRootMap, "root", "path", "writer", "buffer", "def_writer", CfgInList, CtxGenReaders, base.CtxInputConfig:
+					continue
+				}
+				rootNode.Ctx.SetItem(key, value)
+			}
+			rootNode.Ctx.SetItem(base.CtxInputConfig, inputConfig)
+		}
 		rootNode.Ctx.SetItem("writer", node.Ctx.GetItem("writer"))
 		rootNode.Ctx.SetItem("buffer", node.Ctx.GetItem("buffer"))
 		// 补充runtime cfg
@@ -480,13 +499,18 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 				case []byte:
 					raw = ret
 				}
-				raw = append(raw, node.Cfg.GetString(CfgDelimiter)...)
+				delimiter := node.Cfg.GetString(CfgDelimiter)
+				if delimiter == "" {
+					delimiter = node.Cfg.GetString(CfgDel)
+				}
+				raw = append(raw, delimiter...)
 				rawRes, err := d.write(raw, uint64(len(raw)*8))
-				rawRes[1] = rawRes[1] - uint64(len(node.Cfg.GetString(CfgDelimiter))*8)
+				rawRes[1] = rawRes[1] - uint64(len(delimiter)*8)
 				if err != nil {
 					return fmt.Errorf("write error: %w", err)
 				}
 				node.Cfg.SetItem(CfgNodeResult, rawRes)
+				node.Cfg.SetItem(CfgConsumedBits, uint64(len(raw)*8))
 				return nil
 			}
 		},
@@ -563,32 +587,57 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 						return errors.New("delimiter length must be greater than 0")
 					}
 				}
+				available, bounded, err := parseLengthByLengthConfig(node)
+				if err != nil {
+					return fmt.Errorf("delimiter boundary: %w", err)
+				}
+				// KMP preserves overlapping delimiter prefixes (e.g. aab in aaab).
+				prefix := make([]int, len(delimiter))
+				for i, matched := 1, 0; i < len(delimiter); i++ {
+					for matched > 0 && delimiter[i] != delimiter[matched] {
+						matched = prefix[matched-1]
+					}
+					if delimiter[i] == delimiter[matched] {
+						matched++
+					}
+					prefix[i] = matched
+				}
 				delimitern := 0
 				byts := []byte{}
-				// 循环读取数据，直到遇到delimiter结束
+				writeUnterminated := func() error {
+					res, writeErr := d.write(byts, uint64(len(byts)*8))
+					if writeErr != nil {
+						return writeErr
+					}
+					node.Cfg.SetItem(CfgNodeResult, res)
+					node.Cfg.SetItem(CfgConsumedBits, uint64(len(byts)*8))
+					return nil
+				}
 				for {
+					if bounded && (uint64(len(byts))+1)*8 > available {
+						if node.Cfg.GetBool(CfgDelimiterOptional) && uint64(len(byts))*8 == available {
+							return writeUnterminated()
+						}
+						return fmt.Errorf("delimiter not found within field boundary: %w", io.ErrUnexpectedEOF)
+					}
 					b, err := data.ReadBits(8)
 					if err != nil {
 						if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) && node.Cfg.GetBool(CfgDelimiterOptional) {
-							res, writeErr := d.write(byts, uint64(len(byts)*8))
-							if writeErr != nil {
-								return writeErr
-							}
-							node.Cfg.SetItem(CfgNodeResult, res)
-							return nil
+							return writeUnterminated()
 						}
 						return err
 					}
+					byts = append(byts, b[0])
+					for delimitern > 0 && delimiter[delimitern] != b[0] {
+						delimitern = prefix[delimitern-1]
+					}
 					if delimiter[delimitern] == b[0] {
 						delimitern++
-					} else {
-						delimitern = 0
 					}
 					if delimitern == len(delimiter) {
-						byts = byts[:len(byts)+1-delimitern]
+						byts = byts[:len(byts)-delimitern]
 						break
 					}
-					byts = append(byts, b...)
 				}
 				res, err := d.write(byts, uint64(len(byts)*8))
 				if err != nil {
@@ -599,6 +648,7 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 				if err != nil {
 					return err
 				}
+				node.Cfg.SetItem(CfgConsumedBits, uint64((len(byts)+len(delimiter))*8))
 				log.Debugf("node %s result: %v", node.Name, codec.EncodeToHex(byts))
 				return nil
 			}

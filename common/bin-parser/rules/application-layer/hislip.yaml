@@ -1,0 +1,67 @@
+# HiSLIP 1.x message framing. Data/DataEnd carry instrument-command bytes;
+# this rule does not execute them or claim to interpret their command language.
+# HiSLIP 2.0 transitions and instrument/session state machines are not decoded.
+endian: big
+Package:
+  HiSLIP: HiSLIPMessage
+  HiSLIPMessages:
+    list: true
+    Message: HiSLIPMessage
+    operator: |
+      if !this.HasMaxLength() { panic("hislip: message sequence requires a boundary") }
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+HiSLIPMessage:
+  operator: |
+    this.ProcessSubNode("Prologue")
+    if getNodeResult("Prologue").Value != "HS" { panic("hislip: invalid prologue") }
+    this.ProcessSubNode("Message Type")
+    this.ProcessSubNode("Control Code")
+    this.ProcessSubNode("Parameter")
+    this.ProcessSubNode("Payload Length")
+    kind = int(getNodeResult("Message Type").Value)
+    control = int(getNodeResult("Control Code").Value)
+    parameter = getNodeResult("Parameter").Value
+    length = getNodeResult("Payload Length").Value
+    # Reject wide lengths before mixed signed/unsigned VM comparisons or sums.
+    if length >> 32 != 0 { panic("hislip: payload exceeds configured limit") }
+    limit = getCtx("hislipPayloadLimit")
+    if !hasCtx("hislipPayloadLimit") { limit = 16777216 }
+    if limit <= 0 || length > limit { panic("hislip: payload exceeds configured limit") }
+    if this.HasMaxLength() && length > this.GetMaxLength()-16 { panic("hislip: payload exceeds input") }
+    if kind > 25 { panic("hislip: unsupported message type") }
+    this.SetMaxLength(16+length)
+    if kind in [0,13,14,15,16,17,18,19,24] && control != 0 { panic("hislip: reserved control code") }
+    if kind in [1,4,6,7,8,9,12,21,23,25] && control > 1 { panic("hislip: invalid binary control code") }
+    if kind == 5 && control > 3 { panic("hislip: invalid lock response") }
+    if kind in [2,3,5,8,9,11,15,16,19,20,22,23,24] && parameter != 0 { panic("hislip: reserved parameter") }
+    if kind == 0 || kind == 1 {
+      if parameter >> 24 != 1 { panic("hislip: unsupported protocol version") }
+      this.AddInfo("Protocol Version", parameter >> 16)
+    }
+    if kind == 0 || kind == 18 { this.AddInfo("Vendor ID", parameter & 0xffff) }
+    if kind == 1 || kind == 17 { this.AddInfo("Session ID", parameter & 0xffff) }
+    if kind == 17 || kind == 18 {
+      if parameter >> 16 != 0 { panic("hislip: reserved identifier prefix") }
+    }
+    if kind in [6,7,10,12,13,14,21] || (kind == 4 && control == 0) { this.AddInfo("Message ID", parameter) }
+    if kind == 4 && control == 1 { this.AddInfo("Lock Timeout", parameter) }
+    if kind == 25 { this.AddInfo("Client Count", parameter) }
+    if kind == 20 || kind == 22 { this.AddInfo("Status Byte", control) }
+    if kind == 15 || kind == 16 {
+      if length != 8 { panic("hislip: maximum-message-size payload must be eight bytes") }
+      this.ProcessSubNode("Maximum Message Size")
+      return
+    }
+    if kind not in [0,2,3,4,6,7] && length != 0 { panic("hislip: unexpected payload for message type") }
+    if kind == 4 && control == 0 && length != 0 { panic("hislip: lock release cannot contain a key") }
+    if length > 0 {
+      this.GetSubNode("Payload").SetMaxLength(length)
+      this.ProcessSubNode("Payload")
+    }
+  Prologue: string,2
+  Message Type: uint8
+  Control Code: uint8
+  Parameter: uint32
+  Payload Length: uint64
+  Maximum Message Size: uint64
+  Payload: raw

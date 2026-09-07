@@ -1,0 +1,41 @@
+# Query Config Information subset of ATA over Ethernet version one.
+endian: big
+Package:
+  AoE:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Error")
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Tag")
+      if getNodeResult("Version").Value != 1 { panic("aoe: version must be one") }
+      command = getNodeResult("Command").Value
+      if command != 1 { panic("aoe: only query-config command is decoded") }
+      this.ProcessSubNode("Buffer Count")
+      this.ProcessSubNode("Firmware")
+      this.ProcessSubNode("Sector Count")
+      this.ProcessSubNode("Config Version")
+      this.ProcessSubNode("Config Command")
+      this.ProcessSubNode("Config Length")
+      length = getNodeResult("Config Length").Value
+      if length > this.GetMaxLength() - this.Length() { panic("aoe: config string exceeds frame") }
+      if length > 0 { this.GetSubNode("Config String").SetMaxLength(length); this.ProcessSubNode("Config String") }
+      remaining = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && remaining > 0 { this.GetSubNode("Link Padding").SetMaxLength(remaining); this.ProcessSubNode("Link Padding") }
+    Version: uint8,4bit
+    Flags: uint8,4bit
+    Error: uint8
+    Major: uint16
+    Minor: uint8
+    Command: uint8
+    Tag: uint32
+    Buffer Count: uint16
+    Firmware: uint16
+    Sector Count: uint8
+    Config Version: uint8,4bit
+    Config Command: uint8,4bit
+    Config Length: uint16
+    Config String: string
+    Link Padding: raw

@@ -3650,8 +3650,9 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	})
 
 	t.Run("pppoe/session", func(t *testing.T) {
-		// RFC 2516 §4 session (code 0) carries PPP. Protocol 0x002d as in RFC 2661 data example. EtherType 0x8864.
-		sess := mustHex(t, "110000010004ff03002d")
+		// RFC 2516 §6 starts with Protocol-ID, without HDLC address/control.
+		// This fixture exercises the header only, not compressed TCP content.
+		sess := mustHex(t, "110000010002002d")
 		n := parseRule(t, sess, "pppoe", "PPPoE")
 		require.Equal(t, uint64(0), uintVal(t, n.Child("Code")))
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Session ID")))

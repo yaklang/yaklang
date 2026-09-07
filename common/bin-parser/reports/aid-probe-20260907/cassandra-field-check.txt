@@ -1,4 +1,0 @@
-Command: go test ./common/bin-parser -run '^TestProtocolCorpusCassandraFieldsOriginalRecords$' -count=1 -timeout=1m
-Exit: 0
-
-ok  	github.com/yaklang/yaklang/common/bin-parser	0.856s

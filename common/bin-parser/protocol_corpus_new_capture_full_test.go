@@ -121,9 +121,14 @@ func TestProtocolCorpusRadiusBoundaryRejectsEveryFrame(t *testing.T) {
 
 func protocolCorpusRequireBoundedRuleParse(t *testing.T, input []byte, rule, entry string) *base.Node {
 	t.Helper()
+	return protocolCorpusRequireBoundedRuleParseWithConfig(t, input, rule, entry, nil)
+}
+
+func protocolCorpusRequireBoundedRuleParseWithConfig(t *testing.T, input []byte, rule, entry string, config map[string]any) *base.Node {
+	t.Helper()
 	require.NotEmpty(t, input)
 	reader := newProtocolCorpusBoundedReader(input)
-	node, err := parser.ParseBinary(reader, rule, entry)
+	node, err := parser.ParseBinaryWithConfig(reader, rule, config, entry)
 	require.NoError(t, err)
 	require.NotNil(t, node)
 	value, err := node.Result()
