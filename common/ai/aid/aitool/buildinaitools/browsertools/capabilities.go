@@ -135,7 +135,7 @@ func RegisterCapabilityTools(
 	if err := factory.RegisterTool(
 		"browser.capability.catalog",
 		aitool.WithDescription("List every capability and parameter schema declared by the connected browser extension. This tool does not read page data."),
-		aitool.WithUsage("Query this catalog before using browser capabilities outside the dedicated cryptography workflow, such as page interaction, network capture, Deep Capture, Eval, proxy, or Profile management."),
+		aitool.WithUsage("Query only the relevant domain. For page cryptography, signatures, encrypted payloads, or a plaintext gateway, use domain=transform: list an existing Profile first; otherwise record one real operation, create a callable, propose a Profile, and validate it. Validation creates a short-lived draft for local user confirmation; the Agent cannot save it. Use network only to observe requests and proxy only to change Chrome traffic routing."),
 		aitool.WithKeywords([]string{"browser", "capability catalog", "schema", "debugging", "review", "浏览器", "能力目录", "参数", "调试", "权限"}),
 		aitool.WithDangerousNoNeedUserReview(true),
 		aitool.WithStringParam(
@@ -174,7 +174,7 @@ func RegisterCapabilityTools(
 	return factory.RegisterTool(
 		"browser.capability.call",
 		aitool.WithDescription("Call any Agent-facing capability declared by the connected browser extension. Parameters are checked against that extension version's signed schema before dispatch. The paired instance, target, browser restrictions, enterprise policy, and AI review policy remain authoritative."),
-		aitool.WithUsage("Use browser.capability.catalog first and construct params from the selected descriptor's paramsSchema. This tool can open or inspect tabs, create browser identity-isolation contexts, interact with pages, read Cookie or context data, capture traffic, control recording and Deep Capture, run invoke or eval, manage callables and Profiles, or switch proxies. When login requires a QR code, MFA, CAPTCHA, or device confirmation, call browser.handoff.request and wait; Yakit presents that interaction locally, so never extract or display its pixels through the Agent."),
+		aitool.WithUsage("Use browser.capability.catalog with the relevant domain first and follow paramsSchema exactly. Plaintext gateway means transform, not proxy or network. First call browser.transform.profile.list; execute an existing Profile with browser.transform.execute, or generate one through recording/callable/profile.propose/profile.validate and stop for local user confirmation. The Agent cannot save a Profile. When login requires a QR code, MFA, CAPTCHA, or device confirmation, call browser.handoff.request and wait; Yakit presents that interaction locally, so never extract or display its pixels through the Agent."),
 		aitool.WithKeywords([]string{"browser", "identity isolation", "page interaction", "network", "debugging", "eval", "proxy", "浏览器", "身份隔离", "页面操作", "网络", "调试", "代理"}),
 		aitool.WithStringParam(
 			"method",

@@ -411,9 +411,6 @@ const (
 	Yak_ValidP12PassWord_FullMethodName                           = "/ypb.Yak/ValidP12PassWord"
 	Yak_RequestYakURL_FullMethodName                              = "/ypb.Yak/RequestYakURL"
 	Yak_ExecuteBrowserExtensionTask_FullMethodName                = "/ypb.Yak/ExecuteBrowserExtensionTask"
-	Yak_StartBrowserTransformAdapter_FullMethodName               = "/ypb.Yak/StartBrowserTransformAdapter"
-	Yak_GetBrowserTransformAdapterStatus_FullMethodName           = "/ypb.Yak/GetBrowserTransformAdapterStatus"
-	Yak_StopBrowserTransformAdapter_FullMethodName                = "/ypb.Yak/StopBrowserTransformAdapter"
 	Yak_ReadFile_FullMethodName                                   = "/ypb.Yak/ReadFile"
 	Yak_GetPcapMetadata_FullMethodName                            = "/ypb.Yak/GetPcapMetadata"
 	Yak_PcapX_FullMethodName                                      = "/ypb.Yak/PcapX"
@@ -1180,11 +1177,6 @@ type YakClient interface {
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
 	// Browser extension tasks are routed to one paired browser device.
 	ExecuteBrowserExtensionTask(ctx context.Context, in *BrowserExtensionTaskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowserExtensionTaskEvent], error)
-	// A loopback-only, token-authenticated adapter lets Burp/Fiddler reuse one
-	// live browser Transform Profile without introducing another JS runtime.
-	StartBrowserTransformAdapter(ctx context.Context, in *BrowserTransformAdapterStartRequest, opts ...grpc.CallOption) (*BrowserTransformAdapterStatus, error)
-	GetBrowserTransformAdapterStatus(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BrowserTransformAdapterStatus, error)
-	StopBrowserTransformAdapter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BrowserTransformAdapterStatus, error)
 	// 文件IO
 	ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReadFileResponse], error)
 	// Wireshark
@@ -6035,36 +6027,6 @@ func (c *yakClient) ExecuteBrowserExtensionTask(ctx context.Context, in *Browser
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExecuteBrowserExtensionTaskClient = grpc.ServerStreamingClient[BrowserExtensionTaskEvent]
 
-func (c *yakClient) StartBrowserTransformAdapter(ctx context.Context, in *BrowserTransformAdapterStartRequest, opts ...grpc.CallOption) (*BrowserTransformAdapterStatus, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BrowserTransformAdapterStatus)
-	err := c.cc.Invoke(ctx, Yak_StartBrowserTransformAdapter_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *yakClient) GetBrowserTransformAdapterStatus(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BrowserTransformAdapterStatus, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BrowserTransformAdapterStatus)
-	err := c.cc.Invoke(ctx, Yak_GetBrowserTransformAdapterStatus_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *yakClient) StopBrowserTransformAdapter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*BrowserTransformAdapterStatus, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BrowserTransformAdapterStatus)
-	err := c.cc.Invoke(ctx, Yak_StopBrowserTransformAdapter_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *yakClient) ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReadFileResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[73], Yak_ReadFile_FullMethodName, cOpts...)
@@ -9466,11 +9428,6 @@ type YakServer interface {
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
 	// Browser extension tasks are routed to one paired browser device.
 	ExecuteBrowserExtensionTask(*BrowserExtensionTaskRequest, grpc.ServerStreamingServer[BrowserExtensionTaskEvent]) error
-	// A loopback-only, token-authenticated adapter lets Burp/Fiddler reuse one
-	// live browser Transform Profile without introducing another JS runtime.
-	StartBrowserTransformAdapter(context.Context, *BrowserTransformAdapterStartRequest) (*BrowserTransformAdapterStatus, error)
-	GetBrowserTransformAdapterStatus(context.Context, *Empty) (*BrowserTransformAdapterStatus, error)
-	StopBrowserTransformAdapter(context.Context, *Empty) (*BrowserTransformAdapterStatus, error)
 	// 文件IO
 	ReadFile(*ReadFileRequest, grpc.ServerStreamingServer[ReadFileResponse]) error
 	// Wireshark
@@ -10973,15 +10930,6 @@ func (UnimplementedYakServer) RequestYakURL(context.Context, *RequestYakURLParam
 }
 func (UnimplementedYakServer) ExecuteBrowserExtensionTask(*BrowserExtensionTaskRequest, grpc.ServerStreamingServer[BrowserExtensionTaskEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method ExecuteBrowserExtensionTask not implemented")
-}
-func (UnimplementedYakServer) StartBrowserTransformAdapter(context.Context, *BrowserTransformAdapterStartRequest) (*BrowserTransformAdapterStatus, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartBrowserTransformAdapter not implemented")
-}
-func (UnimplementedYakServer) GetBrowserTransformAdapterStatus(context.Context, *Empty) (*BrowserTransformAdapterStatus, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBrowserTransformAdapterStatus not implemented")
-}
-func (UnimplementedYakServer) StopBrowserTransformAdapter(context.Context, *Empty) (*BrowserTransformAdapterStatus, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StopBrowserTransformAdapter not implemented")
 }
 func (UnimplementedYakServer) ReadFile(*ReadFileRequest, grpc.ServerStreamingServer[ReadFileResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method ReadFile not implemented")
@@ -18269,60 +18217,6 @@ func _Yak_ExecuteBrowserExtensionTask_Handler(srv interface{}, stream grpc.Serve
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExecuteBrowserExtensionTaskServer = grpc.ServerStreamingServer[BrowserExtensionTaskEvent]
 
-func _Yak_StartBrowserTransformAdapter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BrowserTransformAdapterStartRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YakServer).StartBrowserTransformAdapter(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_StartBrowserTransformAdapter_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).StartBrowserTransformAdapter(ctx, req.(*BrowserTransformAdapterStartRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Yak_GetBrowserTransformAdapterStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YakServer).GetBrowserTransformAdapterStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_GetBrowserTransformAdapterStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).GetBrowserTransformAdapterStatus(ctx, req.(*Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Yak_StopBrowserTransformAdapter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YakServer).StopBrowserTransformAdapter(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_StopBrowserTransformAdapter_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).StopBrowserTransformAdapter(ctx, req.(*Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Yak_ReadFile_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(ReadFileRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -23776,18 +23670,6 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RequestYakURL",
 			Handler:    _Yak_RequestYakURL_Handler,
-		},
-		{
-			MethodName: "StartBrowserTransformAdapter",
-			Handler:    _Yak_StartBrowserTransformAdapter_Handler,
-		},
-		{
-			MethodName: "GetBrowserTransformAdapterStatus",
-			Handler:    _Yak_GetBrowserTransformAdapterStatus_Handler,
-		},
-		{
-			MethodName: "StopBrowserTransformAdapter",
-			Handler:    _Yak_StopBrowserTransformAdapter_Handler,
 		},
 		{
 			MethodName: "GetPcapMetadata",

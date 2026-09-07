@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -15,8 +14,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
@@ -40,9 +39,6 @@ type Server struct {
 	browserBridge *browser.ExtensionBridgeManager
 	browserTasks  chan struct{}
 	runtimeForges *aiforge.RuntimeForgeRegistry
-
-	browserTransformAdapterMu sync.Mutex
-	browserTransformAdapter   *browserTransformExternalAdapter
 }
 
 type ServerOpts func(config *ServerConfig)
@@ -255,19 +251,11 @@ func (s *Server) CloseBrowserExtensionBridge() error {
 	if s == nil {
 		return nil
 	}
-	adapterErr := s.closeBrowserTransformAdapter()
 	if s.browserBridge == nil {
-		return adapterErr
+		return nil
 	}
 	browser.SetActiveExtensionBridgeManager(nil)
-	bridgeErr := s.browserBridge.Close()
-	if adapterErr != nil {
-		if bridgeErr != nil {
-			return fmt.Errorf("close browser transform adapter: %v; close browser extension bridge: %w", adapterErr, bridgeErr)
-		}
-		return adapterErr
-	}
-	return bridgeErr
+	return s.browserBridge.Close()
 }
 
 var YakitProfileTables = schema.ProfileTables
