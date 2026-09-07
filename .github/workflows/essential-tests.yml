@@ -650,7 +650,9 @@ jobs:
           - name: "Test AI Aid / React"
             test_configs: |
               [
-                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1}
+                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/aiengine", "timeout": "3m", "parallel": 1},
+                {"package": "./common/yak/cmd/yakcmds/memfit-cli", "timeout": "3m", "parallel": 1}
               ]
 
           - name: "Test AI Aid / Core / Tool / Memory"

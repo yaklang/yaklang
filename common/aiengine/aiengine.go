@@ -504,6 +504,12 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 }
 
 func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
+	// Raw-event clients such as Memfit already consume the live deltas. Only
+	// read persisted content when a caller actually registered an end callback;
+	// this runs on the same queue that forwards answers and task completion.
+	if e.config.OnStreamEnd == nil && e.config.OnStreamEndWithTotal == nil {
+		return
+	}
 	streamWriterID := event.GetStreamEventWriterId()
 	if streamWriterID == "" {
 		return
@@ -532,8 +538,12 @@ func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
 	}
 
 	streamEvent := streamEvents[0]
-	e.config.OnStreamEnd(e.operator, streamEvent, streamEvent.NodeId)
-	e.config.OnStreamEndWithTotal(e.operator, streamEvent, streamEvent.NodeId, streamEvent.StreamDelta)
+	if e.config.OnStreamEnd != nil {
+		e.config.OnStreamEnd(e.operator, streamEvent, streamEvent.NodeId)
+	}
+	if e.config.OnStreamEndWithTotal != nil {
+		e.config.OnStreamEndWithTotal(e.operator, streamEvent, streamEvent.NodeId, streamEvent.StreamDelta)
+	}
 }
 
 // buildReActOptions 构建 ReAct 配置选项

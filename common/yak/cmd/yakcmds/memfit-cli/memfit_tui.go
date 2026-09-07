@@ -1159,6 +1159,15 @@ func (ui *memfitTUI) recordProcessEvent(envelopeID string, event memfitWorkerEve
 		}
 		return true
 	}
+	backgroundMemory := func(detail string, state memfitProcessState) bool {
+		// Automatic recall runs alongside the model request. It must not finish
+		// the Thinking row, take over the footer, or accrue foreground wait time.
+		ui.upsertProcessItem(memfitProcessItem{
+			key: "process:memory:background", kind: "Memory", detail: detail,
+			state: state, startedAt: time.Now(), updatedAt: time.Now(),
+		})
+		return true
+	}
 
 	switch typeName {
 	case schema.EVENT_TYPE_THOUGHT:
@@ -1303,7 +1312,9 @@ func (ui *memfitTUI) recordProcessEvent(envelopeID string, event memfitWorkerEve
 			detail = "Relevant context found"
 		}
 		return add("Knowledge", detail, "Using knowledge", memfitProcessDone)
-	case schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY, schema.EVENT_TYPE_MEMORY_SEARCH_SPECIFIC:
+	case schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY:
+		return backgroundMemory("Searching in background", memfitProcessInfo)
+	case schema.EVENT_TYPE_MEMORY_SEARCH_SPECIFIC:
 		key = "process:memory"
 		return add("Memory", "Searching previous context", "Searching memory", memfitProcessRunning)
 	case schema.EVENT_TYPE_MEMORY_BUILD, schema.EVENT_TYPE_MEMORY_SAVE, schema.EVENT_TYPE_MEMORY_ADD_CONTEXT:
@@ -1327,6 +1338,10 @@ func (ui *memfitTUI) recordProcessEvent(envelopeID string, event memfitWorkerEve
 		return add("Tasks", detail, "Updating tasks", memfitProcessDone)
 	case schema.EVENT_TYPE_STRUCTURED:
 		switch event.NodeID {
+		case "stream-finished":
+			if extractMemfitJSONField(event.Content, "node_id") == "fast-memory-fetch" {
+				return backgroundMemory("Background search finished", memfitProcessDone)
+			}
 		case "timeline_item":
 			kind, group, detail, state, ok := classifyMemfitTimelineItem(event.Content)
 			if !ok {
@@ -1345,6 +1360,10 @@ func (ui *memfitTUI) recordProcessEvent(envelopeID string, event memfitWorkerEve
 			detail := extractMemfitStructuredStatus(event.Content)
 			if detail == "" {
 				return false
+			}
+			if event.NodeID == "status" && strings.HasPrefix(extractMemfitJSONField(event.Content, "code"), "reasoning.") {
+				key = "process:reasoning"
+				return add("Thinking", detail, "Thinking", memfitProcessRunning)
 			}
 			ui.activity = singleLineMemfitText(detail)
 			return true
@@ -2723,6 +2742,16 @@ func extractMemfitStructuredStatus(content string) string {
 	var root map[string]any
 	if json.Unmarshal([]byte(content), &root) != nil {
 		return ""
+	}
+	// StatusPayload carries the user-facing text in value/value_i18n; state
+	// only describes its lifecycle (usually "running").
+	if localized, ok := root["value_i18n"].(map[string]any); ok {
+		if value := scalarMemfitMapString(localized, "en", "En", "zh", "Zh"); value != "" {
+			return compactMemfitMessage(value, 480)
+		}
+	}
+	if value := scalarMemfitMapString(root, "value"); value != "" {
+		return compactMemfitMessage(value, 480)
 	}
 	if status := scalarMemfitMapString(root, "react_task_now_status", "status", "state"); status != "" {
 		return "Task " + strings.ReplaceAll(status, "_", " ")
