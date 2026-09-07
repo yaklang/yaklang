@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -77,7 +76,10 @@ func buildSingleFindingVerifyLoop(
 			return action.ActionType != "load_capability"
 		}),
 	}
-	preset = append(preset, auditopts.LoopAuxiliaryOpts()...)
+	preset = append(preset,
+		reactloops.WithDisableLoopPerception(true),
+		reactloops.WithDisablePeriodicVerification(true),
+	)
 	preset = append(preset,
 		reactloops.WithFrozenBlockPartitions(aicommon.FrozenBlockPartition{
 			ID:    "code-audit-phase3-path-rules",

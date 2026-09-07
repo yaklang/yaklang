@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
@@ -58,7 +57,6 @@ func runAllCategoryScans(
 			TaskName:   goal,
 			Goal:       goal,
 			LoopName:   schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT,
-			Timeout:    auditopts.DefaultCategoryScanTimeout,
 		})
 		catalog[category.ID] = categoryScanJob{
 			category: category,
@@ -69,11 +67,11 @@ func runAllCategoryScans(
 
 	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(categories))
 
-	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d, per-category timeout=%s)",
-		len(categories), concurrency, auditopts.DefaultCategoryScanTimeout)
+	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d)",
+		len(categories), concurrency)
 	r.AddToTimeline("[PHASE2_START]",
-		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离，每类超时 %s）。",
-			len(categories), auditopts.DefaultCategoryScanTimeout))
+		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离）。",
+			len(categories)))
 
 	artifacts := newCategoryArtifactStore(state)
 
@@ -83,7 +81,6 @@ func runAllCategoryScans(
 		ParentLoop:         loop,
 		TimelineMode:       reactloops.SubAgentTimelineFork,
 		ExecuteConcurrency: concurrency,
-		DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
 		LoopBuilder: phase2CategoryLoopBuilder{
 			state: state, catalog: catalog, artifacts: artifacts, scanStates: &scanStates,
 		},
@@ -147,20 +144,18 @@ func runAllCategoryScans(
 				Identifier: identifier,
 				TaskName:   resumeGoal,
 				Goal:       resumeGoal,
-				Timeout:    auditopts.DefaultCategoryScanTimeout,
 			})
 			resumeCatalog[identifier] = p
 		}
-		log.Infof("[CodeAudit/Phase2] Resuming %d interrupted categories in parallel (timeout=%s each).",
-			len(resumables), auditopts.DefaultCategoryScanTimeout)
+		log.Infof("[CodeAudit/Phase2] Resuming %d interrupted categories in parallel.",
+			len(resumables))
 		r.AddToTimeline("[PHASE2_RESUME_BATCH]",
-			fmt.Sprintf("[Phase2] 恢复 %d 个被中断的类别扫描（并行，每类预算 %s）。", len(resumables), auditopts.DefaultCategoryScanTimeout))
+			fmt.Sprintf("[Phase2] 恢复 %d 个被中断的类别扫描（并行）。", len(resumables)))
 
 		resumeResults := reactloops.DispatchSubAgents(r, task, resumeJobs, reactloops.SubAgentOptions{
 			ParentLoop:         loop,
 			TimelineMode:       reactloops.SubAgentTimelineFork,
 			ExecuteConcurrency: concurrency,
-			DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
 			LoopBuilder: phase2ResumeBatchLoopBuilder{
 				state: state, resumeCatalog: resumeCatalog, artifacts: artifacts, scanStates: &scanStates,
 			},
