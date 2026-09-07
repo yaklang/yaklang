@@ -209,7 +209,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 			atomic.AddUint64(&sllFirstFallbackCancelled, 1)
 		}
 		if shouldLogFallback {
-			log.Infof("[antlr-sll-first] fallback to LL: reason=cancelled src_len=%d sll_elapsed=%s", len(src), sllElapsed)
+			log.Infof("[antlr-sll-first] fallback to LL: reason=cancelled src_len=%d sll_elapsed=%s sll_err=%v", len(src), sllElapsed, err)
 		}
 	} else if err != nil {
 		if statsEnabled {
