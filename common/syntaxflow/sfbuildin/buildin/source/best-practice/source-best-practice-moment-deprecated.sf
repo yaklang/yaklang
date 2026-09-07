@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Moment Deprecated"
+	title_zh: "Moment Deprecated"
+	type: audit
+	level: low
+	rule_id: "source-best-practice-moment-deprecated"
+	risk: "Best Practice"
+	desc: <<<DESC
+Migrated from Semgrep rule `moment-deprecated` (typescript/lang/best-practice/moment-deprecated.yaml).
+Original message: Moment is a legacy project in maintenance mode. Consider using libraries that are actively supported, e.g. `dayjs`.
+References:
+- https://momentjs.com/docs/#/-project-status/
+- https://day.js.org/
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.ts": <<<POS
+import 'moment'
+POS
+	"safefile://pos.ts": <<<NEG
+import 'date-fns'
+NEG
+)
+
+${*.ts}.pattern_regex(/(?:import\s+'moment')/) as $p0
+${*.js}.pattern_regex(/(?:import\s+'moment')/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "low",
+	title: "Moment Deprecated",
+	title_zh: "Moment Deprecated",
+	message: "Moment Deprecated detected.",
+}

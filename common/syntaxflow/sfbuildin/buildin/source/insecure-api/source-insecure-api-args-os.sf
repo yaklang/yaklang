@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Args Os"
+	title_zh: "Args Os"
+	type: vuln
+	level: low
+	rule_id: "source-insecure-api-args-os"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `args-os` (rust/lang/security/args-os.yml).
+Original message: args_os should not be used for security operations. From the docs: "The first element is traditionally the path of the executable, but it can be set to arbitrary text, and might not even exist. This means this property should not be relied upon for security purposes."
+CWE: CWE-807: Reliance on Untrusted Inputs in a Security Decision
+References:
+- https://doc.rust-lang.org/stable/std/env/fn.args_os.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rs": <<<POS
+std::env::args_os()
+POS
+	"safefile://pos.rs": <<<NEG
+std::env::args()
+NEG
+)
+
+${*.rs}.pattern_regex(/(?:std::env::args_os\(\))/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Args Os",
+	title_zh: "Args Os",
+	message: "Args Os detected.",
+}

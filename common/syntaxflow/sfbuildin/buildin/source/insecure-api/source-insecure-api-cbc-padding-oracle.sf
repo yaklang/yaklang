@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Cbc Padding Oracle"
+	title_zh: "Cbc Padding Oracle"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-cbc-padding-oracle"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `cbc-padding-oracle` (java/lang/security/audit/cbc-padding-oracle.yaml).
+Original message: Using CBC with PKCS5Padding is susceptible to padding oracle attacks. A malicious actor could discern the difference between plaintext with valid or invalid padding. Further, CBC mode does not include any integrity checks. Use 'AES/GCM/NoPadding' instead.
+CWE: CWE-327: Use of a Broken or Risky Cryptographic Algorithm
+References:
+- https://capec.mitre.org/data/definitions/463.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#cipher-modes
+- https://find-sec-bugs.github.io/bugs.htm#CIPHER_INTEGRITY
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred fix: "AES/GCM/NoPadding"
+SOLUTION
+	alert_min: 1
+	"file://pos.java": <<<POS
+Cipher.getInstance("AES/CBC/PKCS5Padding")
+POS
+	"safefile://pos.java": <<<NEG
+Cipher.getInstance("AES/GCM/NoPadding")
+NEG
+)
+
+${*.java}.pattern_regex(/(?:Cipher\.getInstance\(\s*["\'][^"\']*\/CBC\/PKCS5Padding["\']\s*\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Cbc Padding Oracle",
+	title_zh: "Cbc Padding Oracle",
+	message: "Cbc Padding Oracle detected.",
+}

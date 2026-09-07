@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Force Ssl False"
+	title_zh: "Force Ssl False"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-force-ssl-false"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `force-ssl-false` (ruby/lang/security/force-ssl-false.yaml).
+Original message: Checks for configuration setting of force_ssl to false. Force_ssl forces usage of HTTPS, which could lead to network interception of unencrypted application traffic. To fix, set config.force_ssl = true.
+CWE: CWE-311: Missing Encryption of Sensitive Data
+References:
+- https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_force_ssl.rb
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred replacement: = true
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+config.force_ssl = false
+POS
+	"safefile://pos.rb": <<<NEG
+config.force_ssl = true
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:config\.force_ssl\s+=\s+false)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Force Ssl False",
+	title_zh: "Force Ssl False",
+	message: "Force Ssl False detected.",
+}

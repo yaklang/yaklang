@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Tls Renegotiation"
+	title_zh: "Tls Renegotiation"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-tls-renegotiation"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `tls-renegotiation` (problem-based-packs/insecure-transport/java-stdlib/tls-renegotiation.yaml).
+Original message: Checks for cases where java applications are allowing unsafe renegotiation. This leaves the application vulnerable to a man-in-the-middle attack where chosen plain text is injected as prefix to a TLS connection.
+CWE: CWE-319: Cleartext Transmission of Sensitive Information
+References:
+- https://www.oracle.com/java/technologies/javase/tlsreadme.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.java": <<<POS
+java.lang.System.setProperty("sun.security.ssl.allowUnsafeRenegotiation", true);
+POS
+	"safefile://pos.java": <<<NEG
+java.lang.System.setProperty("sun.security.ssl.allowUnsafeRenegotiation", false);
+NEG
+)
+
+${*.java}.pattern_regex(/(?:java\.lang\.System\.setProperty\("sun\.security\.ssl\.allowUnsafeRenegotiation",\s+true\);)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Tls Renegotiation",
+	title_zh: "Tls Renegotiation",
+	message: "Tls Renegotiation detected.",
+}

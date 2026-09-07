@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Deprecated Use Bitwise"
+	title_zh: "Deprecated Use Bitwise"
+	type: audit
+	level: middle
+	rule_id: "source-best-practice-deprecated_use_bitwise"
+	risk: "Best Practice"
+	desc: <<<DESC
+Migrated from Semgrep rule `deprecated_use_bitwise` (elixir/lang/best-practice/deprecated-use-bitwise.yaml).
+Original message: The syntax `use Bitwise` is already deprecated. Please use `import Bitwise` instead.
+References:
+- https://github.com/elixir-lang/elixir/commit/f1b9d3e818e5bebd44540f87be85979f24b9abfc
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred fix: import Bitwise
+SOLUTION
+	alert_min: 1
+	"file://pos.ex": <<<POS
+use Bitwise
+POS
+	"safefile://pos.ex": <<<NEG
+import Bitwise
+NEG
+)
+
+${*.ex}.pattern_regex(/(?:use\s+Bitwise)/) as $p0
+${*.exs}.pattern_regex(/(?:use\s+Bitwise)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Deprecated Use Bitwise",
+	title_zh: "Deprecated Use Bitwise",
+	message: "Deprecated Use Bitwise detected.",
+}

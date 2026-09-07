@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Cookie Serialization"
+	title_zh: "Cookie Serialization"
+	type: vuln
+	level: high
+	rule_id: "source-insecure-api-cookie-serialization"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `cookie-serialization` (ruby/lang/security/cookie-serialization.yaml).
+Original message: Checks if code allows cookies to be deserialized using Marshal. If the attacker can craft a valid cookie, this could lead to remote code execution. The hybrid check is just to warn users to migrate to :json for best practice.
+CWE: CWE-94: Improper Control of Generation of Code ('Code Injection')
+References:
+- https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_cookie_serialization.rb
+- https://robertheaton.com/2013/07/22/how-to-hack-a-rails-app-using-its-secret-token/
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+Rails.application.config.action_dispatch.cookies_serializer = :marshal
+POS
+	"safefile://pos.rb": <<<NEG
+Rails.application.config.action_dispatch.cookies_serializer = :json
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:Rails\.application\.config\.action_dispatch\.cookies_serializer\s+=\s+:marshal)|(?:Rails\.application\.config\.action_dispatch\.cookies_serializer\s+=\s+:hybrid)/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Cookie Serialization",
+	title_zh: "Cookie Serialization",
+	message: "Cookie Serialization detected.",
+}

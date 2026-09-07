@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Prefer Write In Binary Mode"
+	title_zh: "Prefer Write In Binary Mode"
+	type: portability
+	level: middle
+	rule_id: "source-portability-prefer-write-in-binary-mode"
+	risk: "Portability"
+	desc: <<<DESC
+Migrated from Semgrep rule `prefer-write-in-binary-mode` (ocaml/lang/portability/crlf-support.yaml).
+Original message: 'open_out' behaves differently on Windows and on Unix-like systems with respect to line endings. To get the same behavior everywhere, use 'open_out_bin' or 'open_out_gen [Open_binary]'. If you really want LF-to-CRLF translations to take place when running on Windows, use 'open_out_gen [Open_text]'.
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred fix: open_out_bin
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+open_out
+POS
+	"safefile://pos.ml": <<<NEG
+Out_channel.with_open_bin
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:open_out)/) as $p0
+${*.mli}.pattern_regex(/(?:open_out)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Prefer Write In Binary Mode",
+	title_zh: "Prefer Write In Binary Mode",
+	message: "Prefer Write In Binary Mode detected.",
+}

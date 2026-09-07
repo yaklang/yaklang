@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Python37 Compatibility Multiprocess2"
+	title_zh: "Python37 Compatibility Multiprocess2"
+	type: compatibility
+	level: high
+	rule_id: "source-compatibility-python37-compatibility-multiprocess2"
+	risk: "Compatibility"
+	desc: <<<DESC
+Migrated from Semgrep rule `python37-compatibility-multiprocess2` (python/lang/compatibility/python37.yaml).
+Original message: multiprocessing.Process.kill() is only available on Python 3.7+ and is therefore not backwards compatible. Instead, use terminate().
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+multiprocessing.Process.kill()
+POS
+	"safefile://pos.py": <<<NEG
+multiprocessing.Process.terminate()
+NEG
+)
+
+${*.py}.pattern_regex(/(?:multiprocessing\.Process\.kill\(\))/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python37 Compatibility Multiprocess2",
+	title_zh: "Python37 Compatibility Multiprocess2",
+	message: "Python37 Compatibility Multiprocess2 detected.",
+}

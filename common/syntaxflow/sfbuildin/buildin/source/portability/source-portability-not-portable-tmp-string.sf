@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Not Portable Tmp String"
+	title_zh: "Not Portable Tmp String"
+	type: portability
+	level: middle
+	rule_id: "source-portability-not-portable-tmp-string"
+	risk: "Portability"
+	desc: <<<DESC
+Migrated from Semgrep rule `not-portable-tmp-string` (ocaml/lang/portability/slash-tmp.yaml).
+Original message: You should probably use Filename.get_temp_dirname().
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+let path = "/tmp/foo"
+POS
+	"safefile://pos.ml": <<<NEG
+Filename.get_temp_dirname()
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:\/tmp\/)/) as $p0
+${*.mli}.pattern_regex(/(?:\/tmp\/)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Not Portable Tmp String",
+	title_zh: "Not Portable Tmp String",
+	message: "Not Portable Tmp String detected.",
+}

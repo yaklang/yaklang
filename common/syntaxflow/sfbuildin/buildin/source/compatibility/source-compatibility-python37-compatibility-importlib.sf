@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Python37 Compatibility Importlib"
+	title_zh: "Python37 Compatibility Importlib"
+	type: compatibility
+	level: high
+	rule_id: "source-compatibility-python37-compatibility-importlib"
+	risk: "Compatibility"
+	desc: <<<DESC
+Migrated from Semgrep rule `python37-compatibility-importlib` (python/lang/compatibility/python37.yaml).
+Original message: source_hash' is only available on Python 3.7+. This does not work in lower versions, and therefore is not backwards compatible. Instead, use another hash function.
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+importlib.source_hash()
+POS
+	"safefile://pos.py": <<<NEG
+import importlib
+NEG
+)
+
+${*.py}.pattern_regex(/(?:importlib\.source_hash\(\))/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python37 Compatibility Importlib",
+	title_zh: "Python37 Compatibility Importlib",
+	message: "Python37 Compatibility Importlib detected.",
+}

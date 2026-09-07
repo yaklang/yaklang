@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Avoid Default Routes"
+	title_zh: "Avoid Default Routes"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-avoid-default-routes"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `avoid-default-routes` (ruby/rails/security/audit/xss/avoid-default-routes.yaml).
+Original message: Default routes are enabled in this routes file. This means any public method on a controller can be called as an action. It is very easy to accidentally expose a method you didn't mean to. Instead, remove this line and explicitly include all routes you intend external users to follow.
+CWE: CWE-276: Incorrect Default Permissions
+References:
+- https://github.com/presidentbeef/brakeman/blob/main/docs/warning_types/default_routes/index.markdown
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+Original paths.include: ['*routes.rb'].
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://routes.rb": <<<POS
+map.connect ":controller/:action/:id"
+POS
+	"safefile://routes.rb": <<<NEG
+root 'home#index'
+NEG
+)
+
+${*routes.rb}.pattern_regex(/(?:map\.connect\s+":controller\/:action\/:id")|(?:match\s+':controller\(\/:action\(\/:id\(\.:format\)\)\)')/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Avoid Default Routes",
+	title_zh: "Avoid Default Routes",
+	message: "Avoid Default Routes detected.",
+}

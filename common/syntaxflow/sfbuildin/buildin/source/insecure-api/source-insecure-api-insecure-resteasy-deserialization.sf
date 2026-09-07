@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Insecure Resteasy Deserialization"
+	title_zh: "Insecure Resteasy Deserialization"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-insecure-resteasy-deserialization"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `insecure-resteasy-deserialization` (java/jax-rs/security/insecure-resteasy.yaml).
+Original message: When a Restful webservice endpoint is configured to use wildcard mediaType {*/*} as a value for the @Consumes annotation, an attacker could abuse the SerializableProvider by sending a HTTP Request with a Content-Type of application/x-java-serialized-object. The body of that request would be processed by the SerializationProvider and could contain a malicious payload, which may lead to arbitrary code execution when calling the $Y.getObject method.
+CWE: CWE-502: Deserialization of Untrusted Data
+References:
+- https://access.redhat.com/blogs/766093/posts/3162112
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.java": <<<POS
+@Consumes({"application/x-java-serialized-object"})
+POS
+	"safefile://pos.java": <<<NEG
+@Consumes({"application/json"})
+NEG
+)
+
+${*.java}.pattern_regex(/(?:@Consumes\(\{"application\/x\-java\-serialized\-object"\}\))|(?:@Consumes\(\{"\*\/\*"\}\))|(?:@Consumes\("\*\/\*"\))|(?:@Consumes\(\{MediaType\.WILDCARD_TYPE\}\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Insecure Resteasy Deserialization",
+	title_zh: "Insecure Resteasy Deserialization",
+	message: "Insecure Resteasy Deserialization detected.",
+}

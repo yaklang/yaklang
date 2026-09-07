@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "File Disclosure"
+	title_zh: "File Disclosure"
+	type: vuln
+	level: high
+	rule_id: "source-insecure-api-file-disclosure"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `file-disclosure` (ruby/lang/security/file-disclosure.yaml).
+Original message: Special requests can determine whether a file exists on a filesystem that's outside the Rails app's root directory. To fix this, set config.serve_static_assets = false.
+CWE: CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')
+References:
+- https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_file_disclosure.rb
+- https://groups.google.com/g/rubyonrails-security/c/23fiuwb1NBA/m/MQVM1-5GkPMJ
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred replacement: = false
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+config.serve_static_assets = true
+POS
+	"safefile://pos.rb": <<<NEG
+config.serve_static_assets = false
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:config\.serve_static_assets\s+=\s+true)/) as $hit
+alert $hit for {
+	level: "high",
+	title: "File Disclosure",
+	title_zh: "File Disclosure",
+	message: "File Disclosure detected.",
+}

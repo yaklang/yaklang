@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Rails Skip Forgery Protection"
+	title_zh: "Rails Skip Forgery Protection"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-rails-skip-forgery-protection"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `rails-skip-forgery-protection` (ruby/rails/security/audit/rails-skip-forgery-protection.yaml).
+Original message: This call turns off CSRF protection allowing CSRF attacks against the application
+CWE: CWE-352: Cross-Site Request Forgery (CSRF)
+References:
+- https://api.rubyonrails.org/classes/ActionController/RequestForgeryProtection/ClassMethods.html#method-i-skip_forgery_protection
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+skip_forgery_protection
+POS
+	"safefile://pos.rb": <<<NEG
+protect_forgery_protection
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:skip_forgery_protection)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Rails Skip Forgery Protection",
+	title_zh: "Rails Skip Forgery Protection",
+	message: "Rails Skip Forgery Protection detected.",
+}

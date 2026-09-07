@@ -1,0 +1,40 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Use of MD5 in Clojure"
+	title_zh: "Clojure 中使用 MD5"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-use-of-md5-clojure"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `use-of-md5` (clojure/lang/security/use-of-md5.yaml).
+Original message: MD5 hash algorithm detected. This is not collision resistant and leads to easily-cracked password hashes. Replace with current recommended hashing algorithms.
+CWE: CWE-328: Use of Weak Hash
+References:
+- https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.clj": <<<POS
+(MessageDigest/getInstance "MD5")
+POS
+	"safefile://pos.clj": <<<NEG
+(MessageDigest/getInstance "SHA-256")
+NEG
+)
+
+${*.clj}.pattern_regex(/(?:\(MessageDigest\/getInstance\s+"MD5"\))|(?:\(MessageDigest\/getInstance\s+MessageDigestAlgorithms\/MD5\))|(?:\(MessageDigest\/getInstance\s+org\.apache\.commons\.codec\.digest\.MessageDigestAlgorithms\/MD5\))|(?:\(java\.security\.MessageDigest\/getInstance\s+"MD5"\))|(?:\(java\.security\.MessageDigest\/getInstance\s+MessageDigestAlgorithms\/MD5\))|(?:\(java\.security\.MessageDigest\/getInstance\s+org\.apache\.commons\.codec\.digest\.MessageDigestAlgorithms\/MD5\))/) as $p0
+${*.cljs}.pattern_regex(/(?:\(MessageDigest\/getInstance\s+"MD5"\))|(?:\(MessageDigest\/getInstance\s+MessageDigestAlgorithms\/MD5\))|(?:\(MessageDigest\/getInstance\s+org\.apache\.commons\.codec\.digest\.MessageDigestAlgorithms\/MD5\))|(?:\(java\.security\.MessageDigest\/getInstance\s+"MD5"\))|(?:\(java\.security\.MessageDigest\/getInstance\s+MessageDigestAlgorithms\/MD5\))|(?:\(java\.security\.MessageDigest\/getInstance\s+org\.apache\.commons\.codec\.digest\.MessageDigestAlgorithms\/MD5\))/) as $p1
+${*.cljc}.pattern_regex(/(?:\(MessageDigest\/getInstance\s+"MD5"\))|(?:\(MessageDigest\/getInstance\s+MessageDigestAlgorithms\/MD5\))|(?:\(MessageDigest\/getInstance\s+org\.apache\.commons\.codec\.digest\.MessageDigestAlgorithms\/MD5\))|(?:\(java\.security\.MessageDigest\/getInstance\s+"MD5"\))|(?:\(java\.security\.MessageDigest\/getInstance\s+MessageDigestAlgorithms\/MD5\))|(?:\(java\.security\.MessageDigest\/getInstance\s+org\.apache\.commons\.codec\.digest\.MessageDigestAlgorithms\/MD5\))/) as $p2
+$p0 + $p1 + $p2 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Use of MD5 in Clojure",
+	title_zh: "Clojure 中使用 MD5",
+	message: "Use of MD5 detected.",
+}

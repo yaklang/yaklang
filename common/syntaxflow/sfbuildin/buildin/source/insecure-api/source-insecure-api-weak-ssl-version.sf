@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Weak Ssl Version"
+	title_zh: "Weak Ssl Version"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-weak-ssl-version"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `weak-ssl-version` (python/lang/security/audit/weak-ssl-version.yaml).
+Original message: An insecure SSL version was detected. TLS versions 1.0, 1.1, and all SSL versions are considered weak encryption and are deprecated. Use 'ssl.PROTOCOL_TLSv1_2' or higher.
+CWE: CWE-326: Inadequate Encryption Strength
+References:
+- https://tools.ietf.org/html/rfc7568
+- https://tools.ietf.org/id/draft-ietf-tls-oldversions-deprecate-02.html
+- https://docs.python.org/3/library/ssl.html#ssl.PROTOCOL_TLSv1_2
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+ssl.PROTOCOL_SSLv2
+POS
+	"safefile://pos.py": <<<NEG
+ssl.PROTOCOL_TLSv1_2
+NEG
+)
+
+${*.py}.pattern_regex(/(?:ssl\.PROTOCOL_SSLv2)|(?:ssl\.PROTOCOL_SSLv3)|(?:ssl\.PROTOCOL_TLSv1(?![\w]))|(?:ssl\.PROTOCOL_TLSv1_1(?![\w]))|(?:pyOpenSSL\.SSL\.SSLv2_METHOD)|(?:pyOpenSSL\.SSL\.SSLv23_METHOD)|(?:pyOpenSSL\.SSL\.SSLv3_METHOD)|(?:pyOpenSSL\.SSL\.TLSv1_METHOD)|(?:pyOpenSSL\.SSL\.TLSv1_1_METHOD)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Weak Ssl Version",
+	title_zh: "Weak Ssl Version",
+	message: "Weak Ssl Version detected.",
+}

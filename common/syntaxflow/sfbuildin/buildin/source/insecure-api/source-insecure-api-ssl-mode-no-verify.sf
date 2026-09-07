@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Ssl Mode No Verify"
+	title_zh: "Ssl Mode No Verify"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-ssl-mode-no-verify"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `ssl-mode-no-verify` (ruby/lang/security/ssl-mode-no-verify.yaml).
+Original message: Detected SSL that will accept an unverified connection. This makes the connections susceptible to man-in-the-middle attacks. Use 'OpenSSL::SSL::VERIFY_PEER' instead.
+CWE: CWE-295: Improper Certificate Validation
+References:
+- https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred replacement: VERIFY_PEER
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+OpenSSL::SSL::VERIFY_NONE
+POS
+	"safefile://pos.rb": <<<NEG
+OpenSSL::SSL::VERIFY_PEER
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:OpenSSL::SSL::VERIFY_NONE)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Ssl Mode No Verify",
+	title_zh: "Ssl Mode No Verify",
+	message: "Ssl Mode No Verify detected.",
+}

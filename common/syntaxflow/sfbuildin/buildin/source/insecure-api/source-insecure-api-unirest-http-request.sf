@@ -1,0 +1,36 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Unirest Http Request"
+	title_zh: "Unirest Http Request"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-unirest-http-request"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `unirest-http-request` (problem-based-packs/insecure-transport/java-stdlib/unirest-http-request.yaml).
+Original message: Checks for requests sent via Unirest to http:// URLS. This is dangerous because the server is attempting to connect to a website that does not encrypt traffic with TLS. Instead, send requests only to https:// URLS.
+CWE: CWE-319: Cleartext Transmission of Sensitive Information
+References:
+- https://kong.github.io/unirest-java/#requests
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Preferred replacement: https://
+SOLUTION
+	alert_min: 1
+	"file://pos.java": <<<POS
+Unirest.get("http://example.com")
+POS
+	"safefile://pos.java": <<<NEG
+Unirest.get("https://example.com")
+NEG
+)
+
+${*.java}.pattern_regex(/(?:Unirest\.(?:get|post)\(\s*["\'][hH][tT][tT][pP]:\/\/[^"\']*["\']\s*\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Unirest Http Request",
+	title_zh: "Unirest Http Request",
+	message: "Unirest Http Request detected.",
+}

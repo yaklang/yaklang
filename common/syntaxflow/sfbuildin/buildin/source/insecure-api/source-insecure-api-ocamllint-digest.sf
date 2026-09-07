@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Ocamllint Digest"
+	title_zh: "Ocamllint Digest"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-ocamllint-digest"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `ocamllint-digest` (ocaml/lang/security/digest.yaml).
+Original message: Digest uses MD5 and should not be used for security purposes. Consider using SHA256 instead.
+CWE: CWE-328: Use of Weak Hash (4.12)
+References:
+- https://v2.ocaml.org/api/Digest.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+Digest.string
+POS
+	"safefile://pos.ml": <<<NEG
+Digestif.SHA256.digest
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:Digest\.string)|(?:Digest\.bytes)|(?:Digest\.substring)|(?:Digest\.subbytes)|(?:Digest\.channel)|(?:Digest\.file)/) as $p0
+${*.mli}.pattern_regex(/(?:Digest\.string)|(?:Digest\.bytes)|(?:Digest\.substring)|(?:Digest\.subbytes)|(?:Digest\.channel)|(?:Digest\.file)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Ocamllint Digest",
+	title_zh: "Ocamllint Digest",
+	message: "Ocamllint Digest detected.",
+}

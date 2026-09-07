@@ -1,0 +1,38 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Ocamllint Tempfile"
+	title_zh: "Ocamllint Tempfile"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-ocamllint-tempfile"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `ocamllint-tempfile` (ocaml/lang/security/tempfile.yaml).
+Original message: Filename.temp_file might lead to race conditions, since the file could be altered or replaced by a symlink before being opened.
+CWE: CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition
+References:
+- https://v2.ocaml.org/api/Filename.html
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+Filename.temp_file
+POS
+	"safefile://pos.ml": <<<NEG
+Filename.get_temp_dirname
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:Filename\.temp_file)/) as $p0
+${*.mli}.pattern_regex(/(?:Filename\.temp_file)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Ocamllint Tempfile",
+	title_zh: "Ocamllint Tempfile",
+	message: "Ocamllint Tempfile detected.",
+}

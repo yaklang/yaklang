@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Avoid Ssh Insecure Ignore Host Key"
+	title_zh: "Avoid Ssh Insecure Ignore Host Key"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-avoid-ssh-insecure-ignore-host-key"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `avoid-ssh-insecure-ignore-host-key` (go/lang/security/audit/crypto/insecure_ssh.yaml).
+Original message: Disabled host key verification detected. This allows man-in-the-middle attacks. Use the 'golang.org/x/crypto/ssh/knownhosts' package to do host key verification. See https://skarlso.github.io/2019/02/17/go-ssh-with-host-key-verification/ to learn more about the problem and how to fix it.
+CWE: CWE-322: Key Exchange without Entity Authentication
+References:
+- https://skarlso.github.io/2019/02/17/go-ssh-with-host-key-verification/
+- https://gist.github.com/Skarlso/34321a230cf0245018288686c9e70b2d
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.go": <<<POS
+ssh.InsecureIgnoreHostKey()
+POS
+	"safefile://pos.go": <<<NEG
+ssh.FixedHostKey
+NEG
+)
+
+${*.go}.pattern_regex(/(?:ssh\.InsecureIgnoreHostKey\(\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Avoid Ssh Insecure Ignore Host Key",
+	title_zh: "Avoid Ssh Insecure Ignore Host Key",
+	message: "Avoid Ssh Insecure Ignore Host Key detected.",
+}

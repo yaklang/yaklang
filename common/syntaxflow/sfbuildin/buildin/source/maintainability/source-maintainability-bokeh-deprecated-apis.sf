@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Bokeh Deprecated Apis"
+	title_zh: "Bokeh Deprecated Apis"
+	type: maintainability
+	level: middle
+	rule_id: "source-maintainability-bokeh-deprecated-apis"
+	risk: "Maintainability"
+	desc: <<<DESC
+Migrated from Semgrep rule `bokeh-deprecated-apis` (python/bokeh/maintainability/deprecated/deprecated_apis.yaml).
+Original message: These APIs are deprecated in Bokeh see https://docs.bokeh.org/en/latest/docs/releases.html#api-deprecations
+Note: source-mode regex approximation of a safe-literal Semgrep pattern.
+DESC
+	solution: <<<SOLUTION
+Review this occurrence and replace it with a safer alternative.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import bokeh.layouts.widgetbox
+POS
+	"safefile://pos.py": <<<NEG
+import bokeh.plotting
+NEG
+)
+
+${*.py}.pattern_regex(/(?:import\s+bokeh\.layouts\.widgetbox)|(?:import\s+bokeh\.models\.graphs\.from_networkx)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Bokeh Deprecated Apis",
+	title_zh: "Bokeh Deprecated Apis",
+	message: "Bokeh Deprecated Apis detected.",
+}
