@@ -4178,6 +4178,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
 
+	// Keep the policy with the shared manager: NewConfig applies this flag
+	// to the manager, so a child default must not reopen parent MCP access.
+	opts = append(opts, WithDisallowMCPServers(i.DisallowMCPServers))
+
 	// Capability managers: child configs reuse parent instances when present.
 	if i.AiToolManager != nil {
 		opts = append(opts, WithAiToolManager(i.AiToolManager))

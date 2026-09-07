@@ -163,3 +163,27 @@ A non-log real Bind/resolver regression fails before the change and verifies
 retention after later actions, bounded excerpts, original UTF-8 byte positions,
 retry deduplication and no evidence update after a denied read. Final Provider
 content acceptance and the final commit CI remain pending.
+
+
+## Session Manager and capability correction
+
+Earlier real Runs selected a host node directly. They prove the observed input
+functionality only, not Session Manager container isolation. Container acceptance
+and current CI must pass before restoring merge readiness.
+
+The paired Legion service now creates targetless attachment execution Sessions
+on create, recovery and retry. Only the manager's leased-container transaction
+can bind managed input; host targets remain rejected even with input capability.
+
+Capability review: runtime containers receive enrollment and service environment
+values, so arbitrary filesystem/script tools would bypass the immutable input
+resolver and expose runtime material. Retain scoped file tools and no dynamic
+MCP/Forge loading. This policy is per managed-input Run, not a global node limit.
+
+Remove blanket child-Agent denial: buildSubAgentInvoker uses ConvertConfigToOptions
+and inherits the exact finite tool manager and LegionResultRuntime. A regression
+exercises that production constructor and verifies read_file object identity,
+managed-input policy, MCP denial, and rejection of bash. Existing child strategy
+rules still prevent recursive delegation. Plan execution remains disabled because
+its custom planning loop includes EnhanceKnowledgeGetterEx outside the finite
+file-tool manager; Docker alone does not authorize that extra input source.

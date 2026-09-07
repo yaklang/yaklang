@@ -25,12 +25,12 @@ func TestManagedInputActionsExcludeDynamicEscapesAndKeepSignedActions(t *testing
 	}
 	loop.actions.Set("analyze_documents", &LoopAction{ActionType: "analyze_documents"})
 	restrictManagedInputActions(loop)
-	for _, name := range names[:5] {
+	for _, name := range names[:4] {
 		if _, ok := loop.actions.Get(name); ok {
 			t.Fatalf("escape action survived: %s", name)
 		}
 	}
-	for _, name := range []string{"require_tool", "directly_call_tool", "analyze_documents"} {
+	for _, name := range []string{"require_tool", "directly_call_tool", "analyze_documents", "dispatch_sub_react_agents"} {
 		if _, ok := loop.actions.Get(name); !ok {
 			t.Fatalf("bounded/signed action removed: %s", name)
 		}
