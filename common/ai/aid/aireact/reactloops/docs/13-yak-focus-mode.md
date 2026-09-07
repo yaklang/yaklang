@@ -514,7 +514,7 @@ require.Greater(t, utils.InterfaceToInt(loop.GetVariable("greet_count")), 0,
 | 触发点 | 实现 |
 |---|---|
 | `QueryAIFocus` gRPC 调用（UI 拉列表） | [grpc_ai_focus.go](../../../../../yakgrpc/grpc_ai_focus.go) 入口调 `EnsureUserFocusModesLoaded` |
-| `StartAIReAct` gRPC 调用（开新会话） | [grpc_ai_re-act.go](../../../../../yakgrpc/grpc_ai_re-act.go) 入口调 `EnsureUserFocusModesLoaded` |
+| `ReActSessionRuntime.Connect`（gRPC / scheduler / IM 的统一会话入口） | [ai_react_runtime.go](../../../../../yakgrpc/ai_react_runtime.go) 在创建或复用 ReAct 前调 `EnsureUserFocusModesLoaded` |
 | `yak ai-focus --file ...` CLI | 不依赖目录扫描，CLI 显式注册 `--file` 指向的文件 |
 
 ### 行为约定

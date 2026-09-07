@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -11,21 +10,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aischedule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
-	aiReActSchedulePollInterval   = 30 * time.Second
-	aiReActScheduleMaxConcurrent  = 3
-	aiReActScheduleReleaseTimeout = 10 * time.Second
+	aiReActSchedulePollInterval  = 30 * time.Second
+	aiReActScheduleMaxConcurrent = 3
 
 	aiReActScheduleTriggerSchedule = "schedule"
 	aiReActScheduleTriggerManual   = "manual"
@@ -47,6 +43,7 @@ type scheduledReActJob struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	unregisterExecution func()
+	reservation         SessionReservation
 	workerReserved      bool
 	done                chan struct{}
 }
@@ -59,8 +56,8 @@ type scheduleEnqueueError struct {
 func (e *scheduleEnqueueError) Error() string { return e.message }
 
 type aiReActScheduler struct {
-	server *Server
-	db     *gorm.DB
+	runtime ReActSessionRuntime
+	db      *gorm.DB
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -70,15 +67,13 @@ type aiReActScheduler struct {
 	jobsMu           sync.Mutex
 	jobs             map[string]*scheduledReActJob
 	activeBySchedule map[string]string
-	activeBySession  map[string]string
-	startAIReAct     func(ypb.Yak_StartAIReActServer) error
 	wg               sync.WaitGroup
 }
 
 func newAIReActScheduler(server *Server, db *gorm.DB) *aiReActScheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &aiReActScheduler{
-		server:           server,
+		runtime:          server.getReActSessionRuntime(),
 		db:               db,
 		ctx:              ctx,
 		cancel:           cancel,
@@ -86,8 +81,6 @@ func newAIReActScheduler(server *Server, db *gorm.DB) *aiReActScheduler {
 		worker:           make(chan struct{}, aiReActScheduleMaxConcurrent),
 		jobs:             make(map[string]*scheduledReActJob),
 		activeBySchedule: make(map[string]string),
-		activeBySession:  make(map[string]string),
-		startAIReAct:     server.StartAIReAct,
 	}
 }
 
@@ -309,17 +302,15 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 		done:         make(chan struct{}),
 	}
 	m.jobsMu.Lock()
+	if err := m.ctx.Err(); err != nil {
+		m.jobsMu.Unlock()
+		cancel()
+		return err
+	}
 	if _, active := m.activeBySchedule[schedule.UUID]; active {
 		m.jobsMu.Unlock()
 		cancel()
 		return &scheduleEnqueueError{reason: "schedule_overlap", message: "schedule already has a queued or running execution"}
-	}
-	if sessionID != "" {
-		if _, active := m.activeBySession[sessionID]; active || isAIReActSessionBusy(sessionID) {
-			m.jobsMu.Unlock()
-			cancel()
-			return &scheduleEnqueueError{reason: "session_busy", message: "target session is busy"}
-		}
 	}
 	select {
 	case m.worker <- struct{}{}:
@@ -329,22 +320,39 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 		cancel()
 		return &scheduleEnqueueError{reason: "scheduler_capacity", message: "scheduled execution capacity is full"}
 	}
+	reservation, err := m.runtime.ReserveSession(jobCtx, sessionID, executionID)
+	if err != nil {
+		contextErr := jobCtx.Err()
+		<-m.worker
+		job.workerReserved = false
+		m.jobsMu.Unlock()
+		cancel()
+		if contextErr != nil {
+			// A concurrent scheduler stop is cancellation, not a skipped occurrence
+			// caused by a busy target session.
+			return contextErr
+		}
+		return &scheduleEnqueueError{reason: "session_busy", message: "target session is busy"}
+	}
+	job.reservation = reservation
+	job.ctx = reservation.Context()
 	m.jobs[job.executionID] = job
 	m.activeBySchedule[schedule.UUID] = job.executionID
-	if sessionID != "" {
-		m.activeBySession[sessionID] = job.executionID
-	}
 	job.unregisterExecution = aischedule.RegisterExecution(schedule.UUID, cancel)
+	// Reserve the execution wait slot while jobsMu still serializes enqueue with
+	// stop. Once stop has acquired jobsMu, no later WaitGroup.Add can race with
+	// its Wait.
+	m.wg.Add(1)
 	m.jobsMu.Unlock()
 	if trigger == aiReActScheduleTriggerManual {
 		if err := m.db.Model(&schema.AIReActSchedule{}).Where("uuid = ?", schedule.UUID).
 			UpdateColumn("last_run_at", scheduledAt.UTC()).Error; err != nil {
 			cancel()
 			m.unregisterJob(job)
+			m.wg.Done()
 			return err
 		}
 	}
-	m.wg.Add(1)
 	go m.execute(job)
 	return nil
 }
@@ -361,9 +369,6 @@ func (m *aiReActScheduler) unregisterJob(job *scheduledReActJob) {
 	if activeID := m.activeBySchedule[job.scheduleUUID]; activeID == job.executionID {
 		delete(m.activeBySchedule, job.scheduleUUID)
 	}
-	if activeID := m.activeBySession[job.sessionID]; job.sessionID != "" && activeID == job.executionID {
-		delete(m.activeBySession, job.sessionID)
-	}
 	if job.workerReserved {
 		select {
 		case <-m.worker:
@@ -372,6 +377,9 @@ func (m *aiReActScheduler) unregisterJob(job *scheduledReActJob) {
 		}
 	}
 	m.jobsMu.Unlock()
+	if job.reservation != nil {
+		job.reservation.Release()
+	}
 	if job.done != nil {
 		close(job.done)
 	}
@@ -385,70 +393,6 @@ func (m *aiReActScheduler) cancelSchedule(scheduleUUID string) {
 	if job != nil {
 		job.cancel()
 	}
-}
-
-func (m *aiReActScheduler) isSessionReserved(sessionID string) bool {
-	if m == nil || strings.TrimSpace(sessionID) == "" {
-		return false
-	}
-	m.jobsMu.Lock()
-	_, ok := m.activeBySession[strings.TrimSpace(sessionID)]
-	m.jobsMu.Unlock()
-	return ok
-}
-
-// cancelSessionExecutionsAndWait is used by DeleteAISession to make the
-// scheduler's active maps authoritative: session data is not removed until
-// every matching execution has cancelled and unregistered itself.
-func (m *aiReActScheduler) cancelSessionExecutionsAndWait(ctx context.Context, sessionIDs []string, all bool) error {
-	if m == nil {
-		return nil
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	waitCtx, cancel := context.WithTimeout(ctx, aiReActScheduleReleaseTimeout)
-	defer cancel()
-
-	m.jobsMu.Lock()
-	jobs := make([]*scheduledReActJob, 0, len(sessionIDs))
-	seen := make(map[string]struct{})
-	if all {
-		for executionID, job := range m.jobs {
-			if job == nil {
-				continue
-			}
-			seen[executionID] = struct{}{}
-			jobs = append(jobs, job)
-		}
-	} else {
-		for _, sessionID := range sessionIDs {
-			executionID := m.activeBySession[strings.TrimSpace(sessionID)]
-			if executionID == "" {
-				continue
-			}
-			if _, exists := seen[executionID]; exists {
-				continue
-			}
-			if job := m.jobs[executionID]; job != nil {
-				seen[executionID] = struct{}{}
-				jobs = append(jobs, job)
-			}
-		}
-	}
-	m.jobsMu.Unlock()
-
-	for _, job := range jobs {
-		job.cancel()
-	}
-	for _, job := range jobs {
-		select {
-		case <-job.done:
-		case <-waitCtx.Done():
-			return utils.Errorf("wait for scheduled execution %s to release session %s failed: %v", job.executionID, job.sessionID, waitCtx.Err())
-		}
-	}
-	return nil
 }
 
 type scheduledReActOutcome struct {
@@ -517,10 +461,6 @@ func scheduleExecutionSessionID(schedule *schema.AIReActSchedule, executionID st
 		return strings.TrimSpace(schedule.TargetSessionID)
 	}
 	return isolatedScheduleSessionID(executionID)
-}
-
-func isAIReActSessionBusy(sessionID string) bool {
-	return aireact.IsSessionBusy(strings.TrimSpace(sessionID))
 }
 
 func (m *aiReActScheduler) finishScheduleExecution(scheduleUUID string, outcome scheduledReActOutcome) {
@@ -638,13 +578,16 @@ func (m *aiReActScheduler) runReAct(
 	yakit.BroadcastAISessionChanged(yakit.AISessionPushActionStarted, sessionID)
 
 	outcomeCh := make(chan scheduledReActOutcome, 1)
-	serverErrCh := make(chan error, 1)
 	var stateMu sync.Mutex
 	state := scheduledReActOutcome{}
 	pendingReviewIDs := make(map[string]struct{})
-	stream := newInProcessAIReActStream(ctx, func(event *ypb.AIOutputEvent) {
+	onOutput := func(output *schema.AiOutputEvent) error {
+		if output == nil {
+			return nil
+		}
+		event := output.ToGRPC()
 		if event == nil {
-			return
+			return nil
 		}
 		stateMu.Lock()
 		defer stateMu.Unlock()
@@ -675,20 +618,20 @@ func (m *aiReActScheduler) runReAct(
 			case outcomeCh <- state:
 			default:
 			}
-			return
+			return nil
 		}
 		if event.GetNodeId() != "react_task_status_changed" {
-			return
+			return nil
 		}
 		var content struct {
 			TaskID string `json:"react_task_id"`
 			Status string `json:"react_task_now_status"`
 		}
 		if json.Unmarshal(event.GetContent(), &content) != nil || content.Status == "" {
-			return
+			return nil
 		}
 		if state.reactTaskID == "" || content.TaskID != state.reactTaskID {
-			return
+			return nil
 		}
 		switch content.Status {
 		case "completed":
@@ -701,14 +644,14 @@ func (m *aiReActScheduler) runReAct(
 			state.status = scheduledOutcomeSkipped
 			state.errorMessage = "AI ReAct task skipped"
 		default:
-			return
+			return nil
 		}
 		select {
 		case outcomeCh <- state:
 		default:
 		}
-	})
-	stream.push(&ypb.AIInputEvent{IsStart: true, Params: params})
+		return nil
+	}
 	attachedResources := append([]*ypb.AttachedResourceInfo(nil), payload.GetAttachedResourceInfos()...)
 	attachedResources = append(attachedResources,
 		&ypb.AttachedResourceInfo{
@@ -725,43 +668,45 @@ func (m *aiReActScheduler) runReAct(
 		&ypb.AttachedResourceInfo{Type: aicommon.USER_INPUT_SCHEDULE_CONTEXT, Key: aicommon.USER_INPUT_SCHEDULED_AT, Value: job.scheduledAt.Format(time.RFC3339)},
 		&ypb.AttachedResourceInfo{Type: aicommon.USER_INPUT_SCHEDULE_CONTEXT, Key: aicommon.USER_INPUT_SCHEDULE_TRIGGER, Value: job.trigger},
 	)
-	stream.push(&ypb.AIInputEvent{
+	connection, err := m.runtime.Connect(ctx, ConnectRequest{
+		StartParams: params,
+		Reservation: job.reservation,
+	}, onOutput)
+	if err != nil {
+		return scheduledReActRuntimeError(ctx, err)
+	}
+	// Do not unregister the job while its Runtime connection is alive.
+	// DeleteAISession may remove the session immediately after job.done.
+	defer connection.Close()
+	if err := connection.Send(&ypb.AIInputEvent{
 		IsFreeInput:          true,
 		FreeInput:            payload.GetPrompt(),
 		AttachedResourceInfo: attachedResources,
 		FocusModeLoop:        payload.GetFocusModeLoop(),
-	})
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
-		startAIReAct := m.startAIReAct
-		if startAIReAct == nil {
-			startAIReAct = m.server.StartAIReAct
-		}
-		serverErrCh <- startAIReAct(stream)
-	}()
+	}); err != nil {
+		return scheduledReActRuntimeError(ctx, err)
+	}
 	select {
 	case outcome := <-outcomeCh:
-		stream.cancel()
-		<-serverErrCh
 		return outcome
-	case err := <-serverErrCh:
+	case <-connection.Done():
 		stateMu.Lock()
 		defer stateMu.Unlock()
-		if err != nil && ctx.Err() == nil {
-			state.status = scheduledOutcomeFailed
-			state.errorMessage = err.Error()
-		}
 		return state
 	case <-ctx.Done():
-		stream.cancel()
-		// Do not unregister the job while its in-process gRPC handler is alive.
-		// DeleteAISession may remove the session immediately after job.done.
-		<-serverErrCh
 		stateMu.Lock()
 		defer stateMu.Unlock()
 		return state
 	}
+}
+
+func scheduledReActRuntimeError(ctx context.Context, err error) scheduledReActOutcome {
+	if ctx != nil && ctx.Err() != nil {
+		// Preserve the former in-process stream behavior: cancellation and timeout
+		// are classified by execute from the run context, not as runtime failures.
+		return scheduledReActOutcome{}
+	}
+	return scheduledReActOutcome{status: scheduledOutcomeFailed, errorMessage: err.Error()}
 }
 
 func scheduleAttentionForEvent(event *ypb.AIOutputEvent, taskStarted bool, pendingReviewIDs map[string]struct{}) (bool, string) {
@@ -809,74 +754,4 @@ func scheduleAttentionForEvent(event *ypb.AIOutputEvent, taskStarted bool, pendi
 	default:
 		return false, ""
 	}
-}
-
-type inProcessAIReActStream struct {
-	ctx      context.Context
-	cancelFn context.CancelFunc
-	input    chan *ypb.AIInputEvent
-	onOutput func(*ypb.AIOutputEvent)
-}
-
-func newInProcessAIReActStream(parent context.Context, onOutput func(*ypb.AIOutputEvent)) *inProcessAIReActStream {
-	ctx, cancel := context.WithCancel(parent)
-	return &inProcessAIReActStream{ctx: ctx, cancelFn: cancel, input: make(chan *ypb.AIInputEvent, 2), onOutput: onOutput}
-}
-
-func (s *inProcessAIReActStream) push(event *ypb.AIInputEvent) {
-	select {
-	case s.input <- event:
-	case <-s.ctx.Done():
-	}
-}
-
-func (s *inProcessAIReActStream) cancel() { s.cancelFn() }
-
-func (s *inProcessAIReActStream) Recv() (*ypb.AIInputEvent, error) {
-	select {
-	case event := <-s.input:
-		return event, nil
-	case <-s.ctx.Done():
-		return nil, s.ctx.Err()
-	}
-}
-
-func (s *inProcessAIReActStream) Send(event *ypb.AIOutputEvent) error {
-	if s.ctx.Err() != nil {
-		return s.ctx.Err()
-	}
-	if s.onOutput != nil {
-		s.onOutput(event)
-	}
-	return nil
-}
-
-func (s *inProcessAIReActStream) SetHeader(metadata.MD) error  { return nil }
-func (s *inProcessAIReActStream) SendHeader(metadata.MD) error { return nil }
-func (s *inProcessAIReActStream) SetTrailer(metadata.MD)       {}
-func (s *inProcessAIReActStream) Context() context.Context     { return s.ctx }
-
-func (s *inProcessAIReActStream) SendMsg(message any) error {
-	event, ok := message.(*ypb.AIOutputEvent)
-	if !ok {
-		return utils.Error("invalid AI ReAct output message")
-	}
-	return s.Send(event)
-}
-
-func (s *inProcessAIReActStream) RecvMsg(message any) error {
-	event, err := s.Recv()
-	if err != nil {
-		if err == context.Canceled {
-			return io.EOF
-		}
-		return err
-	}
-	target, ok := message.(*ypb.AIInputEvent)
-	if !ok {
-		return utils.Error("invalid AI ReAct input message")
-	}
-	proto.Reset(target)
-	proto.Merge(target, event)
-	return nil
 }

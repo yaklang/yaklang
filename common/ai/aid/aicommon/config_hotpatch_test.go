@@ -73,6 +73,43 @@ func TestHotPatchConfig(t *testing.T) {
 	require.True(t, c.GetSyncPerceptionTrigger())
 }
 
+func TestWaitHotPatchLoopStoppedWaitsForInFlightOption(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	c := NewTestConfig(ctx)
+	c.StartHotPatchLoop(ctx)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	c.HotPatchOptionChan.SafeFeed(func(*Config) error {
+		close(started)
+		<-release
+		return nil
+	})
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("hot-patch option did not start")
+	}
+
+	cancel()
+	waited := make(chan struct{})
+	go func() {
+		c.WaitHotPatchLoopStopped()
+		close(waited)
+	}()
+	select {
+	case <-waited:
+		t.Fatal("hot-patch lifecycle wait returned while an option was still running")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-waited:
+	case <-time.After(time.Second):
+		t.Fatal("hot-patch lifecycle wait did not finish after the option returned")
+	}
+}
+
 func TestConfigHotpatch_PersistSessionStartParams(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
