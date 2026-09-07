@@ -6,6 +6,8 @@
 
 别名（CIFS、MSRPC、TNS、AS-REP / TGS、NTLM v1/v2）与主规则共用同一张卡。
 
+2026-09-07：LDAP、MySQL、PostgreSQL、SMB3 按原规则及已验证能力重新核算，分别仍为 80/B、75/B、81/B、75/B；新字段入口不自动增加 Schema 或分支分。新增消息范围的验收证据独立执行，见 [P0 范围与评分依据](P0_SCOPE.md)。四项能力目录继续标记 `partial`。
+
 历史 `WPAD proxy` 计分卡仅评价 `HTTP GET /wpad.dat` 的 HTTP 封装，不评价 WPAD 发现、代理使用或配置正文语义。专用 WPAD 入口必须保留 `partial` 状态；P0 范围回归同时验证旧 HTTP／Ethernet 路径、专用字段／原始字节，以及未观察发现流程、未证明代理使用、未解析正文的元数据，不能以状态改名绕过这一边界。
 
 | 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |
