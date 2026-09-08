@@ -1,0 +1,70 @@
+desc(
+	title: "C#/.NET user input sources (lib)"
+	title_zh: "用户输入源（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-user-input"
+	risk: "input-validation"
+	desc: <<<DESC
+标记 ASP.NET / ASP.NET Core 常见不可信输入：QueryString、Form、Params、Query、Cookies、Headers、InputStream、Files，以及 Console.ReadLine。可与 SQL、命令执行、路径、SSRF、XSS 等 sink 规则通过数据流组合分析。对应 Fortify DataflowSource（HttpRequest.get_Query/get_Form/get_Cookies 等）与 Semgrep C# taint source。
+DESC
+	solution: <<<SOLUTION
+对用户输入做类型、格式与长度校验；禁止将原始请求数据直接拼接到 SQL、操作系统命令、文件路径或 HTML 响应中。优先使用参数化查询、参数列表形式的进程启动，以及编码器/白名单。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+	rule_id: "5ebe88e5-0d49-4121-b1cc-13fb11b796ec"
+)
+
+*.QueryString as $output
+*.QueryString[*] as $output
+*.Form as $output
+*.Form[*] as $output
+*.Params as $output
+*.Params[*] as $output
+Request.Query as $output
+Request.Query[*] as $output
+*.Cookies as $output
+*.Cookies[*] as $output
+*.Headers as $output
+*.Headers[*] as $output
+*.InputStream as $output
+*.Files as $output
+Console.ReadLine() as $output
+
+alert $output for {
+	title: "C#/.NET user input source",
+	title_zh: "C#/.NET 用户输入点",
+	level: "info",
+	type: "audit",
+	risk: "input-validation",
+	message: "可能存在用户可控的输入来源（HTTP 请求或控制台输入）。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_user_input.cs': <<<UNSAFE
+using System;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["id"];
+        string form = Request.Form["name"];
+        string line = Console.ReadLine();
+        Console.WriteLine(q + form + line);
+    }
+}
+UNSAFE
+	'safefile://safe_user_input.cs': <<<SAFE
+public class Controller {
+    public void Handle() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)

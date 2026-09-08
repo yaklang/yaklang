@@ -1,0 +1,67 @@
+desc(
+	title: "Check C#/.NET XPath Injection via SelectSingleNode"
+	title_zh: "检测 C#/.NET SelectSingleNode XPath 注入"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "xpath-injection"
+	desc: <<<DESC
+该规则检测用户可控输入流入 SelectSingleNode、SelectNodes、Compile 或 Evaluate。将请求参数拼进 XPath 可改变查询，绕过认证或读取额外节点（CWE-643）。对应 Fortify XPath Injection 与 Semgrep xpath-injection。
+DESC
+	solution: <<<SOLUTION
+不要拼接 XPath；对参数做引号转义或使用预定义路径加绑定值；对用户输入做白名单。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-643](https://cwe.mitre.org/data/definitions/643.html)
+REFERENCE
+	rule_id: "ff961a70-dac1-4d9f-9058-7be6c54e8754"
+)
+
+<include("csharp-user-input")> as $input
+
+*.SelectSingleNode as $sink
+*.SelectNodes as $sink
+*.Compile as $sink
+*.Evaluate as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET XPath Injection via SelectSingleNode",
+	title_zh: "C#/.NET SelectSingleNode XPath 注入",
+	level: "high",
+	type: "vuln",
+	risk: "xpath-injection",
+	message: "检测到用户输入流入 XPath 查询，存在 XPath 注入风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_xpath.cs': <<<UNSAFE
+using System.Xml;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["name"];
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml("<root/>");
+        doc.SelectSingleNode("//user[@name='" + q + "']");
+    }
+}
+UNSAFE
+	'safefile://safe_xpath.cs': <<<SAFE
+using System.Xml;
+
+public class Controller {
+    public void Handle() {
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml("<root/>");
+        doc.SelectSingleNode("//user");
+    }
+}
+SAFE
+)

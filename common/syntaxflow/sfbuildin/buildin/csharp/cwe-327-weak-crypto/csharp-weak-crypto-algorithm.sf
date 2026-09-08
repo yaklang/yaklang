@@ -1,0 +1,63 @@
+desc(
+	title: "Check C#/.NET Weak Cryptographic Algorithm"
+	title_zh: "检测 C#/.NET 弱加密或弱哈希算法"
+	type: audit
+	level: mid
+	language: csharp
+	risk: "weak-cryptographic-algorithm"
+	desc: <<<DESC
+该规则检测 DES、TripleDES、RC2、MD5、SHA1 等已不适合安全用途的算法创建入口。这些算法存在已知弱点，用于保密、完整性或口令存储时会被破解或碰撞（CWE-327）。对应 Fortify Weak Encryption / Weak Cryptographic Hash 与 Semgrep use_deprecated_cipher_algorithm。
+DESC
+	solution: <<<SOLUTION
+对称加密使用 AES-GCM 或 ChaCha20Poly1305；哈希使用 SHA-256 及以上；口令存储使用 PBKDF2/Argon2/bcrypt，不要用 MD5/SHA1。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+REFERENCE
+	rule_id: "a988126c-0596-41d0-9e53-247a7eb2afc9"
+)
+
+DES.Create as $mid
+TripleDES.Create as $mid
+RC2.Create as $mid
+MD5.Create as $mid
+SHA1.Create as $mid
+MD5CryptoServiceProvider as $mid
+SHA1CryptoServiceProvider as $mid
+DESCryptoServiceProvider as $mid
+
+alert $mid for {
+	title: "C#/.NET weak cryptographic algorithm",
+	title_zh: "C#/.NET 弱加密或弱哈希算法",
+	level: "mid",
+	type: "audit",
+	risk: "weak-cryptographic-algorithm",
+	message: "检测到 DES/TripleDES/RC2/MD5/SHA1 等弱算法，请改用 AES-GCM 或 SHA-256 及以上。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_crypto.cs': <<<UNSAFE
+using System.Security.Cryptography;
+
+public class Crypto {
+    public void Run() {
+        DES.Create();
+        MD5.Create();
+        SHA1.Create();
+    }
+}
+UNSAFE
+	'safefile://safe_crypto.cs': <<<SAFE
+using System.Security.Cryptography;
+
+public class Crypto {
+    public void Run() {
+        Aes aes = Aes.Create();
+        SHA256 sha = SHA256.Create();
+    }
+}
+SAFE
+)

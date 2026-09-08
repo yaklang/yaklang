@@ -1,0 +1,61 @@
+desc(
+	title: "Check C#/.NET LDAP Injection via DirectorySearcher.Filter"
+	title_zh: "检测 C#/.NET DirectorySearcher.Filter LDAP 注入"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "ldap-injection"
+	desc: <<<DESC
+该规则检测用户可控输入流入 DirectorySearcher.Filter。将请求参数拼进 LDAP 过滤器可改变查询逻辑，导致信息泄露或认证绕过（CWE-90）。对应 Fortify LDAP Injection / LDAP Manipulation 与 Semgrep ldap-injection。
+DESC
+	solution: <<<SOLUTION
+对过滤器参数做 LDAP 编码（Encoder.LdapFilterEncode）；不要拼接原始用户输入。使用白名单约束用户名等字段。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-90](https://cwe.mitre.org/data/definitions/90.html)
+REFERENCE
+	rule_id: "da905652-125a-4adf-a400-221f1ec3b7f5"
+)
+
+<include("csharp-user-input")> as $input
+
+*.Filter as $sink
+$sink?{<self> #{until: `* & $input`}->} as $high
+
+alert $high for {
+	title: "C#/.NET LDAP Injection via Filter",
+	title_zh: "C#/.NET DirectorySearcher.Filter LDAP 注入",
+	level: "high",
+	type: "vuln",
+	risk: "ldap-injection",
+	message: "检测到用户输入流入 LDAP Filter，存在 LDAP 注入风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_ldap.cs': <<<UNSAFE
+using System.DirectoryServices;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["user"];
+        DirectorySearcher s = new DirectorySearcher();
+        s.Filter = "(uid=" + q + ")";
+    }
+}
+UNSAFE
+	'safefile://safe_ldap.cs': <<<SAFE
+using System.DirectoryServices;
+
+public class Controller {
+    public void Handle() {
+        DirectorySearcher s = new DirectorySearcher();
+        s.Filter = "(objectClass=user)";
+    }
+}
+SAFE
+)

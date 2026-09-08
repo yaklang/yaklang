@@ -1,0 +1,59 @@
+desc(
+	title: "C#/.NET SQL command sinks (lib)"
+	title_zh: "SQL 执行入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-sql-sink"
+	risk: "sql-injection"
+	desc: <<<DESC
+标记 SqlCommand、OleDbCommand、OdbcCommand、OracleCommand 以及 EF Core 的 FromSqlRaw / ExecuteSqlRaw 等可将字符串作为 SQL 执行的 API。对应 Fortify SQL Injection sink 与 Semgrep csharp-sqli。
+DESC
+	solution: <<<SOLUTION
+使用参数化查询（SqlParameter / Parameters.AddWithValue）或 ORM 的参数化 API；避免字符串拼接、string.Format、插值字符串构造 SQL。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+	rule_id: "88d689f0-f10a-43c0-8b70-5c090c5edbd8"
+)
+
+SqlCommand as $output
+OleDbCommand as $output
+OdbcCommand as $output
+OracleCommand as $output
+*.FromSqlRaw as $output
+*.ExecuteSqlRaw as $output
+*.ExecuteSqlCommand as $output
+
+alert $output for {
+	title: "C#/.NET SQL execution API",
+	title_zh: "C#/.NET SQL 执行类 API",
+	level: "info",
+	type: "audit",
+	risk: "sql-injection",
+	message: "检测到可将字符串作为 SQL 执行的 API，请检查语句是否由用户输入拼接。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_sql_sink.cs': <<<UNSAFE
+using System.Data.SqlClient;
+
+public class Db {
+    public void Run() {
+        SqlCommand cmd = new SqlCommand("SELECT 1");
+        cmd.ExecuteReader();
+    }
+}
+UNSAFE
+	'safefile://safe_sql_sink.cs': <<<SAFE
+public class Db {
+    public void Run() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)

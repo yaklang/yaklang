@@ -1,0 +1,59 @@
+desc(
+	title: "C#/.NET insecure deserialization sinks (lib)"
+	title_zh: "不安全反序列化入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-deserialization-sink"
+	risk: "deserialization"
+	desc: <<<DESC
+标记 BinaryFormatter.Deserialize、LosFormatter、SoapFormatter、NetDataContractSerializer、JavaScriptSerializer 以及 Newtonsoft JsonConvert.DeserializeObject 等反序列化 API。对不可信数据反序列化可导致远程代码执行（CWE-502）。对应 Fortify Unsafe Deserialization 与 Semgrep insecure-deserialization。
+DESC
+	solution: <<<SOLUTION
+禁止对不可信数据使用 BinaryFormatter 等类型化反序列化；JSON 使用 System.Text.Json 或 Newtonsoft 且 TypeNameHandling 保持 None；如必须保留类型信息，配置自定义 SerializationBinder 白名单。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+	rule_id: "5ef325e1-a59a-4a38-9f82-53007a08a01a"
+)
+
+*.Deserialize as $output
+JsonConvert.DeserializeObject as $output
+BinaryFormatter as $output
+LosFormatter as $output
+SoapFormatter as $output
+NetDataContractSerializer as $output
+
+alert $output for {
+	title: "C#/.NET deserialization API",
+	title_zh: "C#/.NET 反序列化 API",
+	level: "info",
+	type: "audit",
+	risk: "deserialization",
+	message: "检测到反序列化 API，请确认数据来源可信且未启用危险类型处理。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_deser_sink.cs': <<<UNSAFE
+using System.Runtime.Serialization.Formatters.Binary;
+using System.IO;
+
+public class Ser {
+    public void Run(Stream s) {
+        BinaryFormatter bf = new BinaryFormatter();
+        bf.Deserialize(s);
+    }
+}
+UNSAFE
+	'safefile://safe_deser_sink.cs': <<<SAFE
+public class Ser {
+    public void Run() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)

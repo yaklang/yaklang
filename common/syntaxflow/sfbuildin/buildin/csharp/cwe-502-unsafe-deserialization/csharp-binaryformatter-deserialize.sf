@@ -1,0 +1,60 @@
+desc(
+	title: "Check C#/.NET Insecure Deserialization via BinaryFormatter"
+	title_zh: "检测 C#/.NET BinaryFormatter 不安全反序列化"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "deserialization"
+	desc: <<<DESC
+该规则检测用户可控数据流入 BinaryFormatter.Deserialize 或其他类型化反序列化入口。BinaryFormatter 无法被安全配置，反序列化不可信数据可导致远程代码执行（CWE-502）。对应 Fortify Unsafe Deserialization 与 Semgrep insecure-binaryformatter-deserialization。
+DESC
+	solution: <<<SOLUTION
+停止使用 BinaryFormatter；改用 JSON（System.Text.Json）等无类型载荷的格式。不要对请求体、上传文件或外部流调用 Deserialize。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+[BinaryFormatter security guide](https://learn.microsoft.com/dotnet/standard/serialization/binaryformatter-security-guide)
+REFERENCE
+	rule_id: "73476cde-ff2e-4ba6-affe-249ab2a17977"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-deserialization-sink")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET BinaryFormatter insecure deserialization",
+	title_zh: "C#/.NET BinaryFormatter 不安全反序列化",
+	level: "high",
+	type: "vuln",
+	risk: "deserialization",
+	message: "检测到用户可达数据流入反序列化 API，存在远程代码执行风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_deser.cs': <<<UNSAFE
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        BinaryFormatter bf = new BinaryFormatter();
+        bf.Deserialize(Request.InputStream);
+    }
+}
+UNSAFE
+	'safefile://safe_deser.cs': <<<SAFE
+using System.IO;
+
+public class Controller {
+    public void Handle() {
+        string s = File.ReadAllText("data.json");
+    }
+}
+SAFE
+)

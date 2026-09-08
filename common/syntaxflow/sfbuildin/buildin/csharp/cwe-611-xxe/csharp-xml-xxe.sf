@@ -1,0 +1,62 @@
+desc(
+	title: "Check C#/.NET XXE via XmlDocument and XmlTextReader"
+	title_zh: "检测 C#/.NET XmlDocument/XmlTextReader XXE"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "xxe"
+	desc: <<<DESC
+该规则检测用户可控输入流入 XmlDocument.Load/LoadXml 或 XmlTextReader 构造。默认解析器可能处理外部实体，导致文件读取或 SSRF（CWE-611）。对应 Fortify XML External Entity Injection 与 Semgrep csharp/lang/security/xxe。
+DESC
+	solution: <<<SOLUTION
+使用 XmlReaderSettings：DtdProcessing = Prohibit，XmlResolver = null。不要用 XmlTextReader 的不安全默认值解析不可信 XML。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+	rule_id: "845b0419-37c5-48c3-be7c-1ddfbda0ecf3"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-xml-sink")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+*.Load(* #{until: `* & $input`}->) as $high
+*.LoadXml(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET XXE via XML parser",
+	title_zh: "C#/.NET XML 解析 XXE",
+	level: "high",
+	type: "vuln",
+	risk: "xxe",
+	message: "检测到用户输入流入 XML 解析器，存在 XXE 风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_xxe.cs': <<<UNSAFE
+using System.Xml;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["xml"];
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml(q);
+    }
+}
+UNSAFE
+	'safefile://safe_xxe.cs': <<<SAFE
+using System.Xml;
+
+public class Controller {
+    public void Handle() {
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml("<root/>");
+    }
+}
+SAFE
+)
