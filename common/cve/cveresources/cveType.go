@@ -21,6 +21,7 @@ type CVE struct {
 	CWE               string
 	ProblemType       []byte
 	References        []byte
+	Title             string // CVE 5.0 原始英文标题 (containers.cna.title)
 	TitleZh           string
 	Solution          string
 	DescriptionMain   string
@@ -76,6 +77,7 @@ func (c *CVE) ToGPRCModel() *ypb.CVEDetail {
 		DescriptionZh:           utils.EscapeInvalidUTF8Byte([]byte(c.DescriptionMainZh)),
 		DescriptionOrigin:       utils.EscapeInvalidUTF8Byte([]byte(c.DescriptionMain)),
 		Title:                   utils.EscapeInvalidUTF8Byte([]byte(c.TitleZh)),
+		TitleOrigin:             utils.EscapeInvalidUTF8Byte([]byte(c.Title)),
 		Solution:                utils.EscapeInvalidUTF8Byte([]byte(c.Solution)),
 		AccessVector:            utils.EscapeInvalidUTF8Byte([]byte(c.AccessVector)),
 		References:              utils.EscapeInvalidUTF8Byte(c.References),

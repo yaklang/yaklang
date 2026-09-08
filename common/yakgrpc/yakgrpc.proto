@@ -3709,6 +3709,7 @@ message CVEDetail {
   string Product = 25;
   int64  UpdatedAt = 26;
   int64  LastModifiedData = 27;
+  string TitleOrigin = 28; // CVE 5.0 原始英文标题
 }
 
 message QueryCVEResponse {
