@@ -22135,6 +22135,7 @@ type CVEDetail struct {
 	Product                 string                 `protobuf:"bytes,25,opt,name=Product,proto3" json:"Product,omitempty"`
 	UpdatedAt               int64                  `protobuf:"varint,26,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	LastModifiedData        int64                  `protobuf:"varint,27,opt,name=LastModifiedData,proto3" json:"LastModifiedData,omitempty"`
+	TitleOrigin             string                 `protobuf:"bytes,28,opt,name=TitleOrigin,proto3" json:"TitleOrigin,omitempty"` // CVE 5.0 原始英文标题
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -22349,6 +22350,13 @@ func (x *CVEDetail) GetLastModifiedData() int64 {
 		return x.LastModifiedData
 	}
 	return 0
+}
+
+func (x *CVEDetail) GetTitleOrigin() string {
+	if x != nil {
+		return x.TitleOrigin
+	}
+	return ""
 }
 
 type QueryCVEResponse struct {
@@ -79053,7 +79061,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vRelativeCVE\x18\x0e \x03(\tR\vRelativeCVE\"Q\n" +
 	"\vCVEDetailEx\x12 \n" +
 	"\x03CVE\x18\x01 \x01(\v2\x0e.ypb.CVEDetailR\x03CVE\x12 \n" +
-	"\x03CWE\x18\x02 \x03(\v2\x0e.ypb.CWEDetailR\x03CWE\"\xff\a\n" +
+	"\x03CWE\x18\x02 \x03(\v2\x0e.ypb.CWEDetailR\x03CWE\"\xa1\b\n" +
 	"\tCVEDetail\x12\x10\n" +
 	"\x03CVE\x18\x01 \x01(\tR\x03CVE\x12$\n" +
 	"\rDescriptionZh\x18\x02 \x01(\tR\rDescriptionZh\x12,\n" +
@@ -79083,7 +79091,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x17UserInteractionRequired\x18\x18 \x01(\bR\x17UserInteractionRequired\x12\x18\n" +
 	"\aProduct\x18\x19 \x01(\tR\aProduct\x12\x1c\n" +
 	"\tUpdatedAt\x18\x1a \x01(\x03R\tUpdatedAt\x12*\n" +
-	"\x10LastModifiedData\x18\x1b \x01(\x03R\x10LastModifiedData\"y\n" +
+	"\x10LastModifiedData\x18\x1b \x01(\x03R\x10LastModifiedData\x12 \n" +
+	"\vTitleOrigin\x18\x1c \x01(\tR\vTitleOrigin\"y\n" +
 	"\x10QueryCVEResponse\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
