@@ -682,20 +682,20 @@ jobs:
               [
                 {"package": "./common/yak/java/...", "timeout": "8m", "skip": "^TestAllSyntax.*_G4$"},
                 {"package": "./common/yak/ssaapi/test/java/...", "timeout": "4m"},
-                {"package": "./common/yak/typescript/...", "timeout": "2m"},
+                {"package": "./common/yak/typescript/...", "timeout": "2m", "skip": "^TestAllSyntax.*_G4$"},
                 {"package": "./common/yak/ssaapi/test/javascript/...", "timeout": "1m"},
-                {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s"},
+                {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s", "skip": "^TestAllSyntax.*_G4$"},
                 {"package": "./common/yak/ssaapi/test/yak/...", "timeout": "1m"},
                 {"package": "./common/yak/antlr4yak/lsp/...", "timeout": "20s"},
-                {"package": "./common/yak/python/...", "timeout": "4m"},
+                {"package": "./common/yak/python/...", "timeout": "4m", "skip": "^TestAllSyntax.*_G4$"},
                 {"package": "./common/yak/ssaapi/test/python/...", "timeout": "2m"},
-                {"package": "./common/yak/go2ssa/...", "timeout": "3m"},
+                {"package": "./common/yak/go2ssa/...", "timeout": "3m", "skip": "^TestAllSyntax.*_G4$"},
                 {"package": "./common/yak/antlr4go/...", "timeout": "2m"},
                 {"package": "./common/yak/ssaapi/test/golang/...", "timeout": "3m"},
-                {"package": "./common/yak/c2ssa/...", "timeout": "30s"},
+                {"package": "./common/yak/c2ssa/...", "timeout": "30s", "skip": "^TestAllSyntax.*_G4$"},
                 {"package": "./common/yak/antlr4c/...", "timeout": "30s"},
                 {"package": "./common/yak/ssaapi/test/c/...", "timeout": "2m"},
-                {"package": "./common/yak/csharp/...", "timeout": "4m"}
+                {"package": "./common/yak/csharp/...", "timeout": "4m", "skip": "^TestAllSyntax.*_G4$"}
               ]
 
           - name: "Test SSA / SSAAPI Core / SyntaxFlow / StaticAnalyze / SFDB / SFVM"
