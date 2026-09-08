@@ -85,6 +85,9 @@ func InitializingProjectDatabase() error {
 	_ = dialect
 	updateProject(TypeSSAProject, defaultSSAProjectPath)
 
+	// 修复因数据库文件被移动而失效的 DatabasePath
+	repairProjectDatabasePaths(profileDB)
+
 	return nil
 }
 
@@ -454,6 +457,78 @@ func UpdateProjectDatabasePath(db *gorm.DB, id int64, databasePath string) error
 		return utils.Errorf("update project: %s", db.Error)
 	}
 	return nil
+}
+
+// RepairProjectDatabasePath 检查项目的数据库文件是否存在，
+// 如果不存在则按文件名在预期目录中查找，找到则自动更新 DatabasePath。
+//
+// 适用场景：用户移动了 yakit-projects 目录后，projects 表中记录的绝对路径失效。
+// 因为数据库文件名包含时间戳，全局唯一，所以按文件名在预期目录中查找即可命中。
+//
+// 参数:
+//   - profileDB: profile 数据库连接
+//   - proj: 要修复的项目记录
+//
+// 返回值:
+//   - string: 修复后的路径（修复成功则为新路径，否则为原始路径）
+//   - bool: 是否修复成功（文件可用即为 true）
+func RepairProjectDatabasePath(profileDB *gorm.DB, proj *schema.Project) (string, bool) {
+	if proj == nil || proj.DatabasePath == "" {
+		return "", false
+	}
+	// 文件存在，无需修复
+	if utils.FileExists(proj.DatabasePath) {
+		return proj.DatabasePath, true
+	}
+	// SSA 项目可能使用 MySQL/Postgres DSN（非文件路径），跳过文件级修复
+	// DSN 格式如 "mysql://..." / "postgres://..."，SQLite 文件路径不含 "://"
+	if proj.Type == TypeSSAProject && strings.Contains(proj.DatabasePath, "://") {
+		return proj.DatabasePath, false
+	}
+	// 按 type 确定预期目录
+	var expectedDir string
+	switch proj.Type {
+	case TypeSSAProject:
+		expectedDir = consts.GetDefaultSSAProjectDir()
+	default:
+		expectedDir = consts.GetDefaultYakitProjectsDir()
+	}
+	filename := filepath.Base(proj.DatabasePath)
+	if filename == "." || filename == string(filepath.Separator) {
+		return proj.DatabasePath, false
+	}
+	candidatePath := filepath.Join(expectedDir, filename)
+	if !utils.FileExists(candidatePath) {
+		return proj.DatabasePath, false
+	}
+	// 找到了，更新数据库记录
+	if err := UpdateProjectDatabasePath(profileDB, int64(proj.ID), candidatePath); err != nil {
+		log.Errorf("repair project database path failed: %s", err)
+		return proj.DatabasePath, false
+	}
+	log.Infof("repaired project[%d] database path: %s -> %s", proj.ID, proj.DatabasePath, candidatePath)
+	return candidatePath, true
+}
+
+// repairProjectDatabasePaths 遍历所有项目，检查并修复失效的 DatabasePath。
+// 在 InitializingProjectDatabase 启动时调用，实现"移动后自愈"。
+func repairProjectDatabasePaths(profileDB *gorm.DB) {
+	projCh := YieldProject(profileDB, context.Background())
+	for proj := range projCh {
+		if proj == nil || proj.DatabasePath == "" {
+			continue
+		}
+		// 跳过文件夹类型（type=file 的 DatabasePath 为空）
+		if proj.Type == TypeFile {
+			continue
+		}
+		// 文件存在则无需修复
+		if utils.FileExists(proj.DatabasePath) {
+			continue
+		}
+		// 尝试按文件名在预期目录中查找并修复
+		RepairProjectDatabasePath(profileDB, proj)
+	}
 }
 
 func GetTemporaryProject(db *gorm.DB, Type string) (*schema.Project, error) {
