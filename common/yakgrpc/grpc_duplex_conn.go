@@ -254,6 +254,10 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 
 	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream, func(_ context.Context, req *ypb.DuplexConnectionRequest) error {
 		switch req.GetMessageType() {
+		case yakit.ScreenshotSubscribe:
+			yakit.SetServerPushSubscription(id, yakit.ScreenshotRequest, true)
+		case yakit.ScreenshotResponse:
+			return yakit.DeliverYakitScreenshot(id, req.GetData())
 		case yakit.ServerPushType_HTTPFlowCommittedSubscribe:
 			yakit.SetServerPushSubscription(id, yakit.ServerPushType_HTTPFlowCommitted, true)
 		case yakit.ServerPushType_HTTPFlowCommittedUnsubscribe:

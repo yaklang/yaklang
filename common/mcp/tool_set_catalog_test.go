@@ -22,7 +22,7 @@ func TestMCPToolSetCatalogMatchesRegistration(t *testing.T) {
 
 func TestDefaultMCPToolSets_Classification(t *testing.T) {
 	require.Len(t, DefaultMCPToolSets, 12)
-	require.Len(t, OptionalMCPToolSets, 11)
+	require.Len(t, OptionalMCPToolSets, 12)
 	require.Len(t, InternalMCPToolSets, 1)
 
 	for _, name := range DefaultMCPToolSets {
