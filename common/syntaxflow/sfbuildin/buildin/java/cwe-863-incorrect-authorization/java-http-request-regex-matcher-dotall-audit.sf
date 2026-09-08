@@ -2,7 +2,7 @@ desc(
 	title: "Audit HTTP Request Regex Authorization Matching"
 	title_zh: "审计HTTP请求正则授权匹配"
 	type: audit
-	risk: "授权路径匹配"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计基于 HTTP 请求路径进行正则安全匹配的实现。
@@ -38,7 +38,7 @@ alert $matcherCall for {
 	title_zh: "审计HTTP请求正则授权匹配",
 	level: "middle",
 	message: "发现基于 servletPath/pathInfo/queryString 拼接结果的正则授权匹配逻辑，需复核路径归一化和换行符处理是否完备。",
-	risk: "授权路径匹配",
+	risk: "authorization-bypass",
 	name: "matcherCall",
 	desc: <<<DESC
 ### 规则说明

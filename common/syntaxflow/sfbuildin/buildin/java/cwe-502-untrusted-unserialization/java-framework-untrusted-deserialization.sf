@@ -2,7 +2,7 @@ desc(
 	title: "Detect Framework Untrusted Deserialization Patterns"
 	title_zh: "检测Java框架级不可信反序列化模式"
 	type: vuln
-	risk: "反序列化漏洞"
+	risk: "deserialization"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测框架内部常见的高风险反序列化模式：
@@ -34,7 +34,7 @@ alert $risk for {
 	title_zh: "检测Java框架级不可信反序列化模式",
 	level: "high",
 	message: "发现框架级反序列化高风险模式，可能导致默认类型反序列化、动态类型恢复或消息头驱动的危险对象处理。",
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	name: "risk",
 	desc: <<<DESC
 ### 漏洞描述

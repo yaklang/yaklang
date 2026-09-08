@@ -2,7 +2,7 @@ desc(
 	title: "Detect Raw Filter Converter String Serialization"
 	title_zh: "检测过滤器转换器直接序列化原始字符串"
 	type: audit
-	risk: "查询注入"
+	risk: "input-validation"
 	desc: <<<DESC
 ### 规则说明
 当通用过滤表达式转换器把字符串值直接拼进后端查询语法，而没有调用专门的 JSON / Lucene / backend escape helper 时，下游 JSONPath、查询 DSL 或其它解释器可能被注入。
@@ -31,7 +31,7 @@ alert $risk for {
 	title_zh: "检测过滤器转换器直接序列化原始字符串",
 	level: "middle",
 	message: "发现过滤器转换器直接把字符串拼进下游查询语法，且未看到专门 escape helper，需复核是否存在 JSONPath / 查询 DSL 注入。",
-	risk: "查询注入",
+	risk: "input-validation",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

@@ -2,7 +2,7 @@ desc(
 	title: "Detect Dynamic Property Path Expression Access"
 	title_zh: "检测Java动态属性路径表达式访问"
 	type: vuln
-	risk: "表达式注入"
+	risk: "spel-injection"
 	desc: <<<DESC
 ### 漏洞描述
 当代码先将动态属性路径解析为框架内部的属性路径对象，再将该路径交给表达式对象执行 `setValue` / `getValue` 一类读写操作时，如果路径来源于外部输入，就可能造成动态属性访问、路径注入，甚至进一步演变为表达式注入或越权字段写入。
@@ -41,7 +41,7 @@ alert $risk for {
 	title_zh: "检测Java动态属性路径表达式访问",
 	level: "high",
 	message: "发现动态属性路径解析后又进入表达式对象读写，可能导致路径注入、表达式注入或越权字段访问。",
-	risk: "表达式注入",
+	risk: "spel-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 漏洞描述

@@ -2,7 +2,7 @@ desc(
 	title: "Detect Neo4j Filter Key Without Identifier Sanitization"
 	title_zh: "检测Neo4j过滤键缺少标识符净化"
 	type: audit
-	risk: "查询注入"
+	risk: "input-validation"
 	desc: <<<DESC
 ### 规则说明
 当过滤表达式转换器把运行时 metadata key 直接嵌入 Cypher 标识符，而只做简单替换或去引号、没有调用图数据库提供的 identifier sanitizer 时，可能造成 Cypher 注入或查询语义篡改。
@@ -26,7 +26,7 @@ alert $risk for {
 	title_zh: "检测Neo4j过滤键缺少标识符净化",
 	level: "middle",
 	message: "发现运行时过滤 key 直接嵌入 Neo4j 标识符且未调用 sanitizer，需复核是否存在 Cypher 注入。",
-	risk: "查询注入",
+	risk: "input-validation",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

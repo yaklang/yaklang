@@ -2,7 +2,7 @@ desc(
 	title: "Detect Empty Deserialization Allowlist Bypass"
 	title_zh: "检测空反序列化白名单直接放行"
 	type: audit
-	risk: "反序列化漏洞"
+	risk: "deserialization"
 	desc: <<<DESC
 ### 规则说明
 当反序列化 allowlist / allowed-list 校验逻辑把“白名单为空”直接视为允许全部类型时，攻击者可以绕过预期的类型限制，反序列化任意类。
@@ -42,7 +42,7 @@ alert $risk for {
 	title_zh: "检测空反序列化白名单直接放行",
 	level: "high",
 	message: "发现反序列化白名单校验把空 patterns 直接当作允许全部类型，可能导致 allowlist 绕过。",
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

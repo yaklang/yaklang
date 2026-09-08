@@ -2,7 +2,7 @@ desc(
 	title: "Detect Logout Handler Missing Empty Context Persistence"
 	title_zh: "检测登出处理器缺少空安全上下文持久化"
 	type: audit
-	risk: "认证状态残留"
+	risk: "improper-authentication"
 	desc: <<<DESC
 ### 规则说明
 当登出处理器清空 `SecurityContextHolder` 并移除 `Authentication`，但没有把新的空安全上下文写回 `SecurityContextRepository` 时，序列化 session 或组合 repository 场景下可能残留旧认证状态。
@@ -25,7 +25,7 @@ alert $risk for {
 	title_zh: "检测登出处理器缺少空安全上下文持久化",
 	level: "middle",
 	message: "发现 logout 流程只清空线程态安全上下文而未持久化空 context，需复核是否会残留认证状态。",
-	risk: "认证状态残留",
+	risk: "improper-authentication",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

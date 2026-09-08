@@ -2,7 +2,7 @@ desc(
 	title: "Audit Native Header-Derived Spring Expression Parsing"
 	title_zh: "审计Native Header派生的Spring表达式解析"
 	type: audit
-	risk: "表达式注入"
+	risk: "spel-injection"
 	desc: <<<DESC
 ### 规则说明
 当代码先从 STOMP Native Header 或其它消息元数据中取出运行时字符串，再将其交给 Spring Expression 解析器执行 `parseExpression(...)` 时，后续如果配合宽松的求值上下文，就可能演变成表达式注入或消息路由层的远程代码执行。
@@ -39,7 +39,7 @@ alert $risk for {
 	title_zh: "审计Native Header派生的Spring表达式解析",
 	level: "middle",
 	message: "发现 native header 或消息元数据派生的字符串进入 Spring parseExpression(...)，需复核是否存在表达式注入或宽松求值上下文。",
-	risk: "表达式注入",
+	risk: "spel-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

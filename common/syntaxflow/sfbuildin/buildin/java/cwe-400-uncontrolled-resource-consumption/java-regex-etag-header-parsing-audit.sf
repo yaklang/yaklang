@@ -2,7 +2,7 @@ desc(
 	title: "Audit Regex-Based ETag Header Parsing"
 	title_zh: "审计基于正则的ETag头解析"
 	type: audit
-	risk: "拒绝服务"
+	risk: "denial-of-service"
 	desc: <<<DESC
 ### 规则说明
 当条件请求头里的 ETag 列表通过正则 `matcher.find()` 循环解析，而不是交给更明确的专用 parser 时，复杂或超长头部可能带来额外的解析开销和资源消耗风险。
@@ -29,7 +29,7 @@ alert $risk for {
 	title_zh: "审计基于正则的ETag头解析",
 	level: "middle",
 	message: "发现条件请求头里的 ETag 列表通过正则循环解析，需复核是否存在高成本解析或异常输入消耗风险。",
-	risk: "拒绝服务",
+	risk: "denial-of-service",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

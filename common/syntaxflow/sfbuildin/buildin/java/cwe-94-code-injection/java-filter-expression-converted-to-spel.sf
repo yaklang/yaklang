@@ -2,7 +2,7 @@ desc(
 	title: "Detect Filter Expression Converted To SpEL"
 	title_zh: "检测过滤表达式被转换为SpEL执行"
 	type: audit
-	risk: "表达式注入"
+	risk: "spel-injection"
 	desc: <<<DESC
 ### 规则说明
 当代码先把结构化 filter AST 转成 SpEL 字符串，再交给 `parseExpression(...)` 求值时，攻击者可能通过 key / value / 语法边界突破表达式上下文，造成表达式注入或越权过滤。
@@ -32,7 +32,7 @@ alert $risk for {
 	title_zh: "检测过滤表达式被转换为SpEL执行",
 	level: "high",
 	message: "发现结构化过滤表达式被转换为 SpEL 字符串后再执行，需复核是否存在表达式注入。",
-	risk: "表达式注入",
+	risk: "spel-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

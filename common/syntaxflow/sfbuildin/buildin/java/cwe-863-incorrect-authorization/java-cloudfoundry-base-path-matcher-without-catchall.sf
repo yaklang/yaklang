@@ -2,7 +2,7 @@ desc(
 	title: "Audit CloudFoundry Base Path Matcher Without Catch-All"
 	title_zh: "审计CloudFoundry基础路径匹配缺少兜底覆盖"
 	type: audit
-	risk: "授权绕过"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
 当 Cloud Foundry Actuator 安全匹配器只围绕已发现 endpoint paths 构造精确匹配，而没有显式纳入基础路径下的 catch-all 子路径时，未知或未建模的子路径可能绕过预期的 Cloud Foundry 安全处理。
@@ -25,7 +25,7 @@ alert $risk for {
 	title_zh: "审计CloudFoundry基础路径匹配缺少兜底覆盖",
 	level: "middle",
 	message: "发现 Cloud Foundry 安全匹配器未显式覆盖基础路径下的 catch-all 子路径，需复核是否存在未授权子路径访问。",
-	risk: "授权绕过",
+	risk: "authorization-bypass",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

@@ -2,7 +2,7 @@ desc(
 	title: "Detect SpEL Parsing Without Expression Length Limit"
 	title_zh: "检测SpEL解析缺少表达式长度限制"
 	type: audit
-	risk: "拒绝服务"
+	risk: "denial-of-service"
 	desc: <<<DESC
 ### 规则说明
 当表达式解析器直接接收运行时表达式字符串并进入 tokenization / parse 流程，而同一解析入口没有先做表达式长度限制时，攻击者可能构造超长表达式触发拒绝服务。
@@ -41,7 +41,7 @@ alert $risk for {
 	title_zh: "检测SpEL解析缺少表达式长度限制",
 	level: "middle",
 	message: "发现 SpEL 解析入口直接消费表达式字符串且缺少长度限制，可能导致拒绝服务。",
-	risk: "拒绝服务",
+	risk: "denial-of-service",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

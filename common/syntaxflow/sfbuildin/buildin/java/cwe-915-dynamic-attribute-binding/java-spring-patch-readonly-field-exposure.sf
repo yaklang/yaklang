@@ -2,7 +2,7 @@ desc(
 	title: "Audit Spring PATCH Read-only Field Exposure"
 	title_zh: "审计Spring PATCH只读字段暴露"
 	type: vuln
-	risk: "动态属性绑定"
+	risk: "variable-overwrite"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测 Spring 风格 PATCH / JSON Patch 处理链中，只按 property-level writability 判定字段可写性，或在构造 patch converter 时未提供额外 bind context 的实现。
@@ -33,7 +33,7 @@ alert $risk for {
 	title_zh: "审计Spring PATCH只读字段暴露",
 	level: "middle",
 	message: "发现 PATCH / JSON Patch 处理链使用 property-level writability 判定或缺少 bind context，需复核只读/隐藏字段是否可能被暴露或修改。",
-	risk: "动态属性绑定",
+	risk: "variable-overwrite",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

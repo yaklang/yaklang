@@ -2,7 +2,7 @@ desc(
 	title: "Detect MariaDB Filter String Without SQL Escaping"
 	title_zh: "检测MariaDB过滤字符串缺少SQL转义"
 	type: audit
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 规则说明
 当过滤表达式转换器把运行时字符串直接包进 SQL 单引号字面量，而没有调用专门的 SQL escape helper 时，攻击者可以借助引号、反斜杠或控制字符破坏最终查询。
@@ -26,7 +26,7 @@ alert $risk for {
 	title_zh: "检测MariaDB过滤字符串缺少SQL转义",
 	level: "high",
 	message: "发现运行时字符串直接拼进 MariaDB 查询字面量且未调用 escape helper，需复核是否存在 SQL 注入。",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

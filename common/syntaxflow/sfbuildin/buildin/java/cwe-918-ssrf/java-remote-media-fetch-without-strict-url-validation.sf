@@ -2,7 +2,7 @@ desc(
 	title: "Detect Remote Media Fetch Without Strict URL Validation"
 	title_zh: "检测远程媒体抓取缺少严格URL校验"
 	type: audit
-	risk: "SSRF"
+	risk: "ssrf"
 	desc: <<<DESC
 ### 规则说明
 当多模态 / 媒体处理代码接受 `String` 或 `URL` 形式的运行时媒体地址，并直接通过 `openConnection().getInputStream()` 读取远端内容，而没有走严格 URL 校验或受控 fetcher 时，可能触发 SSRF。
@@ -26,7 +26,7 @@ alert $risk for {
 	title_zh: "检测远程媒体抓取缺少严格URL校验",
 	level: "high",
 	message: "发现运行时媒体地址直接通过 URLConnection 取回远端内容，且未看到严格 URL 校验或集中式 fetcher，需复核 SSRF 风险。",
-	risk: "SSRF",
+	risk: "ssrf",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

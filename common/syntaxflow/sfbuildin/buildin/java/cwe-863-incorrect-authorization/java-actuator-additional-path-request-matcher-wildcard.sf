@@ -2,7 +2,7 @@ desc(
 	title: "Audit Actuator Additional Path Request Matcher Wildcard Coverage"
 	title_zh: "审计Actuator附加路径匹配器的通配覆盖"
 	type: audit
-	risk: "授权绕过"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
 当 Actuator 的 additional paths 先被收集成路径集合，再统一交给会追加 `/**` 的通用 delegate matcher 生成逻辑时，原本应精确匹配的附加路径可能被放大为更宽的授权范围。
@@ -25,7 +25,7 @@ alert $risk for {
 	title_zh: "审计Actuator附加路径匹配器的通配覆盖",
 	level: "middle",
 	message: "发现 additional paths 复用了默认 wildcard delegate matcher，需复核是否把精确路径放大为更宽授权范围。",
-	risk: "授权绕过",
+	risk: "authorization-bypass",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

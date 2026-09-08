@@ -2,7 +2,7 @@ desc(
 	title: "Audit Spring Global Handler Path Prefix Registration"
 	title_zh: "审计Spring全局Handler路径前缀注册"
 	type: vuln
-	risk: "请求映射暴露"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测 Spring `RequestMappingHandlerMapping` 派生类中，将配置化 base path 直接通过 `setPathPrefixes(...)` 注册为全局路径前缀的实现。
@@ -29,7 +29,7 @@ alert $risk for {
 	title_zh: "审计Spring全局Handler路径前缀注册",
 	level: "middle",
 	message: "发现配置化 base path 被直接注册为全局 handler 路径前缀，需复核是否会暴露额外 URI 或绕过既有安全边界。",
-	risk: "请求映射暴露",
+	risk: "authorization-bypass",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明
