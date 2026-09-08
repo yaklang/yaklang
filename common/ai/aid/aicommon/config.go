@@ -189,6 +189,7 @@ type Config struct {
 	DisableOutputEventType []string
 	SaveEvent              bool
 	LegionResultRuntime    LegionResultRuntime
+	reActActionPolicy      ReActActionPolicy
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -4181,6 +4182,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Keep the policy with the shared manager: NewConfig applies this flag
 	// to the manager, so a child default must not reopen parent MCP access.
 	opts = append(opts, WithDisallowMCPServers(i.DisallowMCPServers))
+	opts = append(opts, WithReActActionPolicy(i.reActActionPolicy))
 
 	// Capability managers: child configs reuse parent instances when present.
 	if i.AiToolManager != nil {

@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"github.com/yaklang/yaklang/scannode/inputresolver"
@@ -205,10 +207,6 @@ func (h *inputWorkspaceRuntimeHandle) activeTurnID() string {
 	return ""
 }
 
-func (r *legionServerFocusRuntime) ManagedInputRestricted() bool {
-	return r != nil && r.inputWorkspace != nil
-}
-
 func (r *legionServerFocusRuntime) workspaceID() string {
 	if r.inputWorkspace != nil {
 		return utils.InterfaceToString(r.inputWorkspace.Info()["workspace_id"])
@@ -288,7 +286,7 @@ func managedInputTools(runtime *legionServerFocusRuntime) ([]aicommon.ConfigOpti
 	}
 	manager := buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool { return tools }, buildinaitools.WithOnlyTools(tools...))
 	return []aicommon.ConfigOption{aicommon.WithAiToolManager(manager), aicommon.WithDisallowMCPServers(true),
-		aicommon.WithShowForgeListInPrompt(false), aicommon.WithEnablePlanAndExec(false), aicommon.WithEnableDetachedPlan(false),
+		aicommon.WithShowForgeListInPrompt(false), aicommon.WithReActActionPolicy(managedInputActionAllowed),
 		func(cfg *aicommon.Config) error {
 			// Initialize before installing the callback; later concurrent reads use
 			// the existing thread-safe, token-bounded session evidence store.
@@ -313,4 +311,27 @@ func legacyAISessionAttachmentRefs(command *aiv1.BindAISessionCommand) []aiSessi
 		return nil
 	}
 	return cloneAISessionAttachmentRefs(command.GetAttachments())
+}
+
+// The node owns managed-input permissions; the AI core only enforces the
+// injected policy. Planning and coordination are permitted, while independent
+// knowledge/skill/Forge loaders are not authorized by an input manifest.
+func managedInputActionAllowed(loopName, actionName string) bool {
+	if loopName == schema.AI_REACT_LOOP_NAME_PLAN {
+		switch actionName {
+		case "finish_exploration", "generate_direct_plan", "begin_deep_planning", "output_facts", "read_file":
+			return true
+		}
+	}
+	switch actionName {
+	case "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch", "dispatch_sub_react_agents", "request_plan", "request_plan_and_execution", "ask_for_clarification", "list_async_tasks":
+		return true
+	}
+	if loopName == schema.AI_REACT_LOOP_NAME_PLAN {
+		return false
+	}
+	// Locally defined actions are provided by the existing server-approved Focus
+	// release. Process-global actions must be explicitly approved above.
+	_, global := reactloops.GetLoopAction(actionName)
+	return !global
 }
