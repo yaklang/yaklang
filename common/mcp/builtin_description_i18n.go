@@ -11,6 +11,7 @@ import (
 //   - mcp.Tool.Description (WithDescription) remains English for AI / MCP tools/list
 //   - UI DescriptionI18n Zh/En come from this table at export time
 var builtinToolDescriptionI18n = map[string]*schema.I18n{
+	"screenshot": schema.NewI18n("截取 Yakit 当前可见页面并添加本地时间水印；支持指定保存路径，大图自动保存到引擎截图目录", "Capture the visible Yakit page with a local-time watermark; save to a chosen path or automatically save large images on the engine"),
 	// global_hotpatch
 	"get_global_hotpatch_config":      schema.NewI18n("获取当前全局热加载配置，包括启用状态、版本和生效模板", "Get current global hotpatch config (enabled, version, active template)"),
 	"enable_global_hotpatch":          schema.NewI18n("启用全局热加载模板；对新的 MITM 请求与 WebFuzzer 任务生效", "Enable global hotpatch for new MITM / WebFuzzer tasks"),
