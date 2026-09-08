@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - "enhance/cve-parse"
+      - "rookie/enhance/cve-parse"
 
 jobs:
   test-parse:
