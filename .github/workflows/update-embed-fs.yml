@@ -72,6 +72,7 @@ jobs:
             fi
             echo "Resource changes after bot commit. Dropping bot commit and regenerating."
             BRANCH=$(git branch --show-current)
+
             git rebase --onto "$BOT_COMMIT^" "$BOT_COMMIT" "$BRANCH"
           else
             echo "No bot commit found. Continuing."
@@ -89,31 +90,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP"
-          DEST="$RUNNER_TEMP/yak"
-
-          # Prefer the newest version from the active_versions list (not the
-          # "latest" alias): it is the newest published yak that can already
-          # carry embed-fs-hash --dir/--output-file and
-          # syntaxflow-format --rule-version-output. If that binary predates
-          # the flags, build one from this checkout instead.
-          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --quiet)
-          echo "Selected newest active yak version: $SELECTED_VERSION"
-          DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${SELECTED_VERSION}/yak_linux_amd64"
-          if curl -fsSL "$DOWNLOAD_URL" -o "$DEST" && chmod +x "$DEST" && "$DEST" version >/dev/null 2>&1; then
-            if "$DEST" embed-fs-hash --help 2>&1 | grep -q -- "--output-file" && "$DEST" syntaxflow-format --help 2>&1 | grep -q -- "--rule-version-output"; then
-              echo "Downloaded yak $SELECTED_VERSION supports the required flags."
-              echo "YAK=$DEST" >> "$GITHUB_ENV"
-              exit 0
-            fi
-            echo "Downloaded yak $SELECTED_VERSION predates --output-file/--rule-version-output; building from checkout."
-          else
-            echo "Download failed for $SELECTED_VERSION; building from checkout."
-          fi
-
-          go build -o "$DEST" common/yak/cmd/yak.go
-          "$DEST" version
-          echo "YAK=$DEST" >> "$GITHUB_ENV"
+          # 优先用 active_versions 列表最新发布版；缺少所需参数时由脚本从 checkout 编译。
+          echo "YAK=$(bash ./scripts/prepare-yak.sh --out "$RUNNER_TEMP/yak")" >> "$GITHUB_ENV"
 
       - name: Format SyntaxFlow rules and generate rule versions
         if: ${{ env.SKIP_CI != 'true' }}

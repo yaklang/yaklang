@@ -25,16 +25,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Download Yak binary
+      - name: Prepare Yak binary
         run: |
-          curl -fsSL https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64 -o yak
-          chmod +x yak
-          ./yak version
+          # 列表最新发布版必须支持 verify-builtin-risk，否则直接失败（不编译）。
+          YAK_PATH="$(bash ./scripts/prepare-yak.sh --out "$RUNNER_TEMP/yak" --no-build --require 'verify-builtin-risk --dir')"
+          echo "YAK=$YAK_PATH" >> "$GITHUB_ENV"
 
       - name: Validate local rules against the risk taxonomy
         run: |
-          if ! ./yak verify-builtin-risk --help >/dev/null 2>&1; then
-            echo "::error::downloaded yak does not support verify-builtin-risk; publish a release carrying the new command first"
-            exit 1
-          fi
-          ./yak verify-builtin-risk             --dir ./common/syntaxflow/sfbuildin/buildin             --taxonomy ./common/syntaxflow/sfrisk/taxonomy.json
+          "$YAK" verify-builtin-risk \
+            --dir ./common/syntaxflow/sfbuildin/buildin \
+            --taxonomy ./common/syntaxflow/sfrisk/taxonomy.json
