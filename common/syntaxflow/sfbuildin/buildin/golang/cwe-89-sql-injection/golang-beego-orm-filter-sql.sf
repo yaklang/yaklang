@@ -37,3 +37,60 @@ $db.QueryTable() as $qs;
 
 alert $highDirect
 alert $highFmtDirect
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://beego_filter_positive.go': <<<PARAM
+package demo
+
+import (
+	beego "github.com/beego/beego/v2/server/web"
+	"github.com/beego/beego/v2/client/orm"
+)
+
+type Controller struct{}
+type ProjectController struct {
+	beego.Controller
+}
+
+func (c *ProjectController) handle() {
+	projid := c.GetString("projid")
+	var paths []string
+	o := orm.NewOrm()
+	qs := o.QueryTable("casbin_rule")
+	_, _ = qs.Filter("PType", "p").Filter("v1__contains", "/"+projid+"/").All(&paths)
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://beego_filter_negative.go': <<<PARAM
+package demo
+
+import (
+	"strconv"
+
+	beego "github.com/beego/beego/v2/server/web"
+	"github.com/beego/beego/v2/client/orm"
+)
+
+type ProjectController struct {
+	beego.Controller
+}
+
+func (c *ProjectController) handle() {
+	projidStr := c.GetString("projid")
+	projid, err := strconv.ParseInt(projidStr, 10, 64)
+	if err != nil {
+		return
+	}
+
+	var paths []string
+	o := orm.NewOrm()
+	qs := o.QueryTable("casbin_rule")
+	_, _ = qs.Filter("project_id", projid).All(&paths)
+}
+PARAM
+)

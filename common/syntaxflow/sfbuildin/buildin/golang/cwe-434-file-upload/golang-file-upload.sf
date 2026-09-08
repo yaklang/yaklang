@@ -362,3 +362,85 @@ func main() {
 }
 SAFE
 )
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://upload_positive.go': <<<PARAM
+package demo
+
+import "mime/multipart"
+
+type Result struct{}
+
+func Upload(name string, contentType string, payload any) (*Result, error) {
+	return nil, nil
+}
+
+func save(h *multipart.FileHeader) (*Result, error) {
+	return Upload(h.Filename, "", nil)
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://upload_direct_write_positive.go': <<<PARAM
+package demo
+
+import (
+	"mime/multipart"
+	"os"
+)
+
+func save(h *multipart.FileHeader) error {
+	dst, err := os.Create(h.Filename)
+	if err != nil {
+		return err
+	}
+	return dst.Close()
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://upload_negative_non_upload.go': <<<PARAM
+package demo
+
+import "os"
+
+type Controller struct{}
+
+func (c *Controller) GetString(key string) string {
+	return ""
+}
+
+func (c *Controller) createDir(parent string) error {
+	title := c.GetString("name")
+	return os.MkdirAll(parent+"/"+title, 0o777)
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://upload_sanitized_write_negative.go': <<<PARAM
+package demo
+
+import (
+	"mime/multipart"
+	"os"
+	"path/filepath"
+)
+
+func save(h *multipart.FileHeader) error {
+	dst, err := os.Create(filepath.Base(h.Filename))
+	if err != nil {
+		return err
+	}
+	return dst.Close()
+}
+PARAM
+)
