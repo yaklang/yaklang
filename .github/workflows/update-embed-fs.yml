@@ -73,7 +73,62 @@ jobs:
             echo "Resource changes after bot commit. Dropping bot commit and regenerating."
             BRANCH=$(git branch --show-current)
 
-            git rebase --onto "$BOT_COMMIT^" "$BOT_COMMIT" "$BRANCH"
+            # Human commits after the bot commit may also touch these generated
+            # files (e.g. a hand-run hash sync). Their values are stale either
+            # way: the workflow regenerates them below, so resolve those
+            # conflicts to the side being rebased and continue. Other conflicts
+            # are real and must stop CI.
+            PRODUCT_FILES=(
+              "common/consts/coreplugin-hash.go"
+              "common/consts/syntaxflow-hash.go"
+              "common/consts/forge-hash.go"
+              "common/consts/aitool-hash.go"
+              "common/syntaxflow/sfdb/rule_versions.json"
+            )
+            is_product_file() {
+              local f
+              for f in "${PRODUCT_FILES[@]}"; do
+                [ "$f" = "$1" ] && return 0
+              done
+              return 1
+            }
+
+            git rebase --onto "$BOT_COMMIT^" "$BOT_COMMIT" "$BRANCH" || true
+            while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
+              CONFLICTS=$(git diff --name-only --diff-filter=U)
+              if [ -z "$CONFLICTS" ]; then
+                echo "::error::rebase stopped without conflicts; aborting"
+                git rebase --abort
+                exit 1
+              fi
+              HANDLED=0
+              while IFS= read -r f; do
+                if is_product_file "$f"; then
+                  echo "Discarding stale bot-generated content for $f (will regenerate)"
+                  if git checkout --ours -- "$f" 2>/dev/null; then
+                    git add -- "$f"
+                  else
+                    git rm -f -- "$f"
+                  fi
+                  HANDLED=1
+                else
+                  echo "::error::unexpected rebase conflict in $f"
+                  git rebase --abort
+                  exit 1
+                fi
+              done <<< "$CONFLICTS"
+              if [ "$HANDLED" != "1" ]; then
+                echo "::error::no product conflict resolved; aborting rebase"
+                git rebase --abort
+                exit 1
+              fi
+              GIT_EDITOR=true git rebase --continue || break
+            done
+            if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+              echo "::error::bot commit removal rebase still in progress"
+              git status --short
+              exit 1
+            fi
           else
             echo "No bot commit found. Continuing."
           fi
