@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-deserialization-sink"
 	risk: "deserialization"
 	desc: <<<DESC
-标记 BinaryFormatter.Deserialize、LosFormatter、SoapFormatter、NetDataContractSerializer、JavaScriptSerializer 以及 Newtonsoft JsonConvert.DeserializeObject 等反序列化 API。对不可信数据反序列化可导致远程代码执行（CWE-502）。对应 Fortify Unsafe Deserialization 与 Semgrep insecure-deserialization。
+### 说明
+`BinaryFormatter.Deserialize`、`LosFormatter`、`SoapFormatter`、`NetDataContractSerializer`、`JavaScriptSerializer` 以及 Newtonsoft `JsonConvert.DeserializeObject` 会按载荷还原对象。对不可信数据调用这些 API 可导致远程代码执行。
 DESC
 	solution: <<<SOLUTION
-禁止对不可信数据使用 BinaryFormatter 等类型化反序列化；JSON 使用 System.Text.Json 或 Newtonsoft 且 TypeNameHandling 保持 None；如必须保留类型信息，配置自定义 SerializationBinder 白名单。
+### 修复建议
+不要对不可信数据使用 `BinaryFormatter` 等类型化反序列化。JSON 使用 `System.Text.Json`，或 Newtonsoft 且保持 `TypeNameHandling.None`。必须保留类型信息时，用自定义 `SerializationBinder` 允许列表。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-502](https://cwe.mitre.org/data/definitions/502.html)

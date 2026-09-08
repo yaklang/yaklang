@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-http-request-sink"
 	risk: "ssrf"
 	desc: <<<DESC
-标记 HttpClient.GetAsync/GetStringAsync/PostAsync/SendAsync、WebClient.DownloadString/DownloadFile 以及 WebRequest.Create 等出站请求 API。URL 若受用户控制，可导致 SSRF。对应 Fortify Server-Side Request Forgery 与 Semgrep csharp/lang/security/ssrf。
+### 说明
+`HttpClient.GetAsync` / `GetStringAsync` / `PostAsync` / `SendAsync`、`WebClient.DownloadString` / `DownloadFile` 以及 `WebRequest.Create` 会从服务器发起出站请求。URL 受用户控制时，可变成对内网、本机或云元数据的 SSRF。
 DESC
 	solution: <<<SOLUTION
-对请求 URL 做白名单（协议、主机）；禁止用户指定任意内网地址；使用允许列表而非黑名单。
+### 修复建议
+协议和主机由程序固定；用户输入只用于资源 ID 并编码。必须接受 URL 时用允许列表，禁止任意内网地址。不要依赖黑名单。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-918](https://cwe.mitre.org/data/definitions/918.html)

@@ -6,10 +6,29 @@ desc(
 	language: csharp
 	risk: "deserialization"
 	desc: <<<DESC
-该规则检测 Newtonsoft.Json 将 TypeNameHandling 设为 All/Auto/Objects/Arrays。这些设置会根据 JSON 中的 $type 实例化任意类型，可导致反序列化代码执行（CWE-502）。对应 Semgrep insecure-newtonsoft-deserialization。
+### 漏洞描述
+1. **漏洞原理**
+JSON 序列化库有时会在载荷中写入重构对象所需的类型元数据。若攻击者能指定要构造的类型，反序列化就会在进程内实例化任意 CLR 类型并触发构造函数、属性 setter 或回调。Newtonsoft.Json 的 `TypeNameHandling` 为 `All` / `Auto` / `Objects` / `Arrays` 时，会读取 JSON 中的 `$type` 并按该类型创建对象。默认值 `None` 才是安全基线。
+2. **触发场景**
+```csharp
+var settings = new JsonSerializerSettings
+{
+    TypeNameHandling = TypeNameHandling.All
+};
+JsonConvert.DeserializeObject(json, settings);
+```
+攻击者在 JSON 里放入已知 gadget 的 `$type`，即可在反序列化时执行代码或滥用应用逻辑。
+3. **潜在影响**
+远程代码执行、应用逻辑被绕过、拒绝服务。
 DESC
 	solution: <<<SOLUTION
-保持 TypeNameHandling.None；如需类型信息，使用自定义 SerializationBinder 白名单。优先 System.Text.Json。
+### 修复建议
+#### 1. 保持 TypeNameHandling.None
+不要设置 `TypeNameHandling.All` / `Auto` / `Objects` / `Arrays`。多数业务 JSON 不需要在载荷里携带 CLR 类型名。
+#### 2. 必须保留类型信息时使用允许列表 Binder
+自定义 `SerializationBinder`，只允许预期类型；不要用拒绝列表。优先迁移到 `System.Text.Json`，避免 `$type` 机制。
+#### 3. 不要反序列化不可信 JSON 流
+即使用户声称内容来自内部服务，只要边界外可改写，就不能打开类型处理。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-502](https://cwe.mitre.org/data/definitions/502.html)

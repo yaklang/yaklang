@@ -6,10 +6,32 @@ desc(
 	language: csharp
 	risk: "deserialization"
 	desc: <<<DESC
-该规则检测用户可控数据流入 BinaryFormatter.Deserialize 或其他类型化反序列化入口。BinaryFormatter 无法被安全配置，反序列化不可信数据可导致远程代码执行（CWE-502）。对应 Fortify Unsafe Deserialization 与 Semgrep insecure-binaryformatter-deserialization。
+### 漏洞描述
+1. **漏洞原理**
+`BinaryFormatter` 会根据载荷里的类型元数据实例化任意可序列化类型，并执行其反序列化回调。它无法被配置成安全：即使你认为数据来自“可信服务”，Microsoft 仍要求尽快停用。`LosFormatter`、`SoapFormatter`、`NetDataContractSerializer` 同类，都会按载荷选择类型。常用第三方类型甚至 .NET 自身类型可作为 gadget，导致耗尽资源、删文件或执行代码。
+2. **触发场景**
+```csharp
+public List<string> Load(Stream input)
+{
+    var bf = new BinaryFormatter();
+    object tmp = bf.Deserialize(input);
+    return (List<string>)tmp;
+}
+```
+只要输入流格式合法，反序列化就会成功，实际类型不必是 `List<string>`。从 `Request.InputStream`、上传文件或消息队列读取时，攻击者可以放入恶意类型图。
+3. **潜在影响**
+- **远程代码执行**：在应用进程内执行任意代码。
+- **拒绝服务**：构造会无限展开或占用大量内存的对象图。
+- **文件破坏或植入**：删除文件、部署恶意文件、持久化后门。
 DESC
 	solution: <<<SOLUTION
-停止使用 BinaryFormatter；改用 JSON（System.Text.Json）等无类型载荷的格式。不要对请求体、上传文件或外部流调用 Deserialize。
+### 修复建议
+#### 1. 停止使用 BinaryFormatter / LosFormatter / SoapFormatter
+改用不含任意类型回调的格式，例如 `System.Text.Json`、`DataContractSerializer` 或 `XmlSerializer`，并把允许的类型限制为已知列表。不要让用户控制“预期反序列化类型”。
+#### 2. 不要反序列化不可信流
+请求体、上传文件、消息队列载荷一律视为不可信。库或框架若必须反序列化，协议应不公开披露，并使用认证、完整性校验和加密。
+#### 3. 遗留数据
+存量二进制载荷离线转换成安全格式后再接入在线路径。若短期无法替换，使用 `SerializationBinder` 按允许列表决定类型；拒绝列表很容易被 gadget 绕过。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-502](https://cwe.mitre.org/data/definitions/502.html)

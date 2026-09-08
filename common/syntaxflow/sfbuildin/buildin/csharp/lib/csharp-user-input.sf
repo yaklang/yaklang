@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-user-input"
 	risk: "input-validation"
 	desc: <<<DESC
-标记 ASP.NET / ASP.NET Core 常见不可信输入：QueryString、Form、Params、Query、Cookies、Headers、InputStream、Files，以及 Console.ReadLine。可与 SQL、命令执行、路径、SSRF、XSS 等 sink 规则通过数据流组合分析。对应 Fortify DataflowSource（HttpRequest.get_Query/get_Form/get_Cookies 等）与 Semgrep C# taint source。
+### 说明
+ASP.NET / ASP.NET Core 请求中的 QueryString、Form、Params、Query、Cookies、Headers、InputStream、Files 以及 `Console.ReadLine` 都来自调用方，默认不可信。这些值进入 SQL、操作系统命令、文件路径或 HTML 响应时，会分别变成注入、路径遍历或 XSS。
 DESC
 	solution: <<<SOLUTION
-对用户输入做类型、格式与长度校验；禁止将原始请求数据直接拼接到 SQL、操作系统命令、文件路径或 HTML 响应中。优先使用参数化查询、参数列表形式的进程启动，以及编码器/白名单。
+### 修复建议
+对输入做类型、格式与长度校验。不要把原始请求数据拼进 SQL、命令、路径或 HTML。优先参数化查询、参数列表形式的进程启动、路径允许列表和按上下文编码。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-20](https://cwe.mitre.org/data/definitions/20.html)

@@ -6,13 +6,47 @@ desc(
 	language: csharp
 	risk: "path-traversal"
 	desc: <<<DESC
-该规则检测用户可控输入流入 Path.Combine 或 File.ReadAllText/WriteAllText/Open/Delete 等路径 API。未用 Path.GetFileName 约束时，攻击者可使用 ../ 读取或写入基目录之外的文件（CWE-22）。对应 Fortify Path Manipulation 与 Semgrep unsafe-path-combine。
+### 漏洞描述
+1. **漏洞原理**
+路径遍历（Path Manipulation）在两个条件同时成立时出现：攻击者能指定文件系统操作所用的路径；并且通过指定特定资源获得原本没有的权限（读取、覆盖或删除受保护文件）。`File.ReadAllText` / `WriteAllText` / `Delete` / `Open` 等 API 的路径参数若包含用户输入，且未限制在固定基目录内，`../`、绝对路径或 UNC 路径就会逃出预期目录。`Path.Combine` 不会消除 `..`，不能当作净化。
+2. **触发场景**
+```csharp
+string rName = Request["reportName"];
+File.Delete(@"C:\users\reports\" + rName);
+```
+攻击者提供 `..\\..\\Windows\\System32\\krnl386.exe` 即可删除系统文件。
+```csharp
+string name = Request.QueryString["file"];
+string path = Path.Combine(contentRoot, name);
+File.ReadAllText(path);
+```
+`file=../../web.config` 会读到站点配置。Zip 解压时若条目名含 `..`，同样会覆盖基目录外的文件。
+3. **潜在影响**
+- **任意文件读取**：泄露连接串、密钥、源代码。
+- **任意文件写入或删除**：覆盖可执行文件、破坏系统文件。
+- **配置被篡改**：程序随后以攻击者准备的配置运行。
 DESC
 	solution: <<<SOLUTION
-仅允许文件名：先 Path.GetFileName，再与固定基目录拼接；对 GetFullPath 结果做前缀校验，确保仍位于允许目录内。
+### 修复建议
+#### 1. 间接指定资源：只允许文件名
+不要用用户输入直接构成路径。先取出文件名，再与程序控制的基目录拼接，并确认规范化后的路径仍落在基目录内：
+```csharp
+string name = Path.GetFileName(userFile);
+if (name != userFile)
+    throw new InvalidOperationException();
+string full = Path.GetFullPath(Path.Combine(baseDir, name));
+string root = Path.GetFullPath(baseDir);
+if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException();
+```
+#### 2. 必须接受相对路径时用允许列表
+合法资源名集合可控时，让用户只从列表中选择，而不是提交任意路径。
+#### 3. 上传与解压
+不要用客户端提供的完整路径作为落盘路径；校验扩展名与内容类型。解压 Zip 时对每个条目做与上面相同的基目录检查。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+[Path.Combine remarks](https://learn.microsoft.com/dotnet/api/system.io.path.combine)
 REFERENCE
 	rule_id: "f8af00eb-c45b-4a4d-92c8-bb9eadca701c"
 )

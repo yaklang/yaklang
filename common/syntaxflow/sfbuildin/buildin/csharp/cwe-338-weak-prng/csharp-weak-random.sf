@@ -6,13 +6,46 @@ desc(
 	language: csharp
 	risk: "weak-randomness"
 	desc: <<<DESC
-该规则检测 `new System.Random()` 以及随后的 Next/NextBytes。Fortify Insecure Randomness 的 sink 是 Next()，仅匹配构造会漏掉验证码噪声、口令盐值等调用点。System.Random 为可预测伪随机，不能用于令牌、会话 ID、密钥或验证码（CWE-338）。
+### 漏洞描述
+1. **漏洞原理**
+计算机是确定性机器，只能用伪随机数生成器（PRNG）近似随机。PRNG 分两类：统计学 PRNG 输出容易预测、可复现；密码学 PRNG 的输出应使攻击者无法与真随机区分。`System.Random` 属于前者，未声明带加密保护的生成器都不应出现在安全路径上。
+2. **触发场景**
+用 `Random.Next()` 生成收据页面“唯一”标识：
+```csharp
+string GenerateReceiptURL(string baseUrl)
+{
+    Random gen = new Random();
+    return baseUrl + gen.Next().ToString() + ".html";
+}
+```
+攻击者很容易猜到后续数值，遍历他人收据。同样危险的用法包括：
+```csharp
+return new Random().Next(1, 100000).ToString(); // 口令盐
+rng.NextBytes(key);                             // 当作加密密钥
+```
+3. **潜在影响**
+- **口令或验证码可猜**：暴力或预测绕过。
+- **密钥可预测**：对称加密被还原。
+- **会话劫持 / DNS 欺骗**：会话标识或挑战值可复现。
 DESC
 	solution: <<<SOLUTION
-安全随机使用 RandomNumberGenerator.GetBytes / RandomNumberGenerator.Create，或 RandomNumberGenerator.GetInt32。不要用 System.Random 生成密钥或令牌。
+### 修复建议
+#### 1. 安全场景改用密码学 RNG
+不要用 `System.Random` 生成密钥、盐、令牌、验证码或会话标识。
+```csharp
+byte[] salt = RandomNumberGenerator.GetBytes(16);
+int n = RandomNumberGenerator.GetInt32(1, 100000);
+```
+也可使用 `RandomNumberGenerator.Create()` / `RNGCryptoServiceProvider`。
+#### 2. 种子必须有足够熵
+即使使用密码学 PRNG，也不要用当前时间、进程 ID 等低熵值作唯一种子。`DateTime.Now` 提供的熵过低。
+#### 3. 统计用途可以保留 Random
+模拟、乱序展示等不依赖不可预测性的场景可以使用 `System.Random`；一旦输出进入安全决策，就必须换掉。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-338](https://cwe.mitre.org/data/definitions/338.html)
+[System.Random remarks](https://learn.microsoft.com/dotnet/api/system.random)
+[RandomNumberGenerator](https://learn.microsoft.com/dotnet/api/system.security.cryptography.randomnumbergenerator)
 REFERENCE
 	rule_id: "71d32214-1bff-45ca-a1ec-d9ed351a840c"
 )

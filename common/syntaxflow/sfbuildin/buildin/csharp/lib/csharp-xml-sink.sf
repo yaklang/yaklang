@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-xml-sink"
 	risk: "xxe"
 	desc: <<<DESC
-标记 XmlDocument、XmlTextReader、XmlReader.Create 以及 Load/LoadXml 等 XML 解析 API。若未禁止 DTD（DtdProcessing.Prohibit）且输入不可信，可导致 XXE。对应 Fortify XML External Entity Injection 与 Semgrep csharp/lang/security/xxe。
+### 说明
+`XmlDocument.Load` / `LoadXml`、`XmlTextReader`、`XmlReader.Create` 若处理不可信 XML 且未禁止 DTD，解析器会解析外部实体，造成文件读取或内网请求（XXE）。
 DESC
 	solution: <<<SOLUTION
-使用 XmlReaderSettings 并设置 DtdProcessing = Prohibit、XmlResolver = null；避免 XmlTextReader 默认行为解析外部实体。
+### 修复建议
+使用 `XmlReaderSettings`，设置 `DtdProcessing = DtdProcessing.Prohibit` 且 `XmlResolver = null`。不要用 `XmlTextReader` 的默认行为解析外部 XML。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-611](https://cwe.mitre.org/data/definitions/611.html)

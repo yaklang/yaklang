@@ -6,13 +6,35 @@ desc(
 	language: csharp
 	risk: "weak-cryptography"
 	desc: <<<DESC
-该规则检测 CipherMode.ECB 以及 EncryptEcb/DecryptEcb。ECB 对相同明文块产生相同密文，无法提供足够保密性（CWE-327）。对应 Fortify Insecure Mode of Operation 与 Semgrep use_ecb_mode。
+### 漏洞描述
+1. **漏洞原理**
+电子密码本（ECB）对相同明文块产生相同密文，不提供语义安全：观察者可以从密文看出明文结构（经典例子是加密后的位图仍能辨认轮廓）。即便底层算法是 AES，只要工作模式是 ECB，保密性就不成立。`CipherMode.ECB`、`EncryptEcb` / `DecryptEcb` 都属于这一类。
+2. **触发场景**
+```csharp
+Aes aes = Aes.Create();
+aes.Mode = CipherMode.ECB;
+byte[] cipher = aes.CreateEncryptor().TransformFinalBlock(plain, 0, plain.Length);
+```
+重复的数据块（会话令牌、结构化记录）会在密文中留下可对齐的重复模式。
+3. **潜在影响**
+密文被统计分析、部分明文被推断，无法满足保密性要求；在协议中还可能被拼接或重放。
 DESC
 	solution: <<<SOLUTION
-使用带随机 nonce 的认证加密：AesGcm 或 ChaCha20Poly1305。不要将 Mode 设为 CipherMode.ECB。
+### 修复建议
+#### 1. 使用认证加密（AEAD）
+不要设置 `CipherMode.ECB`。使用带随机 nonce 的 `AesGcm` 或 `ChaCha20Poly1305`：
+```csharp
+using var gcm = new AesGcm(key);
+byte[] nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
+gcm.Encrypt(nonce, plaintext, ciphertext, tag);
+```
+#### 2. 必须使用块模式时
+至少使用 CBC 或 CTR，并为密文配备独立 MAC；IV / nonce 必须用密码学 RNG 生成，禁止全零或固定 IV。优先仍应迁移到 AEAD。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+[CipherMode](https://learn.microsoft.com/dotnet/api/system.security.cryptography.ciphermode)
+[AesGcm](https://learn.microsoft.com/dotnet/api/system.security.cryptography.aesgcm)
 REFERENCE
 	rule_id: "9c9e02ad-aef6-46c8-8790-7e657d7ef816"
 )

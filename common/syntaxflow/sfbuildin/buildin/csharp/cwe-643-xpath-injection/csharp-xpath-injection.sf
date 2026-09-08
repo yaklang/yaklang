@@ -6,10 +6,35 @@ desc(
 	language: csharp
 	risk: "xpath-injection"
 	desc: <<<DESC
-该规则检测用户可控输入流入 SelectSingleNode、SelectNodes、Compile 或 Evaluate。将请求参数拼进 XPath 可改变查询，绕过认证或读取额外节点（CWE-643）。对应 Fortify XPath Injection 与 Semgrep xpath-injection。
+### 漏洞描述
+1. **漏洞原理**
+XPath 注入与 SQL 注入同类：攻击者改变查询的语法上下文，把本应作为数据的值变成谓词或路径。`SelectSingleNode` / `SelectNodes` / `XPathNavigator.Compile` / `Evaluate` 若用字符串拼接用户输入，引号和运算符就会改写查询。
+2. **触发场景**
+按账户 ID 取邮箱：
+```csharp
+string acctID = Request["acctID"];
+string query = "/accounts/account[acctID='" + acctID + "']/email/text()";
+nav.Evaluate(query);
+```
+正常输入 `1` 时查询为 `/accounts/account[acctID='1']/email/text()`。输入 `1' or '1' = '1` 后变成：
+```
+/accounts/account[acctID='1' or '1' = '1']/email/text()
+```
+谓词恒真，逻辑上等价于取出文档中全部邮箱。`SelectSingleNode("//user[@name='" + name + "']")` 同样会被 `' or '1'='1` 打穿。
+3. **潜在影响**
+读取未授权 XML 节点、绕过基于 XPath 的登录检查、泄露文档中的敏感字段。
 DESC
 	solution: <<<SOLUTION
-不要拼接 XPath；对参数做引号转义或使用预定义路径加绑定值；对用户输入做白名单。
+### 修复建议
+#### 1. 不要拼接 XPath
+预定义路径，用户值只作为绑定参数或从允许列表中选取。账户 ID 等应先解析为整数：
+```csharp
+if (!int.TryParse(acctID, out int id))
+    throw new InvalidOperationException();
+string query = "/accounts/account[acctID='" + id + "']/email/text()";
+```
+#### 2. 必须包含字符串时用允许列表
+确保用户控制的值完全来自预定字符集合，不含当前上下文中的 XPath 元字符（`'`、`"`、`[`、`]`）。需要这些字符时，使用对应编码去掉其语法含义。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-643](https://cwe.mitre.org/data/definitions/643.html)

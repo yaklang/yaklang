@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-file-path"
 	risk: "path-traversal"
 	desc: <<<DESC
-标记 Path.Combine 以及 File.ReadAllText/WriteAllText/Open/Delete 等文件路径 API。用户输入进入这些 API 且未经 Path.GetFileName 等约束时，可导致路径遍历。对应 Fortify Path Manipulation 与 Semgrep unsafe-path-combine。
+### 说明
+`Path.Combine` 以及 `File.ReadAllText` / `WriteAllText` / `Open` / `Delete` 使用的路径若包含用户输入，攻击者可用 `../` 或绝对路径访问基目录之外的文件。`Path.Combine` 本身不会去掉 `..`。
 DESC
 	solution: <<<SOLUTION
-将用户输入限制为文件名（Path.GetFileName），再与固定基目录拼接；校验最终路径仍位于允许目录内（GetFullPath + 前缀检查）。
+### 修复建议
+把用户输入限制为文件名（`Path.GetFileName`），再与固定基目录拼接；用 `GetFullPath` 规范化后检查前缀，确保最终路径仍在允许目录内。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-22](https://cwe.mitre.org/data/definitions/22.html)

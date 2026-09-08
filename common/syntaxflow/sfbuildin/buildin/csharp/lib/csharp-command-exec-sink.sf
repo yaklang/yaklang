@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-command-exec-sink"
 	risk: "command-injection"
 	desc: <<<DESC
-标记 Process.Start、ProcessStartInfo 等可执行系统命令的 API。若 FileName 或 Arguments 受用户输入影响，可导致命令注入（CWE-78）。对应 Fortify Command Injection 与 Semgrep os-command-injection。
+### 说明
+`Process.Start` 与 `ProcessStartInfo` 会在服务器上启动进程。`FileName` 或 `Arguments` 受用户输入影响时，攻击者可以改写要执行的命令或附加参数。
 DESC
 	solution: <<<SOLUTION
-避免将用户输入拼接到命令字符串；使用 ProcessStartInfo 并将可执行文件与参数分开传递；对参数做白名单校验。
+### 修复建议
+不要把用户输入拼进命令字符串。使用 `ProcessStartInfo`，可执行文件用绝对路径并与参数分开传递，关闭 `UseShellExecute`。参数做允许列表校验。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-78](https://cwe.mitre.org/data/definitions/78.html)

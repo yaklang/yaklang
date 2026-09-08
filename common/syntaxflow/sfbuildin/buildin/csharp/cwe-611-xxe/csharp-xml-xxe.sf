@@ -6,13 +6,49 @@ desc(
 	language: csharp
 	risk: "xxe"
 	desc: <<<DESC
-该规则检测用户可控输入流入 XmlDocument.Load/LoadXml 或 XmlTextReader 构造。默认解析器可能处理外部实体，导致文件读取或 SSRF（CWE-611）。对应 Fortify XML External Entity Injection 与 Semgrep csharp/lang/security/xxe。
+### 漏洞描述
+1. **漏洞原理**
+XML 实体允许在解析时从指定资源动态插入数据。外部实体的 URI 可以指向本机文件或远程系统；解析器若未禁止 DTD、未清空 `XmlResolver`，就会去访问该资源。这就是 XML 外部实体（XXE）。`XmlDocument.Load` / `LoadXml`、`XmlTextReader` 在部分框架版本上默认不安全；把 `XmlResolver` 设回 `XmlUrlResolver` 也会重新打开外部解析。
+2. **触发场景**
+```csharp
+var doc = new XmlDocument();
+doc.LoadXml(userXml);
+```
+攻击者提交：
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///c:/winnt/win.ini">
+]>
+<foo>&xxe;</foo>
+```
+解析器会用 `win.ini` 的内容替换实体，响应中带出文件。同样可以用 `http://169.254.169.254/` 打到云元数据，或用实体膨胀耗尽内存。
+3. **潜在影响**
+- **任意文件读取**：配置、密钥、系统文件。
+- **服务端请求伪造**：解析器代为访问内网或云元数据。
+- **拒绝服务**：递归实体或超大外部资源。
 DESC
 	solution: <<<SOLUTION
-使用 XmlReaderSettings：DtdProcessing = Prohibit，XmlResolver = null。不要用 XmlTextReader 的不安全默认值解析不可信 XML。
+### 修复建议
+#### 1. 禁止 DTD 并清空解析器
+这是首选做法：
+```csharp
+var settings = new XmlReaderSettings
+{
+    DtdProcessing = DtdProcessing.Prohibit,
+    XmlResolver = null,
+};
+using var reader = XmlReader.Create(stream, settings);
+```
+不要用 `XmlTextReader` 的默认行为解析不可信 XML，也不要在 `XmlDocument` 上设置 `XmlUrlResolver`。
+#### 2. 必须处理外部实体时限制解析器
+自定义 `XmlResolver`：设置超时、限制读取量、禁止检索 localhost 以外或以内的意外资源。
+#### 3. 能不用 XML 就不用
+对外接口优先 JSON 等不含 DTD 的格式。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-611](https://cwe.mitre.org/data/definitions/611.html)
+[XmlDocument.XmlResolver](https://learn.microsoft.com/dotnet/api/system.xml.xmldocument.xmlresolver)
 REFERENCE
 	rule_id: "845b0419-37c5-48c3-be7c-1ddfbda0ecf3"
 )
