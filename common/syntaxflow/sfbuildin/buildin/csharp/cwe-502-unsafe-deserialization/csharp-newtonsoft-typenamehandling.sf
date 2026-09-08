@@ -1,0 +1,60 @@
+desc(
+	title: "Check C#/.NET Newtonsoft TypeNameHandling Insecure Deserialization"
+	title_zh: "检测 C#/.NET Newtonsoft TypeNameHandling 不安全反序列化"
+	type: audit
+	level: high
+	language: csharp
+	risk: "deserialization"
+	desc: <<<DESC
+该规则检测 Newtonsoft.Json 将 TypeNameHandling 设为 All/Auto/Objects/Arrays。这些设置会根据 JSON 中的 $type 实例化任意类型，可导致反序列化代码执行（CWE-502）。对应 Semgrep insecure-newtonsoft-deserialization。
+DESC
+	solution: <<<SOLUTION
+保持 TypeNameHandling.None；如需类型信息，使用自定义 SerializationBinder 白名单。优先 System.Text.Json。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+[TypeNameHandling remarks](https://www.newtonsoft.com/json/help/html/T_Newtonsoft_Json_TypeNameHandling.htm)
+REFERENCE
+	rule_id: "29b47af1-bf11-4069-b8de-70364bc24ad4"
+)
+
+TypeNameHandling.All as $high
+TypeNameHandling.Auto as $high
+TypeNameHandling.Objects as $high
+TypeNameHandling.Arrays as $high
+
+alert $high for {
+	title: "C#/.NET Newtonsoft TypeNameHandling unsafe setting",
+	title_zh: "C#/.NET Newtonsoft TypeNameHandling 不安全配置",
+	level: "high",
+	type: "audit",
+	risk: "deserialization",
+	message: "检测到 TypeNameHandling 为 All/Auto/Objects/Arrays，存在不安全反序列化风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_typename.cs': <<<UNSAFE
+using Newtonsoft.Json;
+
+public class Ser {
+    public void Run(string json) {
+        JsonSerializerSettings s = new JsonSerializerSettings();
+        s.TypeNameHandling = TypeNameHandling.All;
+        JsonConvert.DeserializeObject(json, s);
+    }
+}
+UNSAFE
+	'safefile://safe_typename.cs': <<<SAFE
+using Newtonsoft.Json;
+
+public class Ser {
+    public void Run(string json) {
+        JsonConvert.DeserializeObject(json);
+    }
+}
+SAFE
+)

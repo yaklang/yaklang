@@ -1,0 +1,59 @@
+desc(
+	title: "Check C#/.NET Open Redirect via Response.Redirect"
+	title_zh: "检测 C#/.NET Response.Redirect 开放重定向"
+	type: vuln
+	level: mid
+	language: csharp
+	risk: "open-redirect"
+	desc: <<<DESC
+该规则检测用户可控输入流入 Response.Redirect / Controller.Redirect。查询参数作为跳转目标且未校验是否为本站 URL 时，攻击者可诱导用户跳转到恶意站点（CWE-601）。对应 Fortify Open Redirect 与 Semgrep csharp/lang/security/open-redirect。
+DESC
+	solution: <<<SOLUTION
+使用 Url.IsLocalUrl 或白名单校验跳转目标；拒绝协议相对 URL 与外站地址；默认回退到固定安全路径。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-601](https://cwe.mitre.org/data/definitions/601.html)
+REFERENCE
+	rule_id: "a019f712-7c6d-442b-83ae-32d88e3aa2d7"
+)
+
+<include("csharp-user-input")> as $input
+
+Response.Redirect as $sink
+*.Redirect as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET Open Redirect via Redirect",
+	title_zh: "C#/.NET Redirect 开放重定向",
+	level: "mid",
+	type: "vuln",
+	risk: "open-redirect",
+	message: "检测到用户输入流入 Redirect，存在开放重定向风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_redirect.cs': <<<UNSAFE
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request, HttpResponse Response) {
+        string q = Request.QueryString["url"];
+        Response.Redirect(q);
+    }
+}
+UNSAFE
+	'safefile://safe_redirect.cs': <<<SAFE
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpResponse Response) {
+        Response.Redirect("/home");
+    }
+}
+SAFE
+)

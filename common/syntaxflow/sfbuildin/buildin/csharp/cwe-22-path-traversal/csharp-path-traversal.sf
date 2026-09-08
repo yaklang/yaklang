@@ -1,0 +1,59 @@
+desc(
+	title: "Check C#/.NET Path Traversal via File and Path.Combine"
+	title_zh: "检测 C#/.NET 文件路径遍历"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "path-traversal"
+	desc: <<<DESC
+该规则检测用户可控输入流入 Path.Combine 或 File.ReadAllText/WriteAllText/Open/Delete 等路径 API。未用 Path.GetFileName 约束时，攻击者可使用 ../ 读取或写入基目录之外的文件（CWE-22）。对应 Fortify Path Manipulation 与 Semgrep unsafe-path-combine。
+DESC
+	solution: <<<SOLUTION
+仅允许文件名：先 Path.GetFileName，再与固定基目录拼接；对 GetFullPath 结果做前缀校验，确保仍位于允许目录内。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	rule_id: "f8af00eb-c45b-4a4d-92c8-bb9eadca701c"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-file-path")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET Path Traversal via File API",
+	title_zh: "C#/.NET 文件路径遍历",
+	level: "high",
+	type: "vuln",
+	risk: "path-traversal",
+	message: "检测到用户输入流入文件路径 API，存在路径遍历风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_path.cs': <<<UNSAFE
+using System.IO;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["file"];
+        string path = Path.Combine("/data", q);
+        File.ReadAllText(path);
+    }
+}
+UNSAFE
+	'safefile://safe_path.cs': <<<SAFE
+using System.IO;
+
+public class Controller {
+    public void Handle() {
+        File.ReadAllText("/data/readme.txt");
+    }
+}
+SAFE
+)

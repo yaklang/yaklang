@@ -1,0 +1,57 @@
+desc(
+	title: "Check C#/.NET Insecure CipherMode.ECB"
+	title_zh: "检测 C#/.NET 不安全的 ECB 加密模式"
+	type: audit
+	level: mid
+	language: csharp
+	risk: "weak-cryptography"
+	desc: <<<DESC
+该规则检测 CipherMode.ECB 以及 EncryptEcb/DecryptEcb。ECB 对相同明文块产生相同密文，无法提供足够保密性（CWE-327）。对应 Fortify Insecure Mode of Operation 与 Semgrep use_ecb_mode。
+DESC
+	solution: <<<SOLUTION
+使用带随机 nonce 的认证加密：AesGcm 或 ChaCha20Poly1305。不要将 Mode 设为 CipherMode.ECB。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+REFERENCE
+	rule_id: "9c9e02ad-aef6-46c8-8790-7e657d7ef816"
+)
+
+CipherMode.ECB as $mid
+*.EncryptEcb as $mid
+*.DecryptEcb as $mid
+
+alert $mid for {
+	title: "C#/.NET CipherMode.ECB insecure mode",
+	title_zh: "C#/.NET CipherMode.ECB 不安全模式",
+	level: "mid",
+	type: "audit",
+	risk: "weak-cryptography",
+	message: "检测到 ECB 模式，相同明文块会产生相同密文，请改用 AES-GCM 等认证加密。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_ecb.cs': <<<UNSAFE
+using System.Security.Cryptography;
+
+public class Crypto {
+    public void Run() {
+        Aes aes = Aes.Create();
+        aes.Mode = CipherMode.ECB;
+    }
+}
+UNSAFE
+	'safefile://safe_ecb.cs': <<<SAFE
+using System.Security.Cryptography;
+
+public class Crypto {
+    public void Run() {
+        Aes aes = Aes.Create();
+        aes.Mode = CipherMode.CBC;
+    }
+}
+SAFE
+)

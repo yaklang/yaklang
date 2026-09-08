@@ -1,0 +1,63 @@
+desc(
+	title: "C#/.NET file path operation sinks (lib)"
+	title_zh: "文件路径操作入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-file-path"
+	risk: "path-traversal"
+	desc: <<<DESC
+标记 Path.Combine 以及 File.ReadAllText/WriteAllText/Open/Delete 等文件路径 API。用户输入进入这些 API 且未经 Path.GetFileName 等约束时，可导致路径遍历。对应 Fortify Path Manipulation 与 Semgrep unsafe-path-combine。
+DESC
+	solution: <<<SOLUTION
+将用户输入限制为文件名（Path.GetFileName），再与固定基目录拼接；校验最终路径仍位于允许目录内（GetFullPath + 前缀检查）。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	rule_id: "a9f06d2e-e458-46bd-8e03-8274f2f57f5a"
+)
+
+Path.Combine as $output
+File.ReadAllText as $output
+File.ReadAllBytes as $output
+File.WriteAllText as $output
+File.WriteAllBytes as $output
+File.Open as $output
+File.OpenRead as $output
+File.OpenWrite as $output
+File.Delete as $output
+File.Copy as $output
+File.Move as $output
+
+alert $output for {
+	title: "C#/.NET file path API",
+	title_zh: "C#/.NET 文件路径 API",
+	level: "info",
+	type: "audit",
+	risk: "path-traversal",
+	message: "检测到文件路径相关 API，请检查路径是否受用户输入影响。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_path_sink.cs': <<<UNSAFE
+using System.IO;
+
+public class Files {
+    public void Run() {
+        string p = Path.Combine("/data", "a.txt");
+        File.ReadAllText(p);
+    }
+}
+UNSAFE
+	'safefile://safe_path_sink.cs': <<<SAFE
+public class Files {
+    public void Run() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)

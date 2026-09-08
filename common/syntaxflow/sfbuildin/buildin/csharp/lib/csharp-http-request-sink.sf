@@ -1,0 +1,61 @@
+desc(
+	title: "C#/.NET outbound HTTP request sinks (lib)"
+	title_zh: "出站 HTTP 请求入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-http-request-sink"
+	risk: "ssrf"
+	desc: <<<DESC
+标记 HttpClient.GetAsync/GetStringAsync/PostAsync/SendAsync、WebClient.DownloadString/DownloadFile 以及 WebRequest.Create 等出站请求 API。URL 若受用户控制，可导致 SSRF。对应 Fortify Server-Side Request Forgery 与 Semgrep csharp/lang/security/ssrf。
+DESC
+	solution: <<<SOLUTION
+对请求 URL 做白名单（协议、主机）；禁止用户指定任意内网地址；使用允许列表而非黑名单。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+	rule_id: "73e93408-6f0b-4243-9fee-8a9a22fa34d8"
+)
+
+*.GetAsync as $output
+*.GetStringAsync as $output
+*.PostAsync as $output
+*.PutAsync as $output
+*.SendAsync as $output
+*.DownloadString as $output
+*.DownloadData as $output
+*.DownloadFile as $output
+WebRequest.Create as $output
+
+alert $output for {
+	title: "C#/.NET outbound HTTP API",
+	title_zh: "C#/.NET 出站 HTTP API",
+	level: "info",
+	type: "audit",
+	risk: "ssrf",
+	message: "检测到出站 HTTP 请求 API，请检查 URL 是否受用户控制。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_http_sink.cs': <<<UNSAFE
+using System.Net.Http;
+
+public class Client {
+    public void Run() {
+        HttpClient c = new HttpClient();
+        c.GetAsync("https://example.com");
+    }
+}
+UNSAFE
+	'safefile://safe_http_sink.cs': <<<SAFE
+public class Client {
+    public void Run() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)

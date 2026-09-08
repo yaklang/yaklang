@@ -1,0 +1,65 @@
+desc(
+	title: "Check C#/.NET SQL Injection via SqlCommand"
+	title_zh: "检测 C#/.NET SqlCommand SQL 注入"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "sql-injection"
+	desc: <<<DESC
+该规则检测用户可控输入流入 SqlCommand / OleDbCommand / CommandText / EF FromSqlRaw 等 SQL 执行入口。当请求参数、表单或控制台输入被字符串拼接、string.Format 后作为 SQL 执行时，攻击者可篡改查询逻辑，造成数据泄露、未授权访问或数据破坏（CWE-89）。对应 Fortify SQL Injection 与 Semgrep csharp-sqli。
+DESC
+	solution: <<<SOLUTION
+使用参数化查询：SQL 文本只含占位符，用户值通过 SqlParameter / Parameters.AddWithValue 绑定。EF Core 使用 FormattableString 或参数化 FromSql。禁止将用户输入拼接到 SQL 字符串。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+[OWASP SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
+REFERENCE
+	rule_id: "de762792-0e19-4fb8-8600-c0b6859338a4"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-sql-sink")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+*.CommandText as $ct
+$ct?{<self> #{until: `* & $input`}->} as $high
+
+alert $high for {
+	title: "C#/.NET SQL Injection via SqlCommand",
+	title_zh: "C#/.NET SqlCommand SQL 注入",
+	level: "high",
+	type: "vuln",
+	risk: "sql-injection",
+	message: "检测到用户输入流入 SQL 命令构造或 CommandText，存在 SQL 注入风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_sqli.cs': <<<UNSAFE
+using System.Data.SqlClient;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["id"];
+        SqlCommand cmd = new SqlCommand("SELECT * FROM t WHERE id=" + q);
+        cmd.ExecuteReader();
+    }
+}
+UNSAFE
+	'safefile://safe_sqli.cs': <<<SAFE
+using System.Data.SqlClient;
+
+public class Controller {
+    public void Handle() {
+        SqlCommand cmd = new SqlCommand("SELECT * FROM t WHERE id=@id");
+        cmd.Parameters.AddWithValue("@id", 1);
+        cmd.ExecuteReader();
+    }
+}
+SAFE
+)

@@ -1,0 +1,54 @@
+desc(
+	title: "Check C#/.NET Weak PRNG via System.Random"
+	title_zh: "检测 C#/.NET System.Random 弱伪随机"
+	type: audit
+	level: mid
+	language: csharp
+	risk: "weak-randomness"
+	desc: <<<DESC
+该规则检测 `new System.Random()` 构造。System.Random 为可预测伪随机，不能用于令牌、会话 ID、密钥或验证码（CWE-338）。对应 Fortify Insecure Randomness 与 Semgrep use_weak_rng_for_keygeneration。
+DESC
+	solution: <<<SOLUTION
+安全随机使用 RandomNumberGenerator.GetBytes / RandomNumberGenerator.Create，或 RandomNumberGenerator.GetInt32。不要用 System.Random 生成密钥或令牌。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-338](https://cwe.mitre.org/data/definitions/338.html)
+REFERENCE
+	rule_id: "71d32214-1bff-45ca-a1ec-d9ed351a840c"
+)
+
+Random() as $mid
+
+alert $mid for {
+	title: "C#/.NET System.Random weak PRNG",
+	title_zh: "C#/.NET System.Random 弱伪随机",
+	level: "mid",
+	type: "audit",
+	risk: "weak-randomness",
+	message: "检测到 System.Random，输出可预测，不可用于密钥或令牌。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_rng.cs': <<<UNSAFE
+using System;
+
+public class Token {
+    public int Run() {
+        Random r = new Random();
+        return r.Next();
+    }
+}
+UNSAFE
+	'safefile://safe_rng.cs': <<<SAFE
+using System.Security.Cryptography;
+
+public class Token {
+    public byte[] Run() {
+        return RandomNumberGenerator.GetBytes(16);
+    }
+}
+SAFE
+)

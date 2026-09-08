@@ -1,0 +1,61 @@
+desc(
+	title: "Check C#/.NET SSRF via HttpClient and WebRequest"
+	title_zh: "检测 C#/.NET HttpClient/WebRequest SSRF"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "ssrf"
+	desc: <<<DESC
+该规则检测用户可控输入流入 HttpClient.GetAsync/GetStringAsync、WebClient.DownloadString 或 WebRequest.Create 的 URL。服务端按用户指定地址发请求时，可访问内网或云元数据（CWE-918）。对应 Fortify Server-Side Request Forgery 与 Semgrep csharp/lang/security/ssrf。
+DESC
+	solution: <<<SOLUTION
+对 URL 主机与协议做白名单；禁止用户指定任意内网、localhost 或 link-local 地址；出站请求使用固定基址拼接资源 ID。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+	rule_id: "acd5bdca-2638-4666-8ba6-26de044069e2"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-http-request-sink")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET SSRF via outbound HTTP",
+	title_zh: "C#/.NET 出站 HTTP SSRF",
+	level: "high",
+	type: "vuln",
+	risk: "ssrf",
+	message: "检测到用户输入流入出站 HTTP 请求 URL，存在 SSRF 风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_ssrf.cs': <<<UNSAFE
+using System.Net.Http;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["url"];
+        HttpClient c = new HttpClient();
+        c.GetAsync(q);
+    }
+}
+UNSAFE
+	'safefile://safe_ssrf.cs': <<<SAFE
+using System.Net.Http;
+
+public class Controller {
+    public void Handle() {
+        HttpClient c = new HttpClient();
+        c.GetAsync("https://example.com/api");
+    }
+}
+SAFE
+)

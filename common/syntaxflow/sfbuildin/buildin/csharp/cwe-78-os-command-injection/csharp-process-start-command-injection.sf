@@ -1,0 +1,60 @@
+desc(
+	title: "Check C#/.NET OS Command Injection via Process.Start"
+	title_zh: "检测 C#/.NET Process.Start 命令注入"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "command-injection"
+	desc: <<<DESC
+该规则检测用户可控输入流入 Process.Start 或 ProcessStartInfo 的 FileName/Arguments。将 HTTP 参数直接作为可执行文件或拼接到命令行时，攻击者可执行任意系统命令（CWE-78）。对应 Fortify Command Injection 与 Semgrep os-command-injection。
+DESC
+	solution: <<<SOLUTION
+避免调用 shell；使用 ProcessStartInfo 将可执行文件与参数分开传递；对用户输入做白名单。不要把原始请求参数拼进 Arguments。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+[OWASP Command Injection](https://owasp.org/www-community/attacks/Command_Injection)
+REFERENCE
+	rule_id: "449e1b9b-15ff-47f2-860c-3ef3e5d1d917"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-command-exec-sink")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET OS Command Injection via Process.Start",
+	title_zh: "C#/.NET Process.Start 命令注入",
+	level: "high",
+	type: "vuln",
+	risk: "command-injection",
+	message: "检测到用户输入流入 Process.Start / ProcessStartInfo，存在命令注入风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_cmdi.cs': <<<UNSAFE
+using System.Diagnostics;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["cmd"];
+        Process.Start(q);
+    }
+}
+UNSAFE
+	'safefile://safe_cmdi.cs': <<<SAFE
+using System.Diagnostics;
+
+public class Controller {
+    public void Handle() {
+        Process.Start("echo");
+    }
+}
+SAFE
+)

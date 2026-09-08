@@ -1,0 +1,56 @@
+desc(
+	title: "C#/.NET XML parser sinks (lib)"
+	title_zh: "XML 解析入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-xml-sink"
+	risk: "xxe"
+	desc: <<<DESC
+标记 XmlDocument、XmlTextReader、XmlReader.Create 以及 Load/LoadXml 等 XML 解析 API。若未禁止 DTD（DtdProcessing.Prohibit）且输入不可信，可导致 XXE。对应 Fortify XML External Entity Injection 与 Semgrep csharp/lang/security/xxe。
+DESC
+	solution: <<<SOLUTION
+使用 XmlReaderSettings 并设置 DtdProcessing = Prohibit、XmlResolver = null；避免 XmlTextReader 默认行为解析外部实体。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+	rule_id: "509fabfd-d935-4fdc-9c0f-d4f739394f3a"
+)
+
+XmlDocument as $output
+XmlTextReader as $output
+XmlReader.Create as $output
+*.LoadXml as $output
+
+alert $output for {
+	title: "C#/.NET XML parser API",
+	title_zh: "C#/.NET XML 解析 API",
+	level: "info",
+	type: "audit",
+	risk: "xxe",
+	message: "检测到 XML 解析 API，请确认已禁止 DTD/外部实体。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_xml_sink.cs': <<<UNSAFE
+using System.Xml;
+
+public class Xml {
+    public void Run() {
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml("<root/>");
+    }
+}
+UNSAFE
+	'safefile://safe_xml_sink.cs': <<<SAFE
+public class Xml {
+    public void Run() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)
