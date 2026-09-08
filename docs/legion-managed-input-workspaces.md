@@ -89,11 +89,23 @@ new flat filename in `outputs/`
 and cannot modify an input or overwrite an existing output.
 
 The finite tool manager also rejects guessed tool names and database/MCP
-fallbacks. Managed input sessions disable dynamic capability/Forge/skill/child
-agent actions, hotpatches, sync commands and extra per-message host file refs.
-Server-signed Focus actions and ordinary tool calls remain available; those
-tool calls resolve only to the finite scoped tool objects. This is an Agent
-capability boundary, not an OS sandbox for arbitrary trusted Yak scripts.
+fallbacks. The node installs a generic `WithReActActionPolicy` for managed
+inputs; the AI core has no attachment-specific behavior. The policy controls
+both advertised actions and handler lookup, including dynamically added actions,
+and is inherited with the exact tool manager by child Agents.
+
+Planning, detached planning, clarification and asynchronous task inspection
+retain their ordinary configuration. The attachment adapter no longer disables
+planning. The planning loop can produce plans, record facts and read authorized
+input through the same `read_file` object. Its independent knowledge getter and
+unavailable network/file tools are excluded individually. A task or loop that
+disables planning or user interaction still controls those features.
+
+Dynamic capability, Forge, skill-resource and MCP loading remain unavailable
+because the manifest does not authorize those independent loaders. Hotpatches,
+sync commands and extra per-message host file refs remain rejected. Server-signed
+Focus actions retain their existing authority. These are task resource permissions,
+not global node restrictions or an OS sandbox for arbitrary trusted Yak scripts.
 
 The command consumer dispatches at most four concurrent Bind operations. A
 busy worker pool delays excess Bind messages without blocking control commands.

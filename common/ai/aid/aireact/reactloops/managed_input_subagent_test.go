@@ -14,7 +14,6 @@ type managedChildRuntime struct{}
 
 func (*managedChildRuntime) AuthorizedTarget() string                               { return "https://workspace.invalid/test/" }
 func (*managedChildRuntime) Execute(string, map[string]any) (map[string]any, error) { return nil, nil }
-func (*managedChildRuntime) ManagedInputRestricted() bool                           { return true }
 
 func TestManagedInputSubAgentInheritsResourceBoundary(t *testing.T) {
 	ctx := context.Background()
@@ -24,7 +23,7 @@ func TestManagedInputSubAgentInheritsResourceBoundary(t *testing.T) {
 	require.NoError(t, err)
 	manager := buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool { return []*aitool.Tool{tool} }, buildinaitools.WithOnlyTools(tool))
 	runtime := &managedChildRuntime{}
-	parent := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithAiToolManager(manager), aicommon.WithLegionResultRuntime(runtime), aicommon.WithDisallowMCPServers(true))
+	parent := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithAiToolManager(manager), aicommon.WithLegionResultRuntime(runtime), aicommon.WithDisallowMCPServers(true), aicommon.WithReActActionPolicy(func(loop, action string) bool { return action == "read_file" || action == "request_plan" }))
 	timeline := aicommon.NewTimeline(nil, nil)
 	fork, err := timeline.ForkForTask("child", "child", parent, parent)
 	require.NoError(t, err)
@@ -38,7 +37,9 @@ func TestManagedInputSubAgentInheritsResourceBoundary(t *testing.T) {
 	cfg := child.GetConfig().(*aicommon.Config)
 	require.Same(t, runtime, cfg.GetLegionResultRuntime())
 	require.True(t, cfg.DisallowMCPServers)
-	require.True(t, aicommon.HasManagedInputRestriction(cfg))
+	require.True(t, cfg.IsReActActionAllowed("plan", "read_file"))
+	require.True(t, cfg.IsReActActionAllowed("default", "request_plan"))
+	require.False(t, cfg.IsReActActionAllowed("plan", "search_knowledge"))
 	require.Same(t, manager, cfg.GetAiToolManager())
 	inherited, err := cfg.GetAiToolManager().GetToolByName("read_file")
 	require.NoError(t, err)

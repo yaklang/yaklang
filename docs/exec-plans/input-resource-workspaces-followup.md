@@ -165,7 +165,7 @@ retry deduplication and no evidence update after a denied read. Final Provider
 content acceptance and the final commit CI remain pending.
 
 
-## Session Manager and capability correction
+## Session Manager and capability correction (historical checkpoint)
 
 Earlier real Runs selected a host node directly. They prove the observed input
 functionality only, not Session Manager container isolation. Container acceptance
@@ -187,3 +187,42 @@ managed-input policy, MCP denial, and rejection of bash. Existing child strategy
 rules still prevent recursive delegation. Plan execution remains disabled because
 its custom planning loop includes EnhanceKnowledgeGetterEx outside the finite
 file-tool manager; Docker alone does not authorize that extra input source.
+
+
+## Capability policy follow-up (2026-09-08)
+
+Complex: this changes an execution permission boundary within Yaklang. Reuse
+the existing isolated worktree and paired Legion branch; no protocol, Session
+Manager, filesystem authorization or global node capability changes. Replace
+AI-core attachment detection with an inherited generic action policy supplied
+by the node. Restore planning and task coordination while keeping tool lookup
+and non-tool side effects within the existing authorization boundary. Do not
+merge or release. Existing task-scoped branch publication authorization applies.
+
+| Acceptance | Evidence | Status |
+|---|---|---|
+| AI core has no managed-input special case | Source review and generic policy regressions | pass |
+| Policy applies to prompt and execution, including children | Production constructor and handler tests | pass |
+| Planning uses scoped tools; independent knowledge loading denied | Planning loop and resolver integration | pass |
+| Existing managed attachment flow remains correct | Real Bind/resolver/planning runtime integration, with a deterministic model callback | pass (T1) |
+
+Own only task worktree files and task-specific temporary test artifacts. Reuse
+existing synthetic fixtures and approved Provider destination if a real stack
+is needed. Retain all earlier evidence and do not claim old T2 covers changed
+policy behavior. Update the node README policy description with final behavior.
+
+The focused four-package race group passed. Planning now uses the configured
+read tool schema and checks unsuccessful tool results before recording planning
+evidence. A denied path previously appeared as completed; the regression proves
+that it fails and does not change the accumulated evidence. Task-level explicit
+Plan/Detached choices and ordinary loops without a policy retain their behavior.
+
+The runtime fixture uses real Bind, HTTP download, resolver, ReAct constructor,
+planning loop and tool invocation. Only the tool-reason model callback is a
+deterministic local fixture; no external Provider was contacted. This is T1
+integration evidence, not a new product T2 claim. Prior container T2 remains
+source-bound: input resolution, Session Manager and contracts are unchanged;
+the log-analysis Focus explicitly disables planning independently. No live
+stack or repeated 1 GiB Provider run is needed to verify this action-policy
+change. Dynamic Skills/Forge/MCP loaders remain excluded until their independent
+resources are authorized; this follow-up does not claim they were restored.

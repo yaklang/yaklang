@@ -863,10 +863,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if aicommon.HasManagedInputRestriction(config) {
-		restrictManagedInputActions(r)
-	}
-
 	if r.emitter == nil {
 		return nil, utils.Error("loop's emitter is nil in ReActLoop")
 	}
@@ -964,6 +960,9 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 }
 
 func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
+	if !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		return nil, utils.Errorf("action[%s] denied by runtime policy", actionName)
+	}
 	ac, ok := r.actions.Get(actionName)
 	if ok {
 		return ac, nil
@@ -980,9 +979,14 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 }
 
 func (r *ReActLoop) GetAllActionNames() []string {
-	actionNames := r.actions.Keys()
+	var actionNames []string
+	for _, name := range r.actions.Keys() {
+		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, name) {
+			actionNames = append(actionNames, name)
+		}
+	}
 	for _, actionName := range r.loopActions.Keys() {
-		if !r.actions.Have(actionName) {
+		if !r.actions.Have(actionName) && aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
 			actionNames = append(actionNames, actionName)
 		}
 	}
@@ -990,14 +994,18 @@ func (r *ReActLoop) GetAllActionNames() []string {
 }
 
 func (r *ReActLoop) NoActions() bool {
-	return r.actions.Len() == 0 && r.loopActions.Len() == 0
+	return len(r.GetAllActionNames()) == 0
 }
 
 func (r *ReActLoop) GetAllActions() []*LoopAction {
 	var actions []*LoopAction
-	actions = append(actions, r.actions.Values()...)
+	for _, action := range r.actions.Values() {
+		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, action.ActionType) {
+			actions = append(actions, action)
+		}
+	}
 	for _, actionName := range r.loopActions.Keys() {
-		if r.actions.Have(actionName) {
+		if r.actions.Have(actionName) || !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
 			continue
 		}
 		actionFac, ok := r.loopActions.Get(actionName)
@@ -1234,18 +1242,4 @@ func (r *ReActLoop) GetLastLoopSchema() string {
 		return ""
 	}
 	return r.lastLoopSchema
-}
-
-// Keep server-signed Focus actions, while removing process-global capability
-// loading, Forge, file, network and MCP actions. Child agents inherit the same
-// runtime and finite tool manager. Tool actions only
-// resolve objects from the separately enforced finite tool manager.
-func restrictManagedInputActions(loop *ReActLoop) {
-	for _, name := range GetRegisteredActionNames() {
-		switch name {
-		case "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch", "dispatch_sub_react_agents":
-		default:
-			loop.RemoveAction(name)
-		}
-	}
 }

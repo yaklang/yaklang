@@ -17,9 +17,20 @@ func makeToolForwardAction(
 	toolOpts []aitool.ToolOption,
 ) func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+		description, options := desc, toolOpts
+		// A runtime may replace a standard tool with a scoped adapter. Advertise
+		// that exact schema rather than absolute paths or unavailable parameters.
+		if actionName == targetToolName {
+			if manager := r.GetConfig().GetAiToolManager(); manager != nil {
+				if tool, err := manager.GetToolByName(targetToolName); err == nil {
+					action := reactloops.ConvertAIToolToLoopAction(tool)
+					description, options = action.Description, action.Options
+				}
+			}
+		}
 		return reactloops.WithRegisterLoopAction(
 			actionName,
-			desc, toolOpts,
+			description, options,
 			nil,
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 				invoker := loop.GetInvoker()
@@ -34,6 +45,13 @@ func makeToolForwardAction(
 
 				params := action.GetParams()
 				result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)
+				if err == nil && (result == nil || !result.Success) {
+					if result == nil {
+						err = utils.Error("tool returned no result")
+					} else {
+						err = utils.Errorf("tool invocation failed: %s", result.Error)
+					}
+				}
 				if err != nil {
 					log.Warnf("%s call failed: %v", targetToolName, err)
 					op.Feedback(fmt.Sprintf("%s failed: %v", targetToolName, err))
