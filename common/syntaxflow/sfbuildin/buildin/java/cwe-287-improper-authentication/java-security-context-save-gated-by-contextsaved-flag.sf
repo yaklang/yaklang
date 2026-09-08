@@ -55,7 +55,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-security-context-save-wrapper.java': <<<CODE
+	'file://security-context-save-gated-positive.java': <<<CODE
 class SecurityContext {
 }
 
@@ -73,7 +73,7 @@ class Repository {
     }
 }
 CODE
-	'safefile://safe-security-context-save-wrapper.java': <<<CODE
+	'safefile://security-context-save-gated-negative.java': <<<CODE
 class SecurityContext {
 }
 

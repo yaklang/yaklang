@@ -370,3 +370,50 @@ public class ReflectController extends XssBaseController {
 }
 UNSAFE
 )
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://spring-response-body-xss-filtered-positive.java': <<<CODE
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
+
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+    @GetMapping("/echo")
+    public String echo(@RequestParam("input") String input) {
+        return "hello " + HtmlUtils.htmlEscape(input);
+    }
+}
+CODE
+	'file://spring-response-body-xss-string-return-positive.java': <<<CODE
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+    @GetMapping("/echo")
+    public String echo(@RequestParam("input") String input) {
+        return "hello " + input;
+    }
+}
+CODE
+	'safefile://spring-response-body-xss-map-return-negative.java': <<<CODE
+import java.util.HashMap;
+import java.util.Map;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+    @GetMapping("/echo")
+    public Map<String, Object> echo(@RequestParam("input") String input) {
+        Map<String, Object> modelMap = new HashMap<>();
+        modelMap.put("payload", input);
+        modelMap.put("status", "ok");
+        return modelMap;
+    }
+}
+CODE
+)

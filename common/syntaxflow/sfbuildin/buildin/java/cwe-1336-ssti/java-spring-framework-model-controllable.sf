@@ -217,3 +217,55 @@ public class OrgConsoleController {
 }
 CODE
 )
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://spring-model-and-view-ssti-constructor-positive.java': <<<CODE
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
+
+@Controller
+public class OrgConsoleController {
+    @GetMapping("/edit")
+    public ModelAndView edit(@RequestParam String id) {
+        return new ModelAndView("/admin/org" + id + "/edit.html");
+    }
+}
+CODE
+	'file://spring-model-and-view-ssti-setview-positive.java': <<<CODE
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
+
+@Controller
+public class OrgConsoleController {
+    @GetMapping("/edit")
+    public ModelAndView edit(@RequestParam String id) {
+        ModelAndView view = new ModelAndView();
+        view.setViewName("/admin/org" + id + "/edit.html");
+        return view;
+    }
+}
+CODE
+	'safefile://spring-model-and-view-ssti-negative.java': <<<CODE
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
+
+@Controller
+public class OrgConsoleController {
+    @GetMapping("/edit")
+    public ModelAndView edit(@RequestParam String id) {
+        ModelAndView view = new ModelAndView("/admin/org/edit.html");
+        Object org = orgConsoleService.queryById(id);
+        view.addObject("org", org);
+        return view;
+    }
+}
+CODE
+)

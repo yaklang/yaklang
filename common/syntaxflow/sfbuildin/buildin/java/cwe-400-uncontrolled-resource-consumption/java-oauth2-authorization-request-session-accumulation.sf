@@ -41,7 +41,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-httpsession-oauth2-request-accumulation.java': <<<CODE
+	'file://oauth2-authorization-request-session-accumulation-httpsession-positive.java': <<<CODE
 import java.util.HashMap;
 import java.util.Map;
 
@@ -76,7 +76,7 @@ class AuthorizationRequestRepository {
     }
 }
 CODE
-	'file://unsafe-websession-oauth2-request-accumulation.java': <<<CODE
+	'file://oauth2-authorization-request-session-accumulation-websession-positive.java': <<<CODE
 import java.util.HashMap;
 import java.util.Map;
 
@@ -114,7 +114,7 @@ class AuthorizationRequestRepository {
     }
 }
 CODE
-	"safefile://safe-single-oauth2-request.java": <<<CODE
+	'safefile://oauth2-authorization-request-session-accumulation-negative.java': <<<CODE
 class OAuth2AuthorizationRequest {
 }
 

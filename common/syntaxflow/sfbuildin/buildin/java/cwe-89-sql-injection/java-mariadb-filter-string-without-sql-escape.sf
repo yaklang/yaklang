@@ -43,7 +43,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-mariadb-filter-string.java': <<<CODE
+	'file://mariadb-filter-string-without-sql-escape-positive.java': <<<CODE
 class MariaDBFilterExpressionConverter {
     protected void doSingleValue(Object value, StringBuilder context) {
         if (value instanceof String) {
@@ -55,7 +55,7 @@ class MariaDBFilterExpressionConverter {
     }
 }
 CODE
-	'safefile://safe-mariadb-filter-string.java': <<<CODE
+	'safefile://mariadb-filter-string-without-sql-escape-negative.java': <<<CODE
 class MariaDBFilterExpressionConverter {
     protected static void emitSqlString(String value, StringBuilder context) {
     }

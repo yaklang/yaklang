@@ -58,30 +58,8 @@ SOLUTION
 
 desc(
 	lang: java
-	alert_min: 2
-	'file://native-selector-expression.java': <<<CODE
-import org.springframework.expression.Expression;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-
-class MessageHeaders {
-}
-
-class NativeMessageHeaderAccessor {
-    static String getFirstNativeHeader(String name, MessageHeaders headers) {
-        return null;
-    }
-}
-
-class SelectorExpressionRegistry {
-    private final SpelExpressionParser expressionParser = new SpelExpressionParser();
-
-    Expression bad(MessageHeaders headers, String selectorHeaderName) {
-        String selector = NativeMessageHeaderAccessor.getFirstNativeHeader(selectorHeaderName, headers);
-        return this.expressionParser.parseExpression(selector);
-    }
-}
-CODE
-	'file://native-selector-forwarding.java': <<<CODE
+	alert_min: 1
+	'file://spring-message-header-expression-forwarding-positive.java': <<<CODE
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
@@ -104,7 +82,29 @@ class NativeHeaderExpressionController {
     }
 }
 CODE
-	"safefile://fixed-expression.java": <<<CODE
+	'file://spring-message-header-expression-native-header-positive.java': <<<CODE
+import org.springframework.expression.Expression;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class MessageHeaders {
+}
+
+class NativeMessageHeaderAccessor {
+    static String getFirstNativeHeader(String name, MessageHeaders headers) {
+        return null;
+    }
+}
+
+class SelectorExpressionRegistry {
+    private final SpelExpressionParser expressionParser = new SpelExpressionParser();
+
+    Expression bad(MessageHeaders headers, String selectorHeaderName) {
+        String selector = NativeMessageHeaderAccessor.getFirstNativeHeader(selectorHeaderName, headers);
+        return this.expressionParser.parseExpression(selector);
+    }
+}
+CODE
+	'safefile://spring-message-header-expression-fixed-negative.java': <<<CODE
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 
@@ -116,7 +116,7 @@ class FixedExpressionRegistry {
     }
 }
 CODE
-	"safefile://header-read-without-parse.java": <<<CODE
+	'safefile://spring-message-header-expression-readonly-negative.java': <<<CODE
 class MessageHeaders {
 }
 

@@ -43,7 +43,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-document-builder-utils.java': <<<CODE
+	'file://document-builder-factory-unsafe-positive.java': <<<CODE
 class DocumentBuilderFactoryUtils {
     static Factory newInstance() { return null; }
 }
@@ -83,7 +83,7 @@ class DefaultXmlPayloadConverter {
     }
 }
 CODE
-	'safefile://safe-document-builder-utils.java': <<<CODE
+	'safefile://document-builder-factory-unsafe-negative.java': <<<CODE
 class DocumentBuilderFactoryUtils {
     static Factory newInstance() { return null; }
 }
@@ -92,6 +92,12 @@ class InputStream {
 }
 
 class Factory {
+    void setFeature(String feature, boolean flag) {
+    }
+    void setXIncludeAware(boolean flag) {
+    }
+    void setExpandEntityReferences(boolean flag) {
+    }
     Builder newDocumentBuilder() { return null; }
 }
 
@@ -103,19 +109,10 @@ class SafeXmlPayloadConverter {
     private final Factory documentBuilderFactory = DocumentBuilderFactoryUtils.newInstance();
 
     Builder getDocumentBuilder() {
-        setFeature("disallow-doctype-decl", true);
-        setXIncludeAware(false);
-        setExpandEntityReferences(false);
+        this.documentBuilderFactory.setFeature("disallow-doctype-decl", true);
+        this.documentBuilderFactory.setXIncludeAware(false);
+        this.documentBuilderFactory.setExpandEntityReferences(false);
         return this.documentBuilderFactory.newDocumentBuilder();
-    }
-
-    void setFeature(String feature, boolean flag) {
-    }
-
-    void setXIncludeAware(boolean flag) {
-    }
-
-    void setExpandEntityReferences(boolean flag) {
     }
 
     Object sourceToInputSource(Object source) { return source; }

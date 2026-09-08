@@ -43,7 +43,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-redis-filter-value.java': <<<CODE
+	'file://redis-filter-value-without-query-escape-positive.java': <<<CODE
 import java.util.List;
 
 class Expression {
@@ -63,7 +63,7 @@ class RedisFilterExpressionConverter {
     }
 }
 CODE
-	'safefile://safe-redis-filter-value.java': <<<CODE
+	'safefile://redis-filter-value-without-query-escape-negative.java': <<<CODE
 import java.util.List;
 
 class Expression {

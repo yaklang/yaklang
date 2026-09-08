@@ -41,7 +41,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-actuator-additional-paths.java': <<<CODE
+	'file://actuator-additional-path-request-matcher-wildcard-positive.java': <<<CODE
 import java.util.Set;
 
 class RequestMatcherFactory {
@@ -55,6 +55,8 @@ class PathMappedEndpoints {
 }
 
 class AdditionalPathsEndpointRequestMatcher {
+    Object webServerNamespace;
+    java.util.List<Object> endpoints;
     Object httpMethod;
 
     Object getDelegateMatchers(RequestMatcherFactory requestMatcherFactory, RequestMatcherProvider matcherProvider,
@@ -62,18 +64,17 @@ class AdditionalPathsEndpointRequestMatcher {
         return null;
     }
 
-    Set<String> streamAdditionalPaths(PathMappedEndpoints endpoints, Object endpointId) {
-        return endpoints.getAdditionalPaths(null, endpointId);
-    }
-
     Object createDelegate(PathMappedEndpoints endpoints, RequestMatcherFactory requestMatcherFactory,
-            RequestMatcherProvider matcherProvider, Object endpointId) {
-        Set<String> paths = streamAdditionalPaths(endpoints, endpointId);
+            RequestMatcherProvider matcherProvider) {
+        Set<String> paths = this.endpoints.stream()
+                .filter(java.util.Objects::nonNull)
+                .flatMap((endpointId) -> endpoints.getAdditionalPaths(this.webServerNamespace, endpointId).stream())
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
         return getDelegateMatchers(requestMatcherFactory, matcherProvider, paths, this.httpMethod);
     }
 }
 CODE
-	'safefile://safe-actuator-additional-paths.java': <<<CODE
+	'safefile://actuator-additional-path-request-matcher-wildcard-negative.java': <<<CODE
 class RequestMatcherFactory {
     Object antPath(Object matcherProvider, Object httpMethod, String path) { return null; }
 }
@@ -86,12 +87,15 @@ class PathMappedEndpoints {
 }
 
 class AdditionalPathsEndpointRequestMatcher {
+    Object webServerNamespace;
+    java.util.List<Object> endpoints;
     Object httpMethod;
 
     Object createDelegate(PathMappedEndpoints endpoints, RequestMatcherFactory requestMatcherFactory,
-            RequestMatcherProvider matcherProvider, Object endpointId) {
-        java.util.List<Object> matchers = endpoints.getAdditionalPaths(null, endpointId)
-                .stream()
+            RequestMatcherProvider matcherProvider) {
+        java.util.List<Object> matchers = this.endpoints.stream()
+                .filter(java.util.Objects::nonNull)
+                .flatMap((endpointId) -> endpoints.getAdditionalPaths(this.webServerNamespace, endpointId).stream())
                 .map((path) -> requestMatcherFactory.antPath(matcherProvider, this.httpMethod, path))
                 .toList();
         return matchers;

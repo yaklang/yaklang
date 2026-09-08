@@ -41,9 +41,8 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-jar-security-info.java': <<<CODE
+	'file://jar-security-info-without-entry-content-match-positive.java': <<<CODE
 class ZipContent {
-    int size() { return 0; }
     Entry getEntry(String name) { return null; }
     Object openRawZipData() { return null; }
 
@@ -75,7 +74,7 @@ class SecurityInfo {
     }
 }
 CODE
-	'safefile://safe-jar-security-info.java': <<<CODE
+	'safefile://jar-security-info-without-entry-content-match-negative.java': <<<CODE
 class JarEntriesStream {
     JarEntriesStream(Object in) {
     }

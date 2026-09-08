@@ -54,26 +54,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-unmarshaller-source.java': <<<CODE
-class StringSource {
-    StringSource(String payload) {
-    }
-}
-
-interface Unmarshaller {
-    Object unmarshal(Object source) throws java.io.IOException;
-}
-
-class UnmarshallingTransformer {
-    private final Unmarshaller unmarshaller = null;
-
-    Object transformPayload(String payload) throws Exception {
-        Object source = new StringSource(payload);
-        return this.unmarshaller.unmarshal(source);
-    }
-}
-CODE
-	'file://unsafe-unmarshaller-factory-source.java': <<<CODE
+	'file://oxm-unmarshaller-untrusted-source-factory-positive.java': <<<CODE
 interface SourceFactory {
     Object createSource(Object payload);
 }
@@ -92,7 +73,26 @@ class RuntimeSourceTransformer {
     }
 }
 CODE
-	"safefile://safe-unmarshaller-dom.java": <<<CODE
+	'file://oxm-unmarshaller-untrusted-source-positive.java': <<<CODE
+class StringSource {
+    StringSource(String payload) {
+    }
+}
+
+interface Unmarshaller {
+    Object unmarshal(Object source) throws java.io.IOException;
+}
+
+class UnmarshallingTransformer {
+    private final Unmarshaller unmarshaller = null;
+
+    Object transformPayload(String payload) throws Exception {
+        Object source = new StringSource(payload);
+        return this.unmarshaller.unmarshal(source);
+    }
+}
+CODE
+	'safefile://oxm-unmarshaller-untrusted-source-negative.java': <<<CODE
 class DOMSource {
     DOMSource(Object document) {
     }

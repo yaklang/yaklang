@@ -48,7 +48,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-filter-converter.java': <<<CODE
+	'file://filter-converter-raw-string-value-positive.java': <<<CODE
 abstract class AbstractFilterExpressionConverter {
     protected void doSingleValue(Object value, StringBuilder context) {
         if (value instanceof String) {
@@ -60,7 +60,7 @@ abstract class AbstractFilterExpressionConverter {
     }
 }
 CODE
-	'safefile://safe-filter-converter.java': <<<CODE
+	'safefile://filter-converter-raw-string-value-negative.java': <<<CODE
 abstract class AbstractFilterExpressionConverter {
     protected static void emitJsonValue(Object value, StringBuilder context) {
     }

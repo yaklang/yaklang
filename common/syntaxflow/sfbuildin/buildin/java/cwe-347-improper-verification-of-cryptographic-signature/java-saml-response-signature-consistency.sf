@@ -43,7 +43,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-saml-response-validation.java': <<<CODE
+	'file://saml-response-signature-consistency-positive.java': <<<CODE
 class Saml2AuthenticationToken {
 }
 
@@ -71,7 +71,7 @@ class Provider {
     }
 }
 CODE
-	'safefile://safe-saml-response-validation.java': <<<CODE
+	'safefile://saml-response-signature-consistency-negative.java': <<<CODE
 class Provider {
     java.util.List<Object> validateResponse(Object token, Object response) {
         isSigned(response, java.util.List.of());

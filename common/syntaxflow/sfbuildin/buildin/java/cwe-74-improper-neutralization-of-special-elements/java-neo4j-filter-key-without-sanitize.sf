@@ -43,8 +43,8 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-neo4j-filter-key.java': <<<CODE
-class Key {
+	'file://neo4j-filter-key-without-sanitize-positive.java': <<<CODE
+abstract class Key {
     String key() { return null; }
 }
 
@@ -54,7 +54,7 @@ class Neo4jVectorFilterExpressionConverter {
     }
 }
 CODE
-	'safefile://safe-neo4j-filter-key.java': <<<CODE
+	'safefile://neo4j-filter-key-without-sanitize-negative.java': <<<CODE
 class Key {
     String key() { return null; }
 }
