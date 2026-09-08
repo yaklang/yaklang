@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -15,6 +16,36 @@ func normalizeAIForgeUpsertData(forge *schema.AIForge) map[string]interface{} {
 		return nil
 	}
 	return forge.ToUpdateMap()
+}
+
+// preserveUserRoleTags 保留用户已设置的角色归属：库中已有 senso-role: 标签时，
+// 内置同步/导入数据中的角色标签不覆盖用户选择，其余普通标签正常更新
+func preserveUserRoleTags(db *gorm.DB, name string, forge *schema.AIForge) {
+	if forge == nil {
+		return
+	}
+	var existing schema.AIForge
+	if err := db.Where("forge_name = ?", name).First(&existing).Error; err != nil {
+		return
+	}
+	var existingRoles []string
+	for _, t := range strings.Split(existing.Tags, ",") {
+		t = strings.TrimSpace(t)
+		if strings.HasPrefix(t, "senso-role:") {
+			existingRoles = append(existingRoles, t)
+		}
+	}
+	if len(existingRoles) == 0 {
+		return
+	}
+	kept := []string{}
+	for _, t := range strings.Split(forge.Tags, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" && !strings.HasPrefix(t, "senso-role:") {
+			kept = append(kept, t)
+		}
+	}
+	forge.Tags = strings.Join(append(kept, existingRoles...), ",")
 }
 
 func setAIForgeCreateField(forge *schema.AIForge, field string, value interface{}) {
@@ -46,6 +77,7 @@ func CreateOrUpdateAIForgeByName(db *gorm.DB, name string, forge *schema.AIForge
 	}
 
 	setAIForgeCreateField(forge, "forge_name", name)
+	preserveUserRoleTags(db, name, forge)
 	if db := db.Where("forge_name = ?", name).Assign(normalizeAIForgeUpsertData(forge)).FirstOrCreate(forge); db.Error != nil {
 		return utils.Errorf("create/update AI Forge failed: %s", db.Error)
 	}
@@ -189,7 +221,18 @@ func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"forge_name", "forge_content", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt",
 	}, filter.GetKeyword(), false)
-	db = bizhelper.ExactQueryStringArrayOr(db, "tags", filter.GetTag())
+	// tags 在库中是逗号拼接串，需按完整标签做边界匹配（tags = x / x,... / ...,x,... / ...,x）
+	for _, tag := range filter.GetTag() {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		escaped := strings.ReplaceAll(strings.ReplaceAll(tag, "%", "\\%"), "_", "\\_")
+		db = db.Where(
+			"(tags = ? OR tags LIKE ? OR tags LIKE ? OR tags LIKE ?)",
+			tag, escaped+",%", "%,"+escaped+",%", "%,"+escaped,
+		)
+	}
 	if filter.GetId() > 0 {
 		db = bizhelper.ExactQueryInt64(db, "id", filter.GetId())
 	}
@@ -200,7 +243,7 @@ func QueryAIForge(db *gorm.DB, filter *ypb.AIForgeFilter, paging *ypb.Paging) (*
 	db = FilterAIForge(db, filter)
 	db = bizhelper.OrderByPaging(db, paging)
 	var forges []*schema.AIForge
-	pag, db := bizhelper.PagingByPagination(db, paging, &forges)
+	pag, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &forges)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
