@@ -197,10 +197,12 @@ func (n Nodes) insertProducts(db *gorm.DB) []string {
 				if err != nil {
 					log.Error(err)
 				}
-				db.Save(ProductsTable{
-					Product: cpe.Product,
-					Vendor:  cpe.Vendor,
-				})
+				if db != nil {
+					db.Save(ProductsTable{
+						Product: cpe.Product,
+						Vendor:  cpe.Vendor,
+					})
+				}
 			}
 		}
 	}
