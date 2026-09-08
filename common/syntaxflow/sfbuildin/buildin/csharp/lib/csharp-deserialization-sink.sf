@@ -19,7 +19,6 @@ REFERENCE
 )
 
 *.Deserialize as $output
-JsonConvert.DeserializeObject as $output
 BinaryFormatter as $output
 LosFormatter as $output
 SoapFormatter as $output

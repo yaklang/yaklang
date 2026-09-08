@@ -1,0 +1,46 @@
+desc(
+	mode: source
+	title: "Check C#/.NET Razor Form Missing AntiForgery Token"
+	title_zh: "检测 C#/.NET Razor 表单缺少防伪令牌"
+	type: audit
+	level: mid
+	language: general
+	risk: "csrf"
+	desc: <<<DESC
+Razor/cshtml 中的 form 若未包含 AntiForgeryToken 或 RequestVerificationToken，跨站提交可伪造用户操作。Fortify YiShaAdmin CSRF 29 条均落在 .cshtml 表单上。源码模式匹配 form 标签。
+DESC
+	solution: <<<SOLUTION
+在表单中加入 @Html.AntiForgeryToken()，或使用 <form method="post" asp-antiforgery="true">。对应控制器动作加 [ValidateAntiForgeryToken]。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-352](https://cwe.mitre.org/data/definitions/352.html)
+REFERENCE
+	rule_id: "56a180fd-117a-482a-9737-0ed7ca53fe2d"
+)
+
+${*.cshtml}.pattern_regex(/(?i)<form[\s>]/) as $hit
+
+alert $hit for {
+	title: "C#/.NET Razor form missing antiforgery",
+	title_zh: "C#/.NET Razor 表单缺少防伪令牌",
+	level: "mid",
+	type: "audit",
+	risk: "csrf",
+	message: "检测到 cshtml 表单，请确认包含 AntiForgeryToken。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_form.cshtml': <<<UNSAFE
+<form id="form" class="form-horizontal m" method="post">
+    <input id="userName" type="text" />
+</form>
+UNSAFE
+	'safefile://safe_form.cshtml': <<<SAFE
+<div class="wrapper">
+    <span>no form</span>
+</div>
+SAFE
+)

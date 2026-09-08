@@ -18,7 +18,15 @@ REFERENCE
 )
 
 <include("csharp-user-input")> as $input
-<include("csharp-file-path")> as $sink
+
+File.ReadAllText as $sink
+File.ReadAllBytes as $sink
+File.WriteAllText as $sink
+File.WriteAllBytes as $sink
+File.Delete as $sink
+File.Open as $sink
+File.OpenRead as $sink
+File.OpenWrite as $sink
 
 $sink(* #{until: `* & $input`}->) as $high
 

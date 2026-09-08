@@ -6,7 +6,7 @@ desc(
 	language: csharp
 	risk: "weak-randomness"
 	desc: <<<DESC
-该规则检测 `new System.Random()` 构造。System.Random 为可预测伪随机，不能用于令牌、会话 ID、密钥或验证码（CWE-338）。对应 Fortify Insecure Randomness 与 Semgrep use_weak_rng_for_keygeneration。
+该规则检测 `new System.Random()` 以及随后的 Next/NextBytes。Fortify Insecure Randomness 的 sink 是 Next()，仅匹配构造会漏掉验证码噪声、口令盐值等调用点。System.Random 为可预测伪随机，不能用于令牌、会话 ID、密钥或验证码（CWE-338）。
 DESC
 	solution: <<<SOLUTION
 安全随机使用 RandomNumberGenerator.GetBytes / RandomNumberGenerator.Create，或 RandomNumberGenerator.GetInt32。不要用 System.Random 生成密钥或令牌。
@@ -17,6 +17,9 @@ REFERENCE
 	rule_id: "71d32214-1bff-45ca-a1ec-d9ed351a840c"
 )
 
+Random() as $rng
+$rng.Next as $mid
+$rng.NextBytes as $mid
 Random() as $mid
 
 alert $mid for {

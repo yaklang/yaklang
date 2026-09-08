@@ -18,11 +18,13 @@ REFERENCE
 )
 
 <include("csharp-user-input")> as $input
-<include("csharp-xml-sink")> as $sink
+
+XmlDocument.Load as $sink
+XmlDocument.LoadXml as $sink
+*.LoadXml as $sink
+XmlTextReader as $sink
 
 $sink(* #{until: `* & $input`}->) as $high
-*.Load(* #{until: `* & $input`}->) as $high
-*.LoadXml(* #{until: `* & $input`}->) as $high
 
 alert $high for {
 	title: "C#/.NET XXE via XML parser",

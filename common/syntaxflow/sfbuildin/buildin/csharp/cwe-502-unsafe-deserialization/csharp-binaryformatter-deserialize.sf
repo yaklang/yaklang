@@ -19,7 +19,11 @@ REFERENCE
 )
 
 <include("csharp-user-input")> as $input
-<include("csharp-deserialization-sink")> as $sink
+
+BinaryFormatter.Deserialize as $sink
+*.Deserialize as $sink
+LosFormatter as $sink
+SoapFormatter as $sink
 
 $sink(* #{until: `* & $input`}->) as $high
 

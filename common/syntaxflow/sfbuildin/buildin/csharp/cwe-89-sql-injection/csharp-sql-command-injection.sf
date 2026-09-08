@@ -6,7 +6,7 @@ desc(
 	language: csharp
 	risk: "sql-injection"
 	desc: <<<DESC
-该规则检测用户可控输入流入 SqlCommand / OleDbCommand / CommandText / EF FromSqlRaw 等 SQL 执行入口。当请求参数、表单或控制台输入被字符串拼接、string.Format 后作为 SQL 执行时，攻击者可篡改查询逻辑，造成数据泄露、未授权访问或数据破坏（CWE-89）。对应 Fortify SQL Injection 与 Semgrep csharp-sqli。
+该规则检测 SqlCommand 构造参数或 CommandText 来自方法参数、字符串拼接（opcode add）。YiShaAdmin 的 Fortify SQLi 即 `cmd.CommandText = strSql`（PrepareCommand）。不走全图用户输入 dataflow，避免 work-limit 把真正的 CommandText 赋值漏掉。
 DESC
 	solution: <<<SOLUTION
 使用参数化查询：SQL 文本只含占位符，用户值通过 SqlParameter / Parameters.AddWithValue 绑定。EF Core 使用 FormattableString 或参数化 FromSql。禁止将用户输入拼接到 SQL 字符串。
@@ -18,13 +18,16 @@ REFERENCE
 	rule_id: "de762792-0e19-4fb8-8600-c0b6859338a4"
 )
 
-<include("csharp-user-input")> as $input
-<include("csharp-sql-sink")> as $sink
-
-$sink(* #{until: `* & $input`}->) as $high
+SqlCommand(* as $sql)
+OleDbCommand(* as $sql)
+OdbcCommand(* as $sql)
+OracleCommand(* as $sql)
+$sql?{opcode: add} as $high
+$sql?{opcode: param} as $high
 
 *.CommandText as $ct
-$ct?{<self> #{until: `* & $input`}->} as $high
+$ct?{opcode: add} as $high
+$ct?{opcode: param} as $high
 
 alert $high for {
 	title: "C#/.NET SQL Injection via SqlCommand",
