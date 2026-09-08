@@ -6,13 +6,42 @@ desc(
 	language: csharp
 	risk: "ldap-injection"
 	desc: <<<DESC
-该规则检测用户可控输入流入 DirectorySearcher.Filter。将请求参数拼进 LDAP 过滤器可改变查询逻辑，导致信息泄露或认证绕过（CWE-90）。对应 Fortify LDAP Injection / LDAP Manipulation 与 Semgrep ldap-injection。
+### 漏洞描述
+1. **漏洞原理**
+LDAP 注入的根因是攻击者提供的元字符改变了过滤器或 DN 的含义。构造过滤器时，程序员需要分清哪些字符是命令、哪些是数据。`DirectorySearcher.Filter` 若用字符串拼接用户输入，`*`、括号、`&`、`|` 就会改写查询。DN 拼接（`DirectoryEntry` 路径）是另一类问题：滤字符串之外的用户输入同样能改指向的条目。
+2. **触发场景**
+按经理名检索下属：
+```csharp
+DirectorySearcher src = new DirectorySearcher("(manager=" + managerName.Text + ")");
+foreach (SearchResult res in src.FindAll()) { /* ... */ }
+```
+正常输入得到 `(manager=Smith, John)`。输入 `Hacker, Wiley)(|(objectclass=*)` 后变成：
+```
+(manager=Hacker, Wiley)(|(objectclass=*))
+```
+`|(objectclass=*)` 匹配目录中全部条目。`Filter = "(uid=" + user + ")"` 在输入 `*` 时也会枚举所有 uid。
+3. **潜在影响**
+- **目录信息泄露**：检索本不可见的用户、组、属性。
+- **认证绕过**：登录过滤器被改写成恒真。
+- **条目被篡改**：在可写目录上修改或删除对象。
 DESC
 	solution: <<<SOLUTION
-对过滤器参数做 LDAP 编码（Encoder.LdapFilterEncode）；不要拼接原始用户输入。使用白名单约束用户名等字段。
+### 修复建议
+#### 1. 编码过滤器参数
+使用 LDAP 过滤器编码器，去掉元字符的语法含义：
+```csharp
+string user = Encoder.LdapFilterEncode(raw);
+searcher.Filter = "(uid=" + user + ")";
+```
+DN 必须使用 `LdapDistinguishedNameEncode`，不要和 Filter 编码器混用。
+#### 2. 允许列表
+用户控制的值应完全来自预定字符集合（例如姓名只允许字母、点、连字符）。需要元字符时再编码，而不是维护拒绝列表。
+#### 3. 访问控制不要只靠表示层
+绑定到具体用户目录并限制查询范围；匿名绑定只允许完全受限的查询。隐藏字段中的 `ou` 也要对照合法组织单元列表校验。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-90](https://cwe.mitre.org/data/definitions/90.html)
+[OWASP LDAP Injection](https://cheatsheetseries.owasp.org/cheatsheets/LDAP_Injection_Prevention_Cheat_Sheet.html)
 REFERENCE
 	rule_id: "da905652-125a-4adf-a400-221f1ec3b7f5"
 )

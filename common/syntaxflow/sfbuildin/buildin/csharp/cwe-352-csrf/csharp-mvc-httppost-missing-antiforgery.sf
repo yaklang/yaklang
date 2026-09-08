@@ -7,13 +7,44 @@ desc(
 	language: csharp
 	risk: "csrf"
 	desc: <<<DESC
-ASP.NET MVC / Core 的 HttpPost、HttpPut、HttpDelete、HttpPatch 动作若未使用 ValidateAntiForgeryToken，跨站页面可借用用户 Cookie 提交状态变更请求（CWE-352）。Fortify 在 YiShaAdmin 上对缺令牌的表单报 CSRF；本规则在 .cs 中匹配这些 HTTP 方法特性。C# SSA 目前不保留特性，故使用源码模式。
+### 漏洞描述
+1. **漏洞原理**
+使用会话 Cookie 的应用若在处理状态变更请求前不验证“这次请求是否经过用户同意”，就会出现跨站请求伪造（CSRF）。浏览器会自动附带目标站点的 Cookie，服务器单凭 Cookie 无法区分合法表单提交和跨站页面伪造的提交。防伪令牌（nonce）是随表单下发、提交时必须带回的随机值，用来证明请求来自本应用页面。
+2. **触发场景**
+站点有创建用户的 POST 接口，控制器只有 `[HttpPost]`、没有 `[ValidateAntiForgeryToken]`。攻击者页面自动提交到同一地址：
+```html
+<form method="POST" action="http://example.com/user/save">
+  <input type="hidden" name="username" value="hacker">
+</form>
+<script>document.forms[0].submit();</script>
+```
+已登录管理员打开该页时，浏览器带上会话 Cookie，服务器当正常请求处理，于是创建了攻击者指定的账户。`[HttpPut]` / `[HttpDelete]` / `[HttpPatch]` 同样会改变状态，需要同等防护。仅做 CORS 内容类型限制而不校验令牌时，简单请求仍可能绕过预检。
+3. **潜在影响**
+- **未授权状态变更**：改密、转账、创建后门账户、删除数据。
+- **管理员被利用**：高权限会话一旦打开恶意页，操作以管理员身份执行。
+- **与 XSS 叠加**：页面上的 XSS 可以读出防伪令牌，因此 CSRF 防护不能替代输出编码。
 DESC
 	solution: <<<SOLUTION
-在状态变更动作上添加 [ValidateAntiForgeryToken]，或在 Startup 使用 AutoValidateAntiforgeryToken。视图表单包含 @Html.AntiForgeryToken() 或 tag helper asp-antiforgery。
+### 修复建议
+#### 1. 在状态变更动作上校验防伪令牌
+```csharp
+[HttpPost]
+[ValidateAntiForgeryToken]
+public IActionResult Save(UserModel model)
+{
+    // ...
+}
+```
+或在 Startup / Program 中启用 `AutoValidateAntiforgeryToken`，覆盖所有非安全 HTTP 方法。
+#### 2. 表单必须带上令牌
+视图使用 `@Html.AntiForgeryToken()`，或 `<form method="post" asp-antiforgery="true">`。令牌校验与令牌下发必须成对出现。
+#### 3. 其他缓解
+缩短会话有效期；敏感操作加二次确认或 CAPTCHA。不要只依赖 `Referer`。API 若使用非 Cookie 的 Bearer 令牌，跨站页面通常带不上该令牌，但仍应明确设计，而不是默认省略防伪。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-352](https://cwe.mitre.org/data/definitions/352.html)
+[.NET CSRF](https://learn.microsoft.com/aspnet/core/security/anti-request-forgery)
+[OWASP CSRF](https://owasp.org/www-community/attacks/csrf)
 REFERENCE
 	rule_id: "aee62728-fdcb-43c3-ba6d-7905b5d077a2"
 )

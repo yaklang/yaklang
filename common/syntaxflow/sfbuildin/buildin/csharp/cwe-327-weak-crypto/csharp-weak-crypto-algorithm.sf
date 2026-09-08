@@ -6,13 +6,42 @@ desc(
 	language: csharp
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
-该规则检测 DES、TripleDES、RC2、MD5、SHA1 等已不适合安全用途的算法创建入口。这些算法存在已知弱点，用于保密、完整性或口令存储时会被破解或碰撞（CWE-327）。对应 Fortify Weak Encryption / Weak Cryptographic Hash 与 Semgrep use_deprecated_cipher_algorithm。
+### 漏洞描述
+1. **漏洞原理**
+过时算法无法再保证敏感数据的保密性或完整性。加密强度通常用穷举有效密钥所需的计算量衡量；计算能力提升后，短密钥在合理时间内可被穷举。DES 的 56 位密钥在上世纪七十年代足够，今天用普通设备可在一天内破解。RC2、TripleDES 同样过时。MD5、SHA-1 存在碰撞，不能用于完整性校验或口令存储。`DES.Create`、`RC2.Create`、`MD5CryptoServiceProvider`、`SHA1.Create` 等入口会把这些算法用进安全路径。
+2. **触发场景**
+```csharp
+MD5.Create();
+DESCryptoServiceProvider des = new DESCryptoServiceProvider();
+SHA1.Create();
+```
+口令哈希、报文签名、传输加密若使用上述算法，攻击者可以碰撞校验值或暴力还原密文。
+3. **潜在影响**
+- **密文被还原**：对称加密密钥过短。
+- **数据被伪造仍通过校验**：哈希碰撞。
+- **口令被脱库破解**：MD5/SHA-1 无盐或快速哈希。
 DESC
 	solution: <<<SOLUTION
-对称加密使用 AES-GCM 或 ChaCha20Poly1305；哈希使用 SHA-256 及以上；口令存储使用 PBKDF2/Argon2/bcrypt，不要用 MD5/SHA1。
+### 修复建议
+#### 1. 对称加密
+使用 AES（至少 128 位密钥）或 ChaCha20Poly1305，不要用 DES / RC2 / TripleDES。优先认证加密：
+```csharp
+Aes aes = Aes.Create();
+using var gcm = new AesGcm(key);
+```
+选择算法前先确认组织是否已有指定实现。
+#### 2. 哈希与口令
+完整性用 SHA-256 及以上。口令用 PBKDF2 / Argon2 / bcrypt，并使用密码学 RNG 生成足够长的盐，不要用 MD5 或 SHA-1。
+```csharp
+SHA256 sha = SHA256.Create();
+```
+#### 3. 非对称密钥长度
+RSA / DSA 密钥至少 2048 位；长期保护的数据应考虑 4096 位。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+[DES remarks](https://learn.microsoft.com/dotnet/api/system.security.cryptography.des)
+[OWASP Cryptographic Storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
 REFERENCE
 	rule_id: "a988126c-0596-41d0-9e53-247a7eb2afc9"
 )

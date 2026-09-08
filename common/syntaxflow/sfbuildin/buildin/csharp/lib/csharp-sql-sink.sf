@@ -7,10 +7,12 @@ desc(
 	lib: "csharp-sql-sink"
 	risk: "sql-injection"
 	desc: <<<DESC
-标记 SqlCommand、OleDbCommand、OdbcCommand、OracleCommand 以及 EF Core 的 FromSqlRaw / ExecuteSqlRaw 等可将字符串作为 SQL 执行的 API。对应 Fortify SQL Injection sink 与 Semgrep csharp-sqli。
+### 说明
+`SqlCommand`、`OleDbCommand`、`OdbcCommand`、`OracleCommand` 以及 EF Core 的 `FromSqlRaw` / `ExecuteSqlRaw` 会把字符串当作 SQL 执行。若该字符串由用户输入拼接而成，就会出现 SQL 注入。
 DESC
 	solution: <<<SOLUTION
-使用参数化查询（SqlParameter / Parameters.AddWithValue）或 ORM 的参数化 API；避免字符串拼接、string.Format、插值字符串构造 SQL。
+### 修复建议
+使用 `SqlParameter` / `Parameters.AddWithValue` 或 ORM 的参数化 API。不要用字符串拼接、`string.Format` 或插值字符串构造 SQL。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89](https://cwe.mitre.org/data/definitions/89.html)

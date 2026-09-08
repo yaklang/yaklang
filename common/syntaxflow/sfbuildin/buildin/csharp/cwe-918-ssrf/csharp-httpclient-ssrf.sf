@@ -6,13 +6,39 @@ desc(
 	language: csharp
 	risk: "ssrf"
 	desc: <<<DESC
-该规则检测用户可控输入流入 HttpClient.GetAsync/GetStringAsync、WebClient.DownloadString 或 WebRequest.Create 的 URL。服务端按用户指定地址发请求时，可访问内网或云元数据（CWE-918）。对应 Fortify Server-Side Request Forgery 与 Semgrep csharp/lang/security/ssrf。
+### 漏洞描述
+1. **漏洞原理**
+服务端请求伪造（SSRF）发生在攻击者能控制应用程序向其他服务器发起的网络连接时。连接源自应用服务器的内部地址，因此可以绕过网络边界，扫描或攻击本不会暴露的内部资源。`HttpClient.GetAsync` / `GetStringAsync` / `PostAsync`、`WebRequest.Create`、`WebClient.DownloadString` / `DownloadFile` 的 URL 若来自请求参数，服务端就会替攻击者发请求。
+2. **触发场景**
+```csharp
+string url = Request.Form["url"];
+HttpClient client = new HttpClient();
+HttpResponseMessage response = await client.GetAsync(url);
+```
+`url=http://127.0.0.1:8080/admin` 打到本机管理面；`http://169.254.169.254/` 读取云实例元数据。攻击者能控制的 URI 部分越多，危害越大：改 scheme 可能用上 `file://`、`ldap://`、`gopher://`、UNC 路径等。
+3. **潜在影响**
+- **内网探测与端口扫描**。
+- **绕过防火墙**，攻击仅服务端可达的程序。
+- **读取本地文件或内部共享**（`file://` / UNC）。
+- **窃取云元数据中的密钥**。
+- **对内部 Web 应用做注入或 CSRF**。
 DESC
 	solution: <<<SOLUTION
-对 URL 主机与协议做白名单；禁止用户指定任意内网、localhost 或 link-local 地址；出站请求使用固定基址拼接资源 ID。
+### 修复建议
+#### 1. 不要根据用户数据建立连接
+采用间接方法：合法资源名列表，用户只选择其中一项。协议、主机和端口由应用程序固定。
+#### 2. 用固定基址拼接资源 ID
+```csharp
+var url = "https://api.example.com/items/" + Uri.EscapeDataString(id);
+await client.GetAsync(url);
+```
+用户输入只用于路径中的标识，且经过编码。
+#### 3. 必须接受 URL 时用允许列表
+只允许 `https` 以及预定义主机。解析后再拒绝 localhost、RFC1918、链路本地。黑名单容易漏，优先允许列表。用户输入不应控制 URI scheme。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+[OWASP SSRF Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
 REFERENCE
 	rule_id: "acd5bdca-2638-4666-8ba6-26de044069e2"
 )

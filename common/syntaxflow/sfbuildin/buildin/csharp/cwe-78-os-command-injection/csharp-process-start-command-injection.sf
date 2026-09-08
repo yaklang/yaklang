@@ -6,14 +6,59 @@ desc(
 	language: csharp
 	risk: "command-injection"
 	desc: <<<DESC
-该规则检测用户可控输入流入 Process.Start 或 ProcessStartInfo 的 FileName/Arguments。将 HTTP 参数直接作为可执行文件或拼接到命令行时，攻击者可执行任意系统命令（CWE-78）。对应 Fortify Command Injection 与 Semgrep os-command-injection。
+### 漏洞描述
+1. **漏洞原理**
+命令注入有两种形态：攻击者直接控制程序要执行的命令；或通过环境变量、`PATH`、工作目录间接改写命令含义。`Process.Start`、`ProcessStartInfo.FileName` / `Arguments` 若包含不可信数据，或可执行文件只用文件名而不用绝对路径，程序会以自身权限执行恶意二进制或附加参数。
+2. **触发场景**
+直接把请求参数当作命令：
+```csharp
+Process.Start(Request.QueryString["cmd"]);
+```
+攻击者提交 `cmd.exe /c whoami` 即可在服务器上执行任意命令。
+通过环境间接改写路径：
+```csharp
+string val = Environment.GetEnvironmentVariable("APPHOME");
+string cmd = val + INITCMD;
+Process.Start(new ProcessStartInfo(cmd));
+```
+若攻击者能改 `APPHOME`，就可以指向恶意版本的初始化脚本。
+通过 `cmd.exe` 一次执行多条命令：
+```csharp
+string btype = BackupTypeField.Text;
+string cmd = "cmd.exe /K c:\\util\\rmanDB.bat " + btype + " && c:\\util\\cleanup.bat";
+Process.Start(cmd);
+```
+输入 `&& del c:\\dbms\\*.*` 会在备份命令之后删除数据库文件。`Process.Start` 本身通常不解释 `&&`，但先启动 `cmd.exe` 就把 shell 元字符重新打开了。
+3. **潜在影响**
+- **任意命令执行**：以应用程序账户读写文件、拉起反向 shell。
+- **权限提升**：管理类工具往往以较高权限运行，注入命令继承这些权限。
+- **主机被完全控制**：安装持久化后门、横向移动。
 DESC
 	solution: <<<SOLUTION
-避免调用 shell；使用 ProcessStartInfo 将可执行文件与参数分开传递；对用户输入做白名单。不要把原始请求参数拼进 Arguments。
+### 修复建议
+#### 1. 禁止用户直接指定要执行的命令
+可执行文件由程序固定，使用绝对路径；参数与文件名分开传递，并关闭 shell：
+```csharp
+var info = new ProcessStartInfo
+{
+    FileName = @"C:\App\tools\update.exe",
+    Arguments = "--id " + allowedId,
+    UseShellExecute = false,
+};
+Process.Start(info);
+```
+不要把整段用户输入交给 `FileName`，也不要用 `cmd.exe /c` 或 `cmd.exe /K` 拼接。
+#### 2. 白名单而不是黑名单
+只允许预定义的可执行文件和参数格式。从配置或环境读取的路径必须对照合法常量校验；配置文件可写时宁可拒绝启动。
+#### 3. 参数必须动态时限制字符集
+合法参数集合很大时，只接受由允许字符组成的输入，不要维护一份“危险字符”拒绝列表。
+#### 4. 最小权限
+运行外部进程的账户只授予完成该任务所需的权限，降低被注入后的危害。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 [OWASP Command Injection](https://owasp.org/www-community/attacks/Command_Injection)
+[Process.Start](https://learn.microsoft.com/dotnet/api/system.diagnostics.process.start)
 REFERENCE
 	rule_id: "449e1b9b-15ff-47f2-860c-3ef3e5d1d917"
 )

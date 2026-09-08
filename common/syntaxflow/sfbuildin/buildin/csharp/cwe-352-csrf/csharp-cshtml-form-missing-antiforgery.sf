@@ -7,13 +7,50 @@ desc(
 	language: general
 	risk: "csrf"
 	desc: <<<DESC
-Razor/cshtml 中的 form 若未包含 AntiForgeryToken 或 RequestVerificationToken，跨站提交可伪造用户操作。Fortify YiShaAdmin CSRF 29 条均落在 .cshtml 表单上。源码模式匹配 form 标签。
+### 漏洞描述
+1. **漏洞原理**
+ASP.NET MVC / Razor 通过在 HTML 表单中放入防伪标记、并在控制器中校验该标记，来提高“请求来自本应用页面”的可能性。标记通常是隐藏域 `__RequestVerificationToken`，提交时由服务器核对。Razor 视图里的 `<form method="post">` 若没有 `AntiForgeryToken`，或 `Html.BeginForm(..., antiforgery: false)`，后端即使声明了校验也收不到令牌，跨站页面可以原样复制 action 并自动提交。
+2. **触发场景**
+```html
+<form method="POST" action="/new_user">
+  Name: <input name="username">
+  <input type="submit" value="Create User">
+</form>
+```
+或：
+```html
+@using (Html.BeginForm("Save", "User", FormMethod.Post, antiforgery: false))
+{
+    @* 表单字段 *@
+}
+```
+攻击者复制该 action，用隐藏域填入自己的用户名并自动提交。管理员带着有效会话打开恶意页时，就会在不知情的情况下创建账户。
+3. **潜在影响**
+跨站完成创建用户、改资料、删除数据等状态变更。没有令牌的表单也会让控制器侧的 `[ValidateAntiForgeryToken]` 无法真正生效。
 DESC
 	solution: <<<SOLUTION
-在表单中加入 @Html.AntiForgeryToken()，或使用 <form method="post" asp-antiforgery="true">。对应控制器动作加 [ValidateAntiForgeryToken]。
+### 修复建议
+#### 1. 每个状态变更表单加入令牌
+```html
+<form method="post" asp-action="Save" asp-antiforgery="true">
+    @Html.AntiForgeryToken()
+</form>
+```
+或：
+```html
+@using (Html.BeginForm("Save", "User", FormMethod.Post, antiforgery: true))
+{
+    @Html.AntiForgeryToken()
+}
+```
+#### 2. 控制器侧必须校验
+对应动作添加 `[ValidateAntiForgeryToken]`，或全局启用 `AutoValidateAntiforgeryToken`。表单下发令牌与动作校验必须同时存在。
+#### 3. 边界
+该方法提高攻击成本，但不能单独对抗页面上的 XSS：脚本仍可能读取令牌。需要同时做输出编码。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-352](https://cwe.mitre.org/data/definitions/352.html)
+[.NET anti-request-forgery](https://learn.microsoft.com/aspnet/core/security/anti-request-forgery)
 REFERENCE
 	rule_id: "56a180fd-117a-482a-9737-0ed7ca53fe2d"
 )

@@ -6,14 +6,54 @@ desc(
 	language: csharp
 	risk: "sql-injection"
 	desc: <<<DESC
-该规则检测 SqlCommand 构造参数或 CommandText 来自方法参数、字符串拼接（opcode add）。YiShaAdmin 的 Fortify SQLi 即 `cmd.CommandText = strSql`（PrepareCommand）。不走全图用户输入 dataflow，避免 work-limit 把真正的 CommandText 赋值漏掉。
+### 漏洞描述
+1. **漏洞原理**
+SQL 注入发生在程序用不可信数据动态拼出 SQL 语句时。攻击者可以改变语句的语法上下文，把本应作为数据的值变成命令。`SqlCommand`、`OleDbCommand`、`OdbcCommand`、`OracleCommand` 的构造参数以及 `CommandText` 赋值，只要来自字符串拼接、`string.Format` 或插值字符串，输入中的引号、分号和注释符就会被数据库当成语法。
+2. **触发场景**
+下面的代码按当前登录用户和商品名查询条目：
+```csharp
+string userName = ctx.GetAuthenticatedUserName();
+string query = "SELECT * FROM items WHERE owner = '" + userName
+    + "' AND itemname = '" + itemName + "'";
+var sda = new SqlDataAdapter(query, conn);
+```
+意图是执行：
+```sql
+SELECT * FROM items WHERE owner = <userName> AND itemname = <itemName>;
+```
+当 `itemName` 为 `name' OR 'a'='a` 时，语句变成：
+```sql
+SELECT * FROM items WHERE owner = 'wiley' AND itemname = 'name' OR 'a'='a';
+```
+`OR 'a'='a'` 使 WHERE 恒为真，查询返回 `items` 全表，鉴权条件被绕过。若输入 `name'); DELETE FROM items; --`，在支持分号批处理的服务器（如 SQL Server）上会变成两条语句，第二句删除全表；`--` 把原语句剩余部分注释掉。
+3. **潜在影响**
+- **数据泄露**：读取本不应返回的行，包括其他用户的记录。
+- **数据篡改或删除**：插入、更新或 `DROP`/`DELETE` 表。
+- **鉴权绕过**：登录、授权查询被改写成恒真条件。
+- **进一步渗透**：部分数据库允许通过扩展存储过程执行操作系统命令。
 DESC
 	solution: <<<SOLUTION
-使用参数化查询：SQL 文本只含占位符，用户值通过 SqlParameter / Parameters.AddWithValue 绑定。EF Core 使用 FormattableString 或参数化 FromSql。禁止将用户输入拼接到 SQL 字符串。
+### 修复建议
+#### 1. 使用参数化查询
+SQL 文本只保留占位符，运行时值通过 `SqlParameter` 绑定。绑定参数让数据库把输入当数据而不是命令，可挡住几乎所有拼接型注入。
+```csharp
+var cmd = new SqlCommand(
+    "SELECT * FROM items WHERE owner = @owner AND itemname = @name", conn);
+cmd.Parameters.AddWithValue("@owner", userName);
+cmd.Parameters.AddWithValue("@name", itemName);
+```
+`OleDbCommand` / `OdbcCommand` / `OracleCommand` 同样使用 `Parameters` 集合，不要把用户值写进 SQL 字符串。
+#### 2. ORM 也要参数化
+EF Core 使用 `FromSqlInterpolated` 或带参数的 `FromSql`；不要把用户输入拼进 `FromSqlRaw` / `ExecuteSqlRaw`。
+#### 3. 结构必须随输入变化时用间接映射
+报表类代码若要根据用户选择改 WHERE 子句，先把用户选择映射到程序控制的合法片段集合，再把真正的值用绑定参数填入。不要把原始输入拼进命令结构。
+#### 4. 不要只靠转义或黑名单
+转义引号无法覆盖全部方言、编码和批处理语法，不能替代参数绑定。输入类型校验（例如 ID 必须是整数）只能作为辅助。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 [OWASP SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
+[.NET SqlParameter](https://learn.microsoft.com/dotnet/api/system.data.sqlclient.sqlparameter)
 REFERENCE
 	rule_id: "de762792-0e19-4fb8-8600-c0b6859338a4"
 )
