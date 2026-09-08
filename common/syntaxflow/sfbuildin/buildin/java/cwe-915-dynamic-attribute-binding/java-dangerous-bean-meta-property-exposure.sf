@@ -30,7 +30,7 @@ alert $risk for {
 	message: "发现属性描述符遍历中出现危险 Bean 元属性标识，需复核动态属性绑定是否暴露元对象访问入口。",
 	risk: "variable-overwrite",
 	name: "risk",
-desc: <<<DESC
+	desc: <<<DESC
 ### 规则说明
 本规则用于审计 Bean 属性描述符遍历中，是否显式基于危险元属性名称 `protectionDomain` 做过滤判断。
 
