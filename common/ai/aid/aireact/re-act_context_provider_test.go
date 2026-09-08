@@ -246,7 +246,7 @@ func applyInlineContextConfigOptions(t *testing.T, opts []aicommon.ConfigOption)
 	t.Helper()
 	// Apply the real inherited options without constructing an AI runtime or
 	// loading a provider. The parent test context owns cancellation of children.
-	child := &aicommon.Config{}
+	child := &aicommon.Config{KeyValueConfig: aicommon.NewKeyValueConfig()}
 	for _, option := range opts {
 		if err := option(child); err != nil {
 			t.Fatal(err)

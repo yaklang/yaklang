@@ -67,7 +67,7 @@ func TestContextProviderManager_TaskSnapshotOrdinarySharing(t *testing.T) {
 	t.Cleanup(cancel)
 	manager := NewContextProviderManager()
 	parent := &Config{Ctx: ctx, ContextProviderManager: manager}
-	child := &Config{}
+	child := &Config{KeyValueConfig: NewKeyValueConfig()}
 	for _, option := range ConvertConfigToOptions(parent) {
 		if err := option(child); err != nil {
 			t.Fatal(err)
