@@ -725,7 +725,7 @@ jobs:
             sync_rule: "1"
             test_configs: |
               [
-                {"package": "./common/yak/php/...", "timeout": "5m", "skip": "^TestAllSyntax.*_G4$"},
+                {"package": "./common/yak/php/...", "timeout": "5m", "skip": "^TestAllSyntax(ForPHP_G4|ProjectBuildForPHP)$"},
                 {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"}
               ]
 
