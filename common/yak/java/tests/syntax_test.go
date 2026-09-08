@@ -75,7 +75,7 @@ func TestAllSyntaxForJava_G4(t *testing.T) {
 	defer builder.Clearup()
 
 	cache := builder.GetAntlrCache()
-	resetEveryFiles := astMetricResetEveryFiles()
+	resetEveryFiles := javaLocalASTResetEveryFiles()
 	found := false
 	fileCount := 0
 	err := fs.WalkDir(codeFs, "code", func(filePath string, d fs.DirEntry, walkErr error) error {

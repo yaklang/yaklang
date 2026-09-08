@@ -1,22 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Google Maps APIkeyleak"
-	title_zh: "检测到Google Maps APIkeyleak",
+	title: "检测到 Google Maps API 密钥泄露"
+	title_zh: "检测到 Google Maps API 密钥泄露",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-google-maps-apikeyleak"
 	risk: "hardcoded-credentials"
 	desc: <<<DESC
-Migrated from Semgrep rule `google-maps-apikeyleak` (/tmp/semgrep-rules/generic/secrets/security/google-maps-apikeyleak.yaml).
-Original message: Detects potential Google Maps API keys in code
+### 规则说明
+检测到代码中可能包含 Google Maps API 密钥。
 
-CWE: CWE-538: Insertion of Sensitive Information into Externally-Accessible File or Directory
-References:
-- https://ozguralp.medium.com/unauthorized-google-maps-api-key-usage-cases-and-why-you-need-to-care-1ccb28bf21e
+### 风险类型
+硬编码凭据（hardcoded-credentials）
+
+### 影响
+代码中直接写入账号、令牌等敏感凭据，泄露后攻击者可直接使用这些凭据访问系统或服务。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-538
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+移除代码中的 Google Maps API 密钥，改用环境变量或密钥管理服务，并轮换已泄露的密钥。
 SOLUTION
 	alert_min: 1
 	"file://pos.sample": <<<POS
@@ -33,7 +42,7 @@ ${*}.pattern_regex(/(?:^(AIza[0-9A-Za-z_-]{35}(?!\S))$)|YAKLANG_SF_POS_source\-i
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Google Maps APIkeyleak",
-	title_zh: "检测到Google Maps APIkeyleak",
-	message: "Google Maps APIkeyleak",
+	title: "检测到 Google Maps API 密钥泄露",
+	title_zh: "检测到 Google Maps API 密钥泄露",
+	message: "检测到 Google Maps API 密钥泄露",
 }

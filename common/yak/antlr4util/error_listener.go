@@ -62,6 +62,12 @@ type ErrorListener struct {
 	textFilter map[string]struct{}
 	handler    handlerFunc
 	err        []string
+
+	// cachedMeditor memoizes the mem-editor for this parse so that an error
+	// storm does not re-copy and re-split the whole file for every single
+	// syntax error (quadratic amplification on large broken files). One
+	// ErrorListener is scoped to a single source stream (lexer + parser share it).
+	cachedMeditor *memedit.MemEditor
 }
 
 type handlerFunc func(self *ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException)
@@ -100,6 +106,13 @@ func NewErrorListener(handlers ...handlerFunc) *ErrorListener {
 	}
 }
 
+func (el *ErrorListener) memEditorForStream(stream antlr.CharStream) *memedit.MemEditor {
+	if el.cachedMeditor == nil {
+		el.cachedMeditor = memedit.NewMemEditor(stream.GetText(0, stream.Size()))
+	}
+	return el.cachedMeditor
+}
+
 func SimpleSyntaxErrorHandler(simpleHandler func(msg string, start, end *memedit.Position)) handlerFunc {
 	return func(el *ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
 		if el.handler != nil {
@@ -122,8 +135,8 @@ func StringSyntaxErrorHandler(el *ErrorListener, recognizer antlr.Recognizer, of
 	if ok {
 		stream := token.GetInputStream()
 		start, end = token.GetStart(), token.GetStop()
-		// get all code
-		meditor := memedit.NewMemEditor(stream.GetText(0, stream.Size()))
+		// GetText+NewMemEditor is O(file); memoize so broken large files stay linear.
+		meditor := el.memEditorForStream(stream)
 		ctxText, _ = meditor.GetContextAroundRange(
 			meditor.GetPositionByOffset(start),
 			meditor.GetPositionByOffset(end),

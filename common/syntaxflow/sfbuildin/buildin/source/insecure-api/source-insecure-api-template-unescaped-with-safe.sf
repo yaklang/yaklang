@@ -1,22 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Template Unescaped With Safe"
-	title_zh: "检测到Template Unescaped With Safe",
+	title: "检测到模板使用 safe 未转义"
+	title_zh: "检测到模板使用 safe 未转义",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-template-unescaped-with-safe"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `template-unescaped-with-safe` (/tmp/semgrep-rules/python/flask/security/xss/audit/template-unescaped-with-safe.yaml).
-Original message: Detected a segment of a Flask template where autoescaping is explicitly disabled with '| safe' filter. This allows rendering of raw HTML in this segment. Ensure no user data is rendered here, otherwise this is a cross-site scripting (XSS) vulnerability.
+### 规则说明
+Flask 模板中检测到使用 | safe 过滤器显式关闭自动转义的片段，该片段可渲染原始 HTML。若渲染用户数据则构成 XSS 漏洞。
 
-CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
-References:
-- https://flask.palletsprojects.com/en/1.1.x/security/#cross-site-scripting-xss
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-79
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+确保该位置不渲染用户数据，移除 | safe 或先用 mark_safe 安全处理。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS
@@ -34,7 +43,7 @@ ${*.html}.pattern_regex(/{{.*?\|\s*safe(\s*}})?/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Template Unescaped With Safe",
-	title_zh: "检测到Template Unescaped With Safe",
-	message: "Template Unescaped With Safe",
+	title: "检测到模板使用 safe 未转义",
+	title_zh: "检测到模板使用 safe 未转义",
+	message: "检测到模板使用 safe 未转义",
 }

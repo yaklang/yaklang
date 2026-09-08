@@ -100,6 +100,7 @@ jq -e \
     .recipe.cgo_enabled == true and
     .recipe.link_mode == "dynamic-container" and
     .recipe.module_go_version == "1.22.12" and
+    (.capabilities | index("ai.input.managed_attachment.v1")) != null and
     (.capabilities | index("ai.session.bind_epoch.v1")) != null and
     (.capabilities | index("ai.session.turn_lifecycle.v1")) != null and
     (.capabilities | index("ai.session.runtime")) != null and

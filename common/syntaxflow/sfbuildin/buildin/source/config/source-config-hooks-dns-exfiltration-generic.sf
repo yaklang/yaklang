@@ -1,25 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Hooks DNS Exfiltration Generic"
-	title_zh: "检测到Hooks DNS Exfiltration Generic",
+	title: "检测到 Hooks 配置存在 DNS 外传"
+	title_zh: "检测到 Hooks 配置存在 DNS 外传",
 	type: vuln
 	level: critical
 	rule_id: "source-config-hooks-dns-exfiltration-generic"
 	risk: "information-exposure"
 	desc: <<<DESC
-Migrated from Semgrep rule `hooks-dns-exfiltration-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-dns-exfiltration/hooks-dns-exfiltration.yaml).
-Original message: DNS lookup command uses a variable in the hostname, which could exfiltrate sensitive data via DNS queries. In Claude Code and Cursor hooks, this pattern can leak secrets or environment data to attacker-controlled domains. Use static hostnames only in DNS commands.
+### 规则说明
+Hooks 中的 DNS 查询命令在主机名中使用了变量，可能通过 DNS 查询外传敏感数据。在 Claude Code 与 Cursor hooks 中，该模式可向攻击者控制的域名泄露密钥或环境数据。
 
-CWE: CWE-201: Insertion of Sensitive Information Into Sent Data
-References:
-- https://docs.anthropic.com/en/docs/claude-code/hooks
-- https://cursor.com/docs/agent/hooks
+### 风险类型
+敏感信息泄露（information-exposure）
 
-False-positive hardening: hostname argument itself must start with $VAR/${VAR} after optional short flags; ignore help text like "endpoint host (default: $X)".
+### 影响
+应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-201
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+DNS 命令中仅使用静态主机名，不要用变量拼接域名。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS
@@ -47,7 +53,7 @@ ${*.bash}.pattern_regex(/\b(ping|nslookup|dig|host)(?:[ \t]+-[a-zA-Z0-9]+(?:[ \t
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "critical",
-	title: "Hooks DNS Exfiltration Generic",
-	title_zh: "检测到Hooks DNS Exfiltration Generic",
-	message: "Hooks DNS Exfiltration Generic",
+	title: "检测到 Hooks 配置存在 DNS 外传",
+	title_zh: "检测到 Hooks 配置存在 DNS 外传",
+	message: "检测到 Hooks 配置存在 DNS 外传",
 }

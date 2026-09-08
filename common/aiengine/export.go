@@ -26,6 +26,7 @@ var Exports = map[string]interface{}{
 	"excludeToolNames":          WithExcludeToolNames,
 	"keywords":                  WithKeywords,
 	"allowUserInteract":         WithAllowUserInteract,
+	"allowSyncInitContext":      WithAllowSyncInitContext,
 	"reviewPolicy":              WithReviewPolicy,
 	"userInteractLimit":         WithUserInteractLimit,
 	"timelineContentLimit":      WithTimelineContentLimit,

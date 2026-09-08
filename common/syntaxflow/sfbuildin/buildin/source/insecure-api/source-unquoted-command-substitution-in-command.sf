@@ -1,23 +1,28 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Unquoted Command Substitution In Command"
+	title: "检测到命令中未加引号的命令替换"
 	title_zh: "检测到命令中未加引号的命令替换",
 	type: vuln
 	level: middle
 	rule_id: "source-unquoted-command-substitution-in-command"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from Semgrep rule `unquoted-command-substitution-in-command` (/tmp/semgrep-rules/bash/lang/correctness/unquoted-expansion.yaml).
-Original message: The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable. You should surround it with double quotes to avoid splitting the result.
+### 规则说明
+命令替换 $(...) 或反引号的结果在未加引号时，会按 IFS 指定的空白或分隔符拆分，可能导致命令参数被意外拆分。
 
-CWE: -
-References:
-- 
-Note: context-aware regex — `$(...)` / backtick substitution hits are dropped inside double-quoted regions (pattern-not-inside) and excluded when preceded by `=` (assignment) or `$((` (arithmetic).
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Double-quote command substitutions in commands to prevent word splitting.
+### 修复建议
+用双引号包裹命令替换，防止结果被拆分。
 SOLUTION
 	alert_min: 1
 	"file://pos.bash": <<<POS
@@ -44,7 +49,7 @@ $q_sh + $q_bash as $q
 $t not_inside $q as $hit
 alert $hit for {
 	level: "middle",
-	title: "Unquoted Command Substitution In Command",
+	title: "检测到命令中未加引号的命令替换",
 	title_zh: "检测到命令中未加引号的命令替换",
-	message: "The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable.",
+	message: "检测到命令中未加引号的命令替换",
 }

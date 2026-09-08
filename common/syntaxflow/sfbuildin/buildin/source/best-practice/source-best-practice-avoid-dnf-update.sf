@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Dockerfile 中使用 dnf update"
+	title_zh: "检测到 Dockerfile 中使用 dnf update"
+	type: audit
+	level: low
+	rule_id: "source-best-practice-avoid-dnf-update"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+基础镜像中的软件包应保持最新，通常无需在构建时执行 dnf update。如果基础镜像中的软件包已过期，应联系基础镜像维护者更新镜像。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除 Dockerfile 中的 dnf update 指令，改为使用已更新软件包的基础镜像；如软件包过期，联系基础镜像维护者。
+SOLUTION
+	alert_min: 1
+	"file://Dockerfile": <<<POS
+dnf update
+POS
+	"safefile://Dockerfile": <<<NEG
+dnf install
+NEG
+)
+
+${Dockerfile}.pattern_regex(/(?:dnf\s+update)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "检测到 Dockerfile 中使用 dnf update",
+	title_zh: "检测到 Dockerfile 中使用 dnf update",
+	message: "检测到 Dockerfile 中使用 dnf update",
+}

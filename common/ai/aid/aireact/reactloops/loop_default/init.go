@@ -15,6 +15,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		attachedDatas := task.GetAttachedDatas()
 		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 
+		// Attachments remain available to the main loop. Expensive enrichment is
+		// opt-in so the first response can start before intent/knowledge calls.
+		if !config.GetConfigBool("AllowSyncInitContext") {
+			return
+		}
+
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
 		if mustProcessMentionedInfo && hasAttachedKnowledgeBaseResource(attachedResources) {

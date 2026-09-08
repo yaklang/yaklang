@@ -42,7 +42,9 @@ Runtime through `legion-node-v*`; candidate bytes are never promoted in place.
 `SESSION_RUNTIME_MANIFEST.json` binds the Yaklang source commit, producing
 workflow, target platform, Dockerfile, immutable base images, embedded binary
 digest, image archive digest and size, immutable image ID, and the
-`ai.session.runtime` plus `yak.execute` capabilities.
+`ai.session.runtime`, `yak.execute`, bind/turn lifecycle and
+`ai.input.managed_attachment.v1` capabilities. Managed input admission and
+Linux confinement are specified in [Managed input workspaces](legion-managed-input-workspaces.md).
 
 The Docker archive is exported through the verified build tag rather than a
 bare image ID. Its `manifest.json` must retain that non-pullable tag, and the

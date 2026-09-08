@@ -1,17 +1,28 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "Detect Java MD5 MessageDigest"
-	title_zh: "检测 Java MD5 MessageDigest",
+	title: "检测 Java MD5 消息摘要"
+	title_zh: "检测 Java MD5 消息摘要",
 	type: vuln
 	level: medium
 	rule_id: "source-java-md5"
 	risk: "weak-cryptography"
 	desc: <<<DESC
-Flags MessageDigest.getInstance("MD5") which is cryptographically broken for security uses.
+### 规则说明
+检测到 Java 代码中使用 MD5 MessageDigest。MD5 不抗碰撞，不适合安全场景。
+
+### 风险类型
+弱加密算法（weak-cryptography）
+
+### 影响
+使用 CBC、PKCS5Padding 等易受攻击的加密模式或弱算法。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Use SHA-256 or stronger algorithms; prefer password hashing APIs (bcrypt/argon2) for passwords.
+### 修复建议
+改用 SHA-256 等安全哈希算法，口令场景使用 BCrypt/Argon2。
 SOLUTION
 	alert_min: 1
 	"file://Hash.java": <<<POS
@@ -31,7 +42,7 @@ NEG
 ${*.java}.pattern_regex(/MessageDigest\.getInstance\(\s*["']MD5["']\s*\)/) as $hit
 alert $hit for {
 	level: "medium",
-	title: "Weak MD5 Digest",
-	title_zh: "弱哈希 MD5",
-	message: "MessageDigest MD5 detected",
+	title: "检测 Java MD5 消息摘要",
+	title_zh: "检测 Java MD5 消息摘要",
+	message: "检测 Java MD5 消息摘要",
 }

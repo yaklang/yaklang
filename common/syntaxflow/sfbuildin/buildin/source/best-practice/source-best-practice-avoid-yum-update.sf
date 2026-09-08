@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Dockerfile 中使用 yum update"
+	title_zh: "检测到 Dockerfile 中使用 yum update"
+	type: audit
+	level: low
+	rule_id: "source-best-practice-avoid-yum-update"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+基础镜像中的软件包应保持最新，通常无需在构建时执行 yum update。如果基础镜像中的软件包已过期，应联系基础镜像维护者更新镜像。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除 Dockerfile 中的 yum update 指令，改为使用已更新软件包的基础镜像；如软件包过期，联系基础镜像维护者。
+SOLUTION
+	alert_min: 1
+	"file://Dockerfile": <<<POS
+yum update
+POS
+	"safefile://Dockerfile": <<<NEG
+yum install
+NEG
+)
+
+${Dockerfile}.pattern_regex(/(?:yum\s+update)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "检测到 Dockerfile 中使用 yum update",
+	title_zh: "检测到 Dockerfile 中使用 yum update",
+	message: "检测到 Dockerfile 中使用 yum update",
+}

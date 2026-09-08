@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到不安全的 LibXML 后端"
+	title_zh: "检测到不安全的 LibXML 后端"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-libxml-backend"
+	risk: "xxe"
+	desc: <<<DESC
+### 规则说明
+应用使用 LibXML 作为 XML 后端，LibXML 可能存在 XML 外部实体（XXE）漏洞。
+
+### 风险类型
+XML 外部实体注入（XXE）（xxe）
+
+### 影响
+解析不可信 XML 时允许外部实体，可能读取本地文件或发起 SSRF。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-611
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 Rails 内置的 REXML 解析器，或对 XML 解析禁用外部实体。
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+ActiveSupport::XmlMini.backend = "LibXML"
+POS
+	"safefile://pos.rb": <<<NEG
+ActiveSupport::XmlMini.backend = "Nokogiri"
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:ActiveSupport::XmlMini\.backend\s+=\s+"LibXML")/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到不安全的 LibXML 后端",
+	title_zh: "检测到不安全的 LibXML 后端",
+	message: "检测到不安全的 LibXML 后端",
+}

@@ -21,12 +21,30 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 }
 
 func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
+	if c == nil || utils.IsNil(val) {
+		return
+	}
 	if !c.IsMagicMethodName(name) {
 		log.Debugf("register magic method fail: not magic method: %q", name)
 		//return
 	}
 	if method, exit := c.MagicMethod[name]; exit {
-		Point(val, method)
+		if utils.IsNil(method) {
+			c.MagicMethod[name] = val
+		} else if val.GetId() != method.GetId() {
+			alreadyLinked := false
+			if reference := val.GetReference(); !utils.IsNil(reference) && reference.GetId() == method.GetId() {
+				for _, pointer := range method.GetPointer() {
+					if !utils.IsNil(pointer) && pointer.GetId() == val.GetId() {
+						alreadyLinked = true
+						break
+					}
+				}
+			}
+			if !alreadyLinked {
+				Point(val, method)
+			}
+		}
 	} else {
 		c.MagicMethod[name] = val
 	}
@@ -62,7 +80,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 			if utils.IsNil(bluePrint.Destructor) {
 				return false
 			} else {
-				_method = bluePrint.Constructor
+				_method = bluePrint.Destructor
 				return true
 			}
 		default:
@@ -129,6 +147,20 @@ func (c *Blueprint) RegisterNormalMethod(name string, val *Function, store ...bo
 	}
 }
 
+// RegisterNormalMethodExact installs one callable in the blueprint slot without
+// adding a pointer/reference edge to the previous slot value. Frontends with
+// their own overload registry use this to keep overload edges distinct from
+// virtual-dispatch edges.
+func (c *Blueprint) RegisterNormalMethodExact(name string, val *Function, store ...bool) {
+	if len(store) == 0 || store[0] {
+		c.storeField(name, val, BluePrintNormalMethod)
+	}
+	if f, ok := ToFunction(val); ok {
+		f.SetMethod(true, c)
+	}
+	c.NormalMethod[name] = val
+}
+
 func (c *Blueprint) GetNormalMethod(key string) Value {
 	var f Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
@@ -152,6 +184,15 @@ func (c *Blueprint) RegisterStaticMethod(name string, val *Function, store ...bo
 		}
 		c.StaticMethod[name] = val
 	}
+}
+
+// RegisterStaticMethodExact is the static counterpart of
+// RegisterNormalMethodExact.
+func (c *Blueprint) RegisterStaticMethodExact(name string, val *Function, store ...bool) {
+	if len(store) == 0 || store[0] {
+		c.storeField(name, val, BluePrintStaticMember)
+	}
+	c.StaticMethod[name] = val
 }
 
 func (c *Blueprint) GetStaticMethod(key string) Value {

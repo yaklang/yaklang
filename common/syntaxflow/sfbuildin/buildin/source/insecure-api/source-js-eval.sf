@@ -1,17 +1,28 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "Detect JavaScript eval Usage"
+	title: "检测 JavaScript eval 调用"
 	title_zh: "检测 JavaScript eval 调用",
 	type: vuln
 	level: high
 	rule_id: "source-js-eval"
 	risk: "code-injection"
 	desc: <<<DESC
-Flags eval(...) in JS/TS sources which enables code injection.
+### 规则说明
+检测到 JavaScript eval 调用。若执行外部可控内容，可导致任意代码执行。
+
+### 风险类型
+代码注入（code-injection）
+
+### 影响
+不可信输入被直接用于动态代码执行，可能导致任意代码执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Avoid eval; use JSON.parse or safer interpreters for structured data.
+### 修复建议
+避免使用 eval；改用 JSON.parse、Function 构造器之外的安全解析方式。
 SOLUTION
 	alert_min: 1
 	"file://app.js": <<<POS
@@ -25,7 +36,7 @@ NEG
 ${*.js}.pattern_regex(/(?m)(?<![\w.])eval\s*\(/) as $hit
 alert $hit for {
 	level: "high",
-	title: "JavaScript eval()",
-	title_zh: "JavaScript eval()",
-	message: "Dangerous eval() call detected",
+	title: "检测 JavaScript eval 调用",
+	title_zh: "检测 JavaScript eval 调用",
+	message: "检测 JavaScript eval 调用",
 }

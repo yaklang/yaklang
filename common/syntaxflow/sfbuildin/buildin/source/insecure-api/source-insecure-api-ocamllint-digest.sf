@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 OCaml 弱哈希 Digest 使用"
+	title_zh: "检测到 OCaml 弱哈希 Digest 使用"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-ocamllint-digest"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+OCaml Digest 使用了 MD5 哈希，MD5 不抗碰撞，不应在安全场景中使用。
+
+### 风险类型
+弱哈希算法（weak-hash）
+
+### 影响
+使用 MD5、SHA-1 等弱哈希算法，可能被碰撞或暴力破解。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-328
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 SHA-256 等安全哈希算法。
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+Digest.string
+POS
+	"safefile://pos.ml": <<<NEG
+Digestif.SHA256.digest
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:Digest\.string)|(?:Digest\.bytes)|(?:Digest\.substring)|(?:Digest\.subbytes)|(?:Digest\.channel)|(?:Digest\.file)/) as $p0
+${*.mli}.pattern_regex(/(?:Digest\.string)|(?:Digest\.bytes)|(?:Digest\.substring)|(?:Digest\.subbytes)|(?:Digest\.channel)|(?:Digest\.file)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 OCaml 弱哈希 Digest 使用",
+	title_zh: "检测到 OCaml 弱哈希 Digest 使用",
+	message: "检测到 OCaml 弱哈希 Digest 使用",
+}

@@ -1,22 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Avoid V Html"
-	title_zh: "检测到Avoid V Html",
+	title: "检测到使用 v-html"
+	title_zh: "检测到使用 v-html",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-avoid-v-html"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `avoid-v-html` (/tmp/semgrep-rules/javascript/vue/security/audit/xss/templates/avoid-v-html.yaml).
-Original message: Dynamically rendering arbitrary HTML on your website can be very dangerous because it can easily lead to XSS vulnerabilities. Only use HTML interpolation on trusted content and never on user-provided content.
+### 规则说明
+在页面上动态渲染任意 HTML 非常危险，容易导致 XSS 漏洞。只对可信内容使用 HTML 插值，绝不对用户提供的内容使用。
 
-CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
-References:
-- https://vuejs.org/v2/guide/syntax.html#Raw-HTML
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-79
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+移除对用户内容的 v-html 渲染，改用安全的插值或文本渲染方式。
 SOLUTION
 	alert_min: 1
 	"file://pos.vue": <<<POS
@@ -34,7 +43,7 @@ ${*.vue}.pattern_regex(/<[^<>]*v-html=/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Avoid V Html",
-	title_zh: "检测到Avoid V Html",
-	message: "Avoid V Html",
+	title: "检测到使用 v-html",
+	title_zh: "检测到使用 v-html",
+	message: "检测到使用 v-html",
 }

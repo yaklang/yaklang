@@ -1,17 +1,28 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "Detect Java Runtime.exec Usage"
+	title: "检测 Java Runtime.exec 调用"
 	title_zh: "检测 Java Runtime.exec 调用",
 	type: vuln
 	level: medium
 	rule_id: "source-java-runtime-exec"
 	risk: "command-injection"
 	desc: <<<DESC
-Flags Runtime.getRuntime().exec(...) which often leads to command injection when fed with untrusted input.
+### 规则说明
+检测到 Java Runtime.exec 调用。若参数包含外部可控内容，可导致命令注入。
+
+### 风险类型
+命令注入（command-injection）
+
+### 影响
+用户输入未经安全处理即拼接到系统命令中，可能导致任意命令执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Avoid shelling out; if required, use ProcessBuilder with argument lists and strict allowlists.
+### 修复建议
+避免将用户输入拼接到命令中，使用参数化方式调用进程或白名单校验。
 SOLUTION
 	alert_min: 1
 	"file://Run.java": <<<POS
@@ -33,7 +44,7 @@ NEG
 ${*.java}.pattern_regex(/Runtime\.getRuntime\(\)\.exec\s*\(/) as $hit
 alert $hit for {
 	level: "medium",
-	title: "Runtime.exec Call",
-	title_zh: "Runtime.exec 调用",
-	message: "Runtime.getRuntime().exec detected",
+	title: "检测 Java Runtime.exec 调用",
+	title_zh: "检测 Java Runtime.exec 调用",
+	message: "检测 Java Runtime.exec 调用",
 }

@@ -1,23 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Hooks Unconditional Allow Generic"
-	title_zh: "检测到Hooks Unconditional Allow Generic",
+	title: "检测到 Hooks 配置无条件放行"
+	title_zh: "检测到 Hooks 配置无条件放行",
 	type: vuln
 	level: critical
 	rule_id: "source-config-hooks-unconditional-allow-generic"
 	risk: "authorization-bypass"
 	desc: <<<DESC
-Migrated from Semgrep rule `hooks-unconditional-allow-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-unconditional-allow/hooks-unconditional-allow.yaml).
-Original message: Hook unconditionally allows tool execution by outputting a permissionDecision of "allow" without any conditional check. This bypasses the entire permission system. Add a conditional check to validate the tool or command before allowing.
+### 规则说明
+Hook 无条件输出 permissionDecision 为 allow 的决策，未做任何条件检查，直接绕过了整个权限系统。
 
-CWE: CWE-862: Missing Authorization
-References:
-- https://docs.anthropic.com/en/docs/claude-code/hooks
-- https://cursor.com/docs/agent/hooks
+### 风险类型
+授权绕过（authorization-bypass）
+
+### 影响
+访问控制检查缺失或可被绕过，攻击者可访问未授权资源。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-862
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+增加条件检查，在放行前校验工具或命令的合法性。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS
@@ -37,7 +45,7 @@ ${*.py}.pattern_regex(/permissionDecision.*allow/) as $p2
 $p0 + $p1 + $p2 as $hit
 alert $hit for {
 	level: "critical",
-	title: "Hooks Unconditional Allow Generic",
-	title_zh: "检测到Hooks Unconditional Allow Generic",
-	message: "Hooks Unconditional Allow Generic",
+	title: "检测到 Hooks 配置无条件放行",
+	title_zh: "检测到 Hooks 配置无条件放行",
+	message: "检测到 Hooks 配置无条件放行",
 }

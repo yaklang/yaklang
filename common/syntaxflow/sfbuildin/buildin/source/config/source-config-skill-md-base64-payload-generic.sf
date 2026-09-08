@@ -1,23 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Skill Md Base64 Payload Generic"
-	title_zh: "检测到Skill Md Base64 Payload Generic",
+	title: "检测到 Skill 文档包含 Base64 载荷"
+	title_zh: "检测到 Skill 文档包含 Base64 载荷",
 	type: vuln
 	level: middle
 	rule_id: "source-config-skill-md-base64-payload-generic"
 	risk: "encoded-payload-execution"
 	desc: <<<DESC
-Migrated from Semgrep rule `skill-md-base64-payload-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-base64-payload/skill-md-base64-payload.yaml).
-Original message: SKILL.md or AGENT.md instructs the agent to decode and execute a base64 (or hex) blob, which is a common encoding-evasion pattern used to smuggle malicious instructions past human review. Document the content in plain text or remove the encoded payload, and audit the decoded value before reintroducing it.
+### 规则说明
+SKILL.md 或 AGENT.md 指示智能体解码并执行 base64（或 hex）编码的载荷，这是一种常见的编码规避手法，用于绕过人工审查向智能体植入恶意指令。
 
-CWE: CWE-506: Embedded Malicious Code
-References:
-- https://github.com/Agent-Threat-Rule/agent-threat-rules
-- https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+### 风险类型
+编码载荷执行（encoded-payload-execution）
+
+### 影响
+攻击者可通过编码或混淆载荷绕过过滤并执行恶意代码。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-506
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+以纯文本说明内容或移除编码载荷；重新引入前先审计解码后的值。
 SOLUTION
 	alert_min: 1
 	"file://posSKILL.md": <<<POS
@@ -52,7 +60,7 @@ $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 +
 alert $hit for {
 	risk: "encoded-payload-execution",
 	level: "middle",
-	title: "Skill Md Base64 Payload Generic",
-	title_zh: "检测到Skill Md Base64 Payload Generic",
-	message: "Skill Md Base64 Payload Generic",
+	title: "检测到 Skill 文档包含 Base64 载荷",
+	title_zh: "检测到 Skill 文档包含 Base64 载荷",
+	message: "检测到 Skill 文档包含 Base64 载荷",
 }

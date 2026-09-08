@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Python 调试器残留"
+	title_zh: "检测到 Python 调试器残留"
+	type: audit
+	level: middle
+	rule_id: "source-best-practice-python-debugger-found"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+代码中导入了 Python 调试器 pdb，通常属于调试残留，不应留在生产代码中。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除对 pdb（或 pdb.set_trace）的导入与调用，确认调试语句是否误留在代码中。
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import pdb
+POS
+	"safefile://pos.py": <<<NEG
+import logging
+NEG
+)
+
+${*.py}.pattern_regex(/(?:import\s+pdb)|(?:pdb\.set_trace\(\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 Python 调试器残留",
+	title_zh: "检测到 Python 调试器残留",
+	message: "检测到 Python 调试器残留",
+}

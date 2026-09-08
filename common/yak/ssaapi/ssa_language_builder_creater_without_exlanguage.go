@@ -46,6 +46,7 @@ import (
 //   - C:          github.com/yaklang/yaklang/common/yak/c2ssa
 //   - TypeScript: github.com/yaklang/yaklang/common/yak/typescript/ts2ssa
 //   - JavaScript: 同 TypeScript (共享 ts2ssa builder)
+//   - C#:         github.com/yaklang/yaklang/common/yak/csharp/csharp2ssa
 //
 // 库导入说明:
 //   - 在 irify_exclude 模式下，ssa 和 syntaxflow 库仍然会被导入到 Yak 脚本环境中

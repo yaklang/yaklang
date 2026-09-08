@@ -1,0 +1,44 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到已废弃的 Moment.js"
+	title_zh: "检测到已废弃的 Moment.js"
+	type: audit
+	level: low
+	rule_id: "source-best-practice-moment-deprecated"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+Moment.js 已进入维护模式，不再积极开发。建议改用仍在积极维护的日期库，例如 dayjs。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+将 Moment.js 替换为仍在积极维护的日期库，例如 dayjs，并迁移相关日期处理代码。
+SOLUTION
+	alert_min: 1
+	"file://pos.ts": <<<POS
+import 'moment'
+POS
+	"safefile://pos.ts": <<<NEG
+import 'date-fns'
+NEG
+)
+
+${*.ts}.pattern_regex(/(?:import\s+'moment')/) as $p0
+${*.js}.pattern_regex(/(?:import\s+'moment')/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "low",
+	title: "检测到已废弃的 Moment.js",
+	title_zh: "检测到已废弃的 Moment.js",
+	message: "检测到已废弃的 Moment.js",
+}

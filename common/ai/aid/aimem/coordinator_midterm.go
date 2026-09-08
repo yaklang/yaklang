@@ -15,6 +15,14 @@ func EnsureTimelineMidtermArchiveStore(cfg *aicommon.Config) *AIMemoryTriage {
 	if store, ok := cfg.TimelineArchiveStore.(*AIMemoryTriage); ok && store != nil {
 		return store
 	}
+	if store, ok := cfg.TimelineArchiveStore.(*AsyncAIMemory); ok && store != nil {
+		memory, err := store.WaitReady(cfg.GetContext())
+		if err != nil {
+			log.Warnf("load midterm archive store failed: %v", err)
+			return nil
+		}
+		return memory
+	}
 	persistentSessionID := strings.TrimSpace(cfg.PersistentSessionId)
 	if persistentSessionID == "" {
 		return nil

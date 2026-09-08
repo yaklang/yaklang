@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 OCaml Filename.concat 使用"
+	title_zh: "检测到 OCaml Filename.concat 使用"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-ocamllint-filenameconcat"
+	risk: "path-traversal"
+	desc: <<<DESC
+### 规则说明
+将攻击者可控的数据传入 Filename.concat 可能造成目录遍历攻击。
+
+### 风险类型
+路径遍历（path-traversal）
+
+### 影响
+用户输入未校验即用于文件路径，可能读取或写入任意文件。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-35
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对文件名做规范化与白名单校验，禁止路径穿越序列（如 ../）。
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+Filename.concat
+POS
+	"safefile://pos.ml": <<<NEG
+Filename.quote_command
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:Filename\.concat)/) as $p0
+${*.mli}.pattern_regex(/(?:Filename\.concat)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 OCaml Filename.concat 使用",
+	title_zh: "检测到 OCaml Filename.concat 使用",
+	message: "检测到 OCaml Filename.concat 使用",
+}

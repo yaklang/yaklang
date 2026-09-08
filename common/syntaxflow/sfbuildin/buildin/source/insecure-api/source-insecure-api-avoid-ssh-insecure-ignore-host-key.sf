@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 SSH 忽略主机密钥校验"
+	title_zh: "检测到 SSH 忽略主机密钥校验"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-avoid-ssh-insecure-ignore-host-key"
+	risk: "certificate-validation"
+	desc: <<<DESC
+### 规则说明
+检测到禁用主机密钥校验的 SSH 配置，连接易受中间人攻击。
+
+### 风险类型
+证书校验缺失（certificate-validation）
+
+### 影响
+未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-322
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 golang.org/x/crypto/ssh/knownhosts 包进行主机密钥校验。
+SOLUTION
+	alert_min: 1
+	"file://pos.go": <<<POS
+ssh.InsecureIgnoreHostKey()
+POS
+	"safefile://pos.go": <<<NEG
+ssh.FixedHostKey
+NEG
+)
+
+${*.go}.pattern_regex(/(?:ssh\.InsecureIgnoreHostKey\(\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 SSH 忽略主机密钥校验",
+	title_zh: "检测到 SSH 忽略主机密钥校验",
+	message: "检测到 SSH 忽略主机密钥校验",
+}

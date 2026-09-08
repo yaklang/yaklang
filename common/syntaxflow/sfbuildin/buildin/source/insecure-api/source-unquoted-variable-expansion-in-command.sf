@@ -1,23 +1,28 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Unquoted Variable Expansion In Command"
+	title: "检测到命令中未加引号的变量展开"
 	title_zh: "检测到命令中未加引号的变量展开",
 	type: vuln
 	level: middle
 	rule_id: "source-unquoted-variable-expansion-in-command"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from Semgrep rule `unquoted-variable-expansion-in-command` (/tmp/semgrep-rules/bash/lang/correctness/unquoted-expansion.yaml).
-Original message: Variable expansions must be double-quoted so as to prevent being split into multiple pieces according to whitespace or whichever separator is specified by the IFS variable. If you really wish to split the variable's contents, you may use a variable that starts with an underscore e.g. $_X instead of $X, and semgrep will ignore it. If what you need is an array, consider using a proper bash array.
+### 规则说明
+变量展开必须加双引号，防止按 IFS 指定的空白或分隔符拆分成多个参数。
 
-CWE: -
-References:
-- 
-Note: context-aware regex — unquoted `$VAR`/`${VAR}` expansions (metavariable-regex approximation: `[*@0-9]|[A-Za-z].*`), excluding quoted, assignment, and special-parameter forms.
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Double-quote variable expansions in commands to prevent word splitting.
+### 修复建议
+用双引号包裹变量展开；确实需要拆分时使用下划线前缀变量或显式数组。
 SOLUTION
 	alert_min: 1
 	"file://pos.bash": <<<POS
@@ -41,7 +46,7 @@ ${*.bash}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][
 $hit_sh + $hit_bash as $hit
 alert $hit for {
 	level: "middle",
-	title: "Unquoted Variable Expansion In Command",
+	title: "检测到命令中未加引号的变量展开",
 	title_zh: "检测到命令中未加引号的变量展开",
-	message: "Variable expansions must be double-quoted so as to prevent being split into multiple pieces according to whitespace.",
+	message: "检测到命令中未加引号的变量展开",
 }

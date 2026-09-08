@@ -1,23 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Hooks Stop Missing Active Check Generic"
-	title_zh: "检测到Hooks Stop Missing Active Check Generic",
+	title: "检测到 Hooks 配置缺少停止活动检查"
+	title_zh: "检测到 Hooks 配置缺少停止活动检查",
 	type: vuln
 	level: middle
 	rule_id: "source-config-hooks-stop-missing-active-check-generic"
 	risk: "denial-of-service"
 	desc: <<<DESC
-Migrated from Semgrep rule `hooks-stop-missing-active-check-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-stop-missing-active-check/hooks-stop-missing-active-check.yaml).
-Original message: Stop hook outputs a "block" decision. Ensure you check stop_hook_active first and exit 0 if true, otherwise the hook will cause an infinite loop by blocking its own stop attempts.
+### 规则说明
+Stop hook 输出了 block 决策，但未先检查 stop_hook_active。若 stop_hook_active 为 true 时应立即以 0 退出，否则 hook 会阻断自身的停止尝试，造成无限循环。
 
-CWE: CWE-835: Loop with Unreachable Exit Condition
-References:
-- https://docs.anthropic.com/en/docs/claude-code/hooks
-- https://cursor.com/docs/agent/hooks
+### 风险类型
+拒绝服务（denial-of-service）
+
+### 影响
+资源消耗或异常处理不当，可能被利用导致服务不可用。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-835
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+在输出 block 前先检查 stop_hook_active，若为 true 则直接以退出码 0 结束。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS
@@ -36,7 +44,7 @@ ${*.bash}.pattern_regex(/"decision".*"block"/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Hooks Stop Missing Active Check Generic",
-	title_zh: "检测到Hooks Stop Missing Active Check Generic",
-	message: "Hooks Stop Missing Active Check Generic",
+	title: "检测到 Hooks 配置缺少停止活动检查",
+	title_zh: "检测到 Hooks 配置缺少停止活动检查",
+	message: "检测到 Hooks 配置缺少停止活动检查",
 }

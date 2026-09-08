@@ -90,6 +90,31 @@ alert $hit for { level: "critical", message: "pem" }
 	}
 }
 
+func TestLoadFilesFromFSWithOptions_SourceExtensions(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	for _, name := range []string{
+		"code/Main.scala", "code/Token.sol", "code/lib.ml", "code/lib.mli",
+		"code/core.clj", "code/app.ex", "code/app.exs", "code/Page.cls",
+		"code/Handler.apex", "code/Page.page-meta.xml",
+		"code/init.lua",
+	} {
+		vfs.AddFile(name, "content")
+	}
+	// Not in the common source/config allow-list.
+	vfs.AddFile("binary.dat", "content")
+	files, err := LoadFilesFromFSWithOptions(vfs, DefaultLoadOptions())
+	require.NoError(t, err)
+	for _, name := range []string{
+		"code/Main.scala", "code/Token.sol", "code/lib.ml", "code/lib.mli",
+		"code/core.clj", "code/app.ex", "code/app.exs", "code/Page.cls",
+		"code/Handler.apex", "code/Page.page-meta.xml",
+		"code/init.lua",
+	} {
+		require.Contains(t, files, name)
+	}
+	require.NotContains(t, files, "binary.dat")
+}
+
 func TestNewRootFromFS(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	vfs.AddFile("x.java", `password = "s3cretValue"`)

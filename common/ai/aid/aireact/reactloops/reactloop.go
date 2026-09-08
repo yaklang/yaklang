@@ -109,9 +109,12 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// memory management
-	memorySizeLimit int
-	currentMemories *omap.OrderedMap[string, *aicommon.MemoryEntity]
-	memoryTriage    aicommon.MemoryTriage
+	memorySizeLimit          int
+	currentMemories          *omap.OrderedMap[string, *aicommon.MemoryEntity]
+	memoryTriage             aicommon.MemoryTriage
+	memoryUpdateMu           sync.Mutex
+	fastMemorySearchMu       sync.Mutex
+	fastMemorySearchInFlight bool
 
 	// midterm archive memory: loaded/updated alongside regular memory,
 	// rendered together with InjectedMemory in the dynamic section.
@@ -957,6 +960,9 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 }
 
 func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
+	if !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		return nil, utils.Errorf("action[%s] denied by runtime policy", actionName)
+	}
 	ac, ok := r.actions.Get(actionName)
 	if ok {
 		return ac, nil
@@ -973,9 +979,14 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 }
 
 func (r *ReActLoop) GetAllActionNames() []string {
-	actionNames := r.actions.Keys()
+	var actionNames []string
+	for _, name := range r.actions.Keys() {
+		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, name) {
+			actionNames = append(actionNames, name)
+		}
+	}
 	for _, actionName := range r.loopActions.Keys() {
-		if !r.actions.Have(actionName) {
+		if !r.actions.Have(actionName) && aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
 			actionNames = append(actionNames, actionName)
 		}
 	}
@@ -983,14 +994,18 @@ func (r *ReActLoop) GetAllActionNames() []string {
 }
 
 func (r *ReActLoop) NoActions() bool {
-	return r.actions.Len() == 0 && r.loopActions.Len() == 0
+	return len(r.GetAllActionNames()) == 0
 }
 
 func (r *ReActLoop) GetAllActions() []*LoopAction {
 	var actions []*LoopAction
-	actions = append(actions, r.actions.Values()...)
+	for _, action := range r.actions.Values() {
+		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, action.ActionType) {
+			actions = append(actions, action)
+		}
+	}
 	for _, actionName := range r.loopActions.Keys() {
-		if r.actions.Have(actionName) {
+		if r.actions.Have(actionName) || !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
 			continue
 		}
 		actionFac, ok := r.loopActions.Get(actionName)

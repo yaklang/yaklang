@@ -1,22 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Template Autoescape Off"
-	title_zh: "检测到Template Autoescape Off",
+	title: "检测到模板自动转义关闭"
+	title_zh: "检测到模板自动转义关闭",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-template-autoescape-off"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `template-autoescape-off` (/tmp/semgrep-rules/python/django/security/audit/xss/template-autoescape-off.yaml).
-Original message: Detected a template block where autoescaping is explicitly disabled with '{% autoescape off %}'. This allows rendering of raw HTML in this segment. Turn autoescaping on to prevent cross-site scripting (XSS). If you must do this, consider instead, using `mark_safe` in Python code.
+### 规则说明
+模板中检测到使用 {% autoescape off %} 显式关闭自动转义的代码块，该块可渲染原始 HTML，易导致 XSS。
 
-CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
-References:
-- https://docs.djangoproject.com/en/3.1/ref/templates/builtins/#autoescape
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-79
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+开启自动转义；确需输出时优先在 Python 代码中使用 mark_safe。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS
@@ -40,7 +49,7 @@ ${*.html}.pattern_regex(/{%\s+autoescape\s+off\s+%}/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Template Autoescape Off",
-	title_zh: "检测到Template Autoescape Off",
-	message: "Template Autoescape Off",
+	title: "检测到模板自动转义关闭",
+	title_zh: "检测到模板自动转义关闭",
+	message: "检测到模板自动转义关闭",
 }

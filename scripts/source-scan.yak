@@ -71,8 +71,11 @@ opts = [
     syntaxflow.withScanConcurrency(concurrency),
     syntaxflow.withRuleFilterMode("source"),
     syntaxflow.withRuleFilterLibRuleKind("noLib"),
-    syntaxflow.withReporter(report),
 ]
+
+if outPath != "" {
+    opts = append(opts, syntaxflow.withReporter(report))
+}
 
 if str.TrimSpace(ruleKeyword) != "" {
     opts = append(opts, syntaxflow.withRuleFilterKeyword(ruleKeyword))

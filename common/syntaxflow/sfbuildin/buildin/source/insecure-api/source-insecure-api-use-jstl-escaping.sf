@@ -1,26 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Use JSTL Escaping"
-	title_zh: "检测到Use JSTL Escaping",
+	title: "检测到使用 JSTL 转义"
+	title_zh: "检测到使用 JSTL 转义",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-use-jstl-escaping"
 	risk: "xss"
 	desc: <<<DESC
-Migrated from Semgrep rule `use-jstl-escaping` (/tmp/semgrep-rules/java/lang/security/audit/xss/jsp/use-jstl-escaping.yaml).
-Original message: Detected an Expression Language segment in a tag that does not escape output. This is dangerous because if any data in this expression can be controlled externally, it is a cross-site scripting vulnerability. Instead, use the 'out' tag from the JSTL taglib to escape this expression. See https://www.tutorialspoint.com/jsp/jstl_core_out_tag.htm for more information.
+### 规则说明
+检测到 JSP 标签中的表达式语言片段未转义输出。表达式中的数据若可被外部控制，则构成 XSS 漏洞。
 
-CWE: CWE-116: Improper Encoding or Escaping of Output
-References:
-- https://www.tutorialspoint.com/jsp/jstl_core_out_tag.htm
-- https://stackoverflow.com/a/4948856
-- https://stackoverflow.com/a/3180202
+### 风险类型
+跨站脚本（XSS）（xss）
 
-False-positive hardening: ignore ${...} inside scriptlets and single-quoted JS strings inside tags.
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-116
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+使用 JSTL 标签库的 out 标签转义表达式输出。
 SOLUTION
 	alert_min: 1
 	"file://pos.jsp": <<<POS
@@ -38,7 +43,7 @@ ${*.jsp}.pattern_regex_not(/<(?![A-Za-z0-9]+:out)[^>\n]*\$\{[^}\n]*\}[^>\n]*>/, 
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Use JSTL Escaping",
-	title_zh: "检测到Use JSTL Escaping",
-	message: "Use JSTL Escaping",
+	title: "检测到使用 JSTL 转义",
+	title_zh: "检测到使用 JSTL 转义",
+	message: "检测到使用 JSTL 转义",
 }

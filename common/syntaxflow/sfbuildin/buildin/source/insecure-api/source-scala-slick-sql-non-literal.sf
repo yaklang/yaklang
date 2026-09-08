@@ -1,24 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Scala Slick Sql Non Literal"
+	title: "检测到 Scala Slick SQL 非字面量拼接"
 	title_zh: "检测到 Scala Slick SQL 非字面量拼接",
 	type: vuln
 	level: middle
 	rule_id: "source-scala-slick-sql-non-literal"
 	risk: "sql-injection"
 	desc: <<<DESC
-Migrated from Semgrep rule `scala-slick-sql-non-literal` (/tmp/semgrep-rules/scala/slick/security/scala-slick-sql-non-literal.yaml).
-Original message: Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized. Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
+### 规则说明
+检测到 SQL 语句中使用格式化字符串。若 SQL 语句中的变量未正确过滤，可导致 SQL 注入。
 
-CWE: CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')
-References:
-- https://scala-slick.org/doc/3.3.3/sql.html#splicing-literal-values
-- https://find-sec-bugs.github.io/bugs.htm#SCALA_SQL_INJECTION_SLICK
-Note: context-aware regex — `#$` hits are kept only inside `sql"..."` strings (pattern) and inside `import slick...` regions (pattern-inside, AND of two contexts).
+### 风险类型
+SQL 注入（sql-injection）
+
+### 影响
+用户输入未参数化即拼接到 SQL 中，可能导致数据泄露或篡改。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-89
 DESC
 	solution: <<<SOLUTION
-Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
+### 修复建议
+避免使用 #$variable 插值，改用 sql"..." 中的 $variable 参数化写法。
 SOLUTION
 	alert_min: 1
 	"file://pos.scala": <<<POS
@@ -48,7 +55,7 @@ $t inside $sql as $a
 $a inside $imp as $hit
 alert $hit for {
 	level: "middle",
-	title: "Scala Slick Sql Non Literal",
+	title: "检测到 Scala Slick SQL 非字面量拼接",
 	title_zh: "检测到 Scala Slick SQL 非字面量拼接",
-	message: "Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized.",
+	message: "检测到 Scala Slick SQL 非字面量拼接",
 }

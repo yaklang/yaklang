@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到默认路由配置"
+	title_zh: "检测到默认路由配置"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-avoid-default-routes"
+	risk: "security-misconfiguration"
+	desc: <<<DESC
+### 规则说明
+路由文件启用了默认路由，控制器上的任意公共方法都可能被作为动作调用，容易意外暴露本来不打算公开的方法。
+
+### 风险类型
+安全配置不当（security-misconfiguration）
+
+### 影响
+安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-276
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除默认路由配置，显式列出需要对外暴露的全部路由。
+SOLUTION
+	alert_min: 1
+	"file://routes.rb": <<<POS
+map.connect ":controller/:action/:id"
+POS
+	"safefile://routes.rb": <<<NEG
+root 'home#index'
+NEG
+)
+
+${*routes.rb}.pattern_regex(/(?:map\.connect\s+":controller\/:action\/:id")|(?:match\s+':controller\(\/:action\(\/:id\(\.:format\)\)\)')/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到默认路由配置",
+	title_zh: "检测到默认路由配置",
+	message: "检测到默认路由配置",
+}

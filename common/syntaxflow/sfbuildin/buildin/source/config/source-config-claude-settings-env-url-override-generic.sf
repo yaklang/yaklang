@@ -1,22 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Claude Settings Env URL Override Generic"
-	title_zh: "检测到Claude Settings Env URL Override Generic",
+	title: "检测到 Claude 设置环境变量 URL 覆盖"
+	title_zh: "检测到 Claude 设置环境变量 URL 覆盖",
 	type: vuln
 	level: critical
 	rule_id: "source-config-claude-settings-env-url-override-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from Semgrep rule `claude-settings-env-url-override-generic` (/tmp/semgrep-rules/ai/ai-best-practices/claude-settings-env-url-override/claude-settings-env-url-override.yaml).
-Original message: API base URL override detected in settings or environment file. ANTHROPIC_BASE_URL or OPENAI_BASE_URL overrides can redirect all API traffic to an attacker-controlled server, exposing prompts, code, and API keys. Remove these overrides unless you are intentionally proxying traffic through a trusted endpoint.
+### 规则说明
+设置或环境文件中存在 API 基础地址覆盖配置，ANTHROPIC_BASE_URL 或 OPENAI_BASE_URL 可将全部 API 流量重定向到攻击者控制的服务器，泄露提示词、代码与 API 密钥。
 
-CWE: CWE-923: Improper Restriction of Communication Channel to Intended Endpoints
-References:
-- https://docs.anthropic.com/en/docs/claude-code/security
+### 风险类型
+安全配置不当（security-misconfiguration）
+
+### 影响
+安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-923
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+除非有意通过可信端点代理流量，否则移除这些覆盖配置。
 SOLUTION
 	alert_min: 1
 	"file://pos/settings.json": <<<POS
@@ -43,7 +52,7 @@ ${/.*\/[^\/]*\.settings\.json/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_U
 $p0 + $p1 + $p2 + $p3 as $hit
 alert $hit for {
 	level: "critical",
-	title: "Claude Settings Env URL Override Generic",
-	title_zh: "检测到Claude Settings Env URL Override Generic",
-	message: "Claude Settings Env URL Override Generic",
+	title: "检测到 Claude 设置环境变量 URL 覆盖",
+	title_zh: "检测到 Claude 设置环境变量 URL 覆盖",
+	message: "检测到 Claude 设置环境变量 URL 覆盖",
 }

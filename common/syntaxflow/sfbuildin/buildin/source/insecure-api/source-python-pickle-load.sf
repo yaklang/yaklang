@@ -1,17 +1,28 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "Detect Python pickle.load Usage"
+	title: "检测 Python pickle.load"
 	title_zh: "检测 Python pickle.load",
 	type: vuln
 	level: high
 	rule_id: "source-python-pickle-load"
 	risk: "deserialization"
 	desc: <<<DESC
-Flags pickle.load / loads which can execute code when deserializing untrusted data.
+### 规则说明
+检测到 Python pickle.load 调用。pickle 反序列化不可信数据可导致任意代码执行。
+
+### 风险类型
+不安全反序列化（deserialization）
+
+### 影响
+反序列化不可信数据可能触发任意代码执行或对象注入。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Prefer json or other safe formats; never unpickle untrusted bytes.
+### 修复建议
+不要反序列化不可信数据，改用 JSON 等安全格式。
 SOLUTION
 	alert_min: 1
 	"file://ser.py": <<<POS
@@ -27,7 +38,7 @@ NEG
 ${*.py}.pattern_regex(/\bpickle\.(loads?|Unpickler)\s*\(/) as $hit
 alert $hit for {
 	level: "high",
-	title: "Python pickle Deserialization",
-	title_zh: "Python pickle 反序列化",
-	message: "Unsafe pickle deserialization detected",
+	title: "检测 Python pickle.load",
+	title_zh: "检测 Python pickle.load",
+	message: "检测 Python pickle.load",
 }

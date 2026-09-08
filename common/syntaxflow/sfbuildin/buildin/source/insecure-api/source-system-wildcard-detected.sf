@@ -1,24 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "System Wildcard Detected"
+	title: "检测到系统调用中的通配符注入"
 	title_zh: "检测到系统调用中的通配符注入",
 	type: vuln
 	level: middle
 	rule_id: "source-system-wildcard-detected"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
-Migrated from Semgrep rule `system-wildcard-detected` (/tmp/semgrep-rules/python/lang/security/audit/system-wildcard-detected.yaml).
-Original message: Detected use of the wildcard character in a system call that spawns a shell. This subjects the wildcard to normal shell expansion, which can have unintended consequences if there exist any non-standard file names. Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
+### 规则说明
+检测到系统调用中的通配符会进入 shell 展开。若目录中存在特殊文件名（如 -e sh script.sh），rsync 等命令执行时可能产生意料之外的效果。
 
-CWE: CWE-155: Improper Neutralization of Wildcards or Matching Symbols
-References:
-- https://www.defensecode.com/public/DefenseCode_Unix_WildCards_Gone_Wild.txt
-- https://github.com/PyCQA/bandit/blob/b1411bfb43795d3ffd268bef17a839dee954c2b1/bandit/plugins/injection_wildcard.py
-Note: context-aware regex — wildcard hits are kept only inside os.system/os.popen*/subprocess(..., shell=True) call regions (pattern-either of pattern-inside, OR via union).
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-155
 DESC
 	solution: <<<SOLUTION
-Avoid passing wildcards to shell-spawning system calls; use argument lists (e.g. subprocess.run([...])) instead of shell strings.
+### 修复建议
+避免在系统调用中使用未引用的通配符，使用引号包裹参数或将路径显式列出。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS
@@ -45,7 +52,7 @@ $t inside $c as $hit
 alert $hit for {
 	risk: "unsafe-shell-expansion",
 	level: "middle",
-	title: "System Wildcard Detected",
+	title: "检测到系统调用中的通配符注入",
 	title_zh: "检测到系统调用中的通配符注入",
-	message: "Detected use of the wildcard character in a system call that spawns a shell.",
+	message: "检测到系统调用中的通配符注入",
 }

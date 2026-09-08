@@ -1,22 +1,28 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Use Assert Class"
-	title_zh: "检测到Use Assert Class",
+	title: "检测到使用 assert 类"
+	title_zh: "检测到使用 assert 类",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-use-assert-class"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from Semgrep rule `use-assert-class` (/tmp/semgrep-rules/apex/lang/best-practice/ncino/tests/UseAssertClass.yaml).
-Original message: Assert methods in the System class have been replaced with the Assert class: https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_class_System_Assert.htm
+### 规则说明
+System 类中的 Assert 方法已被 Assert 类取代，详见 Salesforce Apex 参考文档。
 
-CWE: -
-References:
-- https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_class_System_Assert.htm
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Follow the framework's secure configuration guidance; remove or replace the flagged pattern.
+### 修复建议
+改用 Assert 类提供的方法进行断言。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS
@@ -35,7 +41,7 @@ ${UseAssertClass.cls}.pattern_regex(/System\.assert/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Use Assert Class",
-	title_zh: "检测到Use Assert Class",
-	message: "Use Assert Class",
+	title: "检测到使用 assert 类",
+	title_zh: "检测到使用 assert 类",
+	message: "检测到使用 assert 类",
 }

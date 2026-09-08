@@ -1,17 +1,28 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "Detect Python eval Usage"
+	title: "检测 Python eval 调用"
 	title_zh: "检测 Python eval 调用",
 	type: vuln
 	level: high
 	rule_id: "source-python-eval"
 	risk: "code-injection"
 	desc: <<<DESC
-Flags eval(...) which can execute arbitrary code when given attacker-controlled strings.
+### 规则说明
+检测到 Python eval 调用。若执行外部可控内容，可导致任意代码执行。
+
+### 风险类型
+代码注入（code-injection）
+
+### 影响
+不可信输入被直接用于动态代码执行，可能导致任意代码执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Avoid eval; use ast.literal_eval for literals or structured parsers.
+### 修复建议
+避免使用 eval/exec 执行外部输入，改用安全的解析与求值方案。
 SOLUTION
 	alert_min: 1
 	"file://dyn.py": <<<POS
@@ -28,7 +39,7 @@ NEG
 ${*.py}.pattern_regex(/(?m)(?<!literal_)(?<!ast\.)\beval\s*\(/) as $hit
 alert $hit for {
 	level: "high",
-	title: "Python eval()",
-	title_zh: "Python eval()",
-	message: "Dangerous eval() call detected",
+	title: "检测 Python eval 调用",
+	title_zh: "检测 Python eval 调用",
+	message: "检测 Python eval 调用",
 }

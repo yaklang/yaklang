@@ -1,23 +1,28 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Absolute URLs"
-	title_zh: "检测到Absolute URLs",
+	title: "检测到绝对 URL"
+	title_zh: "检测到绝对 URL",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-absolute-urls"
 	risk: "best-practice"
 	desc: <<<DESC
-Migrated from Semgrep rule `absolute-urls` (/tmp/semgrep-rules/apex/lang/best-practice/ncino/urls/AbsoluteUrls.yaml).
-Original message: Using absolute URLs to Salesforce Pages is bug prone. Different sandboxes and production environments will have different instance names (like "na10", "na15" etc.). Code using absolute URLs will only work when it runs in the corresponding salesforce instances. It will break as soon as it is deployed in another one. Thus only relative URLs, i.e. without the domain and subdomain names, should be used when pointing to a salesforce page.
+### 规则说明
+Salesforce 页面使用绝对 URL 容易出错：不同沙箱与生产环境的实例名不同（如 na10、na15），使用绝对 URL 的代码只能在对应实例运行，部署到其他实例会失效。
 
-CWE: -
-References:
-- 
-Note: original paths.exclude ['*Test*', '*test*'] not applied (SF path filter limitation).
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
 DESC
 	solution: <<<SOLUTION
-Follow the framework's secure configuration guidance; remove or replace the flagged pattern.
+### 修复建议
+指向 Salesforce 页面时只使用相对 URL，即去掉域名与子域名部分。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS
@@ -35,7 +40,7 @@ ${*.cls}.pattern_regex(/(http|https):\/\/.*(salesforce|force|visualforce)\.com\.
 $p0 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Absolute URLs",
-	title_zh: "检测到Absolute URLs",
-	message: "Absolute URLs",
+	title: "检测到绝对 URL",
+	title_zh: "检测到绝对 URL",
+	message: "检测到绝对 URL",
 }

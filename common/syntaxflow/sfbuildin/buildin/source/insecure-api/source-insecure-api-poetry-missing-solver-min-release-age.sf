@@ -1,22 +1,31 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Poetry Missing Solver Min Release Age"
-	title_zh: "检测到Poetry Missing Solver Min Release Age",
+	title: "检测到 Poetry 缺少求解器最低发布时限"
+	title_zh: "检测到 Poetry 缺少求解器最低发布时限",
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-poetry-missing-solver-min-release-age"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
-Migrated from Semgrep rule `poetry-missing-solver-min-release-age` (/tmp/semgrep-rules/package_managers/poetry/poetry-missing-solver-min-release-age.yaml).
-Original message: This poetry.toml does not set a dependency cooldown via `solver.min-release-age`. Without a cooldown, Poetry may resolve newly published package versions that have not yet been vetted by the community. Supply chain attacks frequently involve publishing a malicious version of a popular package and waiting for it to be pulled in — most are detected and removed within days. Set `min-release-age = 7` under `[solver]` to require that package versions are at least 7 days old before they are considered during dependency resolution. Added in: v2.4.0
+### 规则说明
+poetry.toml 未通过 solver.min-release-age 设置依赖冷却期。没有冷却期时，Poetry 可能解析到社区尚未充分验证的新发布版本，供应链攻击常利用这一点发布恶意版本。
 
-CWE: CWE-829: Inclusion of Functionality from Untrusted Control Sphere
-References:
-- https://python-poetry.org/docs/configuration/#solvermin-release-age
+### 风险类型
+安全配置不当（security-misconfiguration）
+
+### 影响
+安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-829
 DESC
 	solution: <<<SOLUTION
-Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+### 修复建议
+在 [solver] 下设置 min-release-age = 7，要求依赖版本至少发布 7 天才参与解析。
 SOLUTION
 	alert_min: 1
 	"file://pos/poetry.toml": <<<POS
@@ -44,7 +53,7 @@ ${/.*\/config\.toml/}.pattern_regex(/(?ms)^\[solver\](?:[^\[]*?)min-release-age\
 $p0 + $p1 + $p2 + $p3 as $hit
 alert $hit for {
 	level: "middle",
-	title: "Poetry Missing Solver Min Release Age",
-	title_zh: "检测到Poetry Missing Solver Min Release Age",
-	message: "Poetry Missing Solver Min Release Age",
+	title: "检测到 Poetry 缺少求解器最低发布时限",
+	title_zh: "检测到 Poetry 缺少求解器最低发布时限",
+	message: "检测到 Poetry 缺少求解器最低发布时限",
 }

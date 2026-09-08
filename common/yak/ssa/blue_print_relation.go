@@ -57,7 +57,7 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 	if utils.IsNil(c) || utils.IsNil(c._container) || utils.IsNil(c._container.GetFunc()) {
 		return
 	}
-	if utils.IsNil(other) || utils.IsNil(other._container) || utils.IsNil(c._container.GetFunc()) {
+	if utils.IsNil(other) || utils.IsNil(other._container) || utils.IsNil(other._container.GetFunc()) {
 		return
 	}
 
@@ -66,9 +66,20 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 	cName := c._container.GetVerboseName()
 	otherName := other._container.GetVerboseName()
 
+	storeRelation := func(builder *FunctionBuilder, container Value, key BlueprintRelationKind, target Value) {
+		relationKey := builder.EmitConstInstPlaceholder(string(key))
+		// Blueprint relations are SSA-owned metadata rather than source-language
+		// members. Register the known edge before the generic member-variable path
+		// validates it, otherwise class-aware frontends report an ObjectError for
+		// these internal keys. AssignVariable records the normal variable metadata;
+		// the identical member edge is de-duplicated by AddMember.
+		setMemberCallRelationship(container, relationKey, target)
+		variable := builder.CreateMemberCallVariable(container, relationKey)
+		builder.AssignVariable(variable, target)
+	}
+
 	builder := c._container.GetFunc().builder
-	val := builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(string(relation)))
-	builder.AssignVariable(val, other._container)
+	storeRelation(builder, c._container, relation, other._container)
 	other._container.SetVerboseName(otherName)
 	// set relative relation
 	otherBuilder := other._container.GetFunc().builder
@@ -76,8 +87,7 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 	if string(relativeRela) == "" {
 		return
 	}
-	otherVal := otherBuilder.CreateMemberCallVariable(other._container, otherBuilder.EmitConstInstPlaceholder(string(relativeRela)))
-	otherBuilder.AssignVariable(otherVal, c._container)
+	storeRelation(otherBuilder, other._container, relativeRela, c._container)
 	c._container.SetVerboseName(cName)
 }
 

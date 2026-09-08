@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到不安全的随机数使用"
+	title_zh: "检测到不安全的随机数使用"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-insecure-random"
+	risk: "weak-randomness"
+	desc: <<<DESC
+### 规则说明
+检测到使用 scala.util.Random 生成可预测的随机值。用于 CSRF 令牌、密码重置令牌等安全场景时可导致漏洞。
+
+### 风险类型
+弱随机数（weak-randomness）
+
+### 影响
+使用不安全的伪随机数生成器，可能导致令牌、密钥或安全决策可预测。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-330
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 java.security.SecureRandom 生成安全随机值。
+SOLUTION
+	alert_min: 1
+	"file://pos.scala": <<<POS
+import scala.util.Random
+POS
+	"safefile://pos.scala": <<<NEG
+import scala.collection.mutable.ArrayBuffer
+NEG
+)
+
+${*.scala}.pattern_regex(/(?:import\s+scala\.util\.Random)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到不安全的随机数使用",
+	title_zh: "检测到不安全的随机数使用",
+	message: "检测到不安全的随机数使用",
+}
