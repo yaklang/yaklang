@@ -225,7 +225,6 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("安全成熟度评估")
 	registerBuildInForge("security_awareness_training")
 	registerBuildInForge("XDR告警研判")
-	registerBuildInForge("TrustOne安全运营")
 	registerBuildInForge("TDA威胁研判")
 	registerBuildInForge("主机安全研判")
 	registerBuildInForge("资产测绘")
