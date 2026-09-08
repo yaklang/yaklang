@@ -2,7 +2,7 @@ desc(
 	title: "Detect OXM Unmarshaller On Untrusted XML Source"
 	title_zh: "检测OXM Unmarshaller处理不可信XML源"
 	type: audit
-	risk: "XXE"
+	risk: "xxe"
 	desc: <<<DESC
 ### 规则说明
 当代码把运行时生成的 XML `Source` 直接交给 OXM `Unmarshaller.unmarshal(...)` 处理，而上游来源可以是外部字符串、文件、输入流或通用 `SourceFactory` 转换时，如果底层 XML 解析器未禁用外部实体或 DTD，就可能触发 XXE。
@@ -37,7 +37,7 @@ alert $risk for {
 	title_zh: "检测OXM Unmarshaller处理不可信XML源",
 	level: "middle",
 	message: "发现运行时 XML Source 直接进入 OXM Unmarshaller.unmarshal(...)，需复核底层解析器是否存在 XXE 风险。",
-	risk: "XXE",
+	risk: "xxe",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

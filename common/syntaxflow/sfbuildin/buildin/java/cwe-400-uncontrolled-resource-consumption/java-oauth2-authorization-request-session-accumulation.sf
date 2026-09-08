@@ -2,7 +2,7 @@ desc(
 	title: "Audit OAuth2 Authorization Request Session Accumulation"
 	title_zh: "审计OAuth2授权请求会话累积"
 	type: audit
-	risk: "拒绝服务"
+	risk: "denial-of-service"
 	desc: <<<DESC
 ### 规则说明
 当 `saveAuthorizationRequest(...)` 在同一会话里把 `authorizationRequests.put(...)` 的结果整张写回 `HttpSession` 或 `WebSession` attribute 时，攻击者可以通过大量 state 参数让会话中累积多个授权请求对象，造成会话膨胀和拒绝服务。
@@ -25,7 +25,7 @@ alert $risk for {
 	title_zh: "审计OAuth2授权请求会话累积",
 	level: "middle",
 	message: "发现 OAuth2 授权请求按 state 持续累积到 session 中，需复核是否存在会话膨胀和拒绝服务风险。",
-	risk: "拒绝服务",
+	risk: "denial-of-service",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

@@ -2,7 +2,7 @@ desc(
 	title: "Detect Resource createRelative Path Traversal Risk"
 	title_zh: "检测Resource createRelative 路径穿越风险"
 	type: vuln
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 当代码把动态相对路径直接传给 `Resource.createRelative(...)` 这类资源解析入口时，如果没有先做 canonical containment、标准化或白名单校验，就可能导致路径穿越或越界资源访问。
@@ -30,7 +30,7 @@ alert $risk for {
 	title_zh: "检测Resource createRelative 路径穿越风险",
 	level: "high",
 	message: "发现动态相对路径直接进入 Resource.createRelative(...)，可能导致路径穿越或越界资源访问。",
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "risk",
 	desc: <<<DESC
 ### 漏洞描述

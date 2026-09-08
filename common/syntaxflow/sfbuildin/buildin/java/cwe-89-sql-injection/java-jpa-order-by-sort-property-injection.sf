@@ -2,7 +2,7 @@ desc(
 	title: "Detect JPA Dynamic ORDER BY Sort Property Injection"
 	title_zh: "检测JPA动态ORDER BY排序属性注入"
 	type: vuln
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测 JPA / JPQL 查询构造中，将 `Sort.Order.getProperty()` 返回值直接拼入 `ORDER BY` 子句的代码模式。
@@ -40,7 +40,7 @@ alert $risk for {
 	title_zh: "检测JPA动态ORDER BY排序属性注入",
 	level: "middle",
 	message: "发现排序属性直接参与 JPA / JPQL ORDER BY 子句拼接，且当前函数内未看到显式的排序表达式校验。",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

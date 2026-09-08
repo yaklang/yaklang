@@ -2,7 +2,7 @@ desc(
 	title: "Detect Expression-Driven Array Construction Without Size Limit"
 	title_zh: "检测表达式驱动的数组构造缺少大小限制"
 	type: audit
-	risk: "拒绝服务"
+	risk: "denial-of-service"
 	desc: <<<DESC
 ### 规则说明
 当表达式引擎或脚本解释器把运行时表达式结果转换为数组维度，再直接交给 `Array.newInstance(...)` 构造数组，而没有在同一逻辑路径上做元素总量限制时，攻击者可能借此触发超大数组分配，导致拒绝服务。
@@ -46,7 +46,7 @@ alert $risk for {
 	title_zh: "检测表达式驱动的数组构造缺少大小限制",
 	level: "middle",
 	message: "发现表达式计算出的数组维度直接进入 Array.newInstance(...)，且同一函数内缺少元素数量上限检查，可能导致拒绝服务。",
-	risk: "拒绝服务",
+	risk: "denial-of-service",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

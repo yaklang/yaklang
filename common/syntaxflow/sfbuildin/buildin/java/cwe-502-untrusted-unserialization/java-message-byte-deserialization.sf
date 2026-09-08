@@ -2,7 +2,7 @@ desc(
 	title: "Detect Message/Header Byte Deserialization"
 	title_zh: "检测消息体或头部字节驱动的反序列化"
 	type: vuln
-	risk: "反序列化漏洞"
+	risk: "deserialization"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测框架或中间件内部，将消息体或消息头字节直接送入 Java 原生反序列化入口的代码模式，包括：
@@ -46,7 +46,7 @@ alert $risk for {
 	title_zh: "检测消息体或头部字节驱动的反序列化",
 	level: "high",
 	message: "发现消息体或头部字节直接进入 Java 原生/框架反序列化入口，需复核是否可能恢复不可信对象。",
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

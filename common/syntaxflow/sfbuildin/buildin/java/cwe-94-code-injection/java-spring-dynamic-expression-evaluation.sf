@@ -2,7 +2,7 @@ desc(
 	title: "Detect Dynamic Spring Expression Evaluation"
 	title_zh: "检测Java动态Spring表达式求值"
 	type: vuln
-	risk: "表达式注入"
+	risk: "spel-injection"
 	desc: <<<DESC
 ### 漏洞描述
 当代码将动态字符串传入 Spring Expression 相关的解析或求值入口时，如果该字符串可以被外部输入影响，就可能造成 SpEL 注入、JSON Patch SpEL 路径注入，或表达式滥用导致的拒绝服务。
@@ -38,7 +38,7 @@ alert $risk for {
 	title_zh: "检测Java动态Spring表达式求值",
 	level: "high",
 	message: "发现动态字符串进入 Spring 表达式解析或求值入口，可能导致表达式注入或表达式滥用。",
-	risk: "表达式注入",
+	risk: "spel-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 漏洞描述

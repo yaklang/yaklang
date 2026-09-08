@@ -2,7 +2,7 @@ desc(
 	title: "Detect SAML Response Validation Without Signature Consistency Check"
 	title_zh: "检测SAML响应校验缺少签名一致性检查"
 	type: audit
-	risk: "签名校验绕过"
+	risk: "weak-integrity"
 	desc: <<<DESC
 ### 规则说明
 当 SAML 响应校验逻辑先根据 `hasValidSignature(response)` 得出 `responseSigned`，随后把 `!responseSigned` 作为 assertion 校验开关传递，但没有显式检查“响应已签名或每个 assertion 都已签名”的一致性约束时，攻击者可能借助 assertion wrapping / 混签场景绕过预期校验。
@@ -26,7 +26,7 @@ alert $risk for {
 	title_zh: "检测SAML响应校验缺少签名一致性检查",
 	level: "high",
 	message: "发现 SAML 响应校验把 response 签名状态直接下传给 assertion 校验，但未看到整体签名一致性检查，需复核是否存在 wrapping / 混签绕过。",
-	risk: "签名校验绕过",
+	risk: "weak-integrity",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

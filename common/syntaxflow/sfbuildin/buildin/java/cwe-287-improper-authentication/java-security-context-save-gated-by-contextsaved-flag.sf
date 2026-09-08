@@ -2,7 +2,7 @@ desc(
 	title: "Audit SecurityContext Save Gated By Saved-Flag Check"
 	title_zh: "审计被已保存标志门控的SecurityContext持久化"
 	type: audit
-	risk: "认证状态持久化"
+	risk: "improper-authentication"
 	desc: <<<DESC
 ### 规则说明
 当安全上下文持久化逻辑在调用 `saveContext(...)` 之前，先依据 `isContextSaved()` 之类的一次性标志跳过保存时，后续请求内发生的认证上下文切换可能无法再次写回会话或响应包装器，造成认证状态与预期不一致。
@@ -38,7 +38,7 @@ alert $risk for {
 	title_zh: "审计被已保存标志门控的SecurityContext持久化",
 	level: "middle",
 	message: "发现 SecurityContext 保存逻辑先受 isContextSaved() 等标志门控，需复核后续上下文更新是否会被错误跳过。",
-	risk: "认证状态持久化",
+	risk: "improper-authentication",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

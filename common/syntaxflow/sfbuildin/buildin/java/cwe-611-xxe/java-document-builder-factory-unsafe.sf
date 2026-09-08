@@ -2,7 +2,7 @@ desc(
 	title: "Detect DocumentBuilderFactory Parsing Without XXE Hardening"
 	title_zh: "检测DocumentBuilderFactory解析缺少XXE加固"
 	type: audit
-	risk: "XXE"
+	risk: "xxe"
 	desc: <<<DESC
 ### 规则说明
 当代码通过 `DocumentBuilderFactory.newInstance()` 或 `DocumentBuilderFactoryUtils.newInstance()` 创建 XML 解析工厂，并直接进入 `newDocumentBuilder().parse(...)`，但未显式设置 `setFeature(...)`、`setXIncludeAware(...)`、`setExpandEntityReferences(...)` 等安全选项时，可能触发 XXE。
@@ -26,7 +26,7 @@ alert $risk for {
 	title_zh: "检测DocumentBuilderFactory解析缺少XXE加固",
 	level: "high",
 	message: "发现 DocumentBuilderFactory 直接进入 parse(...) 且未看到 XXE 安全特性设置，需复核是否存在外部实体注入。",
-	risk: "XXE",
+	risk: "xxe",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

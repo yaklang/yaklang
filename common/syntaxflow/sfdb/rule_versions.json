@@ -974,8 +974,8 @@
   {
     "rule_id": "0d552b29-dc8b-4f92-86f9-22badc7b5a87",
     "rule_name": "检测 Java Spring Framework ModelAndView SSTI 漏洞",
-    "hash": "0888da342e6c6dc107ded669a7109fa68ba728d28b2c65b5aa840b8c03331497",
-    "version": "20260901.0002"
+    "hash": "9973c3e1896477b20771f9f3db6d4674207f663c1eabd7339ae048c2f6e54918",
+    "version": "20260908.0001"
   },
   {
     "rule_id": "0257563a-689d-4f55-9aa7-6ffcbb4df95f",
@@ -1406,8 +1406,8 @@
   {
     "rule_id": "cad09b46-5b0f-4c43-9b43-2b786b9c625f",
     "rule_name": "检测Java SpringBoot RestController XSS漏洞",
-    "hash": "247941bedbb9ed44b5dba6c4484cf22a3f6ac0e2a733fd400f9fbcbacfe2d8f8",
-    "version": "20260901.0002"
+    "hash": "75e2b851c50f0dc695c43622a5029f24af7367299d01db1d3b80f7103fe2ca6d",
+    "version": "20260908.0001"
   },
   {
     "rule_id": "c44e3929-2379-46d2-ad00-b30fece5e2e1",
@@ -4282,5 +4282,251 @@
     "rule_name": "检测到 Hugging Face 组织 API 令牌",
     "hash": "0a4766b21fc1b7f09a2550eb4b5e05a1ae3432d7ef7c13a141825f4e3b2ba324",
     "version": "20260908.0001"
+  },
+  {
+    "rule_id": "08cc1b52-dff8-467e-8bf9-e8d9e15afc7b",
+    "rule_name": "审计被已保存标志门控的SecurityContext持久化",
+    "hash": "0d02e6ed2430c53966b6ba38772d5cee0dac7673fb0f2a9bd028ad39ebbd50cb",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "146e6ef8-0530-4b48-9339-79cfb1f26db8",
+    "rule_name": "检测OXM Unmarshaller处理不可信XML源",
+    "hash": "d10d4f15fd3b9f42b2899c16ff4374b5806b4d2e6d72197658cb1835f94e566a",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "15f96b0f-1b8a-414b-b550-3e307f0d664c",
+    "rule_name": "审计URL组件校验逻辑",
+    "hash": "c843d4da784e4be7724ab8eaea7c43b38b6d42d570a647fd6df8f4238d67d78f",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "1b8d59c1-8f3f-4f76-8d81-2d310d8d0687",
+    "rule_name": "检测Redis过滤值缺少查询转义",
+    "hash": "28fc06d7bcd625a663c9ab65ade4dc8af4855fb863d45c54ce51789f8d666b9f",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "2886eb15-a1fa-4ece-8412-baf86f1fa1c5",
+    "rule_name": "审计WebFlux路径模式授权匹配",
+    "hash": "27bcfe10084c0ac99be4aa722e529fff56a186ae170750c946bafca8f6a7e0c5",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "30bb70aa-8f37-4fff-a979-db2a84bf63af",
+    "rule_name": "检测JPA LIKE参数未转义",
+    "hash": "3b78bbc2333cc4ce89166196d5b136b13661e39f35fb94d6ddf488b6d6f3e179",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "3a4639ca-bf48-4e16-a6a3-8ca3d0d1c4cf",
+    "rule_name": "检测Java框架级不可信反序列化模式",
+    "hash": "11c08e97b1b3e50ba9b0cfdd2511249619b13a48cb2fa025755be46bcad4f3c9",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "3cf3b820-f0bf-45b1-b9b6-8b68f221583a",
+    "rule_name": "检测JPA LIKE通配符未转义",
+    "hash": "c12bee8ac45ac2c65247e44b32c81d3354a704434ab97c5ef6d2b7f503925d7f",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "45f0d5c0-9b90-46b2-a8e8-82a5f4f7ce67",
+    "rule_name": "检测Java动态属性路径表达式访问",
+    "hash": "715fb1bacc98c7bf64b0f10ddee6b9a658552e4e78595a4caeb33e59c34b2b95",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "4bd297fe-ad94-4402-8f51-9463da15fa8e",
+    "rule_name": "审计隐式请求匹配器选择",
+    "hash": "2af35ac1a410eb7ac35acba41c4c07efd10ef70204a44245b4cc9e4a32094d17",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "4d93f643-b0f4-4f5b-af0d-7c63b3276cf1",
+    "rule_name": "检测MariaDB过滤字符串缺少SQL转义",
+    "hash": "3b3b3bed56553f996c92e1431b9cb8c12ee20d8fe23a7b2cab1e04bd30870587",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "50cbfa3b-3026-4adc-8b9e-782623a7ff3e",
+    "rule_name": "审计CloudFoundry基础路径匹配缺少兜底覆盖",
+    "hash": "8f832935d6933d62d29a9132cded76f556012ca6abe3e8a3069a734cc4b92689",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "53917c3a-c468-4090-ac9d-dcf87a706769",
+    "rule_name": "检测JPA动态ORDER BY排序属性注入",
+    "hash": "a327fff0bcaa87b20e74b563dfaac5ad5c3f748eb656938f927b8a7aabcaab19",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "5866ab9f-d92f-43a3-af8c-9b775514f0f1",
+    "rule_name": "检测SAML响应校验缺少签名一致性检查",
+    "hash": "930464a01786da696077cc9549d272c02a9019a558103133677becd09025fef4",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "5ce72e50-ef75-4b0e-b8c8-33e0c8a6b37b",
+    "rule_name": "检测表达式驱动的数组构造缺少大小限制",
+    "hash": "9af75ac82ba1d89dda29dfc2d31edb920f267c2ccb23c439f408e0c71d101c63",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "62d1968f-9eb2-41c7-8667-07c8c9a0d463",
+    "rule_name": "审计Actuator附加路径匹配器的通配覆盖",
+    "hash": "c49cebb41a27553af7f9e3f4b4d8b760cc2937d08a67d741f65cb4aa573380dd",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "6bc446f2-dced-4313-99af-b01ce5a69b4d",
+    "rule_name": "审计Spring全局Handler路径前缀注册",
+    "hash": "e04e42ca84e2bfa6da4c9dc1e2eb3ff3ff8b7516292543a05174598529180a7d",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "6bca328e-c75a-432d-8f60-620703f35ff8",
+    "rule_name": "检测登出处理器缺少空安全上下文持久化",
+    "hash": "bc07a56e53d2005b85b7e0941c79f411346031f85c6b28fb96b9f2c70a0d6e19",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "6dd00128-9f6c-4a3c-8282-bb6d322ef4ba",
+    "rule_name": "审计HTTP请求正则授权匹配",
+    "hash": "572e2d4d4778caada49005e64e04ad9dae2c0adac94ddb8ae127d10d552da13c",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "73a06af4-c6f9-4ff8-b06c-8213491f53d8",
+    "rule_name": "检测Neo4j过滤键缺少标识符净化",
+    "hash": "85c41fb2c5affa1011893252d52df916a67dd9ce06a2bf348474c4284d0aa153",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "7904f9b7-5e8f-4283-bd88-79047c501a62",
+    "rule_name": "检测敏感HTTP头令牌输出",
+    "hash": "6985a5e0843c189303a2e3db5c9c8f567d438877ea75abefe7b05f1328aacf01",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "7bd3a9c4-a457-4d91-8830-8fb357ab7bde",
+    "rule_name": "检测DocumentBuilderFactory解析缺少XXE加固",
+    "hash": "5c615266798d09a9436b8d319338948e5cf29305a8ae3940ed19308a0fc59d54",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "8758b64f-f88d-4cd7-a422-3d679deba1d5",
+    "rule_name": "检测过滤表达式被转换为SpEL执行",
+    "hash": "3121c8c5ccb061621455d9f829ed3d50484efe6214a05f2782d890385d6231d1",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "89e33fbc-aa95-420f-ac82-e75d31f9ed70",
+    "rule_name": "检测SpEL解析缺少表达式长度限制",
+    "hash": "ff4e45347e11d4d52e1b8d72d9a6d22db23813f11af2c4a281d9c2a249072326",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "8ee44f15-e05f-4b54-9cf1-5a9a4cdc7c0a",
+    "rule_name": "审计XMLBeam投影器不安全XML输入",
+    "hash": "c7eb594720a078a864df363257204c31266ae55d031ea7fd4adfed7236d3da6c",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "9bd8356a-bdf5-4a74-b0d8-a22a7e5199b9",
+    "rule_name": "检测递归属性路径解析缺少深度限制",
+    "hash": "6c05fa6e4cb713c2c18df35b56390c777660657feb5e6df2c35f3929019c662d",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "a1f3416c-99c6-4975-a97a-d92ea90ca0e6",
+    "rule_name": "检测空反序列化白名单直接放行",
+    "hash": "18f7aa12d58081429794ee14bc278a142793cc96a573a5ad0c58a2f8e5cf1003",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "a4a0c7a9-2cbb-4e57-8ea2-78d2e7845f41",
+    "rule_name": "检测Java动态Spring表达式求值",
+    "hash": "8179e28a583c220a9455d2b9327957256e468bc2832dc46b09dd09e2c3644cb9",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "a83071d3-8a3d-4dd0-bfc6-d579e8ef8e6e",
+    "rule_name": "审计授权过滤器Dispatcher覆盖",
+    "hash": "12fd7e8c555abd2eb59741fba552bb85db9ea98d3e5a1d9458d05432399dbaf6",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "ac6641cb-a2fd-4600-90ab-53e445b16ff3",
+    "rule_name": "审计OAuth2授权范围回退逻辑",
+    "hash": "2a7879277880ce447cdba638e02c473451200ff169ec612d3e5935aae788b4a4",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "b56b0813-632d-4ad8-a37b-8431c8c74e14",
+    "rule_name": "检测远程媒体抓取缺少严格URL校验",
+    "hash": "a0fa1316df4e3389ecaca750c4f04ee78f0909fabf4f1c66e84b43496361927d",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "b7e4eec4-4db5-4c12-b9db-6c1b3f2cb4e7",
+    "rule_name": "检测过滤器转换器直接序列化原始字符串",
+    "hash": "52383f1bfad391f4345d7c95b6184e3e2b6fec21caf71555647fca6b3cc72e4a",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "bd9fec9f-5713-4177-a8d8-f2fcf7d1a77c",
+    "rule_name": "审计OAuth2授权请求会话累积",
+    "hash": "9f9beb251500b2fe3d21557e8a47ebc2d7de38c467396d2b03674d27dd92a977",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "bfed985c-f5af-4bf5-a7bf-4fdbf87dbb8c",
+    "rule_name": "审计Native Header派生的Spring表达式解析",
+    "hash": "4f5315e16d0d2902c5614ec70a23b9937b00a7bc4bd168ac9b3fedf9bfdf9da2",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "cd3b9d73-cc6d-47ca-80ab-6d7e411665e4",
+    "rule_name": "审计危险Bean元属性暴露",
+    "hash": "e85e7241be47a9aa6112bc12a82743169bafc659620d10bcf9fef95423413153",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "cec2f27b-d32d-45c2-8253-fe4883be49da",
+    "rule_name": "审计Spring PATCH只读字段暴露",
+    "hash": "e4812b33d63a20775ea0a774c7f85c5d35ef74147a4bf97b64f319d0370e0a9f",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "cf774af7-94cb-449d-8eb2-ac8c4d4af0d5",
+    "rule_name": "检测Jar安全信息加载缺少条目内容匹配",
+    "hash": "1f4a7363ed66bcd18c89bf66d14d222dd5a28fb8713212981a4e7650f4330147",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "cffc1335-4175-4588-b241-bafbd33f90a7",
+    "rule_name": "审计空认证信任判定",
+    "hash": "2aa24e10f17452760d7164cba9b8ea352446fbfd4bee87db4b21ea9bc2c448d1",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "d22f58cf-4761-4b7e-b55e-6227c09a6890",
+    "rule_name": "检测消息体或头部字节驱动的反序列化",
+    "hash": "69bd71642a1ce2a92dbd6332671b5d1707cafde7b96ee65a74e9d43445b34f52",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "e9fefdf9-3f88-4f3d-b3a6-68d6abedf144",
+    "rule_name": "审计基于正则的ETag头解析",
+    "hash": "de703b943eeef8253ce7a16573930d4e42266accc3f5203c02b599c73f442c90",
+    "version": "20260908.0002"
+  },
+  {
+    "rule_id": "f07e45c5-a252-4caa-8b9b-33cf1b45f11c",
+    "rule_name": "检测Resource createRelative 路径穿越风险",
+    "hash": "6965e4b6c096a7bc39b8dc0994547ffd854fff5efd64fdfe2e6f50d0035820ad",
+    "version": "20260908.0002"
   }
 ]

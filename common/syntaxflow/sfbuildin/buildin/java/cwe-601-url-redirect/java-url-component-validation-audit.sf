@@ -2,7 +2,7 @@ desc(
 	title: "Audit URL Component Validation Logic"
 	title_zh: "审计URL组件校验逻辑"
 	type: audit
-	risk: "URL信任决策"
+	risk: "open-redirect"
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计 URL 解析或信任判断中，对单个组件进行合法性校验的实现路径。
@@ -30,7 +30,7 @@ alert $componentArg for {
 	title_zh: "审计URL组件校验逻辑",
 	level: "middle",
 	message: "发现 URL 组件逐段校验逻辑，若后续基于解析结果做信任判断，需复核是否存在 authority 混淆绕过。",
-	risk: "URL信任决策",
+	risk: "open-redirect",
 	name: "componentArg",
 	desc: <<<DESC
 ### 规则说明

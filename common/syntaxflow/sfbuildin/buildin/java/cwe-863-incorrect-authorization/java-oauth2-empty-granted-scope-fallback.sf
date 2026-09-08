@@ -2,7 +2,7 @@ desc(
 	title: "Audit OAuth2 Granted Scope Fallback"
 	title_zh: "审计OAuth2授权范围回退逻辑"
 	type: audit
-	risk: "授权范围授予"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计 OAuth2 访问令牌处理中，将“服务端实际授予范围为空”回退为“客户端请求范围”的逻辑。
@@ -36,7 +36,7 @@ alert $scopeFallback for {
 	title_zh: "审计OAuth2授权范围回退逻辑",
 	level: "middle",
 	message: "发现 token response scope 为空时回退到请求范围的逻辑，需复核是否可能导致错误授权或权限提升。",
-	risk: "授权范围授予",
+	risk: "authorization-bypass",
 	name: "scopeFallback",
 	desc: <<<DESC
 ### 规则说明

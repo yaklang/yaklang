@@ -2,7 +2,7 @@ desc(
 	title: "Detect JPA LIKE Wildcard Without Escape"
 	title_zh: "检测JPA LIKE通配符未转义"
 	type: vuln
-	risk: "查询语义越界"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测 JPA Query-by-Example 或类似查询构造逻辑中，直接把用户值拼进 `LIKE` 模式串而不做 wildcard 转义的实现。
@@ -43,7 +43,7 @@ alert $risk for {
 	title_zh: "检测JPA LIKE通配符未转义",
 	level: "middle",
 	message: "发现 JPA LIKE 模式串直接拼接 wildcard 与用户值，且当前函数内未看到显式的 escape 调用。",
-	risk: "查询语义越界",
+	risk: "sql-injection",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

@@ -2,7 +2,7 @@ desc(
 	title: "Detect Redis Filter Value Without Query Escaping"
 	title_zh: "检测Redis过滤值缺少查询转义"
 	type: audit
-	risk: "查询注入"
+	risk: "input-validation"
 	desc: <<<DESC
 ### 规则说明
 当过滤表达式转换器把 TAG / TEXT 类型的运行时值直接拼进 RediSearch 查询子句，而没有做 TAG 特殊字符转义或 `escapeQuery(...)` 处理时，攻击者可以借助分隔符和控制字符注入额外查询条件。
@@ -26,7 +26,7 @@ alert $risk for {
 	title_zh: "检测Redis过滤值缺少查询转义",
 	level: "middle",
 	message: "发现 Redis 过滤值直接拼入查询语法且未做 TAG / TEXT escape，需复核是否存在 RediSearch 注入。",
-	risk: "查询注入",
+	risk: "input-validation",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

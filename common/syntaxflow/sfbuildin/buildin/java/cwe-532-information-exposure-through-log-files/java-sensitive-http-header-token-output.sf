@@ -2,7 +2,7 @@ desc(
 	title: "Detect Sensitive HTTP Header Token Output"
 	title_zh: "检测敏感HTTP头令牌输出"
 	type: vuln
-	risk: "敏感认证信息泄露"
+	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 本规则检测从敏感 HTTP 头部读取的认证或会话标识，被直接输出到标准输出或控制台的代码模式。
@@ -39,7 +39,7 @@ alert $risk for {
 	title_zh: "检测敏感HTTP头令牌输出",
 	level: "middle",
 	message: "发现敏感 HTTP 头部值被直接输出到 stdout 或控制台，需复核是否泄露了会话标识、访问令牌或认证凭据。",
-	risk: "敏感认证信息泄露",
+	risk: "information-exposure",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

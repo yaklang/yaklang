@@ -2,7 +2,7 @@ desc(
 	title: "Detect Jar Security Info Loading Without Entry Content Match"
 	title_zh: "检测Jar安全信息加载缺少条目内容匹配"
 	type: audit
-	risk: "签名校验绕过"
+	risk: "weak-integrity"
 	desc: <<<DESC
 ### 规则说明
 当 Jar 安全信息加载逻辑通过 `JarInputStream` 遍历条目后直接读取证书 / 签名人，并把结果关联到同名条目，但没有校验流中读到的实际内容与目标条目内容、压缩方式和目录属性是否一致时，可能导致签名信息被错误映射到其他条目。
@@ -25,7 +25,7 @@ alert $risk for {
 	title_zh: "检测Jar安全信息加载缺少条目内容匹配",
 	level: "high",
 	message: "发现 Jar 安全信息加载把 signer / certificate 直接关联到同名条目，但未校验条目内容一致性，需复核是否存在签名映射绕过。",
-	risk: "签名校验绕过",
+	risk: "weak-integrity",
 	name: "risk",
 	desc: <<<DESC
 ### 规则说明

@@ -2,7 +2,7 @@ desc(
 	title: "Audit Implicit Request Matcher Selection"
 	title_zh: "审计隐式请求匹配器选择"
 	type: audit
-	risk: "请求匹配器语义"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计基于字符串路径模式、再由框架在运行时隐式选择具体请求匹配器实现的授权配置逻辑。
@@ -32,7 +32,7 @@ alert $mvcPatterns for {
 	title_zh: "审计隐式请求匹配器选择",
 	level: "middle",
 	message: "发现字符串模式授权配置会在不同 RequestMatcher 实现间隐式切换，需复核 matcher 语义是否与预期一致。",
-	risk: "请求匹配器语义",
+	risk: "authorization-bypass",
 	name: "mvcPatterns",
 	desc: <<<DESC
 ### 规则说明
