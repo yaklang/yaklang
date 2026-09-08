@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 std::env::args_os 使用 相关的风险模式，属于 敏感信息泄露 类问题。
+检测到 std::env::args_os 使用。进程参数可能包含敏感配置或路径信息，直接暴露会扩大攻击面。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+避免依赖进程参数传递敏感数据，限制参数信息的输出与记录范围。
 SOLUTION
 	alert_min: 1
 	"file://pos.rs": <<<POS

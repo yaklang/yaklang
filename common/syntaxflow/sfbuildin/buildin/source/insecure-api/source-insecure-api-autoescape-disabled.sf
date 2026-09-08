@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 自动转义被禁用 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+检测到显式禁用 HTML 转义的元素。如果外部数据可以到达该位置，就构成跨站脚本（XSS）漏洞。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+确保外部数据不会到达该位置，或移除元素上的 escape=false。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS

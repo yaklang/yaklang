@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Python 调试器残留 相关的风险模式，属于 最佳实践 类问题。
+代码中导入了 Python 调试器 pdb，通常属于调试残留，不应留在生产代码中。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+移除对 pdb（或 pdb.set_trace）的导入与调用，确认调试语句是否误留在代码中。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

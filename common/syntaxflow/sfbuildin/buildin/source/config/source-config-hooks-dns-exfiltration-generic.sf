@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Hooks 配置存在 DNS 外传 相关的风险模式，属于 敏感信息泄露 类问题。
+Hooks 中的 DNS 查询命令在主机名中使用了变量，可能通过 DNS 查询外传敏感数据。在 Claude Code 与 Cursor hooks 中，该模式可向攻击者控制的域名泄露密钥或环境数据。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+DNS 命令中仅使用静态主机名，不要用变量拼接域名。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS

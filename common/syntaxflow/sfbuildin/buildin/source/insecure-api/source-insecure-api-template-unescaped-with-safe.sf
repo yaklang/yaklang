@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 模板使用 safe 未转义 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+Flask 模板中检测到使用 | safe 过滤器显式关闭自动转义的片段，该片段可渲染原始 HTML。若渲染用户数据则构成 XSS 漏洞。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+确保该位置不渲染用户数据，移除 | safe 或先用 mark_safe 安全处理。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS

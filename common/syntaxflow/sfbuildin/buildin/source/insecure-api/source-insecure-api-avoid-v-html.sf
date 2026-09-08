@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 使用 v-html 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+在页面上动态渲染任意 HTML 非常危险，容易导致 XSS 漏洞。只对可信内容使用 HTML 插值，绝不对用户提供的内容使用。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+移除对用户内容的 v-html 渲染，改用安全的插值或文本渲染方式。
 SOLUTION
 	alert_min: 1
 	"file://pos.vue": <<<POS

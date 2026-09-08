@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 绝对 URL 相关的风险模式，属于 最佳实践 类问题。
+Salesforce 页面使用绝对 URL 容易出错：不同沙箱与生产环境的实例名不同（如 na10、na15），使用绝对 URL 的代码只能在对应实例运行，部署到其他实例会失效。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+指向 Salesforce 页面时只使用相对 URL，即去掉域名与子域名部分。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 使用 escapeXml 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+检测到 JSP 表达式语言片段未转义输出。表达式中的数据若可被外部控制，则构成 XSS 漏洞。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+使用 JSTL 标签库的 escapeXml 函数转义输出。
 SOLUTION
 	alert_min: 1
 	"file://pos.jsp": <<<POS

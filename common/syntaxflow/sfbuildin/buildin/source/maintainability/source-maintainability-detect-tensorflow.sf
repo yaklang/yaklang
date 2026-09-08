@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 TensorFlow 使用 相关的风险模式，属于 代码规范与兼容性 类问题。
+代码中可能使用了 TensorFlow 相关工具。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+确认该使用是否符合团队规范与安全策略，按需替换或保留。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

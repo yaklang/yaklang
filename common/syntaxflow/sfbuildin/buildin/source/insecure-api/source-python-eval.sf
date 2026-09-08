@@ -9,7 +9,7 @@ desc(
 	risk: "code-injection"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Python eval 调用 相关的风险模式，属于 代码注入 类问题。
+检测到 Python eval 调用。若执行外部可控内容，可导致任意代码执行。
 
 ### 风险类型
 代码注入（code-injection）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-避免动态执行不可信代码，使用安全的解析和求值方式。
+避免使用 eval/exec 执行外部输入，改用安全的解析与求值方案。
 SOLUTION
 	alert_min: 1
 	"file://dyn.py": <<<POS

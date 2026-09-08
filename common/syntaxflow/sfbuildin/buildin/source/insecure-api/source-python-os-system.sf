@@ -9,7 +9,7 @@ desc(
 	risk: "command-injection"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Python os.system 调用 相关的风险模式，属于 命令注入 类问题。
+检测到 Python os.system 调用。命令通过 shell 执行，参数注入可能导致命令执行。
 
 ### 风险类型
 命令注入（command-injection）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-避免拼接命令，使用参数化 API，并对输入进行白名单校验。
+改用 subprocess.run 列表参数方式，避免使用 shell。
 SOLUTION
 	alert_min: 1
 	"file://sh.py": <<<POS

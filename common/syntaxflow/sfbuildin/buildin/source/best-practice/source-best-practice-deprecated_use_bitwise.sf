@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 已废弃的 use Bitwise 用法 相关的风险模式，属于 最佳实践 类问题。
+`use Bitwise` 语法已废弃，应改用 `import Bitwise`。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+将 `use Bitwise` 替换为 `import Bitwise`。
 SOLUTION
 	alert_min: 1
 	"file://pos.ex": <<<POS

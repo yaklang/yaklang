@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 script 标签中的变量 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+模板中检测到在 script 标签中使用模板变量。HTML 转义不能完全防止 JavaScript 上下文中的 XSS 攻击。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+将数据放到 script 标签外的 HTML 区域，或使用 JavaScript 专用编码器（如 OWASP ESAPI）；Django 可使用 json_script 标签。
 SOLUTION
 	alert_min: 1
 	"file://pos.pug": <<<POS

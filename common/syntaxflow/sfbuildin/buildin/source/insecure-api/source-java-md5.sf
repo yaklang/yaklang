@@ -9,7 +9,7 @@ desc(
 	risk: "weak-cryptography"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Java MD5 消息摘要 相关的风险模式，属于 弱加密算法 类问题。
+检测到 Java 代码中使用 MD5 MessageDigest。MD5 不抗碰撞，不适合安全场景。
 
 ### 风险类型
 弱加密算法（weak-cryptography）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用经过验证的安全算法和模式，如 AES-GCM。
+改用 SHA-256 等安全哈希算法，口令场景使用 BCrypt/Argon2。
 SOLUTION
 	alert_min: 1
 	"file://Hash.java": <<<POS

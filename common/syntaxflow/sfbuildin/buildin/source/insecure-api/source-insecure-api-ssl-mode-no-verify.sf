@@ -9,7 +9,7 @@ desc(
 	risk: "certificate-validation"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 SSL 校验被关闭 相关的风险模式，属于 证书校验缺失 类问题。
+检测到接受未验证连接的 SSL 配置，连接易受中间人攻击。
 
 ### 风险类型
 证书校验缺失（certificate-validation）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
+使用 OpenSSL::SSL::VERIFY_PEER 校验对端证书。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

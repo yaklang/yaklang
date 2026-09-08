@@ -9,7 +9,7 @@ desc(
 	risk: "weak-randomness"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不安全的伪随机数生成 相关的风险模式，属于 弱随机数 类问题。
+检测到 crypto.pseudoRandomBytes 的使用，该函数不能产生安全的随机数。
 
 ### 风险类型
 弱随机数（weak-randomness）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用密码学安全的随机数生成器。
+改用 crypto.randomBytes 生成安全随机数。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

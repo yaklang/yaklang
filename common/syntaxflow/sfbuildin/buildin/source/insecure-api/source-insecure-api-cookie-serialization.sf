@@ -9,7 +9,7 @@ desc(
 	risk: "deserialization"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不安全的 Cookie 序列化 相关的风险模式，属于 不安全反序列化 类问题。
+检测到使用 Marshal 反序列化 Cookie 的代码。如果攻击者能构造合法 Cookie，可能导致远程代码执行。
 
 ### 风险类型
 不安全反序列化（deserialization）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-避免反序列化不可信输入，使用安全的数据格式，并校验数据来源与类型。
+改用 JSON 等安全格式序列化 Cookie，禁止反序列化不可信输入。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "denial-of-service"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Hooks 配置缺少停止活动检查 相关的风险模式，属于 拒绝服务 类问题。
+Stop hook 输出了 block 决策，但未先检查 stop_hook_active。若 stop_hook_active 为 true 时应立即以 0 退出，否则 hook 会阻断自身的停止尝试，造成无限循环。
 
 ### 风险类型
 拒绝服务（denial-of-service）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制资源使用，增加超时和限流，并处理异常输入。
+在输出 block 前先检查 stop_hook_active，若为 true 则直接以退出码 0 结束。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS

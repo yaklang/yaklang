@@ -9,7 +9,7 @@ desc(
 	risk: "certificate-validation"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Go TLS 跳过证书校验 相关的风险模式，属于 证书校验缺失 类问题。
+Go 代码中设置了 TLS InsecureSkipVerify，跳过服务器证书校验，连接易受中间人攻击，可能泄露请求数据或被重定向到恶意服务器。
 
 ### 风险类型
 证书校验缺失（certificate-validation）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
+移除 InsecureSkipVerify 配置，使用标准证书链校验，必要时配合 knownhosts 或固定证书指纹。
 SOLUTION
 	alert_min: 1
 	"file://client.go": <<<POS

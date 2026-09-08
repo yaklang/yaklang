@@ -9,7 +9,7 @@ desc(
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Poetry 缺少求解器最低发布时限 相关的风险模式，属于 安全配置不当 类问题。
+poetry.toml 未通过 solver.min-release-age 设置依赖冷却期。没有冷却期时，Poetry 可能解析到社区尚未充分验证的新发布版本，供应链攻击常利用这一点发布恶意版本。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
+在 [solver] 下设置 min-release-age = 7，要求依赖版本至少发布 7 天才参与解析。
 SOLUTION
 	alert_min: 1
 	"file://pos/poetry.toml": <<<POS

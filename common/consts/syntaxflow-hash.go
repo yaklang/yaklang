@@ -5,4 +5,4 @@ package consts
 // ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
 // This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
 // The hash is automatically calculated from the SyntaxFlow rule files during compilation.
-const ExistedSyntaxFlowEmbedFSHash string = "19778b4e719e73c0aecbdc40604a3b266205d5f801aa3dcf04b7be70a1f414e1"
+const ExistedSyntaxFlowEmbedFSHash string = "256c91052da69e1c03e161cba1bea0c3eb9cd447f60c7b0125e39ae9370df797"

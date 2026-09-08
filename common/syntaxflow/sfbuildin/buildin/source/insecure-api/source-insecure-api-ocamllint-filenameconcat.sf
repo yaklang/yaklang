@@ -9,7 +9,7 @@ desc(
 	risk: "path-traversal"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 OCaml Filename.concat 使用 相关的风险模式，属于 路径遍历 类问题。
+将攻击者可控的数据传入 Filename.concat 可能造成目录遍历攻击。
 
 ### 风险类型
 路径遍历（path-traversal）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-规范化路径并校验其位于允许目录内，避免直接拼接用户输入。
+对文件名做规范化与白名单校验，禁止路径穿越序列（如 ../）。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

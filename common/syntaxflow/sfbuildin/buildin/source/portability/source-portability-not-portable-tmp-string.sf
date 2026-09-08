@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不可移植的 /tmp 路径 相关的风险模式，属于 代码规范与兼容性 类问题。
+直接使用临时路径字符串不够可移植，应使用 OCaml 标准库的 Filename.get_temp_dirname()。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+改用 Filename.get_temp_dirname() 获取系统临时目录。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

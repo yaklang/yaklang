@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 href 属性中的变量 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+模板中检测到在 a 标签 href 属性中使用变量。攻击者可输入 javascript: URI，构成 XSS 攻击。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+使用框架安全函数生成 URL（如 Flask 的 url_for、Django 的 url 过滤器），或对链接做 URL 编码预处理。
 SOLUTION
 	alert_min: 1
 	"file://pos.ejs": <<<POS

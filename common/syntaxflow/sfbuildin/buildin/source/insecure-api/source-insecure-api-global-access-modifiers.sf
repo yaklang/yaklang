@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 全局访问修饰符 相关的风险模式，属于 最佳实践 类问题。
+全局类、方法与变量应避免使用（尤其在托管包中），因为全局成员一旦发布就无法删除或修改签名。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+尽量避免使用 global 修饰，确认成员确实需要全局可见。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

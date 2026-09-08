@@ -9,7 +9,7 @@ desc(
 	risk: "insecure-tls"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 弱 SSL/TLS 版本 相关的风险模式，属于 不安全的 TLS 配置 类问题。
+检测到不安全的 SSL/TLS 版本。TLS 1.0、1.1 及所有 SSL 版本均被视为弱加密并已废弃。
 
 ### 风险类型
 不安全的 TLS 配置（insecure-tls）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-启用 TLS 1.2+，强制 HTTPS，并关闭不安全的协议版本。
+使用 ssl.PROTOCOL_TLSv1_2 或更高版本。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

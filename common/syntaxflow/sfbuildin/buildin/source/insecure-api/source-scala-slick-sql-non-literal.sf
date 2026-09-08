@@ -9,7 +9,7 @@ desc(
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Scala Slick SQL 非字面量拼接 相关的风险模式，属于 SQL 注入 类问题。
+检测到 SQL 语句中使用格式化字符串。若 SQL 语句中的变量未正确过滤，可导致 SQL 注入。
 
 ### 风险类型
 SQL 注入（sql-injection）
@@ -25,7 +25,7 @@ SQL 注入（sql-injection）
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用参数化查询或 ORM，禁止拼接 SQL。
+避免使用 #$variable 插值，改用 sql"..." 中的 $variable 参数化写法。
 SOLUTION
 	alert_min: 1
 	"file://pos.scala": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 命令中未加引号的变量展开 相关的风险模式，属于 不安全的 Shell 展开 类问题。
+变量展开必须加双引号，防止按 IFS 指定的空白或分隔符拆分成多个参数。
 
 ### 风险类型
 不安全的 Shell 展开（unsafe-shell-expansion）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对变量和命令替换使用双引号，避免依赖 IFS 进行隐式拆分。
+用双引号包裹变量展开；确实需要拆分时使用下划线前缀变量或显式数组。
 SOLUTION
 	alert_min: 1
 	"file://pos.bash": <<<POS

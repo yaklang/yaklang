@@ -9,7 +9,7 @@ desc(
 	risk: "encoded-payload-execution"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Skill 文档包含 Base64 载荷 相关的风险模式，属于 编码载荷执行 类问题。
+SKILL.md 或 AGENT.md 指示智能体解码并执行 base64（或 hex）编码的载荷，这是一种常见的编码规避手法，用于绕过人工审查向智能体植入恶意指令。
 
 ### 风险类型
 编码载荷执行（encoded-payload-execution）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输入进行严格校验和规范化，避免将不可信内容直接交给执行引擎。
+以纯文本说明内容或移除编码载荷；重新引入前先审计解码后的值。
 SOLUTION
 	alert_min: 1
 	"file://posSKILL.md": <<<POS

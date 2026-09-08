@@ -9,7 +9,7 @@ desc(
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Claude 设置绕过权限检查 相关的风险模式，属于 安全配置不当 类问题。
+检测到 Claude Code 或 Cursor 设置中的危险权限绕过配置，例如 bypassPermissions、allowUnsandboxedCommands: true 或 enableWeakerNestedSandbox: true，这些配置会关闭保护恶意工具调用的关键安全控制。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
+移除这些设置或将其设为 false，保持沙箱隔离与权限检查有效。
 SOLUTION
 	alert_min: 1
 	"file://pos/settings.json": <<<POS

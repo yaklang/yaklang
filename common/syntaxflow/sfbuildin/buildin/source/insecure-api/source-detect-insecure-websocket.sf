@@ -9,7 +9,7 @@ desc(
 	risk: "cleartext-transmission"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不安全的 WebSocket 连接 相关的风险模式，属于 明文传输 类问题。
+检测到不安全的 WebSocket 连接。所有 WebSocket 连接都应使用 wss:// 加密协议。
 
 ### 风险类型
 明文传输（cleartext-transmission）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用 HTTPS/TLS 传输，并确保所有敏感请求都走加密通道。
+将 WebSocket 地址从 ws:// 改为 wss://，确保所有连接走 TLS 加密。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

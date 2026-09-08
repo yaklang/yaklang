@@ -9,7 +9,7 @@ desc(
 	risk: "access-control"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Apex 类未显式声明共享级别 相关的风险模式，属于 访问控制缺陷 类问题。
+每个 Apex 类都应显式声明共享模式。使用 with sharing 或 without sharing 指定是否执行共享规则；使用 inherited sharing 使类沿用调用类的共享模式。
 
 ### 风险类型
 访问控制缺陷（access-control）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按最小权限原则配置访问控制，并验证所有请求的授权状态。
+为 Apex 类显式声明 with sharing、without sharing 或 inherited sharing。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

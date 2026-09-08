@@ -9,7 +9,7 @@ desc(
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 命令中未加引号的命令替换 相关的风险模式，属于 不安全的 Shell 展开 类问题。
+命令替换 $(...) 或反引号的结果在未加引号时，会按 IFS 指定的空白或分隔符拆分，可能导致命令参数被意外拆分。
 
 ### 风险类型
 不安全的 Shell 展开（unsafe-shell-expansion）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对变量和命令替换使用双引号，避免依赖 IFS 进行隐式拆分。
+用双引号包裹命令替换，防止结果被拆分。
 SOLUTION
 	alert_min: 1
 	"file://pos.bash": <<<POS

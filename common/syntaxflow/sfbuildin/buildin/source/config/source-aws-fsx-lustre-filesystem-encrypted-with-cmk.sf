@@ -9,7 +9,7 @@ desc(
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 AWS FSx Lustre 文件系统未使用 KMS CMK 加密 相关的风险模式，属于 安全配置不当 类问题。
+FSx Lustre 文件系统应使用 KMS CMK 进行静态加密。CMK 可以让你控制加密密钥的访问与轮换。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
+为 FSx Lustre 文件系统启用使用 KMS CMK 的静态加密，并配置密钥访问控制与自动轮换。
 SOLUTION
 	alert_min: 1
 	"file://pos.tf": <<<POS
