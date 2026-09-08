@@ -242,8 +242,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "449328d76c6f5f23e16c6206bf3a798d79c499baf640a63283997bc5b52749de",
-    "version": "20260901.0002"
+    "hash": "dc8aaffad18b63418b013d30472207dd50335650b86aafe0c1784e2bcad25085",
+    "version": "20260908.0001"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
@@ -422,8 +422,8 @@
   {
     "rule_id": "e4420d8f-b1f9-4c46-8de7-f4998091d973",
     "rule_name": "检测Golang文件上传漏洞",
-    "hash": "ccb78a693fd0490a0b598f581fe6a22b8fd4ad388a78082c5104b7c8a30521b8",
-    "version": "20260901.0002"
+    "hash": "c675f3f77729e1c8c137398d1a4d78c0268a66fd9c64a60e0bb29ef36fe88761",
+    "version": "20260908.0001"
   },
   {
     "rule_id": "f34ff7d8-9bbd-4b35-8de2-4178289ce41f",
@@ -692,8 +692,8 @@
   {
     "rule_id": "4ba61a38-efec-4cf2-9d38-f77352e05185",
     "rule_name": "审计Golang os包使用",
-    "hash": "9dbe56c0dddf51cd7541530de6214c0e03645e2ad6afb545252a77e26228b5b7",
-    "version": "20260901.0002"
+    "hash": "06ae3c8a2a1e67475f4b8c0a9af9cf7343a9e4f929d7a35d84da7bab185d08af",
+    "version": "20260908.0001"
   },
   {
     "rule_id": "ed507ba1-538b-7c40-98b3-f82e7ba8af9c",
@@ -4528,5 +4528,23 @@
     "rule_name": "检测Resource createRelative 路径穿越风险",
     "hash": "6965e4b6c096a7bc39b8dc0994547ffd854fff5efd64fdfe2e6f50d0035820ad",
     "version": "20260908.0002"
+  },
+  {
+    "rule_id": "2ed31e6b-e189-47c9-9907-477b7b6257d1",
+    "rule_name": "检测Golang Beego ORM动态过滤查询风险",
+    "hash": "07c816074c445186f297142eaa1aa9602ed529ce86ac5be72f161eb52c109f13",
+    "version": "20260908.0001"
+  },
+  {
+    "rule_id": "89ad5372-f73b-47a7-81fe-0fd80a57532a",
+    "rule_name": "检测Goldmark属性或标题渲染中的XSS风险",
+    "hash": "e465cb889d96560235c18c95e717827811760da752dc2bde781a5eb32282fd84",
+    "version": "20260908.0001"
+  },
+  {
+    "rule_id": "db4c6369-d6df-4f14-946f-6275f7c53f5f",
+    "rule_name": "检测Golang外部参数参与的文件路径拼接",
+    "hash": "a9035d1c03afc70267a3e580c2edb073d0ae16f1e39be466f72daa23850e0f32",
+    "version": "20260908.0001"
   }
 ]

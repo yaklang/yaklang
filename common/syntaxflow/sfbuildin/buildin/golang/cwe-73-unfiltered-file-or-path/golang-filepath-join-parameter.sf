@@ -48,3 +48,49 @@ DESC
 对拼接后的最终路径做 `filepath.Clean` 并验证其仍位于安全基目录内；若只需要文件名，应先使用 `filepath.Base` 或等价约束。
 SOLUTION
 }
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://path_join_positive.go': <<<PARAM
+package demo
+
+import (
+	"os"
+	"path/filepath"
+)
+
+func DeleteFile(path string, filename string) error {
+	backupFilePath := filepath.Join(path, filename)
+	if _, err := os.Stat(backupFilePath); err != nil {
+		return err
+	}
+	return os.Remove(backupFilePath)
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://path_join_negative.go': <<<PARAM
+package demo
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func DeleteFile(baseDir string, filename string) error {
+	cleanPath := filepath.Clean(filepath.Join(baseDir, filename))
+	if !strings.HasPrefix(cleanPath, baseDir) {
+		return errors.New("invalid path")
+	}
+	if _, err := os.Stat(cleanPath); err != nil {
+		return err
+	}
+	return os.Remove(cleanPath)
+}
+PARAM
+)

@@ -44,3 +44,52 @@ DESC
 将写入 HTML 属性或标签上下文的动态值先交给 `util.EscapeHTML`、`html.EscapeString` 或等价安全 API，再进入 writer。
 SOLUTION
 }
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://goldmark_xss_positive.go': <<<PARAM
+package demo
+
+import (
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
+)
+
+type hookedRenderer struct {
+	html.Config
+}
+
+func (r *hookedRenderer) renderLinkDefault(w util.BufWriter, node ast.Node) {
+	n := node.(*ast.Link)
+	if n.Title != nil {
+		r.Writer.Write(w, n.Title)
+	}
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://goldmark_xss_negative.go': <<<PARAM
+package demo
+
+import (
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
+)
+
+type hookedRenderer struct {
+	html.Config
+}
+
+func (r *hookedRenderer) renderLinkDefault(w util.BufWriter, node ast.Node) {
+	n := node.(*ast.Link)
+	if n.Title != nil {
+		r.Writer.Write(w, util.EscapeHTML(n.Title))
+	}
+}
+PARAM
+)
