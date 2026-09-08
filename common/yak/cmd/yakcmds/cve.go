@@ -91,6 +91,7 @@ var CVEUtilCommands = []*cli.Command{
 			cli.StringFlag{Name: "description-db"},
 			cli.IntFlag{Name: "year"},
 			cli.BoolFlag{Name: "no-gzip"},
+			cli.BoolFlag{Name: "v5-skip", Usage: "skip CVE 5.0 Record download and merge"},
 		},
 		Action: func(c *cli.Context) error {
 			cvePath := filepath.Join(consts.GetDefaultYakitBaseTempDir(), "cve")
@@ -229,16 +230,20 @@ var CVEUtilCommands = []*cli.Command{
 			cvequeryops.LoadCVE(cvePath, outputFile, years...)
 
 			// 下载并合并 CVE 5.0 Record 数据（补充 title/affected/solution）
-			v5Dir := filepath.Join(cvePath, "cvelistV5")
-			log.Info("start to download CVE 5.0 Record data")
-			if err := cvequeryops.DownloadCVEV5(cvePath); err != nil {
-				log.Warnf("download CVE 5.0 failed: %v", err)
-			} else {
-				log.Info("start to load CVE 5.0 Record data")
-				v5Manager := cveresources.GetManager(outputFile)
-				if err := cvequeryops.LoadCVEV5FromDir(v5Dir, v5Manager); err != nil {
-					log.Warnf("load CVE 5.0 failed: %v", err)
+			if !c.Bool("v5-skip") {
+				v5Dir := filepath.Join(cvePath, "cvelistV5")
+				log.Info("start to download CVE 5.0 Record data")
+				if err := cvequeryops.DownloadCVEV5(cvePath); err != nil {
+					log.Warnf("download CVE 5.0 failed: %v", err)
+				} else {
+					log.Info("start to load CVE 5.0 Record data")
+					v5Manager := cveresources.GetManager(outputFile)
+					if err := cvequeryops.LoadCVEV5FromDir(v5Dir, v5Manager, years...); err != nil {
+						log.Warnf("load CVE 5.0 failed: %v", err)
+					}
 				}
+			} else {
+				log.Info("skipping CVE 5.0 Record download (--v5-skip)")
 			}
 
 			return gzipHandler()

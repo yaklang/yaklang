@@ -141,28 +141,51 @@ func DownloadCVEV5Delta() ([]*cveresources.CVERecordV5, error) {
 // LoadCVEV5FromDir 从解压后的 cvelistV5 目录加载所有 CVE 5.0 Records 并合并到数据库
 // 目录结构: cves/YYYY/NNxxx/CVE-YYYY-NNNNN.json
 // 使用批量处理模式：先收集所有文件路径，然后并发解析+批量写入
-func LoadCVEV5FromDir(dir string, manager *cveresources.SqliteManager) error {
+func LoadCVEV5FromDir(dir string, manager *cveresources.SqliteManager, years ...int) error {
 	cvesDir := filepath.Join(dir, "cves")
 	if utils.GetFirstExistedPath(cvesDir) == "" {
 		cvesDir = dir
 	}
 
 	// 第一阶段：快速扫描所有 JSON 文件路径
+	// 如果指定了 years，只遍历对应年份的子目录（如 cves/2025/）
 	log.Infof("start to scan CVE V5 files in: %s", cvesDir)
 	startTime := time.Now()
 	var filePaths []string
-	err := filepath.Walk(cvesDir, func(filePath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+
+	if len(years) > 0 {
+		// 按年份过滤：只遍历 cves/{year}/ 目录
+		for _, year := range years {
+			yearDir := filepath.Join(cvesDir, fmt.Sprintf("%d", year))
+			if utils.GetFirstExistedPath(yearDir) == "" {
+				log.Warnf("year directory not found: %s", yearDir)
+				continue
+			}
+			filepath.Walk(yearDir, func(filePath string, info os.FileInfo, err error) error {
+				if err != nil {
+					return nil
+				}
+				if info.IsDir() || !strings.HasSuffix(filePath, ".json") {
+					return nil
+				}
+				filePaths = append(filePaths, filePath)
+				return nil
+			})
 		}
-		if info.IsDir() || !strings.HasSuffix(filePath, ".json") {
+	} else {
+		err := filepath.Walk(cvesDir, func(filePath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() || !strings.HasSuffix(filePath, ".json") {
+				return nil
+			}
+			filePaths = append(filePaths, filePath)
 			return nil
+		})
+		if err != nil {
+			return utils.Errorf("walk cves dir failed: %v", err)
 		}
-		filePaths = append(filePaths, filePath)
-		return nil
-	})
-	if err != nil {
-		return utils.Errorf("walk cves dir failed: %v", err)
 	}
 	log.Infof("found %d CVE V5 files in %v", len(filePaths), time.Since(startTime))
 
@@ -250,7 +273,7 @@ func LoadCVEV5FromDir(dir string, manager *cveresources.SqliteManager) error {
 	wg.Wait()
 	close(resultChan)
 
-	err = <-done
+	err := <-done
 	log.Infof("total loaded %d CVE V5 records in %v", processedCount, time.Since(startTime))
 	return err
 }
