@@ -9,15 +9,14 @@
 #
 # 用法:
 #   YAK="$(bash scripts/prepare-yak.sh --out /tmp/yak)"
-#   YAK="$(bash scripts/prepare-yak.sh --out /tmp/yak --no-build \
-#         --require "embed-fs-hash --output-file" --require "syntaxflow-format --rule-version-output")"
+#   YAK="$(bash scripts/prepare-yak.sh --out /tmp/yak \
+#         --require "verify-builtin-risk --dir")"
 #
 # 选项:
 #   --out PATH          yak 输出路径（默认 $RUNNER_TEMP/yak 或 /tmp/yak）
 #   --require "CMD FLAG" 必须支持的参数探测；可重复。默认探测:
 #                          embed-fs-hash --output-file
 #                          syntaxflow-format --rule-version-output
-#   --no-build          下载的二进制不满足要求时直接失败，不编译
 #   --quiet             只输出版本/路径到 stdout，日志走 stderr
 #
 # 成功时只输出最终的 yak 路径到 stdout，方便 CI 直接捕获:
@@ -26,7 +25,6 @@
 set -euo pipefail
 
 OUTPUT="${YAK_OUTPUT:-}"
-NO_BUILD=0
 QUIET=0
 REQUIRES=()
 
@@ -45,10 +43,6 @@ while [[ $# -gt 0 ]]; do
     --require)
       REQUIRES+=("$2")
       shift 2
-      ;;
-    --no-build)
-      NO_BUILD=1
-      shift
       ;;
     --quiet)
       QUIET=1
@@ -131,12 +125,7 @@ if [ -n "$VERSION" ]; then
   log "published yak $VERSION missing required flags or failed verification"
 fi
 
-# 4. 下载不可用时的处理
-if [ "$NO_BUILD" = "1" ]; then
-  echo "prepare-yak.sh: no published yak satisfies required flags and --no-build is set" >&2
-  exit 1
-fi
-
+# 4. 下载不可用（缺参数/下载失败）时，从当前 checkout 编译
 log "building yak from current checkout"
 go build -o "$OUTPUT" ./common/yak/cmd/yak.go
 if ! "$OUTPUT" version >/dev/null 2>&1; then
