@@ -482,8 +482,9 @@ func sanitizeFolderName(name string, maxLen int) string {
 
 // ensureWorkDirectory lazily creates the artifact working directory with a semantic name.
 // This is called at the start of processReActTask, after user input is available.
-// It uses LiteForge to generate a meaningful folder name, falling back to a generic name.
-// It also generates the session title in the same LiteForge call to save overhead.
+// Synchronous enrichment may use LiteForge for the folder name and session title.
+// Otherwise create a stable generic directory immediately; ensureSessionTitle
+// generates the display title asynchronously without delaying the first answer.
 func (r *ReAct) ensureWorkDirectory(userInput string) {
 	cfg := r.config
 	if cfg == nil {
@@ -524,9 +525,9 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 		}
 	}
 
-	// try LiteForge to generate both folder_name and session_title
-	// use a tight timeout to avoid blocking the main flow
-	if trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.GetOriginalAICallback() != nil {
+	// Naming is optional enrichment too. The default first-response path must
+	// not spend a provider round trip here before it can enter the main loop.
+	if cfg.GetConfigBool("AllowSyncInitContext") && trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.GetOriginalAICallback() != nil {
 		func() {
 			defer func() {
 				if err := recover(); err != nil {

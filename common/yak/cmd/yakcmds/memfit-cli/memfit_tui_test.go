@@ -314,6 +314,39 @@ func TestMemfitFooterSegmentsAdaptToTerminalWidth(t *testing.T) {
 	require.Equal(t, "YOLO", right)
 }
 
+func TestMemfitBackgroundMemoryDoesNotReplaceForegroundProgress(t *testing.T) {
+	ui := &memfitTUI{width: 90, height: 24, busy: true, activity: "Thinking"}
+	require.True(t, ui.recordProcessEvent("request", memfitWorkerEvent{
+		Type: string(schema.EVENT_TYPE_STRUCTURED), NodeID: "status",
+		Content: `{"key":"re-act-loop","code":"reasoning.understanding","state":"running","value":"正在理解你的需求","value_i18n":{"zh":"正在理解你的需求","en":"Understanding your request"}}`,
+	}))
+	require.Equal(t, "Understanding your request", ui.processItems[0].detail)
+	require.True(t, ui.recordProcessEvent("memory-start", memfitWorkerEvent{
+		Type: string(schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY), Content: `{"query":"hello"}`,
+	}))
+	require.Equal(t, "Thinking", ui.activity)
+	require.Equal(t, memfitProcessRunning, ui.processItems[0].state)
+	require.Equal(t, memfitProcessInfo, ui.processItems[1].state)
+	require.Equal(t, "process:reasoning", ui.currentProcessKey())
+	require.Contains(t, joinMemfitLiveLines(ui.processPanelLines()), "Searching in background")
+
+	require.True(t, ui.recordProcessEvent("memory-finished", memfitWorkerEvent{
+		Type: string(schema.EVENT_TYPE_STRUCTURED), NodeID: "stream-finished", IsSystem: true,
+		Content: `{"node_id":"fast-memory-fetch","event_writer_id":"memory-stream"}`,
+	}))
+	require.Equal(t, "Thinking", ui.activity)
+	require.Equal(t, memfitProcessRunning, ui.processItems[0].state)
+	require.Equal(t, memfitProcessDone, ui.processItems[1].state)
+	require.NotContains(t, joinMemfitLiveLines(ui.processPanelLines()), "Searching")
+
+	// A deliberate memory search is still foreground work, independent of recall.
+	require.True(t, ui.recordProcessEvent("specific", memfitWorkerEvent{
+		Type: string(schema.EVENT_TYPE_MEMORY_SEARCH_SPECIFIC), Content: `{}`,
+	}))
+	require.Equal(t, "Searching memory", ui.activity)
+	require.Equal(t, memfitProcessRunning, ui.processItems[2].state)
+}
+
 func TestMemfitStructuredTimelineKeepsSemanticsAndDropsBreadcrumbs(t *testing.T) {
 	kind, group, detail, state, ok := classifyMemfitTimelineItem(`{
 		"type":"text",

@@ -111,8 +111,6 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 		EnableForgeSearchTool: true,
 		OnEvent:               func(aicommon.AIEngineOperator, *schema.AiOutputEvent) {},
 		OnStream:              func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
-		OnStreamEnd:           func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string) {},
-		OnStreamEndWithTotal:  func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
 		OnData:                func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
 		OnFinished:            func(aicommon.AIEngineOperator) {},
 		OnInputRequiredRaw:    func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string) string { return "" },
