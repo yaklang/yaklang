@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -118,14 +119,72 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 		return false, err
 	}
 
-	// 处理CVE 2.0格式
+	// 批量处理：解析所有 CVE（ToCVE 传 nil 跳过逐条 DB 写入），然后用事务批量入库
+	batchCVEs := make([]*cveresources.CVE, 0, len(cveFileV2.Vulnerabilities))
+	productSet := make(map[string]struct{})
+	var batchProducts []cveresources.ProductsTable
+
 	for _, vuln := range cveFileV2.Vulnerabilities {
-		manager.SaveCVEVulnerability(&vuln)
+		c, err := vuln.ToCVE(nil) // 传 nil：跳过 extractVendorProduct 中的逐条 db.Save
+		if err != nil {
+			continue
+		}
+		if c == nil {
+			continue
+		}
+		batchCVEs = append(batchCVEs, c)
+
+		// 收集 ProductsTable（去重）
+		for _, vendor := range cveresources.Set(strings.Split(c.Vendor, ",")) {
+			if vendor == "" {
+				continue
+			}
+			for _, product := range cveresources.Set(strings.Split(c.Product, ",")) {
+				if product == "" {
+					continue
+				}
+				key := vendor + "/" + product
+				if _, exists := productSet[key]; !exists {
+					productSet[key] = struct{}{}
+					batchProducts = append(batchProducts, cveresources.ProductsTable{
+						Product: product,
+						Vendor:  vendor,
+					})
+				}
+			}
+		}
 	}
-	log.Infof("成功加载CVE 2.0格式文件: %v, 记录数: %d", fileName, len(cveFileV2.Vulnerabilities))
+	log.Infof("成功解析CVE 2.0格式文件: %v, 记录数: %d", fileName, len(batchCVEs))
+
+	// 批量写入 CVE 主表（每 500 条一个事务）
+	for i := 0; i < len(batchCVEs); i += 500 {
+		endIdx := i + 500
+		if endIdx > len(batchCVEs) {
+			endIdx = len(batchCVEs)
+		}
+		tx := manager.DB.Begin()
+		for _, c := range batchCVEs[i:endIdx] {
+			if err := tx.Save(c).Error; err != nil {
+				fmt.Printf("save cve %s failed: %s\n", c.CVE, err)
+			}
+		}
+		tx.Commit()
+	}
+
+	// 批量写入 ProductsTable
+	if len(batchProducts) > 0 {
+		for i := 0; i < len(batchProducts); i += 500 {
+			endIdx := i + 500
+			if endIdx > len(batchProducts) {
+				endIdx = len(batchProducts)
+			}
+			manager.DB.CreateInBatches(batchProducts[i:endIdx], 500)
+		}
+	}
 
 	return false, nil
 }
+
 
 // DownLoad 从 NVD 下载 CVE json 数据到本地目录（导出名为 cve.Download）
 // 参数:

@@ -533,10 +533,12 @@ func (v *CVEVulnerability) extractVendorProduct(db *gorm.DB, node CVE2Node) ([]s
 			}
 			if product != "*" && product != "" {
 				products = append(products, product)
-				db.Save(ProductsTable{
-					Product: product,
-					Vendor:  vendor,
-				})
+				if db != nil {
+					db.Save(ProductsTable{
+						Product: product,
+						Vendor:  vendor,
+					})
+				}
 			}
 		}
 	}
