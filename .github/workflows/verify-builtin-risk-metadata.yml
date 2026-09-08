@@ -27,9 +27,8 @@ jobs:
 
       - name: Prepare Yak binary
         run: |
-          # 列表最新发布版必须支持 verify-builtin-risk，否则直接失败（不编译）。
-          YAK_PATH="$(bash ./scripts/prepare-yak.sh --out "$RUNNER_TEMP/yak" --no-build --require 'verify-builtin-risk --dir')"
-          echo "YAK=$YAK_PATH" >> "$GITHUB_ENV"
+          # 优先用列表最新发布版；缺少 verify-builtin-risk 时由脚本从 checkout 编译。
+          echo "YAK=$(bash ./scripts/prepare-yak.sh --out "$RUNNER_TEMP/yak" --require 'verify-builtin-risk --dir')" >> "$GITHUB_ENV"
 
       - name: Validate local rules against the risk taxonomy
         run: |

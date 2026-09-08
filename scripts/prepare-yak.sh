@@ -76,9 +76,10 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 1. 从 active_versions 列表取最新版本（与 diff-code-check 相同的版本源）
+# 1. 从 active_versions 列表取最新发布版本（与 diff-code-check 相同的版本源）。
+#    跳过 dev/ 构建：它们不是发布版，且可能缺少正式版才有的 CLI 参数。
 VERSION=""
-if VERSION=$(bash "$SCRIPT_DIR/get-yak-version.sh" --quiet 2>/dev/null) && [ -n "$VERSION" ]; then
+if VERSION=$(bash "$SCRIPT_DIR/get-yak-version.sh" --quiet --pattern '^[^/]+$' 2>/dev/null) && [ -n "$VERSION" ]; then
   log "newest active version: $VERSION"
 else
   log "failed to resolve newest active version from active_versions list"
