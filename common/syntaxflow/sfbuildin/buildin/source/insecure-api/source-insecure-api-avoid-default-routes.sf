@@ -9,7 +9,7 @@ desc(
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 默认路由配置 相关的风险模式，属于 安全配置不当 类问题。
+路由文件启用了默认路由，控制器上的任意公共方法都可能被作为动作调用，容易意外暴露本来不打算公开的方法。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
+移除默认路由配置，显式列出需要对外暴露的全部路由。
 SOLUTION
 	alert_min: 1
 	"file://routes.rb": <<<POS

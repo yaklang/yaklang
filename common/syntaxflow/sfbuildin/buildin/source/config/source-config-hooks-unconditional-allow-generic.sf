@@ -9,7 +9,7 @@ desc(
 	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Hooks 配置无条件放行 相关的风险模式，属于 授权绕过 类问题。
+Hook 无条件输出 permissionDecision 为 allow 的决策，未做任何条件检查，直接绕过了整个权限系统。
 
 ### 风险类型
 授权绕过（authorization-bypass）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-在服务端统一执行授权校验，并覆盖所有入口。
+增加条件检查，在放行前校验工具或命令的合法性。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS

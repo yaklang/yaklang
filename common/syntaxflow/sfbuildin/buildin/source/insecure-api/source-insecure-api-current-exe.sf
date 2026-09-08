@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 std::env::current_exe 使用 相关的风险模式，属于 敏感信息泄露 类问题。
+检测到 std::env::current_exe 使用。依赖可执行文件路径可能暴露部署信息或带来路径安全问题。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+限制可执行文件路径信息的暴露范围，避免用于权限判断或日志输出。
 SOLUTION
 	alert_min: 1
 	"file://pos.rs": <<<POS

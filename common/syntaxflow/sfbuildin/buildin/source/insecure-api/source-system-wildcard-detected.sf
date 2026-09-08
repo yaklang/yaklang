@@ -9,7 +9,7 @@ desc(
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 系统调用中的通配符注入 相关的风险模式，属于 不安全的 Shell 展开 类问题。
+检测到系统调用中的通配符会进入 shell 展开。若目录中存在特殊文件名（如 -e sh script.sh），rsync 等命令执行时可能产生意料之外的效果。
 
 ### 风险类型
 不安全的 Shell 展开（unsafe-shell-expansion）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对变量和命令替换使用双引号，避免依赖 IFS 进行隐式拆分。
+避免在系统调用中使用未引用的通配符，使用引号包裹参数或将路径显式列出。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

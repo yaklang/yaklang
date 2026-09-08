@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 baseURL 配置为 localhost 相关的风险模式，属于 最佳实践 类问题。
+baseURL 被配置为 localhost，部署后可能导致链接无法访问。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+将 baseURL 配置为实际的部署域名，避免使用 localhost。
 SOLUTION
 	alert_min: 1
 	"file://hugo.toml": <<<POS

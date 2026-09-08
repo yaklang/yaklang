@@ -9,7 +9,7 @@ desc(
 	risk: "xxe"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 未使用 defusedxml 相关的风险模式，属于 XML 外部实体注入（XXE） 类问题。
+Python 官方文档推荐使用 defusedxml 替代 xml：原生 xml 库易受 XML 外部实体（XXE）攻击，可泄露机密数据，XML 炸弹还可造成拒绝服务。
 
 ### 风险类型
 XML 外部实体注入（XXE）（xxe）
@@ -25,7 +25,7 @@ XML 外部实体注入（XXE）（xxe）
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-禁用外部实体和 DTD，使用安全的 XML 解析配置。
+改用 defusedxml 处理 XML，禁用外部实体解析。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

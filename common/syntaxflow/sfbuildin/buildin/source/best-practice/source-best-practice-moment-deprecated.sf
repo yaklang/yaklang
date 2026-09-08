@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 已废弃的 Moment.js 相关的风险模式，属于 最佳实践 类问题。
+Moment.js 已进入维护模式，不再积极开发。建议改用仍在积极维护的日期库，例如 dayjs。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+将 Moment.js 替换为仍在积极维护的日期库，例如 dayjs，并迁移相关日期处理代码。
 SOLUTION
 	alert_min: 1
 	"file://pos.ts": <<<POS

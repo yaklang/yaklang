@@ -9,7 +9,7 @@ desc(
 	risk: "xxe"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不安全的 LibXML 后端 相关的风险模式，属于 XML 外部实体注入（XXE） 类问题。
+应用使用 LibXML 作为 XML 后端，LibXML 可能存在 XML 外部实体（XXE）漏洞。
 
 ### 风险类型
 XML 外部实体注入（XXE）（xxe）
@@ -25,7 +25,7 @@ XML 外部实体注入（XXE）（xxe）
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-禁用外部实体和 DTD，使用安全的 XML 解析配置。
+改用 Rails 内置的 REXML 解析器，或对 XML 解析禁用外部实体。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

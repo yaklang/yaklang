@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 静态文件泄露配置 相关的风险模式，属于 敏感信息泄露 类问题。
+特殊请求可以判断 Rails 应用根目录之外的文件是否存在，存在文件泄露风险。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+设置 config.serve_static_assets = false，禁止静态文件服务越界访问。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

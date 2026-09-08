@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Python 3.6 不兼容的 SSL 用法 相关的风险模式，属于 代码规范与兼容性 类问题。
+该函数仅在 Python 3.6 及以上版本可用，在低版本环境下运行会报错，不兼容旧版本。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+改用低版本 Python 也可用的等价函数，或提升运行环境的 Python 版本到 3.6+。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

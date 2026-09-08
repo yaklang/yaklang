@@ -9,7 +9,7 @@ desc(
 	risk: "unicode-direction-control"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 代码包含双向控制字符 相关的风险模式，属于 Unicode 双向控制字符 类问题。
+代码或源文件中包含 Unicode 双向控制字符，可能被用于隐藏恶意逻辑或伪装代码内容，造成人工审查被绕过。
 
 ### 风险类型
 Unicode 双向控制字符（unicode-direction-control）
@@ -25,7 +25,7 @@ Unicode 双向控制字符（unicode-direction-control）
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-移除隐藏 Unicode 控制字符，并使用可显示隐藏字符的编辑器审查源码。
+移除隐藏的 Unicode 双向控制字符，并使用可显示隐藏字符的编辑器审查源码。
 SOLUTION
 	alert_min: 1
 	"file://pos.sample": <<<POS

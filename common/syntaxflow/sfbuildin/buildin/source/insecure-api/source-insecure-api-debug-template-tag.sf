@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 调试模板标签 相关的风险模式，属于 敏感信息泄露 类问题。
+Django 模板中检测到 debug 模板块，开启调试模式时会把调试信息输出到页面。向用户展示调试信息可能泄露环境细节，被攻击者利用。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+移除模板中的 debug 标签。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS

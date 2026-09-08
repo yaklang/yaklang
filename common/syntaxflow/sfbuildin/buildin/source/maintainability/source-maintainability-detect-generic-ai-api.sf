@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 AI API 调用 相关的风险模式，属于 代码规范与兼容性 类问题。
+代码中可能使用了 AI HTTP API 调用。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+确认该调用是否符合团队规范与安全策略，校验 API 密钥管理与请求内容。
 SOLUTION
 	alert_min: 1
 	"file://pos.txt": <<<POS

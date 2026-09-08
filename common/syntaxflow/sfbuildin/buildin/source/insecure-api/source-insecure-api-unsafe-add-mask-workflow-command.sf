@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不安全的 add-mask 工作流命令 相关的风险模式，属于 敏感信息泄露 类问题。
+GitHub Actions 提供 add-mask 工作流命令来屏蔽日志中的敏感数据。如果不使用 add-mask，或工作流命令被停止，敏感数据会泄露到工作流日志；攻击者可复制工作流并注入 stop-commands 载荷使屏蔽失效。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+对敏感数据使用 add-mask 屏蔽，审计工作流命令处理，避免不受信任分支修改工作流。
 SOLUTION
 	alert_min: 1
 	"file://pos.yml": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Python 3.7 不兼容的 multiprocessing.Process.kill 用法 相关的风险模式，属于 代码规范与兼容性 类问题。
+multiprocessing.Process.kill() 仅在 Python 3.7 及以上版本可用，在低版本中会报错，存在向后兼容问题。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+改用 terminate() 替代 kill()，或提升运行环境的 Python 版本到 3.7+。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

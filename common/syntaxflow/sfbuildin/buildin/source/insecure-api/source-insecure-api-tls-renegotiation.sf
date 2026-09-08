@@ -9,7 +9,7 @@ desc(
 	risk: "insecure-tls"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不安全的 TLS 重协商 相关的风险模式，属于 不安全的 TLS 配置 类问题。
+检测到 Java 应用允许不安全的 TLS 重协商，攻击者可利用中间人攻击向 TLS 连接前缀注入选定明文。
 
 ### 风险类型
 不安全的 TLS 配置（insecure-tls）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-启用 TLS 1.2+，强制 HTTPS，并关闭不安全的协议版本。
+禁用不安全的 TLS 重协商，升级到支持安全重协商的版本。
 SOLUTION
 	alert_min: 1
 	"file://pos.java": <<<POS

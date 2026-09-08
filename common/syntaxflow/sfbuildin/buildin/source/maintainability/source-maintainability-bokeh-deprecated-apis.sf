@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 已废弃的 Bokeh API 相关的风险模式，属于 代码规范与兼容性 类问题。
+代码使用了 Bokeh 中已废弃的 API，后续版本可能移除。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+改用 Bokeh 文档中推荐的新 API，移除废弃调用。
 SOLUTION
 	alert_min: 1
 	"file://pos.py": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "cleartext-transmission"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Apex 明文 HTTP 请求 相关的风险模式，属于 明文传输 类问题。
+检测到向 http:// URL 发起的请求。服务器访问未使用 TLS 加密的网站存在风险。
 
 ### 风险类型
 明文传输（cleartext-transmission）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用 HTTPS/TLS 传输，并确保所有敏感请求都走加密通道。
+只向 https:// URL 发起请求，确保通信链路易加密。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS

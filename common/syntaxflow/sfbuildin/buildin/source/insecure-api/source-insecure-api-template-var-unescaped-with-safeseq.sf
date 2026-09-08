@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 模板变量使用 safeseq 未转义 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+Django 模板中检测到使用 | safeseq 过滤器显式禁用自动转义的变量，该片段可渲染原始 HTML，存在 XSS 风险。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+确需输出时在 Python 代码中使用 mark_safe，并确保不渲染用户数据。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS

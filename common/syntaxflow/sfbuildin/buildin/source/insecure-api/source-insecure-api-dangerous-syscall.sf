@@ -9,7 +9,7 @@ desc(
 	risk: "unsafe-implementation"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 危险的 syscall 调用 相关的风险模式，属于 不安全实现 类问题。
+Ruby 的 syscall 本质上不安全且不可移植，官方推荐使用 Fiddle 库实现更安全、可移植的系统调用。
 
 ### 风险类型
 不安全实现（unsafe-implementation）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用受控的安全 API，并补充必要的边界检查。
+改用 Fiddle 库替代 syscall，或使用经过封装的系统调用 API。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 JSON 实体转义被关闭 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+检测到 JSON 输出的 HTML 转义被全局禁用，可能导致 XSS 漏洞。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+恢复 JSON 输出的 HTML 转义，或在渲染前对内容做上下文相关转义。
 SOLUTION
 	alert_min: 1
 	"file://pos.rb": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Hooks 配置访问敏感文件 相关的风险模式，属于 敏感信息泄露 类问题。
+Hook 输入经 jq 处理后直接流入文件操作，未检查是否访问敏感文件。Claude Code 与 Cursor hooks 收到的 JSON 输入可能引用 ~/.ssh/*、~/.aws/credentials、.env 等敏感文件。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+使用 realpath 与校验逻辑过滤或阻断对敏感路径的访问，再做文件操作。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS

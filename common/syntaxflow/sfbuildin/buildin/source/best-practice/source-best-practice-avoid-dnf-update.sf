@@ -9,7 +9,7 @@ desc(
 	risk: "best-practice"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Dockerfile 中使用 dnf update 相关的风险模式，属于 最佳实践 类问题。
+基础镜像中的软件包应保持最新，通常无需在构建时执行 dnf update。如果基础镜像中的软件包已过期，应联系基础镜像维护者更新镜像。
 
 ### 风险类型
 最佳实践（best-practice）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按官方推荐方式改写，并补充必要的安全配置。
+移除 Dockerfile 中的 dnf update 指令，改为使用已更新软件包的基础镜像；如软件包过期，联系基础镜像维护者。
 SOLUTION
 	alert_min: 1
 	"file://Dockerfile": <<<POS

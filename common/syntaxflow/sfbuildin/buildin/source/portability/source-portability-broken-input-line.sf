@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 不兼容的 input_line 读取 相关的风险模式，属于 代码规范与兼容性 类问题。
+OCaml input_line 从 Windows 文本文件读取行时会留下 （CR）字符，在类 Unix 平台或 Windows 二进制模式下读取 CRLF 文件会有问题。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+读取后去除行尾 ；若代码已处理，可添加 nosemgrep 注释禁用该告警。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

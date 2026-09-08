@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 模板自动转义关闭 相关的风险模式，属于 跨站脚本（XSS） 类问题。
+模板中检测到使用 {% autoescape off %} 显式关闭自动转义的代码块，该块可渲染原始 HTML，易导致 XSS。
 
 ### 风险类型
 跨站脚本（XSS）（xss）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对输出进行上下文相关的转义，使用安全的模板 API，并启用 CSP 等防护。
+开启自动转义；确需输出时优先在 Python 代码中使用 mark_safe。
 SOLUTION
 	alert_min: 1
 	"file://pos.html": <<<POS

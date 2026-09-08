@@ -9,7 +9,7 @@ desc(
 	risk: "code-style"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 未使用二进制模式写入 相关的风险模式，属于 代码规范与兼容性 类问题。
+OCaml open_out 在 Windows 与类 Unix 平台上对行尾处理不同。为保持一致行为，应使用 open_out_bin 或 open_out_gen [Open_binary]。
 
 ### 风险类型
 代码规范与兼容性（code-style）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用推荐 API 或兼容写法，并按照项目规范统一代码风格。
+改用 open_out_bin 或 open_out_gen [Open_binary]；确实需要 LF 到 CRLF 转换时使用 open_out_gen [Open_text]。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

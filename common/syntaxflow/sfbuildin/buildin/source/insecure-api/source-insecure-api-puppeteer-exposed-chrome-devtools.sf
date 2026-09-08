@@ -9,7 +9,7 @@ desc(
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Puppeteer 暴露 Chrome 远程调试端口 相关的风险模式，属于 安全配置不当 类问题。
+远程调试协议不执行任何认证，过度暴露调试端口存在安全风险，可能被任意来源访问。
 
 ### 风险类型
 安全配置不当（security-misconfiguration）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-按最小权限原则收紧配置，显式启用安全选项，并定期审计配置项。
+不要暴露远程调试端口，或仅绑定本机回环地址并限制访问来源。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

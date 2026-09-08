@@ -9,7 +9,7 @@ desc(
 	risk: "certificate-validation"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 绕过 TLS 证书校验 相关的风险模式，属于 证书校验缺失 类问题。
+检测到将 NODE_TLS_REJECT_UNAUTHORIZED 设为 0 或设置 rejectUnauthorized 为 false，这会关闭 TLS 证书校验，导致传输易受中间人攻击，仅可用于调试。
 
 ### 风险类型
 证书校验缺失（certificate-validation）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-启用并严格校验证书链、主机名和有效期，禁止在生产环境关闭校验。
+移除关闭 TLS 校验的环境变量或选项，确保校验信任证书列表。
 SOLUTION
 	alert_min: 1
 	"file://pos.js": <<<POS

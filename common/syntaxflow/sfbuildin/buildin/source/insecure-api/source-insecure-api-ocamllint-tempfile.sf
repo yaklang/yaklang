@@ -9,7 +9,7 @@ desc(
 	risk: "symlink-toctou"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 OCaml 临时文件使用 相关的风险模式，属于 符号链接 TOCTOU 类问题。
+Filename.temp_file 生成临时文件后到打开前存在竞态窗口，文件可能被替换为符号链接。
 
 ### 风险类型
 符号链接 TOCTOU（symlink-toctou）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用安全的临时文件 API，避免基于路径的检查后使用。
+使用带 O_EXCL 的安全临时文件创建方式，并校验文件所有权。
 SOLUTION
 	alert_min: 1
 	"file://pos.ml": <<<POS

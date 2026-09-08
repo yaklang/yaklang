@@ -9,7 +9,7 @@ desc(
 	risk: "prompt-injection"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Skill 文档存在提示注入 相关的风险模式，属于 提示词注入 类问题。
+SKILL.md 或 AGENT.md 的 frontmatter 描述中包含提示注入标记，可能覆盖智能体行为。例如技能描述中的忽略之前的指令、system: you are 或 <IMPORTANT> 会被加载该技能的智能体作为权威指令执行，绕过用户意图。
 
 ### 风险类型
 提示词注入（prompt-injection）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-对用户输入与系统指令进行隔离，并限制敏感操作权限。
+从描述中移除覆盖指令，将权威系统文本移出共享技能清单。
 SOLUTION
 	alert_min: 1
 	"file://posSKILL.md": <<<POS

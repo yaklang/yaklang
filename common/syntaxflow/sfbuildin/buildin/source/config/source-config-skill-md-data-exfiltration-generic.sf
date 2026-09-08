@@ -9,7 +9,7 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Skill 文档存在数据外传 相关的风险模式，属于 敏感信息泄露 类问题。
+SKILL.md 或 AGENT.md 内容指示智能体向攻击者控制的端点外传数据，例如将结果发送到 http://...、POST 凭据到 ... 或在请求中包含文件内容。加载该技能的智能体会把这些指令视为权威指令。
 
 ### 风险类型
 敏感信息泄露（information-exposure）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-限制敏感信息的输出范围，关闭不必要的调试接口，并对暴露内容进行脱敏。
+移除外传指令，并审计该技能文件的来源与内容。
 SOLUTION
 	alert_min: 1
 	"file://posSKILL.md": <<<POS

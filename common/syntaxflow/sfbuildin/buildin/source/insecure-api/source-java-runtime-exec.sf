@@ -9,7 +9,7 @@ desc(
 	risk: "command-injection"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 Java Runtime.exec 调用 相关的风险模式，属于 命令注入 类问题。
+检测到 Java Runtime.exec 调用。若参数包含外部可控内容，可导致命令注入。
 
 ### 风险类型
 命令注入（command-injection）
@@ -22,7 +22,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-避免拼接命令，使用参数化 API，并对输入进行白名单校验。
+避免将用户输入拼接到命令中，使用参数化方式调用进程或白名单校验。
 SOLUTION
 	alert_min: 1
 	"file://Run.java": <<<POS

@@ -9,7 +9,7 @@ desc(
 	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 规则说明
-该规则用于检测 DML 原生语句 相关的风险模式，属于 授权绕过 类问题。
+原生 Salesforce DML 操作在系统上下文中执行，会忽略当前用户的权限、字段级安全、组织级默认值、角色层级位置与共享规则。
 
 ### 风险类型
 授权绕过（authorization-bypass）
@@ -25,7 +25,7 @@ desc(
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-在服务端统一执行授权校验，并覆盖所有入口。
+使用带共享控制的 DML 操作（如 with sharing 上下文），或明确评估数据权限影响。
 SOLUTION
 	alert_min: 1
 	"file://pos.cls": <<<POS
