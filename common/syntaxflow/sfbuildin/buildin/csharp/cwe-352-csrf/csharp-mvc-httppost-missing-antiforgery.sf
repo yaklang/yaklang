@@ -1,0 +1,56 @@
+desc(
+	mode: source
+	title: "Check C#/.NET MVC HttpPost Missing AntiForgery Token"
+	title_zh: "检测 C#/.NET MVC HttpPost 缺少防伪令牌"
+	type: audit
+	level: mid
+	language: csharp
+	risk: "csrf"
+	desc: <<<DESC
+ASP.NET MVC / Core 的 HttpPost、HttpPut、HttpDelete、HttpPatch 动作若未使用 ValidateAntiForgeryToken，跨站页面可借用用户 Cookie 提交状态变更请求（CWE-352）。Fortify 在 YiShaAdmin 上对缺令牌的表单报 CSRF；本规则在 .cs 中匹配这些 HTTP 方法特性。C# SSA 目前不保留特性，故使用源码模式。
+DESC
+	solution: <<<SOLUTION
+在状态变更动作上添加 [ValidateAntiForgeryToken]，或在 Startup 使用 AutoValidateAntiforgeryToken。视图表单包含 @Html.AntiForgeryToken() 或 tag helper asp-antiforgery。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-352](https://cwe.mitre.org/data/definitions/352.html)
+REFERENCE
+	rule_id: "aee62728-fdcb-43c3-ba6d-7905b5d077a2"
+)
+
+${*.cs}.pattern_regex(/\[Http(Post|Put|Delete|Patch)\s*\]/) as $hit
+
+alert $hit for {
+	title: "C#/.NET MVC HttpPost missing antiforgery",
+	title_zh: "C#/.NET MVC HttpPost 缺少防伪令牌",
+	level: "mid",
+	type: "audit",
+	risk: "csrf",
+	message: "检测到 HttpPost/Put/Delete/Patch 特性，请确认已启用防伪令牌校验。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_csrf.cs': <<<UNSAFE
+using Microsoft.AspNetCore.Mvc;
+
+public class UserController : Controller {
+    [HttpPost]
+    public IActionResult Save(string name) {
+        return Ok();
+    }
+}
+UNSAFE
+	'safefile://safe_csrf.cs': <<<SAFE
+using Microsoft.AspNetCore.Mvc;
+
+public class UserController : Controller {
+    [HttpGet]
+    public IActionResult Index() {
+        return Ok();
+    }
+}
+SAFE
+)

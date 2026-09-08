@@ -23,9 +23,9 @@ REFERENCE
 *.PostAsync as $output
 *.PutAsync as $output
 *.SendAsync as $output
-*.DownloadString as $output
-*.DownloadData as $output
-*.DownloadFile as $output
+WebClient.DownloadString as $output
+WebClient.DownloadData as $output
+WebClient.DownloadFile as $output
 WebRequest.Create as $output
 
 alert $output for {
