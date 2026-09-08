@@ -150,11 +150,13 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 					break
 				}
 			}
-
 			nextHost, nextPort, _ := utils.ParseStringToHostPort(targetUrl)
 			log.Debugf("[lowhttp] redirect to: %s", targetUrl)
 
-			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r))
+			// Clear the stale NativeHTTPRequestInstance so HTTPWithoutRetry
+			// re-parses reqIns from the redirected packet instead of reusing
+			// the original request (e.g. POST) that no longer matches.
+			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r), WithNativeHTTPRequestInstance(nil))
 			response, err = HTTPWithoutRedirect(newOpts...)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
