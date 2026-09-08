@@ -58,7 +58,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-spel-parse-length.java': <<<CODE
+	'file://spel-expression-length-without-limit-positive.java': <<<CODE
 class Tokenizer {
     Tokenizer(String expressionString) {
     }
@@ -71,7 +71,7 @@ class InternalSpelExpressionParser {
     }
 }
 CODE
-	"safefile://safe-spel-parse-length.java": <<<CODE
+	'safefile://spel-expression-length-without-limit-negative.java': <<<CODE
 class Tokenizer {
     Tokenizer(String expressionString) {
     }

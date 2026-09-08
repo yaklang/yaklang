@@ -49,9 +49,8 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-filter-to-spel.java': <<<CODE
+	'file://filter-expression-converted-to-spel-positive.java': <<<CODE
 class SearchRequest {
-    boolean hasFilterExpression() { return true; }
     Object getFilterExpression() { return null; }
 }
 
@@ -85,7 +84,7 @@ class SimpleVectorStore {
     }
 }
 CODE
-	'safefile://safe-filter-evaluator.java': <<<CODE
+	'safefile://filter-expression-converted-to-spel-negative.java': <<<CODE
 class SearchRequest {
     Object getFilterExpression() { return null; }
 }

@@ -45,7 +45,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 2
-	'file://unsafe-etag-parsing.java': <<<CODE
+	'file://regex-etag-header-parsing-audit-positive.java': <<<CODE
 class Matcher {
     boolean find() { return false; }
 }
@@ -74,7 +74,7 @@ class ServletWebRequest {
     }
 }
 CODE
-	'safefile://safe-etag-parse.java': <<<CODE
+	'safefile://regex-etag-header-parsing-audit-negative.java': <<<CODE
 class ETag {
     static void parse(String value) {
     }

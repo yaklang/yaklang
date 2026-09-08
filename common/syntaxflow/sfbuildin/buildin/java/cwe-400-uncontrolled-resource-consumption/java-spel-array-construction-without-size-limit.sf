@@ -63,7 +63,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-array-construction.java': <<<CODE
+	'file://spel-array-construction-without-size-limit-positive.java': <<<CODE
 import java.lang.reflect.Array;
 
 class ExpressionUtils {
@@ -86,7 +86,7 @@ class UnsafeArrayConstructor {
     }
 }
 CODE
-	"safefile://checked-array-construction.java": <<<CODE
+	'safefile://spel-array-construction-without-size-limit-negative.java': <<<CODE
 import java.lang.reflect.Array;
 
 class ExpressionUtils {

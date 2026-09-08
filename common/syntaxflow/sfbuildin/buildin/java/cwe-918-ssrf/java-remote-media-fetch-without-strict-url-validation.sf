@@ -43,7 +43,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-remote-media-fetch.java': <<<CODE
+	'file://remote-media-fetch-without-strict-url-validation-positive.java': <<<CODE
 import java.io.InputStream;
 import java.net.URL;
 
@@ -68,7 +68,7 @@ class BedrockProxyChatModel {
     }
 }
 CODE
-	'safefile://safe-remote-media-fetch.java': <<<CODE
+	'safefile://remote-media-fetch-without-strict-url-validation-negative.java': <<<CODE
 import java.net.URI;
 import java.net.URL;
 

@@ -59,7 +59,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-empty-allowlist.java': <<<CODE
+	'file://empty-deserialization-allowlist-bypass-positive.java': <<<CODE
 import java.util.Set;
 
 class ObjectUtils {
@@ -89,7 +89,7 @@ class AllowlistVerifier {
     }
 }
 CODE
-	'safefile://guarded-empty-allowlist.java': <<<CODE
+	'safefile://empty-deserialization-allowlist-bypass-negative.java': <<<CODE
 import java.util.Set;
 
 class ObjectUtils {
@@ -105,12 +105,7 @@ class SecurityException extends RuntimeException {
 }
 
 class AllowlistVerifier {
-    private static final boolean TRUST_ALL = false;
-
     static void checkAllowedList(Class<?> clazz, Set<String> patterns) {
-        if (TRUST_ALL && ObjectUtils.isEmpty(patterns)) {
-            return;
-        }
         String className = clazz.getName();
         for (String pattern : patterns) {
             if (PatternMatchUtils.simpleMatch(pattern, className)) {

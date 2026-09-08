@@ -41,7 +41,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-cloudfoundry-base-path-matcher.java': <<<CODE
+	'file://cloudfoundry-base-path-matcher-without-catchall-positive.java': <<<CODE
 class PathMappedEndpoints {
     void getAllPaths() {
     }
@@ -60,7 +60,7 @@ class Config {
     }
 }
 CODE
-	'safefile://safe-cloudfoundry-base-path-matcher.java': <<<CODE
+	'safefile://cloudfoundry-base-path-matcher-without-catchall-negative.java': <<<CODE
 class Config {
     static final String BASE_PATH = "/cfApplication";
 

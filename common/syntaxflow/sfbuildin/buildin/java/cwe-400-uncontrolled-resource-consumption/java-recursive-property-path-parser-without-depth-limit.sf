@@ -63,7 +63,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-property-path-depth.java': <<<CODE
+	'file://recursive-property-path-parser-depth-limit-positive.java': <<<CODE
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -79,7 +79,7 @@ class PropertyPathParser {
     }
 }
 CODE
-	'safefile://safe-property-path-depth.java': <<<CODE
+	'safefile://recursive-property-path-parser-depth-limit-negative.java': <<<CODE
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

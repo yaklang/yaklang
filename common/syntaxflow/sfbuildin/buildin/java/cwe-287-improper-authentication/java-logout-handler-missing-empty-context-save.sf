@@ -41,7 +41,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 1
-	'file://unsafe-logout-handler.java': <<<CODE
+	'file://logout-handler-missing-empty-context-save-positive.java': <<<CODE
 class SecurityContext {
     void setAuthentication(Object authentication) {
     }
@@ -63,7 +63,7 @@ class SecurityContextLogoutHandler {
     }
 }
 CODE
-	'safefile://safe-logout-handler.java': <<<CODE
+	'safefile://logout-handler-missing-empty-context-save-negative.java': <<<CODE
 class SecurityContext {
     void setAuthentication(Object authentication) {
     }
