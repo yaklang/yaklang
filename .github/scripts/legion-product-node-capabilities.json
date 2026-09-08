@@ -4,6 +4,7 @@
   "ai.session.bind_epoch.v1",
   "ai.session.turn_lifecycle.v1",
   "hids",
+  "plugin.bundle.v1",
   "ssa.rule_snapshot.execution.v2",
   "ssa.rule_sync.export",
   "yak.execute"
