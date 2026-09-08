@@ -506,8 +506,6 @@ func (b *legionJobBridge) handleMessagePayload(
 		return b.handleSSADebugQuery(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSALogTail):
 		return b.handleSSALogTail(ctx, message.Data)
-	case strings.HasSuffix(message.Subject, "."+legionCommandPluginGroupsList):
-		return b.handlePluginGroupsList(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSync):
 		return b.handlePluginStoreSync(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSyncStatusQuery):

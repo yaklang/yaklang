@@ -20,6 +20,7 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
+		capabilityKeyPluginBundleV1,
 	}
 	if inputresolver.Supported() {
 		index := len(want)
@@ -56,6 +57,7 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
+		capabilityKeyPluginBundleV1,
 		"extra.capability",
 	}
 	if inputresolver.Supported() {

@@ -1,9 +1,10 @@
 package scannode
 
 import (
-	"github.com/yaklang/yaklang/scannode/inputresolver"
 	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/scannode/inputresolver"
 )
 
 const (
@@ -13,6 +14,7 @@ const (
 	capabilityKeyAITurnLifecycleV1          = "ai.session.turn_lifecycle.v1"
 	capabilityKeyAICodeWorkspaceV1          = "ai.code_workspace.v1"
 	capabilityKeyAIManagedInputV1           = inputresolver.CapabilityV1
+	capabilityKeyPluginBundleV1             = "plugin.bundle.v1"
 )
 
 func normalizeScanNodeCapabilityKeys(input []string) []string {

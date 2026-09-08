@@ -8,6 +8,7 @@ package jobv1
 
 import (
 	v1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
+	v11 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -359,6 +360,7 @@ type DispatchJobCommand struct {
 	Script          *InlineScript          `protobuf:"bytes,8,opt,name=script,proto3" json:"script,omitempty"`
 	RuleSnapshot    *RuleSnapshotRef       `protobuf:"bytes,9,opt,name=rule_snapshot,json=ruleSnapshot,proto3" json:"rule_snapshot,omitempty"`
 	ResourceRequest *ResourceRequest       `protobuf:"bytes,10,opt,name=resource_request,json=resourceRequest,proto3" json:"resource_request,omitempty"`
+	PluginBundle    *v11.PluginBundleRef   `protobuf:"bytes,11,opt,name=plugin_bundle,json=pluginBundle,proto3" json:"plugin_bundle,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -452,6 +454,13 @@ func (x *DispatchJobCommand) GetRuleSnapshot() *RuleSnapshotRef {
 func (x *DispatchJobCommand) GetResourceRequest() *ResourceRequest {
 	if x != nil {
 		return x.ResourceRequest
+	}
+	return nil
+}
+
+func (x *DispatchJobCommand) GetPluginBundle() *v11.PluginBundleRef {
+	if x != nil {
+		return x.PluginBundle
 	}
 	return nil
 }
@@ -1523,7 +1532,7 @@ var File_legion_job_v1_job_proto protoreflect.FileDescriptor
 
 const file_legion_job_v1_job_proto_rawDesc = "" +
 	"\n" +
-	"\x17legion/job/v1/job.proto\x12\rlegion.job.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x19legion/node/v1/node.proto\"]\n" +
+	"\x17legion/job/v1/job.proto\x12\rlegion.job.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x19legion/node/v1/node.proto\x1a\x1dlegion/plugin/v1/plugin.proto\"]\n" +
 	"\x06JobRef\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x1d\n" +
 	"\n" +
@@ -1551,7 +1560,7 @@ const file_legion_job_v1_job_proto_rawDesc = "" +
 	"\tasset_ids\x18\x05 \x03(\tR\bassetIds\"[\n" +
 	"\x0fResourceRequest\x12%\n" +
 	"\x0ecpu_millicores\x18\x01 \x01(\x04R\rcpuMillicores\x12!\n" +
-	"\fmemory_bytes\x18\x02 \x01(\x04R\vmemoryBytes\"\xb3\x04\n" +
+	"\fmemory_bytes\x18\x02 \x01(\x04R\vmemoryBytes\"\xfb\x04\n" +
 	"\x12DispatchJobCommand\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
 	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12'\n" +
@@ -1563,7 +1572,8 @@ const file_legion_job_v1_job_proto_rawDesc = "" +
 	"\x06script\x18\b \x01(\v2\x1b.legion.job.v1.InlineScriptR\x06script\x12C\n" +
 	"\rrule_snapshot\x18\t \x01(\v2\x1e.legion.job.v1.RuleSnapshotRefR\fruleSnapshot\x12I\n" +
 	"\x10resource_request\x18\n" +
-	" \x01(\v2\x1e.legion.job.v1.ResourceRequestR\x0fresourceRequest\x1a9\n" +
+	" \x01(\v2\x1e.legion.job.v1.ResourceRequestR\x0fresourceRequest\x12F\n" +
+	"\rplugin_bundle\x18\v \x01(\v2!.legion.plugin.v1.PluginBundleRefR\fpluginBundle\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x04\x10\x05\"\x90\x01\n" +
@@ -1712,8 +1722,9 @@ var file_legion_job_v1_job_proto_goTypes = []any{
 	(*JobCancelled)(nil),            // 18: legion.job.v1.JobCancelled
 	nil,                             // 19: legion.job.v1.DispatchJobCommand.LabelsEntry
 	(*v1.CommandMetadata)(nil),      // 20: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),        // 21: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil),   // 22: google.protobuf.Timestamp
+	(*v11.PluginBundleRef)(nil),     // 21: legion.plugin.v1.PluginBundleRef
+	(*v1.EventMetadata)(nil),        // 22: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),   // 23: google.protobuf.Timestamp
 }
 var file_legion_job_v1_job_proto_depIdxs = []int32{
 	1,  // 0: legion.job.v1.InlineScript.version:type_name -> legion.job.v1.ScriptVersionRef
@@ -1723,43 +1734,44 @@ var file_legion_job_v1_job_proto_depIdxs = []int32{
 	2,  // 4: legion.job.v1.DispatchJobCommand.script:type_name -> legion.job.v1.InlineScript
 	3,  // 5: legion.job.v1.DispatchJobCommand.rule_snapshot:type_name -> legion.job.v1.RuleSnapshotRef
 	4,  // 6: legion.job.v1.DispatchJobCommand.resource_request:type_name -> legion.job.v1.ResourceRequest
-	20, // 7: legion.job.v1.CancelJobCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 8: legion.job.v1.CancelJobCommand.job:type_name -> legion.job.v1.JobRef
-	21, // 9: legion.job.v1.JobClaimed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 10: legion.job.v1.JobClaimed.job:type_name -> legion.job.v1.JobRef
-	22, // 11: legion.job.v1.JobClaimed.claimed_at:type_name -> google.protobuf.Timestamp
-	21, // 12: legion.job.v1.JobStarted.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 13: legion.job.v1.JobStarted.job:type_name -> legion.job.v1.JobRef
-	22, // 14: legion.job.v1.JobStarted.started_at:type_name -> google.protobuf.Timestamp
-	21, // 15: legion.job.v1.JobProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 16: legion.job.v1.JobProgressed.job:type_name -> legion.job.v1.JobRef
-	21, // 17: legion.job.v1.JobRuleSnapshotPrepared.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 18: legion.job.v1.JobRuleSnapshotPrepared.job:type_name -> legion.job.v1.JobRef
-	22, // 19: legion.job.v1.JobRuleSnapshotPrepared.prepared_at:type_name -> google.protobuf.Timestamp
-	21, // 20: legion.job.v1.JobAsset.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 21: legion.job.v1.JobAsset.job:type_name -> legion.job.v1.JobRef
-	21, // 22: legion.job.v1.JobRisk.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 23: legion.job.v1.JobRisk.job:type_name -> legion.job.v1.JobRef
-	21, // 24: legion.job.v1.JobReport.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 25: legion.job.v1.JobReport.job:type_name -> legion.job.v1.JobRef
-	21, // 26: legion.job.v1.JobArtifactReady.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 27: legion.job.v1.JobArtifactReady.job:type_name -> legion.job.v1.JobRef
-	21, // 28: legion.job.v1.JobArtifactUploadFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 29: legion.job.v1.JobArtifactUploadFailed.job:type_name -> legion.job.v1.JobRef
-	21, // 30: legion.job.v1.JobSucceeded.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 31: legion.job.v1.JobSucceeded.job:type_name -> legion.job.v1.JobRef
-	22, // 32: legion.job.v1.JobSucceeded.finished_at:type_name -> google.protobuf.Timestamp
-	21, // 33: legion.job.v1.JobFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 34: legion.job.v1.JobFailed.job:type_name -> legion.job.v1.JobRef
-	22, // 35: legion.job.v1.JobFailed.finished_at:type_name -> google.protobuf.Timestamp
-	21, // 36: legion.job.v1.JobCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 37: legion.job.v1.JobCancelled.job:type_name -> legion.job.v1.JobRef
-	22, // 38: legion.job.v1.JobCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	39, // [39:39] is the sub-list for method output_type
-	39, // [39:39] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	21, // 7: legion.job.v1.DispatchJobCommand.plugin_bundle:type_name -> legion.plugin.v1.PluginBundleRef
+	20, // 8: legion.job.v1.CancelJobCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,  // 9: legion.job.v1.CancelJobCommand.job:type_name -> legion.job.v1.JobRef
+	22, // 10: legion.job.v1.JobClaimed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 11: legion.job.v1.JobClaimed.job:type_name -> legion.job.v1.JobRef
+	23, // 12: legion.job.v1.JobClaimed.claimed_at:type_name -> google.protobuf.Timestamp
+	22, // 13: legion.job.v1.JobStarted.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 14: legion.job.v1.JobStarted.job:type_name -> legion.job.v1.JobRef
+	23, // 15: legion.job.v1.JobStarted.started_at:type_name -> google.protobuf.Timestamp
+	22, // 16: legion.job.v1.JobProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 17: legion.job.v1.JobProgressed.job:type_name -> legion.job.v1.JobRef
+	22, // 18: legion.job.v1.JobRuleSnapshotPrepared.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 19: legion.job.v1.JobRuleSnapshotPrepared.job:type_name -> legion.job.v1.JobRef
+	23, // 20: legion.job.v1.JobRuleSnapshotPrepared.prepared_at:type_name -> google.protobuf.Timestamp
+	22, // 21: legion.job.v1.JobAsset.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 22: legion.job.v1.JobAsset.job:type_name -> legion.job.v1.JobRef
+	22, // 23: legion.job.v1.JobRisk.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 24: legion.job.v1.JobRisk.job:type_name -> legion.job.v1.JobRef
+	22, // 25: legion.job.v1.JobReport.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 26: legion.job.v1.JobReport.job:type_name -> legion.job.v1.JobRef
+	22, // 27: legion.job.v1.JobArtifactReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 28: legion.job.v1.JobArtifactReady.job:type_name -> legion.job.v1.JobRef
+	22, // 29: legion.job.v1.JobArtifactUploadFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 30: legion.job.v1.JobArtifactUploadFailed.job:type_name -> legion.job.v1.JobRef
+	22, // 31: legion.job.v1.JobSucceeded.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 32: legion.job.v1.JobSucceeded.job:type_name -> legion.job.v1.JobRef
+	23, // 33: legion.job.v1.JobSucceeded.finished_at:type_name -> google.protobuf.Timestamp
+	22, // 34: legion.job.v1.JobFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 35: legion.job.v1.JobFailed.job:type_name -> legion.job.v1.JobRef
+	23, // 36: legion.job.v1.JobFailed.finished_at:type_name -> google.protobuf.Timestamp
+	22, // 37: legion.job.v1.JobCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 38: legion.job.v1.JobCancelled.job:type_name -> legion.job.v1.JobRef
+	23, // 39: legion.job.v1.JobCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	40, // [40:40] is the sub-list for method output_type
+	40, // [40:40] is the sub-list for method input_type
+	40, // [40:40] is the sub-list for extension type_name
+	40, // [40:40] is the sub-list for extension extendee
+	0,  // [0:40] is the sub-list for field type_name
 }
 
 func init() { file_legion_job_v1_job_proto_init() }

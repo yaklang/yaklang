@@ -4,6 +4,7 @@ package legion.job.v1;
 
 import "google/protobuf/timestamp.proto";
 import "legion/node/v1/node.proto";
+import "legion/plugin/v1/plugin.proto";
 
 option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1;jobv1";
 
@@ -52,6 +53,7 @@ message DispatchJobCommand {
   InlineScript script = 8;
   RuleSnapshotRef rule_snapshot = 9;
   ResourceRequest resource_request = 10;
+  legion.plugin.v1.PluginBundleRef plugin_bundle = 11;
 }
 
 message CancelJobCommand {

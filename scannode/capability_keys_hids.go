@@ -12,5 +12,6 @@ func compiledScanNodeCapabilityKeys() []string {
 		capabilityKeyAITurnLifecycleV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyAIManagedInputV1,
+		capabilityKeyPluginBundleV1,
 	}
 }
