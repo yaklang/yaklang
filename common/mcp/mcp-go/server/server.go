@@ -508,8 +508,8 @@ func (s *MCPServer) HandleMessage(
 		if err := json.Unmarshal(message, &request); err != nil {
 			return createErrorResponse(
 				baseMessage.ID,
-				mcp.INVALID_REQUEST,
-				"Invalid call tool request",
+				mcp.INVALID_PARAMS,
+				"Invalid tool parameters",
 			)
 		}
 		return s.handleToolCall(ctx, baseMessage.ID, request)
