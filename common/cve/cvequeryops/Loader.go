@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 const (
@@ -200,6 +200,44 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 // err = cve.Download("/tmp/cve-data", true)
 // if err != nil { die(err) }
 // ```
+// downloadNVDFeed 使用标准 HTTP 库下载 NVD feed 并解压保存
+// 比 poc.DoGET 流式处理更稳定，避免 unexpected EOF
+func downloadNVDFeed(url, destFile string) error {
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(url)
+	if err != nil {
+		return utils.Errorf("HTTP GET failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return utils.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	// 创建 gzip reader
+	gzReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return utils.Errorf("gzip decompress failed: %v", err)
+	}
+	defer gzReader.Close()
+
+	// 写入文件
+	dst, err := os.OpenFile(destFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o666)
+	if err != nil {
+		return utils.Errorf("open %s failed: %v", destFile, err)
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, gzReader)
+	if err != nil {
+		return utils.Errorf("copy data failed: %v", err)
+	}
+
+	log.Infof("downloaded %s -> %s", url, destFile)
+	return nil
+}
+
+
 func DownLoad(dir string, cached bool, years ...int) error {
 	// 如果指定了 years，只下载对应年份的数据
 	allowed := funk.Map(years, func(i int) string {
@@ -218,55 +256,33 @@ func DownLoad(dir string, cached bool, years ...int) error {
 				continue
 			}
 		}
-		log.Infof("start to download from: %v", url)
 
-		// 使用流式处理，避免将大文件读入内存
-		var downloadErr error
-		_, _, err := poc.DoGET(url,
-			poc.WithRetryTimes(3),
-			poc.WithSave(false),        // 禁用 HTTP 流保存到数据库
-			poc.WithNoBodyBuffer(true), // 禁用响应体缓冲
-			poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
-				defer bodyReader.Close()
+		// 重试下载，NVD 经常因网络问题中断
+		maxRetries := 5
+		var lastErr error
+		for retry := 0; retry < maxRetries; retry++ {
+			if retry > 0 {
+				log.Infof("retry %d/%d for %v after 5s", retry, maxRetries, url)
+				time.Sleep(5 * time.Second)
+			}
+			log.Infof("start to download from: %v (attempt %d)", url, retry+1)
 
-				log.Infof("start to un-gzip from: %v", url)
-				rawData, err := gzip.NewReader(bodyReader)
-				if err != nil {
-					downloadErr = utils.Errorf("gzip decompress failed: %v", err)
-					log.Error(downloadErr)
-					return
-				}
-				defer rawData.Close()
+			err := downloadNVDFeed(url, fileName)
+			if err != nil {
+				lastErr = err
+				log.Errorf("download %v failed (attempt %d): %v", url, retry+1, err)
+				os.Remove(fileName)
+				continue
+			}
 
-				log.Infof("start to save to local file: %v", fileName)
-				dstFile, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o666)
-				if err != nil {
-					downloadErr = utils.Errorf("open %v failed: %v", fileName, err)
-					log.Error(downloadErr)
-					return
-				}
-				defer dstFile.Close()
-
-				_, err = io.Copy(dstFile, rawData)
-				if err != nil {
-					downloadErr = utils.Errorf("copy data failed: %v", err)
-					log.Error(downloadErr)
-					return
-				}
-
-				log.Infof("handle %v finished", dstFile.Name())
-			}))
-
-		if err != nil {
-			log.Errorf("download %v failed: %v", url, err)
-			continue
+			// 下载成功
+			lastErr = nil
+			break
 		}
 
-		if downloadErr != nil {
-			log.Errorf("process %v failed: %v", url, downloadErr)
-			// 清理可能产生的不完整文件
-			os.Remove(fileName)
-			continue
+		if lastErr != nil {
+			log.Errorf("download %v failed after %d retries: %v", url, maxRetries, lastErr)
+			// 继续下载其他年份，不中断
 		}
 	}
 	return nil
