@@ -51,7 +51,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
-          cache: true
+          cache: false
 
       - name: Run G4 syntax corpus tests
         run: go test -count=1 -timeout 20m -run '^TestAllSyntax.*_G4$' ${{ matrix.package }}
