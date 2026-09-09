@@ -1693,11 +1693,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 	}
 
-	streamRecorderFactory := minimartian.HTTPStreamRecorderFactory(func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error) {
+	streamRecorderFactory := minimartian.HTTPStreamRecorderFactory(func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte, sizeThreshold int64) (io.WriteCloser, error) {
 		if httpctx.IsFiltered(req) {
 			return nil, nil
 		}
-		return yakit.NewHTTPFlowStreamRecorder(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes)
+		return yakit.NewHTTPFlowStreamRecorder(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes, sizeThreshold)
 	})
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
