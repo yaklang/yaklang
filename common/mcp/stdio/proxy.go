@@ -176,7 +176,12 @@ func Run(ctx context.Context, cmd *exec.Cmd, input io.ReadCloser, output io.Writ
 		return fmt.Errorf("prepare MCP output: %w", err)
 	}
 	defer closeOutput()
-	requests := readFrames(ctx, input, false)
+	reader, closeInput, err := prepareInput(input)
+	if err != nil {
+		return fmt.Errorf("prepare MCP input: %w", err)
+	}
+	defer closeInput()
+	requests := readFrames(ctx, reader, false)
 	r := &relay{output: &protocolWriter{ctx: ctx, output: writer}, pending: make(map[string]json.RawMessage)}
 	var queued []byte
 	select {
