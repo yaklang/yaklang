@@ -120,7 +120,7 @@ func TestExecLowHTTPStreamsAndRecordsSSEBeforeEOF(t *testing.T) {
 	t.Cleanup(cancelPool)
 	proxy.SetConnPool(lowhttp.NewHttpConnPool(poolCtx, 100, 2))
 	recorderCreated := make(chan *testStreamRecorder, 1)
-	proxy.SetHTTPStreamRecorderFactory(func(_ bool, _ *http.Request, _ *http.Response, _ []byte) (io.WriteCloser, error) {
+	proxy.SetHTTPStreamRecorderFactory(func(_ bool, _ *http.Request, _ *http.Response, _ []byte, _ int64) (io.WriteCloser, error) {
 		recorder := &testStreamRecorder{closed: make(chan struct{})}
 		recorderCreated <- recorder
 		return recorder, nil
