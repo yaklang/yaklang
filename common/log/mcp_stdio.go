@@ -39,6 +39,10 @@ func IsMCPStdioLogging() bool {
 	return mcpStdioMode.Load()
 }
 
+// IsMCPStdioCommand identifies the stdio CLI independently of inherited logging
+// settings, so launchers can avoid initializing services in the supervisor.
+func IsMCPStdioCommand(args []string) bool { return isMCPStdioCommand(args) }
+
 func envEnablesMCPStdioMode() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(mcpStdioModeEnv))) {
 	case "1", "true", "yes", "on":
