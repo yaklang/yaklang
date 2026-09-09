@@ -288,6 +288,7 @@ type Program struct {
 	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
 	deferredBuildTotal int
 	currentCompileUnit string
+	CompileUnits       []*CompileUnit
 
 	//consts
 	Consts map[string]Value

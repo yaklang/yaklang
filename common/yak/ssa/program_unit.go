@@ -7,9 +7,9 @@ import (
 	stdlog "github.com/yaklang/yaklang/common/log"
 )
 
-// BeginCompileUnit marks the start of a compile unit: subsequent lazy/deferred
-// builds capture this unitKey so per-unit runs (RunDeferredBuildsForUnits,
-// LazyBuildForUnits) can scope work to a unit.
+// BeginCompileUnit marks the start of a compile unit so deferred file builds
+// capture this unitKey. Function/class LazyBuild is owned by the unit's
+// library Program (see ProgramForCompileUnit), not by this string.
 func (prog *Program) BeginCompileUnit(unitKey string) {
 	if prog == nil {
 		return
@@ -41,6 +41,57 @@ func (prog *Program) CurrentCompileUnit() string {
 		app = prog
 	}
 	return app.currentCompileUnit
+}
+
+// libraryNameFromCompileUnitKey maps a compile-unit key onto the library
+// Program that owns that unit's functions and classes.
+//
+// Language-prefixed keys encode the package/namespace after the first colon
+// (java:a.b → a.b, csharp:Foo.Bar → Foo.Bar). Unprefixed keys are used as-is
+// (tests, explicit NewLibrary names). Directory/resource keys have no library
+// name: their IR lives on the Application.
+func libraryNameFromCompileUnitKey(unitKey string) string {
+	if unitKey == "" {
+		return ""
+	}
+	prefix, rest, ok := strings.Cut(unitKey, ":")
+	if !ok {
+		return unitKey
+	}
+	switch strings.ToLower(prefix) {
+	case "dir", "resource", "unit":
+		return ""
+	default:
+		return rest
+	}
+}
+
+// ProgramForCompileUnit returns the Program that owns this compile unit.
+// A unit is that library: it already contains the package's functions and
+// classes, so LazyBuildForUnits drains this Program rather than walking
+// Application tagged with interned ids.
+func (prog *Program) ProgramForCompileUnit(unitKey string) *Program {
+	if prog == nil || unitKey == "" {
+		return nil
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	if name := libraryNameFromCompileUnitKey(unitKey); name != "" {
+		if lib, _ := app.GetLibrary(name); lib != nil {
+			return lib
+		}
+		if lib, ok := app.UpStream.Get(name); ok && lib != nil {
+			return lib
+		}
+		return nil
+	}
+	if lib, ok := app.UpStream.Get(unitKey); ok && lib != nil {
+		return lib
+	}
+	// Directory-keyed units (python/go default) host IR on Application.
+	return app
 }
 
 // ReleaseCompletedUnitMemory releases the completed compile units' function

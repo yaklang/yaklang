@@ -67,7 +67,6 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...
 	}
 
 	blueprint := NewBlueprint(name)
-
 	blueprint.Range = codeRange
 
 	b.SetBlueprint(name, blueprint)

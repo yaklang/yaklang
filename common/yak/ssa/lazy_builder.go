@@ -8,7 +8,7 @@ import (
 	"go.uber.org/atomic"
 )
 
-// lazyTask is the unit of deferred work queued in a LazyBuilder.
+// lazyTask is one closure queued on a Function/Blueprint LazyBuilder.
 type lazyTask func()
 
 // LazyBuilder 是一个并发安全、内存安全的延迟执行器
@@ -75,7 +75,6 @@ func (l *LazyBuilder) Build() {
 		}
 	}()
 
-	// // 依次执行所有任务
 	for _, task := range tasksToRun {
 		if task != nil {
 			task()
@@ -83,51 +82,57 @@ func (l *LazyBuilder) Build() {
 	}
 }
 
-func (p *Program) LazyBuild() {
-	for _, key := range p.Blueprint.Keys() {
-		blueprint, ok := p.Blueprint.Get(key)
-		_ = ok
-		p.runLazyBuilder(blueprint.LazyBuilder, blueprint.Range)
+func (l *LazyBuilder) hasPending() bool {
+	if l == nil {
+		return false
 	}
-	visited := make(map[*Function]struct{})
-	var stack []*Function
-	for _, key := range p.Funcs.Keys() {
-		fun, ok := p.Funcs.Get(key)
-		if !ok || fun == nil {
-			continue
-		}
-		stack = append(stack, fun)
-	}
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return len(l.tasks) > 0
+}
 
-	for len(stack) > 0 {
-		// 深度优先遍历函数与其子函数，确保所有 LazyBuilder 均被执行
-		fun := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if fun == nil {
-			continue
+func (p *Program) drainLazyBuilders() {
+	if p == nil {
+		return
+	}
+	for {
+		progressed := false
+		if p.Blueprint != nil {
+			for _, key := range p.Blueprint.Keys() {
+				bp, ok := p.Blueprint.Get(key)
+				if !ok || bp == nil || !bp.hasPending() {
+					continue
+				}
+				p.runLazyBuilder(bp.LazyBuilder, bp.Range)
+				progressed = true
+			}
 		}
-		if _, ok := visited[fun]; ok {
-			continue
+		p.forEachFunction(func(fun *Function) {
+			if fun == nil || !fun.hasPending() {
+				return
+			}
+			p.runLazyBuilder(fun.LazyBuilder, fun.GetRange())
+			progressed = true
+		})
+		if !progressed {
+			break
 		}
-		visited[fun] = struct{}{}
-		p.runLazyBuilder(fun.LazyBuilder, fun.GetRange())
-		for _, childID := range fun.ChildFuncs {
-			childValue, ok := fun.GetValueById(childID)
-			if !ok || childValue == nil {
+	}
+	if p.Blueprint != nil {
+		for _, key := range p.Blueprint.Keys() {
+			bp, ok := p.Blueprint.Get(key)
+			if !ok || bp == nil {
 				continue
 			}
-			if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
-				stack = append(stack, childFunc)
-			}
+			bp.BuildConstructorAndDestructor()
 		}
 	}
+}
+
+func (p *Program) LazyBuild() {
+	p.drainLazyBuilders()
 	for _, f := range p.fixImportCallback {
 		f()
-	}
-	for _, key := range p.Blueprint.Keys() {
-		blueprint, ok := p.Blueprint.Get(key)
-		_ = ok
-		blueprint.BuildConstructorAndDestructor()
 	}
 	function := p.GetFunction(string(MainFunctionName), "")
 	if function != nil {
@@ -150,6 +155,86 @@ func (p *Program) LazyBuild() {
 		}
 		log.Errorf("main function is not found and virtual function is not found")
 		return
+	}
+}
+
+// LazyBuildForUnits drains lazy closures on each unit's library Program
+// (functions + blueprints). A compile unit is that library: it already owns
+// the package's methods and classes, so there is no per-task unit tag.
+func (prog *Program) LazyBuildForUnits(unitKeys []string) {
+	if prog == nil || len(unitKeys) == 0 {
+		return
+	}
+	seen := make(map[*Program]struct{})
+	for _, key := range unitKeys {
+		lib := prog.ProgramForCompileUnit(key)
+		if lib == nil {
+			continue
+		}
+		if _, ok := seen[lib]; ok {
+			continue
+		}
+		seen[lib] = struct{}{}
+		lib.drainLazyBuilders()
+	}
+}
+
+func (p *Program) forEachFunction(fn func(*Function)) {
+	if p == nil || fn == nil || p.Funcs == nil {
+		return
+	}
+	visited := make(map[*Function]struct{})
+	var stack []*Function
+	for _, key := range p.Funcs.Keys() {
+		fun, ok := p.Funcs.Get(key)
+		if !ok || fun == nil {
+			continue
+		}
+		stack = append(stack, fun)
+	}
+	if p.Blueprint != nil {
+		for _, key := range p.Blueprint.Keys() {
+			bp, ok := p.Blueprint.Get(key)
+			if !ok || bp == nil {
+				continue
+			}
+			for _, value := range bp.MagicMethod {
+				if fun, ok := ToFunction(value); ok && fun != nil {
+					stack = append(stack, fun)
+				}
+			}
+			for _, fun := range bp.NormalMethod {
+				if fun != nil {
+					stack = append(stack, fun)
+				}
+			}
+			for _, fun := range bp.StaticMethod {
+				if fun != nil {
+					stack = append(stack, fun)
+				}
+			}
+		}
+	}
+	for len(stack) > 0 {
+		fun := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if fun == nil {
+			continue
+		}
+		if _, ok := visited[fun]; ok {
+			continue
+		}
+		visited[fun] = struct{}{}
+		fn(fun)
+		for _, childID := range fun.ChildFuncs {
+			childValue, ok := fun.GetValueById(childID)
+			if !ok || childValue == nil {
+				continue
+			}
+			if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
+				stack = append(stack, childFunc)
+			}
+		}
 	}
 }
 

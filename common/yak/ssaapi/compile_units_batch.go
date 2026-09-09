@@ -192,6 +192,21 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 	return batches
 }
 
+func flattenCompileUnits(plan *UnitPlan) []*CompileUnit {
+	if plan == nil {
+		return nil
+	}
+	out := make([]*CompileUnit, 0, len(plan.Units))
+	for _, scc := range plan.Order {
+		for _, unit := range scc {
+			if unit != nil {
+				out = append(out, unit)
+			}
+		}
+	}
+	return out
+}
+
 func buildSingleBatch(order [][]*CompileUnit) compileUnitExecutionBatch {
 	batch := compileUnitExecutionBatch{startSCC: 0, endSCC: len(order) - 1}
 	for _, scc := range order {

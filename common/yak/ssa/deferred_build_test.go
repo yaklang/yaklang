@@ -101,6 +101,84 @@ func TestRunDeferredBuildsForUnitsRestoresUnitDuringTask(t *testing.T) {
 	require.Equal(t, []string{"nested"}, ran)
 }
 
+func TestProgramForCompileUnitIsLibrary(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "program-for-compile-unit")
+	libA := prog.NewLibrary("a", []string{"a"})
+	require.NotNil(t, libA)
+	require.Equal(t, libA, prog.ProgramForCompileUnit("java:a"))
+	require.Equal(t, libA, prog.ProgramForCompileUnit("a"))
+	require.Nil(t, prog.ProgramForCompileUnit("java:missing"))
+	require.Equal(t, prog, prog.ProgramForCompileUnit("dir:pkg"))
+}
+
+func TestLazyBuildForUnitsOnlyRunsMatchingUnit(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "lazy-build-for-units-match")
+
+	var ran []string
+	libA := prog.NewLibrary("unit-a", []string{"unit-a"})
+	fa := libA.NewFunction("fa")
+	fa.AddLazyBuilder(func() {
+		ran = append(ran, "a")
+	})
+
+	libB := prog.NewLibrary("unit-b", []string{"unit-b"})
+	fb := libB.NewFunction("fb")
+	fb.AddLazyBuilder(func() {
+		ran = append(ran, "b")
+	})
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+	require.Equal(t, []string{"a"}, ran)
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+	require.Equal(t, []string{"a"}, ran, "second drain must be a no-op")
+
+	libB.LazyBuild()
+	require.Equal(t, []string{"a", "b"}, ran)
+}
+
+func TestRunDeferredBuildsForUnitsDrainsNestedSameUnit(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-unit-worklist")
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "first", func() {
+		ran = append(ran, "first")
+		prog.RegisterDeferredBuild(DeferredBuildKindFile, "second", func() {
+			ran = append(ran, "second")
+		})
+	})
+	prog.EndCompileUnit()
+
+	require.True(t, prog.RunDeferredBuildsForUnits([]string{"unit-a"}, nil))
+	require.Equal(t, []string{"first", "second"}, ran)
+}
+
+func TestLazyBuildForUnitsRunsNestedCapturedDuringDeferred(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "lazy-build-for-units-nested-deferred")
+	lib := prog.NewLibrary("unit-a", []string{"unit-a"})
+	builder := lib.GetAndCreateFunctionBuilder("unit-a", "foo")
+	require.NotNil(t, builder)
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "a", func() {
+		builder.Function.AddLazyBuilder(func() {
+			ran = append(ran, "nested")
+		})
+	})
+	prog.EndCompileUnit()
+
+	require.True(t, prog.RunDeferredBuildsForUnits([]string{"unit-a"}, nil))
+	require.Empty(t, ran)
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+	require.Equal(t, []string{"nested"}, ran)
+
+	lib.LazyBuild()
+	require.Equal(t, []string{"nested"}, ran, "library LazyBuild must not rerun drained unit tasks")
+}
+
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {
 	prog := newDeferredBuildTestProgram(t, "finish-expansion")
 	editor := prog.CreateEditor([]byte("package main"), "/tmp/project/main.go")

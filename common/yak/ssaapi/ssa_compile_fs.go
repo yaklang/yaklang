@@ -323,6 +323,7 @@ func (c *Config) parseProjectWithFSUnits(
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 	defer c.LanguageBuilder.Clearup()
 
+	prog.CompileUnits = flattenCompileUnits(plan)
 	prog.ProcessInfof("compile unit graph built units=%d edges=%d scc=%d", len(plan.Units), len(plan.Edges), len(plan.Order))
 	holdSCCIR := envFlagEnabled(compileUnitHoldSCCIREnv)
 	spillMode := "auto"
@@ -510,6 +511,14 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		// Second phase of this batch: expand method-body LazyBuilders that
+		// belong to these units. PreHandler already built the skeleton;
+		// without this drain, bodies wait for Application.Finish and the
+		// unit cannot scan or recycle AST/IR on its own.
+		prog.LazyBuildForUnits(unitKeys)
+		if c.isStop() {
+			return nil, ErrContextCancel
+		}
 		// Per-batch flush: evict ordinary instructions to DB when resident
 		// count exceeds a threshold, keeping Function/Parameter/BasicBlock
 		// boundary instructions resident for cross-unit calls. This bounds
@@ -526,7 +535,6 @@ func (c *Config) parseProjectWithFSUnits(
 		// The threshold avoids flushing on small projects where it provides no
 		// memory benefit and only adds DB write overhead.
 		if prog.Cache != nil {
-			// Batch boundary: flush instructions + aux savers.
 			if !isIncremental {
 				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
 			}
