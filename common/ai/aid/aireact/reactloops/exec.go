@@ -1644,7 +1644,18 @@ func testIsFinished(task aicommon.AIStatefulTask) bool {
 //	task_{index}/loop_{name}_data/
 //
 // This avoids the deep nesting of the old structure (task_{index}/loops/{name}/action_calls/).
+func (r *ReActLoop) localArtifactsDisabled() bool {
+	if r == nil {
+		return false
+	}
+	cfg, ok := r.config.(*aicommon.Config)
+	return ok && cfg.DisableLocalContext
+}
+
 func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
+	if r.localArtifactsDisabled() {
+		return ""
+	}
 	if utils.IsNil(r) || utils.IsNil(task) {
 		return ""
 	}
@@ -1686,6 +1697,9 @@ func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
 // The directory is created if it does not exist. This method can be called by any code
 // that needs to organize loop-specific artifacts into categorized flat directories.
 func (r *ReActLoop) GetLoopContentDir(contentType string) string {
+	if r.localArtifactsDisabled() {
+		return ""
+	}
 	taskDir := r.Get("task_directory")
 	prefix := r.Get("loop_name_prefix")
 
@@ -1713,6 +1727,9 @@ func (r *ReActLoop) GetLoopContentDir(contentType string) string {
 }
 
 func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int, prompt string) {
+	if r.localArtifactsDisabled() {
+		return
+	}
 	if utils.IsNil(r) || utils.IsNil(task) {
 		return
 	}
@@ -1747,6 +1764,9 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 }
 
 func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, action *aicommon.Action, iteration int, prompt string) {
+	if r.localArtifactsDisabled() {
+		return
+	}
 	if utils.IsNil(r) || utils.IsNil(task) || utils.IsNil(action) {
 		return
 	}
