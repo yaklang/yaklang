@@ -92,10 +92,11 @@ runs:
       run: |
         SHA="${{ github.event.pull_request.head.sha }}"
         CONTEXT="${{ inputs.cache-key-prefix }}"
+        STATE=""
         STATE=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/status" \
           --jq --arg ctx "$CONTEXT" \
           '.statuses[] | select(.context == $ctx and .state == "success") | .state' \
-          2>/dev/null | head -1)
+          2>/dev/null | head -1) || STATE=""
         if [ -n "$STATE" ]; then
           echo "commit status $CONTEXT=$STATE found for $SHA, skipping tests"
           echo "status_hit=true" >> "$GITHUB_OUTPUT"
