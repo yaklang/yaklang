@@ -39,7 +39,13 @@ type ResponseModifier interface {
 // streaming responses (e.g. SSE). The recorder receives body chunks as they
 // are relayed to the downstream client. Recorder failures must not affect
 // forwarding; a nil return disables recording for this response.
-type HTTPStreamRecorderFactory func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error)
+//
+// sizeThreshold is the body size that must be exceeded before the recorder
+// marks the flow as too-large / read-too-slow. When 0, the recorder marks the
+// flow immediately (legacy behavior). When > 0, the recorder defers marking
+// until the accumulated body exceeds the threshold, allowing small streaming
+// responses to be persisted as normal flows.
+type HTTPStreamRecorderFactory func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte, sizeThreshold int64) (io.WriteCloser, error)
 
 // RequestResponseModifier is an interface that is both a ResponseModifier and
 // a RequestModifier.
