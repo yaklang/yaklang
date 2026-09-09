@@ -53,6 +53,9 @@ type queryConfig struct {
 	// that do not provide a result callback.
 	sourceResultCallback func(*SyntaxFlowResult)
 
+	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
+	structBound *structBound
+
 	// runtime config
 	opts []sfvm.Option // config
 	// config       *sfvm.Config
@@ -141,6 +144,18 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		}
 	}
 	process(0, "start query syntaxflow")
+	if config.program != nil {
+		prevBound := config.program.structBound
+		prevActive := config.program.structScanActive
+		if config.structBound != nil {
+			config.program.structBound = config.structBound
+			config.program.structScanActive = true
+		}
+		defer func() {
+			config.program.structBound = prevBound
+			config.program.structScanActive = prevActive
+		}()
+	}
 	// handler input  value
 	value := config.value
 	if len(value) == 0 {
@@ -202,6 +217,13 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			root.SetProgramName(config.program.GetProgramName())
 		}
 		res, err = executeSourceFrameBatches(frame, root, config)
+	} else if sfvm.FrameIsStructMode(frame) {
+		if config.structBound == nil {
+			return nil, utils.Errorf("struct rule requires QueryWithStruct")
+		}
+		res, err = frame.Feed(value, config.opts...)
+	} else if config.structBound != nil {
+		return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
 	} else {
 		res, err = frame.Feed(value, config.opts...)
 	}
@@ -315,6 +337,33 @@ func QueryWithValues(values sfvm.Values) QueryOption {
 			return
 		}
 		c.program, _ = fetchProgram(values[0])
+	}
+}
+
+// QueryWithStruct binds a compile-unit structure scan: stamps structBound on
+// the query and ResultProgram, and feeds a StructQueryTarget if c.value is empty.
+func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
+	return func(c *queryConfig) {
+		if unit == nil {
+			return
+		}
+		var ssaProg *ssa.Program
+		if c.program != nil {
+			ssaProg = c.program.Program
+		}
+		bound := newStructBound(unit, ssaProg)
+		c.structBound = bound
+		if len(c.value) == 0 && c.program != nil {
+			c.value = sfvm.ValuesOf(NewStructQueryTarget(c.program, unit, bound))
+		}
+		if c.program != nil {
+			c.program.structBound = bound
+			c.program.structScanActive = true
+		}
+		c.opts = append(c.opts,
+			sfvm.WithRuntimeOption(bound),
+			sfvm.WithRuntimeOption(WithStructBound(bound)),
+		)
 	}
 }
 
@@ -617,9 +666,15 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 }
 
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	if p != nil && sfvm.RuleIsSourceMode(rule, nil) {
+	if p != nil && rule.IsSourceMode() {
 		return nil, utils.Errorf(
 			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
+	if p != nil && rule.IsStructMode() {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute struct rule %s; struct rules require QueryWithStruct",
 			ruleGetRuleName(rule),
 		)
 	}
@@ -628,9 +683,15 @@ func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOptio
 }
 
 func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	if sfvm.RuleIsSourceMode(rule, nil) {
+	if rule.IsSourceMode() {
 		return nil, utils.Errorf(
 			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
+	if rule.IsStructMode() {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute struct rule %s; struct rules require QueryWithStruct",
 			ruleGetRuleName(rule),
 		)
 	}

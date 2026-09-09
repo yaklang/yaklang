@@ -113,6 +113,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	// if not shadow value return i self
 	v = actx.CovertShadowValue(v)
 
+	if !actx.structAllowValue(v) {
+		return Values{}
+	}
+
 	shouldExit, recoverStack := actx.check(v)
 
 	defer recoverStack()

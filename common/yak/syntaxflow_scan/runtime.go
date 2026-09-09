@@ -125,8 +125,14 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
+	if rule.IsStructMode() {
+		if prog, ok := target.(*ssaapi.Program); ok && prog.StructRulesAlreadyRan(rule) {
+			m.markRuleSkipped()
+			return
+		}
+	}
 	// 语言匹配检查（source 模式规则按文件 glob 过滤，不强制语言对齐）
-	if !m.Config.GetScanIgnoreLanguage() && !sfvm.RuleIsSourceMode(rule, nil) {
+	if !m.Config.GetScanIgnoreLanguage() && !rule.IsSourceMode() {
 		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
 			m.markRuleSkipped()
 			return

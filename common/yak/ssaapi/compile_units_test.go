@@ -67,6 +67,22 @@ func TestCompileUnitExecutionBatchesMergeSmallSCCs(t *testing.T) {
 	require.Equal(t, 2, batches[1].endSCC)
 }
 
+func TestSCCExecutionBatchesKeepsOneSCCPerBatch(t *testing.T) {
+	order := [][]*CompileUnit{
+		{testCompileUnit("unit:a", 2, 200), testCompileUnit("unit:b", 3, 300)},
+		{testCompileUnit("unit:c", 10, 1000)},
+	}
+
+	batches := sccExecutionBatches(order)
+	require.Len(t, batches, 2)
+	require.Equal(t, []string{"unit:a", "unit:b"}, batches[0].unitKeys)
+	require.Equal(t, 0, batches[0].startSCC)
+	require.Equal(t, 0, batches[0].endSCC)
+	require.Equal(t, []string{"unit:c"}, batches[1].unitKeys)
+	require.Equal(t, 1, batches[1].startSCC)
+	require.Equal(t, 1, batches[1].endSCC)
+}
+
 func TestFlattenCompileUnitsFollowsSCCOrder(t *testing.T) {
 	plan := &UnitPlan{
 		Units: map[string]*CompileUnit{

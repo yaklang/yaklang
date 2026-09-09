@@ -34,6 +34,29 @@ func MatchInstructionByOpcodesWithFileFilter(
 	return insts
 }
 
+// MatchInstructionByOpcodesResident walks live IR only (no DB). Used by
+// compile-time struct-mode scan on ProgramCacheDBWrite programs.
+func MatchInstructionByOpcodesResident(prog *Program, opcodes ...Opcode) []Instruction {
+	if prog == nil || prog.Cache == nil {
+		return nil
+	}
+	var insts []Instruction
+	for _, inst := range prog.Cache.residentInstructions() {
+		if inst == nil {
+			continue
+		}
+		if slices.Contains(opcodes, inst.GetOpcode()) {
+			insts = append(insts, inst)
+		}
+	}
+	return insts
+}
+
+// InstructionFilePath is the exported form of getInstructionFilePath.
+func InstructionFilePath(inst Instruction) string {
+	return getInstructionFilePath(inst)
+}
+
 func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
 	var insts []Instruction
 	switch prog.DatabaseKind {

@@ -30,6 +30,7 @@ type OperationConfig struct {
 	lastValue *Value
 
 	programOverLay *ProgramOverLay // for program overlay analysis
+	structBound    *structBound
 }
 
 type OperationOption func(*OperationConfig)

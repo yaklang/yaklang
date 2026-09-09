@@ -2,8 +2,6 @@ package sfvm
 
 import (
 	"strings"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 type SFDescKeyType string
@@ -35,6 +33,8 @@ const (
 	RuleModeSource = "source"
 	// RuleModeSSA marks rules that run on SSA IR (default).
 	RuleModeSSA = "ssa"
+	// RuleModeStruct marks rules that scan the current compile unit's resident SSA.
+	RuleModeStruct = "struct"
 )
 
 func ValidDescItemKeyType(key string) SFDescKeyType {
@@ -74,16 +74,6 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 	}
 }
 
-// IsSourceMode reports whether a mode string selects the sfpattern source scanner.
-func IsSourceMode(mode string) bool {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case RuleModeSource, "pattern", "sfpattern":
-		return true
-	default:
-		return false
-	}
-}
-
 // AppendRuleTag appends tag if not already present (pipe-separated).
 func AppendRuleTag(existing, tag string) string {
 	tag = strings.TrimSpace(tag)
@@ -101,40 +91,13 @@ func AppendRuleTag(existing, tag string) string {
 	return existing + "|" + tag
 }
 
-// RuleHasSourceMode reports whether a rule is tagged for source scanning.
-func RuleHasSourceMode(tag string, extra map[string]string) bool {
-	for _, part := range strings.Split(tag, "|") {
-		p := strings.TrimSpace(part)
-		if IsSourceMode(p) || strings.EqualFold(p, RuleModeSource) {
-			return true
-		}
+// FrameIsStructMode reports whether a compiled frame should run via StructQueryTarget.
+// Mode is written onto the rule during SyntaxFlow compile (desc(mode: ...)).
+func FrameIsStructMode(frame *SFFrame) bool {
+	if frame == nil {
+		return false
 	}
-	if extra != nil {
-		if IsSourceMode(extra["mode"]) || IsSourceMode(extra["engine"]) || IsSourceMode(extra["exec_mode"]) {
-			return true
-		}
-	}
-	return false
-}
-
-// RuleIsSourceMode reports whether rule should run via sfpattern.
-func RuleIsSourceMode(rule *schema.SyntaxFlowRule, extra map[string]string) bool {
-	if rule != nil {
-		switch schema.ValidRuleMode(rule.Mode) {
-		case schema.SFR_MODE_SOURCE:
-			return true
-		case schema.SFR_MODE_SSA:
-			return false
-		}
-	}
-	return RuleHasSourceMode(ruleTag(rule), extra)
-}
-
-func ruleTag(rule *schema.SyntaxFlowRule) string {
-	if rule == nil {
-		return ""
-	}
-	return rule.Tag
+	return frame.GetRule().IsStructMode()
 }
 
 // FrameIsSourceMode reports whether a compiled frame should run via sfpattern.
@@ -142,20 +105,7 @@ func FrameIsSourceMode(frame *SFFrame) bool {
 	if frame == nil {
 		return false
 	}
-	rule := frame.GetRule()
-	if rule == nil {
-		return false
-	}
-	extra := map[string]string{}
-	for _, info := range frame.VerifyFsInfo {
-		if info == nil {
-			continue
-		}
-		for k, v := range info.rawDesc {
-			extra[k] = v
-		}
-	}
-	return RuleIsSourceMode(rule, extra)
+	return frame.GetRule().IsSourceMode()
 }
 
 // GetSupplyInfoDescKeyType 拿到所有desc item中，
