@@ -4546,5 +4546,143 @@
     "rule_name": "检测Golang外部参数参与的文件路径拼接",
     "hash": "a9035d1c03afc70267a3e580c2edb073d0ae16f1e39be466f72daa23850e0f32",
     "version": "20260908.0001"
+  },
+  {
+    "rule_id": "29b47af1-bf11-4069-b8de-70364bc24ad4",
+    "rule_name": "检测 C#/.NET Newtonsoft TypeNameHandling 不安全反序列化",
+    "hash": "d1909e825b81e3bdea4d7129ee2ed4b3654daf9df125246fbd23cedc92c2911a",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "353125c8-5cc7-4d67-99a5-0406727f6d51",
+    "rule_name": "检测 C#/.NET Response.Write 跨站脚本",
+    "hash": "4c988e157213a6b87c5e0b953452e1b5fe3c5ca7782153d573cdb02f7b9f0c30",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "449e1b9b-15ff-47f2-860c-3ef3e5d1d917",
+    "rule_name": "检测 C#/.NET Process.Start 命令注入",
+    "hash": "ebb73b0ef13dc5da7f3f858fc62087440ac8caee8c5bf0c5bb24a18adbdc2439",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "4adea2c5-4002-4180-9890-76360c3c492e",
+    "rule_name": "操作系统命令执行入口（C#/.NET 库规则）",
+    "hash": "3d25a34859ec87053abb1b23b99515e067e4894e84c9d667015fc19b88d3be29",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "509fabfd-d935-4fdc-9c0f-d4f739394f3a",
+    "rule_name": "XML 解析入口（C#/.NET 库规则）",
+    "hash": "38bc27d335354db5a6da6cc96b62b37c342cf60f78ce23f4606a3bf4cb95d8e9",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "56a180fd-117a-482a-9737-0ed7ca53fe2d",
+    "rule_name": "检测 C#/.NET Razor 表单缺少防伪令牌",
+    "hash": "9b25358736b891b9ce12affbf7dc1a208462c15ed61af8e89d398e0bad0cd8f7",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "5ebe88e5-0d49-4121-b1cc-13fb11b796ec",
+    "rule_name": "用户输入源（C#/.NET 库规则）",
+    "hash": "77af6fd53d03515dcc6223b763e29358cd3c3b0623e4be940051d9e4e4e59587",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "5ef325e1-a59a-4a38-9f82-53007a08a01a",
+    "rule_name": "不安全反序列化入口（C#/.NET 库规则）",
+    "hash": "057f0869b55a0a9cb87895d248679f65c326e83d71f5d9ae40fed6241b8f2d2c",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "71d32214-1bff-45ca-a1ec-d9ed351a840c",
+    "rule_name": "检测 C#/.NET System.Random 弱伪随机",
+    "hash": "589c56646cc23475a970f6399f161410128cb57c77933c09da6567b2756be9ba",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "73476cde-ff2e-4ba6-affe-249ab2a17977",
+    "rule_name": "检测 C#/.NET BinaryFormatter 不安全反序列化",
+    "hash": "d24fc877387f1006c571006d576a69f0efb360e64e94e3a52404a6cf3c0aedcf",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "73e93408-6f0b-4243-9fee-8a9a22fa34d8",
+    "rule_name": "出站 HTTP 请求入口（C#/.NET 库规则）",
+    "hash": "30630c55a248c2f03c08734a906e9e12b789736c7cbe7c94fa5856a612ccd129",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "845b0419-37c5-48c3-be7c-1ddfbda0ecf3",
+    "rule_name": "检测 C#/.NET XmlDocument/XmlTextReader XXE",
+    "hash": "79e2824687ebbf24dde9a9aa819a068361d890066940abd548c0989b93914cd1",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "88d689f0-f10a-43c0-8b70-5c090c5edbd8",
+    "rule_name": "SQL 执行入口（C#/.NET 库规则）",
+    "hash": "c6a07aa74cfc9008930f05d962ca1bda74b4ca506561d72c0f7eee9404d75478",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "9c9e02ad-aef6-46c8-8790-7e657d7ef816",
+    "rule_name": "检测 C#/.NET 不安全的 ECB 加密模式",
+    "hash": "3d615b90eac8cf33d5b8df46402fcaf9f8b6c5fe38253d422bf5687776fd0cf2",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "a019f712-7c6d-442b-83ae-32d88e3aa2d7",
+    "rule_name": "检测 C#/.NET Response.Redirect 开放重定向",
+    "hash": "1a154bdbf251ff00a17ac58e665bfd5644564a4ced2b8026e0657892cf126b60",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "a988126c-0596-41d0-9e53-247a7eb2afc9",
+    "rule_name": "检测 C#/.NET 弱加密或弱哈希算法",
+    "hash": "4618aa857167e25598e8297beaeb82807def14ca65e29bf09934a14efda7ed7c",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "a9f06d2e-e458-46bd-8e03-8274f2f57f5a",
+    "rule_name": "文件路径操作入口（C#/.NET 库规则）",
+    "hash": "bb709b711254621f433bd843b12db0431eb7a8d60e30e8018309635852d3f4f5",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "acd5bdca-2638-4666-8ba6-26de044069e2",
+    "rule_name": "检测 C#/.NET HttpClient/WebRequest SSRF",
+    "hash": "c338060002319efb25edfe3cb0753269646fb24880874253da39747fefd02f22",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "aee62728-fdcb-43c3-ba6d-7905b5d077a2",
+    "rule_name": "检测 C#/.NET MVC HttpPost 缺少防伪令牌",
+    "hash": "3155f6b33a10a3db12fa2ac7f3df759be776a986fe18aadd92757062ee840499",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "da905652-125a-4adf-a400-221f1ec3b7f5",
+    "rule_name": "检测 C#/.NET DirectorySearcher.Filter LDAP 注入",
+    "hash": "12eeb3cc548d01a3d894b5e0c880a7ea4ad4a253f47f60d0082fa5ef4a1877ee",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "de762792-0e19-4fb8-8600-c0b6859338a4",
+    "rule_name": "检测 C#/.NET SqlCommand SQL 注入",
+    "hash": "ae4f88b7c07a922c20e494428dc2c4f57913ceef080ba8eddd051a7888dfb7e8",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "f8af00eb-c45b-4a4d-92c8-bb9eadca701c",
+    "rule_name": "检测 C#/.NET 文件路径遍历",
+    "hash": "deca1b4741aea7b42c6a72043813dfa47f11fa7579fbdad6233463a118699e84",
+    "version": "20260909.0001"
+  },
+  {
+    "rule_id": "ff961a70-dac1-4d9f-9058-7be6c54e8754",
+    "rule_name": "检测 C#/.NET SelectSingleNode XPath 注入",
+    "hash": "737a25c232459fb3f23db4b4e9f16bbbed9471d3e2382f0b55f6d073dcd3bc2d",
+    "version": "20260909.0001"
   }
 ]
