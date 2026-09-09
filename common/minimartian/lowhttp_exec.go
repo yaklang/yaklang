@@ -287,7 +287,6 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 			// into memory. The trigger timing is decided inside the callback.
 			if isServerSentEventContentType(value) {
 				httpctx.SetNoBodyBuffer(req, true)
-				httpctx.SetResponseReadTooSlow(req, true)
 				httpctx.SetResponseHeaderCallback(req, p.makeStreamResponseCallback(isHttps, req, bwr, cancelUpstream))
 				return
 			}
@@ -386,6 +385,10 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 // only created for SSE responses (see the kind == streamKindSSE guard below):
 // SSE disables body buffering, so the spill file is the only way to persist
 // the long-lived body. Recorder write errors never break or delay forwarding.
+//
+// The recorder defers too-large / read-too-slow marking until the accumulated
+// body exceeds MaxContentLength. Small SSE responses that stay within the
+// limit are finalized as normal flows; only large responses are marked.
 func (p *Proxy) makeStreamResponseCallback(
 	isHTTPS bool,
 	req *http.Request,
@@ -417,19 +420,25 @@ func (p *Proxy) makeStreamResponseCallback(
 		// Only SSE responses need a recorder: SSE sets NoBodyBuffer so the
 		// response builder never buffers the long-lived body, and the only
 		// way to persist it for history/audit is the spill file the recorder
-		// writes incrementally. The recorder also marks the flow as
-		// read-too-slow so History/API reconstruct the response from the
-		// spill file instead of the (empty) DB body.
+		// writes incrementally.
+		//
+		// The recorder is created with a size threshold (MaxContentLength).
+		// It does NOT mark the flow as too-large / read-too-slow upfront.
+		// Instead, it tracks the accumulated body size and only marks the
+		// flow when the body exceeds the threshold. Small SSE responses that
+		// stay within the limit are finalized as normal flows (body read
+		// back from the spill file into the DB), while large responses keep
+		// the spill files and the too-large flags — matching the behavior
+		// of non-streaming large responses.
 		//
 		// Filtered and chunked/large responses do NOT set NoBodyBuffer, so
 		// the response builder still buffers the full body and the ordinary
 		// mirror path persists it. Creating a recorder for them would
-		// unconditionally mark the flow read-too-slow and attach spill files
-		// even when the body is smaller than MaxContentLength (e.g. a chunked
-		// 4 MB response under a 5 MB limit), which is incorrect. The
-		// too-large decision for those kinds stays with the response builder,
-		// which judges by the actual body size — matching the pre-SSE
-		// behavior.
+		// unconditionally attach spill files even when the body is smaller
+		// than MaxContentLength (e.g. a chunked 4 MB response under a 5 MB
+		// limit), which is incorrect. The too-large decision for those kinds
+		// stays with the response builder, which judges by the actual body
+		// size — matching the pre-SSE behavior.
 		var recorder io.WriteCloser
 		var closeOnce sync.Once
 		closeRecorder := func() {
@@ -441,13 +450,25 @@ func (p *Proxy) makeStreamResponseCallback(
 				}
 			})
 		}
+		// MaxContentLength is used both as the recorder size threshold (for
+		// deferred too-large marking on SSE) and as the buffered trigger's
+		// size limit.
+		MaxContentLength := int(consts.GetGlobalMaxContentLength())
+		if p.GetMaxContentLength() != 0 {
+			MaxContentLength = p.maxContentLength
+		}
+
 		if kind == streamKindSSE && p.streamRecorder != nil {
 			recorderRsp, err := utils.ReadHTTPResponseFromBytes(headerBytes, nil)
 			if err != nil {
 				log.Warnf("mitm: parse response header for recorder failed: %v", err)
 			} else {
 				recorderRsp.Request = req
-				recorder, err = p.streamRecorder(isHTTPS, req, recorderRsp, headerBytes)
+				// For SSE, pass the MaxContentLength as the size threshold so
+				// the recorder defers marking the flow as too-large until the
+				// body actually exceeds the limit. Small SSE responses that
+				// stay within the limit are persisted as normal flows.
+				recorder, err = p.streamRecorder(isHTTPS, req, recorderRsp, headerBytes, int64(MaxContentLength))
 				if err != nil {
 					log.Warnf("mitm: create stream recorder failed: %v", err)
 					recorder = nil
@@ -493,11 +514,6 @@ func (p *Proxy) makeStreamResponseCallback(
 			}()
 		}
 
-		// Choose the trigger based on the streaming kind.
-		MaxContentLength := int(consts.GetGlobalMaxContentLength())
-		if p.GetMaxContentLength() != 0 {
-			MaxContentLength = p.maxContentLength
-		}
 		var writerCloser *utils.TriggerWriter
 		if immediate {
 			writerCloser = utils.NewTriggerWriterImmediate(triggerHandler)
