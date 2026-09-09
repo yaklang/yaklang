@@ -27,12 +27,16 @@ jobs:
           cache: false
         id: go
 
+      - name: Install sqlite3
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+
       - name: Build yak
         run: |
           go build -o ./yak ./common/yak/cmd/yak.go
           chmod +x ./yak
 
       # 测试1：只构建 NVD 2.0 数据（跳过 5.0），验证基础链路
+      # 使用 --year 2025 限制下载量，--cache 在第二次构建时复用已下载的文件
       - name: Build CVE Database (NVD 2.0 only, year 2025)
         run: |
           ./yak build-cve-database --no-gzip --year 2025 --v5-skip --output /tmp/test-cve-nvd.db
@@ -42,36 +46,57 @@ jobs:
         run: |
           echo "=== NVD-only Database ==="
           ls -lh /tmp/test-cve-nvd.db
-          sqlite3 /tmp/test-cve-nvd.db "SELECT COUNT(*) as total FROM cves;"
+          TOTAL=$(sqlite3 /tmp/test-cve-nvd.db "SELECT COUNT(*) as total FROM cves;")
+          echo "Total CVEs: $TOTAL"
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "ERROR: No CVEs in NVD-only database!"
+            exit 1
+          fi
           sqlite3 /tmp/test-cve-nvd.db "SELECT COUNT(*) as with_title FROM cves WHERE title != '';"
           sqlite3 /tmp/test-cve-nvd.db "SELECT COUNT(*) as with_vendor FROM cves WHERE vendor != '';"
           echo "=== Sample (NVD only, title should be empty) ==="
-          sqlite3 -header /tmp/test-cve-nvd.db "SELECT cve, title, vendor, product, severity FROM cves LIMIT 3;"
+          sqlite3 -header /tmp/test-cve-nvd.db "SELECT cve, title, vendor, product, severity FROM cves LIMIT 5;"
 
       # 测试2：构建 NVD 2.0 + 5.0 数据，验证 5.0 补充 title
-      - name: Build CVE Database (NVD 2.0 + 5.0, year 2025)
+      # 使用 --cache 复用第一次构建下载的 NVD 文件，避免 NVD rate limit
+      - name: Build CVE Database (NVD 2.0 + 5.0, year 2025, reuse NVD cache)
         run: |
-          ./yak build-cve-database --no-gzip --year 2025 --output /tmp/test-cve-full.db
+          ./yak build-cve-database --no-gzip --year 2025 --cache --output /tmp/test-cve-full.db
           echo "Full build finished"
 
       - name: Verify full database (NVD + 5.0)
         run: |
           echo "=== Full Database (NVD + 5.0) ==="
           ls -lh /tmp/test-cve-full.db
-          sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as total FROM cves;"
-          sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as with_title FROM cves WHERE title != '';"
-          sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as with_vendor FROM cves WHERE vendor != '';"
-          sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as with_product FROM cves WHERE product != '';"
+          TOTAL=$(sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as total FROM cves;")
+          echo "Total CVEs: $TOTAL"
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "ERROR: No CVEs in full database!"
+            exit 1
+          fi
+          TITLE_COUNT=$(sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as with_title FROM cves WHERE title != '';")
+          VENDOR_COUNT=$(sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as with_vendor FROM cves WHERE vendor != '';")
+          PRODUCT_COUNT=$(sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) as with_product FROM cves WHERE product != '';")
+          echo "With title: $TITLE_COUNT"
+          echo "With vendor: $VENDOR_COUNT"
+          echo "With product: $PRODUCT_COUNT"
           echo "=== Sample CVEs with title (from 5.0) ==="
           sqlite3 -header /tmp/test-cve-full.db "SELECT cve, title, vendor, product, severity FROM cves WHERE title != '' LIMIT 5;"
-          echo "=== Sample CVEs without title (old CVEs or no CNA title) ==="
+          echo "=== Sample CVEs without title ==="
           sqlite3 -header /tmp/test-cve-full.db "SELECT cve, vendor, product, severity FROM cves WHERE title = '' LIMIT 5;"
+          # Verify 5.0 added titles
+          if [ "$TITLE_COUNT" -eq 0 ]; then
+            echo "WARNING: No titles found at all, 5.0 data may not have loaded"
+          fi
 
       # 测试3：对比 NVD-only 和 Full 的差异
       - name: Compare NVD-only vs Full
         run: |
           NVD_COUNT=$(sqlite3 /tmp/test-cve-nvd.db "SELECT COUNT(*) FROM cves WHERE title != '';")
           FULL_COUNT=$(sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) FROM cves WHERE title != '';")
+          NVD_TOTAL=$(sqlite3 /tmp/test-cve-nvd.db "SELECT COUNT(*) FROM cves;")
+          FULL_TOTAL=$(sqlite3 /tmp/test-cve-full.db "SELECT COUNT(*) FROM cves;")
+          echo "CVE count  - NVD only: $NVD_TOTAL, Full: $FULL_TOTAL"
           echo "Title count - NVD only: $NVD_COUNT, Full: $FULL_COUNT"
           if [ "$FULL_COUNT" -le "$NVD_COUNT" ]; then
             echo "WARNING: 5.0 did not add any titles, expected Full > NVD-only"
