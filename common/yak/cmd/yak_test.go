@@ -14,7 +14,7 @@ import (
 
 func TestWriteGRPCReadyEvent(t *testing.T) {
 	var output bytes.Buffer
-	if err := writeGRPCReadyEvent(&output, "127.0.0.1:54321"); err != nil {
+	if err := writeGRPCReadyEvent(&output, "127.0.0.1:54321", "tcp", "testid1"); err != nil {
 		t.Fatalf("write ready event: %v", err)
 	}
 
@@ -27,7 +27,7 @@ func TestWriteGRPCReadyEvent(t *testing.T) {
 	if err := json.Unmarshal([]byte(strings.TrimPrefix(line, grpcReadyMarkerPrefix)), &event); err != nil {
 		t.Fatalf("decode ready event: %v", err)
 	}
-	if event.SchemaVersion != 1 || event.Address != "127.0.0.1:54321" {
+	if event.SchemaVersion != 2 || event.Address != "127.0.0.1:54321" || event.Transport != "tcp" || event.InstanceId != "testid1" {
 		t.Fatalf("unexpected ready event: %#v", event)
 	}
 }
