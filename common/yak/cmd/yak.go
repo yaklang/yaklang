@@ -56,6 +56,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/lowtun"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -508,12 +509,23 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "local-password",
 			Usage: "本地密码模式，使用固定端口 9011，不使用 TLS，与 host/port/secret/tls/gen-tls-crt 互斥",
 		},
+		cli.StringFlag{
+			Name:  "transport",
+			Usage: "传输方式：tcp（默认）/ unix / npipe",
+			Value: "tcp",
+		},
+		cli.StringFlag{
+			Name:  "socket-path",
+			Usage: "IPC 模式（unix/npipe）下的 socket 路径或管道名，tcp 模式忽略",
+		},
 	},
 	Action: func(c *cli.Context) (finalError error) {
 		grpcStartTime := time.Now()
 		var grpcPhase string = "init"
 		var grpcReasonCode string
 		var grpcReasonI18n *schema.I18n
+		transport := c.String("transport")
+		socketPath := c.String("socket-path")
 		defer func() {
 			if finalError != nil {
 				elapsedMs := time.Since(grpcStartTime).Milliseconds()
@@ -756,11 +768,37 @@ var startGRPCServerCommand = cli.Command{
 			port = c.Int("port")
 		}
 
-		log.Infof("start to listen on: %v", utils.HostPort(host, port))
 		var lis net.Listener
 
-		// local-password 模式下强制不使用 TLS
-		if localPassword == "" && c.Bool("tls") {
+		// IPC 模式（unix / npipe）：使用 lowtun.ListenSocket
+		if transport == "unix" || transport == "npipe" {
+			if socketPath == "" {
+				grpcPhase = "init"
+				grpcReasonCode = "init_failed"
+				grpcReasonI18n = grpcEventReasonI18n("init_failed")
+				finalError = utils.Errorf("socket-path is required when transport is %s", transport)
+				return
+			}
+			log.Infof("start to listen (%s) on: %s", transport, socketPath)
+			lis, err = lowtun.ListenSocket(socketPath)
+			if err != nil {
+				listenReason, hint := classifyListenError(err)
+				if listenReason == "" {
+					listenReason = "listen_failed"
+				}
+				log.Errorf("failed to listen (%s): [%s] %s", transport, listenReason, hint)
+				grpcPhase = "listen"
+				grpcReasonCode = listenReason
+				grpcReasonI18n = grpcEventReasonI18n(listenReason)
+				finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
+				return
+			}
+		} else {
+			// TCP 模式（默认）
+			log.Infof("start to listen on: %v", utils.HostPort(host, port))
+
+			// local-password 模式下强制不使用 TLS
+			if localPassword == "" && c.Bool("tls") {
 			// 签发证书
 			var cert []byte
 			var key []byte
@@ -839,16 +877,17 @@ var startGRPCServerCommand = cli.Command{
 				finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
 				return
 			}
-		} else {
-			lis, err = net.Listen("tcp", utils.HostPort(host, port))
-			if err != nil {
-				listenReason, hint := classifyListenError(err)
-				log.Errorf("failed to listen (tcp): [%s] %s", listenReason, hint)
-				grpcPhase = "listen"
-				grpcReasonCode = listenReason
-				grpcReasonI18n = grpcEventReasonI18n(listenReason)
-				finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
-				return
+			} else {
+				lis, err = net.Listen("tcp", utils.HostPort(host, port))
+				if err != nil {
+					listenReason, hint := classifyListenError(err)
+					log.Errorf("failed to listen (tcp): [%s] %s", listenReason, hint)
+					grpcPhase = "listen"
+					grpcReasonCode = listenReason
+					grpcReasonI18n = grpcEventReasonI18n(listenReason)
+					finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
+					return
+				}
 			}
 		}
 		s.StartAIReActScheduler()
@@ -857,7 +896,7 @@ var startGRPCServerCommand = cli.Command{
 		actualAddress := lis.Addr().String()
 		instanceId := utils.RandStringBytes(8)
 		log.Infof("yak grpc listener ready on: %s", actualAddress)
-		if err := writeGRPCReadyEvent(os.Stdout, actualAddress, "tcp", instanceId); err != nil {
+		if err := writeGRPCReadyEvent(os.Stdout, actualAddress, transport, instanceId); err != nil {
 			log.Warnf("write yak grpc ready event failed: %v", err)
 		}
 
@@ -971,6 +1010,15 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			Usage:  "Specific SSA Database  Name, eg default-yakssa.db",
 			EnvVar: "SSA_DATABASE_RAW",
 		},
+		cli.StringFlag{
+			Name:  "transport",
+			Usage: "传输方式：tcp（默认）/ unix / npipe",
+			Value: "tcp",
+		},
+		cli.StringFlag{
+			Name:  "socket-path",
+			Usage: "IPC 模式（unix/npipe）下的 socket 路径或管道名，tcp 模式忽略",
+		},
 	},
 	Action: func(ctx *cli.Context) (finalError error) {
 		var port = ctx.Int("port")
@@ -978,6 +1026,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		addr := utils.HostPort("127.0.0.1", port)
 
 		clientPassword := ctx.String("client-password")
+		transport := ctx.String("transport")
+		socketPath := ctx.String("socket-path")
 
 		projectPath := ctx.String("project-db")
 		profilePath := ctx.String("profile-db")
@@ -1013,9 +1063,16 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			m.Set("phase", phase)
 			m.Set("elapsedMs", time.Since(checkSecretStartTime).Milliseconds())
 			m.Set("info", info)
-			m.Set("host", "127.0.0.1")
-			m.Set("port", port)
-			m.Set("addr", utils.HostPort("127.0.0.1", port))
+			m.Set("transport", transport)
+			if transport == "tcp" {
+				m.Set("host", "127.0.0.1")
+				m.Set("port", port)
+				m.Set("addr", utils.HostPort("127.0.0.1", port))
+			} else {
+				m.Set("host", "")
+				m.Set("port", 0)
+				m.Set("addr", socketPath)
+			}
 			m.Set("secret", "***")
 			m.Set("version", version)
 			m.Set("reasonCode", reason)
@@ -1034,7 +1091,11 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		// 客户端模式：只连接服务器测试
 		if clientPassword != "" {
 			log.Info("running in client mode, connecting to existing server...")
-			log.Infof("target: %s", addr)
+			if transport == "tcp" {
+				log.Infof("target: %s", addr)
+			} else {
+				log.Infof("target: %s (%s)", socketPath, transport)
+			}
 
 			// 创建带超时的 context（10 秒）
 			dialCtx, dialCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -1042,16 +1103,34 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 			// 创建客户端连接
 			log.Infof("connecting to grpc server with password (timeout: 10s)...")
-			conn, err := grpc.DialContext(
-				dialCtx,
-				addr,
-				grpc.WithInsecure(),
-				grpc.WithBlock(),
-				grpc.WithDefaultCallOptions(
-					grpc.MaxCallRecvMsgSize(100*1024*1024),
-					grpc.MaxCallSendMsgSize(100*1024*1024),
-				),
-			)
+			var conn *grpc.ClientConn
+			var err error
+			if transport == "tcp" {
+				conn, err = grpc.DialContext(
+					dialCtx,
+					addr,
+					grpc.WithInsecure(),
+					grpc.WithBlock(),
+					grpc.WithDefaultCallOptions(
+						grpc.MaxCallRecvMsgSize(100*1024*1024),
+						grpc.MaxCallSendMsgSize(100*1024*1024),
+					),
+				)
+			} else {
+				conn, err = grpc.DialContext(
+					dialCtx,
+					socketPath,
+					grpc.WithInsecure(),
+					grpc.WithBlock(),
+					grpc.WithContextDialer(func(_ context.Context, _ string) (net.Conn, error) {
+						return lowtun.DialSocket(socketPath)
+					}),
+					grpc.WithDefaultCallOptions(
+						grpc.MaxCallRecvMsgSize(100*1024*1024),
+						grpc.MaxCallSendMsgSize(100*1024*1024),
+					),
+				)
+			}
 			if err != nil {
 				log.Errorf("failed to dial grpc server: %s", err)
 				fmt.Printf("\n[FAILED] Cannot connect to server at %s\n", addr)
@@ -1129,11 +1208,24 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		// 服务器模式：启动测试服务器
 		log.Info("running in server mode, starting test server...")
 
-		// 检查端口是否被占用
-		lis, err := net.Listen("tcp", addr)
+		// 监听
+		var lis net.Listener
+		var err error
+		if transport == "tcp" {
+			lis, err = net.Listen("tcp", addr)
+		} else {
+			lis, err = lowtun.ListenSocket(socketPath)
+		}
 		if err != nil {
 			listenReason, hint := classifyListenError(err)
-			log.Errorf("failed to listen on port %d: [%s] %s", port, listenReason, hint)
+			if listenReason == "" {
+				listenReason = "listen_failed"
+			}
+			if transport == "tcp" {
+				log.Errorf("failed to listen on port %d: [%s] %s", port, listenReason, hint)
+			} else {
+				log.Errorf("failed to listen (%s) on %s: [%s] %s", transport, socketPath, listenReason, hint)
+			}
 			fmt.Printf("\n[FAILED] Cannot listen on port %d\n", port)
 			fmt.Printf("Reason: %s\n", listenReason)
 			fmt.Printf("Hint: %s\n", hint)
@@ -1212,13 +1304,38 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		defer runCheckSecretCleanupWithTimeout("stop test grpc server", time.Second, grpcTrans.Stop)
 
 		// 等待服务器启动
-		if err := utils.WaitConnect(addr, 5); err != nil {
-			log.Errorf("failed to connect to server, start local port listener failed: %s", err)
-			finalError = utils.Wrap(err, "waiting grpc listener failed")
-			phase = "wait_connect"
-			reason = waitConnectFailed
-			checkSecretReasonI18n = grpcEventReasonI18n(waitConnectFailed)
-			return
+		if transport == "tcp" {
+			if err := utils.WaitConnect(addr, 5); err != nil {
+				log.Errorf("failed to connect to server, start local port listener failed: %s", err)
+				finalError = utils.Wrap(err, "waiting grpc listener failed")
+				phase = "wait_connect"
+				reason = waitConnectFailed
+				checkSecretReasonI18n = grpcEventReasonI18n(waitConnectFailed)
+				return
+			}
+		} else {
+			// IPC 模式：轮询 DialSocket 直到成功或超时
+			waitDone := make(chan error, 1)
+			go func() {
+				deadline := time.Now().Add(5 * time.Second)
+				for time.Now().Before(deadline) {
+					if c, e := lowtun.DialSocket(socketPath); e == nil {
+						c.Close()
+						waitDone <- nil
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+				waitDone <- utils.Errorf("ipc wait connect timeout")
+			}()
+			if e := <-waitDone; e != nil {
+				log.Errorf("failed to connect to ipc server: %s", e)
+				finalError = utils.Wrap(e, "waiting ipc listener failed")
+				phase = "wait_connect"
+				reason = waitConnectFailed
+				checkSecretReasonI18n = grpcEventReasonI18n(waitConnectFailed)
+				return
+			}
 		}
 
 		// 创建带超时的 context（10 秒）
@@ -1227,16 +1344,33 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 		// 创建客户端连接
 		log.Infof("connecting to test grpc server (timeout: 10s)...")
-		conn, err := grpc.DialContext(
-			dialCtx,
-			addr,
-			grpc.WithInsecure(),
-			grpc.WithBlock(),
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(100*1024*1024),
-				grpc.MaxCallSendMsgSize(100*1024*1024),
-			),
-		)
+		var conn *grpc.ClientConn
+		if transport == "tcp" {
+			conn, err = grpc.DialContext(
+				dialCtx,
+				addr,
+				grpc.WithInsecure(),
+				grpc.WithBlock(),
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(100*1024*1024),
+					grpc.MaxCallSendMsgSize(100*1024*1024),
+				),
+			)
+		} else {
+			conn, err = grpc.DialContext(
+				dialCtx,
+				socketPath,
+				grpc.WithInsecure(),
+				grpc.WithBlock(),
+				grpc.WithContextDialer(func(_ context.Context, _ string) (net.Conn, error) {
+					return lowtun.DialSocket(socketPath)
+				}),
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(100*1024*1024),
+					grpc.MaxCallSendMsgSize(100*1024*1024),
+				),
+			)
+		}
 		if err != nil {
 			log.Errorf("failed to dial grpc server: %s", err)
 			finalError = utils.Wrap(err, dialGrpcServerFailed)
