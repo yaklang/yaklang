@@ -433,8 +433,12 @@ type Config struct {
 		Lazy WorkDir for semantic artifact directory naming
 	*/
 	// DatabaseRecordID is the gorm primary key ID from AIAgentRuntime
-	DisableCreateDBRuntime bool // some liteforge or async lite agent , not save runtime to database, keep persistSession data clean
-	DatabaseRecordID       uint
+	DisableHelperCoordinators bool // Do not construct nested AI coordinators.
+	DisableGlobalPreset       bool // Do not inherit process-wide AI prompt context.
+	DisableInputDirectives    bool // Runtime owns loop selection; input is data.
+	DisableLocalContext       bool // Do not inspect the host filesystem for prompt context.
+	DisableCreateDBRuntime    bool // some liteforge or async lite agent , not save runtime to database, keep persistSession data clean
+	DatabaseRecordID          uint
 	// workDir is the lazily-created working directory path (set once, never changes)
 	workDir         string
 	workDirOnce     sync.Once
@@ -582,18 +586,24 @@ func (c *Config) GetVisionPriorityRawAICallback() AICallbackType {
 // NewConfig creates a new Config with options
 func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	config := newConfig(ctx)
+	constructorCancel := config.cancel
 
 	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
 	config.originOptions = opts
+	// WithContext can replace the constructor context. Resources created by
+	// newConfig (guardian and channels) must still stop with the final context.
+	context.AfterFunc(config.GetContext(), constructorCancel)
 
 	// Initialize checkpoint storage
-	config.BaseCheckpointableStorage = NewCheckpointableStorageWithDB(config.id, consts.GetGormProjectDatabase())
+	if config.BaseCheckpointableStorage == nil {
+		config.BaseCheckpointableStorage = NewCheckpointableStorageWithDB(config.id, consts.GetGormProjectDatabase())
+	}
 
 	// Initialize endpoint manager
-	config.Epm = NewEndpointManagerContext(ctx)
+	config.Epm = NewEndpointManagerContext(config.GetContext())
 	config.Epm.SetConfig(config)
 	if !config.AICallbackAvailable() {
 		if err := WithTieredAICallback()(config); err != nil || !config.AICallbackAvailable() {
@@ -3964,7 +3974,7 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 
 	e = c.EventFormat(e)
 
-	if e.ShouldSave() {
+	if (c.BaseCheckpointableStorage == nil || !c.BaseCheckpointableStorage.ephemeral) && e.ShouldSave() {
 		err := yakit.CreateOrUpdateAIOutputEvent(consts.GetGormProjectDatabase(), e)
 		if err != nil {
 			log.Errorf("create AI event failed: %v", err)

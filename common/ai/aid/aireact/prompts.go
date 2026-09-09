@@ -112,6 +112,9 @@ func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 // snapshot on PromptManager made concurrent batch prompt builders race on one
 // shared string, while no caller relied on that value after the return.
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
+	if pm.react.config.DisableLocalContext {
+		return ""
+	}
 	return filesys.Glance(wd)
 }
 

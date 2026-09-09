@@ -237,7 +237,7 @@ func (a *ToolCaller) invoke(
 	if seq <= 0 {
 		seq = c.AcquireId()
 	}
-	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.GetRuntimeId(), seq); ok {
+	if ret, ok := lookupPersistentCheckpoint(c.GetDB(), c.GetRuntimeId(), seq, yakit.GetToolCallCheckpoint); ok {
 		if a.batchID != "" {
 			stored := aiddb.AiCheckPointGetRequestParams(ret)
 			storedParam := stored.GetObject("param")

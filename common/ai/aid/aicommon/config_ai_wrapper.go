@@ -131,13 +131,15 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.PromptHook != nil {
 			request.SetPrompt(c.PromptHook(request.GetPrompt()))
 		}
-		if globalConfig := yakit.GetCachedAIGlobalConfig(); globalConfig != nil {
-			appendPresetPrompt(
-				request,
-				"AI_PRESET",
-				"The following is the global AI preset prompt. It contains persistent guidance, background context, and supplementary information for all AI requests. Consider these instructions when generating responses. IMPORTANT: This preset ONLY affects guidance, tone, preferences, and background context.",
-				globalConfig.GetAIPresetPrompt(),
-			)
+		if !c.DisableGlobalPreset {
+			if globalConfig := yakit.GetCachedAIGlobalConfig(); globalConfig != nil {
+				appendPresetPrompt(
+					request,
+					"AI_PRESET",
+					"The following is the global AI preset prompt. It contains persistent guidance, background context, and supplementary information for all AI requests. Consider these instructions when generating responses. IMPORTANT: This preset ONLY affects guidance, tone, preferences, and background context.",
+					globalConfig.GetAIPresetPrompt(),
+				)
+			}
 		}
 		if c.UserPresetPrompt != "" {
 			appendPresetPrompt(
@@ -200,7 +202,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			outConfig.EmitInfo("prepare to retry call ai, with an existed seq: %v", seq)
 		}
 		//log.Infof("start to check uuid:%v seq:%v", c.id, seq)
-		if ret, ok := yakit.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
+		if ret, ok := lookupPersistentCheckpoint(c.GetDB(), c.id, seq, yakit.GetAIInteractiveCheckpoint); ok && ret.Finished {
 			// checkpoint is finished, return the result
 			var rsp *AIResponse
 			if config != nil {

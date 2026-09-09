@@ -181,7 +181,8 @@ type toolCallArtifactManifest struct {
 }
 
 type toolCallArtifactBundle struct {
-	mu sync.Mutex
+	ephemeral bool
+	mu        sync.Mutex
 
 	dir          string
 	reportPath   string
@@ -204,6 +205,11 @@ type toolCallArtifactBundle struct {
 
 func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, identifier string) *toolCallArtifactBundle {
 	b := &toolCallArtifactBundle{preview: newBoundedHeadTailBuffer(toolCapturePreviewBytes)}
+	if cfg, ok := t.config.(*Config); ok && cfg.DisableLocalContext {
+		b.ephemeral = true
+		b.discarded = true
+		return b
+	}
 	workdir := ""
 	if cfg, ok := t.config.(*Config); ok {
 		workdir = cfg.Workdir
@@ -627,7 +633,7 @@ func (b *toolCallArtifactBundle) finalize(
 	paramGenDuration time.Duration,
 	rawAIParamResponse string,
 ) error {
-	if toolResult == nil {
+	if b.ephemeral || toolResult == nil {
 		return nil
 	}
 	if data, ok := toolResult.Data.(string); ok && isCanonicalToolResultData(data) {

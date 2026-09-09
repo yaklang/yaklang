@@ -255,6 +255,9 @@ func (r *ReAct) processRecoveryTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string, []reactloops.ReActLoopOption) {
+	if r.config.DisableInputDirectives {
+		return task.GetUserInput(), schema.AI_REACT_LOOP_NAME_DEFAULT, nil
+	}
 	defaultFocus := r.config.Focus
 	userQuery := task.GetUserInput()
 	parsedQuery, focus, loopOptions := r.parseLoopDirectives(userQuery, defaultFocus) // 遗留的输入指令解析
@@ -486,6 +489,9 @@ func sanitizeFolderName(name string, maxLen int) string {
 // Otherwise create a stable generic directory immediately; ensureSessionTitle
 // generates the display title asynchronously without delaying the first answer.
 func (r *ReAct) ensureWorkDirectory(userInput string) {
+	if r.config != nil && r.config.DisableLocalContext {
+		return
+	}
 	cfg := r.config
 	if cfg == nil {
 		return

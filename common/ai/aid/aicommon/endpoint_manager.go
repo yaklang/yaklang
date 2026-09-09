@@ -95,7 +95,7 @@ func (e *EndpointManager) CreateEndpointWithEventTypeAndSeq(typeName schema.Even
 			seq = c.AcquireId()
 		}
 		endpoint.seq = seq
-		if ret, ok := yakit.GetReviewCheckpoint(c.GetDB(), c.GetRuntimeId(), endpoint.seq); ok {
+		if ret, ok := lookupPersistentCheckpoint(c.GetDB(), c.GetRuntimeId(), endpoint.seq, yakit.GetReviewCheckpoint); ok {
 			endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
 			endpoint.checkpoint = ret
 		} else {

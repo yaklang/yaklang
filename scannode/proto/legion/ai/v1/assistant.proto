@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package legion.ai.v1;
+
+option go_package = "legion/gen/proto/legion/ai/v1;aiv1";
+
+// AssistantMessage is server-reconstructed conversation history, not authority.
+message AssistantMessage {
+  string role = 1;
+  string content = 2;
+}
+
+// AssistantTool describes an exact allowed platform capability, never executable code.
+message AssistantTool {
+  string name = 1;
+  string description = 2;
+  string parameters_json = 3;
+}
+
+// AssistantTurnRequest starts one isolated turn in the resident assistant service.
+// The delegation token is private transport data and must never enter a prompt or event.
+message AssistantTurnRequest {
+  string conversation_id = 1;
+  string turn_id = 2;
+  string owner_user_id = 3;
+  string input = 4;
+  repeated AssistantMessage history = 5;
+  string page_title = 6;
+  string page_path = 7;
+  string delegation_token = 8;
+  repeated AssistantTool tools = 9;
+}
+
+// AssistantModelRequest asks Legion to resolve the delegated user's model.
+message AssistantModelRequest {
+  string prompt = 1;
+}
+
+message AssistantModelResponse {
+  string text = 1;
+}
+
+// AssistantToolRequest carries model-selected parameters, not user identity.
+message AssistantToolRequest {
+  string call_id = 1;
+  string name = 2;
+  string arguments_json = 3;
+}
+
+message AssistantToolResponse {
+  string result_json = 1;
+  bool is_error = 2;
+}
+
+// AssistantRuntimeEvent is a bounded transport event. Legion owns durable state.
+message AssistantRuntimeEvent {
+  string turn_id = 1;
+  string kind = 2;
+  string text = 3;
+  string call_id = 4;
+  string tool_name = 5;
+  string arguments_json = 6;
+  string result_json = 7;
+  string error_code = 8;
+}

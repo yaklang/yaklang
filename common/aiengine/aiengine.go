@@ -55,6 +55,13 @@ type AIEngine struct {
 // ```
 func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	config := NewAIEngineConfig(options...)
+	if config.platformProfile != nil {
+		config.Stateless = true
+		config.DisableAIForge = true
+		config.DisableMCPServers = true
+		config.AllowUserInteract = false
+		config.SessionID = ""
+	}
 	notifySessionID(config)
 
 	// 创建上下文
@@ -548,6 +555,9 @@ func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
 
 // buildReActOptions 构建 ReAct 配置选项
 func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan chan *schema.AiOutputEvent) []aicommon.ConfigOption {
+	if config.platformProfile != nil {
+		return platformOptions(ctx, config, outputChan)
+	}
 	options := []aicommon.ConfigOption{
 		// 基础配置
 		aicommon.WithContext(ctx),

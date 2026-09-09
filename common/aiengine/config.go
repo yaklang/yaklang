@@ -16,6 +16,8 @@ import (
 // AIEngineConfig 简化的 AI 引擎配置
 // 提供更友好的 API 来配置 ReAct 实例
 type AIEngineConfig struct {
+	platformProfile *platformProfile
+
 	// 基础配置
 	Context context.Context
 	Timeout float64
@@ -1093,6 +1095,14 @@ func WithExtendedForgeFromZip(zipPath string, password ...string) AIEngineConfig
 // ConvertToYPBAIStartParams 将 AIEngineConfig 转换为 YPB 的 AIStartParams
 // 用于与现有的 gRPC 接口兼容
 func (c *AIEngineConfig) ConvertToYPBAIStartParams() *ypb.AIStartParams {
+	if c.platformProfile != nil {
+		max := c.MaxIteration
+		if max <= 0 || max > 12 {
+			max = 12
+		}
+		return &ypb.AIStartParams{DisallowRequireForUserPrompt: true, ReviewPolicy: "yolo", ReActMaxIteration: int64(max)}
+	}
+
 	return &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: !c.AllowUserInteract,
 		ReviewPolicy:                 c.ReviewPolicy,

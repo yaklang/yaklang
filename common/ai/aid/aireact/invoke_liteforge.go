@@ -12,6 +12,9 @@ import (
 )
 
 func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	if r.config.DisableHelperCoordinators {
+		return nil, utils.Error("platform-only runtime does not permit helper coordinators")
+	}
 	var rawOutputs []any
 	for _, output := range outputs {
 		var rawOpt any = output

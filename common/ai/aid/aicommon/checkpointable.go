@@ -24,6 +24,7 @@ var _ CheckpointableStorage = &BaseCheckpointableStorage{}
 
 // BaseCheckpointableStorage 基础检查点存储实现
 type BaseCheckpointableStorage struct {
+	ephemeral bool
 	runtimeId string // coordinator runtime ID
 	db        *gorm.DB
 }
@@ -62,7 +63,9 @@ func (s *BaseCheckpointableStorage) createCheckpoint(runtimeId string, typeName 
 
 	db := s.GetDB()
 	if db == nil {
-		log.Error("database connection is nil")
+		if !s.ephemeral {
+			log.Error("database connection is nil")
+		}
 		return checkpoint
 	}
 
@@ -99,6 +102,9 @@ func (s *BaseCheckpointableStorage) SubmitCheckpointRequest(checkpoint *schema.A
 
 	db := s.GetDB()
 	if db == nil {
+		if s.ephemeral {
+			return nil
+		}
 		return utils.Error("database connection is nil")
 	}
 
@@ -122,6 +128,9 @@ func (s *BaseCheckpointableStorage) SubmitCheckpointResponse(checkpoint *schema.
 
 	db := s.GetDB()
 	if db == nil {
+		if s.ephemeral {
+			return nil
+		}
 		return utils.Error("database connection is nil")
 	}
 
