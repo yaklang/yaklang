@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/stdio"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -68,27 +72,37 @@ var MCPCommand = &cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		transport := c.String("transport")
-		protocolStdout := os.Stdout
 		if transport == "stdio" {
-			// Re-apply at the action boundary for embedded callers that invoke
-			// MCPCommand without Yak's normal os.Args layout. Then reserve the
-			// original stdout exclusively for JSON-RPC and redirect every other
-			// process-level stdout write to stderr. This also contains direct
-			// fmt/println output from tools and embedded Yak scripts.
 			log.EnableMCPStdioLogging()
 			log.SetLevel(log.FatalLevel)
-
-			var restoreStdout func() error
-			var isolateErr error
-			protocolStdout, restoreStdout, isolateErr = reserveMCPProtocolStdout()
-			if isolateErr != nil {
-				return utils.Wrap(isolateErr, "reserve stdout for MCP stdio")
-			}
-			defer func() {
-				if err := restoreStdout(); err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "restore stdout after MCP stdio: %v\n", err)
+			if !stdio.IsWorker() {
+				// Retain protection against incidental output in the supervisor.
+				// Tool execution and its standard streams live in the worker;
+				// the worker's protocol uses a separate connection, with no dup.
+				protocolStdout, restore, err := reserveMCPProtocolStdout()
+				if err != nil {
+					return utils.Wrap(err, "reserve stdout for MCP stdio supervisor")
 				}
-			}()
+				defer func() {
+					if err := restore(); err != nil {
+						_, _ = fmt.Fprintf(os.Stderr, "restore stdout after MCP stdio: %v\n", err)
+					}
+				}()
+				executable, err := os.Executable()
+				if err != nil {
+					return utils.Wrap(err, "resolve MCP worker executable")
+				}
+				ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+				defer stop()
+				// Reusing argv preserves every CLI option for both yak mcp and
+				// the standalone MCP binary, regardless of its executable name.
+				if err := stdio.Run(ctx, exec.Command(executable, os.Args[1:]...), os.Stdin, protocolStdout, os.Stderr); err != nil {
+					// Run already attempted a protocol failure response. Do not let
+					// the CLI log.Fatal/panic path block again on a full stderr pipe.
+					return cli.NewExitError("", 1)
+				}
+				return nil
+			}
 		}
 
 		yakit.CallPostInitDatabase()
@@ -180,7 +194,18 @@ var MCPCommand = &cli.Command{
 		}
 		switch transport {
 		case "stdio":
-			err = s.ServeStdioWithIO(os.Stdin, protocolStdout)
+			defer s.Close()
+			// Authenticate only once initialization has succeeded. In particular,
+			// the standalone entry point initializes its databases in this action.
+			if err := s.ensureLocalClient(); err != nil {
+				return err
+			}
+			conn, err := stdio.DialWorker()
+			if err != nil {
+				return err
+			}
+			defer conn.Close()
+			return s.ServeStdioWithIO(conn, conn)
 		case "sse":
 			if port == 0 {
 				port = utils.GetRandomAvailableTCPPort()

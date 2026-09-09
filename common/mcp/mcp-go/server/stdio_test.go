@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -14,6 +15,30 @@ import (
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
+
+func TestStdioServerPreservesRequestIDs(t *testing.T) {
+	for _, id := range []string{`9007199254740992`, `9007199254740993`, `-9007199254740993`, `1e30`, `"request-1"`, `0`} {
+		for _, method := range []string{"ping", "missing-method"} {
+			t.Run(method+"/"+id, func(t *testing.T) {
+				server := NewStdioServer(NewMCPServer("test", "1.0.0"))
+				request := fmt.Sprintf("{\"jsonrpc\":\"2.0\",\"id\":%s,\"method\":%q}\n", id, method)
+				var output bytes.Buffer
+				if err := server.Listen(context.Background(), bytes.NewBufferString(request), &output); err != nil {
+					t.Fatal(err)
+				}
+				var response struct {
+					ID json.RawMessage `json:"id"`
+				}
+				if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+					t.Fatal(err)
+				}
+				if string(response.ID) != id {
+					t.Fatalf("request ID %s changed to %s", id, response.ID)
+				}
+			})
+		}
+	}
+}
 
 type concurrentWriteDetector struct {
 	active     atomic.Int32

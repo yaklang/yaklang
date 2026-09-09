@@ -47,6 +47,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/stdio"
 	"github.com/yaklang/yaklang/common/schema"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
@@ -259,6 +260,9 @@ func init() {
 	/* 初始化数据库: 在 grpc 模式下，数据库应该不在 init 中使用 */
 	ignoreInitDatabase := []string{"grpc", "check-secret-local-grpc", "fixup-database", "ai-http-gateway"}
 	switch {
+	case len(os.Args) > 1 && os.Args[1] == "mcp" && log.IsMCPStdioCommand(os.Args) && !stdio.IsWorker():
+		// The stdio supervisor owns only the client transport. Its worker
+		// initializes databases; this branch must not print the grpc banner.
 	case len(os.Args) > 1 && slices.Contains(ignoreInitDatabase, os.Args[1]):
 		log.Debug("grpc should not initialize database in func:init")
 		fmt.Printf(`
