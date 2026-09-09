@@ -68,7 +68,7 @@ jobs:
             COUNT(CASE WHEN length(cpe_configurations) > 10 THEN 1 END) as with_cpe,
             COUNT(CASE WHEN exploitability_score > 0 THEN 1 END) as with_exploit_score,
             COUNT(CASE WHEN impact_score > 0 THEN 1 END) as with_impact_score,
-            COUNT(CASE WHEN `references` IS NOT NULL AND length(`references`) > 2 THEN 1 END) as with_refs
+            COUNT(CASE WHEN [references] IS NOT NULL AND length([references]) > 2 THEN 1 END) as with_refs
           FROM cves;
           "
 
