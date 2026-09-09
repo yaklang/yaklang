@@ -1,0 +1,31 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "Struct scan: JavaScript eval Call"
+	title_zh: "结构扫描：JavaScript eval 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-js-eval"
+	risk: "code-injection"
+	desc: <<<DESC
+Flags eval(...) in JS as a Call.
+DESC
+	solution: <<<SOLUTION
+Avoid eval; use JSON.parse or safer interpreters for structured data.
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+function run(code) { return eval(code); }
+POS
+	"safefile://app-safe.js": <<<NEG
+function run(code) { return JSON.parse(code); }
+NEG
+)
+
+eval(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "JavaScript eval()",
+	title_zh: "JavaScript eval()",
+	message: "Dangerous eval() Call detected",
+}

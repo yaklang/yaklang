@@ -1,0 +1,34 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python pickle.load Call"
+	title_zh: "结构扫描：Python pickle.load"
+	type: vuln
+	level: high
+	rule_id: "struct-python-pickle-load"
+	risk: "deserialization"
+	desc: <<<DESC
+Flags pickle.load / pickle.loads as Calls.
+DESC
+	solution: <<<SOLUTION
+Prefer json or other safe formats; never unpickle untrusted bytes.
+SOLUTION
+	alert_min: 1
+	"file://ser.py": <<<POS
+import pickle
+obj = pickle.loads(data)
+POS
+	"safefile://ser-safe.py": <<<NEG
+import json
+obj = json.loads(data)
+NEG
+)
+
+pickle.loads(* as $arg) as $call
+pickle.load(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "Python pickle Deserialization",
+	title_zh: "Python pickle 反序列化",
+	message: "Unsafe pickle Call detected",
+}
