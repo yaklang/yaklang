@@ -1567,6 +1567,11 @@ func fetchProgram(v any) (*Program, error) {
 					return utils.Error("normal abort")
 				}
 			}
+		case *StructQueryTarget:
+			if ret != nil && ret.ResultProgram() != nil {
+				parent = ret.ResultProgram()
+				return utils.Error("normal abort")
+			}
 		}
 		return nil
 	})
@@ -1605,6 +1610,22 @@ func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
 		o(n)
 	}
 	NativeCallDocuments[name] = n
+	fn := n.Function
+	if fn != nil {
+		wrapped := func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+			ok, vals, err := fn(v, frame, params)
+			if !ok || err != nil {
+				return ok, vals, err
+			}
+			bound := structBoundFromConfig(frame.GetConfig())
+			if bound == nil {
+				return ok, vals, nil
+			}
+			return true, filterSFVMValuesByStructBound(bound, vals), nil
+		}
+		sfvm.RegisterNativeCall(n.Name, wrapped)
+		return
+	}
 	sfvm.RegisterNativeCall(n.Name, n.Function)
 }
 

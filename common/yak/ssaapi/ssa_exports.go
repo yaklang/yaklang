@@ -184,6 +184,12 @@ var Exports = map[string]any{
 	"withFilePerformanceLog":       WithFilePerformanceLog,
 	"withBaseProgramName":          WithBaseProgramName,
 	"withEnableIncrementalCompile": WithEnableIncrementalCompile,
+	"withStructRule":               WithStructRule,
+	"withStructRuleDir":            WithStructRuleDir,
+	"withStructRuleRaw":            WithStructRuleRaw,
+	"withStructRuleCallback":       WithStructRuleCallback,
+	"withStructRuleTimeout":        WithStructRuleTimeout,
+	"withStructRuleWorkLimit":      WithStructRuleWorkLimit,
 
 	// language:
 	"Javascript": ssaconfig.JS,

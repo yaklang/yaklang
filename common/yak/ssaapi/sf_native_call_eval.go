@@ -20,12 +20,21 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFFrame
 	}
 
 	exec := func(codeRaw string) (bool, sfvm.Values, error) {
-		newResult, err := QuerySyntaxflow(
-			QueryWithProgram(program),
+		opts := []QueryOption{
+			QueryWithResultProgram(program),
 			QueryWithRuleContent(codeRaw),
 			QueryWithInitVar(contextResult.SymbolTable),
 			QueryWithSFConfig(frame.GetConfig()),
-		)
+		}
+		if bound := structBoundFromConfig(frame.GetConfig()); bound != nil {
+			opts = append(opts,
+				QueryWithValue(NewStructQueryTarget(program, bound.compileUnit(), bound)),
+				QueryWithStruct(bound.compileUnit()),
+			)
+		} else {
+			opts = append(opts, QueryWithProgram(program))
+		}
+		newResult, err := QuerySyntaxflow(opts...)
 		if err != nil {
 			return false, nil, err
 		}

@@ -192,6 +192,29 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 	return batches
 }
 
+func sccExecutionBatches(order [][]*CompileUnit) []compileUnitExecutionBatch {
+	if len(order) == 0 {
+		return nil
+	}
+	batches := make([]compileUnitExecutionBatch, 0, len(order))
+	for i, scc := range order {
+		batch := compileUnitExecutionBatch{startSCC: i, endSCC: i}
+		for _, unit := range scc {
+			if unit == nil {
+				continue
+			}
+			batch.units = append(batch.units, unit)
+			batch.unitKeys = append(batch.unitKeys, unit.Key)
+			batch.files += len(unit.Files)
+			batch.bytes += unit.Bytes
+		}
+		if len(batch.units) > 0 {
+			batches = append(batches, batch)
+		}
+	}
+	return batches
+}
+
 func flattenCompileUnits(plan *UnitPlan) []*CompileUnit {
 	if plan == nil {
 		return nil
