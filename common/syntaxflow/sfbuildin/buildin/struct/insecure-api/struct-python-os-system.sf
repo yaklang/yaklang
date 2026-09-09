@@ -1,0 +1,33 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python os.system Call"
+	title_zh: "结构扫描：Python os.system 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-python-os-system"
+	risk: "command-injection"
+	desc: <<<DESC
+Flags os.system(...) as a Call.
+DESC
+	solution: <<<SOLUTION
+Use subprocess with argument lists and shell=False instead of os.system.
+SOLUTION
+	alert_min: 1
+	"file://sh.py": <<<POS
+import os
+os.system("ls " + user)
+POS
+	"safefile://sh-safe.py": <<<NEG
+import subprocess
+subprocess.run(["ls", user], check=False)
+NEG
+)
+
+os.system(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "Python os.system()",
+	title_zh: "Python os.system()",
+	message: "os.system() Call detected",
+}

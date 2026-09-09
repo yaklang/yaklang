@@ -1,0 +1,34 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python eval Call"
+	title_zh: "结构扫描：Python eval 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-python-eval"
+	risk: "code-injection"
+	desc: <<<DESC
+Flags eval(...) as a Call rather than a text match.
+DESC
+	solution: <<<SOLUTION
+Avoid eval; use ast.literal_eval for literals or structured parsers.
+SOLUTION
+	alert_min: 1
+	"file://dyn.py": <<<POS
+def run(user_input):
+    return eval(user_input)
+POS
+	"safefile://dyn-safe.py": <<<NEG
+import ast
+def run(user_input):
+    return ast.literal_eval(user_input)
+NEG
+)
+
+eval(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "Python eval()",
+	title_zh: "Python eval()",
+	message: "Dangerous eval() Call detected",
+}

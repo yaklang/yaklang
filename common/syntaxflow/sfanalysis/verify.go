@@ -70,6 +70,9 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 	if sfvm.FrameIsSourceMode(frame) {
 		return runSourceVerifyWithFrame(frame, cfg)
 	}
+	if sfvm.FrameIsStructMode(frame) {
+		return runStructVerifyWithFrame(frame, cfg)
+	}
 
 	rule := frame.GetRule()
 	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
@@ -136,6 +139,95 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 
 	report.Passed = true
 	return report
+}
+
+func runStructVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyReport {
+	report := &EmbeddedVerifyReport{}
+	rule := frame.GetRule()
+	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
+	if err != nil {
+		report.Error = err
+		return report
+	}
+	report.PositiveTestCount = len(verifyFs)
+	if len(verifyFs) == 0 && cfg.requirePositive {
+		report.Error = utils.Errorf("no positive filesystem found in struct rule: %s", rule.RuleName)
+		return report
+	}
+	for _, f := range verifyFs {
+		err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
+			result, err := queryStructFrame(programs, frame)
+			if err != nil {
+				return utils.Errorf("struct syntax flow failed: %v", err)
+			}
+			return checkPositiveResult(f, rule, result, cfg)
+		}, ssaapi.WithLanguage(f.GetLanguage()))
+		if err != nil {
+			report.Error = err
+			return report
+		}
+	}
+	negativeFs, err := frame.ExtractNegativeFilesystemAndLanguage()
+	if err != nil {
+		report.Error = err
+		return report
+	}
+	report.NegativeTestCount = len(negativeFs)
+	if len(negativeFs) == 0 && cfg.requireNegative {
+		report.Error = utils.Errorf("no negative filesystem found in struct rule: %s", rule.RuleName)
+		return report
+	}
+	if cfg.verifyNegative {
+		for _, f := range negativeFs {
+			err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
+				result, err := queryStructFrame(programs, frame)
+				if err != nil {
+					return utils.Errorf("struct syntax flow failed: %v", err)
+				}
+				return checkNegativeResult(result)
+			}, ssaapi.WithLanguage(f.GetLanguage()))
+			if err != nil {
+				report.Error = err
+				return report
+			}
+		}
+	}
+	report.Passed = true
+	return report
+}
+
+func queryStructFrame(programs ssaapi.Programs, frame *sfvm.SFFrame) (*ssaapi.SyntaxFlowResult, error) {
+	if len(programs) == 0 || programs[0] == nil || programs[0].Program == nil {
+		return nil, utils.Error("no program for struct verify")
+	}
+	prog := programs[0]
+	units := prog.Program.CompileUnits
+	if len(units) == 0 {
+		return nil, utils.Error("no compile units for struct verify")
+	}
+	var last *ssaapi.SyntaxFlowResult
+	for _, unit := range units {
+		if unit == nil {
+			continue
+		}
+		res, err := ssaapi.QuerySyntaxflow(
+			ssaapi.QueryWithValue(ssaapi.NewStructQueryTarget(prog, unit, nil)),
+			ssaapi.QueryWithResultProgram(prog),
+			ssaapi.QueryWithStruct(unit),
+			ssaapi.QueryWithFrame(frame),
+		)
+		if err != nil {
+			return nil, err
+		}
+		last = res
+		if res != nil && len(res.GetAlertVariables()) > 0 {
+			return res, nil
+		}
+	}
+	if last == nil {
+		return nil, utils.Error("struct verify produced no result")
+	}
+	return last, nil
 }
 
 func runSourceVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyReport {

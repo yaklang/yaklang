@@ -171,7 +171,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 }
 
 // ApplySyntaxFlowRuleModeFilter restricts rules by persisted execution mode
-// (source | ssa). Mode is stored on schema.SyntaxFlowRule, not in gRPC filter.
+// (source | ssa | struct). Mode is stored on schema.SyntaxFlowRule, not in gRPC filter.
 func ApplySyntaxFlowRuleModeFilter(db *gorm.DB, modes []string) *gorm.DB {
 	if db == nil || len(modes) == 0 {
 		return db

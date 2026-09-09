@@ -296,7 +296,7 @@ func WithRuleFilterTag(tag ...string) Option {
 	}
 }
 
-// WithRuleFilterMode 设置规则执行模式过滤器（source | ssa），对应 DB mode 列。
+// WithRuleFilterMode 设置规则执行模式过滤器（source | ssa | struct），对应 DB mode 列。
 func WithRuleFilterMode(mode ...string) Option {
 	return func(c *Config) error {
 		if err := c.ensureSyntaxFlowRule("Rule Filter Mode"); err != nil {
