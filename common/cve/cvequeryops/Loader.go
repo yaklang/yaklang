@@ -203,7 +203,7 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 // downloadNVDFeed 使用标准 HTTP 库下载 NVD feed 并解压保存
 // 比 poc.DoGET 流式处理更稳定，避免 unexpected EOF
 func downloadNVDFeed(url, destFile string) error {
-	client := &http.Client{Timeout: 5 * time.Minute}
+	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(url)
 	if err != nil {
 		return utils.Errorf("HTTP GET failed: %v", err)
