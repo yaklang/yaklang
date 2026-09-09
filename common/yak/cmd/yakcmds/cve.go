@@ -177,13 +177,18 @@ var CVEUtilCommands = []*cli.Command{
 				return gzipHandler()
 			}
 
+			var years []int
+			if ret := c.Int("year"); ret > 0 {
+				years = append(years, ret)
+			}
+
 			wg := new(sync.WaitGroup)
 			wg.Add(2)
 			var downloadFailed bool
 			go func() {
 				defer wg.Done()
 				log.Infof("start to save cve data from database: %v", cvePath)
-				err := cvequeryops.DownLoad(cvePath, c.Bool("cache"))
+				err := cvequeryops.DownLoad(cvePath, c.Bool("cache"), years...)
 				if err != nil {
 					log.Errorf("download failed: %s", err)
 					downloadFailed = true
@@ -223,10 +228,6 @@ var CVEUtilCommands = []*cli.Command{
 				return utils.Error("download failed")
 			}
 
-			var years []int
-			if ret := c.Int("year"); ret > 0 {
-				years = append(years, ret)
-			}
 			cvequeryops.LoadCVE(cvePath, outputFile, years...)
 
 			// 下载并合并 CVE 5.0 Record 数据（补充 title/affected/solution）

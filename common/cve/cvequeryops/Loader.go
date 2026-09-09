@@ -171,14 +171,14 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 		tx.Commit()
 	}
 
-	// 批量写入 ProductsTable
+	// 批量写入 ProductsTable（使用 OnConflictDoNothing 避免主键冲突）
 	if len(batchProducts) > 0 {
 		for i := 0; i < len(batchProducts); i += 500 {
 			endIdx := i + 500
 			if endIdx > len(batchProducts) {
 				endIdx = len(batchProducts)
 			}
-			manager.DB.CreateInBatches(batchProducts[i:endIdx], 500)
+			manager.DB.OnConflictDoNothing("product").CreateInBatches(batchProducts[i:endIdx], 500)
 		}
 	}
 
@@ -200,8 +200,17 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 // err = cve.Download("/tmp/cve-data", true)
 // if err != nil { die(err) }
 // ```
-func DownLoad(dir string, cached bool) error {
+func DownLoad(dir string, cached bool, years ...int) error {
+	// 如果指定了 years，只下载对应年份的数据
+	allowed := funk.Map(years, func(i int) string {
+		return fmt.Sprintf("CVE-%d.json", i)
+	}).([]string)
+
 	for name, url := range CveDataFeed {
+		if len(years) > 0 && !utils.StringArrayContains(allowed, name) {
+			log.Infof("skip %v (filtered by year)", name)
+			continue
+		}
 		fileName := filepath.Join(dir, name)
 		if cached {
 			if utils.GetFirstExistedFile(fileName) != "" {

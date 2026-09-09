@@ -90,7 +90,51 @@ func DownloadCVEV5(dir string) error {
 	// 5. 删除 zip 文件节省空间
 	os.Remove(zipPath)
 
+	// 6. 处理双层 zip：GitHub release 的全量包文件名是 xxx.zip.zip，
+	//    解压后可能得到一个内层 zip，需要再解压一次
+	innerZips, _ := findInnerZips(extractDir)
+	for _, innerZip := range innerZips {
+		log.Infof("found inner zip: %s, extracting...", innerZip)
+		innerExtractDir := filepath.Dir(innerZip)
+		if err := unzipFile(innerZip, innerExtractDir); err != nil {
+			log.Warnf("extract inner zip %s failed: %v", innerZip, err)
+			continue
+		}
+		os.Remove(innerZip)
+	}
+
 	return nil
+}
+
+// findInnerZips 在目录中查找嵌套的 zip 文件
+func findInnerZips(dir string) ([]string, error) {
+	var zips []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() && strings.HasSuffix(strings.ToLower(path), ".zip") {
+			zips = append(zips, path)
+		}
+		return nil
+	})
+	return zips, err
+}
+
+// findCvesDir 递归查找包含 cves 目录的路径（处理多层解压的情况）
+func findCvesDir(root string) string {
+	var found string
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() && filepath.Base(path) == "cves" {
+			found = path
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return found
 }
 
 // DownloadCVEV5Delta 下载最新的 cvelistV5 delta zip 并返回 CVE 5.0 Records
@@ -144,7 +188,13 @@ func DownloadCVEV5Delta() ([]*cveresources.CVERecordV5, error) {
 func LoadCVEV5FromDir(dir string, manager *cveresources.SqliteManager, years ...int) error {
 	cvesDir := filepath.Join(dir, "cves")
 	if utils.GetFirstExistedPath(cvesDir) == "" {
-		cvesDir = dir
+		// 可能解压后有多层目录（如 cvelistV5/cvelistV5/cves/），递归查找 cves 目录
+		found := findCvesDir(dir)
+		if found != "" {
+			cvesDir = found
+		} else {
+			cvesDir = dir
+		}
 	}
 
 	// 第一阶段：快速扫描所有 JSON 文件路径
