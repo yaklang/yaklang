@@ -19,6 +19,9 @@ concurrency:
 jobs:
   check-wip:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      statuses: read
     outputs:
       should_run_tests: ${{ steps.pre_check.outputs.should_run_tests }}
     steps:
@@ -716,6 +719,9 @@ jobs:
     needs: setup
     if: success()
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      statuses: write
     steps:
       # checkout code for this ./.github/actions/post-check/action.yml to work
       - name: 'Check Out'

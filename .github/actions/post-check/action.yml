@@ -1,24 +1,25 @@
 name: 'Post-Check Action'
-description: 'Saves test results to cache after successful test run'
+description: 'Marks this commit as passed via a GitHub commit status after a successful test run'
 
 inputs:
   cache-key-prefix:
-    description: 'Prefix for the test result cache key'
+    description: 'Suite context name used for the commit status'
     required: true
 
 runs:
   using: 'composite'
   steps:
-    - name: "Save Test Result Marker"
+    - name: "Set Commit Status: Success"
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        # Create a cache marker file indicating this commit passed all tests
-        mkdir -p /tmp/test_results_${{ inputs.cache-key-prefix }}
-        echo "true" > /tmp/test_results_${{ inputs.cache-key-prefix }}/test_passed
-        echo "Test result marker created for commit ${{ github.event.pull_request.head.sha }}"
-
-    - name: 'Save Test Results to Cache'
-      uses: actions/cache/save@v3
-      with:
-        path: /tmp/test_results_${{ inputs.cache-key-prefix }}
-        key: test-result-${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.head.sha }}
+        SHA="${{ github.event.pull_request.head.sha }}"
+        CONTEXT="${{ inputs.cache-key-prefix }}"
+        gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+          -f state=success \
+          -f context="$CONTEXT" \
+          -f description="All tests passed" \
+          -f target_url="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+          --jq '.context + " = " + .state'
+        echo "Commit status $CONTEXT=success saved for $SHA"

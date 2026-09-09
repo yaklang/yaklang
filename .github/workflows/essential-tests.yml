@@ -32,6 +32,9 @@ jobs:
   check-wip:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      statuses: read
     outputs:
       should_run_tests: ${{ steps.finalize.outputs.should_run_tests }}
       target_ref: ${{ steps.target.outputs.ref }}
@@ -1223,6 +1226,9 @@ jobs:
     needs: [check-wip, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      statuses: write
     steps:
       - name: 'Check Out'
         uses: actions/checkout@v3
