@@ -3,11 +3,6 @@
 Yak IPC 测试脚本 — Windows 版
 用法: python test_ipc_windows.py <yak_path>
 示例: python test_ipc_windows.py C:\yakit-projects\yak-engine\yak.exe
-
-测试内容:
-  1. TCP 回归: 端口占用 / 数据库错误 / 正常启动
-  2. IPC (npipe): ready 事件 / 服务器模式自检 / 客户端模式连接 / 密码错误
-  3. IPC 缺少 socket-path 参数校验
 """
 
 import subprocess, time, json, re, os, sys, socket, threading
@@ -25,7 +20,7 @@ YAK = get_yak()
 results = []
 
 def read_event(proc, timeout=10):
-    """从 stdout 读取 yak grpc ready/failed 事件，阻塞直到读到或超时"""
+    """阻塞读取 yak grpc ready/failed 事件"""
     lines = []
     def reader():
         for line in proc.stdout:
@@ -43,7 +38,7 @@ def read_event(proc, timeout=10):
     return None
 
 def read_event_after_kill(proc, timeout=3):
-    """kill 后读取已缓冲的 stdout，找 ready/failed 事件"""
+    """kill 后读取已缓冲的 stdout"""
     proc.kill()
     proc.wait()
     try:
@@ -63,13 +58,20 @@ def extract_json(out):
     return json.loads(m.group(1)) if m else None
 
 def run_check_secret(args, env=None, wait=5):
-    """运行 check-secret 并返回 JSON 结果"""
+    """运行 check-secret 并返回 JSON 结果，用 utf-8 编码避免 GBK 解码错误"""
     proc = subprocess.Popen([YAK, 'check-secret-local-grpc'] + args,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        encoding='utf-8', errors='replace')
     time.sleep(wait)
     proc.kill()
     proc.wait()
     return extract_json(proc.stdout.read())
+
+def spawn(args, env=None):
+    """启动子进程，用 utf-8 编码"""
+    return subprocess.Popen(args,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        encoding='utf-8', errors='replace')
 
 def record(name, ok, detail=""):
     results.append((name, ok))
@@ -89,8 +91,7 @@ print("\n--- TCP 回归测试 ---")
 # T1: TCP 端口占用
 print("\n[T1] yak grpc tcp 端口占用")
 s = socket.socket(); s.bind(('127.0.0.1', 19031)); s.listen(1)
-proc = subprocess.Popen([YAK, 'grpc', '--local-password', 't', '--port', '19031'],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+proc = spawn([YAK, 'grpc', '--local-password', 't', '--port', '19031'])
 time.sleep(3)
 d = read_event_after_kill(proc, 3)
 s.close()
@@ -128,14 +129,12 @@ PIPE_NAME = "yakit-test-ipc"
 
 # T4: npipe ready 事件
 print("\n[T4] yak grpc npipe ready 事件")
-proc = subprocess.Popen([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe', '--socket-path', PIPE_NAME],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+proc = spawn([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe', '--socket-path', PIPE_NAME])
 d = read_event(proc, 10)
 if d:
     ok = d.get('transport') == 'npipe' and 'instanceId' in d
     record("T4 npipe ready", ok, f"transport={d.get('transport')}, address={d.get('address')}")
 else:
-    # try read after kill
     d = read_event_after_kill(proc, 3)
     if d:
         ok = d.get('transport') == 'npipe' and 'instanceId' in d
@@ -155,11 +154,9 @@ else:
 
 # T6: check-secret npipe 客户端模式
 print("\n[T6] check-secret npipe 客户端模式连接")
-server = subprocess.Popen([YAK, 'grpc', '--local-password', 'cpass', '--transport', 'npipe', '--socket-path', PIPE_NAME],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+server = spawn([YAK, 'grpc', '--local-password', 'cpass', '--transport', 'npipe', '--socket-path', PIPE_NAME])
 time.sleep(2)
-client = subprocess.Popen([YAK, 'check-secret-local-grpc', '--transport', 'npipe', '--socket-path', PIPE_NAME, '--client-password', 'cpass'],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+client = spawn([YAK, 'check-secret-local-grpc', '--transport', 'npipe', '--socket-path', PIPE_NAME, '--client-password', 'cpass'])
 time.sleep(4); client.kill(); client.wait()
 d = extract_json(client.stdout.read())
 server.kill(); server.wait()
@@ -170,11 +167,9 @@ else:
 
 # T7: npipe 客户端模式密码错误
 print("\n[T7] check-secret npipe 客户端模式密码错误")
-server = subprocess.Popen([YAK, 'grpc', '--local-password', 'rightpass', '--transport', 'npipe', '--socket-path', PIPE_NAME],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+server = spawn([YAK, 'grpc', '--local-password', 'rightpass', '--transport', 'npipe', '--socket-path', PIPE_NAME])
 time.sleep(2)
-client = subprocess.Popen([YAK, 'check-secret-local-grpc', '--transport', 'npipe', '--socket-path', PIPE_NAME, '--client-password', 'wrongpass'],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+client = spawn([YAK, 'check-secret-local-grpc', '--transport', 'npipe', '--socket-path', PIPE_NAME, '--client-password', 'wrongpass'])
 time.sleep(5); client.kill(); client.wait()
 d = extract_json(client.stdout.read())
 server.kill(); server.wait()
@@ -186,8 +181,7 @@ else:
 
 # T8: npipe 缺少 socket-path
 print("\n[T8] yak grpc npipe 缺少 socket-path")
-proc = subprocess.Popen([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe'],
-    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+proc = spawn([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe'])
 time.sleep(3)
 d = read_event_after_kill(proc, 3)
 if d:
