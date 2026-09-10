@@ -510,7 +510,7 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "local-password",
-			Usage: "本地密码模式，使用固定端口 9011，不使用 TLS，与 host/port/secret/tls/gen-tls-crt 互斥",
+			Usage: "本地密码认证，不使用 TLS；TCP 默认 127.0.0.1:9011（可用 --port 修改），unix/npipe 仅监听 --socket-path",
 		},
 		cli.StringFlag{
 			Name:  "transport",
@@ -618,7 +618,11 @@ var startGRPCServerCommand = cli.Command{
 			}
 
 			log.Info("starting grpc server in local-password mode")
-			log.Infof("local-password mode: port=%d, tls=false, password=***", localRandomPasswordPort)
+			if transport == "tcp" {
+				log.Infof("local-password mode: port=%d, tls=false, password=***", localRandomPasswordPort)
+			} else {
+				log.Infof("local-password mode: transport=%s, endpoint=%s, tls=false, password=***", transport, socketPath)
+			}
 		}
 
 		if c.String("home") != "" {
@@ -766,11 +770,11 @@ var startGRPCServerCommand = cli.Command{
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
 
-		// 确定监听地址和端口
+		// TCP 监听地址和端口；IPC 分支不使用这些值。
 		var host string
 		var port int
 		if localPassword != "" {
-			// local-password 模式：强制使用 127.0.0.1:9011
+			// local-password TCP 模式仅绑定 loopback，默认 9011，可显式指定端口。
 			host = "127.0.0.1"
 			port = localRandomPasswordPort
 		} else {
@@ -927,7 +931,9 @@ var startGRPCServerCommand = cli.Command{
 		}
 
 		log.Infof("start to startup grpc server(yak grpc ok)...")
-		if host == "127.0.0.1" {
+		if transport != "tcp" {
+			log.Infof("the current yak grpc listening on %s endpoint %s", transport, actualAddress)
+		} else if host == "127.0.0.1" {
 			if localPassword != "" {
 				log.Infof("the current yak grpc running in local-password mode on '127.0.0.1:%d'", port)
 			} else {
