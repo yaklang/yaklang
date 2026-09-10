@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-var ErrInvalidDirectory = errors.New("unix socket parent must be a directory, not a symbolic link")
+var ErrInvalidDirectory = errors.New("unix socket parent must resolve to a directory")
 
 // Validate must run before database initialization or any filesystem mutation.
 func Validate(transport, endpoint string) error {
