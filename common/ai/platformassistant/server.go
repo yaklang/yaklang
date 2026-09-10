@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -32,6 +33,7 @@ var errInvalidModelResponse = errors.New("runtime_invalid_model_response")
 
 const maxBody = 256 << 10
 const maxOutput = 1 << 20
+const maxThoughtBytes = 64000
 
 var allowedTools = map[string]bool{
 	"platform.list_projects": true, "platform.list_scans": true, "platform.list_risks": true,
@@ -268,7 +270,9 @@ func (s *Server) run(ctx context.Context, turn *aiv1.AssistantTurnRequest, emit 
 	}
 	callback := s.modelCallback(ctx, turn.DelegationToken)
 	var invalidFormat atomic.Bool
+	forwardThought := thoughtForwarder(emit)
 	engine, err := aiengine.NewAIEngine(aiengine.WithOnEvent(func(_ aicommon.AIEngineOperator, event *schema.AiOutputEvent) {
+		forwardThought(event)
 		if event.NodeId != aicommon.NodeAICallFailure {
 			return
 		}
@@ -302,6 +306,43 @@ func (s *Server) run(ctx context.Context, turn *aiv1.AssistantTurnRequest, emit 
 		return errInvalidModelResponse
 	}
 	return err
+}
+
+// thoughtForwarder retains only public structured summaries until stream-finished.
+// Platform engines are ephemeral: WithOnStreamContent reads persisted events and
+// must not be used here. This callback runs on the engine's serial output queue.
+func thoughtForwarder(emit func(*aiv1.AssistantRuntimeEvent)) func(*schema.AiOutputEvent) {
+	remaining := maxThoughtBytes
+	streams := make(map[string][]byte)
+	return func(event *schema.AiOutputEvent) {
+		if event == nil {
+			return
+		}
+		if event.Type == schema.EVENT_TYPE_STREAM && event.NodeId == "re-act-loop-thought" && event.VizSource == "human_readable_thought" && event.EventUUID != "" && remaining > 0 {
+			data := event.StreamDelta
+			if len(data) > remaining {
+				data = data[:remaining]
+			}
+			if len(data) > 0 {
+				streams[event.EventUUID] = append(streams[event.EventUUID], data...)
+				remaining -= len(data)
+			}
+			return
+		}
+		if event.Type != schema.EVENT_TYPE_STRUCTURED || event.NodeId != "stream-finished" {
+			return
+		}
+		id := event.GetStreamEventWriterId()
+		data := streams[id]
+		delete(streams, id)
+		// A byte budget may cut the last rune. Never emit broken UTF-8.
+		for len(data) > 0 && !utf8.Valid(data) {
+			data = data[:len(data)-1]
+		}
+		if text := strings.TrimSpace(string(data)); text != "" {
+			emit(&aiv1.AssistantRuntimeEvent{Kind: "thought", Text: text})
+		}
+	}
 }
 
 // modelCallback honors both turn cancellation and an individual model subrequest.

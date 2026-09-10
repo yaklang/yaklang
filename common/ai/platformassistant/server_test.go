@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
@@ -16,6 +17,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 const secret = "01234567890123456789012345678901"
@@ -148,7 +150,7 @@ func TestPlatformRealEngineToolThenAnswer(t *testing.T) {
 		text := `{"@action":"object","next_action":{"type":"finish"}}`
 		switch n {
 		case 1:
-			text = `{"@action":"object","next_action":{"type":"directly_call_tool","directly_call_tool_name":"platform.list_projects","directly_call_tool_params":{}}}`
+			text = `{"@action":"object","human_readable_thought":"先查询当前用户的项目。","next_action":{"type":"directly_call_tool","directly_call_tool_name":"platform.list_projects","directly_call_tool_params":{}}}`
 		case 2:
 			text = `{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"Alice project"}}`
 		}
@@ -169,12 +171,22 @@ func TestPlatformRealEngineToolThenAnswer(t *testing.T) {
 		t.Fatalf("tool calls %d decisions %d body %s", toolCalls, decisions, w.Body.String())
 	}
 	kinds := map[string]bool{}
+	var thoughts []string
 	for _, line := range strings.Split(strings.TrimSpace(w.Body.String()), "\n") {
 		e := new(aiv1.AssistantRuntimeEvent)
 		if err := protojson.Unmarshal([]byte(line), e); err != nil {
 			t.Fatal(err)
 		}
+		if e.Kind == "thought" {
+			if kinds["completed"] || kinds["failed"] {
+				t.Fatal("thought arrived after terminal event")
+			}
+			thoughts = append(thoughts, e.Text)
+		}
 		kinds[e.Kind] = true
+	}
+	if len(thoughts) != 1 || thoughts[0] != "先查询当前用户的项目。" {
+		t.Fatalf("public summary missing or polluted: %q", thoughts)
 	}
 	if !kinds["tool_started"] || !kinds["tool_completed"] || !kinds["completed"] || !kinds["answer"] || !strings.Contains(w.Body.String(), "Alice project") {
 		b, _ := json.Marshal(kinds)
@@ -343,5 +355,83 @@ func TestPlatformMalformedResponseRetriesAreBounded(t *testing.T) {
 	w := request(s, turn("invalid-format", "alice"), "Bearer "+secret)
 	if calls != 3 || !strings.Contains(w.Body.String(), "runtime_invalid_model_response") || strings.Contains(w.Body.String(), `"kind":"completed"`) {
 		t.Fatalf("calls=%d body=%s", calls, w.Body.String())
+	}
+}
+
+func TestPlatformThoughtForwarderFiltersAndBounds(t *testing.T) {
+	var events []*aiv1.AssistantRuntimeEvent
+	forward := thoughtForwarder(func(event *aiv1.AssistantRuntimeEvent) { events = append(events, event) })
+	finish := func(id string) {
+		data, _ := json.Marshal(map[string]string{"event_writer_id": id})
+		forward(&schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "stream-finished", Content: data})
+	}
+	for _, stream := range []struct{ node, source string }{
+		{"re-act-loop-answer-payload", "human_readable_thought"},
+		{"re-act-loop-thought", "reason_content"},
+		{"re-act-loop-thought", "modify_code_reason"},
+		{"re-act-loop-thought", ""},
+	} {
+		forward(&schema.AiOutputEvent{Type: schema.EVENT_TYPE_STREAM, EventUUID: "private", VizSource: stream.source, NodeId: stream.node, StreamDelta: []byte("private or answer")})
+		finish("private")
+	}
+	if len(events) != 0 {
+		t.Fatal("non-public streams were forwarded")
+	}
+	public := func(id, text string) {
+		forward(&schema.AiOutputEvent{Type: schema.EVENT_TYPE_STREAM, EventUUID: id, VizSource: "human_readable_thought", NodeId: "re-act-loop-thought", StreamDelta: []byte(text)})
+	}
+	public("one", "查询")
+	public("one", "项目")
+	if len(events) != 0 {
+		t.Fatal("incomplete summary was forwarded")
+	}
+	finish("one")
+	finish("one")
+	public("two", strings.Repeat("中", maxThoughtBytes))
+	finish("two")
+	public("three", "must be ignored")
+	finish("three")
+	total := 0
+	for _, event := range events {
+		if event.Kind != "thought" || !utf8.ValidString(event.Text) {
+			t.Fatal("invalid thought event")
+		}
+		total += len(event.Text)
+	}
+	if len(events) != 2 || events[0].Text != "查询项目" || total != maxThoughtBytes-1 {
+		t.Fatalf("unexpected bounded output: events=%d bytes=%d", len(events), total)
+	}
+}
+
+func TestPlatformFlatActionPublicSummary(t *testing.T) {
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, _ := protojson.Marshal(&aiv1.AssistantModelResponse{Text: `{"@action":"directly_answer","identifier":"explain_page","human_readable_thought":"根据页面上下文回答。","answer_payload":"当前页面是项目列表。"}`})
+		_, _ = w.Write(data)
+	}))
+	defer callback.Close()
+	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
+	w := request(s, turn("flat-summary", "alice"), "Bearer "+secret)
+	thoughts, answer, completed := 0, "", false
+	for _, line := range strings.Split(strings.TrimSpace(w.Body.String()), "\n") {
+		event := new(aiv1.AssistantRuntimeEvent)
+		if err := protojson.Unmarshal([]byte(line), event); err != nil {
+			t.Fatal(err)
+		}
+		switch event.Kind {
+		case "thought":
+			if completed || event.Text != "根据页面上下文回答。" {
+				t.Fatalf("invalid summary: %v", event)
+			}
+			thoughts++
+		case "answer":
+			answer += event.Text
+		case "completed":
+			completed = true
+		case "failed":
+			t.Fatalf("flat action failed: %s", event.ErrorCode)
+		}
+	}
+	if thoughts != 1 || !completed || answer != "当前页面是项目列表。" {
+		t.Fatalf("thoughts=%d completed=%t answer=%q", thoughts, completed, answer)
 	}
 }
