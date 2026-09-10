@@ -1,6 +1,7 @@
 name: Diff-Code-Check
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     types: [ opened, synchronize, reopened, labeled, unlabeled ]
@@ -19,13 +20,16 @@ concurrency:
 jobs:
   check-wip:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      statuses: read
     outputs:
       should_run_tests: ${{ steps.pre_check.outputs.should_run_tests }}
     steps:
       - name: 'Check Out'
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Run Pre-Check
         id: pre_check
@@ -44,11 +48,14 @@ jobs:
       pull-requests: write
       issues: write
       actions: read
+    outputs:
+      should_skip: ${{ steps.validate.outputs.should_skip }}
+      skip_reason: ${{ steps.validate.outputs.skip_reason }}
     steps:
       - name: Initialize workflow context
         id: init
         run: |
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           
           echo "HEAD_SHA=$HEAD_SHA" >> $GITHUB_ENV
@@ -64,6 +71,12 @@ jobs:
       - name: Validate PR state
         id: validate
         run: |
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+            echo "skip_reason=dispatch" >> $GITHUB_OUTPUT
+            echo "Manual dispatch without PR context, scanning current commit"
+            exit 0
+          fi
           PR_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}")
@@ -714,14 +727,17 @@ jobs:
   post-check:
     name: Save Scan Results to Cache
     needs: setup
-    if: success()
+    if: needs.setup.outputs.should_skip != 'true' && success()
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      statuses: write
     steps:
       # checkout code for this ./.github/actions/post-check/action.yml to work
       - name: 'Check Out'
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Run Post-Check (Save Scan Results)
         uses: ./.github/actions/post-check
