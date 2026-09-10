@@ -80,15 +80,18 @@ func buildSingleFindingVerifyLoop(
 		reactloops.WithDisableLoopPerception(true),
 		reactloops.WithDisablePeriodicVerification(true),
 	)
-	preset = append(preset,
-		reactloops.WithFrozenBlockPartitions(aicommon.FrozenBlockPartition{
-			ID:    "code-audit-phase3-path-rules",
-			Title: "Code Audit Phase3 Path Rules",
-			Content: "路径规则：所有工具路径必须使用项目绝对路径；read_file 用 file；grep 用 path。" +
+	// frozen-block 分区经由子代理自己的 config 注入（aicommon 既有机制，
+	// PromptMaterials 组装时与 config producer 汇合），不新增 loop 层字段。
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok && cfg != nil {
+		cfg.AppendFrozenBlockPartition(
+			"code-audit-phase3-path-rules",
+			"Code Audit Phase3 Path Rules",
+			"路径规则：所有工具路径必须使用项目绝对路径；read_file 用 file；grep 用 path。"+
 				"Finding.file 多为相对路径，调用前需拼接项目根目录。",
-			Order: 210,
-		}),
-
+			210,
+		)
+	}
+	preset = append(preset,
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			return utils.RenderTemplate(phase3VerifyInstruction, map[string]any{
 				"Nonce":       nonce,

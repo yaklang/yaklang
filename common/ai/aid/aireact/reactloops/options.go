@@ -575,20 +575,6 @@ func WithDisablePeriodicVerification(disable ...bool) ReActLoopOption {
 	}
 }
 
-// WithFrozenBlockPartitions appends stable prompt partitions into the loop's
-// frozen-block (hoisted out of the per-turn dynamic section).
-func WithFrozenBlockPartitions(partitions ...aicommon.FrozenBlockPartition) ReActLoopOption {
-	return func(r *ReActLoop) {
-		if r == nil || len(partitions) == 0 {
-			return
-		}
-		// 注入时完成规范化（含 nonce 的全内容 FNV 哈希）；每轮 prompt 组装里
-		// 的 NormalizeFrozenBlockPartitions 见 nonce 非空即跳过重算。
-		// 幂等：最终拼接后的再规范化语义不变（按 ID 去重 / 排序结果一致）。
-		r.extraFrozenPartitions = append(r.extraFrozenPartitions, aicommon.NormalizeFrozenBlockPartitions(partitions)...)
-	}
-}
-
 // WithPeriodicVerificationInterval sets the  iteration interval used by
 // loop-level periodic checkpoint behaviors
 // auto-verification.
