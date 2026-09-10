@@ -361,6 +361,16 @@ func (i *IfBuilder) Build() *IfBuilder {
 		}
 		// create if-instruction in IfStatementBlock
 		ifStmt := SSABuilder.EmitIf()
+		if ifStmt == nil {
+			// The current block is already finished (e.g. a previous statement
+			// terminated it during broken-AST recovery), so the If instruction
+			// cannot be emitted. Calling AddTrue/SetCondition on a nil *If
+			// panics; skip the wiring and keep the builder walkable by moving
+			// on to the false branch.
+			SSABuilder.CurrentBlock = falseBlock
+			IfStatementBlock = falseBlock
+			return
+		}
 		ifStmt.AddTrue(trueBlock)
 		ifStmt.SetCondition(condition)
 		ifStmt.AddFalse(falseBlock)
