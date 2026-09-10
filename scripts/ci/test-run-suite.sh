@@ -92,7 +92,8 @@ fi
 
 export TEST_LOG_DIR
 set +e
-timeout --signal=TERM --kill-after=30s "$SUITE_TIMEOUT" ./scripts/ci/test-run.sh 2>&1 | tee -a "$suite_log"
+TEST_RUNNER="${TEST_RUNNER:-./scripts/ci/test-run.sh}"
+timeout --signal=TERM --kill-after=30s "$SUITE_TIMEOUT" "$TEST_RUNNER" 2>&1 | tee -a "$suite_log"
 suite_rc=${PIPESTATUS[0]}
 set -e
 

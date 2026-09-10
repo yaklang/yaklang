@@ -1,5 +1,5 @@
 name: 'Pre-Check Action'
-description: 'Checks failed/skip labels and test result cache. Outputs should_run_tests flag.'
+description: 'Checks failed/skip labels and commit success status. Outputs should_run_tests flag.'
 
 inputs:
   failed-labels:
@@ -11,7 +11,7 @@ inputs:
     required: false
     default: ''
   cache-key-prefix:
-    description: 'Prefix for the test result cache key'
+    description: 'Suite context name used for the commit status'
     required: true
 
 outputs:
@@ -82,15 +82,27 @@ runs:
         echo "No skip-labels found"
         echo "should_skip=false" >> $GITHUB_OUTPUT
 
-    # Step 3: Check Test Result Cache (only if not skipping)
-    - name: 'Restore Test Result Cache'
-      id: restore_cache
+    # Step 3: Check Commit Success Status (only if not skipping)
+    - name: 'Check Commit Success Status'
+      id: check_status
       if: steps.check_skip.outputs.should_skip != 'true'
-      uses: actions/cache/restore@v3
-      with:
-        path: /tmp/test_results_${{ inputs.cache-key-prefix }}
-        key: test-result-${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.head.sha }}
-        lookup-only: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+        CONTEXT="${{ inputs.cache-key-prefix }}"
+        STATE=""
+        STATE=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/status" \
+          --jq ".statuses[] | select(.context == \"$CONTEXT\" and .state == \"success\") | .state" \
+          2>/dev/null | head -1) || STATE=""
+        if [ -n "$STATE" ]; then
+          echo "commit status $CONTEXT=$STATE found for $SHA, skipping tests"
+          echo "status_hit=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "no success commit status for $CONTEXT on $SHA, will run tests"
+          echo "status_hit=false" >> "$GITHUB_OUTPUT"
+        fi
 
     # Step 4: Determine if tests should run
     - name: 'Determine Test Execution'
@@ -106,11 +118,11 @@ runs:
           exit 0
         fi
         
-        # Check if test result cache exists
-        if [[ "${{ steps.restore_cache.outputs.cache-hit }}" == "true" ]]; then
-          echo "Test result cache found, skipping tests"
+        # Check if this commit already passed this suite
+        if [[ "${{ steps.check_status.outputs.status_hit }}" == "true" ]]; then
+          echo "Commit status found, skipping tests"
           echo "should_run_tests=false" >> $GITHUB_OUTPUT
         else
-          echo "No test result cache found, will run tests"
+          echo "No success commit status, will run tests"
           echo "should_run_tests=true" >> $GITHUB_OUTPUT
         fi
