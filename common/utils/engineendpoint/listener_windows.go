@@ -26,13 +26,17 @@ func privatePipeSecurityDescriptor() (string, error) {
 	return "D:P(A;;GA;;;SY)(A;;GA;;;" + user.User.Sid.String() + ")S:(ML;;NW;;;ME)", nil
 }
 
-// Windows has no filesystem parent to prepare. Pipe ownership is enforced at bind.
+// Windows has no filesystem parent to prepare. Detect an occupied name without
+// connecting to its server; only Listen's FILE_CREATE reserves ownership.
 func PrepareListener(transport, endpoint string) error {
 	if err := Validate(transport, endpoint); err != nil {
 		return err
 	}
 	if transport != "npipe" {
 		return fmt.Errorf("IPC listener requires npipe transport")
+	}
+	if namedPipeExists(endpoint) {
+		return &os.PathError{Op: "listen", Path: endpoint, Err: syscall.EADDRINUSE}
 	}
 	return nil
 }
@@ -50,8 +54,8 @@ func Listen(transport, endpoint string) (net.Listener, error) {
 		SecurityDescriptor: sddl, InputBufferSize: 4096, OutputBufferSize: 4096,
 	})
 	// FILE_CREATE reports ERROR_ACCESS_DENIED for an existing pipe, too.
-	// Enumerate only after a denied bind: never connect to, close or replace the
-	// other server merely to distinguish an occupied name from a policy denial.
+	// Recheck the name after a denied bind: never connect to, close or replace
+	// the other server merely to distinguish occupancy from a policy denial.
 	if errors.Is(err, os.ErrExist) || (errors.Is(err, windows.ERROR_ACCESS_DENIED) && namedPipeExists(endpoint)) {
 		return nil, &os.PathError{Op: "listen", Path: endpoint, Err: syscall.EADDRINUSE}
 	}

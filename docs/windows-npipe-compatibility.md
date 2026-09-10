@@ -4,7 +4,7 @@
 TCP 仍是默认传输；显式传入 `--transport npipe --socket-path ...` 后，引擎和检查命令均使用命名管道。
 IPC 必须配置有效的 `--local-password` 或 `--secret`，所有 gRPC 请求仍经过密码认证。
 
-## 本机验证结果（2026-09-10）
+## 初轮本机验证结果（2026-09-10）
 
 环境：Windows 11 Pro，10.0.26200，amd64；Go 1.22.12，CGO 开启。
 源码基点：`9571a2e4e`。以下结果包含本次工作区修改。
@@ -29,6 +29,34 @@ IPC 必须配置有效的 `--local-password` 或 `--secret`，所有 gRPC 请求
 跨账号（使用其他管理员账号运行）、AppContainer/Low 完整性沙箱、第二块真实硬盘、Windows 10/Server/ARM64，未在本机完成实测。
 “普通权限”指可读写自身数据目录的桌面进程，不表示能够绕过已有 NTFS 拒绝访问规则。
 对于已有的、当前账号确实不可写的数据目录，应明确报告数据库权限错误；不自动重置 ACL、删除或更换用户数据库。
+
+## Unix 更新后的 Windows 专项修复（2026-09-10）
+
+在 `5c4ed4ebed5a351f0e27867fe7965b59e091758c` 上复测后，补充以下 Windows 修复。
+不改变 macOS / Unix 的监听、锁文件、残留 socket 回收或输出行为：
+
+- `PrepareListener` 只读识别被占用的管道；`grpc` 和服务器模式的
+  `check-secret-local-grpc` 在数据库初始化前独占获取管道。真正的创建操作负责
+  处理预检后的竞争，失败不会初始化数据库、连接或关闭已有服务。
+  初始化中途失败时只释放本进程持有的 listener。
+- Windows 的 `yak grpc ready` / `yak grpc failed` 使用启动时保存的原始 stdout，
+  避免异步日志缓存尚未转发就退出而丢失控制事件。普通日志缓存保持原状，
+  不通过延时等待补救，也不放宽管道 ACL 或密码校验。
+
+两项问题在未修复的该提交及已发布 alpha 上均可复现，不是本次 Unix 更新引入。
+新增回归在旧引擎失败、修复后通过：两个入口遇到管道占用均不创建三个数据库；
+数据库初始化失败后管道名可复用；启用日志缓存后的 bind 失败恰好输出一次结构化事件。
+
+修复后真实 Windows 引擎回归通过（约 37 秒），原有 CLI 启动验收通过（约 29 秒）。
+另外完成提升权限测试：管理员服务端/普通客户端、反向连接，以及管理员创建隔离数据后
+普通权限复用、管理员再次复用均通过（约 12 秒）；错误密码仍被拒绝。
+跨盘符仍使用 SUBST，不代表第二块物理硬盘验证。
+
+`prepare-yak` 后新增的 Windows / macOS / Linux 并行任务仅测试当前源码的 IPC 层，
+不重新编译完整引擎、不加载数据库；参见 [快速 IPC 冒烟](unix-ipc-startup-compatibility.md#fast-three-platform-ipc-smoke-test)。
+Windows 冒烟覆盖 16 个竞争启动者仅一个成功、双向大于管道缓冲区的数据、强杀服务端后
+保留旧客户端句柄再启动和通信、普通令牌和私有 ACL。本机连续 20 轮通过，冷缓存含编译
+约 34 秒。macOS / Linux 仅完成交叉编译，实际运行需对应 CI runner 验证。
 
 ## 本次修改
 
@@ -78,7 +106,7 @@ $env:YAK_NPIPE_TEST_SECOND_ROOT = 'D:\npipe-test-output'
 
 ## Yakit 接入约定
 
-当前检出的 `yakit/master` 仍只传 TCP 端口，不能把引擎测试通过等同于现有完整 GUI 已经使用 npipe。
+初轮验证时检出的 `yakit/master` 只传 TCP 端口，不能把引擎测试通过等同于完整 GUI 已经使用 npipe。
 前端需要同时传递传输方式、端点和会话密码，并以 `yak grpc ready` 中的实际 `address` 为准。
 旧 TCP 启动与预检 JSON 协议保持不变。
 
