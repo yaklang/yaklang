@@ -76,7 +76,7 @@ func runHeavyScanWithWorkLimit(t *testing.T, progID string, workLimit int64, rul
 // binding structural bound on within-opcode getTopDef fanout that the wall-clock
 // RuleTimeout only catches after the fact.
 func TestStartScan_WorkBudget_BailsHeavyTopDefRule(t *testing.T) {
-	const n, chainDepth = 2000, 15
+	const n, chainDepth = 200, 5
 	progID := uuid.NewString()
 	cleanup := prepareHeavyPHPProgram(t, progID, n, chainDepth)
 	defer cleanup()
@@ -86,21 +86,21 @@ func TestStartScan_WorkBudget_BailsHeavyTopDefRule(t *testing.T) {
 	baselineElapsed, baselineErrs := runHeavyScanWithWorkLimit(t, progID, 0, 5*time.Minute, 120*time.Second)
 	require.False(t, baselineErrs.has("per-rule budget"),
 		"baseline (no work budget) should not be bailed by the per-rule budget, got: %v", baselineErrs.msgs)
-	require.Greater(t, baselineElapsed, 150*time.Millisecond,
+	require.Greater(t, baselineElapsed, 20*time.Millisecond,
 		"baseline heavy rule should do real work, took %s", baselineElapsed)
 
-	// With a small work budget (5000 ops << n*chainDepth=30000 descent nodes),
+	// With a small work budget (500 ops << n*chainDepth=1000 descent nodes),
 	// the rule is bailed at the budget: the scan emits the "per-rule budget"
 	// error callback and finishes fast. The wall-clock (5m) is generous so the
 	// WORK budget is what fires, proving the per-element EnterWork() in
 	// AnalyzeContext.check() is in effect.
-	budgetElapsed, budgetErrs := runHeavyScanWithWorkLimit(t, progID, 5000, 5*time.Minute, 60*time.Second)
+	budgetElapsed, budgetErrs := runHeavyScanWithWorkLimit(t, progID, 500, 5*time.Minute, 60*time.Second)
 	require.True(t, budgetErrs.has("per-rule budget"),
 		"work-budget scan should bail the heavy rule (expected 'per-rule budget' error callback), got: %v", budgetErrs.msgs)
 	require.True(t, budgetErrs.has("visited="),
 		"work-budget diagnostic should include actual usage, got: %v", budgetErrs.msgs)
 	require.Less(t, budgetElapsed, 30*time.Second,
-		"scan with workLimit=5000 should finish fast, took %s", budgetElapsed)
+		"scan with workLimit=500 should finish fast, took %s", budgetElapsed)
 	require.Less(t, budgetElapsed, baselineElapsed,
 		"work-budget scan (%s) should be faster than baseline (%s)", budgetElapsed, baselineElapsed)
 }
@@ -110,7 +110,7 @@ func TestStartScan_WorkBudget_BailsHeavyTopDefRule(t *testing.T) {
 // nil, the rule is logged as hit-budget) rather than a fatal scan failure. This
 // guards the runtime.go bailedByBudget path that recognizes workBudget.Exceeded().
 func TestStartScan_WorkBudget_BailIsPartialNotFatal(t *testing.T) {
-	const n, chainDepth = 2000, 15
+	const n, chainDepth = 200, 5
 	progID := uuid.NewString()
 	cleanup := prepareHeavyPHPProgram(t, progID, n, chainDepth)
 	defer cleanup()

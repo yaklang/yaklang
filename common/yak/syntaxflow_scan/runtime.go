@@ -256,8 +256,8 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 				log.Info("========================================")
 				log.Infof("Rule Performance: %s", rule.RuleName)
 				log.Info("========================================")
-				for _, snapshot := range snapshots {
-					log.Info(snapshot.String())
+				for i := range snapshots {
+					log.Info(snapshots[i].String())
 				}
 				log.Info("========================================")
 			} else {
