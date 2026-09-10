@@ -19,12 +19,20 @@ func privatePipeSecurityDescriptor() (string, error) {
 	return "D:P(A;;GA;;;SY)(A;;GA;;;" + user.User.Sid.String() + ")", nil
 }
 
-func Listen(transport, endpoint string) (net.Listener, error) {
+// Windows has no filesystem parent to prepare. Pipe ownership is enforced at bind.
+func PrepareListener(transport, endpoint string) error {
 	if err := Validate(transport, endpoint); err != nil {
-		return nil, err
+		return err
 	}
 	if transport != "npipe" {
-		return nil, fmt.Errorf("IPC listener requires npipe transport")
+		return fmt.Errorf("IPC listener requires npipe transport")
+	}
+	return nil
+}
+
+func Listen(transport, endpoint string) (net.Listener, error) {
+	if err := PrepareListener(transport, endpoint); err != nil {
+		return nil, err
 	}
 	sddl, err := privatePipeSecurityDescriptor()
 	if err != nil {

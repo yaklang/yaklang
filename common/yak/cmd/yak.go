@@ -519,7 +519,7 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "socket-path",
-			Usage: "IPC 模式（unix/npipe）下的 socket 路径或管道名，tcp 模式忽略",
+			Usage: "IPC socket 路径或管道名（仅 unix/npipe）；Unix 新建父目录默认 0700，保留已有目录权限，socket 为 0600",
 		},
 	},
 	Action: func(c *cli.Context) (finalError error) {
@@ -562,6 +562,14 @@ var startGRPCServerCommand = cli.Command{
 			grpcReasonCode = "init_failed"
 			grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
 			return err
+		}
+		if transport != "tcp" {
+			if err := engineendpoint.PrepareListener(transport, socketPath); err != nil {
+				grpcPhase = "listen"
+				grpcReasonCode, _ = classifyEndpointListenError(transport, err)
+				grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
+				return err
+			}
 		}
 
 		// 检查 local-password 模式
@@ -784,7 +792,7 @@ var startGRPCServerCommand = cli.Command{
 			log.Infof("start to listen (%s) on: %s", transport, socketPath)
 			lis, err = engineendpoint.Listen(transport, socketPath)
 			if err != nil {
-				listenReason, hint := classifyListenError(err)
+				listenReason, hint := classifyEndpointListenError(transport, err)
 				if listenReason == "" {
 					listenReason = "listen_failed"
 				}
@@ -1002,10 +1010,36 @@ const (
 	waitConnectFailed    = "wait_connect_failed"
 
 	// listen error sub-categories
-	tcpBindDenied  = "tcp_bind_denied"
-	tcpBindInUse   = "tcp_bind_in_use"
-	tcpBindGeneric = "tcp_bind_failed"
+	tcpBindDenied      = "tcp_bind_denied"
+	tcpBindInUse       = "tcp_bind_in_use"
+	tcpBindGeneric     = "tcp_bind_failed"
+	ipcEndpointInvalid = "ipc_endpoint_invalid"
+	ipcBindDenied      = "ipc_bind_denied"
+	ipcBindInUse       = "ipc_bind_in_use"
+	ipcBindGeneric     = "ipc_bind_failed"
 )
+
+func classifyEndpointListenError(transport string, err error) (reason string, userHint string) {
+	if transport == "tcp" {
+		return classifyListenError(err)
+	}
+	if errors.Is(err, engineendpoint.ErrInvalidDirectory) {
+		return ipcEndpointInvalid, err.Error()
+	}
+	reason, _ = classifyListenError(err)
+	switch reason {
+	case tcpBindDenied:
+		reason = ipcBindDenied
+	case tcpBindInUse:
+		reason = ipcBindInUse
+	default:
+		reason = ipcBindGeneric
+	}
+	if err != nil {
+		userHint = err.Error()
+	}
+	return
+}
 
 // classifyListenError inspects a net.Listen / tls.Listen error and returns
 // a structured reason string plus a human-readable hint for diagnostics.
@@ -1091,7 +1125,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "socket-path",
-			Usage: "IPC 模式（unix/npipe）下的 socket 路径或管道名，tcp 模式忽略",
+			Usage: "IPC socket 路径或管道名（仅 unix/npipe）；Unix 新建父目录默认 0700，保留已有目录权限，socket 为 0600",
 		},
 	},
 	Action: func(ctx *cli.Context) (finalError error) {
@@ -1287,6 +1321,15 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			return
 		}
 
+		if transport != "tcp" {
+			if err := engineendpoint.PrepareListener(transport, socketPath); err != nil {
+				phase = "listen"
+				reason, _ = classifyEndpointListenError(transport, err)
+				checkSecretReasonI18n = grpcEventReasonI18n(reason)
+				return err
+			}
+		}
+
 		// 检查相关文件
 		if err := consts.InitializeYakitDatabase(projectPath, profilePath, ssaPath); err != nil {
 			finalError = err
@@ -1310,7 +1353,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			lis, err = engineendpoint.Listen(transport, socketPath)
 		}
 		if err != nil {
-			listenReason, hint := classifyListenError(err)
+			listenReason, hint := classifyEndpointListenError(transport, err)
 			if listenReason == "" {
 				listenReason = "listen_failed"
 			}
@@ -1319,7 +1362,11 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			} else {
 				log.Errorf("failed to listen (%s) on %s: [%s] %s", transport, socketPath, listenReason, hint)
 			}
-			fmt.Printf("\n[FAILED] Cannot listen on port %d\n", port)
+			if transport == "tcp" {
+				fmt.Printf("\n[FAILED] Cannot listen on port %d\n", port)
+			} else {
+				fmt.Printf("\n[FAILED] Cannot listen on %s endpoint %s\n", transport, socketPath)
+			}
 			fmt.Printf("Reason: %s\n", listenReason)
 			fmt.Printf("Hint: %s\n", hint)
 			fmt.Printf("Please check if:\n")
@@ -2000,6 +2047,22 @@ var grpcPhaseI18n = map[string]*schema.I18n{
 //   - bracketed prefix codes from classifyListenError (e.g. tcp_bind_in_use)
 //   - check-secret reason constants (e.g. database_error, dial_failed)
 var grpcReasonI18n = map[string]*schema.I18n{
+	ipcEndpointInvalid: schema.NewI18n(
+		"Unix socket 的父路径不是目录或是符号链接，请选择实际目录下的 socket 路径",
+		"The Unix socket parent is not a directory or is a symbolic link. Choose a socket path under a real directory",
+	),
+	ipcBindDenied: schema.NewI18n(
+		"无法创建本地 IPC 端点，请检查所选目录或命名管道的访问权限，或换一个可写位置",
+		"Cannot create the local IPC endpoint. Check directory or named-pipe access permissions, or choose a writable location",
+	),
+	ipcBindInUse: schema.NewI18n(
+		"本地 IPC 端点已存在，未覆盖或删除原端点；请选择其他 socket 路径或管道名",
+		"The local IPC endpoint already exists and was left unchanged. Choose another socket path or pipe name",
+	),
+	ipcBindGeneric: schema.NewI18n(
+		"本地 IPC 监听失败，请检查 socket 路径或管道名，以及所选位置的访问权限",
+		"Local IPC listener failed. Check the socket path or pipe name and access permissions at the selected location",
+	),
 	// listen error sub-categories (from classifyListenError)
 	"tcp_bind_denied": schema.NewI18n(
 		"端口被系统策略阻止，请以管理员身份运行 Yakit，或检查防火墙设置",
