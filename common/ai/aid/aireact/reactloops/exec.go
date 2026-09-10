@@ -1176,12 +1176,11 @@ LOOP:
 		// when the current iteration is below GoalMinIterations, causing finish to
 		// be removed from the schema. Idempotent via DisallowNextLoopExit's Once.
 		r.ApplyGoalModeGate(operator, iterationCount)
-		frozenParts := r.extraFrozenPartitions
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,
 			userInputForDynamic,
 			frozenUserContext,
-			frozenParts,
+			nil,
 			r.GetCurrentMemoriesContent(),
 			operator,
 		)
