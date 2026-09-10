@@ -529,6 +529,15 @@ var startGRPCServerCommand = cli.Command{
 		var grpcReasonI18n *schema.I18n
 		transport := c.String("transport")
 		socketPath := c.String("socket-path")
+		// Windows cache logging redirects os.Stdout asynchronously. Control events
+		// must reach the parent even when a startup failure immediately exits.
+		originalOutput := os.Stdout
+		eventOutput := func() *os.File {
+			if runtime.GOOS == "windows" {
+				return originalOutput
+			}
+			return os.Stdout
+		}
 		defer func() {
 			if finalError != nil {
 				elapsedMs := time.Since(grpcStartTime).Milliseconds()
@@ -553,7 +562,7 @@ var startGRPCServerCommand = cli.Command{
 					ReasonI18n:    grpcReasonI18n,
 				}
 				payload, _ := json.Marshal(failedEvent)
-				fmt.Fprintf(os.Stdout, "yak grpc failed %s\n", payload)
+				fmt.Fprintf(eventOutput(), "yak grpc failed %s\n", payload)
 				log.Flush()
 			}
 		}()
@@ -570,6 +579,18 @@ var startGRPCServerCommand = cli.Command{
 				grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
 				return err
 			}
+		}
+		// Reserve Windows pipes before database work, not just a racy existence
+		// check. Every early return releases only this process's listener.
+		reservedIPCListener, err := reserveWindowsIPCListener(transport, socketPath)
+		if err != nil {
+			grpcPhase = "listen"
+			grpcReasonCode, _ = classifyEndpointListenError(transport, err)
+			grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
+			return err
+		}
+		if reservedIPCListener != nil {
+			defer reservedIPCListener.Close()
 		}
 
 		// 检查 local-password 模式
@@ -689,7 +710,7 @@ var startGRPCServerCommand = cli.Command{
 		}
 		log.Info("start to initialize database")
 
-		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), c.String("ssa-db"))
+		err = initializeDatabase(c.String("project-db"), c.String("profile-db"), c.String("ssa-db"))
 		if err != nil {
 			log.Errorf("init database failed: %s", err)
 			grpcPhase = "database"
@@ -782,7 +803,7 @@ var startGRPCServerCommand = cli.Command{
 			port = c.Int("port")
 		}
 
-		var lis net.Listener
+		var lis net.Listener = reservedIPCListener
 
 		// IPC endpoints are private; Unix may reclaim a verified stale socket.
 		if transport == "unix" || transport == "npipe" {
@@ -794,7 +815,9 @@ var startGRPCServerCommand = cli.Command{
 				return
 			}
 			log.Infof("start to listen (%s) on: %s", transport, socketPath)
-			lis, err = engineendpoint.Listen(transport, socketPath)
+			if lis == nil {
+				lis, err = engineendpoint.Listen(transport, socketPath)
+			}
 			if err != nil {
 				listenReason, hint := classifyEndpointListenError(transport, err)
 				if listenReason == "" {
@@ -904,7 +927,9 @@ var startGRPCServerCommand = cli.Command{
 				}
 			}
 		}
-		defer lis.Close()
+		if reservedIPCListener == nil {
+			defer lis.Close()
+		}
 		// IPC paths belong to this listener. A normal interrupt must release the
 		// endpoint so a manual restart can reuse it. Unix also recovers stale
 		// sockets on the next start if the process cannot clean up (e.g. SIGKILL).
@@ -931,7 +956,7 @@ var startGRPCServerCommand = cli.Command{
 		actualAddress := lis.Addr().String()
 		instanceId := utils.RandStringBytes(8)
 		log.Infof("yak grpc listener ready on: %s", actualAddress)
-		if err := writeGRPCReadyEvent(os.Stdout, actualAddress, transport, instanceId); err != nil {
+		if err := writeGRPCReadyEvent(eventOutput(), actualAddress, transport, instanceId); err != nil {
 			log.Warnf("write yak grpc ready event failed: %v", err)
 		}
 
@@ -960,6 +985,15 @@ var startGRPCServerCommand = cli.Command{
 		}
 		return nil
 	},
+}
+
+// Unix keeps its existing preflight/stale-socket lifecycle. Windows can reserve
+// the kernel pipe before opening databases without creating filesystem entries.
+func reserveWindowsIPCListener(transport, endpoint string) (net.Listener, error) {
+	if runtime.GOOS != "windows" || transport != "npipe" {
+		return nil, nil
+	}
+	return engineendpoint.Listen(transport, endpoint)
 }
 
 func newEngineSecret() (string, error) {
@@ -1353,7 +1387,18 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			}
 		}
 
-		// 检查相关文件
+		// Fail on an occupied Windows pipe before opening or migrating databases.
+		reservedIPCListener, err := reserveWindowsIPCListener(transport, socketPath)
+		if err != nil {
+			phase = "listen"
+			reason, _ = classifyEndpointListenError(transport, err)
+			checkSecretReasonI18n = grpcEventReasonI18n(reason)
+			return err
+		}
+		if reservedIPCListener != nil {
+			defer reservedIPCListener.Close()
+		}
+
 		if err := consts.InitializeYakitDatabase(projectPath, profilePath, ssaPath); err != nil {
 			finalError = err
 			log.Errorf("failed to open database: %s", err)
@@ -1368,11 +1413,10 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		log.Info("running in server mode, starting test server...")
 
 		// 监听
-		var lis net.Listener
-		var err error
+		var lis net.Listener = reservedIPCListener
 		if transport == "tcp" {
 			lis, err = net.Listen("tcp", addr)
-		} else {
+		} else if lis == nil {
 			lis, err = engineendpoint.Listen(transport, socketPath)
 		}
 		if err != nil {
@@ -1410,7 +1454,9 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			checkSecretReasonI18n = grpcEventReasonI18n(listenReason)
 			return
 		}
-		defer lis.Close()
+		if reservedIPCListener == nil {
+			defer lis.Close()
+		}
 
 		log.Info("generated random secret for testing: ***")
 

@@ -23,6 +23,7 @@ on:
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
       - "scripts/ci/test-yak-startup.sh"
+      - "scripts/ci/test-ipc-smoke.ps1"
       - "go.mod"
 
 concurrency:
@@ -248,24 +249,6 @@ jobs:
         run: |
           go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
 
-      - name: Smoke test compiled yak startup
-        id: startup_smoke
-        timeout-minutes: 10
-        env:
-          YAK_BINARY_PATH: ${{ runner.temp }}/yak
-        run: |
-          set -o pipefail
-          bash ./scripts/ci/test-yak-startup.sh 2>&1 | tee "$RUNNER_TEMP/yak-startup-smoke.log"
-
-      - name: Upload startup smoke failure log
-        if: failure() && steps.startup_smoke.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: yak-startup-smoke-${{ github.run_id }}
-          path: ${{ runner.temp }}/yak-startup-smoke.log
-          retention-days: 3
-          if-no-files-found: warn
-
       - name: Package yak artifact
         run: |
           ARTIFACT_COPY_LIST="$RUNNER_TEMP/yak|yak" \
@@ -295,6 +278,64 @@ jobs:
           path: ${{ runner.temp }}/essential-tests-yak-cache.tar.gz
           retention-days: 1
           compression-level: 0
+
+  ipc-smoke:
+    name: IPC smoke (${{ matrix.platform }})
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - os: windows-2022
+            platform: Windows npipe
+          - os: macos-15
+            platform: macOS unix
+          - os: ubuntu-22.04
+            platform: Linux unix
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: '0'
+      GOCACHE: ${{ github.workspace }}/.ipc-cache/build
+      GOMODCACHE: ${{ github.workspace }}/.ipc-cache/mod
+    steps:
+      - name: Check out the prepared revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      # Do not transfer the large Linux engine/cache artifact to other OSes.
+      # This cache contains only the small endpoint package's dependencies.
+      - name: Restore IPC-only Go cache
+        uses: actions/cache@v4
+        with:
+          path: .ipc-cache
+          key: ipc-smoke-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: |
+            ipc-smoke-v1-${{ runner.os }}-${{ runner.arch }}-
+      - name: Verify IPC communication and lifecycle
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          ./scripts/ci/test-ipc-smoke.ps1 *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ipc-smoke.log"
+      - name: Upload IPC failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipc-smoke-${{ matrix.os }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ipc-smoke.log
+          retention-days: 3
+          if-no-files-found: warn
 
   scannode-focused:
     name: Test ScanNode Focused
@@ -1113,7 +1154,7 @@ jobs:
 
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    needs: [check-wip, ipc-smoke, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
     steps:
@@ -1133,6 +1174,7 @@ jobs:
       - check-wip
       - scannode-focused
       - slim-gate
+      - ipc-smoke
       - test-local
       - test-prepared-yakgrpc
       - test-prepared-coreplugin
@@ -1145,6 +1187,7 @@ jobs:
           TEST_SCOPE: ${{ needs.check-wip.outputs.test_scope }}
           SCANNODE_RESULT: ${{ needs.scannode-focused.result }}
           SLIM_RESULT: ${{ needs.slim-gate.result }}
+          IPC_RESULT: ${{ needs.ipc-smoke.result }}
           LOCAL_RESULT: ${{ needs.test-local.result }}
           YAKGRPC_RESULT: ${{ needs.test-prepared-yakgrpc.result }}
           COREPLUGIN_RESULT: ${{ needs.test-prepared-coreplugin.result }}
@@ -1163,7 +1206,7 @@ jobs:
             exit 0
           fi
 
-          for result in "$SLIM_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
+          for result in "$SLIM_RESULT" "$IPC_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Full test scope did not pass: $result" >&2
               exit 1
