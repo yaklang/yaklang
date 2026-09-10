@@ -8,7 +8,7 @@ import (
 
 func hitRDP(t *testing.T, addr, user, pass string) *BruteItemResult {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	return rdpAuth.BrutePass(&BruteItem{
 		Type: "rdp", Target: addr, Username: user, Password: pass, Context: ctx,

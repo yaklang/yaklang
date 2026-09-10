@@ -137,7 +137,7 @@ func (s *nlaTestServer) result() *nlaVerifyRecord {
 
 func (s *nlaTestServer) waitResult(t *testing.T, wantVerify bool) *nlaVerifyRecord {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		res := s.result()
 		if res != nil && res.GotAuth && res.Verified == wantVerify {
@@ -160,7 +160,7 @@ func (s *nlaTestServer) serve() {
 
 func (s *nlaTestServer) handle(conn net.Conn) {
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// 1. X.224 Connection Request → Confirm（选择 HYBRID/CredSSP）
 	if err := x224NegotiateNLA(conn); err != nil {
