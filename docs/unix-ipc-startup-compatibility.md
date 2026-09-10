@@ -48,7 +48,32 @@ The lock coordinates engine processes. Callers should not concurrently replace
 the endpoint directory, socket or lock file from another program. Choose another
 path when it belongs to a different user or a running service.
 
-## Prepared binary smoke test
+## Fast three-platform IPC smoke test
+
+Essential Tests runs three parallel `ipc-smoke` jobs after `prepare-yak` succeeds:
+Windows named pipes, macOS Unix sockets, and Linux Unix sockets. All check out the
+same prepared revision. They build only the small `engineendpoint` test package
+with CGO disabled, not another full engine. No engine download, database loading,
+TCP listener or external service is involved.
+
+```powershell
+pwsh -File scripts/ci/test-ipc-smoke.ps1
+```
+
+The smoke suite verifies real bidirectional IPC payloads, cancellation, occupied
+endpoint protection, normal close/reuse, and restart after killing its own server
+child while retaining the client handle. Platform cases cover private Windows
+ACLs, ordinary-token startup and Unicode names; Unix aliases, stale socket
+reclamation, locks, shared directories and preservation of unrelated paths.
+
+The target is 1–2 minutes per job including a small OS-specific Go cache restore
+and compilation. Test execution has a 45-second deadline, its CI step a 2-minute
+limit, and the whole job a 3-minute guard for runner/setup overhead. Cold downloads
+and GitHub runner queues are not guaranteed to fit the target. No matrix failure
+is ignored: the Essential Tests Gate and successful-result cache depend on all
+three jobs. These are transport smoke tests, not full CLI/auth/database tests.
+
+## Prepared binary CLI acceptance test (manual)
 
 After building the native engine, run from the repository:
 
@@ -56,10 +81,9 @@ After building the native engine, run from the repository:
 YAK_BINARY_PATH=/absolute/path/to/built/yak bash scripts/ci/test-yak-startup.sh
 ```
 
-The existing Essential Tests `prepare-yak` job runs this command after compiling
-`$RUNNER_TEMP/yak` and before packaging/uploading it. It executes the exact built
-artifact and fails if that executable is missing; acceptance tests cannot
-silently skip. No additional platform matrix or engine build is introduced.
+This longer suite is retained for explicit native-engine acceptance runs and is
+no longer on `prepare-yak`'s serial path. It executes the exact supplied artifact
+and fails if that executable is missing; acceptance tests cannot silently skip.
 
 The smoke test covers actual TCP authentication and legacy check output, Unix
 authentication, both live endpoint collision paths, no database initialization
@@ -73,4 +97,4 @@ preservation and short aliases for long real paths.
 The script isolates database environment variables before Go package
 initialization. Each real engine child uses a separate test home, a deadline and
 cleanup of only its own PID. Tests use ephemeral TCP ports and random Unix paths.
-CI retains the smoke log on failure and does not publish the failed artifact.
+The parallel IPC jobs retain their smoke logs on failure and block the final gate.

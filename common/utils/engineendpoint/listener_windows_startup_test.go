@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -280,5 +281,89 @@ func TestWindowsEngineDifferentDrive(t *testing.T) {
 	result, logs := client.check(t, 0, endpoint, secret)
 	if result["ok"] != true {
 		t.Fatalf("cross-drive RPC failed: phase=%v reason=%v\n%s", result["phase"], result["reasonCode"], logs)
+	}
+}
+
+func TestWindowsEngineOccupiedPipeDoesNotInitializeDatabases(t *testing.T) {
+	_, endpoint := testEndpoint(t)
+	l, err := Listen("npipe", endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	for _, command := range []string{"grpc", "check-secret-local-grpc"} {
+		t.Run(command, func(t *testing.T) {
+			f := newWindowsEngineFixture(t)
+			args := []string{command, "--transport", "npipe", "--socket-path", endpoint}
+			if command == "grpc" {
+				args = append(args, "--local-password", "occupied-pipe-test-password")
+			}
+			output, err := f.command(t, 0, args...).CombinedOutput()
+			if err == nil || !bytes.Contains(output, []byte("ipc_bind_in_use")) {
+				t.Fatalf("missing IPC collision result: %v", err)
+			}
+			if command == "grpc" && bytes.Count(output, []byte("yak grpc failed ")) != 1 {
+				t.Fatal("expected exactly one structured startup failure")
+			}
+			for _, name := range []string{"project.db", "profile.db", "ssa.db"} {
+				if _, err := os.Stat(filepath.Join(f.home, name)); !os.IsNotExist(err) {
+					t.Fatalf("occupied IPC initialized %s", name)
+				}
+			}
+		})
+	}
+	// Rejected starts must not connect to or disrupt the current owner.
+	done := make(chan error, 1)
+	go func() { done <- servePipeEcho(l) }()
+	exchangePipe(t, endpoint)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWindowsEngineReservedPipeReleasedOnStartupFailure(t *testing.T) {
+	for _, command := range []string{"grpc", "check-secret-local-grpc"} {
+		t.Run(command, func(t *testing.T) {
+			f := newWindowsEngineFixture(t)
+			_, endpoint := testEndpoint(t)
+			// An invalid Win32 filename fails database opening after reservation.
+			// Do not use '?': SQLite interprets it as the start of DSN options.
+			args := []string{command, "--transport", "npipe", "--socket-path", endpoint,
+				"--profile-db", filepath.Join(f.home, "invalid|.db")}
+			if command == "grpc" {
+				args = append(args, "--local-password", "failed-start-test-password")
+			}
+			output, err := f.command(t, 0, args...).CombinedOutput()
+			if err == nil || !bytes.Contains(output, []byte(`"phase":"database"`)) {
+				// The check protocol is pretty-printed, while grpc events are compact.
+				if err == nil || !bytes.Contains(output, []byte(`"phase": "database"`)) {
+					t.Fatalf("expected database failure after pipe reservation: %v", err)
+				}
+			}
+			l, err := Listen("npipe", endpoint)
+			if err != nil {
+				t.Fatalf("failed startup leaked its reserved pipe: %v", err)
+			}
+			l.Close()
+		})
+	}
+}
+
+func TestWindowsEngineFailureEventBypassesCachedOutput(t *testing.T) {
+	// Use a TCP bind failure to reach the same Windows grpc action *after*
+	// NewServer enables stdout caching. Npipe now fails before database work.
+	occupied, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer occupied.Close()
+	f := newWindowsEngineFixture(t)
+	port := strconv.Itoa(occupied.Addr().(*net.TCPAddr).Port)
+	output, err := f.command(t, 0, "grpc", "--port", port, "--local-password", "cached-output-test-password").CombinedOutput()
+	if err == nil || bytes.Count(output, []byte("yak grpc failed ")) != 1 || !bytes.Contains(output, []byte("tcp_bind_in_use")) {
+		t.Fatalf("cached logging swallowed or duplicated the structured failure: %v", err)
+	}
+	if bytes.Contains(output, []byte("cached-output-test-password")) {
+		t.Fatal("control output leaked the password")
 	}
 }
