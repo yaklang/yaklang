@@ -1,0 +1,93 @@
+name: testCveDownload
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "rookie/enhance/cve-parse"
+    paths:
+      - ".github/workflows/testCveDownload.yaml"
+
+jobs:
+  test:
+    name: Test NVD Download Speed
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+        id: go
+
+      - name: Build yak
+        run: |
+          go build -o ./yak ./common/yak/cmd/yak.go
+          chmod +x ./yak
+
+      # ── Test 1: Serial download with curl (baseline) ──
+      - name: Serial download baseline (curl)
+        run: |
+          mkdir -p /tmp/cve-serial
+          echo "=== SERIAL DOWNLOAD START ==="
+          date -u +%Y-%m-%dT%H:%M:%SZ
+
+          YEARS="2002 2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025 2026"
+          TOTAL_START=$(date -u +%s)
+          for YEAR in $YEARS; do
+            URL="https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-${YEAR}.json.gz"
+            OUT="/tmp/cve-serial/CVE-${YEAR}.json"
+            START=$(date -u +%s%3N)
+            HTTP_CODE=$(curl -s -o /tmp/cve-serial/tmp.gz -w "%{http_code}" --max-time 120 "$URL")
+            END=$(date -u +%s%3N)
+            ELAPSED=$((END - START))
+            if [ "$HTTP_CODE" = "200" ]; then
+              gunzip -f /tmp/cve-serial/tmp.gz && mv /tmp/cve-serial/tmp "$OUT" 2>/dev/null || true
+              SIZE=$(stat -c%s "$OUT" 2>/dev/null || echo 0)
+              echo "CVE-${YEAR}.json: ${ELAPSED}ms, ${SIZE} bytes, HTTP 200"
+            else
+              echo "CVE-${YEAR}.json: ${ELAPSED}ms, FAILED, HTTP ${HTTP_CODE}"
+            fi
+          done
+          TOTAL_END=$(date -u +%s)
+          echo ""
+          echo "=== SERIAL DOWNLOAD END ==="
+          echo "Serial total: $((TOTAL_END - TOTAL_START))s"
+          echo ""
+          echo "--- Downloaded files ---"
+          ls -lh /tmp/cve-serial/CVE-*.json 2>/dev/null | wc -l
+          du -sh /tmp/cve-serial/ 2>/dev/null
+
+      # ── Test 2: Parallel download (yak, 4 workers) ──
+      - name: Parallel download (yak 4 workers)
+        run: |
+          mkdir -p /tmp/cve-parallel
+          echo "=== PARALLEL DOWNLOAD START ==="
+          date -u +%Y-%m-%dT%H:%M:%SZ
+          TOTAL_START=$(date -u +%s)
+
+          # Use yak to download only — we use --v5-skip and --no-gzip and --year to force just download
+          # Actually we need a simpler approach: directly call the download via a small Go snippet
+          # Instead, let's just time the full build but focus on download logs
+          ./yak build-cve-database --no-gzip --v5-skip --output /tmp/cve-parallel/test.db 2>&1 | tee /tmp/parallel.log || true
+
+          TOTAL_END=$(date -u +%s)
+          date -u +%Y-%m-%dT%H:%M:%SZ
+          echo "=== PARALLEL DOWNLOAD END ==="
+          echo "Parallel total (full build incl parse+db): $((TOTAL_END - TOTAL_START))s"
+          echo ""
+          echo "--- Download phase breakdown ---"
+          # Extract download start and end from logs
+          grep "start to download from\|downloaded.*->\|handle.*cost\|download.*NVD feeds" /tmp/parallel.log || echo "(no download logs)"
+          echo ""
+          echo "--- Parse+DB phase breakdown ---"
+          grep "LoadCVE begin\|handle.*cost.*25\|成功" /tmp/parallel.log || echo "(no parse logs)"
+          echo ""
+          echo "--- Downloaded files ---"
+          ls -lh ~/yakit-projects/temp/cve/CVE-*.json 2>/dev/null | wc -l
+          du -sh ~/yakit-projects/temp/cve/ 2>/dev/null
