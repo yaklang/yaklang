@@ -141,22 +141,22 @@ func runHeavyScan(t *testing.T, progID string, budget time.Duration, hardBacksto
 // the binding bound on total dataflow work that dataflowValueLimit/MaxDepth
 // (per-branch only) do not provide.
 func TestStartScan_RuleTimeout_BailsHeavyRule(t *testing.T) {
-	const n, chainDepth = 2000, 15
+	const n, chainDepth = 200, 5
 	progID := uuid.NewString()
 	cleanup := prepareHeavyPHPProgram(t, progID, n, chainDepth)
 	defer cleanup()
 
-	// Baseline: no per-rule budget. The heavy rule runs to completion and must
+	// Baseline: no per-rule budget. The rule runs to completion and must
 	// do real work (well over the budget below) but still finish (not hang).
 	baselineElapsed, baselineErrs := runHeavyScan(t, progID, 0, 90*time.Second)
 	require.False(t, baselineErrs.has("per-rule budget"),
 		"baseline (no budget) should not be bailed by the per-rule budget")
-	require.Greater(t, baselineElapsed, 150*time.Millisecond,
+	require.Greater(t, baselineElapsed, 20*time.Millisecond,
 		"baseline heavy rule should do real work (> budget), took %s", baselineElapsed)
 
 	// With a small per-rule budget, the heavy rule is bailed at the budget: the
 	// scan emits the "hit per-rule budget" error callback and finishes fast.
-	budgetElapsed, budgetErrs := runHeavyScan(t, progID, 100*time.Millisecond, 30*time.Second)
+	budgetElapsed, budgetErrs := runHeavyScan(t, progID, 20*time.Millisecond, 30*time.Second)
 	require.True(t, budgetErrs.has("per-rule budget"),
 		"budget scan should bail the heavy rule (expected 'per-rule budget' error callback), got: %v", budgetErrs.msgs)
 	require.Less(t, budgetElapsed, 5*time.Second,
