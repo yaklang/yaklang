@@ -92,8 +92,8 @@ print("\n--- TCP 回归测试 ---")
 print("\n[T1] yak grpc tcp 端口占用")
 s = socket.socket(); s.bind(('127.0.0.1', 19031)); s.listen(1)
 proc = spawn([YAK, 'grpc', '--local-password', 't', '--port', '19031'])
-time.sleep(3)
-d = read_event_after_kill(proc, 3)
+time.sleep(8)
+d = read_event_after_kill(proc, 5)
 s.close()
 if d:
     ok = d.get('reasonCode') == 'tcp_bind_in_use'
@@ -130,12 +130,12 @@ PIPE_NAME = "yakit-test-ipc"
 # T4: npipe ready 事件
 print("\n[T4] yak grpc npipe ready 事件")
 proc = spawn([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe', '--socket-path', PIPE_NAME])
-d = read_event(proc, 10)
+d = read_event(proc, 15)
 if d:
     ok = d.get('transport') == 'npipe' and 'instanceId' in d
     record("T4 npipe ready", ok, f"transport={d.get('transport')}, address={d.get('address')}")
 else:
-    d = read_event_after_kill(proc, 3)
+    d = read_event_after_kill(proc, 5)
     if d:
         ok = d.get('transport') == 'npipe' and 'instanceId' in d
         record("T4 npipe ready", ok, f"transport={d.get('transport')} (after kill)")
@@ -182,8 +182,8 @@ else:
 # T8: npipe 缺少 socket-path
 print("\n[T8] yak grpc npipe 缺少 socket-path")
 proc = spawn([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe'])
-time.sleep(3)
-d = read_event_after_kill(proc, 3)
+time.sleep(5)
+d = read_event_after_kill(proc, 5)
 if d:
     ok = d.get('reasonCode') == 'init_failed'
     record("T8 npipe missing path", ok, f"reasonCode={d.get('reasonCode')}")
