@@ -18,6 +18,7 @@ func runIPCSmokePlatform(t *testing.T) {
 	t.Run("concurrent-starts", TestNamedPipeConcurrentStarts)
 	t.Run("unicode-name", TestNamedPipeUnicodeName)
 	t.Run("private-acl", TestNamedPipeACLContainsOnlyCurrentUserAndSystem)
+	t.Run("acl-validation", TestNamedPipeACLValidation)
 	t.Run("working-directory", TestNamedPipeDifferentWorkingDirectory)
 	t.Run("ordinary-token-server", func(t *testing.T) {
 		token := ordinaryTestToken(t)

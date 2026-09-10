@@ -58,6 +58,18 @@ Windows 冒烟覆盖 16 个竞争启动者仅一个成功、双向大于管道�
 保留旧客户端句柄再启动和通信、普通令牌和私有 ACL。本机连续 20 轮通过，冷缓存含编译
 约 34 秒。macOS / Linux 仅完成交叉编译，实际运行需对应 CI runner 验证。
 
+### Windows CI 的 SID 别名回归
+
+首轮 Windows Server 2022 CI 的通信测试通过，但 ACL 断言失败：系统将 runner 的
+内置管理员 SID 格式化为 `LA`，旧测试错误地要求 SDDL 中包含完整数字 SID。
+这属于测试断言的账号兼容性问题，不通过修改生产 ACL 或跳过权限测试解决。
+
+测试现在使用 `GetAce` 和二进制 SID 比较，要求受保护的 DACL 恰有当前用户和
+SYSTEM 的两个显式完整授权，拒绝其他账号、额外条目、拒绝型条目、继承和不完整权限。
+新增 22 个正反例覆盖 `LA`/数字 SID 等价、条目顺序、SYSTEM 进程及不安全或不可用的 ACL，
+同时纳入快速 IPC 冒烟；Medium 完整性标签的检查保持不变。
+SID 别名定义参见 [Microsoft SDDL SID 说明](https://learn.microsoft.com/en-us/windows/win32/secauthz/sid-strings)。
+
 ## 本次修改
 
 1. Windows 在独占创建同名管道时可能返回 `ERROR_ACCESS_DENIED (5)`。仅在失败后核实该名字确实存在，将其归为地址占用；核实过程不连接或替换原管道。
