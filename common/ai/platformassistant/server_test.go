@@ -177,7 +177,7 @@ func TestPlatformRealEngineToolThenAnswer(t *testing.T) {
 		if err := protojson.Unmarshal([]byte(line), e); err != nil {
 			t.Fatal(err)
 		}
-		if e.Kind == "thought" {
+		if e.Kind == "thought_delta" {
 			if kinds["completed"] || kinds["failed"] {
 				t.Fatal("thought arrived after terminal event")
 			}
@@ -185,7 +185,7 @@ func TestPlatformRealEngineToolThenAnswer(t *testing.T) {
 		}
 		kinds[e.Kind] = true
 	}
-	if len(thoughts) != 1 || thoughts[0] != "先查询当前用户的项目。" {
+	if strings.Join(thoughts, "") != "先查询当前用户的项目。" {
 		t.Fatalf("public summary missing or polluted: %q", thoughts)
 	}
 	if !kinds["tool_started"] || !kinds["tool_completed"] || !kinds["completed"] || !kinds["answer"] || !strings.Contains(w.Body.String(), "Alice project") {
@@ -382,8 +382,8 @@ func TestPlatformThoughtForwarderFiltersAndBounds(t *testing.T) {
 	}
 	public("one", "查询")
 	public("one", "项目")
-	if len(events) != 0 {
-		t.Fatal("incomplete summary was forwarded")
+	if len(events) != 2 {
+		t.Fatal("summary deltas were not forwarded immediately")
 	}
 	finish("one")
 	finish("one")
@@ -393,12 +393,12 @@ func TestPlatformThoughtForwarderFiltersAndBounds(t *testing.T) {
 	finish("three")
 	total := 0
 	for _, event := range events {
-		if event.Kind != "thought" || !utf8.ValidString(event.Text) {
+		if event.Kind != "thought_delta" || !utf8.ValidString(event.Text) {
 			t.Fatal("invalid thought event")
 		}
 		total += len(event.Text)
 	}
-	if len(events) != 2 || events[0].Text != "查询项目" || total != maxThoughtBytes-1 {
+	if len(events) != 3 || events[0].Text+events[1].Text != "查询项目" || total > maxThoughtBytes || total < maxThoughtBytes-3 {
 		t.Fatalf("unexpected bounded output: events=%d bytes=%d", len(events), total)
 	}
 }
@@ -411,18 +411,18 @@ func TestPlatformFlatActionPublicSummary(t *testing.T) {
 	defer callback.Close()
 	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
 	w := request(s, turn("flat-summary", "alice"), "Bearer "+secret)
-	thoughts, answer, completed := 0, "", false
+	thoughts, answer, completed := "", "", false
 	for _, line := range strings.Split(strings.TrimSpace(w.Body.String()), "\n") {
 		event := new(aiv1.AssistantRuntimeEvent)
 		if err := protojson.Unmarshal([]byte(line), event); err != nil {
 			t.Fatal(err)
 		}
 		switch event.Kind {
-		case "thought":
-			if completed || event.Text != "根据页面上下文回答。" {
+		case "thought_delta":
+			if completed {
 				t.Fatalf("invalid summary: %v", event)
 			}
-			thoughts++
+			thoughts += event.Text
 		case "answer":
 			answer += event.Text
 		case "completed":
@@ -431,7 +431,127 @@ func TestPlatformFlatActionPublicSummary(t *testing.T) {
 			t.Fatalf("flat action failed: %s", event.ErrorCode)
 		}
 	}
-	if thoughts != 1 || !completed || answer != "当前页面是项目列表。" {
-		t.Fatalf("thoughts=%d completed=%t answer=%q", thoughts, completed, answer)
+	if thoughts != "根据页面上下文回答。" || !completed || answer != "当前页面是项目列表。" {
+		t.Fatalf("thoughts=%q completed=%t answer=%q", thoughts, completed, answer)
+	}
+}
+
+func TestResiliencePlatformStreamingBeforeModelCompletion(t *testing.T) {
+	gate := make(chan struct{})
+	defer func() {
+		select {
+		case <-gate:
+		default:
+			close(gate)
+		}
+	}()
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") != "application/x-ndjson" {
+			t.Error("stream negotiation absent")
+		}
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		emit := func(kind, text string) {
+			data, _ := protojson.Marshal(&aiv1.AssistantRuntimeEvent{Kind: kind, Text: text})
+			w.Write(append(data, '\n'))
+			w.(http.Flusher).Flush()
+		}
+		emit("model_delta", `{"@action":"object","human_readable_thought":"正在检查页面。","next_action":{"type":"directly_answer","answer_payload":"当前页面`)
+		select {
+		case <-gate:
+		case <-r.Context().Done():
+			return
+		}
+		emit("model_delta", `是项目。"}}`)
+		emit("completed", "")
+	}))
+	defer callback.Close()
+	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	events := make(chan *aiv1.AssistantRuntimeEvent, 100)
+	done := make(chan error, 1)
+	go func() {
+		done <- s.run(ctx, turn("stream", "alice"), func(e *aiv1.AssistantRuntimeEvent) { events <- e })
+	}()
+	thought, answer := false, false
+	for !thought || !answer {
+		select {
+		case e := <-events:
+			thought = thought || e.Kind == "thought_delta"
+			answer = answer || e.Kind == "answer"
+		case err := <-done:
+			t.Fatalf("finished before release: %v", err)
+		case <-ctx.Done():
+			t.Fatal("public output buffered until model completion")
+		}
+	}
+	close(gate)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal("turn did not finish")
+	}
+}
+
+func TestResiliencePlatformPartialModelFailureIsNotRetried(t *testing.T) {
+	for _, terminal := range []string{"failed", "eof", "completed"} {
+		t.Run(terminal, func(t *testing.T) {
+			calls := 0
+			callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.Header().Set("Content-Type", "application/x-ndjson")
+				data, _ := protojson.Marshal(&aiv1.AssistantRuntimeEvent{Kind: "model_delta", Text: `{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"partial`})
+				w.Write(append(data, '\n'))
+				w.(http.Flusher).Flush()
+				if terminal == "completed" {
+					w.Write([]byte("{\"kind\":\"completed\"}\n"))
+				}
+				if terminal == "failed" {
+					w.Write([]byte("{\"kind\":\"failed\",\"error_code\":\"assistant_model_upstream_error\"}\n"))
+				}
+			}))
+			defer callback.Close()
+			s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
+			w := request(s, turn("partial", "alice"), "Bearer "+secret)
+			if calls != 1 || !strings.Contains(w.Body.String(), `"kind":"failed"`) || strings.Contains(w.Body.String(), `"kind":"completed"`) {
+				t.Fatalf("calls=%d body=%s", calls, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestResiliencePlatformStreamingCancellation(t *testing.T) {
+	entered := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Write([]byte("{\"kind\":\"model_delta\",\"text\":\"prefix\"}\n"))
+		w.(http.Flusher).Flush()
+		close(entered)
+		<-r.Context().Done()
+	}))
+	defer upstream.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s, _ := New(Config{LegionURL: upstream.URL, ServiceSecret: secret})
+	callback, lastError := s.streamingModelCallback(ctx, "delegation")
+	response, err := callback(aicommon.NewConfig(ctx), aicommon.NewAIRequest("prompt", aicommon.WithAIRequest_Context(ctx)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, reader := response.GetUnboundStreamReaderEx(nil, nil, nil)
+	done := make(chan error, 1)
+	go func() { _, err := io.ReadAll(reader); done <- err }()
+	<-entered
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stream reader leaked after cancellation")
+	}
+	if lastError() == nil {
+		t.Fatal("canceled partial response treated as success")
 	}
 }
