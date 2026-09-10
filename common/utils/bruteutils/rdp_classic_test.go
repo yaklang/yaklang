@@ -63,7 +63,7 @@ func (s *classicRDPServer) serve() {
 
 func (s *classicRDPServer) handle(conn net.Conn) {
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// 1. X.224 CR → CC without rdpNegData（XP 风格）
 	pkt, err := readTPKT(conn)
