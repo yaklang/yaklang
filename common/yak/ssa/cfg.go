@@ -189,6 +189,17 @@ func (lb *LoopBuilder) Finish() {
 	SSABuild := lb.builder
 	ExternBlock := SSABuild.CurrentBlock
 	scope := ExternBlock.ScopeTable
+	if utils.IsNil(scope) {
+		// a CFG path can reach the current block before SetScope ran
+		// (e.g. broken-AST recovery); reconstruct a placeholder scope
+		// instead of panicking in NewLoopStmt on the nil scope
+		ExternBlock.restoreScopeIfMissing()
+		scope = ExternBlock.ScopeTable
+	}
+	if utils.IsNil(scope) {
+		log.Errorf("build loop: current block %v has no ScopeTable, skip loop (%s)", ExternBlock.GetName(), SSABuild.builderDebugContext())
+		return
+	}
 	header := SSABuild.NewBasicBlock(LoopHeader)
 	condition := SSABuild.NewBasicBlockUnSealed(LoopCondition)
 	body := SSABuild.NewBasicBlockNotAddBlocks(LoopBody)
