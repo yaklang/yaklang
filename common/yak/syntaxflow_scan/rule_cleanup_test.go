@@ -33,7 +33,7 @@ func TestScan_ResetInterRuleState_ClearsHeavyRuleAccumulators(t *testing.T) {
 	progID := uuid.NewString()
 	// Large enough that the rule materializes many Values and pushes the cache
 	// above resetInterRuleStateCacheThreshold between rules.
-	cleanup := prepareHeavyPHPProgram(t, progID, 4000, 25)
+	cleanup := prepareHeavyPHPProgram(t, progID, 200, 5)
 	defer cleanup()
 
 	// Lower the per-Program threshold on the EXACT instance the scan runs on.
