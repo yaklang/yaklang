@@ -784,7 +784,7 @@ var startGRPCServerCommand = cli.Command{
 
 		var lis net.Listener
 
-		// IPC endpoints are private and never take over an existing path.
+		// IPC endpoints are private; Unix may reclaim a verified stale socket.
 		if transport == "unix" || transport == "npipe" {
 			if socketPath == "" {
 				grpcPhase = "init"
@@ -906,9 +906,14 @@ var startGRPCServerCommand = cli.Command{
 		}
 		defer lis.Close()
 		// IPC paths belong to this listener. A normal interrupt must release the
-		// endpoint so a manual restart can reuse it; forced kills never delete stale paths.
+		// endpoint so a manual restart can reuse it. Unix also recovers stale
+		// sockets on the next start if the process cannot clean up (e.g. SIGKILL).
 		if transport != "tcp" {
-			signalCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			signals := []os.Signal{os.Interrupt, syscall.SIGTERM}
+			if transport == "unix" {
+				signals = append(signals, syscall.SIGHUP)
+			}
+			signalCtx, stopSignals := signal.NotifyContext(context.Background(), signals...)
 			defer stopSignals()
 			done := make(chan struct{})
 			defer close(done)
@@ -2070,8 +2075,8 @@ var grpcPhaseI18n = map[string]*schema.I18n{
 //   - check-secret reason constants (e.g. database_error, dial_failed)
 var grpcReasonI18n = map[string]*schema.I18n{
 	ipcEndpointInvalid: schema.NewI18n(
-		"Unix socket 的父路径不是目录或是符号链接，请选择实际目录下的 socket 路径",
-		"The Unix socket parent is not a directory or is a symbolic link. Choose a socket path under a real directory",
+		"Unix socket 的父路径未指向有效目录，请检查目录或符号链接的目标",
+		"The Unix socket parent does not resolve to a directory. Check the directory or symbolic link target",
 	),
 	ipcBindDenied: schema.NewI18n(
 		"无法创建本地 IPC 端点，请检查所选目录或命名管道的访问权限，或换一个可写位置",
