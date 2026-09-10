@@ -1032,6 +1032,11 @@ func classifyEndpointListenError(transport string, err error) (reason string, us
 	if errors.Is(err, engineendpoint.ErrInvalidDirectory) {
 		return ipcEndpointInvalid, err.Error()
 	}
+	// Win32 named pipes return ERROR_ACCESS_DENIED (5), not Winsock's
+	// WSAEACCES (10013). os.ErrPermission recognizes both native platforms.
+	if errors.Is(err, os.ErrPermission) {
+		return ipcBindDenied, err.Error()
+	}
 	reason, _ = classifyListenError(err)
 	switch reason {
 	case tcpBindDenied:
@@ -1142,6 +1147,9 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		clientPassword := ctx.String("client-password")
 		transport := ctx.String("transport")
 		socketPath := ctx.String("socket-path")
+		if transport != "tcp" {
+			addr = socketPath
+		}
 
 		projectPath := ctx.String("project-db")
 		profilePath := ctx.String("profile-db")
@@ -1270,7 +1278,11 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				fmt.Printf("Error: %s\n", err)
 				fmt.Printf("Please check if:\n")
 				// Distinguish gRPC error codes for better diagnostics
-				if strings.Contains(err.Error(), "Unavailable") || strings.Contains(err.Error(), "unavailable") {
+				if transport != "tcp" {
+					fmt.Printf("  1. The engine is running on this %s endpoint\n", transport)
+					fmt.Printf("  2. The socket path or pipe name matches the engine's ready event\n")
+					fmt.Printf("  3. The current user has permission to connect to the IPC endpoint\n")
+				} else if strings.Contains(err.Error(), "Unavailable") || strings.Contains(err.Error(), "unavailable") {
 					fmt.Printf("  1. The yak engine is not running on port %d\n", port)
 					fmt.Printf("  2. The connection was refused by the target\n")
 				} else if strings.Contains(err.Error(), "DeadlineExceeded") || strings.Contains(err.Error(), "context deadline exceeded") {
@@ -1544,7 +1556,11 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 		log.Infof("Version RPC successful: %s", versionResp.Version)
 		fmt.Printf("\n[SUCCESS] Local GRPC server with secret authentication test passed\n")
-		fmt.Printf("  Port: %d\n", port)
+		if transport == "tcp" {
+			fmt.Printf("  Port: %d\n", port)
+		} else {
+			fmt.Printf("  Endpoint: %s (%s)\n", socketPath, transport)
+		}
 		fmt.Printf("  Secret: ***\n")
 		fmt.Printf("  Version: %s\n\n", versionResp.Version)
 		version = versionResp.Version
