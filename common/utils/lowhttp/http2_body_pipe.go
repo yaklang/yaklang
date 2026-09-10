@@ -13,6 +13,7 @@ type h2BodyPipe struct {
 	mu                         sync.Mutex
 	cond                       *sync.Cond
 	buf                        bytes.Buffer
+	maxBufferedBytes           int
 	readerClosed, writerClosed bool
 	onRead                     func(int)
 	onClose                    func()
@@ -21,7 +22,11 @@ type h2BodyReader struct{ p *h2BodyPipe }
 type h2BodyWriter struct{ p *h2BodyPipe }
 
 func newH2BodyPipe() (*h2BodyReader, *h2BodyWriter) {
-	p := &h2BodyPipe{}
+	return newH2BodyPipeWithLimit(defaultStreamReceiveWindowSize)
+}
+
+func newH2BodyPipeWithLimit(limit int) (*h2BodyReader, *h2BodyWriter) {
+	p := &h2BodyPipe{maxBufferedBytes: limit}
 	p.cond = sync.NewCond(&p.mu)
 	return &h2BodyReader{p}, &h2BodyWriter{p}
 }
@@ -70,7 +75,7 @@ func (w *h2BodyWriter) Write(src []byte) (int, error) {
 	if p.readerClosed || p.writerClosed {
 		return 0, io.ErrClosedPipe
 	}
-	if len(src) > defaultStreamReceiveWindowSize-p.buf.Len() {
+	if len(src) > p.maxBufferedBytes-p.buf.Len() {
 		return 0, errH2BodyWindowExceeded
 	}
 	n, err := p.buf.Write(src)

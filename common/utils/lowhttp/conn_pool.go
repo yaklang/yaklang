@@ -836,6 +836,10 @@ func (pc *persistConn) h2Conn() {
 		},
 	}
 
+	// The peer may grow its encoder table to our advertised limit. Keep the
+	// initial table at the protocol default until its HPACK size update arrives.
+	newH2Conn.hDec.SetAllowedMaxDynamicTableSize(profile.settingValue(http2.SettingHeaderTableSize, 4096))
+
 	// Initialize synchronization before starting any timer callback.
 	newH2Conn.streamsCond = sync.NewCond(newH2Conn.mu)
 	newH2Conn.bw = bufio.NewWriterSize(&h2DeadlineWriter{conn: newH2Conn}, 4096)
