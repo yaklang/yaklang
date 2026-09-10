@@ -1,0 +1,57 @@
+name: Syntax G4 Tests
+
+# The per-language `TestAllSyntax*_G4` corpus tests parse every embedded syntax
+# fixture through the antlr grammar and SSA frontend. They are CPU-heavy
+# (PHP alone ~190s) and only change when a grammar or its fixtures change, so
+# they run here instead of in Essential Tests on every PR.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "common/yak/**/*.g4"
+      - "common/yak/**/tests/syntax/**"
+      - "common/yak/**/tests/code/**"
+      - "common/yak/**/test/syntax/**"
+      - "common/yak/**/test/code/**"
+      - "common/yak/**/syntax/**"
+      - "common/yak/**/code/**"
+      - "common/yak/**/syntax_test.go"
+      - "go.mod"
+      - "go.sum"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  g4-corpus:
+    name: ${{ matrix.package }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - ./common/yak/java/tests
+          - ./common/yak/go2ssa/test
+          - ./common/yak/python/test
+          - ./common/yak/csharp/tests
+          - ./common/yak/php/tests
+          - ./common/yak/typescript/ts2ssa/tests
+          - ./common/yak/c2ssa/test
+          - ./common/yak/yak2ssa/test
+          - ./common/yak/JS2ssa/test
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Run G4 syntax corpus tests
+        run: go test -count=1 -timeout 20m -run '^TestAllSyntax.*_G4$' ${{ matrix.package }}
