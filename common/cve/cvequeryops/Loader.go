@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -262,6 +263,18 @@ func downloadWithRetry(url, destFile string) error {
 	return lastErr
 }
 
+// probeContentLength 发送 HEAD 请求获取文件大小，用于下载排序。
+// 失败时返回 0，不影响下载流程。
+func probeContentLength(url string) int64 {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Head(url)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	return resp.ContentLength
+}
+
 func DownLoad(dir string, cached bool, years ...int) error {
 	// 如果指定了 years，只下载对应年份的数据
 	allowed := funk.Map(years, func(i int) string {
@@ -270,8 +283,9 @@ func DownLoad(dir string, cached bool, years ...int) error {
 
 	// 收集需要下载的任务
 	type downloadTask struct {
-		name string
-		url  string
+		name   string
+		url    string
+		size   int64 // Content-Length (gzip), 0 if unknown
 	}
 	var tasks []downloadTask
 	for name, url := range CveDataFeed {
@@ -293,7 +307,23 @@ func DownLoad(dir string, cached bool, years ...int) error {
 		return nil
 	}
 
-	log.Infof("download %d NVD feeds with %d concurrent workers", len(tasks), nvdDownloadConcurrency)
+	// 快速探测各文件大小，用于排序。HEAD 请求很快（~100ms），并发执行不影响总时间。
+	var probeWg sync.WaitGroup
+	for i := range tasks {
+		probeWg.Add(1)
+		go func(idx int) {
+			defer probeWg.Done()
+			tasks[idx].size = probeContentLength(tasks[idx].url)
+		}(i)
+	}
+	probeWg.Wait()
+
+	// 按 Content-Length 降序排序：大文件先下载，小文件填空隙，避免末尾批次全是大文件造成慢尾巴
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].size > tasks[j].size
+	})
+
+	log.Infof("download %d NVD feeds with %d concurrent workers (sorted by size desc)", len(tasks), nvdDownloadConcurrency)
 
 	// 并发下载，使用信号量控制并发数
 	sem := make(chan struct{}, nvdDownloadConcurrency)

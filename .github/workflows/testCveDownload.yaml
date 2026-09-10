@@ -7,6 +7,7 @@ on:
       - "rookie/enhance/cve-parse"
     paths:
       - ".github/workflows/testCveDownload.yaml"
+      - "common/cve/cvequeryops/Loader.go"
 
 jobs:
   test:
@@ -67,15 +68,14 @@ jobs:
           ls /tmp/cve-serial/CVE-*.json 2>/dev/null | wc -l
           du -sh /tmp/cve-serial/ 2>/dev/null
 
-      # ── Test 2: Parallel download (yak, 4 workers) ──
-      - name: Parallel download (yak 4 workers)
+      # ── Test 2: Parallel download with size-sorted tasks (yak, 4 workers) ──
+      - name: Parallel download (yak 4 workers, sorted)
         run: |
           mkdir -p /tmp/cve-parallel
-          echo "=== PARALLEL DOWNLOAD START ==="
+          echo "=== PARALLEL DOWNLOAD START (sorted by size desc) ==="
           date -u +%Y-%m-%dT%H:%M:%SZ
           TOTAL_START=$(date -u +%s)
 
-          # Run full build but with --v5-skip to skip V5, focus on download + parse timing
           ./yak build-cve-database --no-gzip --v5-skip --output /tmp/cve-parallel/test.db 2>&1 | tee /tmp/parallel.log || true
 
           TOTAL_END=$(date -u +%s)
@@ -84,7 +84,7 @@ jobs:
           echo "Parallel total (full build incl parse+db): $((TOTAL_END - TOTAL_START))s"
           echo ""
           echo "--- Download phase logs ---"
-          grep "start to download from\|downloaded.*->\|handle.*cost\|download.*NVD feeds" /tmp/parallel.log || echo "(no download logs)"
+          grep "start to download from\|downloaded.*->\|handle.*cost\|download.*NVD feeds\|sorted" /tmp/parallel.log || echo "(no download logs)"
           echo ""
           echo "--- Parse+DB phase logs ---"
           grep "LoadCVE begin\|handle.*cost.*25\|成功\|cve:154\|migrate" /tmp/parallel.log || echo "(no parse logs)"
