@@ -25,6 +25,10 @@ jobs:
           cache: false
         id: go
 
+      - name: Init Module
+        run: |
+          go mod tidy
+
       - name: Build yak
         run: |
           go build -o ./yak ./common/yak/cmd/yak.go
@@ -47,7 +51,7 @@ jobs:
             END=$(date -u +%s%3N)
             ELAPSED=$((END - START))
             if [ "$HTTP_CODE" = "200" ]; then
-              gunzip -f /tmp/cve-serial/tmp.gz && mv /tmp/cve-serial/tmp "$OUT" 2>/dev/null || true
+              gunzip -f /tmp/cve-serial/tmp.gz 2>/dev/null && mv /tmp/cve-serial/tmp "$OUT" 2>/dev/null || true
               SIZE=$(stat -c%s "$OUT" 2>/dev/null || echo 0)
               echo "CVE-${YEAR}.json: ${ELAPSED}ms, ${SIZE} bytes, HTTP 200"
             else
@@ -60,7 +64,7 @@ jobs:
           echo "Serial total: $((TOTAL_END - TOTAL_START))s"
           echo ""
           echo "--- Downloaded files ---"
-          ls -lh /tmp/cve-serial/CVE-*.json 2>/dev/null | wc -l
+          ls /tmp/cve-serial/CVE-*.json 2>/dev/null | wc -l
           du -sh /tmp/cve-serial/ 2>/dev/null
 
       # ── Test 2: Parallel download (yak, 4 workers) ──
@@ -71,9 +75,7 @@ jobs:
           date -u +%Y-%m-%dT%H:%M:%SZ
           TOTAL_START=$(date -u +%s)
 
-          # Use yak to download only — we use --v5-skip and --no-gzip and --year to force just download
-          # Actually we need a simpler approach: directly call the download via a small Go snippet
-          # Instead, let's just time the full build but focus on download logs
+          # Run full build but with --v5-skip to skip V5, focus on download + parse timing
           ./yak build-cve-database --no-gzip --v5-skip --output /tmp/cve-parallel/test.db 2>&1 | tee /tmp/parallel.log || true
 
           TOTAL_END=$(date -u +%s)
@@ -81,13 +83,12 @@ jobs:
           echo "=== PARALLEL DOWNLOAD END ==="
           echo "Parallel total (full build incl parse+db): $((TOTAL_END - TOTAL_START))s"
           echo ""
-          echo "--- Download phase breakdown ---"
-          # Extract download start and end from logs
+          echo "--- Download phase logs ---"
           grep "start to download from\|downloaded.*->\|handle.*cost\|download.*NVD feeds" /tmp/parallel.log || echo "(no download logs)"
           echo ""
-          echo "--- Parse+DB phase breakdown ---"
-          grep "LoadCVE begin\|handle.*cost.*25\|成功" /tmp/parallel.log || echo "(no parse logs)"
+          echo "--- Parse+DB phase logs ---"
+          grep "LoadCVE begin\|handle.*cost.*25\|成功\|cve:154\|migrate" /tmp/parallel.log || echo "(no parse logs)"
           echo ""
           echo "--- Downloaded files ---"
-          ls -lh ~/yakit-projects/temp/cve/CVE-*.json 2>/dev/null | wc -l
+          ls ~/yakit-projects/temp/cve/CVE-*.json 2>/dev/null | wc -l
           du -sh ~/yakit-projects/temp/cve/ 2>/dev/null
