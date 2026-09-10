@@ -2316,6 +2316,14 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 	// TODO: 函数调用导致实参发生改变如何处理?
 	call := b.EmitCall(b.NewCall(callee, args))
 
+	// EmitCall returns nil when the current block is already finished (e.g.
+	// after syntax-error recovery terminated the block). Returning a nil *Call
+	// wrapped in the ssa.Value interface would panic later at call.SetType /
+	// GetType / GetId call sites, so fall back to an undefined value here.
+	if utils.IsNil(call) {
+		return b.EmitUndefined("")
+	}
+
 	// 根据被调用函数的类型设置 Call 指令的返回类型
 	// 这对于 Promise 等返回类型的正确传递非常重要
 	if funcType := callee.GetType(); funcType != nil {
@@ -2430,7 +2438,7 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 				} else {
 					// 在作用域中查找同名变量
 					variableName := ""
-					if idNode := propertyName.AsIdentifier(); idNode != nil {
+					if idNode := propertyName.TryAsIdentifier(); idNode != nil {
 						variableName = idNode.Text
 					} else {
 						variableName = propertyName.Text()
@@ -2459,7 +2467,7 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 			var methodName string
 			if methodDecl.Name() != nil {
 				propertyName := methodDecl.Name()
-				if idNode := propertyName.AsIdentifier(); idNode != nil {
+				if idNode := propertyName.TryAsIdentifier(); idNode != nil {
 					methodName = idNode.Text
 				} else {
 					methodName = propertyName.Text()
@@ -2501,7 +2509,7 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 
 			// 处理属性名
 			if propertyName != nil {
-				if idNode := propertyName.AsIdentifier(); idNode != nil {
+				if idNode := propertyName.TryAsIdentifier(); idNode != nil {
 					accessorName = idNode.Text
 				} else {
 					accessorName = propertyName.Text()
@@ -2746,7 +2754,7 @@ func (b *builder) VisitPropertyAccessExpressionRight(node *ast.PropertyAccessExp
 	}
 
 	obj := b.VisitRightValueExpression(node.Expression)
-	if obj == nil {
+	if utils.IsNil(obj) {
 		var objName string
 		if ast.IsIdentifier(node.Expression) {
 			objName = node.Expression.AsIdentifier().Text
@@ -5333,7 +5341,7 @@ func (b *builder) ExtractPromiseResolvedType(promiseType ssa.Type) ssa.Type {
 // ExtractPromiseResolvedValue 从 Promise 值中提取解析后的值
 // 这个值代表 Promise 完成后的结果
 func (b *builder) ExtractPromiseResolvedValue(promiseValue ssa.Value) ssa.Value {
-	if promiseValue == nil {
+	if utils.IsNil(promiseValue) {
 		return b.EmitUndefined("")
 	}
 	if resolvedValue := b.extractSingleCallReturnValue(promiseValue); resolvedValue != nil {
@@ -5394,7 +5402,7 @@ func (b *builder) extractSingleCallReturnValue(value ssa.Value) ssa.Value {
 
 // WrapInPromise 将一个值包装成 Promise 类型
 func (b *builder) WrapInPromise(value ssa.Value) ssa.Value {
-	if value == nil {
+	if utils.IsNil(value) {
 		value = b.EmitUndefined("")
 	}
 

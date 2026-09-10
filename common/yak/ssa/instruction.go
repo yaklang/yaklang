@@ -276,13 +276,23 @@ func (i *If) SetCondition(t Value) {
 }
 
 func (i *If) AddTrue(t *BasicBlock) {
+	if t == nil {
+		return
+	}
 	i.True = t.GetId()
-	i.GetBlock().AddSucc(t)
+	if block := i.GetBlock(); block != nil {
+		block.AddSucc(t)
+	}
 }
 
 func (i *If) AddFalse(f *BasicBlock) {
+	if f == nil {
+		return
+	}
 	i.False = f.GetId()
-	i.GetBlock().AddSucc(f)
+	if block := i.GetBlock(); block != nil {
+		block.AddSucc(f)
+	}
 }
 
 func (l *Loop) Finish(init, step []Value) {
