@@ -1,6 +1,7 @@
 package jsonextractor
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -24,14 +25,22 @@ func keyFormatted(i string) string {
 	// 3. 转换为小写
 	trimmed := strings.TrimSpace(i)
 	if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) {
-		unquoted, err := strconv.Unquote(trimmed)
-		if err != nil {
-			trimmed = trimmed[1 : len(trimmed)-1]
-		} else {
-			trimmed = unquoted
-		}
+		trimmed = unquoteJSONOrTolerantString(trimmed)
 	}
 	return trimmed
+}
+
+func unquoteJSONOrTolerantString(quoted string) string {
+	var decoded string
+	// JSON allows escaped solidus and UTF-16 surrogate pairs, unlike Go's
+	// strconv.Unquote. Keep the old fallback for non-standard model output.
+	if err := json.Unmarshal([]byte(quoted), &decoded); err == nil {
+		return decoded
+	}
+	if decoded, err := strconv.Unquote(quoted); err == nil {
+		return decoded
+	}
+	return quoted[1 : len(quoted)-1]
 }
 
 type RAW_VALUE_TYPE int
@@ -41,6 +50,10 @@ const (
 	RAW_VALUE_TYPE_ARR RAW_VALUE_TYPE = 1
 	RAW_VALUE_TYPE_MAP RAW_VALUE_TYPE = 2
 )
+
+// Retain the existing tolerance for leading zeroes, but match the whole token
+// so malformed numeric text cannot silently become zero after a parse error.
+var rawNumberPattern = regexp.MustCompile(`^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$`)
 
 func rawValueFormatter(data any) (RAW_VALUE_TYPE, any, map[string]any, []any) {
 	if data == nil {
@@ -60,18 +73,15 @@ func rawValueFormatter(data any) (RAW_VALUE_TYPE, any, map[string]any, []any) {
 			data = nil
 		} else if lowerTrimmedValue == "undefined" {
 			data = nil
-		} else if matched, _ := regexp.Match(`^\d+$`, []byte(lowerTrimmedValue)); matched {
-			data, _ = strconv.ParseInt(lowerTrimmedValue, 10, 64)
-			data = int(data.(int64))
-		} else if matched, _ := regexp.Match(`^\d+\.\d+`, []byte(lowerTrimmedValue)); matched {
-			data, _ = strconv.ParseFloat(lowerTrimmedValue, 64)
-		} else if strings.HasPrefix(trimmedValue, `"`) && strings.HasSuffix(trimmedValue, `"`) {
-			unquoted, err := strconv.Unquote(trimmedValue)
-			if err != nil {
-				data = trimmedValue[1 : len(trimmedValue)-1]
-			} else {
-				data = unquoted
+		} else if rawNumberPattern.MatchString(trimmedValue) {
+			data = trimmedValue
+			if integer, err := strconv.Atoi(trimmedValue); err == nil {
+				data = integer
+			} else if number, err := strconv.ParseFloat(trimmedValue, 64); err == nil {
+				data = number
 			}
+		} else if strings.HasPrefix(trimmedValue, `"`) && strings.HasSuffix(trimmedValue, `"`) {
+			data = unquoteJSONOrTolerantString(trimmedValue)
 		} else {
 			data = trimmedValue
 		}
