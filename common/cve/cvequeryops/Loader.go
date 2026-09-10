@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -25,6 +26,10 @@ const (
 	LatestCveModifiedDataFeed = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-modified.json.gz"
 	LatestCveRecentDataFeed   = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-recent.json.gz"
 )
+
+// nvdDownloadConcurrency 控制同时下载 NVD feed 的并发数。
+// NVD 服务器对适度并发 (4) 不会限流，且能将总下载时间减少到串行的 ~1/4。
+const nvdDownloadConcurrency = 4
 
 var CveDataFeed = map[string]string{
 	"CVE-2002.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2002.json.gz",
@@ -98,6 +103,8 @@ func LoadCVE(fileDir, DbPath string, years ...int) {
 	}
 }
 
+// LoadCVEByFileName 解析单个 NVD 2.0 JSON 文件并批量写入数据库。
+// 使用 CreateInBatches 多行 INSERT 替代逐条 tx.Save，将 N 条 SQL 降为 N/500 条。
 func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (shouldExit bool, err error) {
 	CVEContext, err := ioutil.ReadFile(fileName)
 	if err != nil {
@@ -119,7 +126,7 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 		return false, err
 	}
 
-	// 批量处理：解析所有 CVE（ToCVE 传 nil 跳过逐条 DB 写入），然后用事务批量入库
+	// 批量处理：解析所有 CVE（ToCVE 传 nil 跳过逐条 DB 写入），然后用 CreateInBatches 批量入库
 	batchCVEs := make([]*cveresources.CVE, 0, len(cveFileV2.Vulnerabilities))
 	productSet := make(map[string]struct{})
 	var batchProducts []cveresources.ProductsTable
@@ -156,19 +163,12 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 	}
 	log.Infof("成功解析CVE 2.0格式文件: %v, 记录数: %d", fileName, len(batchCVEs))
 
-	// 批量写入 CVE 主表（每 500 条一个事务）
-	for i := 0; i < len(batchCVEs); i += 500 {
-		endIdx := i + 500
-		if endIdx > len(batchCVEs) {
-			endIdx = len(batchCVEs)
+	// 批量写入 CVE 主表：使用 CreateInBatches 多行 INSERT
+	// 相比逐条 tx.Save（每条 2 SQL：UPDATE 尝试 + INSERT），CreateInBatches 每 500 条仅 1 条 SQL
+	if len(batchCVEs) > 0 {
+		if db := manager.DB.CreateInBatches(batchCVEs, 500); db.Error != nil {
+			log.Errorf("CreateInBatches CVE failed: %s", db.Error)
 		}
-		tx := manager.DB.Begin()
-		for _, c := range batchCVEs[i:endIdx] {
-			if err := tx.Save(c).Error; err != nil {
-				fmt.Printf("save cve %s failed: %s\n", c.CVE, err)
-			}
-		}
-		tx.Commit()
 	}
 
 	// 批量写入 ProductsTable（使用 OnConflictDoNothing 避免主键冲突）
@@ -237,6 +237,30 @@ func downloadNVDFeed(url, destFile string) error {
 	return nil
 }
 
+// downloadWithRetry 带重试的单文件下载，NVD 经常因网络问题中断
+func downloadWithRetry(url, destFile string) error {
+	maxRetries := 5
+	var lastErr error
+	for retry := 0; retry < maxRetries; retry++ {
+		if retry > 0 {
+			log.Infof("retry %d/%d for %v after 5s", retry, maxRetries, url)
+			time.Sleep(5 * time.Second)
+		}
+		log.Infof("start to download from: %v (attempt %d)", url, retry+1)
+
+		err := downloadNVDFeed(url, destFile)
+		if err != nil {
+			lastErr = err
+			log.Errorf("download %v failed (attempt %d): %v", url, retry+1, err)
+			os.Remove(destFile)
+			continue
+		}
+
+		// 下载成功
+		return nil
+	}
+	return lastErr
+}
 
 func DownLoad(dir string, cached bool, years ...int) error {
 	// 如果指定了 years，只下载对应年份的数据
@@ -244,6 +268,12 @@ func DownLoad(dir string, cached bool, years ...int) error {
 		return fmt.Sprintf("CVE-%d.json", i)
 	}).([]string)
 
+	// 收集需要下载的任务
+	type downloadTask struct {
+		name string
+		url  string
+	}
+	var tasks []downloadTask
 	for name, url := range CveDataFeed {
 		if len(years) > 0 && !utils.StringArrayContains(allowed, name) {
 			log.Infof("skip %v (filtered by year)", name)
@@ -256,34 +286,44 @@ func DownLoad(dir string, cached bool, years ...int) error {
 				continue
 			}
 		}
+		tasks = append(tasks, downloadTask{name: name, url: url})
+	}
 
-		// 重试下载，NVD 经常因网络问题中断
-		maxRetries := 5
-		var lastErr error
-		for retry := 0; retry < maxRetries; retry++ {
-			if retry > 0 {
-				log.Infof("retry %d/%d for %v after 5s", retry, maxRetries, url)
-				time.Sleep(5 * time.Second)
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	log.Infof("download %d NVD feeds with %d concurrent workers", len(tasks), nvdDownloadConcurrency)
+
+	// 并发下载，使用信号量控制并发数
+	sem := make(chan struct{}, nvdDownloadConcurrency)
+	var wg sync.WaitGroup
+	var failedCount int
+	var mu sync.Mutex
+
+	for _, task := range tasks {
+		wg.Add(1)
+		go func(t downloadTask) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			destFile := filepath.Join(dir, t.name)
+			startTime := time.Now()
+			if err := downloadWithRetry(t.url, destFile); err != nil {
+				log.Errorf("download %v failed after retries: %v", t.url, err)
+				mu.Lock()
+				failedCount++
+				mu.Unlock()
+				return
 			}
-			log.Infof("start to download from: %v (attempt %d)", url, retry+1)
+			log.Infof("handle %v cost %v", t.name, time.Since(startTime))
+		}(task)
+	}
+	wg.Wait()
 
-			err := downloadNVDFeed(url, fileName)
-			if err != nil {
-				lastErr = err
-				log.Errorf("download %v failed (attempt %d): %v", url, retry+1, err)
-				os.Remove(fileName)
-				continue
-			}
-
-			// 下载成功
-			lastErr = nil
-			break
-		}
-
-		if lastErr != nil {
-			log.Errorf("download %v failed after %d retries: %v", url, maxRetries, lastErr)
-			// 继续下载其他年份，不中断
-		}
+	if failedCount > 0 {
+		log.Errorf("download completed with %d/%d failures", failedCount, len(tasks))
 	}
 	return nil
 }
