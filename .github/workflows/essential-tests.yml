@@ -314,6 +314,61 @@ jobs:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
 
+  prepared-startup:
+    name: Prepared engine startup smoke
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the prepared revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Download prepared engine
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak
+          path: ${{ runner.temp }}/yak-artifact
+      - name: Download shared Go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak-cache
+          path: ${{ runner.temp }}/go-cache-artifact
+      - name: Unpack prepared engine and cache
+        run: |
+          ARTIFACT_PATH="$RUNNER_TEMP/yak-artifact/essential-tests-yak.tar.gz" \
+          DEST_DIR="$RUNNER_TEMP/shared-yak" \
+          ARTIFACT_EXPECT_PATHS="yak" ARTIFACT_EXECUTABLE_PATHS="yak" \
+          ./scripts/ci/artifact-unpackage.sh
+          ARTIFACT_PATH="$RUNNER_TEMP/go-cache-artifact/essential-tests-yak-cache.tar.gz" \
+          DEST_DIR="$RUNNER_TEMP/shared-go-cache" \
+          ARTIFACT_EXPECT_PATHS="go-build-cache" \
+          ./scripts/ci/artifact-unpackage.sh
+      - name: Smoke test compiled yak startup
+        env:
+          YAK_BINARY_PATH: ${{ runner.temp }}/shared-yak/yak
+          GOCACHE: ${{ runner.temp }}/shared-go-cache/go-build-cache
+          GOMODCACHE: ${{ runner.temp }}/go-mod-cache
+        run: |
+          set -o pipefail
+          bash ./scripts/ci/test-yak-startup.sh 2>&1 | tee "$RUNNER_TEMP/yak-startup-smoke.log"
+      - name: Upload startup failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-startup-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/yak-startup-smoke.log
+          retention-days: 3
+          if-no-files-found: warn
+
   ipc-smoke:
     name: IPC smoke (${{ matrix.platform }})
     needs: prepare-yak
@@ -1226,8 +1281,8 @@ jobs:
           ./scripts/ci/artifact-delete.sh
 
   cleanup-yak-artifact:
-    needs: [prepare-yak, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
-    if: needs.prepare-yak.result == 'success' && needs.test-local.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
+    needs: [prepare-yak, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    if: needs.prepare-yak.result == 'success' && needs.prepared-startup.result == 'success' && needs.test-local.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
     permissions:
       actions: write
@@ -1259,7 +1314,7 @@ jobs:
 
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, ipc-smoke, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    needs: [check-wip, ipc-smoke, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
     permissions:
@@ -1283,6 +1338,7 @@ jobs:
       - scannode-focused
       - slim-gate
       - ipc-smoke
+      - prepared-startup
       - test-local
       - test-prepared-yakgrpc
       - test-prepared-coreplugin
@@ -1296,6 +1352,7 @@ jobs:
           SCANNODE_RESULT: ${{ needs.scannode-focused.result }}
           SLIM_RESULT: ${{ needs.slim-gate.result }}
           IPC_RESULT: ${{ needs.ipc-smoke.result }}
+          STARTUP_RESULT: ${{ needs.prepared-startup.result }}
           LOCAL_RESULT: ${{ needs.test-local.result }}
           YAKGRPC_RESULT: ${{ needs.test-prepared-yakgrpc.result }}
           COREPLUGIN_RESULT: ${{ needs.test-prepared-coreplugin.result }}
@@ -1314,7 +1371,7 @@ jobs:
             exit 0
           fi
 
-          for result in "$SLIM_RESULT" "$IPC_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
+          for result in "$SLIM_RESULT" "$IPC_RESULT" "$STARTUP_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Full test scope did not pass: $result" >&2
               exit 1
