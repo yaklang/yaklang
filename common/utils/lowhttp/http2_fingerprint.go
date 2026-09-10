@@ -24,11 +24,9 @@ const (
 
 // http2Profile describes the HTTP/2 framing behaviour of a specific client.
 //
-// A profile only changes the bytes this client writes. Flow-control
-// bookkeeping (initialWindowSize, connWindowControl) tracks the windows the
-// peer advertises to us and is deliberately left untouched: SETTINGS and
-// WINDOW_UPDATE written here advertise our receive capacity, which is a
-// separate direction from the send windows those fields account for.
+// SETTINGS advertise our receive capacity, so the HPACK decoder, stream
+// receive window and streaming buffer must honor the profile's limits.
+// Send windows still follow the peer's SETTINGS and WINDOW_UPDATE frames.
 type http2Profile struct {
 	id                string
 	settings          []http2.Setting
@@ -61,6 +59,19 @@ var http2Profiles = map[string]*http2Profile{
 		},
 		endStreamOnHeaders: true,
 	},
+}
+
+// settingValue keeps local receive limits aligned with the advertised settings.
+// A nil profile uses the compatibility defaults supplied by the caller.
+func (p *http2Profile) settingValue(id http2.SettingID, fallback uint32) uint32 {
+	if p != nil {
+		for _, setting := range p.settings {
+			if setting.ID == id {
+				return setting.Val
+			}
+		}
+	}
+	return fallback
 }
 
 func getHTTP2Profile(name string) (*http2Profile, error) {

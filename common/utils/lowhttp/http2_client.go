@@ -528,7 +528,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 	cs.resp = new(http.Response)
 	cs.resp.ProtoMajor = 2
 	cs.contentLength = -1
-	cs.recvWindow = defaultStreamReceiveWindowSize
+	cs.recvWindow = int64(h2Conn.http2Profile.settingValue(http2.SettingInitialWindowSize, defaultStreamReceiveWindowSize))
 	h2Conn.mu.Lock()
 	initialWindowSize := h2Conn.initialWindowSize
 	h2Conn.mu.Unlock()
@@ -555,7 +555,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 	if option != nil {
 		cs.noBodyBuffer = option.NoBodyBuffer
 		if option.BodyStreamReaderHandler != nil {
-			reader, writer := newH2BodyPipe()
+			reader, writer := newH2BodyPipeWithLimit(int(cs.recvWindow))
 			cs.bodyStreamReader = reader
 			cs.bodyStreamWriter = writer
 			cs.bodyStreamDone = make(chan struct{})
@@ -759,9 +759,15 @@ func (cs *http2ClientStream) doRequest() error {
 	h2HeaderWriter := func(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize uint32, hdrs []byte) error {
 		first := true // first frame written (HEADERS is first, then CONTINUATION)
 		for len(hdrs) > 0 {
+			fragmentLimit := int(maxFrameSize)
+			if first && profile != nil && !profile.headersPriority.IsZero() {
+				// The dependency and weight occupy five bytes of the HEADERS
+				// payload; CONTINUATION frames have no priority fields.
+				fragmentLimit -= 5
+			}
 			chunk := hdrs
-			if len(chunk) > int(maxFrameSize) {
-				chunk = chunk[:maxFrameSize]
+			if len(chunk) > fragmentLimit {
+				chunk = chunk[:fragmentLimit]
 			}
 			hdrs = hdrs[len(chunk):]
 			endHeaders := len(hdrs) == 0

@@ -3,6 +3,7 @@
 package yakgrpc
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -10,6 +11,52 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+func TestMITMPipelineTrackerCanceledRequestLeavesNoUpstreamWait(t *testing.T) {
+	tracker := newMITMPipelineTracker("cancel-test")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.invalid/", nil)
+	require.NoError(t, err)
+	tracker.requestObserved(req)
+	tracker.requestDispatched(req, false)
+	require.Equal(t, int64(1), tracker.snapshot(0, 0).GetUpstreamActive())
+
+	// H2 upstream errors and downstream cancellation can return without ever
+	// invoking the response modifier/mirror callbacks.
+	cancel()
+	require.Eventually(t, func() bool {
+		return tracker.snapshot(0, 0).GetActiveTotal() == 0
+	}, time.Second, time.Millisecond, "canceled request remains reported as waiting upstream")
+	stats := tracker.snapshot(0, 0)
+	require.Zero(t, stats.GetOldestUpstreamAgeMs())
+	require.Zero(t, stats.GetUpstreamCompletedTotal())
+	require.Zero(t, stats.GetDroppedTotal(), "transport cancellation is not a manual drop")
+}
+
+func TestMITMPipelineTrackerUpstreamContextCompletionPreservesResponseStage(t *testing.T) {
+	tracker := newMITMPipelineTracker("context-test")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.invalid/", nil)
+	require.NoError(t, err)
+	tracker.requestObserved(req)
+	tracker.requestDispatched(req, false)
+	// lowhttp temporarily installs an upstream child context on the native
+	// request. Completing that child must not remove pending response work.
+	upstreamCtx, cancelUpstream := context.WithCancel(req.Context())
+	*req = *req.WithContext(upstreamCtx)
+	cancelUpstream()
+	tracker.upstreamCompleted(req, true)
+	require.Equal(t, int64(1), tracker.snapshot(0, 0).GetResponseProcessingActive())
+	tracker.responseMirrored(req)
+	tracker.responseProcessingFinished(req)
+	cancel()
+	stats := tracker.snapshot(0, 0)
+	require.Zero(t, stats.GetActiveTotal())
+	require.Equal(t, uint64(1), stats.GetUpstreamCompletedTotal())
+	require.Equal(t, uint64(1), stats.GetResponseMirroredTotal())
+}
 
 func TestMITMPipelineTrackerRequestStages(t *testing.T) {
 	base := time.UnixMilli(1_700_000_000_000)
