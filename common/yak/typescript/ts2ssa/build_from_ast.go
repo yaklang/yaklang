@@ -2979,9 +2979,9 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
 	store := b.StoreFunctionBuilder()
-	log.Infof("add function funcName = %s", funcName)
+	log.Debugf("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazy-build function funcName = %s", funcName)
+		log.Debugf("lazy-build function funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
@@ -3054,10 +3054,10 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
 	store := b.StoreFunctionBuilder()
-	log.Infof("add function expression funcName = %s", funcName)
+	log.Debugf("add function expression funcName = %s", funcName)
 
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazy-build function expression funcName = %s", funcName)
+		log.Debugf("lazy-build function expression funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
@@ -3128,10 +3128,10 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
 	store := b.StoreFunctionBuilder()
-	log.Infof("add arrow function funcName = %s", funcName)
+	log.Debugf("add arrow function funcName = %s", funcName)
 
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazy-build arrow function funcName = %s", funcName)
+		log.Debugf("lazy-build arrow function funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
@@ -4465,7 +4465,7 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 	storeImportTBL := b.importTbl
 
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazybuild class method for uuidName and method name: %s : %s ", funcName, methodName)
+		log.Debugf("lazybuild class method for uuidName and method name: %s : %s ", funcName, methodName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		b.importTbl = storeImportTBL
 		defer switchHandler()
@@ -4553,7 +4553,7 @@ func (b *builder) ProcessClassCtor(member *ast.ClassElement, class *ssa.Blueprin
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := b.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazybuild: %s ", ctorName)
+		log.Debugf("lazybuild: %s ", ctorName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
