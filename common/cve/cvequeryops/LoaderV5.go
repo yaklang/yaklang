@@ -25,7 +25,7 @@ const (
 	// cvelistV5 GitHub Releases API
 	CVEListV5ReleasesAPI = "https://api.github.com/repos/CVEProject/cvelistV5/releases"
 	// 批量处理的并发数
-	v5BatchWorkers = 8
+	v5BatchWorkers = 16
 	// 批量提交的批次大小
 	v5BatchSize = 500
 )
@@ -275,6 +275,14 @@ func LoadCVEV5FromDir(dir string, manager *cveresources.SqliteManager, years ...
 				cve, err := record.ToCVE(nil)
 				if err != nil {
 					continue // REJECTED 等
+				}
+				// 预过滤：V5 的价值在于补充 title/solution/vendor/product 等字段。
+				// 如果这些字段全为空，合并时不会产生任何更新，直接跳过以减少 DB 操作。
+				if cve.Title == "" && cve.Solution == "" &&
+					cve.Vendor == "" && cve.Product == "" &&
+					cve.CVSSVersion == "" && cve.DescriptionMain == "" &&
+					cve.CWE == "" && len(cve.References) == 0 {
+					continue
 				}
 				resultChan <- &v5Result{cve: cve, cveID: cve.CVE}
 			}
