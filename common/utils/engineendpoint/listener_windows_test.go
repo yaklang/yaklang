@@ -56,4 +56,11 @@ func TestNamedPipeACLContainsOnlyCurrentUserAndSystem(t *testing.T) {
 	if dacl.AceCount != 2 {
 		t.Fatalf("unexpected extra ACL entries: %s", actual)
 	}
+	label, err := windows.GetSecurityInfo(handle, windows.SE_KERNEL_OBJECT, windows.LABEL_SECURITY_INFORMATION)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(label.String(), "(ML;;NW;;;ME)") {
+		t.Fatalf("pipe must explicitly accept ordinary desktop clients even when created elevated: %s", label.String())
+	}
 }

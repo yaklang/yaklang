@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -26,6 +27,7 @@ func TestIPCListenDiagnosticsDoNotSuggestTCPRecovery(t *testing.T) {
 	}{
 		{engineendpoint.ErrInvalidDirectory, ipcEndpointInvalid},
 		{syscall.EACCES, ipcBindDenied},
+		{os.ErrPermission, ipcBindDenied},
 		{syscall.EADDRINUSE, ipcBindInUse},
 		{syscall.ENOENT, ipcBindGeneric},
 	} {
@@ -37,6 +39,12 @@ func TestIPCListenDiagnosticsDoNotSuggestTCPRecovery(t *testing.T) {
 		legacy, _ := classifyListenError(tc.err)
 		if code != legacy {
 			t.Fatal("changed TCP error classification")
+		}
+	}
+	if runtime.GOOS == "windows" {
+		code, _ := classifyEndpointListenError("npipe", &os.PathError{Op: "listen", Path: `\\.\pipe\test`, Err: syscall.Errno(5)})
+		if code != ipcBindDenied {
+			t.Fatalf("Win32 access denied was misclassified: %s", code)
 		}
 	}
 }

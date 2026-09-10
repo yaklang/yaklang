@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
 var ErrInvalidDirectory = errors.New("unix socket parent must be a directory, not a symbolic link")
@@ -32,8 +34,12 @@ func Validate(transport, endpoint string) error {
 			return fmt.Errorf("npipe transport is only supported on Windows; use unix")
 		}
 		const prefix = `\\.\pipe\`
-		name := strings.TrimPrefix(endpoint, prefix)
-		if name == endpoint || name == "" || strings.ContainsAny(name, `/\`+"\x00") || len(endpoint) > 256 {
+		if len(endpoint) <= len(prefix) || !strings.EqualFold(endpoint[:len(prefix)], prefix) {
+			return fmt.Errorf("npipe socket-path must be a full local named pipe path (\\\\.\\pipe\\name)")
+		}
+		name := endpoint[len(prefix):]
+		// Win32 measures this limit in UTF-16 code units, not UTF-8 bytes.
+		if !utf8.ValidString(endpoint) || strings.ContainsAny(name, `/\`+"\x00") || len(utf16.Encode([]rune(endpoint))) > 256 {
 			return fmt.Errorf("npipe socket-path must be a full local named pipe path (\\\\.\\pipe\\name)")
 		}
 	default:
