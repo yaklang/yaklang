@@ -22,6 +22,7 @@ on:
       - "common/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
+      - "scripts/ci/test-yak-startup.sh"
       - "go.mod"
 
 concurrency:
@@ -277,6 +278,24 @@ jobs:
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
           go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
+
+      - name: Smoke test compiled yak startup
+        id: startup_smoke
+        timeout-minutes: 10
+        env:
+          YAK_BINARY_PATH: ${{ runner.temp }}/yak
+        run: |
+          set -o pipefail
+          bash ./scripts/ci/test-yak-startup.sh 2>&1 | tee "$RUNNER_TEMP/yak-startup-smoke.log"
+
+      - name: Upload startup smoke failure log
+        if: failure() && steps.startup_smoke.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: yak-startup-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/yak-startup-smoke.log
+          retention-days: 3
+          if-no-files-found: warn
 
       - name: Package yak artifact
         run: |

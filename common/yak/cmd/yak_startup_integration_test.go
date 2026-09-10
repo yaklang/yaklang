@@ -179,51 +179,9 @@ func testCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t *testing.T, parentM
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, f.binary, "grpc", "--transport", transport, "--socket-path", endpoint, "--local-password", secret)
-	cmd.Env, cmd.Dir, cmd.Stderr = f.env, f.home, io.Discard
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	ready := make(chan grpcReadyEvent, 1)
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, grpcReadyMarkerPrefix) {
-				var event grpcReadyEvent
-				if json.Unmarshal([]byte(strings.TrimPrefix(line, grpcReadyMarkerPrefix)), &event) == nil {
-					select {
-					case ready <- event:
-					default:
-					}
-				}
-			}
-		}
-		done <- cmd.Wait()
-	}()
-	t.Cleanup(func() {
-		cancel()
-		cmd.Process.Kill()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Error("engine child did not exit")
-		}
-	})
-	select {
-	case event := <-ready:
-		if event.Transport != transport || event.Address != endpoint {
-			t.Fatal("ready advertises a different endpoint")
-		}
-	case <-time.After(20 * time.Second):
-		t.Fatal("IPC engine readiness timeout")
+	child := startEngineCLI(t, f, "grpc", "--transport", transport, "--socket-path", endpoint, "--local-password", secret)
+	if child.ready.Transport != transport || child.ready.Address != endpoint {
+		t.Fatal("ready advertises a different endpoint")
 	}
 	dialCtx, dialCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer dialCancel()
@@ -273,17 +231,8 @@ func testCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t *testing.T, parentM
 		if err != nil || info.Mode().Perm() != 0600 {
 			t.Fatal("insecure socket permissions")
 		}
-		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-			t.Fatal(err)
-		}
-		select {
-		case err := <-done:
-			done <- err // cleanup also observes termination
-			if err != nil {
-				t.Fatalf("graceful IPC shutdown failed: %v", err)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("IPC shutdown timed out")
+		if err := child.stop(t, syscall.SIGTERM); err != nil {
+			t.Fatalf("graceful IPC shutdown failed: %v", err)
 		}
 		if _, err := os.Lstat(endpoint); !os.IsNotExist(err) {
 			t.Fatal("normal shutdown left its socket behind")
@@ -297,7 +246,11 @@ func TestCLIStartupIPCInvalidParentDoesNotInitializeDatabases(t *testing.T) {
 	}
 	_, endpoint := integrationEndpoint(t)
 	link := filepath.Dir(endpoint) + "-link"
-	if err := os.Symlink(filepath.Dir(endpoint), link); err != nil {
+	target := filepath.Join(filepath.Dir(endpoint), "not-a-directory")
+	if err := os.WriteFile(target, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(link)
@@ -317,6 +270,129 @@ func TestCLIStartupIPCInvalidParentDoesNotInitializeDatabases(t *testing.T) {
 					t.Fatal("invalid IPC endpoint initialized databases")
 				}
 			}
+		})
+	}
+}
+
+// Every child has a deadline and is reaped even when readiness/authentication
+// fails. Tests never search for or kill another engine by name or port.
+type engineCLIChild struct {
+	cmd   *exec.Cmd
+	done  chan struct{}
+	err   error
+	ready grpcReadyEvent
+}
+
+func startEngineCLI(t *testing.T, f engineCLI, args ...string) *engineCLIChild {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	t.Cleanup(cancel)
+	cmd := exec.CommandContext(ctx, f.binary, args...)
+	cmd.Env, cmd.Dir, cmd.Stderr = f.env, f.home, io.Discard
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	child := &engineCLIChild{cmd: cmd, done: make(chan struct{})}
+	ready := make(chan grpcReadyEvent, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 4096), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, grpcReadyMarkerPrefix) {
+				var event grpcReadyEvent
+				if json.Unmarshal([]byte(strings.TrimPrefix(line, grpcReadyMarkerPrefix)), &event) == nil {
+					select {
+					case ready <- event:
+					default:
+					}
+				}
+			}
+		}
+		child.err = cmd.Wait()
+		close(child.done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		cmd.Process.Kill()
+		select {
+		case <-child.done:
+		case <-time.After(5 * time.Second):
+			t.Error("engine child did not exit")
+		}
+	})
+	select {
+	case child.ready = <-ready:
+	case <-child.done:
+		t.Fatalf("engine exited before readiness: %v", child.err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("engine readiness timeout")
+	}
+	return child
+}
+
+func (c *engineCLIChild) stop(t *testing.T, signal os.Signal) error {
+	t.Helper()
+	if err := c.cmd.Process.Signal(signal); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-c.done:
+		return c.err
+	case <-time.After(10 * time.Second):
+		t.Fatal("engine shutdown timed out")
+		return nil
+	}
+}
+
+func requireEngineEcho(t *testing.T, transport, endpoint, secret string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, "passthrough:///engine", grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			if transport == "tcp" {
+				return (&net.Dialer{}).DialContext(ctx, "tcp", endpoint)
+			}
+			return engineendpoint.DialContext(ctx, transport, endpoint)
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	client := ypb.NewYakClient(conn)
+	if _, err := client.Echo(ctx, &ypb.EchoRequest{Text: "anonymous"}); status.Code(err) != codes.Unauthenticated {
+		t.Fatal("anonymous RPC was not rejected")
+	}
+	wrong := metadata.AppendToOutgoingContext(ctx, "authorization", "bearer wrong-password")
+	if _, err := client.Echo(wrong, &ypb.EchoRequest{Text: "wrong"}); err == nil {
+		t.Fatal("wrong password was accepted")
+	}
+	auth := metadata.AppendToOutgoingContext(ctx, "authorization", "bearer "+secret)
+	reply, err := client.Echo(auth, &ypb.EchoRequest{Text: "authenticated startup 冒烟"})
+	if err != nil || reply.GetResult() != "authenticated startup 冒烟" {
+		t.Fatalf("authenticated Echo failed: %v", err)
+	}
+}
+
+func TestCLIStartupLegacyTCPAuthentication(t *testing.T) {
+	for _, flag := range []string{"--secret", "--local-password"} {
+		t.Run(flag, func(t *testing.T) {
+			f := newEngineCLI(t)
+			secret, err := newEngineSecret()
+			if err != nil {
+				t.Fatal(err)
+			}
+			port := freeEnginePort(t)
+			child := startEngineCLI(t, f, "grpc", "--host", "127.0.0.1", "--port", port, flag, secret)
+			if child.ready.Transport != "tcp" || child.ready.Address != "127.0.0.1:"+port {
+				t.Fatal("legacy TCP startup endpoint changed")
+			}
+			requireEngineEcho(t, "tcp", child.ready.Address, secret)
 		})
 	}
 }
