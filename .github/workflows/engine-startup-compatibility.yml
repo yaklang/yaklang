@@ -1,0 +1,67 @@
+name: Engine startup compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'common/yak/cmd/**'
+      - 'common/utils/engineendpoint/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/engine-startup-compatibility.yml'
+  push:
+    branches: [feature/engine-distribution-optimization]
+    paths:
+      - 'common/yak/cmd/**'
+      - 'common/utils/engineendpoint/**'
+      - '.github/workflows/engine-startup-compatibility.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-startup-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  startup:
+    name: Startup and private IPC (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04, macos-15]
+    env:
+      CGO_ENABLED: '1'
+      GOMAXPROCS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.12'
+          cache: false
+      - name: Verify private endpoints, ownership, ACL and cancellation
+        timeout-minutes: 5
+        run: go test -mod=readonly -p 2 -count=1 -timeout=60s ./common/utils/engineendpoint
+      - name: Build the real engine
+        timeout-minutes: 20
+        shell: bash
+        run: go build -mod=readonly -p 2 -o "$RUNNER_TEMP/yak-startup.exe" ./common/yak/cmd/yak.go
+      - name: Verify legacy protocol, real IPC auth and safe failure paths
+        timeout-minutes: 5
+        shell: bash
+        env:
+          YAK_STARTUP_TEST_BINARY: ${{ runner.temp }}/yak-startup.exe
+        run: |
+          set -o pipefail
+          go test -mod=readonly -p 2 -count=1 -timeout=180s -v ./common/yak/cmd 2>&1 | tee engine-startup-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-startup-${{ matrix.os }}-${{ github.run_attempt }}
+          path: engine-startup-tests.log
+          if-no-files-found: warn
+          retention-days: 14
