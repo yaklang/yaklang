@@ -1049,6 +1049,14 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				finalError = utils.Errorf("panic: %v\n%s", err, spew.Sdump(string(debug.Stack())))
 			}
 
+			// panic fallback: if we crashed without setting reason/phase/i18n,
+			// provide a generic error so front-end always gets usable fields.
+			if !utils.IsNil(finalError) && reason == "" {
+				reason = "unexpected_error"
+				phase = "init"
+				checkSecretReasonI18n = grpcEventReasonI18n("unexpected_error")
+			}
+
 			m := omap.NewGeneralOrderedMap()
 			ok := utils.IsNil(finalError)
 			var info string
@@ -1976,6 +1984,10 @@ var grpcReasonI18n = map[string]*schema.I18n{
 	"serve_failed": schema.NewI18n(
 		"gRPC 服务运行异常，请重启 Yakit 后重试",
 		"gRPC server serve failed. Restart Yakit and retry",
+	),
+	"unexpected_error": schema.NewI18n(
+		"引擎发生意外错误，请重启 Yakit 后重试，如问题持续请重新安装引擎",
+		"Engine encountered an unexpected error. Restart Yakit and retry; if the problem persists, reinstall the engine",
 	),
 }
 
