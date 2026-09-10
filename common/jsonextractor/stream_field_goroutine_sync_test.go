@@ -2,6 +2,7 @@ package jsonextractor
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -455,12 +456,18 @@ func TestFieldStreamGoroutineSync_NestedObjectInArray(t *testing.T) {
 	defer mu.Unlock()
 	require.Len(t, names, 2)
 	require.Len(t, configs, 2)
-	assert.Equal(t, "task1", names[0])
-	assert.Equal(t, "task2", names[1])
+	// Field handlers run concurrently; completion order is not input order.
+	assert.ElementsMatch(t, []string{"task1", "task2"}, names)
+	var decodedConfigs []map[string]any
 	for _, cfg := range configs {
-		assert.Contains(t, cfg, "timeout")
-		assert.Contains(t, cfg, "retry")
+		var decoded map[string]any
+		require.NoError(t, json.Unmarshal([]byte(cfg), &decoded))
+		decodedConfigs = append(decodedConfigs, decoded)
 	}
+	assert.ElementsMatch(t, []map[string]any{
+		{"timeout": float64(30), "retry": true},
+		{"timeout": float64(60), "retry": false},
+	}, decodedConfigs)
 }
 
 func TestFieldStreamGoroutineSync_UnicodeMultiObject(t *testing.T) {
