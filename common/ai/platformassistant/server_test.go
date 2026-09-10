@@ -165,7 +165,7 @@ func TestPlatformRealEngineToolThenAnswer(t *testing.T) {
 	w := request(s, q, "Bearer "+secret)
 	mu.Lock()
 	defer mu.Unlock()
-	if toolCalls != 1 {
+	if toolCalls != 1 || decisions != 2 {
 		t.Fatalf("tool calls %d decisions %d body %s", toolCalls, decisions, w.Body.String())
 	}
 	kinds := map[string]bool{}
@@ -275,5 +275,73 @@ func TestPlatformModelCallbackHonorsRequestAndTurnCancellation(t *testing.T) {
 				t.Fatal("upstream request was not canceled")
 			}
 		})
+	}
+}
+
+// The bounded platform profile must stop after the verified final answer. A
+// second model call used to repeat the answer or fail an otherwise complete turn.
+func TestResiliencePlatformFinalAnswerNeedsNoFollowupModelCall(t *testing.T) {
+	calls := 0
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls > 1 {
+			http.Error(w, "unexpected follow-up", 500)
+			return
+		}
+		data, _ := protojson.Marshal(&aiv1.AssistantModelResponse{Text: `{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"Current page is Projects."}}`})
+		w.Write(data)
+	}))
+	defer callback.Close()
+	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
+	w := request(s, turn("final-answer", "alice"), "Bearer "+secret)
+	if calls != 1 || strings.Contains(w.Body.String(), `"kind":"failed"`) || !strings.Contains(w.Body.String(), `"kind":"completed"`) {
+		t.Fatalf("calls=%d body=%s", calls, w.Body.String())
+	}
+	if strings.Count(w.Body.String(), "Current page is Projects.") != 1 {
+		t.Fatalf("answer duplicated: %s", w.Body.String())
+	}
+}
+
+func TestPlatformCorrectsPlainTextWithoutReplayingTools(t *testing.T) {
+	calls := 0
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		text := "Current page is Projects."
+		if calls > 1 {
+			text = `{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"Current page is Projects."}}`
+		}
+		data, _ := protojson.Marshal(&aiv1.AssistantModelResponse{Text: text})
+		w.Write(data)
+	}))
+	defer callback.Close()
+	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
+	w := request(s, turn("format-retry", "alice"), "Bearer "+secret)
+	if calls != 2 || strings.Contains(w.Body.String(), `"kind":"failed"`) || !strings.Contains(w.Body.String(), `"kind":"completed"`) || strings.Count(w.Body.String(), "Current page is Projects.") != 1 {
+		t.Fatalf("calls=%d body=%s", calls, w.Body.String())
+	}
+}
+func TestPlatformDoesNotMultiplyFailedModelCallbacks(t *testing.T) {
+	calls := 0
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; http.Error(w, "model failed", 500) }))
+	defer callback.Close()
+	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
+	w := request(s, turn("model-failure", "alice"), "Bearer "+secret)
+	if calls != 1 || !strings.Contains(w.Body.String(), `"kind":"failed"`) {
+		t.Fatalf("calls=%d body=%s", calls, w.Body.String())
+	}
+}
+
+func TestPlatformMalformedResponseRetriesAreBounded(t *testing.T) {
+	calls := 0
+	callback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		data, _ := protojson.Marshal(&aiv1.AssistantModelResponse{Text: "plain answer"})
+		w.Write(data)
+	}))
+	defer callback.Close()
+	s, _ := New(Config{LegionURL: callback.URL, ServiceSecret: secret, TurnTimeout: 10 * time.Second})
+	w := request(s, turn("invalid-format", "alice"), "Bearer "+secret)
+	if calls != 3 || !strings.Contains(w.Body.String(), "runtime_invalid_model_response") || strings.Contains(w.Body.String(), `"kind":"completed"`) {
+		t.Fatalf("calls=%d body=%s", calls, w.Body.String())
 	}
 }

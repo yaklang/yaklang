@@ -50,3 +50,13 @@ context, then pass `--listen 0.0.0.0:8094 --legion-url <Legion origin>` at start
 The recipe copies that exact artifact and runs as UID 65532. It does not build
 source or alter product release manifests. Build platform compatibility and
 release artifact publication remain the release owner's responsibility.
+
+The platform profile treats a verified final answer as the end of the current
+exchange when there is no effective TODO delta or open TODO work. It does not
+ask the model for an additional finish decision after delivering that answer.
+General agent completion semantics and tool authorization remain unchanged.
+
+Malformed action responses can be corrected within three transaction attempts.
+Model callback failures remain terminal to this loop: Legion owns provider retries,
+so the runtime does not multiply them. Exhausted format failures emit a stable
+error category without forwarding raw engine prompts, causes or HTTP dumps.

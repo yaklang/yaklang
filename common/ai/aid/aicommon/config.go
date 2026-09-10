@@ -362,6 +362,7 @@ type Config struct {
 	// task config
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
 	DisableEnhanceDirectlyAnswer       bool
+	FinishAfterDirectlyAnswer          bool // Host policy for bounded platform-only exchanges.
 	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
 	AllowSyncInitContext               bool // 首轮同步增强上下文，默认 false；后续按需识别意图
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）

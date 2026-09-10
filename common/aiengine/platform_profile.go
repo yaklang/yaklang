@@ -41,6 +41,7 @@ func platformOptions(ctx context.Context, c *AIEngineConfig, output chan *schema
 			c.DisableInputDirectives = true
 			c.DisableGlobalPreset = true
 			c.DisableHelperCoordinators = true
+			c.FinishAfterDirectlyAnswer = true
 			return nil
 		},
 		aicommon.WithToolManager(manager), aicommon.WithEphemeralStorage(),
@@ -52,7 +53,7 @@ func platformOptions(ctx context.Context, c *AIEngineConfig, output chan *schema
 		aicommon.WithDisablePerception(true), aicommon.WithDisableIntentRecognition(true), aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableEnhanceDirectlyAnswer(true), aicommon.WithGenerateReport(false),
 		aicommon.WithWorkdir("/"), aicommon.WithMaxIterationCount(int64(iterations)),
-		aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(3),
 		aicommon.WithReActActionPolicy(func(_ string, action string) bool {
 			switch action {
 			case "directly_answer", "finish", "require_tool", "directly_call_tool":

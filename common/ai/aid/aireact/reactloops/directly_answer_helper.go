@@ -89,11 +89,16 @@ func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicomm
 }
 
 // ShouldAutoFinishAfterSimpleQueryDirectlyAnswer identifies the narrow host
-// guard for greetings, status checks, and other classifier-approved trivial
-// inquiries. No extra model round is useful when the answer was delivered and
+// guard for classifier-approved trivial inquiries and host-selected bounded
+// platform exchanges. No extra model round is useful when the answer was delivered and
 // neither todo_delta nor the persistent TODO store contains remaining work.
 func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
-	if loop == nil || action == nil || strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
+	if loop == nil || action == nil {
+		return false
+	}
+	policy, _ := loop.GetConfig().(interface{ GetFinishAfterDirectlyAnswer() bool })
+	platformFinalAnswer := policy != nil && policy.GetFinishAfterDirectlyAnswer()
+	if !platformFinalAnswer && strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
 		return false
 	}
 	if directlyAnswerHasTodoDelta(action) {
@@ -127,9 +132,10 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
-				"simple_query answer delivered; CURRENT-TASK has no effective todo_delta or open TODO. "+
-					"The host is closing this trivial exchange without another model iteration.")
+				"simple_query or host-final answer delivered; CURRENT-TASK has no effective todo_delta or open TODO. "+
+					"The host is closing this bounded exchange without another model iteration.")
 		}
+		loop.Set("directly_answer_auto_finished", true)
 		operator.Exit()
 		return
 	}

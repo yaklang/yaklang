@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
+
+var errInvalidModelResponse = errors.New("runtime_invalid_model_response")
 
 const maxBody = 256 << 10
 const maxOutput = 1 << 20
@@ -176,7 +179,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err = s.run(ctx, turn, emit); err != nil {
-		emit(&aiv1.AssistantRuntimeEvent{Kind: "failed", ErrorCode: "runtime_failed"})
+		code := "runtime_failed"
+		if errors.Is(err, errInvalidModelResponse) {
+			code = "runtime_invalid_model_response"
+		}
+		emit(&aiv1.AssistantRuntimeEvent{Kind: "failed", ErrorCode: code})
 		return
 	}
 	emit(&aiv1.AssistantRuntimeEvent{Kind: "completed"})
@@ -260,7 +267,18 @@ func (s *Server) run(ctx context.Context, turn *aiv1.AssistantTurnRequest, emit 
 		tools = append(tools, tool)
 	}
 	callback := s.modelCallback(ctx, turn.DelegationToken)
-	engine, err := aiengine.NewAIEngine(aiengine.WithContext(ctx), aiengine.WithPlatformOnlyProfile(callback, tools...), aiengine.WithMaxIteration(12), aiengine.WithOnStream(func(_ aicommon.AIEngineOperator, _ *schema.AiOutputEvent, node string, data []byte) {
+	var invalidFormat atomic.Bool
+	engine, err := aiengine.NewAIEngine(aiengine.WithOnEvent(func(_ aicommon.AIEngineOperator, event *schema.AiOutputEvent) {
+		if event.NodeId != aicommon.NodeAICallFailure {
+			return
+		}
+		var failure struct {
+			Cause string `json:"cause"`
+		}
+		if json.Unmarshal(event.Content, &failure) == nil && (strings.Contains(failure.Cause, "action resolution failed:") || strings.Contains(failure.Cause, "answer_payload is required")) {
+			invalidFormat.Store(true)
+		}
+	}), aiengine.WithContext(ctx), aiengine.WithPlatformOnlyProfile(callback, tools...), aiengine.WithMaxIteration(12), aiengine.WithOnStream(func(_ aicommon.AIEngineOperator, _ *schema.AiOutputEvent, node string, data []byte) {
 		if node == "re-act-loop-answer-payload" {
 			emit(&aiv1.AssistantRuntimeEvent{Kind: "answer", Text: string(data)})
 		}
@@ -280,12 +298,25 @@ func (s *Server) run(ctx context.Context, turn *aiv1.AssistantTurnRequest, emit 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	if err != nil && invalidFormat.Load() {
+		return errInvalidModelResponse
+	}
 	return err
 }
 
 // modelCallback honors both turn cancellation and an individual model subrequest.
 func (s *Server) modelCallback(ctx context.Context, token string) aicommon.AICallbackType {
+	// The transaction may correct malformed model output, but Legion has already
+	// exhausted its bounded transport retries before a callback returns an error.
+	// Do not multiply those attempts or retry a permanent provider rejection.
+	var mu sync.Mutex
+	var terminalErr error
 	return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if terminalErr != nil {
+			return nil, terminalErr
+		}
 		requestCtx := req.GetContext()
 		if requestCtx == nil {
 			requestCtx = ctx
@@ -299,6 +330,7 @@ func (s *Server) modelCallback(ctx context.Context, token string) aicommon.AICal
 		}
 		result := new(aiv1.AssistantModelResponse)
 		if err := s.callback(callCtx, token, "/v1/ai/assistant/runtime/model", &aiv1.AssistantModelRequest{Prompt: req.GetPrompt()}, result); err != nil {
+			terminalErr = err
 			return nil, err
 		}
 		response := i.NewAIResponse()

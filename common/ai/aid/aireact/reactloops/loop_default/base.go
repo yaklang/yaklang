@@ -94,6 +94,11 @@ func init() {
 					if !isDone {
 						return
 					}
+					// The host has already delivered and closed a bounded answer.
+					// Do not request a second model-generated summary of that answer.
+					if done, _ := loop.GetVariable("directly_answer_auto_finished").(bool); done {
+						return
+					}
 					lastAction := loop.GetLastValidAction()
 					if lastAction == nil {
 						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)

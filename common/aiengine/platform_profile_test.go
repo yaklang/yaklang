@@ -15,7 +15,7 @@ func TestPlatformProfileCannotBeWidened(t *testing.T) {
 	tool := aitool.NewWithoutCallback("platform.list_projects")
 	cfg := NewAIEngineConfig(WithPlatformOnlyProfile(nil, tool), WithStateless(false), WithDisableAIForge(false), WithExtOptions(aicommon.WithReActActionPolicy(func(string, string) bool { return true }), aicommon.WithBuiltinTools()))
 	c := aicommon.NewConfig(context.Background(), buildReActOptions(context.Background(), cfg, make(chan *schema.AiOutputEvent, 100))...)
-	if c.GetDB() != nil || c.PersistentSessionId != "" || c.EnablePlanAndExec || !c.DisallowMCPServers {
+	if !c.GetFinishAfterDirectlyAnswer() || c.GetDB() != nil || c.PersistentSessionId != "" || c.EnablePlanAndExec || !c.DisallowMCPServers {
 		t.Fatal("profile persistence/capability boundary widened")
 	}
 	for _, action := range []string{"yaklang_code", "bash", "write_file", "loading_skills", "require_ai_blueprint", "request_plan_and_execution", "tool_compose", "load_capability"} {
