@@ -14,7 +14,6 @@ import subprocess, time, json, re, os, sys, socket, threading
 
 def get_yak():
     if len(sys.argv) < 2:
-        # 尝试默认路径
         for p in [r"C:\yakit-projects\yak-engine\yak.exe", "yak.exe", "yak"]:
             if os.path.exists(p):
                 return p
@@ -25,8 +24,8 @@ def get_yak():
 YAK = get_yak()
 results = []
 
-def read_event(proc, timeout=5):
-    """从 stdout 读取 yak grpc ready/failed 事件"""
+def read_event(proc, timeout=10):
+    """从 stdout 读取 yak grpc ready/failed 事件，阻塞直到读到或超时"""
     lines = []
     def reader():
         for line in proc.stdout:
@@ -37,6 +36,21 @@ def read_event(proc, timeout=5):
     t.start()
     t.join(timeout=timeout)
     for line in lines:
+        if 'yak grpc ready' in line:
+            return json.loads(line.replace('yak grpc ready ', ''))
+        if 'yak grpc failed' in line:
+            return json.loads(line.replace('yak grpc failed ', ''))
+    return None
+
+def read_event_after_kill(proc, timeout=3):
+    """kill 后读取已缓冲的 stdout，找 ready/failed 事件"""
+    proc.kill()
+    proc.wait()
+    try:
+        stdout = proc.stdout.read()
+    except Exception:
+        stdout = ""
+    for line in stdout.split('\n'):
         if 'yak grpc ready' in line:
             return json.loads(line.replace('yak grpc ready ', ''))
         if 'yak grpc failed' in line:
@@ -77,18 +91,13 @@ print("\n[T1] yak grpc tcp 端口占用")
 s = socket.socket(); s.bind(('127.0.0.1', 19031)); s.listen(1)
 proc = subprocess.Popen([YAK, 'grpc', '--local-password', 't', '--port', '19031'],
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-time.sleep(3); proc.kill(); proc.wait()
-stdout = proc.stdout.read()
+time.sleep(3)
+d = read_event_after_kill(proc, 3)
 s.close()
-found = False
-for line in stdout.split('\n'):
-    if 'yak grpc failed' in line:
-        d = json.loads(line.replace('yak grpc failed ', ''))
-        ok = d.get('reasonCode') == 'tcp_bind_in_use'
-        record("T1 tcp port in use", ok, f"reasonCode={d.get('reasonCode')}")
-        found = True
-        break
-if not found:
+if d:
+    ok = d.get('reasonCode') == 'tcp_bind_in_use'
+    record("T1 tcp port in use", ok, f"reasonCode={d.get('reasonCode')}")
+else:
     record("T1 tcp port in use", False, "no failed event")
 
 # T2: TCP 数据库错误
@@ -121,13 +130,19 @@ PIPE_NAME = "yakit-test-ipc"
 print("\n[T4] yak grpc npipe ready 事件")
 proc = subprocess.Popen([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe', '--socket-path', PIPE_NAME],
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-d = read_event(proc, 5)
-proc.kill(); proc.wait()
+d = read_event(proc, 10)
 if d:
     ok = d.get('transport') == 'npipe' and 'instanceId' in d
     record("T4 npipe ready", ok, f"transport={d.get('transport')}, address={d.get('address')}")
 else:
-    record("T4 npipe ready", False, "no event")
+    # try read after kill
+    d = read_event_after_kill(proc, 3)
+    if d:
+        ok = d.get('transport') == 'npipe' and 'instanceId' in d
+        record("T4 npipe ready", ok, f"transport={d.get('transport')} (after kill)")
+    else:
+        record("T4 npipe ready", False, "no event")
+proc.kill(); proc.wait()
 
 # T5: check-secret npipe 服务器模式
 print("\n[T5] check-secret npipe 服务器模式成功")
@@ -140,11 +155,9 @@ else:
 
 # T6: check-secret npipe 客户端模式
 print("\n[T6] check-secret npipe 客户端模式连接")
-# 先启动引擎
 server = subprocess.Popen([YAK, 'grpc', '--local-password', 'cpass', '--transport', 'npipe', '--socket-path', PIPE_NAME],
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 time.sleep(2)
-# 客户端连接
 client = subprocess.Popen([YAK, 'check-secret-local-grpc', '--transport', 'npipe', '--socket-path', PIPE_NAME, '--client-password', 'cpass'],
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 time.sleep(4); client.kill(); client.wait()
@@ -175,8 +188,8 @@ else:
 print("\n[T8] yak grpc npipe 缺少 socket-path")
 proc = subprocess.Popen([YAK, 'grpc', '--local-password', 't', '--transport', 'npipe'],
     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-time.sleep(2); proc.kill(); proc.wait()
-d = read_event(proc, 0)
+time.sleep(3)
+d = read_event_after_kill(proc, 3)
 if d:
     ok = d.get('reasonCode') == 'init_failed'
     record("T8 npipe missing path", ok, f"reasonCode={d.get('reasonCode')}")
@@ -192,9 +205,9 @@ print("=" * 60)
 passed = sum(1 for _, ok in results if ok)
 total = len(results)
 for name, ok in results:
-    print(f"  {'✅' if ok else '❌'} {name}")
+    print(f"  {'PASS' if ok else 'FAIL'}: {name}")
 print(f"\n  {passed}/{total} passed")
 if passed == total:
-    print("\n  全部通过 ✅")
+    print("\n  全部通过")
 else:
-    print(f"\n  {total - passed} 项失败 ❌")
+    print(f"\n  {total - passed} 项失败")
