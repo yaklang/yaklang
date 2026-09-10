@@ -73,7 +73,7 @@ and GitHub runner queues are not guaranteed to fit the target. No matrix failure
 is ignored: the Essential Tests Gate and successful-result cache depend on all
 three jobs. These are transport smoke tests, not full CLI/auth/database tests.
 
-## Prepared binary CLI acceptance test (manual)
+## Prepared binary CLI acceptance test
 
 After building the native engine, run from the repository:
 
@@ -81,9 +81,12 @@ After building the native engine, run from the repository:
 YAK_BINARY_PATH=/absolute/path/to/built/yak bash scripts/ci/test-yak-startup.sh
 ```
 
-This longer suite is retained for explicit native-engine acceptance runs and is
-no longer on `prepare-yak`'s serial path. It executes the exact supplied artifact
-and fails if that executable is missing; acceptance tests cannot silently skip.
+CI runs this suite in `prepared-startup`, parallel to the lightweight IPC matrix
+and other test jobs after `prepare-yak`. It reuses the prepared Linux executable
+and Go build cache; it does not build another engine. The final gate and artifact
+cleanup depend on its result. It executes the exact supplied artifact and fails
+if that executable is missing; acceptance tests cannot silently skip. The same
+command supports explicit native-engine acceptance runs on macOS.
 
 The smoke test covers actual TCP authentication and legacy check output, Unix
 authentication, both live endpoint collision paths, no database initialization
