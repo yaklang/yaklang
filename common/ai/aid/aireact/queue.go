@@ -284,11 +284,19 @@ func (tq *TaskQueue) ClearRemoveFromQueueHooks() {
 // Clear 清空队列中的所有任务
 func (tq *TaskQueue) Clear() {
 	tq.mutex.Lock()
-	defer tq.mutex.Unlock()
+	removed := tq.queue
+	tq.queue = list.New()
+	tq.mutex.Unlock()
 
-	count := tq.queue.Len()
-	tq.queue.Init() // 重新初始化链表，清空所有元素
-	log.Infof("Task queue [%s]: cleared %d tasks", tq.queueName, count)
+	// Detach the whole queue before emitting lifecycle events. Event handlers
+	// may re-enter the queue, and newly queued tasks must survive this clear.
+	for e := removed.Front(); e != nil; e = e.Next() {
+		task := e.Value.(aicommon.AIStatefulTask)
+		task.SetUserCancelled()
+		task.Cancel("user cleared task queue")
+		task.SetStatus(aicommon.AITaskState_Skipped)
+	}
+	log.Infof("Task queue [%s]: cleared %d tasks", tq.queueName, removed.Len())
 }
 
 // IsEmpty 检查队列是否为空
@@ -413,6 +421,9 @@ func (tq *TaskQueue) RemoveTask(taskId string) bool {
 	// As in GetFirst, notify only after ownership of the queue lock has ended.
 	// The built-in hook observes the new queue length, and no hook can deadlock
 	// by re-entering TaskQueue.
+	removedTask.SetUserCancelled()
+	removedTask.Cancel("user removed task from queue")
+	removedTask.SetStatus(aicommon.AITaskState_Skipped)
 	_, _ = tq.executeDequeueHooks(removedTask, "manual_remove")
 	log.Infof("Task queue [%s]: removed task [%s] from queue", tq.queueName, taskId)
 	return true
