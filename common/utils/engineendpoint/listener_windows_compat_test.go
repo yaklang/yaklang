@@ -29,6 +29,9 @@ func TestNamedPipeWindowsCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close()
+	if err := PrepareListener(transport, endpoint); !errors.Is(err, syscall.EADDRINUSE) {
+		t.Fatalf("preflight must reject an occupied pipe without connecting: %v", err)
+	}
 	second, err := Listen(transport, endpoint)
 	if err == nil {
 		second.Close()
@@ -36,6 +39,46 @@ func TestNamedPipeWindowsCollision(t *testing.T) {
 	}
 	if !errors.Is(err, syscall.EADDRINUSE) {
 		t.Fatalf("duplicate pipe must be identifiable as already existing: %v", err)
+	}
+}
+
+func TestNamedPipeConcurrentStarts(t *testing.T) {
+	_, endpoint := testEndpoint(t)
+	type result struct {
+		listener net.Listener
+		err      error
+	}
+	start := make(chan struct{})
+	results := make(chan result, 16)
+	for i := 0; i < cap(results); i++ {
+		go func() {
+			<-start
+			l, err := Listen("npipe", endpoint)
+			results <- result{l, err}
+		}()
+	}
+	close(start)
+	var winner net.Listener
+	for i := 0; i < cap(results); i++ {
+		r := <-results
+		if r.err == nil {
+			defer r.listener.Close()
+			if winner != nil {
+				t.Error("more than one listener owns the pipe")
+			}
+			winner = r.listener
+		} else if !errors.Is(r.err, syscall.EADDRINUSE) {
+			t.Errorf("unexpected concurrent startup error: %v", r.err)
+		}
+	}
+	if winner == nil {
+		t.Fatal("no listener acquired the pipe")
+	}
+	done := make(chan error, 1)
+	go func() { done <- servePipeEcho(winner) }()
+	exchangePipe(t, endpoint)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 
