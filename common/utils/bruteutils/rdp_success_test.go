@@ -94,7 +94,7 @@ func TestRDPBruteSuccessCases(t *testing.T) {
 			WithOkToStop(true),
 			WithTargetsConcurrent(1),
 			WithTargetTasksConcurrent(1),
-			WithFinishingThreshold(1),
+			WithFinishingThreshold(2),
 		)
 		if err != nil {
 			t.Fatal(err)
