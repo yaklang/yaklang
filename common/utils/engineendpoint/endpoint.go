@@ -3,11 +3,14 @@
 package engineendpoint
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
+
+var ErrInvalidDirectory = errors.New("unix socket parent must be a directory, not a symbolic link")
 
 // Validate must run before database initialization or any filesystem mutation.
 func Validate(transport, endpoint string) error {

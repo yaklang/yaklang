@@ -149,8 +149,24 @@ func integrationEndpoint(t *testing.T) (string, string) {
 }
 
 func TestCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t *testing.T) {
+	testCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t, 0700)
+}
+
+func TestCLIStartupIPCSharedDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix socket directory permissions")
+	}
+	testCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t, 0777)
+}
+
+func testCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t *testing.T, parentMode os.FileMode) {
 	f := newEngineCLI(t)
 	transport, endpoint := integrationEndpoint(t)
+	if transport == "unix" {
+		if err := os.Chmod(filepath.Dir(endpoint), parentMode); err != nil {
+			t.Fatal(err)
+		}
+	}
 	output, err := f.run(t, "grpc", "--transport", transport, "--socket-path", endpoint)
 	if err == nil || !bytes.Contains(output, []byte("yak grpc failed")) {
 		t.Fatal("unauthenticated IPC startup was accepted")
@@ -249,6 +265,10 @@ func TestCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t *testing.T) {
 		t.Fatal("check disrupted the existing engine")
 	}
 	if runtime.GOOS != "windows" {
+		parent, err := os.Stat(filepath.Dir(endpoint))
+		if err != nil || parent.Mode().Perm() != parentMode {
+			t.Fatal("changed existing socket directory permissions")
+		}
 		info, err := os.Stat(endpoint)
 		if err != nil || info.Mode().Perm() != 0600 {
 			t.Fatal("insecure socket permissions")
@@ -268,5 +288,35 @@ func TestCLIStartupIPCRequiresAuthAndPreservesLiveEndpoint(t *testing.T) {
 		if _, err := os.Lstat(endpoint); !os.IsNotExist(err) {
 			t.Fatal("normal shutdown left its socket behind")
 		}
+	}
+}
+
+func TestCLIStartupIPCInvalidParentDoesNotInitializeDatabases(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix socket filesystem paths")
+	}
+	_, endpoint := integrationEndpoint(t)
+	link := filepath.Dir(endpoint) + "-link"
+	if err := os.Symlink(filepath.Dir(endpoint), link); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(link)
+	for _, command := range []string{"grpc", "check-secret-local-grpc"} {
+		t.Run(command, func(t *testing.T) {
+			f := newEngineCLI(t)
+			args := []string{command, "--transport", "unix", "--socket-path", filepath.Join(link, "sock")}
+			if command == "grpc" {
+				args = append(args, "--local-password", "test-secret")
+			}
+			output, err := f.run(t, args...)
+			if err == nil || !bytes.Contains(output, []byte(ipcEndpointInvalid)) || bytes.Contains(output, []byte("tcp_bind_")) {
+				t.Fatal("invalid socket parent did not produce an IPC-specific error")
+			}
+			for _, db := range []string{"project.db", "profile.db", "ssa.db"} {
+				if _, err := os.Stat(filepath.Join(f.home, db)); !os.IsNotExist(err) {
+					t.Fatal("invalid IPC endpoint initialized databases")
+				}
+			}
+		})
 	}
 }

@@ -33,31 +33,43 @@ func (l *ownedListener) Close() error {
 	return l.err
 }
 
-func Listen(transport, endpoint string) (net.Listener, error) {
+// PrepareListener checks the endpoint before expensive server/database startup.
+// It creates only a missing immediate parent; existing directories are never chmodded.
+// Listen repeats these checks because the filesystem can change after preflight.
+func PrepareListener(transport, endpoint string) error {
 	if err := Validate(transport, endpoint); err != nil {
-		return nil, err
+		return err
 	}
 	if transport != "unix" {
-		return nil, fmt.Errorf("IPC listener requires unix transport")
+		return fmt.Errorf("IPC listener requires unix transport")
 	}
 	parent := filepath.Dir(endpoint)
 	if err := os.Mkdir(parent, 0700); err != nil && !os.IsExist(err) {
-		return nil, err
+		return err
 	}
 	dir, err := os.Lstat(parent)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	owner, ok := dir.Sys().(*syscall.Stat_t)
-	if !dir.IsDir() || dir.Mode()&os.ModeSymlink != 0 || dir.Mode().Perm()&0077 != 0 || !ok || owner.Uid != uint32(os.Geteuid()) {
-		return nil, fmt.Errorf("unix socket parent must be a private directory owned by the current user (mode 0700)")
+	// Existing project directories may be shared (0755/0777). The CLI requires
+	// authentication, and the socket itself is restricted to 0600 below. Do not
+	// change permissions on an existing directory or require users to move it.
+	if !dir.IsDir() || dir.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%w: %q", ErrInvalidDirectory, parent)
 	}
 	// Refuse files, directories, links, live sockets AND stale sockets. No takeover.
 	if _, err := os.Lstat(endpoint); !os.IsNotExist(err) {
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return nil, fmt.Errorf("endpoint already exists: %w", syscall.EADDRINUSE)
+		return fmt.Errorf("endpoint already exists: %w", syscall.EADDRINUSE)
+	}
+	return nil
+}
+
+func Listen(transport, endpoint string) (net.Listener, error) {
+	if err := PrepareListener(transport, endpoint); err != nil {
+		return nil, err
 	}
 	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: endpoint, Net: "unix"})
 	if err != nil {

@@ -5,16 +5,41 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"net/http"
 	"runtime"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
 	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils/engineendpoint"
 )
+
+func TestIPCListenDiagnosticsDoNotSuggestTCPRecovery(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		code string
+	}{
+		{engineendpoint.ErrInvalidDirectory, ipcEndpointInvalid},
+		{syscall.EACCES, ipcBindDenied},
+		{syscall.EADDRINUSE, ipcBindInUse},
+		{syscall.ENOENT, ipcBindGeneric},
+	} {
+		code, hint := classifyEndpointListenError("unix", fmt.Errorf("endpoint: %w", tc.err))
+		if code != tc.code || hint == "" || grpcEventReasonI18n(code) == nil {
+			t.Fatalf("invalid IPC diagnostic: code=%s hint=%s", code, hint)
+		}
+		code, _ = classifyEndpointListenError("tcp", tc.err)
+		legacy, _ := classifyListenError(tc.err)
+		if code != legacy {
+			t.Fatal("changed TCP error classification")
+		}
+	}
+}
 
 func TestCheckProtocolPreservesLegacyReasons(t *testing.T) {
 	for code, legacy := range map[string]string{

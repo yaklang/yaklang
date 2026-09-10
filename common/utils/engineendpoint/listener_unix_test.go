@@ -89,19 +89,49 @@ func TestPrivateModesAndReplacementPreservedOnClose(t *testing.T) {
 	}
 }
 
-func TestRefusesSharedOrSymlinkParent(t *testing.T) {
+func TestExistingSharedDirectoryPermissionsArePreserved(t *testing.T) {
+	for _, mode := range []os.FileMode{0755, 0777} {
+		t.Run(mode.String(), func(t *testing.T) {
+			_, endpoint := testEndpoint(t)
+			dir := filepath.Dir(endpoint)
+			if err := os.Chmod(dir, mode); err != nil {
+				t.Fatal(err)
+			}
+			l, err := Listen("unix", endpoint)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer l.Close()
+			parent, err := os.Stat(dir)
+			if err != nil || parent.Mode().Perm() != mode {
+				t.Fatal("changed existing directory permissions")
+			}
+			socket, err := os.Stat(endpoint)
+			if err != nil || socket.Mode().Perm() != 0600 {
+				t.Fatal("socket was not restricted to 0600")
+			}
+		})
+	}
+}
+
+func TestPrepareCreatesPrivateParentWithoutBinding(t *testing.T) {
+	_, endpoint := testEndpoint(t)
+	endpoint = filepath.Join(filepath.Dir(endpoint), "ipc", "sock")
+	if err := PrepareListener("unix", endpoint); err != nil {
+		t.Fatal(err)
+	}
+	parent, err := os.Stat(filepath.Dir(endpoint))
+	if err != nil || parent.Mode().Perm() != 0700 {
+		t.Fatal("new parent was not restricted to 0700")
+	}
+	if _, err := os.Lstat(endpoint); !os.IsNotExist(err) {
+		t.Fatal("preflight bound the endpoint")
+	}
+}
+
+func TestRefusesSymlinkParent(t *testing.T) {
 	_, endpoint := testEndpoint(t)
 	dir := filepath.Dir(endpoint)
-	if err := os.Chmod(dir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if l, err := Listen("unix", endpoint); err == nil {
-		l.Close()
-		t.Fatal("accepted shared parent")
-	}
-	if err := os.Chmod(dir, 0700); err != nil {
-		t.Fatal(err)
-	}
 	link := dir + "-link"
 	if err := os.Symlink(dir, link); err != nil {
 		t.Fatal(err)
