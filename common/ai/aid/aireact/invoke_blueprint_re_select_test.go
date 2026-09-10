@@ -122,7 +122,10 @@ func TestReAct_RequireBlueprint_ChangeBlueprint(t *testing.T) {
 		aicommon.WithDebug(false),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
+			select {
+			case out <- e.ToGRPC():
+			case <-abort.Done():
+			}
 		}),
 		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithHijackPERequest(func(ctx context.Context, planPayload string) error {
@@ -209,6 +212,10 @@ LOOP:
 			break LOOP
 		}
 	}
+
+	// No consumer remains after LOOP. Let trailing stream events finish before
+	// WaitForStream; a full output channel must not keep the emitter alive.
+	cancel()
 
 	if !reviewed {
 		t.Fatal("no reviewed (modified params)")
