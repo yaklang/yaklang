@@ -106,9 +106,9 @@ jobs:
             --output syntaxflow-meta.json \
             --version ${{ env.YAK_TAG }} \
             --custom-ai \
-            --ai-type chatglm \
-            --apikey ${{ secrets.CHATGLM_APIKEY }} \
-            --ai-model glm-4-long \
+            --ai-type aibalance \
+            --apikey free-user \
+            --ai-model memfit-light-free \
             --concurrent 5 
           
           echo "Checking generated files..."
