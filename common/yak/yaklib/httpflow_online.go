@@ -219,13 +219,13 @@ func (s *OnlineClient) downloadOnlineHTTPFlows(token string, page int, limit int
 
 type setHTTPFlowTagsRequest struct {
 	Hash         string `json:"hash"`
-	IssueType    string `json:"issueType"`
-	Severity     string `json:"severity"`
-	Status       string `json:"status"`
+	SetIssueType string `json:"setIssueType"`
+	SetSeverity  string `json:"setSeverity"`
+	SetStatus    string `json:"setStatus"`
 	StatusReason string `json:"statusReason"`
 }
 
-func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string, hashes []string, issueType, severity, status, statusReason string) error {
+func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string, hashes []string, setIssueType, setSeverity, setStatus, statusReason string) error {
 	if token == "" {
 		return utils.Errorf("token is empty")
 	}
@@ -235,9 +235,9 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 
 	raw, err := json.Marshal(setHTTPFlowTagsRequest{
 		Hash:         strings.Join(hashes, ","),
-		IssueType:    issueType,
-		Severity:     severity,
-		Status:       status,
+		SetIssueType: setIssueType,
+		SetSeverity:  setSeverity,
+		SetStatus:    setStatus,
 		StatusReason: statusReason,
 	})
 	if err != nil {
@@ -260,7 +260,7 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 		rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 		var errData map[string]interface{}
 		_ = json.Unmarshal(rawResponse, &errData)
-		return utils.Errorf("set httpflow tags to online error: %s %s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
+		return utils.Errorf("set httpflow tags to online error: %s%s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
 	}
 
 	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
@@ -415,7 +415,7 @@ func (s *OnlineClient) downloadHTTPFlowPage(token string, page, limit int64) ([]
 	if rsp.GetStatusCode() != 200 {
 		var errData map[string]interface{}
 		_ = json.Unmarshal(rawResponse, &errData)
-		return nil, nil, utils.Errorf("download httpflow error: %s %s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
+		return nil, nil, utils.Errorf("download httpflow error: %s%s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
 	}
 
 	var container downloadHTTPFlowResponse

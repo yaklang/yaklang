@@ -1610,7 +1610,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if len(params.ProcessName) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "process_name", params.ProcessName)
 	}
-
+	db = bizhelper.ExactQueryString(db, "issue_type", params.IssueType)
+	db = bizhelper.ExactQueryString(db, "severity", params.Severity)
+	db = bizhelper.ExactQueryString(db, "status", params.Status)
 	db = filterHTTPFlowByMITMExtractAggregateRows(db, params.GetMitmExtractAggregateFilterRows())
 
 	return db

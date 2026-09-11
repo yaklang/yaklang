@@ -2243,9 +2243,9 @@ func TestBatchSetHTTPFlowIssueFields(t *testing.T) {
 
 		req := &ypb.BatchSetHTTPFlowIssueFieldsRequest{
 			Hashes:       []string{flow.Hash},
-			IssueType:    "sql-injection",
-			Severity:     "high",
-			Status:       "confirmed",
+			SetIssueType: "sql-injection",
+			SetSeverity:  "high",
+			SetStatus:    "confirmed",
 			StatusReason: "verified by admin",
 			Token:        "test-token",
 		}
