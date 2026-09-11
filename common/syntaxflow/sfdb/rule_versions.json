@@ -4684,5 +4684,41 @@
     "rule_name": "检测 C#/.NET SelectSingleNode XPath 注入",
     "hash": "737a25c232459fb3f23db4b4e9f16bbbed9471d3e2382f0b55f6d073dcd3bc2d",
     "version": "20260909.0001"
+  },
+  {
+    "rule_id": "struct-java-md5",
+    "rule_name": "结构扫描：Java MD5 MessageDigest",
+    "hash": "5d4e9cff4f74110d9c6b46c523b2d4021f2c5e6629636d783f961bff58174541",
+    "version": "20260911.0001"
+  },
+  {
+    "rule_id": "struct-java-runtime-exec",
+    "rule_name": "结构扫描：Java Runtime.exec 调用",
+    "hash": "ea2d6f0483f5902f801ae06917ac4a344e28dc24ad1f4654f85cc9cef651a5bd",
+    "version": "20260911.0001"
+  },
+  {
+    "rule_id": "struct-js-eval",
+    "rule_name": "结构扫描：JavaScript eval 调用",
+    "hash": "fb015b68c67e3105e3cf5e19f20bebed95518ca7d8d176cf3e97b3bd75ec9d75",
+    "version": "20260911.0001"
+  },
+  {
+    "rule_id": "struct-python-eval",
+    "rule_name": "结构扫描：Python eval 调用",
+    "hash": "0792aa54a99aa2c2236e1989fb4e6d2181fe317607c088bbf5a817f0f8e4edfe",
+    "version": "20260911.0001"
+  },
+  {
+    "rule_id": "struct-python-os-system",
+    "rule_name": "结构扫描：Python os.system 调用",
+    "hash": "a84a5a7a87384cf3c4b9713c3482a706461a9c170e6198fddb62c2f9a380031c",
+    "version": "20260911.0001"
+  },
+  {
+    "rule_id": "struct-python-pickle-load",
+    "rule_name": "结构扫描：Python pickle.load",
+    "hash": "cd9269fae6f46e27c5ebcb4182b62bb4017a9287474527f9910b6fe876a0aa63",
+    "version": "20260911.0001"
   }
 ]
