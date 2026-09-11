@@ -69,15 +69,12 @@ func shouldSkipFile(path string) bool {
 	if strings.Contains(slash, "/vendor/") {
 		return true
 	}
-	// 跳过 embed_data / templates 下的明文配置源文件（开发用，不是 Go 代码）
-	if strings.Contains(slash, "/embed_data/") {
+	// 跳过 /static/ 下的明文配置源文件（开发用，不是 Go 代码）
+	if strings.Contains(slash, "/static/") && !strings.HasSuffix(base, ".go") {
 		return true
 	}
-	if strings.Contains(slash, "/templates/") && strings.HasSuffix(base, ".json") {
-		return true
-	}
-	// 跳过 .enc / .b64 编码文件
-	if strings.HasSuffix(base, ".enc") || strings.HasSuffix(base, ".b64") {
+	// 跳过 .tar.gz 编码文件
+	if strings.HasSuffix(base, ".tar.gz") {
 		return true
 	}
 	// 跳过非 .go 文件
@@ -162,7 +159,6 @@ func indexOfLineComment(line string) int {
 // ---------------------------------------------------------------------------
 
 var embedLoadKeywords = []string{
-	"xorencoded.Load",
 	"embeddata.Load",
 	"templates.GetTemplates",
 	"loadSignaturesFromEmbed",
@@ -173,6 +169,7 @@ var embedLoadKeywords = []string{
 	"//go:embed",
 	"gzip_embed.New",
 	"NewPreprocessingEmbed",
+	"PreprocessingEmbed",
 }
 
 // isEmbedLoadLine 检查匹配内容所在的行是否是 embed 加载行。
