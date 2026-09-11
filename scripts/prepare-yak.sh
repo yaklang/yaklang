@@ -99,17 +99,22 @@ fi
 
 # 检查二进制是否满足所有 --require 参数
 binary_satisfies() {
-  local dest="$1" req cmd flag
+  local dest="$1" req cmd flag help_file
   if ! "$dest" version >/dev/null 2>&1; then
     return 1
   fi
+  help_file="$(mktemp)"
   for req in "${REQUIRES[@]}"; do
     cmd="${req%% *}"
     flag="${req#* }"
-    if ! "$dest" "$cmd" --help 2>&1 | grep -q -- "$flag"; then
+    # 先把 help 写入文件再 grep，避免 stdout 管道被提前关闭时 yak 收到
+    # SIGPIPE（141），导致已发布的二进制被误判为缺少所需参数。
+    if ! "$dest" "$cmd" --help >"$help_file" 2>&1 || ! grep -q -- "$flag" "$help_file"; then
+      rm -f "$help_file"
       return 1
     fi
   done
+  rm -f "$help_file"
   return 0
 }
 

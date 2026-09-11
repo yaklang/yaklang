@@ -170,6 +170,27 @@ func isVersionCommand() bool {
 	return false
 }
 
+// isHelpCommand 判断本次调用是否只需要输出帮助（help/--help/-h）。
+// 这类调用不应触发数据库初始化：初始化会建库、导入内置插件并输出大量日志，
+// 在 CI 中探测帮助文本时会拖慢命令甚至触发 SIGPIPE 误判。
+func isHelpCommand() bool {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "help", "-h", "--help", "-help", "--help=true":
+			return true
+		}
+	}
+	// 子命令帮助: yak <command> --help / -h（第二参数直接是帮助标志）。
+	// 只检查第二参数，避免把 -c/脚本内容里的 "--help" 误判为帮助调用。
+	if len(os.Args) > 2 {
+		switch os.Args[2] {
+		case "--help", "-h", "-help", "--help=true":
+			return true
+		}
+	}
+	return false
+}
+
 func init() {
 	// 取消掉 0022 的限制，让用户可以创建别人也能写的文件夹
 	umask.Umask(0)
@@ -232,7 +253,7 @@ func init() {
 
 `, consts.GetYakVersion(), "yaklang.io")
 
-	case isVersionCommand():
+	case isVersionCommand(), isHelpCommand():
 		// pass
 
 	default:
