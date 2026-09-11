@@ -38,9 +38,9 @@ req.setEndpoint('https://example.com/api');
 NEG
 )
 
-${*}.pattern_regex(/http:\/\//) as $t
-${*}.pattern_regex(/\/\/.*/) as $comment
-${*}.pattern_regex(/\*.*/) as $glob
+${*.cls}.pattern_regex(/http:\/\//) as $t
+${*.cls}.pattern_regex(/\/\/.*/) as $comment
+${*.cls}.pattern_regex(/\*.*/) as $glob
 $t not_inside $comment as $a
 $a not_inside $glob as $hit
 alert $hit for {
