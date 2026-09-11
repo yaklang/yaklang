@@ -27,7 +27,7 @@ func BuildVerifyLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
-		reactloops.WithAllowUserInteract(false),
+		reactloops.WithAllowUserInteract(true),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 			findings := state.GetFindings()
@@ -45,27 +45,33 @@ func BuildVerifyLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 
 			outcomes := runAllFindingVerifications(r, loop, task, state)
 
-			state.DedupeVerifiedVulns()
-			state.SetPhase(model.AuditPhaseReport)
+		state.DedupeVerifiedVulns()
 
-			stats := state.GetStats()
-			verified := state.GetVerifiedVulns()
-			confirmed := state.GetConfirmedVulns()
-			incomplete := 0
-			for _, o := range outcomes {
-				if o.incomplete {
-					incomplete++
-				}
+		// 如果存在失败/未完成的 finding，进入手动重试循环。
+		// 该循环会阻塞等待用户选择要重试的项，用户选择不重试或没有可重试项时自动退出。
+		runRetryVerificationLoop(r, loop, task, state)
+
+		state.DedupeVerifiedVulns()
+		state.SetPhase(model.AuditPhaseReport)
+
+		stats := state.GetStats()
+		verified := state.GetVerifiedVulns()
+		confirmed := state.GetConfirmedVulns()
+		incomplete := 0
+		for _, o := range outcomes {
+			if o.incomplete {
+				incomplete++
 			}
+		}
 
-			r.AddToTimeline("[VERIFY_COMPLETE]", fmt.Sprintf(
-				"Phase 3 验证完成。共 %d 个 finding，确认: %d，uncertain: %d，safe: %d（未完成子任务: %d）",
-				len(findings), len(confirmed), stats.UncertainCount, stats.SafeCount, incomplete))
+		r.AddToTimeline("[VERIFY_COMPLETE]", fmt.Sprintf(
+			"Phase 3 验证完成。共 %d 个 finding，确认: %d，uncertain: %d，safe: %d（未完成子任务: %d）",
+			len(findings), len(confirmed), stats.UncertainCount, stats.SafeCount, incomplete))
 
-			log.Infof("[CodeAudit/Phase3] Verify orchestrator complete. total=%d verified=%d confirmed=%d uncertain=%d safe=%d incomplete=%d",
-				len(findings), len(verified), len(confirmed), stats.UncertainCount, stats.SafeCount, incomplete)
-			op.Done()
-		}),
+		log.Infof("[CodeAudit/Phase3] Verify orchestrator complete. total=%d verified=%d confirmed=%d uncertain=%d safe=%d incomplete=%d",
+			len(findings), len(verified), len(confirmed), stats.UncertainCount, stats.SafeCount, incomplete)
+		op.Done()
+	}),
 	}
 
 	preset = append(preset, opts...)

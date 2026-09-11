@@ -139,6 +139,14 @@ func finalizeFindingVerifyAfterFork(
 		}
 	}
 
+	// 记录子 Agent 执行错误到 VerifiedFinding，便于前端展示重试原因。
+	if vf := state.GetVerifiedFindingByID(finding.ID); vf != nil {
+		if forkResult.ExecErr != nil {
+			vf.LastError = forkResult.ExecErr.Error()
+			state.UpsertVerifiedFinding(vf)
+		}
+	}
+
 	if incomplete {
 		msg := fmt.Sprintf("Finding %s 验证未调用 conclude_finding 就结束了，已自动标记 uncertain。", finding.ID)
 		r.AddToTimeline("[PHASE3_FINDING_INCOMPLETE]", msg)

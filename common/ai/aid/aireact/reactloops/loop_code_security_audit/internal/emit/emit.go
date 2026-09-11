@@ -376,6 +376,46 @@ func VerifyComplete(loop *reactloops.ReActLoop, summary string, stats model.Audi
 	})
 }
 
+// RetryPrompt 通知前端当前有可重试的 finding 列表。
+func RetryPrompt(loop *reactloops.ReActLoop, retryFindings []*model.Finding, state *model.AuditState) {
+	if loop == nil || len(retryFindings) == 0 {
+		return
+	}
+	items := make([]map[string]any, 0, len(retryFindings))
+	ids := make([]string, 0, len(retryFindings))
+	for _, f := range retryFindings {
+		if f == nil || f.ID == "" {
+			continue
+		}
+		retryCount, lastError := 0, ""
+		if state != nil {
+			retryCount, lastError = state.GetVerifiedFindingRetryInfo(f.ID)
+		}
+		ids = append(ids, f.ID)
+		items = append(items, map[string]any{
+			"id":          f.ID,
+			"title":       f.Title,
+			"category":    f.Category,
+			"severity":    f.Severity,
+			"confidence":  f.Confidence,
+			"retry_count": retryCount,
+			"last_error":  lastError,
+		})
+	}
+	if len(items) == 0 {
+		return
+	}
+	reactloops.EmitActionLog(loop, util.VerifyNodeID, fmt.Sprintf(
+		"以下 %d 个 finding 验证失败或未完成，等待用户选择重试：%s",
+		len(items), strings.Join(ids, ", "),
+	))
+	Structured(loop, "code_audit_retry_prompt", map[string]any{
+		"finding_count": len(items),
+		"finding_ids":   ids,
+		"findings":      items,
+	})
+}
+
 // ─── Phase 4 ──────────────────────────────────────────────────────────
 
 func Phase4ReportComplete(loop *reactloops.ReActLoop, reportPath string, stats model.AuditStats) {

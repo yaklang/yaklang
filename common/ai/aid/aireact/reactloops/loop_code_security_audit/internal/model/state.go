@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 
@@ -73,6 +74,11 @@ type VerifiedFinding struct {
 	DataFlow   string       `json:"data_flow,omitempty"` // 完整数据流（验证后可能更准确）
 	Exploit    string       `json:"exploit,omitempty"`   // 利用方式
 	Fix        string       `json:"fix,omitempty"`       // 修复建议
+
+	// RetryCount 记录该 finding 被手动重试的次数，便于前端展示和避免无限循环。
+	RetryCount int `json:"retry_count,omitempty"`
+	// LastError 记录最近一次子 Agent 验证失败的错误信息（status 为 uncertain 时可为空）。
+	LastError string `json:"last_error,omitempty"`
 }
 
 // --------- AuditState（全局状态）---------
@@ -379,6 +385,97 @@ func (s *AuditState) GetConfirmedVulns() []*VerifiedFinding {
 		}
 	}
 	return result
+}
+
+// RemoveVerifiedFindingByID 从 VerifiedVulns 和索引中移除指定 finding 的验证结果。
+// 返回 true 表示确实移除了记录。
+func (s *AuditState) RemoveVerifiedFindingByID(id string) bool {
+	if s == nil || id == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	removed := false
+	var kept []*VerifiedFinding
+	for _, v := range s.VerifiedVulns {
+		if v != nil && v.Finding != nil && v.Finding.ID == id {
+			removed = true
+			continue
+		}
+		kept = append(kept, v)
+	}
+	s.VerifiedVulns = kept
+	if s.verifiedByID != nil {
+		delete(s.verifiedByID, id)
+	}
+	return removed
+}
+
+// GetFindingsNeedingRetry 返回当前仍需要重试的 finding 列表。
+// 可重试状态包括 uncertain（未得出结论）以及 failed（子 Agent 执行失败）。
+// 结果按 finding.Confidence 降序排列，与 Phase3 原始调度顺序一致。
+func (s *AuditState) GetFindingsNeedingRetry() []*Finding {
+	if s == nil {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var retryFindingIDs []string
+	for id, v := range s.verifiedByID {
+		if v == nil || v.Finding == nil {
+			continue
+		}
+		if v.Status == VerifyUncertain || v.Status == "" {
+			retryFindingIDs = append(retryFindingIDs, id)
+		}
+	}
+
+	if len(retryFindingIDs) == 0 {
+		return nil
+	}
+
+	idSet := make(map[string]struct{}, len(retryFindingIDs))
+	for _, id := range retryFindingIDs {
+		idSet[id] = struct{}{}
+	}
+
+	var out []*Finding
+	for _, f := range s.Findings {
+		if f == nil || f.ID == "" {
+			continue
+		}
+		if _, ok := idSet[f.ID]; ok {
+			out = append(out, f)
+		}
+	}
+
+	// 保持与 Phase3 调度一致：按 confidence 降序稳定排序。
+	sort.SliceStable(out, func(i, j int) bool {
+		ci, cj := 0, 0
+		if out[i] != nil {
+			ci = out[i].Confidence
+		}
+		if out[j] != nil {
+			cj = out[j].Confidence
+		}
+		return ci > cj
+	})
+	return out
+}
+
+// GetVerifiedFindingRetryInfo 返回指定 finding 的当前重试次数和最近错误。
+func (s *AuditState) GetVerifiedFindingRetryInfo(id string) (retryCount int, lastError string) {
+	if s == nil || id == "" {
+		return 0, ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if v, ok := s.verifiedByID[id]; ok && v != nil {
+		return v.RetryCount, v.LastError
+	}
+	return 0, ""
 }
 
 // --------- Phase 4 helpers ---------
