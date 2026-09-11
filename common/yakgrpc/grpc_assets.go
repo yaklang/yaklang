@@ -1111,6 +1111,7 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 				"verifier_uid":      item.VerifierUid,
 				"fix_time":          time.Unix(item.FixTime, 0),
 				"fix_suggestion":    item.FixSuggestion,
+				"tag_reason":        item.TagReason,
 				"risk_type_verbose": item.RiskTypeVerbose,
 				"severity":          item.Severity,
 				"severity_score":    item.SeverityScore,
@@ -1145,9 +1146,10 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 				IP:              item.IP,
 				FromYakScript:   item.FromYakScript,
 				Tags:            item.Tags,
-				VerifierUid:        item.VerifierUid,
+				VerifierUid:     item.VerifierUid,
 				FixTime:         time.Unix(item.FixTime, 0),
 				FixSuggestion:   item.FixSuggestion,
+				TagReason:       item.TagReason,
 				IsPotential:     item.IsPotential,
 				CVE:             item.CVE,
 				SeverityScore:   item.SeverityScore,
@@ -1171,10 +1173,11 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 }
 
 func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTagsRequest) (*ypb.BatchSetRiskTagsResponse, error) {
-	tags := strings.TrimSpace(req.Tags)
+	tags := strings.Join(utils.RemoveRepeatStringSlice(req.SetTags), "|")
 	verifierUid := strings.TrimSpace(req.VerifierUid)
 	fixTime := time.Unix(req.FixTime, 0)
 	fixSuggestion := strings.TrimSpace(req.FixSuggestion)
+	tagReason := strings.TrimSpace(req.TagReason)
 	riskTypeVerbose := strings.TrimSpace(req.RiskTypeVerbose)
 	severity := strings.TrimSpace(req.Severity)
 	severityScore := req.SeverityScore
@@ -1211,7 +1214,7 @@ func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTags
 	var syncHashes []string
 	if req.GetToken() != "" {
 		if err := db.Pluck("hash", &syncHashes).Error; err != nil {
-			return nil, utils.Errorf("pluck risk hashes for online sync failed: %s", err)
+			log.Errorf("pluck risk hashes for online sync failed: %s", err)
 		}
 	}
 
@@ -1220,18 +1223,19 @@ func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTags
 		"verifier_uid":      verifierUid,
 		"fix_time":          fixTime,
 		"fix_suggestion":    fixSuggestion,
+		"tag_reason":        tagReason,
 		"risk_type_verbose": riskTypeVerbose,
 		"severity":          severity,
 		"severity_score":    severityScore,
 	})
 	if result.Error != nil {
-		return nil, utils.Errorf("batch set risk tags failed: %s", result.Error)
+		return nil, result.Error
 	}
 
 	if req.GetToken() != "" && len(syncHashes) > 0 {
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		if err := client.SetRiskTagsToOnline(ctx, req.GetToken(), syncHashes, req.Tags, req.VerifierUid, req.FixSuggestion, req.RiskTypeVerbose, req.Severity, req.FixTime, req.SeverityScore); err != nil {
-			return nil, utils.Errorf("sync risk tags to online failed: %s", err)
+		if err := client.SetRiskTagsToOnline(ctx, req.GetToken(), syncHashes, tags, req.VerifierUid, req.FixSuggestion, tagReason, req.RiskTypeVerbose, req.Severity, req.FixTime, req.SeverityScore); err != nil {
+			return nil, err
 		}
 	}
 

@@ -38558,20 +38558,23 @@ func (x *RisksFromOnlineProgress) GetLog() string {
 }
 
 type BatchSetRiskTagsRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Filter          *QueryRisksRequest     `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
-	Tags            string                 `protobuf:"bytes,2,opt,name=Tags,proto3" json:"Tags,omitempty"`
-	VerifierUid     string                 `protobuf:"bytes,3,opt,name=VerifierUid,proto3" json:"VerifierUid,omitempty"`
-	FixTime         int64                  `protobuf:"varint,4,opt,name=FixTime,proto3" json:"FixTime,omitempty"`
-	FixSuggestion   string                 `protobuf:"bytes,5,opt,name=FixSuggestion,proto3" json:"FixSuggestion,omitempty"`
-	Ids             []int64                `protobuf:"varint,6,rep,packed,name=Ids,proto3" json:"Ids,omitempty"`
-	Hashes          []string               `protobuf:"bytes,7,rep,name=Hashes,proto3" json:"Hashes,omitempty"`
-	Token           string                 `protobuf:"bytes,8,opt,name=Token,proto3" json:"Token,omitempty"`
-	RiskTypeVerbose string                 `protobuf:"bytes,9,opt,name=RiskTypeVerbose,proto3" json:"RiskTypeVerbose,omitempty"`
-	Severity        string                 `protobuf:"bytes,10,opt,name=Severity,proto3" json:"Severity,omitempty"`
-	SeverityScore   float64                `protobuf:"fixed64,11,opt,name=SeverityScore,proto3" json:"SeverityScore,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Filter *QueryRisksRequest     `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	// 设置 处置状态标签   QueryRisksRequest中tags为筛选条件
+	SetTags         []string `protobuf:"bytes,2,rep,name=SetTags,proto3" json:"SetTags,omitempty"`
+	VerifierUid     string   `protobuf:"bytes,3,opt,name=VerifierUid,proto3" json:"VerifierUid,omitempty"`
+	FixTime         int64    `protobuf:"varint,4,opt,name=FixTime,proto3" json:"FixTime,omitempty"`
+	FixSuggestion   string   `protobuf:"bytes,5,opt,name=FixSuggestion,proto3" json:"FixSuggestion,omitempty"`
+	Ids             []int64  `protobuf:"varint,6,rep,packed,name=Ids,proto3" json:"Ids,omitempty"`
+	Hashes          []string `protobuf:"bytes,7,rep,name=Hashes,proto3" json:"Hashes,omitempty"`
+	Token           string   `protobuf:"bytes,8,opt,name=Token,proto3" json:"Token,omitempty"`
+	RiskTypeVerbose string   `protobuf:"bytes,9,opt,name=RiskTypeVerbose,proto3" json:"RiskTypeVerbose,omitempty"`
+	Severity        string   `protobuf:"bytes,10,opt,name=Severity,proto3" json:"Severity,omitempty"`
+	SeverityScore   float64  `protobuf:"fixed64,11,opt,name=SeverityScore,proto3" json:"SeverityScore,omitempty"`
+	// 处置原因
+	TagReason     string `protobuf:"bytes,12,opt,name=TagReason,proto3" json:"TagReason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BatchSetRiskTagsRequest) Reset() {
@@ -38611,11 +38614,11 @@ func (x *BatchSetRiskTagsRequest) GetFilter() *QueryRisksRequest {
 	return nil
 }
 
-func (x *BatchSetRiskTagsRequest) GetTags() string {
+func (x *BatchSetRiskTagsRequest) GetSetTags() []string {
 	if x != nil {
-		return x.Tags
+		return x.SetTags
 	}
-	return ""
+	return nil
 }
 
 func (x *BatchSetRiskTagsRequest) GetVerifierUid() string {
@@ -38679,6 +38682,13 @@ func (x *BatchSetRiskTagsRequest) GetSeverityScore() float64 {
 		return x.SeverityScore
 	}
 	return 0
+}
+
+func (x *BatchSetRiskTagsRequest) GetTagReason() string {
+	if x != nil {
+		return x.TagReason
+	}
+	return ""
 }
 
 type BatchSetRiskTagsResponse struct {
@@ -52861,7 +52871,10 @@ type QueryHTTPFlowRequest struct {
 	ExcludeRequestRaw bool `protobuf:"varint,54,opt,name=ExcludeRequestRaw,proto3" json:"ExcludeRequestRaw,omitempty"`
 	// 显式跳过精确 Total；用于已有游标的实时增量查询。
 	// Data/Pagination 仍正常返回，但 Total 为 0。初始化、历史与周期校准不得开启。
-	SkipTotal     bool `protobuf:"varint,55,opt,name=SkipTotal,proto3" json:"SkipTotal,omitempty"`
+	SkipTotal     bool   `protobuf:"varint,55,opt,name=SkipTotal,proto3" json:"SkipTotal,omitempty"`
+	IssueType     string `protobuf:"bytes,56,opt,name=IssueType,proto3" json:"IssueType,omitempty"`
+	Severity      string `protobuf:"bytes,57,opt,name=Severity,proto3" json:"Severity,omitempty"`
+	Status        string `protobuf:"bytes,58,opt,name=Status,proto3" json:"Status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53267,6 +53280,27 @@ func (x *QueryHTTPFlowRequest) GetSkipTotal() bool {
 	return false
 }
 
+func (x *QueryHTTPFlowRequest) GetIssueType() string {
+	if x != nil {
+		return x.IssueType
+	}
+	return ""
+}
+
+func (x *QueryHTTPFlowRequest) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *QueryHTTPFlowRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
 type HTTPFlowsToOnlineRequest struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Token               string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
@@ -53544,12 +53578,13 @@ func (x *HTTPFlowsFromOnlineProgress) GetLog() string {
 }
 
 type BatchSetHTTPFlowIssueFieldsRequest struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	Filter       *QueryHTTPFlowRequest  `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
-	IssueType    string                 `protobuf:"bytes,2,opt,name=IssueType,proto3" json:"IssueType,omitempty"`
-	Severity     string                 `protobuf:"bytes,3,opt,name=Severity,proto3" json:"Severity,omitempty"`
-	Status       string                 `protobuf:"bytes,4,opt,name=Status,proto3" json:"Status,omitempty"`
-	StatusReason string                 `protobuf:"bytes,5,opt,name=StatusReason,proto3" json:"StatusReason,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 批量更新 条件筛选
+	Filter       *QueryHTTPFlowRequest `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	SetIssueType string                `protobuf:"bytes,2,opt,name=SetIssueType,proto3" json:"SetIssueType,omitempty"`
+	SetSeverity  string                `protobuf:"bytes,3,opt,name=SetSeverity,proto3" json:"SetSeverity,omitempty"`
+	SetStatus    string                `protobuf:"bytes,4,opt,name=SetStatus,proto3" json:"SetStatus,omitempty"`
+	StatusReason string                `protobuf:"bytes,5,opt,name=StatusReason,proto3" json:"StatusReason,omitempty"`
 	// 按 ID 批量更新
 	Ids []int64 `protobuf:"varint,6,rep,packed,name=Ids,proto3" json:"Ids,omitempty"`
 	// 按 Hash 批量更新
@@ -53596,23 +53631,23 @@ func (x *BatchSetHTTPFlowIssueFieldsRequest) GetFilter() *QueryHTTPFlowRequest {
 	return nil
 }
 
-func (x *BatchSetHTTPFlowIssueFieldsRequest) GetIssueType() string {
+func (x *BatchSetHTTPFlowIssueFieldsRequest) GetSetIssueType() string {
 	if x != nil {
-		return x.IssueType
+		return x.SetIssueType
 	}
 	return ""
 }
 
-func (x *BatchSetHTTPFlowIssueFieldsRequest) GetSeverity() string {
+func (x *BatchSetHTTPFlowIssueFieldsRequest) GetSetSeverity() string {
 	if x != nil {
-		return x.Severity
+		return x.SetSeverity
 	}
 	return ""
 }
 
-func (x *BatchSetHTTPFlowIssueFieldsRequest) GetStatus() string {
+func (x *BatchSetHTTPFlowIssueFieldsRequest) GetSetStatus() string {
 	if x != nil {
-		return x.Status
+		return x.SetStatus
 	}
 	return ""
 }
@@ -82053,10 +82088,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\"G\n" +
 	"\x17RisksFromOnlineProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x10\n" +
-	"\x03Log\x18\x02 \x01(\tR\x03Log\"\xeb\x02\n" +
+	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x8f\x03\n" +
 	"\x17BatchSetRiskTagsRequest\x12.\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x16.ypb.QueryRisksRequestR\x06Filter\x12\x12\n" +
-	"\x04Tags\x18\x02 \x01(\tR\x04Tags\x12 \n" +
+	"\x06Filter\x18\x01 \x01(\v2\x16.ypb.QueryRisksRequestR\x06Filter\x12\x18\n" +
+	"\aSetTags\x18\x02 \x03(\tR\aSetTags\x12 \n" +
 	"\vVerifierUid\x18\x03 \x01(\tR\vVerifierUid\x12\x18\n" +
 	"\aFixTime\x18\x04 \x01(\x03R\aFixTime\x12$\n" +
 	"\rFixSuggestion\x18\x05 \x01(\tR\rFixSuggestion\x12\x10\n" +
@@ -82066,7 +82101,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fRiskTypeVerbose\x18\t \x01(\tR\x0fRiskTypeVerbose\x12\x1a\n" +
 	"\bSeverity\x18\n" +
 	" \x01(\tR\bSeverity\x12$\n" +
-	"\rSeverityScore\x18\v \x01(\x01R\rSeverityScore\">\n" +
+	"\rSeverityScore\x18\v \x01(\x01R\rSeverityScore\x12\x1c\n" +
+	"\tTagReason\x18\f \x01(\tR\tTagReason\">\n" +
 	"\x18BatchSetRiskTagsResponse\x12\"\n" +
 	"\fUpdatedCount\x18\x01 \x01(\x03R\fUpdatedCount\"\x84\x01\n" +
 	"\x1eVerifyTunnelServerDomainParams\x12J\n" +
@@ -83331,7 +83367,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"_PartIndex\"g\n" +
 	"!MITMExtractAggregateFlowFilterRow\x12 \n" +
 	"\vRuleVerbose\x18\x01 \x01(\tR\vRuleVerbose\x12 \n" +
-	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\xb7\x0f\n" +
+	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\x89\x10\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -83396,7 +83432,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13IncludeSystemTiming\x184 \x01(\bR\x13IncludeSystemTiming\x12.\n" +
 	"\x12ExcludeResponseRaw\x185 \x01(\bR\x12ExcludeResponseRaw\x12,\n" +
 	"\x11ExcludeRequestRaw\x186 \x01(\bR\x11ExcludeRequestRaw\x12\x1c\n" +
-	"\tSkipTotal\x187 \x01(\bR\tSkipTotal\"\xdc\x01\n" +
+	"\tSkipTotal\x187 \x01(\bR\tSkipTotal\x12\x1c\n" +
+	"\tIssueType\x188 \x01(\tR\tIssueType\x12\x1a\n" +
+	"\bSeverity\x189 \x01(\tR\bSeverity\x12\x16\n" +
+	"\x06Status\x18: \x01(\tR\x06Status\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
@@ -83413,12 +83452,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\"K\n" +
 	"\x1bHTTPFlowsFromOnlineProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x10\n" +
-	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x8d\x02\n" +
+	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x9f\x02\n" +
 	"\"BatchSetHTTPFlowIssueFieldsRequest\x121\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x19.ypb.QueryHTTPFlowRequestR\x06Filter\x12\x1c\n" +
-	"\tIssueType\x18\x02 \x01(\tR\tIssueType\x12\x1a\n" +
-	"\bSeverity\x18\x03 \x01(\tR\bSeverity\x12\x16\n" +
-	"\x06Status\x18\x04 \x01(\tR\x06Status\x12\"\n" +
+	"\x06Filter\x18\x01 \x01(\v2\x19.ypb.QueryHTTPFlowRequestR\x06Filter\x12\"\n" +
+	"\fSetIssueType\x18\x02 \x01(\tR\fSetIssueType\x12 \n" +
+	"\vSetSeverity\x18\x03 \x01(\tR\vSetSeverity\x12\x1c\n" +
+	"\tSetStatus\x18\x04 \x01(\tR\tSetStatus\x12\"\n" +
 	"\fStatusReason\x18\x05 \x01(\tR\fStatusReason\x12\x10\n" +
 	"\x03Ids\x18\x06 \x03(\x03R\x03Ids\x12\x16\n" +
 	"\x06Hashes\x18\a \x03(\tR\x06Hashes\x12\x14\n" +

@@ -1032,13 +1032,13 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 
 func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.BatchSetHTTPFlowIssueFieldsRequest) (*ypb.BatchSetHTTPFlowIssueFieldsResponse, error) {
 	updates := map[string]interface{}{}
-	if v := strings.TrimSpace(req.IssueType); v != "" {
+	if v := strings.TrimSpace(req.SetIssueType); v != "" {
 		updates["issue_type"] = v
 	}
-	if v := strings.TrimSpace(req.Severity); v != "" {
+	if v := strings.TrimSpace(req.SetSeverity); v != "" {
 		updates["severity"] = v
 	}
-	if v := strings.TrimSpace(req.Status); v != "" {
+	if v := strings.TrimSpace(req.SetStatus); v != "" {
 		updates["status"] = v
 	}
 	if v := strings.TrimSpace(req.StatusReason); v != "" {
@@ -1073,7 +1073,7 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		return nil, utils.Errorf("count httpflow for batch limit failed: %s", err)
 	}
 	if count == 0 {
-		return nil, utils.Errorf("未匹配到任何 httpflow")
+		return nil, utils.Errorf("未匹配到任何数据")
 	}
 	if count > batchMaxLimit {
 		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
@@ -1095,8 +1095,8 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 	if req.GetToken() != "" && len(syncHashes) > 0 {
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 		if err := client.SetHTTPFlowTagsToOnline(ctx, req.GetToken(), syncHashes,
-			req.IssueType, req.Severity, req.Status, req.StatusReason); err != nil {
-			return nil, utils.Errorf("sync httpflow tags to online failed: %s", err)
+			req.SetIssueType, req.SetSeverity, req.SetStatus, req.StatusReason); err != nil {
+			log.Errorf("sync httpflow tags to online failed: %s", err)
 		}
 	}
 
