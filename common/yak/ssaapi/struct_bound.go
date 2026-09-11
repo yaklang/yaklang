@@ -56,20 +56,16 @@ func (b *structBound) Allow(inst ssa.Instruction) bool {
 	if inst.IsExtern() || inst.GetOpcode() == ssa.SSAOpcodeExternLib {
 		return true
 	}
-	p := inst.GetProgram()
-	if b.lib != nil && p != nil {
-		if p == b.lib {
-			if b.lib.ProgramKind == ssa.Library {
-				return true
-			}
-			// Application-hosted unit: the Program is shared, so isolate by file.
-			return ssadb.PathPassesFileFilter(ssa.InstructionFilePath(inst), b.files, ssadb.FileFilterInclude, b.programName)
-		}
-		if p.ProgramKind == ssa.Library {
-			return false
+	fp := ssa.InstructionFilePath(inst)
+	if ssadb.PathPassesFileFilter(fp, b.files, ssadb.FileFilterInclude, b.programName) {
+		return true
+	}
+	if b.lib != nil {
+		if p := inst.GetProgram(); p != nil && p == b.lib && b.lib.ProgramKind == ssa.Library {
+			return true
 		}
 	}
-	return ssadb.PathPassesFileFilter(ssa.InstructionFilePath(inst), b.files, ssadb.FileFilterInclude, b.programName)
+	return false
 }
 
 func structBoundFromConfig(cfg *sfvm.Config) *structBound {

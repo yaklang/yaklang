@@ -219,6 +219,122 @@ alert $call for {
 	}
 }
 
+func TestStructScanBuiltinSnippets(t *testing.T) {
+	cases := []struct {
+		name     string
+		lang     ssaconfig.Language
+		file     string
+		code     string
+		rule     string
+		ssaQuery string
+	}{
+		{
+			name: "python-eval",
+			lang: ssaconfig.PYTHON,
+			file: "dyn.py",
+			code: "def run(user_input):\n    return eval(user_input)\n",
+			rule: `desc(mode: "struct", language: "python")
+eval(* as $arg) as $call
+alert $call`,
+			ssaQuery: `eval(* as $arg) as $call
+alert $call`,
+		},
+		{
+			name: "python-os-system",
+			lang: ssaconfig.PYTHON,
+			file: "sh.py",
+			code: "import os\ndef run(user):\n    os.system(\"ls \" + user)\n",
+			rule: `desc(mode: "struct", language: "python")
+os.system as $call
+os.system(* as $arg) as $call
+alert $call`,
+			ssaQuery: `os.system as $call
+alert $call`,
+		},
+		{
+			name: "python-pickle",
+			lang: ssaconfig.PYTHON,
+			file: "ser.py",
+			code: "import pickle\ndef load(data):\n    return pickle.loads(data)\n",
+			rule: `desc(mode: "struct", language: "python")
+pickle.loads as $call
+alert $call`,
+			ssaQuery: `pickle.loads as $call
+alert $call`,
+		},
+		{
+			name: "java-md5",
+			lang: ssaconfig.JAVA,
+			file: "Hash.java",
+			code: `import java.security.MessageDigest;
+class Hash {
+  void bad() throws Exception {
+    MessageDigest.getInstance("MD5");
+  }
+}
+`,
+			rule: `desc(mode: "struct", language: "java")
+MessageDigest.getInstance(*?{have: "MD5"}) as $call
+alert $call`,
+			ssaQuery: `MessageDigest.getInstance(*?{have: "MD5"}) as $call
+alert $call`,
+		},
+		{
+			name: "js-eval",
+			lang: ssaconfig.JS,
+			file: "app.js",
+			code: "function run(code) { return eval(code); }\n",
+			rule: `desc(mode: "struct", language: "javascript")
+eval(* as $arg) as $call
+alert $call`,
+			ssaQuery: `eval(* as $arg) as $call
+alert $call`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			vf := filesys.NewVirtualFs()
+			vf.AddFile(tc.file, tc.code)
+			progName := uuid.NewString()
+			defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+			progs, err := ParseProjectWithFS(vf,
+				WithLanguage(tc.lang),
+				WithProgramName(progName),
+				WithMemory(),
+				WithStructRuleRaw(tc.rule),
+			)
+			require.NoError(t, err)
+			require.NotEmpty(t, progs)
+			t.Logf("struct results=%d errs=%v", len(progs[0].StructScanResults()), progs[0].StructScanErrors())
+			for _, res := range progs[0].StructScanResults() {
+				t.Logf("struct alerts=%v", res.GetAlertVariables())
+			}
+			ssaRes, err := progs[0].SyntaxFlowWithError(tc.ssaQuery)
+			require.NoError(t, err)
+			t.Logf("ssa alerts=%v count=%d", ssaRes.GetAlertVariables(), len(ssaRes.GetAlertVariables()))
+			for _, name := range ssaRes.GetAlertVariables() {
+				for _, val := range ssaRes.GetValues(name) {
+					if val == nil {
+						continue
+					}
+					fp := ""
+					if val.GetRange() != nil && val.GetRange().GetEditor() != nil {
+						fp = val.GetRange().GetEditor().GetUrl()
+					}
+					t.Logf("ssa hit opcode=%s name=%s file=%s", val.GetOpcode(), val.GetName(), fp)
+				}
+			}
+			structHits := 0
+			for _, res := range progs[0].StructScanResults() {
+				for _, name := range res.GetAlertVariables() {
+					structHits += len(res.GetValues(name))
+				}
+			}
+			require.Greater(t, structHits, 0, "struct scan should hit")
+		})
+	}
+}
+
 func TestStructScanRequiresProgramName(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("a/A.java", `package a; class A { void f() {} }`)

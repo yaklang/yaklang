@@ -185,6 +185,7 @@ var Exports = map[string]any{
 	"withBaseProgramName":          WithBaseProgramName,
 	"withEnableIncrementalCompile": WithEnableIncrementalCompile,
 	"withStructRule":               WithStructRule,
+	"withStructRules":              WithStructRules,
 	"withStructRuleDir":            WithStructRuleDir,
 	"withStructRuleRaw":            WithStructRuleRaw,
 	"withStructRuleCallback":       WithStructRuleCallback,

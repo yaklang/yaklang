@@ -16,14 +16,17 @@ SOLUTION
 	alert_min: 1
 	"file://sh.py": <<<POS
 import os
-os.system("ls " + user)
+def run(user):
+    os.system("ls " + user)
 POS
 	"safefile://sh-safe.py": <<<NEG
 import subprocess
-subprocess.run(["ls", user], check=False)
+def run(user):
+    subprocess.run(["ls", user], check=False)
 NEG
 )
 
+os.system as $call
 os.system(* as $arg) as $call
 alert $call for {
 	level: "high",

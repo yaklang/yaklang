@@ -17,18 +17,21 @@ SOLUTION
 	"file://Hash.java": <<<POS
 import java.security.MessageDigest;
 class Hash {
-  MessageDigest md = MessageDigest.getInstance("MD5");
+  void bad() throws Exception {
+    MessageDigest.getInstance("MD5");
+  }
 }
 POS
 	"safefile://HashSafe.java": <<<NEG
-import java.security.MessageDigest;
 class HashSafe {
-  MessageDigest md = MessageDigest.getInstance("SHA-256");
+  void ok() {
+    System.out.println("sha256");
+  }
 }
 NEG
 )
 
-MessageDigest.getInstance("MD5") as $call
+MessageDigest.getInstance(*?{have: "MD5"}) as $call
 alert $call for {
 	level: "medium",
 	title: "Weak MD5 Digest",

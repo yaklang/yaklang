@@ -3,8 +3,8 @@ package sfanalysis
 import (
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -144,6 +144,9 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 func runStructVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyReport {
 	report := &EmbeddedVerifyReport{}
 	rule := frame.GetRule()
+	if rule != nil && strings.TrimSpace(rule.Content) == "" {
+		rule.Content = frame.Text
+	}
 	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
 	if err != nil {
 		report.Error = err
@@ -155,13 +158,13 @@ func runStructVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyRe
 		return report
 	}
 	for _, f := range verifyFs {
-		err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
-			result, err := queryStructFrame(programs, frame)
-			if err != nil {
-				return utils.Errorf("struct syntax flow failed: %v", err)
+		err = checkStructCompile(f, rule, func(prog *ssaapi.Program) error {
+			result := firstAlertingStructResult(prog)
+			if result == nil {
+				return utils.Error("struct verify produced no result")
 			}
 			return checkPositiveResult(f, rule, result, cfg)
-		}, ssaapi.WithLanguage(f.GetLanguage()))
+		})
 		if err != nil {
 			report.Error = err
 			return report
@@ -179,13 +182,13 @@ func runStructVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyRe
 	}
 	if cfg.verifyNegative {
 		for _, f := range negativeFs {
-			err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
-				result, err := queryStructFrame(programs, frame)
-				if err != nil {
-					return utils.Errorf("struct syntax flow failed: %v", err)
+			err = checkStructCompile(f, rule, func(prog *ssaapi.Program) error {
+				result := firstAlertingStructResult(prog)
+				if result == nil {
+					return nil
 				}
 				return checkNegativeResult(result)
-			}, ssaapi.WithLanguage(f.GetLanguage()))
+			})
 			if err != nil {
 				report.Error = err
 				return report
@@ -196,43 +199,54 @@ func runStructVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyRe
 	return report
 }
 
-func queryStructFrame(programs ssaapi.Programs, frame *sfvm.SFFrame) (*ssaapi.SyntaxFlowResult, error) {
-	if len(programs) == 0 || programs[0] == nil || programs[0].Program == nil {
-		return nil, utils.Error("no program for struct verify")
+func checkStructCompile(f *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, handler func(*ssaapi.Program) error) error {
+	if f == nil {
+		return utils.Error("nil verify filesystem")
 	}
-	prog := programs[0]
-	units := prog.Program.CompileUnits
-	if len(units) == 0 {
-		return nil, utils.Error("no compile units for struct verify")
+	opts := []ssaconfig.Option{
+		ssaapi.WithProgramName("struct-verify-" + uuid.NewString()),
+		ssaapi.WithMemory(),
+		ssaapi.WithStructRule(rule),
+	}
+	if lang := f.GetLanguage(); lang != "" {
+		opts = append(opts, ssaapi.WithLanguage(lang))
+	}
+	progs, err := ssaapi.ParseProjectWithFS(f.GetVirtualFs(), opts...)
+	if err != nil {
+		return err
+	}
+	if len(progs) == 0 || progs[0] == nil {
+		return utils.Error("struct verify produced no program")
+	}
+	if errs := progs[0].StructScanErrors(); len(errs) > 0 {
+		return errs[0]
+	}
+	return handler(progs[0])
+}
+
+func firstAlertingStructResult(prog *ssaapi.Program) *ssaapi.SyntaxFlowResult {
+	if prog == nil {
+		return nil
 	}
 	var last *ssaapi.SyntaxFlowResult
-	for _, unit := range units {
-		if unit == nil {
+	for _, res := range prog.StructScanResults() {
+		if res == nil {
 			continue
 		}
-		res, err := ssaapi.QuerySyntaxflow(
-			ssaapi.QueryWithValue(ssaapi.NewStructQueryTarget(prog, unit, nil)),
-			ssaapi.QueryWithResultProgram(prog),
-			ssaapi.QueryWithStruct(unit),
-			ssaapi.QueryWithFrame(frame),
-		)
-		if err != nil {
-			return nil, err
-		}
 		last = res
-		if res != nil && len(res.GetAlertVariables()) > 0 {
-			return res, nil
+		if len(res.GetAlertVariables()) > 0 {
+			return res
 		}
 	}
-	if last == nil {
-		return nil, utils.Error("struct verify produced no result")
-	}
-	return last, nil
+	return last
 }
 
 func runSourceVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyReport {
 	report := &EmbeddedVerifyReport{}
 	rule := frame.GetRule()
+	if rule != nil && strings.TrimSpace(rule.Content) == "" {
+		rule.Content = frame.Text
+	}
 	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
 	if err != nil {
 		report.Error = err
@@ -244,9 +258,9 @@ func runSourceVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyRe
 		return report
 	}
 	for _, f := range verifyFs {
-		result, err := sfpattern.ExecFrameOnFS(frame, f.GetVirtualFs())
+		result, err := querySourceOnFS(f.GetVirtualFs(), rule)
 		if err != nil {
-			report.Error = utils.Errorf("sfpattern positive verify failed: %v", err)
+			report.Error = utils.Errorf("source positive verify failed: %v", err)
 			return report
 		}
 		if err := checkSourcePositiveResult(f, rule, result, cfg); err != nil {
@@ -267,17 +281,16 @@ func runSourceVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyRe
 	}
 	if cfg.verifyNegative {
 		for _, f := range negativeFs {
-			result, err := sfpattern.ExecFrameOnFS(frame, f.GetVirtualFs())
+			result, err := querySourceOnFS(f.GetVirtualFs(), rule)
 			if err != nil {
-				// No match / path miss is success for negative cases.
 				if strings.Contains(err.Error(), "no file") || strings.Contains(err.Error(), "file filter failed") {
 					continue
 				}
-				report.Error = utils.Errorf("sfpattern negative verify failed: %v", err)
+				report.Error = utils.Errorf("source negative verify failed: %v", err)
 				return report
 			}
-			if sfpattern.HasAlert(result) {
-				report.Error = utils.Errorf("source negative verify: unexpected alert count=%d", sfpattern.AlertCount(result))
+			if sourceAlertCount(result) > 0 {
+				report.Error = utils.Errorf("source negative verify: unexpected alert count=%d", sourceAlertCount(result))
 				return report
 			}
 		}
@@ -286,15 +299,38 @@ func runSourceVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyRe
 	return report
 }
 
-func checkSourcePositiveResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *sfvm.SFFrameResult, cfg config) (errs error) {
+func querySourceOnFS(fs fi.FileSystem, rule *schema.SyntaxFlowRule) (*ssaapi.SyntaxFlowResult, error) {
+	name := "source-verify"
+	if rule != nil && rule.RuleName != "" {
+		name = rule.RuleName
+	}
+	target, err := ssaapi.NewSourceQueryTargetFromFS(name, fs)
+	if err != nil {
+		return nil, err
+	}
+	return target.SyntaxFlowRule(rule)
+}
+
+func sourceAlertCount(result *ssaapi.SyntaxFlowResult) int {
+	if result == nil {
+		return 0
+	}
+	n := 0
+	for _, name := range result.GetAlertVariables() {
+		n += len(result.GetValues(name))
+	}
+	return n
+}
+
+func checkSourcePositiveResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, cfg config) (errs error) {
 	_ = cfg
 	if result == nil {
-		return utils.Error("sfpattern result is nil")
+		return utils.Error("source result is nil")
 	}
-	if len(result.Errors) > 0 {
-		return utils.Errorf("sfpattern errors: %v", strings.Join(result.Errors, "; "))
+	if len(result.GetErrors()) > 0 {
+		return utils.Errorf("source errors: %v", strings.Join(result.GetErrors(), "; "))
 	}
-	alertCount := sfpattern.AlertCount(result)
+	alertCount := sourceAlertCount(result)
 	if alertCount <= 0 {
 		return utils.Errorf("alert symbol table is empty")
 	}

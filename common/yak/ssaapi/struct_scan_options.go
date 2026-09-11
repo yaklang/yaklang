@@ -5,13 +5,36 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func WithStructRule(enable bool) ssaconfig.Option {
-	return ssaconfig.SetOption("ssa_compile/struct_rule_enable", func(c *Config, v bool) {
-		c.ensureStructScan().enableBuiltin = v
-	})(enable)
+// WithStructRule enables builtin struct rules (bool) or appends an explicit
+// *schema.SyntaxFlowRule to run during compile (after LazyBuildForUnits,
+// before FlushCompileUnit).
+func WithStructRule(v any) ssaconfig.Option {
+	switch t := v.(type) {
+	case bool:
+		return ssaconfig.SetOption("ssa_compile/struct_rule_enable", func(c *Config, enable bool) {
+			c.ensureStructScan().enableBuiltin = enable
+		})(t)
+	case *schema.SyntaxFlowRule:
+		return WithStructRules(t)
+	case schema.SyntaxFlowRule:
+		return WithStructRules(&t)
+	default:
+		return func(*ssaconfig.Config) error {
+			return utils.Errorf("withStructRule: want bool or *schema.SyntaxFlowRule, got %T", v)
+		}
+	}
+}
+
+// WithStructRules appends compiled struct-mode rules to the compile-time scan.
+func WithStructRules(rules ...*schema.SyntaxFlowRule) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa_compile/struct_rules", func(c *Config, v []*schema.SyntaxFlowRule) {
+		s := c.ensureStructScan()
+		s.rules = append(s.rules, v...)
+	})(rules)
 }
 
 func WithStructRuleDir(dir string) ssaconfig.Option {
