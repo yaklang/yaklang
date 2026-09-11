@@ -27,6 +27,30 @@ if enableCustomAI {
     opts.Push(ai.apiKey(aiAPIKEY))
 }
 
+// AI 连通性预检：在正式处理规则前快速验证 AI 服务是否可用，避免无效运行
+log.Info("checking AI connectivity ...")
+connectCheckOpts = [
+    ai.funcCallRetryTimes(1),
+]
+if enableCustomAI {
+    connectCheckOpts.Push(ai.model(aiModel))
+    connectCheckOpts.Push(ai.type(aiType))
+    connectCheckOpts.Push(ai.apiKey(aiAPIKEY))
+}
+try {
+    probe = ai.FunctionCall(
+        "返回一个JSON，keyword字段值为ok",
+        {"keyword": "(类型：字符串)返回 ok"},
+        connectCheckOpts...
+    )~
+    if probe == nil || probe["keyword"] == "" {
+        die("AI connectivity check failed: function call returned empty result, AI service may be unavailable")
+    }
+    log.Info("AI connectivity check passed: AI service is available")
+} catch e {
+    die(f"AI connectivity check failed: AI service is not reachable, aborting. error: ${e}")
+}
+
 want_data := {
     "detail": string, 
     "detail_en": string, 
