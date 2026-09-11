@@ -3974,8 +3974,8 @@
   {
     "rule_id": "source-insecure-api-apex-insecure-http-request",
     "rule_name": "检测到 Apex 明文 HTTP 请求",
-    "hash": "e11ea320531f3ab42224d48f52ad3651235a0d41e9e6ec5fc9260607f7fb89a1",
-    "version": "20260908.0001"
+    "hash": "0e1e770756927f238e93ee51199b9829ecb1bf6a59ece75040cedadaf1f4bb85",
+    "version": "20260911.0001"
   },
   {
     "rule_id": "source-insecure-api-apex-specify-sharing-level",
