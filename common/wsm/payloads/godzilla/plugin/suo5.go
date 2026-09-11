@@ -1,3 +1,6 @@
+//go:generate xorencode -input embed_data/getsuo5memfilterbytecode.b64 -output embed_data/getsuo5memfilterbytecode.b64.enc -key yaklang-plugin-v1
+//go:generate xorencode -input embed_data/getsuo5memservletbytecode.b64 -output embed_data/getsuo5memservletbytecode.b64.enc -key yaklang-plugin-v1
+//go:generate xorencode -input embed_data/getwebappcomponentinfoscanbytecode.b64 -output embed_data/getwebappcomponentinfoscanbytecode.b64.enc -key yaklang-plugin-v1
 package plugin
 
 import (

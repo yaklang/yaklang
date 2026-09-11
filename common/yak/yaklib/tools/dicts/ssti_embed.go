@@ -1,3 +1,4 @@
+//go:generate xorencode -input embed_data/ssti.txt -output embed_data/ssti.txt.enc -key yaklang-dicts-v1
 package dicts
 
 import (
