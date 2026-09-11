@@ -52,7 +52,10 @@ NOTE: Even when using the external tag, a foundational Action JSON structure is 
 		if payload == "" {
 			payload = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("answer_payload"))
 		}
-		tagPayload := strings.TrimSpace(loop.Get("tag_final_answer"))
+		tagPayload := strings.TrimSpace(action.GetString("tag_final_answer"))
+		if tagPayload == "" {
+			tagPayload = strings.TrimSpace(loop.Get("tag_final_answer"))
+		}
 		if payload != "" && tagPayload != "" && payload != tagPayload {
 			return utils.Error("directly_answer requires exactly one of answer_payload or FINAL_ANSWER tag, but both were provided")
 		}

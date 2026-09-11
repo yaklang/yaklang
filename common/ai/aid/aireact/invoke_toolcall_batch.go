@@ -241,8 +241,10 @@ func cloneToolBatchParams(params aitool.InvokeParams) aitool.InvokeParams {
 	return cloneToolBatchMap(map[string]any(params))
 }
 
-func cloneToolBatchMap(input map[string]any) aitool.InvokeParams {
-	result := make(aitool.InvokeParams, len(input))
+func cloneToolBatchMap(input map[string]any) map[string]any {
+	// Nested objects must remain plain JSON maps. jsonschema rejects the
+	// named InvokeParams type, even though it has the same underlying type.
+	result := make(map[string]any, len(input))
 	for key, value := range input {
 		result[key] = cloneToolBatchValue(value)
 	}

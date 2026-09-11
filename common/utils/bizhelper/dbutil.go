@@ -1182,7 +1182,18 @@ func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []strin
 		return db
 	}
 
-	return db.Where(strings.Join(conds, " OR "), items...)
+	return db.Where(joinBalancedSearchOr(conds), items...)
+}
+
+// Build a balanced expression instead of a left-deep OR chain. Expanded
+// natural-language search terms can otherwise exceed SQLite's depth limit
+// even while the number of bound parameters is well within its limit.
+func joinBalancedSearchOr(conditions []string) string {
+	if len(conditions) <= 8 {
+		return strings.Join(conditions, " OR ")
+	}
+	middle := len(conditions) / 2
+	return "(" + joinBalancedSearchOr(conditions[:middle]) + ") OR (" + joinBalancedSearchOr(conditions[middle:]) + ")"
 }
 
 // ilike sqliter not support

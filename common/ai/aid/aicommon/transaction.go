@@ -23,6 +23,9 @@ func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 	if err == nil || rsp == nil {
 		return err
 	}
+	if rsp.GetHTTPStatusCode() >= 400 || rsp.GetError() != nil {
+		return err
+	}
 	lower := strings.ToLower(err.Error())
 	if rsp.GetTotalOutputBytes() != 0 {
 		return err
@@ -38,6 +41,20 @@ func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 		return utils.Wrapf(err, "ai model returned empty response")
 	}
 	return err
+}
+
+func isNonRetryableAIHTTPResponse(rsp *AIResponse) bool {
+	status := rsp.GetHTTPStatusCode()
+	// Request/authentication errors cannot be repaired by replaying the same
+	// request. Keep transient timeout, conflict, early-data and rate limits.
+	return status >= 400 && status < 500 && status != 408 && status != 409 && status != 425 && status != 429
+}
+
+func aiHTTPResponseError(rsp *AIResponse) error {
+	if err := rsp.GetError(); err != nil {
+		return err
+	}
+	return utils.Errorf("AI provider returned HTTP %d: %s", rsp.GetHTTPStatusCode(), rsp.GetHTTPResponseBody())
 }
 
 func CallAITransaction(
@@ -94,6 +111,7 @@ func callAITransaction(
 	var lastCallAiErr error // 保留 API 调用错误，防止被 postHandler 错误覆盖
 	var lastRsp *AIResponse
 	var lastReq *AIRequest
+	var nonRetryableHTTPFailure bool
 
 	// attemptHistory records every attempt (including 429 rate-limit retries) so
 	// that the final failure message can expose the full retry history to the
@@ -176,6 +194,10 @@ func callAITransaction(
 			i++
 			attemptHistory = append(attemptHistory, buildAttemptRecord(i, finalPrompt, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
+			if isNonRetryableAIHTTPResponse(rsp) {
+				nonRetryableHTTPFailure = true
+				break
+			}
 			if i < trcRetry {
 				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
 					return waitErr
@@ -201,7 +223,13 @@ func callAITransaction(
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		postHandlerErr = postHandler(rsp)
+		if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {
+			// An HTTP error body is not model output. Do not send it through
+			// action parsing and generate secondary "missing @action" errors.
+			postHandlerErr = aiHTTPResponseError(rsp)
+		} else {
+			postHandlerErr = postHandler(rsp)
+		}
 		// The post-handler may consume a stream with the same request context.
 		// If that context was cancelled while parsing, do not reinterpret the
 		// cancellation as malformed model output and retry it.
@@ -219,6 +247,10 @@ func callAITransaction(
 			attemptHistory = append(attemptHistory, rec)
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			if isNonRetryableAIHTTPResponse(rsp) {
+				nonRetryableHTTPFailure = true
+				break
+			}
 			if i < trcRetry {
 				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
 					return waitErr
@@ -263,7 +295,7 @@ func callAITransaction(
 			"2. Try switching to a different AI model\n"+
 			"3. Simplify the task or reduce the prompt complexity\n"+
 			"4. Check network connectivity and API rate limits",
-		trcRetry, modelInfo, finalErr,
+		len(attemptHistory), modelInfo, finalErr,
 	)
 	var tier consts.ModelTier
 	if lastReq != nil {
@@ -295,6 +327,9 @@ func callAITransaction(
 	// error stays concise — callers that need the full retry history should
 	// consume the emitted events rather than parsing the error string.
 	if finalErr != nil {
+		if nonRetryableHTTPFailure {
+			return utils.Wrap(finalErr, "non-retryable AI HTTP request failure")
+		}
 		return utils.Wrap(finalErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
 	}
 	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
