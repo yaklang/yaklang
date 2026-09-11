@@ -1,3 +1,4 @@
+//go:generate xorencode -input embed_data/malicious_signatures.json -output embed_data/malicious_signatures.json.enc -key yaklang-sigs-v1
 package yaklib
 
 import (

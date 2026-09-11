@@ -1,3 +1,5 @@
+//go:generate xorencode -input check_list.json -output check_list.json.enc -key yaklang-yso-v1
+//go:generate xorencode -input serialized_objects.json -output serialized_objects.json.enc -key yaklang-yso-v1
 package embeddata
 
 import (

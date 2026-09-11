@@ -1,3 +1,4 @@
+//go:generate xorencode -input webshell_templates.json -output webshell_templates.json.enc -key yaklang-wsm-v1
 package templates
 
 import (
