@@ -1,4 +1,3 @@
-//go:generate xorencode -input webshell_templates.json -output webshell_templates.json.enc -key yaklang-wsm-v1
 package templates
 
 import (
@@ -7,13 +6,23 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/utils/xorencoded"
+	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
-const xorKey = "yaklang-wsm-v1"
+//go:generate gzip-embed -cache --source ./static --gz static.tar.gz --xor-key yaklang-wsm-v1 --no-embed
 
-//go:embed webshell_templates.json.enc
+const templatesXorKey = "yaklang-wsm-v1"
+
+//go:embed static.tar.gz
 var templatesFS embed.FS
+
+var templatesFSIns = func() *gzip_embed.PreprocessingEmbed {
+	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(&templatesFS, "static.tar.gz", true, []byte(templatesXorKey))
+	if err != nil {
+		panic(fmt.Sprintf("init templates embed failed: %v", err))
+	}
+	return ins
+}()
 
 // WebshellTemplates 是从 XOR 编码文件中解码出来的所有 webshell 生成模板。
 type WebshellTemplates struct {
@@ -45,12 +54,12 @@ var (
 // GetTemplates 返回解码后的 webshell 模板配置（单例）。
 func GetTemplates() *WebshellTemplates {
 	once.Do(func() {
-		content, err := xorencoded.LoadEmbedFile(templatesFS, "webshell_templates.json.enc", []byte(xorKey))
+		raw, err := templatesFSIns.ReadFile("webshell_templates.json")
 		if err != nil {
-			panic(fmt.Sprintf("load webshell templates failed: %v", err))
+			panic(fmt.Sprintf("read webshell_templates.json failed: %v", err))
 		}
 		t := &WebshellTemplates{}
-		if err := json.Unmarshal([]byte(content), t); err != nil {
+		if err := json.Unmarshal(raw, t); err != nil {
 			panic(fmt.Sprintf("unmarshal webshell templates failed: %v", err))
 		}
 		templatesInstance = t
