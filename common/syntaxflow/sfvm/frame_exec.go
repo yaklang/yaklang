@@ -1134,7 +1134,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		// removal (Semgrep pattern-not-regex); SSA values keep ID-based removal.
 		var newVal Values
 		if RegionAllSimpleHits(value) && RegionAllSimpleHits(vs) {
-			newVal = RegionNotOverlap(value, vs)
+			newVal = RegionNotOverlap(value, s.config, vs)
 		} else {
 			newVal = RemoveValues(value, vs)
 		}
@@ -1174,7 +1174,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		// intersection (Semgrep AND of multiple pattern-regex); SSA values
 		// keep ID-based intersection.
 		if RegionAllSimpleHits(value) && RegionAllSimpleHits(vs) {
-			s.pushStack(RegionOverlap(value, vs))
+			s.pushStack(RegionOverlap(value, s.config, vs))
 			return true, nil
 		}
 
@@ -1215,7 +1215,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		s.pushStack(RegionContained(value, vs))
+		s.pushStack(RegionContained(value, vs, s.config))
 		s.debugSubLog("<< push")
 		return true, nil
 	case OpNotInsideRef:
@@ -1235,7 +1235,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		s.pushStack(RegionNotContained(value, vs))
+		s.pushStack(RegionNotContained(value, vs, s.config))
 		s.debugSubLog("<< push")
 		return true, nil
 	case OpNativeCall:

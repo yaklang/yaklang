@@ -56,12 +56,20 @@ func MatchRegexpWithNegatives(files map[string]string, pathPattern string, posit
 }
 
 func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, pathPattern string, positive string, negatives []string) (sfvm.Values, error) {
-	hits, err := MatchRegexpHits(files, pathPattern, []string{positive})
-	if err != nil {
-		return nil, err
+	// Reuse the regular regexp cache for the positive set; then apply the
+	// negative filter ourselves. This avoids recomputing the (often large)
+	// positive hit list every time a pattern_regex_not statement runs.
+	positiveKey := sourceHitKey(pathPattern, []string{positive})
+	hits, cached := root.SourceHits(positiveKey)
+	if !cached {
+		var err error
+		hits, err = MatchRegexpHits(files, pathPattern, []string{positive})
+		if err != nil {
+			return nil, err
+		}
+		root.SetSourceHits(positiveKey, hits)
 	}
 	if len(negatives) == 0 {
-		root.SetSourceHits(sourceHitKey(pathPattern, []string{positive}), hits)
 		return sourceHitsToValues(root, hits)
 	}
 
