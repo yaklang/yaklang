@@ -847,6 +847,12 @@ jobs:
                 {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
               ]
 
+          - name: "Test Antiviral / No Plaintext Malicious Strings"
+            test_configs: |
+              [
+                {"package": "./ci_antiviral_check/...", "timeout": "30s"}
+              ]
+
           - name: "Test AI Aid / React"
             test_configs: |
               [
