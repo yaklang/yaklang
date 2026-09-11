@@ -203,13 +203,8 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 						log.Debugf("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
 							v.TagName, contentLength, totalCost)
 
-						if totalCost.Milliseconds() <= 300 {
-							log.Warnf("AITag[%s] stream too fast, cost %v (content: %d chars), stream maybe not valid",
-								v.TagName, totalCost, contentLength)
-						} else {
-							log.Infof("AITag[%s] stream processing completed normally, cost %v for %d chars",
-								v.TagName, totalCost, contentLength)
-						}
+						// Buffered responses can drain immediately; latency is not a
+						// validity check. Parsing and action validation report failures.
 					},
 				)
 				if eventErr != nil {

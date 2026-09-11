@@ -105,3 +105,33 @@ func TestAIResponse_WaitForCallbackDone_AlreadyDone(t *testing.T) {
 	ok := rsp.WaitForCallbackDone(context.Background())
 	assert.True(t, ok)
 }
+
+func TestTransactionHTTP400StopsBeforeActionParsing(t *testing.T) {
+	cfg := newTransactionTestConfig(context.Background())
+	cfg.retryMax = 5
+	calls, parsed := 0, false
+	err := CallAITransaction(cfg, "invalid tool schema", func(*AIRequest) (*AIResponse, error) {
+		calls++
+		rsp := NewUnboundAIResponse()
+		rsp.SetRawHTTPResponseData([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"), []byte(`{"error":{"message":"Invalid schema: required:null"}}`))
+		return rsp, nil
+	}, func(*AIResponse) error {
+		parsed = true
+		return fmt.Errorf("action @action not found or invalid")
+	})
+	require.ErrorContains(t, err, "400")
+	require.ErrorContains(t, err, "Invalid schema")
+	require.NotContains(t, err.Error(), "empty response")
+	require.NotContains(t, err.Error(), "max retry count")
+	require.Equal(t, 1, calls)
+	require.False(t, parsed)
+}
+
+func TestTransactionHTTPRetryClassification(t *testing.T) {
+	for _, status := range []int{0, 200, 400, 401, 403, 404, 408, 409, 413, 422, 425, 429, 500, 502, 503} {
+		rsp := NewUnboundAIResponse()
+		rsp.SetRawHTTPResponseData([]byte(fmt.Sprintf("HTTP/1.1 %d Status\r\n\r\n", status)), nil)
+		want := status == 400 || status == 401 || status == 403 || status == 404 || status == 413 || status == 422
+		require.Equal(t, want, isNonRetryableAIHTTPResponse(rsp), "status %d", status)
+	}
+}

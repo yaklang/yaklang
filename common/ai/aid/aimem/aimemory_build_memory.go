@@ -77,9 +77,20 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 	if err != nil {
 		return nil, utils.Errorf("InvokeLiteForge failed: %v", err)
 	}
-	result := ac.GetInvokeParamsArray("memory_entities")
+	if ac == nil {
+		return nil, utils.Error("memory triage returned no action")
+	}
+	result, present, err := ac.GetCanonicalObjectArray("memory_entities")
+	if err != nil {
+		return nil, err
+	}
+	if !present {
+		return nil, utils.Error("memory triage response is missing memory_entities")
+	}
 	if len(result) == 0 {
-		return nil, utils.Errorf("no memory entities found")
+		// The triage prompt explicitly allows an empty array for transient
+		// tool logs and other input with no durable facts to retain.
+		return nil, nil
 	}
 
 	var entities []*aicommon.MemoryEntity

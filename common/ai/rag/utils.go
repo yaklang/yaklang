@@ -240,7 +240,13 @@ func NewTemporaryRAGDB() (*gorm.DB, error) {
 	return db, nil
 }
 
+var ragSchemaMigrationMu sync.Mutex
+
 func autoMigrateRAGSystem(db *gorm.DB) error {
+	// Runtime memory and timeline archive initialize concurrently. Gorm's
+	// check-then-create migration is not atomic, even with one SQL connection.
+	ragSchemaMigrationMu.Lock()
+	defer ragSchemaMigrationMu.Unlock()
 	return db.AutoMigrate(
 		&schema.KnowledgeBaseEntry{},
 		&schema.KnowledgeBaseInfo{},
@@ -266,9 +272,11 @@ func autoMigrateRAGSystem(db *gorm.DB) error {
 //
 // Example:
 // ```
-// cb = ai.MockAIService(func(msg) {
-//     return "mocked response for: " + msg
-// })
+//
+//	cb = ai.MockAIService(func(msg) {
+//	    return "mocked response for: " + msg
+//	})
+//
 // assert cb != nil, "MockAIService should return a non-nil callback"
 // println("ai.MockAIService created callback successfully")
 // ```

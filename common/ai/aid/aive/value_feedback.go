@@ -249,6 +249,10 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 
 	result, err := forge.Execute(ctx, nil, execOpts...)
 	if err != nil {
+		if ctx.Err() != nil {
+			log.Debugf("aive value feedback stopped with context: %v", err)
+			return
+		}
 		log.Warnf("aive value feedback liteforge execute failed: id=%s focus=%s err=%v", record.ID, record.FocusMode, err)
 		return
 	}

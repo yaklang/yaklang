@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -10,6 +12,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
+
+func TestDirectlyAnswerUsesParsedTagBeforeEmitterFinishes(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	ctx := context.Background()
+	release := make(chan struct{})
+	defer close(release)
+	action, err := aicommon.ExtractActionFromStream(ctx, strings.NewReader(`{"@action":"directly_answer"}
+<|FINAL_ANSWER_test|>complete answer<|FINAL_ANSWER_END_test|>`), "object",
+		aicommon.WithActionAlias("directly_answer"),
+		aicommon.WithActionNonce("test"),
+		aicommon.WithActionTagToKey("FINAL_ANSWER", "tag_final_answer"),
+		aicommon.WithActionFieldStreamHandler([]string{"tag_final_answer"}, func(_ string, reader io.Reader) {
+			_, _ = io.Copy(io.Discard, reader)
+			<-release // The UI completion callback has not populated loop vars yet.
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, action.WaitParseResult(ctx))
+	require.Empty(t, loop.Get("tag_final_answer"))
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+	require.Equal(t, "complete answer", loop.Get("directly_answer_payload"))
+}
 
 func newMinimalLoopForHelperTest() *ReActLoop {
 	return &ReActLoop{vars: omap.NewEmptyOrderedMap[string, any]()}

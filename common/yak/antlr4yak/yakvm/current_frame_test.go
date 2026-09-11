@@ -41,6 +41,42 @@ func TestCurrentGoroutineID(t *testing.T) {
 	}
 }
 
+func TestCallbackWithCapturedParentOwnsCurrentGoroutine(t *testing.T) {
+	vm := New()
+	ctx := context.Background()
+	err := vm.Exec(ctx, func(parent *Frame) {
+		entered := make(chan struct{})
+		release := make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			done <- vm.exec(ctx, parent.nativeCallbackFrame(), func(child *Frame) {
+				if child.ownerGoroutineID != currentGoroutineID() || vm.CurrentFM() != child {
+					t.Error("native callback registered against its captured parent's goroutine")
+				}
+				if child.coroutine == parent.coroutine || child.ThreadID == parent.ThreadID {
+					t.Error("independent callback shares panic/debugger state with its parent")
+				}
+				close(entered)
+				<-release
+			}, Sub)
+		}()
+		<-entered
+		if vm.CurrentFM() != parent {
+			t.Error("callback replaced the parent's active frame")
+		}
+		close(release)
+		if err := <-done; err != nil {
+			t.Error(err)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vm.activeFrames.Load() != 0 {
+		t.Error("callback leaked active frames")
+	}
+}
+
 func TestConcurrentBareVMGetVarDoesNotRelinkGlobals(t *testing.T) {
 	vm := New()
 	start := make(chan struct{})

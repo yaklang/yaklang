@@ -435,8 +435,8 @@ func (v *VirtualMachine) execWithFrameFactory(ctx context.Context, parentFrame *
 		frame = NewSubFrame(parentFrame)
 		// Synchronous Yak function calls stay on the parent's goroutine. Reuse
 		// its already-resolved ID instead of calling runtime.Stack for every
-		// nested frame. Async calls do not go through this path and resolve their
-		// owner after the goroutine starts.
+		// nested frame. Native callbacks normalize their parent at the Go-to-Yak
+		// boundary; async calls resolve their owner after the goroutine starts.
 		frame.ownerGoroutineID = parentFrame.ownerGoroutineID
 	} else if flag&Inline == Inline {
 		topFrame := v.peekCurrentFrame()

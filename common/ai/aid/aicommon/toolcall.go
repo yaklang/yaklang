@@ -3,6 +3,7 @@ package aicommon
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -714,17 +715,20 @@ func buildNativeToolForParamGen(tool *aitool.Tool) aispec.Tool {
 			"description": "Short snake_case identifier for this tool call",
 		},
 	}
-	if tool.InputSchema.Properties != nil && tool.InputSchema.Properties.Len() > 0 {
-		props["params"] = map[string]any{
-			"type":        "object",
-			"description": "Tool parameters",
-			"properties":  tool.InputSchema.Properties,
-			"required":    tool.InputSchema.Required,
-		}
+	paramSchema := map[string]any{
+		"type":        "object",
+		"description": "Tool parameters",
 	}
+	if tool.InputSchema.Properties != nil && tool.InputSchema.Properties.Len() > 0 {
+		paramSchema["properties"] = tool.InputSchema.Properties
+	}
+	if len(tool.InputSchema.Required) > 0 {
+		paramSchema["required"] = tool.InputSchema.Required
+	}
+	props["params"] = paramSchema
 	props["call_expectations"] = map[string]any{
 		"type":        "string",
-			"description": "Expected duration, success criteria, and exception handling",
+		"description": "Expected duration, success criteria, and exception handling",
 	}
 
 	params := map[string]any{
@@ -1040,6 +1044,19 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
 			return nil, err
 		}
+	}
+
+	// Batch children share the task/timeline prompt, but each generates params
+	// for a different invocation. Carry the selected call's intent into R2 so
+	// repeated uses of the same tool do not all target the first task item.
+	if t.reason != "" || t.destinationIdentifier != "" || t.callExpectations != "" {
+		intent, _ := json.Marshal(map[string]string{
+			"tool":              tool.Name,
+			"reason":            t.reason,
+			"identifier":        t.destinationIdentifier,
+			"call_expectations": t.callExpectations,
+		})
+		paramsPrompt += "\n\nGenerate parameters for this specific tool invocation. Use its reason, identifier and expectations to distinguish it from other calls in the task:\n" + string(intent)
 	}
 
 	invokeParams := aitool.InvokeParams{}

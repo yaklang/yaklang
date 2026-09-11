@@ -403,6 +403,10 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 								log.Infof("processing memory flush[%s] for iteration %d with %d pending diffs (%d bytes)", payload.FlushReason, iteration, payload.PendingIterations, payload.PendingBytes)
 							}
 							if err := r.memoryTriage.HandleMemory(payload.ContextualInput); err != nil {
+								if r.config.GetContext().Err() != nil {
+									log.Debugf("memory processing stopped with runtime: %v", err)
+									return
+								}
 								log.Warnf("intelligent memory processing failed: %v", err)
 								return
 							}

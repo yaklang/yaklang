@@ -315,7 +315,8 @@ func TestBuildNativeToolForParamGen_NoProperties(t *testing.T) {
 	_, ok = props["tool"].(map[string]any)
 	require.True(t, ok, "tool field should always exist")
 
-	// params field should NOT exist when tool has no properties
-	_, ok = props["params"]
-	require.False(t, ok, "params field should NOT exist when tool has no InputSchema properties")
+	// The protocol always requires params; a parameterless tool accepts {}.
+	paramsField, ok := props["params"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "object", paramsField["type"])
 }

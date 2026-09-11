@@ -106,6 +106,9 @@ func newTool(name string, options ...ToolOption) *Tool {
 	for _, option := range options {
 		option(tool)
 	}
+	// Multiple actions may contribute the same property (e.g. pattern in
+	// find_files and grep_text). JSON Schema requires unique required names.
+	tool.InputSchema.Required = utils.RemoveRepeatStringSlice(tool.InputSchema.Required)
 
 	return tool
 }
@@ -684,7 +687,9 @@ func WithOneOfStructParam(name string, opts []PropertyOption, itemsOpt ...[]Tool
 		temp := newTool("", itemOpt...)
 		m := map[string]any{
 			"properties": temp.InputSchema.Properties,
-			"required":   temp.InputSchema.Required,
+		}
+		if len(temp.InputSchema.Required) > 0 {
+			m["required"] = temp.InputSchema.Required
 		}
 		oneOfArray = append(oneOfArray, m)
 	}
@@ -702,7 +707,9 @@ func WithAnyOfStructParam(name string, opts []PropertyOption, itemsOpt ...[]Tool
 		temp := newTool("", itemOpt...)
 		m := map[string]any{
 			"properties": temp.InputSchema.Properties,
-			"required":   temp.InputSchema.Required,
+		}
+		if len(temp.InputSchema.Required) > 0 {
+			m["required"] = temp.InputSchema.Required
 		}
 		anyOfArray = append(anyOfArray, m)
 	}
@@ -884,15 +891,19 @@ func (t *Tool) ToJSONSchema() *omap.OrderedMap[string, any] {
 	})
 
 	paramProperties := t.Tool.InputSchema.Properties
-	// 将参数添加到params字段 (第三个)
-	if paramProperties != nil && paramProperties.Len() > 0 {
-		properties.Set("params", map[string]any{
-			"type":        "object",
-			"description": "工具的参数",
-			"properties":  paramProperties,
-			"required":    t.InputSchema.Required,
-		})
+	// params is required even for parameterless tools. An optional-only tool
+	// must omit required rather than serialize a nil slice as JSON null.
+	paramsSchema := map[string]any{
+		"type":        "object",
+		"description": "工具的参数",
 	}
+	if paramProperties != nil && paramProperties.Len() > 0 {
+		paramsSchema["properties"] = paramProperties
+	}
+	if len(t.InputSchema.Required) > 0 {
+		paramsSchema["required"] = t.InputSchema.Required
+	}
+	properties.Set("params", paramsSchema)
 
 	// 构建最终的JSON Schema - 使用 OrderedMap 保证顺序
 	schema := omap.NewEmptyOrderedMap[string, any]()
