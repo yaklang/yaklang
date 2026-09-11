@@ -20,6 +20,23 @@ type imRuntimeStub struct {
 	connection *imConnectionStub
 }
 
+type imRuntimeProviderStub struct {
+	mu      sync.Mutex
+	runtime sessionruntime.ReActSessionRuntime
+}
+
+func (p *imRuntimeProviderStub) Runtime() sessionruntime.ReActSessionRuntime {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.runtime
+}
+
+func (p *imRuntimeProviderStub) Bind(runtime sessionruntime.ReActSessionRuntime) {
+	p.mu.Lock()
+	p.runtime = runtime
+	p.mu.Unlock()
+}
+
 func (r *imRuntimeStub) Connect(_ context.Context, req sessionruntime.ConnectRequest, onEvent sessionruntime.ReActEventHandler) (sessionruntime.ReActConnection, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -53,7 +70,7 @@ func (c *imConnectionStub) CreatedRuntime() bool  { return true }
 func TestIMAIReActBackendUsesSessionRuntimeDirectly(t *testing.T) {
 	connection := &imConnectionStub{done: make(chan struct{})}
 	runtime := &imRuntimeStub{connection: connection}
-	backend := &imAIReActBackend{runtime: runtime}
+	backend := &imAIReActBackend{runtimeProvider: &imRuntimeProviderStub{runtime: runtime}}
 
 	// Preserve the former in-process stream contract: Send only admits the
 	// message; an invalid first message terminates the actor and is observed by
@@ -102,5 +119,55 @@ func TestIMAIReActBackendUsesSessionRuntimeDirectly(t *testing.T) {
 	case <-connection.Done():
 	case <-time.After(time.Second):
 		t.Fatal("closing the IM stream did not close its runtime connection")
+	}
+}
+
+func TestIMAIReActBackendResolvesRuntimeAfterProjectBind(t *testing.T) {
+	firstConnection := &imConnectionStub{done: make(chan struct{})}
+	firstRuntime := &imRuntimeStub{connection: firstConnection}
+	provider := &imRuntimeProviderStub{runtime: firstRuntime}
+	backend := &imAIReActBackend{runtimeProvider: provider}
+
+	firstStream, err := backend.StartAIReAct(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, firstStream.Send(&ypb.AIInputEvent{
+		IsStart: true,
+		Params:  &ypb.AIStartParams{TimelineSessionID: "im-before-project-bind"},
+	}))
+	require.Eventually(t, func() bool {
+		firstRuntime.mu.Lock()
+		defer firstRuntime.mu.Unlock()
+		return len(firstRuntime.requests) == 1
+	}, time.Second, 10*time.Millisecond)
+
+	// The process-level Service keeps the same identity across a project switch,
+	// but BindProject installs a fresh project-scoped Runtime behind it.
+	secondConnection := &imConnectionStub{done: make(chan struct{})}
+	secondRuntime := &imRuntimeStub{connection: secondConnection}
+	provider.Bind(secondRuntime)
+
+	secondStream, err := backend.StartAIReAct(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, secondStream.Send(&ypb.AIInputEvent{
+		IsStart: true,
+		Params:  &ypb.AIStartParams{TimelineSessionID: "im-after-project-bind"},
+	}))
+	require.Eventually(t, func() bool {
+		secondRuntime.mu.Lock()
+		defer secondRuntime.mu.Unlock()
+		return len(secondRuntime.requests) == 1
+	}, time.Second, 10*time.Millisecond)
+
+	firstRuntime.mu.Lock()
+	require.Len(t, firstRuntime.requests, 1, "new IM streams must not reuse the retired project Runtime")
+	firstRuntime.mu.Unlock()
+	require.NoError(t, firstStream.CloseSend())
+	require.NoError(t, secondStream.CloseSend())
+	for _, connection := range []*imConnectionStub{firstConnection, secondConnection} {
+		select {
+		case <-connection.Done():
+		case <-time.After(time.Second):
+			t.Fatal("closing an IM stream did not release its project Runtime connection")
+		}
 	}
 }

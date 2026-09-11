@@ -15,7 +15,15 @@ import (
 )
 
 type imAIReActBackend struct {
-	runtime sessionruntime.ReActSessionRuntime
+	runtimeProvider reActSessionRuntimeProvider
+}
+
+// reActSessionRuntimeProvider is the stable process/project service boundary
+// used by IM. A project switch replaces the project-scoped Runtime inside the
+// provider, so each newly opened IM stream must resolve it at start time rather
+// than retaining a stale Runtime from StartIMControl.
+type reActSessionRuntimeProvider interface {
+	Runtime() sessionruntime.ReActSessionRuntime
 }
 
 // StartAIReAct retains IM's asynchronous stream contract while routing the
@@ -23,14 +31,18 @@ type imAIReActBackend struct {
 // and terminal error delivery match the former in-process gRPC bridge, without
 // constructing a fake ypb.Yak_StartAIReActServer.
 func (b *imAIReActBackend) StartAIReAct(ctx context.Context) (imcontrol.AIReActStream, error) {
-	if b == nil || b.runtime == nil {
+	if b == nil || b.runtimeProvider == nil {
+		return nil, fmt.Errorf("AI ReAct session runtime is not configured")
+	}
+	runtime := b.runtimeProvider.Runtime()
+	if runtime == nil {
 		return nil, fmt.Errorf("AI ReAct session runtime is not configured")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	stream := &imReActRuntimeStream{
 		ctx:       ctx,
 		cancel:    cancel,
-		runtime:   b.runtime,
+		runtime:   runtime,
 		toRuntime: make(chan *ypb.AIInputEvent, 32),
 		fromSrv:   make(chan *ypb.AIOutputEvent, 128),
 		done:      make(chan error, 1),
