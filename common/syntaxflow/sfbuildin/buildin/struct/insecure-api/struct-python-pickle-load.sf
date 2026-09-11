@@ -16,14 +16,18 @@ SOLUTION
 	alert_min: 1
 	"file://ser.py": <<<POS
 import pickle
-obj = pickle.loads(data)
+def load(data):
+    return pickle.loads(data)
 POS
 	"safefile://ser-safe.py": <<<NEG
 import json
-obj = json.loads(data)
+def load(data):
+    return json.loads(data)
 NEG
 )
 
+pickle.loads as $call
+pickle.load as $call
 pickle.loads(* as $arg) as $call
 pickle.load(* as $arg) as $call
 alert $call for {

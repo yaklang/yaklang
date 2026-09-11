@@ -44,7 +44,19 @@ func (s *structScanRuntime) wantsScan() bool {
 	if s == nil {
 		return false
 	}
-	return s.enableBuiltin || len(s.extraDirs) > 0 || len(s.extraRaw) > 0 || len(s.rules) > 0
+	return s.enableBuiltin || len(s.extraDirs) > 0 || len(s.extraRaw) > 0 || hasExplicitStructRules(s)
+}
+
+func hasExplicitStructRules(s *structScanRuntime) bool {
+	if s == nil {
+		return false
+	}
+	for _, rule := range s.rules {
+		if rule != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Config) prepareStructScan(plan *UnitPlan) error {
@@ -53,7 +65,7 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 	}
 	s := c.structScan
 	if s.riskCB != nil && !s.wantsScan() {
-		return utils.Errorf("withStructRuleCallback requires withStructRule(true) or withStructRuleDir/Raw")
+		return utils.Errorf("withStructRuleCallback requires withStructRule(true|rule) or withStructRuleDir/Raw")
 	}
 	if !s.wantsScan() {
 		return nil
@@ -69,10 +81,14 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 	}
 	if plan != nil && len(plan.Units) == 1 {
 		if _, ok := plan.Units["unit:all"]; ok {
-			s.skipped = true
-			s.skipReason = "unit:all fallback"
-			log.Warnf("[struct_scan] skipped: %s", s.skipReason)
-			return nil
+			// Builtin whole-program fallback has no package boundary.
+			// Explicit withStructRule(rule)/Raw still scans that single unit.
+			if s.enableBuiltin && len(s.extraRaw) == 0 && len(s.extraDirs) == 0 && !hasExplicitStructRules(s) {
+				s.skipped = true
+				s.skipReason = "unit:all fallback"
+				log.Warnf("[struct_scan] skipped: %s", s.skipReason)
+				return nil
+			}
 		}
 	}
 	if err := s.resolveRules(); err != nil {
@@ -305,6 +321,13 @@ func (p *Program) StructScanErrors() []error {
 		return nil
 	}
 	return p.config.structScan.errs
+}
+
+func (p *Program) StructScanResults() []*SyntaxFlowResult {
+	if p == nil || p.config == nil || p.config.structScan == nil {
+		return nil
+	}
+	return p.config.structScan.results
 }
 
 func (p *Program) StructScanTaskID() string {

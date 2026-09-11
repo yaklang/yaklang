@@ -22,6 +22,7 @@ function run(code) { return JSON.parse(code); }
 NEG
 )
 
+eval as $call
 eval(* as $arg) as $call
 alert $call for {
 	level: "high",

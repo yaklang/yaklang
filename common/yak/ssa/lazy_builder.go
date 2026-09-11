@@ -175,7 +175,30 @@ func (prog *Program) LazyBuildForUnits(unitKeys []string) {
 			continue
 		}
 		seen[lib] = struct{}{}
-		lib.drainLazyBuilders()
+		drainProgramLazy(lib)
+		if libraryNameFromCompileUnitKey(key) == "" && lib.UpStream != nil {
+			lib.UpStream.ForEach(func(_ string, child *Program) bool {
+				if child == nil {
+					return true
+				}
+				if _, ok := seen[child]; ok {
+					return true
+				}
+				seen[child] = struct{}{}
+				drainProgramLazy(child)
+				return true
+			})
+		}
+	}
+}
+
+func drainProgramLazy(p *Program) {
+	if p == nil {
+		return
+	}
+	p.drainLazyBuilders()
+	for _, f := range p.fixImportCallback {
+		f()
 	}
 }
 
