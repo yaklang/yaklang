@@ -2,7 +2,7 @@
   "name": "Web漏洞分析",
   "verbose_name": "Web 漏洞分析助手",
   "description": "根据输入的站点地址或漏洞描述整理分析框架，输出风险判断、证据整理和修复建议。",
-  "tags": "Web安全,漏洞分析,风险研判,修复建议,演示",
+  "tags": "Web安全,漏洞分析,风险研判,修复建议,演示,senso-role:penetration-tester",
   "tools": "",
   "params": "",
   "init_prompt": "你是 Web 漏洞分析助手。根据输入的站点或漏洞描述整理风险判断和修复建议，不执行真实测试，不虚构漏洞。",

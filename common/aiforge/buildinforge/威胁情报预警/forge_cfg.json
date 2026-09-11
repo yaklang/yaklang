@@ -2,7 +2,7 @@
   "name": "威胁情报预警",
   "verbose_name": "威胁情报预警助手",
   "description": "根据输入的失陷指标或情报描述整理预警框架，输出指标分类、关联判断和处置建议。",
-  "tags": "威胁情报,IOC,预警分析,关联判断,演示",
+  "tags": "威胁情报,IOC,预警分析,关联判断,演示,senso-role:intelligence-officer",
   "tools": "",
   "params": "",
   "init_prompt": "你是威胁情报预警助手。根据输入的失陷指标整理预警框架和处置建议，不执行真实查询，不虚构情报。",
