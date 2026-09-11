@@ -42,6 +42,7 @@ import (
 	systemLog "log"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
 	"github.com/yaklang/yaklang/common/consts"
 	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel"
@@ -971,8 +972,11 @@ var startGRPCServerCommand = cli.Command{
 				}
 			}()
 		}
-		s.StartAIReActScheduler()
-		defer s.StopAIReActScheduler()
+		// Scheduled ReAct is an engine-process service. The gRPC Server below is
+		// only one adapter to it and does not own its lifecycle.
+		reActService := reactservice.Default()
+		reActService.StartScheduler()
+		defer reActService.StopScheduler()
 
 		actualAddress := lis.Addr().String()
 		instanceId := utils.RandStringBytes(8)

@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc/metadata"
@@ -172,7 +173,7 @@ func TestStartAIReActReturnsWhenRuntimeConnectionStops(t *testing.T) {
 	defer cancel()
 	connection := &imConnectionStub{done: make(chan struct{})}
 	runtime := &imRuntimeStub{connection: connection}
-	server := &Server{reActRuntime: runtime}
+	server := &Server{reActService: reactservice.New(nil, reactservice.WithRuntime(runtime))}
 	stream := newCancelableAIReActServerStream(ctx, &ypb.AIInputEvent{
 		IsStart: true,
 		Params:  &ypb.AIStartParams{TimelineSessionID: "runtime-stopped"},

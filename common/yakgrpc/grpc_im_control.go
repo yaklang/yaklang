@@ -52,7 +52,7 @@ func (s *Server) StartIMControl(ctx context.Context, req *ypb.StartIMControlRequ
 		PlatformConfigs:           buildIMRuntimePlatformConfigs(req.GetPlatformConfigs()),
 	}
 	engine := imcontrol.New(cfg)
-	engine.SetAIBackend(&imAIReActBackend{server: s}, s)
+	engine.SetAIBackend(&imAIReActBackend{runtime: s.getReActSessionRuntime()}, s)
 	if err := engine.Start(); err != nil {
 		log.Errorf("start im engine failed: %v", err)
 		signalIMEngineLifecycleLocked()
