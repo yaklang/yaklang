@@ -2,14 +2,16 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/sessionruntime"
+	"github.com/yaklang/yaklang/common/ai/aid/aireactscheduler"
 	"github.com/yaklang/yaklang/common/ai/aid/aischedule"
+	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -17,11 +19,11 @@ import (
 )
 
 type connectOverrideRuntime struct {
-	ReActSessionRuntime
-	connect func(context.Context, ConnectRequest, ReActEventHandler) (ReActConnection, error)
+	sessionruntime.ReActSessionRuntime
+	connect func(context.Context, sessionruntime.ConnectRequest, sessionruntime.ReActEventHandler) (sessionruntime.ReActConnection, error)
 }
 
-func (r *connectOverrideRuntime) Connect(ctx context.Context, req ConnectRequest, onEvent ReActEventHandler) (ReActConnection, error) {
+func (r *connectOverrideRuntime) Connect(ctx context.Context, req sessionruntime.ConnectRequest, onEvent sessionruntime.ReActEventHandler) (sessionruntime.ReActConnection, error) {
 	return r.connect(ctx, req, onEvent)
 }
 
@@ -109,8 +111,8 @@ func TestAIReActScheduleSupportsBothSessionTargets(t *testing.T) {
 	require.Equal(t, "busy-user-session", record.TargetSessionID)
 
 	const runUUID = "17ea0eb4-acde-40c1-965e-3661c62347f2"
-	require.Equal(t, "busy-user-session", scheduleExecutionSessionID(record, runUUID))
-	require.Equal(t, "ai-schedule-"+runUUID, scheduleExecutionSessionID(&schema.AIReActSchedule{
+	require.Equal(t, "busy-user-session", aireactscheduler.ScheduleExecutionSessionID(record, runUUID))
+	require.Equal(t, "ai-schedule-"+runUUID, aireactscheduler.ScheduleExecutionSessionID(&schema.AIReActSchedule{
 		TargetMode: schema.AIReActScheduleTargetNewSession,
 	}, runUUID))
 }
@@ -126,16 +128,15 @@ func TestPrepareIsolatedScheduleSessionIsImmediatelyQueryable(t *testing.T) {
 		TargetMode: schema.AIReActScheduleTargetNewSession,
 	}
 
-	require.NoError(t, prepareIsolatedScheduleSession(
+	require.NoError(t, aireactscheduler.PrepareIsolatedScheduleSession(
 		server.GetProjectDatabase(),
 		schedule,
 		params,
 		sessionID,
 		startedAt,
 	))
-	manager := newAIReActScheduler(server, server.GetProjectDatabase())
-	server.aiReActScheduler = manager
-	reservation, err := manager.runtime.ReserveSession(context.Background(), sessionID, "running-execution")
+	runtime := server.getReActSessionRuntime()
+	reservation, err := runtime.ReserveSession(context.Background(), sessionID, "running-execution")
 	require.NoError(t, err)
 
 	response, err := server.QueryAISession(context.Background(), &ypb.QueryAISessionRequest{
@@ -173,7 +174,7 @@ func TestContinueSessionScheduleKeepsChatReviewPolicy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	params, err := scheduleRunStartParams(server.GetProjectDatabase(), &schema.AIReActSchedule{
+	params, err := aireactscheduler.ScheduleRunStartParams(server.GetProjectDatabase(), &schema.AIReActSchedule{
 		TargetMode:      schema.AIReActScheduleTargetContinueSession,
 		TargetSessionID: sessionID,
 	}, &ypb.AIStartParams{ReviewPolicy: "yolo"})
@@ -183,7 +184,7 @@ func TestContinueSessionScheduleKeepsChatReviewPolicy(t *testing.T) {
 	require.False(t, params.GetAttach())
 	require.False(t, params.GetPreferSessionCachedConfig())
 
-	isolated, err := scheduleRunStartParams(server.GetProjectDatabase(), &schema.AIReActSchedule{
+	isolated, err := aireactscheduler.ScheduleRunStartParams(server.GetProjectDatabase(), &schema.AIReActSchedule{
 		TargetMode: schema.AIReActScheduleTargetNewSession,
 	}, &ypb.AIStartParams{ReviewPolicy: "manual"})
 	require.NoError(t, err)
@@ -200,43 +201,6 @@ func TestPreviewAIReActScheduleTimes(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, response.GetTimestamps(), 3)
 	require.Equal(t, start.Unix(), response.GetTimestamps()[0])
-}
-
-func TestAIReActSchedulerSkipsMisfireAndAdvances(t *testing.T) {
-	server := newScheduleTestServer(t)
-	now := time.Now().UTC().Truncate(time.Second)
-	due := now.Add(-10 * time.Minute)
-	schedule := &schema.AIReActSchedule{
-		UUID:                  "misfire-schedule",
-		Name:                  "misfire",
-		Status:                schema.AIReActScheduleStatusActive,
-		TargetMode:            schema.AIReActScheduleTargetNewSession,
-		Prompt:                "test",
-		StartParams:           `{}`,
-		AttachedResourceInfos: `[]`,
-		RRule:                 "RRULE:FREQ=HOURLY;INTERVAL=1",
-		Timezone:              "UTC",
-		StartAt:               now.Add(-time.Hour),
-		NextRunAt:             &due,
-		MisfireGraceSeconds:   1,
-		MaxRuntimeSeconds:     60,
-	}
-	require.NoError(t, server.GetProjectDatabase().Create(schedule).Error)
-	manager := newAIReActScheduler(server, server.GetProjectDatabase())
-	defer manager.cancel()
-	manager.dispatchDue()
-
-	manager.jobsMu.Lock()
-	require.Empty(t, manager.jobs)
-	require.Empty(t, manager.activeBySchedule)
-	manager.jobsMu.Unlock()
-
-	updated, err := getAIReActScheduleRecord(server.GetProjectDatabase(), schedule.UUID)
-	require.NoError(t, err)
-	require.NotNil(t, updated.NextRunAt)
-	require.True(t, updated.NextRunAt.After(now))
-	require.Equal(t, scheduledOutcomeSkipped, updated.LastOutcome)
-	require.Equal(t, "misfire", updated.LastSkipReason)
 }
 
 func TestAIReActScheduleFiltersAndSessionLifecycle(t *testing.T) {
@@ -276,103 +240,6 @@ func TestAIReActScheduleFiltersAndSessionLifecycle(t *testing.T) {
 	require.Equal(t, schema.AIReActScheduleTargetNewSession, remaining.TargetMode)
 }
 
-func TestAIReActSchedulerSkipsAtTriggerBoundary(t *testing.T) {
-	server := newScheduleTestServer(t)
-	manager := newAIReActScheduler(server, server.GetProjectDatabase())
-	defer manager.cancel()
-	const sessionID = "starting-user-session"
-	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(server.GetProjectDatabase(), sessionID, &ypb.AIStartParams{})
-	require.NoError(t, err)
-	reservation, err := manager.runtime.ReserveSession(context.Background(), sessionID, "frontend-start")
-	require.NoError(t, err)
-	defer reservation.Release()
-
-	schedule := &schema.AIReActSchedule{
-		UUID: "busy-boundary", TargetMode: schema.AIReActScheduleTargetContinueSession, TargetSessionID: sessionID,
-		Status: schema.AIReActScheduleStatusActive,
-	}
-	require.NoError(t, server.GetProjectDatabase().Create(schedule).Error)
-	err = manager.enqueue(schedule, time.Now(), aiReActScheduleTriggerSchedule)
-	var skip *scheduleEnqueueError
-	require.ErrorAs(t, err, &skip)
-	require.Equal(t, "session_busy", skip.reason)
-	require.Empty(t, manager.jobs)
-}
-
-func TestAIReActSchedulerUsesBoundedParallelCapacity(t *testing.T) {
-	server := newScheduleTestServer(t)
-	manager := newAIReActScheduler(server, server.GetProjectDatabase())
-	defer manager.cancel()
-	for i := 0; i < aiReActScheduleMaxConcurrent; i++ {
-		manager.worker <- struct{}{}
-	}
-	schedule := &schema.AIReActSchedule{
-		UUID: "over-capacity", TargetMode: schema.AIReActScheduleTargetNewSession,
-		Status: schema.AIReActScheduleStatusActive,
-	}
-	require.NoError(t, server.GetProjectDatabase().Create(schedule).Error)
-	err := manager.enqueue(schedule, time.Now(), aiReActScheduleTriggerSchedule)
-	var skip *scheduleEnqueueError
-	require.ErrorAs(t, err, &skip)
-	require.Equal(t, "scheduler_capacity", skip.reason)
-}
-
-func TestAIReActSchedulerRejectsEnqueueAfterStop(t *testing.T) {
-	server := newScheduleTestServer(t)
-	manager := newAIReActScheduler(server, server.GetProjectDatabase())
-	manager.cancel()
-
-	schedule, err := buildScheduleRecord(validScheduleRequest(time.Now().Add(time.Hour)).GetSchedule(), nil)
-	require.NoError(t, err)
-	require.NoError(t, server.GetProjectDatabase().Create(schedule).Error)
-	err = manager.enqueue(schedule, time.Now(), aiReActScheduleTriggerSchedule)
-	require.ErrorIs(t, err, context.Canceled)
-	require.Empty(t, manager.jobs)
-	require.Empty(t, manager.activeBySchedule)
-	require.Empty(t, manager.worker)
-}
-
-func TestScheduledReActRuntimeErrorPreservesContextClassification(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	outcome := scheduledReActRuntimeError(ctx, context.Canceled)
-	require.Empty(t, outcome.status)
-	require.Empty(t, outcome.errorMessage)
-
-	outcome = scheduledReActRuntimeError(context.Background(), context.Canceled)
-	require.Equal(t, scheduledOutcomeFailed, outcome.status)
-	require.ErrorContains(t, context.Canceled, outcome.errorMessage)
-}
-
-func TestAIReActSchedulerCancelsActiveExecutionInMemory(t *testing.T) {
-	server := newScheduleTestServer(t)
-	manager := newAIReActScheduler(server, server.GetProjectDatabase())
-	defer manager.cancel()
-
-	jobCtx, cancel := context.WithCancel(manager.ctx)
-	reservation, err := manager.runtime.ReserveSession(jobCtx, "ai-schedule-active-execution", "active-execution")
-	require.NoError(t, err)
-	job := &scheduledReActJob{
-		executionID:  "active-execution",
-		scheduleUUID: "schedule",
-		sessionID:    "ai-schedule-active-execution",
-		ctx:          reservation.Context(),
-		cancel:       cancel,
-		reservation:  reservation,
-		done:         make(chan struct{}),
-	}
-	manager.jobs[job.executionID] = job
-	manager.activeBySchedule[job.scheduleUUID] = job.executionID
-	require.True(t, manager.runtime.IsSessionBusy(job.sessionID))
-
-	manager.cancelSchedule(job.scheduleUUID)
-	require.Eventually(t, func() bool { return job.ctx.Err() == context.Canceled }, time.Second, 10*time.Millisecond)
-	manager.unregisterJob(job)
-	require.Empty(t, manager.jobs)
-	require.Empty(t, manager.activeBySchedule)
-	require.False(t, manager.runtime.IsSessionBusy(job.sessionID))
-}
-
 func TestDeleteRunningScheduleSessionReleasesBeforeRunNow(t *testing.T) {
 	server := newScheduleTestServer(t)
 	db := server.GetProjectDatabase()
@@ -384,7 +251,6 @@ func TestDeleteRunningScheduleSessionReleasesBeforeRunNow(t *testing.T) {
 		&schema.AISessionPlanAndExec{},
 	).Error)
 
-	manager := newAIReActScheduler(server, db)
 	executionCancelled := make(chan struct{})
 	allowShutdown := make(chan struct{})
 	var cancellationReported atomic.Bool
@@ -395,8 +261,9 @@ func TestDeleteRunningScheduleSessionReleasesBeforeRunNow(t *testing.T) {
 		}
 	}
 	defer releaseShutdown()
-	overrideRuntime := &connectOverrideRuntime{ReActSessionRuntime: manager.runtime}
-	overrideRuntime.connect = func(ctx context.Context, _ ConnectRequest, _ ReActEventHandler) (ReActConnection, error) {
+	baseRuntime := sessionruntime.New(server.GetProjectDatabase)
+	overrideRuntime := &connectOverrideRuntime{ReActSessionRuntime: baseRuntime}
+	overrideRuntime.connect = func(ctx context.Context, _ sessionruntime.ConnectRequest, _ sessionruntime.ReActEventHandler) (sessionruntime.ReActConnection, error) {
 		<-ctx.Done()
 		if cancellationReported.CompareAndSwap(false, true) {
 			close(executionCancelled)
@@ -404,34 +271,31 @@ func TestDeleteRunningScheduleSessionReleasesBeforeRunNow(t *testing.T) {
 		<-allowShutdown
 		return nil, ctx.Err()
 	}
-	manager.runtime = overrideRuntime
-	server.reActRuntime = overrideRuntime
-	server.aiReActSchedulerMu.Lock()
-	server.aiReActScheduler = manager
-	server.aiReActSchedulerMu.Unlock()
+	service := reactservice.New(server.GetProjectDatabase, reactservice.WithRuntime(overrideRuntime))
+	server.reActService = service
+	service.StartScheduler()
+	defer service.StopScheduler()
 
 	created, err := server.CreateAIReActSchedule(context.Background(), validScheduleRequest(time.Now().Add(time.Hour)))
 	require.NoError(t, err)
 	_, err = server.RunAIReActScheduleNow(context.Background(), &ypb.RunAIReActScheduleNowRequest{UUID: created.GetUUID()})
 	require.NoError(t, err)
 
-	var firstJob *scheduledReActJob
+	var firstJob aireactscheduler.ActiveExecution
 	require.Eventually(t, func() bool {
-		manager.jobsMu.Lock()
-		defer manager.jobsMu.Unlock()
-		executionID := manager.activeBySchedule[created.GetUUID()]
-		firstJob = manager.jobs[executionID]
-		return firstJob != nil
+		var ok bool
+		firstJob, ok = service.ActiveExecution(created.GetUUID())
+		return ok
 	}, time.Second, 10*time.Millisecond)
 	require.Eventually(t, func() bool {
-		_, queryErr := yakit.GetAISessionMetaBySessionID(db, firstJob.sessionID)
+		_, queryErr := yakit.GetAISessionMetaBySessionID(db, firstJob.SessionID)
 		return queryErr == nil
 	}, time.Second, 10*time.Millisecond)
 
 	deleteDone := make(chan error, 1)
 	go func() {
 		_, deleteErr := server.DeleteAISession(context.Background(), &ypb.DeleteAISessionRequest{
-			Filter: &ypb.DeleteAISessionFilter{SessionID: []string{firstJob.sessionID}},
+			Filter: &ypb.DeleteAISessionFilter{SessionID: []string{firstJob.SessionID}},
 		})
 		deleteDone <- deleteErr
 	}()
@@ -454,74 +318,28 @@ func TestDeleteRunningScheduleSessionReleasesBeforeRunNow(t *testing.T) {
 		t.Fatal("DeleteAISession did not finish after scheduler shutdown")
 	}
 	select {
-	case <-firstJob.done:
+	case <-firstJob.Done:
 	default:
 		t.Fatal("DeleteAISession returned before the scheduler job unregistered")
 	}
-	manager.jobsMu.Lock()
-	require.NotContains(t, manager.jobs, firstJob.executionID)
-	require.NotContains(t, manager.activeBySchedule, created.GetUUID())
-	manager.jobsMu.Unlock()
-	require.False(t, manager.runtime.IsSessionBusy(firstJob.sessionID))
+	_, active := service.ActiveExecution(created.GetUUID())
+	require.False(t, active)
+	require.False(t, baseRuntime.IsSessionBusy(firstJob.SessionID))
 
 	// Reproduce the UI sequence from the bug report: delete the running
 	// independent session and immediately run the same schedule again.
 	_, err = server.RunAIReActScheduleNow(context.Background(), &ypb.RunAIReActScheduleNowRequest{UUID: created.GetUUID()})
 	require.NoError(t, err)
-	var secondJob *scheduledReActJob
+	var secondJob aireactscheduler.ActiveExecution
 	require.Eventually(t, func() bool {
-		manager.jobsMu.Lock()
-		defer manager.jobsMu.Unlock()
-		executionID := manager.activeBySchedule[created.GetUUID()]
-		secondJob = manager.jobs[executionID]
-		return secondJob != nil && secondJob.executionID != firstJob.executionID
+		var ok bool
+		secondJob, ok = service.ActiveExecution(created.GetUUID())
+		return ok && secondJob.ExecutionID != firstJob.ExecutionID
 	}, time.Second, 10*time.Millisecond)
-	manager.cancelSchedule(created.GetUUID())
+	service.CancelSchedule(created.GetUUID())
 	select {
-	case <-secondJob.done:
+	case <-secondJob.Done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("replacement scheduled execution did not stop")
 	}
-}
-
-func TestScheduleAttentionWaitsForActualAIEscalation(t *testing.T) {
-	pending := make(map[string]struct{})
-	reviewRequest := &ypb.AIOutputEvent{
-		Type:    string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE),
-		Content: json.RawMessage(`{"id":"review-1"}`),
-	}
-	attention, _ := scheduleAttentionForEvent(reviewRequest, true, pending)
-	require.False(t, attention, "starting AI review must not pause a scheduled run")
-	require.Contains(t, pending, "review-1")
-
-	autoApproved := &ypb.AIOutputEvent{
-		Type:    string(schema.EVENT_TYPE_AI_REVIEW_END),
-		Content: json.RawMessage(`{"interactive_id":"review-1","level":"low","requires_user":false}`),
-	}
-	attention, _ = scheduleAttentionForEvent(autoApproved, true, pending)
-	require.False(t, attention, "low-risk AI review should continue unattended")
-	require.NotContains(t, pending, "review-1")
-
-	attention, _ = scheduleAttentionForEvent(&ypb.AIOutputEvent{
-		Type:    string(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE),
-		Content: json.RawMessage(`{"id":"review-2"}`),
-	}, true, pending)
-	require.False(t, attention)
-
-	attention, message := scheduleAttentionForEvent(&ypb.AIOutputEvent{
-		Type: string(schema.EVENT_TYPE_AI_REVIEW_END),
-		Content: json.RawMessage(
-			`{"interactive_id":"review-2","level":"high","requires_user":true,"reason":"dangerous operation"}`,
-		),
-	}, true, pending)
-	require.True(t, attention, "only an explicit high-risk escalation should need the user")
-	require.Contains(t, message, "dangerous operation")
-}
-
-func TestScheduleAttentionForExplicitUserInteraction(t *testing.T) {
-	attention, message := scheduleAttentionForEvent(&ypb.AIOutputEvent{
-		Type: string(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE),
-	}, true, make(map[string]struct{}))
-	require.True(t, attention)
-	require.Contains(t, message, "user interaction")
 }

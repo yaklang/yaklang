@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
 	"github.com/yaklang/yaklang/common/imcontrol"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -36,14 +37,8 @@ type Server struct {
 	// imEngine 是 IM 远程控制引擎（可选，StartIMControl 启动后非 nil）。
 	imEngine *imcontrol.Engine
 
-	aiReActSchedulerMu sync.Mutex
-	aiReActScheduler   *aiReActScheduler
-
-	reActRuntimeMu sync.Mutex
-	reActRuntime   ReActSessionRuntime
-	// reActRuntimeRetired keeps a quiesced runtime installed while the project
-	// database is closed or changing, so no caller can create against the old DB.
-	reActRuntimeRetired bool
+	reActServiceMu sync.Mutex
+	reActService   *reactservice.Service
 }
 
 type ServerOpts func(config *ServerConfig)

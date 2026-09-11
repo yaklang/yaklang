@@ -1,4 +1,4 @@
-package yakgrpc
+package aireactscheduler
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/sessionruntime"
 	"github.com/yaklang/yaklang/common/ai/aid/aischedule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -23,8 +24,8 @@ const (
 	aiReActSchedulePollInterval  = 30 * time.Second
 	aiReActScheduleMaxConcurrent = 3
 
-	aiReActScheduleTriggerSchedule = "schedule"
-	aiReActScheduleTriggerManual   = "manual"
+	TriggerSchedule = "schedule"
+	TriggerManual   = "manual"
 
 	scheduledOutcomeSucceeded      = "succeeded"
 	scheduledOutcomeFailed         = "failed"
@@ -43,7 +44,7 @@ type scheduledReActJob struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	unregisterExecution func()
-	reservation         SessionReservation
+	reservation         sessionruntime.SessionReservation
 	workerReserved      bool
 	done                chan struct{}
 }
@@ -55,8 +56,8 @@ type scheduleEnqueueError struct {
 
 func (e *scheduleEnqueueError) Error() string { return e.message }
 
-type aiReActScheduler struct {
-	runtime ReActSessionRuntime
+type Scheduler struct {
+	runtime sessionruntime.ReActSessionRuntime
 	db      *gorm.DB
 
 	ctx    context.Context
@@ -64,16 +65,25 @@ type aiReActScheduler struct {
 	wake   chan struct{}
 	worker chan struct{}
 
+	lifecycleMu      sync.Mutex
+	started          bool
 	jobsMu           sync.Mutex
 	jobs             map[string]*scheduledReActJob
 	activeBySchedule map[string]string
 	wg               sync.WaitGroup
 }
 
-func newAIReActScheduler(server *Server, db *gorm.DB) *aiReActScheduler {
+// ActiveExecution is an immutable view of one in-memory scheduled run.
+type ActiveExecution struct {
+	ExecutionID string
+	SessionID   string
+	Done        <-chan struct{}
+}
+
+func NewScheduler(runtime sessionruntime.ReActSessionRuntime, db *gorm.DB) *Scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &aiReActScheduler{
-		runtime:          server.getReActSessionRuntime(),
+	return &Scheduler{
+		runtime:          runtime,
 		db:               db,
 		ctx:              ctx,
 		cancel:           cancel,
@@ -84,86 +94,41 @@ func newAIReActScheduler(server *Server, db *gorm.DB) *aiReActScheduler {
 	}
 }
 
-// StartAIReActScheduler starts the project-scoped scheduler. Task definitions
-// are durable, while active execution state intentionally remains in memory.
-// It is safe to call more than once and is independent of UI streams.
-func (s *Server) StartAIReActScheduler() {
-	s.ensureAIReActScheduler()
-}
-
-func (s *Server) ensureAIReActScheduler() {
-	if s == nil {
+// Start begins the project-scoped polling loop. A Scheduler is started once;
+// callers create a new instance when the active project changes.
+func (m *Scheduler) Start() {
+	if m == nil {
 		return
 	}
-	s.aiReActSchedulerMu.Lock()
-	defer s.aiReActSchedulerMu.Unlock()
-	if s.aiReActScheduler != nil && s.aiReActScheduler.ctx.Err() == nil {
+	m.lifecycleMu.Lock()
+	defer m.lifecycleMu.Unlock()
+	if m.started || m.ctx.Err() != nil {
 		return
 	}
-	manager := newAIReActScheduler(s, s.GetProjectDatabase())
-	s.aiReActScheduler = manager
-	manager.wg.Add(1)
-	go manager.loop()
+	// Add while holding the same lifecycle lock used by Stop. This prevents a
+	// concurrent Stop from observing a zero WaitGroup and returning immediately
+	// before Start publishes the polling goroutine.
+	m.started = true
+	m.wg.Add(1)
+	go m.loop()
 }
 
-// StopAIReActScheduler stops the project-scoped scheduler and waits for its
-// in-memory executions to release their resources.
-func (s *Server) StopAIReActScheduler() {
-	s.stopAIReActScheduler()
-}
-
-func (s *Server) stopAIReActScheduler() {
-	if s == nil {
-		return
-	}
-	s.aiReActSchedulerMu.Lock()
-	manager := s.aiReActScheduler
-	s.aiReActScheduler = nil
-	s.aiReActSchedulerMu.Unlock()
-	if manager != nil {
-		manager.stop()
-	}
-}
-
-func (s *Server) wakeAIReActScheduler() {
-	s.aiReActSchedulerMu.Lock()
-	manager := s.aiReActScheduler
-	s.aiReActSchedulerMu.Unlock()
-	if manager != nil {
-		manager.notify()
-	}
-}
-
-func (s *Server) currentAIReActScheduler() *aiReActScheduler {
-	s.aiReActSchedulerMu.Lock()
-	defer s.aiReActSchedulerMu.Unlock()
-	return s.aiReActScheduler
-}
-
-func (s *Server) enqueueAIReActSchedule(schedule *schema.AIReActSchedule, scheduledAt time.Time, trigger string) error {
-	manager := s.currentAIReActScheduler()
-	if manager == nil {
-		return utils.Error("AI ReAct scheduler is not running")
-	}
-	return manager.enqueue(schedule, scheduledAt, trigger)
-}
-
-func (s *Server) cancelAIReActScheduleExecution(scheduleUUID string) {
-	aischedule.CancelExecution(scheduleUUID)
-	if manager := s.currentAIReActScheduler(); manager != nil {
-		manager.cancelSchedule(scheduleUUID)
-	}
-}
-
-func (m *aiReActScheduler) notify() {
+func (m *Scheduler) Notify() {
 	select {
 	case m.wake <- struct{}{}:
 	default:
 	}
 }
 
-func (m *aiReActScheduler) stop() {
+// Stop waits for the polling loop and all in-memory executions to release
+// their resources.
+func (m *Scheduler) Stop() {
+	if m == nil {
+		return
+	}
+	m.lifecycleMu.Lock()
 	m.cancel()
+	m.lifecycleMu.Unlock()
 	m.jobsMu.Lock()
 	for _, job := range m.jobs {
 		job.cancel()
@@ -172,7 +137,7 @@ func (m *aiReActScheduler) stop() {
 	m.wg.Wait()
 }
 
-func (m *aiReActScheduler) loop() {
+func (m *Scheduler) loop() {
 	defer m.wg.Done()
 	ticker := time.NewTicker(aiReActSchedulePollInterval)
 	defer ticker.Stop()
@@ -187,7 +152,7 @@ func (m *aiReActScheduler) loop() {
 	}
 }
 
-func (m *aiReActScheduler) dispatchDue() {
+func (m *Scheduler) dispatchDue() {
 	if m == nil || m.db == nil || m.ctx.Err() != nil {
 		return
 	}
@@ -217,7 +182,7 @@ func (m *aiReActScheduler) dispatchDue() {
 			m.recordScheduleSkipped(schedule.UUID, "misfire", "scheduled occurrence exceeded its misfire grace period")
 			continue
 		}
-		if err := m.enqueue(schedule, occurrence, aiReActScheduleTriggerSchedule); err != nil {
+		if err := m.Enqueue(schedule, occurrence, TriggerSchedule); err != nil {
 			if skip, ok := err.(*scheduleEnqueueError); ok {
 				if skip.reason != "schedule_inactive" {
 					m.recordScheduleSkipped(schedule.UUID, skip.reason, skip.message)
@@ -230,7 +195,7 @@ func (m *aiReActScheduler) dispatchDue() {
 	}
 }
 
-func (m *aiReActScheduler) advanceSchedule(schedule *schema.AIReActSchedule, occurrence, now time.Time) (bool, error) {
+func (m *Scheduler) advanceSchedule(schedule *schema.AIReActSchedule, occurrence, now time.Time) (bool, error) {
 	rule, err := aischedule.Parse(schedule.RRule, schedule.Timezone, schedule.StartAt)
 	if err != nil {
 		result := m.db.Model(&schema.AIReActSchedule{}).Where("uuid = ? AND status = ?", schedule.UUID, schema.AIReActScheduleStatusActive).Updates(map[string]any{
@@ -255,11 +220,11 @@ func (m *aiReActScheduler) advanceSchedule(schedule *schema.AIReActSchedule, occ
 	return result.RowsAffected > 0, result.Error
 }
 
-func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt time.Time, trigger string) error {
+func (m *Scheduler) Enqueue(schedule *schema.AIReActSchedule, scheduledAt time.Time, trigger string) error {
 	if schedule == nil {
 		return utils.Error("schedule is nil")
 	}
-	if trigger == aiReActScheduleTriggerSchedule {
+	if trigger == TriggerSchedule {
 		latest, err := aischedule.GetRecord(m.db, schedule.UUID)
 		if err != nil {
 			return err
@@ -289,7 +254,7 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 		}
 	}
 	executionID := uuid.NewString()
-	sessionID := scheduleExecutionSessionID(schedule, executionID)
+	sessionID := ScheduleExecutionSessionID(schedule, executionID)
 	jobCtx, cancel := context.WithCancel(m.ctx)
 	job := &scheduledReActJob{
 		executionID:  executionID,
@@ -344,7 +309,7 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 	// its Wait.
 	m.wg.Add(1)
 	m.jobsMu.Unlock()
-	if trigger == aiReActScheduleTriggerManual {
+	if trigger == TriggerManual {
 		if err := m.db.Model(&schema.AIReActSchedule{}).Where("uuid = ?", schedule.UUID).
 			UpdateColumn("last_run_at", scheduledAt.UTC()).Error; err != nil {
 			cancel()
@@ -357,7 +322,7 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 	return nil
 }
 
-func (m *aiReActScheduler) unregisterJob(job *scheduledReActJob) {
+func (m *Scheduler) unregisterJob(job *scheduledReActJob) {
 	if job == nil {
 		return
 	}
@@ -385,7 +350,8 @@ func (m *aiReActScheduler) unregisterJob(job *scheduledReActJob) {
 	}
 }
 
-func (m *aiReActScheduler) cancelSchedule(scheduleUUID string) {
+func (m *Scheduler) CancelSchedule(scheduleUUID string) {
+	aischedule.CancelExecution(scheduleUUID)
 	m.jobsMu.Lock()
 	activeID := m.activeBySchedule[strings.TrimSpace(scheduleUUID)]
 	job := m.jobs[activeID]
@@ -395,6 +361,24 @@ func (m *aiReActScheduler) cancelSchedule(scheduleUUID string) {
 	}
 }
 
+func (m *Scheduler) ActiveExecution(scheduleUUID string) (ActiveExecution, bool) {
+	if m == nil {
+		return ActiveExecution{}, false
+	}
+	m.jobsMu.Lock()
+	defer m.jobsMu.Unlock()
+	activeID := m.activeBySchedule[strings.TrimSpace(scheduleUUID)]
+	job := m.jobs[activeID]
+	if job == nil {
+		return ActiveExecution{}, false
+	}
+	return ActiveExecution{
+		ExecutionID: job.executionID,
+		SessionID:   job.sessionID,
+		Done:        job.done,
+	}, true
+}
+
 type scheduledReActOutcome struct {
 	status       string
 	errorMessage string
@@ -402,7 +386,7 @@ type scheduledReActOutcome struct {
 	reactTaskID  string
 }
 
-func (m *aiReActScheduler) execute(job *scheduledReActJob) {
+func (m *Scheduler) execute(job *scheduledReActJob) {
 	defer m.wg.Done()
 	defer func() {
 		job.cancel()
@@ -410,7 +394,7 @@ func (m *aiReActScheduler) execute(job *scheduledReActJob) {
 		yakit.BroadcastAISessionChanged(yakit.AISessionPushActionFinished, job.sessionID)
 	}()
 
-	schedule, err := getAIReActScheduleRecord(m.db, job.scheduleUUID)
+	schedule, err := aischedule.GetRecord(m.db, job.scheduleUUID)
 	if err != nil {
 		log.Infof("scheduled AI ReAct execution %s ended before start: %v", job.executionID, err)
 		return
@@ -425,13 +409,13 @@ func (m *aiReActScheduler) execute(job *scheduledReActJob) {
 	}).Error
 	maxRuntime := schedule.MaxRuntimeSeconds
 	if maxRuntime <= 0 {
-		maxRuntime = defaultAIReActScheduleRuntime
+		maxRuntime = aischedule.DefaultMaxRuntime
 	}
 	runCtx, runCancel := context.WithTimeout(job.ctx, time.Duration(maxRuntime)*time.Second)
 	defer runCancel()
 	sessionID := job.sessionID
 	if sessionID == "" {
-		sessionID = scheduleExecutionSessionID(schedule, job.executionID)
+		sessionID = ScheduleExecutionSessionID(schedule, job.executionID)
 	}
 
 	outcome := m.runReAct(runCtx, schedule, job, sessionID)
@@ -456,14 +440,14 @@ func isolatedScheduleSessionID(executionID string) string {
 	return "ai-schedule-" + strings.TrimSpace(executionID)
 }
 
-func scheduleExecutionSessionID(schedule *schema.AIReActSchedule, executionID string) string {
+func ScheduleExecutionSessionID(schedule *schema.AIReActSchedule, executionID string) string {
 	if schedule != nil && schedule.TargetMode == schema.AIReActScheduleTargetContinueSession {
 		return strings.TrimSpace(schedule.TargetSessionID)
 	}
 	return isolatedScheduleSessionID(executionID)
 }
 
-func (m *aiReActScheduler) finishScheduleExecution(scheduleUUID string, outcome scheduledReActOutcome) {
+func (m *Scheduler) finishScheduleExecution(scheduleUUID string, outcome scheduledReActOutcome) {
 	if strings.TrimSpace(scheduleUUID) == "" {
 		return
 	}
@@ -482,7 +466,7 @@ func (m *aiReActScheduler) finishScheduleExecution(scheduleUUID string, outcome 
 	}
 }
 
-func (m *aiReActScheduler) recordScheduleSkipped(scheduleUUID, reason, message string) {
+func (m *Scheduler) recordScheduleSkipped(scheduleUUID, reason, message string) {
 	if m == nil || m.db == nil || strings.TrimSpace(scheduleUUID) == "" {
 		return
 	}
@@ -498,8 +482,8 @@ func (m *aiReActScheduler) recordScheduleSkipped(scheduleUUID, reason, message s
 	}
 }
 
-func scheduleRunStartParams(db *gorm.DB, schedule *schema.AIReActSchedule, captured *ypb.AIStartParams) (*ypb.AIStartParams, error) {
-	params, err := normalizeScheduleStartParams(captured)
+func ScheduleRunStartParams(db *gorm.DB, schedule *schema.AIReActSchedule, captured *ypb.AIStartParams) (*ypb.AIStartParams, error) {
+	params, err := aischedule.NormalizeStartParams(captured)
 	if err != nil {
 		return nil, err
 	}
@@ -525,13 +509,13 @@ func scheduleRunStartParams(db *gorm.DB, schedule *schema.AIReActSchedule, captu
 	return params, nil
 }
 
-// prepareIsolatedScheduleSession makes a new-session-per-run execution visible
+// PrepareIsolatedScheduleSession makes a new-session-per-run execution visible
 // to history queries before the ReAct loop starts producing output. Interactive
 // sessions are announced optimistically by the renderer; scheduled sessions
 // persist the same durable row and then push an invalidation to the renderer.
 // Use the schedule name as the stable title instead of waiting for asynchronous
 // title generation near the end of the run.
-func prepareIsolatedScheduleSession(
+func PrepareIsolatedScheduleSession(
 	db *gorm.DB,
 	schedule *schema.AIReActSchedule,
 	params *ypb.AIStartParams,
@@ -554,22 +538,22 @@ func prepareIsolatedScheduleSession(
 	return nil
 }
 
-func (m *aiReActScheduler) runReAct(
+func (m *Scheduler) runReAct(
 	ctx context.Context,
 	schedule *schema.AIReActSchedule,
 	job *scheduledReActJob,
 	sessionID string,
 ) scheduledReActOutcome {
-	payload, err := unmarshalSchedulePayload(schedule)
+	payload, err := aischedule.UnmarshalPayload(schedule)
 	if err != nil {
 		return scheduledReActOutcome{status: scheduledOutcomeFailed, errorMessage: err.Error()}
 	}
-	params, err := scheduleRunStartParams(m.db, schedule, payload.GetStartParams())
+	params, err := ScheduleRunStartParams(m.db, schedule, payload.GetStartParams())
 	if err != nil {
 		return scheduledReActOutcome{status: scheduledOutcomeFailed, errorMessage: err.Error()}
 	}
 	params.TimelineSessionID = sessionID
-	if err := prepareIsolatedScheduleSession(m.db, schedule, params, sessionID, time.Now()); err != nil {
+	if err := PrepareIsolatedScheduleSession(m.db, schedule, params, sessionID, time.Now()); err != nil {
 		// Keep the execution semantics consistent with interactive ReAct startup:
 		// metadata persistence failure is observable in logs but does not suppress
 		// the actual task.
@@ -668,7 +652,7 @@ func (m *aiReActScheduler) runReAct(
 		&ypb.AttachedResourceInfo{Type: aicommon.USER_INPUT_SCHEDULE_CONTEXT, Key: aicommon.USER_INPUT_SCHEDULED_AT, Value: job.scheduledAt.Format(time.RFC3339)},
 		&ypb.AttachedResourceInfo{Type: aicommon.USER_INPUT_SCHEDULE_CONTEXT, Key: aicommon.USER_INPUT_SCHEDULE_TRIGGER, Value: job.trigger},
 	)
-	connection, err := m.runtime.Connect(ctx, ConnectRequest{
+	connection, err := m.runtime.Connect(ctx, sessionruntime.ConnectRequest{
 		StartParams: params,
 		Reservation: job.reservation,
 	}, onOutput)

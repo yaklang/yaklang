@@ -7,19 +7,20 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/sessionruntime"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type imRuntimeStub struct {
-	ReActSessionRuntime
+	sessionruntime.ReActSessionRuntime
 	mu         sync.Mutex
-	requests   []ConnectRequest
-	onEvent    ReActEventHandler
+	requests   []sessionruntime.ConnectRequest
+	onEvent    sessionruntime.ReActEventHandler
 	connection *imConnectionStub
 }
 
-func (r *imRuntimeStub) Connect(_ context.Context, req ConnectRequest, onEvent ReActEventHandler) (ReActConnection, error) {
+func (r *imRuntimeStub) Connect(_ context.Context, req sessionruntime.ConnectRequest, onEvent sessionruntime.ReActEventHandler) (sessionruntime.ReActConnection, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.requests = append(r.requests, req)
@@ -52,7 +53,7 @@ func (c *imConnectionStub) CreatedRuntime() bool  { return true }
 func TestIMAIReActBackendUsesSessionRuntimeDirectly(t *testing.T) {
 	connection := &imConnectionStub{done: make(chan struct{})}
 	runtime := &imRuntimeStub{connection: connection}
-	backend := &imAIReActBackend{server: &Server{reActRuntime: runtime}}
+	backend := &imAIReActBackend{runtime: runtime}
 
 	// Preserve the former in-process stream contract: Send only admits the
 	// message; an invalid first message terminates the actor and is observed by
