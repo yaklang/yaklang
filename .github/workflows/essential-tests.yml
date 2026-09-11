@@ -332,31 +332,41 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Configure Go build directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
+          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
+      - name: Restore Go module cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/go-mod-cache
+          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
+      - name: Restore Go build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/go-build-cache
+          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-
+            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
+            ${{ runner.os }}-essential-gobuild-
       - name: Download prepared engine
         uses: actions/download-artifact@v4
         with:
           name: essential-tests-yak
           path: ${{ runner.temp }}/yak-artifact
-      - name: Download shared Go build cache
-        uses: actions/download-artifact@v4
-        with:
-          name: essential-tests-yak-cache
-          path: ${{ runner.temp }}/go-cache-artifact
-      - name: Unpack prepared engine and cache
+      - name: Unpack prepared engine
         run: |
           ARTIFACT_PATH="$RUNNER_TEMP/yak-artifact/essential-tests-yak.tar.gz" \
           DEST_DIR="$RUNNER_TEMP/shared-yak" \
           ARTIFACT_EXPECT_PATHS="yak" ARTIFACT_EXECUTABLE_PATHS="yak" \
           ./scripts/ci/artifact-unpackage.sh
-          ARTIFACT_PATH="$RUNNER_TEMP/go-cache-artifact/essential-tests-yak-cache.tar.gz" \
-          DEST_DIR="$RUNNER_TEMP/shared-go-cache" \
-          ARTIFACT_EXPECT_PATHS="go-build-cache" \
-          ./scripts/ci/artifact-unpackage.sh
       - name: Smoke test compiled yak startup
         env:
           YAK_BINARY_PATH: ${{ runner.temp }}/shared-yak/yak
-          GOCACHE: ${{ runner.temp }}/shared-go-cache/go-build-cache
-          GOMODCACHE: ${{ runner.temp }}/go-mod-cache
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
           set -o pipefail
           bash ./scripts/ci/test-yak-startup.sh 2>&1 | tee "$RUNNER_TEMP/yak-startup-smoke.log"
