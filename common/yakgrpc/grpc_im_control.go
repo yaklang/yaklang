@@ -52,7 +52,9 @@ func (s *Server) StartIMControl(ctx context.Context, req *ypb.StartIMControlRequ
 		PlatformConfigs:           buildIMRuntimePlatformConfigs(req.GetPlatformConfigs()),
 	}
 	engine := imcontrol.New(cfg)
-	engine.SetAIBackend(&imAIReActBackend{runtime: s.getReActSessionRuntime()}, s)
+	// Keep the stable Service, not its current project-scoped Runtime. The IM
+	// engine survives project switches, while the Service binds a fresh Runtime.
+	engine.SetAIBackend(&imAIReActBackend{runtimeProvider: s.getReActService()}, s)
 	if err := engine.Start(); err != nil {
 		log.Errorf("start im engine failed: %v", err)
 		signalIMEngineLifecycleLocked()
