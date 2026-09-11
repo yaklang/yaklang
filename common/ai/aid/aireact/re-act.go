@@ -253,11 +253,8 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		meta, err := yakit.EnsureAISessionMeta(cfg.GetDB(), cfg.PersistentSessionId, cfg.SessionSource)
 		if err != nil {
 			log.Warnf("ensure ai session meta failed for %s: %v", cfg.PersistentSessionId, err)
-		} else if meta != nil && strings.TrimSpace(meta.Title) != "" {
-			cfg.SetConfig("session_title", meta.Title)
-			cfg.SetSessionTitle(meta.Title)
-			cfg.SetConfig(sessionTitleGeneratedKey, true)
-			react.Emitter.EmitSessionTitle(meta.Title)
+		} else {
+			react.restoreInitializedSessionTitle(meta)
 		}
 	}
 
@@ -474,6 +471,28 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 
 	return react, nil
+}
+
+// restoreInitializedSessionTitle restores only a real, durable session title.
+// New session metadata deliberately contains the non-empty "<未命名>" placeholder
+// with TitleInitialized=false. Treating that placeholder as a generated title
+// sets sessionTitleGeneratedKey too early and permanently skips title generation
+// for the first user input.
+func (r *ReAct) restoreInitializedSessionTitle(meta *schema.AISession) bool {
+	if r == nil || r.config == nil || meta == nil || !meta.TitleInitialized {
+		return false
+	}
+	title := strings.TrimSpace(meta.Title)
+	if title == "" {
+		return false
+	}
+	r.config.SetConfig("session_title", title)
+	r.config.SetSessionTitle(title)
+	r.config.SetConfig(sessionTitleGeneratedKey, true)
+	if r.Emitter != nil {
+		r.Emitter.EmitSessionTitle(title)
+	}
+	return true
 }
 
 // UpdateDebugMode dynamically updates the debug mode settings

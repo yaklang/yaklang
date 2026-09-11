@@ -576,12 +576,7 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 	// load existing title for restored session so UI gets it even when generation is skipped.
 	if cfg.GetConfigString("session_title", "") == "" && r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
 		if meta, err := yakit.GetAISessionMetaBySessionID(cfg.GetDB(), r.config.PersistentSessionId); err == nil {
-			if existing := strings.TrimSpace(meta.Title); existing != "" {
-				cfg.SetConfig("session_title", existing)
-				cfg.SetSessionTitle(existing)
-				cfg.SetConfig(sessionTitleGeneratedKey, true)
-				r.Emitter.EmitSessionTitle(existing)
-			}
+			r.restoreInitializedSessionTitle(meta)
 		}
 	}
 
