@@ -20,6 +20,9 @@ package sfpattern
 // as the FileFilter matcher. init() below performs the registration.
 
 import (
+	"context"
+	"sort"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -31,20 +34,20 @@ func init() {
 // regionFilterImpl adapts the package-level functions to sfvm.RegionFilterFunc.
 type regionFilterImpl struct{}
 
-func (regionFilterImpl) FilterContained(target, ctx sfvm.Values) sfvm.Values {
-	return FilterContained(target, ctx)
+func (regionFilterImpl) FilterContained(target, ctx sfvm.Values, cfg *sfvm.Config) sfvm.Values {
+	return filterContained(target, ctx, newFilterOptions(cfg))
 }
 
-func (regionFilterImpl) FilterNotContained(target, ctx sfvm.Values) sfvm.Values {
-	return FilterNotContained(target, ctx)
+func (regionFilterImpl) FilterNotContained(target, ctx sfvm.Values, cfg *sfvm.Config) sfvm.Values {
+	return filterNotContained(target, ctx, newFilterOptions(cfg))
 }
 
-func (regionFilterImpl) FilterOverlap(target sfvm.Values, others ...sfvm.Values) sfvm.Values {
-	return FilterOverlap(target, others...)
+func (regionFilterImpl) FilterOverlap(target sfvm.Values, cfg *sfvm.Config, others ...sfvm.Values) sfvm.Values {
+	return filterOverlap(target, newFilterOptions(cfg), others...)
 }
 
-func (regionFilterImpl) FilterNotOverlap(target sfvm.Values, others ...sfvm.Values) sfvm.Values {
-	return FilterNotOverlap(target, others...)
+func (regionFilterImpl) FilterNotOverlap(target sfvm.Values, cfg *sfvm.Config, others ...sfvm.Values) sfvm.Values {
+	return filterNotOverlap(target, newFilterOptions(cfg), others...)
 }
 
 func (regionFilterImpl) AllSimpleHits(vs sfvm.Values) bool {
@@ -87,35 +90,161 @@ func collectRegions(vs sfvm.Values) []hitRegion {
 }
 
 // regionContains reports whether r contains t (same file, inclusive bounds).
+// Kept for direct use / tests; the hot path uses regionIndex.contains.
 func regionContains(r, t hitRegion) bool {
 	return r.path == t.path && r.start <= t.start && t.end <= r.end
 }
 
 // regionOverlaps reports whether r and t overlap (same file, strict overlap).
+// Kept for direct use / tests; the hot path uses regionIndex.overlaps.
 func regionOverlaps(r, t hitRegion) bool {
 	return r.path == t.path && t.start < r.end && r.start < t.end
+}
+
+// regionIndex provides per-file sorted hit regions for O(log n) contains/overlap
+// queries. This replaces the previous O(n*m) linear scans in FilterContained,
+// FilterNotContained, FilterOverlap and FilterNotOverlap.
+type regionIndex struct {
+	// byFile maps a file path to its sorted non-empty hit regions.
+	byFile map[string][]hitRegion
+}
+
+// newRegionIndex builds an index from a slice of hit regions.
+func newRegionIndex(regions []hitRegion) regionIndex {
+	idx := regionIndex{byFile: make(map[string][]hitRegion, len(regions))}
+	for _, r := range regions {
+		idx.byFile[r.path] = append(idx.byFile[r.path], r)
+	}
+	for path, rs := range idx.byFile {
+		if len(rs) <= 1 {
+			continue
+		}
+		sort.Slice(rs, func(i, j int) bool {
+			if rs[i].start == rs[j].start {
+				return rs[i].end < rs[j].end
+			}
+			return rs[i].start < rs[j].start
+		})
+		// Deduplicate exact duplicates to keep searches tight.
+		compact := rs[:0]
+		for _, r := range rs {
+			if len(compact) == 0 || r != compact[len(compact)-1] {
+				compact = append(compact, r)
+			}
+		}
+		idx.byFile[path] = compact
+	}
+	return idx
+}
+
+// contains reports whether any region in the same file fully contains t.
+func (idx regionIndex) contains(t hitRegion) bool {
+	rs, ok := idx.byFile[t.path]
+	if !ok || len(rs) == 0 {
+		return false
+	}
+	// Find the rightmost region with start <= t.start. Only that region (and
+	// possibly the previous one with same start) can contain t.
+	i := sort.Search(len(rs), func(i int) bool { return rs[i].start > t.start })
+	if i > 0 {
+		cand := rs[i-1]
+		if cand.start <= t.start && t.end <= cand.end {
+			return true
+		}
+	}
+	return false
+}
+
+// overlaps reports whether any region in the same file overlaps t.
+func (idx regionIndex) overlaps(t hitRegion) bool {
+	rs, ok := idx.byFile[t.path]
+	if !ok || len(rs) == 0 {
+		return false
+	}
+	// Find the first region whose end > t.start. That is the only candidate that
+	// can overlap t (all earlier regions end before t starts).
+	i := sort.Search(len(rs), func(i int) bool { return rs[i].end > t.start })
+	if i < len(rs) {
+		cand := rs[i]
+		if cand.start < t.end && t.start < cand.end {
+			return true
+		}
+	}
+	return false
+}
+
+// bailContext bundles cancellation/budget callbacks so long-running filters can
+// bail out cooperatively. nil-safe: all methods are no-ops when the receiver is
+// nil.
+type bailContext struct {
+	ctx        context.Context
+	workBudget *sfvm.RuleWorkBudget
+}
+
+// check returns a non-nil error when the rule should stop. It also records one
+// work unit against the budget if workBudget is present.
+func (b *bailContext) check() error {
+	if b == nil {
+		return nil
+	}
+	if b.ctx != nil {
+		select {
+		case <-b.ctx.Done():
+			return b.ctx.Err()
+		default:
+		}
+	}
+	if b.workBudget != nil && b.workBudget.EnterWork() {
+		return utils.Errorf("work budget exceeded")
+	}
+	return nil
+}
+
+// filterOptions carries optional cancellation/budget through the filter API.
+type filterOptions struct {
+	bail *bailContext
+}
+
+// newFilterOptions builds options from an sfvm.Config. If cfg is nil, returns
+// an empty options struct (no cancellation, no budget accounting).
+func newFilterOptions(cfg *sfvm.Config) filterOptions {
+	if cfg == nil {
+		return filterOptions{}
+	}
+	return filterOptions{bail: &bailContext{
+		ctx:        cfg.GetContext(),
+		workBudget: cfg.GetWorkBudget(),
+	}}
 }
 
 // FilterContained keeps target hits that are contained in at least one
 // context region (Semgrep pattern-inside). Non-hit values pass through.
 // With no context regions the result is empty (nothing is inside nothing).
 func FilterContained(target, ctx sfvm.Values) sfvm.Values {
-	regions := collectRegions(ctx)
-	if len(regions) == 0 {
+	return filterContained(target, ctx, filterOptions{})
+}
+
+func filterContained(target, ctx sfvm.Values, opts filterOptions) sfvm.Values {
+	idx := newRegionIndex(collectRegions(ctx))
+	if len(idx.byFile) == 0 {
 		return sfvm.NewEmptyValues()
 	}
 	var out []sfvm.ValueOperator
+	var n int
 	_ = target.Recursive(func(v sfvm.ValueOperator) error {
 		t, ok := asHitRegion(v)
 		if !ok {
 			out = append(out, v)
 			return nil
 		}
-		for _, r := range regions {
-			if regionContains(r, t) {
-				out = append(out, v)
-				return nil
+		n++
+		if n%1024 == 0 {
+			if err := opts.bail.check(); err != nil {
+				return err
 			}
+		}
+		if idx.contains(t) {
+			out = append(out, v)
 		}
 		return nil
 	})
@@ -126,23 +255,31 @@ func FilterContained(target, ctx sfvm.Values) sfvm.Values {
 // (Semgrep pattern-not-inside). Non-hit values pass through. With no
 // context regions everything is kept.
 func FilterNotContained(target, ctx sfvm.Values) sfvm.Values {
-	regions := collectRegions(ctx)
-	if len(regions) == 0 {
+	return filterNotContained(target, ctx, filterOptions{})
+}
+
+func filterNotContained(target, ctx sfvm.Values, opts filterOptions) sfvm.Values {
+	idx := newRegionIndex(collectRegions(ctx))
+	if len(idx.byFile) == 0 {
 		return target
 	}
 	var out []sfvm.ValueOperator
+	var n int
 	_ = target.Recursive(func(v sfvm.ValueOperator) error {
 		t, ok := asHitRegion(v)
 		if !ok {
 			out = append(out, v)
 			return nil
 		}
-		for _, r := range regions {
-			if regionContains(r, t) {
-				return nil // dropped
+		n++
+		if n%1024 == 0 {
+			if err := opts.bail.check(); err != nil {
+				return err
 			}
 		}
-		out = append(out, v)
+		if !idx.contains(t) {
+			out = append(out, v)
+		}
 		return nil
 	})
 	return sfvm.NewValues(out)
@@ -153,30 +290,39 @@ func FilterNotContained(target, ctx sfvm.Values) sfvm.Values {
 // non-empty). Non-hit values pass through. An empty others list keeps
 // everything; a set with no hit regions contributes no constraint.
 func FilterOverlap(target sfvm.Values, others ...sfvm.Values) sfvm.Values {
+	return filterOverlap(target, filterOptions{}, others...)
+}
+
+func filterOverlap(target sfvm.Values, opts filterOptions, others ...sfvm.Values) sfvm.Values {
 	if len(others) == 0 {
 		return target
 	}
-	regionSets := make([][]hitRegion, 0, len(others))
+	indexes := make([]regionIndex, 0, len(others))
 	for _, other := range others {
-		regionSets = append(regionSets, collectRegions(other))
+		idx := newRegionIndex(collectRegions(other))
+		if len(idx.byFile) == 0 {
+			// A required AND operand has no hits → nothing can overlap it.
+			return sfvm.NewEmptyValues()
+		}
+		indexes = append(indexes, idx)
 	}
 	var out []sfvm.ValueOperator
+	var n int
 	_ = target.Recursive(func(v sfvm.ValueOperator) error {
 		t, ok := asHitRegion(v)
 		if !ok {
 			out = append(out, v)
 			return nil
 		}
-		for _, regions := range regionSets {
-			matched := false
-			for _, r := range regions {
-				if regionOverlaps(r, t) {
-					matched = true
-					break
-				}
+		n++
+		if n%1024 == 0 {
+			if err := opts.bail.check(); err != nil {
+				return err
 			}
-			if !matched {
-				return nil // fails this AND constraint
+		}
+		for _, idx := range indexes {
+			if !idx.overlaps(t) {
+				return nil
 			}
 		}
 		out = append(out, v)
@@ -189,29 +335,38 @@ func FilterOverlap(target sfvm.Values, others ...sfvm.Values) sfvm.Values {
 // (Semgrep pattern-not-regex: the match must not overlap a negative match).
 // Non-hit values pass through. An empty others list keeps everything.
 func FilterNotOverlap(target sfvm.Values, others ...sfvm.Values) sfvm.Values {
+	return filterNotOverlap(target, filterOptions{}, others...)
+}
+
+func filterNotOverlap(target sfvm.Values, opts filterOptions, others ...sfvm.Values) sfvm.Values {
 	if len(others) == 0 {
 		return target
 	}
-	var regions []hitRegion
+	allRegions := make([]hitRegion, 0)
 	for _, other := range others {
-		regions = append(regions, collectRegions(other)...)
+		allRegions = append(allRegions, collectRegions(other)...)
 	}
-	if len(regions) == 0 {
+	idx := newRegionIndex(allRegions)
+	if len(idx.byFile) == 0 {
 		return target
 	}
 	var out []sfvm.ValueOperator
+	var n int
 	_ = target.Recursive(func(v sfvm.ValueOperator) error {
 		t, ok := asHitRegion(v)
 		if !ok {
 			out = append(out, v)
 			return nil
 		}
-		for _, r := range regions {
-			if regionOverlaps(r, t) {
-				return nil // dropped
+		n++
+		if n%1024 == 0 {
+			if err := opts.bail.check(); err != nil {
+				return err
 			}
 		}
-		out = append(out, v)
+		if !idx.overlaps(t) {
+			out = append(out, v)
+		}
 		return nil
 	})
 	return sfvm.NewValues(out)
