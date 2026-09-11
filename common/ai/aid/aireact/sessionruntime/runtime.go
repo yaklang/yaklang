@@ -1,4 +1,4 @@
-package yakgrpc
+package sessionruntime
 
 import (
 	"context"
@@ -46,13 +46,16 @@ type ReActEventHandler func(*schema.AiOutputEvent) error
 type ConnectRequest struct {
 	StartParams *ypb.AIStartParams
 	Reservation SessionReservation
-	options     *reActConnectOptions
+	Options     *ConnectOptions
 }
 
-type reActConnectOptions struct {
-	loadBuiltinTools bool
-	configOptions    []aicommon.ConfigOption
-	onEventError     func(error)
+// ConnectOptions contains caller-specific delivery and construction options.
+// Production callers normally leave LoadBuiltinTools enabled; ConfigOptions is
+// primarily useful to inject deterministic dependencies in lifecycle tests.
+type ConnectOptions struct {
+	LoadBuiltinTools bool
+	ConfigOptions    []aicommon.ConfigOption
+	OnEventError     func(error)
 }
 
 // SessionReservation is an execution lease, not merely a creation lock. A
@@ -184,72 +187,13 @@ func (g *reActSessionQuiescence) Release() {
 	g.once.Do(func() { g.runtime.releaseQuiescence(g.ids, g.all) })
 }
 
-func newReActSessionRuntime(projectDB func() *gorm.DB) *reActSessionRuntime {
+func New(projectDB func() *gorm.DB) ReActSessionRuntime {
 	return &reActSessionRuntime{
 		projectDB: projectDB,
 		newReAct:  aireact.NewReAct,
 		entries:   make(map[string]*reActSessionState),
 		changed:   make(chan struct{}),
 	}
-}
-
-func (s *Server) getReActSessionRuntime() ReActSessionRuntime {
-	if s == nil {
-		return nil
-	}
-	s.reActRuntimeMu.Lock()
-	defer s.reActRuntimeMu.Unlock()
-	if s.reActRuntime == nil {
-		s.reActRuntime = newReActSessionRuntime(s.GetProjectDatabase)
-		s.reActRuntimeRetired = false
-	}
-	return s.reActRuntime
-}
-
-// retireReActSessionRuntime stops every session owned by the current runtime and
-// permanently quiesces that runtime before it is detached from the server. This
-// is used when the project database changes: a ReAct created for the old project
-// must never be attached through the new project context.
-func (s *Server) retireReActSessionRuntime(ctx context.Context) error {
-	if s == nil {
-		return nil
-	}
-	s.reActRuntimeMu.Lock()
-	if s.reActRuntimeRetired {
-		s.reActRuntimeMu.Unlock()
-		return nil
-	}
-	runtime := s.reActRuntime
-	if runtime == nil {
-		runtime = newReActSessionRuntime(s.GetProjectDatabase)
-		s.reActRuntime = runtime
-	}
-	s.reActRuntimeMu.Unlock()
-
-	// Intentionally keep the returned guard: stale holders of this runtime must
-	// continue to reject reservations and connections. The retired runtime also
-	// stays installed until the database switch completes, closing the gap where
-	// a concurrent caller could otherwise create against the old project DB.
-	if _, err := runtime.QuiesceAll(ctx); err != nil {
-		return err
-	}
-
-	s.reActRuntimeMu.Lock()
-	if s.reActRuntime == runtime {
-		s.reActRuntimeRetired = true
-	}
-	s.reActRuntimeMu.Unlock()
-	return nil
-}
-
-func (s *Server) resetReActSessionRuntimeAfterProjectSwitch() {
-	if s == nil {
-		return
-	}
-	s.reActRuntimeMu.Lock()
-	s.reActRuntime = nil
-	s.reActRuntimeRetired = false
-	s.reActRuntimeMu.Unlock()
 }
 
 func normalizeReActSessionID(sessionID string) string {
@@ -405,9 +349,9 @@ func (r *reActSessionRuntime) IsSessionBusy(sessionID string) bool {
 func (r *reActSessionRuntime) Connect(ctx context.Context, req ConnectRequest, onEvent ReActEventHandler) (ReActConnection, error) {
 	loadBuiltinTools := true
 	var configOptions []aicommon.ConfigOption
-	if req.options != nil {
-		loadBuiltinTools = req.options.loadBuiltinTools
-		configOptions = req.options.configOptions
+	if req.Options != nil {
+		loadBuiltinTools = req.Options.LoadBuiltinTools
+		configOptions = req.Options.ConfigOptions
 	}
 	return r.connectWithOptions(ctx, req, onEvent, loadBuiltinTools, configOptions...)
 }
@@ -431,8 +375,8 @@ func (r *reActSessionRuntime) connectWithOptions(
 	}
 	sessionID := normalizeReActSessionID(startParams.GetTimelineSessionID())
 	var onEventError func(error)
-	if req.options != nil {
-		onEventError = req.options.onEventError
+	if req.Options != nil {
+		onEventError = req.Options.OnEventError
 	}
 
 	// 启动 ReAct 之前懒扫描用户的 ~/yakit-projects/ai-focus/，
@@ -585,7 +529,7 @@ func (r *reActSessionRuntime) createRuntime(
 	loadBuiltinTools bool,
 	additionalOptions ...aicommon.ConfigOption,
 ) (*ownedReActRuntime, error) {
-	resolvedStartParams, err := resolveAISessionStartParams(
+	resolvedStartParams, err := ResolveSessionStartParams(
 		r.projectDatabase(),
 		sessionID,
 		startParams,
@@ -627,7 +571,7 @@ func (r *reActSessionRuntime) createRuntime(
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
-	configOptions = append(configOptions, ConvertYPBAIStartParamsToReActConfig(resolvedStartParams)...)
+	configOptions = append(configOptions, ConvertStartParamsToReActConfig(resolvedStartParams)...)
 	if aiconfig.IsTieredAIConfig() {
 		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}

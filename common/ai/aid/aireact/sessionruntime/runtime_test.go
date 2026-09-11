@@ -1,19 +1,32 @@
-package yakgrpc
+package sessionruntime
 
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+type noOpTimelineArchiveStore struct{}
+
+func (*noOpTimelineArchiveStore) ArchiveCompressedBatch(context.Context, *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
+	return nil, nil
+}
+
+func (*noOpTimelineArchiveStore) SearchArchivedBatches(context.Context, *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
+	return &aicommon.TimelineArchiveSearchResult{}, nil
+}
 
 func TestReActEventDeliveryKeepsNormalOutputBestEffortAndReportsSyncFailure(t *testing.T) {
 	deliveryErr := errors.New("subscriber delivery failed")
@@ -77,7 +90,7 @@ func TestReActSessionRuntimeHonorsProcessWideStartReservation(t *testing.T) {
 	require.True(t, ok)
 	defer release()
 
-	runtime := newReActSessionRuntime(nil)
+	runtime := New(nil).(*reActSessionRuntime)
 	var createCount atomic.Int32
 	runtime.newReAct = func(...aicommon.ConfigOption) (*aireact.ReAct, error) {
 		createCount.Add(1)
@@ -158,7 +171,7 @@ func TestReActSessionRuntimeCoordinationBusyReasons(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			runtime := newReActSessionRuntime(nil)
+			runtime := New(nil).(*reActSessionRuntime)
 			sessionID := "coordination-busy-reason-" + test.name
 			test.setup(runtime, sessionID)
 
@@ -173,7 +186,7 @@ func TestReActSessionRuntimeWillNotQuiesceAnotherRuntimeStart(t *testing.T) {
 	release, ok := aireact.TryBeginSessionStart(sessionID)
 	require.True(t, ok)
 
-	runtime := newReActSessionRuntime(nil)
+	runtime := New(nil).(*reActSessionRuntime)
 	_, err := runtime.QuiesceSessions(context.Background(), []string{sessionID})
 	require.ErrorContains(t, err, "starting outside this runtime")
 	require.True(t, aireact.IsSessionStarting(sessionID))
@@ -189,7 +202,7 @@ func TestReActSessionRuntimeWillNotQuiesceAnotherRuntimeStart(t *testing.T) {
 }
 
 func TestReActSessionRuntimeReservationAndQuiescence(t *testing.T) {
-	runtime := newReActSessionRuntime(nil)
+	runtime := New(nil).(*reActSessionRuntime)
 	reservation, err := runtime.ReserveSession(context.Background(), "lease-session", "execution-1")
 	require.NoError(t, err)
 	require.True(t, runtime.IsSessionBusy("lease-session"))
@@ -242,7 +255,7 @@ func TestReActSessionRuntimeReservationAndQuiescence(t *testing.T) {
 }
 
 func TestReActSessionRuntimeOnlyTaskAdmissionBlocksReservation(t *testing.T) {
-	runtime := newReActSessionRuntime(nil)
+	runtime := New(nil).(*reActSessionRuntime)
 	runtime.entries["input-admission"] = &reActSessionState{admitting: 1}
 	reservation, err := runtime.ReserveSession(context.Background(), "input-admission", "execution")
 	require.NoError(t, err, "non-task sync/hot-patch admission must not make a schedule skip")
@@ -253,41 +266,11 @@ func TestReActSessionRuntimeOnlyTaskAdmissionBlocksReservation(t *testing.T) {
 	require.Error(t, err, "free-input admission must remain atomic with schedule reservation")
 }
 
-func TestServerRetireReActSessionRuntime(t *testing.T) {
-	server := newScheduleTestServer(t)
-	oldRuntime := server.getReActSessionRuntime().(*reActSessionRuntime)
-	reservation, err := oldRuntime.ReserveSession(context.Background(), "old-project-session", "old-execution")
-	require.NoError(t, err)
-
-	retired := make(chan error, 1)
-	go func() { retired <- server.retireReActSessionRuntime(context.Background()) }()
-	select {
-	case <-reservation.Context().Done():
-	case <-time.After(time.Second):
-		t.Fatal("retiring the project runtime did not cancel its reservation")
-	}
-	reservation.Release()
-	select {
-	case err := <-retired:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		t.Fatal("project runtime retirement did not finish")
-	}
-
-	_, err = oldRuntime.ReserveSession(context.Background(), "stale-session", "stale-execution")
-	require.Error(t, err, "a retired runtime must stay permanently quiesced")
-	require.Same(t, oldRuntime, server.getReActSessionRuntime(), "the retired runtime must cover the project-switch window")
-	server.resetReActSessionRuntimeAfterProjectSwitch()
-	newRuntime := server.getReActSessionRuntime().(*reActSessionRuntime)
-	require.NotSame(t, oldRuntime, newRuntime)
-	newReservation, err := newRuntime.ReserveSession(context.Background(), "new-project-session", "new-execution")
-	require.NoError(t, err)
-	newReservation.Release()
-}
-
 func TestReActSessionRuntimeCreatesOnceAttachesAndGatesReservedInput(t *testing.T) {
-	server := newScheduleTestServer(t)
-	runtime := server.getReActSessionRuntime().(*reActSessionRuntime)
+	db, err := consts.CreateProjectDatabase(filepath.Join(t.TempDir(), "runtime.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	runtime := New(func() *gorm.DB { return db }).(*reActSessionRuntime)
 	originalFactory := runtime.newReAct
 	var createCount atomic.Int32
 	factoryEntered := make(chan struct{})

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/sessionruntime"
 	"github.com/yaklang/yaklang/common/imcontrol"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -14,7 +15,7 @@ import (
 )
 
 type imAIReActBackend struct {
-	server *Server
+	runtime sessionruntime.ReActSessionRuntime
 }
 
 // StartAIReAct retains IM's asynchronous stream contract while routing the
@@ -22,18 +23,14 @@ type imAIReActBackend struct {
 // and terminal error delivery match the former in-process gRPC bridge, without
 // constructing a fake ypb.Yak_StartAIReActServer.
 func (b *imAIReActBackend) StartAIReAct(ctx context.Context) (imcontrol.AIReActStream, error) {
-	if b == nil || b.server == nil {
-		return nil, fmt.Errorf("yakgrpc server is not configured")
-	}
-	runtime := b.server.getReActSessionRuntime()
-	if runtime == nil {
+	if b == nil || b.runtime == nil {
 		return nil, fmt.Errorf("AI ReAct session runtime is not configured")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	stream := &imReActRuntimeStream{
 		ctx:       ctx,
 		cancel:    cancel,
-		runtime:   runtime,
+		runtime:   b.runtime,
 		toRuntime: make(chan *ypb.AIInputEvent, 32),
 		fromSrv:   make(chan *ypb.AIOutputEvent, 128),
 		done:      make(chan error, 1),
@@ -45,7 +42,7 @@ func (b *imAIReActBackend) StartAIReAct(ctx context.Context) (imcontrol.AIReActS
 type imReActRuntimeStream struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
-	runtime   ReActSessionRuntime
+	runtime   sessionruntime.ReActSessionRuntime
 	toRuntime chan *ypb.AIInputEvent
 	fromSrv   chan *ypb.AIOutputEvent
 	done      chan error
@@ -116,11 +113,11 @@ func (s *imReActRuntimeStream) serveRuntime() error {
 		return fmt.Errorf("first msg is not a start/config message, set IsStart to true")
 	}
 
-	connection, err := s.runtime.Connect(s.ctx, ConnectRequest{
+	connection, err := s.runtime.Connect(s.ctx, sessionruntime.ConnectRequest{
 		StartParams: first.GetParams(),
-		options: &reActConnectOptions{
-			loadBuiltinTools: true,
-			onEventError: func(err error) {
+		Options: &sessionruntime.ConnectOptions{
+			LoadBuiltinTools: true,
+			OnEventError: func(err error) {
 				log.Errorf("send re-act event to stream failed: %v", err)
 			},
 		},
