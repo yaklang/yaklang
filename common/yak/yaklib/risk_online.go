@@ -74,9 +74,10 @@ type DownloadRiskItem struct {
 	SourceType      string  `json:"sourceType"`
 	FromYakScript   string  `json:"fromYakScript"`
 	Tags            string  `json:"tags"`
-	VerifierUid        string  `json:"verifierUid"`
+	VerifierUid     string  `json:"verifierUid"`
 	FixTime         int64   `json:"fixTime"`
 	FixSuggestion   string  `json:"fixSuggestion"`
+	TagReason    string  `json:"tagReason"`
 	IsPotential     bool    `json:"isPotential"`
 	CVE             string  `json:"cve"`
 	SeverityScore   float64 `json:"severityScore"`
@@ -185,7 +186,7 @@ func (s *OnlineClient) downloadRiskPage(token string, page, limit int64) ([]*Dow
 	if rsp.GetStatusCode() != 200 {
 		var errData map[string]interface{}
 		_ = json.Unmarshal(rawResponse, &errData)
-		return nil, nil, utils.Errorf("download risk error: %s %s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
+		return nil, nil, utils.Errorf("download risk error:%s%s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
 	}
 
 	var container riskDownloadResponse
@@ -197,16 +198,17 @@ func (s *OnlineClient) downloadRiskPage(token string, page, limit int64) ([]*Dow
 
 type setRiskTagsRequest struct {
 	Hash            []string `json:"hash"`
-	Tags            []string `json:"tags"`
-	VerifierUid        string   `json:"verifierUid,omitempty"`
+	SetTags         []string `json:"setTags"`
+	VerifierUid     string   `json:"verifierUid,omitempty"`
 	FixTime         int64    `json:"fixTime,omitempty"`
 	FixSuggestion   string   `json:"fixSuggestion,omitempty"`
+	TagReason    string   `json:"tagReason,omitempty"`
 	RiskTypeVerbose string   `json:"riskTypeVerbose,omitempty"`
 	Severity        string   `json:"severity,omitempty"`
 	SeverityScore   float64  `json:"severityScore,omitempty"`
 }
 
-func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, hashes []string, tags, verifierUid, fixSuggestion, riskTypeVerbose, severity string, fixTime int64, severityScore float64) error {
+func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, hashes []string, setTags, verifierUid, fixSuggestion, tagReason, riskTypeVerbose, severity string, fixTime int64, severityScore float64) error {
 	if token == "" {
 		return utils.Errorf("token is empty")
 	}
@@ -216,16 +218,17 @@ func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, ha
 
 	// tags 竖线分隔 → []string
 	var tagsSlice []string
-	if tags != "" {
-		tagsSlice = utils.PrettifyListFromStringSplited(tags, "|")
+	if setTags != "" {
+		tagsSlice = utils.PrettifyListFromStringSplited(setTags, "|")
 	}
 
 	raw, err := json.Marshal(setRiskTagsRequest{
 		Hash:            hashes,
-		Tags:            tagsSlice,
-		VerifierUid:        verifierUid,
+		SetTags:         tagsSlice,
+		VerifierUid:     verifierUid,
 		FixTime:         fixTime,
 		FixSuggestion:   fixSuggestion,
+		TagReason:    tagReason,
 		RiskTypeVerbose: riskTypeVerbose,
 		Severity:        severity,
 		SeverityScore:   severityScore,
@@ -245,12 +248,11 @@ func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, ha
 	if err != nil {
 		return utils.Errorf("set risk tags to online failed: %s", err)
 	}
-
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 	if rsp.GetStatusCode() != 200 {
-		rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 		var errData map[string]interface{}
 		_ = json.Unmarshal(rawResponse, &errData)
-		return utils.Errorf("set risk tags to online error: %s %s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
+		return utils.Errorf("set risk tags to online error:%s%s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
 	}
 
 	return nil

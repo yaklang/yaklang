@@ -72,6 +72,7 @@ type Risk struct {
 	VerifierUid            string    `json:"verifierUid"`        // 验证人
 	FixTime             time.Time `json:"fix_time"`        // 修复时间
 	FixSuggestion       string    `json:"fix_suggestion"`  // 修复建议
+	TagReason        string    `json:"tag_reason"`  // 处置原因
 	SeverityScore       float64   `json:"severity_score"`
 
 	// SyntaxFlow
