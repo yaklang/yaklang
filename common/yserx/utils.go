@@ -9,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
+	embeddata "github.com/yaklang/yaklang/common/yserx/embed_data"
 	"io"
 	"math"
 	"reflect"
@@ -690,14 +692,14 @@ func initTCType(j JavaSerializable) {
 var dirtyDataHeaderByOverLongString []byte
 
 func init() {
-	bs, err := codec.DecodeBase64("rO0ABXVyACbBm8GMwarBocG2waHArsGswaHBrsGnwK7Bj8GiwarBpcGjwbTAu5DOWJ8QcylsAgAAeHA=")
+	bs, err := codec.DecodeBase64(embeddata.LoadSerializedObjects().DirtyDataHeader)
 	if err != nil {
 		log.Errorf("init dirtyDataHeader failed: %v", err)
 	}
 	dirtyDataHeaderByOverLongString = bs
 }
 func GetJavaObjectArrayIns() (JavaSerializable, error) {
-	data := "rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAA="
+	data := embeddata.LoadSerializedObjects().ObjectArray
 	byts, err := codec.DecodeBase64(data)
 	if err != nil {
 		return nil, err
