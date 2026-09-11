@@ -375,15 +375,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					CompletionTokens: int(outputTokens),
 					TotalTokens:      int(totalTokens),
 				})
-				if outputBytes == 0 {
+				if outputBytes == 0 && requestCtx.Err() == nil && origRsp.GetError() == nil && origRsp.GetHTTPStatusCode() < 400 {
 					rawDump := origRsp.GetRawHTTPResponseDump()
 					if rawDump != "" {
-						println(rawDump)
 						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-							"The AI model returned HTTP 200 but generated 0 output tokens "+
-							"(finish_reason: stop without delta.content). "+
-							"This is typically a transient model-side issue and will be retried automatically.",
-							provider, model, du, inputTokens,
+							"No output content was received (HTTP status=%d).",
+							provider, model, du, inputTokens, origRsp.GetHTTPStatusCode(),
 						)
 					} else {
 						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+

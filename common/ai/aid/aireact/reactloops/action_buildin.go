@@ -112,7 +112,12 @@ var loopAction_DirectlyAnswer = &LoopAction{
 		}
 
 		if payload == "" {
-			tagPayload := loop.Get("tag_final_answer")
+			// Parsed tags are available before the asynchronous stream emitter
+			// finishes populating loop variables.
+			tagPayload := action.GetString("tag_final_answer")
+			if tagPayload == "" {
+				tagPayload = loop.Get("tag_final_answer")
+			}
 			if tagPayload != "" {
 				payload = tagPayload
 			}

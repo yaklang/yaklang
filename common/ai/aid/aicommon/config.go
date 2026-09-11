@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -4015,6 +4017,10 @@ func (c *Config) restorePersistentSession() {
 
 	runtime, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(c.GetDB(), c.PersistentSessionId)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Debugf("no runtime found for new persistent session [%s]", c.PersistentSessionId)
+			return
+		}
 		log.Warnf("failed to fetch AI runtime for session [%s]: %v", c.PersistentSessionId, err)
 		return
 	}

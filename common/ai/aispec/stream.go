@@ -308,6 +308,9 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 		_, _ = io.Copy(&mirrorResponse, closer)
 		return nil
 	}
+	if statusCode >= 400 {
+		return readAIHTTPError(statusCode, closer, chunked, &mirrorResponse)
+	}
 
 	var reader io.Reader = closer
 	ioReader := reader
@@ -750,6 +753,9 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	if statusCode == 429 {
 		_, _ = io.Copy(&mirrorResponse, closer)
 		return nil
+	}
+	if statusCode >= 400 {
+		return readAIHTTPError(statusCode, closer, chunked, &mirrorResponse)
 	}
 
 	var reader io.Reader = io.TeeReader(closer, &mirrorResponse)

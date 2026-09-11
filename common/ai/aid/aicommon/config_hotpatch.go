@@ -29,7 +29,10 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 					//log.Infof("hotpatch loop for config %s started", c.Id)
 				case <-ctx.Done():
 					return
-				case hotPatchOption := <-c.HotPatchOptionChan.OutputChannel():
+				case hotPatchOption, ok := <-c.HotPatchOptionChan.OutputChannel():
+					if !ok {
+						return
+					}
 					if hotPatchOption == nil {
 						log.Errorf("hotpatch option is nil, will return")
 						return
@@ -77,9 +80,9 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AIAutoTransactionRetry":      c.AiTransactionAutoRetry,
 		"GenerateReport":              c.GenerateReport,
 		"ForgeName":                   c.ForgeName,
-		"EnablePlan":            c.GetEnablePlanAndExec(),
-		"SyncPerceptionTrigger": c.GetSyncPerceptionTrigger(),
-		"EnabledCapabilities":   c.GetEnabledCapabilities(),
+		"EnablePlan":                  c.GetEnablePlanAndExec(),
+		"SyncPerceptionTrigger":       c.GetSyncPerceptionTrigger(),
+		"EnabledCapabilities":         c.GetEnabledCapabilities(),
 	}
 }
 
