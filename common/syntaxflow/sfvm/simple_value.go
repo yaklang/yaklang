@@ -333,16 +333,15 @@ func (v *SimpleValue) SetAnchorBitVector(*utils.BitVector)  {}
 // PatternRoot is the feed root for source-mode scans: holds files and responds to
 // FileFilter by delegating to a registered regexp matcher (set by sfpattern).
 type PatternRoot struct {
-	files           map[string]string
-	matcher         FileFilterFunc
-	programName     string
-	sourceMu        sync.RWMutex
-	sourceHitOffset int
-	sourceHitLimit  int
-	sourceHitTotal  int
-	sourceHitKey    string
-	sourceHitCache  []SourceHit
-	sourceEditors   map[string]*memedit.MemEditor
+	files            map[string]string
+	matcher          FileFilterFunc
+	programName      string
+	sourceMu         sync.RWMutex
+	sourceHitOffset  int
+	sourceHitLimit   int
+	sourceHitTotal   int
+	sourceHitCaches  map[string][]SourceHit
+	sourceHitEditors map[string]*memedit.MemEditor
 }
 
 // SourceHit is a raw source match before it is wrapped as a ValueOperator.
@@ -403,18 +402,25 @@ func (r *PatternRoot) SourceHitBatch() (offset int, limit int, total int) {
 }
 
 // SetSourceHits caches raw hits for repeated bounded executions of one filter.
+// Multiple independent filters within the same rule are cached under distinct
+// keys, so the same positive regex can be reused across statements and across
+// pattern_regex_not calls.
 func (r *PatternRoot) SetSourceHits(key string, hits []SourceHit) {
 	if r == nil {
 		return
 	}
 	r.sourceMu.Lock()
 	defer r.sourceMu.Unlock()
-	if key != r.sourceHitKey {
-		r.sourceHitKey = key
-		r.sourceHitCache = append([]SourceHit(nil), hits...)
-		r.sourceEditors = make(map[string]*memedit.MemEditor)
+	if r.sourceHitCaches == nil {
+		r.sourceHitCaches = make(map[string][]SourceHit)
+		r.sourceHitEditors = make(map[string]*memedit.MemEditor)
 	}
-	r.sourceHitTotal = len(r.sourceHitCache)
+	if _, ok := r.sourceHitCaches[key]; !ok {
+		r.sourceHitCaches[key] = append([]SourceHit(nil), hits...)
+	}
+	// sourceHitTotal tracks the size of the most recently accessed cache entry,
+	// which is what the batch window slices in sourceHitsToValues.
+	r.sourceHitTotal = len(r.sourceHitCaches[key])
 }
 
 // SourceHits returns cached raw hits when the filter key matches.
@@ -424,10 +430,12 @@ func (r *PatternRoot) SourceHits(key string) ([]SourceHit, bool) {
 	}
 	r.sourceMu.RLock()
 	defer r.sourceMu.RUnlock()
-	if key != r.sourceHitKey {
+	hits, ok := r.sourceHitCaches[key]
+	if !ok {
 		return nil, false
 	}
-	return r.sourceHitCache, true
+	r.sourceHitTotal = len(hits)
+	return hits, true
 }
 
 // SourceHitEditor returns one editor per file across all batches. Reusing the
@@ -438,10 +446,10 @@ func (r *PatternRoot) SourceHitEditor(path string) *memedit.MemEditor {
 	}
 	r.sourceMu.Lock()
 	defer r.sourceMu.Unlock()
-	if r.sourceEditors == nil {
-		r.sourceEditors = make(map[string]*memedit.MemEditor)
+	if r.sourceHitEditors == nil {
+		r.sourceHitEditors = make(map[string]*memedit.MemEditor)
 	}
-	if editor, ok := r.sourceEditors[path]; ok {
+	if editor, ok := r.sourceHitEditors[path]; ok {
 		return editor
 	}
 	content, ok := r.files[path]
@@ -449,7 +457,7 @@ func (r *PatternRoot) SourceHitEditor(path string) *memedit.MemEditor {
 		return nil
 	}
 	editor := memedit.NewMemEditorWithFileUrl(content, path)
-	r.sourceEditors[path] = editor
+	r.sourceHitEditors[path] = editor
 	return editor
 }
 
