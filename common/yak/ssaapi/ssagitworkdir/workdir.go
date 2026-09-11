@@ -203,6 +203,8 @@ func Prepare(ctx context.Context, pid int) (string, func() error, error) {
 }
 
 // CleanupForOwner removes only SSA Git workspaces owned by a finished child process.
+// Names are yakgit-{owner}-*; that includes compile clones and Legion
+// source-scan clones (yakgit-{owner}-source-scan-*).
 func CleanupForOwner(owner string) error {
 	if err := validateOwner(owner); err != nil {
 		return err
