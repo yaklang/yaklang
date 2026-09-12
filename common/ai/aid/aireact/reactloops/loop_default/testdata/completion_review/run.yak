@@ -1,0 +1,20 @@
+// Run via: yak -c (contents of this file). Credentials are environment-only.
+key = os.Getenv("REACT_LAB_API_KEY")
+if key == "" { die("REACT_LAB_API_KEY is required") }
+prompt = string(file.ReadFile(os.Getenv("REACT_LAB_PROMPT"))~)
+opts = [ai.apiKey(key), ai.baseURL("https://aibalance.yaklang.com/v1/chat/completions"), ai.model("deepseek-v4.1-flash"), ai.timeout(180)]
+err = aim.InvokeReAct(prompt,
+    aim.aiConfig("openai", opts...),
+    aim.qualityPriorityAIConfig("openai", opts...),
+    aim.speedPriorityAIConfig("openai", opts...),
+    aim.workdir(os.Getenv("REACT_LAB_WORKDIR")),
+    aim.timeout(900), aim.maxIteration(80), aim.yoloMode(),
+    aim.allowUserInteract(false), aim.disableAIForge(true),
+    aim.disableMCPServers(true),
+    aim.includeToolNames("read_file", "write_file", "list_dir", "grep", "find_files"),
+    aim.onEvent(func(op, event) {
+        println("LAB_EVENT " + json.dumps(event))
+    }),
+)
+if err != nil { die(err) }
+println("LAB_FINISHED")

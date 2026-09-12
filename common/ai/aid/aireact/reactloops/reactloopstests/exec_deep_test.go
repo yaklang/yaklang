@@ -46,7 +46,7 @@ func testFunc() {
 				})))
 			} else {
 				// 第二次调用：完成
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Code generated"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Code generated"}`))
 			}
 
 			rsp.Close()
@@ -117,7 +117,7 @@ pythonCode = "test python code"
 <javascript-code>
 const jsCode = "test js code";
 </javascript-code>
-{"@action": "finish", "answer": "Multiple codes generated"}`))
+{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Multiple codes generated"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -177,7 +177,7 @@ func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
 			rsp := i.NewAIResponse()
 			// 返回空标签
 			rsp.EmitOutputStream(bytes.NewBufferString(`<GEN_CODE></GEN_CODE>
-{"@action": "finish", "answer": "Empty code"}`))
+{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Empty code"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -214,7 +214,7 @@ func TestExec_CreateMirrors_NoAITags(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "No tags"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "No tags"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -244,7 +244,7 @@ func TestExec_CreateMirrors_TagWithNewlines(t *testing.T) {
 			rsp := i.NewAIResponse()
 			// 标签内容前后有换行符
 			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "finish", "answer": "Done"}
+{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Done"}
 <GEN_CODE>
 
 func multiLineFunc() {
@@ -317,7 +317,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 			rsp := i.NewAIResponse()
 			// 添加小延迟确保processing状态能被捕获
 			time.Sleep(10 * time.Millisecond) // Reduced from 50ms for faster tests
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Done"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -518,7 +518,7 @@ func TestExec_AITransaction_RetryMechanism(t *testing.T) {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "nonexistent_invalid_action"}`))
 			} else {
 				// 第三次返回有效action
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Success after retry"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Success after retry"}`))
 			}
 
 			rsp.Close()
@@ -581,7 +581,7 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 				})))
 			} else {
 				// 默认响应
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Done"}`))
 			}
 
 			rsp.Close()
@@ -648,7 +648,7 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 			if iterCount == 1 {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Rapid task completed"}`))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish"}`))
 			}
 
 			rsp.Close()
@@ -674,8 +674,8 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if iterCount != 2 {
-		t.Errorf("Expected 2 iterations (directly_answer, finish), got: %d", iterCount)
+	if iterCount != 3 {
+		t.Errorf("Expected answer, completion checkpoint and reviewed finish, got: %d", iterCount)
 	}
 
 	t.Logf("Rapid iterations completed: %d iterations in %v", iterCount, duration)
@@ -692,7 +692,7 @@ func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 
 			// 使用自定义action来测试多次迭代，而不是directly_answer
 			if iterCount >= 3 {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Done"}`))
 			} else {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "continue_action"}`))
 			}
@@ -780,7 +780,7 @@ func TestExec_StreamProcessing_ComplexJSON(t *testing.T) {
 					"step1": "First, understand the requirement",
 					"step2": "Then, design the solution"
 				},
-				"@action": "finish",
+				"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish",
 				"answer": "Complex JSON processed",
 				"metadata": {
 					"confidence": 0.95,
@@ -825,7 +825,7 @@ func TestExec_Feedback_MultipleRounds(t *testing.T) {
 			case 2:
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "feedback_action", "data": "round2"}`))
 			default:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Feedback done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Feedback done"}`))
 			}
 
 			rsp.Close()
@@ -888,7 +888,7 @@ func TestExec_DisallowNextLoopExit_Enforcement(t *testing.T) {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Trying to continue after feedback"}`))
 			} else {
 				// 最后：成功finish
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Finally finished"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Finally finished"}`))
 			}
 
 			rsp.Close()

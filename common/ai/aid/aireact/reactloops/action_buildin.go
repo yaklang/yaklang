@@ -31,18 +31,26 @@ func buildFinishBlockedByGoalModeMessage() string {
 
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
-	Description: "Request completion of the current task. Exit immediately when no open TODO remains and the host completion gate permits it. " +
+	Description: "Request completion of the current task after an evidence-backed coverage audit. An empty TODO list is not completion evidence. " +
 		"This is the normal terminator for non-trivial ReAct tasks; the only narrow host exception is a classifier-approved simple_query with no effective todo_delta or current-task TODO history. " +
-		"Use it when evidence/results are already present in the timeline and no evidence-backed, in-scope, immediately executable next action would materially improve confidence, risk coverage, or impact assessment " +
+		"Every acceptance goal and relevant observed object must be accounted for by executed TODOs and traceable observations. Register and execute untracked in-scope work before finish, including discoveries mentioned only in answers or evidence. " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
 		"CRITICAL: finish is a claim that the requested work is exhausted, not a TODO-reset command. If the current task still owns active TODO items, finish will be rejected until each is actually resolved, discriminatively dismissed, or externally blocked and deferred with evidence. " +
 		"Never bulk-close, downgrade, or fabricate outcomes merely to pass finish. A deferred item remains unfinished history; if its continuation condition is now satisfied, create a new open continuation TODO with a new ID and execute it before trying finish again. " +
 		"If the user needs a structured Markdown answer emitted to the chat, use 'directly_answer' first " +
-		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
+		"(it delivers the answer but does NOT end the task), audit its discoveries and continue any remaining work. " +
+		"The host requests a completion checkpoint even for an empty list. After reviewing unchanged work, provide completion_review; further actions or TODO/evidence changes require a fresh checkpoint. " +
 		"Add 'human_readable_thought' only if a brief closing note is needed.",
+	Options:        []aitool.ToolOption{completionReviewOption()},
+	ActionVerifier: verifyCompletionReviewAction,
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+		if action != nil && action.GetString("_todo_delta_error") != "" {
+			operator.Feedback(action.GetString("_todo_delta_error"))
+			operator.Continue()
+			return
+		}
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
 			msg := buildFinishBlockedByGoalModeMessage()
 			loop.invoker.AddToTimeline("[GOAL_MODE_FINISH_BLOCKED]", msg)
@@ -50,9 +58,8 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
-		// Only a finish request with remaining work needs a TODO checkpoint.
-		// Empty tasks must not spend another model turn confirming termination.
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
+			loop.invalidateCompletionReview(loop.GetCurrentTask())
 			msg := buildExitBlockedByTodoMessage("finish", items)
 			loop.requestFinishTodoCheckpoint()
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
@@ -60,8 +67,14 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
+		if msg, accepted := loop.checkCompletionReview(action); !accepted {
+			loop.invoker.AddToTimeline("[COMPLETION_REVIEW_REQUIRED]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
 		if loop.invoker != nil {
-			loop.invoker.AddToTimeline("finish", "AI requested finish with no open TODO remaining in the current task")
+			loop.invoker.AddToTimeline("finish", fmt.Sprintf("AI requested finish after completion review: %v", action.GetInvokeParams("completion_review")))
 		}
 		operator.Exit()
 	},
@@ -70,7 +83,7 @@ var loopAction_Finish = &LoopAction{
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType: "directly_answer",
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
-		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +
+		"For ordinary tasks directly_answer ONLY delivers the answer; review relevant discoveries in the answer, register untracked work in todo_delta, and execute it before requesting finish. An empty TODO list alone does not prove completion. " +
 		"A classifier-approved simple_query with no effective todo_delta and no current-task TODO history is closed by the host immediately after delivery. " +
 		"Do not call directly_answer twice without an effective todo_delta in the same CURRENT-TASK; repeated or rephrased answers are rejected. " +
 		"Carry a non-empty 'todo_delta' alongside a progress answer whenever it changes or schedules follow-up TODO state.",

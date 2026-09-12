@@ -53,7 +53,7 @@ func TestReActLoop_FieldStreamHandler_DropsJSONEmbeddedAITag(t *testing.T) {
 				buggy := `{"@action":"capture_facts","facts":"<|FACTS_CURRENT_NONCE|>\n## 测试事实\n- inner content line 1\n- inner content line 2\n<|FACTS_END_CURRENT_NONCE|>"}`
 				rsp.EmitOutputStream(bytes.NewBufferString(buggy))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -153,7 +153,7 @@ func TestReActLoop_FieldStreamHandler_KeepsCleanJSONFieldValue(t *testing.T) {
 					`{"@action":"capture_facts","facts":"## 测试事实\n- 干净 markdown 内容\n- 第二行"}`,
 				))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil

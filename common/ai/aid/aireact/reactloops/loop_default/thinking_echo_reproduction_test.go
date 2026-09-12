@@ -15,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
+const testReviewedFinish = `{"@action":"finish","completion_review":{"goal_evidence":"The scripted answer has been emitted in the preceding action.","discovery_audit":"The scripted observation introduces no additional objects.","closure_audit":"No tool work or deferred blocker remains in this fixture."}}`
+
 const reproducedPromptExampleReasoning = `The output examples are:
 {"@action":"directly_answer","answer_payload":"...[your-answer not a markdown].."}
 {"@action":"directly_answer"}
@@ -81,10 +83,10 @@ func TestDefaultLoop_ReproducesReasoningReplayPromptExampleEcho(t *testing.T) {
 					strings.Contains(prompt, "FINAL_ANSWER_CURRENT_NONCE") {
 					response.EmitOutputStream(strings.NewReader(reproducedPromptExampleEcho))
 				} else {
-					response.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
+					response.EmitOutputStream(strings.NewReader(testReviewedFinish))
 				}
 			default:
-				response.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
+				response.EmitOutputStream(strings.NewReader(testReviewedFinish))
 			}
 			response.Close()
 			return response, nil
@@ -123,7 +125,7 @@ func TestDefaultLoop_ReproducesReasoningReplayPromptExampleEcho(t *testing.T) {
 	callCount := calls
 	mu.Unlock()
 
-	require.Equal(t, 3, callCount, "after the answer retry, one finish must end the task")
+	require.Equal(t, 4, callCount, "after the answer retry, a completion checkpoint and reviewed finish end the task")
 	require.GreaterOrEqual(t, len(capturedPrompts), 2)
 	require.Equal(t, 1, strings.Count(capturedPrompts[0], "...[your-answer not a markdown].."),
 		"the initial prompt already contains one executable copy in output_example")
@@ -185,7 +187,7 @@ func TestDefaultLoop_PromptExampleEchoDoesNotRequireReasoningReplay(t *testing.T
 				require.Contains(t, request.GetPrompt(), "FINAL_ANSWER_CURRENT_NONCE")
 				response.EmitOutputStream(strings.NewReader(reproducedPromptExampleEcho))
 			} else {
-				response.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
+				response.EmitOutputStream(strings.NewReader(testReviewedFinish))
 			}
 			response.Close()
 			return response, nil
@@ -213,7 +215,7 @@ func TestDefaultLoop_PromptExampleEchoDoesNotRequireReasoningReplay(t *testing.T
 	capturedEvents := append([]*schema.AiOutputEvent(nil), events...)
 	callCount := calls
 	mu.Unlock()
-	require.Equal(t, 2, callCount, "one answer and one finish must end the task")
+	require.Equal(t, 3, callCount, "one answer, completion checkpoint and reviewed finish end the task")
 
 	answerStreamStarts, answerStream, _ := snapshotAnswerStreams(capturedEvents)
 	require.Equal(t, 2, answerStreamStarts)
@@ -259,7 +261,7 @@ func TestDefaultLoop_ReasonStreamProtocolTextIsNotParsedAsAnswer(t *testing.T) {
 			if callIndex == 0 {
 				response.EmitReasonStream(strings.NewReader(reproducedPromptExampleReasoning))
 			}
-			response.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
+			response.EmitOutputStream(strings.NewReader(testReviewedFinish))
 			response.Close()
 			return response, nil
 		}),
