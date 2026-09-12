@@ -88,7 +88,7 @@ func newPostIterationTestLoop(t *testing.T, invoker *postIterationTestInvoker, e
 }
 
 // scriptedCallback 按调用次序依次返回脚本化的 AI 响应。
-// 无开放 TODO 时，首次 finish 即可退出。
+// 最后一条响应重复使用, 使完成检查点之后仍可提交同一状态的审计。
 func scriptedCallback(responses ...string) aicommon.AICallbackType {
 	var mu sync.Mutex
 	callCount := 0
@@ -114,7 +114,7 @@ func scriptedCallback(responses ...string) aicommon.AICallbackType {
 func TestDefaultLoop_PostIterationSkipsSummaryAfterDirectlyAnswer(t *testing.T) {
 	invoker := newPostIterationTestInvoker(scriptedCallback(
 		`{"@action": "directly_answer", "answer_payload": "最终答案"}`,
-		`{"@action": "finish", "answer": "done"}`,
+		testReviewedFinish,
 	))
 	loop := newPostIterationTestLoop(t, invoker)
 
@@ -137,7 +137,7 @@ func TestDefaultLoop_PostIterationSkipsSummaryAfterDirectlyAnswer(t *testing.T) 
 func TestDefaultLoop_PostIterationGeneratesSummaryAfterOtherAction(t *testing.T) {
 	invoker := newPostIterationTestInvoker(scriptedCallback(
 		`{"@action": "record_note", "note": "做了一些工作"}`,
-		`{"@action": "finish", "answer": "done"}`,
+		testReviewedFinish,
 	))
 	loop := newPostIterationTestLoop(t, invoker,
 		reactloops.WithRegisterLoopAction(

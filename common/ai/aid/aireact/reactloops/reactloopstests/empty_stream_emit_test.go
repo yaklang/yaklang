@@ -50,7 +50,7 @@ func TestReActLoop_AITagEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 					`{"@action":"capture_facts"}<|FACTS_CURRENT_NONCE|><|FACTS_END_CURRENT_NONCE|>`,
 				))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -126,7 +126,7 @@ func TestReActLoop_FieldEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 			if callCount == 1 {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"capture_summary","summary":""}`))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -213,7 +213,7 @@ func TestReActLoop_AITagChineseStreamKeepsUTF8(t *testing.T) {
 					`{"@action":"capture_facts"}<|FACTS_CURRENT_NONCE|>` + expected + `<|FACTS_END_CURRENT_NONCE|>`,
 				))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -273,7 +273,7 @@ func TestReActLoop_FieldChineseStreamKeepsUTF8(t *testing.T) {
 			if callCount == 1 {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"capture_summary","summary":"` + expected + `"}`))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil

@@ -125,7 +125,7 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
 				"assistant output delivered; the loop continues to honor the scheduled todo_delta. "+
-					"Use the 'finish' action to end the task once all work is done.")
+					"Register relevant discoveries from the answer, execute remaining work, and audit acceptance evidence before requesting finish.")
 		}
 		operator.Continue()
 		return
@@ -142,8 +142,8 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	if !utils.IsNil(invoker) {
 		invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
 			"assistant output delivered. Do not repeat or rephrase the same answer. "+
-				"Re-evaluate CURRENT-TASK: if the latest user input is fully answered and no open TODO remains, use 'finish' now; "+
-				"otherwise continue the existing Current with tools and maintain todo_delta. "+
+				"Audit the answer and recent observations for relevant objects not yet tracked in TODOs; add them through todo_delta and execute them. "+
+				"An empty TODO list is not completion evidence. Continue the existing Current and verify acceptance goals before requesting finish. "+
 				"The user does not need to reply 'continue'.")
 	}
 	operator.Continue()
