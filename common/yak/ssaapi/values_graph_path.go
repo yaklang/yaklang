@@ -145,7 +145,10 @@ func (this *Value) getPathWithDirectionWithContext(ctx context.Context, edgeFilt
 			return out
 		},
 		func(node *Value) int64 { // getKey
-			return node.GetId()
+			// Edges belong to an analysis Value, not just its SSA instruction.
+			// Distinct wrappers for one instruction may have different paths;
+			// collapsing them keeps an arbitrary map iteration's continuation.
+			return node.GetUID()
 		},
 		func(t *Value) *Value { // getValue
 			return t
