@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -16,6 +17,7 @@ import (
 )
 
 type ScanNode struct {
+	resourcePolicyMu  sync.Mutex
 	node              *node.NodeBase
 	manager           *TaskManager
 	capabilityManager *CapabilityManager
@@ -91,6 +93,9 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 	}
 	if cfg.NodeType == "" {
 		cfg.NodeType = spec.NodeType_Scanner
+	}
+	if strings.TrimSpace(cfg.Kind) != "ai_session" {
+		cfg.CapabilityKeys = append(cfg.CapabilityKeys, "node.resource_policy.v1")
 	}
 	cfg.CapabilityKeys = normalizeScanNodeCapabilityKeys(cfg.CapabilityKeys)
 	if cfg.StatusProvider == nil {
@@ -263,6 +268,8 @@ func (s *ScanNode) releaseSSAGitScopeLockAfterTasks() {
 }
 
 func (s *ScanNode) Snapshot() node.RuntimeStatus {
+	s.resourcePolicyMu.Lock()
+	defer s.resourcePolicyMu.Unlock()
 	status := node.RuntimeStatus{
 		LifecycleState: node.DefaultLifecycleState,
 		RunningJobs:    s.invokeLimiter.activeCount(),
