@@ -94,7 +94,7 @@ func runForgeEquivTest(
 			}
 
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish"}`))
 			rsp.Close()
 			return rsp, nil
 		}),

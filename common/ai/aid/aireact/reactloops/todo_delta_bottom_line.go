@@ -10,8 +10,8 @@ import (
 // suppressInvalidTodoDelta keeps TODO maintenance subordinate to the selected
 // ReAct action. The invalid delta is rejected atomically and recorded for a
 // later correction, while the already-valid tool/answer action is preserved.
-// Finish remains safe because its handler independently refuses to exit while
-// the current scope owns open TODOs.
+// Finish rejects invalid maintenance and independently checks open TODOs and
+// completion review before it can exit.
 func suppressInvalidTodoDelta(r *ReActLoop, action *aicommon.Action, err error) {
 	if action == nil || err == nil {
 		return
@@ -21,12 +21,16 @@ func suppressInvalidTodoDelta(r *ReActLoop, action *aicommon.Action, err error) 
 		err,
 	)
 	if r != nil {
+		r.invalidateCompletionReview(r.GetCurrentTask())
 		if invoker := r.GetInvoker(); invoker != nil {
 			invoker.AddToTimeline("TODO_DELTA_ERROR", message)
 		}
 	}
 	log.Warnf("%s", message)
 	action.DeleteParam("todo_delta")
+	// Preserve the selected tool/answer, but an invalid sidecar must never be
+	// silently discarded on a finish that would otherwise accept a stale audit.
+	action.Set("_todo_delta_error", message)
 }
 
 // validateTodoDeltaBeforeActionVerifier normalizes and validates TODO state

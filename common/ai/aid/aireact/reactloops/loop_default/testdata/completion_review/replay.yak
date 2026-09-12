@@ -1,0 +1,61 @@
+// Fault injection, not a natural-model success-rate benchmark. The first three
+// primary decisions replay a partial delivery and premature finish; every later
+// decision uses the configured live model through the actual aim.InvokeReAct loop.
+key = os.Getenv("REACT_LAB_API_KEY")
+if key == "" { die("REACT_LAB_API_KEY is required") }
+prompt = string(file.ReadFile(os.Getenv("REACT_LAB_PROMPT"))~)
+root = os.Getenv("REACT_LAB_FIXTURE")
+resultPath = os.Getenv("REACT_LAB_RESULT")
+opts = [ai.type("openai"), ai.apiKey(key), ai.baseURL("https://aibalance.yaklang.com/v1/chat/completions"), ai.model("deepseek-v4.1-flash"), ai.timeout(180)]
+step = 0
+lock = sync.NewMutex()
+func callback(cfg, req) {
+    p = req.GetPrompt()
+    primary = str.HasPrefix(req.GetCallerLabel(), "react-loop:")
+    lock.Lock()
+    s = 0
+    if primary { step++; s = step }
+    lock.Unlock()
+    reply = ""
+    if s == 1 {
+        calls = []
+        for name in ["index.json", "defaults.json", "routes/checkout.json", "registry.json"] {
+            calls = append(calls, {"tool_name":"read_file", "params":{"file":root+"/"+name, "mode":"lines"}, "identifier":str.ReplaceAll(name,"/","_"), "reason":"Read release configuration"})
+        }
+        reply = json.dumps({"@action":"directly_call_tool", "identifier":"seed_read_primary", "directly_call_tool_calls":calls,
+            "todo_delta":{"add":[{"id":"release","text":"Audit production release routes and publish effective configuration, source: user request"}],"current":"release"}})
+    } elif s == 2 {
+        partial = json.dumps({"routes":[{"name":"checkout","timeout":45,"retries":2,"proof":"CHECK-741","sources":["defaults.json","routes/checkout.json"]}],"excluded":["retired"]})
+        reply = json.dumps({"@action":"directly_call_tool", "identifier":"seed_partial_delivery", "directly_call_tool_name":"write_file", "directly_call_tool_params":{"file":resultPath,"content":partial},
+            "todo_delta":{"close":[{"id":"release","outcome":"resolved","reason":"Primary checkout route has been confirmed; other registry routes are secondary findings","refs":["seed_read_primary"]}]}})
+    } elif s == 3 {
+        reply = json.dumps({"@action":"finish","identifier":"seed_premature_finish"})
+    } else {
+        buffered = ""
+        liveOpts = append(opts, ai.onStream(func(reader) { buffered = string(io.ReadAll(reader)~) }), ai.onReasonStream(func(reader) { io.ReadAll(reader) }))
+        returned = ai.Chat(p, liveOpts...)~
+        reply = buffered
+        if reply == "" { reply = returned }
+    }
+    rsp = cfg.NewAIResponse()
+    if s > 0 && s <= 3 {
+        rsp.SetModelInfo("fixture", "scripted-early-finish")
+        println("LAB_SEEDED_DECISION " + sprint(s))
+    } else {
+        rsp.SetModelInfo("openai", "deepseek-v4.1-flash")
+    }
+    rsp.EmitOutputStream(str.NewReader(reply))
+    rsp.Close()
+    return rsp, nil
+}
+err = aim.InvokeReAct(prompt,
+    aim.aiConfig("openai", opts...),
+    aim.qualityPriorityAICallback(callback),
+    aim.speedPriorityAIConfig("openai", opts...),
+    aim.workdir(os.Getenv("REACT_LAB_WORKDIR")),
+    aim.timeout(900), aim.maxIteration(80), aim.yoloMode(),
+    aim.allowUserInteract(false), aim.disableAIForge(true), aim.disableMCPServers(true),
+    aim.onEvent(func(op, event) { println("LAB_EVENT " + json.dumps(event)) }),
+)
+if err != nil { die(err) }
+println("LAB_FINISHED")

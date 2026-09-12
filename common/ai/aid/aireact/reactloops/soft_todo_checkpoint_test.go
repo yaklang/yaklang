@@ -93,17 +93,11 @@ func switchCurrentTodo(t *testing.T, cfg *softCheckpointConfig, task aicommon.AI
 	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
 }
 
-func TestFinishWithoutOpenTodosExitsImmediately(t *testing.T) {
-	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
-	op := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, op)
-	terminated, err := op.IsTerminated()
-	require.True(t, terminated)
-	require.NoError(t, err)
-	require.False(t, op.IsContinued())
-	require.Empty(t, op.GetFeedback().String())
+func TestFinishWithoutOpenTodosRequiresCompletionReview(t *testing.T) {
+	loop, _, _, task := newTodoGateTestLoop(t, nil)
+	requireCompletionCheckpoint(t, loop, task)
+	requireReviewedFinish(t, loop, task)
 	require.Empty(t, loop.consumeTodoCheckpoint())
-	require.NotContains(t, strings.Join(invoker.timeline, "\n"), "CHECKPOINT")
 }
 
 func TestFinishWithOpenTodosBlocksUntilTheyAreClosed(t *testing.T) {
@@ -125,11 +119,8 @@ func TestFinishWithOpenTodosBlocksUntilTheyAreClosed(t *testing.T) {
 		Close: []aicommon.TodoClose{{ID: "todo-1", Outcome: aicommon.TodoOutcomeResolved, Reason: "targeted check passed", Refs: []string{"observation-1"}}},
 	})
 	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
-	op := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, op)
-	terminated, err := op.IsTerminated()
-	require.True(t, terminated, "the first finish after resolving work must exit")
-	require.NoError(t, err)
+	requireCompletionCheckpoint(t, loop, task)
+	requireReviewedFinish(t, loop, task)
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
@@ -215,7 +206,7 @@ func TestCurrentTodoCheckpointQueuesAfterTwentyFifthValidIteration(t *testing.T)
 	require.Contains(t, checkpoint, "主要矛盾")
 	require.Contains(t, checkpoint, "尚未进入 Frontier 的同级有效分支")
 	require.Contains(t, checkpoint, "沿 CURRENT 继续向深处执行")
-	require.Contains(t, checkpoint, "同一 todo_delta 中 close 旧项并设置下一 CURRENT")
+	require.Contains(t, checkpoint, "保持开放并切换 current")
 	require.NotContains(t, checkpoint, "25")
 	require.NotContains(t, strings.ToLower(checkpoint), "iteration")
 	require.NotContains(t, checkpoint, "迭代")

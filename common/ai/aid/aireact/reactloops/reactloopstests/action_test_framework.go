@@ -84,11 +84,11 @@ func NewActionTestFrameworkEx(
 				if actionJSON != "" {
 					rsp.EmitOutputStream(bytes.NewBufferString(actionJSON))
 				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Test completed"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Test completed"}`))
 				}
 			} else {
 				// Subsequent calls finish
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Test completed"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action": "finish", "answer": "Test completed"}`))
 			}
 
 			rsp.Close()

@@ -49,7 +49,7 @@ func TestReActLoop_FieldStream_EmptyContentTypeFallsToDefault(t *testing.T) {
 					`{"@action":"capture_reason","reason":"` + reasonBody + `"}`,
 				))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -70,8 +70,8 @@ func TestReActLoop_FieldStream_EmptyContentTypeFallsToDefault(t *testing.T) {
 			"capture reason with empty content type",
 			nil,
 			[]*reactloops.LoopStreamField{{
-				FieldName:  reasonField,
-				AINodeId:   reasonNodeID,
+				FieldName: reasonField,
+				AINodeId:  reasonNodeID,
 				// ContentType 留空
 			}},
 			nil,
@@ -144,7 +144,7 @@ func TestReActLoop_FieldStream_ExplicitContentTypePreserved(t *testing.T) {
 					`{"@action":"capture_conclusion","conclusion":"` + answerBody + `"}`,
 				))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","answer":"done"}`))
 			}
 			rsp.Close()
 			return rsp, nil
