@@ -909,9 +909,9 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "验证",
 		En: "Verification",
 	},
-	"verification_payload": {
-		Zh: "验证说明",
-		En: "Verification Payload",
+	"evidence_content": {
+		Zh: "记录",
+		En: "Recording Evidence",
 	},
 	"answer": {
 		Zh: "回答",
