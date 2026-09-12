@@ -31,8 +31,8 @@ func buildFinishBlockedByGoalModeMessage() string {
 
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
-	Description: "Request completion of the current task. The first valid request starts one soft TODO checkpoint; confirm with finish again after that checkpoint to exit. " +
-		"This is the normal terminator for non-trivial ReAct tasks; the only narrow host exception is a classifier-approved simple_query with no effective todo_delta or open TODO. " +
+	Description: "Request completion of the current task. Exit immediately when no open TODO remains and the host completion gate permits it. " +
+		"This is the normal terminator for non-trivial ReAct tasks; the only narrow host exception is a classifier-approved simple_query with no effective todo_delta or current-task TODO history. " +
 		"Use it when evidence/results are already present in the timeline and no evidence-backed, in-scope, immediately executable next action would materially improve confidence, risk coverage, or impact assessment " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
@@ -50,28 +50,18 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
-		// Known open work is a concrete blocker and should be reported before the
-		// general completion audit. Showing the soft checkpoint first makes the
-		// model audit an impossible finish, then retry finish instead of advancing
-		// or applying an evidence-backed todo_delta.
+		// Only a finish request with remaining work needs a TODO checkpoint.
+		// Empty tasks must not spend another model turn confirming termination.
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 			msg := buildExitBlockedByTodoMessage("finish", items)
+			loop.requestFinishTodoCheckpoint()
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
 			operator.Feedback(msg)
 			operator.Continue()
 			return
 		}
-		if !loop.requestSoftTodoCheckpoint() {
-			msg := "finish requested; a soft TODO checkpoint will be shown in the next context before termination can be confirmed"
-			if loop.invoker != nil {
-				loop.invoker.AddToTimeline("SOFT_TODO_CHECKPOINT_REQUESTED", msg)
-			}
-			operator.Feedback(msg)
-			operator.Continue()
-			return
-		}
 		if loop.invoker != nil {
-			loop.invoker.AddToTimeline("finish", "AI confirmed finish after the soft TODO checkpoint")
+			loop.invoker.AddToTimeline("finish", "AI requested finish with no open TODO remaining in the current task")
 		}
 		operator.Exit()
 	},
@@ -81,7 +71,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType: "directly_answer",
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +
-		"A classifier-approved simple_query with no effective todo_delta and no open TODO is closed by the host immediately after delivery. " +
+		"A classifier-approved simple_query with no effective todo_delta and no current-task TODO history is closed by the host immediately after delivery. " +
 		"Do not call directly_answer twice without an effective todo_delta in the same CURRENT-TASK; repeated or rephrased answers are rejected. " +
 		"Carry a non-empty 'todo_delta' alongside a progress answer whenever it changes or schedules follow-up TODO state.",
 	Options: []aitool.ToolOption{

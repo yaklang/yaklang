@@ -9,32 +9,14 @@ import (
 
 const currentTodoCheckpointThreshold = 25
 
-const softTodoCheckpointPrompt = `[SOFT TODO CHECKPOINT]
+const finishTodoCheckpointPrompt = `[FINISH BLOCKED BY TODO]
 
-你准备结束当前任务。
+你请求 finish，但当前任务仍有未完成 TODO。
 
-这是完成性审计，不是清空 TODO 的指令。结束前穷尽检查 CURRENT-TASK、TODO、timeline 和最新 Observation 与交付物。TODO 已清空不是任务完成的充分证据：
-
-- 是否仍有不能忽略的开放事项；
-- 是否有 TODO 已解决但尚未记录结果；
-- 最近关闭的 TODO 是否只有行政性 reason、缺少对应 Observation/交付物，或仅凭单次阴性请求、普通扫描未命中、工具报错就被标为 resolved/dismissed/deferred；若有，不得改写终态历史，必须用新 ID 添加延续 TODO，设为 CURRENT，并执行至少一次有实质差异、能产生证据的行动；
-- deferred 是未完成的终态历史，不是完成证明。若其恢复条件已满足且仍属于当前目标，用新 ID 建立延续 TODO；只有确有外部前置条件、权限或范围阻塞时才可保持 deferred；
-- timeline 或最新 Observation 是否暴露了尚未通过 todo_delta 进入 Frontier 的范围内具体入口（链接、表单 action、跳转、脚本路由、文档端点或响应字段）；
-- 是否把单次工具、参数、连接、认证、空响应或 payload 失败误当成路径结束，而没有先执行有实质差异的修正或替代实验；
-- 未完成事项是否应明确标记为 deferred。
-
-还要检查是否出现了尚未进入 TODO 的高价值后续行动。只有同时满足以下条件时，它才阻止结束：
-
-- 仍属于当前用户目标和 CURRENT-TASK；
-- 由已有证据、异常或弱信号直接支持；
-- 无需用户新增目标或授权，能够在当前主线之后或前置条件满足后执行；
-- 预计会实质提高结论可信度、风险覆盖或影响判断。
-
-若存在一个或多个合格分支，立即在下一动作 JSON 的 todo_delta 字段中将它们全部加入或更新到 Frontier；TODO LIST、自然语言或自定义 TODO 标签都不会改变状态。终态 ID 不可 UPDATE/CLOSE/CURRENT；要恢复它必须 ADD 一个新 ID。覆盖入口写清目标、来源证据和第一步；验证型分支再写可证伪假设。随后将价值最高且最接近当前证据的一项设为 CURRENT，并在下一动作直接执行，不要再次 finish 或重复答复。
-通用优化、范围外扩展、需要用户新选择、没有具体观察目标或只有空泛猜测且预期信息增益很低的想法不阻止结束，也不要为了显得主动制造 TODO。
-
-严禁为通过 finish 而批量 reset、resolved、dismissed 或 deferred；每个 outcome 都必须由已有证据支持。
-仅当以上检查未发现范围内、可执行、会实质提高完成度的行动，并且所有交付物都已验证时，才再次 finish。`
+继续执行当前 TODO；没有 CURRENT 时，选择一个可执行的开放项并用 todo_delta 设为 CURRENT。
+仅当已有 Observation 或交付物支持该项结论时，才用 todo_delta.close 写明 outcome、reason 和 refs。
+不要为结束而批量关闭、降级或 deferred，也不要重复答复或反复 finish。
+处理完剩余事项后再 finish；无开放 TODO 时直接结束，无需再次确认。`
 
 const currentTodoCheckpointPrompt = `[CURRENT TODO CHECKPOINT]
 
@@ -66,23 +48,17 @@ func todoCheckpointScopeKey(scope aicommon.VerificationTodoScope) string {
 	return scope.TaskID + "\x00" + scope.TaskIndex
 }
 
-// requestSoftTodoCheckpoint returns true only after the checkpoint belonging
-// to the current finish flow has already been requested. A finish checkpoint
-// subsumes any pending CURRENT checkpoint for the same task scope.
-func (r *ReActLoop) requestSoftTodoCheckpoint() bool {
+// requestFinishTodoCheckpoint is called only when finish is blocked by open
+// TODOs. It subsumes a pending CURRENT checkpoint for the same task scope.
+func (r *ReActLoop) requestFinishTodoCheckpoint() {
+	key := todoCheckpointScopeKey(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()))
 	r.todoCheckpointMu.Lock()
 	defer r.todoCheckpointMu.Unlock()
-	if r.softTodoChecked {
-		return true
-	}
-	r.softTodoChecked = true
-	r.softTodoCheckpointPending = true
-	key := todoCheckpointScopeKey(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()))
+	r.finishTodoCheckpointScope = key
 	if progress := r.currentTodoProgress[key]; progress != nil {
 		progress.Iterations = 0
 		progress.Pending = false
 	}
-	return false
 }
 
 // consumeTodoCheckpoint returns at most one checkpoint. Finish has priority;
@@ -92,19 +68,20 @@ func (r *ReActLoop) consumeTodoCheckpoint() string {
 	if r == nil || r.config == nil {
 		return ""
 	}
-	scope := aicommon.BuildVerificationTodoScope(r.GetCurrentTask())
+	task := r.GetCurrentTask()
+	scope := aicommon.BuildVerificationTodoScope(task)
+	hasOpenTodos := len(aicommon.GetBlockingVerificationTodoItems(r.config, task)) > 0
 	_, current, _ := r.config.SnapshotCanonicalTodos(scope)
 	key := todoCheckpointScopeKey(scope)
 
 	r.todoCheckpointMu.Lock()
 	defer r.todoCheckpointMu.Unlock()
-	if r.softTodoCheckpointPending {
-		r.softTodoCheckpointPending = false
-		if progress := r.currentTodoProgress[key]; progress != nil {
-			progress.Iterations = 0
-			progress.Pending = false
+	if r.finishTodoCheckpointScope != "" {
+		pendingScope := r.finishTodoCheckpointScope
+		r.finishTodoCheckpointScope = ""
+		if pendingScope == key && hasOpenTodos {
+			return finishTodoCheckpointPrompt
 		}
-		return softTodoCheckpointPrompt
 	}
 	progress := r.currentTodoProgress[key]
 	if progress == nil || !progress.Pending {

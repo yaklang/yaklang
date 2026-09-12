@@ -674,8 +674,8 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if iterCount != 3 {
-		t.Errorf("Expected 3 iterations (directly_answer, finish checkpoint, finish confirmation), got: %d", iterCount)
+	if iterCount != 2 {
+		t.Errorf("Expected 2 iterations (directly_answer, finish), got: %d", iterCount)
 	}
 
 	t.Logf("Rapid iterations completed: %d iterations in %v", iterCount, duration)
