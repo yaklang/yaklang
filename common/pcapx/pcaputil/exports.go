@@ -19,6 +19,9 @@ var Exports = map[string]any{
 	"pcap_everyPacket":                  WithEveryPacket,
 	"pcap_debug":                        WithDebug,
 	"pcap_disableAssembly":              WithDisableAssembly,
+	"pcap_tcpReassemblyStream":          WithTCPReassemblyStream,
+	"pcap_tcpReassemblyWorkers":         WithTCPReassemblyWorkers,
+	"pcap_tcpReassemblyStats":           WithTCPReassemblyStats,
 }
 
 // StartSniff 在指定网卡上开始抓包(嗅探),通过回调选项处理捕获到的流量
