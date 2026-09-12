@@ -619,11 +619,6 @@ type yakRuntimeOptions struct {
 	FocusRuntimeName               string                    `json:"focus_runtime_name"`
 	FocusTargetURL                 string                    `json:"focus_target_url"`
 	ConversationResultTargetURL    string                    `json:"conversation_result_target_url"`
-	AITaskRunID                    string                    `json:"ai_task_run_id"`
-	AITaskKey                      string                    `json:"ai_task_key"`
-	AITaskVersion                  string                    `json:"ai_task_version"`
-	AITaskDefinitionChecksum       string                    `json:"ai_task_definition_checksum"`
-	AITaskSessionRole              string                    `json:"ai_task_session_role"`
 	Workdir                        string                    `json:"workdir"`
 	Language                       string                    `json:"language"`
 	SessionMCPServers              []sessionMCPServer        `json:"session_mcp_servers"`

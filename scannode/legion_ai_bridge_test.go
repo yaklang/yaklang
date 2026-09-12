@@ -351,6 +351,9 @@ func TestAISessionRuntimeManagerPendingRebindCancelRetiresPreviousRuntime(t *tes
 	if _, err := manager.Bind(context.Background(), first, nil, aiSessionRuntimeBindOptions{}); err != nil {
 		t.Fatalf("first bind: %v", err)
 	}
+	manager.mu.Lock()
+	retired := manager.sessions[first.GetSession().GetSessionId()]
+	manager.mu.Unlock()
 	second := proto.Clone(first).(*aiv1.BindAISessionCommand)
 	second.Metadata.CommandId = "cmd-bind-2"
 	second.BindEpoch = 2
@@ -371,27 +374,23 @@ func TestAISessionRuntimeManagerPendingRebindCancelRetiresPreviousRuntime(t *tes
 	if err != nil {
 		t.Fatalf("cancel pending rebind: %v", err)
 	}
-	if !cancelled.applyHandle || cancelled.handle == nil || cancelled.ref.BindEpoch != 2 {
+	if cancelled.ref.BindEpoch != 2 {
 		t.Fatalf("pending rebind did not retain previous runtime for terminal cleanup: %#v", cancelled)
 	}
-	manager.mu.Lock()
-	retired := manager.sessions[first.GetSession().GetSessionId()]
-	manager.mu.Unlock()
 	if retired == nil || retired.currentRef().BindEpoch != first.BindEpoch || retired.beginEmission() {
 		t.Fatalf("previous runtime was not fenced under its original epoch: %#v", retired)
 	}
-	cancelled.handle.Cancel(cancelled.reason)
 	retried, err := manager.Cancel(cancelCommand)
-	if err != nil || retried.applyHandle || retried.ref.BindEpoch != 2 || retried.runtimeRef.BindEpoch != first.BindEpoch {
+	if err != nil || retried.applyHandle || retried.ref.BindEpoch != 2 {
 		t.Fatalf("retry pending-rebind cancellation: cancelled=%#v err=%v", retried, err)
 	}
-	if err := manager.CompleteTerminal(retried.runtimeRef, "cancel"); err != nil {
+	if err := manager.CompleteTerminal(retried.ref, "cancel"); err != nil {
 		t.Fatalf("complete pending-rebind cancellation: %v", err)
 	}
 	if err := <-bindDone; !errors.Is(err, errAISessionBindFenced) {
 		t.Fatalf("cancelled replacement bind error = %v, want fenced", err)
 	}
-	recorder.assertCancel(t, 0, "user requested")
+	recorder.assertClose(t, 0, "pending binding cancelled")
 	if hasAISessionRuntime(manager, first.GetSession().GetSessionId()) {
 		t.Fatal("previous runtime survived pending-rebind cancellation")
 	}
@@ -413,7 +412,7 @@ func TestAISessionRuntimeManagerCloseFencesPendingBindAndRebind(t *testing.T) {
 		}()
 		<-driver.started
 		closed, err := manager.Close(validAISessionCloseCommand())
-		if err != nil || !closed.alreadyTerminal || !closed.acknowledge {
+		if err != nil || !closed.acknowledge {
 			t.Fatalf("close initial pending bind: closed=%#v err=%v", closed, err)
 		}
 		if err := <-bindDone; !errors.Is(err, errAISessionBindFenced) {
@@ -434,6 +433,9 @@ func TestAISessionRuntimeManagerCloseFencesPendingBindAndRebind(t *testing.T) {
 		if _, err := manager.Bind(context.Background(), first, nil, aiSessionRuntimeBindOptions{}); err != nil {
 			t.Fatalf("first bind: %v", err)
 		}
+		manager.mu.Lock()
+		retired := manager.sessions[first.GetSession().GetSessionId()]
+		manager.mu.Unlock()
 		second := proto.Clone(first).(*aiv1.BindAISessionCommand)
 		second.Metadata.CommandId = "cmd-bind-2"
 		second.BindEpoch = 2
@@ -447,27 +449,23 @@ func TestAISessionRuntimeManagerCloseFencesPendingBindAndRebind(t *testing.T) {
 		closeCommand := validAISessionCloseCommand()
 		closeCommand.Session.BindEpoch = 2
 		closed, err := manager.Close(closeCommand)
-		if err != nil || !closed.applyHandle || closed.handle == nil {
+		if err != nil || closed.ref.BindEpoch != 2 {
 			t.Fatalf("close pending rebind: closed=%#v err=%v", closed, err)
 		}
-		manager.mu.Lock()
-		retired := manager.sessions[first.GetSession().GetSessionId()]
-		manager.mu.Unlock()
 		if retired == nil || retired.currentRef().BindEpoch != first.BindEpoch || retired.beginEmission() {
 			t.Fatalf("previous runtime was not fenced under its original epoch: %#v", retired)
 		}
-		closed.handle.Close(closed.reason)
 		retried, err := manager.Close(closeCommand)
-		if err != nil || retried.applyHandle || retried.ref.BindEpoch != 2 || retried.runtimeRef.BindEpoch != first.BindEpoch {
+		if err != nil || retried.applyHandle || retried.ref.BindEpoch != 2 {
 			t.Fatalf("retry pending-rebind close: closed=%#v err=%v", retried, err)
 		}
-		if err := manager.CompleteTerminal(retried.runtimeRef, "close"); err != nil {
+		if err := manager.CompleteTerminal(retried.ref, "close"); err != nil {
 			t.Fatalf("complete pending-rebind close: %v", err)
 		}
 		if err := <-bindDone; !errors.Is(err, errAISessionBindFenced) {
 			t.Fatalf("closed replacement bind error = %v, want fenced", err)
 		}
-		recorder.assertClose(t, 0, "platform done")
+		recorder.assertClose(t, 0, "pending binding cancelled")
 		if hasAISessionRuntime(manager, first.GetSession().GetSessionId()) {
 			t.Fatal("previous runtime survived pending-rebind close")
 		}
@@ -880,7 +878,9 @@ func TestAISessionOlderBindFailureCannotDowngradeHigherCancelTombstone(t *testin
 
 	manager.mu.Lock()
 	manager.bindings[first.GetSession().GetSessionId()] = aiSessionBindReservation{
-		ref: aiSessionRefFromBindCommand(higher),
+		ref:       aiSessionRefFromBindCommand(higher),
+		commandID: higher.GetMetadata().GetCommandId(),
+		epoch:     higher.BindEpoch,
 	}
 	manager.mu.Unlock()
 	cancelCommand := validAISessionCancelCommand()
@@ -890,9 +890,10 @@ func TestAISessionOlderBindFailureCannotDowngradeHigherCancelTombstone(t *testin
 	if err != nil {
 		t.Fatalf("cancel higher pending bind: %v", err)
 	}
-	if !cancelled.applyHandle || cancelled.runtimeRef.BindEpoch != first.BindEpoch {
-		t.Fatalf("higher cancel did not retain the old runtime for cleanup: %#v", cancelled)
+	if cancelled.ref.BindEpoch != higher.BindEpoch {
+		t.Fatalf("higher cancel lost its generation identity: %#v", cancelled)
 	}
+	recorder.assertClose(t, 0, "pending binding cancelled")
 
 	failedRef := aiSessionRefFromBindCommand(failed)
 	if err := manager.finishBindError(failedRef, errors.New("late epoch-2 bind failure")); !errors.Is(err, errAISessionBindFenced) {
@@ -906,13 +907,13 @@ func TestAISessionOlderBindFailureCannotDowngradeHigherCancelTombstone(t *testin
 	if tombstone.kind != "cancel" || tombstone.commandID != cancelCommand.GetMetadata().GetCommandId() || tombstone.epoch != higher.BindEpoch {
 		t.Fatalf("higher cancel tombstone was downgraded: %#v", tombstone)
 	}
-	if retired == nil || !retired.retired || retired.terminalKind != "cancel" {
-		t.Fatalf("cancelled runtime was replaced by a lower bind failure: %#v", retired)
+	if retired != nil {
+		t.Fatalf("cancelled runtime survived a lower bind failure: %#v", retired)
 	}
 	if _, err := manager.Bind(context.Background(), higher, nil, aiSessionRuntimeBindOptions{}); !errors.Is(err, errAISessionBindFenced) {
 		t.Fatalf("cancelled higher epoch rebound: %v", err)
 	}
-	if err := manager.CompleteTerminal(cancelled.runtimeRef, "cancel"); err != nil {
+	if err := manager.CompleteTerminal(cancelled.ref, "cancel"); err != nil {
 		t.Fatalf("complete higher cancel: %v", err)
 	}
 	manager.mu.Lock()

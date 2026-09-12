@@ -224,7 +224,6 @@ type acceptedAISessionContextUpdate struct {
 
 type cancelledAISessionRuntime struct {
 	ref         aiSessionCommandRef
-	runtimeRef  aiSessionCommandRef
 	reason      string
 	handle      aiSessionRuntimeHandle
 	resultSink  *aiSessionResultSinkProxy
@@ -233,7 +232,6 @@ type cancelledAISessionRuntime struct {
 
 type closedAISessionRuntime struct {
 	ref             aiSessionCommandRef
-	runtimeRef      aiSessionCommandRef
 	reason          string
 	handle          aiSessionRuntimeHandle
 	resultSink      *aiSessionResultSinkProxy
@@ -377,7 +375,6 @@ func (m *aiSessionRuntimeManager) Bind(
 		}
 		attachmentBindDigest = sha256.Sum256(raw)
 	}
-	ctx, cancel := context.WithCancel(parent)
 
 	m.mu.Lock()
 	var replaced *aiSessionRuntime
@@ -390,16 +387,6 @@ func (m *aiSessionRuntimeManager) Bind(
 		if pending.commandID == ref.CommandID {
 			m.mu.Unlock()
 			return ref, errAISessionBindRetry
-		}
-		if pending.ref.OwnerUserID != ref.OwnerUserID {
-			m.mu.Unlock()
-			cancel()
-			return ref, fmt.Errorf("ai session owner mismatch: %s", pending.ref.OwnerUserID)
-		}
-		if ref.CommandID == pending.ref.CommandID && bindEpoch == pending.ref.BindEpoch {
-			m.mu.Unlock()
-			cancel()
-			return ref, fmt.Errorf("%w: original bind is still preparing", errAISessionBindRetry)
 		}
 		if bindEpoch == 0 || bindEpoch <= pending.ref.BindEpoch {
 			m.mu.Unlock()
@@ -823,6 +810,14 @@ func cloneAISessionCommandSet(input map[string]struct{}) map[string]struct{} {
 	return cloned
 }
 
+func (m *aiSessionRuntimeManager) clearBindReservation(sessionID, commandID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if pending, ok := m.bindings[sessionID]; ok && pending.commandID == commandID {
+		delete(m.bindings, sessionID)
+	}
+}
+
 func (m *aiSessionRuntimeManager) finishBindError(ref aiSessionCommandRef, bindErr error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1085,74 +1080,6 @@ func (m *aiSessionRuntimeManager) Cancel(
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if pending, ok := m.bindings[ref.SessionID]; ok {
-		if pending.ref.OwnerUserID != ref.OwnerUserID {
-			return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", pending.ref.OwnerUserID)
-		}
-		if ref.BindEpoch != pending.ref.BindEpoch {
-			return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
-				"ai session bind epoch mismatch: command=%d pending=%d session=%s",
-				ref.BindEpoch,
-				pending.ref.BindEpoch,
-				ref.SessionID,
-			)
-		}
-		ref.RunID = pending.ref.RunID
-		ref.BindEpoch = pending.ref.BindEpoch
-		session := m.sessions[ref.SessionID]
-		if session != nil && session.ref.OwnerUserID != ref.OwnerUserID {
-			return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
-		}
-		if session != nil {
-			session.mu.Lock()
-			if session.terminalCommandID != "" &&
-				(session.terminalCommandID != ref.CommandID || session.terminalKind != "cancel") {
-				terminalKind := session.terminalKind
-				terminalCommandID := session.terminalCommandID
-				session.mu.Unlock()
-				return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
-					"ai session terminal command conflicts with pending %s command %s",
-					terminalKind,
-					terminalCommandID,
-				)
-			}
-		}
-		delete(m.bindings, ref.SessionID)
-		m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
-			commandID: ref.CommandID,
-			kind:      "cancel",
-			epoch:     ref.BindEpoch,
-		})
-		if pending.cancel != nil {
-			pending.cancel()
-		}
-		if session == nil {
-			return cancelledAISessionRuntime{ref: ref, reason: reason}, nil
-		}
-		handle := session.handle
-		runtimeRef := ref
-		runtimeRef.RunID = session.ref.RunID
-		runtimeRef.BindEpoch = session.bindEpoch
-		applyHandle := session.terminalCommandID == ""
-		if applyHandle {
-			// Fence the previous runtime before publishing the replacement
-			// generation's terminal event. Its immutable ref stays unchanged so
-			// any emission already in flight remains attributable to the old epoch.
-			session.retired = true
-			session.terminalCommandID = ref.CommandID
-			session.terminalKind = "cancel"
-			session.terminalReason = reason
-			if session.cancel != nil {
-				session.cancel()
-			}
-		} else {
-			reason = session.terminalReason
-		}
-		session.mu.Unlock()
-		return cancelledAISessionRuntime{
-			ref: ref, runtimeRef: runtimeRef, reason: reason, handle: handle, resultSink: session.resultSink, applyHandle: applyHandle,
-		}, nil
-	}
 
 	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch > ref.BindEpoch {
 		return cancelledAISessionRuntime{ref: ref}, errAISessionBindFenced
@@ -1203,20 +1130,6 @@ func (m *aiSessionRuntimeManager) Cancel(
 	}
 	session.mu.Lock()
 	if ref.BindEpoch != session.ref.BindEpoch {
-		if tombstone, terminal := m.terminalTombstones[ref.SessionID]; terminal &&
-			tombstone.commandID == ref.CommandID && tombstone.kind == "cancel" && tombstone.epoch == ref.BindEpoch &&
-			session.retired && session.terminalCommandID == ref.CommandID && session.terminalKind == "cancel" {
-			runtimeRef := ref
-			runtimeRef.RunID = session.ref.RunID
-			runtimeRef.BindEpoch = session.bindEpoch
-			handle := session.handle
-			resultSink := session.resultSink
-			reason = session.terminalReason
-			session.mu.Unlock()
-			return cancelledAISessionRuntime{
-				ref: ref, runtimeRef: runtimeRef, reason: reason, handle: handle, resultSink: resultSink,
-			}, nil
-		}
 		currentEpoch := session.ref.BindEpoch
 		session.mu.Unlock()
 		return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
@@ -1231,7 +1144,6 @@ func (m *aiSessionRuntimeManager) Cancel(
 	handle := session.handle
 	applyHandle := false
 	if session.terminalCommandID == "" {
-		session.retired = true
 		session.terminalCommandID = ref.CommandID
 		session.terminalKind = "cancel"
 		session.terminalReason = reason
@@ -1253,7 +1165,6 @@ func (m *aiSessionRuntimeManager) Cancel(
 	session.mu.Unlock()
 	return cancelledAISessionRuntime{
 		ref:         ref,
-		runtimeRef:  ref,
 		reason:      reason,
 		handle:      handle,
 		resultSink:  session.resultSink,
@@ -1272,73 +1183,6 @@ func (m *aiSessionRuntimeManager) Close(
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if pending, ok := m.bindings[ref.SessionID]; ok {
-		if pending.ref.OwnerUserID != ref.OwnerUserID {
-			return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", pending.ref.OwnerUserID)
-		}
-		if ref.BindEpoch != pending.ref.BindEpoch {
-			return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
-				"ai session bind epoch mismatch: command=%d pending=%d session=%s",
-				ref.BindEpoch,
-				pending.ref.BindEpoch,
-				ref.SessionID,
-			)
-		}
-		ref.RunID = pending.ref.RunID
-		ref.BindEpoch = pending.ref.BindEpoch
-		session := m.sessions[ref.SessionID]
-		if session != nil && session.ref.OwnerUserID != ref.OwnerUserID {
-			return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
-		}
-		if session != nil {
-			session.mu.Lock()
-			if session.terminalCommandID != "" &&
-				(session.terminalCommandID != ref.CommandID || session.terminalKind != "close") {
-				terminalKind := session.terminalKind
-				terminalCommandID := session.terminalCommandID
-				session.mu.Unlock()
-				return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
-					"ai session terminal command conflicts with pending %s command %s",
-					terminalKind,
-					terminalCommandID,
-				)
-			}
-		}
-		delete(m.bindings, ref.SessionID)
-		m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
-			commandID: ref.CommandID,
-			kind:      "close",
-			epoch:     ref.BindEpoch,
-		})
-		if pending.cancel != nil {
-			pending.cancel()
-		}
-		if session == nil {
-			return closedAISessionRuntime{ref: ref, reason: reason, alreadyTerminal: true, acknowledge: true}, nil
-		}
-		handle := session.handle
-		runtimeRef := ref
-		runtimeRef.RunID = session.ref.RunID
-		runtimeRef.BindEpoch = session.bindEpoch
-		applyHandle := session.terminalCommandID == ""
-		if applyHandle {
-			// Keep the retired runtime's immutable generation identity. The
-			// close acknowledgement uses the pending generation ref separately.
-			session.retired = true
-			session.terminalCommandID = ref.CommandID
-			session.terminalKind = "close"
-			session.terminalReason = reason
-			if session.cancel != nil {
-				session.cancel()
-			}
-		} else {
-			reason = session.terminalReason
-		}
-		session.mu.Unlock()
-		return closedAISessionRuntime{
-			ref: ref, runtimeRef: runtimeRef, reason: reason, handle: handle, resultSink: session.resultSink, applyHandle: applyHandle,
-		}, nil
-	}
 
 	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch > ref.BindEpoch {
 		return closedAISessionRuntime{ref: ref}, errAISessionBindFenced
@@ -1390,20 +1234,6 @@ func (m *aiSessionRuntimeManager) Close(
 	}
 	session.mu.Lock()
 	if ref.BindEpoch != session.ref.BindEpoch {
-		if tombstone, terminal := m.terminalTombstones[ref.SessionID]; terminal &&
-			tombstone.commandID == ref.CommandID && tombstone.kind == "close" && tombstone.epoch == ref.BindEpoch &&
-			session.retired && session.terminalCommandID == ref.CommandID && session.terminalKind == "close" {
-			runtimeRef := ref
-			runtimeRef.RunID = session.ref.RunID
-			runtimeRef.BindEpoch = session.bindEpoch
-			handle := session.handle
-			resultSink := session.resultSink
-			reason = session.terminalReason
-			session.mu.Unlock()
-			return closedAISessionRuntime{
-				ref: ref, runtimeRef: runtimeRef, reason: reason, handle: handle, resultSink: resultSink,
-			}, nil
-		}
 		currentEpoch := session.ref.BindEpoch
 		session.mu.Unlock()
 		return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
@@ -1418,7 +1248,6 @@ func (m *aiSessionRuntimeManager) Close(
 	handle := session.handle
 	applyHandle := false
 	if session.terminalCommandID == "" {
-		session.retired = true
 		session.terminalCommandID = ref.CommandID
 		session.terminalKind = "close"
 		session.terminalReason = reason
@@ -1444,7 +1273,6 @@ func (m *aiSessionRuntimeManager) Close(
 	session.mu.Unlock()
 	return closedAISessionRuntime{
 		ref:         ref,
-		runtimeRef:  ref,
 		reason:      reason,
 		handle:      handle,
 		resultSink:  session.resultSink,
@@ -1497,15 +1325,10 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 		)
 	}
 	delete(m.sessions, ref.SessionID)
-	tombstoneEpoch := session.bindEpoch
-	if existing, ok := m.terminalTombstones[ref.SessionID]; ok &&
-		existing.commandID == ref.CommandID && existing.kind == kind && existing.epoch > tombstoneEpoch {
-		tombstoneEpoch = existing.epoch
-	}
 	m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
 		commandID: ref.CommandID,
 		kind:      kind,
-		epoch:     tombstoneEpoch,
+		epoch:     session.bindEpoch,
 	})
 	if session.cancel != nil {
 		session.cancel()
@@ -1794,15 +1617,13 @@ func (b *legionJobBridge) handleAISessionCancel(ctx context.Context, raw []byte)
 	if cancelled.applyHandle && cancelled.handle != nil {
 		cancelled.handle.Cancel(cancelled.reason)
 	}
-	if cancelled.resultSink != nil {
-		if err := cancelled.resultSink.Cancel(ctx, cancelled.reason); err != nil {
-			return fmt.Errorf("publish focus result cancelled: %w", err)
-		}
+	if err := cancelled.resultSink.Cancel(ctx, cancelled.reason); err != nil {
+		return fmt.Errorf("publish focus result cancelled: %w", err)
 	}
 	if err := b.ensureAIPublisher().PublishCancelled(ctx, cancelled.ref, cancelled.reason); err != nil {
 		return err
 	}
-	return b.ensureAIRuntime().CompleteTerminal(cancelled.runtimeRef, "cancel")
+	return b.ensureAIRuntime().CompleteTerminal(cancelled.ref, "cancel")
 }
 
 func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) error {
@@ -1851,7 +1672,7 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if err := b.ensureAIPublisher().PublishClose(ctx, closed.ref, resultJSON); err != nil {
 		return err
 	}
-	return b.ensureAIRuntime().CompleteTerminal(closed.runtimeRef, "close")
+	return b.ensureAIRuntime().CompleteTerminal(closed.ref, "close")
 }
 
 func (b *legionJobBridge) publishAISessionCommandFailure(
