@@ -6,7 +6,12 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
+var defaultParserRegistration base.Parser
+
 func init() {
-	base.RegisterParser("default", &stream_parser.DefParser{})
+	base.RegisterParserFactory("default", func() base.Parser {
+		return &stream_parser.DefParser{}
+	})
+	defaultParserRegistration = base.ParserRegistration("default")
 	base.RegisterParser("ser", &ser_parser.SerParser{})
 }

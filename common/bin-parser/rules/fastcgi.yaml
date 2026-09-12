@@ -1,0 +1,66 @@
+endian: big
+Package:
+  FastCGI:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 {
+        panic("fastcgi: version must be 1")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 11 {
+        panic("fastcgi: unknown type")
+      }
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Content Length")
+      this.ProcessSubNode("Padding Length")
+      this.ProcessSubNode("Reserved")
+      cl = getNodeResult("Content Length").Value
+      if typ == 1 && cl >= 8 {
+        this.ProcessSubNode("BEGIN_REQUEST")
+      } else {
+        if cl > 0 && cl < 1048576 {
+          this.GetSubNode("Params").SetMaxLength(cl)
+          this.ProcessSubNode("Params")
+        }
+      }
+    Version: uint8
+    Type: uint8
+    Request ID: uint16
+    Content Length: uint16
+    Padding Length: uint8
+    Reserved: uint8
+    BEGIN_REQUEST:
+      Role: uint16
+      Flags: uint8
+      Reserved5: raw,5
+    Params:
+      list: true
+      Pair: FastCGIPair
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          ele.Process()
+        }
+FastCGIPair:
+  operator: |
+    this.ProcessSubNode("Name Len")
+    this.ProcessSubNode("Value Len")
+    nl = getNodeResult("Name Len").Value
+    vl = getNodeResult("Value Len").Value
+    if nl > 0 && nl < 256 {
+      this.GetSubNode("Name").SetMaxLength(nl)
+      this.ProcessSubNode("Name")
+    }
+    if vl > 0 && vl < 256 {
+      this.GetSubNode("Value").SetMaxLength(vl)
+      this.ProcessSubNode("Value")
+    }
+  Name Len: uint8
+  Value Len: uint8
+  Name: string
+  Value: string
+

@@ -1,3 +1,4 @@
+endian: big
 Package:
   ICMP:
     Type: uint8
@@ -12,14 +13,97 @@ Package:
             this.ProcessByType("ICMP Echo")
           case 0:
             this.ProcessByType("ICMP Echo Reply")
+          case 3:
+            this.ProcessByType("ICMP Destination Unreachable")
+          case 11:
+            this.ProcessByType("ICMP Time Exceeded")
+          case 5:
+            this.ProcessByType("ICMP Redirect")
+          case 13:
+            this.ProcessByType("ICMP Timestamp")
+          case 14:
+            this.ProcessByType("ICMP Timestamp Reply")
           default:
             return
         }
 ICMP Echo:
+  operator: |
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Sequence Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
   Identifier: uint16
   Sequence Number: uint16
-  Data: raw
+  Echo Data: string
 ICMP Echo Reply:
+  operator: |
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Sequence Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
   Identifier: uint16
   Sequence Number: uint16
-  Data: raw
+  Echo Data: string
+ICMP Destination Unreachable:
+  operator: |
+    this.ProcessSubNode("Unused")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Unused: raw,4
+  Original Datagram: string
+ICMP Time Exceeded:
+  operator: |
+    this.ProcessSubNode("Unused")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Unused: raw,4
+  Original Datagram: string
+ICMP Redirect:
+  operator: |
+    this.ProcessSubNode("Gateway")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Gateway: raw,4
+  Original Datagram: string
+ICMP Timestamp:
+  Identifier: uint16
+  Sequence Number: uint16
+  Originate: uint32
+  Receive: uint32
+  Transmit: uint32
+ICMP Timestamp Reply:
+  Identifier: uint16
+  Sequence Number: uint16
+  Originate: uint32
+  Receive: uint32
+  Transmit: uint32

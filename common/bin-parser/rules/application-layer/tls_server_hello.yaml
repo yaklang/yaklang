@@ -1,0 +1,40 @@
+# Explicit complete plaintext TLS 1.2 / TLS 1.3 ordinary ServerHello only.
+# RFC 5246 6.2.1/7.4.1.3; RFC 8446 4.1.3/4.2/5.1.
+# Extensions: RFC 6066, 4492/8422, 6520, 7301, 6962, 7627, 5077, 5746.
+# Unknown extensions, key values and SCT signatures remain unverified bytes.
+# No TLS state machine, offer correlation, peer identity or handshake outcome.
+# HRR is explicitly outside profile; old application-layer/tls.yaml unchanged.
+# A record decodes its first complete handshake only and preserves its tail raw.
+endian: big
+unit: byte
+Package:
+  TLSHandshakeServerHello:
+    operator: |
+      err = parseTLSServerHello(false)
+      if err != nil { panic(err) }
+  TLSServerHelloRecord:
+    operator: |
+      err = parseTLSServerHello(true)
+      if err != nil { panic(err) }
+  TLSHandshakeServerHelloCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls-server-hello: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65611 { panic("tls-server-hello: handshake carrier exceeds 65611-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLSHandshakeServerHelloExact", "TLSHandshakeServerHello")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS ServerHello")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLSServerHelloRecordCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls-server-hello: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 16389 { panic("tls-server-hello: record carrier exceeds 16389-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLSServerHelloRecordExact", "TLSServerHelloRecord")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS ServerHello Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TLSHandshakeServerHelloExact: "import:application-layer/tls_server_hello.yaml;node:TLSHandshakeServerHello"
+TLSServerHelloRecordExact: "import:application-layer/tls_server_hello.yaml;node:TLSServerHelloRecord"

@@ -1,0 +1,28 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("RARPFrame")
+  RARPFrame:
+    operator: |
+      this.ProcessSubNode("Destination")
+      this.ProcessSubNode("Source")
+      this.ProcessSubNode("EtherType")
+      if getNodeResult("EtherType").Value != 0x8035 { panic("rarp: wrong EtherType") }
+      this.ProcessSubNode("RARP")
+      remaining = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && remaining > 0 {
+        this.GetSubNode("Link Padding").SetMaxLength(remaining)
+        this.ProcessSubNode("Link Padding")
+      }
+    Destination: raw,6
+    Source: raw,6
+    EtherType: uint16
+    RARP: RARPBody
+    Link Padding: raw
+  RARP: RARPBody
+RARPBody:
+  operator: |
+    value = this.ProcessSubNode("Addresses")
+    opcode = value.Child("Opcode").Value
+    if opcode < 1 || opcode > 4 { panic("rarp: undefined opcode") }
+  Addresses: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"

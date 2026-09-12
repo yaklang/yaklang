@@ -1,0 +1,69 @@
+# Ether-S-I/O version-0 transfer and RIO-status datagrams. Transfer bytes need
+# a separate station/application layout; they are not treated as executable.
+endian: big
+Package:
+  EtherSIO:
+    operator: |
+      if !this.HasMaxLength() { panic("ether-s-io: datagram boundary is required") }
+      size = this.GetMaxLength()
+      limit = getCtx("etherSIODatagramLimit")
+      if !hasCtx("etherSIODatagramLimit") { limit = 65507 }
+      if size < 12 || size > 65507 || limit <= 0 || size > limit { panic("ether-s-io: invalid datagram size") }
+      if this.ProcessSubNode("Magic").Value != "ESIO" { panic("ether-s-io: invalid magic") }
+      kind = this.ProcessSubNode("Telegram Type").Value
+      if kind != 1 && kind != 2 { panic("ether-s-io: unsupported telegram type") }
+      if this.ProcessSubNode("Version").Value != 0 { panic("ether-s-io: unsupported version") }
+      if this.ProcessSubNode("Length").Value != size { panic("ether-s-io: declared length differs from datagram boundary") }
+      this.ProcessSubNode("Transaction ID")
+      if kind == 1 {
+        this.ProcessSubNode("Telegram ID")
+        this.ProcessSubNode("Source Station ID")
+        count = this.ProcessSubNode("Transfer Count").Value
+        this.ProcessSubNode("Transfer Flags")
+        if count > (size-this.Length())/10 { panic("ether-s-io: transfer count exceeds datagram") }
+        if count > 0 {
+          this.GetSubNode("Transfers").SetCfg("transferCount", count)
+          this.ProcessSubNode("Transfers")
+        }
+      } else {
+        if this.ProcessSubNode("Status Type").Value != 1 { panic("ether-s-io: unsupported status type") }
+        if this.ProcessSubNode("Status Length").Value != 12 { panic("ether-s-io: RIO status length must be twelve bytes") }
+        this.ProcessSubNode("Source Station ID")
+        this.ProcessSubNode("RIO Status")
+        this.ProcessSubNode("Lost Telegrams")
+        this.ProcessSubNode("RIO Diagnostics")
+        this.ProcessSubNode("RIO Flags")
+      }
+      if this.Length() != size { panic("ether-s-io: trailing or inconsistent telegram data") }
+    Magic: string,4
+    Telegram Type: uint16
+    Version: uint16
+    Length: uint16
+    Transaction ID: uint16
+    Telegram ID: uint32
+    Source Station ID: uint32
+    Transfer Count: uint8
+    Transfer Flags: uint8
+    Transfers:
+      list: true
+      Transfer: EtherSIOTransfer
+      operator: |
+        for index = 0; index < this.GetCfg("transferCount"); index++ { this.NewElement().Process() }
+    Status Type: uint16
+    Status Length: uint16
+    RIO Status: uint8
+    Lost Telegrams: uint8
+    RIO Diagnostics: uint8
+    RIO Flags: uint8
+EtherSIOTransfer:
+  operator: |
+    this.ProcessSubNode("Transfer ID")
+    this.ProcessSubNode("Destination Station ID")
+    size = this.ProcessSubNode("Data Length").Value
+    if size > this.GetMaxLength()-10 { panic("ether-s-io: transfer data exceeds datagram boundary") }
+    this.SetMaxLength(10+size)
+    if size > 0 { this.ProcessSubNode("Data") }
+  Transfer ID: uint32
+  Destination Station ID: uint32
+  Data Length: uint16
+  Data: raw

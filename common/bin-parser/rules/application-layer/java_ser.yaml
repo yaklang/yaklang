@@ -1,0 +1,61 @@
+endian: big
+Package:
+  JavaSer:
+    operator: |
+      this.ProcessSubNode("Magic")
+      if getNodeResult("Magic").Value != 0xaced {
+        panic("java-ser: magic must be 0xACED")
+      }
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 5 {
+        panic("java-ser: stream version must be 5")
+      }
+      if this.GetMaxLength() - this.Length() < 1 { panic("java-ser: missing stream content") }
+      this.ProcessSubNode("JavaContent")
+    Magic: uint16
+    Version: uint16
+    JavaContent: JavaContent
+JavaContent:
+  operator: |
+    this.ProcessSubNode("Content Type")
+    tc = getNodeResult("Content Type").Value
+    if tc != 0x70 && tc != 0x71 && tc != 0x72 && tc != 0x73 && tc != 0x74 && tc != 0x75 && tc != 0x76 && tc != 0x77 && tc != 0x78 && tc != 0x79 && tc != 0x7a && tc != 0x7b && tc != 0x7c && tc != 0x7d && tc != 0x7e {
+      panic("java-ser: unknown TC content type")
+    }
+    if tc == 0x70 || tc == 0x78 || tc == 0x79 { return }
+    if tc == 0x71 {
+      this.ProcessSubNode("Handle")
+      return
+    }
+    if tc == 0x74 {
+      this.ProcessSubNode("UTF Length")
+      length = getNodeResult("UTF Length").Value
+      if length > this.GetMaxLength() - this.Length() { panic("java-ser: string exceeds stream") }
+      this.GetSubNode("UTF Data").SetMaxLength(length)
+      if length > 0 { this.ProcessSubNode("UTF Data") }
+      return
+    }
+    if tc == 0x77 {
+      this.ProcessSubNode("Block Length")
+      length = getNodeResult("Block Length").Value
+      if length > this.GetMaxLength() - this.Length() { panic("java-ser: block data exceeds stream") }
+      this.GetSubNode("Block Data").SetMaxLength(length)
+      if length > 0 { this.ProcessSubNode("Block Data") }
+      return
+    }
+    if tc == 0x7a {
+      this.ProcessSubNode("Long Block Length")
+      length = getNodeResult("Long Block Length").Value
+      if length >= 1048576 || length > this.GetMaxLength() - this.Length() { panic("java-ser: long block data exceeds stream") }
+      this.GetSubNode("Block Data").SetMaxLength(length)
+      if length > 0 { this.ProcessSubNode("Block Data") }
+      return
+    }
+    panic("java-ser: content type requires an unsupported complete descriptor")
+  Content Type: uint8
+  Handle: uint32
+  UTF Length: uint16
+  UTF Data: string
+  Block Length: uint8
+  Long Block Length: uint32
+  Block Data: raw

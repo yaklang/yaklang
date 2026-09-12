@@ -249,6 +249,9 @@ func LuaVMValuesToFunctionMap(f *Function, vs []*Value) map[int]*Value {
 // nativeCallbackFrame preserves captured lexical context without registering
 // concurrent Go callbacks in the defining goroutine's execution stack.
 func (vm *Frame) nativeCallbackFrame() *Frame {
+	if vm.vm.config.synchronousExecution {
+		return vm
+	}
 	gid := currentGoroutineID()
 	if gid == vm.ownerGoroutineID {
 		return vm

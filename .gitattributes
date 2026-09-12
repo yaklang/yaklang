@@ -1,0 +1,3 @@
+common/bin-parser/rules/**/*.yaml text eol=lf
+common/bin-parser/rules/*.yaml text eol=lf
+*.zst binary

@@ -1,0 +1,211 @@
+# IEEE 802.1Q Connectivity Fault Management CCM wire layout, cross-checked
+# against Wireshark's packet-cfm.c (based on IEEE 802.1Q-2022 and Y.1731):
+# https://gitlab.com/wireshark/wireshark/-/blob/0d289c003bfb3e40b0480860b27e35a5b4e1b279/epan/dissectors/packet-cfm.c
+#
+# This deliberately bounded receiver implements Continuity Check Messages
+# (opcode 1), their complete fixed body, MAID, and generic TLV framing.  Port
+# Status, Data, Interface Status, and Organizational-Specific TLVs are decoded;
+# other TLV values remain explicit opaque bytes.  In line with G.8013 clause
+# 11.2, future-version values, nonzero reserved fields, a longer fixed header,
+# overlong known TLVs, and an omitted End TLV at the exact PDU boundary do not
+# make an otherwise bounded received PDU invalid.  Other CFM/Y.1731 opcodes are
+# not inferred from their common header.
+endian: big
+Package:
+  CFM: CFMMessage
+
+  # Link-layer dispatch is transactional: malformed or unsupported CFM bytes
+  # remain available as one complete raw carrier payload.
+  CFMCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("cfm: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("cfm: empty carrier has no message") }
+      value, trial = this.TryProcessByType("CFMFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed CFM Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+CFMFrame: "import:cfm.yaml;node:CFM"
+
+CFMMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("cfm: explicit message boundary required") }
+    if this.GetMaxLength() < 74 { panic("cfm: CCM is shorter than its fixed body") }
+    if this.GetMaxLength() > 65535 { panic("cfm: message exceeds the supported bounded size") }
+    this.ProcessSubNode("MD Level")
+    // Future versions are processed using the known version-zero fields.
+    this.ProcessSubNode("Version")
+    if this.ProcessSubNode("Opcode").Value != 1 { panic("cfm: unsupported CFM opcode") }
+    this.ProcessSubNode("Remote Defect Indication")
+    this.ProcessSubNode("Traffic")
+    this.ProcessSubNode("Flags Reserved")
+    if this.ProcessSubNode("CCM Interval").Value == 0 { panic("cfm: invalid zero CCM interval") }
+    firstTLVOffset = this.ProcessSubNode("First TLV Offset").Value
+    if firstTLVOffset < 70 { panic("cfm: First TLV Offset precedes the CCM fixed body") }
+    this.ProcessSubNode("Sequence Number")
+    // Reserved identifier bits are exposed and ignored on receipt.
+    this.ProcessSubNode("MEP ID Reserved")
+    mepID = this.ProcessSubNode("MEP ID").Value
+    if mepID == 0 { panic("cfm: MEP ID must be in the range 1..8191") }
+    this.GetSubNode("Maintenance Association Identifier").SetMaxLength(48)
+    this.ProcessSubNode("Maintenance Association Identifier")
+    this.ProcessSubNode("TxFCf")
+    this.ProcessSubNode("RxFCb")
+    this.ProcessSubNode("TxFCb")
+    this.ProcessSubNode("Y.1731 Reserved")
+    extensionLength = firstTLVOffset - 70
+    if extensionLength > this.GetMaxLength()-this.Length() { panic("cfm: First TLV Offset exceeds the message boundary") }
+    if extensionLength > 0 {
+      this.GetSubNode("Header Extension").SetMaxLength(extensionLength)
+      this.ProcessSubNode("Header Extension")
+    }
+    // A missing End TLV is valid reception syntax only when the fixed header
+    // itself ends exactly at the bounded PDU end.
+    if this.Length() == this.GetMaxLength() { return }
+    this.GetSubNode("TLVs").SetMaxLength(this.GetMaxLength()-this.Length())
+    this.ProcessSubNode("TLVs")
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Link Padding").SetMaxLength(remaining)
+      this.ProcessSubNode("Link Padding")
+    }
+  MD Level: uint8,3bit
+  Version: uint8,5bit
+  Opcode: uint8
+  Remote Defect Indication: uint8,1bit
+  Traffic: uint8,1bit
+  Flags Reserved: uint8,3bit
+  CCM Interval: uint8,3bit
+  First TLV Offset: uint8
+  Sequence Number: uint32
+  MEP ID Reserved: uint8,3bit
+  MEP ID: uint16,13bit
+  Maintenance Association Identifier: CFMMAID
+  TxFCf: uint32
+  RxFCb: uint32
+  TxFCb: uint32
+  Y.1731 Reserved: raw,4
+  Header Extension: raw
+  TLVs: CFMTLVs
+  Link Padding: raw
+
+CFMMAID:
+  operator: |
+    mdFormat = this.ProcessSubNode("MD Name Format").Value
+    if mdFormat == 0 || mdFormat > 4 { panic("cfm: reserved MD name format") }
+    if mdFormat != 1 {
+      mdLength = this.ProcessSubNode("MD Name Length").Value
+      if mdLength == 0 || mdLength > 43 { panic("cfm: invalid MD name length") }
+      if mdFormat == 3 && mdLength != 8 { panic("cfm: MAC-based MD name must be eight octets") }
+      if mdLength > this.GetMaxLength()-this.Length()-2 { panic("cfm: MD name exceeds the 48-octet MAID") }
+      this.GetSubNode("MD Name").SetMaxLength(mdLength)
+      this.ProcessSubNode("MD Name")
+    }
+    shortFormat = this.ProcessSubNode("Short MA Name Format").Value
+    shortLength = this.ProcessSubNode("Short MA Name Length").Value
+    if shortFormat == 0 { panic("cfm: reserved Short MA name format") }
+    if shortFormat == 1 && shortLength != 2 { panic("cfm: PVID Short MA name must be two octets") }
+    if shortFormat == 2 && (shortLength == 0 || shortLength > 45) { panic("cfm: invalid string Short MA name length") }
+    if shortFormat == 3 && shortLength != 2 { panic("cfm: integer Short MA name must be two octets") }
+    if shortFormat == 4 && shortLength != 7 { panic("cfm: VPN ID Short MA name must be seven octets") }
+    if shortFormat == 32 && shortLength != 13 { panic("cfm: ICC Short MA name must be thirteen octets") }
+    if shortFormat == 33 && shortLength != 15 { panic("cfm: ICC and CC Short MA name must be fifteen octets") }
+    if shortFormat != 1 && shortFormat != 2 && shortFormat != 3 && shortFormat != 4 && shortFormat != 32 && shortFormat != 33 { panic("cfm: unsupported Short MA name format") }
+    if shortLength > this.GetMaxLength()-this.Length() { panic("cfm: Short MA name exceeds the 48-octet MAID") }
+    if shortLength > 0 {
+      this.GetSubNode("Short MA Name").SetMaxLength(shortLength)
+      this.ProcessSubNode("Short MA Name")
+    }
+    paddingLength = this.GetMaxLength()-this.Length()
+    if paddingLength > 0 {
+      this.GetSubNode("MAID Padding").SetMaxLength(paddingLength)
+      padding = this.ProcessSubNode("MAID Padding").Value
+      for octet in padding { if octet != 0 { panic("cfm: MAID padding must be zero") } }
+    }
+  MD Name Format: uint8
+  MD Name Length: uint8
+  MD Name: raw
+  Short MA Name Format: uint8
+  Short MA Name Length: uint8
+  Short MA Name: raw
+  MAID Padding: raw
+
+CFMTLVs:
+  operator: |
+    count = 0
+    for this.Length() < this.GetMaxLength() {
+      // Count the one-octet End TLV as an element.  This bounds list/tree
+      // growth without reducing the enclosing 65535-octet message boundary.
+      if count >= 1024 { panic("cfm: too many TLVs") }
+      tlv = this.NewSubNode("CFMTLV", "TLV")
+      result = tlv.Process()
+      count++
+      if result.Child("TLV Type").Value == 0 { return }
+    }
+    // G.8013 11.2 permits omission of the End TLV when the last declared TLV
+    // ends exactly at the PDU boundary.
+    return
+
+CFMTLV:
+  operator: |
+    tlvType = this.ProcessSubNode("TLV Type").Value
+    if tlvType == 0 { return }
+    if this.GetMaxLength()-this.Length() < 2 { panic("cfm: truncated TLV length") }
+    tlvLength = this.ProcessSubNode("TLV Length").Value
+    if tlvLength > this.GetMaxLength()-this.Length() { panic("cfm: TLV length exceeds the message boundary") }
+    switch tlvType {
+      case 2:
+        if tlvLength < 1 { panic("cfm: Port Status TLV length must be at least one") }
+        status = this.ProcessSubNode("Port Status").Value
+        if status != 1 && status != 2 { panic("cfm: invalid Port Status value") }
+        if tlvLength > 1 {
+          this.GetSubNode("TLV Extension").SetMaxLength(tlvLength-1)
+          this.ProcessSubNode("TLV Extension")
+        }
+      case 3:
+        if tlvLength > 0 {
+          this.GetSubNode("Data").SetMaxLength(tlvLength)
+          this.ProcessSubNode("Data")
+        }
+      case 4:
+        if tlvLength < 1 { panic("cfm: Interface Status TLV length must be at least one") }
+        status = this.ProcessSubNode("Interface Status").Value
+        if status < 1 || status > 7 { panic("cfm: invalid Interface Status value") }
+        if tlvLength > 1 {
+          this.GetSubNode("TLV Extension").SetMaxLength(tlvLength-1)
+          this.ProcessSubNode("TLV Extension")
+        }
+      case 31:
+        if tlvLength < 4 { panic("cfm: Organizational-Specific TLV is shorter than OUI and subtype") }
+        organization = this.NewSubNode("CFMOrganizationSpecific", "Organizational-Specific")
+        organization.SetMaxLength(tlvLength)
+        organization.Process()
+      default:
+        if tlvLength > 0 {
+          this.GetSubNode("Opaque Value").SetMaxLength(tlvLength)
+          this.ProcessSubNode("Opaque Value")
+        }
+    }
+  TLV Type: uint8
+  TLV Length: uint16
+  Port Status: uint8
+  Data: raw
+  Interface Status: uint8
+  TLV Extension: raw
+  Opaque Value: raw
+
+CFMOrganizationSpecific:
+  operator: |
+    this.GetSubNode("OUI").SetMaxLength(3)
+    this.ProcessSubNode("OUI")
+    this.ProcessSubNode("Subtype")
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Organization Value").SetMaxLength(remaining)
+      this.ProcessSubNode("Organization Value")
+    }
+  OUI: raw
+  Subtype: uint8
+  Organization Value: raw

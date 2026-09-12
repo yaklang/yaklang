@@ -1,0 +1,197 @@
+# Explicit, bounded uncompressed classic-protocol layouts. Old mysql.yaml is unchanged.
+# https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
+# https://mariadb.com/docs/server/reference/clientserver-protocol/4-server-response-packets/result-set-packets
+# The caller chooses phase/direction/capabilities, never inferred from packet markers.
+# response41 requires MySQL reserved layout; mariadb-response41 requires the
+# MariaDB server context, including its third capability word. SSLRequest is a
+# request to switch transport, not proof of an established TLS session.
+# Command grammar excludes CLIENT_QUERY_ATTRIBUTES; OK41 excludes SESSION_TRACK.
+# ResultSet41 requires fresh column definitions and legacy EOF terminators;
+# MariaDBTextResultSet additionally requires CACHE_METADATA + EXTENDED_METADATA.
+# Cached metadata, compressed framing, binary/prepared rows, local-file requests,
+# deprecated-EOF resultsets and multi-packet 0xffffff fragments are not implied.
+# Local limits: 1 MiB; 4096 columns, attributes, metadata items, rows/total values.
+# SQL and row values retain octets, not evaluated queries or assumed text encoding.
+endian: little
+unit: byte
+Package:
+  MySQLGreetingFields:
+    operator: |
+      err = parseMySQLFields("greeting")
+      if err != nil { panic(err) }
+  MySQLGreetingFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLGreetingFieldsExact", "MySQLGreetingFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLHandshakeResponse41Fields:
+    operator: |
+      err = parseMySQLFields("response41")
+      if err != nil { panic(err) }
+  MySQLHandshakeResponse41FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLHandshakeResponse41FieldsExact", "MySQLHandshakeResponse41Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MariaDBHandshakeResponse41Fields:
+    operator: |
+      err = parseMySQLFields("mariadb-response41")
+      if err != nil { panic(err) }
+  MariaDBHandshakeResponse41FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MariaDBHandshakeResponse41FieldsExact", "MariaDBHandshakeResponse41Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLSSLRequestFields:
+    operator: |
+      err = parseMySQLFields("ssl-request")
+      if err != nil { panic(err) }
+  MySQLSSLRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLSSLRequestFieldsExact", "MySQLSSLRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MariaDBSSLRequestFields:
+    operator: |
+      err = parseMySQLFields("mariadb-ssl-request")
+      if err != nil { panic(err) }
+  MariaDBSSLRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MariaDBSSLRequestFieldsExact", "MariaDBSSLRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLCommandFields:
+    operator: |
+      err = parseMySQLFields("command")
+      if err != nil { panic(err) }
+  MySQLCommandFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLCommandFieldsExact", "MySQLCommandFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLOK41Fields:
+    operator: |
+      err = parseMySQLFields("ok41")
+      if err != nil { panic(err) }
+  MySQLOK41FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLOK41FieldsExact", "MySQLOK41Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLOKSessionTrackFields:
+    operator: |
+      err = parseMySQLFields("ok41-session-track")
+      if err != nil { panic(err) }
+  MySQLOKSessionTrackFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLOKSessionTrackFieldsExact", "MySQLOKSessionTrackFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLError41Fields:
+    operator: |
+      err = parseMySQLFields("error41")
+      if err != nil { panic(err) }
+  MySQLError41FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLError41FieldsExact", "MySQLError41Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLEOF41Fields:
+    operator: |
+      err = parseMySQLFields("eof41")
+      if err != nil { panic(err) }
+  MySQLEOF41FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLEOF41FieldsExact", "MySQLEOF41Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MySQLTextResultSet41Fields:
+    operator: |
+      err = parseMySQLFields("text-resultset41")
+      if err != nil { panic(err) }
+  MySQLTextResultSet41FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MySQLTextResultSet41FieldsExact", "MySQLTextResultSet41Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MariaDBTextResultSetFields:
+    operator: |
+      err = parseMySQLFields("mariadb-text-resultset")
+      if err != nil { panic(err) }
+  MariaDBTextResultSetFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("mysql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("mysql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MariaDBTextResultSetFieldsExact", "MariaDBTextResultSetFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MySQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+MySQLGreetingFieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLGreetingFields"
+MySQLHandshakeResponse41FieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLHandshakeResponse41Fields"
+MariaDBHandshakeResponse41FieldsExact: "import:application-layer/mysql_fields.yaml;node:MariaDBHandshakeResponse41Fields"
+MySQLSSLRequestFieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLSSLRequestFields"
+MariaDBSSLRequestFieldsExact: "import:application-layer/mysql_fields.yaml;node:MariaDBSSLRequestFields"
+MySQLCommandFieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLCommandFields"
+MySQLOK41FieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLOK41Fields"
+MySQLOKSessionTrackFieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLOKSessionTrackFields"
+MySQLError41FieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLError41Fields"
+MySQLEOF41FieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLEOF41Fields"
+MySQLTextResultSet41FieldsExact: "import:application-layer/mysql_fields.yaml;node:MySQLTextResultSet41Fields"
+MariaDBTextResultSetFieldsExact: "import:application-layer/mysql_fields.yaml;node:MariaDBTextResultSetFields"

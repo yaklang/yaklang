@@ -1,0 +1,71 @@
+endian: big
+Package:
+  Elasticsearch:
+    operator: |
+      this.ProcessSubNode("Magic")
+      magic = getNodeResult("Magic").Value
+      if magic[0] != 0x45 || magic[1] != 0x53 {
+        panic("elasticsearch: magic must be ES")
+      }
+      this.ProcessSubNode("Message Length")
+      length = getNodeResult("Message Length").Value
+      if length < 13 || length > 1048576 || length > this.GetMaxLength() - this.Length() {
+        panic("elasticsearch: invalid message length")
+      }
+      this.SetMaxLength(this.Length() + length)
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Status Flags")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Header Count")
+      this.ProcessSubNode("Feature Count")
+      features = getNodeResult("Feature Count").Value
+      if features > 256 {
+        panic("elasticsearch: too many features")
+      }
+      setCtx("elasticsearch_feature_count", features)
+      this.ProcessSubNode("Features")
+      this.ProcessSubNode("Action Length")
+      actionLength = getNodeResult("Action Length").Value
+      if actionLength > this.GetMaxLength() - this.Length() {
+        panic("elasticsearch: action exceeds message")
+      }
+      this.GetSubNode("Action").SetMaxLength(actionLength)
+      this.ProcessSubNode("Action")
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 {
+        this.GetSubNode("Data").SetMaxLength(rest)
+        this.ProcessSubNode("Data")
+      }
+    Magic: raw,2
+    Message Length: uint32
+    Request ID: uint64
+    Status Flags: uint8
+    Version: uint32
+    Header Count: uint8
+    Feature Count: uint16
+    Features:
+      list: true
+      Feature:
+        operator: |
+          this.ProcessSubNode("Length")
+          length = getNodeResult("Length").Value
+          if length > this.GetMaxLength() - this.Length() {
+            panic("elasticsearch: feature exceeds message")
+          }
+          this.GetSubNode("Name").SetMaxLength(length)
+          this.ProcessSubNode("Name")
+        Length: uint8
+        Name: string
+      operator: |
+        count = getCtx("elasticsearch_feature_count")
+        i = 0
+        for {
+          if i >= count {
+            break
+          }
+          this.NewElement().Process()
+          i = i + 1
+        }
+    Action Length: uint8
+    Action: string
+    Data: raw

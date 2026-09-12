@@ -1,0 +1,140 @@
+# Link headers carried by the retained PR #5023 records. Field layouts are
+# cross-checked against Wireshark packet-marker, packet-homeplug-av,
+# packet-vntag and packet-ieee8021ah dissectors. Unknown message bodies remain
+# explicitly bounded bytes, without inferring a schema from the fixture name.
+endian: big
+Package:
+  SlowProtocols:
+    operator: |
+      res, op = this.TryProcessByType("PeekSubtype")
+      op.Recovery()
+      if !op.OK { panic("slow protocols: missing subtype") }
+      switch res.Value {
+        case 1: this.ProcessByType("LACP")
+        case 2: this.ProcessByType("MarkerPDU")
+        case 3: this.ProcessByType("EOAM")
+        default:
+          this.ProcessSubNode("Subtype")
+          remaining = this.GetMaxLength() - this.Length()
+          if remaining > 0 { this.GetSubNode("Subtype Data").SetMaxLength(remaining); this.ProcessSubNode("Subtype Data") }
+      }
+    Subtype: uint8
+    Subtype Data: raw
+
+  LACPMarker: MarkerPDU
+
+  HomePlugAV:
+    operator: |
+      this.ProcessSubNode("Version")
+      version = getNodeResult("Version").Value
+      if version > 1 { panic("homeplug av: unsupported version") }
+      this.ProcessSubNode("Message Type")
+      vendor = (getNodeResult("Message Type").Value & 32768) != 0
+      if version == 1 || !vendor {
+        this.ProcessSubNode("Fragment Count")
+        this.ProcessSubNode("Fragment Index")
+        this.ProcessSubNode("Fragment Sequence")
+        if getNodeResult("Fragment Index").Value > getNodeResult("Fragment Count").Value { panic("homeplug av: fragment index exceeds count") }
+      }
+      if vendor { this.ProcessSubNode("Organization ID") }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 { this.GetSubNode("Message Data").SetMaxLength(remaining); this.ProcessSubNode("Message Data") }
+    Version: uint8
+    Message Type:
+      type: uint16
+      endian: little
+    Fragment Count: uint8,4bit
+    Fragment Index: uint8,4bit
+    Fragment Sequence: uint8
+    Organization ID: raw,3
+    Message Data: raw
+
+  VNTag:
+    operator: |
+      this.ProcessSubNode("Direction")
+      this.ProcessSubNode("Pointer")
+      this.ProcessSubNode("Destination Interface")
+      this.ProcessSubNode("Looped")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Source Interface")
+      this.ProcessSubNode("Protocol Type")
+      kind = getNodeResult("Protocol Type").Value
+      remaining = this.GetMaxLength() - this.Length()
+      if kind < 1536 && kind > remaining { panic("vntag: declared payload length exceeds frame") }
+      if (kind == 0x0800 || kind == 0x86dd) && remaining == 0 { panic("vntag: missing network payload") }
+      if remaining > 0 {
+        var node
+        switch kind {
+          case 0x0800: node = this.NewSubNode("IPv4")
+          case 0x86dd: node = this.NewSubNode("IPv6")
+          default: node = this.NewSubNode("Protocol Data")
+        }
+        node.SetMaxLength(remaining)
+        node.Process()
+      }
+    Direction: uint8,1bit
+    Pointer: uint8,1bit
+    Destination Interface: uint16,14bit
+    Looped: uint8,1bit
+    Reserved: uint8,1bit
+    Version: uint8,2bit
+    Source Interface: uint16,12bit
+    Protocol Type: uint16
+
+  ProviderBackboneBridge:
+    operator: |
+      this.ProcessSubNode("Priority")
+      this.ProcessSubNode("Drop Eligible")
+      this.ProcessSubNode("No Customer Addresses")
+      this.ProcessSubNode("Reserved 1")
+      this.ProcessSubNode("Reserved 2")
+      this.ProcessSubNode("Service ID")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining < 14 { panic("pbb: customer Ethernet header is truncated") }
+      this.GetSubNode("Customer Ethernet").SetMaxLength(remaining)
+      this.ProcessSubNode("Customer Ethernet")
+    Priority: uint8,3bit
+    Drop Eligible: uint8,1bit
+    No Customer Addresses: uint8,1bit
+    Reserved 1: uint8,1bit
+    Reserved 2: uint8,2bit
+    Service ID: uint32,24bit
+    Customer Ethernet: "import:ethernet.yaml;node:Ethernet"
+
+MarkerPDU:
+  operator: |
+    if this.GetMaxLength() != 110 { panic("lacp marker: PDU length must be 110 bytes") }
+    this.ProcessSubNode("Subtype")
+    this.ProcessSubNode("Version")
+    if getNodeResult("Subtype").Value != 2 || getNodeResult("Version").Value != 1 { panic("lacp marker: unsupported subtype or version") }
+    this.ProcessSubNode("TLV Type")
+    this.ProcessSubNode("TLV Length")
+    kind = getNodeResult("TLV Type").Value
+    if (kind != 1 && kind != 2) || getNodeResult("TLV Length").Value != 16 { panic("lacp marker: invalid information TLV") }
+    this.ProcessSubNode("Requester Port")
+    this.ProcessSubNode("Requester System")
+    this.ProcessSubNode("Transaction ID")
+    this.ProcessSubNode("Requester Pad")
+    this.ProcessSubNode("Terminator Type")
+    this.ProcessSubNode("Terminator Length")
+    if getNodeResult("Terminator Type").Value != 0 || getNodeResult("Terminator Length").Value != 0 { panic("lacp marker: invalid terminator") }
+    this.ProcessSubNode("Reserved Padding")
+  Subtype: uint8
+  Version: uint8
+  TLV Type: uint8
+  TLV Length: uint8
+  Requester Port: uint16
+  Requester System: raw,6
+  Transaction ID: uint32
+  Requester Pad: uint16
+  Terminator Type: uint8
+  Terminator Length: uint8
+  Reserved Padding: raw,90
+
+LACP: "import:link_aggregation.yaml;node:LACP"
+EOAM: "import:management_samples.yaml;node:EOAM"
+PeekSubtype: uint8
+IPv4: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+Protocol Data: raw

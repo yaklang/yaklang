@@ -1,0 +1,267 @@
+# Redfish-specific, bodyless SSDP discovery, not Redfish REST or full HTTP.
+# DMTF DSP0266 v1.23.1 (2025-12-04), 12.4.3-12.4.5:
+# https://www.dmtf.org/sites/default/files/standards/documents/DSP0266_1.23.1.html
+# UPnP Device Architecture 2.0, 2020-04-17, 1.1 and 1.3.2; backwards
+# compatibility with 1.x is explicit in section 1 (printed page 21).
+# https://openconnectivity.org/upnp-specs/UPnP-arch-DeviceArchitecture-v2.0-20200417.pdf
+# Legacy-compatible alive/byebye core: UDA 1.0, 2000-06-13, 1.1.2/1.1.3.
+# https://upnp.org/specs/arch/UPnPDA10_20000613.htm
+#
+# This profile requires a Redfish service URN, never classifies ssdp:all or
+# upnp:rootdevice as Redfish-specific evidence, and does not implement update,
+# folded headers, bodies, HTTP transfer framing, or a full UPnP device profile.
+# Header names are case-insensitive; field values retain their original bytes.
+# Every recognized singleton is unique, including identical duplicate fields.
+# Unknown extension headers remain ordered and may repeat. The fixed resource
+# profile is 16384 bytes, 64 headers, 64 bytes per header name, and 1024 bytes
+# per header including CRLF. Notification multicast HOST supports the standard
+# IPv4 group and IPv6 link/site scopes, not every multicast scope extension.
+# URL fields use an explicit absolute HTTP(S) URL profile without credentials
+# or fragments, not all RFC 3986 URI schemes. These limits are parser limits,
+# not SSDP wire length fields. Neither a TTL
+# recommendation nor the actual UDP port is enforced by this application rule.
+# Structured GenerateBinary has no explicit input boundary and is unsupported.
+endian: big
+Package:
+  RedfishSSDP: RedfishSSDPMessage
+  RedfishSSDPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("redfish-ssdp: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("redfish-ssdp: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("redfish-ssdp: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("RedfishSSDPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Redfish SSDP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+RedfishSSDPFrame: "import:application-layer/redfish_ssdp.yaml;node:RedfishSSDP"
+RedfishSSDPPeek: uint16
+RedfishSSDPFirstWord: "type:string;del: "
+
+RedfishSSDPMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("redfish-ssdp: explicit message boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("redfish-ssdp: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 21 { panic("redfish-ssdp: incomplete start line") }
+    if total > 16384 { panic("redfish-ssdp: message exceeds 16384-byte parser profile") }
+    first, trial = this.TryProcessByType("RedfishSSDPFirstWord")
+    trial.Recovery()
+    if !trial.OK { panic("redfish-ssdp: incomplete start line") }
+    kind = ""
+    if string(first.Value) == "HTTP/1.1" {
+      this.ProcessSubNode("Response Line")
+      kind = "Search Response"
+    } else {
+      this.ProcessSubNode("Request Line")
+      method = string(this.GetSubNode("Request Line").GetSubNode("Method").Result().Value)
+      if method == "M-SEARCH" { kind = "Search Request" } else if method == "NOTIFY" { kind = "Notification" } else { panic("redfish-ssdp: unsupported method") }
+    }
+    this.ProcessSubNode("Headers")
+    if this.ProcessSubNode("Message End").Value != 0x0d0a { panic("redfish-ssdp: missing header terminator") }
+    if this.Length() != total { panic("redfish-ssdp: unsupported body or trailing bytes") }
+
+    values = map[string]any{}
+    present = map[string]bool{}
+    singleton = ["host", "man", "mx", "st", "nt", "nts", "usn", "al", "ext", "cache-control", "location", "server", "content-length", "transfer-encoding", "bootid.upnp.org", "configid.upnp.org", "nextbootid.upnp.org", "searchport.upnp.org"]
+    for _, header = range this.GetSubNode("Headers").GetChildren() {
+      name = header.GetInfo("Normalized Name")
+      value = header.GetInfo("Normalized Value")
+      if name in singleton {
+        if present[name] { panic("redfish-ssdp: duplicate singleton header " + name) }
+        values[name] = value
+        present[name] = true
+      }
+    }
+    decimal = func(value, label, limit) {
+      if len(value) == 0 { panic("redfish-ssdp: empty decimal " + label) }
+      number = 0
+      for _, octet = range []byte(value) {
+        if octet < 48 || octet > 57 { panic("redfish-ssdp: invalid decimal " + label) }
+        digit = int(octet)-48
+        if number > (limit-digit)/10 { panic("redfish-ssdp: decimal exceeds parser profile " + label) }
+        number = number*10+digit
+      }
+      return number
+    }
+    if present["transfer-encoding"] { panic("redfish-ssdp: unsupported transfer framing") }
+    if present["content-length"] && decimal(values["content-length"], "content-length", 4294967295) != 0 { panic("redfish-ssdp: unsupported body length") }
+
+    target = ""
+    if kind == "Search Request" {
+      if !present["host"] || !present["man"] || !present["st"] { panic("redfish-ssdp: missing search header") }
+      if values["man"] != "\"ssdp:discover\"" { panic("redfish-ssdp: invalid discovery namespace") }
+      target = values["st"]
+      if present["nt"] || present["nts"] { panic("redfish-ssdp: notification fields in search") }
+    } else if kind == "Search Response" {
+      for _, required = range ["cache-control", "st", "usn", "al", "ext"] {
+        if !present[required] { panic("redfish-ssdp: missing response header " + required) }
+      }
+      if values["ext"] != "" { panic("redfish-ssdp: EXT must be empty") }
+      if present["nt"] || present["nts"] || present["man"] || present["mx"] { panic("redfish-ssdp: request fields in response") }
+      target = values["st"]
+    } else {
+      for _, required = range ["host", "nt", "nts", "usn"] {
+        if !present[required] { panic("redfish-ssdp: missing notification header " + required) }
+      }
+      if values["nts"] != "ssdp:alive" && values["nts"] != "ssdp:byebye" { panic("redfish-ssdp: unsupported notification subtype") }
+      if present["st"] || present["man"] || present["mx"] { panic("redfish-ssdp: search fields in notification") }
+      if values["nts"] == "ssdp:alive" {
+        for _, required = range ["cache-control", "location", "server"] {
+          if !present[required] { panic("redfish-ssdp: missing alive header " + required) }
+        }
+        if len(values["server"]) == 0 { panic("redfish-ssdp: empty SERVER") }
+      }
+      target = values["nt"]
+      this.AddInfo("Notification Subtype", values["nts"])
+    }
+
+    versionParts = target.Split(":")
+    if len(versionParts) != 5 && len(versionParts) != 6 { panic("redfish-ssdp: unsupported Redfish service target") }
+    if versionParts[0] != "urn" || versionParts[1] != "dmtf-org" || versionParts[2] != "service" || versionParts[3] != "redfish-rest" || versionParts[4] != "1" { panic("redfish-ssdp: unsupported Redfish service target") }
+    minor = 0
+    if len(versionParts) == 6 {
+      minor = decimal(versionParts[5], "service minor version", 4294967295)
+      if minor == 0 { panic("redfish-ssdp: explicit minor version must be nonzero") }
+    }
+    this.AddInfo("Service Target", target)
+    this.AddInfo("Service Major Version", 1)
+    this.AddInfo("Service Minor Version", minor)
+    this.AddInfo("Service Minor Present", len(versionParts) == 6)
+
+    if present["host"] {
+      host = values["host"]
+      hostInfo, hostError = decodeHTTPServiceURL("http://"+host+"/")
+      if hostError != nil || host.Contains("/") || host.Contains("?") || host.Contains("#") || host.Contains("@") { panic("redfish-ssdp: invalid HOST authority") }
+      hostAddress = hostInfo["canonical_ip"]
+      hostPort = 1900
+      if len(hostInfo["port"]) > 0 { hostPort = decimal(hostInfo["port"], "HOST port", 65535) }
+      multicastAddress = hostAddress in ["239.255.255.250", "ff02::c", "ff05::c"]
+      if multicastAddress && hostPort != 1900 { panic("redfish-ssdp: unsupported multicast HOST port") }
+      multicast = hostPort == 1900 && multicastAddress
+      this.AddInfo("Host Is Standard Multicast", multicast)
+      if kind == "Search Request" && multicast && !present["mx"] { panic("redfish-ssdp: multicast search requires MX") }
+      if kind == "Notification" && !multicast { panic("redfish-ssdp: unsupported notification multicast HOST") }
+    }
+    if present["mx"] {
+      mx = decimal(values["mx"], "MX", 4294967295)
+      if mx == 0 { panic("redfish-ssdp: MX must be positive") }
+      this.AddInfo("Maximum Wait Seconds", mx)
+    }
+    if present["usn"] {
+      usn = values["usn"].SplitN("::", 2)
+      if len(usn) != 2 || !usn[0].HasPrefix("uuid:") || len(usn[0]) != 41 { panic("redfish-ssdp: invalid USN UUID") }
+      uuid = usn[0][5:]
+      for index, octet = range []byte(uuid) {
+        if index == 8 || index == 13 || index == 18 || index == 23 {
+          if octet != 45 { panic("redfish-ssdp: invalid USN UUID") }
+        } else if (octet < 48 || octet > 57) && (octet < 65 || octet > 70) && (octet < 97 || octet > 102) { panic("redfish-ssdp: invalid USN UUID") }
+      }
+      if usn[1] != target { panic("redfish-ssdp: USN target does not match service target") }
+      this.AddInfo("Service UUID", uuid)
+    }
+    for _, name = range ["al", "location"] {
+      if present[name] {
+        urlInfo, urlError = decodeHTTPServiceURL(values[name])
+        if urlError != nil { panic("redfish-ssdp: invalid absolute HTTP(S) URL " + name) }
+        this.AddInfo(name+" URL", urlInfo)
+      }
+    }
+    if present["cache-control"] {
+      // Split only unquoted commas, retaining unknown cache extensions.
+      cache = values["cache-control"]
+      parts = []string{}
+      start = 0
+      quoted = false
+      escaped = false
+      for index, octet = range []byte(cache) {
+        if escaped { escaped = false; continue }
+        if quoted && octet == 92 { escaped = true; continue }
+        if octet == 34 { quoted = !quoted }
+        if octet == 44 && !quoted { parts.Append(cache[start:index]); start = index+1 }
+      }
+      if quoted || escaped { panic("redfish-ssdp: malformed cache directive") }
+      parts.Append(cache[start:])
+      seenAge = false
+      age = 0
+      for _, part = range parts {
+        directive = part.Trim(" \t").SplitN("=", 2)
+        if directive[0].Trim(" \t").Lower() == "max-age" {
+          if seenAge || len(directive) != 2 { panic("redfish-ssdp: ambiguous max-age") }
+          age = decimal(directive[1].Trim(" \t"), "max-age", 4294967295)
+          seenAge = true
+        }
+      }
+      if !seenAge { panic("redfish-ssdp: missing max-age") }
+      if kind == "Search Response" && age < 1800 { panic("redfish-ssdp: response max-age below 1800") }
+      this.AddInfo("Maximum Age Seconds", age)
+    }
+    // UPnP capability-extension fields are retained as raw header strings;
+    // this legacy-compatible core does not interpret their versioned ranges.
+    this.AddInfo("Message Kind", kind)
+    this.AddInfo("Redfish Specific Target", true)
+    this.AddInfo("Redfish REST Validated", false)
+    this.AddInfo("Remote UUID Equality Validated", false)
+    this.AddInfo("UPnP Capability Profile Validated", false)
+    this.AddInfo("Transport Context Validated", false)
+    this.AddInfo("Maximum Message Bytes", 16384)
+    this.AddInfo("Maximum Header Count", 64)
+    this.AddInfo("Maximum Header Bytes", 1024)
+  Request Line:
+    operator: |
+      this.ProcessSubNode("Method")
+      if string(this.ProcessSubNode("Target").Value) != "*" { panic("redfish-ssdp: request target must be asterisk") }
+      if string(this.ProcessSubNode("Version").Value) != "HTTP/1.1" { panic("redfish-ssdp: unsupported request version") }
+    Method: "type:string;del: "
+    Target: "type:string;del: "
+    Version: "type:string;del:\r\n"
+  Response Line:
+    operator: |
+      if string(this.ProcessSubNode("Version").Value) != "HTTP/1.1" { panic("redfish-ssdp: unsupported response version") }
+      if string(this.ProcessSubNode("Status").Value) != "200" { panic("redfish-ssdp: response status must be 200") }
+      if string(this.ProcessSubNode("Reason").Value) != "OK" { panic("redfish-ssdp: response reason must be OK") }
+    Version: "type:string;del: "
+    Status: "type:string;del: "
+    Reason: "type:string;del:\r\n"
+  Headers:
+    list: true
+    Header: RedfishSSDPHeader
+    operator: |
+      remaining = this.GetMaxLength()
+      count = 0
+      for {
+        if remaining < 2 { panic("redfish-ssdp: truncated header block") }
+        peek, trial = this.TryProcessByType("RedfishSSDPPeek")
+        trial.Recovery()
+        if !trial.OK { panic("redfish-ssdp: truncated header block") }
+        if peek.Value == 0x0d0a { break }
+        if count >= 64 { panic("redfish-ssdp: header count exceeds parser profile") }
+        header = this.NewElement()
+        limit = remaining
+        if limit > 1024 { limit = 1024 }
+        header.SetMaxLength(limit)
+        header.Process()
+        remaining -= header.Length()
+        count++
+      }
+      this.AddInfo("Count", count)
+  Message End: uint16
+
+RedfishSSDPHeader:
+  operator: |
+    limit = this.GetMaxLength()
+    if limit > 65 { limit = 65 }
+    this.GetSubNode("Name").SetMaxLength(limit)
+    name = string(this.ProcessSubNode("Name").Value)
+    if len(name) == 0 { panic("redfish-ssdp: empty header name") }
+    for _, octet = range []byte(name) {
+      if (octet < 65 || octet > 90) && (octet < 97 || octet > 122) && (octet < 48 || octet > 57) && octet not in []byte("!#$%&'*+-.^_`|~") { panic("redfish-ssdp: invalid header name") }
+    }
+    value = string(this.ProcessSubNode("Value").Value)
+    for _, octet = range []byte(value) { if (octet < 32 && octet != 9) || octet == 127 { panic("redfish-ssdp: invalid header value") } }
+    this.AddInfo("Normalized Name", name.Lower())
+    this.AddInfo("Normalized Value", value.Trim(" \t"))
+  Name: "type:string;del::"
+  Value: "type:string;del:\r\n"

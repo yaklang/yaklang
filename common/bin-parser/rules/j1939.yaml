@@ -1,0 +1,53 @@
+# Network-order classic SocketCAN capture record. Application PGN data is not
+# assigned physical units without the corresponding device/parameter schema.
+endian: big
+Package:
+  J1939:
+    operator: |
+      if this.HasMaxLength() && this.GetMaxLength() != 16 { panic("j1939: classic SocketCAN record must be 16 bytes") }
+      this.ProcessSubNode("Extended Flag")
+      this.ProcessSubNode("Remote Flag")
+      this.ProcessSubNode("Error Flag")
+      if getNodeResult("Extended Flag").Value != 1 || getNodeResult("Remote Flag").Value != 0 || getNodeResult("Error Flag").Value != 0 { panic("j1939: expected extended CAN data frame") }
+      this.ProcessSubNode("Identifier")
+      length = this.ProcessSubNode("Data Length").Value
+      if length > 8 { panic("j1939: invalid classic CAN data length") }
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Length Code")
+      if length > 0 {
+        this.GetSubNode("Data").SetMaxLength(length)
+        this.ProcessSubNode("Data")
+      }
+      if length < 8 {
+        this.GetSubNode("Padding").SetMaxLength(8-length)
+        this.ProcessSubNode("Padding")
+      }
+    Extended Flag: uint8,1bit
+    Remote Flag: uint8,1bit
+    Error Flag: uint8,1bit
+    Identifier:
+      operator: |
+        this.ForEachChild(func(node) { node.Process() })
+        pf = getNodeResult("PDU Format").Value
+        ps = getNodeResult("PDU Specific").Value
+        pgn = (getNodeResult("Reserved Bit").Value << 17) | (getNodeResult("Data Page").Value << 16) | (pf << 8)
+        if pf < 240 {
+          this.AddInfo("Destination Address", ps)
+        } else {
+          pgn = pgn | ps
+          this.AddInfo("Group Extension", ps)
+        }
+        this.AddInfo("PGN", pgn)
+      Priority: uint8,3bit
+      Reserved Bit: uint8,1bit
+      Data Page: uint8,1bit
+      PDU Format: uint8
+      PDU Specific: uint8
+      Source Address: uint8
+    Data Length: uint8
+    Flags: uint8
+    Reserved: uint8
+    Length Code: uint8
+    Data: raw
+    Padding: raw

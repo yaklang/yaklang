@@ -1,0 +1,48 @@
+# RFC 3828. An enclosing IPv4/IPv6 entry supplies the pseudo-header addresses.
+# Direct callers without that context get field/bound validation only.
+endian: big
+Package:
+  UDPLite:
+    operator: |
+      if !this.HasMaxLength() { panic("udp-lite: an IP payload boundary is required") }
+      this.ProcessSubNode("Source Port")
+      this.ProcessSubNode("Destination Port")
+      this.ProcessSubNode("Checksum Coverage")
+      this.ProcessSubNode("Checksum")
+      coverage = getNodeResult("Checksum Coverage").Value
+      if coverage == 0 { coverage = this.GetMaxLength() }
+      if coverage < 8 || coverage > this.GetMaxLength() { panic("udp-lite: invalid checksum coverage") }
+      if getNodeResult("Checksum").Value == 0 { panic("udp-lite: checksum must be nonzero") }
+      if coverage > 8 {
+        this.GetSubNode("Covered Payload").SetMaxLength(coverage-8)
+        this.ProcessSubNode("Covered Payload")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Uncovered Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Uncovered Payload")
+      }
+      source = this.GetCfg("IP Source")
+      destination = this.GetCfg("IP Destination")
+      if source != nil && destination != nil {
+        length = this.GetMaxLength()
+        sum = getNodeResult("Source Port").Value + getNodeResult("Destination Port").Value + getNodeResult("Checksum Coverage").Value + getNodeResult("Checksum").Value + 136 + (length >> 16) + (length & 65535)
+        for address in [source, destination] {
+          for i = 0; i < len(address); i += 2 { sum += (int(address[i]) << 8) + int(address[i+1]) }
+        }
+        if coverage > 8 {
+          data = getNodeResult("Covered Payload").Value
+          for i = 0; i < len(data); i += 2 {
+            sum += int(data[i]) << 8
+            if i+1 < len(data) { sum += int(data[i+1]) }
+          }
+        }
+        for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+        if sum != 65535 { panic("udp-lite: checksum mismatch") }
+      }
+    Source Port: uint16
+    Destination Port: uint16
+    Checksum Coverage: uint16
+    Checksum: uint16
+    Covered Payload: raw
+    Uncovered Payload: raw

@@ -1,0 +1,256 @@
+# Explicit protocol 3.0 layouts; historical postgresql.yaml stays unchanged.
+# https://www.postgresql.org/docs/16/protocol-message-formats.html
+# https://www.postgresql.org/docs/16/sasl-authentication.html
+# https://datatracker.ietf.org/doc/html/rfc5802
+# Caller supplies phase/direction; overloaded 'p' requires its own entry.
+# Block entries contain consecutive complete messages from one direction.
+# A local RowDescription may annotate later rows, until CommandComplete/Ready;
+# only the observed binary int4 representation is decoded into a scalar.
+# Other OIDs/encodings retain octets. No query, session, identity or proof check.
+# SCRAM entries are SHA-256 syntax only; unknown mechanisms retain raw data.
+# Limits: 1 MiB per input, 4096 items per collection, 65536 total wire leaves.
+# No TCP reassembly, compression, replication/COPY content, arbitrary function
+# calls, protocol 2.0/3.2 or negotiated option semantics are implied.
+endian: big
+unit: byte
+Package:
+  PostgreSQLStartupFields:
+    operator: |
+      err = parsePostgreSQLFields("startup")
+      if err != nil { panic(err) }
+  PostgreSQLStartupFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLStartupFieldsExact", "PostgreSQLStartupFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLSSLRequestFields:
+    operator: |
+      err = parsePostgreSQLFields("ssl-request")
+      if err != nil { panic(err) }
+  PostgreSQLSSLRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLSSLRequestFieldsExact", "PostgreSQLSSLRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLGSSRequestFields:
+    operator: |
+      err = parsePostgreSQLFields("gss-request")
+      if err != nil { panic(err) }
+  PostgreSQLGSSRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLGSSRequestFieldsExact", "PostgreSQLGSSRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLCancelFields:
+    operator: |
+      err = parsePostgreSQLFields("cancel")
+      if err != nil { panic(err) }
+  PostgreSQLCancelFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLCancelFieldsExact", "PostgreSQLCancelFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLSSLResponseFields:
+    operator: |
+      err = parsePostgreSQLFields("ssl-response")
+      if err != nil { panic(err) }
+  PostgreSQLSSLResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLSSLResponseFieldsExact", "PostgreSQLSSLResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLGSSResponseFields:
+    operator: |
+      err = parsePostgreSQLFields("gss-response")
+      if err != nil { panic(err) }
+  PostgreSQLGSSResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLGSSResponseFieldsExact", "PostgreSQLGSSResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLFrontendFields:
+    operator: |
+      err = parsePostgreSQLFields("frontend")
+      if err != nil { panic(err) }
+  PostgreSQLFrontendFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLFrontendFieldsExact", "PostgreSQLFrontendFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLBackendFields:
+    operator: |
+      err = parsePostgreSQLFields("backend")
+      if err != nil { panic(err) }
+  PostgreSQLBackendFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLBackendFieldsExact", "PostgreSQLBackendFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLFrontendBlockFields:
+    operator: |
+      err = parsePostgreSQLFields("frontend-block")
+      if err != nil { panic(err) }
+  PostgreSQLFrontendBlockFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLFrontendBlockFieldsExact", "PostgreSQLFrontendBlockFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLBackendBlockFields:
+    operator: |
+      err = parsePostgreSQLFields("backend-block")
+      if err != nil { panic(err) }
+  PostgreSQLBackendBlockFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLBackendBlockFieldsExact", "PostgreSQLBackendBlockFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLBackendSCRAMFields:
+    operator: |
+      err = parsePostgreSQLFields("backend-scram")
+      if err != nil { panic(err) }
+  PostgreSQLBackendSCRAMFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLBackendSCRAMFieldsExact", "PostgreSQLBackendSCRAMFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLBackendSCRAMBlockFields:
+    operator: |
+      err = parsePostgreSQLFields("backend-scram-block")
+      if err != nil { panic(err) }
+  PostgreSQLBackendSCRAMBlockFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLBackendSCRAMBlockFieldsExact", "PostgreSQLBackendSCRAMBlockFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLPasswordFields:
+    operator: |
+      err = parsePostgreSQLFields("password")
+      if err != nil { panic(err) }
+  PostgreSQLPasswordFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLPasswordFieldsExact", "PostgreSQLPasswordFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLSASLInitialFields:
+    operator: |
+      err = parsePostgreSQLFields("sasl-initial")
+      if err != nil { panic(err) }
+  PostgreSQLSASLInitialFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLSASLInitialFieldsExact", "PostgreSQLSASLInitialFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLSASLResponseFields:
+    operator: |
+      err = parsePostgreSQLFields("sasl-response")
+      if err != nil { panic(err) }
+  PostgreSQLSASLResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLSASLResponseFieldsExact", "PostgreSQLSASLResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  PostgreSQLSASLSCRAMResponseFields:
+    operator: |
+      err = parsePostgreSQLFields("sasl-scram-response")
+      if err != nil { panic(err) }
+  PostgreSQLSASLSCRAMResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("postgresql-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("postgresql-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("PostgreSQLSASLSCRAMResponseFieldsExact", "PostgreSQLSASLSCRAMResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed PostgreSQL Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+PostgreSQLStartupFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLStartupFields"
+PostgreSQLSSLRequestFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLSSLRequestFields"
+PostgreSQLGSSRequestFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLGSSRequestFields"
+PostgreSQLCancelFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLCancelFields"
+PostgreSQLSSLResponseFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLSSLResponseFields"
+PostgreSQLGSSResponseFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLGSSResponseFields"
+PostgreSQLFrontendFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLFrontendFields"
+PostgreSQLBackendFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLBackendFields"
+PostgreSQLFrontendBlockFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLFrontendBlockFields"
+PostgreSQLBackendBlockFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLBackendBlockFields"
+PostgreSQLBackendSCRAMFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLBackendSCRAMFields"
+PostgreSQLBackendSCRAMBlockFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLBackendSCRAMBlockFields"
+PostgreSQLPasswordFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLPasswordFields"
+PostgreSQLSASLInitialFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLSASLInitialFields"
+PostgreSQLSASLResponseFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLSASLResponseFields"
+PostgreSQLSASLSCRAMResponseFieldsExact: "import:application-layer/postgresql_fields.yaml;node:PostgreSQLSASLSCRAMResponseFields"

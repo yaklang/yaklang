@@ -1,0 +1,31 @@
+endian: little
+Package:
+  Zabbix:
+    operator: |
+      this.ProcessSubNode("Magic")
+      mag = string(getNodeResult("Magic").Value)
+      if mag != "ZBXD" {
+        panic("zabbix: magic must be ZBXD")
+      }
+      this.ProcessSubNode("Flags")
+      proto = getNodeResult("Flags/Protocol").Value
+      if proto != 1 {
+        panic("zabbix: protocol bit must be set")
+      }
+      this.ProcessSubNode("Length")
+      zlen = getNodeResult("Length").Value
+      this.ProcessSubNode("Reserved")
+      if zlen > 0 && zlen < 1048576 {
+        this.GetSubNode("JSON").SetMaxLength(zlen)
+        this.ProcessSubNode("JSON")
+      }
+      return
+    Magic: raw,4
+    Flags:
+      Unused: uint8,5bit
+      Large: uint8,1bit
+      Compression: uint8,1bit
+      Protocol: uint8,1bit
+    Length: uint32
+    Reserved: uint32
+    JSON: string

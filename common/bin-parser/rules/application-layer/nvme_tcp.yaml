@@ -1,0 +1,209 @@
+# NVMe/TCP plain PDUs. Digests and fragmented command-data reassembly are not
+# implemented. nvmeAdminQueue must be supplied before interpreting admin opcodes;
+# opcode 2 on an I/O queue is NOT Get Log Page. A caller-owned nvmeCommands map
+# belongs to one queue/transport session, never to the whole capture collection.
+# nvmeAllowZeroPDO is an explicit compatibility option for a pinned upstream
+# fixture with data but PDO=0; this anomaly is always reported in node metadata.
+endian: little
+Package:
+  operator: |
+    this.ProcessSubNode("NVMeTCP")
+  NVMeTCP: NVMeTCPMessage
+  NVMeTCPMessages:
+    list: true
+    Message: NVMeTCPMessage
+    operator: |
+      if !this.HasMaxLength() { panic("nvme-tcp: message sequence requires a boundary") }
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+NVMeTCPMessage:
+  operator: |
+    this.ProcessSubNode("Header")
+    kind = int(getNodeResult("Header/PDU Type").Value)
+    flags = getNodeResult("Header/Flags").Value
+    hlen = getNodeResult("Header/Header Length").Value
+    pdo = getNodeResult("Header/PDU Data Offset").Value
+    plen = getNodeResult("Header/PDU Length").Value
+    if plen < 8 || plen > this.GetMaxLength() { panic("nvme-tcp: invalid PDU length") }
+    if (flags & 3) != 0 { panic("nvme-tcp: digest verification is not implemented") }
+    if (flags & 240) != 0 || ((kind != 6 && kind != 7) && flags != 0) { panic("nvme-tcp: invalid PDU flags") }
+    expected = 24
+    if kind == 0 || kind == 1 { expected = 128 }
+    if kind == 4 { expected = 72 }
+    if kind not in [0,1,2,3,4,5,6,7,9] { panic("nvme-tcp: unsupported PDU type") }
+    if hlen != expected || hlen > plen { panic("nvme-tcp: invalid header length") }
+    this.SetMaxLength(plen)
+    commands = getCtx("nvmeCommands")
+    if !hasCtx("nvmeCommands") { commands = map[int]any{}; setCtx("nvmeCommands", commands) }
+    pending = nil
+    completed = -1
+    if kind == 0 || kind == 1 {
+      this.ProcessSubNode("Initialize")
+    } else if kind == 2 || kind == 3 {
+      this.ProcessSubNode("Terminate")
+    } else if kind == 4 {
+      command = this.ProcessSubNode("Command")
+      pending = this.GetSubNode("Command").GetCfg("command")
+    } else if kind == 5 {
+      completion = this.ProcessSubNode("Completion")
+      completed = int(completion.Child("Command ID").Value)
+    } else {
+      this.ProcessSubNode("Transfer")
+    }
+    if this.Length() != hlen { panic("nvme-tcp: incomplete PDU header") }
+    dataLength = plen-hlen
+    if kind in [0,1,5,9] {
+      if dataLength != 0 || pdo != 0 { panic("nvme-tcp: unexpected data for header-only PDU") }
+    } else if kind == 2 || kind == 3 {
+      if pdo != 0 { panic("nvme-tcp: termination PDO must be zero") }
+      if dataLength > 0 {
+        this.GetSubNode("Terminated Header").SetMaxLength(dataLength)
+        this.ProcessSubNode("Terminated Header")
+      }
+    } else {
+      if dataLength == 0 {
+        if pdo != 0 { panic("nvme-tcp: nonzero PDO without data") }
+      } else {
+        if pdo == 0 {
+          if !getCtx("nvmeAllowZeroPDO") { panic("nvme-tcp: data present with zero PDO") }
+          this.AddInfo("Noncanonical Zero PDO", true)
+          pdo = hlen
+        }
+        if pdo < hlen || pdo >= plen { panic("nvme-tcp: invalid data offset") }
+        if pdo > hlen {
+          this.GetSubNode("Alignment Padding").SetMaxLength(pdo-hlen)
+          padding = this.ProcessSubNode("Alignment Padding").Value
+          for _, octet = range padding { if octet != 0 { panic("nvme-tcp: alignment padding must be zero") } }
+        }
+        dataLength = plen-pdo
+      }
+      command = nil
+      if kind == 6 || kind == 7 {
+        declared = getNodeResult("Transfer/Data Length").Value
+        if declared != dataLength { panic("nvme-tcp: transfer length differs from PDU data") }
+        command = commands[int(getNodeResult("Transfer/Command ID").Value)]
+      }
+      entry = "Data"
+      if kind == 7 && command != nil && command["discovery"] && getNodeResult("Transfer/Data Offset").Value == 0 {
+        if dataLength > command["length"] { panic("nvme-tcp: response exceeds requested log length") }
+        entry = "Discovery Log"
+      }
+      if dataLength > 0 {
+        this.GetSubNode(entry).SetMaxLength(dataLength)
+        this.ProcessSubNode(entry)
+      }
+    }
+    if this.Length() != plen { panic("nvme-tcp: incomplete PDU") }
+    # Do not publish a command parsed from a malformed PDU.
+    if pending != nil { commands[pending["id"]] = pending }
+    if completed >= 0 { commands[completed] = nil }
+  Header:
+    PDU Type: uint8
+    Flags: uint8
+    Header Length: uint8
+    PDU Data Offset: uint8
+    PDU Length: uint32
+  Initialize:
+    Protocol Format Version: uint16
+    Data Alignment: uint8
+    Digest Options: uint8
+    Transfer Limit: uint32
+    Reserved: raw,112
+  Terminate:
+    Fatal Status: uint16
+    Fatal Information: uint32
+    Reserved: raw,10
+  Command: NVMeCommand
+  Completion:
+    Result: uint64
+    Submission Queue Head: uint16
+    Submission Queue ID: uint16
+    Command ID: uint16
+    Status: uint16
+  Transfer:
+    Command ID: uint16
+    Transfer Tag: uint16
+    Data Offset: uint32
+    Data Length: uint32
+    Reserved: raw,4
+  Alignment Padding: raw
+  Terminated Header: raw
+  Data: raw
+  Discovery Log: NVMeDiscoveryLog
+NVMeCommand:
+  operator: |
+    for _, name = range ["Opcode","Command Flags","Command ID","Namespace ID","CDW2","CDW3","Metadata Pointer","Data Pointer","CDW10","CDW11","CDW12","CDW13","CDW14","CDW15"] {
+      this.ProcessSubNode(name)
+    }
+    id = int(getNodeResult("Command ID").Value)
+    opcode = getNodeResult("Opcode").Value
+    cdw10 = getNodeResult("CDW10").Value
+    cdw11 = getNodeResult("CDW11").Value
+    command = {"id":id, "discovery":false}
+    if getCtx("nvmeAdminQueue") {
+      if opcode == 6 {
+        this.AddInfo("Admin Command", "Identify")
+        this.AddInfo("Identify CNS", cdw10 & 255)
+        this.AddInfo("Controller ID", cdw10 >> 16)
+      } else if opcode == 2 {
+        this.AddInfo("Admin Command", "Get Log Page")
+        lid = cdw10 & 255
+        length = (((cdw11 & 65535) << 16) | (cdw10 >> 16)) + 1
+        length *= 4
+        this.AddInfo("Log Page Identifier", lid)
+        this.AddInfo("Log Specific Parameter", (cdw10 >> 8) & 127)
+        this.AddInfo("Retain Event", (cdw10 >> 15) & 1)
+        this.AddInfo("Requested Byte Length", length)
+        this.AddInfo("Log Specific Identifier", cdw11 >> 16)
+        command["length"] = length
+        command["discovery"] = lid == 112 && getNodeResult("CDW12").Value == 0 && getNodeResult("CDW13").Value == 0
+      }
+    }
+    this.SetCfg("command", command)
+  Opcode: uint8
+  Command Flags: uint8
+  Command ID: uint16
+  Namespace ID: uint32
+  CDW2: uint32
+  CDW3: uint32
+  Metadata Pointer: uint64
+  Data Pointer: raw,16
+  CDW10: uint32
+  CDW11: uint32
+  CDW12: uint32
+  CDW13: uint32
+  CDW14: uint32
+  CDW15: uint32
+NVMeDiscoveryLog:
+  operator: |
+    if this.GetMaxLength() < 1024 { panic("nvme-tcp: incomplete discovery log header") }
+    this.ProcessSubNode("Generation Counter")
+    count = this.ProcessSubNode("Number of Records").Value
+    this.ProcessSubNode("Record Format")
+    this.ProcessSubNode("Reserved Header")
+    if count > (this.GetMaxLength()-1024)/1024 { panic("nvme-tcp: discovery record count exceeds data") }
+    for i = range count { this.NewSubNode("Discovery Entry").Process() }
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Unused Transfer Bytes").SetMaxLength(remaining)
+      this.ProcessSubNode("Unused Transfer Bytes")
+    }
+  Generation Counter: uint64
+  Number of Records: uint64
+  Record Format: uint16
+  Reserved Header: raw,1006
+  Unused Transfer Bytes: raw
+Discovery Entry:
+  Transport Type: uint8
+  Address Family: uint8
+  Subsystem Type: uint8
+  Transport Requirements: uint8
+  Port ID: uint16
+  Controller ID: uint16
+  Admin Queue Size: uint16
+  Entry Flags: uint16
+  Reserved Identity: raw,20
+  Transport Service ID: raw,32
+  Reserved Address: raw,192
+  Subsystem Qualified Name: raw,256
+  Transport Address: raw,256
+  Transport Specific Address: raw,256

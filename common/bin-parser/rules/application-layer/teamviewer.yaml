@@ -1,0 +1,70 @@
+endian: big
+Package:
+  TeamViewerRecord:
+    unpack: true
+    operator: |
+      this.ProcessByType("TeamViewerRecordFields")
+  TeamViewerDatagram:
+    operator: |
+      if this.GetMaxLength() < 16 {
+        panic("teamviewer: datagram shorter than outer prefix and record header")
+      }
+      this.ProcessSubNode("Datagram Prefix")
+      this.ProcessByType("TeamViewerRecordFields")
+    Datagram Prefix: raw,11
+TeamViewerRecordFields:
+  operator: |
+    this.ProcessSubNode("Magic")
+    magic = getNodeResult("Magic").Value
+    if magic == 0x1724 {
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Body Length 16")
+      length = getNodeResult("Body Length 16").Value
+      if length > 65535 {
+        panic("teamviewer: 1724 body length exceeds limit")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining != length {
+        panic("teamviewer: 1724 body length does not match input")
+      }
+      if length > 0 {
+        this.GetSubNode("Opaque Body").SetMaxLength(length)
+        this.ProcessSubNode("Opaque Body")
+      }
+      return
+    }
+    if magic == 0x1130 {
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Header Byte")
+      this.ProcessSubNode("Body Length 32")
+      length = getNodeResult("Body Length 32").Value
+      if length > 16777216 {
+        panic("teamviewer: 1130 body length exceeds 16 MiB")
+      }
+      this.ProcessSubNode("Counter")
+      this.ProcessSubNode("Opaque Header")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining != length {
+        panic("teamviewer: 1130 body length does not match input")
+      }
+      if length > 0 {
+        this.GetSubNode("Opaque Body").SetMaxLength(length)
+        this.ProcessSubNode("Opaque Body")
+      }
+      return
+    }
+    panic("teamviewer: unsupported record magic")
+  Magic: uint16
+  Command: uint8
+  Header Byte: uint8
+  Body Length 16:
+    type: uint16
+    endian: little
+  Body Length 32:
+    type: uint32
+    endian: little
+  Counter:
+    type: uint32
+    endian: little
+  Opaque Header: raw,12
+  Opaque Body: string

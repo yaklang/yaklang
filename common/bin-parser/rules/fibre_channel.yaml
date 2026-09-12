@@ -1,0 +1,155 @@
+# Bounded FC-2 header + Data Field. Direct input excludes SOF, CRC and EOF;
+# FCoE supplies those through its enclosing rule. This is not physical FC,
+# FCIP/iFCP framing, an exchange reassembler, or an FC-4 body decoder.
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/uapi/scsi/fc/fc_fs.h
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/scsi/libfc/fc_exch.c
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/scsi/fc/fc_encaps.h
+# https://github.com/wireshark/wireshark/blob/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-fc.c
+# https://github.com/wireshark/wireshark/blob/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-fc.h
+#
+# Supported framing profile: 24-byte header, up to 2112 Data Field bytes,
+# optionally one 8-byte VFT version/type 0. Other extended routing prefixes
+# are explicitly unsupported. Network Header is split when DF_CTL=0x20;
+# other optional-header layouts are rejected by this direct profile and the
+# enclosing carrier retains the complete input as raw, without partial fields.
+# F_CTL bit 17 and bits 15:14 have revision-dependent meanings in the pinned
+# sources; keep the complete scalar rather than imposing one interpretation.
+# Fill requires known optional-header layout and END_SEQ. EOFt permits it;
+# EOFn also permits it for a known ACK-requiring SOF (class 2/4/F), as emitted
+# by Linux fc_exch_setup_hdr. Other EOFs and EOFn without SOF stay uninterpreted.
+# Direct callers may supply fibreChannelEOF and fibreChannelSOF; FCoE passes
+# its actual delimiters through child-local configuration, not shared context.
+# Structured GenerateBinary has no frame-boundary input and is unsupported.
+endian: big
+Package:
+  FibreChannel: FibreChannelMessage
+  FibreChannelCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("fc: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("fc: byte-sized carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("fc: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("FibreChannelFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Fibre Channel Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+FibreChannelFrame: "import:fibre_channel.yaml;node:FibreChannel"
+FibreChannelPeekByte: uint8
+
+FibreChannelMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("fc: explicit frame boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("fc: byte-sized frame boundary required") }
+    total = this.GetMaxLength()
+    if total < 24 { panic("fc: incomplete fixed header") }
+    if total > 2144 { panic("fc: exceeds the supported 2144-byte framing profile") }
+    if total % 4 != 0 { panic("fc: frame is not word-aligned") }
+    first, trial = this.TryProcessByType("FibreChannelPeekByte")
+    trial.Recovery()
+    if !trial.OK { panic("fc: truncated routing control") }
+    prefix = 0
+    if first.Value == 0x50 {
+      if total < 32 { panic("fc: incomplete VFT and fixed header") }
+      vft = this.ProcessSubNode("VFT Header")
+      if int(vft.Child("VFT Version").Value) != 0 || int(vft.Child("VFT Type").Value) != 0 { panic("fc: unsupported VFT version or type profile") }
+      prefix = 8
+    }
+    if total-prefix > 2136 { panic("fc: Data Field exceeds the 2112-byte profile") }
+    header = this.ProcessSubNode("Frame Header")
+    rctl = int(header.Child("R_CTL").Value)
+    if rctl & 0xf0 == 0x50 { panic("fc: unsupported extended routing header") }
+    fctl = int(header.Child("F_CTL").Value)
+    dfctl = int(header.Child("DF_CTL").Value)
+    if dfctl != 0 && dfctl != 0x20 { panic("fc: unsupported optional-header layout") }
+    dataLength = total-prefix-24
+    declaredFill = fctl & 3
+    eof = this.GetCfg("FC EOF")
+    eofAvailable = eof != nil
+    if !eofAvailable && hasCtx("fibreChannelEOF") {
+      eof = getCtx("fibreChannelEOF")
+      eofAvailable = true
+    }
+    if eofAvailable && eof != 0x41 && eof != 0x42 && eof != 0x44 && eof != 0x46 && eof != 0x49 && eof != 0x4e && eof != 0x4f && eof != 0x50 {
+      panic("fc: unknown external EOF delimiter")
+    }
+    sof = this.GetCfg("FC SOF")
+    sofAvailable = sof != nil
+    if !sofAvailable && hasCtx("fibreChannelSOF") {
+      sof = getCtx("fibreChannelSOF")
+      sofAvailable = true
+    }
+    if sofAvailable && sof != 0x28 && sof != 0x29 && sof != 0x2d && sof != 0x2e && sof != 0x31 && sof != 0x35 && sof != 0x36 && sof != 0x39 {
+      panic("fc: unknown external SOF delimiter")
+    }
+    // fc_sof_needs_ack is true for these supported class 2/4/F codes.
+    // Do not infer this from an absent SOF.
+    needsACK = sofAvailable && (sof == 0x28 || sof == 0x29 || sof == 0x2d || sof == 0x31 || sof == 0x35 || sof == 0x39)
+    terminalDelimiter = eof == 0x42 || (eof == 0x41 && needsACK)
+    fillLength = 0
+    fillSeparated = terminalDelimiter && fctl & 0x080000 != 0
+    if fillSeparated {
+      if declaredFill > dataLength { panic("fc: fill count exceeds Data Field") }
+      fillLength = declaredFill
+    }
+    bodyLength = dataLength-fillLength
+    if dfctl == 0x20 {
+      if bodyLength < 16 { panic("fc: incomplete Network Header") }
+      this.ProcessSubNode("Network Header")
+      bodyLength -= 16
+    }
+    if bodyLength > 0 {
+      body = this.GetSubNode("FC Data")
+      body.SetMaxLength(bodyLength)
+      body.Process()
+    }
+    if fillLength > 0 {
+      this.GetSubNode("Fill Bytes").SetMaxLength(fillLength)
+      this.ProcessSubNode("Fill Bytes")
+    }
+    if this.Length() != total { panic("fc: frame did not consume its boundary") }
+    this.AddInfo("VFT Present", prefix != 0)
+    this.AddInfo("Data Field Length", dataLength)
+    this.AddInfo("Declared Fill Count", declaredFill)
+    this.AddInfo("Fill Separated", fillSeparated)
+    this.AddInfo("Fill Length", fillLength)
+    this.AddInfo("EOF Context Available", eofAvailable)
+    this.AddInfo("SOF Context Available", sofAvailable)
+    this.AddInfo("Optional Headers Decoded", true)
+    this.AddInfo("Body Semantics Decoded", false)
+    this.AddInfo("Session State Validated", false)
+    this.AddInfo("Exchange Responder", fctl & 0x800000 != 0)
+    this.AddInfo("Sequence Context (Responder-sent)", fctl & 0x400000 != 0)
+    this.AddInfo("First Sequence", fctl & 0x200000 != 0)
+    this.AddInfo("Last Sequence", fctl & 0x100000 != 0)
+    this.AddInfo("End Sequence", fctl & 0x080000 != 0)
+    this.AddInfo("Parameter Is Relative Offset", fctl & 8 != 0)
+  VFT Header:
+    VFT R_CTL: uint8
+    VFT Version: uint8,2bit
+    VFT Type: uint8,4bit
+    VFT Version Reserved: uint8,2bit
+    VFT Priority: uint8,3bit
+    VF_ID: uint16,12bit
+    VFT ID Reserved: uint8,1bit
+    VFT Hop Count: uint8
+    VFT Reserved: raw,3
+  Frame Header:
+    R_CTL: uint8
+    D_ID: uint32,24bit
+    CS_CTL: uint8
+    S_ID: uint32,24bit
+    FC Type: uint8
+    F_CTL: uint32,24bit
+    SEQ_ID: uint8
+    DF_CTL: uint8
+    SEQ_CNT: uint16
+    OX_ID: uint16
+    RX_ID: uint16
+    Parameter: uint32
+  Network Header:
+    Network Destination: raw,8
+    Network Source: raw,8
+  FC Data: raw
+  Fill Bytes: raw

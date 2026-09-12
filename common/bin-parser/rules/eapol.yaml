@@ -1,6 +1,17 @@
 endian: big
 Package:
   EAPOL:
+    operator: |
+      this.ProcessSubNode("Protocol Version")
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("Body Length")
+      packetType = getNodeResult("Packet Type").Value
+      bodyLength = getNodeResult("Body Length").Value
+      if bodyLength == 0 {
+        return
+      }
+      this.GetSubNode("Body").SetMaxLength(bodyLength)
+      this.ProcessSubNode("Body")
     Protocol Version: uint8
     Packet Type: uint8
     Body Length: uint16
@@ -8,43 +19,184 @@ Package:
       unpack: true
       operator: |
         packetType = getNodeResult("@EAPOL/Packet Type").Value
-        bodyLength = getNodeResult("@EAPOL/Body Length").Value
-        switch packetType {
-          case 0x00: // EAP-Packet
-            node = this.NewSubNode("EAP-Packet")
-          case 0x01: // EAPOL-Start
-            node = this.NewEmptyNode()
-          case 0x02: // EAPOL-Logoff
-            node = this.NewEmptyNode()
-          case 0x03: // EAPOL-Key
-            node = this.NewSubNode("EAPOL-Key")
-          case 0x04: // EAPOL-Encapsulated-ASF-Alert
-            node = this.NewSubNode("EAPOL-Encapsulated-ASF-Alert")
-          default:
-            node = this.NewUnknownNode()
+        if packetType == 0 {
+          this.ProcessByType("EAPPacket")
+          return
         }
-        node.SetMaxLength(bodyLength)
-        node.Process()
-
-  EAP-Packet:
-    Code: uint8
-    Identifier: uint8
-    Length: uint16
-    Data: raw
-
-  EAPOL-Key:
-    Descriptor Type: uint8
-    Key Information: uint16
-    Key Length: uint16
-    Replay Counter: raw,8
-    Key Nonce: raw,32
-    Key IV: raw,16
-    Key RSC: raw,8
-    Key ID: raw,8
-    Key MIC: raw,16
-    Key Data Length: uint16
-    Key Data: raw
-
-  EAPOL-Encapsulated-ASF-Alert:
-    # Assume this is a raw data type, specific parsing rules would depend on the ASF specification
-    Data: raw
+        if packetType == 3 {
+          this.ProcessByType("EAPOLKey")
+          return
+        }
+        if packetType == 4 {
+          this.ProcessByType("EAPOLASFAlert")
+          return
+        }
+        res, op = this.TryProcessByType("PeekByte")
+        op.Recovery()
+        if op.OK {
+          this.ProcessByType("Next Protocol Data")
+        }
+        return
+EAPPacket:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Length")
+    el = getNodeResult("Length").Value
+    if el >= 5 {
+      this.ProcessSubNode("Type")
+    }
+    if el > 5 {
+      t = getNodeResult("Type").Value
+      dlen = el - 5
+      if t == 1 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Identity").SetMaxLength(dlen)
+        this.ProcessSubNode("Identity")
+        return
+      }
+      if t == 2 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Notification").SetMaxLength(dlen)
+        this.ProcessSubNode("Notification")
+        return
+      }
+      if t == 3 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Nak").SetMaxLength(dlen)
+        this.ProcessSubNode("Nak")
+        return
+      }
+      if t == 4 && dlen > 1 && dlen < 1048576 {
+        this.GetSubNode("MD5-Challenge").SetMaxLength(dlen)
+        this.ProcessSubNode("MD5-Challenge")
+        return
+      }
+      if t == 5 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("OTP").SetMaxLength(dlen)
+        this.ProcessSubNode("OTP")
+        return
+      }
+      if t == 6 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("GTC").SetMaxLength(dlen)
+        this.ProcessSubNode("GTC")
+        return
+      }
+      if t == 254 && dlen > 6 && dlen < 1048576 {
+        this.GetSubNode("Expanded").SetMaxLength(dlen)
+        this.ProcessSubNode("Expanded")
+        return
+      }
+      if t == 13 && dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("EAP-TLS").SetMaxLength(dlen)
+        this.ProcessSubNode("EAP-TLS")
+        return
+      }
+    }
+    return
+  Code: uint8
+  Identifier: uint8
+  Length: uint16
+  Type: uint8
+  Identity: string
+  Notification: string
+  OTP: string
+  GTC: string
+  Nak:
+    operator: |
+      for {
+        res, op = this.TryProcessByType("PeekByte")
+        if !op.OK {
+          op.Recovery()
+          break
+        }
+        op.Recovery()
+        this.ProcessByType("Desired Type")
+      }
+  MD5-Challenge:
+    operator: |
+      this.ProcessSubNode("Value Size")
+      vs = getNodeResult("Value Size").Value
+      if vs > 0 && vs < 255 {
+        this.GetSubNode("Value").SetMaxLength(vs)
+        this.ProcessSubNode("Value")
+      }
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Name").SetMaxLength(rest)
+        this.ProcessSubNode("Name")
+      }
+    Value Size: uint8
+    Value: string
+    Name: string
+  Expanded:
+    operator: |
+      this.ProcessSubNode("Vendor-Id")
+      this.ProcessSubNode("Vendor Type")
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Vendor Data").SetMaxLength(rest)
+        this.ProcessSubNode("Vendor Data")
+      }
+    Vendor-Id: raw,3
+    Vendor Type: uint32
+    Vendor Data: string
+  EAP-TLS:
+    operator: |
+      this.ProcessSubNode("Flags")
+      flags = getNodeResult("Flags").Value
+      if (flags & 0x80) != 0 {
+        this.ProcessSubNode("TLS Message Length")
+      }
+      rest = this.GetMaxLength() - this.Length()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Fragment").SetMaxLength(rest)
+        this.ProcessSubNode("Fragment")
+      }
+    Flags: uint8
+    TLS Message Length: uint32
+    Fragment: raw
+EAPOLKey:
+  operator: |
+    this.ProcessSubNode("Descriptor Type")
+    this.ProcessSubNode("Key Information")
+    this.ProcessSubNode("Key Length")
+    this.ProcessSubNode("Replay Counter")
+    this.ProcessSubNode("Key Nonce")
+    this.ProcessSubNode("Key IV")
+    this.ProcessSubNode("Key RSC")
+    this.ProcessSubNode("Key ID")
+    this.ProcessSubNode("Key MIC")
+    this.ProcessSubNode("Key Data Length")
+    kdl = getNodeResult("Key Data Length").Value
+    if kdl > 0 {
+      this.GetSubNode("Key Data").SetMaxLength(kdl)
+      this.ProcessSubNode("Key Data")
+    }
+  Descriptor Type: uint8
+  Key Information: uint16
+  Key Length: uint16
+  Replay Counter: raw,8
+  Key Nonce: raw,32
+  Key IV: raw,16
+  Key RSC: raw,8
+  Key ID: raw,8
+  Key MIC: raw,16
+  Key Data Length: uint16
+  Key Data: raw
+EAPOLASFAlert:
+  Vendor ID: uint32
+  Vendor Type: uint32
+Desired Type: uint8
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8

@@ -1,0 +1,74 @@
+endian: big
+Package:
+  UPnPSSDPNotify:
+    operator: |
+      this.ProcessSubNode("Method")
+      if string(getNodeResult("Method").Value) != "NOTIFY" {
+        panic("upnp: expected SSDP NOTIFY")
+      }
+      this.ProcessSubNode("Target")
+      if string(getNodeResult("Target").Value) != "*" {
+        panic("upnp: SSDP NOTIFY target must be '*'")
+      }
+      this.ProcessSubNode("Version")
+      if string(getNodeResult("Version").Value) != "HTTP/1.1" {
+        panic("upnp: unsupported SSDP version")
+      }
+      setCtx("upnpHost", false)
+      setCtx("upnpLocation", false)
+      setCtx("upnpNotificationType", false)
+      setCtx("upnpNotificationSubtype", false)
+      setCtx("upnpServer", false)
+      setCtx("upnpUSN", false)
+      this.ProcessSubNode("Headers")
+      if !getCtx("upnpHost") || !getCtx("upnpLocation") || !getCtx("upnpNotificationType") || !getCtx("upnpNotificationSubtype") || !getCtx("upnpServer") || !getCtx("upnpUSN") {
+        panic("upnp: incomplete SSDP device announcement")
+      }
+      this.ProcessSubNode("Message End")
+      if getNodeResult("Message End").Value != 0x0d0a {
+        panic("upnp: SSDP message must end with CRLF")
+      }
+    Method: "del: ;type:string"
+    Target: "del: ;type:string"
+    Version: "del:\r\n;type:string"
+    Headers:
+      list: true
+      Header: UPnPHeader
+      operator: |
+        for {
+          res, probe = this.TryProcessByType("PeekByte")
+          probe.Recovery()
+          if !probe.OK {
+            panic("upnp: truncated SSDP header block")
+          }
+          if res.Value == 0x0d {
+            setCtx("inList", false)
+            break
+          }
+          this.NewElement().Process()
+        }
+    Message End: uint16
+
+UPnPHeader:
+  operator: |
+    this.ProcessSubNode("Line")
+    line = string(getNodeResult("Line").Value)
+    if len(line) == 0 {
+      panic("upnp: end of header block")
+    }
+    if line.HasPrefix("HOST: 239.255.255.250:1900") {
+      setCtx("upnpHost", true)
+    } else if line.HasPrefix("LOCATION: http://") {
+      setCtx("upnpLocation", true)
+    } else if line.HasPrefix("NT: urn:schemas-upnp-org:") {
+      setCtx("upnpNotificationType", true)
+    } else if line.HasPrefix("NTS: ssdp:") {
+      setCtx("upnpNotificationSubtype", true)
+    } else if line.HasPrefix("SERVER: ") && line.Contains("UPnP/") {
+      setCtx("upnpServer", true)
+    } else if line.HasPrefix("USN: uuid:") {
+      setCtx("upnpUSN", true)
+    }
+  Line: "del:\r\n;type:string"
+
+PeekByte: uint8

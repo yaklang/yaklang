@@ -1,0 +1,255 @@
+# IEEE 1609.3 WAVE Short Message Protocol, EtherType 0x88dc.
+# Version 2, p-encoded PSIDs, version 3 length/count and extension layouts:
+# https://github.com/wireshark/wireshark/blob/411f78566bed622a2ca2e6480c659486175db129/epan/dissectors/packet-wsmp.c
+# Version 3 TPID 0..3 layouts are independently specified in ISO 16460:2021
+# 5.3, 5.4.6 and 5.5.1-5.5.2, figures 8-10 (printed pages 3, 8, 9).
+# Section 5.3 identifies the bit-equivalent IEEE 1609.3-2016 TPID presentation:
+# https://cdn.standards.iteh.ai/samples/81066/0b768bec5b6c4b53876979d3ba8f5f1b/ISO-16460-2021.pdf
+#
+# Subtype zero is supported. LPP (TPID 4/5), forwarding subtypes and older
+# versions are explicitly unsupported. Application message and unknown v3
+# information-element contents remain bytes; no application state is inferred.
+# Implementation limits: 65535 total octets, 1024 elements per extension,
+# 256 legacy extension fields and 256 supplement octets. Length/count fields
+# use their shortest encoding. A direct entry consumes exactly one message.
+endian: big
+Package:
+  WSMP: WSMPMessage
+  WSMPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("wsmp: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("wsmp: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("wsmp: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("WSMPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed WSMP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+WSMPFrame: "import:wsmp.yaml;node:WSMP"
+WSMPPeekByte: uint8
+
+WSMPMessage:
+  operator: |
+    handled, err = tryParseWSMP()
+    if err != nil { panic(err) }
+    if handled { return }
+    if !this.HasMaxLength() { panic("wsmp: explicit message boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("wsmp: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 4 { panic("wsmp: truncated minimum message") }
+    if total > 65535 { panic("wsmp: message exceeds the 65535-byte implementation boundary") }
+    first, trial = this.TryProcessByType("WSMPPeekByte")
+    trial.Recovery()
+    if !trial.OK { panic("wsmp: truncated version") }
+    message = this.GetSubNode("Version 2 Message")
+    if first.Value == 2 {
+      message = this.GetSubNode("Version 2 Message")
+    } elif first.Value & 7 == 3 {
+      message = this.GetSubNode("Version 3 Message")
+    } else { panic("wsmp: unsupported version") }
+    message.SetMaxLength(total)
+    message.Process()
+    if this.Length() != total { panic("wsmp: message did not consume its boundary") }
+    this.AddInfo("Application Message Decoded", false)
+  Version 2 Message: WSMPVersion2
+  Version 3 Message: WSMPVersion3
+
+WSMPVersion3:
+  operator: |
+    subtype = int(this.ProcessSubNode("Subtype").Value)
+    option = int(this.ProcessSubNode("Network Extension Present").Value)
+    this.ProcessSubNode("Version")
+    if subtype != 0 { panic("wsmp: unsupported network subtype") }
+    if option != 0 {
+      extension = this.GetSubNode("Network Extensions")
+      extension.AddInfo("Network Fields", true)
+      extension.SetMaxLength(this.GetMaxLength()-this.Length())
+      extension.Process()
+    }
+    tpid = int(this.ProcessSubNode("TPID").Value)
+    if tpid > 3 { panic("wsmp: unsupported transport identifier") }
+    if tpid < 2 {
+      this.ProcessSubNode("PSID")
+    } else {
+      this.ProcessSubNode("Source ITS Port")
+      this.ProcessSubNode("Destination ITS Port")
+    }
+    if tpid & 1 != 0 {
+      extension = this.GetSubNode("Transport Extensions")
+      extension.AddInfo("Network Fields", false)
+      extension.SetMaxLength(this.GetMaxLength()-this.Length())
+      extension.Process()
+    }
+    length = int(this.ProcessSubNode("WSM Length").Value)
+    if length != this.GetMaxLength()-this.Length() { panic("wsmp: WSM length does not match message boundary") }
+    if length > 0 {
+      this.GetSubNode("WSM Data").SetMaxLength(length)
+      this.ProcessSubNode("WSM Data")
+    }
+  Subtype: uint8,4bit
+  Network Extension Present: uint8,1bit
+  Version: uint8,3bit
+  Network Extensions: WSMPExtensions
+  TPID: uint8
+  PSID: WSMPPSID
+  Source ITS Port: uint16
+  Destination ITS Port: uint16
+  Transport Extensions: WSMPExtensions
+  WSM Length: WSMPLength
+  WSM Data: raw
+
+WSMPPSID:
+  operator: |
+    first, trial = this.TryProcessByType("WSMPPeekByte")
+    trial.Recovery()
+    if !trial.OK { panic("wsmp: truncated PSID") }
+    value = int(first.Value)
+    size = 1
+    if value < 128 { size = 1 } elif value < 192 { size = 2 } elif value < 224 { size = 3 } elif value < 240 { size = 4 } else { panic("wsmp: invalid PSID encoding prefix") }
+    this.GetSubNode("Encoded PSID").SetMaxLength(size)
+    this.ProcessSubNode("Encoded PSID")
+  Encoded PSID: raw
+  out: |
+    encoded = data.Value[0].Value
+    value = 0
+    for _, octet = range encoded { value = (value << 8) | int(octet) }
+    if len(encoded) == 2 { return (value & 16383) + 128 }
+    if len(encoded) == 3 { return (value & 2097151) + 16512 }
+    if len(encoded) == 4 { return (value & 268435455) + 2113664 }
+    return value
+
+WSMPLength:
+  operator: |
+    first = int(this.ProcessSubNode("Length First Octet").Value)
+    if first >= 192 { panic("wsmp: invalid length or count encoding prefix") }
+    if first >= 128 {
+      second = int(this.ProcessSubNode("Length Second Octet").Value)
+      if (((first & 63) << 8) | second) < 128 { panic("wsmp: nonminimal length or count encoding") }
+    }
+  Length First Octet: uint8
+  Length Second Octet: uint8
+  out: |
+    first = int(data.Value[0].Value)
+    if first < 128 { return first }
+    return ((first & 63) << 8) | int(data.Value[1].Value)
+
+WSMPExtensions:
+  operator: |
+    count = int(this.ProcessSubNode("Element Count").Value)
+    if count > 1024 { panic("wsmp: extension count exceeds the 1024-element implementation limit") }
+    if count*2 > this.GetMaxLength()-this.Length() { panic("wsmp: extension count exceeds message boundary") }
+    if count > 0 {
+      elements = this.GetSubNode("Information Elements")
+      elements.AddInfo("Count", count)
+      elements.AddInfo("Network Fields", this.GetInfo("Network Fields"))
+      elements.SetMaxLength(this.GetMaxLength()-this.Length())
+      elements.Process()
+    }
+  Element Count: WSMPLength
+  Information Elements: WSMPInformationElements
+
+WSMPInformationElements:
+  list: true
+  Element: WSMPInformationElement
+  operator: |
+    for i = 0; i < this.GetInfo("Count"); i++ {
+      element = this.NewElement()
+      element.AddInfo("Network Fields", this.GetInfo("Network Fields"))
+      element.SetMaxLength(this.GetMaxLength()-this.Length())
+      element.Process()
+    }
+
+WSMPInformationElement:
+  operator: |
+    id = int(this.ProcessSubNode("Element ID").Value)
+    length = int(this.ProcessSubNode("Element Length").Value)
+    if length > this.GetMaxLength()-this.Length() { panic("wsmp: information element exceeds message boundary") }
+    if this.GetInfo("Network Fields") && (id == 4 || id == 15 || id == 16 || id == 23) {
+      if length != 1 { panic("wsmp: known network element requires one value octet") }
+      if id == 4 { this.ProcessSubNode("Transmit Power") } elif id == 15 { this.ProcessSubNode("Channel Number") } elif id == 16 { this.ProcessSubNode("Data Rate") } else { this.ProcessSubNode("Channel Load") }
+    } elif length > 0 {
+      this.GetSubNode("Element Data").SetMaxLength(length)
+      this.ProcessSubNode("Element Data")
+    }
+  Element ID: uint8
+  Element Length: WSMPLength
+  Transmit Power: uint8
+  Channel Number: uint8
+  Data Rate: uint8
+  Channel Load: uint8
+  Element Data: raw
+
+WSMPVersion2:
+  operator: |
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("PSID")
+    first, trial = this.TryProcessByType("WSMPPeekByte")
+    trial.Recovery()
+    if !trial.OK { panic("wsmp: missing legacy WAVE element identifier") }
+    if first.Value != 128 && first.Value != 129 && first.Value != 130 {
+      extensions = this.GetSubNode("Legacy Extensions")
+      extensions.SetMaxLength(this.GetMaxLength()-this.Length())
+      extensions.Process()
+    }
+    id = int(this.ProcessSubNode("WAVE Element ID").Value)
+    length = int(this.ProcessSubNode("WSM Length").Value)
+    if length != this.GetMaxLength()-this.Length() { panic("wsmp: WSM length does not match message boundary") }
+    if id == 129 {
+      if length == 0 { panic("wsmp: supplement has no terminating octet") }
+      supplement = this.GetSubNode("Supplement")
+      supplement.SetMaxLength(length)
+      supplement.Process()
+    }
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("WSM Data").SetMaxLength(remaining)
+      this.ProcessSubNode("WSM Data")
+    }
+  Version: uint8
+  PSID: WSMPPSID
+  Legacy Extensions: WSMPLegacyElements
+  WAVE Element ID: uint8
+  WSM Length: uint16
+  Supplement: WSMPSupplement
+  WSM Data: raw
+
+WSMPLegacyElements:
+  list: true
+  Element: WSMPLegacyElement
+  operator: |
+    count = 0
+    for {
+      first, trial = this.TryProcessByType("WSMPPeekByte")
+      trial.Recovery()
+      if !trial.OK { panic("wsmp: missing legacy WAVE element identifier") }
+      id = int(first.Value)
+      if id == 128 || id == 129 || id == 130 { break }
+      if id != 4 && id != 15 && id != 16 { panic("wsmp: unsupported legacy extension identifier") }
+      if count >= 256 { panic("wsmp: too many legacy extension fields") }
+      this.NewElement().Process()
+      count++
+    }
+    this.AddInfo("Legacy Extension Count", count)
+
+WSMPLegacyElement:
+  operator: |
+    id = int(this.ProcessSubNode("Element ID").Value)
+    if this.ProcessSubNode("Element Length").Value != 1 { panic("wsmp: legacy network element requires one value octet") }
+    if id == 4 { this.ProcessSubNode("Transmit Power") } elif id == 15 { this.ProcessSubNode("Channel Number") } else { this.ProcessSubNode("Data Rate") }
+  Element ID: uint8
+  Element Length: uint8
+  Transmit Power: uint8
+  Channel Number: uint8
+  Data Rate: uint8
+
+WSMPSupplement:
+  list: true
+  Octet: uint8
+  operator: |
+    for i = 0; i < 256; i++ {
+      if this.Length() >= this.GetMaxLength() { panic("wsmp: supplement has no terminating octet") }
+      if this.NewElement().Process().Value & 128 == 0 { return }
+    }
+    panic("wsmp: supplement exceeds the 256-octet implementation limit")

@@ -1,4 +1,91 @@
+endian: big
 Package:
+  LDAPMessage:
+    operator: |
+      this.ProcessSubNode("Identifier")
+      if getNodeResult("Identifier").Value != 0x30 {
+        panic("ldap: expected SEQUENCE")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l >= 0x80 {
+        panic("ldap: long-form BER length not in this rule")
+      }
+      if l > 0 {
+        this.GetSubNode("Body").SetMaxLength(l)
+        this.ProcessSubNode("Body")
+      }
+    Identifier: uint8
+    Length: uint8
+    Body:
+      operator: |
+        this.ProcessSubNode("MessageID Tag")
+        if getNodeResult("MessageID Tag").Value != 0x02 {
+          panic("ldap: expected INTEGER messageID")
+        }
+        this.ProcessSubNode("MessageID Length")
+        ml = getNodeResult("MessageID Length").Value
+        if ml > 0 {
+          this.GetSubNode("MessageID").SetMaxLength(ml)
+          this.ProcessSubNode("MessageID")
+        }
+        this.ProcessSubNode("ProtocolOp Tag")
+        tag = getNodeResult("ProtocolOp Tag").Value
+        if tag != 0x60 && tag != 0x61 && tag != 0x63 && tag != 0x64 && tag != 0x65 && tag != 0x42 && tag != 0x66 && tag != 0x67 && tag != 0x68 && tag != 0x69 && tag != 0x4a && tag != 0x6b && tag != 0x50 && tag != 0x6c && tag != 0x6d && tag != 0x6e && tag != 0x6f && tag != 0x73 && tag != 0x78 && tag != 0x79 {
+          panic("ldap: unexpected protocolOp tag")
+        }
+        this.ProcessSubNode("ProtocolOp Length")
+        pl = getNodeResult("ProtocolOp Length").Value
+        if pl > 0 {
+          this.GetSubNode("ProtocolOp").SetMaxLength(pl)
+          this.ProcessSubNode("ProtocolOp")
+        }
+      MessageID Tag: uint8
+      MessageID Length: uint8
+      MessageID: string
+      ProtocolOp Tag: uint8
+      ProtocolOp Length: uint8
+      ProtocolOp:
+        operator: |
+          tag = getNodeResult("../ProtocolOp Tag").Value
+          if tag == 0x60 {
+            this.ProcessSubNode("BindRequest")
+            return
+          }
+          return
+        BindRequest:
+          operator: |
+            this.ProcessSubNode("Version Tag")
+            this.ProcessSubNode("Version Length")
+            vl = getNodeResult("Version Length").Value
+            if vl > 0 {
+              this.GetSubNode("Version").SetMaxLength(vl)
+              this.ProcessSubNode("Version")
+            }
+            this.ProcessSubNode("Name Tag")
+            this.ProcessSubNode("Name Length")
+            nl = getNodeResult("Name Length").Value
+            if nl > 0 {
+              this.GetSubNode("Name").SetMaxLength(nl)
+              this.ProcessSubNode("Name")
+            }
+            this.ProcessSubNode("Auth Tag")
+            this.ProcessSubNode("Auth Length")
+            al = getNodeResult("Auth Length").Value
+            if al > 0 && al < 1048576 {
+              this.GetSubNode("Auth").SetMaxLength(al)
+              this.ProcessSubNode("Auth")
+            }
+            return
+          Version Tag: uint8
+          Version Length: uint8
+          Version: string
+          Name Tag: uint8
+          Name Length: uint8
+          Name: string
+          Auth Tag: uint8
+          Auth Length: uint8
+          Auth: string
   Message: BER
   LDAP:
     parser: |

@@ -1,0 +1,147 @@
+endian: big
+Package:
+  NBNS:
+    operator: |
+      this.ProcessSubNode("Header")
+      qd = getNodeResult("Header/Questions").Value
+      if qd > 16 {
+        panic("nbns: too many questions")
+      }
+      if qd > 0 {
+        this.ProcessSubNode("Questions")
+      }
+      an = getNodeResult("Header/Answer RRs").Value
+      if an > 16 {
+        panic("nbns: too many answers")
+      }
+      if an > 0 {
+        this.ProcessSubNode("Answers")
+      }
+    Header:
+      ID: uint16
+      Flags: uint16
+      Questions: uint16
+      Answer RRs: uint16
+      Authority RRs: uint16
+      Additional RRs: uint16
+    Questions:
+      list: true
+      list-length-from-field: "../Header/Questions"
+      Question:
+        Name: NBName
+        Type: uint16
+        Class: uint16
+    Answers:
+      list: true
+      list-length-from-field: "../Header/Answer RRs"
+      Answer:
+        operator: |
+          this.ProcessSubNode("Name")
+          this.ProcessSubNode("Type")
+          this.ProcessSubNode("Class")
+          this.ProcessSubNode("TTL")
+          this.ProcessSubNode("RDLength")
+          t = getNodeResult("Type").Value
+          l = getNodeResult("RDLength").Value
+          if t == 1 && l == 4 {
+            this.ProcessByType("NBNSA")
+            return
+          }
+          if t == 0x20 && l >= 6 && l < 1048576 {
+            this.ProcessByType("NBNSNB")
+            return
+          }
+          if l > 0 && l < 1048576 {
+            this.GetSubNode("RData").SetMaxLength(l)
+            this.ProcessSubNode("RData")
+          }
+          return
+        Name: NBName
+        Type: uint16
+        Class: uint16
+        TTL: uint32
+        RDLength: uint16
+        RData: "type:raw;length-from-field:../RDLength"
+  LLMNR:
+    operator: |
+      this.ProcessSubNode("Header")
+      qd = getNodeResult("Header/Questions").Value
+      if qd > 16 {
+        panic("llmnr: too many questions")
+      }
+      if qd > 0 {
+        this.ProcessSubNode("Questions")
+      }
+      an = getNodeResult("Header/Answer RRs").Value
+      if an > 16 {
+        panic("llmnr: too many answers")
+      }
+      if an > 0 {
+        this.ProcessSubNode("Answers")
+      }
+    Header:
+      ID: uint16
+      Flags: uint16
+      Questions: uint16
+      Answer RRs: uint16
+      Authority RRs: uint16
+      Additional RRs: uint16
+    Questions:
+      list: true
+      list-length-from-field: "../Header/Questions"
+      Question:
+        Name: NBName
+        Type: uint16
+        Class: uint16
+    Answers:
+      list: true
+      list-length-from-field: "../Header/Answer RRs"
+      Answer:
+        operator: |
+          this.ProcessSubNode("Name")
+          this.ProcessSubNode("Type")
+          this.ProcessSubNode("Class")
+          this.ProcessSubNode("TTL")
+          this.ProcessSubNode("RDLength")
+          t = getNodeResult("Type").Value
+          l = getNodeResult("RDLength").Value
+          if t == 1 && l == 4 {
+            this.ProcessByType("NBNSA")
+            return
+          }
+          if t == 0x20 && l >= 6 && l < 1048576 {
+            this.ProcessByType("NBNSNB")
+            return
+          }
+          if l > 0 && l < 1048576 {
+            this.GetSubNode("RData").SetMaxLength(l)
+            this.ProcessSubNode("RData")
+          }
+          return
+        Name: NBName
+        Type: uint16
+        Class: uint16
+        TTL: uint32
+        RDLength: uint16
+        RData: "type:raw;length-from-field:../RDLength"
+NBName:
+  list: true
+  Label:
+    operator: |
+      count = this.ProcessSubNode("Count").Value
+      if count == 0 {
+        setCtx("inList",false)
+        return
+      }
+      if count > 63 {
+        panic("nbns: label too long")
+      }
+      this.GetSubNode("Text").SetMaxLength(count)
+      this.ProcessSubNode("Text")
+    Count: uint8
+    Text: string
+NBNSA:
+  Address: raw,4
+NBNSNB:
+  NB Flags: uint16
+  Address: raw,4

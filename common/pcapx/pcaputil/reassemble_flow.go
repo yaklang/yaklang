@@ -38,6 +38,7 @@ type TrafficFrame struct {
 // OnClosed: reason(fin/rst/timeout) -> flow
 // OnCreated: flow created
 type TrafficFlow struct {
+	binState               *binFlow
 	key                    flowKey
 	frameMu                sync.Mutex
 	httpStarted            sync.Once
@@ -148,6 +149,16 @@ func (t *TrafficFlow) flushFrame() {
 }
 
 func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
+	if t.pool.captureConf != nil && t.pool.captureConf.binParser != nil {
+		if t.binState == nil {
+			t.binState = t.pool.captureConf.binParser.newFlow(t)
+		}
+		direction := 0
+		if frame.Connection != t.ClientConn {
+			direction = 1
+		}
+		t.binState.feed(direction, frame.Payload, frame.Timestamp)
+	}
 	// Arrived callbacks may retain frames. Do not give them packet-source storage
 	// or the same object that is subsequently extended for a reassembled frame.
 	if t.onDataFrameArrived != nil {
@@ -254,9 +265,16 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 	if !t.closeNotified.CompareAndSwap(false, true) {
 		return
 	}
-	if reason == TrafficFlowCloseReason_RESOURCE_LIMIT && t.pool.counters != nil {
-		t.pool.counters.limits.Add(1)
-		t.pool.parallel.fail(fmt.Errorf("TCP stream closed by a reassembly resource limit"))
+	if t.binState != nil {
+		t.binState.close(reason)
+	}
+	if reason == TrafficFlowCloseReason_RESOURCE_LIMIT {
+		if t.pool.counters != nil {
+			t.pool.counters.limits.Add(1)
+		} else {
+			t.pool.singleDiagnostics.limits.Add(1)
+		}
+		t.pool.reassemblyFailure("TCP stream closed by a reassembly resource limit")
 	}
 	t.flushFrame()
 	if t.onCloseHandler != nil {
@@ -265,6 +283,10 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 }
 
 func (t *TrafficFlow) Release() {
+	if t.binState != nil {
+		t.binState.close(TrafficFlowCloseReason_CTX_CANCEL)
+		t.binState = nil
+	}
 	t.pool.flowCache.Remove(t.key)
 	// t.ClientConn.Close()
 	// t.ServerConn.Close()

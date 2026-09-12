@@ -1,0 +1,58 @@
+# JSON-RPC 2.0 documents extracted from a caller-bounded message or HTTP body.
+# Typed JSON metadata retains every nested value, member order and exact number
+# spelling. No remote methods are called. The legacy jsonrpc.yaml shape remains
+# available separately; this entry point requires a complete document boundary.
+Package:
+  JSONRPC2:
+    operator: |
+      if !this.HasMaxLength() { panic("jsonrpc2: document requires an explicit boundary") }
+      limit = getCtx("jsonrpcMessageLimit")
+      if !hasCtx("jsonrpcMessageLimit") { limit = 1048576 }
+      if limit <= 0 || this.GetMaxLength() > limit { panic("jsonrpc2: document exceeds limit") }
+      depth = getCtx("jsonrpcDepthLimit")
+      if !hasCtx("jsonrpcDepthLimit") { depth = 64 }
+      text = this.ProcessSubNode("JSON Text").Value
+      value, err = decodeJSONText(text, depth)
+      if err != nil { panic(err) }
+      messages = [value]
+      batch = value.Kind == "array"
+      if batch {
+        messages = value.Elements
+        if len(messages) == 0 { panic("jsonrpc2: empty batch") }
+      }
+      kinds = []string{}
+      for message in messages {
+        if message.Kind != "object" { panic("jsonrpc2: each message must be an object") }
+        fields = message.Members
+        version = fields["jsonrpc"]
+        if version == nil || version.Kind != "string" || version.StringValue != "2.0" { panic("jsonrpc2: invalid version") }
+        id = fields["id"]
+        if id != nil && id.Kind != "number" && id.Kind != "string" && id.Kind != "null" { panic("jsonrpc2: invalid identifier type") }
+        method = fields["method"]
+        result = fields["result"]
+        fault = fields["error"]
+        if method != nil {
+          if method.Kind != "string" || result != nil || fault != nil { panic("jsonrpc2: invalid request fields") }
+          params = fields["params"]
+          if params != nil && params.Kind != "array" && params.Kind != "object" { panic("jsonrpc2: invalid parameter type") }
+          if id == nil { kinds.Append("notification") } else { kinds.Append("request") }
+        } else {
+          if id == nil || (result == nil && fault == nil) || (result != nil && fault != nil) { panic("jsonrpc2: invalid response fields") }
+          if fault != nil {
+            if fault.Kind != "object" { panic("jsonrpc2: error must be an object") }
+            code = fault.Members["code"]
+            description = fault.Members["message"]
+            if code == nil || code.Kind != "number" || description == nil || description.Kind != "string" { panic("jsonrpc2: invalid error fields") }
+            // This entry point supports integer-spelled codes. Numeric IDs and
+            // other numbers retain all JSON spellings without float conversion.
+            for c in []byte(code.NumberValue) { if c == 46 || c == 101 || c == 69 { panic("jsonrpc2: unsupported non-integer-spelled error code") } }
+            kinds.Append("error")
+          } else {
+            kinds.Append("success")
+          }
+        }
+      }
+      this.AddInfo("JSON Value", value)
+      this.AddInfo("Batch", batch)
+      this.AddInfo("Message Kinds", kinds)
+    JSON Text: string

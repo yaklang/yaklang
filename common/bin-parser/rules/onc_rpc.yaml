@@ -1,0 +1,63 @@
+endian: big
+Package:
+  ONCRPC:
+    operator: |
+      this.ProcessSubNode("XID")
+      this.ProcessSubNode("Message Type")
+      mt = getNodeResult("Message Type").Value
+      if mt != 0 && mt != 1 {
+        panic("onc_rpc: message type must be call or reply")
+      }
+      if mt == 0 {
+        this.ProcessSubNode("RPC Version")
+        if getNodeResult("RPC Version").Value != 2 {
+          panic("onc_rpc: rpc version must be 2")
+        }
+        this.ProcessSubNode("Program")
+        this.ProcessSubNode("Program Version")
+        this.ProcessSubNode("Procedure")
+        this.ProcessSubNode("Cred Flavor")
+        this.ProcessSubNode("Cred Length")
+        cl = getNodeResult("Cred Length").Value
+        if cl > 0 {
+          this.GetSubNode("Cred Body").SetMaxLength(cl)
+          this.ProcessSubNode("Cred Body")
+        }
+        this.ProcessSubNode("Verf Flavor")
+        this.ProcessSubNode("Verf Length")
+        vl = getNodeResult("Verf Length").Value
+        if vl > 0 {
+          this.GetSubNode("Verf Body").SetMaxLength(vl)
+          this.ProcessSubNode("Verf Body")
+        }
+        if this.Length() < this.GetMaxLength() {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 && rest < 1048576 {
+            this.GetSubNode("Stub").SetMaxLength(rest)
+            this.ProcessSubNode("Stub")
+          }
+        }
+        return
+      }
+      this.ProcessSubNode("Reply Stat")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Stub").SetMaxLength(rest)
+          this.ProcessSubNode("Stub")
+        }
+      }
+    XID: uint32
+    Message Type: uint32
+    RPC Version: uint32
+    Program: uint32
+    Program Version: uint32
+    Procedure: uint32
+    Cred Flavor: uint32
+    Cred Length: uint32
+    Cred Body: string
+    Verf Flavor: uint32
+    Verf Length: uint32
+    Verf Body: string
+    Reply Stat: uint32
+    Stub: raw

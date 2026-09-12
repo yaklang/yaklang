@@ -1,0 +1,164 @@
+endian: little
+Package:
+  MongoDB:
+    operator: |
+      this.ProcessSubNode("Message Length")
+      l = getNodeResult("Message Length").Value
+      if l < 16 {
+        panic("mongodb: message length smaller than 16")
+      }
+      if l > 50331648 || (this.HasMaxLength() && l > this.GetMaxLength()) {
+        panic("mongodb: message length exceeds input or configured bound")
+      }
+      this.SetMaxLength(l)
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Response To")
+      this.ProcessSubNode("Op Code")
+      op = getNodeResult("Op Code").Value
+      if op == 2004 && l >= 32 {
+        this.ProcessSubNode("OP_QUERY")
+        if this.Length() != l { panic("mongodb: unsupported trailing query fields") }
+        return
+      }
+      if op == 2013 && l >= 21 {
+        this.ProcessSubNode("OP_MSG")
+        if this.Length() != l { panic("mongodb: unsupported additional sections or trailing data") }
+        return
+      }
+      panic("mongodb: unsupported opcode or incomplete message body")
+    Message Length: uint32
+    Request ID: uint32
+    Response To: uint32
+    Op Code: uint32
+    OP_QUERY:
+      operator: |
+        this.ProcessSubNode("Flags")
+        this.ProcessSubNode("Collection")
+        this.ProcessSubNode("Skip")
+        this.ProcessSubNode("Return")
+        this.ProcessSubNode("Query")
+      Flags: uint32
+      Collection: "del:\x00;type:string"
+      Skip: uint32
+      Return: uint32
+      Query:
+        unpack: true
+        operator: |
+          this.ProcessByType("BSONDoc")
+    OP_MSG:
+      operator: |
+        this.ProcessSubNode("Flag Bits")
+        flags = getNodeResult("Flag Bits").Value
+        if flags & 1 != 0 { panic("mongodb: checksummed messages are not supported") }
+        if flags & 0xfffc != 0 { panic("mongodb: unknown required flag") }
+        this.ProcessSubNode("Section Kind")
+        if getNodeResult("Section Kind").Value != 0 { panic("mongodb: unsupported section kind") }
+        this.ProcessSubNode("Document")
+      Flag Bits: uint32
+      Section Kind: uint8
+      Document:
+        unpack: true
+        operator: |
+          this.ProcessByType("BSONDoc")
+BSONDoc:
+  operator: |
+    this.ProcessSubNode("Size")
+    sz = getNodeResult("Size").Value
+    if sz < 5 {
+      panic("bson: document too small")
+    }
+    if sz > 16777216 || (this.HasMaxLength() && sz > this.GetMaxLength()) {
+      panic("bson: document exceeds input or supported limit")
+    }
+    this.SetMaxLength(sz)
+    this.GetSubNode("Elements").SetMaxLength(sz - 4)
+    this.ProcessSubNode("Elements")
+    if this.Length() != sz { panic("bson: document boundary mismatch") }
+  Size: uint32
+  Elements:
+    list: true
+    Element:
+      operator: |
+        this.ProcessSubNode("Type")
+        t = getNodeResult("Type").Value
+        if t == 0 {
+          return
+        }
+        this.ProcessSubNode("Name")
+        if t == 0x10 {
+          this.ProcessSubNode("Int32")
+          return
+        }
+        if t == 0x12 {
+          this.ProcessSubNode("Int64")
+          return
+        }
+        if t == 0x01 {
+          this.ProcessSubNode("Double")
+          return
+        }
+        if t == 0x09 {
+          this.ProcessSubNode("Datetime")
+          return
+        }
+        if t == 0x07 {
+          this.ProcessSubNode("ObjectId")
+          return
+        }
+        if t == 0x02 {
+          this.ProcessSubNode("StrLen")
+          sl = getNodeResult("StrLen").Value
+          if sl < 1 || sl > 16777216 { panic("bson: invalid string length") }
+          this.GetSubNode("Str").SetMaxLength(sl)
+          this.ProcessSubNode("Str")
+          strValue = getNodeResult("Str").Value
+          if strValue[len(strValue)-1] != 0 { panic("bson: string terminator missing") }
+          return
+        }
+        if t == 0x05 {
+          this.ProcessSubNode("BinLen")
+          bl = getNodeResult("BinLen").Value
+          this.ProcessSubNode("BinSubtype")
+          if bl > 16777216 { panic("bson: invalid binary length") }
+          if bl > 0 {
+            this.GetSubNode("Binary").SetMaxLength(bl)
+            this.ProcessSubNode("Binary")
+          }
+          return
+        }
+        if t == 0x08 {
+          this.ProcessSubNode("Bool")
+          if getNodeResult("Bool").Value > 1 { panic("bson: invalid boolean") }
+          return
+        }
+        if t == 0x0a {
+          return
+        }
+        if t == 0x03 || t == 0x04 {
+          this.ProcessByType("BSONDoc")
+          return
+        }
+        panic("bson: unsupported element type")
+      Type: uint8
+      Name: "del:\x00;type:string"
+      Int32: uint32
+      Int64: uint64
+      Double: raw,8
+      Datetime: uint64
+      ObjectId: raw,12
+      StrLen: uint32
+      Str: string
+      BinLen: uint32
+      BinSubtype: uint8
+      Binary: string
+      Bool: uint8
+    operator: |
+      for this.Length() < this.GetMaxLength() {
+        ele = this.NewElement()
+        result = ele.Process()
+        if result.Child("Type").Value == 0 {
+          if this.Length() != this.GetMaxLength() { panic("bson: premature document terminator") }
+          return
+        }
+      }
+      panic("bson: document terminator missing")

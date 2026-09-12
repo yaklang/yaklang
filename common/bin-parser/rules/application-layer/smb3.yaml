@@ -1,0 +1,51 @@
+# MS-SMB2 revision 87.0 (2026-07-14), 2.2.1, 2.2.3, 2.2.4,
+# 3.2.5.2 and 3.3.5.4:
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/5606ad47-5ee0-437a-817e-70c366052962
+# SMB3Negotiate is a parse-only, exact-boundary single successful NEGOTIATE
+# profile, 100..65536 bytes (implementation resource bound). Request dialects
+# must include 0300, 0302 or 0311; the latter selects the context-offset union
+# rather than ClientStartTime and requires precisely one PREAUTH context.
+# Known context fields and arrays are decoded; reserved and unknown data are
+# retained. Extra context/record bytes are explicitly uninterpreted, not silently
+# discarded. No session matching, algorithm execution, GSS token interpretation,
+# signing verification, transform payload decoding, compound PDU or reassembly.
+# Existing SMB3Transform and permissive SMB2 APIs are intentionally unchanged.
+endian: little
+Package:
+  SMB3Negotiate:
+    operator: |
+      err = parseSMB3Negotiate()
+      if err != nil { panic(err) }
+
+  SMB3NegotiateCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 { panic("smb3 negotiate: explicit nonempty carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("smb3 negotiate: carrier requires a byte boundary") }
+      candidate, trial = this.TryProcessByType("SMB3NegotiateExact", "SMB3Negotiate")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SMB3 Negotiate")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+  SMB3Transform:
+    operator: |
+      this.ProcessSubNode("ProtocolId")
+      if getNodeResult("ProtocolId").Value != 0x424d53fd {
+        panic("smb3: ProtocolId must be \\xfdSMB")
+      }
+      this.ProcessSubNode("Signature")
+      this.ProcessSubNode("Nonce")
+      this.ProcessSubNode("OriginalMessageSize")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("SessionId")
+    ProtocolId: uint32
+    Signature: raw,16
+    Nonce: raw,16
+    OriginalMessageSize: uint32
+    Reserved: uint16
+    Flags: uint16
+    SessionId: uint64
+
+SMB3NegotiateExact: "import:application-layer/smb3.yaml;node:SMB3Negotiate"

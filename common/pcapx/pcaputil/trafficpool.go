@@ -38,6 +38,9 @@ func makeFlowKey(srcIP, dstIP net.IP, srcPort, dstPort uint16, ipv6 bool) (flowK
 }
 
 type TrafficPool struct {
+	captureAccountingAvailable                            bool // fixed before reader goroutines start
+	capturedPackets, capturedBytes                        atomic.Uint64
+	singleUnreassembledBytes, singleUnreassembledSegments atomic.Uint64
 	// Default Feed is serialized. Optional workers preserve each flow's packet
 	// order and invoke callbacks concurrently across flows. Callbacks must not
 	// recursively call Feed, NewFlow or Close on this pool.
@@ -62,6 +65,9 @@ type TrafficPool struct {
 	owner                           *TrafficPool
 	counters                        *reassemblyCounters
 	firstError                      atomic.Pointer[reassemblyError]
+	deviceStatsMu                   sync.Mutex
+	singleDevices                   []TCPDeviceCaptureStats
+	singleDiagnostics               reassemblyCounters
 }
 
 func NewTrafficPool(ctx context.Context) *TrafficPool {

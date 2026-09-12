@@ -1,0 +1,320 @@
+# Bounded SNA Ethernet/LLC and single PIU field-layout profile, network order.
+# IBM SNA Formats GA27-3136-20, chapters 4, 5 and 10:
+# https://publibfp.dhe.ibm.com/epubs/pdf/d50a5007.pdf
+# SHA256 891376a3c2a48918fd94e94f3d8ad653370b0177275cbff58ef12416e4987704
+# IBM SC41-5404-08 Figure 1-8: EtherType 80D5 carries Length(2), Pad(1), LLC.
+# https://public.dhe.ibm.com/systems/power/docs/systemi/v5r4/en_US/sc415404.pdf
+# The length excludes those 3 encapsulation bytes and includes the LLC header.
+# Cross-check: wireshark/wireshark@57bf672140761a871aaad0f709fb7f7c32fd186b,
+# packet-snaeth.c, packet-sna.c, packet-llc.c and epan/llcsaps.h.
+# FID0/1 (10 bytes), FID2 (6), and retired FID3 (2) are implemented. FID4/5/F
+# and HPR are unsupported, not reinterpreted as FID2. DCF must delimit one PIU;
+# blocked PIUs, Ethernet padding inference and BIU reassembly are unsupported.
+# RH request/response bits have separate active/reserved names. Reserved bits
+# are retained (IBM specifies sender checks, not general receiver rejection).
+# Continuation/first-segment RU bytes are opaque; no incomplete sense/IPM/RU
+# is presented as complete. Whole BIUs expose 4-byte sense fields, the 3-byte
+# IPM extension, and the defined 3-byte compression header when applicable.
+# IPR/IPM is recognized by the IBM receiver mask, not all RH bytes being 830100.
+# FMD format-1 is session-dependent (NS versus FMH): no session kind is guessed.
+# SC/NC/DFC expose their common one-byte code, not command-specific parameters.
+# No XID body, session/chain/sequence validation, compression expansion,
+# enciphered-body interpretation, or application/business semantics is provided.
+# 1500 bytes is an explicit implementation resource profile, not an SNA maximum.
+# Parsed NodeToBytes is supported; structured GenerateBinary is unsupported.
+endian: big
+Package:
+  SNAEthernet: SNAEthernetPacket
+  SNAPIU: SNAPacket
+  SNAEthernetCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("sna: explicit packet boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("sna: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("sna: empty carrier has no packet") }
+      candidate, trial = this.TryProcessByType("SNAEthernetFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SNA Ethernet Packet")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SNAEthernetFrame: "import:sna.yaml;node:SNAEthernet"
+
+SNAEthernetPacket:
+  operator: |
+    if !this.HasMaxLength() { panic("sna: explicit packet boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("sna: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 6 { panic("sna: truncated encapsulation and LLC header") }
+    if total > 1500 { panic("sna: packet exceeds 1500-byte implementation profile") }
+    length = int(this.ProcessSubNode("SNA Ethernet Length").Value)
+    if length != total-3 { panic("sna: encapsulated length does not equal bounded LLC bytes") }
+    this.ProcessSubNode("SNA Ethernet Padding")
+    dsap = int(this.ProcessSubNode("DSAP").Value)
+    ssap = int(this.ProcessSubNode("SSAP").Value)
+    sap = dsap & 0xfe
+    if sap != 4 && sap != 8 && sap != 12 && sap != 64 && sap != 200 { panic("sna: destination SAP outside SNA LLC profile") }
+    control = int(this.ProcessSubNode("LLC Control").Value)
+    header = 3
+    form = "U"
+    information = (control & 0xef) == 3
+    if (control & 3) != 3 {
+      if length < 4 { panic("sna: truncated extended LLC control") }
+      second = int(this.ProcessSubNode("LLC Extended Control").Value)
+      header = 4
+      this.AddInfo("LLC Receive Sequence", second >> 1)
+      this.AddInfo("LLC Poll Final", (second & 1) == 1)
+      form = "S"
+      if (control & 1) == 0 {
+        form = "I"
+        information = true
+        this.AddInfo("LLC Send Sequence", control >> 1)
+      } else {
+        this.AddInfo("LLC Supervisory Function", (control >> 2) & 3)
+        if length != header { panic("sna: supervisory LLC frame has unexpected information bytes") }
+      }
+    } else {
+      this.AddInfo("LLC Unnumbered Modifier", control & 0xec)
+      this.AddInfo("LLC Poll Final", (control & 16) != 0)
+    }
+    remaining = length-header
+    if remaining > 0 {
+      bodyName = "Uninterpreted LLC Information"
+      if information { bodyName = "PIU" }
+      this.GetSubNode(bodyName).SetMaxLength(remaining)
+      this.ProcessSubNode(bodyName)
+    }
+    if this.Length() != total { panic("sna: unconsumed Ethernet packet bytes") }
+    this.AddInfo("Profile", "SNA Ethernet LLC bounded field layout")
+    this.AddInfo("Maximum Packet Bytes", 1500)
+    this.AddInfo("Destination SAP", sap)
+    this.AddInfo("Destination Group", (dsap & 1) != 0)
+    this.AddInfo("Source SAP", ssap & 0xfe)
+    this.AddInfo("LLC Response", (ssap & 1) != 0)
+    this.AddInfo("LLC Format", form)
+    this.AddInfo("PIU Decoded", information && remaining > 0)
+    this.AddInfo("XID Body Decoded", false)
+    this.AddInfo("Session State Validated", false)
+  SNA Ethernet Length: uint16
+  SNA Ethernet Padding: uint8
+  DSAP: uint8
+  SSAP: uint8
+  LLC Control: uint8
+  LLC Extended Control: uint8
+  PIU: SNAPacket
+  Uninterpreted LLC Information: raw
+
+SNAPacket:
+  operator: |
+    if !this.HasMaxLength() { panic("sna: explicit packet boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("sna: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 2 { panic("sna: truncated transmission header") }
+    if total > 1500 { panic("sna: packet exceeds 1500-byte implementation profile") }
+    fid = int(this.ProcessSubNode("Format Identification").Value)
+    if fid > 3 { panic("sna: unsupported transmission header format") }
+    begin = int(this.ProcessSubNode("Begin BIU").Value)
+    end = int(this.ProcessSubNode("End BIU").Value)
+    if fid == 2 { this.ProcessSubNode("ODAI") } else { this.ProcessSubNode("TH Reserved Bit") }
+    this.ProcessSubNode("Expedited Flow")
+    header = 2
+    if fid == 3 {
+      this.ProcessSubNode("LU SSCP Indicator")
+      this.ProcessSubNode("LU PU Indicator")
+      this.ProcessSubNode("Local Address")
+    } else {
+      header = 10
+      if fid == 2 { header = 6 }
+      if total < header { panic("sna: truncated format-specific transmission header") }
+      this.ProcessSubNode("TH Reserved Octet")
+      if fid == 2 {
+        this.ProcessSubNode("Destination Local Address")
+        this.ProcessSubNode("Origin Local Address")
+      } else {
+        this.ProcessSubNode("Destination Address")
+        this.ProcessSubNode("Origin Address")
+      }
+      this.ProcessSubNode("Sequence Number")
+      if fid != 2 {
+        if int(this.ProcessSubNode("Data Count").Value) != total-header { panic("sna: data count does not delimit one bounded PIU") }
+      }
+    }
+    remaining = total-header
+    whole = begin == 1 && end == 1
+    senseDecoded = false
+    compressionDecoded = false
+    commandDecoded = false
+    pacing = false
+    pacingExtension = false
+    if begin == 0 {
+      if remaining > 0 {
+        this.GetSubNode("BIU Continuation Bytes").SetMaxLength(remaining)
+        this.ProcessSubNode("BIU Continuation Bytes")
+      }
+    } else {
+      if remaining < 3 { panic("sna: truncated 3-byte request response header") }
+      this.ProcessSubNode("Request Response Header")
+      rh = this.GetSubNode("Request Response Header")
+      response = int(rh.GetSubNode("Response Indicator").Result().Value)
+      category = int(rh.GetSubNode("RU Category").Result().Value)
+      format = int(rh.GetSubNode("Format Indicator").Result().Value)
+      sense = int(rh.GetSubNode("Sense Data Included").Result().Value)
+      remaining -= 3
+      bodyName = "Uninterpreted RU Bytes"
+      if !whole {
+        bodyName = "First BIU Segment Bytes"
+      } else {
+        pacing = response == 1 && rh.GetSubNode("Definite Response 1").Result().Value == 0 && rh.GetSubNode("Definite Response 2").Result().Value == 0 && rh.GetSubNode("Pacing Indicator").Result().Value == 1
+        if pacing {
+          if remaining != 0 && remaining != 3 { panic("sna: isolated pacing unit must have zero or three extension bytes") }
+          if remaining == 3 {
+            this.ProcessSubNode("IPM Extension")
+            remaining = 0
+            pacingExtension = true
+          }
+        } else if sense == 1 {
+          if remaining < 4 { panic("sna: truncated 4-byte sense data") }
+          this.ProcessSubNode("Sense Data")
+          remaining -= 4
+          senseDecoded = true
+          bodyName = "Sense Associated RU Bytes"
+        } else if response == 0 && category == 0 && rh.GetSubNode("Enciphered Data").Result().Value == 1 {
+          bodyName = "Enciphered RU Bytes"
+        } else if response == 0 && category == 0 && rh.GetSubNode("Length Checked Compression").Result().Value == 1 {
+          if remaining < 1 { panic("sna: missing compression format octet") }
+          this.ProcessSubNode("Compression Algorithm")
+          kind = int(this.ProcessSubNode("Uncompressed Data Type").Value)
+          remaining -= 1
+          bodyName = "Uninterpreted Compression Bytes"
+          if kind == 1 {
+            if remaining < 2 { panic("sna: truncated 3-byte compression header") }
+            this.ProcessSubNode("Uncompressed RU Length")
+            remaining -= 2
+            compressionDecoded = true
+            bodyName = "Compressed RU Bytes"
+          }
+        } else if category != 0 && format == 1 {
+          if remaining == 0 { panic("sna: missing control RU request code") }
+          this.ProcessSubNode("RU Request Code")
+          remaining -= 1
+          commandDecoded = true
+          bodyName = "Uninterpreted RU Parameters"
+        }
+      }
+      if remaining > 0 {
+        this.GetSubNode(bodyName).SetMaxLength(remaining)
+        this.ProcessSubNode(bodyName)
+      }
+    }
+    if this.Length() != total { panic("sna: unconsumed PIU bytes") }
+    this.AddInfo("Profile", "SNA FID0 FID1 FID2 FID3 bounded PIU fields")
+    this.AddInfo("TH Bytes", header)
+    this.AddInfo("RH Present", begin == 1)
+    this.AddInfo("Whole BIU", whole)
+    this.AddInfo("Sense Fields Decoded", senseDecoded)
+    this.AddInfo("Isolated Pacing Unit", pacing)
+    this.AddInfo("IPM Extension Decoded", pacingExtension)
+    this.AddInfo("Compression Header Decoded", compressionDecoded)
+    this.AddInfo("RU Code Decoded", commandDecoded)
+    this.AddInfo("Application Body Decoded", false)
+    this.AddInfo("Reassembled", false)
+    this.AddInfo("Decompressed", false)
+    this.AddInfo("Session State Validated", false)
+  Format Identification: uint8,4bit
+  Begin BIU: uint8,1bit
+  End BIU: uint8,1bit
+  ODAI: uint8,1bit
+  TH Reserved Bit: uint8,1bit
+  Expedited Flow: uint8,1bit
+  TH Reserved Octet: uint8
+  LU SSCP Indicator: uint8,1bit
+  LU PU Indicator: uint8,1bit
+  Local Address: uint8,6bit
+  Destination Address: uint16
+  Origin Address: uint16
+  Destination Local Address: uint8
+  Origin Local Address: uint8
+  Sequence Number: uint16
+  Data Count: uint16
+  Request Response Header: SNARH
+  Sense Data: SNASense
+  IPM Extension: SNAIPM
+  Compression Algorithm: uint8,4bit
+  Uncompressed Data Type: uint8,4bit
+  Uncompressed RU Length: uint16
+  RU Request Code: uint8
+  BIU Continuation Bytes: raw
+  First BIU Segment Bytes: raw
+  Uninterpreted RU Bytes: raw
+  Uninterpreted RU Parameters: raw
+  Sense Associated RU Bytes: raw
+  Enciphered RU Bytes: raw
+  Compressed RU Bytes: raw
+  Uninterpreted Compression Bytes: raw
+
+SNARH:
+  operator: |
+    response = int(this.ProcessSubNode("Response Indicator").Value)
+    this.ProcessSubNode("RU Category")
+    this.ProcessSubNode("RH Reserved Bit")
+    this.ProcessSubNode("Format Indicator")
+    this.ProcessSubNode("Sense Data Included")
+    this.ProcessSubNode("Begin Chain")
+    this.ProcessSubNode("End Chain")
+    this.ProcessSubNode("Definite Response 1")
+    if response == 0 { this.ProcessSubNode("Length Checked Compression") } else { this.ProcessSubNode("Response Reserved Bit 1") }
+    this.ProcessSubNode("Definite Response 2")
+    if response == 0 { this.ProcessSubNode("Exception Response") } else { this.ProcessSubNode("Negative Response") }
+    this.ProcessSubNode("RH Second Reserved Bit")
+    if response == 0 { this.ProcessSubNode("Request Larger Window") } else { this.ProcessSubNode("Response Reserved Bit 5") }
+    this.ProcessSubNode("Queued Response")
+    this.ProcessSubNode("Pacing Indicator")
+    if response == 0 {
+      this.ProcessSubNode("Begin Bracket")
+      this.ProcessSubNode("End Bracket")
+      this.ProcessSubNode("Change Direction")
+      this.ProcessSubNode("Request Third Reserved Bit")
+      this.ProcessSubNode("Code Selection")
+      this.ProcessSubNode("Enciphered Data")
+      this.ProcessSubNode("Padded Data")
+      this.ProcessSubNode("Conditional End Bracket")
+    } else { this.ProcessSubNode("Response Reserved Octet") }
+  Response Indicator: uint8,1bit
+  RU Category: uint8,2bit
+  RH Reserved Bit: uint8,1bit
+  Format Indicator: uint8,1bit
+  Sense Data Included: uint8,1bit
+  Begin Chain: uint8,1bit
+  End Chain: uint8,1bit
+  Definite Response 1: uint8,1bit
+  Length Checked Compression: uint8,1bit
+  Response Reserved Bit 1: uint8,1bit
+  Definite Response 2: uint8,1bit
+  Exception Response: uint8,1bit
+  Negative Response: uint8,1bit
+  RH Second Reserved Bit: uint8,1bit
+  Request Larger Window: uint8,1bit
+  Response Reserved Bit 5: uint8,1bit
+  Queued Response: uint8,1bit
+  Pacing Indicator: uint8,1bit
+  Begin Bracket: uint8,1bit
+  End Bracket: uint8,1bit
+  Change Direction: uint8,1bit
+  Request Third Reserved Bit: uint8,1bit
+  Code Selection: uint8,1bit
+  Enciphered Data: uint8,1bit
+  Padded Data: uint8,1bit
+  Conditional End Bracket: uint8,1bit
+  Response Reserved Octet: uint8
+
+SNASense:
+  Sense Category: uint8
+  Sense Modifier: uint8
+  Sense Specific Information: uint16
+
+SNAIPM:
+  IPM Type: uint8,2bit
+  Reset Residual Count: uint8,1bit
+  IPM Reserved Bits: uint8,5bit
+  Next Window Format: uint16,1bit
+  Next Window Size: uint16,15bit

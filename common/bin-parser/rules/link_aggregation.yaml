@@ -1,0 +1,55 @@
+# IEEE 802.1AX LACP version 1 within the Slow Protocols envelope.
+endian: big
+Package:
+  LACP:
+    operator: |
+      this.ProcessSubNode("Subtype")
+      this.ProcessSubNode("Version")
+      if getNodeResult("Subtype").Value != 1 || getNodeResult("Version").Value != 1 { panic("lacp: unsupported subtype or version") }
+      this.ProcessSubNode("Actor")
+      if getNodeResult("Actor/Type").Value != 1 { panic("lacp: expected actor information") }
+      this.ProcessSubNode("Partner")
+      if getNodeResult("Partner/Type").Value != 2 { panic("lacp: expected partner information") }
+      this.ProcessSubNode("Collector Type")
+      this.ProcessSubNode("Collector Length")
+      if getNodeResult("Collector Type").Value != 3 || getNodeResult("Collector Length").Value != 16 { panic("lacp: invalid collector information") }
+      this.ProcessSubNode("Collector Maximum Delay")
+      this.ProcessSubNode("Collector Reserved")
+      this.ProcessSubNode("Terminator Type")
+      this.ProcessSubNode("Terminator Length")
+      if getNodeResult("Terminator Type").Value != 0 || getNodeResult("Terminator Length").Value != 0 { panic("lacp: invalid terminator") }
+      this.ProcessSubNode("Reserved Padding")
+      if this.Length() != this.GetMaxLength() { panic("lacp: unexpected trailing bytes") }
+    Subtype: uint8
+    Version: uint8
+    Actor: LACPIdentity
+    Partner: LACPIdentity
+    Collector Type: uint8
+    Collector Length: uint8
+    Collector Maximum Delay: uint16
+    Collector Reserved: raw,12
+    Terminator Type: uint8
+    Terminator Length: uint8
+    Reserved Padding: raw,50
+
+LACPIdentity:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Length").Value != 20 { panic("lacp: invalid identity length") }
+    this.ProcessSubNode("System Priority")
+    this.ProcessSubNode("System ID")
+    this.ProcessSubNode("Key")
+    this.ProcessSubNode("Port Priority")
+    this.ProcessSubNode("Port")
+    this.ProcessSubNode("State")
+    this.ProcessSubNode("Reserved")
+  Type: uint8
+  Length: uint8
+  System Priority: uint16
+  System ID: raw,6
+  Key: uint16
+  Port Priority: uint16
+  Port: uint16
+  State: uint8
+  Reserved: raw,3

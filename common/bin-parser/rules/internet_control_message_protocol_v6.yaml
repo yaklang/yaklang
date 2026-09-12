@@ -1,36 +1,370 @@
+endian: big
 Package:
   ICMPV6:
     Type: uint8
     Code: uint8
     Checksum: uint16
-    Payload: raw
-Echo Request:
-    Identifier: uint16
-    Sequence Number: uint16
-    Data: raw
-Echo Reply:
-    Identifier: uint16
-    Sequence Number: uint16
-    Data: raw
-Destination Unreachable:
-    Code: uint8
-    Checksum: uint16
-    Unused: uint32
     Payload:
       unpack: true
       operator: |
-        code = getNodeResult("@Destination Unreachable/Code").Value
-        switch code {
+        type = getNodeResult("@ICMPV6/Type").Value
+        switch type {
           case 1:
-            this.ProcessByType("No Route to Destination")
+            this.ProcessByType("Destination Unreachable")
           case 2:
-            this.ProcessByType("Communication with Destination Administratively Prohibited")
+            this.ProcessByType("Packet Too Big")
           case 3:
-            this.ProcessByType("Beyond Scope of Source Address")
+            this.ProcessByType("Time Exceeded")
           case 4:
-            this.ProcessByType("Address Unreachable")
-          case 5:
-            this.ProcessByType("Port Unreachable")
+            this.ProcessByType("Parameter Problem")
+          case 128:
+            this.ProcessByType("Echo Request")
+          case 129:
+            this.ProcessByType("Echo Reply")
+          case 130:
+            this.ProcessByType("Multicast Listener Query")
+          case 131:
+            this.ProcessByType("Multicast Listener Report")
+          case 132:
+            this.ProcessByType("Multicast Listener Done")
+          case 133:
+            this.ProcessByType("Router Solicitation")
+          case 134:
+            this.ProcessByType("Router Advertisement")
+          case 135:
+            this.ProcessByType("Neighbor Solicitation")
+          case 136:
+            this.ProcessByType("Neighbor Advertisement")
+          case 137:
+            this.ProcessByType("Redirect")
+          case 143:
+            this.ProcessByType("Multicast Listener Report v2")
           default:
             return
         }
+Echo Request:
+  operator: |
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Sequence Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
+  Identifier: uint16
+  Sequence Number: uint16
+  Echo Data: string
+Echo Reply:
+  operator: |
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Sequence Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
+  Identifier: uint16
+  Sequence Number: uint16
+  Echo Data: string
+Router Solicitation:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Reserved: raw,4
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+Router Advertisement:
+  operator: |
+    this.ProcessSubNode("Hop Limit")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Router Lifetime")
+    this.ProcessSubNode("Reachable Time")
+    this.ProcessSubNode("Retrans Timer")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Hop Limit: uint8
+  Flags: uint8
+  Router Lifetime: uint16
+  Reachable Time: uint32
+  Retrans Timer: uint32
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+Neighbor Solicitation:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Target Address")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Reserved: raw,4
+  Target Address: raw,16
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+Neighbor Advertisement:
+  operator: |
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Target Address")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Flags: uint32
+  Target Address: raw,16
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+NDPOption:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    t = getNodeResult("Type").Value
+    if n < 1 {
+      panic("ndp: option length smaller than 1")
+    }
+    body = n * 8 - 2
+    if t == 1 || t == 2 {
+      if body > 0 && body < 1048576 {
+        this.GetSubNode("Link Layer").SetMaxLength(body)
+        this.ProcessSubNode("Link Layer")
+      }
+      return
+    }
+    if t == 5 {
+      this.ProcessSubNode("MTU Reserved")
+      this.ProcessSubNode("MTU")
+      return
+    }
+    if t == 3 {
+      this.ProcessSubNode("Prefix Length")
+      this.ProcessSubNode("Prefix Flags")
+      this.ProcessSubNode("Valid Lifetime")
+      this.ProcessSubNode("Preferred Lifetime")
+      this.ProcessSubNode("Prefix Reserved")
+      this.ProcessSubNode("Prefix")
+      return
+    }
+    if body > 0 && body < 1048576 {
+      this.GetSubNode("Octets").SetMaxLength(body)
+      this.ProcessSubNode("Octets")
+    }
+  Type: uint8
+  Length: uint8
+  Link Layer: raw,6
+  MTU Reserved: uint16
+  MTU: uint32
+  Prefix Length: uint8
+  Prefix Flags: uint8
+  Valid Lifetime: uint32
+  Preferred Lifetime: uint32
+  Prefix Reserved: uint32
+  Prefix: raw,16
+  Octets: string
+Destination Unreachable:
+  operator: |
+    this.ProcessSubNode("Unused")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Unused: uint32
+  Original Datagram: string
+Packet Too Big:
+  operator: |
+    this.ProcessSubNode("MTU")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  MTU: uint32
+  Original Datagram: string
+Time Exceeded:
+  operator: |
+    this.ProcessSubNode("Unused")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Unused: uint32
+  Original Datagram: string
+Parameter Problem:
+  operator: |
+    this.ProcessSubNode("Pointer")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Pointer: uint32
+  Original Datagram: string
+Multicast Listener Query:
+  Maximum Response Delay: uint16
+  Reserved: uint16
+  Multicast Address: raw,16
+Multicast Listener Report:
+  Maximum Response Delay: uint16
+  Reserved: uint16
+  Multicast Address: raw,16
+Multicast Listener Done:
+  Maximum Response Delay: uint16
+  Reserved: uint16
+  Multicast Address: raw,16
+Redirect:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Target Address")
+    this.ProcessSubNode("Destination Address")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Reserved: raw,4
+  Target Address: raw,16
+  Destination Address: raw,16
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+Multicast Listener Report v2:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Number of Mcast Address Records")
+    nrec = getNodeResult("Number of Mcast Address Records").Value
+    if nrec > 0 && nrec < 256 {
+      this.ProcessSubNode("Records")
+    }
+    return
+  Reserved: uint16
+  Number of Mcast Address Records: uint16
+  Records:
+    list: true
+    list-length-from-field: "../Number of Mcast Address Records"
+    Record: MLDAddressRecord
+MLDAddressRecord:
+  operator: |
+    this.ProcessSubNode("Record Type")
+    this.ProcessSubNode("Aux Data Len")
+    this.ProcessSubNode("Number of Sources")
+    this.ProcessSubNode("Multicast Address")
+    nsrc = getNodeResult("Number of Sources").Value
+    if nsrc > 0 && nsrc < 64 {
+      this.ProcessSubNode("Sources")
+    }
+    return
+  Record Type: uint8
+  Aux Data Len: uint8
+  Number of Sources: uint16
+  Multicast Address: raw,16
+  Sources:
+    list: true
+    list-length-from-field: "../Number of Sources"
+    Source Address: raw,16

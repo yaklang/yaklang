@@ -1,0 +1,147 @@
+endian: big
+Package:
+  AJP:
+    operator: |
+      this.ProcessSubNode("Magic")
+      magic = getNodeResult("Magic").Value
+      if magic != 0x1234 && magic != 0x4142 {
+        panic("ajp: magic must be 0x1234 or 'AB'")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 1 {
+        panic("ajp: empty body")
+      }
+      this.ProcessSubNode("Code")
+      code = getNodeResult("Code").Value
+      if l > 1 {
+        rest = l - 1
+        if rest > 0 && rest < 1048576 {
+          this.SetMaxLength(4 + l)
+          if code == 2 && rest >= 22 {
+            this.ProcessByType("AJPForward")
+          } else {
+            if code == 4 && rest >= 7 {
+              this.ProcessByType("AJPHeaders")
+            } else {
+              if code == 5 {
+                this.ProcessByType("AJPEnd")
+              } else {
+                this.GetSubNode("Octets").SetMaxLength(rest)
+                this.ProcessSubNode("Octets")
+              }
+            }
+          }
+        }
+      }
+      return
+    Magic: uint16
+    Length: uint16
+    Code: uint8
+    Octets: string
+AJPForward:
+  operator: |
+    this.ProcessSubNode("Method")
+    this.ProcessSubNode("Protocol Length")
+    pl = getNodeResult("Protocol Length").Value
+    if pl != 0xffff {
+      if pl > 0 && pl < 1048576 {
+        this.GetSubNode("Protocol").SetMaxLength(pl)
+        this.ProcessSubNode("Protocol")
+      }
+      this.ProcessSubNode("Protocol NUL")
+      if getNodeResult("Protocol NUL").Value != 0 {
+        panic("ajp: protocol NUL")
+      }
+    }
+    this.ProcessSubNode("URI Length")
+    ul = getNodeResult("URI Length").Value
+    if ul != 0xffff {
+      if ul > 0 && ul < 1048576 {
+        this.GetSubNode("URI").SetMaxLength(ul)
+        this.ProcessSubNode("URI")
+      }
+      this.ProcessSubNode("URI NUL")
+      if getNodeResult("URI NUL").Value != 0 {
+        panic("ajp: uri NUL")
+      }
+    }
+    this.ProcessSubNode("RemoteAddr Length")
+    rl = getNodeResult("RemoteAddr Length").Value
+    if rl != 0xffff {
+      if rl > 0 && rl < 1048576 {
+        this.GetSubNode("RemoteAddr").SetMaxLength(rl)
+        this.ProcessSubNode("RemoteAddr")
+      }
+      this.ProcessSubNode("RemoteAddr NUL")
+    }
+    this.ProcessSubNode("RemoteHost Length")
+    hl = getNodeResult("RemoteHost Length").Value
+    if hl != 0xffff {
+      if hl > 0 && hl < 1048576 {
+        this.GetSubNode("RemoteHost").SetMaxLength(hl)
+        this.ProcessSubNode("RemoteHost")
+      }
+      this.ProcessSubNode("RemoteHost NUL")
+    }
+    this.ProcessSubNode("ServerName Length")
+    sl = getNodeResult("ServerName Length").Value
+    if sl != 0xffff {
+      if sl > 0 && sl < 1048576 {
+        this.GetSubNode("ServerName").SetMaxLength(sl)
+        this.ProcessSubNode("ServerName")
+      }
+      this.ProcessSubNode("ServerName NUL")
+    }
+    this.ProcessSubNode("ServerPort")
+    this.ProcessSubNode("SSL")
+    this.ProcessSubNode("NumHeaders")
+    this.ProcessSubNode("Terminator")
+    if getNodeResult("Terminator").Value != 0xff {
+      panic("ajp: expected request terminator 0xff")
+    }
+    return
+  Method: uint8
+  Protocol Length: uint16
+  Protocol: string
+  Protocol NUL: uint8
+  URI Length: uint16
+  URI: string
+  URI NUL: uint8
+  RemoteAddr Length: uint16
+  RemoteAddr: string
+  RemoteAddr NUL: uint8
+  RemoteHost Length: uint16
+  RemoteHost: string
+  RemoteHost NUL: uint8
+  ServerName Length: uint16
+  ServerName: string
+  ServerName NUL: uint8
+  ServerPort: uint16
+  SSL: uint8
+  NumHeaders: uint16
+  Terminator: uint8
+AJPHeaders:
+  operator: |
+    this.ProcessSubNode("Status")
+    this.ProcessSubNode("Message Length")
+    ml = getNodeResult("Message Length").Value
+    if ml != 0xffff {
+      if ml > 0 && ml < 1048576 {
+        this.GetSubNode("Message").SetMaxLength(ml)
+        this.ProcessSubNode("Message")
+      }
+      this.ProcessSubNode("Message NUL")
+      if getNodeResult("Message NUL").Value != 0 {
+        panic("ajp: status message NUL")
+      }
+    }
+    this.ProcessSubNode("NumHeaders")
+    return
+  Status: uint16
+  Message Length: uint16
+  Message: string
+  Message NUL: uint8
+  NumHeaders: uint16
+AJPEnd:
+  Reuse: uint8

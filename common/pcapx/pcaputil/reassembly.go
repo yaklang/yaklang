@@ -49,6 +49,8 @@ type TrafficConnection struct {
 	nextSeq              uint32
 	finSeq               uint32
 	finSeen              bool
+	resetPending         bool
+	resetSeq             uint32
 	currentSeq           uint32
 	waitACK              bool
 	initialed            bool
@@ -150,6 +152,7 @@ func (t *TrafficConnection) Release() {
 	t.localPort, t.remotePort = 0, 0
 	t.isn, t.nextSeq, t.currentSeq = 0, 0, 0
 	t.finSeq, t.finSeen = 0, false
+	t.resetPending, t.resetSeq = false, 0
 	t.waitACK, t.initialed, t.initHttpPacketDirect, t.isHttpRequestConn = false, false, false, false
 
 	connectionPool.Put(t)
@@ -284,9 +287,27 @@ func (t *TrafficConnection) consume(seq uint32, payload []byte, fin bool, ts tim
 	}
 	if fin && end == t.nextSeq {
 		t.nextSeq++
+		if t.resolvePendingReset() {
+			return
+		}
 		t.Close()
 		t.Flow.IsClosed()
+	} else {
+		t.resolvePendingReset()
 	}
+}
+
+func (t *TrafficConnection) resolvePendingReset() bool {
+	if !t.resetPending || seqBefore(t.nextSeq, t.resetSeq) {
+		return false
+	}
+	t.resetPending = false
+	if t.nextSeq == t.resetSeq {
+		t.Flow.Close()
+		return true
+	}
+	t.Flow.pool.invalidSegment("TCP RST sequence falls inside subsequently captured data")
+	return false
 }
 
 // Heap ordering lets us prune complete subtrees starting beyond this segment.
@@ -319,6 +340,11 @@ func (t *TrafficConnection) pendingConflict(i int, seq uint32, payload []byte) b
 // can start midstream; SYN retransmits never reset an established cursor.
 func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	if t.IsClosed() {
+		// FIN closes one direction. A later in-sequence RST still closes the
+		// whole flow, allowing a subsequent SYN to reuse this four-tuple.
+		if t.Flow != nil && !t.Flow.stopped() && tcp.RST && !tcp.SYN && !tcp.FIN && t.initialed && tcp.Seq == t.nextSeq {
+			t.Flow.Close()
+		}
 		return
 	}
 	if uint64(len(tcp.Payload)) > uint64(t.Flow.pool.options.MaxSequenceGap) {
@@ -331,7 +357,16 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	}
 	if tcp.RST {
 		if t.initialed && tcp.Seq != t.nextSeq {
-			t.Flow.pool.invalidSegment("TCP RST does not match the receive cursor")
+			// A passive capture can expose RST before preceding data/FIN.
+			// Retain at most one sequence (no payload allocation). Never advance
+			// the cursor or accept the reset until observed contiguous bytes
+			// reach it exactly. Missing gaps remain errors on flow disposal.
+			distance := uint32(tcp.Seq - t.nextSeq)
+			if distance < 1<<31 && uint64(distance) <= uint64(t.Flow.pool.options.MaxSequenceGap) && len(tcp.Payload) == 0 && !tcp.FIN && (!t.resetPending || t.resetSeq == tcp.Seq) {
+				t.resetPending, t.resetSeq = true, tcp.Seq
+				return
+			}
+			t.Flow.pool.invalidSegment(fmt.Sprintf("TCP RST does not match the receive cursor: %s seq=%d expected=%d ack=%d pending=%d", t, tcp.Seq, t.nextSeq, tcp.Ack, len(t.waitGroup)))
 			return
 		}
 		t.Flow.Close()
@@ -487,10 +522,35 @@ func (c *TrafficConnection) GetBuffer() io.Reader {
 // Called by the pool while packet feeding is stopped/serialized.
 func (t *TrafficConnection) discardPending() {
 	p := t.Flow.pool
-	if p.counters != nil && len(t.waitGroup) > 0 && !(t.finSeen && t.nextSeq == t.finSeq+1) {
-		p.counters.unreassembledBytes.Add(uint64(t.pendingBytes))
-		p.counters.unreassembledSegments.Add(uint64(len(t.waitGroup)))
-		p.parallel.fail(fmt.Errorf("TCP stream closed with an unfilled sequence gap (%d buffered bytes)", t.pendingBytes))
+	if t.resetPending {
+		p.invalidSegment(fmt.Sprintf("TCP RST does not match the receive cursor: %s seq=%d; preceding data/FIN was not captured", t, t.resetSeq))
+		t.resetPending = false
+	}
+	if len(t.waitGroup) > 0 && !(t.finSeen && t.nextSeq == t.finSeq+1) {
+		if p.counters != nil {
+			p.counters.unreassembledBytes.Add(uint64(t.pendingBytes))
+			p.counters.unreassembledSegments.Add(uint64(len(t.waitGroup)))
+		} else {
+			p.singleUnreassembledBytes.Add(uint64(t.pendingBytes))
+			p.singleUnreassembledSegments.Add(uint64(len(t.waitGroup)))
+		}
+		reason := fmt.Sprintf("TCP stream closed with an unfilled sequence gap (%d buffered bytes)", t.pendingBytes)
+		p.reassemblyFailure(reason)
+		if p.captureConf != nil && p.captureConf.binParser != nil {
+			if t.Flow.binState == nil {
+				t.Flow.binState = p.captureConf.binParser.newFlow(t.Flow)
+			}
+			f := t.Flow.binState
+			dir := 0
+			if t != t.Flow.ClientConn {
+				dir = 1
+			}
+			e := f.event(dir, nil, "incomplete", reason)
+			e.Timestamp = t.waitGroup[0].Timestamp
+			e.Length = t.pendingBytes
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
+		}
 	}
 	p.releasePending(t.pendingBytes, len(t.waitGroup))
 	t.pendingBytes = 0

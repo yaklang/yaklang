@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"hash/crc32"
+	"reflect"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"reflect"
 )
 
 type YakNode struct {
@@ -32,6 +34,7 @@ type YakNode struct {
 	Length            func(uint ...string) uint64
 	SetMaxLength      func(l uint64, uint ...string)
 	GetMaxLength      func(uint ...string) uint64
+	HasMaxLength      func() bool
 	NewSubNode        func(datas ...any) *YakNode
 	NewUnknownNode    func(name ...string) *YakNode
 	NewEmptyNode      func(name ...string) *YakNode
@@ -73,9 +76,9 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	yakNode.ProcessSubNode = func(name string) any {
 		return yakNode.GetSubNode(name).Process()
 	}
-	yakNode.TryProcessSubNode = func(name string) (any, map[string]any) {
+	yakNode.TryProcessSubNode = func(name string) (result any, response map[string]any) {
 		typeNode := yakNode.GetSubNode(name)
-		response := map[string]any{
+		response = map[string]any{
 			"OK":       false,
 			"Message":  "",
 			"Save":     func() {},
@@ -98,25 +101,25 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		//	return
 		//}
 		deferFun, err := operator(copyNode)
-		if err != nil {
-			response["Message"] = err.Error()
-			response["OK"] = false
-		} else {
-			response["OK"] = true
-		}
-
 		response["Save"] = func() {
 			deferFun(false)
 		}
 		response["GetNode"] = func() any {
 			return copyYakNode
 		}
-		response["Result"] = copyYakNode.Result()
 		response["Recovery"] = func() {
 			deferFun(true)
 			yakNode.origin.Children = yakNode.origin.Children[:len(yakNode.origin.Children)-1]
 		}
-		return copyYakNode.Result(), response
+		if err != nil {
+			response["Message"] = err.Error()
+			return nil, response
+		}
+
+		result = copyYakNode.Result()
+		response["Result"] = result
+		response["OK"] = true
+		return result, response
 	}
 	yakNode.GetMaxLength = func(uints ...string) uint64 {
 		n := getMulti(yakNode.origin, uints...)
@@ -125,6 +128,15 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 			panic(err)
 		}
 		return l / n
+	}
+	// A stream with no declared end is different from a bounded empty value.
+	// Rules must not allocate the sentinel returned by GetMaxLength as padding.
+	yakNode.HasMaxLength = func() bool {
+		_, bounded, err := parseLengthByLengthConfig(yakNode.origin)
+		if err != nil {
+			panic(err)
+		}
+		return bounded
 	}
 	yakNode.NewUnknownNode = func(datas ...string) *YakNode {
 		name := utils.InterfaceToString(utils.GetLastElement(datas))
@@ -172,7 +184,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 			nodeName = typeName
 		case 2:
 			typeName = utils.InterfaceToString(datas[0])
-			nodeName = utils.InterfaceToString(datas[2])
+			nodeName = utils.InterfaceToString(datas[1])
 		default:
 			panic("invalid args")
 		}
@@ -220,7 +232,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 			nodeName = typeName
 		case 2:
 			typeName = utils.InterfaceToString(datas[0])
-			nodeName = utils.InterfaceToString(datas[2])
+			nodeName = utils.InterfaceToString(datas[1])
 		default:
 			panic("invalid args")
 		}
@@ -251,25 +263,25 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		//	return
 		//}
 		deferFun, err := operator(copyNode)
-		if err != nil {
-			response["Message"] = err.Error()
-			response["OK"] = false
-		} else {
-			response["OK"] = true
-		}
-
 		response["Save"] = func() {
 			deferFun(false)
 		}
 		response["GetNode"] = func() any {
 			return copyYakNode
 		}
-		response["Result"] = copyYakNode.Result()
 		response["Recovery"] = func() {
 			deferFun(true)
 			yakNode.origin.Children = yakNode.origin.Children[:len(yakNode.origin.Children)-1]
 		}
-		return copyYakNode.Result(), response
+		if err != nil {
+			response["Message"] = err.Error()
+			return nil, response
+		}
+
+		result = copyYakNode.Result()
+		response["Result"] = result
+		response["OK"] = true
+		return result, response
 	}
 	yakNode.Process = func() any {
 		//defer func() {
@@ -279,6 +291,9 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		//}()
 		deferFun, err := operator(node)
 		if err != nil {
+			if deferFun != nil {
+				deferFun(true)
+			}
 			panic(err)
 		}
 		deferFun(false)
@@ -316,7 +331,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 			nodeName = typeName
 		case 2:
 			typeName = utils.InterfaceToString(datas[0])
-			nodeName = utils.InterfaceToString(datas[2])
+			nodeName = utils.InterfaceToString(datas[1])
 		default:
 			panic("invalid args")
 		}
@@ -343,21 +358,360 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	}
 	yakNode.Length = func(uints ...string) uint64 {
 		n := getMulti(yakNode.origin, uints...)
-		return CalcNodeResultLength(yakNode.origin) / uint64(n)
+		return CalcNodeConsumedLength(yakNode.origin) / uint64(n)
 	}
 	return yakNode
 }
-func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (func(bool), error)) error {
-	//if mode != "parse" && mode != "generate" {
-	//	return errors.New("mode must be parse or generate")
-	//}
-	engineLib := map[string]interface{}{
-		"this": ConvertToYakNode(node, operator),
+
+type operatorInvocation struct {
+	bridgeResult *bridgeCallResult
+	node         *base.Node
+	operator     func(*base.Node) (func(bool), error)
+	modes        []string
+}
+
+// The ordinary evaluator owns an immutable invocation. A pooled bridge worker
+// owns a private invocation whose binding is changed only under an exclusive
+// lease. Such programs cannot access this, save callbacks, eval or start tasks.
+func (invocation *operatorInvocation) library() map[string]interface{} {
+	var this *YakNode
+	if invocation.node != nil {
+		this = ConvertToYakNode(invocation.node, invocation.operator)
+	}
+	return map[string]interface{}{
+		"parseMemcachedFields": func(profile string) error {
+			if invocation.bridgeResult != nil {
+				return invocation.bridgeResult.deliver()
+			}
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("memcached-fields: structured generation is unsupported")
+			}
+			return parseMemcachedFields(invocation.node, invocation.operator, profile)
+		},
+		"parseCassandraFields": func(profile string) error {
+			if invocation.bridgeResult != nil {
+				return invocation.bridgeResult.deliver()
+			}
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cassandra-fields: structured generation is unsupported")
+			}
+			return parseCassandraFields(invocation.node, invocation.operator, profile)
+		},
+		"parseTNSFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tns-fields: structured generation is unsupported")
+			}
+			return parseTNSFields(invocation.node, invocation.operator, profile)
+		},
+		"parseTDSFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tds-fields: structured generation is unsupported")
+			}
+			return parseTDSFields(invocation.node, invocation.operator, profile)
+		},
+		"parseSMB3TransformFields": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smb3-transform: structured generation is unsupported")
+			}
+			return parseSMB3TransformFields(invocation.node, invocation.operator)
+		},
+		"parseLDAPFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("ldap-fields: structured generation is unsupported")
+			}
+			return parseLDAPFields(invocation.node, invocation.operator, profile)
+		},
+		"parsePostgreSQLFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("postgresql-fields: structured generation is unsupported")
+			}
+			return parsePostgreSQLFields(invocation.node, invocation.operator, profile)
+		},
+		"parseMySQLFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("mysql-fields: structured generation is unsupported")
+			}
+			return parseMySQLFields(invocation.node, invocation.operator, profile)
+		},
+		"parseIMAPFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("imap-fields: structured generation is unsupported")
+			}
+			return parseIMAPFields(invocation.node, invocation.operator, profile)
+		},
+		"parsePOP3Fields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("pop3-fields: structured generation is not supported")
+			}
+			return parsePOP3Fields(invocation.node, invocation.operator, profile)
+		},
+		"parseSMTPFields": func(data bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smtp-fields: structured generation is not supported")
+			}
+			return parseSMTPFields(invocation.node, invocation.operator, data)
+		},
+		"parseMQTTFields": func(level int) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("mqtt-fields: structured generation is not supported")
+			}
+			return parseMQTTFields(invocation.node, invocation.operator, level)
+		},
+		"parseKerberosFields": func(tcp bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("kerberos-fields: structured generation is not supported")
+			}
+			return parseKerberosFields(invocation.node, invocation.operator, tcp)
+		},
+		"parseHTTP2Fields": func(mode string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("http2-fields: structured generation is not supported")
+			}
+			return parseHTTP2Fields(invocation.node, invocation.operator, mode)
+		},
+		"parseSSHPlaintextPacket": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("ssh-plaintext: structured generation is not supported")
+			}
+			return parseSSHPlaintextPacket(invocation.node, invocation.operator, profile)
+		},
+		"parseX509CertificateDERPublicKey": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("x509-public-key: structured generation is not supported")
+			}
+			return parseCertificateFieldTree(invocation.node, invocation.operator, decodeX509CertificateDERPublicKey, "x509-public-key")
+		},
+		"parseX509CertificateDERExtensions": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("x509-extensions: structured generation is not supported")
+			}
+			return parseCertificateFieldTree(invocation.node, invocation.operator, decodeX509CertificateDERExtensions, "x509-extensions")
+		},
+		"parseX509CertificateDER": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("x509-der: structured generation is not supported")
+			}
+			return parseCertificateFieldTree(invocation.node, invocation.operator, decodeX509CertificateDER, "x509-der")
+		},
+		"parseTLSChangeCipherSpecRecord": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tls-ccs: structured generation is not supported")
+			}
+			return parseTLSChangeCipherSpecRecord(invocation.node, invocation.operator)
+		},
+		"parseTLS12CertificateAuth": func(messageType uint8) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tls-certificate-auth: structured generation is not supported")
+			}
+			return parseTLS12CertificateAuth(invocation.node, invocation.operator, messageType)
+		},
+		"parseTLS12KeyExchange": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tls12-key-exchange: structured generation is not supported")
+			}
+			return parseTLS12KeyExchange(invocation.node, invocation.operator, profile)
+		},
+		"parseTLS12ControlHandshake": func(messageType uint8) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tls-control-handshake: structured generation is not supported")
+			}
+			return parseTLS12ControlHandshake(invocation.node, invocation.operator, messageType)
+		},
+		"parseTLSCertificateHandshake": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tls-certificate: structured generation is not supported")
+			}
+			return parseTLSCertificateHandshake(invocation.node, invocation.operator)
+		},
+		"parseTLSServerHello": func(record bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("tls-server-hello: structured generation is not supported")
+			}
+			return parseTLSServerHello(invocation.node, record, invocation.operator)
+		},
+		"parseZlibJSONRecord": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("zlib-json: structured generation is not supported")
+			}
+			return parseZlibJSONRecord(invocation.node, invocation.operator)
+		},
+		"parseKCP": func(singleSegment bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("kcp: structured generation is not supported")
+			}
+			return parseKCP(invocation.node, invocation.operator, singleSegment)
+		},
+		"parseSMTPReply": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smtp-reply: structured generation is not supported")
+			}
+			return parseSMTPReply(invocation.node, invocation.operator)
+		},
+		"parseGQUIC35": func(fromServer bool, clientHello bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("gquic35: structured generation is not supported")
+			}
+			return parseGQUIC35(invocation.node, invocation.operator, fromServer, clientHello)
+		},
+		"parseBrowserMailslotDatagram": func(strict bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("browser-mailslot: structured generation is not supported")
+			}
+			return parseBrowserMailslotDatagram(invocation.node, strict, invocation.operator)
+		},
+		"parseHTTP3Stream": func(mode string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("http3: structured generation is not supported")
+			}
+			return parseHTTP3Stream(invocation.node, mode, invocation.operator)
+		},
+		"parseT38SDPAdvertisement": func(h248 bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("t38-sdp: structured generation is not supported")
+			}
+			return parseT38SDPAdvertisement(invocation.node, invocation.operator, h248)
+		},
+		"parseDoQStream": func(mode string, response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("doq: structured generation is not supported")
+			}
+			return parseDoQStream(invocation.node, mode, response, invocation.operator)
+		},
+		"parseEtcdVersionRecord": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("etcd: structured generation is not supported")
+			}
+			return parseEtcdVersionRecord(invocation.node, invocation.operator)
+		},
+		"parseS3SignatureV4Request": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("s3: structured generation is not supported")
+			}
+			return parseS3SignatureV4Request(invocation.node, invocation.operator)
+		},
+		"parseKubernetesAPIRequest": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("kubernetes: structured generation is not supported")
+			}
+			return parseKubernetesAPIRequest(invocation.node, invocation.operator)
+		},
+		"parseWinRMRecord": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("winrm: structured generation is not supported")
+			}
+			return parseWinRMRecord(invocation.node, invocation.operator)
+		},
+		"parseGSSAPIToken": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("gssapi: structured generation is not supported")
+			}
+			return parseGSSAPIToken(invocation.node, invocation.operator)
+		},
+		"inspectGSSAPIBase64":             inspectGSSAPIBase64,
+		"inspectACMEJWS":                  inspectACMEJWS,
+		"decodeRedfishServiceRootTarget":  decodeRedfishServiceRootTarget,
+		"decodeDockerContainerListTarget": decodeDockerContainerListTarget,
+		"parseSMB3Negotiate": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smb3: structured generation is not supported")
+			}
+			return parseSMB3Negotiate(invocation.node, invocation.operator)
+		},
+		"parseRMIRecord": func(mode string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("rmi: structured generation is not supported")
+			}
+			return parseRMIRecord(invocation.node, invocation.operator, mode)
+		},
+		"parseXTPMessage": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("xtp: structured generation is not supported")
+			}
+			return parseXTPMessage(invocation.node, invocation.operator)
+		},
+		"parseH225Message": func(mode string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("h225: structured generation is not supported")
+			}
+			return parseH225Message(invocation.node, invocation.operator, mode)
+		},
+		"parseMegacoMessage": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("megaco: structured generation is not supported")
+			}
+			return parseMegacoMessage(invocation.node, invocation.operator)
+		},
+		"parseZigbeeFrame": func(hasFCS bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("zigbee: structured generation is not supported")
+			}
+			return parseZigbeeFrame(invocation.node, invocation.operator, hasFCS)
+		},
+		"parseLATMessage": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("lat: structured generation is not supported")
+			}
+			return parseLATMessage(invocation.node, invocation.operator)
+		},
+		"parseGIOPMessage": func(exact bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("giop: structured generation is not supported")
+			}
+			return parseGIOPMessage(invocation.node, invocation.operator, exact)
+		},
+		"parseSteamDiscovery": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("steam discovery: structured generation is not supported")
+			}
+			return parseSteamDiscovery(invocation.node, invocation.operator)
+		},
+		"tryParseWSMP": func() (bool, error) {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode || invocation.node.Ctx.GetBool("wsmpLegacy") {
+				return false, nil
+			}
+			return parseWSMP(invocation.node, invocation.operator)
+		},
+		"tryParseNATTPayloads": func() (bool, error) {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode || invocation.node.Ctx.GetBool("nattPayloadsLegacy") {
+				return false, nil
+			}
+			return parseNATTPayloads(invocation.node, invocation.operator)
+		},
+		"tryParseNHRPClients": func() (bool, error) {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode || invocation.node.Ctx.GetBool("nhrpClientsLegacy") {
+				return false, nil
+			}
+			return parseNHRPClients(invocation.node, invocation.operator)
+		},
+		"tryParseDICOMUserInformation": func() (bool, error) {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode || invocation.node.Ctx.GetBool("dicomUserLegacy") {
+				return false, nil
+			}
+			return parseDICOMUserInformation(invocation.node, invocation.operator)
+		},
+		"tryParseDICOMPDVList": func() (bool, error) {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode || invocation.node.Ctx.GetBool("dicomPDVLegacy") {
+				return false, nil
+			}
+			return parseDICOMPDVList(invocation.node, invocation.operator)
+		},
+		"this":                      this,
+		"decodeJSONText":            decodeJSONText,
+		"decodeXMLRPCText":          decodeXMLRPCText,
+		"decodeWSDiscoveryText":     decodeWSDiscoveryText,
+		"decodeXMPPText":            decodeXMPPText,
+		"decodeHTTPServiceURL":      decodeHTTPServiceURL,
+		"decodeC37118Frame":         decodeC37118Frame,
+		"validateDCCPDataChecksums": validateDCCPDataChecksums,
+		"fcoeCRC32IEEE":             crc32.ChecksumIEEE,
+		"decodePrometheusText":      decodePrometheusText,
+		"decodeEtherSBusDatagram":   decodeEtherSBusDatagram,
+		"decodeIPCompPayload":       decodeIPCompPayload,
 		"len": func(i interface{}) int {
 			return reflect.ValueOf(i).Len()
 		},
 		"getNodeResult": func(key string) any {
-			targetNode := getNodeByPath(node, key)
+			targetNode := getNodeByPath(invocation.node, key)
 			if targetNode == nil {
 				panic("node not found")
 			}
@@ -368,66 +722,92 @@ func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (
 			return res
 		},
 		"setCfg": func(key string, value any) {
-			targetNode, key := getNodeAttrByPath(node, key)
+			targetNode, key := getNodeAttrByPath(invocation.node, key)
 			if targetNode == nil {
 				panic("node not found")
 			}
 			targetNode.Cfg.SetItem(key, value)
 		},
 		"getCfg": func(key string) any {
-			targetNode, key := getNodeAttrByPath(node, key)
+			targetNode, key := getNodeAttrByPath(invocation.node, key)
 			if targetNode == nil {
 				panic("node not found")
 			}
 			return targetNode.Cfg.GetItem(key)
 		},
 		"deleteCfg": func(key string) {
-			targetNode, key := getNodeAttrByPath(node, key)
+			targetNode, key := getNodeAttrByPath(invocation.node, key)
 			if targetNode == nil {
 				panic("node not found")
 			}
 			targetNode.Cfg.DeleteItem(key)
 		},
 		"setCtx": func(key string, value any) {
-			node.Ctx.SetItem(key, value)
+			invocation.node.Ctx.SetItem(key, value)
 		},
 		"getCtx": func(key string) any {
-			return node.Ctx.GetItem(key)
+			return invocation.node.Ctx.GetItem(key)
+		},
+		"hasCtx": func(key string) bool {
+			return invocation.node.Ctx.Has(key)
 		},
 		"deleteCtx": func(key string) {
-			node.Ctx.DeleteItem(key)
+			invocation.node.Ctx.DeleteItem(key)
 		},
 		"getRootNode": func(key string) any { // 需要处理mapData
-			rootMap := node.Ctx.GetItem(CfgRootMap).(map[string]*base.Node)
+			rootMap := invocation.node.Ctx.GetItem(CfgRootMap).(map[string]*base.Node)
 			if v, ok := rootMap[key]; ok {
-				return ConvertToYakNode(v, operator)
+				return ConvertToYakNode(v, invocation.operator)
 			}
 			panic("not found root node " + key)
 		},
 		"getNode": func(key string) any {
-			n := getNodeByPath(node, key)
-			return ConvertToYakNode(n, operator)
+			n := getNodeByPath(invocation.node, key)
+			return ConvertToYakNode(n, invocation.operator)
 		},
 		"getCurrentPosition": func() int {
-			buf := node.Ctx.GetItem("buffer").(*bytes.Buffer)
+			buf := invocation.node.Ctx.GetItem("buffer").(*bytes.Buffer)
 			return len(buf.Bytes())
 		},
 		"dump":  spew.Dump,
 		"debug": log.Debugf,
 	}
+}
+
+func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (func(bool), error), modes ...string) error {
+	if handled, err := execOperatorPlan(node, code, operator, modes); handled {
+		return err
+	}
+	if handled, err := execRegisteredNativeBridge(node, code, operator, modes); handled {
+		return err
+	}
+	if reusableBridgeOperator(code) {
+		return execBridgeOperator(node, code, operator, modes)
+	}
+	if handled, err := execPreparedOperator(node, code, operator, modes); handled {
+		return err
+	}
+	return execFreshOperator(node, code, operator, modes)
+}
+
+func execFreshOperator(node *base.Node, code string, operator func(node *base.Node) (func(bool), error), modes []string) error {
+	invocation := &operatorInvocation{node: node, operator: operator, modes: modes}
 	engine := antlr4yak.New()
-	engine.ImportLibs(engineLib)
+	// Preserve complete returned diagnostics without the optional Go stack dump.
+	engine.GetVM().GetConfig().SetSuppressPanicDebugStack(true)
+	engine.ImportLibs(invocation.library())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	return engine.SafeEval(ctx, code)
+	return evalOperatorProgram(ctx, engine, code)
 }
 func getMulti(node *base.Node, uints ...string) uint64 {
 	var uint string
 	if len(uints) > 0 {
 		uint = utils.InterfaceToString(utils.GetLastElement(uints))
 	}
-	if uint == "" && node.Cfg.GetItem(CfgUnit) != nil {
-		uint = node.Cfg.GetString(CfgUnit)
+	if uint == "" {
+		value, _ := node.Cfg.LookupItem(CfgUnit)
+		uint, _ = value.(string)
 	}
 	if uint == "" {
 		uint = "byte"
@@ -450,9 +830,10 @@ func ExecParser(node *base.Node) (res any, err error) {
 		}
 	}()
 	code := node.Cfg.GetString("out")
+	history := captureExpressionConfigHistory(node)
 	node.Cfg.DeleteItem("out")
 	defer func() {
-		node.Cfg.SetItem("out", code)
+		history.restore(node, "out", code)
 	}()
 	res, err = node.Result()
 	if err != nil {
@@ -481,13 +862,31 @@ func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 		}
 	}()
 	code := node.Cfg.GetString("out")
+	history := captureExpressionConfigHistory(node)
 	node.Cfg.DeleteItem("out")
 	defer func() {
-		node.Cfg.SetItem("out", code)
+		history.restore(node, "out", code)
 	}()
 	res, err = node.Result()
 	if err != nil {
 		return nil, err
+	}
+	if !node.Ctx.GetBool("outProgramLegacy") && !node.Ctx.GetBool("outScalarLegacy") {
+		if value, handled := evalWSMPScalarOut(code, res); handled {
+			return newNodeValue(node, value), nil
+		}
+		if kind := steamScalarOutKind(code); kind != "" {
+			if raw, ok := res.Value.([]byte); ok {
+				value, err := decodeSteamScalar(raw, kind)
+				if err != nil {
+					return nil, err
+				}
+				return newNodeValue(node, value), nil
+			}
+		}
+		if value, handled := evalScalarOut(code, res); handled {
+			return newNodeValue(node, value), nil
+		}
 	}
 	engineLib := map[string]interface{}{
 		"name": node.Name,
@@ -497,14 +896,29 @@ func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 		"len": func(i interface{}) int {
 			return reflect.ValueOf(i).Len()
 		},
+		"decodeSteamScalar": func(data []byte, kind string) any {
+			value, err := decodeSteamScalar(data, kind)
+			if err != nil {
+				panic(err)
+			}
+			return value
+		},
 		"data":           res,
-		"newStructValue": newStructNodeValue,
+		"newStructValue": newStructValueAny,
 		"newListValue":   newListNodeValue,
-		"newValue":       newNodeValue,
+		"newValue":       newValueAny,
+		"node":           node,
 	}
 	engine := antlr4yak.New()
 	engine.ImportLibs(engineLib)
-	returnV, err := engine.ExecuteAsExpression(code, nil)
+	var returnV any
+	if node.Ctx.GetBool("outProgramLegacy") {
+		// Diagnostic oracle for expression/result differential tests. Imports
+		// receive this explicit caller setting through the normal context path.
+		returnV, err = engine.ExecuteAsExpression(code, nil)
+	} else {
+		returnV, err = evalOutProgram(engine, code)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -521,9 +935,10 @@ func ExecInput(node *base.Node) (res any, err error) {
 		}
 	}()
 	code := node.Cfg.GetString("input")
+	history := captureExpressionConfigHistory(node)
 	node.Cfg.DeleteItem("input")
 	defer func() {
-		node.Cfg.SetItem("input", code)
+		history.restore(node, "input", code)
 	}()
 	res, err = node.Result()
 	if err != nil {

@@ -1,0 +1,99 @@
+# Explicit MS-TDS 7.1 or 7.2 SQLBatch/RPC/response layout, complete message.
+# Caller supplies version, cleartext context and ordered TCP bytes. All TDS
+# packet headers are retained, even when a value spans multiple packets.
+# Columns are local to the current response only. No session state or execution.
+# Unsupported layouts use exact raw fallback. Bounds: 1 MiB, 4096 packets,
+# requests/tokens/columns/values/chunks and 65536 projected leaves.
+endian: big
+unit: byte
+Package:
+  TDSBatch71Fields:
+    operator: |
+      err = parseTDSFields("batch71")
+      if err != nil { panic(err) }
+  TDSBatch71FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tds-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tds-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TDSBatch71FieldsExact", "TDSBatch71Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TDSBatch72Fields:
+    operator: |
+      err = parseTDSFields("batch72")
+      if err != nil { panic(err) }
+  TDSBatch72FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tds-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tds-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TDSBatch72FieldsExact", "TDSBatch72Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TDSRPC71Fields:
+    operator: |
+      err = parseTDSFields("rpc71")
+      if err != nil { panic(err) }
+  TDSRPC71FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tds-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tds-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TDSRPC71FieldsExact", "TDSRPC71Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TDSRPC72Fields:
+    operator: |
+      err = parseTDSFields("rpc72")
+      if err != nil { panic(err) }
+  TDSRPC72FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tds-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tds-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TDSRPC72FieldsExact", "TDSRPC72Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TDSResponse71Fields:
+    operator: |
+      err = parseTDSFields("response71")
+      if err != nil { panic(err) }
+  TDSResponse71FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tds-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tds-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TDSResponse71FieldsExact", "TDSResponse71Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TDSResponse72Fields:
+    operator: |
+      err = parseTDSFields("response72")
+      if err != nil { panic(err) }
+  TDSResponse72FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tds-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tds-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("TDSResponse72FieldsExact", "TDSResponse72Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDS Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TDSBatch71FieldsExact: "import:application-layer/tds_fields.yaml;node:TDSBatch71Fields"
+TDSBatch72FieldsExact: "import:application-layer/tds_fields.yaml;node:TDSBatch72Fields"
+TDSRPC71FieldsExact: "import:application-layer/tds_fields.yaml;node:TDSRPC71Fields"
+TDSRPC72FieldsExact: "import:application-layer/tds_fields.yaml;node:TDSRPC72Fields"
+TDSResponse71FieldsExact: "import:application-layer/tds_fields.yaml;node:TDSResponse71Fields"
+TDSResponse72FieldsExact: "import:application-layer/tds_fields.yaml;node:TDSResponse72Fields"

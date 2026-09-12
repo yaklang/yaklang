@@ -1,0 +1,33 @@
+# RFC 6120/6121 bounded UTF-8 stream events. TCP reassembly, direction-specific
+# stream context and negotiation state belong to the caller, never global state.
+# Extension XML is field-decoded but its XEP operations and SASL tokens remain
+# uninterpreted. A declaration alone, non-XML data and partial tags are rejected.
+Package:
+  XMPP:
+    operator: |
+      if !this.HasMaxLength() { panic("xmpp: explicit message boundary required") }
+      if this.GetMaxLength() <= 0 || this.GetMaxLength() > 1048576 { panic("xmpp: message size limit exceeded") }
+      header = ""
+      if hasCtx("xmppStreamHeader") { header = getCtx("xmppStreamHeader") }
+      text = this.ProcessSubNode("XML Text").Value
+      message, err = decodeXMPPText(text, header)
+      if err != nil { panic(err) }
+      if message.ContextRequired { panic("xmpp: captured stream namespace context required") }
+      this.AddInfo("XMPP Message", message)
+      this.AddInfo("Stream Header", message.StreamHeader)
+      this.AddInfo("Context Required", false)
+    XML Text: string
+  # Explicit opt-in for known iq/message/presence XML with a missing captured
+  # stream header, or an orphan conventional closing tag. This does not create
+  # an XMPPStanza or infer jabber:client. It is never a public TCP candidate.
+  XMPPFragment:
+    operator: |
+      if !this.HasMaxLength() { panic("xmpp: explicit fragment boundary required") }
+      if this.GetMaxLength() <= 0 || this.GetMaxLength() > 1048576 { panic("xmpp: fragment size limit exceeded") }
+      text = this.ProcessSubNode("XML Text").Value
+      message, err = decodeXMPPText(text, "")
+      if err != nil { panic(err) }
+      if !message.ContextRequired { panic("xmpp: fragment entry requires unresolved stream context") }
+      this.AddInfo("XMPP Fragment", message)
+      this.AddInfo("Context Required", true)
+    XML Text: string

@@ -1,0 +1,70 @@
+endian: big
+Package:
+  VRRP:
+    operator: |
+      this.ProcessSubNode("VersionType")
+      vt = getNodeResult("VersionType").Value
+      ver = vt >> 4
+      typ = vt & 0x0f
+      if ver != 2 && ver != 3 {
+        panic("vrrp: version must be 2 or 3")
+      }
+      if typ != 1 {
+        panic("vrrp: type must be 1 (advertisement)")
+      }
+      this.ProcessSubNode("VRID")
+      this.ProcessSubNode("Priority")
+      this.ProcessSubNode("Count IP")
+      if ver == 2 {
+        this.ProcessSubNode("Auth Type")
+        this.ProcessSubNode("Advert Int")
+      } else {
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("Max Advert Interval")
+      }
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Addresses")
+      rest = this.GetMaxLength() - this.Length()
+      if ver == 2 && rest >= 8 {
+        result, auth = this.TryProcessSubNode("Authentication Data")
+        if auth.OK {
+          auth.Save()
+        } else {
+          auth.Recovery()
+        }
+      }
+    VersionType: uint8
+    VRID: uint8
+    Priority: uint8
+    Count IP: uint8
+    Auth Type: uint8
+    Advert Int: uint8
+    Reserved: uint8,4bit
+    Max Advert Interval: uint16,12bit
+    Checksum: uint16
+    Addresses:
+      list: true
+      Address: raw,4
+      operator: |
+        count = getNodeResult("../Count IP").Value
+        ver = getNodeResult("../VersionType").Value >> 4
+        size = 4
+        if ver == 3 {
+          size = 16
+        }
+        i = 0
+        for {
+          if i >= count {
+            break
+          }
+          if this.GetMaxLength() - this.Length() < size {
+            panic("vrrp: address count exceeds packet")
+          }
+          ele = this.NewElement()
+          ele.SetMaxLength(size)
+          ele.Process()
+          i = i + 1
+        }
+    Authentication Data:
+      Data One: uint32
+      Data Two: uint32

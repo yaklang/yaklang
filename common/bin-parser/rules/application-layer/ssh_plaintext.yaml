@@ -1,0 +1,65 @@
+# RFC 4251/4253/4419/5656/8332. One initial plaintext binary packet,
+# including padding, excluding any MAC. Explicit caller boundary and exchange
+# layout required. No automatic TCP, negotiation, compression or cipher state.
+# RSA host/signature fields and P-256 encoded coordinates only; no mathematics,
+# signature checks, identity or session outcome. Other formats remain opaque.
+# Historical ssh.yaml entries are unchanged. Total 35000-byte local cap.
+endian: big
+unit: byte
+Package:
+  SSHPlaintextPacket:
+    operator: |
+      err = parseSSHPlaintextPacket("transport")
+      if err != nil { panic(err) }
+  SSHPlaintextDH:
+    operator: |
+      err = parseSSHPlaintextPacket("dh")
+      if err != nil { panic(err) }
+  SSHPlaintextDHGEX:
+    operator: |
+      err = parseSSHPlaintextPacket("dh-gex")
+      if err != nil { panic(err) }
+  SSHPlaintextECDHP256:
+    operator: |
+      err = parseSSHPlaintextPacket("ecdh-nistp256")
+      if err != nil { panic(err) }
+  SSHPlaintextPacketCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 35000 { panic("ssh-plaintext: explicit 1..35000 byte boundary required") }
+      candidate, trial = this.TryProcessByType("SSHTransportExact", "SSHPlaintextPacket")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SSH Plaintext Packet")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  SSHPlaintextDHCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 35000 { panic("ssh-plaintext: explicit 1..35000 byte boundary required") }
+      candidate, trial = this.TryProcessByType("SSHDHExact", "SSHPlaintextDH")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SSH Plaintext Packet")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  SSHPlaintextDHGEXCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 35000 { panic("ssh-plaintext: explicit 1..35000 byte boundary required") }
+      candidate, trial = this.TryProcessByType("SSHDHGEXExact", "SSHPlaintextDHGEX")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SSH Plaintext Packet")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  SSHPlaintextECDHP256Carrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 35000 { panic("ssh-plaintext: explicit 1..35000 byte boundary required") }
+      candidate, trial = this.TryProcessByType("SSHECDHExact", "SSHPlaintextECDHP256")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SSH Plaintext Packet")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+SSHTransportExact: "import:application-layer/ssh_plaintext.yaml;node:SSHPlaintextPacket"
+SSHDHExact: "import:application-layer/ssh_plaintext.yaml;node:SSHPlaintextDH"
+SSHDHGEXExact: "import:application-layer/ssh_plaintext.yaml;node:SSHPlaintextDHGEX"
+SSHECDHExact: "import:application-layer/ssh_plaintext.yaml;node:SSHPlaintextECDHP256"

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 	"strconv"
 	"strings"
@@ -29,6 +28,9 @@ const (
 	CfgNodeResult = "node result"
 	CfgLastNode   = "last node"
 	CfgOptionFuns = "options functions"
+	// CtxInputConfig carries only explicit caller settings through rule imports.
+	// Internal parser state and a rule's temporary setCtx values stay local.
+	CtxInputConfig = "__bin_parser_input_config"
 )
 
 type NodeValue struct {
@@ -66,7 +68,7 @@ func (n *NodeValue) Children() []*NodeValue {
 }
 
 type BaseKV struct {
-	data *omap.OrderedMap[string, any]
+	data *configStore
 }
 
 func (c *BaseKV) DeleteItem(k string) {
@@ -89,9 +91,14 @@ func (c *BaseKV) GetItem(k string) any {
 	v, _ := c.data.Get(k)
 	return v
 }
+
+// LookupItem returns the value and whether the key exists in one lookup. A
+// present nil value remains distinguishable from an absent configuration key.
+func (c *BaseKV) LookupItem(k string) (any, bool) {
+	return c.data.Get(k)
+}
 func (c *BaseKV) Has(k string) bool {
-	_, ok := c.data.Get(k)
-	return ok
+	return c.data.Has(k)
 }
 func (c *BaseKV) ConvertUint64(k string) uint64 {
 	v, ok := c.data.Get(k)
@@ -129,55 +136,37 @@ type Config struct {
 }
 
 func NewEmptyConfig() *Config {
-	return &Config{
-		BaseKV: BaseKV{
-			omap.NewEmptyOrderedMap[string, any](),
-		},
-	}
+	allocation := &struct {
+		config Config
+		store  configStore
+	}{}
+	allocation.config.data = &allocation.store
+	return &allocation.config
 }
+
 func (c *Config) SetItem(k string, v any) {
-	c.BaseKV.SetItem(k, v)
-	if c.Has(CfgOptionFuns) {
-		newOptions := append(c.GetItem(CfgOptionFuns).([]NodeConfigFun), func(config *Config) {
-			config.SetItem(k, v)
-		})
-		c.data.Set(CfgOptionFuns, newOptions)
-	} else {
-		c.data.Set(CfgOptionFuns, []NodeConfigFun{func(config *Config) {
-			config.SetItem(k, v)
-		}})
-	}
+	c.data.setConfigItem(k, v)
 }
+
+// ReplayHistoryLen inspects assignment history without exposing its mutable
+// function slice. A missing history is well formed; an explicitly installed
+// value of any other public type is not. It does not execute replay callbacks.
+func (c *Config) ReplayHistoryLen() (count int, present, wellFormed bool) {
+	return c.data.replayHistoryLen()
+}
+
 func AppendConfig(parent, config *Config) *Config {
 	res := CopyConfig(parent)
-	if config.Has(CfgOptionFuns) {
-		for _, opt := range config.GetItem(CfgOptionFuns).([]NodeConfigFun) {
-			opt(res)
-		}
-	}
+	config.data.replay(res)
 	return res
 }
 func CopyConfig(config *Config) *Config {
 	res := NewEmptyConfig()
-	config.data.ForEach(func(k string, v any) bool {
-		res.SetItem(k, v)
-		return true
-	})
+	config.data.copyInto(res.data)
 	return res
 }
 func NewConfig(config *Config) *Config {
-	res := &Config{
-		BaseKV: BaseKV{
-			omap.NewEmptyOrderedMap[string, any](),
-		},
-	}
-	copeFields := []string{"endian", "parser", "unit"}
-	for _, field := range copeFields {
-		if config.Has(field) {
-			res.SetItem(field, config.GetItem(field))
-		}
-	}
-	return res
+	return NewConfigWithItems(config)
 }
 
 type NodeContext struct {
@@ -200,6 +189,21 @@ func (n *Node) Result() (*NodeValue, error) {
 	return parser.Result(n)
 }
 
+// ValidateResult performs Result's validation and observable callbacks when
+// the caller will discard its value. Parsers may omit private result wrappers;
+// implementations without this optional capability still run Result normally.
+func (n *Node) ValidateResult() error {
+	parser, err := n.getParser()
+	if err != nil {
+		return err
+	}
+	if validator, ok := parser.(interface{ ValidateResult(*Node) error }); ok {
+		return validator.ValidateResult(n)
+	}
+	_, err = parser.Result(n)
+	return err
+}
+
 func (n *Node) Copy() *Node {
 	res := &Node{
 		Name:     n.Name,
@@ -209,8 +213,9 @@ func (n *Node) Copy() *Node {
 		Ctx:      n.Ctx,
 	}
 	for _, child := range n.Children {
-		child.Cfg.SetItem(CfgParent, res)
-		res.Children = append(res.Children, child.Copy())
+		copiedChild := child.Copy()
+		copiedChild.Cfg.SetItem(CfgParent, res)
+		res.Children = append(res.Children, copiedChild)
 	}
 	return res
 }
@@ -220,11 +225,65 @@ func (n *Node) getParser() (Parser, error) {
 	if parserName == nil {
 		return nil, errors.New("not set parser")
 	}
-	parser, ok := parseMap[utils.InterfaceToString(parserName)]
+	name := utils.InterfaceToString(parserName)
+	parser, ok := parseMap[name]
 	if !ok {
 		return nil, fmt.Errorf("parser %s not found", parserName)
 	}
-	return parser, nil
+	registration, perTree := parser.(*parserFactoryRegistration)
+	if !perTree {
+		return parser, nil
+	}
+	localRuntimes := n.ensureParserRuntimeMap(n.Ctx)
+	if runtime := localRuntimes.load(name, registration); runtime != nil {
+		return runtime, nil
+	}
+	runtimeContext := n.parserRuntimeContext()
+	if runtimeContext == nil {
+		return nil, fmt.Errorf("parser %s node has no runtime context", parserName)
+	}
+	runtimes := n.ensureParserRuntimeMap(runtimeContext)
+	runtime, err := runtimes.parser(name, registration)
+	if err != nil {
+		return nil, err
+	}
+	if localRuntimes != runtimes {
+		localRuntimes.bind(name, registration, runtime)
+	}
+	return runtime, nil
+}
+
+func (n *Node) ensureParserRuntimeMap(ctx *NodeContext) *parserRuntimeMap {
+	if ctx != nil {
+		if runtimes, ok := ctx.GetItem(ctxParserRuntimeMap).(*parserRuntimeMap); ok && runtimes != nil {
+			return runtimes
+		}
+	}
+	runtimes := newParserRuntimeMap()
+	if ctx != nil {
+		ctx.SetItem(ctxParserRuntimeMap, runtimes)
+	}
+	return runtimes
+}
+
+func (n *Node) parserRuntimeContext() *NodeContext {
+	current := n
+	seen := make(map[*Node]struct{})
+	for current != nil {
+		if _, duplicate := seen[current]; duplicate {
+			break
+		}
+		seen[current] = struct{}{}
+		parent, ok := current.Cfg.GetItem(CfgParent).(*Node)
+		if !ok || parent == nil {
+			break
+		}
+		current = parent
+	}
+	if current != nil && current.Ctx != nil {
+		return current.Ctx
+	}
+	return n.Ctx
 }
 func (n *Node) GenerateSubNode(data any, path string) error {
 	parser, err := n.getParser()
@@ -359,16 +418,17 @@ func (n *Node) AppendNode(node *Node) error {
 func NewNodeTree(d yaml.MapSlice) (*Node, error) {
 	defaultConfig := &Config{
 		BaseKV: BaseKV{
-			omap.NewEmptyOrderedMap[string, any](),
+			&configStore{},
 		},
 	}
 	defaultConfig.SetItem("endian", "big")
 	defaultConfig.SetItem("parser", "default")
 	ctx := &NodeContext{
 		BaseKV: BaseKV{
-			omap.NewEmptyOrderedMap[string, any](),
+			&configStore{},
 		},
 	}
+	ctx.SetItem(ctxParserRuntimeMap, newParserRuntimeMap())
 	root, err := newNodeTree(defaultConfig, "root", d, ctx)
 	if err != nil {
 		return nil, err
@@ -411,6 +471,18 @@ func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*N
 		node := NewEmptyNode(name, data, cfg, ctx)
 		node.Cfg = cfg
 		node.Cfg.SetItem(CfgIsTerminal, true)
+		// Most field descriptions are a bare type. Avoid allocating three
+		// split slices for that common case; retain the option parser below
+		// for lengths, delimiters and custom attributes.
+		if !strings.ContainsAny(ret, ",;:") {
+			typeName := ret
+			if strings.HasSuffix(typeName, "...") {
+				typeName = strings.TrimSuffix(typeName, "...")
+				node.Cfg.SetItem(CfgIsList, true)
+			}
+			node.Cfg.SetItem(CfgType, typeName)
+			return node, nil
+		}
 		nodeData := utils.InterfaceToString(node.Origin)
 		options := strings.Split(nodeData, ";")
 		for _, option := range options {

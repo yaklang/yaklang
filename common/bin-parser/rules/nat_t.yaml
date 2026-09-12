@@ -1,0 +1,226 @@
+# RFC 3948 sections 2.1--2.3: UDP payload is one 0xff keepalive, a nonzero
+# ESP SPI, or a four-zero-byte marker followed by an IKE message. The marker
+# is not part of the IKE length. RFC 2408 and RFC 7296 define its clear header
+# and generic payload chain. RFC 7383 defines the clear fragment counters.
+# https://www.rfc-editor.org/rfc/rfc3948.html
+# https://www.rfc-editor.org/rfc/rfc2408.html
+# https://www.rfc-editor.org/rfc/rfc7296.html
+# https://www.rfc-editor.org/rfc/rfc7383.html
+# No negotiated algorithms, inner encrypted fields, ICV, session or replay
+# state are inferred. ESP body boundaries require external algorithm context.
+endian: big
+Package:
+  NATT: NATTDatagram
+  NATTCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("nat-t: explicit carrier boundary required") }
+      if this.GetMaxLength("bit")%8 != 0 { panic("nat-t: carrier boundary must be byte-aligned") }
+      if this.GetMaxLength() == 0 { panic("nat-t: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("NATTFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed NAT-T Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+NATTFrame: "import:nat_t.yaml;node:NATT"
+
+NATTDatagram:
+  operator: |
+    if !this.HasMaxLength() { panic("nat-t: explicit datagram boundary required") }
+    if this.GetMaxLength("bit")%8 != 0 { panic("nat-t: datagram boundary must be byte-aligned") }
+    total = this.GetMaxLength()
+    if total == 0 || total > 65527 { panic("nat-t: datagram outside 1..65527 bytes") }
+    if total == 1 {
+      keepalive = this.ProcessSubNode("Keepalive").Value
+      if keepalive != 255 { panic("nat-t: one-byte payload must be 0xff") }
+      this.AddInfo("Message Kind", "keepalive")
+      return
+    }
+    if total < 4 { panic("nat-t: truncated marker or SPI") }
+    marker = this.ProcessSubNode("Marker or SPI").Value
+    if marker != 0 {
+      if total < 12 { panic("nat-t: ESP needs its header and at least one four-byte body word") }
+      this.ProcessSubNode("ESP Sequence")
+      data = this.GetSubNode("ESP Opaque Body")
+      data.SetMaxLength(total-8)
+      data.Process()
+      this.AddInfo("Message Kind", "esp")
+      this.AddInfo("Algorithm Context Available", false)
+      this.AddInfo("Extended Sequence Reconstructed", false)
+      this.AddInfo("Body Decoded", false)
+    } else {
+      if total < 32 { panic("nat-t: non-ESP marker requires a complete IKE header") }
+      ike = this.GetSubNode("IKE Message")
+      ike.SetMaxLength(total-4)
+      ike.Process()
+      this.AddInfo("Message Kind", "ike")
+    }
+    if this.Length() != total { panic("nat-t: message did not consume its boundary") }
+  Keepalive: uint8
+  Marker or SPI: uint32
+  ESP Sequence: uint32
+  ESP Opaque Body: raw
+  IKE Message: NATTIKEMessage
+
+NATTIKEMessage:
+  operator: |
+    total = this.GetMaxLength()
+    this.ProcessSubNode("Initiator SPI")
+    this.ProcessSubNode("Responder SPI")
+    next = int(this.ProcessSubNode("Next Payload").Value)
+    version = int(this.ProcessSubNode("Version").Value)
+    major = version >> 4
+    if major != 1 && major != 2 { panic("nat-t: IKE major version must be one or two") }
+    this.ProcessSubNode("Exchange Type")
+    flags = int(this.ProcessSubNode("Flags").Value)
+    this.ProcessSubNode("Message ID")
+    declared = int(this.ProcessSubNode("IKE Length").Value)
+    if declared != total { panic("nat-t: IKE length must match the complete datagram after the marker") }
+    this.AddInfo("Major Version", major)
+    this.AddInfo("Minor Version", version & 15)
+    this.AddInfo("Session State Decoded", false)
+    remaining = total-28
+    if major == 1 && (flags & 1) != 0 {
+      if remaining == 0 { panic("nat-t: encrypted IKEv1 body is empty") }
+      data = this.GetSubNode("Encrypted IKEv1 Body")
+      data.SetMaxLength(remaining)
+      data.Process()
+      this.AddInfo("Payload Chain Decoded", false)
+      return
+    }
+    setCtx("natt_payload_type", next)
+    setCtx("natt_ike_major", major)
+    if remaining > 0 {
+      payloads = this.GetSubNode("Payloads")
+      payloads.SetMaxLength(remaining)
+      payloads.Process()
+    } else if next != 0 { panic("nat-t: IKE next payload has no bytes") }
+    this.AddInfo("Payload Chain Decoded", true)
+  Initiator SPI: raw,8
+  Responder SPI: raw,8
+  Next Payload: uint8
+  Version: uint8
+  Exchange Type: uint8
+  Flags: uint8
+  Message ID: uint32
+  IKE Length: uint32
+  Encrypted IKEv1 Body: raw
+  Payloads: NATTIKEPayloads
+
+NATTIKEPayloads:
+  list: true
+  Payload: NATTIKEPayload
+  operator: |
+    handled, err = tryParseNATTPayloads()
+    if err != nil { panic(err) }
+    if handled { return }
+    count = 0
+    for this.Length() < this.GetMaxLength() {
+      if int(getCtx("natt_payload_type")) == 0 {
+        remaining = this.GetMaxLength()-this.Length()
+        if int(getCtx("natt_ike_major")) == 1 && count > 0 && remaining <= 3 && this.GetMaxLength()%4 == 0 {
+          padding = this.NewUnknownNode("ISAKMP Padding")
+          padding.SetMaxLength(remaining)
+          padding.Process()
+          break
+        }
+        panic("nat-t: bytes remain after the final IKE payload")
+      }
+      if count >= 4096 { panic("nat-t: IKE payload count exceeds 4096") }
+      if this.GetMaxLength()-this.Length() < 4 { panic("nat-t: truncated IKE payload header") }
+      setCtx("natt_payload_index", count)
+      element = this.NewElement()
+      element.Process()
+      count++
+    }
+    if int(getCtx("natt_payload_type")) != 0 { panic("nat-t: IKE payload chain ends before its next payload") }
+    this.AddInfo("Payload Count", count)
+
+NATTIKEPayload:
+  operator: |
+    typ = int(getCtx("natt_payload_type"))
+    major = int(getCtx("natt_ike_major"))
+    next = int(this.ProcessSubNode("Next Payload").Value)
+    bits = int(this.ProcessSubNode("Payload Flags").Value)
+    length = int(this.ProcessSubNode("Payload Length").Value)
+    if length < 4 || length > this.GetMaxLength() { panic("nat-t: IKE payload length exceeds its boundary or is below four") }
+    this.SetMaxLength(length)
+    body = length-4
+    this.AddInfo("Payload Type", typ)
+    this.AddInfo("Critical", major == 2 && (bits & 128) != 0)
+    this.AddInfo("Reserved Flags", bits & 127)
+    if major == 1 { this.AddInfo("Reserved Flags", bits) }
+    opaque = "Payload Data"
+    layout = "opaque"
+    if major == 2 && (typ == 46 || typ == 53) {
+      if typ == 53 {
+        if body < 5 { panic("nat-t: encrypted fragment needs counters and nonempty data") }
+        fragment = int(this.ProcessSubNode("Fragment Number").Value)
+        fragments = int(this.ProcessSubNode("Total Fragments").Value)
+        if fragment == 0 || fragments == 0 || fragment > fragments { panic("nat-t: invalid IKE fragment counters") }
+        if fragment > 1 && next != 0 { panic("nat-t: later IKE fragments must have next payload zero") }
+        if fragment > 1 && int(getCtx("natt_payload_index")) != 0 { panic("nat-t: only first IKE fragment can have preceding payloads") }
+      } else if body == 0 { panic("nat-t: encrypted payload is empty") }
+      opaque = "Encrypted Payload Data"
+      layout = "encrypted"
+      this.AddInfo("Inner Next Payload", next)
+      this.AddInfo("Inner Payloads Decoded", false)
+      next = 0
+    } else if (major == 2 && typ == 41) || (major == 1 && typ == 11) {
+      minimum = 4
+      if major == 1 { minimum = 8 }
+      if body < minimum { panic("nat-t: truncated notification fields") }
+      if major == 1 { this.ProcessSubNode("Domain of Interpretation") }
+      this.ProcessSubNode("Protocol ID")
+      spiSize = int(this.ProcessSubNode("SPI Size").Value)
+      this.ProcessSubNode("Notify Type")
+      if spiSize > length-this.Length() { panic("nat-t: notification SPI exceeds payload") }
+      if spiSize > 0 {
+        spi = this.GetSubNode("Notification SPI")
+        spi.SetMaxLength(spiSize)
+        spi.Process()
+      }
+      opaque = "Notification Data"
+      layout = "notification"
+    } else if major == 2 && typ == 34 {
+      if body < 5 { panic("nat-t: key exchange requires group, reserved bytes and data") }
+      this.ProcessSubNode("DH Group")
+      this.ProcessSubNode("KE Reserved")
+      opaque = "Key Exchange Data"
+      layout = "key-exchange"
+    } else if (major == 2 && typ == 40) || (major == 1 && typ == 10) {
+      if major == 2 && (body < 16 || body > 256) { panic("nat-t: IKEv2 nonce data must contain 16..256 bytes") }
+      opaque = "Nonce Data"
+      layout = "nonce"
+    } else if (major == 2 && typ == 43) || (major == 1 && typ == 13) {
+      opaque = "Vendor ID"
+      layout = "vendor-id"
+    }
+    remaining = length-this.Length()
+    if remaining > 0 {
+      data = this.GetSubNode(opaque)
+      data.SetMaxLength(remaining)
+      data.Process()
+    }
+    this.AddInfo("Body Layout", layout)
+    this.AddInfo("Body Semantics Decoded", false)
+    setCtx("natt_payload_type", next)
+  Next Payload: uint8
+  Payload Flags: uint8
+  Payload Length: uint16
+  Fragment Number: uint16
+  Total Fragments: uint16
+  Domain of Interpretation: uint32
+  Protocol ID: uint8
+  SPI Size: uint8
+  Notify Type: uint16
+  Notification SPI: raw
+  Notification Data: raw
+  DH Group: uint16
+  KE Reserved: uint16
+  Key Exchange Data: raw
+  Nonce Data: raw
+  Vendor ID: raw
+  Encrypted Payload Data: raw
+  Payload Data: raw

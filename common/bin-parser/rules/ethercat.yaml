@@ -1,0 +1,57 @@
+# EtherCAT datagram framing. Address interpretation follows the command type;
+# process data remains explicit bytes unless a device object model is supplied.
+endian: little
+Package:
+  EtherCAT:
+    operator: |
+      this.ProcessSubNode("Frame Header")
+      header = getNodeResult("Frame Header").Value
+      if (header >> 12) != 1 || (header & 0x0800) != 0 { panic("ethercat: invalid frame header") }
+      length = header & 0x07ff
+      if length < 12 || length > this.GetMaxLength() - this.Length() { panic("ethercat: invalid datagram area length") }
+      this.GetSubNode("Datagrams").SetMaxLength(length)
+      this.ProcessSubNode("Datagrams")
+      rest = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && rest > 0 { this.GetSubNode("Link Padding").SetMaxLength(rest); this.ProcessSubNode("Link Padding") }
+    Frame Header: uint16
+    Datagrams:
+      list: true
+      Datagram: EtherCATDatagram
+      operator: |
+        for this.Length() < this.GetMaxLength() {
+          element = this.NewElement()
+          element.Process()
+          more = (element.GetSubNode("Length Flags").Result().Value & 0x8000) != 0
+          if more != (this.Length() < this.GetMaxLength()) { panic("ethercat: datagram continuation flag mismatch") }
+        }
+    Link Padding: raw
+
+EtherCATDatagram:
+  operator: |
+    this.ProcessSubNode("Command")
+    command = getNodeResult("Command").Value
+    if command > 14 { panic("ethercat: unsupported command") }
+    this.ProcessSubNode("Index")
+    if command >= 10 && command <= 12 {
+      this.ProcessSubNode("Logical Address")
+    } else {
+      this.ProcessSubNode("Station Address")
+      this.ProcessSubNode("Register Offset")
+    }
+    this.ProcessSubNode("Length Flags")
+    flags = getNodeResult("Length Flags").Value
+    length = flags & 0x07ff
+    if (flags & 0x3800) != 0 { panic("ethercat: reserved datagram flags are nonzero") }
+    this.ProcessSubNode("Interrupt")
+    if length + 2 > this.GetMaxLength() - this.Length() { panic("ethercat: datagram length exceeds frame") }
+    if length > 0 { this.GetSubNode("Data").SetMaxLength(length); this.ProcessSubNode("Data") }
+    this.ProcessSubNode("Working Counter")
+  Command: uint8
+  Index: uint8
+  Station Address: uint16
+  Register Offset: uint16
+  Logical Address: uint32
+  Length Flags: uint16
+  Interrupt: uint16
+  Data: raw
+  Working Counter: uint16

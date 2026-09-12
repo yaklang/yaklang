@@ -1,0 +1,46 @@
+endian: big
+Package:
+  Hessian:
+    operator: |
+      this.ProcessSubNode("Magic")
+      mag = getNodeResult("Magic").Value
+      if mag != 0x48 && mag != 0x43 && mag != 0x63 && mag != 0x72 {
+        panic("hessian: unexpected magic")
+      }
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Values").SetMaxLength(rest)
+          this.ProcessSubNode("Values")
+        }
+      }
+    Magic: uint8
+    Major: uint8
+    Minor: uint8
+    Values:
+      list: true
+      Value: HessianValue
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          ele.Process()
+        }
+HessianValue:
+  operator: |
+    this.ProcessSubNode("Tag")
+    t = getNodeResult("Tag").Value
+    if t == 0x4e || t == 0x54 || t == 0x46 {
+      return
+    }
+    if t == 0x49 {
+      this.ProcessSubNode("Int")
+      return
+    }
+    panic("hessian: unsupported type tag")
+  Tag: uint8
+  Int: uint32

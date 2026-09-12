@@ -1,0 +1,148 @@
+# IEEE 802.1AE clear SecTAG and bounded data/ICV layout. Wire references:
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/net/macsec.c
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/uapi/linux/if_macsec.h
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/crypto/gcm.h
+# https://github.com/wireshark/wireshark/blob/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-macsec.c
+#
+# The cipher suite, ICV size, implicit SCI, upper XPN bits and capture FCS
+# presence are NOT encoded in the SecTAG. The default is a 16-byte ICV and
+# an FCS-free frame boundary. Callers may supply macsecICVLength (8,12..16)
+# and macsecTrailerLength explicitly. Nonzero SL identifies the end of data;
+# any bytes after its ICV remain an uninterpreted trailer. SL=0 cannot locate
+# an undeclared FCS/trailer. This parser does not decrypt or verify ICVs and
+# never treats a successful field parse as a valid receive/session outcome.
+endian: big
+Package:
+  MACSec: MACSecMessage
+
+  MACSecCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("macsec: explicit carrier boundary required") }
+      if this.GetMaxLength("bit")%8 != 0 { panic("macsec: carrier boundary must be byte-aligned") }
+      if this.GetMaxLength() == 0 { panic("macsec: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("MACSecFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MACSec Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+MACSecFrame: "import:macsec.yaml;node:MACSec"
+
+MACSecMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("macsec: explicit message boundary required") }
+    if this.GetMaxLength("bit")%8 != 0 { panic("macsec: message boundary must be byte-aligned") }
+    total = this.GetMaxLength()
+    if total < 6 { panic("macsec: message is shorter than the fixed tag") }
+    if total > 65535 { panic("macsec: message exceeds the 65535-byte implementation boundary") }
+    icvLength = 16
+    if hasCtx("macsecICVLength") {
+      icvLength = getCtx("macsecICVLength")
+      if icvLength != 8 && icvLength != 12 && icvLength != 13 && icvLength != 14 && icvLength != 15 && icvLength != 16 {
+        panic("macsec: unsupported external ICV length")
+      }
+    }
+    declaredTrailer = 0
+    if hasCtx("macsecTrailerLength") {
+      declaredTrailer = getCtx("macsecTrailerLength")
+      if declaredTrailer < 0 || declaredTrailer > total || declaredTrailer != int(declaredTrailer) {
+        panic("macsec: invalid external trailer length")
+      }
+    }
+    tag = this.ProcessSubNode("SecTAG")
+    flags = tag.Child("TCI AN")
+    sciPresent = int(flags.Child("SCI Present").Value)
+    encrypted = int(flags.Child("Encrypted").Value)
+    changed = int(flags.Child("Changed Text").Value)
+    if icvLength != 16 && changed == 0 { panic("macsec: nonstandard ICV length requires changed text") }
+    shortLength = int(tag.Child("Length Byte").Child("Short Length").Value)
+    tagLength = 6+sciPresent*8
+    remaining = total-tagLength-icvLength-declaredTrailer
+    if remaining < 1 { panic("macsec: incomplete data or ICV") }
+    dataLength = remaining
+    trailerLength = declaredTrailer
+    if shortLength != 0 {
+      if remaining < shortLength { panic("macsec: short length exceeds available data") }
+      if hasCtx("macsecTrailerLength") && remaining != shortLength {
+        panic("macsec: short length conflicts with external trailer boundary")
+      }
+      dataLength = shortLength
+      trailerLength = total-tagLength-dataLength-icvLength
+    } else if dataLength < 48 {
+      panic("macsec: zero short length requires at least 48 data bytes")
+    }
+    if encrypted == 0 && changed == 0 {
+      if dataLength < 2 { panic("macsec: clear data is shorter than its EtherType") }
+      this.ProcessSubNode("Inner EtherType")
+      if dataLength > 2 {
+        this.GetSubNode("Clear Data").SetMaxLength(dataLength-2)
+        this.ProcessSubNode("Clear Data")
+      }
+    } else if encrypted != 0 {
+      this.GetSubNode("Encrypted Data").SetMaxLength(dataLength)
+      this.ProcessSubNode("Encrypted Data")
+    } else {
+      this.GetSubNode("Changed Data").SetMaxLength(dataLength)
+      this.ProcessSubNode("Changed Data")
+    }
+    this.GetSubNode("ICV").SetMaxLength(icvLength)
+    this.ProcessSubNode("ICV")
+    if trailerLength > 0 {
+      this.GetSubNode("MACSec Trailer").SetMaxLength(trailerLength)
+      this.ProcessSubNode("MACSec Trailer")
+    }
+    if this.Length() != total { panic("macsec: message did not consume its boundary") }
+    this.AddInfo("ICV Length", icvLength)
+    this.AddInfo("ICV Length Explicit", hasCtx("macsecICVLength"))
+    this.AddInfo("Trailer Length", trailerLength)
+    this.AddInfo("Trailer Length Explicit", hasCtx("macsecTrailerLength"))
+    this.AddInfo("Data Length", dataLength)
+    this.AddInfo("ICV Verified", false)
+    this.AddInfo("Data Decrypted", false)
+    this.AddInfo("Inner Protocol Decoded", false)
+    this.AddInfo("Implicit SCI Resolved", false)
+    this.AddInfo("Extended Packet Number Resolved", false)
+    this.AddInfo("Zero Packet Number Needs XPN Context", int(tag.Child("Packet Number").Value) == 0)
+  SecTAG: MACSecTag
+  Inner EtherType: uint16
+  Clear Data: raw
+  Encrypted Data: raw
+  Changed Data: raw
+  ICV: raw
+  MACSec Trailer: raw
+
+MACSecTag:
+  operator: |
+    flags = this.ProcessSubNode("TCI AN")
+    if int(flags.Child("Version").Value) != 0 { panic("macsec: unsupported tag version") }
+    sciPresent = int(flags.Child("SCI Present").Value)
+    if sciPresent != 0 && (int(flags.Child("End Station").Value) != 0 || int(flags.Child("Single Copy Broadcast").Value) != 0) {
+      panic("macsec: SCI cannot accompany ES or SCB")
+    }
+    if int(flags.Child("Encrypted").Value) != 0 && int(flags.Child("Changed Text").Value) == 0 {
+      panic("macsec: reserved E-without-C encoding")
+    }
+    length = this.ProcessSubNode("Length Byte")
+    if int(length.Child("Reserved").Value) != 0 { panic("macsec: reserved length bits must be zero") }
+    shortLength = int(length.Child("Short Length").Value)
+    if shortLength >= 48 { panic("macsec: short length must be zero or 1 through 47") }
+    this.ProcessSubNode("Packet Number")
+    if sciPresent != 0 {
+      this.ProcessSubNode("System Identifier")
+      this.ProcessSubNode("Port Identifier")
+    }
+  TCI AN:
+    Version: uint8,1bit
+    End Station: uint8,1bit
+    SCI Present: uint8,1bit
+    Single Copy Broadcast: uint8,1bit
+    Encrypted: uint8,1bit
+    Changed Text: uint8,1bit
+    Association Number: uint8,2bit
+  Length Byte:
+    Reserved: uint8,2bit
+    Short Length: uint8,6bit
+  Packet Number: uint32
+  System Identifier: raw,6
+  Port Identifier: uint16

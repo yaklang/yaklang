@@ -1,0 +1,123 @@
+# TDM over Ethernet follows the wire format implemented by the official
+# Asterisk DAHDI drivers.  dahdi_dynamic_eth.c defines EtherType 0xd00d and
+# the two-octet network-order subaddress; dahdi_dynamic.c defines and validates
+# the bounded dynamic-span message that follows it:
+# https://github.com/asterisk/dahdi-linux/blob/276c914ea7d58bc2c19478f17835ed833e8f66d4/drivers/dahdi/dahdi_dynamic_eth.c
+# https://github.com/asterisk/dahdi-linux/blob/276c914ea7d58bc2c19478f17835ed833e8f66d4/drivers/dahdi/dahdi_dynamic.c
+#
+# DAHDI uses exactly eight samples per channel and permits 1..255 channels.
+# Signalling occupies one network-order 16-bit word per four channels, with
+# the lowest channel in the least-significant nibble.  Channel sample octets
+# remain uninterpreted telephony data; no signalling or call state is inferred.
+endian: big
+Package:
+  TDMoE: TDMoEMessage
+
+  # Link-layer dispatch is transactional.  Invalid or unsupported payloads
+  # remain one complete raw value without a partially decoded TDMoE tree.
+  TDMoECarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("tdmoe: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("tdmoe: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("TDMoEFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TDMoE Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+TDMoEFrame: "import:tdmoe.yaml;node:TDMoE"
+
+TDMoEMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("tdmoe: explicit message boundary required") }
+    total = this.GetMaxLength()
+    if total < 8 { panic("tdmoe: message is shorter than the fixed header") }
+    if total > 2176 { panic("tdmoe: message exceeds the 2176-byte implementation boundary") }
+    this.ProcessSubNode("Subaddress")
+    samples = int(this.ProcessSubNode("Samples Per Channel").Value)
+    if samples != 8 { panic("tdmoe: samples per channel must be eight") }
+    flags = this.ProcessSubNode("Flags")
+    signalPresent = int(flags.Child("Signaling Bits Present").Value)
+    this.ProcessSubNode("Packet Counter")
+    channels = int(this.ProcessSubNode("Channel Count").Value)
+    if channels == 0 { panic("tdmoe: channel count must be nonzero") }
+    if channels > 255 { panic("tdmoe: channel count exceeds the DAHDI implementation limit") }
+
+    signalingWords = 0
+    if signalPresent != 0 { signalingWords = (channels+3)/4 }
+    signalingBytes = signalingWords*2
+    channelBytes = channels*samples
+    expected = 8+signalingBytes+channelBytes
+    if total != expected { panic("tdmoe: message length does not match samples, flags, and channels") }
+
+    if signalingBytes > 0 {
+      signaling = this.GetSubNode("Signaling Words")
+      signaling.SetMaxLength(signalingBytes)
+      signaling.Process()
+    }
+    data = this.GetSubNode("Channel Data")
+    data.SetMaxLength(channelBytes)
+    data.Process()
+    if this.Length() != total { panic("tdmoe: message did not consume its boundary") }
+    this.AddInfo("Signaling Word Count", signalingWords)
+    this.AddInfo("Channel Data Bytes", channelBytes)
+    this.AddInfo("Channel State Decoded", false)
+  Subaddress: uint16
+  Samples Per Channel: uint8
+  Flags: TDMoEFlags
+  Packet Counter: uint16
+  Channel Count: uint16
+  Signaling Words: TDMoESignalingWords
+  Channel Data: TDMoEChannelData
+
+TDMoEFlags:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Loopback")
+    this.ProcessSubNode("Signaling Bits Present")
+    this.ProcessSubNode("Yellow Alarm")
+  Reserved: uint8,5bit
+  Loopback: uint8,1bit
+  Signaling Bits Present: uint8,1bit
+  Yellow Alarm: uint8,1bit
+
+TDMoESignalingWords:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() % 2 != 0 { panic("tdmoe: invalid signaling-word boundary") }
+    count = this.GetMaxLength()/2
+    if count > 64 { panic("tdmoe: too many signaling words") }
+    for i = 0; i < count; i++ {
+      word = this.NewSubNode("TDMoESignalingWord", "Signaling Word")
+      word.Process()
+      first = i*4+1
+      represented = 4
+      channels = int(getNodeResult("../Channel Count").Value)
+      if channels-first+1 < represented { represented = channels-first+1 }
+      word.AddInfo("First Channel", first)
+      word.AddInfo("Channels Represented", represented)
+    }
+
+TDMoESignalingWord:
+  operator: |
+    this.ProcessSubNode("High Nibble")
+    this.ProcessSubNode("Upper Middle Nibble")
+    this.ProcessSubNode("Lower Middle Nibble")
+    this.ProcessSubNode("Low Nibble")
+  High Nibble: uint8,4bit
+  Upper Middle Nibble: uint8,4bit
+  Lower Middle Nibble: uint8,4bit
+  Low Nibble: uint8,4bit
+
+TDMoEChannelData:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() % 8 != 0 { panic("tdmoe: invalid channel-data boundary") }
+    count = this.GetMaxLength()/8
+    if count == 0 || count > 255 { panic("tdmoe: invalid channel-data count") }
+    for i = 0; i < count; i++ {
+      channel = this.NewSubNode("TDMoEChannelSamples", "Channel Samples")
+      channel.Process()
+      channel.AddInfo("Channel Number", i+1)
+    }
+
+TDMoEChannelSamples: raw,8

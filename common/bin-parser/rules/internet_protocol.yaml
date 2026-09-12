@@ -2,7 +2,6 @@ endian: big
 Package:
   Internet Protocol:
     length-from-field: Total Length
-    length-from-field-multiply: 4
     Version: uint8,4bit
     Header Length: uint8,4bit
     Type of Service: raw,1
@@ -19,25 +18,132 @@ Package:
       operator: |
         protocol = getNodeResult("@Internet Protocol/Protocol").Value
         total = getNodeResult("@Internet Protocol/Total Length").Value
+        // These bounded carriers must not interpret IPv4 options or a
+        // fragment as a complete protocol message. Reassembly is caller-owned.
+        if protocol == 9 || protocol == 2 || protocol == 36 || protocol == 53 {
+          header = getNodeResult("@Internet Protocol/Header Length").Value * 4
+          if getNodeResult("@Internet Protocol/Version").Value != 4 || header < 20 || total < header { panic("ip: invalid routing-message IPv4 header boundary") }
+          if header > 20 {
+            options = this.NewSubNode("IP Header Options")
+            options.SetMaxLength(header-20)
+            options.Process()
+          }
+          fragments = getNodeResult("@Internet Protocol/Flags And Fragment Offset").Value
+          if (int(fragments[0]) & 63) != 0 || fragments[1] != 0 {
+            if total > header {
+              fragment = this.NewUnknownNode("IP Fragment Data")
+              fragment.SetMaxLength(total-header)
+              fragment.Process()
+            }
+            return
+          }
+        }
+        dccpDestination = nil
+        if protocol == 33 {
+          dccpDestination = getNodeResult("@Internet Protocol/Destination").Value
+          header = getNodeResult("@Internet Protocol/Header Length").Value * 4
+          if getNodeResult("@Internet Protocol/Version").Value != 4 || header < 20 || total < header { panic("dccp: invalid enclosing IPv4 length") }
+          fragments = getNodeResult("@Internet Protocol/Flags And Fragment Offset").Value
+          if (int(fragments[0]) & 63) != 0 || fragments[1] != 0 { panic("dccp: IPv4 fragments require caller reassembly") }
+          if header > 20 {
+            options = this.NewSubNode("IP Header Options")
+            options.SetMaxLength(header-20)
+            data = options.Process().Value
+            for position = 0; position < len(data); {
+              optionType = int(data[position])
+              if optionType == 0 { break }
+              if optionType == 1 { position++; continue }
+              if position+1 >= len(data) { panic("dccp: incomplete IPv4 option") }
+              optionLength = int(data[position+1])
+              if optionLength < 2 || optionLength > len(data)-position { panic("dccp: invalid IPv4 option length") }
+              if optionType == 131 || optionType == 137 {
+                if optionLength < 3 || (optionLength-3)%4 != 0 { panic("dccp: invalid IPv4 source route") }
+                pointer = int(data[position+2])
+                if pointer < 4 || (pointer-4)%4 != 0 { panic("dccp: invalid IPv4 source route pointer") }
+                if pointer <= optionLength {
+                  dccpDestination = data[position+optionLength-4:position+optionLength]
+                }
+              }
+              position += optionLength
+            }
+          }
+        }
         l = total - getNode("@Internet Protocol").Length()
         var node 
         switch protocol {
+          case 4:
+            node = this.NewSubNode("IPv4")
           case 6:
             node = this.NewSubNode("TCP")
           case 17:
             node = this.NewSubNode("UDP")
+          case 33:
+            node = this.NewSubNode("DCCP")
+          case 36:
+            node = this.NewSubNode("XTPCarrier")
+          case 53:
+            node = this.NewSubNode("SwIPeCarrier")
+          case 54:
+            node = this.NewSubNode("NHRPCarrier")
+          case 9:
+            node = this.NewSubNode("IGRPCarrier")
           case 1:
             node = this.NewSubNode("ICMP")
+          case 2:
+            peek, trial = this.TryProcessByType("IP Protocol Byte")
+            trial.Recovery()
+            if trial.OK && peek.Value == 0x13 {
+              node = this.NewSubNode("DVMRPCarrier")
+            } else { node = this.NewSubNode("IGMP") }
           case 0x2f:
             node = this.NewSubNode("GRE")
+          case 41:
+            node = this.NewSubNode("IPv6")
+          case 50:
+            node = this.NewSubNode("ESP")
+          case 51:
+            node = this.NewSubNode("AH")
+          case 89:
+            node = this.NewSubNode("OSPF")
+          case 88:
+            node = this.NewSubNode("EIGRP")
+          case 112:
+            node = this.NewSubNode("VRRP")
+          case 132:
+            node = this.NewSubNode("SCTP")
+          case 136:
+            node = this.NewSubNode("UDP-Lite")
           default:
-            node = this.NewUnknownNode()
+            node = this.NewSubNode("Next Protocol Data")
         }
         node.SetMaxLength(l)
+        if protocol == 136 || protocol == 33 {
+          node.SetCfg("IP Source", getNodeResult("@Internet Protocol/Source").Value)
+          node.SetCfg("IP Destination", getNodeResult("@Internet Protocol/Destination").Value)
+          if protocol == 33 { node.SetCfg("IP Destination", dccpDestination) }
+        }
         node.Process()
 
 TCP: "import:transmission_control_protocol.yaml;node:TCP"
 UDP: "import:user_datagram_protocol.yaml;node:UDP"
+DCCP: "import:dccp.yaml;node:DCCP"
+XTPCarrier: "import:transport-layer/xtp.yaml;node:XTPCarrier"
+SwIPeCarrier: "import:swipe.yaml;node:SwIPeCarrier"
+NHRPCarrier: "import:nhrp.yaml;node:NHRPCarrier"
+IGRPCarrier: "import:igrp.yaml;node:IGRPCarrier"
+DVMRPCarrier: "import:dvmrp.yaml;node:DVMRPCarrier"
+IP Protocol Byte: uint8
 ICMP: "import:internet_control_message_protocol.yaml;node:ICMP"
+IGMP: "import:igmp.yaml;node:IGMP"
 GRE: "import:generic_routing_encapsulation.yaml;node:GRE"
-Unknown: raw
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+IPv4: "import:internet_protocol.yaml;node:Internet Protocol"
+UDP-Lite: "import:udp_lite.yaml;node:UDPLite"
+ESP: "import:ipsec.yaml;node:ESP"
+AH: "import:ipsec.yaml;node:AH"
+OSPF: "import:ospf.yaml;node:OSPF"
+EIGRP: "import:eigrp.yaml;node:EIGRP"
+VRRP: "import:vrrp.yaml;node:VRRP"
+SCTP: "import:sctp.yaml;node:SCTP"
+IP Header Options: raw
+Next Protocol Data: string

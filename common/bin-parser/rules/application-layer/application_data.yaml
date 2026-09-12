@@ -1,0 +1,21 @@
+# Neutral framing for an application-data record carrying one bounded zlib
+# member. This rule does not identify an application protocol or decompress the
+# member.
+endian: big
+Package:
+  LengthPrefixedZlibRecord:
+    operator: |
+      this.ProcessSubNode("Compressed Length")
+      length = getNodeResult("Compressed Length").Value
+      if length > 65536 {
+        panic("application-data: compressed length exceeds 64 KiB")
+      }
+      if length != this.GetMaxLength() - this.Length() {
+        panic("application-data: compressed length does not match input")
+      }
+      if length > 0 {
+        this.GetSubNode("Zlib Bytes").SetMaxLength(length)
+        this.ProcessSubNode("Zlib Bytes")
+      }
+    Compressed Length: uint32
+    Zlib Bytes: raw

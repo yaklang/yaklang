@@ -1,0 +1,76 @@
+endian: big
+Package:
+  JDWP:
+    operator: |
+      this.ProcessSubNode("Handshake")
+      s = string(getNodeResult("Handshake").Value)
+      if s != "JDWP-Handshake" {
+        panic("jdwp: handshake mismatch")
+      }
+      rest = 0
+      if this.GetMaxLength() > this.Length() {
+        rest = this.GetMaxLength() - this.Length()
+      }
+      if rest >= 11 && rest < 1048576 {
+        this.ProcessSubNode("Command")
+        return
+      }
+      if rest >= 11 {
+        res, op = this.TryProcessSubNode("Command")
+        if op.OK {
+          op.Save()
+        } else {
+          op.Recovery()
+        }
+      }
+      return
+    Handshake: raw,14
+    Command:
+      operator: |
+        this.ProcessSubNode("Length")
+        l = getNodeResult("Length").Value
+        if l < 11 {
+          panic("jdwp: command length smaller than 11")
+        }
+        if l >= 1048576 {
+          panic("jdwp: command length too large")
+        }
+        this.SetMaxLength(l)
+        this.ProcessSubNode("Id")
+        this.ProcessSubNode("Flags")
+        flags = getNodeResult("Flags").Value
+        if (flags & 0x80) != 0 {
+          this.ProcessSubNode("Error Code")
+          return
+        }
+        this.ProcessSubNode("Command Set")
+        this.ProcessSubNode("Command")
+        cset = getNodeResult("Command Set").Value
+        cmd = getNodeResult("Command").Value
+        if cset == 1 && cmd == 11 {
+          this.ProcessSubNode("String Length")
+          sl = getNodeResult("String Length").Value
+          if sl > 0 && sl < 1048576 {
+            this.GetSubNode("String").SetMaxLength(sl)
+            this.ProcessSubNode("String")
+          }
+          return
+        }
+        if cset == 15 && cmd == 1 {
+          this.ProcessSubNode("Event Kind")
+          this.ProcessSubNode("Suspend Policy")
+          this.ProcessSubNode("Modifiers")
+          return
+        }
+        return
+      Length: uint32
+      Id: uint32
+      Flags: uint8
+      Error Code: uint16
+      Command Set: uint8
+      Command: uint8
+      String Length: uint32
+      String: string
+      Event Kind: uint8
+      Suspend Policy: uint8
+      Modifiers: uint32

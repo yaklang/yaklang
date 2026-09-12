@@ -343,7 +343,11 @@ func (r *RDPClient) Connect() (protocol uint32, e error) {
 	if err != nil {
 		return 0, err
 	}
-	rspNeg, err := r.ParseProtocol(bytes.NewReader(rspX224["VariableData"].([]byte)), "Negotiation")
+	if neg, ok := rspX224["RDPNegotiation"].(map[string]any); ok {
+		protocol = neg["Protocol"].(uint32)
+		return
+	}
+	rspNeg, err := r.ParseProtocol(bytes.NewReader(utils.InterfaceToBytes(rspX224["VariableData"])), "Negotiation")
 	if err != nil {
 		return 0, err
 	}

@@ -1,0 +1,49 @@
+# ISO 13400 message layout, cross-checked with Scapy 2.6.1 automotive/doip.py.
+endian: big
+Package:
+  DoIP:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Inverse Version")
+      version = getNodeResult("Version").Value
+      if (version ^ getNodeResult("Inverse Version").Value) != 255 { panic("doip: inverse version mismatch") }
+      this.ProcessSubNode("Payload Type")
+      this.ProcessSubNode("Payload Length")
+      length = getNodeResult("Payload Length").Value
+      if length != this.GetMaxLength() - this.Length() { panic("doip: payload length mismatch") }
+      kind = getNodeResult("Payload Type").Value
+      if kind == 0x8001 || kind == 0x8002 || kind == 0x8003 {
+        this.ProcessSubNode("Source Address")
+        this.ProcessSubNode("Target Address")
+        if kind == 0x8002 { this.ProcessSubNode("Acknowledgement Code") }
+        if kind == 0x8003 { this.ProcessSubNode("Negative Acknowledgement Code") }
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 {
+          if kind == 0x8001 {
+            this.GetSubNode("Diagnostic Data").SetMaxLength(rest)
+            this.ProcessSubNode("Diagnostic Data")
+          } else {
+            this.GetSubNode("Previous Message").SetMaxLength(rest)
+            this.ProcessSubNode("Previous Message")
+          }
+        }
+        return
+      }
+      if kind == 0 && length == 1 { this.ProcessSubNode("Header Rejection Code"); return }
+      if kind == 1 || kind == 7 {
+        if length != 0 { panic("doip: request must have an empty body") }
+        return
+      }
+      if length > 0 { this.GetSubNode("Payload").SetMaxLength(length); this.ProcessSubNode("Payload") }
+    Version: uint8
+    Inverse Version: uint8
+    Payload Type: uint16
+    Payload Length: uint32
+    Source Address: uint16
+    Target Address: uint16
+    Acknowledgement Code: uint8
+    Negative Acknowledgement Code: uint8
+    Header Rejection Code: uint8
+    Diagnostic Data: raw
+    Previous Message: raw
+    Payload: raw

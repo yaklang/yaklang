@@ -1,0 +1,38 @@
+# Standalone entry used by high-volume LLC carriers. Keep the IPX definition
+# identical to extended_protocols.yaml, whose original entry remains supported.
+endian: big
+Package:
+  IPX:
+    operator: |
+      if !this.HasMaxLength() { panic("ipx: packet boundary is required") }
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      if length != this.GetMaxLength() || length < 30 {
+        panic("ipx: packet length does not match input")
+      }
+      this.ProcessSubNode("Transport Control")
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("Destination Network")
+      this.ProcessSubNode("Destination Node")
+      this.ProcessSubNode("Destination Socket")
+      this.ProcessSubNode("Source Network")
+      this.ProcessSubNode("Source Node")
+      this.ProcessSubNode("Source Socket")
+      this.AddInfo("Upper Layer Decoded", false)
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+    Checksum: uint16
+    Length: uint16
+    Transport Control: uint8
+    Packet Type: uint8
+    Destination Network: uint32
+    Destination Node: raw,6
+    Destination Socket: uint16
+    Source Network: uint32
+    Source Node: raw,6
+    Source Socket: uint16
+    Payload: raw

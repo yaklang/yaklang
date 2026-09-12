@@ -1,0 +1,107 @@
+endian: big
+Package:
+  PPPoE:
+    operator: |
+      this.ProcessSubNode("VersionType")
+      vt = getNodeResult("VersionType").Value
+      if vt != 0x11 {
+        panic("pppoe: version and type must be 1")
+      }
+      this.ProcessSubNode("Code")
+      this.ProcessSubNode("Session ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > this.GetMaxLength() - this.Length() { panic("pppoe: payload length exceeds input") }
+      if getNodeResult("Code").Value == 0 && (l < 2 || getNodeResult("Session ID").Value == 0) { panic("pppoe: invalid session header") }
+      if l > 0 {
+        this.GetSubNode("Payload").SetMaxLength(l)
+        this.ProcessSubNode("Payload")
+      }
+      rest = this.GetMaxLength() - this.Length()
+      if this.HasMaxLength() && rest > 0 { this.GetSubNode("Link Padding").SetMaxLength(rest); this.ProcessSubNode("Link Padding") }
+      return
+    VersionType: uint8
+    Code: uint8
+    Session ID: uint16
+    Length: uint16
+    Payload:
+      operator: |
+        code = getNodeResult("../Code").Value
+        if code == 0 {
+          this.ProcessByType("PPP")
+          return
+        }
+        res, op = this.TryProcessByType("PeekByte")
+        if !op.OK {
+          op.Recovery()
+          return
+        }
+        op.Recovery()
+        this.ProcessSubNode("Tags")
+        return
+      Tags:
+        list: true
+        Tag: PPPoETag
+        operator: |
+          for this.Length() < this.GetMaxLength() {
+            if this.GetMaxLength() - this.Length() < 4 { panic("pppoe: truncated tag header") }
+            ele = this.NewElement()
+            ele.Process()
+            if ele.GetSubNode("Type").Result().Value == 0 {
+              if this.Length() != this.GetMaxLength() { panic("pppoe: bytes after end-of-list tag") }
+              break
+            }
+          }
+    Link Padding: raw
+PPP: "import:ppp.yaml;node:PPPProtocol"
+PPPoETag:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    t = getNodeResult("Type").Value
+    l = getNodeResult("Length").Value
+    if t == 0 {
+      if l != 0 { panic("pppoe: end-of-list tag length must be zero") }
+      return
+    }
+    if t == 257 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Service-Name").SetMaxLength(l)
+        this.ProcessSubNode("Service-Name")
+      }
+      return
+    }
+    if t == 258 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("AC-Name").SetMaxLength(l)
+        this.ProcessSubNode("AC-Name")
+      }
+      return
+    }
+    if t == 259 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Host-Uniq").SetMaxLength(l)
+        this.ProcessSubNode("Host-Uniq")
+      }
+      return
+    }
+    if t == 260 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("AC-Cookie").SetMaxLength(l)
+        this.ProcessSubNode("AC-Cookie")
+      }
+      return
+    }
+    if l > 0 && l < 1048576 {
+      this.GetSubNode("Tag Data").SetMaxLength(l)
+      this.ProcessSubNode("Tag Data")
+    }
+    return
+  Type: uint16
+  Length: uint16
+  Service-Name: string
+  AC-Name: string
+  Host-Uniq: string
+  AC-Cookie: string
+  Tag Data: string
+PeekByte: uint8
