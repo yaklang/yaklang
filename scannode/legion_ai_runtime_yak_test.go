@@ -2,8 +2,11 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -19,6 +22,184 @@ import (
 )
 
 func boolPointer(value bool) *bool { return &value }
+
+func TestStatefulDriverTaskFocusInput(t *testing.T) {
+	for _, test := range taskFocusInputCases() {
+		t.Run(test.name, func(t *testing.T) {
+			engine := newTaskFocusCaptureEngine(t)
+			handle := &yakAIEngineRuntimeHandle{
+				engine: engine, emitter: noopEmitter{}, messageQueue: make(chan yakAIQueuedMessage, 1),
+			}
+			input := aiSessionInput{
+				Ref:       aiSessionCommandRef{CommandID: "task-focus-command", SessionID: "task-focus-session", RunID: "task-focus-run", BindEpoch: 3},
+				InputType: "message", PayloadJSON: test.payload,
+			}
+			beforePayload, beforeRef := string(input.PayloadJSON), input.Ref
+			err := handle.SendInput(context.Background(), input)
+			if string(input.PayloadJSON) != beforePayload || input.Ref != beforeRef {
+				t.Fatal("focus projection changed durable payload or command identity")
+			}
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Errorf("invalid focus was not explicitly rejected (%s): %v", test.wantErr, err)
+				}
+				if err != nil && strings.Contains(err.Error(), "DO_NOT_LOG_USER_VALUE") {
+					t.Error("focus validation disclosed the rejected value")
+				}
+				if len(handle.messageQueue) != 0 {
+					t.Error("invalid focus was enqueued")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			queued := <-handle.messageQueue
+			if queued.turnID != input.Ref.CommandID {
+				t.Fatal("focus projection changed the queued turn identity")
+			}
+			done := make(chan struct{})
+			go func() { defer close(done); handle.sendMessage(queued) }()
+			message := receiveTaskFocusMessage(t, engine)
+			assertTaskFocusMessage(t, message.content, "PAYLOAD_USER_INPUT", test)
+			assertTaskFocusAttachmentOption(t, message.options)
+			close(engine.release)
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("stateful task did not finish after engine release")
+			}
+		})
+	}
+}
+
+func TestStatefulDriverTaskFocusControlInputUnchanged(t *testing.T) {
+	for _, input := range taskFocusControlInputs() {
+		t.Run(input.InputType, func(t *testing.T) {
+			engine := newTaskFocusCaptureEngine(t)
+			handle := &yakAIEngineRuntimeHandle{
+				engine: engine, emitter: noopEmitter{}, messageQueue: make(chan yakAIQueuedMessage, 1),
+			}
+			before := string(input.PayloadJSON)
+			if err := handle.SendInput(context.Background(), input); err != nil {
+				t.Fatalf("control input was treated as a task focus message: %v", err)
+			}
+			if len(handle.messageQueue) != 0 || len(engine.messages) != 0 || string(input.PayloadJSON) != before {
+				t.Fatal("control input was rewritten or enqueued as a user message")
+			}
+			event := <-engine.events
+			if input.InputType == "interactive_response" {
+				if !event.GetIsInteractiveMessage() || event.GetInteractiveId() != "review-task-focus" || event.GetInteractiveJSONInput() != before {
+					t.Fatal("interactive response changed")
+				}
+			} else if !event.GetIsSyncMessage() || event.GetSyncID() != "sync-task-focus" || event.GetSyncJsonInput() != "{}" {
+				t.Fatal("sync input changed")
+			}
+		})
+	}
+}
+
+func testAttachmentTaskBinding(t *testing.T, body string) aiSessionBinding {
+	t.Helper()
+	command := testAttachmentTaskBindCommand(t)
+	runtime, _, _ := newTestAttachmentFocusRuntime(t)
+	return aiSessionBinding{
+		Ref:                       aiSessionRefFromBindCommand(command),
+		RuntimeOptionSnapshotJSON: command.RuntimeOptionSnapshotJson,
+		Attachments:               cloneAISessionAttachmentRefs(command.Attachments),
+		ExecutionMode:             "single_run", AuthorizedFocusReleaseID: command.ResultContext.FocusReleaseId,
+		AuthorizedTargetURL: testAttachmentTaskTarget, LegionResultRuntime: runtime,
+		PlatformBearerToken: "synthetic-node-token",
+		PlatformAPIBaseURL:  "https://platform.invalid",
+		NodeSessionID:       "synthetic-node-session",
+		HTTPClient: &http.Client{Transport: runtimeHostRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if request.URL.String() != "https://platform.invalid/v1/ai/attachments/attachment-log-1/download?node_session_id=synthetic-node-session" || request.Method != http.MethodGet {
+				return nil, fmt.Errorf("unexpected synthetic attachment request: %s %s", request.Method, request.URL)
+			}
+			if request.Header.Get("Authorization") != "Bearer synthetic-node-token" {
+				return nil, errors.New("missing synthetic node authorization")
+			}
+			return &http.Response{StatusCode: http.StatusOK, ContentLength: int64(len(body)), Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+		})},
+	}
+}
+
+func TestDownloadAISessionAttachmentVerifiesTaskPins(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		mutate  func(*aiSessionAttachmentRef)
+		wantErr string
+	}{
+		{name: "matching", body: testAttachmentTaskContent},
+		{name: "size_mismatch", body: testAttachmentTaskContent, mutate: func(a *aiSessionAttachmentRef) { a.SizeBytes++ }, wantErr: "size"},
+		{name: "digest_mismatch", body: testAttachmentTaskContent, mutate: func(a *aiSessionAttachmentRef) { a.SHA256 = strings.Repeat("0", 64) }, wantErr: "sha256"},
+		{name: "over_limit_is_not_truncated", body: strings.Repeat("x", maxAISessionAttachmentBytes+1), wantErr: "limit"},
+		{name: "invalid_utf8", body: "\xff", mutate: func(a *aiSessionAttachmentRef) {
+			a.SizeBytes = 1
+			a.SHA256 = fmt.Sprintf("%x", sha256.Sum256([]byte("\xff")))
+		}, wantErr: "utf-8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			binding := testAttachmentTaskBinding(t, tt.body)
+			attachment := binding.Attachments[0]
+			if tt.mutate != nil {
+				tt.mutate(&attachment)
+			}
+			content, err := downloadAISessionAttachment(context.Background(), binding, attachment)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(strings.ToLower(err.Error()), tt.wantErr) {
+					t.Fatalf("expected %s rejection, got %v", tt.wantErr, err)
+				}
+				if content != "" {
+					t.Fatal("rejected attachment leaked content to the model")
+				}
+				return
+			}
+			if err != nil || !strings.Contains(content, testAttachmentTaskContent) {
+				t.Fatalf("verified attachment not available to the model: %v", err)
+			}
+		})
+	}
+}
+
+func TestBuildYakAIEngineOptionsAttachmentTaskRejectsExtraMCP(t *testing.T) {
+	for _, source := range []string{"runtime", "provider_snapshot"} {
+		t.Run(source, func(t *testing.T) {
+			binding := testAttachmentTaskBinding(t, testAttachmentTaskContent)
+			mcp := []sessionMCPServer{{Name: "forbidden", URL: "https://mcp.invalid/sse"}}
+			if source == "runtime" {
+				options, err := decodeYakRuntimeOptions(binding.RuntimeOptionSnapshotJSON, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				options.SessionMCPServers = mcp
+				binding.RuntimeOptionSnapshotJSON, err = json.Marshal(options)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				raw, err := json.Marshal(yakRuntimeOptions{SessionMCPServers: mcp})
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding.ProviderPolicySnapshotJSON = raw
+			}
+			if _, err := buildYakAIEngineOptions(context.Background(), binding, noopAISessionRuntimeEmitter{}); err == nil || !strings.Contains(err.Error(), "MCP") {
+				t.Fatalf("attachment task accepted ExtraMCP from %s: %v", source, err)
+			}
+		})
+	}
+	options, err := buildYakAIEngineOptions(context.Background(), testAttachmentTaskBinding(t, testAttachmentTaskContent), noopAISessionRuntimeEmitter{})
+	if err != nil {
+		t.Fatalf("valid attachment task rejected: %v", err)
+	}
+	config := aiengine.NewAIEngineConfig(options...)
+	if config.Focus != "" || len(config.AttachedResources) != 1 || !strings.Contains(config.AttachedResources[0].Value, testAttachmentTaskContent) {
+		t.Fatal("attachment task lost pinned content or bypassed context release activation")
+	}
+}
 
 func TestStatefulDriverKeepsConversationRuntimeAfterTurnFailure(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
@@ -347,6 +528,9 @@ func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection
 		if got := r.Header.Get("Authorization"); got != "Bearer node-session-token" {
 			t.Fatalf("unexpected authorization header: %s", got)
 		}
+		if r.URL.Path != "/v1/ai/attachments/inputf_123/download" || r.URL.Query().Get("node_session_id") != "node-session-ai" {
+			t.Fatalf("unexpected managed attachment request: %s", r.URL.String())
+		}
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("hello from attachment"))
 	}))
@@ -359,7 +543,6 @@ func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection
 				AttachmentID: "inputf_123",
 				Filename:     "targets.txt",
 				ContentType:  "text/plain",
-				DownloadURL:  server.URL,
 			},
 		},
 		CredentialRefs: []aiSessionCredentialRef{
@@ -397,6 +580,78 @@ func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection
 	}
 	if !strings.Contains(credentialProjection, "Secret material is not exposed") {
 		t.Fatalf("unexpected credential projection: %s", credentialProjection)
+	}
+}
+
+func testAttachmentWorkspaceBinding(t *testing.T) aiSessionBinding {
+	t.Helper()
+	binding := testAttachmentTaskBinding(t, testAttachmentTaskContent)
+	workspace := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindAttachments)
+	target, err := legionCodeWorkspaceSentinel(workspace.WorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, err := mergedYakRuntimeOptions(binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.SourceWorkspace = &workspace
+	options.FocusTargetURL = target
+	binding.AuthorizedTargetURL = target
+	binding.RuntimeOptionSnapshotJSON, err = json.Marshal(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := binding.LegionResultRuntime.(*legionServerFocusRuntime)
+	runtime.authorized, err = normalizeServerFocusURL(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime.attachmentResourceID = ""
+	runtime.workspace = &legionCodeWorkspaceRuntime{spec: workspace}
+	return binding
+}
+
+func TestBuildYakAIEngineOptionsAttachmentWorkspaceRejectsExtraMCP(t *testing.T) {
+	for _, source := range []string{"provider", "runtime"} {
+		t.Run(source, func(t *testing.T) {
+			binding := testAttachmentWorkspaceBinding(t)
+			payload := yakRuntimeOptions{SessionMCPServers: []sessionMCPServer{{Name: "untrusted", URL: "https://forbidden.invalid"}}}
+			if source == "runtime" {
+				options, err := mergedYakRuntimeOptions(binding)
+				if err != nil {
+					t.Fatal(err)
+				}
+				options.SessionMCPServers = payload.SessionMCPServers
+				binding.RuntimeOptionSnapshotJSON, _ = json.Marshal(options)
+			} else {
+				binding.ProviderPolicySnapshotJSON, _ = json.Marshal(payload)
+			}
+			if _, err := buildYakAIEngineOptions(context.Background(), binding, noopAISessionRuntimeEmitter{}); err == nil || !strings.Contains(err.Error(), "MCP") {
+				t.Fatalf("workspace accepted ambient MCP: %v", err)
+			}
+		})
+	}
+}
+
+func TestBuildYakAIEngineOptionsDoesNotInlineAttachmentWorkspaceFiles(t *testing.T) {
+	t.Parallel()
+
+	binding := testAttachmentWorkspaceBinding(t)
+	requested := false
+	client := &http.Client{Transport: aiRuntimeRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requested = true
+		return nil, errors.New("attachment workspace bytes must not be requested by prompt assembly")
+	})}
+	binding.HTTPClient = client
+	binding.Attachments = []aiSessionAttachmentRef{{AttachmentID: "aiatt_large", Filename: "large.log", SizeBytes: 5 << 30, SHA256: strings.Repeat("a", 64)}}
+	options, err := buildYakAIEngineOptions(context.Background(), binding, noopAISessionRuntimeEmitter{})
+	if err != nil {
+		t.Fatalf("build attachment workspace engine options: %v", err)
+	}
+	config := aiengine.NewAIEngineConfig(options...)
+	if requested || len(config.AttachedResources) != 0 {
+		t.Fatalf("attachment workspace leaked into prompt resources: requested=%v resources=%#v", requested, config.AttachedResources)
 	}
 }
 
@@ -575,7 +830,7 @@ func TestBuildYakAIEngineOptionsMapsPlanStrategyCapabilitiesAndSessionMCP(t *tes
 			"forge_params":[{"key":"target","value":"https://example.test"}],
 			"enabled_capabilities":[{"name":"httpx","type":"tool"}],
 			"strategy":{"enable_multi_agent":true,"enable_goal_mode":true,"goal_min_iterations":8},
-			"session_mcp_servers":[{"name":"irify","url":"http://legion.test/mcp/sse","allowed_tools":["get_risk"]}]
+			"session_mcp_servers":[{"name":"ssa_risk_ai_judgement","url":"http://legion.test/v1/ai/ssa-evidence-mcp/sse","headers":{"Authorization":"Bearer signed-test-token"},"allowed_tools":["get_risk"]}]
 		}`),
 	}, noopAISessionRuntimeEmitter{})
 	if err != nil {
@@ -585,6 +840,15 @@ func TestBuildYakAIEngineOptionsMapsPlanStrategyCapabilitiesAndSessionMCP(t *tes
 	engineConfig := aiengine.NewAIEngineConfig(options...)
 	if len(engineConfig.ExtraMCPServers) != 1 || !engineConfig.RestrictToSessionMCP {
 		t.Fatalf("session mcp contract was not applied: %#v", engineConfig.ExtraMCPServers)
+	}
+	if got := engineConfig.ExtraMCPServers[0].Server.Name; got != "ssa_risk_ai_judgement" {
+		t.Fatalf("session mcp server name was not preserved: %q", got)
+	}
+	if got := engineConfig.ExtraMCPServers[0].Server.Headers["Authorization"]; got != "Bearer signed-test-token" {
+		t.Fatalf("session mcp Authorization header was not preserved: %#v", engineConfig.ExtraMCPServers[0].Server.Headers)
+	}
+	if strings.Contains(engineConfig.ExtraMCPServers[0].Server.URL, "signed-test-token") {
+		t.Fatal("session MCP credential leaked into its URL")
 	}
 	config := aicommon.NewConfig(context.Background(), engineConfig.ExtOptions...)
 	if !config.GetEnablePlanAndExec() || !config.GetEnableDetachedPlan() {

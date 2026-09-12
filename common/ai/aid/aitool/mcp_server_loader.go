@@ -217,7 +217,7 @@ func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string, onT
 
 // LoadAIToolsFromMCPServer 从单个显式 MCP server（不查 DB）加载工具，用于会话级挂载。
 // allowedTools 非空时在 client 侧按裸工具名做白名单过滤，server 多暴露的工具一律丢弃，
-// 不依赖 server 自觉只暴露。客户端生命周期随返回的 Tool（Callback 持有 client）。
+// 不依赖 server 自觉只暴露。客户端由返回的 Tool 持有，直到 ctx 结束或显式 Close。
 func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, allowedTools []string) ([]*Tool, error) {
 	if server == nil {
 		return nil, utils.Errorf("mcp server is nil")
@@ -226,10 +226,16 @@ func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, all
 		ctx = context.Background()
 	}
 
-	mcpClient, err := createMCPClient(server)
+	// Keep the connection lifetime separate from the initialization timeout.
+	// Cancelling it also interrupts an idle SSE read, which Close alone does
+	// not interrupt in the underlying transport.
+	clientCtx, cancelClient := context.WithCancel(ctx)
+	rawClient, err := createMCPClientWithContext(clientCtx, server)
 	if err != nil {
+		cancelClient()
 		return nil, utils.Errorf("create mcp client failed: %v", err)
 	}
+	mcpClient := &sessionMCPClient{MCPClient: rawClient, cancel: cancelClient}
 	// createMCPClient already opened a live connection (sse) or spawned a
 	// subprocess (stdio). On any failure path below we must close it; only when
 	// tools are returned does ownership transfer to the caller (the returned
@@ -280,11 +286,33 @@ func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, all
 		return nil, utils.Errorf("no tools loaded from mcp server %s (allowlist=%v)", server.Name, allowedTools)
 	}
 	success = true
+	context.AfterFunc(clientCtx, func() { _ = mcpClient.Close() })
 	return aiTools, nil
+}
+
+// sessionMCPClient gives shared tool callbacks one idempotent shutdown path,
+// whether construction rolls back, the session ends, or the owner closes it.
+type sessionMCPClient struct {
+	client.MCPClient
+	cancel    context.CancelFunc
+	closeOnce sync.Once
+	closeErr  error
+}
+
+func (c *sessionMCPClient) Close() error {
+	c.closeOnce.Do(func() {
+		c.cancel()
+		c.closeErr = c.MCPClient.Close()
+	})
+	return c.closeErr
 }
 
 // createMCPClient 根据 MCP 服务器配置创建客户端
 func createMCPClient(server *schema.MCPServer) (client.MCPClient, error) {
+	return createMCPClientWithContext(context.Background(), server)
+}
+
+func createMCPClientWithContext(ctx context.Context, server *schema.MCPServer) (client.MCPClient, error) {
 	switch server.Type {
 	case "stdio":
 		// 解析命令和参数
@@ -301,10 +329,10 @@ func createMCPClient(server *schema.MCPServer) (client.MCPClient, error) {
 		if err != nil {
 			return nil, utils.Errorf("create sse mcp client failed: %v", err)
 		}
-		// 使用一个长期存在的 context 来保持 SSE 连接
-		// 不能使用带超时的 context，否则连接会断开导致 session 失效
-		err = sseMcpClient.Start(context.Background())
+		// Use the client lifetime, never the short initialization timeout.
+		err = sseMcpClient.Start(ctx)
 		if err != nil {
+			_ = sseMcpClient.Close()
 			return nil, utils.Errorf("start sse mcp client failed: %v", err)
 		}
 		return sseMcpClient, nil

@@ -297,6 +297,191 @@ func TestAISessionRuntimeManagerHigherPendingBindEpochWins(t *testing.T) {
 	}
 }
 
+func TestAISessionRuntimeManagerCancelsPendingBind(t *testing.T) {
+	recorder := &recordingAISessionRuntimeDriver{}
+	driver := &controlledAISessionRuntimeDriver{
+		recorder: recorder,
+		blockOn:  1,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+	manager := newAISessionRuntimeManager(driver)
+	bind := validAISessionBindCommand()
+	bindDone := make(chan error, 1)
+	go func() {
+		_, err := manager.Bind(context.Background(), bind, nil, aiSessionRuntimeBindOptions{})
+		bindDone <- err
+	}()
+	select {
+	case <-driver.started:
+	case <-time.After(time.Second):
+		t.Fatal("bind did not reach the controlled barrier")
+	}
+
+	cancelled, err := manager.Cancel(validAISessionCancelCommand())
+	if err != nil {
+		t.Fatalf("cancel pending bind: %v", err)
+	}
+	if cancelled.applyHandle || cancelled.handle != nil || cancelled.resultSink != nil {
+		t.Fatalf("unexpected pending-bind cancellation: %#v", cancelled)
+	}
+	select {
+	case err := <-bindDone:
+		if !errors.Is(err, errAISessionBindFenced) {
+			t.Fatalf("cancelled pending bind error = %v, want fenced", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("pending bind did not stop promptly after cancellation")
+	}
+	if hasAISessionRuntime(manager, bind.GetSession().GetSessionId()) {
+		t.Fatal("cancelled pending bind became an active runtime")
+	}
+}
+
+func TestAISessionRuntimeManagerPendingRebindCancelRetiresPreviousRuntime(t *testing.T) {
+	recorder := &recordingAISessionRuntimeDriver{}
+	driver := &controlledAISessionRuntimeDriver{
+		recorder: recorder,
+		blockOn:  2,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+	manager := newAISessionRuntimeManager(driver)
+	first := validAISessionBindCommand()
+	if _, err := manager.Bind(context.Background(), first, nil, aiSessionRuntimeBindOptions{}); err != nil {
+		t.Fatalf("first bind: %v", err)
+	}
+	manager.mu.Lock()
+	retired := manager.sessions[first.GetSession().GetSessionId()]
+	manager.mu.Unlock()
+	second := proto.Clone(first).(*aiv1.BindAISessionCommand)
+	second.Metadata.CommandId = "cmd-bind-2"
+	second.BindEpoch = 2
+	second.Session.BindEpoch = 2
+	bindDone := make(chan error, 1)
+	go func() {
+		_, err := manager.Bind(context.Background(), second, nil, aiSessionRuntimeBindOptions{})
+		bindDone <- err
+	}()
+	select {
+	case <-driver.started:
+	case <-time.After(time.Second):
+		t.Fatal("replacement bind did not reach the controlled barrier")
+	}
+	cancelCommand := validAISessionCancelCommand()
+	cancelCommand.Session.BindEpoch = 2
+	cancelled, err := manager.Cancel(cancelCommand)
+	if err != nil {
+		t.Fatalf("cancel pending rebind: %v", err)
+	}
+	if cancelled.ref.BindEpoch != 2 {
+		t.Fatalf("pending rebind did not retain previous runtime for terminal cleanup: %#v", cancelled)
+	}
+	if retired == nil || retired.currentRef().BindEpoch != first.BindEpoch || retired.beginEmission() {
+		t.Fatalf("previous runtime was not fenced under its original epoch: %#v", retired)
+	}
+	retried, err := manager.Cancel(cancelCommand)
+	if err != nil || retried.applyHandle || retried.ref.BindEpoch != 2 {
+		t.Fatalf("retry pending-rebind cancellation: cancelled=%#v err=%v", retried, err)
+	}
+	if err := manager.CompleteTerminal(retried.ref, "cancel"); err != nil {
+		t.Fatalf("complete pending-rebind cancellation: %v", err)
+	}
+	if err := <-bindDone; !errors.Is(err, errAISessionBindFenced) {
+		t.Fatalf("cancelled replacement bind error = %v, want fenced", err)
+	}
+	recorder.assertClose(t, 0, "pending binding cancelled")
+	if hasAISessionRuntime(manager, first.GetSession().GetSessionId()) {
+		t.Fatal("previous runtime survived pending-rebind cancellation")
+	}
+}
+
+func TestAISessionRuntimeManagerCloseFencesPendingBindAndRebind(t *testing.T) {
+	t.Run("initial bind", func(t *testing.T) {
+		driver := &controlledAISessionRuntimeDriver{
+			recorder: &recordingAISessionRuntimeDriver{},
+			blockOn:  1,
+			started:  make(chan struct{}),
+			release:  make(chan struct{}),
+		}
+		manager := newAISessionRuntimeManager(driver)
+		bindDone := make(chan error, 1)
+		go func() {
+			_, err := manager.Bind(context.Background(), validAISessionBindCommand(), nil, aiSessionRuntimeBindOptions{})
+			bindDone <- err
+		}()
+		<-driver.started
+		closed, err := manager.Close(validAISessionCloseCommand())
+		if err != nil || !closed.acknowledge {
+			t.Fatalf("close initial pending bind: closed=%#v err=%v", closed, err)
+		}
+		if err := <-bindDone; !errors.Is(err, errAISessionBindFenced) {
+			t.Fatalf("closed pending bind error = %v, want fenced", err)
+		}
+	})
+
+	t.Run("replacement bind", func(t *testing.T) {
+		recorder := &recordingAISessionRuntimeDriver{}
+		driver := &controlledAISessionRuntimeDriver{
+			recorder: recorder,
+			blockOn:  2,
+			started:  make(chan struct{}),
+			release:  make(chan struct{}),
+		}
+		manager := newAISessionRuntimeManager(driver)
+		first := validAISessionBindCommand()
+		if _, err := manager.Bind(context.Background(), first, nil, aiSessionRuntimeBindOptions{}); err != nil {
+			t.Fatalf("first bind: %v", err)
+		}
+		manager.mu.Lock()
+		retired := manager.sessions[first.GetSession().GetSessionId()]
+		manager.mu.Unlock()
+		second := proto.Clone(first).(*aiv1.BindAISessionCommand)
+		second.Metadata.CommandId = "cmd-bind-2"
+		second.BindEpoch = 2
+		second.Session.BindEpoch = 2
+		bindDone := make(chan error, 1)
+		go func() {
+			_, err := manager.Bind(context.Background(), second, nil, aiSessionRuntimeBindOptions{})
+			bindDone <- err
+		}()
+		<-driver.started
+		closeCommand := validAISessionCloseCommand()
+		closeCommand.Session.BindEpoch = 2
+		closed, err := manager.Close(closeCommand)
+		if err != nil || closed.ref.BindEpoch != 2 {
+			t.Fatalf("close pending rebind: closed=%#v err=%v", closed, err)
+		}
+		if retired == nil || retired.currentRef().BindEpoch != first.BindEpoch || retired.beginEmission() {
+			t.Fatalf("previous runtime was not fenced under its original epoch: %#v", retired)
+		}
+		retried, err := manager.Close(closeCommand)
+		if err != nil || retried.applyHandle || retried.ref.BindEpoch != 2 {
+			t.Fatalf("retry pending-rebind close: closed=%#v err=%v", retried, err)
+		}
+		if err := manager.CompleteTerminal(retried.ref, "close"); err != nil {
+			t.Fatalf("complete pending-rebind close: %v", err)
+		}
+		if err := <-bindDone; !errors.Is(err, errAISessionBindFenced) {
+			t.Fatalf("closed replacement bind error = %v, want fenced", err)
+		}
+		recorder.assertClose(t, 0, "pending binding cancelled")
+		if hasAISessionRuntime(manager, first.GetSession().GetSessionId()) {
+			t.Fatal("previous runtime survived pending-rebind close")
+		}
+	})
+}
+
+func TestAISessionRuntimeManagerCancelBeforeAsyncBindFencesBind(t *testing.T) {
+	manager := newAISessionRuntimeManager(&recordingAISessionRuntimeDriver{})
+	if _, err := manager.Cancel(validAISessionCancelCommand()); err != nil {
+		t.Fatalf("record cancellation before bind worker starts: %v", err)
+	}
+	if _, err := manager.Bind(context.Background(), validAISessionBindCommand(), nil, aiSessionRuntimeBindOptions{}); !errors.Is(err, errAISessionBindFenced) {
+		t.Fatalf("bind after cancellation error = %v, want fenced", err)
+	}
+}
+
 func TestAISessionRuntimeManagerDuplicateBindRemainsIdempotentAfterInput(t *testing.T) {
 	bridge, _, driver := newTestAISessionBridge(t)
 	bind := validAISessionBindCommand()
@@ -674,6 +859,71 @@ func TestAISessionBindFailureTombstoneAllowsStrictlyHigherEpochRecovery(t *testi
 	}
 }
 
+func TestAISessionOlderBindFailureCannotDowngradeHigherCancelTombstone(t *testing.T) {
+	recorder := &recordingAISessionRuntimeDriver{}
+	manager := newAISessionRuntimeManager(recorder)
+	first := validAISessionBindCommand()
+	if _, err := manager.Bind(context.Background(), first, nil, aiSessionRuntimeBindOptions{}); err != nil {
+		t.Fatalf("first bind: %v", err)
+	}
+
+	failed := proto.Clone(first).(*aiv1.BindAISessionCommand)
+	failed.Metadata.CommandId = "cmd-bind-failed-epoch-2"
+	failed.BindEpoch = first.BindEpoch + 1
+	failed.Session.BindEpoch = failed.BindEpoch
+	higher := proto.Clone(first).(*aiv1.BindAISessionCommand)
+	higher.Metadata.CommandId = "cmd-bind-pending-epoch-3"
+	higher.BindEpoch = failed.BindEpoch + 1
+	higher.Session.BindEpoch = higher.BindEpoch
+
+	manager.mu.Lock()
+	manager.bindings[first.GetSession().GetSessionId()] = aiSessionBindReservation{
+		ref:       aiSessionRefFromBindCommand(higher),
+		commandID: higher.GetMetadata().GetCommandId(),
+		epoch:     higher.BindEpoch,
+	}
+	manager.mu.Unlock()
+	cancelCommand := validAISessionCancelCommand()
+	cancelCommand.Metadata.CommandId = "cmd-cancel-pending-epoch-3"
+	cancelCommand.Session.BindEpoch = higher.BindEpoch
+	cancelled, err := manager.Cancel(cancelCommand)
+	if err != nil {
+		t.Fatalf("cancel higher pending bind: %v", err)
+	}
+	if cancelled.ref.BindEpoch != higher.BindEpoch {
+		t.Fatalf("higher cancel lost its generation identity: %#v", cancelled)
+	}
+	recorder.assertClose(t, 0, "pending binding cancelled")
+
+	failedRef := aiSessionRefFromBindCommand(failed)
+	if err := manager.finishBindError(failedRef, errors.New("late epoch-2 bind failure")); !errors.Is(err, errAISessionBindFenced) {
+		t.Fatalf("late lower bind failure = %v, want fenced", err)
+	}
+	manager.RetireAfterBindFailure(failedRef)
+	manager.mu.Lock()
+	tombstone := manager.terminalTombstones[first.GetSession().GetSessionId()]
+	retired := manager.sessions[first.GetSession().GetSessionId()]
+	manager.mu.Unlock()
+	if tombstone.kind != "cancel" || tombstone.commandID != cancelCommand.GetMetadata().GetCommandId() || tombstone.epoch != higher.BindEpoch {
+		t.Fatalf("higher cancel tombstone was downgraded: %#v", tombstone)
+	}
+	if retired != nil {
+		t.Fatalf("cancelled runtime survived a lower bind failure: %#v", retired)
+	}
+	if _, err := manager.Bind(context.Background(), higher, nil, aiSessionRuntimeBindOptions{}); !errors.Is(err, errAISessionBindFenced) {
+		t.Fatalf("cancelled higher epoch rebound: %v", err)
+	}
+	if err := manager.CompleteTerminal(cancelled.ref, "cancel"); err != nil {
+		t.Fatalf("complete higher cancel: %v", err)
+	}
+	manager.mu.Lock()
+	tombstone = manager.terminalTombstones[first.GetSession().GetSessionId()]
+	manager.mu.Unlock()
+	if tombstone.kind != "cancel" || tombstone.epoch != higher.BindEpoch {
+		t.Fatalf("terminal completion lost the higher cancel epoch: %#v", tombstone)
+	}
+}
+
 func TestAISessionFailedReplacementBindRetiresPreviousRuntimeAfterTerminalEvent(t *testing.T) {
 	bridge, fakeJS, _ := newTestAISessionBridge(t)
 	recorder := &recordingAISessionRuntimeDriver{}
@@ -805,6 +1055,12 @@ func TestHandleAISessionBindPassesAttachmentAndCredentialRefsToRuntime(t *testin
 	}
 	if binding.PlatformBearerToken != "node-session-token" {
 		t.Fatalf("unexpected platform bearer token: %q", binding.PlatformBearerToken)
+	}
+	if binding.PlatformAPIBaseURL != "http://platform.test" {
+		t.Fatalf("unexpected platform API base URL: %q", binding.PlatformAPIBaseURL)
+	}
+	if binding.NodeSessionID != "node-session-ai" {
+		t.Fatalf("unexpected node session ID: %q", binding.NodeSessionID)
 	}
 }
 
@@ -958,6 +1214,96 @@ func TestHandleAISessionInputRepublishesAckWithoutReexecutingAfterPublishFailure
 	fakeJS.mu.Unlock()
 	if eventCount != 1 {
 		t.Fatalf("expected one successful acknowledgement after retry, got %d", eventCount)
+	}
+}
+
+func TestDuplicateBindRepublishesSourceWorkspaceReadyWithStableSequence(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	ref := aiSessionRefFromBindCommand(command)
+	rawSink, err := newLegionAIFocusResultSink(
+		&recordingAIFocusRiskPublisher{},
+		command.GetMetadata().GetCommandId(),
+		validCodeAuditResultContext(),
+	)
+	if err != nil {
+		t.Fatalf("new focus result sink: %v", err)
+	}
+	if err := rawSink.(aiFocusExecutionContractBinder).bindFocusExecutionContract(testLegionCodeWorkspaceExecutionContract(t)); err != nil {
+		t.Fatalf("bind original Focus execution contract: %v", err)
+	}
+	duplicateSink, err := newLegionAIFocusResultSink(
+		&recordingAIFocusRiskPublisher{},
+		command.GetMetadata().GetCommandId(),
+		validCodeAuditResultContext(),
+	)
+	if err != nil {
+		t.Fatalf("new duplicate focus result sink: %v", err)
+	}
+	workspace := &legionCodeWorkspaceRuntime{
+		spec:           validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindAttachments),
+		files:          2,
+		bytes:          96 * 1024 * 1024,
+		sha256:         strings.Repeat("a", 64),
+		lockedRevision: "attachments-sha256:" + strings.Repeat("a", 64),
+	}
+	runtime := &aiSessionRuntime{
+		ref:                    ref,
+		bindCommandID:          ref.CommandID,
+		bindEpoch:              ref.BindEpoch,
+		handle:                 noopAISessionRuntimeHandle{},
+		resultSink:             newAISessionResultSinkProxy(rawSink),
+		processedInputCommands: make(map[string]processedAISessionInput),
+		inFlightInputCommands:  make(map[string]struct{}),
+		codeWorkspace:          workspace,
+	}
+	bridge.aiRuntime.mu.Lock()
+	bridge.aiRuntime.sessions[ref.SessionID] = runtime
+	bridge.aiRuntime.mu.Unlock()
+
+	fakeJS.failNextPublishes(1)
+	options := aiSessionRuntimeBindOptions{ResultSink: duplicateSink}
+	if _, err := bridge.aiRuntime.Bind(context.Background(), command, bridge.aiPublisher, options); !errors.Is(err, errAISessionBindRetry) {
+		t.Fatalf("first ready publication = %v, want retry", err)
+	}
+	if _, err := bridge.aiRuntime.Bind(context.Background(), command, bridge.aiPublisher, options); err != nil {
+		t.Fatalf("duplicate bind did not republish workspace ready: %v", err)
+	}
+
+	driver.mu.Lock()
+	bindCount := len(driver.bindings)
+	driver.mu.Unlock()
+	if bindCount != 0 {
+		t.Fatalf("duplicate ready retry rebound the runtime %d times", bindCount)
+	}
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	var event aiv1.AISessionEvent
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal source workspace ready event: %v", err)
+	}
+	if event.GetEventType() != "source.workspace.ready" || event.GetSeq() != 1 {
+		t.Fatalf("unexpected retried workspace ready event: %#v", &event)
+	}
+	fakeJS.mu.Lock()
+	publishedCount := len(fakeJS.publish)
+	fakeJS.mu.Unlock()
+	if publishedCount != 1 {
+		t.Fatalf("workspace ready was published %d times, want one successful stable event", publishedCount)
+	}
+	if err := runtime.resultSink.Succeed(context.Background(), []byte(`{"status":"premature"}`)); err == nil ||
+		!strings.Contains(err.Error(), "ai_code_audit_v1") {
+		t.Fatalf("duplicate bind lost the active required-result gate: %v", err)
+	}
+	runtime.resultSink.mu.RLock()
+	activeSink := runtime.resultSink.sink
+	runtime.resultSink.mu.RUnlock()
+	if activeSink != rawSink {
+		t.Fatal("duplicate bind replaced the active result sink state")
+	}
+	if !runtime.workspaceReadyPublished || runtime.workspaceReadySeq != 1 {
+		t.Fatalf("workspace ready state did not converge: %#v", runtime)
 	}
 }
 
@@ -1854,8 +2200,9 @@ func newTestAISessionBridge(
 	waitForAINodeSession(t, base)
 
 	bridge := newLegionJobBridge(&ScanNode{
-		node:       base,
-		httpClient: &http.Client{Timeout: time.Second},
+		node:           base,
+		ruleSyncClient: NewRuleSyncClient(&RuleSyncConfig{ServerURL: "http://platform.test"}),
+		httpClient:     &http.Client{Timeout: time.Second},
 	})
 	driver := &recordingAISessionRuntimeDriver{}
 	bridge.aiRuntime = newAISessionRuntimeManager(driver)

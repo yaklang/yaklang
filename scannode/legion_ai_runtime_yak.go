@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +37,7 @@ const (
 	aiSessionRuntimeEventToolCall           = "ai.session.tool_call"
 	aiSessionRuntimeEventToolResult         = "ai.session.tool_result"
 	maxAISessionAttachmentBytes             = 64 << 10
+	maxAISessionAttachmentTotalBytes        = 256 << 10
 )
 
 type yakAIEngineRuntimeDriver struct{}
@@ -131,6 +133,10 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		return h.sendControlInput(event, "sync event")
 	}
 
+	content, err = appendAITaskFocusInput(content, input.PayloadJSON)
+	if err != nil {
+		return err
+	}
 	return h.enqueueMessage(ctx, input.Ref.CommandID, content, options...)
 }
 
@@ -617,6 +623,10 @@ type yakRuntimeOptions struct {
 	Language                       string                    `json:"language"`
 	SessionMCPServers              []sessionMCPServer        `json:"session_mcp_servers"`
 	SourceWorkspace                *legionCodeWorkspaceSpec  `json:"source_workspace,omitempty"`
+	// RiskJudgementScope is a private bind-only recovery pin. The node checks
+	// it against the protobuf ResultContext, then strips it before runtime or
+	// model configuration is constructed.
+	RiskJudgementScope json.RawMessage `json:"risk_judgement_scope,omitempty"`
 }
 
 type yakProviderModelOptions struct {
@@ -662,9 +672,14 @@ type yakAIStrategy struct {
 }
 
 type sessionMCPServer struct {
-	Name         string   `json:"name"`
-	URL          string   `json:"url"`
-	AllowedTools []string `json:"allowed_tools"`
+	Name         string            `json:"name"`
+	URL          string            `json:"url"`
+	Headers      map[string]string `json:"headers"`
+	AllowedTools []string          `json:"allowed_tools"`
+}
+
+func isAttachmentWorkspace(spec *legionCodeWorkspaceSpec) bool {
+	return spec != nil && strings.EqualFold(strings.TrimSpace(spec.Kind), legionCodeWorkspaceKindAttachments)
 }
 
 func buildYakAIEngineOptions(
@@ -675,6 +690,38 @@ func buildYakAIEngineOptions(
 	options, err := mergedYakRuntimeOptions(binding)
 	if err != nil {
 		return nil, fmt.Errorf("decode runtime options: %w", err)
+	}
+	attachmentTask := isLegionAttachmentTarget(binding.AuthorizedTargetURL) || isLegionAttachmentTarget(options.FocusTargetURL) || isAttachmentWorkspace(options.SourceWorkspace)
+	if attachmentTask {
+		if binding.ProjectID != "" || binding.ExecutionMode != "single_run" || binding.LegionResultRuntime == nil || binding.LegionResultRuntime.AuthorizedTarget() != binding.AuthorizedTargetURL {
+			return nil, fmt.Errorf("attachment task requires a projectless single-run server resource binding")
+		}
+		focusMode, _, _ := strings.Cut(binding.AuthorizedFocusReleaseID, "@")
+		if isAttachmentWorkspace(options.SourceWorkspace) {
+			target, err := legionCodeWorkspaceSentinel(options.SourceWorkspace.WorkspaceID)
+			if err != nil || target != binding.AuthorizedTargetURL || target != options.FocusTargetURL || focusMode != legionLogAnalysisFocusName || options.FocusReleaseID != binding.AuthorizedFocusReleaseID {
+				return nil, fmt.Errorf("attachment workspace does not match the server resource binding")
+			}
+			if len(options.SessionMCPServers) > 0 || strings.TrimSpace(options.ForgeName) != "" || len(options.RiskJudgementScope) > 0 {
+				return nil, fmt.Errorf("attachment workspace does not allow ExtraMCP, Forge, or risk judgement scope")
+			}
+		} else {
+			if err := validateAttachmentTaskRuntimeOptions(options, binding.AuthorizedTargetURL, focusMode, binding.AuthorizedFocusReleaseID); err != nil {
+				return nil, err
+			}
+			if err := validateAttachmentTaskPins(binding.Attachments); err != nil {
+				return nil, err
+			}
+		}
+		// Immutable attachment Focus code owns stage/report execution. Do not
+		// expose the ordinary engine's tools, filesystem, search, or ambient MCP
+		// surfaces through merged provider/session configuration.
+		enabled, disabled := true, false
+		options.DisableToolUse = &enabled
+		options.EnableSystemFileSystemOperator = &disabled
+		options.EnableAISearchTool = &disabled
+		options.EnableAISearchInternet = &disabled
+		options.EnabledCapabilities = nil
 	}
 
 	config := []aiengine.AIEngineConfigOption{
@@ -716,6 +763,9 @@ func buildYakAIEngineOptions(
 		return nil, err
 	}
 	extOptions := buildYakAICommonExtOptions(options)
+	if attachmentTask {
+		extOptions = append(extOptions, aicommon.WithDisallowMCPServers(true))
+	}
 	if callbacks.Vision != nil {
 		extOptions = append(extOptions, aicommon.WithVisionPriorityAICallback(callbacks.Vision))
 	}
@@ -755,7 +805,7 @@ func buildYakAIEngineOptions(
 	if strings.TrimSpace(options.Language) != "" {
 		config = append(config, aiengine.WithLanguage(strings.TrimSpace(options.Language)))
 	}
-	config, err = appendYakAttachmentOptions(ctx, config, binding)
+	config, err = appendYakAttachmentOptions(ctx, config, binding, options.SourceWorkspace)
 	if err != nil {
 		return nil, err
 	}
@@ -898,13 +948,19 @@ func buildYakSessionMCPServers(options yakRuntimeOptions) ([]*aicommon.ExtraMCPS
 		name := strings.TrimSpace(server.Name)
 		url := strings.TrimSpace(server.URL)
 		if name == "" || url == "" {
-			log.Warnf("skip session-scoped mcp server with empty name or url: name=%q url=%q", name, url)
+			log.Warnf("skip session-scoped mcp server with incomplete identity: has_name=%t has_url=%t", name != "", url != "")
 			continue
+		}
+		headers := make(schema.MapStringAny, len(server.Headers))
+		for key, value := range server.Headers {
+			headers[key] = value
 		}
 		servers = append(servers, &aicommon.ExtraMCPServer{
 			Server: &schema.MCPServer{
-				Type: "sse",
-				URL:  url,
+				Name:    name,
+				Type:    "sse",
+				URL:     url,
+				Headers: headers,
 			},
 			AllowedTools: append([]string(nil), server.AllowedTools...),
 		})
@@ -1120,8 +1176,15 @@ func appendYakAttachmentOptions(
 	ctx context.Context,
 	config []aiengine.AIEngineConfigOption,
 	binding aiSessionBinding,
+	workspace *legionCodeWorkspaceSpec,
 ) ([]aiengine.AIEngineConfigOption, error) {
 	if len(binding.Attachments) == 0 {
+		return config, nil
+	}
+	if workspace != nil && strings.EqualFold(strings.TrimSpace(workspace.Kind), legionCodeWorkspaceKindAttachments) {
+		// Professional Task logs are materialized into the run-scoped read-only
+		// workspace before the engine is bound. Their bytes must never be copied
+		// into prompt attachments.
 		return config, nil
 	}
 	for _, attachment := range binding.Attachments {
@@ -1196,6 +1259,18 @@ func downloadAISessionAttachment(
 		return "", fmt.Errorf("read body: %w", err)
 	}
 	truncated := len(raw) > maxAISessionAttachmentBytes
+	if isLegionAttachmentTarget(binding.AuthorizedTargetURL) {
+		if truncated {
+			return "", fmt.Errorf("attachment task content exceeds the attachment size limit")
+		}
+		if uint64(len(raw)) != attachment.SizeBytes {
+			return "", fmt.Errorf("attachment task content size does not match the pinned size")
+		}
+		checksum := fmt.Sprintf("%x", sha256.Sum256(raw))
+		if checksum != attachment.SHA256 {
+			return "", fmt.Errorf("attachment task content sha256 does not match the pinned sha256")
+		}
+	}
 	if truncated {
 		raw = raw[:maxAISessionAttachmentBytes]
 		for trim := 0; trim < utf8.UTFMax && trim <= len(raw); trim++ {
@@ -1269,7 +1344,7 @@ func renderAttachmentContent(
 	builder.WriteString("\n--- Begin Attachment Content ---\n")
 	builder.WriteString(content)
 	if truncated {
-		builder.WriteString("\n\n[attachment content truncated to 65536 bytes]")
+		builder.WriteString(fmt.Sprintf("\n\n[attachment content truncated to %d bytes]", maxAISessionAttachmentBytes))
 	}
 	builder.WriteString("\n--- End Attachment Content ---\n")
 	return builder.String()
@@ -1713,6 +1788,9 @@ func buildYakAIHotpatchEvent(input aiSessionInput) (*ypb.AIInputEvent, error) {
 }
 
 func validateYakAIHotpatch(hotpatchType string, params yakRuntimeOptions) error {
+	if hasYakRuntimeJSONValue(params.RiskJudgementScope) {
+		return fmt.Errorf("ai session hotpatch cannot change risk_judgement_scope")
+	}
 	required := func(ok bool, field string) error {
 		if ok {
 			return nil

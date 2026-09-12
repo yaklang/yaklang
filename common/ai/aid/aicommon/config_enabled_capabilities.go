@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -160,9 +161,17 @@ func WithEnabledCapabilities(caps ...EnabledCapability) ConfigOption {
 		nextSkillNames := capabilityNamesByType(c.enabledCapabilities, EnabledCapabilityTypeSkill)
 		nextForgeNames := capabilityNamesByType(c.enabledCapabilities, EnabledCapabilityTypeForge)
 		tmReady := c.AiToolManager != nil
+		capsToApply := append([]EnabledCapability(nil), c.enabledCapabilities...)
+		restrictedAtOption := c.RestrictToolsToExtraMCPServers
+		deferred := c.queueToolManagerUpdateLocked(func(manager *buildinaitools.AiToolManager) error {
+			// Preserve each option's skip semantics for ordinary shared managers.
+			// An explicit MCP session must also obey its final restriction.
+			restricted := restrictedAtOption || (len(c.ExtraMCPServers) > 0 && c.RestrictToolsToExtraMCPServers)
+			return c.applyEnabledToolManagerCapabilities(manager, capsToApply, restricted)
+		})
 		c.m.Unlock()
 
-		if tmReady {
+		if tmReady && !deferred {
 			if err := c.applyEnabledImmediateCapabilities(); err != nil {
 				return err
 			}
@@ -222,9 +231,12 @@ func WithDisabledCapabilities(caps ...EnabledCapability) ConfigOption {
 		removed := normalizeEnabledCapabilities(caps)
 		c.setEnabledCapabilitiesLocked(subtractEnabledCapabilities(c.enabledCapabilities, removed))
 		tmReady := c.AiToolManager != nil
+		deferred := c.queueToolManagerUpdateLocked(func(manager *buildinaitools.AiToolManager) error {
+			return c.applyDisabledToolManagerCapabilities(manager, removed)
+		})
 		c.m.Unlock()
 
-		if tmReady {
+		if tmReady && !deferred {
 			if err := c.applyDisabledImmediateCapabilities(removed); err != nil {
 				return err
 			}
@@ -240,7 +252,10 @@ func (c *Config) applyDisabledImmediateCapabilities(caps []EnabledCapability) er
 	if c == nil || len(caps) == 0 {
 		return nil
 	}
-	tm := c.GetAiToolManager()
+	return c.applyDisabledToolManagerCapabilities(c.GetAiToolManager(), caps)
+}
+
+func (c *Config) applyDisabledToolManagerCapabilities(tm *buildinaitools.AiToolManager, caps []EnabledCapability) error {
 	if tm == nil {
 		return utils.Error("ai tool manager is nil")
 	}
@@ -271,19 +286,21 @@ func (c *Config) applyEnabledImmediateCapabilities() error {
 	if c == nil {
 		return nil
 	}
+	return c.applyEnabledToolManagerCapabilities(c.GetAiToolManager(), c.GetEnabledCapabilities(), c.RestrictToolsToExtraMCPServers)
+}
+
+func (c *Config) applyEnabledToolManagerCapabilities(tm *buildinaitools.AiToolManager, caps []EnabledCapability, restricted bool) error {
 	// A session restricted to its injected MCP servers must stay restricted:
 	// re-enabling tools/plugins/mcp_tools here (incl. via the EnabledCapabilities
 	// hotpatch, which runs after RestrictToTools) would silently defeat the
 	// restriction. Skip capability application entirely under restriction.
-	if c.RestrictToolsToExtraMCPServers {
+	if restricted {
 		return nil
 	}
-	caps := c.GetEnabledCapabilities()
 	if len(caps) == 0 {
 		return nil
 	}
 
-	tm := c.GetAiToolManager()
 	if tm == nil {
 		return utils.Error("ai tool manager is nil")
 	}

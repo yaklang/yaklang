@@ -2,6 +2,8 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -266,30 +268,36 @@ type aiSessionTerminalTombstone struct {
 const maxAISessionTerminalTombstones = 1024
 
 type aiSessionRuntime struct {
-	emissionWG             sync.WaitGroup
-	mu                     sync.Mutex
-	ref                    aiSessionCommandRef
-	bindCommandID          string
-	bindEpoch              uint64
-	bindIssuedAt           time.Time
-	bindIssuedAtValid      bool
-	retired                bool
-	projectID              string
-	title                  string
-	seq                    uint64
-	cancel                 context.CancelFunc
-	handle                 aiSessionRuntimeHandle
-	resultSink             *aiSessionResultSinkProxy
-	processedInputCommands map[string]processedAISessionInput
-	processedInputOrder    []string
-	inFlightInputCommands  map[string]struct{}
-	terminalCommandID      string
-	terminalKind           string
-	terminalReason         string
-	terminalPublishFailed  bool
-	executionMode          string
-	codeWorkspace          *legionCodeWorkspaceRuntime
-	inputWorkspace         *inputresolver.Workspace
+	emissionWG               sync.WaitGroup
+	mu                       sync.Mutex
+	ref                      aiSessionCommandRef
+	bindCommandID            string
+	bindEpoch                uint64
+	bindIssuedAt             time.Time
+	bindIssuedAtValid        bool
+	retired                  bool
+	projectID                string
+	title                    string
+	seq                      uint64
+	cancel                   context.CancelFunc
+	handle                   aiSessionRuntimeHandle
+	resultSink               *aiSessionResultSinkProxy
+	processedInputCommands   map[string]processedAISessionInput
+	processedInputOrder      []string
+	inFlightInputCommands    map[string]struct{}
+	terminalCommandID        string
+	terminalKind             string
+	terminalReason           string
+	terminalPublishFailed    bool
+	executionMode            string
+	codeWorkspace            *legionCodeWorkspaceRuntime
+	workspaceReadyRef        aiSessionCommandRef
+	workspaceReadySeq        uint64
+	workspaceReadyPublished  bool
+	workspaceReadyPublishing bool
+	attachmentTask           bool
+	attachmentBindDigest     [sha256.Size]byte
+	inputWorkspace           *inputresolver.Workspace
 }
 
 type processedAISessionInput struct {
@@ -351,9 +359,26 @@ func (m *aiSessionRuntimeManager) Bind(
 	}()
 	bindIssuedAt, bindIssuedAtValid := aiSessionBindIssuedAt(command)
 	bindEpoch := command.GetBindEpoch()
+	runtimeOptions, err := decodeYakRuntimeOptions(command.GetRuntimeOptionSnapshotJson(), true)
+	if err != nil {
+		return ref, fmt.Errorf("decode Bind runtime options: %w", err)
+	}
+	attachmentTask := isLegionAttachmentTarget(command.GetResultContext().GetTargetUrl()) || isAttachmentWorkspace(runtimeOptions.SourceWorkspace)
+	var attachmentBindDigest [sha256.Size]byte
+	if attachmentTask {
+		// Compare the complete server request, including its immutable resource,
+		// release, result identity and attachment pins, without retaining another
+		// plaintext copy of provider configuration. Redelivery must not mutate it.
+		raw, err := (proto.MarshalOptions{Deterministic: true}).Marshal(command)
+		if err != nil {
+			return ref, fmt.Errorf("encode attachment Bind identity: %w", err)
+		}
+		attachmentBindDigest = sha256.Sum256(raw)
+	}
 
 	m.mu.Lock()
 	var replaced *aiSessionRuntime
+	var supersededCancel context.CancelFunc
 	if pending, ok := m.bindings[ref.SessionID]; ok {
 		if pending.ref.OwnerUserID != "" && pending.ref.OwnerUserID != ref.OwnerUserID {
 			m.mu.Unlock()
@@ -363,26 +388,38 @@ func (m *aiSessionRuntimeManager) Bind(
 			m.mu.Unlock()
 			return ref, errAISessionBindRetry
 		}
-		if bindEpoch == 0 || bindEpoch <= pending.epoch {
+		if bindEpoch == 0 || bindEpoch <= pending.ref.BindEpoch {
 			m.mu.Unlock()
+			cancel()
 			return ref, fmt.Errorf(
 				"%w: bind %s cannot replace pending bind %s (epoch %d)",
 				errAISessionBindFenced,
 				ref.CommandID,
-				pending.commandID,
-				pending.epoch,
+				pending.ref.CommandID,
+				pending.ref.BindEpoch,
 			)
 		}
+		supersededCancel = pending.cancel
 	}
 	if tombstone, terminal := m.terminalTombstones[ref.SessionID]; terminal {
 		if tombstone.kind != "bind_failed" || bindEpoch == 0 || bindEpoch <= tombstone.epoch {
 			m.mu.Unlock()
+			cancel()
 			return ref, fmt.Errorf("%w: session %s is already terminal", errAISessionBindFenced, ref.SessionID)
 		}
 	}
 	if existing, ok := m.sessions[ref.SessionID]; ok {
+		attachmentReplay := existing.bindCommandID == ref.CommandID && (existing.attachmentTask || attachmentTask)
+		if attachmentReplay && (existing.attachmentTask != attachmentTask || existing.attachmentBindDigest != attachmentBindDigest) {
+			m.mu.Unlock()
+			cancel()
+			// Treat a changed replay as fenced so the handler does not terminate
+			// the original authorized runtime with a bind-failed event.
+			return ref, fmt.Errorf("%w: attachment Bind command_id cannot be replayed with a different payload", errAISessionBindFenced)
+		}
 		if existing.ref.OwnerUserID != ref.OwnerUserID {
 			m.mu.Unlock()
+			cancel()
 			return ref, fmt.Errorf("ai session owner mismatch: %s", existing.ref.OwnerUserID)
 		}
 		existing.mu.Lock()
@@ -397,26 +434,46 @@ func (m *aiSessionRuntimeManager) Bind(
 			}
 			if terminalCommandID != "" || terminalPublishFailed {
 				m.mu.Unlock()
+				cancel()
 				return ref, fmt.Errorf(
 					"%w: original bind %s belongs to an unusable terminal runtime",
 					errAISessionBindRetry,
 					ref.CommandID,
 				)
 			}
+			if attachmentReplay {
+				// Keep the original sink and all of its contract and published-result
+				// accounting. Rebinding only the contract would lose prior reports.
+				m.mu.Unlock()
+				defer cancel()
+				if err := m.publishWorkspaceReady(ctx, existing, publisher); err != nil {
+					return ref, err
+				}
+				return ref, nil
+			}
 			if err := bindAIFocusCodeWorkspaceEvidence(options.ResultSink, existing.codeWorkspace); err != nil {
 				m.mu.Unlock()
+				cancel()
 				return ref, err
 			}
-			existing.resultSink.Set(options.ResultSink)
+			// The same bind command is a transport retry, not a runtime rebind.
+			// Preserve the active sink because it owns the already-bound execution
+			// contract and the accumulated required/published result state.
 			m.mu.Unlock()
+			defer cancel()
+			if err := m.publishWorkspaceReady(ctx, existing, publisher); err != nil {
+				return ref, err
+			}
 			return ref, nil
 		}
 		if aiSessionBindIsFenced(existing, bindEpoch, bindIssuedAt, bindIssuedAtValid) {
 			m.mu.Unlock()
+			cancel()
 			return ref, fmt.Errorf("%w: stale bind %s for session %s", errAISessionBindFenced, ref.CommandID, ref.SessionID)
 		}
 		if terminalCommandID != "" {
 			m.mu.Unlock()
+			cancel()
 			if terminalKind == "auto" {
 				return ref, fmt.Errorf(
 					"%w: runtime is publishing terminal command %s",
@@ -432,11 +489,11 @@ func (m *aiSessionRuntimeManager) Bind(
 		}
 		replaced = existing
 	}
-	if pending, ok := m.bindings[ref.SessionID]; ok && pending.cancel != nil {
-		pending.cancel()
-	}
 	m.bindings[ref.SessionID] = aiSessionBindReservation{commandID: ref.CommandID, epoch: bindEpoch, ref: ref, cancel: cancel, resultSink: newAISessionResultSinkProxy(options.ResultSink)}
 	m.mu.Unlock()
+	if supersededCancel != nil {
+		supersededCancel()
+	}
 
 	inputEvents := &inputWorkspaceEmitter{manager: m, ref: ref, publisher: publisher, ctx: ctx}
 	var inputWorkspace *inputresolver.Workspace
@@ -479,18 +536,17 @@ func (m *aiSessionRuntimeManager) Bind(
 			PlatformAPIBaseURL:  options.PlatformAPIBaseURL,
 			NodeSessionID:       options.NodeSessionID,
 			PlatformBearerToken: options.PlatformBearerToken,
+			Attachments:         cloneAISessionAttachmentRefs(command.GetAttachments()),
 		},
 	)
 	if err != nil {
 		cancel()
-		m.clearBindReservation(ref.SessionID, ref.CommandID)
-		return ref, fmt.Errorf("prepare source workspace: %w", err)
+		return ref, m.finishBindError(ref, fmt.Errorf("prepare source workspace: %w", err))
 	}
 	if err := bindAIFocusCodeWorkspaceEvidence(options.ResultSink, codeWorkspace); err != nil {
 		cancel()
 		_ = codeWorkspace.Cleanup()
-		m.clearBindReservation(ref.SessionID, ref.CommandID)
-		return ref, err
+		return ref, m.finishBindError(ref, err)
 	}
 	resultSink := newAISessionResultSinkProxy(options.ResultSink)
 	focusRuntime, err := newLegionServerFocusRuntime(
@@ -502,8 +558,7 @@ func (m *aiSessionRuntimeManager) Bind(
 	if err != nil {
 		cancel()
 		_ = codeWorkspace.Cleanup()
-		m.clearBindReservation(ref.SessionID, ref.CommandID)
-		return ref, err
+		return ref, m.finishBindError(ref, err)
 	}
 	if codeWorkspace != nil {
 		if _, err := resultSink.SubmitAsset(
@@ -512,8 +567,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		); err != nil {
 			cancel()
 			_ = codeWorkspace.Cleanup()
-			m.clearBindReservation(ref.SessionID, ref.CommandID)
-			return ref, fmt.Errorf("publish source_locked asset: %w", err)
+			return ref, m.finishBindError(ref, fmt.Errorf("publish source_locked asset: %w", err))
 		}
 	}
 	runtime := &aiSessionRuntime{
@@ -533,6 +587,8 @@ func (m *aiSessionRuntimeManager) Bind(
 		codeWorkspace:          codeWorkspace,
 		inputWorkspace:         inputWorkspace,
 		seq:                    inputEvents.seq,
+		attachmentTask:         attachmentTask,
+		attachmentBindDigest:   attachmentBindDigest,
 	}
 	m.mu.Lock()
 	inputEvents.runtime = runtime
@@ -559,7 +615,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		Attachments:                legacyAISessionAttachmentRefs(command),
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
-		PlatformAPIBaseURL:         strings.TrimSpace(options.PlatformAPIBaseURL),
+		PlatformAPIBaseURL:         strings.TrimRight(strings.TrimSpace(options.PlatformAPIBaseURL), "/"),
 		NodeSessionID:              strings.TrimSpace(options.NodeSessionID),
 		HTTPClient:                 options.HTTPClient,
 		LegionResultRuntime:        focusRuntime,
@@ -573,15 +629,7 @@ func (m *aiSessionRuntimeManager) Bind(
 			handle.Close("runtime bind failed")
 		}
 		_ = codeWorkspace.Cleanup()
-		m.mu.Lock()
-		pending, ok := m.bindings[ref.SessionID]
-		superseded := !ok || pending.commandID != ref.CommandID
-		m.mu.Unlock()
-		m.clearBindReservation(ref.SessionID, ref.CommandID)
-		if superseded {
-			return ref, errAISessionBindFenced
-		}
-		return ref, err
+		return ref, m.finishBindError(ref, err)
 	}
 	// Completing preparation detaches transport lifetime from the installed engine.
 	// If transport shutdown won the race, wait for cancellation and retire this handle.
@@ -607,7 +655,7 @@ func (m *aiSessionRuntimeManager) Bind(
 	}
 	m.mu.Lock()
 	pending, reserved := m.bindings[ref.SessionID]
-	if !reserved || pending.commandID != ref.CommandID {
+	if !reserved || pending.ref.CommandID != ref.CommandID {
 		m.mu.Unlock()
 		cancel()
 		runtime.handle.Close("bind reservation superseded")
@@ -669,18 +717,78 @@ func (m *aiSessionRuntimeManager) Bind(
 			replaced.emissionWG.Wait()
 		}()
 	}
-	if codeWorkspace != nil {
-		managedEmitter.Emit("source.workspace.ready", mustJSON(map[string]any{
-			"workspace_id":    codeWorkspace.spec.WorkspaceID,
-			"kind":            codeWorkspace.spec.Kind,
-			"locked_revision": codeWorkspace.lockedRevision,
-			"sha256":          codeWorkspace.sha256,
-			"files":           codeWorkspace.files,
-			"bytes":           codeWorkspace.bytes,
-			"subpath":         codeWorkspace.spec.Subpath,
-		}))
+	if err := m.publishWorkspaceReady(ctx, runtime, publisher); err != nil {
+		return ref, err
 	}
 	return ref, nil
+}
+
+func (m *aiSessionRuntimeManager) publishWorkspaceReady(
+	ctx context.Context,
+	runtime *aiSessionRuntime,
+	publisher *aiSessionEventPublisher,
+) error {
+	if runtime == nil || runtime.codeWorkspace == nil {
+		return nil
+	}
+	runtime.mu.Lock()
+	if runtime.workspaceReadyPublished {
+		runtime.mu.Unlock()
+		return nil
+	}
+	if runtime.retired {
+		runtime.mu.Unlock()
+		return fmt.Errorf("%w: source workspace runtime is retired", errAISessionBindFenced)
+	}
+	if runtime.workspaceReadyPublishing {
+		runtime.mu.Unlock()
+		return fmt.Errorf("%w: source workspace ready event is already publishing", errAISessionBindRetry)
+	}
+	// Direct manager tests may intentionally omit the transport publisher. A
+	// production bind always supplies one through legionJobBridge.
+	if publisher == nil {
+		runtime.workspaceReadyPublished = true
+		runtime.mu.Unlock()
+		return nil
+	}
+	if runtime.workspaceReadySeq == 0 {
+		runtime.seq++
+		runtime.workspaceReadyRef = runtime.ref
+		runtime.workspaceReadySeq = runtime.seq
+	}
+	ref := runtime.workspaceReadyRef
+	seq := runtime.workspaceReadySeq
+	runtime.workspaceReadyPublishing = true
+	runtime.emissionWG.Add(1)
+	runtime.mu.Unlock()
+
+	workspace := runtime.codeWorkspace
+	payload := mustJSON(map[string]any{
+		"workspace_id":    workspace.spec.WorkspaceID,
+		"kind":            workspace.spec.Kind,
+		"locked_revision": workspace.lockedRevision,
+		"sha256":          workspace.sha256,
+		"files":           workspace.files,
+		"bytes":           workspace.bytes,
+		"subpath":         workspace.spec.Subpath,
+	})
+	err := publisher.PublishEvent(ctx, ref, seq, "source.workspace.ready", payload)
+
+	runtime.mu.Lock()
+	runtime.workspaceReadyPublishing = false
+	if err == nil {
+		runtime.workspaceReadyPublished = true
+	}
+	retired := runtime.retired
+	runtime.mu.Unlock()
+	runtime.emissionWG.Done()
+	if err != nil {
+		return fmt.Errorf("%w: publish source workspace ready: %w", errAISessionBindRetry, err)
+	}
+	if retired {
+		return fmt.Errorf("%w: source workspace runtime was retired while publishing ready", errAISessionBindFenced)
+	}
+	return nil
 }
 
 func cloneProcessedAISessionInputs(
@@ -708,6 +816,28 @@ func (m *aiSessionRuntimeManager) clearBindReservation(sessionID, commandID stri
 	if pending, ok := m.bindings[sessionID]; ok && pending.commandID == commandID {
 		delete(m.bindings, sessionID)
 	}
+}
+
+func (m *aiSessionRuntimeManager) finishBindError(ref aiSessionCommandRef, bindErr error) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if pending, ok := m.bindings[ref.SessionID]; ok {
+		if pending.ref.CommandID == ref.CommandID {
+			delete(m.bindings, ref.SessionID)
+			return bindErr
+		}
+		if pending.ref.BindEpoch > ref.BindEpoch {
+			return fmt.Errorf("%w: bind reservation was superseded for %s", errAISessionBindFenced, ref.SessionID)
+		}
+	}
+	if tombstone, ok := m.terminalTombstones[ref.SessionID]; ok &&
+		(tombstone.kind == "cancel" || tombstone.kind == "close") && tombstone.epoch >= ref.BindEpoch {
+		return fmt.Errorf("%w: bind was terminated by %s for %s", errAISessionBindFenced, tombstone.kind, ref.SessionID)
+	}
+	if active, ok := m.sessions[ref.SessionID]; ok && active.bindEpoch > ref.BindEpoch {
+		return fmt.Errorf("%w: a newer bind became active for %s", errAISessionBindFenced, ref.SessionID)
+	}
+	return bindErr
 }
 
 func aiSessionBindIsFenced(existing *aiSessionRuntime, epoch uint64, issuedAt time.Time, issuedAtValid bool) bool {
@@ -765,6 +895,10 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 			currentEpoch,
 			ref.SessionID,
 		)
+	}
+	if session.attachmentTask && strings.EqualFold(strings.TrimSpace(command.GetInputType()), "hotpatch") {
+		session.mu.Unlock()
+		return acceptedAISessionInput{ref: ref}, fmt.Errorf("attachment task runtime options are immutable; hotpatch is disabled")
 	}
 	if processed, ok := session.processedInputCommands[ref.CommandID]; ok {
 		ref.RunID = session.ref.RunID
@@ -874,6 +1008,10 @@ func (m *aiSessionRuntimeManager) AcceptContextUpdate(
 	reason := strings.TrimSpace(command.GetReason())
 
 	session.mu.Lock()
+	if session.attachmentTask {
+		session.mu.Unlock()
+		return acceptedAISessionContextUpdate{ref: ref}, fmt.Errorf("attachment task inputs are immutable; context updates are disabled")
+	}
 	if ref.BindEpoch != session.ref.BindEpoch {
 		currentEpoch := session.ref.BindEpoch
 		session.mu.Unlock()
@@ -1204,7 +1342,11 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 
 func (m *aiSessionRuntimeManager) RetireAfterBindFailure(ref aiSessionCommandRef) {
 	m.mu.Lock()
-	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch > ref.BindEpoch {
+	if tombstone, ok := m.terminalTombstones[ref.SessionID]; ok && tombstone.epoch >= ref.BindEpoch {
+		m.mu.Unlock()
+		return
+	}
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.ref.BindEpoch > ref.BindEpoch {
 		m.mu.Unlock()
 		return
 	}
@@ -1299,7 +1441,7 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		return b.publishAISessionCommandFailure(ctx, ref, "invalid_ai_focus_result_context", err)
 	}
 	ref, err = b.ensureAIRuntime().Bind(
-		b.agent.node.GetRootContext(),
+		ctx,
 		&command,
 		b.ensureAIPublisher(),
 		aiSessionRuntimeBindOptions{
@@ -1651,6 +1793,12 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 	if err != nil {
 		return fmt.Errorf("invalid ai session runtime options: %w", err)
 	}
+	if err := validateYakRiskJudgementScopePin(
+		runtimeOptions.RiskJudgementScope,
+		command.GetResultContext(),
+	); err != nil {
+		return fmt.Errorf("invalid ai session risk judgement scope: %w", err)
+	}
 	if runtimeOptions.SourceWorkspace != nil {
 		spec := *runtimeOptions.SourceWorkspace
 		if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {
@@ -1658,6 +1806,11 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 		}
 		if command.GetResultContext() == nil {
 			return fmt.Errorf("source_workspace requires an ai focus result context")
+		}
+		if spec.Kind == legionCodeWorkspaceKindAttachments {
+			if err := validateLegionLogAnalysisTaskBind(command, runtimeOptions, spec); err != nil {
+				return err
+			}
 		}
 		expectedTarget, err := legionCodeWorkspaceSentinel(spec.WorkspaceID)
 		if err != nil {
@@ -1672,6 +1825,142 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 		if targetErr == nil && strings.EqualFold(target.Hostname(), "workspace.invalid") {
 			return fmt.Errorf("workspace.invalid target requires source_workspace")
 		}
+	}
+	if isLegionAttachmentTarget(command.GetResultContext().GetTargetUrl()) || isLegionAttachmentTarget(runtimeOptions.FocusTargetURL) {
+		return validateAttachmentOnlyProfessionalTaskBind(command, runtimeOptions)
+	}
+	return nil
+}
+
+func validateAttachmentOnlyProfessionalTaskBind(command *aiv1.BindAISessionCommand, options yakRuntimeOptions) error {
+	result := command.GetResultContext()
+	if result == nil || strings.TrimSpace(command.GetProjectId()) != "" || options.SourceWorkspace != nil {
+		return fmt.Errorf("attachment task requires a Focus result context without project or source_workspace")
+	}
+	if err := validateAttachmentTaskRuntimeOptions(options, result.GetTargetUrl(), result.GetFocusMode(), result.GetFocusReleaseId()); err != nil {
+		return err
+	}
+	for _, attachment := range command.GetAttachments() {
+		if attachment == nil {
+			return fmt.Errorf("attachment task contains an empty attachment reference")
+		}
+	}
+	return validateAttachmentTaskPins(cloneAISessionAttachmentRefs(command.GetAttachments()))
+}
+
+func validateAttachmentTaskRuntimeOptions(options yakRuntimeOptions, target, focusMode, releaseID string) error {
+	if _, err := legionAttachmentResourceID(target); err != nil {
+		return err
+	}
+	if options.FocusTargetURL != target {
+		return fmt.Errorf("attachment task runtime focus_target_url must equal the authorized target")
+	}
+	focusMode, releaseID = strings.TrimSpace(focusMode), strings.TrimSpace(releaseID)
+	if !legionFocusExecutionKeyPattern.MatchString(focusMode) || focusMode == legionAIConversationAuditResultMode ||
+		!strings.HasPrefix(releaseID, focusMode+"@") || options.FocusModeLoop != focusMode || options.FocusReleaseID != releaseID {
+		return fmt.Errorf("attachment task runtime must pin the authorized focus_mode and focus_release_id")
+	}
+	versionAndHash := strings.TrimPrefix(releaseID, focusMode+"@")
+	separator := strings.LastIndex(versionAndHash, "+")
+	if separator <= 0 || len(versionAndHash[separator+1:]) != 12 {
+		return fmt.Errorf("attachment task requires an immutable focus_release_id")
+	}
+	releaseHash := versionAndHash[separator+1:]
+	if _, err := hex.DecodeString(releaseHash); err != nil || releaseHash != strings.ToLower(releaseHash) {
+		return fmt.Errorf("attachment task focus_release_id hash is invalid")
+	}
+	if checksum := options.FocusReleaseSHA256; checksum != "" && (!isAttachmentSHA256(checksum) || checksum[:12] != releaseHash) {
+		return fmt.Errorf("attachment task focus_release_sha256 does not match focus_release_id")
+	}
+	if name := options.FocusRuntimeName; name != "" && (!serverFocusRuntimeNamePattern.MatchString(name) ||
+		!strings.HasPrefix(name, "legion_release_"+focusMode+"_") || !strings.HasSuffix(name, "_"+releaseHash)) {
+		return fmt.Errorf("attachment task focus_runtime_name does not match focus_release_id")
+	}
+	if options.SourceWorkspace != nil || len(options.RiskJudgementScope) > 0 {
+		return fmt.Errorf("attachment task cannot bind source_workspace or risk judgement scope")
+	}
+	if len(options.SessionMCPServers) > 0 {
+		return fmt.Errorf("ExtraMCP is disabled for attachment tasks")
+	}
+	if strings.TrimSpace(options.ForgeName) != "" {
+		return fmt.Errorf("Forge execution is disabled for attachment tasks")
+	}
+	return nil
+}
+
+func isAttachmentSHA256(value string) bool {
+	if len(value) != 64 || value != strings.ToLower(value) {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func validateAttachmentTaskPins(attachments []aiSessionAttachmentRef) error {
+	if len(attachments) == 0 || len(attachments) > 5 {
+		return fmt.Errorf("attachment task requires between 1 and 5 pinned attachments")
+	}
+	seen := make(map[string]struct{}, len(attachments))
+	var total uint64
+	for _, attachment := range attachments {
+		id := strings.TrimSpace(attachment.AttachmentID)
+		if id == "" || strings.TrimSpace(attachment.Filename) == "" {
+			return fmt.Errorf("attachment task attachment_id and filename are required")
+		}
+		if _, exists := seen[id]; exists {
+			return fmt.Errorf("attachment task attachment_id is duplicated")
+		}
+		seen[id] = struct{}{}
+		if attachment.SizeBytes > maxAISessionAttachmentBytes || !isAttachmentSHA256(attachment.SHA256) {
+			return fmt.Errorf("attachment task requires a valid sha256 and a size within the attachment limit")
+		}
+		total += attachment.SizeBytes
+	}
+	if total > maxAISessionAttachmentTotalBytes {
+		return fmt.Errorf("attachment task total size exceeds the attachment limit")
+	}
+	return nil
+}
+
+func validateLegionLogAnalysisTaskBind(
+	command *aiv1.BindAISessionCommand,
+	options yakRuntimeOptions,
+	spec legionCodeWorkspaceSpec,
+) error {
+	result := command.GetResultContext()
+	releaseID := strings.TrimSpace(result.GetFocusReleaseId())
+	if len(options.SessionMCPServers) > 0 || strings.TrimSpace(options.ForgeName) != "" || len(options.RiskJudgementScope) > 0 {
+		return fmt.Errorf("attachment workspace does not allow ExtraMCP, Forge, or risk judgement scope")
+	}
+	releasePrefix := legionLogAnalysisFocusName + "@" + legionLogAnalysisFocusVersion + "+"
+	if strings.TrimSpace(command.GetProjectId()) != "" ||
+		!strings.EqualFold(strings.TrimSpace(result.GetFocusMode()), legionLogAnalysisFocusName) ||
+		!strings.EqualFold(strings.TrimSpace(result.GetExecutionMode()), "single_run") ||
+		strings.TrimSpace(options.AITaskKey) != legionLogAnalysisFocusName ||
+		strings.TrimSpace(options.AITaskSessionRole) != legionAITaskExecutionRole {
+		return fmt.Errorf("source_workspace attachments are restricted to projectless log_analysis Professional Task execution")
+	}
+	runID := strings.TrimSpace(options.AITaskRunID)
+	if !legionAITaskRunIDPattern.MatchString(runID) ||
+		spec.WorkspaceID != "aicw_"+strings.TrimPrefix(runID, "aitr_") ||
+		!legionAITaskVersionPattern.MatchString(strings.TrimSpace(options.AITaskVersion)) ||
+		len(strings.TrimSpace(options.AITaskDefinitionChecksum)) != sha256.Size*2 ||
+		!isLowerHex(strings.TrimSpace(options.AITaskDefinitionChecksum)) {
+		return fmt.Errorf("source_workspace attachments require immutable Professional Task identity")
+	}
+	if len(command.GetAttachments()) < 1 || len(command.GetAttachments()) > legionCodeWorkspaceMaxAttachments ||
+		len(command.GetCredentialRefs()) != 0 {
+		return fmt.Errorf("source_workspace attachments require only the pinned log attachment set")
+	}
+	releaseSHA256 := strings.ToLower(strings.TrimSpace(options.FocusReleaseSHA256))
+	if !strings.HasPrefix(releaseID, releasePrefix) || len(releaseID) != len(releasePrefix)+12 ||
+		strings.TrimSpace(options.FocusReleaseID) != releaseID ||
+		len(releaseSHA256) != sha256.Size*2 || !isLowerHex(releaseSHA256) ||
+		!strings.HasSuffix(releaseID, releaseSHA256[:12]) ||
+		strings.TrimSpace(options.FocusModeLoop) != legionLogAnalysisFocusName ||
+		strings.TrimSpace(options.FocusRuntimeName) != "legion_release_log_analysis_1_0_0_"+releaseSHA256[:12] ||
+		strings.TrimSpace(options.FocusTargetURL) != strings.TrimSpace(result.GetTargetUrl()) {
+		return fmt.Errorf("source_workspace attachments require the immutable log_analysis@1.0.0 Focus Release")
 	}
 	return nil
 }
