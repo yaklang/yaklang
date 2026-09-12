@@ -231,9 +231,10 @@ func OpenFile(filename string) (*pcap.Handle, error) {
 }
 
 type OpenIfaceLiveOptions struct {
-	SnapLen int32
-	Promisc bool
-	Timeout time.Duration
+	SnapLen    int32
+	Promisc    bool
+	Timeout    time.Duration
+	BufferSize int
 }
 
 func DefaultOpenIfaceLiveOptions() []LiveConfig {
@@ -275,7 +276,29 @@ func OpenIfaceLive(iface string, opts ...LiveConfig) (*pcap.Handle, error) {
 	for _, opt := range opts {
 		opt(options)
 	}
-	handler, err := pcap.OpenLive(iface, options.SnapLen, options.Promisc, options.Timeout)
+	var handler *pcap.Handle
+	var err error
+	if options.BufferSize > 0 {
+		inactive, createErr := pcap.NewInactiveHandle(iface)
+		if createErr != nil {
+			return nil, fmt.Errorf("pcap create %s: %w", iface, createErr)
+		}
+		defer inactive.CleanUp()
+		// These portable libpcap/Npcap settings must precede activation.
+		for _, setting := range []func() error{
+			func() error { return inactive.SetSnapLen(int(options.SnapLen)) },
+			func() error { return inactive.SetPromisc(options.Promisc) },
+			func() error { return inactive.SetTimeout(options.Timeout) },
+			func() error { return inactive.SetBufferSize(options.BufferSize) },
+		} {
+			if err := setting(); err != nil {
+				return nil, fmt.Errorf("pcap configure %s: %w", iface, err)
+			}
+		}
+		handler, err = inactive.Activate()
+	} else {
+		handler, err = pcap.OpenLive(iface, options.SnapLen, options.Promisc, options.Timeout)
+	}
 	if err != nil {
 		return nil, utils.Errorf("pcap.OpenLive %s failed: %v", iface, err)
 	}
@@ -284,6 +307,7 @@ func OpenIfaceLive(iface string, opts ...LiveConfig) (*pcap.Handle, error) {
 }
 
 type PcapHandleWrapper struct {
+	device     string
 	handle     *pcap.Handle
 	mutex      *sync.RWMutex
 	isClose    bool
@@ -318,11 +342,16 @@ func (w *PcapHandleWrapper) WritePacketData(data []byte) error {
 
 func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
 	w.mutex.RLock()
-	defer w.mutex.RUnlock()
 	if w.isClose {
+		w.mutex.RUnlock()
 		return nil, gopacket.CaptureInfo{}, utils.Errorf("handle is closed")
 	}
-	return w.handle.ReadPacketData()
+	handle := w.handle
+	w.mutex.RUnlock()
+	// libpcap's Handle serializes reads with Close internally. Holding the
+	// wrapper lock during a blocking read prevents Close from setting its stop
+	// flag, so cancelling an idle live capture can otherwise deadlock.
+	return handle.ReadPacketData()
 }
 
 func (w *PcapHandleWrapper) close() {

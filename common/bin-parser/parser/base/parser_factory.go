@@ -3,12 +3,20 @@ package base
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 // ParserFactory builds the mutable parser runtime used by one node tree.
 // RegisterParser remains available for parsers whose implementation is safe to
 // share, while stateful parsers can opt in to per-tree construction.
 type ParserFactory func() Parser
+
+// ParserRegistration returns the registered parser or factory identity. Like
+// RegisterParser, this is a configuration-time registry, not a concurrent
+// replacement API. A factory registration must not be invoked as a parser.
+func ParserRegistration(name string) Parser {
+	return parseMap[name]
+}
 
 // parserFactoryRegistration occupies the existing parser registry so a later
 // RegisterParser call keeps its historical replacement semantics. The embedded
@@ -25,6 +33,15 @@ type parserFactoryRegistration struct {
 type parserRuntimeMap struct {
 	mu      sync.Mutex
 	parsers map[string]parserRuntimeEntry
+	cached  atomic.Pointer[parserRuntimeLookup]
+}
+
+// Most trees repeatedly resolve the same parser. Publish one immutable lookup
+// entry so established runtimes need no map lock on each field/result access.
+// The registration identity is checked on every read, including replacement.
+type parserRuntimeLookup struct {
+	name string
+	parserRuntimeEntry
 }
 
 type parserRuntimeEntry struct {
@@ -47,9 +64,13 @@ func RegisterParserFactory(name string, factory ParserFactory) {
 }
 
 func (r *parserRuntimeMap) parser(name string, registration *parserFactoryRegistration) (Parser, error) {
+	if cached := r.cached.Load(); cached != nil && cached.name == name && cached.registration == registration {
+		return cached.parser, nil
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if entry := r.parsers[name]; entry.registration == registration && entry.parser != nil {
+		r.cacheLocked(name, entry)
 		return entry.parser, nil
 	}
 	if registration.factory == nil {
@@ -59,16 +80,24 @@ func (r *parserRuntimeMap) parser(name string, registration *parserFactoryRegist
 	if parser == nil {
 		return nil, fmt.Errorf("parser %s factory returned nil", name)
 	}
-	r.parsers[name] = parserRuntimeEntry{registration: registration, parser: parser}
+	entry := parserRuntimeEntry{registration: registration, parser: parser}
+	r.parsers[name] = entry
+	r.cacheLocked(name, entry)
 	return parser, nil
 }
 
 func (r *parserRuntimeMap) load(name string, registration *parserFactoryRegistration) Parser {
+	if cached := r.cached.Load(); cached != nil && cached.name == name && cached.registration == registration {
+		return cached.parser
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	entry := r.parsers[name]
 	if entry.registration != registration {
 		return nil
+	}
+	if entry.parser != nil {
+		r.cacheLocked(name, entry)
 	}
 	return entry.parser
 }
@@ -78,6 +107,21 @@ func (r *parserRuntimeMap) bind(name string, registration *parserFactoryRegistra
 	defer r.mu.Unlock()
 	entry := r.parsers[name]
 	if entry.registration != registration || entry.parser == nil {
-		r.parsers[name] = parserRuntimeEntry{registration: registration, parser: parser}
+		entry = parserRuntimeEntry{registration: registration, parser: parser}
+		r.parsers[name] = entry
 	}
+	if entry.parser != nil {
+		r.cacheLocked(name, entry)
+	}
+}
+
+func (r *parserRuntimeMap) cacheLocked(name string, entry parserRuntimeEntry) {
+	if cached := r.cached.Load(); cached != nil {
+		// Keep the first established name hot. Alternating custom parsers must
+		// not allocate a replacement cache record on every lookup.
+		if cached.name != name || cached.registration == entry.registration {
+			return
+		}
+	}
+	r.cached.Store(&parserRuntimeLookup{name: name, parserRuntimeEntry: entry})
 }

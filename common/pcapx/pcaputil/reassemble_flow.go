@@ -1,14 +1,12 @@
 package pcaputil
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/gopacket/gopacket/layers"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/algorithm"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -17,13 +15,9 @@ import (
 var flowPool = &sync.Pool{ // TrafficFlow
 	New: func() any {
 		return &TrafficFlow{
-			createdOnce:       new(sync.Once),
-			triggerClosedOnce: new(sync.Once),
-			httpflowMutex:     new(sync.Mutex),
-			httpflowWg:        new(sync.WaitGroup),
-			requestQueue:      algorithm.NewQueue[*http.Request](),
-			responseQueue:     algorithm.NewQueue[*http.Response](),
-			frames:            make([]*TrafficFrame, 0),
+			requestQueue:  algorithm.NewQueue[*http.Request](),
+			responseQueue: algorithm.NewQueue[*http.Response](),
+			frames:        make([]*TrafficFrame, 0),
 		}
 	},
 }
@@ -44,24 +38,28 @@ type TrafficFrame struct {
 // OnClosed: reason(fin/rst/timeout) -> flow
 // OnCreated: flow created
 type TrafficFlow struct {
-	ctx                    context.Context
+	binState               *binFlow
+	key                    flowKey
+	frameMu                sync.Mutex
+	httpStarted            sync.Once
+	closed                 atomic.Bool
 	ClientConn             *TrafficConnection
-	createdOnce            *sync.Once
+	createdOnce            sync.Once
 	pool                   *TrafficPool
-	cancel                 context.CancelFunc
 	requestQueue           *algorithm.Queue[*http.Request]
 	ServerConn             *TrafficConnection
-	httpflowWg             *sync.WaitGroup
-	httpflowMutex          *sync.Mutex
+	httpflowWg             sync.WaitGroup
+	httpflowMutex          sync.Mutex
 	onDataFrameArrived     func(*TrafficFlow, *TrafficConnection, *TrafficFrame)
 	onDataFrameReassembled func(*TrafficFlow, *TrafficConnection, *TrafficFrame)
 	responseQueue          *algorithm.Queue[*http.Response]
 	onCloseHandler         func(reason TrafficFlowCloseReason, frame *TrafficFlow)
-	triggerClosedOnce      *sync.Once
+	closeNotified          atomic.Bool
 	Hash                   string
 	HardwareSrcMac         string
 	HardwareDstMac         string
 	frames                 []*TrafficFrame
+	streamCapacity         int
 	Index                  uint64
 	IsHalfOpen             bool
 	IsIpv6                 bool
@@ -69,24 +67,28 @@ type TrafficFlow struct {
 	IsIpv4                 bool
 }
 
+// Context cancellation is shared by the capture; individual flow/direction
+// state does not need a context tree or registration in its parent's map.
+func (t *TrafficFlow) stopped() bool {
+	return t.closed.Load() || t.pool == nil || t.pool.canceled()
+}
+
 func (t *TrafficFlow) IsClosed() bool {
-	if t.ctx == nil {
+	if t.pool == nil {
 		// already released
 		return true
 	}
 
-	select {
-	case <-t.ctx.Done():
+	if t.stopped() {
 		t.triggerCloseEvent(TrafficFlowCloseReason_CTX_CANCEL)
 		return true
-	default:
-		if t.ServerConn.IsClosed() && t.ClientConn.IsClosed() {
-			t.cancel()
-			t.triggerCloseEvent(TrafficFlowCloseReason_FIN)
-			return true
-		}
-		return false
 	}
+	if t.ServerConn.IsClosed() && t.ClientConn.IsClosed() {
+		t.closed.Store(true)
+		t.triggerCloseEvent(TrafficFlowCloseReason_FIN)
+		return true
+	}
+	return false
 }
 
 func (t *TrafficFlow) ShiftFlow() (*http.Request, *http.Response) {
@@ -112,14 +114,7 @@ func (t *TrafficFlow) AutoTriggerHTTPFlow(h func(*TrafficFlow, *http.Request, *h
 		rsp.Request = req
 		if req != nil && rsp != nil {
 			if offset := codec.Atoi(rsp.Header.Get(tsconst)); offset > 0 {
-				count := 0
-				t.GetHTTPResponseConnection().frames.ForEach(func(tf *TrafficFrame) {
-					count += len(tf.Payload)
-					if count >= offset {
-						httpctx.SetResponseTimestamp(rsp, tf.Timestamp)
-						return
-					}
-				})
+				httpctx.SetResponseTimestamp(rsp, t.GetHTTPResponseConnection().timestamps.at(offset))
 			}
 		}
 
@@ -137,45 +132,94 @@ func (t *TrafficFlow) String() string {
 	return fmt.Sprintf("stream[%3d]: %v <-> %v", t.Index, t.ClientConn.localAddr, t.ServerConn.localAddr)
 }
 
-func (t *TrafficFlow) feed(packet *layers.TCP, ts time.Time) {
-	if t != nil {
-		if t.pool != nil {
-			t.pool.flowCache.Set(t.Hash, t)
-		}
+// flushFrame detaches the accumulated frame before callbacks so previously
+// delivered frames are immutable and callbacks may close their flow.
+func (t *TrafficFlow) flushFrame() {
+	t.frameMu.Lock()
+	var frame *TrafficFrame
+	if len(t.frames) > 0 {
+		frame = t.frames[0]
+		t.frames = nil
+		frame.Done = true
 	}
-
-	if t.ClientConn.localPort == int(packet.SrcPort) {
-		t.ClientConn.FeedClient(packet, ts)
-	} else {
-		t.ServerConn.FeedServer(packet, ts)
+	t.frameMu.Unlock()
+	if frame != nil && t.onDataFrameReassembled != nil {
+		t.onDataFrameReassembled(t, frame.Connection, frame)
 	}
 }
 
 func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
+	if t.pool.captureConf != nil && t.pool.captureConf.binParser != nil {
+		if t.binState == nil {
+			t.binState = t.pool.captureConf.binParser.newFlow(t)
+		}
+		direction := 0
+		if frame.Connection != t.ClientConn {
+			direction = 1
+		}
+		t.binState.feed(direction, frame.Payload, frame.Timestamp)
+	}
+	// Arrived callbacks may retain frames. Do not give them packet-source storage
+	// or the same object that is subsequently extended for a reassembled frame.
 	if t.onDataFrameArrived != nil {
-		t.onDataFrameArrived(t, frame.Connection, frame)
+		arrived := *frame
+		arrived.Payload = append([]byte(nil), frame.Payload...)
+		t.onDataFrameArrived(t, frame.Connection, &arrived)
 	}
-
-	if len(t.frames) > 0 {
-		lastFrame := t.frames[len(t.frames)-1]
-		if lastFrame.ConnHash != frame.ConnHash {
-			if t.onDataFrameReassembled != nil {
-				t.onDataFrameReassembled(t, lastFrame.Connection, lastFrame)
+	if t.onDataFrameReassembled == nil {
+		return
+	}
+	t.frameMu.Lock()
+	switchDirection := len(t.frames) > 0 && t.frames[0].Connection != frame.Connection
+	t.frameMu.Unlock()
+	if switchDirection {
+		t.flushFrame()
+	}
+	payload, seq := frame.Payload, frame.Seq
+	for len(payload) > 0 {
+		t.frameMu.Lock()
+		if t.closeNotified.Load() {
+			t.frameMu.Unlock()
+			return
+		}
+		if len(t.frames) == 0 {
+			t.frames = []*TrafficFrame{{ConnHash: frame.ConnHash, Seq: seq, Timestamp: frame.Timestamp, Connection: frame.Connection}}
+			if t.pool.options.Stream && t.streamCapacity > 0 {
+				t.frames[0].Payload = make([]byte, 0, t.streamCapacity)
 			}
-			t.frames = append(t.frames, frame)
-		} else {
-			lastFrame.Payload = append(lastFrame.Payload, frame.Payload...)
 		}
-	} else {
-		t.frames = append(t.frames, frame)
-	}
-
-	if t.IsClosed() {
-		if len(t.frames) > 0 && t.onDataFrameReassembled != nil {
-			lastFrame := t.frames[len(t.frames)-1]
-			t.onDataFrameReassembled(t, lastFrame.Connection, lastFrame)
+		current := t.frames[0]
+		n := len(payload)
+		limit := t.pool.options.MaxFrameBytes
+		if t.pool.options.Stream && n > limit-len(current.Payload) {
+			n = limit - len(current.Payload)
 		}
-		log.Warnf("writing frame to a closed flow: %v (%#v)", t.String(), frame.Payload)
+		if need := len(current.Payload) + n; t.pool.options.Stream && need > cap(current.Payload) {
+			// Grow geometrically up to the chunk limit. Ordinary append growth
+			// repeatedly copies large chunks and can overshoot the configured size.
+			capacity := cap(current.Payload) * 2
+			if capacity < need {
+				capacity = need
+			}
+			if capacity > limit {
+				capacity = limit
+			}
+			grown := make([]byte, len(current.Payload), capacity)
+			copy(grown, current.Payload)
+			current.Payload = grown
+		}
+		current.Payload = append(current.Payload, payload[:n]...)
+		full := t.pool.options.Stream && len(current.Payload) >= limit
+		if full {
+			// A full chunk establishes the useful allocation size for this flow.
+			// Later chunks need one allocation and no geometric growth/copying.
+			t.streamCapacity = limit
+		}
+		t.frameMu.Unlock()
+		payload, seq = payload[n:], seq+uint32(n)
+		if full {
+			t.flushFrame()
+		}
 	}
 }
 
@@ -185,60 +229,83 @@ func (t *TrafficFlow) init(
 	onArrivedFrame []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame),
 	onClose func(reason TrafficFlowCloseReason, flow *TrafficFlow),
 ) {
-	t.createdOnce.Do(func() {
-		if handle == nil {
-			return
-		}
-		handle(t)
-	})
-	t.onDataFrameReassembled = func(flow *TrafficFlow, connection *TrafficConnection, frame *TrafficFrame) {
-		for _, i := range onReassembledFrame {
-			i(flow, connection, frame)
+	if len(onReassembledFrame) > 0 {
+		t.onDataFrameReassembled = func(flow *TrafficFlow, connection *TrafficConnection, frame *TrafficFrame) {
+			for _, h := range onReassembledFrame {
+				h(flow, connection, frame)
+			}
 		}
 	}
-	t.onDataFrameArrived = func(flow *TrafficFlow, connection *TrafficConnection, frame *TrafficFrame) {
-		for _, i := range onArrivedFrame {
-			i(flow, connection, frame)
+	if len(onArrivedFrame) > 0 {
+		t.onDataFrameArrived = func(flow *TrafficFlow, connection *TrafficConnection, frame *TrafficFrame) {
+			for _, h := range onArrivedFrame {
+				h(flow, connection, frame)
+			}
 		}
 	}
 	t.onCloseHandler = onClose
+	t.createdOnce.Do(func() {
+		if handle != nil {
+			handle(t)
+		}
+	})
 }
 
 type TrafficFlowCloseReason string
 
 const (
-	TrafficFlowCloseReason_FIN        TrafficFlowCloseReason = "fin"
-	TrafficFlowCloseReason_RST        TrafficFlowCloseReason = "rst"
-	TrafficFlowCloseReason_CTX_CANCEL TrafficFlowCloseReason = "ctx-canceled"
-	TrafficFlowCloseReason_INACTIVE   TrafficFlowCloseReason = "inactive"
+	TrafficFlowCloseReason_FIN            TrafficFlowCloseReason = "fin"
+	TrafficFlowCloseReason_RST            TrafficFlowCloseReason = "rst"
+	TrafficFlowCloseReason_CTX_CANCEL     TrafficFlowCloseReason = "ctx-canceled"
+	TrafficFlowCloseReason_INACTIVE       TrafficFlowCloseReason = "inactive"
+	TrafficFlowCloseReason_RESOURCE_LIMIT TrafficFlowCloseReason = "resource-limit"
 )
 
 func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
-	t.triggerClosedOnce.Do(func() {
-		if t.onCloseHandler != nil {
-			t.onCloseHandler(reason, t)
+	if !t.closeNotified.CompareAndSwap(false, true) {
+		return
+	}
+	if t.binState != nil {
+		t.binState.close(reason)
+	}
+	if reason == TrafficFlowCloseReason_RESOURCE_LIMIT {
+		if t.pool.counters != nil {
+			t.pool.counters.limits.Add(1)
+		} else {
+			t.pool.singleDiagnostics.limits.Add(1)
 		}
-	})
+		t.pool.reassemblyFailure("TCP stream closed by a reassembly resource limit")
+	}
+	t.flushFrame()
+	if t.onCloseHandler != nil {
+		t.onCloseHandler(reason, t)
+	}
 }
 
 func (t *TrafficFlow) Release() {
-	t.pool.flowCache.Remove(t.Hash)
-	t.ctx = nil
+	if t.binState != nil {
+		t.binState.close(TrafficFlowCloseReason_CTX_CANCEL)
+		t.binState = nil
+	}
+	t.pool.flowCache.Remove(t.key)
 	// t.ClientConn.Close()
 	// t.ServerConn.Close()
 	t.ClientConn, t.ServerConn = nil, nil
-	t.createdOnce = new(sync.Once)
+	t.createdOnce = sync.Once{}
 	t.pool = nil
-	t.cancel = nil
+	t.closed.Store(false)
 	t.requestQueue.Clear()
 	t.responseQueue.Clear()
-	t.httpflowWg = new(sync.WaitGroup)
-	t.httpflowMutex = new(sync.Mutex)
+	t.httpflowWg = sync.WaitGroup{}
+	t.httpflowMutex = sync.Mutex{}
 	t.onDataFrameArrived, t.onDataFrameReassembled, t.onCloseHandler = nil, nil, nil
-	t.triggerClosedOnce = new(sync.Once)
+	t.closeNotified.Store(false)
 	t.Hash, t.HardwareSrcMac, t.HardwareDstMac = "", "", ""
 	t.frames = make([]*TrafficFrame, 0)
 	t.Index = 0
+	t.streamCapacity = 0
+	t.key = flowKey{}
+	t.httpStarted = sync.Once{}
 	t.IsHalfOpen, t.IsEthernetLinkLayer, t.IsIpv4, t.IsIpv6 = false, false, false, false
 
 	flowPool.Put(t)
@@ -252,15 +319,7 @@ func (t *TrafficFlow) StashHTTPRequest(req *http.Request) {
 	t.httpflowMutex.Lock()
 	defer t.httpflowMutex.Unlock()
 	if offset := httpctx.GetRequestReaderOffset(req); offset > 0 {
-		// have offset
-		count := 0
-		t.GetHTTPRequestConnection().frames.ForEach(func(tf *TrafficFrame) {
-			count += len(tf.Payload)
-			if count >= offset {
-				httpctx.SetRequestTimestamp(req, tf.Timestamp)
-				return
-			}
-		})
+		httpctx.SetRequestTimestamp(req, t.GetHTTPRequestConnection().timestamps.at(offset))
 	}
 	t.requestQueue.Enqueue(req)
 }
@@ -291,9 +350,11 @@ func (t *TrafficFlow) GetHTTPResponseConnection() *TrafficConnection {
 	return t.ClientConn
 }
 
-func (t *TrafficFlow) Close() {
-	t.cancel()
+func (t *TrafficFlow) Close() { t.closeWithReason(TrafficFlowCloseReason_RST) }
+
+func (t *TrafficFlow) closeWithReason(reason TrafficFlowCloseReason) {
+	t.closed.Store(true)
 	t.ServerConn.Close()
 	t.ClientConn.Close()
-	t.triggerCloseEvent(TrafficFlowCloseReason_RST)
+	t.triggerCloseEvent(reason)
 }

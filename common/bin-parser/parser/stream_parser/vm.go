@@ -775,11 +775,17 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 }
 
 func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (func(bool), error), modes ...string) error {
+	if handled, err := execOperatorPlan(node, code, operator, modes); handled {
+		return err
+	}
 	if handled, err := execRegisteredNativeBridge(node, code, operator, modes); handled {
 		return err
 	}
 	if reusableBridgeOperator(code) {
 		return execBridgeOperator(node, code, operator, modes)
+	}
+	if handled, err := execPreparedOperator(node, code, operator, modes); handled {
+		return err
 	}
 	return execFreshOperator(node, code, operator, modes)
 }
@@ -799,8 +805,9 @@ func getMulti(node *base.Node, uints ...string) uint64 {
 	if len(uints) > 0 {
 		uint = utils.InterfaceToString(utils.GetLastElement(uints))
 	}
-	if uint == "" && node.Cfg.GetItem(CfgUnit) != nil {
-		uint = node.Cfg.GetString(CfgUnit)
+	if uint == "" {
+		value, _ := node.Cfg.LookupItem(CfgUnit)
+		uint, _ = value.(string)
 	}
 	if uint == "" {
 		uint = "byte"

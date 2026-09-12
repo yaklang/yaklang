@@ -1902,7 +1902,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				if firstChar >= 'a' && firstChar <= 'z' {
 					newMemberName = strings.ToUpper(string(firstChar)) + memberName[1:]
 				}
-				fun := callerReflectValue.MethodByName(newMemberName)
+				fun := nativeMethodByName(callerReflectValue, newMemberName)
 				if fun.IsValid() {
 					literal := caller.memberLiteral(memberName)
 					value := NewValue(fun.Type().String(), fun.Interface(), literal)

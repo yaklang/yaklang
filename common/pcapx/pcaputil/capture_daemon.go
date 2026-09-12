@@ -85,6 +85,12 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 	}
 
 	loop := false
+	if conf.captureBuffer > 0 {
+		defLiveOpts = append(defLiveOpts, func(o *OpenIfaceLiveOptions) { o.BufferSize = conf.captureBuffer })
+	}
+	if conf.requiresExclusiveHandle() {
+		defLiveOpts = append(defLiveOpts, WithTimeout(20*time.Millisecond))
+	}
 	if conf.mock == nil {
 		netIface, err := PcapIfaceNameToNetInterface(dev)
 		if err != nil {
@@ -158,6 +164,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 				source := packetSource.Packets()
 
 				go func() {
+					idleTimer := time.NewTimer(3 * time.Second)
+					defer idleTimer.Stop()
 					defer func() {
 						log.Infof("background iface: %v is stop...", ifaceName)
 					}()
@@ -168,6 +176,13 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 							if packet == nil {
 								return
 							}
+							if !idleTimer.Stop() {
+								select {
+								case <-idleTimer.C:
+								default:
+								}
+							}
+							idleTimer.Reset(3 * time.Second)
 							var failedTrigger []string
 							daemon.registeredHandlers.ForEach(func(i string, v *pcapPacketHandlerContext) bool {
 								err := v.handler(v.ctx, packet)
@@ -181,7 +196,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 							for _, i := range failedTrigger {
 								daemon.registeredHandlers.Delete(i)
 							}
-						case <-time.After(3 * time.Second):
+						case <-idleTimer.C:
+							idleTimer.Reset(3 * time.Second)
 							if handler == nil {
 								log.Errorf("background iface: %v handler is nil", ifaceName)
 								return
@@ -228,9 +244,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		return "", nil, err
 	}
 	handler := WrapPcapHandle(pcapHandler, loop)
+	handler.device = dev
 	err = handler.SetBPFFilter(bpf)
 	if err != nil {
-		return "", handler, err
+		handler.close()
+		return "", nil, err
 	}
 	return "", handler, err
 }

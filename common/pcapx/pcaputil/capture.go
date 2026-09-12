@@ -2,6 +2,10 @@ package pcaputil
 
 import (
 	"context"
+	"errors"
+	"io"
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/gopacket/gopacket"
 	"github.com/yaklang/pcap"
@@ -13,6 +17,11 @@ import (
 func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	if conf.recorder != nil {
+		if err := conf.recorder.init(handler.LinkType()); err != nil {
+			return err
+		}
+	}
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
 	packetSource.Lazy = true
 	packetSource.NoCopy = true
@@ -20,35 +29,91 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 	if conf.onNetInterfaceCreated != nil {
 		conf.onNetInterfaceCreated(handler)
 	}
+	if conf.Filename != "" && len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug {
+		return openOfflineFast(conf, innerCtx, handler)
+	}
+	if conf.Filename == "" && conf.requiresExclusiveHandle() {
+		return openLiveWorkers(conf, innerCtx, handler)
+	}
 
+	// Offline handles cannot block indefinitely. Avoid a packet channel and its
+	// producer goroutine for files; preserve the cancellable path for live input.
+	if conf.Filename != "" {
+		for ctx.Err() == nil {
+			packet, err := packetSource.NextPacket()
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			conf.trafficPool.observeCapture(len(packet.Data()))
+			if conf.recorder != nil {
+				if err := conf.recorder.write(packet.Data(), packet.Metadata().CaptureInfo, handler.LinkType()); err != nil {
+					return err
+				}
+			}
+			conf.packetHandler(innerCtx, packet)
+		}
+		return nil
+	}
+	packets := packetSource.PacketsCtx(innerCtx)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		//case packet := <-packetSource.PacketsCtx(innerCtx):
-		case packet := <-packetSource.Packets():
+		case packet := <-packets:
 			if packet == nil {
 				return nil
 			}
+			conf.trafficPool.observeCapture(len(packet.Data()))
 			conf.packetHandler(innerCtx, packet)
-			//fmt.Println(packet.String())
 		}
 	}
 }
 
-func Start(opt ...CaptureOption) error {
+func Start(opt ...CaptureOption) (resultErr error) {
 	conf := NewDefaultConfig()
 	for _, i := range opt {
 		if err := i(conf); err != nil {
 			return utils.Errorf("set option failed: %s", err)
 		}
 	}
+	if err := conf.prepareBinParser(); err != nil {
+		return err
+	}
+	if (conf.recorder != nil || conf.captureBuffer > 0) && conf.EnableCache {
+		return errors.New("capture writer/buffer requires an exclusive capture handle")
+	}
+	if conf.captureBuffer > 0 && conf.Filename != "" {
+		return errors.New("capture buffer applies only to live devices")
+	}
+	if conf.reassemblyOptions.Stream && conf.requiresFullStream {
+		return utils.Errorf("TCP streaming cannot be combined with built-in HTTP/TLS parsers")
+	}
+	if conf.reassemblyOptions.Workers > 1 && conf.EnableCache {
+		return utils.Errorf("TCP workers require an exclusive capture handle; disable capture cache")
+	}
 	handlers := omap.NewOrderedMap(map[string]PcapHandleOperation{})
+	if conf.requiresExclusiveHandle() {
+		defer handlers.ForEach(func(_ string, op PcapHandleOperation) bool {
+			if h, ok := op.(*PcapHandleWrapper); ok {
+				h.close()
+			}
+			return true
+		})
+	}
 	if conf.Filename != "" {
 		pcapHandler, err := OpenFile(conf.Filename)
 		if err != nil {
-			log.Errorf("open file (%v) failed: %s", conf.Filename, err)
+			return err
 		} else {
+			if conf.BPFFilter != "" {
+				if err := pcapHandler.SetBPFFilter(conf.BPFFilter); err != nil {
+					pcapHandler.Close()
+					return err
+				}
+			}
 			handlers.Set(conf.Filename, WrapPcapHandle(pcapHandler))
 		}
 	} else if len(conf.DeviceAdapter) > 0 {
@@ -62,6 +127,9 @@ func Start(opt ...CaptureOption) error {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", pcapIface, err)
+				if conf.requiresExclusiveHandle() {
+					return err
+				}
 				continue
 			}
 			if cacheId == "" {
@@ -79,6 +147,9 @@ func Start(opt ...CaptureOption) error {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", pcapIface, err)
+				if conf.requiresExclusiveHandle() {
+					return err
+				}
 				continue
 			}
 			if cacheId == "" {
@@ -108,6 +179,9 @@ func Start(opt ...CaptureOption) error {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(iface.Name, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
+				if conf.requiresExclusiveHandle() {
+					return err
+				}
 				continue
 			}
 			if cacheId == "" {
@@ -120,29 +194,25 @@ func Start(opt ...CaptureOption) error {
 		conf.Context = context.Background()
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
+	conf.trafficPool = newTrafficPool(ctx, conf.reassemblyOptions)
+	conf.trafficPool.captureAccountingAvailable = !conf.EnableCache
 	defer func() {
-		log.Debug("pcapx.utils.capture context done")
+		conf.trafficPool.Close()
 		cancel()
-		conf.trafficPool.flowCache.ForEach(func(key string, flow *TrafficFlow) {
-			flow.ForceShutdownConnection()
-			if flow.requestQueue.Len() > 0 || flow.responseQueue.Len() > 0 {
-				if conf.trafficPool._onHTTPFlow == nil {
-					log.Warnf("unbalanced flow request/response flow: req[%v] rsp[%v]", flow.requestQueue.Len(), flow.responseQueue.Len())
-				} else {
-					for flow.CanShiftHTTPFlow() {
-						req, rsp := flow.ShiftFlow()
-						conf.trafficPool._onHTTPFlow(flow, req, rsp)
-					}
-				}
-			}
-		})
+		if err := conf.trafficPool.Err(); err != nil {
+			resultErr = errors.Join(resultErr, err)
+		}
+		if conf.onReassemblyStats != nil {
+			conf.onReassemblyStats(conf.trafficPool.Stats())
+		}
+		resultErr = errors.Join(resultErr, conf.finishBinParser())
 	}()
 
-	conf.trafficPool = NewTrafficPool(ctx)
 	conf.trafficPool.captureConf = conf
 	for _, p := range conf.onPoolCreated {
 		p(conf.trafficPool)
 	}
+	conf.trafficPool.startWorkers()
 
 	if conf.EnableCache {
 		// keep cache
@@ -177,6 +247,8 @@ func Start(opt ...CaptureOption) error {
 		case <-ctx.Done():
 		}
 	} else {
+		var captureErr error
+		var captureErrMu sync.Mutex
 		utils.WaitRoutinesFromSlice(handlers.Values(), func(origin PcapHandleOperation) {
 			handler, ok := origin.(*PcapHandleWrapper)
 			if !ok {
@@ -184,12 +256,21 @@ func Start(opt ...CaptureOption) error {
 				return
 			}
 			defer func() {
+				if conf.Filename == "" && conf.requiresExclusiveHandle() {
+					conf.trafficPool.deviceStats(handler)
+				}
 				handler.close()
 			}()
 			if err := _open(conf, ctx, handler); err != nil {
-				log.Errorf("open device failed: %s", err)
+				cancel()
+				captureErrMu.Lock()
+				captureErr = errors.Join(captureErr, err)
+				captureErrMu.Unlock()
 			}
 		})
+		if captureErr != nil {
+			return captureErr
+		}
 	}
 
 	return nil

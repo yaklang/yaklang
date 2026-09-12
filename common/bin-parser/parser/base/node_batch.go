@@ -8,11 +8,13 @@ type nodeConfigAllocation struct {
 	store  configStore
 }
 
+const nodeBatchConfigReserve = 6
+
 // NewNodeBatch reserves independently owned nodes/configs for a single result
 // tree. It is an allocation helper, not a pool: retained nodes keep their
 // storage alive and are never reused by another parse. It must be used serially.
 func NewNodeBatch(count int) *nodeBatch {
-	return &nodeBatch{nodes: make([]nodeConfigAllocation, count), writes: make([]compactConfigWrite, count*8)}
+	return &nodeBatch{nodes: make([]nodeConfigAllocation, count), writes: make([]compactConfigWrite, count*nodeBatchConfigReserve)}
 }
 
 type nodeBatch struct {
@@ -29,18 +31,36 @@ func (b *nodeBatch) NewNode(name string, origin any, parent *Config, ctx *NodeCo
 	b.next++
 	slot := &b.nodes[i]
 	slot.config.data = &slot.store
-	slot.store.writes = b.writes[i*8 : i*8 : (i+1)*8]
+	slot.store.writes = b.writes[i*nodeBatchConfigReserve : i*nodeBatchConfigReserve : (i+1)*nodeBatchConfigReserve]
 	inherited, count := parent.data.inheritedItems()
 	skip, used := slot.store.initializePrefix(inherited, count, items)
 	if !used {
 		for _, item := range inherited[:count] {
-			slot.store.setConfigItemLocked(item.key, item.value, 8)
+			slot.store.setConfigItemLocked(item.key, item.value, nodeBatchConfigReserve)
 		}
 	}
 	for _, item := range items[skip:] {
-		slot.store.setConfigItemLocked(item.Key, item.Value, 8)
+		slot.store.setConfigItemLocked(item.Key, item.Value, nodeBatchConfigReserve)
 	}
 
+	slot.node = Node{Name: name, Origin: origin, Cfg: &slot.config, Ctx: ctx}
+	return &slot.node
+}
+
+// A construction plan may share an immutable configuration prefix, but never
+// its Node, Config, write storage, Origin, or publicly exposed history slice.
+func (b *nodeBatch) newNodeWithPrefix(name string, origin any, ctx *NodeContext, prefix *configPrefix) *Node {
+	if b.next == len(b.nodes) {
+		cfg := NewEmptyConfig()
+		cfg.data.usePrefix(prefix)
+		return NewEmptyNode(name, origin, cfg, ctx)
+	}
+	i := b.next
+	b.next++
+	slot := &b.nodes[i]
+	slot.config.data = &slot.store
+	slot.store.writes = b.writes[i*nodeBatchConfigReserve : i*nodeBatchConfigReserve : (i+1)*nodeBatchConfigReserve]
+	slot.store.usePrefix(prefix)
 	slot.node = Node{Name: name, Origin: origin, Cfg: &slot.config, Ctx: ctx}
 	return &slot.node
 }

@@ -41,10 +41,11 @@ type (
 		globalVar        *limitedmap.ReadOnlyMap
 		runtimeGlobalVar *limitedmap.SafeMap
 
-		frameStacksMu sync.RWMutex
-		frameStacks   map[int64]*vmstack.Stack
-		activeFrames  atomic.Int64
-		rootScope     *Scope
+		frameStacksMu     sync.RWMutex
+		frameStacks       map[int64]*vmstack.Stack
+		activeFrames      atomic.Int64
+		synchronousFrames []*Frame
+		rootScope         *Scope
 
 		// asyncWaitGroup
 		asyncWaitGroup *sync.WaitGroup
@@ -551,6 +552,10 @@ func currentGoroutineID() int64 {
 }
 
 func (v *VirtualMachine) pushCurrentFrame(frame *Frame) {
+	if v.config.synchronousExecution {
+		v.synchronousFrames = append(v.synchronousFrames, frame)
+		return
+	}
 	gid := frame.ownerGoroutineID
 	if gid == 0 {
 		gid = currentGoroutineID()
@@ -569,6 +574,15 @@ func (v *VirtualMachine) pushCurrentFrame(frame *Frame) {
 }
 
 func (v *VirtualMachine) popCurrentFrame(expected *Frame) *Frame {
+	if v.config.synchronousExecution {
+		n := len(v.synchronousFrames)
+		if n == 0 || v.synchronousFrames[n-1] != expected {
+			return nil
+		}
+		v.synchronousFrames[n-1] = nil
+		v.synchronousFrames = v.synchronousFrames[:n-1]
+		return expected
+	}
 	gid := expected.ownerGoroutineID
 	if gid == 0 {
 		gid = currentGoroutineID()
@@ -596,6 +610,12 @@ func (v *VirtualMachine) popCurrentFrame(expected *Frame) *Frame {
 }
 
 func (v *VirtualMachine) peekCurrentFrame() *Frame {
+	if v.config.synchronousExecution {
+		if n := len(v.synchronousFrames); n != 0 {
+			return v.synchronousFrames[n-1]
+		}
+		return nil
+	}
 	// Most external GetVar calls happen after compilation has finished, when
 	// there cannot be a current frame. Avoid runtime.Stack entirely in that
 	// common hot-load path.

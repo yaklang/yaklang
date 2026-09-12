@@ -64,9 +64,10 @@ func (b *bitReaderBackup) appendChunk(chunk bitReaderChunk) {
 
 type BitReader struct {
 	Reader          *bitio.Reader
-	backupList      []*bitReaderBackup
+	backupList      []bitReaderBackup
 	replay          []bitReaderChunk
 	sourceBitOffset uint8
+	single          [1]byte
 }
 type BitWriter struct {
 	*bitio.Writer
@@ -86,6 +87,11 @@ func (r *BitReader) Read(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+	if r.sourceBitOffset == 0 && len(r.replay) == 0 {
+		n, err = r.readAligned(p)
+		r.recordRead(p, uint64(n)*8)
+		return n, err
+	}
 
 	data, bitsRead, err := r.readBits(uint64(len(p)) * 8)
 	n = int(bitsRead / 8)
@@ -94,7 +100,7 @@ func (r *BitReader) Read(p []byte) (n int, err error) {
 }
 
 func (b *BitReader) Backup() error {
-	b.backupList = append(b.backupList, &bitReaderBackup{})
+	b.backupList = append(b.backupList, bitReaderBackup{})
 	return nil
 }
 
@@ -105,9 +111,10 @@ func (b *BitReader) PopBackup() error {
 
 	topIndex := len(b.backupList) - 1
 	top := b.backupList[topIndex]
+	b.backupList[topIndex] = bitReaderBackup{}
 	b.backupList = b.backupList[:len(b.backupList)-1]
 	if len(b.backupList) > 0 {
-		parent := b.backupList[len(b.backupList)-1]
+		parent := &b.backupList[len(b.backupList)-1]
 		for _, chunk := range top.chunks {
 			parent.appendChunk(chunk)
 		}
@@ -122,6 +129,7 @@ func (b *BitReader) Recovery() error {
 
 	topIndex := len(b.backupList) - 1
 	top := b.backupList[topIndex]
+	b.backupList[topIndex] = bitReaderBackup{}
 	b.backupList = b.backupList[:topIndex]
 	if len(top.chunks) == 0 {
 		return nil
@@ -192,10 +200,92 @@ func (b *BitReader) recordRead(data []byte, length uint64) {
 		return
 	}
 
+	top := &b.backupList[len(b.backupList)-1]
+	// The journal owns this storage. Merge a full-byte read directly into it,
+	// rather than allocating a temporary copy only to copy it a second time.
+	if length%8 == 0 && len(top.chunks) > 0 {
+		last := &top.chunks[len(top.chunks)-1]
+		if last.offset == 0 && last.length%8 == 0 {
+			last.data = append(last.data, data[:length/8]...)
+			last.length += length
+			return
+		}
+	}
 	byteLength := (length + 7) / 8
 	dataCopy := append([]byte(nil), data[:byteLength]...)
-	top := b.backupList[len(b.backupList)-1]
 	top.appendChunk(bitReaderChunk{data: dataCopy, length: length})
+}
+
+// ReadByte has the same exact-consumption and transaction semantics as
+// ReadBits(8). Unaligned/partial replay still uses the general bit reader so
+// an EOF after consuming a partial octet remains recoverable.
+func (b *BitReader) ReadByte() (byte, error) {
+	var value byte
+	if len(b.replay) > 0 {
+		chunk := &b.replay[0]
+		if chunk.offset%8 != 0 || chunk.offset+8 > chunk.length/8*8 {
+			data, err := b.ReadBits(8)
+			if err != nil {
+				return 0, err
+			}
+			return data[0], nil
+		}
+		value = chunk.data[chunk.offset/8]
+		chunk.offset += 8
+		if chunk.offset == chunk.length {
+			b.replay = b.replay[1:]
+		}
+	} else if b.sourceBitOffset == 0 {
+		// Keep using io.Reader.Read, as ReadBits does, even if a caller supplies
+		// a ByteReader with different buffering/error behavior. Scratch belongs
+		// to this serial reader, never to a caller or a retained result.
+		n, err := b.Reader.Read(b.single[:])
+		if n == 0 {
+			if err == nil {
+				err = io.ErrNoProgress
+			}
+			return 0, err
+		}
+		value = b.single[0]
+	} else {
+		data, err := b.ReadBits(8)
+		if err != nil {
+			return 0, err
+		}
+		return data[0], nil
+	}
+	if len(b.backupList) > 0 {
+		top := &b.backupList[len(b.backupList)-1]
+		if len(top.chunks) > 0 {
+			last := &top.chunks[len(top.chunks)-1]
+			if last.offset == 0 && last.length%8 == 0 {
+				last.data = append(last.data, value)
+				last.length += 8
+				return value, nil
+			}
+		}
+		top.chunks = append(top.chunks, bitReaderChunk{data: []byte{value}, length: 8})
+	}
+	return value, nil
+}
+
+func (b *BitReader) readAligned(buf []byte) (int, error) {
+	read := 0
+	for read < len(buf) {
+		n, err := b.Reader.Read(buf[read:])
+		read += n
+		// A reader may return the final requested bytes together with EOF.
+		if read == len(buf) {
+			return read, nil
+		}
+		if err != nil {
+			return read, err
+		}
+		if n == 0 {
+			return read, io.ErrNoProgress
+		}
+	}
+	return read, nil
 }
 
 func (b *BitReader) readReplay(sequence *bitSequence, length uint64) uint64 {
@@ -218,6 +308,11 @@ func (b *BitReader) readReplay(sequence *bitSequence, length uint64) uint64 {
 }
 
 func (b *BitReader) readSourceBits(length uint64) ([]byte, uint64, error) {
+	if b.sourceBitOffset == 0 && length%8 == 0 {
+		buf := make([]byte, length/8)
+		n, err := b.readAligned(buf)
+		return buf[:n], uint64(n) * 8, err
+	}
 	sequence := &bitSequence{data: make([]byte, 0, (length+7)/8)}
 	remaining := length
 
@@ -317,17 +412,22 @@ func (b *BitReader) ReadBits(n uint64) ([]byte, error) {
 // bitio otherwise inserts a private buffered reader and can consume the next
 // message's bytes, which become inaccessible when this parser is discarded.
 // Callers wanting buffering can supply their own reusable bufio.Reader.
-type exactByteReader struct{ io.Reader }
+type exactByteReader struct {
+	io.Reader
+	single [1]byte
+}
 
-func (r exactByteReader) ReadByte() (byte, error) {
-	var single [1]byte
-	_, err := io.ReadFull(r.Reader, single[:])
-	return single[0], err
+func (r *exactByteReader) ReadByte() (byte, error) {
+	_, err := io.ReadFull(r.Reader, r.single[:])
+	if err != nil {
+		return 0, err
+	}
+	return r.single[0], err
 }
 
 func NewBitReader(reader io.Reader) *BitReader {
 	if _, ok := reader.(io.ByteReader); !ok {
-		reader = exactByteReader{Reader: reader}
+		reader = &exactByteReader{Reader: reader}
 	}
 	return &BitReader{
 		Reader: bitio.NewReader(reader),

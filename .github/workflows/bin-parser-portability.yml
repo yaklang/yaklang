@@ -1,0 +1,82 @@
+name: Bin-parser portability
+
+on:
+  pull_request:
+    paths:
+      - 'common/bin-parser/**'
+      - 'common/pcapx/**'
+      - 'common/utils/embeddedfs/**'
+      - 'common/yak/antlr4yak/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/bin-parser-portability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bin-parser-portability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-tests:
+    name: Bin-parser (${{ matrix.os }} / ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            arch: amd64
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: amd64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Embedded corpus hashes must not change with the checkout platform.
+      - name: Preserve repository line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify native toolchain
+        run: |
+          go version
+          go env GOOS GOARCH CGO_ENABLED CC
+          test "$(go env GOARCH)" = "${{ matrix.arch }}"
+      - name: Test complete bin-parser package
+        run: go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=5m
+      - name: Verify generated rules and protocol inventory
+        run: |
+          go generate ./common/bin-parser/rules ./common/bin-parser
+          git diff --exit-code -- common/bin-parser/rules/rules.tar.zst common/bin-parser/PROTOCOL_TODO.md
+      - name: Test driver-free pcapx integration
+        run: |
+          go test ./common/pcapx/pcaputil -run '^Test(BinParser|CaptureWriterReplay|CaptureWriterErrors|TCPAdversarialSegments)' -count=1 -timeout=5m
+          go test ./common/pcapx/cmd/... -count=1 -timeout=5m
+          go build ./common/pcapx/cmd/...
+      - name: Check pcapx integration races
+        run: go test -race ./common/pcapx/pcaputil ./common/pcapx/cmd/... -run '^Test(BinParser|CaptureWriter|TCPAdversarialSegments|Inspect)' -count=1 -timeout=5m
+      - name: Check parser races
+        run: go test -race ./common/utils/embeddedfs ./common/bin-parser/rules ./common/bin-parser/parser/... -count=1 -timeout=5m
+      - name: Check structured output ownership and compatibility races
+        run: go test -race ./common/bin-parser -run '^(TestParseStructured|TestMessagePlan|TestStructuredResultLifetime|TestNodeToMapSinglePassSemantics|TestProtocolCorpusNodeToMapSinglePassApplication)' -count=1 -timeout=5m
+      - name: Check automatic dispatch and prepared execution races
+        run: |
+          go test -race ./common/bin-parser -run '^TestCorpusAutomaticDispatch(Prepared|NetworkPlans)' -count=1 -timeout=5m
+          go test -race ./common/yak/antlr4yak/yakvm -run '^(TestSynchronousExecution|TestExecPanicClearsCurrentFrame|TestCallbackWithCapturedParent|TestCurrent)' -count=1 -timeout=5m
+      - name: Check native method cache and VM compatibility races
+        run: |
+          go test -race ./common/yak/antlr4yak/yakvm -run '^TestNativeMethod' -count=1 -timeout=5m
+          go test -race ./common/yak/antlr4yak -run '^(TestMemberMethod|TestConcurrentMember|TestConcurrentNativeCallbacks|TestConcurrentCrossVM)' -count=1 -timeout=5m

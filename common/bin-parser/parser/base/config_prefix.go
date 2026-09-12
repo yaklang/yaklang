@@ -5,7 +5,7 @@ package base
 // Every later overwrite remains a private log version and every public
 // exposure materializes an independent journal with the original write order.
 type configPrefix struct {
-	writes    [5]compactConfigWrite
+	writes    []compactConfigWrite
 	count     uint16
 	positions [33]uint16
 	order     [33]uint8
@@ -19,6 +19,7 @@ var configPrefixes = func() [2][2][len(configPrefixTypes)]configPrefix {
 		for unit := 0; unit < 2; unit++ {
 			for typ, name := range configPrefixTypes {
 				p := &result[endian][unit][typ]
+				p.writes = make([]compactConfigWrite, 5)
 				add := func(k uint8, v any) {
 					p.writes[p.count] = compactConfigWrite{v, k, true}
 					p.count++

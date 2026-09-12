@@ -8,6 +8,11 @@ import (
 // NodeToMap projects current fields without executing custom out expressions.
 // Each node reads live settings once; results and mutable values are not cached.
 func NodeToMap(node *base.Node) any {
+	var source nodeResultSource
+	return nodeToMapWithSource(node, &source)
+}
+
+func nodeToMapWithSource(node *base.Node, source *nodeResultSource) any {
 	settings := node.Cfg.ResultSettings()
 	if settings.Present {
 		// Match Result's collection type for an observed zero-width list.
@@ -22,7 +27,7 @@ func NodeToMap(node *base.Node) any {
 				}
 			}
 		}
-		value, err := getNodeResultWithSettings(node, false, settings)
+		value, err := getNodeResultWithSource(node, false, settings, source)
 		if err != nil {
 			log.Errorf("get node result error: %v", err)
 		}
@@ -31,7 +36,7 @@ func NodeToMap(node *base.Node) any {
 	if settings.List {
 		res := make([]any, 0, len(node.Children))
 		for _, sub := range node.Children {
-			d := NodeToMap(sub)
+			d := nodeToMapWithSource(sub, source)
 			if d != nil {
 				res = append(res, d)
 			}
@@ -43,7 +48,7 @@ func NodeToMap(node *base.Node) any {
 	} else {
 		res := make(map[string]any, len(node.Children))
 		for _, sub := range node.Children {
-			d := NodeToMap(sub)
+			d := nodeToMapWithSource(sub, source)
 			if d != nil {
 				res[sub.Name] = d
 			}

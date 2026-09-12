@@ -5,8 +5,16 @@ import (
 )
 
 var Exports = map[string]any{
-	"StartSniff":   Sniff,
-	"OpenPcapFile": OpenPcapFile,
+	"StartSniff":             Sniff,
+	"OpenPcapFile":           OpenPcapFile,
+	"ReplayPcapFile":         ReplayPcapFile,
+	"NewBinParserInspector":  NewBinParserInspector,
+	"pcap_binParser":         WithBinParser,
+	"pcap_binParserDeferred": WithBinParserDeferred,
+	"pcap_binParserStats":    WithBinParserStats,
+	"pcap_captureWriter":     WithCaptureWriter,
+	"pcap_captureBufferSize": WithCaptureBufferSize,
+	"pcap_context":           WithContext,
 
 	"pcap_bpfFilter":                    WithBPFFilter,
 	"pcap_onFlowCreated":                WithOnTrafficFlowCreated,
@@ -19,6 +27,9 @@ var Exports = map[string]any{
 	"pcap_everyPacket":                  WithEveryPacket,
 	"pcap_debug":                        WithDebug,
 	"pcap_disableAssembly":              WithDisableAssembly,
+	"pcap_tcpReassemblyStream":          WithTCPReassemblyStream,
+	"pcap_tcpReassemblyWorkers":         WithTCPReassemblyWorkers,
+	"pcap_tcpReassemblyStats":           WithTCPReassemblyStats,
 }
 
 // StartSniff 在指定网卡上开始抓包(嗅探),通过回调选项处理捕获到的流量
