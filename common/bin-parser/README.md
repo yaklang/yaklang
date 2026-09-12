@@ -61,7 +61,7 @@ ReadFile 返回独立副本；内部文件视图共享不可变归档，避免�
 ```sh
 go generate ./common/bin-parser
 go generate ./common/bin-parser/rules
-go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=5m
+go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=15m
 go test ./common/pcapx/pcaputil ./common/pcapx/cmd/... -count=1 -timeout=5m
 go test -race ./common/utils/embeddedfs ./common/bin-parser/rules ./common/bin-parser/parser/... -count=1 -timeout=5m
 ```
