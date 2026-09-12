@@ -528,7 +528,7 @@ func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection
 		if got := r.Header.Get("Authorization"); got != "Bearer node-session-token" {
 			t.Fatalf("unexpected authorization header: %s", got)
 		}
-		if r.URL.Path != "/v1/ai/attachments/inputf_123/download" || r.URL.Query().Get("node_session_id") != "node-session-1" {
+		if r.URL.Path != "/v1/ai/attachments/inputf_123/download" || r.URL.Query().Get("node_session_id") != "node-session-ai" {
 			t.Fatalf("unexpected managed attachment request: %s", r.URL.String())
 		}
 		w.Header().Set("Content-Type", "text/plain")

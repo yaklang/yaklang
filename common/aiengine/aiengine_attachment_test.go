@@ -104,7 +104,7 @@ func TestInvokeReActAttachmentOptionsAppliedOnce(t *testing.T) {
 	}
 	var captured *ypb.AIInputEvent
 	aicommon.RegisterReActAIEngineOperator(func(options ...aicommon.ConfigOption) (aicommon.AIEngineOperator, error) {
-		config := &aicommon.Config{}
+		config := &aicommon.Config{KeyValueConfig: aicommon.NewKeyValueConfig()}
 		for _, option := range options {
 			if err := option(config); err != nil {
 				return nil, err

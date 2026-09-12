@@ -81,7 +81,9 @@ func TestPendingBindRedeliveryRequiresRetry(t *testing.T) {
 	command := validAISessionBindCommand()
 	ref := aiSessionRefFromBindCommand(command)
 	manager := newAISessionRuntimeManager(noopAISessionRuntimeDriver{})
-	manager.bindings[ref.SessionID] = aiSessionBindReservation{ref: ref, cancel: func() {}}
+	manager.bindings[ref.SessionID] = aiSessionBindReservation{
+		ref: ref, cancel: func() {}, commandID: ref.CommandID, epoch: ref.BindEpoch,
+	}
 	if _, err := manager.Bind(context.Background(), command, nil, aiSessionRuntimeBindOptions{}); !errors.Is(err, errAISessionBindRetry) {
 		t.Fatalf("same pending command must retry, not acknowledge: %v", err)
 	}
