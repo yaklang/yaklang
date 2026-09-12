@@ -1,5 +1,7 @@
 package bin_parser
 
+//go:generate go run ./internal/protocoldoc
+
 // RoadmapItem is one protocol we intend the YAML dissector tree to cover.
 // Sources:
 //   - wireshark: present in Wireshark dissectors

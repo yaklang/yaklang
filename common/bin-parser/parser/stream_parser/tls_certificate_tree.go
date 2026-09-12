@@ -2,6 +2,7 @@ package stream_parser
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
@@ -69,22 +70,28 @@ func parseExactByteFieldTreeWithEndian(node *base.Node, process func(*base.Node)
 func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info map[string]any, start, bits uint64, profile, endian string) error {
 	var err error
 	staged := &base.Node{Name: node.Name, Origin: yaml.MapSlice{}, Cfg: base.NewConfigWithItems(node.Cfg, base.ConfigItem{Key: CfgEndian, Value: endian}), Ctx: node.Ctx}
+	// Builtin fields cannot install operators or resolve reference types during
+	// InitNode. Record its parent/last-child writes during private construction,
+	// retaining their exact history while avoiding a second locked tree walk.
+	inlineInit := true
 	var count func([]tlsCertificateField) int
 	count = func(fs []tlsCertificateField) int {
 		n := len(fs)
 		for _, f := range fs {
+			if f.Type != "" && !slices.Contains(baseType, f.Type) {
+				inlineInit = false
+			}
 			n += count(f.Children)
 		}
 		return n
 	}
 	batch := base.NewNodeBatch(count(fields))
-	var fill func(*base.Node, []tlsCertificateField) error
-	fill = func(parent *base.Node, fields []tlsCertificateField) error {
+	var fill func(*base.Node, []tlsCertificateField, bool) error
+	fill = func(parent *base.Node, fields []tlsCertificateField, parentIsList bool) error {
 		if len(fields) == 0 {
 			return nil // retain nil Children, not an allocated empty slice
 		}
 		parent.Children = make([]*base.Node, 0, len(fields))
-		parentIsList := parent.Cfg.GetBool(CfgIsList)
 		for index, f := range fields {
 			if f.Endian != "" && f.Endian != "big" && f.Endian != "little" {
 				return fmt.Errorf("%s: unsupported individual field byte order", profile)
@@ -92,7 +99,7 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
 			if f.Start < 0 || f.End < f.Start || uint64(f.End)*8 > bits {
 				return fmt.Errorf("tls-certificate: invalid field span")
 			}
-			var local [6]base.ConfigItem
+			var local [8]base.ConfigItem
 			items := local[:0]
 			// An empty list has an observed zero-width result; ordinary empty
 			// containers do not. Preserve the original config replay order.
@@ -109,6 +116,12 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
 			if parentIsList {
 				items = append(items, base.ConfigItem{Key: CfgElementIndex, Value: index})
 			}
+			if inlineInit {
+				items = append(items, base.ConfigItem{Key: CfgParent, Value: parent})
+				if index == len(fields)-1 {
+					items = append(items, base.ConfigItem{Key: CfgLastNode, Value: true})
+				}
+			}
 			var child *base.Node
 			if f.Type == "" {
 				child = batch.NewNode(f.Name, yaml.MapSlice{}, parent.Cfg, node.Ctx, items...)
@@ -118,18 +131,20 @@ func buildExactByteFieldTree(node *base.Node, fields []tlsCertificateField, info
 					return err
 				}
 			}
-			if err = fill(child, f.Children); err != nil {
+			if err = fill(child, f.Children, f.List); err != nil {
 				return err
 			}
 			parent.Children = append(parent.Children, child)
 		}
 		return nil
 	}
-	if err = fill(staged, fields); err != nil {
+	if err = fill(staged, fields, false); err != nil {
 		return err
 	}
-	if err = InitNode(staged); err != nil {
-		return err
+	if !inlineInit {
+		if err = InitNode(staged); err != nil {
+			return err
+		}
 	}
 	for _, child := range staged.Children {
 		child.Cfg.SetItem(CfgParent, node)

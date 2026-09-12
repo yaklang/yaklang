@@ -27,27 +27,34 @@ type kerberosFieldSpec struct {
 	optional bool
 }
 
-func (d *kerberosFieldsDecoder) sequence(n *x509DERElement, name string, extensible bool, specs ...kerberosFieldSpec) (map[byte]*x509DERElement, error) {
+func (d *kerberosFieldsDecoder) sequence(n *x509DERElement, name string, extensible bool, specs ...kerberosFieldSpec) ([31]*x509DERElement, error) {
+	var out [31]*x509DERElement
 	if n.tag != 0x30 {
-		return nil, fmt.Errorf("kerberos-fields: %s requires SEQUENCE", name)
+		return out, fmt.Errorf("kerberos-fields: %s requires SEQUENCE", name)
 	}
 	n.name = name
-	known := map[byte]kerberosFieldSpec{}
+	// Explicit context tags are the closed range 0..30. Stack tables avoid
+	// allocating and hashing two maps at every nested SEQUENCE.
+	var known [31]*kerberosFieldSpec
 	for _, s := range specs {
-		known[s.id] = s
+		if s.id >= 31 {
+			return out, fmt.Errorf("kerberos-fields: invalid field specification")
+		}
 	}
-	out := map[byte]*x509DERElement{}
+	for i := range specs {
+		known[specs[i].id] = &specs[i]
+	}
 	previous := -1
 	for _, field := range n.children {
 		id := int(field.tag & 31)
 		if field.tag&0xe0 != 0xa0 || id == 31 || id <= previous || len(field.children) != 1 {
-			return nil, fmt.Errorf("kerberos-fields: invalid explicit field/order in %s", name)
+			return out, fmt.Errorf("kerberos-fields: invalid explicit field/order in %s", name)
 		}
 		previous = id
-		s, ok := known[byte(id)]
-		if !ok {
+		s := known[id]
+		if s == nil {
 			if !extensible {
-				return nil, fmt.Errorf("kerberos-fields: unsupported field %d in %s", id, name)
+				return out, fmt.Errorf("kerberos-fields: unsupported field %d in %s", id, name)
 			}
 			field.name = fmt.Sprintf("Unparsed %s Field %d", name, id)
 			field.payloadFields = []tlsCertificateField{tlsCertificateLeaf("Encoded Extension", "raw", field.content, field.end)}
@@ -60,7 +67,7 @@ func (d *kerberosFieldsDecoder) sequence(n *x509DERElement, name string, extensi
 	}
 	for _, s := range specs {
 		if !s.optional && out[s.id] == nil {
-			return nil, fmt.Errorf("kerberos-fields: missing %s", s.name)
+			return out, fmt.Errorf("kerberos-fields: missing %s", s.name)
 		}
 	}
 	return out, nil
@@ -394,7 +401,7 @@ func (d *kerberosFieldsDecoder) message(n *x509DERElement) error {
 	if err != nil {
 		return err
 	}
-	var f map[byte]*x509DERElement
+	var f [31]*x509DERElement
 	if msg == 10 || msg == 12 {
 		f, err = d.sequence(s, name+" Fields", false, kerberosFieldSpec{1, "Protocol Version", false}, kerberosFieldSpec{2, "Message Type", false}, kerberosFieldSpec{3, "PA-DATA", true}, kerberosFieldSpec{4, "Request Body", false})
 		if err != nil {

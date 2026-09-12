@@ -5,8 +5,16 @@ import (
 )
 
 var Exports = map[string]any{
-	"StartSniff":   Sniff,
-	"OpenPcapFile": OpenPcapFile,
+	"StartSniff":             Sniff,
+	"OpenPcapFile":           OpenPcapFile,
+	"ReplayPcapFile":         ReplayPcapFile,
+	"NewBinParserInspector":  NewBinParserInspector,
+	"pcap_binParser":         WithBinParser,
+	"pcap_binParserDeferred": WithBinParserDeferred,
+	"pcap_binParserStats":    WithBinParserStats,
+	"pcap_captureWriter":     WithCaptureWriter,
+	"pcap_captureBufferSize": WithCaptureBufferSize,
+	"pcap_context":           WithContext,
 
 	"pcap_bpfFilter":                    WithBPFFilter,
 	"pcap_onFlowCreated":                WithOnTrafficFlowCreated,

@@ -315,3 +315,20 @@ func (s *configStore) ForEach(handler func(string, any) bool) {
 		}
 	}
 }
+
+// CopyConfig's destination is unpublished and exclusively owned. Its ordered
+// SetItem operations cannot execute user callbacks, so no intermediate entry
+// snapshot or per-assignment destination lock is needed. Expose the source's
+// journal exactly as ForEach did: callback slice capacity and shallow aliases
+// (including writes through spare capacity) retain their existing semantics.
+func (s *configStore) copyInto(target *configStore) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exposeReplayLocked()
+	for _, entry := range s.entries {
+		target.setConfigItemLocked(entry.key, entry.value, 4)
+	}
+}

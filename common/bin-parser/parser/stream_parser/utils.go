@@ -485,59 +485,46 @@ func GetParentNode(node *base.Node) *base.Node {
 	return getParent(node)
 }
 func GetSubNodes(node *base.Node) []*base.Node {
-	isPackage := func(node *base.Node) bool {
-		if node.Name == "Package" && node.Cfg.GetItem("parent") == node.Ctx.GetItem("root") {
-			return true
-		}
-		return false
-	}
-	var getSubs func(node *base.Node) []*base.Node
-	getSubs = func(node *base.Node) []*base.Node {
-		children := []*base.Node{}
-		for _, sub := range node.Children {
-			if sub.Cfg.GetBool(CfgIsRefType) || sub.Cfg.GetBool("unpack") || isPackage(sub) {
-				children = append(children, getSubs(sub)...)
-			} else {
-				children = append(children, sub)
-			}
-		}
-		return children
-	}
-	return getSubs(node)
+	// Preserve the public non-nil empty result, while flattening into one
+	// destination instead of allocating a slice at every transparent wrapper.
+	return collectResultChildren([]*base.Node{}, node)
 }
-func getNodeByPath(node *base.Node, key string) *base.Node {
-	splits := strings.Split(key, "/")
-	var findChildByPath func(node *base.Node, path ...string) *base.Node
-	findChildByPath = func(node *base.Node, path ...string) *base.Node {
-		if node == nil {
-			return nil
+
+// Path lookups need one child, not a materialized list of every sibling.
+// Scan all siblings even after a match: the old flattened traversal chooses
+// the LAST duplicate and still visits malformed later wrappers.
+func findLastSubNode(node *base.Node, name string) (found *base.Node) {
+	for _, child := range node.Children {
+		if child.Cfg.GetBool(CfgIsRefType) || child.Cfg.GetBool("unpack") ||
+			child.Name == "Package" && child.Cfg.GetItem(CfgParent) == child.Ctx.GetItem("root") {
+			if candidate := findLastSubNode(child, name); candidate != nil {
+				found = candidate
+			}
+		} else if child.Name == name {
+			found = child
 		}
-		if len(path) == 0 {
+	}
+	return
+}
+
+func getNodeByPath(node *base.Node, key string) *base.Node {
+	if strings.HasPrefix(key, "@") {
+		node = node.Ctx.GetItem("root").(*base.Node)
+		key = key[1:]
+	}
+	for node != nil {
+		part, remaining, more := strings.Cut(key, "/")
+		if part == ".." {
+			node = node.Cfg.GetItem(CfgParent).(*base.Node)
+		} else {
+			node = findLastSubNode(node, part)
+		}
+		if !more {
 			return node
 		}
-		var child1 *base.Node
-		if path[0] == ".." {
-			child1 = node.Cfg.GetItem(CfgParent).(*base.Node)
-		} else {
-			for _, child := range GetSubNodes(node) {
-				if child.Name == path[0] {
-					child1 = child
-				}
-			}
-		}
-		return findChildByPath(child1, path[1:]...)
+		key = remaining
 	}
-	var targetNode *base.Node
-	if strings.HasPrefix(splits[0], "@") {
-		splits[0] = splits[0][1:]
-		targetNode = findChildByPath(node.Ctx.GetItem("root").(*base.Node), splits...)
-	} else {
-		targetNode = findChildByPath(node, splits...)
-	}
-	if targetNode == nil {
-		return nil
-	}
-	return targetNode
+	return nil
 }
 
 func getNodeAttrByPath(node *base.Node, key string) (*base.Node, string) {
@@ -552,15 +539,16 @@ func SetParentLengthCache(parentNode *base.Node, childName string, l uint64) {
 	parentNode.Cfg.GetItem(CfgLengthCacheMap).(map[string]uint64)[childName] = l
 }
 func GetParentLengthCache(parentNode *base.Node, childName string) (uint64, bool) {
-	if parentNode.Cfg.Has(CfgLengthCacheMap) {
-		return parentNode.Cfg.GetItem(CfgLengthCacheMap).(map[string]uint64)[childName], true
+	if cache, ok := parentNode.Cfg.LookupItem(CfgLengthCacheMap); ok {
+		return cache.(map[string]uint64)[childName], true
 	}
 	return 0, false
 }
 func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	if node.Name == "root" {
-		if node.Cfg.Has(CfgLength) {
-			return node.Cfg.GetUint64(CfgLength), true, nil
+		if value, present := node.Cfg.LookupItem(CfgLength); present {
+			length, _ := base.InterfaceToUint64(value)
+			return length, true, nil
 		}
 		return math.MaxUint64, false, nil
 	}
@@ -588,12 +576,13 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	//parentRemaininigLength := uint64(0)
 	var length uint64
 	getLengthOK := false
-	if node.Cfg.Has(CfgLength) {
-		length = node.Cfg.GetUint64(CfgLength)
+	settings := node.Cfg.LengthSettings()
+	if settings.HasLength {
+		length = settings.Length
 		getLengthOK = true
 	} else {
-		if node.Cfg.Has(CfgType) {
-			typeName := node.Cfg.GetString(CfgType)
+		if settings.HasType {
+			typeName := settings.Type
 			ok := true
 			switch typeName {
 			case "int":
@@ -624,10 +613,10 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 			}
 		}
 		if !getLengthOK {
-			if node.Cfg.Has(CfgLengthFromField) {
+			if settings.HasField {
 				// 从field 读取length
-				if node.Cfg.Has(CfgLengthFromField) {
-					fieldName := node.Cfg.GetString(CfgLengthFromField)
+				{
+					fieldName := settings.Field
 					target := getNodeByPath(node, fieldName)
 					if target.Cfg.Has(CfgNodeResult) {
 						res := GetResultByNode(target)
@@ -861,6 +850,45 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 }
 
 func getNodeResultWithSettings(node *base.Node, isByte bool, settings base.ResultSettings) (any, error) {
+	var source nodeResultSource
+	return getNodeResultWithSource(node, isByte, settings, &source)
+}
+
+// A projection performs no writes or custom out expressions. Resolve the two
+// shared context objects once per contiguous context, rather than taking two
+// context locks for every leaf. The cache lives only for this traversal; mixed
+// contexts and replacements between separate projections remain observable.
+type nodeResultSource struct {
+	ctx    *base.NodeContext
+	buffer *bytes.Buffer
+	writer *base.BitWriter
+}
+
+func (s *nodeResultSource) resolve(ctx *base.NodeContext) {
+	if s.ctx == ctx && s.buffer != nil {
+		return
+	}
+	s.buffer = ctx.GetItem("buffer").(*bytes.Buffer)
+	s.writer = ctx.GetItem("writer").(*base.BitWriter)
+	s.ctx = ctx
+}
+
+// Both projection and discarded-result validation use this exact boundary
+// check, including the readable padding in a pending writer octet.
+func (s *nodeResultSource) checkedSpan(ctx *base.NodeContext, span [2]uint64) ([]byte, *base.BitWriter, error) {
+	s.resolve(ctx)
+	data, writer := s.buffer.Bytes(), s.writer
+	available := uint64(len(data))
+	if writer.PreIsBit {
+		available++
+	}
+	if span[1] < span[0] || span[1] > available*8 {
+		return nil, nil, fmt.Errorf("read bits error: invalid result span [%d, %d) for %d bytes", span[0], span[1], available)
+	}
+	return data, writer, nil
+}
+
+func getNodeResultWithSource(node *base.Node, isByte bool, settings base.ResultSettings, source *nodeResultSource) (any, error) {
 	endian := settings.Endian
 	if endian != "little" {
 		endian = "big"
@@ -892,18 +920,12 @@ func getNodeResultWithSettings(node *base.Node, isByte bool, settings base.Resul
 	} else {
 		resPoint = settings.Position.([2]uint64)
 	}
-	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
-	byts := buffer.Bytes()
-	writer := node.Ctx.GetItem("writer").(*base.BitWriter)
-	availableBytes := uint64(len(byts))
-	if writer.PreIsBit {
-		availableBytes++
-	}
 	// Seek directly to the containing octet. Reading and discarding the whole
 	// prefix allocates in proportion to the field offset for every Result call.
 	// Keep the pending writer octet (including its padding) readable as before.
-	if resPoint[1] < resPoint[0] || resPoint[1] > availableBytes*8 {
-		return nil, fmt.Errorf("read bits error: invalid result span [%d, %d) for %d bytes", resPoint[0], resPoint[1], availableBytes)
+	byts, writer, err := source.checkedSpan(node.Ctx, resPoint)
+	if err != nil {
+		return nil, err
 	}
 	byteStart, byteEnd := resPoint[0]/8, (resPoint[1]+7)/8
 	if composite && resPoint[0]%8 == 0 && resPoint[1]%8 == 0 && byteEnd <= uint64(len(byts)) {

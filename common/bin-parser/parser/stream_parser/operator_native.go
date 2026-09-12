@@ -8,21 +8,32 @@ import (
 // Register complete immutable bridge programs, not textual rewrites or a
 // purity inference for arbitrary Yak. Any different source uses the VM. The
 // successful program has exactly one native call and no observable locals.
-var nativeBridgePrograms = func() map[string]func(*base.Node, func(*base.Node) (func(bool), error)) error {
-	programs := make(map[string]func(*base.Node, func(*base.Node) (func(bool), error)) error)
+type nativeBridgeProgram struct {
+	parse  func(*base.Node, func(*base.Node) (func(bool), error)) error
+	decode func([]byte, *fieldArena) ([]tlsCertificateField, map[string]any, error)
+}
+
+var nativeBridgePrograms = func() map[string]nativeBridgeProgram {
+	programs := make(map[string]nativeBridgeProgram)
 	for _, family := range []struct {
 		name     string
 		profiles []string
 		call     func(*base.Node, func(*base.Node) (func(bool), error), string) error
+		decode   func([]byte, string, *fieldArena) ([]tlsCertificateField, map[string]any, error)
 	}{
-		{"parseMemcachedFields", []string{"stats-request", "stats-response", "binary-get-request"}, parseMemcachedFields},
-		{"parseCassandraFields", []string{"options4", "supported4", "startup4", "options5-initial", "supported5-initial", "startup5-initial", "internode-initiate-modern"}, parseCassandraFields},
+		{"parseMemcachedFields", []string{"stats-request", "stats-response", "binary-get-request"}, parseMemcachedFields, decodeMemcachedFieldsWithArena},
+		{"parseCassandraFields", []string{"options4", "supported4", "startup4", "options5-initial", "supported5-initial", "startup5-initial", "internode-initiate-modern"}, parseCassandraFields, decodeCassandraFieldsWithArena},
 	} {
 		for _, p := range family.profiles {
-			profile, call := p, family.call
+			profile, call, decode := p, family.call, family.decode
 			source := fmt.Sprintf("err = %s(%q)\nif err != nil { panic(err) }\n", family.name, profile)
-			programs[source] = func(node *base.Node, process func(*base.Node) (func(bool), error)) error {
-				return call(node, process, profile)
+			programs[source] = nativeBridgeProgram{
+				parse: func(node *base.Node, process func(*base.Node) (func(bool), error)) error {
+					return call(node, process, profile)
+				},
+				decode: func(wire []byte, arena *fieldArena) ([]tlsCertificateField, map[string]any, error) {
+					return decode(wire, profile, arena)
+				},
 			}
 		}
 	}
@@ -62,7 +73,7 @@ func execRegisteredNativeBridge(node *base.Node, source string, process func(*ba
 				result.panicValue = recover()
 			}
 		}()
-		result.err = call(node, process)
+		result.err = call.parse(node, process)
 		completed = true
 	}()
 	if result.err == nil && !result.panicked {

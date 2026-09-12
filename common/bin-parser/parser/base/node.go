@@ -162,10 +162,7 @@ func AppendConfig(parent, config *Config) *Config {
 }
 func CopyConfig(config *Config) *Config {
 	res := NewEmptyConfig()
-	config.data.ForEach(func(k string, v any) bool {
-		res.SetItem(k, v)
-		return true
-	})
+	config.data.copyInto(res.data)
 	return res
 }
 func NewConfig(config *Config) *Config {
@@ -190,6 +187,21 @@ func (n *Node) Result() (*NodeValue, error) {
 		return nil, err
 	}
 	return parser.Result(n)
+}
+
+// ValidateResult performs Result's validation and observable callbacks when
+// the caller will discard its value. Parsers may omit private result wrappers;
+// implementations without this optional capability still run Result normally.
+func (n *Node) ValidateResult() error {
+	parser, err := n.getParser()
+	if err != nil {
+		return err
+	}
+	if validator, ok := parser.(interface{ ValidateResult(*Node) error }); ok {
+		return validator.ValidateResult(n)
+	}
+	_, err = parser.Result(n)
+	return err
 }
 
 func (n *Node) Copy() *Node {

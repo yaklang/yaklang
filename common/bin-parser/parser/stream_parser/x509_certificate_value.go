@@ -221,17 +221,28 @@ func (r *x509DERReader) date(n *x509DERElement, name string) (string, error) {
 
 func (r *x509DERReader) field(n *x509DERElement) tlsCertificateField {
 	f := tlsCertificateField{Name: n.name, Start: n.start, End: n.end}
-	f.Children = []tlsCertificateField{
-		tlsCertificateLeaf("DER Tag", "raw", n.start, n.tagEnd),
-		tlsCertificateLeaf("DER Length Encoding", "raw", n.tagEnd, n.content),
+	// The validated DER tree already gives the exact child count. Allocate its
+	// projection once instead of repeatedly copying pointer-bearing descriptors.
+	bitString := n.tag == 3 || n.bitString || n.name == "Issuer Unique ID" || n.name == "Subject Unique ID"
+	count := 3
+	switch {
+	case n.payloadFields != nil:
+		count = 2 + len(n.payloadFields)
+	case n.tag&32 != 0 || n.embedded:
+		count = 2 + len(n.children)
+	case bitString:
+		count = 4
 	}
+	f.Children = make([]tlsCertificateField, 2, count)
+	f.Children[0] = tlsCertificateLeaf("DER Tag", "raw", n.start, n.tagEnd)
+	f.Children[1] = tlsCertificateLeaf("DER Length Encoding", "raw", n.tagEnd, n.content)
 	if n.payloadFields != nil {
 		f.Children = append(f.Children, n.payloadFields...)
 	} else if n.tag&32 != 0 || n.embedded {
 		for _, child := range n.children {
 			f.Children = append(f.Children, r.field(child))
 		}
-	} else if n.tag == 3 || n.bitString || n.name == "Issuer Unique ID" || n.name == "Subject Unique ID" {
+	} else if bitString {
 		f.Children = append(f.Children, tlsCertificateLeaf("Unused Bits", "uint8", n.content, n.content+1), tlsCertificateLeaf("Bit String Bytes", "raw", n.content+1, n.end))
 	} else {
 		typ := "raw"

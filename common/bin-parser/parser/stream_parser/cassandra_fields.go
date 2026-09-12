@@ -1,7 +1,6 @@
 package stream_parser
 
 import (
-	"bytes"
 	"fmt"
 	"hash/crc32"
 	"net"
@@ -21,6 +20,9 @@ type cassandraFieldsReader struct {
 	at, end, items, leaves int
 	err                    error
 	fields                 []tlsCertificateField
+	arena                  *fieldArena
+	direct                 bool
+	values                 []structuredFieldValue
 }
 
 func (r *cassandraFieldsReader) fail(s string) {
@@ -43,13 +45,29 @@ func (r *cassandraFieldsReader) take(name, typ string, n int) []byte {
 	r.leaves++
 	s := r.at
 	r.at += n
-	r.fields = append(r.fields, tlsCertificateLeaf(name, typ, s, r.at))
+	if r.direct {
+		var value any
+		if typ == "raw" {
+			value = r.arena.cloneBytes(r.wire[s:r.at])
+		}
+		r.values = r.arena.appendValue(r.values, name, value)
+	} else {
+		if len(r.fields) == cap(r.fields) {
+			fields := r.arena.allocate(max(8, 2*cap(r.fields)))[:len(r.fields)]
+			copy(fields, r.fields)
+			r.fields = fields
+		}
+		r.fields = append(r.fields, tlsCertificateLeaf(name, typ, s, r.at))
+	}
 	return r.wire[s:r.at]
 }
 func (r *cassandraFieldsReader) uint(name string, n int) uint64 {
 	var v uint64
 	for _, x := range r.take(name, "uint64", n) {
 		v = v<<8 | uint64(x)
+	}
+	if r.direct && r.err == nil {
+		r.values[len(r.values)-1].value = v
 	}
 	return v
 }
@@ -65,43 +83,90 @@ func (r *cassandraFieldsReader) item() bool {
 	return true
 }
 func (r *cassandraFieldsReader) group(name string, start, index int, list bool) {
-	children := append([]tlsCertificateField(nil), r.fields[index:]...)
+	if r.direct {
+		if r.err != nil {
+			return
+		}
+		value := projectCassandraValues(r.values[index:], list)
+		clear(r.values[index:])
+		r.values = r.arena.appendValue(r.values[:index], name, value)
+		return
+	}
+	children := r.arena.allocate(len(r.fields) - index)
+	copy(children, r.fields[index:])
 	r.fields = append(r.fields[:index], tlsCertificateField{Name: name, Start: start, End: r.at, List: list, Children: children})
 }
-func (r *cassandraFieldsReader) text(name string) map[string]any {
-	n := r.uint(name+" Length", 2)
+
+// Direct mode collapses validated groups as they finish. The exact same reader
+// enforces all wire boundaries and resource limits; no descriptor tree needs
+// to be copied and traversed afterwards. These maps/slices are never pooled.
+func projectCassandraValues(fields []structuredFieldValue, list bool) any {
+	if list {
+		values := make([]any, len(fields))
+		for i := range fields {
+			values[i] = fields[i].value
+		}
+		return values
+	}
+	values := make(map[string]any, len(fields))
+	for i := range fields {
+		values[fields[i].name] = fields[i].value
+	}
+	return values
+}
+func (r *cassandraFieldsReader) text(name, lengthName string) map[string]any {
+	n := r.uint(lengthName, 2)
 	s := r.at
 	b := r.take(name, "string", int(n))
 	if !utf8.Valid(b) {
 		r.fail("invalid UTF-8 in " + name)
 	}
-	return map[string]any{"Text": string(b), "Bytes": bytes.Clone(b), "Byte Range": [2]int{s, r.at}}
+	value := any(string(b))
+	if r.direct && r.err == nil {
+		r.values[len(r.values)-1].value = value
+	}
+	return map[string]any{"Text": value, "Bytes": r.arena.cloneBytes(b), "Byte Range": [2]int{s, r.at}}
 }
+func (r *cassandraFieldsReader) fieldCount() int {
+	if r.direct {
+		return len(r.values)
+	}
+	return len(r.fields)
+}
+
 func (r *cassandraFieldsReader) options(info map[string]any, multi bool) {
 	count := r.uint("Option Count", 2)
-	start, index := r.at, len(r.fields)
+	start, index := r.at, r.fieldCount()
 	var options []map[string]any
+	// A valid option needs two string-length fields even when both are empty.
+	// Bound speculative capacity by the wire as well as the existing item limit.
+	if capacity := min(int(count), cassandraFieldsMaxItems, (r.end-r.at)/4); capacity > 0 {
+		options = make([]map[string]any, 0, capacity)
+	}
 	hasVersion := false
 	for i := uint64(0); i < count && r.item(); i++ {
-		s, ix := r.at, len(r.fields)
-		key := r.text("Option Key")
+		s, ix := r.at, r.fieldCount()
+		key := r.text("Option Key", "Option Key Length")
 		if key["Text"] == "CQL_VERSION" {
 			hasVersion = true
 		}
 		m := map[string]any{"Key": key}
 		if multi {
 			n := r.uint("Option Value Count", 2)
-			vs, vi := r.at, len(r.fields)
+			vs, vi := r.at, r.fieldCount()
 			var values []map[string]any
+			if capacity := min(int(n), cassandraFieldsMaxItems-r.items, (r.end-r.at)/2); capacity > 0 {
+				values = make([]map[string]any, 0, capacity)
+			}
 			for j := uint64(0); j < n && r.item(); j++ {
-				valueStart, valueIndex := r.at, len(r.fields)
-				values = append(values, r.text("Option Value"))
+				valueStart, valueIndex := r.at, r.fieldCount()
+				values = append(values, r.text("Option Value", "Option Value Length"))
 				r.group("Value", valueStart, valueIndex, false)
 			}
 			r.group("Values", vs, vi, true)
 			m["Values"] = values
 		} else {
-			m["Value"] = r.text("Option Value")
+			m["Value"] = r.text("Option Value", "Option Value Length")
 		}
 		m["Byte Range"] = [2]int{s, r.at}
 		options = append(options, m)
@@ -141,7 +206,7 @@ func (r *cassandraFieldsReader) initiate(info map[string]any) {
 	}
 	s := r.at
 	address := r.take("Endpoint Address", "raw", int(length)-2)
-	info["Endpoint Address"] = map[string]any{"Bytes": bytes.Clone(address), "Byte Range": [2]int{s, r.at}, "Text": net.IP(address).String()}
+	info["Endpoint Address"] = map[string]any{"Bytes": r.arena.cloneBytes(address), "Byte Range": [2]int{s, r.at}, "Text": net.IP(address).String()}
 	info["Endpoint Port"] = r.uint("Endpoint Port", 2)
 	crcStart := r.at
 	want := r.uint("Message CRC32", 4)
@@ -161,11 +226,27 @@ func (r *cassandraFieldsReader) initiate(info map[string]any) {
 }
 
 func decodeCassandraFields(wire []byte, profile string) ([]tlsCertificateField, map[string]any, error) {
+	return decodeCassandraFieldsWithArena(wire, profile, nil)
+}
+
+func decodeCassandraFieldsWithArena(wire []byte, profile string, arena *fieldArena) ([]tlsCertificateField, map[string]any, error) {
 	if len(wire) < 9 || len(wire) > cassandraFieldsMaxBytes {
 		return nil, nil, fmt.Errorf("cassandra-fields: input boundary or resource limit")
 	}
-	r := &cassandraFieldsReader{wire: wire, end: len(wire)}
-	info := map[string]any{"Layout Context": profile, "Context Is Caller Supplied": true, "Session State Validated": false, "TCP Reassembly Performed": false, "Query Executed": false, "Byte Ranges Are Message Relative": true}
+	r := &cassandraFieldsReader{wire: wire, end: len(wire), arena: arena, direct: arena != nil && arena.outputReserve > 0}
+	if r.direct {
+		r.values = arena.values[:0]
+	}
+	capacity := 15
+	switch profile {
+	case "options4", "options5-initial":
+		capacity = 13
+	case "internode-initiate-modern":
+		capacity = 22
+	}
+	info := make(map[string]any, capacity)
+	info["Layout Context"], info["Context Is Caller Supplied"], info["Session State Validated"] = profile, true, false
+	info["TCP Reassembly Performed"], info["Query Executed"], info["Byte Ranges Are Message Relative"] = false, false, true
 	if profile == "internode-initiate-modern" {
 		info["Protocol"] = "Cassandra Internode"
 		r.initiate(info)
@@ -226,11 +307,17 @@ func decodeCassandraFields(wire []byte, profile string) ([]tlsCertificateField, 
 	if r.err != nil {
 		return nil, nil, r.err
 	}
+	if r.direct {
+		arena.structuredValue = projectCassandraValues(r.values, false)
+		return nil, info, nil
+	}
 	return r.fields, info, nil
 }
 
 func parseCassandraFields(node *base.Node, process func(*base.Node) (func(bool), error), profile string) error {
+	arena := acquireFieldArena()
+	defer arena.release()
 	return parseCertificateFieldTree(node, process, func(wire []byte) ([]tlsCertificateField, map[string]any, error) {
-		return decodeCassandraFields(wire, profile)
+		return decodeCassandraFieldsWithArena(wire, profile, arena)
 	}, "cassandra-fields")
 }

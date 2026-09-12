@@ -99,3 +99,25 @@ func TestRulePlanEmptyDocumentReplacementPreservesOrigin(t *testing.T) {
 		require.Equal(t, document, n.Origin)
 	}
 }
+
+func TestRulePlanPrefixPrivateMutation(t *testing.T) {
+	var doc yaml.MapSlice
+	require.NoError(t, yaml.Unmarshal([]byte("Package:\n  First: 'type:uint16;length:16;type:uint32;length:7'\n  endian: little\n  Second: raw,2\n"), &doc))
+	a, err := instantiateRuleDocument(t.Name(), doc)
+	require.NoError(t, err)
+	b, err := instantiateRuleDocument(t.Name(), doc)
+	require.NoError(t, err)
+	first := a.Children[0].Children[0].Cfg
+	other := b.Children[0].Children[0].Cfg
+	require.NotNil(t, first.data.prefix)
+	require.Same(t, first.data.prefix, other.data.prefix)
+	first.SetItem(CfgType, "mutated")
+	first.GetItem(CfgOptionFuns).([]NodeConfigFun)[0] = func(target *Config) { target.SetItem(CfgEndian, "edited") }
+	first.DeleteItem(CfgLength)
+	a.Children[0].Origin.(yaml.MapSlice)[0].Value = "changed"
+	c, err := instantiateRuleDocument(t.Name(), doc)
+	require.NoError(t, err)
+	require.Equal(t, rulePlanTestSnapshot(b), rulePlanTestSnapshot(c))
+	require.Equal(t, "big", other.GetString(CfgEndian))
+	require.Equal(t, "little", b.Children[0].Children[1].Cfg.GetString(CfgEndian))
+}

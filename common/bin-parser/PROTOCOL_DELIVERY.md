@@ -4,7 +4,7 @@
 
 交付物是 YAML 规则 + 走 `parser.ParseBinary` 的测试，不是旁路实现。
 
-**2026-09 修订（针对机械 A 返工）：**
+**评分约束：**
 
 - **去掉 leftover 不等于 Schema 25。** 无界 `*: raw` 清掉、再加几个 `uint8` 和一句 `if`，最高只到 15。25 分要求：leftover 合法 **并且** 有真实 TLV/列表循环 **并且** type/command 分发 **并且** 足够多的具名标量。
 - **禁止 leftover 改名刷分。** `Body`/`Payload`/`Data`/`Rest` 从 `raw` 改成 `string` 仍算未完成 leftover。

@@ -240,6 +240,29 @@ func decodeTDSFields(wire []byte, profile string) ([]tlsCertificateField, map[st
 	// TDS header is raw fragments; its decoded value and all spans live in info.
 	// This never publishes a numeric field spanning a packet header.
 	list := tlsCertificateField{Name: "TDS Packets", Start: 0, End: len(wire), List: true}
+	if len(r.packets) == 1 {
+		// With one packet every logical leaf has the same physical +8 offset,
+		// including zero-width values. No fragment ranges/search/copy pass is
+		// needed; metadata still keeps its complete independent wire ranges.
+		if len(r.fields)+6 > tdsFieldsMaxLeaves {
+			return framingError("projected field resource limit")
+		}
+		fs := make([]tlsCertificateField, 6+len(r.fields))
+		fs[0] = tlsCertificateLeaf("Type", "uint8", 0, 1)
+		fs[1] = tlsCertificateLeaf("Status", "uint8", 1, 2)
+		fs[2] = tlsCertificateLeaf("Length", "uint16", 2, 4)
+		fs[3] = tlsCertificateLeaf("SPID", "uint16", 4, 6)
+		fs[4] = tlsCertificateLeaf("PacketID", "uint8", 6, 7)
+		fs[5] = tlsCertificateLeaf("Window", "uint8", 7, 8)
+		for i, f := range r.fields {
+			f.Start += 8
+			f.End += 8
+			fs[6+i] = f
+		}
+		list.Children = []tlsCertificateField{{Name: "TDS Packet", Start: 0, End: len(wire), Children: fs}}
+		info["Value Count"] = r.values
+		return []tlsCertificateField{list}, info, nil
+	}
 	fragments := make([][]tlsCertificateField, len(r.packets))
 	for _, f := range r.fields {
 		for _, span := range r.ranges(f.Start, f.End) {

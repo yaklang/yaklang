@@ -11,12 +11,6 @@ func init() {
 	formatters["default"] = ToMap
 }
 func ToMap(node *base.Node) (*base.NodeValue, error) {
-	isPackage := func(node *base.Node) bool {
-		if node.Name == "Package" && node.Cfg.GetItem(CfgParent) == node.Ctx.GetItem("root") {
-			return true
-		}
-		return false
-	}
 	if NodeHasResult(node) {
 		// A processed, empty list can carry an exact zero-width wire span.
 		// Preserve its collection type; dormant lists without a result still
@@ -50,20 +44,7 @@ func ToMap(node *base.Node) (*base.NodeValue, error) {
 		return res, nil
 	} else {
 		res := newStructNodeValue(node)
-		//res := map[string]any{}
-		var getSubs func(node *base.Node) []*base.Node
-		getSubs = func(node *base.Node) []*base.Node {
-			children := []*base.Node{}
-			for _, sub := range node.Children {
-				if sub.Cfg.GetBool(CfgIsRefType) || sub.Cfg.GetBool("unpack") || isPackage(sub) {
-					children = append(children, getSubs(sub)...)
-				} else {
-					children = append(children, sub)
-				}
-			}
-			return children
-		}
-		children := getSubs(node)
+		children := collectResultChildren(nil, node)
 		for _, sub := range children {
 			d, err := sub.Result()
 			if err != nil {

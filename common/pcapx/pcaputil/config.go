@@ -33,6 +33,10 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
+	binParserConfig       *BinParserConfig
+	binParser             *binParser
+	recorder              *captureWriter
+	captureBuffer         int
 	reassemblyOptions     TCPReassemblyOptions
 	requiresFullStream    bool
 	Context               context.Context
@@ -520,6 +524,11 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk && packet.TransportLayer() != nil {
+		if c.binParser != nil {
+			if udp, ok := packet.TransportLayer().(*layers.UDP); ok {
+				c.binParser.datagram(packet, udp)
+			}
+		}
 		return // Do not decode unrelated UDP applications just to inspect errors.
 	}
 	// A decoder can expose a partially populated TCP layer before returning

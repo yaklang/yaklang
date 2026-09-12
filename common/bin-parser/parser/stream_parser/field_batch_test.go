@@ -147,3 +147,55 @@ func TestExactByteBatchWideCertificateList(t *testing.T) {
 	walk(n)
 	require.Equal(t, uint64(len(wire)*8), n.Ctx.GetUint64("pointer"))
 }
+
+func TestExactByteBatchInitializationHistory(t *testing.T) {
+	parent := base.NewEmptyConfig()
+	parent.SetItems(base.ConfigItem{Key: CfgEndian, Value: "big"}, base.ConfigItem{Key: "parser", Value: "default"}, base.ConfigItem{Key: "unit", Value: "byte"})
+	n := &base.Node{Name: "Message", Cfg: base.NewConfig(parent)}
+	fields := []tlsCertificateField{
+		{Name: "Values", Start: 0, End: 2, List: true, Children: []tlsCertificateField{
+			{Name: "First", Type: "uint8", Start: 0, End: 1},
+			{Name: "Second", Type: "uint8", Start: 1, End: 2, Endian: "little"},
+		}},
+		{Name: "Tail", Type: "raw", Start: 2, End: 3},
+	}
+	require.NoError(t, buildExactByteFieldTree(n, fields, nil, 0, 24, "history", "big"))
+	defaults := []base.ConfigItem{{Key: CfgEndian, Value: "big"}, {Key: "parser", Value: "default"}, {Key: "unit", Value: "byte"}}
+	check := func(cfg *base.Config, want []base.ConfigItem) {
+		callbacks := cfg.GetItem(base.CfgOptionFuns).([]base.NodeConfigFun)
+		require.Len(t, callbacks, len(want))
+		for i, callback := range callbacks {
+			target := base.NewEmptyConfig()
+			callback(target)
+			require.True(t, target.Has(want[i].Key), "history entry %d", i)
+			if node, ok := want[i].Value.(*base.Node); ok {
+				require.Same(t, node, target.GetItem(want[i].Key))
+			} else {
+				require.Equal(t, want[i].Value, target.GetItem(want[i].Key))
+			}
+		}
+	}
+	list := n.Children[0]
+	// The original staging parent remains in the early replay entries; only
+	// the final write publishes the root's real parent. Do not deduplicate it.
+	firstParent := base.NewEmptyConfig()
+	list.Cfg.GetItem(base.CfgOptionFuns).([]base.NodeConfigFun)[3](firstParent)
+	staged := firstParent.GetItem(CfgParent).(*base.Node)
+	require.NotSame(t, n, staged)
+	check(list.Cfg, append(append([]base.ConfigItem(nil), defaults...),
+		base.ConfigItem{Key: CfgParent, Value: staged}, base.ConfigItem{Key: CfgLength, Value: uint64(16)},
+		base.ConfigItem{Key: CfgIsList, Value: true}, base.ConfigItem{Key: CfgParent, Value: staged}, base.ConfigItem{Key: CfgParent, Value: n}))
+	for i, child := range list.Children {
+		want := append(append([]base.ConfigItem(nil), defaults...), base.ConfigItem{Key: CfgIsTerminal, Value: true}, base.ConfigItem{Key: CfgType, Value: "uint8"},
+			base.ConfigItem{Key: CfgNodeResult, Value: [2]uint64{uint64(i * 8), uint64((i + 1) * 8)}})
+		if i == 1 {
+			want = append(want, base.ConfigItem{Key: CfgEndian, Value: "little"})
+		}
+		want = append(want, base.ConfigItem{Key: CfgParent, Value: list}, base.ConfigItem{Key: CfgLength, Value: uint64(8)},
+			base.ConfigItem{Key: CfgIsList, Value: false}, base.ConfigItem{Key: CfgElementIndex, Value: i}, base.ConfigItem{Key: CfgParent, Value: list})
+		if i == 1 {
+			want = append(want, base.ConfigItem{Key: CfgLastNode, Value: true})
+		}
+		check(child.Cfg, want)
+	}
+}
