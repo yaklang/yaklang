@@ -10,10 +10,11 @@ import (
 	binparser "github.com/yaklang/yaklang/common/bin-parser/parser"
 )
 
-// BinParserEvent owns its bytes and structured values. It never retains a
-// pooled TrafficFlow/TrafficConnection. Callbacks may run concurrently for
-// different flows; messages in one TCP flow are delivered in order.
-type BinParserEvent struct {
+// ProtocolEvent owns its bytes and structured values. It never retains a
+// pooled TrafficFlow/TrafficConnection. WithOnProtocolMessage serializes delivery;
+// legacy WithBinParser callbacks may run concurrently for different flows.
+// Messages in one TCP flow are delivered in order.
+type ProtocolEvent struct {
 	ID, FlowID                               uint64
 	Timestamp                                time.Time
 	Transport, Source, Destination, Protocol string
@@ -22,6 +23,8 @@ type BinParserEvent struct {
 	Length                                   int
 	Status, Summary, Rule, Entry, Error      string
 	Raw                                      []byte
+	Fields                                   map[string]any // complete protocol fields; owned by this event
+	Metadata                                 any
 	Structured                               map[string]any
 	plan                                     *binparser.StructuredPlan
 	decodeSkip                               int
@@ -29,21 +32,24 @@ type BinParserEvent struct {
 	historySequence                          uint64
 }
 
+// BinParserEvent is retained for source compatibility. Use ProtocolEvent.
+type BinParserEvent = ProtocolEvent
+
 // Decode parses a complete event on demand. Incomplete/unrecognized samples
 // cannot be decoded as if they were messages. The returned object belongs to
 // the caller; no JSON conversion takes place.
-func (e *BinParserEvent) Decode() (map[string]any, error) {
+func (e *ProtocolEvent) Decode() (map[string]any, error) {
 	if e.Structured != nil {
 		return e.Structured, nil
 	}
 	if e.Status != "deferred" && e.Status != "decoded" && e.Status != "malformed" {
-		return nil, fmt.Errorf("bin-parser: event is %s, not an exact message", e.Status)
+		return nil, fmt.Errorf("protocol parser: event is %s, not an exact message", e.Status)
 	}
 	if e.Rule == "" {
-		return nil, fmt.Errorf("bin-parser: no exact rule for this message")
+		return nil, fmt.Errorf("protocol parser: no exact rule for this message")
 	}
 	if e.decodeSkip > len(e.Raw) {
-		return nil, fmt.Errorf("bin-parser: incomplete transport prefix")
+		return nil, fmt.Errorf("protocol parser: incomplete transport prefix")
 	}
 	wire := e.Raw[e.decodeSkip:]
 	if e.decodeConfig != nil {
@@ -56,6 +62,31 @@ func (e *BinParserEvent) Decode() (map[string]any, error) {
 		return binparser.ParseStructured(wire, e.Rule)
 	}
 	return binparser.ParseStructured(wire, e.Rule, e.Entry)
+}
+
+// GetFields returns the protocol field tree directly, also for deferred events.
+// Decode remains the compatibility API returning the fields/metadata envelope.
+func (e *ProtocolEvent) GetFields() (map[string]any, error) {
+	if e.Fields != nil {
+		return e.Fields, nil
+	}
+	result, err := e.Decode()
+	if err != nil {
+		return nil, err
+	}
+	return protocolFields(result), nil
+}
+
+func protocolFields(result map[string]any) map[string]any {
+	if fields, ok := result["fields"].(map[string]any); ok {
+		return fields
+	}
+	return result
+}
+
+func (e *ProtocolEvent) setStructured(result map[string]any) {
+	e.Structured = result
+	e.Fields, e.Metadata = protocolFields(result), result["metadata"]
 }
 
 // BinParserBinding admits an explicit protocol profile. Frame returns the
@@ -79,12 +110,15 @@ type BinParserConfig struct {
 	Bindings                                      []BinParserBinding
 }
 
-type BinParserStats struct {
+type ProtocolStats struct {
 	ContextRequired                                                                uint64
 	Flows, ProbeCalls, Messages, Decoded, Deferred, Malformed, Incomplete, Unknown uint64
 	InputBytes, MessageBytes, UnclassifiedBytes, LimitedBytes, CallbackPanics      uint64
 	BufferedBytes, PeakBufferedBytes                                               int64
 }
+
+// BinParserStats is retained for source compatibility. Use ProtocolStats.
+type BinParserStats = ProtocolStats
 
 // WithBinParser enables full structured parsing after TCP framing and for
 // supported UDP datagrams. It reuses pcapx's flow workers, applies bounded
@@ -147,16 +181,13 @@ type binParser struct {
 type binParserError struct{ err error }
 
 func (c *CaptureConfig) prepareBinParser() error {
-	if c.binParserConfig == nil {
+	if c.binParserConfig == nil || (c.binParserConfig.OnEvent == nil && c.binParserConfig.OnStats == nil) {
 		return nil
 	}
 	if c.DisableAssembly || c.EnableCache || c.requiresFullStream {
-		return fmt.Errorf("bin-parser requires exclusive streaming reassembly; disable capture cache and built-in full-stream HTTP/TLS helpers")
+		return fmt.Errorf("protocol parser requires exclusive streaming reassembly; disable capture cache and built-in full-stream HTTP/TLS helpers")
 	}
 	config := *c.binParserConfig
-	if config.OnEvent == nil {
-		return fmt.Errorf("bin-parser requires an event callback")
-	}
 	if config.MaxMessageBytes == 0 {
 		config.MaxMessageBytes = 1 << 20
 	}
@@ -167,7 +198,7 @@ func (c *CaptureConfig) prepareBinParser() error {
 		config.ProbeBytes = 64
 	}
 	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 16<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
-		return fmt.Errorf("invalid bin-parser buffer/probe limits")
+		return fmt.Errorf("invalid protocol parser buffer/probe limits")
 	}
 	a := &binParser{config: config, specs: make(map[string]*binSpec)}
 	a.bindings = make(map[uint16][]*BinParserBinding)
@@ -176,7 +207,7 @@ func (c *CaptureConfig) prepareBinParser() error {
 	}
 	for _, b := range config.Bindings {
 		if b.Protocol == "" || b.Rule == "" || b.Probe == nil || b.Frame == nil {
-			return fmt.Errorf("bin-parser binding requires protocol, rule, probe and frame")
+			return fmt.Errorf("protocol binding requires protocol, rule, probe and frame")
 		}
 		a.addSpec(b.Rule, b.Entry)
 	}
@@ -217,11 +248,15 @@ func (c *CaptureConfig) finishBinParser() error {
 }
 
 func (a *binParser) emit(e *BinParserEvent) {
+	if a.config.OnEvent == nil {
+		return
+	}
+	e.setStructured(e.Structured)
 	e.ID = a.ids.Add(1)
 	defer func() {
 		if p := recover(); p != nil {
 			a.panics.Add(1)
-			a.err.CompareAndSwap(nil, &binParserError{fmt.Errorf("bin-parser callback panic: %v", p)})
+			a.err.CompareAndSwap(nil, &binParserError{fmt.Errorf("protocol callback panic: %v", p)})
 		}
 	}()
 	a.config.OnEvent(e)
@@ -319,7 +354,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	a, d := f.a, &f.directions[dir]
 	defer func() {
 		if p := recover(); p != nil {
-			a.err.CompareAndSwap(nil, &binParserError{fmt.Errorf("bin-parser flow panic: %v", p)})
+			a.err.CompareAndSwap(nil, &binParserError{fmt.Errorf("protocol flow panic: %v", p)})
 			a.malformed.Add(1)
 			d.stopped = true
 			f.release(d)
@@ -492,16 +527,19 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 	}
 }
 
-// BinParserInspector is a bounded message history for CLI/Yak viewing. It
+// ProtocolInspector is a bounded message history for CLI/Yak viewing. It
 // retains raw messages and routing metadata, not eager field trees. Details
 // decode outside the capture lock. Eviction is observable, never capture loss.
-type BinParserInspector struct {
+type ProtocolInspector struct {
 	mu                           sync.Mutex
 	rows                         []*BinParserEvent
 	head, count, bytes, maxBytes int
 	evicted                      uint64
 	received                     uint64
 }
+
+// BinParserInspector is retained for source compatibility. Use ProtocolInspector.
+type BinParserInspector = ProtocolInspector
 
 func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 	if messages <= 0 || messages > 1000000 || bytes <= 0 {
@@ -512,7 +550,8 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	row := *e
-	row.Structured = nil
+	row.Structured, row.Fields = nil, nil
+	row.Metadata = nil
 	row.Raw = append([]byte(nil), e.Raw...)
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -572,7 +611,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 		if err != nil {
 			return row, err
 		}
-		row.Structured = result
+		row.setStructured(result)
 		row.Status = "decoded"
 	}
 	return row, nil

@@ -1,6 +1,0 @@
-PASS
-ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil/tests	0.481s
-PASS
-ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil	4.850s
-
-Detailed case counts are in test-summary.json; full JSON log was summarized.

@@ -18,24 +18,38 @@ import (
 // It preserves nanosecond timestamps. BPF and native handle hooks require
 // OpenPcapFile instead; they are never silently ignored here.
 func ReplayPcapFile(filename string, options ...CaptureOption) error {
-	f, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return ReplayPcap(f, options...)
-}
-
-// ReplayPcap borrows the reader until return, drains accepted worker jobs at EOF
-// or cancellation, and does not close the caller's reader. A blocking custom
-// reader must provide its own cancellation (ordinary file reads are bounded).
-func ReplayPcap(input io.Reader, options ...CaptureOption) (resultErr error) {
 	conf := NewDefaultConfig()
 	for _, option := range options {
 		if err := option(conf); err != nil {
 			return err
 		}
 	}
+	return replayFileWithConfig(filename, conf)
+}
+
+func replayFileWithConfig(filename string, conf *CaptureConfig) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return replayWithConfig(f, conf)
+}
+
+// ReplayPcap borrows the reader until return, drains accepted worker jobs at EOF
+// or cancellation, and does not close the caller's reader. A blocking custom
+// reader must provide its own cancellation (ordinary file reads are bounded).
+func ReplayPcap(input io.Reader, options ...CaptureOption) error {
+	conf := NewDefaultConfig()
+	for _, option := range options {
+		if err := option(conf); err != nil {
+			return err
+		}
+	}
+	return replayWithConfig(input, conf)
+}
+
+func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 	if conf.captureBuffer > 0 || conf.BPFFilter != "" || conf.onNetInterfaceCreated != nil || conf.EnableCache || len(conf.DeviceAdapter) != 0 || len(conf.Device) != 0 {
 		return fmt.Errorf("ReplayPcap: BPF, devices, native handle callbacks and capture cache require a native capture")
 	}
@@ -66,6 +80,11 @@ func ReplayPcap(input io.Reader, options ...CaptureOption) (resultErr error) {
 		}
 		read, link = r.read, r.link
 	}
+	closeOutput, err := conf.openCaptureOutput()
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, closeOutput()) }()
 	if conf.recorder != nil && ng == nil {
 		if err := conf.recorder.init(link); err != nil {
 			return err

@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"fmt"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/gopacket/gopacket"
@@ -42,6 +43,9 @@ func WithCaptureBufferSize(size int) CaptureOption {
 // The caller owns the writer and must flush/close it after Start/ReplayPcap.
 func WithCaptureWriter(w io.Writer) CaptureOption {
 	return func(c *CaptureConfig) error {
+		if c.outputFile != "" {
+			return fmt.Errorf("choose an output file or a capture writer")
+		}
 		if w == nil {
 			return fmt.Errorf("capture writer is nil")
 		}
@@ -51,6 +55,46 @@ func WithCaptureWriter(w io.Writer) CaptureOption {
 		c.recorder = &captureWriter{output: w}
 		return nil
 	}
+}
+
+// pcap_outputFile 将捕获到的原始包保存为新的 pcap 文件，配合 StartSniff 或 OpenPcapFile 使用。
+// 文件在捕获/回放开始时创建，结束或出错时由 pcapx 关闭；已存在的文件不会被覆盖。
+// 保存发生在协议分析前，回调中的显示筛选不影响保存内容，BPF 输入过滤仍生效。
+// 输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。写入失败会返回错误。
+//
+// 参数:
+//   - filename: 尚不存在的非空输出文件路径，父目录必须存在。不能与 pcap_captureWriter 同时使用。
+//
+// 返回值:
+//   - 抓包配置选项。
+//
+// Example:
+// ```
+// pcapx.OpenPcapFile("input.pcapng", pcapx.pcap_outputFile("output.pcap"))~
+// ```
+func WithOutputFile(filename string) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if filename == "" {
+			return fmt.Errorf("capture output filename is empty")
+		}
+		if c.recorder != nil {
+			return fmt.Errorf("choose an output file or a capture writer")
+		}
+		c.outputFile = filename
+		return nil
+	}
+}
+
+func (c *CaptureConfig) openCaptureOutput() (func() error, error) {
+	if c.outputFile == "" {
+		return func() error { return nil }, nil
+	}
+	f, err := os.OpenFile(c.outputFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return nil, err
+	}
+	c.recorder = &captureWriter{output: f}
+	return f.Close, nil
 }
 
 type captureWriter struct {

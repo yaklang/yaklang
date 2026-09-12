@@ -216,7 +216,33 @@ func (p *TrafficPool) Stats() TCPReassemblyStats {
 	return s
 }
 
-// WithTCPReassemblyStats reports the final, drained multi-worker counters.
+// pcap_onTCPReassemblyStats 注册捕获及 TCP 重组的最终统计回调，支持单 worker 和多 worker。
+// 捕获启动后，在结束并处理完已接收任务时回调一次；初始化失败时不保证回调。
+// CapturedPackets/CapturedBytes 是已读取的包数/字节数；AcceptedPackets/ProcessedPackets
+// 是重组任务计数。它们均不是协议消息数，协议分析统计使用 pcap_onProtocolStats。
+// 实时抓包的 Devices 包含驱动统计；仅当 Available 为 true 时才能使用 Dropped 和
+// InterfaceDropped 判断丢包，false 不表示零丢包。纯 Go 文件回放没有驱动统计。
+//
+// 参数:
+//   - callback: 接收 TCPReassemblyStats 的函数。最后一次配置生效，nil 取消订阅。
+//
+// 返回值:
+//   - 抓包配置选项。
+//
+// Example:
+// ```
+//
+//	pcapx.OpenPcapFile("session.pcap", pcapx.pcap_onTCPReassemblyStats(func(stats) {
+//	    println(stats.CapturedPackets, stats.CapturedBytes)
+//	}))~
+//
+// ```
+func WithOnTCPReassemblyStats(callback func(stats TCPReassemblyStats)) CaptureOption {
+	return WithTCPReassemblyStats(callback)
+}
+
+// WithTCPReassemblyStats reports final capture and reassembly counters.
+// Deprecated: use WithOnTCPReassemblyStats (pcapx.pcap_onTCPReassemblyStats in Yak).
 func WithTCPReassemblyStats(h func(TCPReassemblyStats)) CaptureOption {
 	return func(c *CaptureConfig) error { c.onReassemblyStats = h; return nil }
 }
