@@ -1,5 +1,8 @@
 # pcapx + bin-parser：抓包、初步解析和回放
 
+新脚本从 [pcapx 协议解析 API](PROTOCOL_PARSER.md) 和 [shark.yak](../examples/shark.yak)
+开始。本文保留底层集成与旧 API 的兼容参考；新代码使用 `pcap_onProtocolMessage` 和 `Fields`。
+
 这条链路提供类似 Wireshark 的基本工作流：选网卡 → 抓取原包 → TCP 重组 → 识别
 已支持协议 → 按完整消息解析字段 → 查看/筛选会话 → 保存后回放。它是消息分析工具，
 当前没有 Wireshark 的完整协议覆盖、逐包 GUI、TLS 解密或专家诊断功能。

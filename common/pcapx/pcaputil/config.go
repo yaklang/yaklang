@@ -36,6 +36,7 @@ type CaptureConfig struct {
 	binParserConfig       *BinParserConfig
 	binParser             *binParser
 	recorder              *captureWriter
+	outputFile            string
 	captureBuffer         int
 	reassemblyOptions     TCPReassemblyOptions
 	requiresFullStream    bool
@@ -571,7 +572,9 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 }
 
 func NewDefaultConfig() *CaptureConfig {
-	return &CaptureConfig{wg: new(sync.WaitGroup)}
+	// Protocol analysis is built in. Preparing plans is deferred until a
+	// message or statistics consumer is attached, so raw capture stays cheap.
+	return &CaptureConfig{wg: new(sync.WaitGroup), binParserConfig: &BinParserConfig{}}
 }
 
 func WithCaptureStartedCallback(callback func()) CaptureOption {

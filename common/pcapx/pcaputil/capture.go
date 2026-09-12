@@ -79,10 +79,15 @@ func Start(opt ...CaptureOption) (resultErr error) {
 			return utils.Errorf("set option failed: %s", err)
 		}
 	}
+	// File users share one API. Use the driver-free reader unless an option
+	// actually needs a native handle (for example a BPF program).
+	if conf.Filename != "" && conf.BPFFilter == "" && conf.onNetInterfaceCreated == nil && !conf.EnableCache && conf.captureBuffer == 0 && len(conf.DeviceAdapter) == 0 && len(conf.Device) == 0 {
+		return replayFileWithConfig(conf.Filename, conf)
+	}
 	if err := conf.prepareBinParser(); err != nil {
 		return err
 	}
-	if (conf.recorder != nil || conf.captureBuffer > 0) && conf.EnableCache {
+	if (conf.recorder != nil || conf.outputFile != "" || conf.captureBuffer > 0) && conf.EnableCache {
 		return errors.New("capture writer/buffer requires an exclusive capture handle")
 	}
 	if conf.captureBuffer > 0 && conf.Filename != "" {
@@ -94,6 +99,11 @@ func Start(opt ...CaptureOption) (resultErr error) {
 	if conf.reassemblyOptions.Workers > 1 && conf.EnableCache {
 		return utils.Errorf("TCP workers require an exclusive capture handle; disable capture cache")
 	}
+	closeOutput, err := conf.openCaptureOutput()
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, closeOutput()) }()
 	handlers := omap.NewOrderedMap(map[string]PcapHandleOperation{})
 	if conf.requiresExclusiveHandle() {
 		defer handlers.ForEach(func(_ string, op PcapHandleOperation) bool {

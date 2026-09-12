@@ -6,7 +6,7 @@ pcapx 提供实时抓包/文件回放、TCP 重组、有限协议探测、消息
 
 | 文档 | 内容 |
 |---|---|
-| [抓包、初步解析与回放](../pcapx/pcaputil/BIN_PARSER.md) | 类 Wireshark 基本工作流、CLI、Yak/Go API、当前自动协议范围 |
+| [抓包、初步解析与回放](../pcapx/pcaputil/PROTOCOL_PARSER.md) | shark.yak、pcapx 编程 API、当前自动协议范围 |
 | [消息解析 API](API.md) | ParseStructured / PrepareStructured、完整消息和上下文合同 |
 | [协议实现 TODO](PROTOCOL_TODO.md) | 路线图、未完成模型和实时协议接入任务 |
 | [最终性能与边界](PERFORMANCE.md) | 当前实测结果、失败边界和复现入口 |
