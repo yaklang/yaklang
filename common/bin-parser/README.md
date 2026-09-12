@@ -54,16 +54,14 @@ go generate ./common/bin-parser/rules
 goroutine。结构化入口索引及规则指纹校验也延迟到首次使用。解压上限为 32 MiB。
 ReadFile 返回独立副本；内部文件视图共享不可变归档，避免逐文件内容缓冲的重复分配。
 规则正文的 LF 字节、字段语义和计划校验一致，使用现有纯 Go zstd，无新增 CGO。
-测试逐文件检查源码与归档相同，CI 校验生成结果没有漂移。
+协议解析测试逐文件检查源码与归档一致。
 
 ## 开发与验证
 
 ```sh
 go generate ./common/bin-parser
 go generate ./common/bin-parser/rules
-go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=15m
-go test ./common/pcapx/pcaputil ./common/pcapx/cmd/... -count=1 -timeout=5m
-go test -race ./common/utils/embeddedfs ./common/bin-parser/rules ./common/bin-parser/parser/... -count=1 -timeout=5m
+go test ./common/bin-parser/... -count=1 -timeout=5m
 ```
 
 后续优先逐协议补齐字段、协商状态和实时入口。保留全部回归正负样本和来源；
