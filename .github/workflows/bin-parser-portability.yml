@@ -56,7 +56,9 @@ jobs:
           go env GOOS GOARCH CGO_ENABLED CC
           test "$(go env GOARCH)" = "${{ matrix.arch }}"
       - name: Test complete bin-parser package
-        run: go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=5m
+        # Exhaustive corpus/prefix checks exceed five minutes on hosted Intel Macs.
+        # Keep every case and assertion; allow a bounded native compatibility run.
+        run: go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=10m
       - name: Verify generated rules and protocol inventory
         run: |
           go generate ./common/bin-parser/rules ./common/bin-parser
