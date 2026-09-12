@@ -14,14 +14,14 @@ import (
 // 核心约定 (与 high_static_section.txt 的 "## 任务状态机制: TODO" 的 "对任务终结的影响"子节
 // 以及 "统一入口与终结" 对齐): directly_answer 只交付答复, 不应被当成
 // 通用终结器. 普通任务由 finish 收口; 但 intent classifier 已明确标记为
-// simple_query、本轮无有效 todo_delta 且无开放 TODO 时, host 在答复交付后
+// simple_query、本轮无有效 todo_delta 且无当前任务 TODO 历史时, host 在答复交付后
 // 直接 Exit, 避免为了补一个 finish 再次调模型.
 //
 // 语义分支:
 //   - 携带 todo_delta 增量: timeline 标注循环将继续推进这些 TODO 更新.
 //   - 未携带增量: timeline 标注答复已交付, 需要时用 finish 收尾. 若当前任务
-//     仍有未关闭 (pending/doing) TODO, 额外 Feedback 提醒 AI 先把 TODO 关掉
-//     再 finish (finish 会被 blocked-by-todo 闸门拦住, 提前告知更顺滑).
+//     仍有未关闭 (pending/doing) TODO, 继续执行; 只有实际请求 finish 时
+//     才触发 blocked-by-todo 提示.
 //
 // 注意: todo_delta 增量的 store apply 由主循环 (exec.go 的
 // applyTodoDeltaBottomLine) 在 ActionHandler 之前完成, 所以这里
@@ -91,7 +91,7 @@ func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicomm
 // ShouldAutoFinishAfterSimpleQueryDirectlyAnswer identifies the narrow host
 // guard for greetings, status checks, and other classifier-approved trivial
 // inquiries. No extra model round is useful when the answer was delivered and
-// neither todo_delta nor the persistent TODO store contains remaining work.
+// neither todo_delta nor the current task TODO history indicates work.
 func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
 	if loop == nil || action == nil || strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
 		return false
@@ -101,6 +101,12 @@ func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aic
 	}
 	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 		return false
+	}
+	if cfg := loop.GetConfig(); cfg != nil {
+		open, _, closed := cfg.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(loop.GetCurrentTask()))
+		if len(open) > 0 || len(closed) > 0 {
+			return false
+		}
 	}
 	return true
 }
@@ -127,7 +133,7 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
-				"simple_query answer delivered; CURRENT-TASK has no effective todo_delta or open TODO. "+
+				"simple_query answer delivered; CURRENT-TASK has no effective todo_delta or TODO history. "+
 					"The host is closing this trivial exchange without another model iteration.")
 		}
 		operator.Exit()
@@ -139,9 +145,6 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 				"Re-evaluate CURRENT-TASK: if the latest user input is fully answered and no open TODO remains, use 'finish' now; "+
 				"otherwise continue the existing Current with tools and maintain todo_delta. "+
 				"The user does not need to reply 'continue'.")
-	}
-	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
-		operator.Feedback(buildExitBlockedByTodoMessage("finish", items))
 	}
 	operator.Continue()
 }

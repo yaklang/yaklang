@@ -311,7 +311,7 @@ Timeline 有三类条目, 由系统自动写入, 你不可伪造或篡改:
 
 ### simple_query 例外
 
-host 已标记的 `simple_query` 在一次答复、无有效 `todo_delta` 且无开放待办时自动收口, 避免空转.
+host 已标记的 `simple_query` 在一次答复、无有效 `todo_delta` 且当前任务无 TODO 历史时自动收口, 避免空转.
 
 ### 答复后操作
 

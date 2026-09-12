@@ -88,7 +88,7 @@ func newPostIterationTestLoop(t *testing.T, invoker *postIterationTestInvoker, e
 }
 
 // scriptedCallback 按调用次序依次返回脚本化的 AI 响应。
-// finish 动作首次触发软 TODO 检查点会继续迭代，因此脚本需要两次 finish 才会退出。
+// 无开放 TODO 时，首次 finish 即可退出。
 func scriptedCallback(responses ...string) aicommon.AICallbackType {
 	var mu sync.Mutex
 	callCount := 0
@@ -108,13 +108,12 @@ func scriptedCallback(responses ...string) aicommon.AICallbackType {
 }
 
 // TestDefaultLoop_PostIterationSkipsSummaryAfterDirectlyAnswer 是本次改动的回归测试：
-// 循环以 directly_answer -> finish -> finish 收尾时，post-iteration 钩子必须通过
+// 循环以 directly_answer -> finish 收尾时，post-iteration 钩子必须通过
 // GetLastValidAction 看到 finish 之前的 directly_answer，从而跳过最终总结。
 // 旧实现使用 GetLastAction 只会看到 finish 记录，导致直接回答后仍多余地生成总结。
 func TestDefaultLoop_PostIterationSkipsSummaryAfterDirectlyAnswer(t *testing.T) {
 	invoker := newPostIterationTestInvoker(scriptedCallback(
 		`{"@action": "directly_answer", "answer_payload": "最终答案"}`,
-		`{"@action": "finish", "answer": "done"}`,
 		`{"@action": "finish", "answer": "done"}`,
 	))
 	loop := newPostIterationTestLoop(t, invoker)
@@ -138,7 +137,6 @@ func TestDefaultLoop_PostIterationSkipsSummaryAfterDirectlyAnswer(t *testing.T) 
 func TestDefaultLoop_PostIterationGeneratesSummaryAfterOtherAction(t *testing.T) {
 	invoker := newPostIterationTestInvoker(scriptedCallback(
 		`{"@action": "record_note", "note": "做了一些工作"}`,
-		`{"@action": "finish", "answer": "done"}`,
 		`{"@action": "finish", "answer": "done"}`,
 	))
 	loop := newPostIterationTestLoop(t, invoker,

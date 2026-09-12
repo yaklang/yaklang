@@ -437,8 +437,8 @@ func TestExec_ComplexIterations(t *testing.T) {
 		t.Errorf("Should complete successfully, got error: %v", err)
 	}
 
-	if callCount != 3 {
-		t.Errorf("Expected 3 iterations (directly_answer, finish checkpoint, finish confirmation), got %d", callCount)
+	if callCount != 2 {
+		t.Errorf("Expected 2 iterations (directly_answer, finish), got %d", callCount)
 	}
 
 	t.Logf("Completed %d iterations successfully", callCount)

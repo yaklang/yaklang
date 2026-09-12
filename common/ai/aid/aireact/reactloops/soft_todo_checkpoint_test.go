@@ -20,10 +20,13 @@ type softCheckpointConfig struct {
 	goalMinIterations int64
 }
 
-func (c *softCheckpointConfig) ActiveVerificationTodoItemsByScope(aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+func (c *softCheckpointConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]aicommon.VerificationTodoItem(nil), c.active...)
+	if c.active != nil {
+		return append([]aicommon.VerificationTodoItem(nil), c.active...)
+	}
+	return c.MockedAIConfig.ActiveVerificationTodoItemsByScope(scope)
 }
 func (c *softCheckpointConfig) GetEnableGoalMode() bool     { return c.enableGoalMode }
 func (c *softCheckpointConfig) GetGoalMinIterations() int64 { return c.goalMinIterations }
@@ -90,80 +93,67 @@ func switchCurrentTodo(t *testing.T, cfg *softCheckpointConfig, task aicommon.AI
 	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
 }
 
-func TestFinishFirstRequestAlwaysContinuesAndQueuesCheckpoint(t *testing.T) {
-	loop, _, _, task := newTodoGateTestLoop(t, nil)
+func TestFinishWithoutOpenTodosExitsImmediately(t *testing.T) {
+	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
 	op := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, op)
-	require.True(t, op.IsContinued())
-	checkpoint := loop.consumeTodoCheckpoint()
-	require.Equal(t, softTodoCheckpointPrompt, checkpoint)
-	require.Contains(t, checkpoint, "单次阴性请求")
-	require.Contains(t, checkpoint, "设为 CURRENT")
-	require.Contains(t, checkpoint, "timeline 和最新 Observation")
-	require.Contains(t, checkpoint, "TODO 已清空不是任务完成的充分证据")
-	require.Contains(t, checkpoint, "仍属于当前用户目标和 CURRENT-TASK")
-	require.Contains(t, checkpoint, "无需用户新增目标或授权")
-	require.Contains(t, checkpoint, "预期信息增益很低")
-	require.Contains(t, checkpoint, "下一动作 JSON 的 todo_delta 字段")
-	require.Contains(t, checkpoint, "自定义 TODO 标签都不会改变状态")
-	require.Contains(t, checkpoint, "尚未通过 todo_delta 进入 Frontier")
-	require.Contains(t, checkpoint, "将它们全部加入或更新到 Frontier")
-	require.Contains(t, checkpoint, "范围内具体入口")
-	require.Contains(t, checkpoint, "单次工具、参数、连接、认证、空响应或 payload 失败")
-	require.Contains(t, checkpoint, "有实质差异的修正或替代实验")
-	require.Contains(t, checkpoint, "覆盖入口写清目标、来源证据和第一步")
-	require.Contains(t, checkpoint, "验证型分支再写可证伪假设")
-	require.Contains(t, checkpoint, "不是清空 TODO 的指令")
-	require.Contains(t, checkpoint, "终态 ID 不可 UPDATE/CLOSE/CURRENT")
-	require.Contains(t, checkpoint, "用新 ID 建立延续 TODO")
-	require.Contains(t, checkpoint, "严禁为通过 finish 而批量 reset")
-	require.Empty(t, loop.consumeTodoCheckpoint())
-}
-
-func TestFinishSecondRequestExitsWithoutOpenTodos(t *testing.T) {
-	loop, _, _, task := newTodoGateTestLoop(t, nil)
-	first := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, first)
-	_ = loop.consumeTodoCheckpoint()
-	second := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, second)
-	terminated, err := second.IsTerminated()
+	terminated, err := op.IsTerminated()
 	require.True(t, terminated)
 	require.NoError(t, err)
-}
-
-func TestFinishWithOpenTodosBlocksBeforeCheckpoint(t *testing.T) {
-	loop, _, _, task := newTodoGateTestLoop(t, []aicommon.VerificationTodoItem{{ID: "todo-1", Content: "work", Status: aicommon.VerificationTodoStatusDoing}})
-	op := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, op)
-	require.True(t, op.IsContinued())
-	require.Contains(t, op.GetFeedback().String(), "todo_delta.close")
-	require.Contains(t, op.GetFeedback().String(), "only the action JSON's todo_delta field changes state")
-	require.Contains(t, op.GetFeedback().String(), "Do not retry finish")
+	require.False(t, op.IsContinued())
+	require.Empty(t, op.GetFeedback().String())
 	require.Empty(t, loop.consumeTodoCheckpoint())
+	require.NotContains(t, strings.Join(invoker.timeline, "\n"), "CHECKPOINT")
 }
 
-func TestWorkAfterCheckpointDoesNotRestartFinishFlow(t *testing.T) {
+func TestFinishWithOpenTodosBlocksUntilTheyAreClosed(t *testing.T) {
 	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
 	setCurrentTodo(t, cfg, task, "todo-1")
-	first := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, first)
-	_ = loop.consumeTodoCheckpoint()
+	// Repeating finish never bypasses remaining work or opens a count gate.
+	for attempt := 0; attempt < 3; attempt++ {
+		op := NewActionHandlerOperator(task)
+		loopAction_Finish.ActionHandler(loop, nil, op)
+		require.True(t, op.IsContinued())
+		require.Contains(t, op.GetFeedback().String(), "Remaining TODOs")
+		require.Contains(t, op.GetFeedback().String(), "todo-1")
+		require.Contains(t, op.GetFeedback().String(), "Do not retry finish")
+		require.Equal(t, finishTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+		require.Empty(t, loop.consumeTodoCheckpoint())
+	}
 
-	delta := &aicommon.TodoDelta{Close: []aicommon.TodoClose{{
-		ID:      "todo-1",
-		Outcome: aicommon.TodoOutcomeResolved,
-		Reason:  "targeted verification passed and the result was recorded",
-	}}}
-	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), delta)
+	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{
+		Close: []aicommon.TodoClose{{ID: "todo-1", Outcome: aicommon.TodoOutcomeResolved, Reason: "targeted check passed", Refs: []string{"observation-1"}}},
+	})
 	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
-
-	again := NewActionHandlerOperator(task)
-	loopAction_Finish.ActionHandler(loop, nil, again)
-	terminated, err := again.IsTerminated()
-	require.True(t, terminated)
+	op := NewActionHandlerOperator(task)
+	loopAction_Finish.ActionHandler(loop, nil, op)
+	terminated, err := op.IsTerminated()
+	require.True(t, terminated, "the first finish after resolving work must exit")
 	require.NoError(t, err)
 	require.Empty(t, loop.consumeTodoCheckpoint())
+}
+
+func TestFinishCheckpointOnlyAppliesToRemainingTodosInRequestingScope(t *testing.T) {
+	for _, change := range []string{"resolved", "different task"} {
+		t.Run(change, func(t *testing.T) {
+			loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+			setCurrentTodo(t, cfg, task, "todo-1")
+			op := NewActionHandlerOperator(task)
+			loopAction_Finish.ActionHandler(loop, nil, op)
+			require.True(t, op.IsContinued())
+			if change == "resolved" {
+				results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{
+					Close: []aicommon.TodoClose{{ID: "todo-1", Outcome: aicommon.TodoOutcomeResolved, Reason: "completed"}},
+				})
+				require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
+			} else {
+				other := aicommon.NewStatefulTaskBase("other-task", "input", context.Background(), cfg.GetEmitter(), true)
+				setCurrentTodo(t, cfg, other, "other-todo")
+				loop.SetCurrentTask(other)
+			}
+			require.Empty(t, loop.consumeTodoCheckpoint(), "a stale finish request must not trigger a checkpoint")
+		})
+	}
 }
 
 func TestGoalModeGatePrecedesCheckpoint(t *testing.T) {
@@ -206,7 +196,8 @@ func TestDirectlyAnswerWithOpenTodosStillEmitsAndContinues(t *testing.T) {
 	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
 	require.True(t, op.IsContinued())
 	require.Equal(t, []string{"progress"}, invoker.results)
-	require.Contains(t, op.GetFeedback().String(), "Remaining TODOs")
+	require.Empty(t, op.GetFeedback().String(), "a progress answer must not trigger the finish gate")
+	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
 func TestCurrentTodoCheckpointQueuesAfterTwentyFifthValidIteration(t *testing.T) {
@@ -289,7 +280,7 @@ func TestFinishCheckpointSubsumesPendingCurrentCheckpoint(t *testing.T) {
 		loop.recordCurrentTodoIteration(task)
 	}
 
-	require.False(t, loop.requestSoftTodoCheckpoint())
-	require.Equal(t, softTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+	loopAction_Finish.ActionHandler(loop, nil, NewActionHandlerOperator(task))
+	require.Equal(t, finishTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }

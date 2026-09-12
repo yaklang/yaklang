@@ -218,11 +218,8 @@ func TestReAct_DirectlyAnswer_ChecksCurrentTaskTodo(t *testing.T) {
 					// finish 是被 TODO 闸门拦截的唯一终结器: 此时仍有 open TODO
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"try finish","cumulative_summary":"summary"}`)
 				case 3:
-					// finish 可在同轮携带 todo_delta；先关闭 TODO，再进入完成审计。
+					// finish 可在同轮携带 todo_delta；先关闭 TODO，本次请求即可结束。
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish","todo_delta":{"close":[{"id":"current_open_todo","outcome":"resolved","reason":"最终答复已生成并完成当前任务要求","refs":[]}]}} ,"human_readable_thought":"close todo and finish","cumulative_summary":"todo updated"}`)
-				case 4:
-					// 完成审计 checkpoint 后再次 finish，确认所有工作已终结。
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm audited finish","cumulative_summary":"summary"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}
@@ -276,8 +273,8 @@ LOOP:
 	if !taskCompleted {
 		t.Fatal("task should complete after current task todo is closed and finish is allowed")
 	}
-	if got := atomic.LoadInt32(&primaryAttempts); got != 4 {
-		t.Fatalf("expected 4 primary decision attempts, got %d", got)
+	if got := atomic.LoadInt32(&primaryAttempts); got != 3 {
+		t.Fatalf("expected 3 primary decision attempts, got %d", got)
 	}
 	haveFinalAnswer := false
 	for _, result := range results {
@@ -323,11 +320,8 @@ func TestReAct_DirectlyAnswer_IgnoresSessionTodoFromOtherTask(t *testing.T) {
 					addScopedVerificationTodo(ins.GetConfig(), siblingTask, "session_only_open_todo", "别的任务残留待办")
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"final answer"},"human_readable_thought":"directly answer","cumulative_summary":"summary"}`)
 				case 2:
-					// 首次 finish 只触发软 TODO checkpoint；兄弟任务 TODO 不参与检查。
+					// 当前任务无开放 TODO，首次 finish 即可结束；兄弟任务 TODO 不参与检查。
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"finish","cumulative_summary":"summary"}`)
-				case 3:
-					// checkpoint 后再次 finish：当前 scope 无开放 TODO，应直接放行。
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm finish","cumulative_summary":"summary"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}
@@ -381,8 +375,8 @@ LOOP:
 	if !taskCompleted {
 		t.Fatal("task should complete when only sibling task owns unfinished todo")
 	}
-	if got := atomic.LoadInt32(&primaryAttempts); got != 3 {
-		t.Fatalf("expected exactly 3 primary decision attempts, got %d", got)
+	if got := atomic.LoadInt32(&primaryAttempts); got != 2 {
+		t.Fatalf("expected exactly 2 primary decision attempts, got %d", got)
 	}
 	haveFinalAnswer := false
 	for _, result := range results {
@@ -431,11 +425,8 @@ func TestReAct_DirectlyAnswer_PrefersCurrentTaskTodoOverSessionTodo(t *testing.T
 					// 当前任务仍有 open TODO, finish 被拦
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"try finish","cumulative_summary":"summary"}`)
 				case 3:
-					// 当前任务 TODO 已关闭，兄弟任务 TODO 不拦；进入完成审计。
+					// 当前任务 TODO 已关闭，兄弟任务 TODO 不拦；本次请求即可结束。
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish","todo_delta":{"close":[{"id":"current_blocking_todo","outcome":"resolved","reason":"当前任务要求已完成并生成最终答复","refs":[]}]}} ,"human_readable_thought":"close current todo and finish","cumulative_summary":"todo updated"}`)
-				case 4:
-					// 完成审计 checkpoint 后再次 finish，确认所有工作已终结。
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm audited finish","cumulative_summary":"summary"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}
@@ -489,8 +480,8 @@ LOOP:
 	if !taskCompleted {
 		t.Fatal("task should complete after closing only the current task todo")
 	}
-	if got := atomic.LoadInt32(&primaryAttempts); got != 4 {
-		t.Fatalf("expected 4 primary decision attempts, got %d", got)
+	if got := atomic.LoadInt32(&primaryAttempts); got != 3 {
+		t.Fatalf("expected 3 primary decision attempts, got %d", got)
 	}
 	haveFinalAnswer := false
 	for _, result := range results {

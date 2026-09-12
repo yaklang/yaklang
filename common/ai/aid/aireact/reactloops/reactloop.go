@@ -75,8 +75,7 @@ type ReActLoop struct {
 	outputExampleProvider         ContextProviderFunc
 	reactiveDataBuilder           FeedbackProviderFunc
 	todoCheckpointMu              sync.Mutex
-	softTodoChecked               bool
-	softTodoCheckpointPending     bool
+	finishTodoCheckpointScope     string
 	currentTodoProgress           map[string]*currentTodoProgress
 
 	allowAIForge       func() bool

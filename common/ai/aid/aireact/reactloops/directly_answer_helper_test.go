@@ -235,3 +235,20 @@ func TestInvalidClosedTodoDeltaCannotBypassDuplicateDirectlyAnswer(t *testing.T)
 	require.Contains(t, timeline, "TODO_DELTA_ERROR")
 	require.Contains(t, timeline, "use todo_delta.add with a new id")
 }
+
+func TestSimpleQueryDoesNotAutoFinishWithTodoHistory(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	setCurrentTodo(t, cfg, task, "previous-work")
+	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{
+		Close: []aicommon.TodoClose{{ID: "previous-work", Outcome: aicommon.TodoOutcomeResolved, Reason: "completed"}},
+	})
+	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	require.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+
+	other := aicommon.NewStatefulTaskBase("new-task", "你好", context.Background(), cfg.GetEmitter(), true)
+	loop.SetCurrentTask(other)
+	require.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action), "unrelated history must not block a new greeting")
+}
