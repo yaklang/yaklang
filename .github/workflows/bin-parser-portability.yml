@@ -33,7 +33,9 @@ jobs:
           - os: macos-15-intel
             arch: amd64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # Cold Intel macOS compilation plus exhaustive corpus/race checks can take
+    # over 30 minutes. This is a compatibility suite, not a throughput benchmark.
+    timeout-minutes: 45
     env:
       CGO_ENABLED: '1'
     defaults:
@@ -56,9 +58,9 @@ jobs:
           go env GOOS GOARCH CGO_ENABLED CC
           test "$(go env GOARCH)" = "${{ matrix.arch }}"
       - name: Test complete bin-parser package
-        # Exhaustive corpus/prefix checks exceed five minutes on hosted Intel Macs.
+        # Exhaustive corpus/prefix checks take about ten minutes on hosted Intel Macs.
         # Keep every case and assertion; allow a bounded native compatibility run.
-        run: go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=10m
+        run: go test ./common/utils/embeddedfs ./common/bin-parser/... -count=1 -timeout=15m
       - name: Verify generated rules and protocol inventory
         run: |
           go generate ./common/bin-parser/rules ./common/bin-parser
