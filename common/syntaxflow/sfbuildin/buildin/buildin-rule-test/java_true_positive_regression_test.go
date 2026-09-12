@@ -1,14 +1,57 @@
 package buildin_rule
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+func TestJavaServletInputReceiverTypes(t *testing.T) {
+	rule := loadBuiltinRule(t, "java/lib/user-input-http-source/java-servlet-params.sf")
+	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule)
+	require.NoError(t, err)
+	for _, instruction := range frame.Codes {
+		if instruction.OpCode == sfvm.OpNativeCall {
+			_, err := sfvm.GetNativeCall(instruction.UnaryStr)
+			require.NoError(t, err, "every source-library branch must use an available NativeCall")
+		}
+	}
+	for _, method := range []string{
+		"getParameterValues", "getParameterMap", "getParameterNames", "getQueryString",
+		"getCookies", "getProtocol", "getScheme", "getAuthType",
+	} {
+		for _, receiver := range []string{"HttpServletRequest", "LocalConfig"} {
+			t.Run(method+"/"+receiver, func(t *testing.T) {
+				code := fmt.Sprintf(`package example;
+import javax.servlet.http.HttpServletRequest;
+class InputReader {
+    Object read(%s input) {
+        return input.%s();
+    }
+}`, receiver, method)
+				vfs := filesys.NewVirtualFs()
+				vfs.AddFile("InputReader.java", code)
+				programs, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithLanguage(ssaconfig.JAVA))
+				require.NoError(t, err)
+				require.NotEmpty(t, programs)
+				result, err := programs[0].SyntaxFlowWithError(rule)
+				require.NoError(t, err)
+				require.Empty(t, result.GetErrors())
+				if receiver == "HttpServletRequest" {
+					require.Len(t, result.GetValues("output"), 1, "request input must remain a source")
+				} else {
+					require.Empty(t, result.GetValues("output"), "same method name on a non-request object is not a source")
+				}
+			})
+		}
+	}
+}
 
 // This file is the long-term home for *true-positive* (and paired negative)
 // regression tests of the builtin Java SyntaxFlow rules. It is table-driven:
