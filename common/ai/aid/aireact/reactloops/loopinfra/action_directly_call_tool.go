@@ -19,7 +19,6 @@ import (
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
-const directlyCallToolPromptLoopKey = "last_ai_decision_prompt"
 const directlyCallToolResponseLoopKey = "last_ai_decision_response"
 const directlyCallToolNonceLoopKey = "last_ai_decision_nonce"
 
@@ -484,10 +483,9 @@ Few-shot example 2 (valid directly_call_tool):
 				event, _ := emitter.EmitDefaultSystemStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
 				if event != nil {
 					progressEventID := event.GetStreamEventWriterId()
-					aicommon.EmitAIRequestAndResponseReferenceMaterials(
+					aicommon.EmitAIResponseReferenceMaterial(
 						emitter,
 						progressEventID,
-						loop.Get(directlyCallToolPromptLoopKey),
 						loop.Get(directlyCallToolResponseLoopKey),
 					)
 				}

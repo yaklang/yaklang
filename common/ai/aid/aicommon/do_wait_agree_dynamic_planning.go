@@ -321,7 +321,7 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	reviewEvent, _ := emitReviewStatus(config, "plan-review", planReviewDisplayMessage(suggestion, compactReason), ep.GetId())
 	waitForReviewStreams(config)
 	if reviewEvent != nil {
-		EmitAIRequestAndResponseReferenceMaterials(config.GetEmitter(), reviewEvent.GetStreamEventWriterId(), prompt, rawResponse.String())
+		EmitAIResponseReferenceMaterial(config.GetEmitter(), reviewEvent.GetStreamEventWriterId(), rawResponse.String())
 	}
 	emitReviewStructured(config, "plan-review-decision", payload)
 	emitReviewStructured(config, "plan-review", payload)
@@ -395,7 +395,7 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		}
 		waitForReviewStreams(config)
 		if reviewEvent != nil {
-			EmitAIRequestAndResponseReferenceMaterials(config.GetEmitter(), reviewEvent.GetStreamEventWriterId(), prompt, rawResponse.String())
+			EmitAIResponseReferenceMaterial(config.GetEmitter(), reviewEvent.GetStreamEventWriterId(), rawResponse.String())
 		}
 		payload := map[string]any{
 			"verdict":    taskReviewVerdict(suggestion),

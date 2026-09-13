@@ -80,7 +80,7 @@ func TestVerifyUserSatisfaction_TaskCancellationStopsRequestWithoutRetry(t *test
 	}
 }
 
-func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
+func TestVerifyUserSatisfaction_EmitsResponseReferenceWithoutPrompt(t *testing.T) {
 	var (
 		events   []*schema.AiOutputEvent
 		eventsMu sync.Mutex
@@ -119,9 +119,7 @@ func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *tes
 	defer eventsMu.Unlock()
 
 	streamStartIDs := make(map[string]bool)
-	var requestPayload string
 	var responsePayload string
-	var requestEventID string
 	var responseEventID string
 
 	for _, event := range events {
@@ -138,22 +136,17 @@ func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *tes
 		payloadStr, _ := payload["payload"].(string)
 		eventID, _ := payload["event_uuid"].(string)
 
-		switch {
-		case strings.Contains(payloadStr, "AI 请求原文"):
-			requestPayload = payloadStr
-			requestEventID = eventID
-		case strings.Contains(payloadStr, "AI 响应原文"):
+		require.NotContains(t, payloadStr, "AI 请求原文")
+		require.NotContains(t, payloadStr, queryToken)
+		require.NotContains(t, payloadStr, payloadToken)
+		if strings.Contains(payloadStr, "AI 响应原文") {
 			responsePayload = payloadStr
 			responseEventID = eventID
 		}
 	}
 
-	require.NotEmpty(t, requestPayload)
 	require.NotEmpty(t, responsePayload)
-	require.Contains(t, requestPayload, queryToken)
-	require.Contains(t, requestPayload, payloadToken)
 	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
 	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
 }
 

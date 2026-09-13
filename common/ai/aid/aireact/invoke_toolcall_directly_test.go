@@ -300,7 +300,7 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	var toolCallCount int32
 	var capturedCommand atomic.Value
-	var requestReferencePayload string
+	var responseReferencePayload string
 	var directCallParamStreamID string
 	bashTool, err := aitool.New(
 		"bash_test",
@@ -344,8 +344,10 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 		var payload map[string]any
 		require.NoError(t, json.Unmarshal(e.Content, &payload))
 		payloadStr := utils.InterfaceToString(payload["payload"])
-		if strings.Contains(payloadStr, "AI 请求原文") && strings.Contains(payloadStr, "CACHE_TOOL_CALL") {
-			requestReferencePayload = payloadStr
+		require.NotContains(t, payloadStr, "AI 请求原文")
+		require.NotContains(t, payloadStr, "test directly call tool with aitag block params")
+		if strings.Contains(payloadStr, "AI 响应原文") && utils.InterfaceToString(payload["event_writer_id"]) == directCallParamStreamID {
+			responseReferencePayload = payloadStr
 		}
 	}
 
@@ -378,7 +380,7 @@ LOOP:
 	}
 
 	postTimeout := time.After(2 * time.Second)
-	for requestReferencePayload == "" && directCallParamStreamID != "" {
+	for responseReferencePayload == "" && directCallParamStreamID != "" {
 		select {
 		case e := <-out:
 			collectReference(e)
@@ -392,7 +394,7 @@ ASSERT:
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
 	require.Equal(t, "#!/bin/bash\necho hello direct call", capturedCommand.Load())
 	require.NotEmpty(t, directCallParamStreamID, "should emit directly_call_tool params stream id")
-	require.Contains(t, requestReferencePayload, "test directly call tool with aitag block params")
+	require.Contains(t, responseReferencePayload, "echo hello direct call")
 }
 
 // TestReAct_DirectlyCallTool_RequireThenDirect uses require_tool first, then directly_call_tool.

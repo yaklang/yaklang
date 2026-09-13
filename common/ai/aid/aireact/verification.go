@@ -65,7 +65,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			log.Warnf("skip verification reference materials because no stream anchor was emitted")
 			return
 		}
-		aicommon.EmitAIRequestAndResponseReferenceMaterials(emitter, referenceAnchorID, verificationPrompt, rawResponse)
+		aicommon.EmitAIResponseReferenceMaterial(emitter, referenceAnchorID, rawResponse)
 	}
 
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
