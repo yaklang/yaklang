@@ -2,125 +2,179 @@ package aimem
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
-// cleanupInterval 两次清理之间的最小间隔
 const cleanupInterval = 30 * time.Minute
+const cleanupSessionPageSize = 32
+const cleanupRunTimeout = 10 * time.Second
+const cleanupStateKey = "aimemory-cleanup-v2"
 
-// cleanupMinBatch 攒批阈值：扫描出的待清理条数不足此值时不做物理清理，
-// 避免频繁 HNSW Load/Save
-const cleanupMinBatch = 20
-
-// cleanupCoordinator 是 DB 级别的全局清理协调器。
-// 因为 AIMemoryTriage 不是单例（同一 sessionID 会被反复 NewAIMemory 创建新实例），
-// 清理调度状态必须放在全局级别，而不是实例级别。
-//
-// 设计要点:
-//   - lastCleanupTime: 全局时间戳，atomic 读写，纳秒级检查
-//   - cleanupRunning:  全局 CAS 标志，同一时间只有一个清理 goroutine
-//   - 惰性触发: 写入和搜索都调 MaybeCleanup，但不阻塞主路径
+// A single worker bounds process-wide contention. The cooldown is scoped to
+// the database and persisted there; restarting must not reset the interval.
+// Only one database pointer is retained, rather than an unbounded DB registry.
 type cleanupCoordinator struct {
-	lastCleanupTime int64 // unix nano, atomic
-	cleanupRunning  int32 // 0=空闲, 1=清理中, CAS
+	lastCleanupTime int64
+	cleanupRunning  int32
+	lastDB          atomic.Pointer[sql.DB]
 }
 
-// globalCoordinator 包级别单例
 var globalCoordinator = &cleanupCoordinator{}
 
-// MaybeCleanup 惰性触发清理检查。
-// 在写入和搜索路径调用，开销仅一次 atomic.Load + time 比较（纳秒级），完全无感。
-// 如果距上次清理不足 cleanupInterval，直接返回；否则异步触发清理。
 func MaybeCleanup(db *gorm.DB) {
 	if db == nil {
 		return
 	}
-
-	// 距上次清理不足间隔，跳过
-	last := atomic.LoadInt64(&globalCoordinator.lastCleanupTime)
-	if last > 0 && time.Since(time.Unix(0, last)) < cleanupInterval {
+	rawDB, ok := db.CommonDB().(*sql.DB)
+	// Never schedule maintenance on a caller-owned transaction.
+	if !ok {
 		return
 	}
-
-	// CAS 防并发：只有 0→1 的那个调用才触发
+	if globalCoordinator.lastDB.Load() == rawDB {
+		last := atomic.LoadInt64(&globalCoordinator.lastCleanupTime)
+		if last > 0 && time.Since(time.Unix(0, last)) < cleanupInterval {
+			return
+		}
+	}
 	if !atomic.CompareAndSwapInt32(&globalCoordinator.cleanupRunning, 0, 1) {
 		return
 	}
-
-	// 记录触发时间
+	globalCoordinator.lastDB.Store(rawDB)
 	atomic.StoreInt64(&globalCoordinator.lastCleanupTime, time.Now().UnixNano())
-
-	// 异步执行清理，不阻塞调用方
 	go globalCoordinator.runCleanup(db)
 }
 
-// runCleanup 执行一次完整的清理流程：扫描所有 session → 攒批判断 → 物理清理。
+type cleanupState struct {
+	StartedAt time.Time `json:"started_at"`
+	SessionID string    `json:"session_id"`
+}
+
+// Claim before doing expensive work, including on empty databases. A crash
+// leaves a durable cooldown; failures retain their entity/document mappings
+// for retry after that interval. Concurrent processes cannot both commit a
+// claim on the same SQLite database.
+func claimCleanup(ctx context.Context, db *gorm.DB, now time.Time) (cleanupState, bool, error) {
+	tx := db.BeginTx(ctx, nil)
+	if tx.Error != nil {
+		return cleanupState{}, false, tx.Error
+	}
+	defer tx.Rollback()
+	key := strconv.Quote(cleanupStateKey)
+	var row schema.ProjectGeneralStorage
+	var state cleanupState
+	err := tx.Where("key = ?", key).First(&row).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return state, false, err
+	}
+	if row.Value != "" {
+		value, unquoteErr := strconv.Unquote(row.Value)
+		if unquoteErr != nil {
+			value = row.Value
+		}
+		if err := json.Unmarshal([]byte(value), &state); err != nil {
+			// A corrupt checkpoint must not disable maintenance permanently.
+			state = cleanupState{}
+		}
+		elapsed := now.Sub(state.StartedAt)
+		// Ignore a far-future timestamp after clock correction or a bad import.
+		if elapsed > -cleanupInterval && elapsed < cleanupInterval {
+			return state, false, nil
+		}
+	}
+	state.StartedAt = now
+	value, err := json.Marshal(state)
+	if err != nil {
+		return state, false, err
+	}
+	if row.ID == 0 {
+		row.Key, row.Value = key, strconv.Quote(string(value))
+		err = tx.Create(&row).Error
+	} else {
+		err = tx.Model(&row).Update("value", strconv.Quote(string(value))).Error
+	}
+	if err != nil {
+		return state, false, err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return state, false, err
+	}
+	return state, true, nil
+}
+
 func (c *cleanupCoordinator) runCleanup(db *gorm.DB) {
 	defer atomic.StoreInt32(&c.cleanupRunning, 0)
-
-	config := DefaultCleanupConfig()
-	ctx := context.Background()
-
-	// 长期记忆表，不含 midterm
-	tableName := "ai_memory_entities_v1"
-
-	// 获取所有需要清理的 sessionID
-	// 目前长期记忆基本都走 "default"，但为了覆盖性，扫描所有 distinct session_id
-	var sessionIDs []string
-	if err := db.Table(tableName).Select("DISTINCT(session_id)").Pluck("session_id", &sessionIDs).Error; err != nil {
-		log.Warnf("cleanup: failed to get distinct session_ids: %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), cleanupRunTimeout)
+	defer cancel()
+	state, claimed, err := claimCleanup(ctx, db, time.Now())
+	if err != nil {
+		log.Warnf("cleanup: failed to claim database maintenance: %v", err)
 		return
 	}
-
+	if !claimed {
+		return
+	}
+	config := DefaultCleanupConfig()
+	const tableName = "ai_memory_entities_v1"
+	// Keyset pagination bounds session metadata and makes progress through
+	// imported databases containing thousands of sessions across runs.
+	var sessionIDs []string
+	if err := db.Table(tableName).Select("session_id").
+		Where("session_id > ? AND deleted_at IS NULL", state.SessionID).
+		Group("session_id").Order("session_id").Limit(cleanupSessionPageSize).
+		Pluck("session_id", &sessionIDs).Error; err != nil {
+		log.Warnf("cleanup: failed to get session page: %v", err)
+		return
+	}
+	completed := true
 	for _, sid := range sessionIDs {
+		if ctx.Err() != nil {
+			completed = false
+			break
+		}
 		c.cleanupSession(ctx, db, tableName, sid, config)
+		state.SessionID = sid
+	}
+	if completed && len(sessionIDs) < cleanupSessionPageSize {
+		state.SessionID = ""
+	}
+	value, _ := json.Marshal(state)
+	if err := db.Model(&schema.ProjectGeneralStorage{}).
+		Where("key = ?", strconv.Quote(cleanupStateKey)).Update("value", strconv.Quote(string(value))).Error; err != nil {
+		log.Warnf("cleanup: failed to checkpoint session page: %v", err)
 	}
 }
 
-// cleanupSession 清理单个 session 的过期/低价值/超量记忆。
 func (c *cleanupCoordinator) cleanupSession(ctx context.Context, db *gorm.DB, tableName, sessionID string, config CleanupConfig) {
-	// 1. 扫描所有待清理的记忆 ID（过期 + 低价值 + 超量）
+	if ctx.Err() != nil {
+		return
+	}
 	ids, err := ScanAllCleanupMemories(db, tableName, sessionID, config)
 	if err != nil {
 		log.Warnf("cleanup scan failed for session %s: %v", sessionID, err)
 		return
 	}
-
-	if len(ids) == 0 {
+	if len(ids) == 0 || ctx.Err() != nil {
 		return
 	}
-
-	// 2. 攒批阈值：待清理数量太少时不做物理清理，攒着下次一起删
-	if len(ids) < cleanupMinBatch {
-		log.Debugf("cleanup skipped for session %s: only %d candidates (< %d), will batch next time",
-			sessionID, len(ids), cleanupMinBatch)
-		return
-	}
-
-	// 限制单次清理数量
-	maxBatch := config.MaxBatchSize
-	if maxBatch <= 0 {
-		maxBatch = 100
-	}
-	if len(ids) > maxBatch {
-		ids = ids[:maxBatch]
-	}
-
-	// 3. 执行物理清理（HNSW + RAG + DB）
-	log.Infof("cleanup started for session %s: %d memories to clean", sessionID, len(ids))
+	started := time.Now()
 	if err := BatchCleanupMemories(ctx, db, sessionID, ids); err != nil {
 		log.Warnf("cleanup batch delete failed for session %s: %v", sessionID, err)
 		return
 	}
-	log.Infof("cleanup completed for session %s: %d memories cleaned", sessionID, len(ids))
+	log.Infof("cleanup completed for session %s: %d memories cleaned in %v", sessionID, len(ids), time.Since(started))
 }
 
-// resetCleanupCoordinatorForTest 重置全局协调器状态，仅供测试使用。
 func resetCleanupCoordinatorForTest() {
 	atomic.StoreInt64(&globalCoordinator.lastCleanupTime, 0)
 	atomic.StoreInt32(&globalCoordinator.cleanupRunning, 0)
+	globalCoordinator.lastDB.Store(nil)
 }

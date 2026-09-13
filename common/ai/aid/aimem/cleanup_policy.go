@@ -1,13 +1,26 @@
 package aimem
 
 import (
-	"sort"
 	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+// Keep the same arithmetic order as CalcMemoryValue.
+const memoryValueSQL = "(COALESCE(r_score,0)*0.25 + COALESCE(a_score,0)*0.20 + COALESCE(p_score,0)*0.15 + COALESCE(c_score,0)*0.15 + COALESCE(o_score,0)*0.10 + COALESCE(e_score,0)*0.05 + COALESCE(t_score,0)*0.10)"
+
+func cleanupBatchSize(size int) int {
+	if size <= 0 {
+		return 100
+	}
+	// Bound SQLite variables and allocations even for a malformed config.
+	if size > 1000 {
+		return 1000
+	}
+	return size
+}
 
 // CleanupConfig 清理策略配置
 type CleanupConfig struct {
@@ -66,14 +79,12 @@ func ScanExpiredMemories(db *gorm.DB, tableName, sessionID string, maxBatch int)
 	if db == nil || tableName == "" || sessionID == "" {
 		return nil, nil
 	}
-	if maxBatch <= 0 {
-		maxBatch = 100
-	}
+	maxBatch = cleanupBatchSize(maxBatch)
 
 	var entities []schema.AIMemoryEntity
 	err := db.Table(tableName).
 		Select("memory_id").
-		Where("session_id = ? AND expires_at IS NOT NULL AND expires_at < ?", sessionID, time.Now()).
+		Where("session_id = ? AND deleted_at IS NULL AND expires_at IS NOT NULL AND expires_at < ?", sessionID, time.Now()).
 		Limit(maxBatch).
 		Find(&entities).Error
 	if err != nil {
@@ -102,46 +113,27 @@ func ScanLowValueMemories(db *gorm.DB, tableName, sessionID string, config Clean
 	}
 
 	maxBatch := config.MaxBatchSize
-	if maxBatch <= 0 {
-		maxBatch = 100
-	}
+	maxBatch = cleanupBatchSize(maxBatch)
 
 	coldThreshold := time.Now().AddDate(0, 0, -config.ColdMemoryDays)
 
-	// 按 CreatedAt 和 T_Score 从 DB 筛选候选集
+	// Filter and rank in SQLite. Never materialize content, tags or embeddings
+	// to select a small cleanup batch. COALESCE matches Go's zero-value scores
+	// for legacy rows containing NULL.
 	var candidates []schema.AIMemoryEntity
 	err := db.Table(tableName).
-		Where("session_id = ? AND created_at < ? AND t_score < 0.8",
-			sessionID, coldThreshold).
-		Limit(maxBatch * 2). // 多取一些，后面按综合评分再过滤
-		Find(&candidates).Error
+		Select("memory_id").
+		Where("session_id = ? AND deleted_at IS NULL AND created_at < ? AND COALESCE(t_score,0) < 0.8", sessionID, coldThreshold).
+		Where(memoryValueSQL+" < ?", config.MinValueThreshold).
+		Order(memoryValueSQL + ", id").
+		Limit(maxBatch).Find(&candidates).Error
 	if err != nil {
 		return nil, err
 	}
-
-	// 在内存中计算综合评分，低于阈值的才入选
 	ids := make([]string, 0, len(candidates))
 	for _, e := range candidates {
-		entity := &aicommon.MemoryEntity{
-			C_Score: e.C_Score,
-			O_Score: e.O_Score,
-			R_Score: e.R_Score,
-			E_Score: e.E_Score,
-			P_Score: e.P_Score,
-			A_Score: e.A_Score,
-			T_Score: e.T_Score,
-		}
-		value := CalcMemoryValue(entity)
-		if value < config.MinValueThreshold {
-			ids = append(ids, e.MemoryID)
-		}
+		ids = append(ids, e.MemoryID)
 	}
-
-	// 限制最终数量
-	if len(ids) > maxBatch {
-		ids = ids[:maxBatch]
-	}
-
 	return ids, nil
 }
 
@@ -165,7 +157,7 @@ func ScanOverCountMemories(db *gorm.DB, tableName, sessionID string, config Clea
 	// 统计当前 session 内的记忆总数
 	var totalCount int64
 	if err := db.Table(tableName).
-		Where("session_id = ?", sessionID).
+		Where("session_id = ? AND deleted_at IS NULL", sessionID).
 		Count(&totalCount).Error; err != nil {
 		return nil, err
 	}
@@ -176,53 +168,26 @@ func ScanOverCountMemories(db *gorm.DB, tableName, sessionID string, config Clea
 	}
 
 	// 需要淘汰的数量 = 超出量 + 安全余量
-	toEvict := int(totalCount) - config.MaxMemoryCount + config.OverEvictMargin
-	if toEvict <= 0 {
-		return nil, nil
+	maxBatch := cleanupBatchSize(config.MaxBatchSize)
+	excess := totalCount - int64(config.MaxMemoryCount)
+	if excess > int64(maxBatch) {
+		excess = int64(maxBatch)
 	}
-
-	// 查询所有记忆（不豁免任何 T_Score），按综合评分从低到高排序
+	toEvict := int(excess)
+	toEvict += min(max(config.OverEvictMargin, 0), maxBatch-toEvict)
 	var candidates []schema.AIMemoryEntity
 	err := db.Table(tableName).
-		Where("session_id = ?", sessionID).
+		Select("memory_id").
+		Where("session_id = ? AND deleted_at IS NULL", sessionID).
+		Order(memoryValueSQL + ", id").Limit(toEvict).
 		Find(&candidates).Error
 	if err != nil {
 		return nil, err
 	}
-
-	// 计算综合评分并排序
-	type scoredEntity struct {
-		id    string
-		value float64
-	}
-	scored := make([]scoredEntity, 0, len(candidates))
+	ids := make([]string, 0, len(candidates))
 	for _, e := range candidates {
-		entity := &aicommon.MemoryEntity{
-			C_Score: e.C_Score,
-			O_Score: e.O_Score,
-			R_Score: e.R_Score,
-			E_Score: e.E_Score,
-			P_Score: e.P_Score,
-			A_Score: e.A_Score,
-			T_Score: e.T_Score,
-		}
-		scored = append(scored, scoredEntity{
-			id:    e.MemoryID,
-			value: CalcMemoryValue(entity),
-		})
+		ids = append(ids, e.MemoryID)
 	}
-
-	// 按综合评分升序（最低价值优先淘汰）
-	sort.Slice(scored, func(i, j int) bool {
-		return scored[i].value < scored[j].value
-	})
-
-	// 取前 toEvict 个
-	ids := make([]string, 0, toEvict)
-	for i := 0; i < toEvict && i < len(scored); i++ {
-		ids = append(ids, scored[i].id)
-	}
-
 	return ids, nil
 }
 
@@ -256,5 +221,8 @@ func ScanAllCleanupMemories(db *gorm.DB, tableName, sessionID string, config Cle
 
 	// 去重
 	allIDs = uniqueNonEmptyStrings(allIDs)
+	if limit := cleanupBatchSize(config.MaxBatchSize); len(allIDs) > limit {
+		allIDs = allIDs[:limit]
+	}
 	return allIDs, nil
 }

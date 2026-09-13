@@ -27,6 +27,16 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 
 	offset := 7
 
+	// Every declared element must be backed by bytes still in the input.
+	// Validate before converting lengths or allocating: corrupt local graph
+	// headers can otherwise request terabytes from a tiny SQLite blob.
+	checkCount := func(count uint64, minBytes uint64) error {
+		if count > uint64(len(data)-offset)/minBytes {
+			return utils.Error("graph count exceeds remaining binary data")
+		}
+		return nil
+	}
+
 	consumeUint32 := func() (uint32, error) {
 		v, n := protowire.ConsumeFixed32(data[offset:])
 		if n < 0 {
@@ -68,7 +78,7 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		if err != nil {
 			return "", utils.Wrap(err, "consume string length")
 		}
-		if offset+int(strLen) > len(data) {
+		if strLen > uint64(len(data)-offset) {
 			return "", utils.Error("not enough data for string")
 		}
 		str := string(data[offset : offset+int(strLen)])
@@ -82,7 +92,7 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		if err != nil {
 			return nil, utils.Wrap(err, "consume string length")
 		}
-		if offset+int(strLen) > len(data) {
+		if strLen > uint64(len(data)-offset) {
 			return nil, utils.Error("not enough data for string")
 		}
 		data := data[offset : offset+int(strLen)]
@@ -135,6 +145,9 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		return nil, utils.Wrap(err, "export mode")
 	}
 
+	if exportMode < uint64(ExportModePQ) || exportMode > uint64(ExportModeStrUID) {
+		return nil, utils.Error("unsupported graph export mode")
+	}
 	p := &Persistent[K]{
 		Total:      total,
 		Dims:       dims,
@@ -192,17 +205,26 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 			return nil, utils.Errorf("centroids len mismatch: %d vs %d", l1len, lenCentroids)
 		}
 
+		if err := checkCount(l1len, 1); err != nil {
+			return nil, err
+		}
 		p.PQCodebook.Centroids = make([][][]float64, l1len)
 		for i := uint64(0); i < l1len; i++ {
 			l2len, err := consumeVarint()
 			if err != nil {
 				return nil, utils.Wrap(err, "centroids l2 len")
 			}
+			if err := checkCount(l2len, 1); err != nil {
+				return nil, err
+			}
 			l2 := make([][]float64, l2len)
 			for j := uint64(0); j < l2len; j++ {
 				l3len, err := consumeVarint()
 				if err != nil {
 					return nil, utils.Wrap(err, "centroids l3 len")
+				}
+				if err := checkCount(l3len, 8); err != nil {
+					return nil, err
 				}
 				l3 := make([]float64, l3len)
 				for k := uint64(0); k < l3len; k++ {
@@ -223,11 +245,17 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "layers len")
 	}
+	if err := checkCount(layersLen, 1); err != nil {
+		return nil, err
+	}
 	p.Layers = make([]*PersistentLayer, layersLen)
 	for i := uint64(0); i < layersLen; i++ {
 		nodesLen, err := consumeVarint()
 		if err != nil {
 			return nil, utils.Wrap(err, "layer nodes len")
+		}
+		if err := checkCount(nodesLen, 1); err != nil {
+			return nil, err
 		}
 		nodes := make([]uint32, nodesLen)
 		for j := uint64(0); j < nodesLen; j++ {
@@ -247,6 +275,9 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 	offsetToKeyLen, err := consumeVarint()
 	if err != nil {
 		return nil, utils.Wrap(err, "offset to key len")
+	}
+	if err := checkCount(offsetToKeyLen, 1); err != nil {
+		return nil, err
 	}
 	p.OffsetToKey = make([]*PersistentNode[K], offsetToKeyLen)
 	for i := uint64(0); i < offsetToKeyLen; i++ {
@@ -305,6 +336,9 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 			offset += size
 			code = tempCode
 		case ExportModeStandard:
+			if err := checkCount(uint64(p.Dims), 8); err != nil {
+				return nil, err
+			}
 			vec := make([]float64, p.Dims)
 			for j := uint32(0); j < p.Dims; j++ {
 				f, err := consumeFloat64()
@@ -344,6 +378,9 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "neighbors len")
 	}
+	if err := checkCount(neighborsLen, 2); err != nil {
+		return nil, err
+	}
 	p.Neighbors = make(map[uint32][]uint32, neighborsLen)
 	for i := uint64(0); i < neighborsLen; i++ {
 		off, err := consumeVarint()
@@ -353,6 +390,9 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		lenNs, err := consumeVarint()
 		if err != nil {
 			return nil, utils.Wrap(err, "neighbor len")
+		}
+		if err := checkCount(lenNs, 1); err != nil {
+			return nil, err
 		}
 		ns := make([]uint32, lenNs)
 		for j := uint64(0); j < lenNs; j++ {
@@ -554,8 +594,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 		for _, neighborOffset := range neighbors {
 			neighbor, exists := nodes[neighborOffset]
 			if !exists {
-				log.Warnf("neighbor offset %d not found", neighborOffset)
-				continue
+				return nil, utils.Errorf("neighbor offset %d not found", neighborOffset)
 			}
 			node.AddSingleNeighbor(neighbor)
 		}

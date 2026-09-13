@@ -566,7 +566,7 @@ func TestMaybeCleanup_LazyTimerTrigger(t *testing.T) {
 			C_Score:   0.1, O_Score: 0.1, R_Score: 0.1, E_Score: 0.1, P_Score: 0.1, A_Score: 0.1,
 		}
 		entity.CreatedAt = time.Now().Add(-8 * 24 * time.Hour) // 8 days ago → expired
-		expires := time.Now().Add(-1 * time.Hour)                // already expired
+		expires := time.Now().Add(-1 * time.Hour)              // already expired
 		entity.ExpiresAt = &expires
 		require.NoError(t, db.Table(tableName).Create(entity).Error)
 	}
@@ -595,6 +595,7 @@ func TestMaybeCleanup_RateLimit(t *testing.T) {
 	// Reset and set lastCleanupTime to now → should NOT trigger
 	resetCleanupCoordinatorForTest()
 	atomicStoreLastCleanupNow()
+	globalCoordinator.lastDB.Store(db.DB())
 
 	// Call MaybeCleanup multiple times — should not trigger because within interval
 	for i := 0; i < 10; i++ {

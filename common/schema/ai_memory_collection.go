@@ -14,6 +14,9 @@ type AIMemoryCollection struct {
 	// HNSW Graph 的二进制序列化数据
 	GraphBinary []byte `json:"graph_binary" gorm:"type:blob"`
 
+	// CleanupVersion prevents older live backends from restoring deleted nodes.
+	CleanupVersion int64 `json:"-" gorm:"default:0"`
+
 	// HNSW 参数配置
 	M           int     `json:"m" gorm:"default:16"`             // 最大邻居数
 	Ml          float64 `json:"ml" gorm:"default:0.25"`          // 层生成因子
