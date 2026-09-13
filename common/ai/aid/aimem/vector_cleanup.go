@@ -67,43 +67,31 @@ func DeleteMemoryVectorArtifacts(ctx context.Context, db *gorm.DB, entities []sc
 		default:
 		}
 
-		backend, err := getOrCreateHNSWBackend(hnswBackends, db, sessionID)
-		if err == nil {
-			for _, memoryID := range payload.memoryIDs {
-				_ = backend.Delete(memoryID)
+		// Preserve entity rows if either artifact store fails, so a later cleanup
+		// can retry with the same document IDs instead of losing that mapping.
+		if len(payload.docIDs) > 0 {
+			store, ok, err := getOrCreateRAGStore(ragStores, ragExists, db, sessionID)
+			if err != nil {
+				return err
 			}
-			if len(payload.memoryIDs) > 0 {
-				if err := backend.SaveGraph(); err != nil {
-					log.Warnf("AIMemory HNSW save skipped: %v", err)
+			if ok {
+				if err := store.Delete(payload.docIDs...); err != nil {
+					return err
 				}
 			}
-		} else {
-			log.Warnf("AIMemory HNSW delete skipped: %v", err)
 		}
-
-		if len(payload.docIDs) == 0 {
-			continue
-		}
-
-		store, ok, err := getOrCreateRAGStore(ragStores, ragExists, db, sessionID)
+		backend, err := getOrCreateHNSWBackend(hnswBackends, db, sessionID)
 		if err != nil {
-			log.Warnf("AIMemory RAG delete skipped: %v", err)
-			continue
+			return err
 		}
-		if !ok {
-			continue
-		}
-		if err := store.Delete(payload.docIDs...); err != nil {
-			log.Warnf("AIMemory RAG delete docs skipped: %v", err)
+		if err := backend.deleteAndSave(ctx, payload.memoryIDs, false); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 func uniqueNonEmptyStrings(in []string) []string {
-	if len(in) <= 1 {
-		return in
-	}
 	seen := make(map[string]struct{}, len(in))
 	out := make([]string, 0, len(in))
 	for _, v := range in {
@@ -155,7 +143,12 @@ func getOrCreateRAGStore(
 		exists[collectionName] = false
 		return nil, false, nil
 	}
-	store, err := vectorstore.LoadCollection(db, collectionName, vectorstore.WithEmbeddingClient(rag.NewEmptyMockEmbedding()))
+	store, err := vectorstore.LoadCollection(db, collectionName,
+		vectorstore.WithEmbeddingClient(rag.NewEmptyMockEmbedding()),
+		// Maintenance must not rebuild a large corrupt RAG or erase its surviving
+		// documents as a side effect of deleting a small memory batch.
+		vectorstore.WithTryRebuildHNSWIndex(false),
+		vectorstore.WithAutoDeleteCorruptedRAG(false))
 	if err != nil {
 		return nil, false, err
 	}
@@ -189,62 +182,61 @@ func BatchCleanupMemories(ctx context.Context, db *gorm.DB, sessionID string, me
 		return nil
 	}
 
-	// 1. 查询 DB 获取完整实体（用于收集 RAG docIDs）
+	// Bound parameters and entity metadata even for explicit bulk callers.
+	for start := 0; start < len(memoryIDs); start += 100 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := cleanupMemoryBatch(ctx, db, sessionID, memoryIDs[start:min(start+100, len(memoryIDs))]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func cleanupMemoryBatch(ctx context.Context, db *gorm.DB, sessionID string, memoryIDs []string) error {
 	midtermMode := strings.HasPrefix(sessionID, MidtermSessionPrefix)
 	entityTable := "ai_memory_entities_v1"
 	if midtermMode {
 		entityTable = "ai_midterm_archive_entities_v1"
 	}
-
 	var entities []schema.AIMemoryEntity
-	if err := db.Table(entityTable).
+	if err := db.Table(entityTable).Select("memory_id, session_id, potential_questions").
 		Where("memory_id IN (?) AND session_id = ?", memoryIDs, sessionID).
 		Find(&entities).Error; err != nil {
-		return utils.Errorf("query entities for cleanup failed: %v", err)
+		return utils.Wrap(err, "query entities for cleanup")
 	}
-
-	// 2. HNSW: 加载一次 backend → 批量 Delete → 只 SaveGraph 一次
-	backend, err := NewAIMemoryHNSWBackend(
-		WithHNSWSessionID(sessionID),
-		WithHNSWDatabase(db),
-		WithHNSWAutoSave(false),
-		WithHNSWMidtermMode(midtermMode),
-	)
-	if err != nil {
-		log.Warnf("BatchCleanupMemories: HNSW backend init failed: %v", err)
-	} else {
-		for _, mid := range memoryIDs {
-			_ = backend.Delete(mid)
-		}
-		if err := backend.SaveGraph(); err != nil {
-			log.Warnf("BatchCleanupMemories: HNSW save graph failed: %v", err)
-		}
+	if len(entities) == 0 {
+		return nil
 	}
-
-	// 3. RAG: 批量收集 docIDs 一次性删除
-	var allDocIDs []string
+	var docIDs []string
 	for i := range entities {
-		allDocIDs = append(allDocIDs, entities[i].DocumentQuestionHashIDs()...)
+		docIDs = append(docIDs, entities[i].DocumentQuestionHashIDs()...)
 	}
-	allDocIDs = uniqueNonEmptyStrings(allDocIDs)
-	if len(allDocIDs) > 0 {
+	docIDs = uniqueNonEmptyStrings(docIDs)
+	if len(docIDs) > 0 {
 		store, ok, err := getOrCreateRAGStore(make(map[string]*vectorstore.SQLiteVectorStoreHNSW), make(map[string]bool), db, sessionID)
 		if err != nil {
-			log.Warnf("BatchCleanupMemories: RAG store init failed: %v", err)
-		} else if ok {
-			if err := store.Delete(allDocIDs...); err != nil {
-				log.Warnf("BatchCleanupMemories: RAG delete failed: %v", err)
+			return utils.Wrap(err, "load memory RAG for cleanup")
+		}
+		if ok {
+			if err := store.Delete(docIDs...); err != nil {
+				return utils.Wrap(err, "delete memory RAG documents")
 			}
 		}
 	}
-
-	// 4. DB: 一条 DELETE 批量删除
-	if err := db.Table(entityTable).
-		Where("memory_id IN (?) AND session_id = ?", memoryIDs, sessionID).
-		Delete(nil).Error; err != nil {
-		return utils.Errorf("batch delete memory entities failed: %v", err)
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-
-	log.Infof("BatchCleanupMemories: cleaned up %d memories for session %s", len(memoryIDs), sessionID)
+	backend, err := NewAIMemoryHNSWBackend(
+		WithHNSWSessionID(sessionID), WithHNSWDatabase(db),
+		WithHNSWAutoSave(false), WithHNSWMidtermMode(midtermMode))
+	if err != nil {
+		return err
+	}
+	if err := backend.deleteAndSave(ctx, memoryIDs, true); err != nil {
+		return err
+	}
+	log.Debugf("cleaned up %d memories for session %s", len(entities), sessionID)
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -716,33 +717,42 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 		return nil
 	}
 
-	const deleteBatchSize = 200
-	err := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		for start := 0; start < len(ids); start += deleteBatchSize {
-			end := start + deleteBatchSize
-			if end > len(ids) {
-				end = len(ids)
-			}
-			if err := tx.Model(&schema.VectorStoreDocument{}).
-				Where("collection_id = ? AND document_id IN (?)", s.collection.ID, ids[start:end]).
-				Unscoped().
-				Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-				return utils.Errorf("删除文档批次失败: %v", err)
+	// Serialize the survivor graph while all backing rows still exist. Keep
+	// both the graph snapshot and row deletion in the same transaction. A failed
+	// export/commit restores the in-memory topology and is returned to callers.
+	return s.hnsw.deleteWithCommit(ids, func() error {
+		var binaryData []byte
+		reader, err := s.hnsw.exportHNSWGraphToBinaryInLock()
+		if err != nil && !errors.Is(err, graphNodesIsEmpty) {
+			return err
+		}
+		if reader != nil {
+			binaryData, err = io.ReadAll(reader)
+			if err != nil {
+				return err
 			}
 		}
-		return nil
+		return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+			const deleteBatchSize = 200
+			for start := 0; start < len(ids); start += deleteBatchSize {
+				end := min(start+deleteBatchSize, len(ids))
+				if err := tx.Model(&schema.VectorStoreDocument{}).
+					Where("collection_id = ? AND document_id IN (?)", s.collection.ID, ids[start:end]).
+					Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+					return utils.Wrap(err, "delete vector documents")
+				}
+			}
+			result := tx.Model(&schema.VectorStoreCollection{}).
+				Where("id = ?", s.collection.ID).Update("graph_binary", binaryData)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return utils.Error("vector collection was deleted")
+			}
+			return nil
+		})
 	})
-	if err != nil {
-		return err
-	}
-
-	// Only mutate the in-memory graph after the durable delete commits. This
-	// avoids reporting success while leaving database rows behind.
-	if err := s.hnsw.DeleteWithError(ids...); err != nil {
-		return utils.Wrap(err, "delete graph nodes")
-	}
-
-	return nil
 }
 
 func (s *SQLiteVectorStoreHNSW) GetName() string {

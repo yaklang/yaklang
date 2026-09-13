@@ -118,6 +118,12 @@ func ImportCodebook(reader io.Reader) (*pq.Codebook, error) {
 			M, K, SubVectorDim)
 	}
 
+	// Check the declared matrix against the actual bytes before allocation.
+	// Divide instead of multiplying attacker/corruption-controlled dimensions.
+	remainingFloats := uint64(len(data)-offset) / 8
+	if mVal > remainingFloats/kVal/subVectorDimVal {
+		return nil, utils.Error("codebook dimensions exceed remaining binary data")
+	}
 	// Initialize centroids
 	centroids := make([][][]float64, M)
 	for m := 0; m < M; m++ {

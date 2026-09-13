@@ -10,9 +10,8 @@ import (
 type LazyNodeID any
 
 type LazyLayerNode[K cmp.Ordered] struct {
-	uid          LazyNodeID
-	nodeCacheErr error
-	nodeGetter   func(uid LazyNodeID) (LayerNode[K], error)
+	uid        LazyNodeID
+	nodeGetter func(uid LazyNodeID) (LayerNode[K], error)
 }
 
 var _ LayerNode[string] = (*LazyLayerNode[string])(nil)
@@ -27,7 +26,6 @@ func (n *LazyLayerNode[K]) GetUID() LazyNodeID {
 
 func (n *LazyLayerNode[K]) LoadNode() LayerNode[K] {
 	node, err := n.nodeGetter(n.GetUID())
-	n.nodeCacheErr = err
 	if err != nil {
 		log.Errorf("LazyLayerNode.LoadNode failed for uid=%v: %v", n.uid, err)
 		return nil
