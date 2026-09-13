@@ -22,7 +22,29 @@ import "strings"
 // IsToolParamGenerationPrompt detects a parameter-generation prompt (R2/R3/R5).
 // Generic entry; does not distinguish tool vs blueprint vs regeneration.
 func IsToolParamGenerationPrompt(prompt, toolName string) bool {
+	if name, _, ok := promptParameterTarget(prompt); ok {
+		return IsToolParamGenPrompt(prompt) && (toolName == "" || toolName == name)
+	}
 	return IsToolParamGenPrompt(prompt) && (toolName == "" || strings.Contains(prompt, toolName))
+}
+
+// Parameter prompts include the complete tool inventory and past calls. Match
+// the current context's target, not another tool mentioned elsewhere in it.
+// Keep the old matcher fallback for standalone prompts without this context.
+func promptParameterTarget(prompt string) (name string, blueprint bool, ok bool) {
+	const toolPrefix = "# Tool Context\n需要为 `"
+	const blueprintPrefix = "# Blueprint Context\nYou need to generate parameters for the AI Blueprint '"
+	toolAt := strings.LastIndex(prompt, toolPrefix)
+	blueprintAt := strings.LastIndex(prompt, blueprintPrefix)
+	if blueprintAt > toolAt {
+		name, _, ok = strings.Cut(prompt[blueprintAt+len(blueprintPrefix):], "'.")
+		return name, true, ok
+	}
+	if toolAt >= 0 {
+		name, _, ok = strings.Cut(prompt[toolAt+len(toolPrefix):], "` 生成参数")
+		return name, false, ok
+	}
+	return "", false, false
 }
 
 // IsToolParamGenPrompt detects a parameter-generation prompt (R2/R3/R5)
@@ -49,6 +71,9 @@ func IsToolParamGenPromptForTool(prompt, toolName string) bool {
 	if !IsToolParamGenPrompt(prompt) {
 		return false
 	}
+	if name, blueprint, ok := promptParameterTarget(prompt); ok {
+		return !blueprint && (toolName == "" || toolName == name)
+	}
 	// Blueprint param gen uses "You need to generate parameters for the AI Blueprint".
 	if strings.Contains(prompt, "You need to generate parameters for the AI Blueprint") {
 		return false
@@ -59,6 +84,9 @@ func IsToolParamGenPromptForTool(prompt, toolName string) bool {
 // IsToolParamGenPromptForBlueprint detects a *blueprint* parameter generation
 // prompt.
 func IsToolParamGenPromptForBlueprint(prompt, forgeName string) bool {
+	if name, blueprint, ok := promptParameterTarget(prompt); ok {
+		return blueprint && (forgeName == "" || forgeName == name)
+	}
 	// New path: dynamic section has "You need to generate parameters for the AI Blueprint".
 	if strings.Contains(prompt, "You need to generate parameters for the AI Blueprint") {
 		return forgeName == "" || strings.Contains(prompt, forgeName)
