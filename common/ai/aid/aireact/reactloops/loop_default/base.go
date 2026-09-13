@@ -28,7 +28,7 @@ const reActPostSummary = `
 
 ## 验收结果与已关闭工作
 
-将每项用户验收要求对应到实际产出和 Observation/交付物位置。存在 TODO 历史时逐项对应 id、outcome、关闭所依据的证据; 不另写一套故事, 不把 deferred 算作执行完成。没有 TODO 历史的纯文本任务按实际交付核对, 不编造 id 或工具调用。
+将每项用户验收要求对应到实际产出和 Observation/交付物位置。存在 TODO 历史时逐项对应 id、outcome、关闭所依据的证据; 不另写一套故事, 不把 deferred 算作执行完成。当前上下文缺少 TODO 明细时, 明确写“TODO 明细未提供, 无法逐项核对”; 不得推断本次没有 TODO 或未启用 todo_delta, 不编造 id 或工具调用。
 
 ## 仍未完成的工作
 
