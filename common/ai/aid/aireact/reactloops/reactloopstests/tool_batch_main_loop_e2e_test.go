@@ -170,12 +170,11 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
 				if len(committed) != 2 || committed[0].Name != firstToolName || committed[1].Name != secondToolName {
 					return nil, fmt.Errorf("task results were not committed in model order: %#v", committed)
 				}
-				if decision > 3 {
+				if decision > 2 {
 					return nil, fmt.Errorf("unexpected extra primary decision %d", decision)
 				}
-				// The post-join finish requests a completion checkpoint; the next
-				// decision audits the unchanged evidence and exits.
-				return respond(config, `{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","identifier":"finish_after_batch"}`)
+				// With no open TODO, the immediate post-join finish ends the task.
+				return respond(config, `{"@action":"finish","identifier":"finish_after_batch"}`)
 
 			default:
 				return nil, fmt.Errorf("unexpected AI prompt in direct batch main-loop E2E: %.200s", prompt)
@@ -200,7 +199,7 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
 	require.Equal(t, int32(2), atomic.LoadInt32(&started))
 	require.Equal(t, int32(2), atomic.LoadInt32(&finished))
 	require.Equal(t, int32(2), atomic.LoadInt32(&maxActive), "both callbacks must overlap")
-	require.Equal(t, int32(3), atomic.LoadInt32(&primaryDecisions), "batch, completion checkpoint, reviewed finish")
+	require.Equal(t, int32(2), atomic.LoadInt32(&primaryDecisions), "batch followed by one finish")
 	require.Positive(t, atomic.LoadInt32(&satisfactionChecks))
 
 	completionMu.Lock()
@@ -214,13 +213,12 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
 	require.Equal(t, []string{firstToolName, secondToolName}, []string{committed[0].Name, committed[1].Name})
 
 	history := loop.GetAllExistedActionRecord()
-	require.Len(t, history, 3)
+	require.Len(t, history, 2)
 	require.Equal(t, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, history[0].ActionType)
 	require.Equal(t, []string{firstToolName, secondToolName}, history[0].ToolNames)
 	require.Equal(t, 2, history[0].ToolCallCount)
 	require.Equal(t, 2, history[0].ExecutedToolCallCount)
 	require.Equal(t, "finish", history[1].ActionType)
-	require.Equal(t, "finish", history[2].ActionType)
 }
 
 // TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E covers the
@@ -430,10 +428,10 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 				if joinErr := assertJoinedAndCommitted(fmt.Sprintf("primary decision %d", decision)); joinErr != nil {
 					return nil, joinErr
 				}
-				if decision > 3 {
+				if decision > 2 {
 					return nil, fmt.Errorf("unexpected extra primary decision %d", decision)
 				}
-				return respond(config, `{"completion_review":{"goal_evidence":"Scripted tool observations confirm the fixture result.","discovery_audit":"The fixture exposes no additional untracked target.","closure_audit":"The scripted work is complete with no deferred blocker."},"@action":"finish","identifier":"finish_after_require_batch"}`)
+				return respond(config, `{"@action":"finish","identifier":"finish_after_require_batch"}`)
 
 			default:
 				return nil, fmt.Errorf("unexpected AI prompt in require batch main-loop E2E: %.200s", prompt)
@@ -461,7 +459,7 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackStarted))
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackFinished))
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackMaxActive), "both plugin callbacks must overlap")
-	require.Equal(t, int32(3), atomic.LoadInt32(&primaryDecisions), "batch, completion checkpoint, reviewed finish")
+	require.Equal(t, int32(2), atomic.LoadInt32(&primaryDecisions), "batch followed by one finish")
 	require.Positive(t, atomic.LoadInt32(&satisfactionChecks))
 
 	observedParamsMu.Lock()
@@ -486,7 +484,7 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	require.Equal(t, []string{firstToolName, secondToolName}, []string{committed[0].Name, committed[1].Name})
 
 	history := loop.GetAllExistedActionRecord()
-	require.Len(t, history, 3)
+	require.Len(t, history, 2)
 	require.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, history[0].ActionType)
 	require.Equal(t, []string{firstToolName, secondToolName}, history[0].ToolNames)
 	require.Equal(t, 2, history[0].ToolCallCount)

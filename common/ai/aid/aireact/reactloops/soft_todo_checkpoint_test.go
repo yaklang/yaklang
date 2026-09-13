@@ -93,11 +93,17 @@ func switchCurrentTodo(t *testing.T, cfg *softCheckpointConfig, task aicommon.AI
 	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
 }
 
-func TestFinishWithoutOpenTodosRequiresCompletionReview(t *testing.T) {
-	loop, _, _, task := newTodoGateTestLoop(t, nil)
-	requireCompletionCheckpoint(t, loop, task)
-	requireReviewedFinish(t, loop, task)
+func TestFinishWithoutOpenTodosExitsImmediately(t *testing.T) {
+	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
+	op := NewActionHandlerOperator(task)
+	loopAction_Finish.ActionHandler(loop, nil, op)
+	terminated, err := op.IsTerminated()
+	require.True(t, terminated)
+	require.NoError(t, err)
+	require.False(t, op.IsContinued())
+	require.Empty(t, op.GetFeedback().String())
 	require.Empty(t, loop.consumeTodoCheckpoint())
+	require.NotContains(t, strings.Join(invoker.timeline, "\n"), "CHECKPOINT")
 }
 
 func TestFinishWithOpenTodosBlocksUntilTheyAreClosed(t *testing.T) {
@@ -119,8 +125,11 @@ func TestFinishWithOpenTodosBlocksUntilTheyAreClosed(t *testing.T) {
 		Close: []aicommon.TodoClose{{ID: "todo-1", Outcome: aicommon.TodoOutcomeResolved, Reason: "targeted check passed", Refs: []string{"observation-1"}}},
 	})
 	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
-	requireCompletionCheckpoint(t, loop, task)
-	requireReviewedFinish(t, loop, task)
+	op := NewActionHandlerOperator(task)
+	loopAction_Finish.ActionHandler(loop, nil, op)
+	terminated, err := op.IsTerminated()
+	require.True(t, terminated, "the first finish after resolving work must exit")
+	require.NoError(t, err)
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 

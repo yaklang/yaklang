@@ -35,7 +35,8 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.NotContains(t, highStatic, "任务漂移即完成")
 	require.Contains(t, highStatic, "同一 CURRENT-TASK 中不携带有效 `todo_delta` 的直接答复最多成功一次")
 	require.Contains(t, highStatic, "`simple_query` 例外")
-	require.Contains(t, highStatic, "无剩余工作时立即用 \"标记完成\" 收口")
+	require.Contains(t, highStatic, "确无剩余工作且已核对验收证据时再收口")
+	require.Contains(t, highStatic, "仅有空列表不得终结")
 	require.Contains(t, highStatic, "## 推理增量纪律")
 	require.Contains(t, highStatic, "内部推理是相对现有上下文的决策增量")
 	require.Contains(t, highStatic, "不引用、复述或改写系统提示词")
@@ -48,12 +49,12 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, highStatic, "第一条可执行动作就要建立初始待办集合并显式指定 `current`")
 	require.Contains(t, highStatic, "Observation 打开新分支")
 	require.Contains(t, highStatic, "具体目标")
-	require.Contains(t, highStatic, "来源证据")
-	require.Contains(t, highStatic, "可验证假设")
+	require.Contains(t, highStatic, "**来源** (用户要求或具体 Observation/工具调用)")
+	require.Contains(t, highStatic, "**验收方法**")
 	require.Contains(t, highStatic, "以 `\"待探索：\"` 开头")
 	require.Contains(t, highStatic, "存在开放待办时以工具推进 `current`, 不得终结任务")
 	require.Contains(t, highStatic, "不得为清空列表伪造 `resolved`")
-	require.Contains(t, highStatic, "一条一任务")
+	require.Contains(t, highStatic, "一个独立验收目标一条")
 	require.Contains(t, defaultLoopOutputExample, "`todo_delta` 使用案例")
 	require.Contains(t, defaultLoopOutputExample, "`save_evidence` 使用案例")
 
@@ -124,7 +125,8 @@ func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 			name: "low value ideas do not inflate the frontier or justify finish",
 			required: []string{
 				"只要求范围内、具体、可追溯出处",
-				"无目标、无来源、无可验证假设",
+				"不机械展开无关文件或穷举猜测",
+				"性价比不用于取消验收目标、降级开放项或决定 finish",
 				"存在开放待办时以工具推进 `current`, 不得终结任务",
 			},
 		},

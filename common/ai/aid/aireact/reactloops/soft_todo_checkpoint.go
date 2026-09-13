@@ -16,7 +16,7 @@ const finishTodoCheckpointPrompt = `[FINISH BLOCKED BY TODO]
 继续执行当前 TODO；没有 CURRENT 时，选择一个可执行的开放项并用 todo_delta 设为 CURRENT。
 仅当已有 Observation 或交付物支持该项结论时，才用 todo_delta.close 写明 outcome、reason 和 refs。
 不要为结束而批量关闭、降级或 deferred，也不要重复答复或反复 finish。
-处理完剩余事项后再审计验收覆盖、新发现和终态理由；无开放 TODO 仍不能证明完成。`
+处理完剩余事项后再 finish；无开放 TODO 时直接结束，无需再次确认。`
 
 const currentTodoCheckpointPrompt = `[CURRENT TODO CHECKPOINT]
 
