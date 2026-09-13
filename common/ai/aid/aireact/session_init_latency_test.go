@@ -11,9 +11,35 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestReActPersistentSessionDoesNotInitializeMidtermArchive(t *testing.T) {
+	for _, disableMemory := range []bool{false, true} {
+		t.Run(map[bool]string{false: "regular-memory", true: "memory-disabled"}[disableMemory], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			memory := aimem.NewMockMemoryTriage()
+			r, err := NewTestReAct(
+				aicommon.WithContext(ctx),
+				aicommon.WithWorkdir(t.TempDir()),
+				aicommon.WithPersistentSessionId("no-midterm-"+t.Name()),
+				aicommon.WithMemoryTriage(memory),
+				aicommon.WithDisableMemoryTriage(disableMemory),
+			)
+			require.NoError(t, err)
+			defer func() { cancel(); r.WaitLifecycleStopped() }()
+			require.Nil(t, r.config.TimelineArchiveStore, "a persistent session must not create an archive backend")
+			if disableMemory {
+				require.Equal(t, "noop", r.memoryTriage.GetSessionID())
+			} else {
+				require.Same(t, memory, r.memoryTriage, "ordinary memory must remain available")
+			}
+		})
+	}
+}
 
 func TestReActFirstAnswerDoesNotWaitForSessionNaming(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

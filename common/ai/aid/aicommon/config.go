@@ -300,6 +300,7 @@ type Config struct {
 	MemoryTriage        MemoryTriage
 	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
 
+	// Deprecated: retained for source compatibility; timeline archives are no longer written or recalled.
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
 	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
@@ -3311,6 +3312,9 @@ func WithMemoryTriageId(id string) ConfigOption {
 	}
 }
 
+// WithTimelineArchiveStore retains the legacy option for source compatibility.
+//
+// Deprecated: the store is no longer used by timeline compression or ReAct.
 func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
@@ -3320,6 +3324,7 @@ func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
 	}
 }
 
+// Deprecated: the returned legacy store is not used by the runtime.
 func (c *Config) GetTimelineArchiveStore() TimelineArchiveStore {
 	if c == nil {
 		return nil

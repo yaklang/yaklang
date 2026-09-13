@@ -18,7 +18,7 @@
 | `<\|AI_CACHE_SEMI_semi\|>` | **顶级 / 跨段** | 标记"此段中等稳定, 也适合作 prefix cache" (二级缓存边界, P1 双 cache 边界) | aireact 主路径由 `wrapAICacheSemi` 注入到 PROMPT_SECTION_semi-dynamic 外层 |
 
 > 说明: `PROMPT_SECTION_timeline-open` 是 aireact "按稳定性分层" 路径下新增段名,
-> 仅含 timeline 末桶 + Current Time + Workspace + (可选) midterm prefix; 与老
+> 仅含 timeline 末桶 + Current Time + Workspace; 与老
 > `PROMPT_SECTION_timeline` 段名共存, 由 splitter / hijacker 同时识别为 "timeline 类"
 > section, SectionHashCount 各自独立计数。
 
@@ -122,7 +122,7 @@ SEMI       <|AI_CACHE_SEMI_semi|>
              <|PROMPT_SECTION_END_semi-dynamic|>
            <|AI_CACHE_SEMI_END_semi|>
 OPEN       <|PROMPT_SECTION_timeline-open|>
-             # Timeline Memory (Open Tail)        最末 interval + midterm prefix
+             # Timeline Memory (Open Tail)        最末 interval
              # Current Time
              # Workspace Context
            <|PROMPT_SECTION_END_timeline-open|>
@@ -158,8 +158,7 @@ DYNAMIC    <|PROMPT_SECTION_dynamic_<turnNonce>|>
 - **CacheToolCall 在 SEMI 段 (P1 物理迁移)**: 历史上该块位于 dynamic/reactive-data,
   内含 turn nonce 导致每轮变化无法缓存. 现迁到 SEMI 段并改用稳定 nonce 渲染,
   随 SEMI 段一起进入二级 cache 命中.
-- **Timeline 末桶在 OPEN**: 最末 interval 桶仍在写入, midterm 检索结果也只在
-  perception 触发时出现 — 全部归到 OPEN 段, hijacker 不缓存这段。
+- **Timeline 末桶在 OPEN**: 最末 interval 桶仍在写入，归到 OPEN 段，hijacker 不缓存这段。
 
 ### 2.2 三层职责分工
 

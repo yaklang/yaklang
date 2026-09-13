@@ -22,7 +22,6 @@ type AsyncAIMemory struct {
 }
 
 var _ aicommon.MemoryTriage = (*AsyncAIMemory)(nil)
-var _ aicommon.TimelineArchiveStore = (*AsyncAIMemory)(nil)
 
 func NewAsyncAIMemory(ctx context.Context, sessionID string, opts ...Option) *AsyncAIMemory {
 	return newAsyncAIMemory(ctx, sessionID, func() (*AIMemoryTriage, error) {
@@ -148,20 +147,4 @@ func (m *AsyncAIMemory) SearchMemoryWithoutAI(input any, tokenLimit int) (*aicom
 		return nil, err
 	}
 	return memory.SearchMemoryWithoutAI(input, tokenLimit)
-}
-
-func (m *AsyncAIMemory) ArchiveCompressedBatch(ctx context.Context, batch *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
-	memory, err := m.WaitReady(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return memory.ArchiveCompressedBatch(ctx, batch)
-}
-
-func (m *AsyncAIMemory) SearchArchivedBatches(ctx context.Context, query *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
-	memory, err := m.WaitReady(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return memory.SearchArchivedBatches(ctx, query)
 }

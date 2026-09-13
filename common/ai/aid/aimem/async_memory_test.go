@@ -83,8 +83,6 @@ func TestAsyncMemoryInitializationErrorsReachOperations(t *testing.T) {
 	_, err := memory.SearchMemoryWithoutAI("query", 100)
 	require.ErrorIs(t, err, expected)
 	require.ErrorIs(t, memory.HandleMemory("remember this"), expected)
-	_, err = memory.SearchArchivedBatches(ctx, nil)
-	require.ErrorIs(t, err, expected)
 }
 
 func TestAsyncMemoryEmptyBackendClose(t *testing.T) {

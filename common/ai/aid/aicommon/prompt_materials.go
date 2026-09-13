@@ -157,8 +157,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 //
 // 段内排序原则:
 //  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
-//     首要信息源, 顶到段首让 LLM 第一时间看到。midterm 内容 (若有) 已并入
-//     TimelineOpen。
+//     首要信息源, 顶到段首让 LLM 第一时间看到。
 //  2. SessionEvidence 紧跟 Timeline: SESSION_ARTIFACTS 是 Config 级持久化
 //     观测 (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"
 //     连续语料块, 物理上贴近 Timeline 让两者形成连续语义。

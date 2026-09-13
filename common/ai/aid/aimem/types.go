@@ -26,7 +26,7 @@ type Config struct {
 
 	// midtermArchiveMode makes this AIMemoryTriage instance use independent DB tables
 	// (ai_midterm_archive_entities_v1 / ai_midterm_archive_collections_v1) instead of
-	// the shared long-term memory tables. Used by timeline midterm archive stores.
+	// the shared long-term memory tables. Retained for access to historical archives.
 	midtermArchiveMode bool
 }
 
@@ -102,6 +102,8 @@ func WithAutoReActInvoker(opts ...aicommon.ConfigOption) Option {
 // WithMidtermArchiveMode makes the AIMemoryTriage instance use independent DB tables
 // (ai_midterm_archive_entities_v1 / ai_midterm_archive_collections_v1) for midterm
 // archive storage, physically isolating it from normal long-term memory.
+//
+// Deprecated: retained for access to historical data; the runtime no longer archives timelines.
 func WithMidtermArchiveMode() Option {
 	return func(config *Config) {
 		config.midtermArchiveMode = true

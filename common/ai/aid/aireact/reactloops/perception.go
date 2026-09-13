@@ -55,7 +55,7 @@ const (
 
 // IntentShift 取值约定 — 描述本轮 perception 与上一轮相比意图的"方向性"变化粒度.
 // 这是 Changed bool 的精细化补充: Changed 决定 state 是否覆盖 (受 topics hash 影响),
-// IntentShift 决定昂贵下游 (capability/knowledge/midterm timeline 召回) 是否要重新加载.
+// IntentShift 决定昂贵下游 (capability/knowledge 召回) 是否要重新加载.
 //
 // 设计动机: AI 经常在同一个领域里推进时也把 Changed 标成 true, 导致下游每轮都重新刷新,
 // 浪费 token 与算力, 还让前端每轮都收到新的 perception_capabilities / perception_knowledge
@@ -71,7 +71,7 @@ const (
 	// 调整了关注点), Changed 可能是 true 但意图方向没变, 不应触发昂贵下游.
 	IntentShiftDrift = "drift"
 	// IntentShiftPivot 用户/任务真正切换了方向 (例如从写代码切换到写测试),
-	// 必须重新加载下游推荐 (capability / knowledge / midterm recall).
+	// 必须重新加载下游推荐 (capability / knowledge).
 	IntentShiftPivot = "pivot"
 )
 
@@ -204,10 +204,6 @@ type perceptionController struct {
 	consecutiveUnchanged     int
 
 	running int32 // atomic CAS guard to prevent concurrent AI calls
-}
-
-type midtermTimelineRecallScheduler interface {
-	ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string)
 }
 
 func newPerceptionController(iterationTriggerInterval int) *perceptionController {
@@ -906,24 +902,9 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	//   2. forced trigger 一律绕门 (用户/系统显式请求, 必须刷新)
 	//   3. 否则要求 IntentShift=pivot (向后兼容: IntentShift 空时回退到 Changed)
 	//
-	// 注意行为变化: ScheduleMidtermTimelineRecallFromPerception 之前是每次 TriggerPerception
-	// 必调, 现在改为只在 pivot 或 forced 时调用. 这是用户明确要求的, 用于解决意图未真正
-	// 变化时的中长期 timeline 召回噪音.
-	//
-	// 关键词: TriggerPerception 下游门控, refreshCapabilities/refreshKnowledge/ScheduleMidterm
-	//        统一走 shouldRefreshDownstreamForState
 	if currentState.shouldRefreshDownstreamForState(updated) {
 		r.refreshCapabilitiesFromPerception(currentState)
 		r.refreshKnowledgeFromPerception(currentState)
-		if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {
-			summaryForMidterm := strings.TrimSpace(parsed.OneLinerSummary)
-			if summaryForMidterm == "" {
-				if current := r.perception.getCurrent(); current != nil {
-					summaryForMidterm = strings.TrimSpace(current.OneLinerSummary)
-				}
-			}
-			scheduler.ScheduleMidtermTimelineRecallFromPerception(summaryForMidterm, parsed.Topics, parsed.Keywords)
-		}
 	}
 
 	if cfg := r.config; cfg != nil && currentState != nil {

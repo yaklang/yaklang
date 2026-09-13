@@ -31,6 +31,8 @@ type TimelineArchiveBatch struct {
 	Tags                []string
 }
 
+// TimelineArchiveRef preserves archive metadata in existing serialized timelines.
+// New timeline compression does not create archive references.
 type TimelineArchiveRef struct {
 	ArchiveID      string                `json:"archive_id"`
 	Reason         TimelineArchiveReason `json:"reason"`
@@ -72,6 +74,8 @@ type TimelineArchiveSearchResult struct {
 	SelectedMemory []*MemoryEntity
 }
 
+// Deprecated: retained for legacy configuration compatibility. The runtime no longer
+// invokes this interface; historical archive data can still be inspected and deleted.
 type TimelineArchiveStore interface {
 	ArchiveCompressedBatch(ctx context.Context, batch *TimelineArchiveBatch) (*TimelineArchiveRef, error)
 	SearchArchivedBatches(ctx context.Context, query *TimelineArchiveSearchQuery) (*TimelineArchiveSearchResult, error)

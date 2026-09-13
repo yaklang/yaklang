@@ -1,4 +1,4 @@
-﻿package aicommon
+package aicommon
 
 import (
 	"context"
@@ -282,23 +282,17 @@ func TestConfig_SessionPromptStatePropagation(t *testing.T) {
 	require.Equal(t, "round-2", parent.GetPrevSessionUserInput())
 }
 
-func TestConfig_ConvertConfigToOptions_RebindsTimelineConfigForArchiveStore(t *testing.T) {
+func TestConfig_ConvertConfigToOptions_RebindsTimelineConfig(t *testing.T) {
 	parent := NewConfig(context.Background())
 	require.NotNil(t, parent.Timeline)
 	require.Nil(t, parent.TimelineArchiveStore)
 
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 	require.Same(t, parent.Timeline, child.Timeline)
-
-	store := &mockTimelineArchiveStore{}
-	child.TimelineArchiveStore = store
-
-	got := child.Timeline.timelineArchiveStore()
-	require.NotNil(t, got)
-	require.True(t, got == store)
+	require.Same(t, child, child.Timeline.config)
 }
 
-func TestConfig_ConvertConfigToOptions_PropagatesTimelineArchiveStore(t *testing.T) {
+func TestConfig_ConvertConfigToOptions_PreservesLegacyArchiveOption(t *testing.T) {
 	parent := NewConfig(context.Background())
 	store := &mockTimelineArchiveStore{}
 	parent.TimelineArchiveStore = store
@@ -306,9 +300,7 @@ func TestConfig_ConvertConfigToOptions_PropagatesTimelineArchiveStore(t *testing
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 
 	require.Same(t, store, child.TimelineArchiveStore)
-	got := child.Timeline.timelineArchiveStore()
-	require.NotNil(t, got)
-	require.True(t, got == store)
+	require.Same(t, store, child.GetTimelineArchiveStore())
 }
 
 type stubBrowserSessionTracker struct{}

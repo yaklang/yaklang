@@ -125,7 +125,7 @@ func (i *perceptionKnowledgeSearchTestInvoker) CompressLongTextWithDestination(c
 	return i.compressedResult, nil
 }
 
-func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
+func TestTriggerPerception_DoesNotScheduleLegacyMidtermRecall(t *testing.T) {
 	invoker := &perceptionMidtermSchedulerTestInvoker{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
@@ -140,9 +140,11 @@ func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 	state := loop.TriggerPerception(PerceptionTriggerForced, true)
 	require.NotNil(t, state)
 	require.Equal(t, "focused summary from perception", state.OneLinerSummary)
-	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
-	require.Equal(t, []string{"http fuzzing"}, invoker.scheduledTopics)
-	require.Equal(t, []string{"header", "malformed"}, invoker.scheduledKeywords)
+	require.Empty(t, invoker.scheduledSummary)
+	require.Empty(t, invoker.scheduledTopics)
+	require.Equal(t, []string{"http fuzzing"}, state.Topics)
+	require.Empty(t, invoker.scheduledKeywords)
+	require.Equal(t, []string{"header", "malformed"}, state.Keywords)
 }
 
 func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
@@ -580,7 +582,7 @@ func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *te
 	loop.actionHistoryMutex = new(sync.Mutex)
 
 	loop.MaybeTriggerPerceptionAfterAction(2)
-	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
+	require.Empty(t, invoker.scheduledSummary)
 }
 
 // TestPerceptionState_IsIntentPivot_ExplicitValues 验证三个枚举值的显式判定:
