@@ -1155,11 +1155,10 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
 		}
 
-		event, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
+		_, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
 		if err != nil {
 			boundEmitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
 		}
-		_ = event
 
 		pw.WriteString("[开始处理参数] → ")
 
@@ -1205,7 +1204,6 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		paramDuration = cost
 		rawAIResponse = response.String()
 		pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
-		boundEmitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
 		pw.Close()
 
 		// Extract identifier from action (destination identifier for this tool call)

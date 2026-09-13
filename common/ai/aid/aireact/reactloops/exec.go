@@ -439,7 +439,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
 			// The immediate assignment below is intentionally only a snapshot. Once
 			// the parser consumes EOF, replace it with the full response for
-			// diagnostics/reference material.
+			// diagnostics and action recovery.
 			tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
 				r.Set("last_ai_decision_response", buf.String())
 			}))
@@ -557,7 +557,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				options...,
 			)
 			log.Debugf("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
-			r.Set("last_ai_decision_prompt", prompt)
 			r.Set("last_ai_decision_nonce", nonce)
 
 			if actionErr != nil {

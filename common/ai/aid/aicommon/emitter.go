@@ -1321,6 +1321,8 @@ func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, resul
 
 }
 
+// EmitReferenceMaterial attaches source documents, evidence, or business artifacts.
+// Raw model request prompts and response envelopes are not reference materials.
 func (e *Emitter) EmitReferenceMaterial(typeName string, eventId string, content any) (*schema.AiOutputEvent, error) {
 	log.Infof("emit reference material: [%v]-[to:%v] content: %v", typeName, eventId, utils.ShrinkTextBlock(utils.InterfaceToString(content), 256))
 	return e.EmitJSON(schema.EVENT_TYPE_REFERENCE_MATERIAL, "reference_material", map[string]any{

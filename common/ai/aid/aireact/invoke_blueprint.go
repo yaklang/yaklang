@@ -1,7 +1,6 @@
 package aireact
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"io"
@@ -170,11 +169,8 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 			emitter := rsp.BindEmitter(r.config.GetEmitter())
 			stream := rsp.GetOutputStreamReader("call-forge", true, emitter)
 
-			var response bytes.Buffer
-			stream = io.TeeReader(stream, &response)
-
 			pr, pw := utils.NewPipe()
-			event, err := emitter.EmitDefaultStreamEvent(
+			_, err := emitter.EmitDefaultStreamEvent(
 				"call-forge",
 				pr, rsp.GetTaskIndex(),
 			)
@@ -184,12 +180,6 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 				r.config.GetContext(),
 				stream, "call-ai-blueprint",
 				aicommon.WithActionOnReaderFinished(func() {
-					if event != nil {
-						streamId := event.GetStreamEventWriterId()
-						if streamId != "" {
-							emitter.EmitTextReferenceMaterial(streamId, response.String())
-						}
-					}
 					pw.Close()
 				}),
 				aicommon.WithActionFieldStreamHandler([]string{

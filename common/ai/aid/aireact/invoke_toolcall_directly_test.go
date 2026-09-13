@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"strings"
 	"sync/atomic"
@@ -300,7 +299,6 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	var toolCallCount int32
 	var capturedCommand atomic.Value
-	var responseReferencePayload string
 	var directCallParamStreamID string
 	bashTool, err := aitool.New(
 		"bash_test",
@@ -337,18 +335,9 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	timeout := time.After(10 * time.Second)
 	taskCompleted := false
-	collectReference := func(e *ypb.AIOutputEvent) {
-		if e.Type != string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
-			return
-		}
-		var payload map[string]any
-		require.NoError(t, json.Unmarshal(e.Content, &payload))
-		payloadStr := utils.InterfaceToString(payload["payload"])
-		require.NotContains(t, payloadStr, "AI 请求原文")
-		require.NotContains(t, payloadStr, "test directly call tool with aitag block params")
-		if strings.Contains(payloadStr, "AI 响应原文") && utils.InterfaceToString(payload["event_writer_id"]) == directCallParamStreamID {
-			responseReferencePayload = payloadStr
-		}
+	assertNoModelExchangeReference := func(e *ypb.AIOutputEvent) {
+		require.NotEqual(t, string(schema.EVENT_TYPE_REFERENCE_MATERIAL), e.Type,
+			"direct tool call prompts and raw responses are not reference materials")
 	}
 
 LOOP:
@@ -358,7 +347,7 @@ LOOP:
 			if e.Type == string(schema.EVENT_TYPE_STREAM_START) && e.NodeId == "directly_call_tool_params" {
 				directCallParamStreamID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.event_writer_id"))
 			}
-			collectReference(e)
+			assertNoModelExchangeReference(e)
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				iid := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
 				in <- &ypb.AIInputEvent{
@@ -379,12 +368,12 @@ LOOP:
 		}
 	}
 
-	postTimeout := time.After(2 * time.Second)
-	for responseReferencePayload == "" && directCallParamStreamID != "" {
+	react.WaitForStream()
+	for {
 		select {
 		case e := <-out:
-			collectReference(e)
-		case <-postTimeout:
+			assertNoModelExchangeReference(e)
+		default:
 			goto ASSERT
 		}
 	}
@@ -394,7 +383,6 @@ ASSERT:
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
 	require.Equal(t, "#!/bin/bash\necho hello direct call", capturedCommand.Load())
 	require.NotEmpty(t, directCallParamStreamID, "should emit directly_call_tool params stream id")
-	require.Contains(t, responseReferencePayload, "echo hello direct call")
 }
 
 // TestReAct_DirectlyCallTool_RequireThenDirect uses require_tool first, then directly_call_tool.
