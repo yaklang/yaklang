@@ -707,6 +707,13 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 
 // Delete 根据 ID 删除文档
 func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
+	return s.DeleteWithTransactionCheck(nil, ids...)
+}
+
+// DeleteWithTransactionCheck revalidates a conditional deletion in the same
+// transaction that removes rows and saves the graph. A failed check restores
+// the in-memory graph too. check must use tx and must not re-enter the store.
+func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.DB) error, ids ...string) error {
 	if err := s.requireWriteCollection(); err != nil {
 		return err
 	}
@@ -733,6 +740,11 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 			}
 		}
 		return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+			if check != nil {
+				if err := check(tx); err != nil {
+					return err
+				}
+			}
 			const deleteBatchSize = 200
 			for start := 0; start < len(ids); start += deleteBatchSize {
 				end := min(start+deleteBatchSize, len(ids))

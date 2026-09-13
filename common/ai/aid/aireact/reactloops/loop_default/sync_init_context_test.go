@@ -57,15 +57,19 @@ func TestPETaskStillEnrichesContextAfterFastInitialization(t *testing.T) {
 
 func TestGreetingCompletionWithoutSynchronousEnrichment(t *testing.T) {
 	for _, tc := range []struct {
-		name, query string
-		attached    bool
-		disable     bool
-		wantSimple  bool
+		name, query   string
+		attached      bool
+		emptyHTTP     bool
+		malformedHTTP bool
+		disable       bool
+		wantSimple    bool
 	}{
 		{name: "Chinese greeting", query: "你好", wantSimple: true},
 		{name: "English punctuation", query: " Hello! ", wantSimple: true},
 		{name: "greeting with work", query: "你好，请读取 report.txt"},
 		{name: "greeting with attachment", query: "你好", attached: true},
+		{name: "greeting with empty HTTP attachment", query: "你好？", emptyHTTP: true, wantSimple: true},
+		{name: "greeting with malformed HTTP attachment", query: "你好？", malformedHTTP: true},
 		{name: "intent explicitly disabled", query: "你好", disable: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -77,6 +81,12 @@ func TestGreetingCompletionWithoutSynchronousEnrichment(t *testing.T) {
 			task := aicommon.NewStatefulTaskBase("greeting", tc.query, cfg.GetContext(), cfg.GetEmitter())
 			if tc.attached {
 				task.SetAttachedDatas([]*aicommon.AttachedResource{aicommon.NewAttachedResource("file", "file_content", "pending work")})
+			}
+			if tc.emptyHTTP {
+				task.SetAttachedDatas([]*aicommon.AttachedResource{nil, aicommon.NewAttachedResource("http_flow", "id", " \t")})
+			}
+			if tc.malformedHTTP {
+				task.SetAttachedDatas([]*aicommon.AttachedResource{aicommon.NewAttachedResource("http_flow", "id", "not-an-id")})
 			}
 			loop.SetCurrentTask(task)
 			buildInitTask(inv)(loop, task, &reactloops.InitTaskOperator{})
