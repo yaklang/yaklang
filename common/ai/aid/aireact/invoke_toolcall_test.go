@@ -241,8 +241,18 @@ func TestReAct_ToolUse(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	primaryDecisionCount := 0
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if isPrimaryDecisionPrompt(r.GetPrompt()) {
+				primaryDecisionCount++
+				if primaryDecisionCount > 1 {
+					response := i.NewAIResponse()
+					response.EmitOutputStream(strings.NewReader(`{"@action":"finish","human_readable_thought":"tool call completed"}`))
+					response.Close()
+					return response, nil
+				}
+			}
 			return mockedToolCalling(i, r, "sleep")
 		}),
 		aicommon.WithEventInputChan(in),
@@ -269,7 +279,10 @@ func TestReAct_ToolUse(t *testing.T) {
 	reviewed := false
 	reviewReleased := false
 	toolCallOutputEvent := false
-	materialFetched := false
+	assertNoModelExchangeReference := func(e *ypb.AIOutputEvent) {
+		require.NotEqual(t, string(schema.EVENT_TYPE_REFERENCE_MATERIAL), e.Type,
+			"tool call prompts and raw responses are not reference materials")
+	}
 	var iid string
 	taskDone := false
 LOOP:
@@ -307,9 +320,7 @@ LOOP:
 				toolCallOutputEvent = true
 			}
 
-			if e.Type == string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
-				materialFetched = true
-			}
+			assertNoModelExchangeReference(e)
 
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
@@ -318,14 +329,26 @@ LOOP:
 				}
 			}
 
-			if materialFetched && taskDone {
+			if taskDone {
 				break LOOP
 			}
 		case <-after:
 			break LOOP
 		}
 	}
+	ins.WaitForStream()
+	for {
+		select {
+		case e := <-out:
+			assertNoModelExchangeReference(e)
+		default:
+			goto ASSERT
+		}
+	}
+
+ASSERT:
 	close(in)
+	require.True(t, taskDone, "tool-use task should complete")
 
 	if !reviewed {
 		t.Fatal("Expected to have at least one review event, but got none")
@@ -341,10 +364,6 @@ LOOP:
 
 	if !toolCallOutputEvent {
 		t.Fatal("Expected to have at least one output event, but got none")
-	}
-
-	if !materialFetched {
-		t.Fatal("Expected to have at least one material event, but got none")
 	}
 
 	fmt.Println("--------------------------------------")
