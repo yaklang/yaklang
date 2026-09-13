@@ -1233,11 +1233,7 @@ LOOP:
 
 		// 落地 todo_delta 并判定本轮是否为有效推进 (空转轮不计入迭代预算).
 		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
-		// A host-requested completion review is not additional task work. Do not
-		// consume the execution budget just for asking/answering that checkpoint.
-		if handler.ActionType != loopAction_Finish.ActionType || (appliedTodoDelta != nil && appliedTodoDelta.HasChanges()) {
-			r.advanceEffectiveIteration(task, appliedTodoDelta)
-		}
+		r.advanceEffectiveIteration(task, appliedTodoDelta)
 
 		if handler.AsyncMode {
 			r.UserStatus(
@@ -1323,7 +1319,6 @@ LOOP:
 		// in history without falsely turning them into iteration_end training data.
 		r.applyActionExecutionRecord(actionRecord, operator)
 		if handler.ActionType != loopAction_Finish.ActionType {
-			r.invalidateCompletionReview(task)
 			r.recordCurrentTodoIteration(task)
 		}
 

@@ -74,8 +74,6 @@ func TestReactiveDataDoesNotExposeIterationDeadline(t *testing.T) {
 	}
 }
 
-const testReviewedFinish = `{"@action":"finish","completion_review":{"goal_evidence":"The scripted note or answer has been emitted in the preceding action.","discovery_audit":"The scripted observation introduces no additional objects.","closure_audit":"No tool work or deferred blocker remains in this fixture."}}`
-
 func TestPostSummaryAuditsAcceptanceAndUnfinishedWork(t *testing.T) {
 	require.Contains(t, reActPostSummary, "## 验收结果与已关闭工作")
 	require.Contains(t, reActPostSummary, "## 仍未完成的工作")

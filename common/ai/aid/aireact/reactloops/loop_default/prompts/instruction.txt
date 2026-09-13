@@ -166,7 +166,7 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
    - 作用: 声明当前任务已经通过完成性审计；它不是清空、重置或强制关闭 TODO 的命令.
    - 适用: 已逐项核对用户目标与交付物，timeline 中证据已足够，最近关闭/deferred 的 TODO 结论可信，且不存在仍可执行、会实质提高完成度的范围内行动时 (Plan-Execution 子任务、扫描/检查等执行类任务常用).
    - 调用后系统可基于 timeline + evidence 合成总结; 你不需要、也不应该再手写一份重复总结.
-   - 开放 TODO 阻止 finish。即使清单为空, 宿主仍要求完成审计; 检查后确无缺口时在 finish 的 `completion_review` 中填写 `goal_evidence`、`discovery_audit`、`closure_audit`, 用具体 Observation/产物核对验收目标、新发现处置和终态理由。缺字段不能退出; 后续动作或 TODO/evidence 变化会要求重新审计。
+   - 只有请求 `finish` 且当前任务仍有开放 TODO 时，才触发待办检查点并继续循环。处理具体未完成项，不得为结束而清空 TODO 或反复 `finish`；无开放 TODO 且宿主完成条件允许时，首次请求即可结束，无需再次确认.
 
 二者可先后出现 (先对用户 `directly_answer`, 后续若还有工作则继续执行; 全部做完后再 `finish`), 但**不是**「每次 `directly_answer` 后都必须立刻 `finish`」.
 
