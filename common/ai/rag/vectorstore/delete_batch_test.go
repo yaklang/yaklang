@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -117,5 +118,48 @@ func TestMUSTPASS_DeleteBatchConcurrentReaders(t *testing.T) {
 	readers.Wait()
 	for i, id := range ids {
 		require.Equal(t, i >= 32, store.Has(id))
+	}
+}
+
+func TestMUSTPASS_DeletePreconditionSkipsGraphWork(t *testing.T) {
+	_, store, ids := batchDeleteStore(t, 24)
+	var visits atomic.Int32
+	// Count even adjacency reads: rejecting obsolete repair must happen before
+	// snapshotting survivors or loading lazy vectors, regardless of cache state.
+	for _, layer := range store.hnsw.graph.Layers {
+		for key, node := range layer.Nodes {
+			node := node
+			layer.Nodes[key] = hnswspec.NewLazyLayerNode(key, func(hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+				visits.Add(1)
+				return node, nil
+			})
+		}
+	}
+	changed := errors.New("already repaired")
+	require.ErrorIs(t, store.DeleteWithTransactionCheck(func(*gorm.DB) error { return changed }, ids[:12]...), changed)
+	require.Zero(t, visits.Load(), "failed precondition must not traverse the graph")
+	for _, id := range ids {
+		require.True(t, store.Has(id))
+	}
+}
+
+func TestMUSTPASS_DeletePreconditionRecheckedInTransaction(t *testing.T) {
+	_, store, ids := batchDeleteStore(t, 24)
+	var calls int
+	changed := errors.New("entity restored after preflight")
+	err := store.DeleteWithTransactionCheck(func(*gorm.DB) error {
+		calls++
+		if calls == 1 {
+			return nil
+		}
+		return changed
+	}, ids[:12]...)
+	require.ErrorIs(t, err, changed)
+	require.Equal(t, 2, calls)
+	for _, id := range ids {
+		require.True(t, store.Has(id), "failed transactional recheck must restore graph")
+		_, exists, err := store.Get(id)
+		require.NoError(t, err)
+		require.True(t, exists, "failed transactional recheck must preserve rows")
 	}
 }
