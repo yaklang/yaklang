@@ -22,15 +22,10 @@ var allBuiltinSkills = []struct {
 	fsPath   string // path inside the embedded FS
 	keywords []string
 }{
-	{"security-engineering", "skills/security-engineering/SKILL.md", []string{"授权边界", "证据优先", "code-review", "pentest-task-design"}},
+	{"security-engineering", "skills/security-engineering/SKILL.md", []string{"授权边界", "证据优先", "可复现", "蓝队", "code-review", "pentest-task-design"}},
 	{"code-review", "skills/code-review/SKILL.md", []string{"grep", "CWE-89", "CWE-77", "CWE-79"}},
-	{"xss-testing", "skills/xss-testing/SKILL.md", []string{"XSS", "Payload", "CSP"}},
-	{"sql-injection", "skills/sql-injection/SKILL.md", []string{"UNION", "SQL", "Payload"}},
-	{"command-injection", "skills/command-injection/SKILL.md", []string{"CWE-77", "CWE-78", "Payload"}},
-	{"template-injection", "skills/template-injection/SKILL.md", []string{"SSTI", "Jinja2", "Freemarker"}},
-	{"recon-planning", "skills/recon-planning/SKILL.md", []string{"OWASP", "Recon", "Scoping"}},
-	{"web-crawler", "skills/web-crawler/SKILL.md", []string{"URL", "API", "JavaScript"}},
-	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
+	{"recon-planning", "skills/recon-planning/SKILL.md", []string{"Recon", "攻击面", "眼前的先测完", "子 Agent", "活站"}},
+	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "Phase", "cybersecurity-risk"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
@@ -138,32 +133,41 @@ func TestBuiltinSkillsFS_AllMetaValid(t *testing.T) {
 	}
 }
 
-func TestBuiltinWebCrawlerSkillUsesBoundedEvidenceDrivenRouting(t *testing.T) {
-	content, err := GetBuiltinSkillsFS().ReadFile("skills/web-crawler/SKILL.md")
+func TestSecurityEngineeringSkillIsMergedAndCompact(t *testing.T) {
+	fs := GetBuiltinSkillsFS()
+	if _, err := fs.ReadFile("skills/security-engineering/SKILL2.md"); err == nil {
+		t.Fatal("SKILL2.md should be merged into SKILL.md and must not ship separately")
+	}
+
+	content, err := fs.ReadFile("skills/security-engineering/SKILL.md")
 	if err != nil {
-		t.Fatalf("read web-crawler skill: %v", err)
+		t.Fatalf("read SKILL.md: %v", err)
 	}
 	body := string(content)
-
+	if strings.Contains(body, "SKILL2") {
+		t.Error("SKILL.md must not point at SKILL2.md after the merge")
+	}
 	for _, expected := range []string{
-		"URL 快速路径与调用预算",
-		"do_http_request",
-		"simple_crawler",
-		"各 1 次",
-		"use_browser",
-		"crawl_js_collector",
-		"js_static_extract_ai",
-		"普通爬虫不执行 JavaScript",
+		"攻击面与信息收集",
+		"红队 / 黑盒",
+		"业务逻辑",
+		"白盒",
+		"Git 探索",
+		"源码探索",
+		"蓝队",
+		"验收闸门",
+		"禁止破坏",
+		"可复现",
+		"关键证据",
+		"被动与主动并行",
+		"把图画全",
 	} {
 		if !strings.Contains(body, expected) {
-			t.Errorf("web-crawler skill missing bounded routing guidance %q", expected)
+			t.Errorf("merged SKILL.md missing guidance %q", expected)
 		}
 	}
-	if strings.Contains(body, "URL 自动等于“必须爬取”") {
-		t.Error("web-crawler skill must not make crawling mandatory merely because input contains a URL")
-	}
-	if strings.Contains(body, "- [ ] 未认证爬取完成") {
-		t.Error("web-crawler checklist must not make unauthenticated crawling universally mandatory")
+	if n := len([]rune(body)); n > 5600 {
+		t.Errorf("merged SKILL.md should stay compact, got %d runes", n)
 	}
 }
 
