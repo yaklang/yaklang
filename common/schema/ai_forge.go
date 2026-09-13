@@ -27,6 +27,10 @@ type AIForge struct {
 	Author    string
 	IsBuiltin bool `gorm:"default:false;index"`
 
+	// BuiltinSkillHash is the last embedded skill revision installed by the system.
+	// Intentionally excluded from ToUpdateMap and GRPC: user edits must not reset it.
+	BuiltinSkillHash string
+
 	InitPrompt       string
 	PersistentPrompt string
 	PlanPrompt       string
