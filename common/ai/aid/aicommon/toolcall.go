@@ -1018,6 +1018,44 @@ type GenerateParamsResult struct {
 	CallExpectations string        // AI-generated expectations for this tool call (timing, success criteria, etc.)
 }
 
+// extractToolCallAction tolerates an omitted discriminator only in R2, where
+// the caller has already selected one tool. Recovery requires a complete outer
+// object with that tool name and object-valued params, and never replaces an
+// explicit action marker.
+func extractToolCallAction(ctx context.Context, stream io.Reader, toolName string, opts ...ActionMakerOption) (*Action, error) {
+	action, err := ExtractActionFromStream(ctx, stream, "call-tool", opts...)
+	if err != nil {
+		return nil, err
+	}
+	parseErr := action.WaitParseResult(ctx)
+	action.WaitStream(ctx)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	if action.ValidCheck("call-tool") {
+		return action, nil
+	}
+
+	params := action.GetParams()
+	_, hasMarker := actionMarker(params)
+	requestedTool, _ := params["tool"].(string)
+	toolParams, hasObjectParams := params["params"].(map[string]any)
+	if !hasMarker && toolName != "" && requestedTool == toolName && hasObjectParams && toolParams != nil {
+		canonical := make(aitool.InvokeParams, len(params)+1)
+		for key, value := range params {
+			canonical[key] = value
+		}
+		canonical[ActionMagicKey] = "call-tool"
+		action.ForceSet(action.generalParamKey, canonical)
+		action.ForceSet(ActionMagicKey, "call-tool")
+		action.SetName("call-tool")
+		action.observeActionType("call-tool")
+		log.Debugf("recovered omitted @action for selected tool[%s] from complete tool/params envelope", toolName)
+		return action, nil
+	}
+	return nil, utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: [call-tool]", action.ObservedActionType())
+}
+
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
 	emitter := t.emitter
 
@@ -1093,9 +1131,8 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	// a native tool whose parameters schema mirrors the call-tool action
 	// protocol (same as ToJSONSchema: {@action, tool, params, identifier,
 	// call_expectations}). The model outputs the complete action JSON as
-	// tool_call arguments, which flow through the same
-	// ExtractValidActionFromStream("call-tool") pipeline as text mode — no
-	// parsing changes needed. The native tool uses the tool's real name (not
+	// tool_call arguments, which flow through the same extractToolCallAction
+	// pipeline as text mode. The native tool uses the tool's real name (not
 	// R1's execute_action), so R2 never sees R1's big tool.
 	functionCallMode := t.config.GetConfigBool("EnableFunctionCallMode")
 	var requestOpts []AIRequestOption
@@ -1189,13 +1226,13 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			}),
 		)
 
-		callToolAction, err := ExtractValidActionFromStream(t.ctx, stream, "call-tool", actionOpts...)
+		callToolAction, err := extractToolCallAction(t.ctx, stream, tool.Name, actionOpts...)
 		if err != nil {
 			boundEmitter.EmitError("error extract tool params: %v", err)
 			pw.Close()
 			return utils.Errorf("error extracting action params: %v", err)
 		}
-		// ExtractValidActionFromStream waits for canonical parsing. Wait for field
+		// extractToolCallAction waits for canonical parsing. Wait for field
 		// stream handlers too, then finalize response metadata synchronously. The
 		// old OnReaderFinished callback ran in the parser goroutine after parseDone
 		// and raced these variables under concurrent parameter generation.
@@ -1207,18 +1244,19 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		pw.Close()
 
 		// Extract identifier from action (destination identifier for this tool call)
-		identifier = sanitizeIdentifier(callToolAction.GetString("identifier"))
+		callToolParams := callToolAction.GetParams()
+		identifier = sanitizeIdentifier(callToolParams.GetString("identifier"))
 		if identifier != "" {
 			log.Debugf("extracted identifier[%s] for tool[%s]", identifier, tool.Name)
 		}
 
-		callExpectations = callToolAction.GetString("call_expectations")
+		callExpectations = callToolParams.GetString("call_expectations")
 		if callExpectations != "" {
 			log.Debugf("extracted call_expectations for tool[%s]: %s", tool.Name, callExpectations)
 		}
 
 		// First, get params from JSON
-		for k, v := range callToolAction.GetInvokeParams("params") {
+		for k, v := range callToolParams.GetObject("params") {
 			invokeParams.Set(k, v)
 		}
 
