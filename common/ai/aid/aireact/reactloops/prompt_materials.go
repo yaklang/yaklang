@@ -11,7 +11,7 @@ import (
 //
 // Timeline 已经按稳定性分层为 frozen / open 两段:
 //   - TimelineFrozen: 仅 reducer + 非末 interval 的"冻结前缀"渲染, 不带边界 tag
-//   - TimelineOpen: 仅最末 interval 桶 + midterm prefix 等"易变尾段", 不带边界 tag
+//   - TimelineOpen: 仅最末 interval 桶等"易变尾段", 不带边界 tag
 //
 // 关键词: LoopPromptBaseMaterials, Timeline 拆分, frozen/open 分层
 type LoopPromptBaseMaterials struct {

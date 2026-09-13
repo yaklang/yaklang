@@ -141,7 +141,7 @@ reports/
    - high-static → 检查 [aireact/prompts/loop/system_prompt.txt](../aireact/prompts/loop/) 是否引入了变量
    - frozen → 检查 [aireact/prompts/loop/frozen_block_section.txt](../aireact/prompts/loop/) 与 ToolInventory / ForgeInventory 的稳定性
    - semi-dynamic → 通常是 SkillsContext (Skills 加载/卸载) 或 Schema 漂移
-   - timeline-open → 注意是否进了 last interval 桶, midterm 是否被消费两次
+   - timeline-open → 注意是否进了 last interval 桶
 4. 选一条 `lcp_hit_but_upstream_miss` 行 → 通常是:
    - hijacker 走了 2 段退化路径 (frozen 边界没找到), 检查
      [hijacker.go::splitByFrozenBoundary](hijacker.go) 的 fallback 分支

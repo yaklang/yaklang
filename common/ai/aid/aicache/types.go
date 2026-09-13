@@ -8,8 +8,8 @@ import "time"
 //   - SectionTimeline ("timeline"): 老路径 (liteforge / 部分老 caller) 仍使用
 //     的合并 timeline 段, 同时承载 frozen reducer + interval + open last bucket。
 //   - SectionTimelineOpen ("timeline-open"): aireact 新路径 "按稳定性分层" 拆分
-//     后的 timeline 易变尾段 (仅含最末 interval 桶 + Current Time + Workspace +
-//     midterm prefix)。frozen 部分被迁到 AI_CACHE_FROZEN 块中, 不再走 timeline
+//     后的 timeline 易变尾段 (仅含最末 interval 桶 + Current Time + Workspace)。
+//     frozen 部分被迁到 AI_CACHE_FROZEN 块中, 不再走 timeline
 //     section 包装。
 //
 // SectionSemiDynamic / SectionSemiDynamic1 / SectionSemiDynamic2 同时存在:

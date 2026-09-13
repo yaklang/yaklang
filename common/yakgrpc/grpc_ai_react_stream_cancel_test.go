@@ -69,16 +69,6 @@ func (s *cancelableAIReActServerStream) RecvMsg(message any) error {
 	return nil
 }
 
-type noOpTimelineArchiveStore struct{}
-
-func (*noOpTimelineArchiveStore) ArchiveCompressedBatch(context.Context, *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
-	return nil, nil
-}
-
-func (*noOpTimelineArchiveStore) SearchArchivedBatches(context.Context, *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
-	return &aicommon.TimelineArchiveSearchResult{}, nil
-}
-
 func TestStartAIReActFrontendStreamCancelReleasesFreeInput(t *testing.T) {
 	server := newScheduleTestServer(t)
 	sessionID := "frontend-stream-cancel-" + uuid.NewString()
@@ -111,7 +101,6 @@ func TestStartAIReActFrontendStreamCancelReleasesFreeInput(t *testing.T) {
 			false,
 			aicommon.WithAICallback(blockingCallback),
 			aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-			aicommon.WithTimelineArchiveStore(&noOpTimelineArchiveStore{}),
 			aicommon.WithEnhanceKnowledgeManager(mockKnowledgeManager),
 			aicommon.WithDisallowMCPServers(true),
 			aicommon.WithDisableSessionTitleGeneration(true),

@@ -108,10 +108,6 @@ type ReAct struct {
 	taskHandoffs       int
 	taskHandoffVersion uint64
 
-	midtermRecallMutex           sync.Mutex
-	pendingMidtermTimelineRecall bool
-	pendingMidtermPerception     *midtermPerceptionSnapshot
-
 	pureInvokerMode bool // 纯调用者模式，不启动事件循环和队列处理器
 
 	browserSessionsMu sync.Mutex
@@ -280,11 +276,6 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	log.Infof("memory triage id: %s", react.memoryTriage.GetSessionID())
 
-	if cfg.TimelineArchiveStore == nil && strings.TrimSpace(cfg.PersistentSessionId) != "" {
-		midtermSessionID := aimem.PersistentSessionToMidtermMemorySessionID(cfg.PersistentSessionId)
-		cfg.TimelineArchiveStore = aimem.NewAsyncAIMemoryForQuery(cfg.GetContext(), midtermSessionID,
-			aimem.WithDatabase(cfg.GetDB()), aimem.WithMidtermArchiveMode())
-	}
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	if cfg.Timeline == nil {
 		cfg.Timeline = aicommon.NewTimeline(cfg, nil)

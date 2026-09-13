@@ -18,16 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type noOpTimelineArchiveStore struct{}
-
-func (*noOpTimelineArchiveStore) ArchiveCompressedBatch(context.Context, *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
-	return nil, nil
-}
-
-func (*noOpTimelineArchiveStore) SearchArchivedBatches(context.Context, *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
-	return &aicommon.TimelineArchiveSearchResult{}, nil
-}
-
 func TestReActEventDeliveryKeepsNormalOutputBestEffortAndReportsSyncFailure(t *testing.T) {
 	deliveryErr := errors.New("subscriber delivery failed")
 	normalErrors := make(chan error, 1)
@@ -286,7 +276,6 @@ func TestReActSessionRuntimeCreatesOnceAttachesAndGatesReservedInput(t *testing.
 	mockKnowledgeManager, _ := aicommon.NewMockEKManagerAndToken()
 	options := []aicommon.ConfigOption{
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithTimelineArchiveStore(&noOpTimelineArchiveStore{}),
 		aicommon.WithEnhanceKnowledgeManager(mockKnowledgeManager),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),

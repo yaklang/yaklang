@@ -774,8 +774,6 @@ func (pm *PromptManager) timelineDumpForPrompt() string {
 	if timeline == nil {
 		return ""
 	}
-	// Midterm archive memory is now appended to InjectedMemory in the dynamic
-	// section, no longer prepended to the timeline dump.
 	return timeline.DumpForPrompt()
 }
 

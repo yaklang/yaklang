@@ -1056,12 +1056,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	stopStallHeartbeat := r.startStallHeartbeat(task.GetContext(), task)
 	defer stopStallHeartbeat()
 
-	// When regular memory is updated, also refresh midterm archive memory in
-	// parallel. Both fire at the same trigger point; midterm queries are based
-	// on the perception snapshot, consumed from the invoker.
 	if !r.isSimpleQueryWithoutWork() {
-		r.refreshMidtermMemoryAsync()
-
 		if !utils.IsNil(r.memoryTriage) {
 			go func() {
 				log.Info("start to handle searching memory for ReActLoop with AI")

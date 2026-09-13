@@ -388,13 +388,6 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		CoveredEndItemID: lastCompressedId,
 		CoveredEndAtMs:   lastCompressedTs,
 	})
-	m.attachArchiveRef(lastCompressedId, m.archiveForgottenBatch(
-		TimelineArchiveReasonBatchCompress,
-		lastCompressedId,
-		idsToRemove,
-		toCompress,
-		finalText,
-	))
 	log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
 
 	// 标记被压缩的 items 为非活跃

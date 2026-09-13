@@ -115,13 +115,6 @@ type ReActLoop struct {
 	fastMemorySearchMu       sync.Mutex
 	fastMemorySearchInFlight bool
 
-	// midterm archive memory: loaded/updated alongside regular memory,
-	// rendered together with InjectedMemory in the dynamic section.
-	currentMidtermMemory string
-	midtermMemoryMu      sync.Mutex
-
-	midtermMemorySearchInFlight bool
-
 	// task status control
 	onTaskCreated         func(task aicommon.AIStatefulTask)
 	onAsyncTaskFinished   func(task aicommon.AIStatefulTask)
@@ -659,7 +652,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		taskMutex:                    new(sync.Mutex),
 		currentMemories:              omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit:              10 * 1024,
-		currentMidtermMemory:         "",
 		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
 		actionHistory:                make([]*ActionRecord, 0),
 		actionHistoryMutex:           new(sync.Mutex),
