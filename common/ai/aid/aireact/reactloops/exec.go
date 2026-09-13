@@ -225,10 +225,16 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 		return ""
 	}
 
+	if candidate := strings.TrimSpace(action.ActionType()); candidate != "" && candidate != "object" {
+		return candidate
+	}
+	// GetString also exposes flattened nested keys for legacy field consumers.
+	// A tool parameter such as params.type="A" is not an action discriminator.
+	params := action.GetParams()
+	nextAction := params.GetObject("next_action")
 	candidates := []string{
-		strings.TrimSpace(action.ActionType()),
-		strings.TrimSpace(action.GetString("next_action.type")),
-		strings.TrimSpace(action.GetString("type")),
+		strings.TrimSpace(nextAction.GetString("type")),
+		strings.TrimSpace(params.GetString("type")),
 	}
 	for _, candidate := range candidates {
 		if candidate != "" && candidate != "object" {
@@ -237,20 +243,19 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 	}
 
 	hasField := func(key string) bool {
-		if strings.TrimSpace(action.GetString(key)) != "" {
+		if strings.TrimSpace(params.GetString(key)) != "" {
 			return true
 		}
-		if strings.TrimSpace(action.GetInvokeParams("next_action").GetString(key)) != "" {
+		if strings.TrimSpace(nextAction.GetString(key)) != "" {
 			return true
 		}
 		return false
 	}
 	hasCanonicalField := func(key string) bool {
-		params := action.GetParams()
 		if _, ok := params[key]; ok {
 			return true
 		}
-		if nextAction := params.GetObject("next_action"); nextAction != nil {
+		if nextAction != nil {
 			_, ok := nextAction[key]
 			return ok
 		}
@@ -594,7 +599,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				unsupportedErr := actionTypeResolutionError(
 					observedActionType,
 					actionNames,
-					"a non-empty @action value was parsed, but it did not exactly match any action registered in this loop",
+					"a non-empty @action or action value was parsed, but it did not exactly match any action registered in this loop",
 				)
 				if currentCtxCanceled() {
 					unsupportedErr = utils.Wrap(unsupportedErr, "task context canceled while parsing action")
@@ -612,7 +617,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				missingErr := actionTypeResolutionError(
 					"",
 					actionNames,
-					"no non-empty @action value was found and legacy payload inference found no known action",
+					"no non-empty @action or action value was found and legacy payload inference found no known action",
 				)
 				if currentCtxCanceled() {
 					missingErr = utils.Wrap(missingErr, "task context canceled while parsing action")
