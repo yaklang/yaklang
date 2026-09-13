@@ -215,3 +215,19 @@ func TestMUSTPASS_CleanupCorruptRAGRetainsRows(t *testing.T) {
 	require.Equal(t, 1, memories)
 	require.Equal(t, 1, collections, "maintenance must not delete a corrupt RAG collection")
 }
+
+func TestMUSTPASS_CleanupTableRecreationStaleWriter(t *testing.T) {
+	db := cleanupRegressionDB(t)
+	stale := cleanupRegressionBackend(t, db)
+	insertCleanupRegressionMemory(t, db, stale, "deleted")
+	require.NoError(t, stale.SaveGraph())
+	// The delete-all endpoint drops and recreates these tables; primary keys
+	// can be reused by a newly created session while old backends still live.
+	require.NoError(t, db.DropTableIfExists(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{}).Error)
+	fresh := cleanupRegressionBackend(t, db)
+	insertCleanupRegressionMemory(t, db, fresh, "new")
+	require.NoError(t, fresh.SaveGraph())
+	require.NoError(t, stale.Close())
+	require.Equal(t, []string{"new"}, cleanupRegressionBackend(t, db).ListMemoryIDs())
+}

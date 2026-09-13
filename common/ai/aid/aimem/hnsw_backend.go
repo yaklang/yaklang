@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -127,12 +128,15 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 创建新的collection
 		collection = schema.AIMemoryCollection{
-			SessionID:   sessionID,
-			M:           16,
-			Ml:          0.25,
-			EfSearch:    20,
-			EfConstruct: 200,
-			Dimension:   7,
+			// A fresh generation also distinguishes drop/recreate of the same
+			// session, where SQLite can reuse the old collection primary key.
+			CleanupVersion: time.Now().UnixNano(),
+			SessionID:      sessionID,
+			M:              16,
+			Ml:             0.25,
+			EfSearch:       20,
+			EfConstruct:    200,
+			Dimension:      7,
 		}
 		if err := db.Table(collectionTable).Create(&collection).Error; err != nil {
 			return nil, utils.Errorf("create collection failed: %v", err)

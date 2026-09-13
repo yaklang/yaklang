@@ -24,7 +24,9 @@ The fix removes all targets before repairing survivors, saves the graph once,
 transacts RAG rows with their graph, transacts memory rows with their graph and
 cleanup generation, and returns persistence errors. Stale memory writers rebase
 against that generation and retain only still-live local additions. Empty graphs
-are persisted explicitly. Save requests share one worker per memory backend.
+are persisted explicitly. New collections receive a fresh generation so a
+drop/recreate cannot reset the stale-writer guard. Save requests share one worker
+per memory backend.
 
 ## Measurements
 
@@ -108,3 +110,9 @@ memory cleanup in the inspected revision. The baseline executable exited in
 2.59 seconds. The cleanup timings above come from invoking the actual cleanup
 chain against that same backup, which reproduced the supplied warning pattern;
 they are not claims about total CLI startup time or Go compilation time.
+
+A separate warm `go run` process sample took about 10.1 seconds and observed
+approximately 3.41 GB RSS in Go's `link` process versus 63 MB in the running
+`yak` process (200-ms sampling). The first changed-source invocation took 42.9
+seconds including compilation/linking. These observations distinguish build
+resource use from the runtime cleanup defect; this PR changes the latter.
