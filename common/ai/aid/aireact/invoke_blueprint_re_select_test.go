@@ -36,7 +36,7 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 
 	prompt := req.GetPrompt()
 
-	if isToolParamGenPromptForBlueprint(prompt, forgeName1) && !isToolParamGenPromptWithOldParams(prompt) {
+	if (isToolParamGenPromptForBlueprint(prompt, forgeName1) || isToolParamGenPromptForBlueprint(prompt, forgeName2)) && !isToolParamGenPromptWithOldParams(prompt) {
 		rs := bytes.NewBufferString(`
 {"@action": "call-ai-blueprint", "params": {
 	"query": "...[` + codec.Sha256(flag) + `]...",
