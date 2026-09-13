@@ -63,7 +63,7 @@ iter 20  t=770   phase=4
 解读 (realistic 画像下):
 - 13 分钟内会发起 10 次 perception AI 调用 (每次 LiteForge SpeedPriority).
 - 其中只有 4 次产生有效 updated (含首次), 浪费 6 次, 浪费率 60%.
-- 在 noisy 上界 (AI 永远 changed=true) 下, fired 达到 10 次, 全部刷新下游 (capability search + RAG + midterm recall), 是最坏情况.
+- 在 noisy 上界 (AI 永远 changed=true) 下, fired 达到 10 次, 全部刷新下游 (capability search + RAG), 是最坏情况.
 
 ## 15.4 参数扫描矩阵
 
