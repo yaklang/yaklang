@@ -949,11 +949,17 @@ func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 	// Output: Second call includes changes for traced providers
 }
 
-// TestPromptManager_AIForgeList 测试 AIForgeList 功能
-// 该测试验证：
-// 1. AIForgeList 能够正确获取内置的 Forge 列表
-// 2. 生成的循环提示包含 Prompt loop.txt 中的内容
-// 3. 特别验证 hostscan 作为内置 aiforge 的代表
+type promptFixtureForgeFactory struct {
+	aicommon.AIForgeFactory
+	forges []*schema.AIForge
+}
+
+func (f *promptFixtureForgeFactory) Query(context.Context, ...aicommon.ForgeQueryOption) ([]*schema.AIForge, error) {
+	return f.forges, nil
+}
+
+// TestPromptManager_AIForgeList verifies inventory rendering without requiring a
+// previously initialized user profile database. Rendering uses the real factory.
 func TestPromptManager_AIForgeList(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 AIForgeList 功能
 	react, err := NewTestReAct(
@@ -966,6 +972,14 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+	react.config.AiForgeManager = &promptFixtureForgeFactory{
+		AIForgeFactory: react.config.GetAIForgeManager(),
+		forges: []*schema.AIForge{{
+			ForgeName:        "hostscan",
+			ForgeVerboseName: "主机体检",
+			Description:      "专业的主机体检AI助手",
+		}},
 	}
 
 	// 获取可用的 AI Forge 列表
