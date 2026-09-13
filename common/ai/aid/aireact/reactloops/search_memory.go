@@ -14,7 +14,7 @@ import (
 // refreshFastMemoryAsync never delays an iteration and allows only one quick
 // search in flight per loop, even when the backend is still initializing.
 func (r *ReActLoop) refreshFastMemoryAsync(task aicommon.AIStatefulTask) {
-	if utils.IsNil(r.memoryTriage) || task.GetContext().Err() != nil {
+	if utils.IsNil(r.memoryTriage) || task.GetContext().Err() != nil || r.isSimpleQueryWithoutWork() {
 		return
 	}
 	r.fastMemorySearchMu.Lock()

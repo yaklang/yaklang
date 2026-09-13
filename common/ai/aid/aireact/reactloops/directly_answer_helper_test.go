@@ -252,3 +252,19 @@ func TestSimpleQueryDoesNotAutoFinishWithTodoHistory(t *testing.T) {
 	loop.SetCurrentTask(other)
 	require.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action), "unrelated history must not block a new greeting")
 }
+
+func TestSimpleQueryPreservesGoalAndTodoWork(t *testing.T) {
+	loop, _, cfg, _ := newTodoGateTestLoop(t, nil)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	cfg.enableGoalMode, cfg.goalMinIterations = true, 6
+	loop.currentIterationIndex = 1
+	require.False(t, loop.isSimpleQueryWithoutWork(), "goal work must retain automatic recall")
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	require.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action), "greeting must not bypass the goal finish gate")
+	loop.currentIterationIndex = 6
+	require.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+	cfg.enableGoalMode = false
+	cfg.active = []aicommon.VerificationTodoItem{{ID: "pending", Status: aicommon.VerificationTodoStatusPending}}
+	require.False(t, loop.isSimpleQueryWithoutWork(), "pending TODOs must retain automatic recall")
+}

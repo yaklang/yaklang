@@ -1059,20 +1059,22 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	// When regular memory is updated, also refresh midterm archive memory in
 	// parallel. Both fire at the same trigger point; midterm queries are based
 	// on the perception snapshot, consumed from the invoker.
-	r.refreshMidtermMemoryAsync()
+	if !r.isSimpleQueryWithoutWork() {
+		r.refreshMidtermMemoryAsync()
 
-	go func() {
 		if !utils.IsNil(r.memoryTriage) {
-			log.Info("start to handle searching memory for ReActLoop with AI")
-			result, err := r.memoryTriage.SearchMemory(task, 5*1024)
-			if err != nil {
-				log.Warnf("search memory failed: %v", err)
-			}
-			if task.GetContext().Err() == nil {
-				r.PushMemory(result)
-			}
+			go func() {
+				log.Info("start to handle searching memory for ReActLoop with AI")
+				result, err := r.memoryTriage.SearchMemory(task, 5*1024)
+				if err != nil {
+					log.Warnf("search memory failed: %v", err)
+				}
+				if task.GetContext().Err() == nil {
+					r.PushMemory(result)
+				}
+			}()
 		}
-	}()
+	}
 
 	needSummary := utils.NewBool(false)
 LOOP:

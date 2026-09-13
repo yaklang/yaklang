@@ -36,10 +36,7 @@ func RunAttachedExtraResourcesInit(
 	resourcesByType := make(map[string][]aicommon.AttachedResourceData)
 	var resources []aicommon.AttachedResourceData
 
-	for idx, data := range attachedDatas {
-		if data == nil {
-			continue
-		}
+	for idx, data := range aicommon.NonEmptyAttachedResources(attachedDatas) {
 		loop.UserStatus(
 			fmt.Sprintf("正在加载第 %d 个附加资源", idx+1),
 			fmt.Sprintf("Loading attached resource %d", idx+1),
