@@ -504,6 +504,10 @@ func (gw *GraphWrapper[K]) DeleteWithError(uids ...K) error {
 }
 
 func (gw *GraphWrapper[K]) deleteWithCommit(uids []K, commit func() error) (err error) {
+	return gw.deleteWithPrecondition(uids, nil, commit)
+}
+
+func (gw *GraphWrapper[K]) deleteWithPrecondition(uids []K, check, commit func() error) (err error) {
 	done := make(chan struct{})
 	if !gw.submit(&graphOp{
 		opType: opTypeWrite,
@@ -516,6 +520,13 @@ func (gw *GraphWrapper[K]) deleteWithCommit(uids []K, commit func() error) (err 
 					err = fmt.Errorf("delete graph nodes: %v", r)
 				}
 			}()
+			// Check after earlier graph writes finish, before traversing or
+			// snapshotting the graph for a now-obsolete maintenance request.
+			if check != nil {
+				if err = check(); err != nil {
+					return
+				}
+			}
 			_, err = gw.graph.DeleteBatchWithCommit(uids, commit)
 		},
 	}) {

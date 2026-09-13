@@ -710,9 +710,10 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	return s.DeleteWithTransactionCheck(nil, ids...)
 }
 
-// DeleteWithTransactionCheck revalidates a conditional deletion in the same
-// transaction that removes rows and saves the graph. A failed check restores
-// the in-memory graph too. check must use tx and must not re-enter the store.
+// DeleteWithTransactionCheck checks a conditional deletion before graph work,
+// then revalidates inside the transaction that removes rows and saves the graph.
+// A failed transaction restores the graph too. check must be read-only, use
+// the supplied DB, and never re-enter the store or graph.
 func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.DB) error, ids ...string) error {
 	if err := s.requireWriteCollection(); err != nil {
 		return err
@@ -727,7 +728,12 @@ func (s *SQLiteVectorStoreHNSW) DeleteWithTransactionCheck(check func(tx *gorm.D
 	// Serialize the survivor graph while all backing rows still exist. Keep
 	// both the graph snapshot and row deletion in the same transaction. A failed
 	// export/commit restores the in-memory topology and is returned to callers.
-	return s.hnsw.deleteWithCommit(ids, func() error {
+	return s.hnsw.deleteWithPrecondition(ids, func() error {
+		if check != nil {
+			return check(s.db)
+		}
+		return nil
+	}, func() error {
 		var binaryData []byte
 		reader, err := s.hnsw.exportHNSWGraphToBinaryInLock()
 		if err != nil && !errors.Is(err, graphNodesIsEmpty) {

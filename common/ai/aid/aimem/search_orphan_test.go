@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -129,7 +130,7 @@ func TestMUSTPASS_SemanticOrphanBacklogBounded(t *testing.T) {
 	mem.db.Callback().Query().After("gorm:query").Register("test:bounded-memory-query", func(scope *gorm.Scope) {
 		if scope.TableName() == mem.entityTableName() {
 			queries.Add(1)
-			require.LessOrEqual(t, len(scope.SQLVars), semanticSearchBatchSize+1, "SQL parameter count must stay bounded")
+			assert.LessOrEqual(t, len(scope.SQLVars), semanticSearchBatchSize+1, "SQL parameter count must stay bounded")
 		}
 	})
 	mem.db.Callback().Update().Before("gorm:update").Register("test:one-orphan-save", func(scope *gorm.Scope) {
