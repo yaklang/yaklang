@@ -53,6 +53,10 @@ func useTempBuiltinSkillReleaseDB(t *testing.T) {
 
 func useTempYakitHome(t *testing.T) string {
 	t.Helper()
+	// Config initializes process-wide database handles lazily. Resolve them
+	// before switching HOME so a global handle cannot pin a test's temp directory.
+	_ = consts.GetGormProfileDatabase()
+	_ = consts.GetGormProjectDatabase()
 
 	tempDir := t.TempDir()
 	originalYakitHome := os.Getenv("YAKIT_HOME")
@@ -206,7 +210,7 @@ func TestExtractBuiltinSkills_WritesToBuiltinSubdir(t *testing.T) {
 	}
 }
 
-func TestExtractBuiltinSkills_PreservesExistingFile(t *testing.T) {
+func TestExtractBuiltinSkills_MigratesUnknownExistingFile(t *testing.T) {
 	useTempBuiltinSkillReleaseDB(t)
 	tmpDir := t.TempDir()
 	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
@@ -228,11 +232,15 @@ func TestExtractBuiltinSkills_PreservesExistingFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read preserved skill file: %v", err)
 	}
-	if string(got) != string(customContent) {
-		t.Fatalf("existing skill file was overwritten, got %q", string(got))
+	if string(got) == string(customContent) {
+		t.Fatal("canonical skill must be upgraded to the embedded version")
 	}
-	if raw := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); raw != "" {
-		t.Fatalf("expected no release record for pre-existing local file, got %q", raw)
+	legacyPath := filepath.Join(filepath.Dir(targetPath)+"-legacy", "SKILL.original.md")
+	if preserved, err := os.ReadFile(legacyPath); err != nil || string(preserved) != string(customContent) {
+		t.Fatalf("unknown local content must be preserved byte-for-byte, got %q, err=%v", preserved, err)
+	}
+	if raw := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); raw == "" {
+		t.Fatal("expected a release record after migration")
 	}
 }
 
@@ -349,7 +357,7 @@ func TestExtractBuiltinSkills_PreservesModifiedFileAfterRelease(t *testing.T) {
 	}
 }
 
-func TestExtractBuiltinSkills_PreservesExistingFileEvenWithPriorReleaseRecord(t *testing.T) {
+func TestExtractBuiltinSkills_MigrationDoesNotTrustReleaseTimestamp(t *testing.T) {
 	useTempBuiltinSkillReleaseDB(t)
 	tmpDir := t.TempDir()
 	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
@@ -378,20 +386,21 @@ func TestExtractBuiltinSkills_PreservesExistingFileEvenWithPriorReleaseRecord(t 
 	if err != nil {
 		t.Fatalf("failed to read preserved legacy skill file: %v", err)
 	}
-	if string(got) != string(customContent) {
-		t.Fatalf("legacy skill file was overwritten, got %q", string(got))
+	if string(got) == string(customContent) {
+		t.Fatal("canonical skill must be upgraded even when the old mtime is misleading")
+	}
+	legacyPath := filepath.Join(filepath.Dir(targetPath)+"-legacy", "SKILL.original.md")
+	if preserved, err := os.ReadFile(legacyPath); err != nil || string(preserved) != string(customContent) {
+		t.Fatalf("old content must survive migration, got %q, err=%v", preserved, err)
 	}
 	currentRelease, ok := getBuiltinSkillReleaseTime(relPath)
 	if !ok {
 		t.Fatal("expected existing release record to remain readable")
 	}
-	if currentRelease.UnixMilli() != legacyReleaseAt.UnixMilli() {
-		t.Fatalf("expected release record to remain unchanged, got %v want %v", currentRelease, legacyReleaseAt)
-	}
 	if info, err := os.Stat(targetPath); err != nil {
 		t.Fatalf("failed to stat legacy skill file: %v", err)
-	} else if !info.ModTime().Before(currentRelease) {
-		t.Fatalf("expected legacy skill file mtime %v to remain before release time %v", info.ModTime(), currentRelease)
+	} else if info.ModTime().UnixMilli() != currentRelease.UnixMilli() {
+		t.Fatalf("expected release record to match the new file, got %v want %v", currentRelease, info.ModTime())
 	}
 }
 

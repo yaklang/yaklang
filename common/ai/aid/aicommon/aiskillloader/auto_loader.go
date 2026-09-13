@@ -120,7 +120,9 @@ func (l *AutoSkillLoader) discoverSkills(rootFS fi.FileSystem) error {
 				return nil
 			}
 
-			parentDir := filepath.Dir(pathname)
+			// The source may use slash paths even on Windows (embed, zip, VFS).
+			parentDir, _ := rootFS.PathSplit(pathname)
+			parentDir = strings.TrimRight(parentDir, string(rootFS.GetSeparators()))
 			if parentDir == "." {
 				parentDir = ""
 			}
@@ -144,7 +146,7 @@ func (l *AutoSkillLoader) discoverSkills(rootFS fi.FileSystem) error {
 				skillFS = &subDirFS{
 					parent:  rootFS,
 					subDir:  parentDir,
-					dirName: filepath.Base(parentDir),
+					dirName: rootFS.Base(parentDir),
 				}
 			}
 
