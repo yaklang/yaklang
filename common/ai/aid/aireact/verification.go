@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -40,33 +38,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	}
 
 	result := &aicommon.VerifySatisfactionResult{}
-	var referenceAnchorOnce sync.Once
-	var referenceAnchorID string
-
-	captureReferenceAnchor := func(event *schema.AiOutputEvent) {
-		if event == nil {
-			return
-		}
-		streamID := event.GetStreamEventWriterId()
-		if streamID == "" {
-			log.Errorf("empty streamId provided for verification reference anchor, origin data: %v", string(event.Content))
-			return
-		}
-		referenceAnchorOnce.Do(func() {
-			referenceAnchorID = streamID
-		})
-	}
-
-	emitVerificationReferenceMaterials := func(emitter *aicommon.Emitter, rawResponse string) {
-		if emitter == nil {
-			return
-		}
-		if strings.TrimSpace(referenceAnchorID) == "" {
-			log.Warnf("skip verification reference materials because no stream anchor was emitted")
-			return
-		}
-		aicommon.EmitAIResponseReferenceMaterial(emitter, referenceAnchorID, rawResponse)
-	}
 
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 	// 同步 AI 调用 post-action 卡死兜底: 给 verification 的 AI 输出流套一层
@@ -97,16 +68,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			}()
 			stream := io.Reader(idleReader)
 
-			var rawResponse bytes.Buffer
-			stream = io.TeeReader(stream, &rawResponse)
-
 			createReasonCallback := func(prompt string) func(key string, reader io.Reader) {
 				return func(key string, reader io.Reader) {
 					var out bytes.Buffer
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
-					var event *schema.AiOutputEvent
 					var err error
-					event, err = boundEmitter.EmitDefaultSystemStreamEvent(
+					_, err = boundEmitter.EmitDefaultSystemStreamEvent(
 						"re-act-verify",
 						reader,
 						rsp.GetTaskIndex(),
@@ -120,7 +87,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						log.Errorf("failed to emit %s stream event: %v", key, err)
 						return
 					}
-					captureReferenceAnchor(event)
 				}
 			}
 
@@ -173,8 +139,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 
 						var out bytes.Buffer
 						var outputReader = io.TeeReader(displayReader, &out)
-						var event *schema.AiOutputEvent
-						event, err = boundEmitter.EmitDefaultSystemStreamEvent(
+						_, err = boundEmitter.EmitDefaultSystemStreamEvent(
 							"plan-evidence",
 							outputReader,
 							rsp.GetTaskIndex(),
@@ -184,7 +149,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							log.Errorf("failed to emit evidence stream event: %v", err)
 							return
 						}
-						captureReferenceAnchor(event)
 					},
 				),
 			)
@@ -213,7 +177,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			// 关键词: verification 纯观测, 不写 todo_delta, 不维护 TODO,
 			// todo_delta 是 TODO 权威入口
 
-			emitVerificationReferenceMaterials(boundEmitter, rawResponse.String())
 			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel("verification"),

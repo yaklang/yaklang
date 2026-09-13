@@ -3,8 +3,6 @@ package aireact
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -80,7 +78,7 @@ func TestVerifyUserSatisfaction_TaskCancellationStopsRequestWithoutRetry(t *test
 	}
 }
 
-func TestVerifyUserSatisfaction_EmitsResponseReferenceWithoutPrompt(t *testing.T) {
+func TestVerifyUserSatisfaction_DoesNotEmitModelExchangeReferences(t *testing.T) {
 	var (
 		events   []*schema.AiOutputEvent
 		eventsMu sync.Mutex
@@ -118,36 +116,16 @@ func TestVerifyUserSatisfaction_EmitsResponseReferenceWithoutPrompt(t *testing.T
 	eventsMu.Lock()
 	defer eventsMu.Unlock()
 
-	streamStartIDs := make(map[string]bool)
-	var responsePayload string
-	var responseEventID string
-
+	var sawVerificationStream bool
 	for _, event := range events {
-		if event.Type == schema.EVENT_TYPE_STREAM_START {
-			streamStartIDs[event.GetStreamEventWriterId()] = true
-		}
-		if event.Type != schema.EVENT_TYPE_REFERENCE_MATERIAL {
-			continue
-		}
-
-		var payload map[string]any
-		require.NoError(t, json.Unmarshal(event.Content, &payload))
-
-		payloadStr, _ := payload["payload"].(string)
-		eventID, _ := payload["event_uuid"].(string)
-
-		require.NotContains(t, payloadStr, "AI 请求原文")
-		require.NotContains(t, payloadStr, queryToken)
-		require.NotContains(t, payloadStr, payloadToken)
-		if strings.Contains(payloadStr, "AI 响应原文") {
-			responsePayload = payloadStr
-			responseEventID = eventID
+		require.NotEqual(t, schema.EVENT_TYPE_REFERENCE_MATERIAL, event.Type,
+			"verification prompts and raw responses are not reference materials")
+		if event.Type == schema.EVENT_TYPE_STREAM_START && event.NodeId == "re-act-verify" {
+			sawVerificationStream = true
 		}
 	}
+	require.True(t, sawVerificationStream, "verification progress must remain visible")
 
-	require.NotEmpty(t, responsePayload)
-	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
 }
 
 func TestVerifyUserSatisfaction_AcceptsEvidenceAITag(t *testing.T) {

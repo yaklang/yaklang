@@ -89,34 +89,24 @@ func newDynamicPlanningTestConfig(ctx context.Context, aiCallback AICallbackType
 	return NewTestConfig(ctx, baseOpts...)
 }
 
-// Review completion synchronously emits references; drain the buffered events after it.
-func collectResponseReferenceMaterial(t *testing.T, events <-chan *schema.AiOutputEvent, promptToken string) (string, string, map[string]bool) {
+// Inspect all events buffered before review completion, including unrelated streams.
+func assertReviewWithoutModelExchangeReferences(t *testing.T, events <-chan *schema.AiOutputEvent, nodeID string) {
 	t.Helper()
-	streamStartIDs := make(map[string]bool)
-	var responsePayload, responseEventID string
+	var sawReviewStream bool
 	for {
 		select {
 		case evt := <-events:
 			if evt == nil {
 				continue
 			}
-			if evt.Type == schema.EVENT_TYPE_STREAM_START {
-				streamStartIDs[evt.GetStreamEventWriterId()] = true
-			}
-			if evt.Type != schema.EVENT_TYPE_REFERENCE_MATERIAL {
-				continue
-			}
-			var payload map[string]any
-			require.NoError(t, json.Unmarshal(evt.Content, &payload))
-			payloadStr, _ := payload["payload"].(string)
-			require.NotContains(t, payloadStr, "AI 请求原文")
-			require.NotContains(t, payloadStr, promptToken)
-			if strings.Contains(payloadStr, "AI 响应原文") {
-				responsePayload = payloadStr
-				responseEventID, _ = payload["event_uuid"].(string)
+			require.NotEqual(t, schema.EVENT_TYPE_REFERENCE_MATERIAL, evt.Type,
+				"review prompts and raw responses are not reference materials")
+			if evt.Type == schema.EVENT_TYPE_STREAM_START && evt.NodeId == nodeID {
+				sawReviewStream = true
 			}
 		default:
-			return responsePayload, responseEventID, streamStartIDs
+			require.True(t, sawReviewStream, "review result must remain visible")
+			return
 		}
 	}
 }
@@ -412,7 +402,7 @@ func TestYOLO_DynamicPlanning_PlanReview_EmitsStructuredDecision(t *testing.T) {
 	}
 }
 
-func TestYOLO_DynamicPlanning_PlanReview_EmitsResponseReferenceWithoutPrompt(t *testing.T) {
+func TestYOLO_DynamicPlanning_PlanReview_DoesNotEmitModelExchangeReferences(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -457,13 +447,10 @@ func TestYOLO_DynamicPlanning_PlanReview_EmitsResponseReferenceWithoutPrompt(t *
 		t.Fatal("plan review AI call should complete within timeout")
 	}
 
-	responsePayload, responseEventID, streamStartIDs := collectResponseReferenceMaterial(t, events, planToken)
-	require.NotEmpty(t, responsePayload)
-	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
+	assertReviewWithoutModelExchangeReferences(t, events, "plan-review")
 }
 
-func TestYOLO_DynamicPlanning_TaskReview_EmitsResponseReferenceWithoutPrompt(t *testing.T) {
+func TestYOLO_DynamicPlanning_TaskReview_DoesNotEmitModelExchangeReferences(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -510,10 +497,7 @@ func TestYOLO_DynamicPlanning_TaskReview_EmitsResponseReferenceWithoutPrompt(t *
 		t.Fatal("task review AI call should complete within timeout")
 	}
 
-	responsePayload, responseEventID, streamStartIDs := collectResponseReferenceMaterial(t, events, taskToken)
-	require.NotEmpty(t, responsePayload)
-	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
+	assertReviewWithoutModelExchangeReferences(t, events, "task-review")
 }
 
 func TestYOLO_DynamicPlanning_CustomPlanReview(t *testing.T) {
