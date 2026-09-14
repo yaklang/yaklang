@@ -1,4 +1,6 @@
 desc(
+	mode: "struct"
+	language: "java"
 	title_zh: "审计Java 使用System.out输出流"
 	title: "Audit Java Usage of System.out Output Stream"
 	risk:"code-style"
@@ -29,6 +31,21 @@ SOLUTION
 	rule_id: "e1315696-3f1e-404c-9906-06c1db41a6b0"
 	cwe: 532
 	cwe: 215
+	alert_min: 1
+	"file://Log.java": <<<POS
+class Log {
+  void bad() {
+    System.out.println("debug");
+  }
+}
+POS
+	"safefile://LogSafe.java": <<<NEG
+class LogSafe {
+  void ok() {
+    return;
+  }
+}
+NEG
 )
 
 System.out.print*() as $out;
