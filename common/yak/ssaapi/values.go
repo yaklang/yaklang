@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -14,6 +15,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+// Edges can connect Values from different Programs. Keep their integer keys
+// unique across the process, without changing the public edge-map key type.
+var nextValueUID atomic.Int64
+
 // valuePool reuses *Value structs to cut the flat reflect.unsafe_New allocation
 // (the &Value{} inside Program.NewValue) that dominates GC on large-project scans
 // (~1.65GB flat / ~605M objects on hadoop, see scan-perf-optimization-plan A1).
@@ -21,8 +26,8 @@ import (
 // SAFETY (design principle 1): a Value carries per-descent analysis state
 // (EffectOn/DependOn/Predecessors/anchorBits/cfgSiteInstID/runtimeCtx), so a
 // pooled Value is ALWAYS a brand-new independent object: acquireValue returns a
-// fully zeroed struct and Program.NewValue assigns a fresh uid (p.id.Inc()) plus
-// ParentProgram/inner identity. Two prior attempts to identity-share Values
+// fully zeroed struct and Program.NewValue assigns a fresh process-local uid
+// plus ParentProgram/inner identity. Two prior attempts to identity-share Values
 // across a descent were semantically rejected (missing anchor bits /
 // Test_Values_Graph_Dot), so we NEVER reuse a Value that escaped into a result,
 // an edge graph, the users/operands cache, Predecessors, or nodeId2ValueCache.
@@ -315,7 +320,8 @@ func (v *Value) GetId() int64 {
 	return v.getInstruction().GetId()
 }
 
-// GetUID returns the unique int64 identifier of the Value.
+// GetUID identifies one analysis Value across Programs within this process.
+// It is transient: use the instruction/audit identity for persisted results.
 func (v *Value) GetUID() int64 {
 	if v.IsNil() {
 		return 0

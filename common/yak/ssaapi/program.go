@@ -6,8 +6,6 @@ import (
 	goatomic "sync/atomic"
 	"time"
 
-	"go.uber.org/atomic"
-
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -31,7 +29,6 @@ type Program struct {
 	comeFromDatabase bool
 	//value cache
 	nodeId2ValueCache *utils.CacheWithKey[string, *Value]
-	id                *atomic.Int64
 	overlay           *ProgramOverLay
 
 	// interRuleStateThreshold is the nodeId2ValueCache entry count above which
@@ -244,7 +241,6 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
 		Program:                 prog,
 		nodeId2ValueCache:       utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		id:                      atomic.NewInt64(0),
 		interRuleStateThreshold: resetInterRuleStateCacheThreshold,
 	}
 	if config != nil {
@@ -270,7 +266,6 @@ func NewTmpProgram(name string) *Program {
 		config:                  &Config{},
 		enableDatabase:          false,
 		nodeId2ValueCache:       utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		id:                      atomic.NewInt64(0),
 		interRuleStateThreshold: resetInterRuleStateCacheThreshold,
 	}
 	return p
@@ -404,10 +399,10 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	// NewValue is called per instruction in hot dataflow paths, so the struct
 	// allocation is pooled (A1). acquireValue returns a fully zeroed struct with a
 	// brand-new identity: every Value here is independent even if its underlying
-	// memory came from the pool. uid stays unique via p.id.Inc().
+	// memory came from the pool. uid stays unique across Programs via nextValueUID.
 	v := acquireValue()
 	v.ParentProgram = p
-	v.uid = p.id.Inc()
+	v.uid = nextValueUID.Add(1)
 
 	// if lazy, get the real inst
 	checkInst := inst
@@ -521,6 +516,7 @@ func (p *Program) NewValueFromAuditNode(db *gorm.DB, nodeID string) *Value {
 		}
 		val := p.NewConstValue(auditNode.TmpValue, rangeIf)
 		val.auditNode = auditNode
+		p.nodeId2ValueCache.Set(nodeID, val)
 		return val
 	}
 	val, err := p.GetValueById(auditNode.IRCodeID)

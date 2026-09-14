@@ -136,11 +136,26 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 	return nil
 }
 
+// A reloaded audit node represents the same persisted graph node even when
+// the Value cache has expired. In-memory wrappers keep independent identities
+// because they may carry different edges for the same SSA instruction.
+type valueGraphKey struct {
+	uid         int64
+	auditNodeID string
+}
+
+func (v *Value) graphKey() valueGraphKey {
+	if v.auditNode != nil && v.auditNode.NodeID != "" {
+		return valueGraphKey{auditNodeID: v.auditNode.NodeID}
+	}
+	return valueGraphKey{uid: v.GetUID()}
+}
+
 const MAXLevel = 1000
 
 func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Context) error {
 	// Perform DFS traversal
-	stack := omap.NewEmptyOrderedMap[int64, *Value]()
+	stack := omap.NewEmptyOrderedMap[valueGraphKey, *Value]()
 	level := 0
 	var dfs func(v *Value) error
 	dfs = func(v *Value) error {
@@ -153,10 +168,10 @@ func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Con
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if stack.Have(v.GetUID()) {
+		if stack.Have(v.graphKey()) {
 			return nil
 		}
-		stack.PushKey(v.GetUID(), v)
+		stack.PushKey(v.graphKey(), v)
 		defer stack.Pop()
 
 		vs, err := handler(v)

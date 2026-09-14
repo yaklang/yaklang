@@ -501,28 +501,6 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		vs = append(vs, v)
 		return nil
 	})
-	// NOTE(large-project): on big targets (e.g. moodle, 7733 PHP files) an
-	// `include` like `php-tp-all-extern-variable-param-source` can match >11k
-	// sources here, and the recursive getTopDefs dataflow below runs on each →
-	// heavy rules can run for 20+ min and the scan never finishes. The
-	// cross-process rollback fix (restoring emptyStackHash) removed the implicit
-	// early-abort depth cap that used to bound this; dataflowValueLimit/MaxDepth
-	// only bound per-branch depth, not total work.
-	//
-	// This is now bounded by a per-rule wall-clock budget in the scan runner
-	// (syntaxflow_scan/runtime.go Query -> context.WithTimeout, propagated via
-	// QueryWithContext -> sfvm.Config.ctx -> config.GetContext() here). Two heavy
-	// paths now honor the rule ctx:
-	//   - getTopDefs/getBottomUses (DataFlowWithSFConfig, line ~414
-	//     WithExclusiveContext) -> AnalyzeContext.check() ctx.Done() (analyze_context.go).
-	//   - the dataflow path enumeration here (dataFlowFilter -> enumeratePaths ->
-	//     GetDataflowPathWithContext -> getPathWithDirectionWithContext ->
-	//     graph.GraphPathEx, which checks ctx.Done() at every DFS node). The old
-	//     GraphPathWithKey used context.Background(), so the deadline never fired
-	//     here — that was the real reason heavy rules ran for hours even after the
-	//     per-rule timeout was added.
-	// `yak code-scan` defaults the budget to 5m (--rule-timeout, 0 disables); a
-	// rule that exceeds it is bailed (partial results) instead of hanging.
 
 	var ret = vs
 	var condition []*filterCondition
@@ -556,11 +534,8 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		}
 	}
 
-	// Per-dataflow wall-clock budget: a dataflow() rule on a large project
-	// can match thousands of sources and the for-each-source loop in
-	// dataFlowFilter has no total-work cap. Wrap the call context with a
-	// deadline; dataFlowFilter checks ctx.Done() on each source so the loop
-	// unwinds cleanly and returns partial results instead of hanging.
+	// Bound this call independently of the rule deadline. Path traversal also
+	// shares the rule's total-work budget through dataFlowFilter.
 	dataflowTimeout := loadDataflowTimeout()
 	dataflowCtx := frame.GetVM().GetConfig().GetContext()
 	var dataflowCancel context.CancelFunc
@@ -574,6 +549,10 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 	}()
 
 	ret = dataFlowFilter(dataflowCtx, ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, reachMergeHook, condition...)
+	if err := dataflowCtx.Err(); err != nil {
+		// A child timeout must not look like a successful zero-match query.
+		return false, sfvm.NewEmptyValues(), utils.Wrap(sfvm.CriticalError, "dataflow path traversal interrupted: "+err.Error())
+	}
 
 	// Post-mode: same anchor pipeline as # { only_reachable: `$cfg` } -> (resolveTopDefReachAnchors + filterTopDefResultsByReachAnchors).
 	if len(reachSym) > 0 && reachMode == "post" {
@@ -648,19 +627,20 @@ func dataFlowFilter(
 		return pathCheck.CheckMatch(ToSFVMValues(path))
 	}
 
-	// Drive the path-enumeration DFS with the rule ctx so the per-rule
-	// wall-clock budget (syntaxflow_scan/runtime.go Query -> QueryWithContext
-	// -> sfvm.Config.ctx, read here via config.GetContext()) can bail it. The
-	// DFS (graph.GraphPathEx / DeepFirstPath.deepFirst) checks ctx.Done() at
-	// every node; without passing ctx it ran under context.Background() and the
-	// per-rule deadline never fired — heavy rules ran for hours on large projects.
-	pathCtx := config.GetContext()
-	var enumeratePaths func(v *Value) []Values
+	// Keep the per-dataflow deadline as well as the outer rule context. Each
+	// visited node and emitted combination consumes the shared work budget;
+	// budget overflow cancels the rule and is reported as partial by the runner.
+	if ctx == nil {
+		ctx = config.GetContext()
+	}
+	bail := func() bool {
+		return ctx.Err() != nil || config.GetContext().Err() != nil || config.EnterWork()
+	}
+	var edgeFilter func(from, to *Value) bool
 	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
 		memo := make(map[int64]*CfgCtxValue)
 		condMemo := make(map[int64]*ssa.BlockConditionSummary)
-		edgeFilter := func(from, to *Value) bool {
-			// Prefer block-level condition summary extraction on path nodes.
+		edgeFilter = func(from, to *Value) bool {
 			_ = cfgConditionForValueMemo(pathReach.prog, to, memo, condMemo)
 			cfgTo := cfgCtxForValueMemo(pathReach.prog, to, memo)
 			if cfgTo == nil || cfgTo.IsEmpty() {
@@ -668,48 +648,27 @@ func dataFlowFilter(
 			}
 			return reachableWithOptions(pathReach.prog, cfgTo, pathReach.targetCfg, pathReach.opt)
 		}
-		enumeratePaths = func(v *Value) []Values {
-			if end != nil {
-				return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, FromSFVMValues(end)...)
-			}
-			return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter)
-		}
-	} else {
-		enumeratePaths = func(v *Value) []Values {
-			if end != nil {
-				return v.GetDataflowPathWithContext(pathCtx, FromSFVMValues(end)...)
-			}
-			return v.GetDataflowPathWithContext(pathCtx)
-		}
 	}
-
-	var ret []*Value
+	var targets Values
+	if end != nil {
+		targets = FromSFVMValues(end)
+	}
+	var ret Values
 	for _, v := range vs {
-		// Honor the rule ctx + total-work budget in the outer per-source loop. On
-		// a large project `vs` can hold tens of thousands of sources (e.g. every
-		// servlet/spring param for an include, or every call site reaching a sink
-		// for an exclude-only dataflow); enumeratePaths is fast per-source but the
-		// outer loop itself never re-checked the per-rule deadline, so a heavy
-		// rule kept feeding sources long after its budget fired. Bailing here
-		// returns the partial matches found so far.
-		select {
-		case <-pathCtx.Done():
-			return ret
-		default:
+		if bail() {
+			break
 		}
-		if config.EnterWork() {
-			return ret
-		}
-		flag := false
-		for _, path := range enumeratePaths(v) {
+		v.visitDataflowPaths(ctx, edgeFilter, bail, func(path Values) bool {
 			if checkMatch(path) {
-				flag = true
-				break
+				// A sub-rule may itself hit the budget. Do not retain an
+				// unverified match after it aborted.
+				if ctx.Err() == nil && config.GetContext().Err() == nil && !config.GetWorkBudget().Exceeded() {
+					ret = append(ret, v)
+				}
+				return false
 			}
-		}
-		if flag {
-			ret = append(ret, v)
-		}
+			return true
+		}, targets...)
 	}
 	return ret
 }
