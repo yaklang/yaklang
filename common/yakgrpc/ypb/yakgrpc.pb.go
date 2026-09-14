@@ -38569,7 +38569,7 @@ type BatchSetRiskTagsRequest struct {
 	Hashes          []string `protobuf:"bytes,7,rep,name=Hashes,proto3" json:"Hashes,omitempty"`
 	Token           string   `protobuf:"bytes,8,opt,name=Token,proto3" json:"Token,omitempty"`
 	RiskTypeVerbose string   `protobuf:"bytes,9,opt,name=RiskTypeVerbose,proto3" json:"RiskTypeVerbose,omitempty"`
-	Severity        string   `protobuf:"bytes,10,opt,name=Severity,proto3" json:"Severity,omitempty"`
+	SetSeverity     string   `protobuf:"bytes,10,opt,name=SetSeverity,proto3" json:"SetSeverity,omitempty"`
 	SeverityScore   float64  `protobuf:"fixed64,11,opt,name=SeverityScore,proto3" json:"SeverityScore,omitempty"`
 	// 处置原因
 	TagReason     string `protobuf:"bytes,12,opt,name=TagReason,proto3" json:"TagReason,omitempty"`
@@ -38670,9 +38670,9 @@ func (x *BatchSetRiskTagsRequest) GetRiskTypeVerbose() string {
 	return ""
 }
 
-func (x *BatchSetRiskTagsRequest) GetSeverity() string {
+func (x *BatchSetRiskTagsRequest) GetSetSeverity() string {
 	if x != nil {
-		return x.Severity
+		return x.SetSeverity
 	}
 	return ""
 }
@@ -82088,7 +82088,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\"G\n" +
 	"\x17RisksFromOnlineProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x10\n" +
-	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x8f\x03\n" +
+	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x95\x03\n" +
 	"\x17BatchSetRiskTagsRequest\x12.\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x16.ypb.QueryRisksRequestR\x06Filter\x12\x18\n" +
 	"\aSetTags\x18\x02 \x03(\tR\aSetTags\x12 \n" +
@@ -82098,9 +82098,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Ids\x18\x06 \x03(\x03R\x03Ids\x12\x16\n" +
 	"\x06Hashes\x18\a \x03(\tR\x06Hashes\x12\x14\n" +
 	"\x05Token\x18\b \x01(\tR\x05Token\x12(\n" +
-	"\x0fRiskTypeVerbose\x18\t \x01(\tR\x0fRiskTypeVerbose\x12\x1a\n" +
-	"\bSeverity\x18\n" +
-	" \x01(\tR\bSeverity\x12$\n" +
+	"\x0fRiskTypeVerbose\x18\t \x01(\tR\x0fRiskTypeVerbose\x12 \n" +
+	"\vSetSeverity\x18\n" +
+	" \x01(\tR\vSetSeverity\x12$\n" +
 	"\rSeverityScore\x18\v \x01(\x01R\rSeverityScore\x12\x1c\n" +
 	"\tTagReason\x18\f \x01(\tR\tTagReason\">\n" +
 	"\x18BatchSetRiskTagsResponse\x12\"\n" +
