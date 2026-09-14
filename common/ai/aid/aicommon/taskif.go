@@ -658,6 +658,10 @@ func (s *AIStatefulTaskBase) GetOriginUserInput() string {
 	return s.originUserInput
 }
 
+func (s *AIStatefulTaskBase) SetOriginUserInput(input string) {
+	s.originUserInput = input
+}
+
 func (s *AIStatefulTaskBase) GetUserInput() string {
 	return s.userInput
 }

@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
@@ -753,12 +754,12 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	return nil
 }
 
-// HandleRedoSubtaskInPlan 处理重做子任务的同步事件
-// 用户可以中断当前子任务，添加额外信息到 timeline，然后重新执行该任务
+// HandleRedoSubtaskInPlan 处理重做/重新运行子任务的同步事件
+// 用户可以重新执行已完成、失败或被跳过的子任务。
 // 输入参数:
 //   - subtask_index: 子任务的索引，如 "1-1", "1-2"（与 subtask_id 二选一）
 //   - subtask_id: 子任务的稳定逻辑 ID（可选，优先于 subtask_index）
-//   - user_message: 用户提供的额外信息，用于辅助 AI 更好地执行任务（必需）
+//   - user_message: 用户提供的额外信息，用于辅助 AI 更好地执行任务（可选）
 //
 // 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
 func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
@@ -801,12 +802,8 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
 	subtaskID := utils.InterfaceToString(params["subtask_id"])
 
-	// 用户消息是必须的
+	// 用户补充信息可选
 	userMessage := utils.InterfaceToString(params["user_message"])
-	if userMessage == "" {
-		sendFailResponse("user_message is required for redo_subtask_in_plan")
-		return nil
-	}
 
 	// 查找子任务：优先使用 subtask_id，其次使用 subtask_index
 	var task *AiTask
@@ -827,46 +824,80 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
-	if task.GetStatus() != aicommon.AITaskState_Completed {
+	// 只有处于终态的子任务才允许重跑
+	if !isFinishedTaskStatus(task.GetStatus()) {
 		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
 			"success":       false,
 			"subtask_index": task.Index,
 			"subtask_id":    task.TaskId,
 			"subtask_name":  task.Name,
 			"user_message":  userMessage,
-			"message":       "only completed subtasks can be redone",
+			"message":       "only finished subtasks can be redone",
 		}, event.SyncID)
 		return nil
 	}
 
-	// 构建 timeline 消息 - 包含用户的额外信息
-	timelineMessage := strings.Join([]string{
-		"用户请求重新执行当前子任务，并提供了以下额外信息来辅助任务执行:",
-		"",
-		"<用户补充信息>",
-		userMessage,
-		"</用户补充信息>",
-		"",
-		"请 AI 认真解读用户提供的信息，理解用户的真实意图，并据此调整任务执行策略，确保更好地满足用户需求。",
-	}, "\n")
+	// 不修改原任务状态，而是克隆一个新任务追加到父任务列表末尾。
+	// 这样左侧任务列表会保留原失败/跳过记录，同时在末尾出现一条
+	// "重新运行：xxx" 的新子 Agent，由 plan runtime 正常调度执行。
+	parent := task.ParentTask
+	if parent == nil {
+		sendFailResponse("cannot rerun subtask without parent task")
+		return nil
+	}
 
-	// 先添加 timeline 消息
-	c.Timeline.PushText(c.AcquireId(), "[user-redo-subtask] 任务 %s (%s) 被用户请求重新执行:\n%s", task.Index, task.Name, timelineMessage)
+	newName := fmt.Sprintf("重新运行：%s", task.Name)
+	newTask := c.generateAITaskWithName(newName, task.Goal)
+	newTask.SetUserInput(task.GetUserInput())
+	newTask.SetOriginUserInput(task.GetOriginUserInput())
+	newTask.ParentTask = parent
+	newTask.DependsOn = task.DependsOn
+	parent.Subtasks = append(parent.Subtasks, newTask)
 
-	c.EmitInfo("subtask %s (%s) will be redone with user message", task.Index, task.Name)
+	var timelineMessage string
+	if userMessage != "" {
+		// 构建 timeline 消息 - 包含用户的额外信息
+		timelineMessage = strings.Join([]string{
+			"用户请求重新执行任务，并提供了以下额外信息来辅助任务执行:",
+			"",
+			"<用户补充信息>",
+			userMessage,
+			"</用户补充信息>",
+			"",
+			"请 AI 认真解读用户提供的信息，理解用户的真实意图，并据此调整任务执行策略，确保更好地满足用户需求。",
+		}, "\n")
+		c.Timeline.PushText(c.AcquireId(), "[user-redo-subtask] 任务 %s (%s) 被用户请求重新执行:\n%s", newTask.Index, newTask.Name, timelineMessage)
+		c.EmitInfo("subtask %s (%s) will be redone with user message", newTask.Index, newTask.Name)
+	} else {
+		timelineMessage = "用户请求重新执行子任务"
+		c.Timeline.PushText(c.AcquireId(), "[user-redo-subtask] 任务 %s (%s) 被用户请求重新执行", newTask.Index, newTask.Name)
+		c.EmitInfo("subtask %s (%s) will be redone", newTask.Index, newTask.Name)
+	}
 
-	task.SetContext(c.GetContext())
-	c.AppendTask(task)
+	c.standardizeTaskTreeAndNotify(parent, "task appended")
 
 	// 发送同步响应
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
-		"success":       true,
-		"subtask_index": task.Index,
-		"subtask_id":    task.TaskId,
-		"subtask_name":  task.Name,
-		"user_message":  userMessage,
-		"message":       timelineMessage,
+		"success":           true,
+		"subtask_index":     newTask.Index,
+		"subtask_id":        newTask.TaskId,
+		"subtask_name":      newTask.Name,
+		"ref_subtask_index": task.Index,
+		"ref_subtask_id":    task.TaskId,
+		"ref_subtask_name":  task.Name,
+		"user_message":      userMessage,
+		"message":           timelineMessage,
 	}, event.SyncID)
 
 	return nil
+}
+
+// isFinishedTaskStatus 判断任务状态是否为终态（已完成、失败、跳过）
+func isFinishedTaskStatus(status aicommon.AITaskState) bool {
+	switch status {
+	case aicommon.AITaskState_Completed, aicommon.AITaskState_Aborted, aicommon.AITaskState_Skipped:
+		return true
+	default:
+		return false
+	}
 }
