@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/subprocess"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 )
@@ -245,9 +246,7 @@ func (r *ScreenRecorder) Stop() {
 		case <-timeout.C:
 			// Timeout, force kill
 			log.Warnf("ffmpeg did not exit gracefully within 5 seconds, force killing")
-			if r.cmd.Process != nil {
-				_ = r.cmd.Process.Kill()
-			}
+			subprocess.KillProcessGroup(r.cmd)
 		}
 	}
 

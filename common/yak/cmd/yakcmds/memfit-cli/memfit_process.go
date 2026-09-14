@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/subprocess"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -54,8 +55,11 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 	}
 	cmd := exec.Command(executable, "memfit-worker")
 	cmd.Dir = config.Workdir
-	cmd.Env = memfitChildEnvironment(os.Environ())
-	configureMemfitChildProcess(cmd)
+	cmd.Env = subprocess.BuildChildEnvironment(os.Environ(),
+		[]string{"YAK_AI_API_KEY", memfitWorkerEnvironment},
+		[]string{memfitWorkerEnvironment + "=1"},
+	)
+	subprocess.ConfigureProcessGroup(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -125,17 +129,6 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 			return nil, utils.Errorf("timed out waiting for memfit worker%s", client.formattedLogTail())
 		}
 	}
-}
-
-func memfitChildEnvironment(parent []string) []string {
-	child := make([]string, 0, len(parent)+1)
-	for _, entry := range parent {
-		if strings.HasPrefix(entry, "YAK_AI_API_KEY=") || strings.HasPrefix(entry, memfitWorkerEnvironment+"=") {
-			continue
-		}
-		child = append(child, entry)
-	}
-	return append(child, memfitWorkerEnvironment+"=1")
 }
 
 func (c *memfitProcessClient) readProtocol(reader io.Reader) {
@@ -247,7 +240,7 @@ func (c *memfitProcessClient) Close() {
 	case <-c.done:
 		return
 	case <-timer.C:
-		killMemfitChildProcess(c.cmd)
+		subprocess.KillProcessGroup(c.cmd)
 		select {
 		case <-c.done:
 		case <-time.After(time.Second):
