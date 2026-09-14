@@ -69,11 +69,19 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 	}
 	extraOptions := append([]aicommon.ConfigOption{}, additionalOptions...)
 	if startParams.GetSource() == "ai" && s.browserBridge != nil {
-		browserTools, toolErr := browsertools.BuildDynamicCapabilityTools(serverBrowserExtensionBridge{server: s})
+		bridge := serverBrowserExtensionBridge{server: s}
+		browserTools, toolErr := s.buildBrowserAgentTools()
 		if toolErr != nil {
 			log.Warnf("build AI Agent browser capability tools failed: %v", toolErr)
 		} else {
-			extraOptions = append(extraOptions, aicommon.WithTools(browserTools...))
+			extraOptions = append(extraOptions,
+				aicommon.WithTools(browserTools...),
+				aicommon.WithDynamicContextProvider("browser_runtime", func(
+					aicommon.AICallerConfigIf, *aicommon.Emitter, string,
+				) (string, error) {
+					return browsertools.RuntimeContext(bridge), nil
+				}),
+			)
 		}
 	}
 	if forgeName := strings.TrimSpace(startParams.GetForgeName()); forgeName != "" {

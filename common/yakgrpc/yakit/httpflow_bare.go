@@ -17,6 +17,10 @@ func httpFlowBareResponseKey(flowID uint) string {
 	return strconv.FormatUint(uint64(flowID), 10) + "_response"
 }
 
+func httpFlowBareRequestKey(flowID uint) string {
+	return strconv.FormatUint(uint64(flowID), 10) + "_request"
+}
+
 func httpFlowWireResponse(wirePacket, rspHint []byte) []byte {
 	if len(wirePacket) > 0 {
 		return wirePacket
@@ -109,6 +113,28 @@ func saveHTTPFlowBareResponse(db *gorm.DB, flowID uint, wire []byte) error {
 	}
 	wire = truncateHTTPPacketBodyForStorage(wire, maxStoredHTTPFlowResponseBodyBytes)
 	return SetProjectKeyWithGroup(db, httpFlowBareResponseKey(flowID), wire, BARE_RESPONSE_GROUP)
+}
+
+func saveHTTPFlowBareRequest(db *gorm.DB, flowID uint, wire []byte) error {
+	if db == nil {
+		db = consts.GetGormProjectDatabase()
+	}
+	if flowID == 0 || len(wire) == 0 {
+		return nil
+	}
+	return SetProjectKeyWithGroup(db, httpFlowBareRequestKey(flowID), wire, BARE_REQUEST_GROUP)
+}
+
+func afterSaveHTTPFlowBareRequest(wire []byte) func(*schema.HTTPFlow) {
+	wire = bytes.Clone(wire)
+	return func(flow *schema.HTTPFlow) {
+		if flow == nil || flow.ID == 0 {
+			return
+		}
+		if err := saveHTTPFlowBareRequest(nil, flow.ID, wire); err != nil {
+			log.Errorf("save httpflow bare request failed: %s", err)
+		}
+	}
 }
 
 func afterSaveHTTPFlowBareResponse(wire []byte) func(*schema.HTTPFlow) {

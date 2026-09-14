@@ -25,6 +25,13 @@ func loadTestHTTPFlowBareResponse(t *testing.T, db *gorm.DB, flowID uint) []byte
 	return []byte(raw)
 }
 
+func loadTestHTTPFlowBareRequest(t *testing.T, db *gorm.DB, flowID uint) []byte {
+	t.Helper()
+	raw, err := GetProjectKeyWithError(db, httpFlowBareRequestKey(flowID))
+	require.NoError(t, err)
+	return []byte(raw)
+}
+
 func testHTTPFlowBareResponseMissing(db *gorm.DB, flowID uint) bool {
 	_, err := GetProjectKeyWithError(db, httpFlowBareResponseKey(flowID))
 	return err != nil
@@ -260,6 +267,35 @@ func TestCreateHTTPFlowBareSidecar(t *testing.T) {
 		require.Contains(t, flow.GetResponse(), "charset=utf-8")
 		require.Contains(t, flow.GetResponse(), "你好")
 	})
+}
+
+func TestCreateHTTPFlowExplicitBarePacketPair(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+	plainRequest := []byte("POST /" + token + " HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\n\r\nplain")
+	wireRequest := []byte("POST /" + token + " HTTP/1.1\r\nHost: example.com\r\nContent-Length: 6\r\n\r\ncipher")
+	plainResponse := testHTTPFlowJSONWirePacket(`{"plain":true}`)
+	wireResponse := testHTTPFlowJSONWirePacket(`{"cipher":true}`)
+
+	flow, err := CreateHTTPFlow(
+		CreateHTTPFlowWithHTTPS(false),
+		CreateHTTPFlowWithRequestRaw(plainRequest),
+		CreateHTTPFlowWithResponseRaw(plainResponse),
+		CreateHTTPFlowWithBarePacketsRaw(wireRequest, wireResponse),
+		CreateHTTPFlowWithTags(HTTPFlowTagBrowserPlaintext),
+		CreateHTTPFlowWithSource("ai-browser-http"),
+		CreateHTTPFlowWithURL("http://example.com/"+token),
+		CreateHTTPFlowWithRemoteAddr("127.0.0.1:80"),
+	)
+	require.NoError(t, err)
+	insertTestHTTPFlow(t, db, flow)
+
+	require.Equal(t, plainRequest, []byte(flow.GetRequest()))
+	require.Equal(t, plainResponse, []byte(flow.GetResponse()))
+	require.Equal(t, wireRequest, loadTestHTTPFlowBareRequest(t, db, flow.ID))
+	require.Equal(t, wireResponse, loadTestHTTPFlowBareResponse(t, db, flow.ID))
+	require.Contains(t, flow.Tags, HTTPFlowTagBrowserPlaintext)
+	require.NotContains(t, flow.Tags, HTTPFlowTagAutoFixResponse)
 }
 
 func TestSaveLowHTTPFlowBareSidecar(t *testing.T) {

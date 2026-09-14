@@ -309,19 +309,18 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。先枚举本轮已明确的真实调用：" +
-		"存在 2-8 个互不依赖、互不干扰且参数完整的调用时，优先使用 directly_call_tool_calls 一次并发提交，不要拆成多个单工具轮次；" +
-		"只有本轮恰好一个调用时才同时填写 directly_call_tool_name 和 directly_call_tool_params。" +
+	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。默认使用 directly_call_tool_name 和 directly_call_tool_params 的单调用形式。" +
+		"仅当存在 2-8 个低风险、互不依赖、互不干扰，且每层参数都已从真实 Schema 确定的调用时，才可用 directly_call_tool_calls 并发；" +
 		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
-		"参数不确定时改用 require_tool；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+		"参数不确定或工具是参数未完整的嵌套 wrapper 时改用单次 require_tool；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
-			aitool.WithParam_Description("仅当本轮恰好一个直接调用时填写；存在 directly_call_tool_calls 时必须省略。填写一个已启用工具的准确名称。优先选择 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；未缓存但已启用的工具仍可解析并产生告警。下面是经过 CI 校验且可执行的单调用格式：\n"+directlyCallToolScalarOutputExampleJSON),
+			aitool.WithParam_Description("选择单调用形式时填写；存在 directly_call_tool_calls 时必须省略。填写一个已启用工具的准确名称。优先选择 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；未缓存但已启用的工具仍可解析并产生告警。下面是经过 CI 校验且可执行的单调用格式：\n"+directlyCallToolScalarOutputExampleJSON),
 		),
 		aitool.WithRawParam("directly_call_tool_params", map[string]any{
 			"type": []string{"object", "string"},
-		}, aitool.WithParam_Description(`仅当本轮恰好一个直接调用时填写；存在 directly_call_tool_calls 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
+		}, aitool.WithParam_Description(`选择单调用形式时填写；存在 directly_call_tool_calls 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
 		aitool.WithStringParam(
 			"directly_call_identifier",
 			aitool.WithParam_Description(`可选。描述调用目的的简短 snake_case 标识，例如 "scan_port_443"、"query_large_file"；用于报告文件命名。`),

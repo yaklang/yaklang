@@ -38,7 +38,16 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		explicitToolSets = true
 		log.Infof("StartMcpServer: explicit tool sets: %v", req.GetTool())
 	}
-	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, mcp.WithDatabaseProvider(s.GetProfileDatabase, s.GetProjectDatabase))
+	baseOptions := []mcp.McpServerOption{mcp.WithDatabaseProvider(s.GetProfileDatabase, s.GetProjectDatabase)}
+	if s.browserBridge != nil {
+		browserTools, err := s.buildBrowserAgentTools()
+		if err != nil {
+			log.Warnf("StartMcpServer: build browser extension tools failed: %v", err)
+		} else {
+			baseOptions = append(baseOptions, mcp.WithAITools(browserTools...))
+		}
+	}
+	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, baseOptions...)
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
