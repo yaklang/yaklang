@@ -23,6 +23,7 @@ type TodoListUpdatePayload struct {
 	CurrentTodoID  string                 `json:"current_todo_id,omitempty"`
 	ClosedTodos    []TodoClosedItem       `json:"closed_todos"`
 	AppliedDelta   *TodoDelta             `json:"applied_delta,omitempty"`
+	Lifecycles     []TodoLifecycle        `json:"lifecycles,omitempty"`
 }
 
 // BuildCurrentTaskTodoListPayload builds a TodoListUpdatePayload scoped to the
@@ -56,6 +57,7 @@ func BuildCurrentTaskTodoListPayload(
 	payload.Items = cfg.SnapshotVerificationTodoItemsByScope(scope)
 	payload.Stats = cfg.GetVerificationTodoStatsByScope(scope)
 	payload.OpenTodos, payload.CurrentTodoID, payload.ClosedTodos = cfg.SnapshotCanonicalTodos(scope)
+	payload.Lifecycles = ComputeTodoLifecycleBatch(payload.Items, nowTs())
 	return payload
 }
 
@@ -71,6 +73,9 @@ func normalizeTodoListUpdatePayload(payload TodoListUpdatePayload) TodoListUpdat
 	}
 	if payload.ClosedTodos == nil {
 		payload.ClosedTodos = []TodoClosedItem{}
+	}
+	if payload.Lifecycles == nil {
+		payload.Lifecycles = []TodoLifecycle{}
 	}
 	return payload
 }
@@ -106,6 +111,7 @@ func (r *Emitter) EmitTodoListUpdate(payload TodoListUpdatePayload) (*schema.AiO
 		return nil, nil
 	}
 	payload = normalizeTodoListUpdatePayload(payload)
+	payload.Lifecycles = ensureLifecycles(payload)
 	return r.EmitJSON(schema.EVENT_TYPE_TODO_LIST_UPDATE, "todo_list", payload)
 }
 
@@ -124,7 +130,22 @@ func (r *Emitter) EmitTodoListUpdates(cfg AICallerConfigIf, task AIStatefulTask,
 	currentPayload := BuildCurrentTaskTodoListPayload(cfg, task, payload.IterationIndex, payload.Satisfied, payload.AppliedOps)
 	currentPayload.AppliedDelta = payload.AppliedDelta
 	currentPayload = normalizeTodoListUpdatePayload(currentPayload)
+	currentPayload.Lifecycles = ensureLifecycles(currentPayload)
 	if _, err := r.EmitJSON(schema.EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE, "current_task_todo_list", currentPayload); err != nil {
 		log.Warnf("emit current_task_todo_list_update event failed: %v", err)
 	}
+}
+
+// ensureLifecycles computes lifecycle durations for the payload's items at
+// emit time when they have not already been populated. This centralizes the
+// "now" timestamp so both the session-wide and task-scoped events share the
+// same reference point within a single emit call.
+func ensureLifecycles(payload TodoListUpdatePayload) []TodoLifecycle {
+	if len(payload.Lifecycles) > 0 || len(payload.Items) == 0 {
+		if payload.Lifecycles == nil {
+			return []TodoLifecycle{}
+		}
+		return payload.Lifecycles
+	}
+	return ComputeTodoLifecycleBatch(payload.Items, nowTs())
 }
