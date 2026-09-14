@@ -14,7 +14,7 @@ import (
 func TestLegionCodeSourceSnapshotRuntime(t *testing.T) {
 	for _, tc := range []struct {
 		name, content string
-		omitted       bool
+		rejected      bool
 	}{
 		{"exact bytes", "package main\r\n// 中文\r\n\tfunc main() {}\n", false},
 		{"limit", strings.Repeat("a", maxInlineCodeSourceSnapshotBytes), false},
@@ -43,7 +43,14 @@ func TestLegionCodeSourceSnapshotRuntime(t *testing.T) {
 				t.Fatal(err)
 			}
 			params["source_snapshot"] = map[string]any{"path": "main.go", "content": "model fabricated source", "sha256": strings.Repeat("f", 64)}
-			if _, err := runtime.Execute(serverFocusCapabilitySubmitCodeFinding, params); err != nil {
+			_, err = runtime.Execute(serverFocusCapabilitySubmitCodeFinding, params)
+			if tc.rejected {
+				if err == nil || !strings.Contains(err.Error(), "64 KiB") || len(publisher.risks) != 0 {
+					t.Fatalf("oversize file must reject finding before publication: err=%v risks=%d", err, len(publisher.risks))
+				}
+				return
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
 			if len(publisher.risks) != 1 {
@@ -52,12 +59,6 @@ func TestLegionCodeSourceSnapshotRuntime(t *testing.T) {
 			var published aiFocusCodeFinding
 			if err := json.Unmarshal(publisher.risks[0].raw, &published); err != nil {
 				t.Fatal(err)
-			}
-			if tc.omitted {
-				if published.SourceSnapshot != nil {
-					t.Fatal("oversize file must not masquerade as a full source snapshot")
-				}
-				return
 			}
 			want := fmt.Sprintf("%x", sha256.Sum256([]byte(tc.content)))
 			if published.SourceSnapshot == nil || published.SourceSnapshot.Path != "main.go" || published.SourceSnapshot.Content != tc.content || published.SourceSnapshot.SHA256 != want {
@@ -75,8 +76,8 @@ func TestLegionCodeSourceSnapshotSafety(t *testing.T) {
 			t.Fatal(err)
 		}
 		snapshot, err := w.captureSourceSnapshot("binary")
-		if err != nil || snapshot != nil {
-			t.Fatalf("non-text should omit snapshot: %#v %v", snapshot, err)
+		if err == nil || snapshot != nil || !strings.Contains(err.Error(), "UTF-8") {
+			t.Fatalf("non-text should reject snapshot: %#v %v", snapshot, err)
 		}
 	}
 	if err := os.WriteFile(filepath.Join(root, "source"), []byte("source"), 0600); err != nil {
