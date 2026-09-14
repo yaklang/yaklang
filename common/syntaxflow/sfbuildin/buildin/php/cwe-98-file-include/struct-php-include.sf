@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "php"
+	title: "Struct scan: PHP include/require"
+	title_zh: "结构扫描：PHP include/require"
+	type: vuln
+	level: high
+	rule_id: "struct-php-include"
+	risk: "file-include"
+	desc: <<<DESC
+### 规则说明
+检测到 include/require。路径若外部可控，可导致文件包含。
+
+### 风险类型
+file-include
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只包含固定路径；不要把请求参数拼进 include。
+SOLUTION
+	alert_min: 1
+	"file://app.php": <<<POS
+<?php
+function load($f) { include $f; }
+
+POS
+	"safefile://app-safe.php": <<<NEG
+<?php
+function load($f) { echo htmlspecialchars($f); }
+
+NEG
+)
+
+include(* as $path) as $call
+require(* as $path) as $call
+include_once(* as $path) as $call
+require_once(* as $path) as $call
+alert $call for {
+	level: "high",
+	title: "PHP include/require",
+	title_zh: "PHP include/require",
+	message: "结构扫描：PHP include/require",
+	risk: "file-include",
+}

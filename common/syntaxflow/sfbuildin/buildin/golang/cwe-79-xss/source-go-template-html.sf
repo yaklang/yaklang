@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "检测 Go template.HTML"
+	title_zh: "检测 Go template.HTML"
+	type: vuln
+	level: high
+	rule_id: "source-go-template-html"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 template.HTML 转换。
+
+### 风险类型
+xss
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免关闭 HTML 转义。
+SOLUTION
+	alert_min: 1
+	"file://main.go": <<<POS
+package main
+import "html/template"
+func bad(s string) template.HTML { return template.HTML(s) }
+
+POS
+	"safefile://safe.go": <<<NEG
+package main
+import "html/template"
+func ok(s string) string { return template.HTMLEscapeString(s) }
+
+NEG
+)
+
+${*.go}.pattern_regex(/template\.HTML\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Go template.HTML",
+	title_zh: "检测 Go template.HTML",
+	message: "检测 Go template.HTML",
+	risk: "xss",
+}

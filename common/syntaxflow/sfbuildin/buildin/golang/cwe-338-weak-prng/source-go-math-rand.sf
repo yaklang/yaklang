@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "检测 Go math/rand 安全用途"
+	title_zh: "检测 Go math/rand 安全用途"
+	type: vuln
+	level: medium
+	rule_id: "source-go-math-rand"
+	risk: "weak-randomness"
+	desc: <<<DESC
+### 规则说明
+检测到 math/rand。该 PRNG 可预测，不能用于令牌或密钥。
+
+### 风险类型
+weak-randomness
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+安全随机数使用 crypto/rand。
+SOLUTION
+	alert_min: 1
+	"file://rnd.go": <<<POS
+package main
+import "math/rand"
+func bad() int { return rand.Int() }
+
+POS
+	"safefile://rnd-safe.go": <<<NEG
+package main
+import "crypto/rand"
+func ok(b []byte) (int, error) { return rand.Read(b) }
+
+NEG
+)
+
+${*.go}.pattern_regex(/"math\/rand"/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Go math/rand 安全用途",
+	title_zh: "检测 Go math/rand 安全用途",
+	message: "检测 Go math/rand 安全用途",
+	risk: "weak-randomness",
+}

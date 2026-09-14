@@ -1,0 +1,53 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Jackson enableDefaultTyping"
+	title_zh: "结构扫描：Jackson enableDefaultTyping"
+	type: vuln
+	level: high
+	rule_id: "struct-java-jackson-default-typing"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 Jackson enableDefaultTyping。开启默认类型信息后，不可信 JSON 可导致反序列化 RCE。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要启用 default typing；如需多态，使用显式 @JsonTypeInfo 白名单。
+SOLUTION
+	alert_min: 1
+	"file://Ser.java": <<<POS
+class Ser {
+  void bad(com.fasterxml.jackson.databind.ObjectMapper mapper) {
+    mapper.enableDefaultTyping();
+  }
+}
+POS
+	"safefile://SerSafe.java": <<<NEG
+class SerSafe {
+  void ok() {
+    System.out.println("typed-json");
+  }
+}
+NEG
+)
+
+enableDefaultTyping as $call
+enableDefaultTyping() as $call
+enableDefaultTyping(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "Jackson Default Typing",
+	title_zh: "Jackson 默认类型",
+	message: "结构扫描：Jackson enableDefaultTyping",
+	risk: "deserialization",
+}

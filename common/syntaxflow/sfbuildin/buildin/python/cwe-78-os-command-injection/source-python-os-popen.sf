@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python os.popen 调用"
+	title_zh: "检测 Python os.popen 调用"
+	type: vuln
+	level: high
+	rule_id: "source-python-os-popen"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 os.popen。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 subprocess.run 列表参数。
+SOLUTION
+	alert_min: 1
+	"file://sh.py": <<<POS
+import os
+def run(user):
+    os.popen("ls " + user)
+
+POS
+	"safefile://sh-safe.py": <<<NEG
+import subprocess
+def run(user):
+    subprocess.run(["ls", user], check=False)
+
+NEG
+)
+
+${*.py}.pattern_regex(/os\.popen\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python os.popen 调用",
+	title_zh: "检测 Python os.popen 调用",
+	message: "检测 Python os.popen 调用",
+	risk: "command-injection",
+}

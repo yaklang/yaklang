@@ -1,0 +1,53 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java XMLDecoder"
+	title_zh: "结构扫描：Java XMLDecoder 反序列化"
+	type: vuln
+	level: high
+	rule_id: "struct-java-xmldecoder"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 XMLDecoder。它可从 XML 实例化任意对象，不可信输入可导致 RCE。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要用 XMLDecoder 解析外部 XML；改用受约束的 XML 解析。
+SOLUTION
+	alert_min: 1
+	"file://Ser.java": <<<POS
+import java.beans.XMLDecoder;
+import java.io.InputStream;
+class Ser {
+  Object bad(InputStream in) {
+    return new XMLDecoder(in).readObject();
+  }
+}
+POS
+	"safefile://SerSafe.java": <<<NEG
+class SerSafe {
+  void ok() {
+    System.out.println("xml-safe");
+  }
+}
+NEG
+)
+
+XMLDecoder(* as $in) as $call
+alert $call for {
+	level: "high",
+	title: "XMLDecoder Call",
+	title_zh: "XMLDecoder 调用",
+	message: "结构扫描：Java XMLDecoder 反序列化",
+	risk: "deserialization",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python exec Call"
+	title_zh: "结构扫描：Python exec 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-python-exec"
+	risk: "code-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 exec(...) 调用。执行外部可控代码可导致任意代码执行。
+
+### 风险类型
+code-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要对外部输入使用 exec；改用安全解析或白名单表达式。
+SOLUTION
+	alert_min: 1
+	"file://dyn.py": <<<POS
+def run(user_input):
+    exec(user_input)
+
+POS
+	"safefile://dyn-safe.py": <<<NEG
+def run(user_input):
+    return user_input.strip()
+
+NEG
+)
+
+exec(* as $code) as $call
+alert $call for {
+	level: "high",
+	title: "Python exec()",
+	title_zh: "Python exec()",
+	message: "结构扫描：Python exec 调用",
+	risk: "code-injection",
+}

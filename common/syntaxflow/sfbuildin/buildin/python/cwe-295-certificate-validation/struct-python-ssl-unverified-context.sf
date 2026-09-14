@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python ssl unverified context"
+	title_zh: "结构扫描：Python ssl 未校验上下文"
+	type: vuln
+	level: high
+	rule_id: "struct-python-ssl-unverified-context"
+	risk: "certificate-validation"
+	desc: <<<DESC
+### 规则说明
+检测到 ssl._create_unverified_context。它会跳过证书校验。
+
+### 风险类型
+certificate-validation
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 ssl.create_default_context()。
+SOLUTION
+	alert_min: 1
+	"file://tls.py": <<<POS
+import ssl
+def ctx():
+    return ssl._create_unverified_context()
+
+POS
+	"safefile://tls-safe.py": <<<NEG
+import ssl
+def ctx():
+    return ssl.create_default_context()
+
+NEG
+)
+
+ssl._create_unverified_context as $call
+ssl._create_unverified_context() as $call
+alert $call for {
+	level: "high",
+	title: "ssl._create_unverified_context",
+	title_zh: "未校验 SSL 上下文",
+	message: "结构扫描：Python ssl 未校验上下文",
+	risk: "certificate-validation",
+}

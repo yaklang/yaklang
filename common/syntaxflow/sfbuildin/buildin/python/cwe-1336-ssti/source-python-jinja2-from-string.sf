@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python jinja2 字符串模板"
+	title_zh: "检测 Python jinja2 字符串模板"
+	type: vuln
+	level: high
+	rule_id: "source-python-jinja2-from-string"
+	risk: "ssti"
+	desc: <<<DESC
+### 规则说明
+检测到 jinja2.Template 或 from_string。
+
+### 风险类型
+ssti
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用文件模板，不要编译用户输入。
+SOLUTION
+	alert_min: 1
+	"file://tpl.py": <<<POS
+import jinja2
+def render(user):
+    return jinja2.Template(user).render()
+
+POS
+	"safefile://tpl-safe.py": <<<NEG
+def render(user):
+    return user.replace("<", "")
+
+NEG
+)
+
+${*.py}.pattern_regex(/jinja2\.Template\s*\(|from_string\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python jinja2 字符串模板",
+	title_zh: "检测 Python jinja2 字符串模板",
+	message: "检测 Python jinja2 字符串模板",
+	risk: "ssti",
+}

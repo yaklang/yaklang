@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java Cookie setSecure(false)"
+	title_zh: "检测 Java Cookie setSecure(false)"
+	type: vuln
+	level: medium
+	rule_id: "source-java-cookie-secure-false"
+	risk: "cookie-security"
+	desc: <<<DESC
+### 规则说明
+检测到 Cookie.setSecure(false)，会话 Cookie 可能经明文 HTTP 发送。
+
+### 风险类型
+cookie-security
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对会话 Cookie 调用 setSecure(true)，并启用 HttpOnly。
+SOLUTION
+	alert_min: 1
+	"file://Ck.java": <<<POS
+import javax.servlet.http.Cookie;
+class Ck {
+  void bad(Cookie c) {
+    c.setSecure(false);
+  }
+}
+POS
+	"safefile://CkSafe.java": <<<NEG
+import javax.servlet.http.Cookie;
+class CkSafe {
+  void ok(Cookie c) {
+    c.setSecure(true);
+  }
+}
+NEG
+)
+
+${*.java}.pattern_regex(/setSecure\s*\(\s*false\s*\)/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Java Cookie setSecure(false)",
+	title_zh: "检测 Java Cookie setSecure(false)",
+	message: "检测 Java Cookie setSecure(false)",
+	risk: "cookie-security",
+}

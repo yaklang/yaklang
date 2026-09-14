@@ -1,0 +1,54 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "Struct scan: Go exec.Command"
+	title_zh: "结构扫描：Go exec.Command"
+	type: vuln
+	level: high
+	rule_id: "struct-go-exec-command"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 exec.Command。若命令名或参数来自外部输入且经 shell 拼接，可导致命令注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+把命令和参数分开传递，不要拼接 shell 字符串。
+SOLUTION
+	alert_min: 1
+	"file://main.go": <<<POS
+package main
+import "os/exec"
+func bad(cmd string) {
+	exec.Command(cmd).Run()
+}
+
+POS
+	"safefile://safe.go": <<<NEG
+package main
+import "fmt"
+func ok() {
+	fmt.Println("no exec")
+}
+
+NEG
+)
+
+exec.Command(* as $cmd) as $call
+exec.CommandContext(* as $cmd) as $call
+alert $call for {
+	level: "high",
+	title: "exec.Command",
+	title_zh: "exec.Command",
+	message: "结构扫描：Go exec.Command",
+	risk: "command-injection",
+}

@@ -1,0 +1,53 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java SHA-1 MessageDigest"
+	title_zh: "结构扫描：Java SHA-1 消息摘要"
+	type: vuln
+	level: medium
+	rule_id: "struct-java-sha1"
+	risk: "weak-cryptography"
+	desc: <<<DESC
+### 规则说明
+检测到 MessageDigest.getInstance 使用 SHA-1/SHA1。SHA-1 不抗碰撞，不适合完整性校验或签名。
+
+### 风险类型
+weak-cryptography
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 SHA-256 或更强算法；口令哈希使用 Argon2/BCrypt/PBKDF2。
+SOLUTION
+	alert_min: 1
+	"file://Hash.java": <<<POS
+import java.security.MessageDigest;
+class Hash {
+  void bad() throws Exception {
+    MessageDigest.getInstance("SHA-1");
+  }
+}
+POS
+	"safefile://HashSafe.java": <<<NEG
+class HashSafe {
+  void ok() {
+    System.out.println("sha256");
+  }
+}
+NEG
+)
+
+MessageDigest.getInstance(*?{have: "SHA-1"}) as $call
+MessageDigest.getInstance(*?{have: "SHA1"}) as $call
+alert $call for {
+	level: "medium",
+	title: "Weak SHA-1 Digest",
+	title_zh: "弱哈希 SHA-1",
+	message: "结构扫描：Java SHA-1 消息摘要",
+	risk: "weak-cryptography",
+}

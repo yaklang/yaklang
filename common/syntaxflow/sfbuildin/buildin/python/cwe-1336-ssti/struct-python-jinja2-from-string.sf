@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python jinja2 from_string"
+	title_zh: "结构扫描：Python jinja2 from_string"
+	type: vuln
+	level: high
+	rule_id: "struct-python-jinja2-from-string"
+	risk: "ssti"
+	desc: <<<DESC
+### 规则说明
+检测到 jinja2 从字符串编译模板。模板内容若外部可控，可导致 SSTI。
+
+### 风险类型
+ssti
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只渲染静态模板文件，不要把用户输入当作模板源。
+SOLUTION
+	alert_min: 1
+	"file://tpl.py": <<<POS
+import jinja2
+def render(user):
+    return jinja2.Template(user).render()
+
+POS
+	"safefile://tpl-safe.py": <<<NEG
+def render(user):
+    return user.replace("<", "")
+
+NEG
+)
+
+jinja2.Template(* as $src) as $call
+from_string(* as $src) as $call
+alert $call for {
+	level: "high",
+	title: "Jinja2 Template from string",
+	title_zh: "Jinja2 字符串模板",
+	message: "结构扫描：Python jinja2 from_string",
+	risk: "ssti",
+}
