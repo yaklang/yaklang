@@ -331,6 +331,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 	if isStrict {
 		return sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithStrictEmbeddedVerify())
 	}
+	// source/struct still enforce POS/NEG inside sfanalysis even when isStrict is false.
 	return sfanalysis.EvaluateVerifyFilesystemWithRule(rule)
 }
 

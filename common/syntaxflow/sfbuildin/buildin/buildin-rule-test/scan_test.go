@@ -54,9 +54,11 @@ func TestVerifiedRule(t *testing.T) {
 				detach()
 			}()
 			t.Log("Start to verify: " + rule.RuleName)
-			// TODO: switch this suite to strict embedded verification after the builtin rules are
-			// adjusted to satisfy the tighter sfanalysis expectations.
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
+			// source/struct always run strict POS/NEG via sfanalysis mode defaults.
+			// SSA keeps non-strict embedded verification until that corpus is tightened.
+			compiled := f.GetRule()
+			strict := compiled != nil && (compiled.IsSourceMode() || compiled.IsStructMode())
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, strict)
 			if err != nil {
 				failedMu.Lock()
 				failedRules = append(failedRules, caseName)
@@ -98,9 +100,8 @@ func TestVerify_DEBUG(t *testing.T) {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Parallel()
 			t.Log("Start to verify: " + rule.RuleName)
-			// TODO: switch this debug path to strict embedded verification after the builtin rules are
-			// adjusted to satisfy the tighter sfanalysis expectations.
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
+			strict := rule.IsSourceMode() || rule.IsStructMode()
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, strict)
 			if err != nil {
 				require.NoError(t, err)
 			}

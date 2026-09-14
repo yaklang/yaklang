@@ -1,16 +1,10 @@
 package sfanalysis
 
 import (
-	"io/fs"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func TestEvaluateVerifyFilesystemWithRule_BlankIsNoop(t *testing.T) {
@@ -106,44 +100,52 @@ alert $call
 	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()))
 }
 
+func TestEvaluateVerifyFilesystemWithRule_SourceModeAlwaysChecksNegative(t *testing.T) {
+	rule := &schema.SyntaxFlowRule{Content: `
+desc(
+	mode: "source"
+	language: "python"
+	alert_min: 1
+	"file://dyn.py": <<<POS
+eval(user)
+POS
+	"safefile://dyn-safe.py": <<<NEG
+eval(user)
+NEG
+)
+${*.py}.pattern_regex(/eval\s*\(/) as $call
+alert $call
+`}
+	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule), "unexpected alert")
+}
+
+func TestEvaluateVerifyFilesystemWithRule_StructModeAlwaysChecksNegative(t *testing.T) {
+	rule := &schema.SyntaxFlowRule{Content: `
+desc(
+	mode: "struct"
+	language: "java"
+	alert_min: 1
+	"file://Run.java": <<<POS
+class Run {
+  void bad(String cmd) throws Exception {
+    Runtime.getRuntime().exec(cmd);
+  }
+}
+POS
+	"safefile://RunSafe.java": <<<NEG
+class RunSafe {
+  void ok(String cmd) throws Exception {
+    Runtime.getRuntime().exec(cmd);
+  }
+}
+NEG
+)
+Runtime.getRuntime().exec(* as $cmd) as $call
+alert $call for { title: "Runtime.exec" }
+`}
+	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule), "alert symbol table not empty")
+}
+
 func TestBuiltinStructRules_VerifyFilesystem(t *testing.T) {
-	_, thisFile, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	root := filepath.Join(filepath.Dir(thisFile), "..", "sfbuildin", "buildin")
-	root, err := filepath.Abs(root)
-	require.NoError(t, err)
-
-	local := filesys.NewLocalFs()
-	var rules []string
-	err = filesys.Recursive(root, filesys.WithFileStat(func(path string, info fs.FileInfo) error {
-		if info.IsDir() || !strings.HasSuffix(path, ".sf") {
-			return nil
-		}
-		raw, err := local.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(string(raw))
-		if err != nil || !sfvm.FrameIsStructMode(frame) {
-			return nil
-		}
-		rules = append(rules, path)
-		return nil
-	}))
-	require.NoError(t, err)
-	require.NotEmpty(t, rules, "expected mode=struct rules under %s", root)
-
-	for _, path := range rules {
-		path := path
-		name := filepath.Base(path)
-		t.Run(name, func(t *testing.T) {
-			raw, err := local.ReadFile(path)
-			require.NoError(t, err)
-			frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(string(raw))
-			require.NoError(t, err)
-			require.True(t, sfvm.FrameIsStructMode(frame), "rule must be mode=struct")
-			err = EvaluateVerifyFilesystemWithFrame(frame, WithStrictEmbeddedVerify())
-			require.NoError(t, err)
-		})
-	}
+	RunBuiltinRuleVerify(t, BuiltinVerifyFilter{Struct: true})
 }
