@@ -47,30 +47,37 @@ type aiFocusAssetResult struct {
 	Payload     []byte
 }
 
+type aiFocusCodeSourceSnapshot struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	SHA256  string `json:"sha256"`
+}
+
 type aiFocusCodeFinding struct {
-	WorkspaceID        string  `json:"workspace_id"`
-	LockedRevision     string  `json:"locked_revision"`
-	SourceSHA256       string  `json:"source_sha256"`
-	File               string  `json:"file"`
-	StartLine          int     `json:"start_line"`
-	EndLine            int     `json:"end_line"`
-	StartColumn        int     `json:"start_column,omitempty"`
-	EndColumn          int     `json:"end_column,omitempty"`
-	CWE                string  `json:"cwe"`
-	VulnerabilityType  string  `json:"vulnerability_type"`
-	Category           string  `json:"category"`
-	Module             string  `json:"module,omitempty"`
-	Severity           string  `json:"severity"`
-	Confidence         float64 `json:"confidence"`
-	VerificationStatus string  `json:"verification_status"`
-	Title              string  `json:"title"`
-	Description        string  `json:"description,omitempty"`
-	Evidence           string  `json:"evidence"`
-	DataFlow           string  `json:"data_flow"`
-	ExploitScenario    string  `json:"exploit_scenario"`
-	Recommendation     string  `json:"recommendation,omitempty"`
-	DedupeKey          string  `json:"dedupe_key"`
-	Target             string  `json:"target"`
+	SourceSnapshot     *aiFocusCodeSourceSnapshot `json:"source_snapshot,omitempty"`
+	WorkspaceID        string                     `json:"workspace_id"`
+	LockedRevision     string                     `json:"locked_revision"`
+	SourceSHA256       string                     `json:"source_sha256"`
+	File               string                     `json:"file"`
+	StartLine          int                        `json:"start_line"`
+	EndLine            int                        `json:"end_line"`
+	StartColumn        int                        `json:"start_column,omitempty"`
+	EndColumn          int                        `json:"end_column,omitempty"`
+	CWE                string                     `json:"cwe"`
+	VulnerabilityType  string                     `json:"vulnerability_type"`
+	Category           string                     `json:"category"`
+	Module             string                     `json:"module,omitempty"`
+	Severity           string                     `json:"severity"`
+	Confidence         float64                    `json:"confidence"`
+	VerificationStatus string                     `json:"verification_status"`
+	Title              string                     `json:"title"`
+	Description        string                     `json:"description,omitempty"`
+	Evidence           string                     `json:"evidence"`
+	DataFlow           string                     `json:"data_flow"`
+	ExploitScenario    string                     `json:"exploit_scenario"`
+	Recommendation     string                     `json:"recommendation,omitempty"`
+	DedupeKey          string                     `json:"dedupe_key"`
+	Target             string                     `json:"target"`
 }
 
 type aiFocusCodeAuditReport struct {
@@ -434,6 +441,9 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding file: %w", err)
 	}
 	finding.File = cleanedFile
+	if err := validateLegionCodeSourceSnapshot(finding.SourceSnapshot, finding.File); err != nil {
+		return aiFocusResultReceipt{}, err
+	}
 	switch {
 	case kind == "":
 		return aiFocusResultReceipt{}, fmt.Errorf("finding result kind is required")
