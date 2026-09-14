@@ -122,7 +122,9 @@ binary_satisfies() {
 if [ -n "$VERSION" ]; then
   DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${VERSION}/${BINARY_NAME}"
   log "downloading $DOWNLOAD_URL"
-  if curl -fsSL "$DOWNLOAD_URL" -o "$OUTPUT" && binary_satisfies "$OUTPUT"; then
+  # curl 落盘的文件没有可执行位，必须先 chmod，否则 version 探测会以
+  # Permission denied(126) 失败，导致任何发布版都被误判为不可用。
+  if curl -fsSL "$DOWNLOAD_URL" -o "$OUTPUT" && chmod +x "$OUTPUT" && binary_satisfies "$OUTPUT"; then
     log "using published yak $VERSION ($BINARY_NAME)"
     echo "$OUTPUT"
     exit 0
