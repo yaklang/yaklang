@@ -5558,7 +5558,7 @@ message BatchSetRiskTagsRequest {
   repeated string Hashes = 7;
   string Token = 8;
   string RiskTypeVerbose = 9;
-  string Severity = 10;
+  string SetSeverity = 10;
   double SeverityScore = 11;
   // 处置原因
   string TagReason = 12;
