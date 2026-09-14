@@ -79,6 +79,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 
 	err = syntaxflow_scan.Scan(safeStream.Context(),
 		ssaconfig.WithScanRaw(rawConfig),
+		syntaxflow_scan.WithCompiledSource(true),
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
 		}),

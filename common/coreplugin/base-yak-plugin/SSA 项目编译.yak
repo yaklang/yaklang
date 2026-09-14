@@ -67,7 +67,7 @@ if projectName != "" {
 opts = [ssa.withProcess((msg, process) => {
     yakit.SetProgressEx("compile", process)
     yakit.Info("%s: %f", msg, process)
-}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withSetProgramName(programName)]
+}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withSetProgramName(programName), ssa.withStructRule(true)]
 
 if enableIncrementalCompile {
     opts = append(opts, ssa.withEnableIncrementalCompile(true))

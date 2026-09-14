@@ -636,9 +636,9 @@ var syncRule = &cli.Command{
 }
 
 var verifyBuiltinRisk = &cli.Command{
-	Name:    "verify-builtin-risk",
-	Aliases: []string{"verify-risk", "builtin-risk-check"},
-	Usage:   "verify built-in SyntaxFlow rules' risk types against the risk taxonomy",
+	Name:      "verify-builtin-risk",
+	Aliases:   []string{"verify-risk", "builtin-risk-check"},
+	Usage:     "verify built-in SyntaxFlow rules' risk types against the risk taxonomy",
 	UsageText: "yak verify-builtin-risk [--dir <rule-dir>] [--taxonomy <taxonomy.json>]",
 	Flags: []cli.Flag{
 		cli.StringFlag{
@@ -1617,6 +1617,7 @@ and exports structured report (sarif/irify).`,
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithPrograms(progs...),
+			syntaxflow_scan.WithCompiledSource(true),
 			syntaxflow_scan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessRuleDetail(true),
 		)
