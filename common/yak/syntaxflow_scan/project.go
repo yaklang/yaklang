@@ -9,10 +9,13 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+// CompileProject is registered by ssa_compile init so this package does not
+// import ssa_compile (ssa_compile -> yakscript -> yak -> syntaxflow_scan).
+var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error)
 
 // ScanProjectFromJSON is the script/platform entry: one ssaconfig JSON blob
 // plus optional callbacks. CLI and gRPC parse their inputs into the same
@@ -22,10 +25,11 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 	return ScanProject(ctx, opts...)
 }
 
-// ScanProject is the product pipeline for CLI, gRPC, and yak scripts.
+// ScanProject is the product pipeline for CLI and yak scripts.
 //
-//	cli/grpc/script → syntaxflow-scan → (ssa-compile → ssaapi | syntaxflow)
+//	cli/script → syntaxflow-scan → (ssa-compile → yak 编译脚本 | syntaxflow)
 //
+// gRPC SyntaxFlowScan stays on Scan: the frontend compiles first, then scans.
 // Project input: live source inspect → compile+struct review → SSA analyze.
 // Program input: IrSource inspect → stored/program struct review → SSA analyze.
 // Stages: 收集代码 → 代码检测 → 语义检测 → 深度分析.
@@ -258,7 +262,10 @@ func wrapStageProcess(cfg *Config, stage ProductStage, emit func(ProductStage, f
 }
 
 func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
-	return ssa_compile.CompileWithConfig(ctx, cfg, extra...)
+	if CompileProject == nil {
+		return nil, utils.Errorf("ScanProject: compiler is not registered")
+	}
+	return CompileProject(ctx, cfg, extra...)
 }
 
 func loadNamedPrograms(cfg *Config) error {

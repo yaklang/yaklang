@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -101,7 +102,7 @@ func detectProject(ctx context.Context, target, language string) (*AutoDetectInf
 	}
 
 	var info *AutoDetectInfo
-	err := execYakPlugin(ctx, pluginName, param,
+	err := yakscript.ExecScriptWithParam(ctx, pluginName, param,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil
@@ -143,22 +144,12 @@ func compileProject(ctx context.Context, config *ssaconfig.Config, forceProgramN
 		return nil, utils.Errorf("config is nil")
 	}
 
-	if shouldCompileInMemory(config) {
-		configJSON, err := config.ToJSONString()
+	if shouldCompileInMemory(config) || extraInfoForcesInProcess(config) {
+		prog, err := CompileWithConfig(ctx, config)
 		if err != nil {
-			return nil, utils.Errorf("failed to convert config to json: %s", err)
+			return nil, err
 		}
-		progs, err := ssaapi.ParseProject(
-			ssaconfig.WithConfigJson(configJSON),
-			ssaconfig.WithContext(ctx),
-		)
-		if err != nil {
-			return nil, utils.Errorf("failed to compile project (memory): %s", err)
-		}
-		if len(progs) == 0 {
-			return nil, utils.Errorf("compile project (memory) returned no programs")
-		}
-		return progs[0], nil
+		return prog, nil
 	}
 
 	compiledProgramName, err := compileProjectByPlugin(ctx, config, forceProgramName, disableTimestampProgramName)
@@ -200,7 +191,7 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 	}
 
 	var result compilePluginResult
-	err = execYakPlugin(ctx, compilePluginName, compileParam,
+	err = yakscript.ExecScriptWithParam(ctx, compilePluginName, compileParam,
 		"", func(exec *ypb.ExecResult) error {
 			return result.handle(exec)
 		},
