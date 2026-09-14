@@ -379,6 +379,10 @@ func (r *legionServerFocusRuntime) submitFindingV1(capability string, params map
 	if finding.StartLine <= 0 || finding.EndLine < finding.StartLine || !containsEndLine {
 		return nil, fmt.Errorf("result.finding.v1 line range is outside the source file")
 	}
+	finding.SourceSnapshot, err = r.workspace.captureSourceSnapshot(finding.File)
+	if err != nil {
+		return nil, fmt.Errorf("result.finding.v1 source snapshot: %w", err)
+	}
 	receipt, err := sink.SubmitCodeFinding(r.ctx, resultContract.Kind, finding)
 	if err != nil {
 		return nil, err
