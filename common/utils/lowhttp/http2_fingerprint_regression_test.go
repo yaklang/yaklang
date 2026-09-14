@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"time"
 	"errors"
 	"io"
 	"net"
@@ -21,13 +22,14 @@ func newH2FingerprintRegressionConn(t *testing.T, profile string, output io.Writ
 	t.Helper()
 	client, peer := net.Pipe()
 	t.Cleanup(func() { client.Close(); peer.Close() })
-	pc := &persistConn{
+	pool := NewH2ConnPool(context.Background(), 10, time.Minute, 30*time.Second)
+	entry := &h2ConnEntry{
 		conn:     client,
-		p:        &LowHttpConnPool{ctx: context.Background()},
-		cacheKey: &connectKey{http2Fingerprint: profile},
+		cacheKey: &connectKey{http2Fingerprint: profile, scheme: H2},
+		pool:     pool,
 	}
-	pc.h2Conn()
-	c := pc.alt
+	pool.initH2Conn(entry)
+	c := entry.alt
 	c.pc = nil
 	c.bw = bufio.NewWriter(output)
 	c.fr = http2.NewFramer(c.bw, nil)

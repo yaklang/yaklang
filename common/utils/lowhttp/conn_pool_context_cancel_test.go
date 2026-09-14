@@ -167,13 +167,12 @@ func TestHTTP2RequestContextCancellationResetsOnlyCurrentStream(t *testing.T) {
 		t.Fatal("H2 stream remained blocked after request cancellation")
 	}
 
-	pool.h2Mu.Lock()
-	connectionCount := len(pool.h2ConnMap)
+	live, _ := pool.h2Pool.Snapshot()
+	connectionCount := len(live)
 	connectionClosed := false
-	for _, pc := range pool.h2ConnMap {
-		connectionClosed = connectionClosed || pc.alt == nil || pc.alt.closed
+	for _, entry := range live {
+		connectionClosed = connectionClosed || entry.alt == nil || entry.alt.closed
 	}
-	pool.h2Mu.Unlock()
 	if connectionCount != 1 || connectionClosed {
 		t.Fatalf("canceling one H2 stream affected shared connection: count=%d closed=%t", connectionCount, connectionClosed)
 	}
