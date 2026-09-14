@@ -75,14 +75,18 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 
 			if isWrongToolReviewPrompt(prompt) {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-tool", "tool": ` + toolName2 + `}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "require-tool", "tool": %q}`, toolName2)))
 				rsp.Close()
 				return rsp, nil
 			}
 
 			if isToolParamGenerationPrompt(prompt, toolName1) || isToolParamGenerationPrompt(prompt, toolName2) {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "mocked-echo-params" }}`))
+				if isToolParamGenerationPrompt(prompt, toolName1) {
+					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "tool": %q, "params": {"path": "."}}`, toolName1)))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "tool": %q, "params": {}}`, toolName2)))
+				}
 				rsp.Close()
 				return rsp, nil
 			}
