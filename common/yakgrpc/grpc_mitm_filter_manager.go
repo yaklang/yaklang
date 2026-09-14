@@ -125,17 +125,17 @@ func (m *MITMFilter) updateMatcher() {
 		return
 	}
 	m.Filters = &FilterMatcher{}
-	m.Filters.ExcludeSuffixMatcher = FilterDataToMatchers(m.Data.ExcludeSuffix)
-	m.Filters.IncludeSuffixMatcher = FilterDataToMatchers(m.Data.IncludeSuffix)
+	m.Filters.ExcludeSuffixMatcher = FilterDataToMatchers(m.Data.ExcludeSuffix, true) // 支持逗号/分号/换行分隔多值
+	m.Filters.IncludeSuffixMatcher = FilterDataToMatchers(m.Data.IncludeSuffix, true)
 
-	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames, true) // 支持逗号/分号/换行分隔多域名
+	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames, true)
 	m.Filters.IncludeHostnamesMatcher = FilterDataToMatchers(m.Data.IncludeHostnames, true)
 
-	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(m.Data.ExcludeUri)
-	m.Filters.IncludeUriMatcher = FilterDataToMatchers(m.Data.IncludeUri)
+	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(m.Data.ExcludeUri, true)
+	m.Filters.IncludeUriMatcher = FilterDataToMatchers(m.Data.IncludeUri, true)
 
-	m.Filters.ExcludeMethodsMatcher = FilterDataToMatchers(m.Data.ExcludeMethods)
-	m.Filters.ExcludeMIMEMatcher = FilterDataToMatchers(m.Data.ExcludeMIME)
+	m.Filters.ExcludeMethodsMatcher = FilterDataToMatchers(m.Data.ExcludeMethods, true)
+	m.Filters.ExcludeMIMEMatcher = FilterDataToMatchers(m.Data.ExcludeMIME, true)
 }
 
 func (m *MITMFilter) Recover() {
