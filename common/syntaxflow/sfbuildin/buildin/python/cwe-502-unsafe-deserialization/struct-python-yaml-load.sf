@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python yaml.load"
+	title_zh: "结构扫描：Python yaml.load"
+	type: vuln
+	level: high
+	rule_id: "struct-python-yaml-load"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 yaml.load。PyYAML 默认 load 可构造任意对象，不可信 YAML 可导致 RCE。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 yaml.safe_load，或显式传入 SafeLoader。
+SOLUTION
+	alert_min: 1
+	"file://ser.py": <<<POS
+import yaml
+def load(data):
+    return yaml.load(data)
+
+POS
+	"safefile://ser-safe.py": <<<NEG
+import json
+def load(data):
+    return json.loads(data)
+
+NEG
+)
+
+yaml.load as $call
+yaml.load(* as $data) as $call
+alert $call for {
+	level: "high",
+	title: "Python yaml.load",
+	title_zh: "Python yaml.load",
+	message: "结构扫描：Python yaml.load",
+	risk: "deserialization",
+}

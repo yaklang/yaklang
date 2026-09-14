@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python ssl._create_unverified_context"
+	title_zh: "检测 Python ssl._create_unverified_context"
+	type: vuln
+	level: high
+	rule_id: "source-python-ssl-unverified-context"
+	risk: "certificate-validation"
+	desc: <<<DESC
+### 规则说明
+检测到跳过证书校验的 SSL 上下文。
+
+### 风险类型
+certificate-validation
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 create_default_context。
+SOLUTION
+	alert_min: 1
+	"file://tls.py": <<<POS
+import ssl
+def ctx():
+    return ssl._create_unverified_context()
+
+POS
+	"safefile://tls-safe.py": <<<NEG
+import ssl
+def ctx():
+    return ssl.create_default_context()
+
+NEG
+)
+
+${*.py}.pattern_regex(/ssl\._create_unverified_context\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python ssl._create_unverified_context",
+	title_zh: "检测 Python ssl._create_unverified_context",
+	message: "检测 Python ssl._create_unverified_context",
+	risk: "certificate-validation",
+}

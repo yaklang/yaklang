@@ -1,0 +1,52 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java ProcessBuilder"
+	title_zh: "结构扫描：Java ProcessBuilder 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-java-process-builder"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 ProcessBuilder 构造或 command() 调用。参数若来自外部输入，可导致操作系统命令注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用参数列表而不是拼接命令字符串；对外部输入做白名单校验。
+SOLUTION
+	alert_min: 1
+	"file://Run.java": <<<POS
+class Run {
+  void bad(String cmd) throws Exception {
+    new ProcessBuilder(cmd).start();
+  }
+}
+POS
+	"safefile://RunSafe.java": <<<NEG
+class RunSafe {
+  void ok() {
+    System.out.println("no process");
+  }
+}
+NEG
+)
+
+ProcessBuilder(* as $cmd) as $call
+ProcessBuilder.command(* as $cmd) as $call
+alert $call for {
+	level: "high",
+	title: "ProcessBuilder Call",
+	title_zh: "ProcessBuilder 调用",
+	message: "结构扫描：Java ProcessBuilder 调用",
+	risk: "command-injection",
+}

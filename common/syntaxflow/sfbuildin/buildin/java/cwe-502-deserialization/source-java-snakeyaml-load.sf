@@ -1,0 +1,51 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java SnakeYAML load"
+	title_zh: "检测 Java SnakeYAML load"
+	type: vuln
+	level: high
+	rule_id: "source-java-snakeyaml-load"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 SnakeYAML load 调用。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 SafeConstructor。
+SOLUTION
+	alert_min: 1
+	"file://Ser.java": <<<POS
+class Ser {
+  Object bad(org.yaml.snakeyaml.Yaml yaml, String data) {
+    return yaml.load(data);
+  }
+}
+POS
+	"safefile://SerSafe.java": <<<NEG
+class SerSafe {
+  void ok() {
+    System.out.println("json");
+  }
+}
+NEG
+)
+
+${*.java}.pattern_regex(/snakeyaml/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Java SnakeYAML load",
+	title_zh: "检测 Java SnakeYAML load",
+	message: "检测 Java SnakeYAML load",
+	risk: "deserialization",
+}

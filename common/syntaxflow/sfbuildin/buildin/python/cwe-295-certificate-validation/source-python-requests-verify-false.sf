@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python requests verify=False"
+	title_zh: "检测 Python requests verify=False"
+	type: vuln
+	level: high
+	rule_id: "source-python-requests-verify-false"
+	risk: "certificate-validation"
+	desc: <<<DESC
+### 规则说明
+检测到 requests 关闭 TLS 证书校验，连接易受中间人攻击。
+
+### 风险类型
+certificate-validation
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+删除 verify=False，使用系统或指定 CA 校验证书。
+SOLUTION
+	alert_min: 1
+	"file://http.py": <<<POS
+import requests
+def get(url):
+    return requests.get(url, verify=False)
+
+POS
+	"safefile://http-safe.py": <<<NEG
+import requests
+def get(url):
+    return requests.get(url)
+
+NEG
+)
+
+${*.py}.pattern_regex(/verify\s*=\s*False/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python requests verify=False",
+	title_zh: "检测 Python requests verify=False",
+	message: "检测 Python requests verify=False",
+	risk: "certificate-validation",
+}

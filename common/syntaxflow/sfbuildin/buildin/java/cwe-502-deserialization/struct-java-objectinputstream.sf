@@ -1,0 +1,53 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java ObjectInputStream"
+	title_zh: "结构扫描：Java ObjectInputStream 反序列化"
+	type: vuln
+	level: high
+	rule_id: "struct-java-objectinputstream"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 ObjectInputStream 构造。反序列化不可信字节流可导致任意代码执行。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免原生 Java 序列化；如必须使用，配合白名单 ObjectInputFilter。
+SOLUTION
+	alert_min: 1
+	"file://Ser.java": <<<POS
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+class Ser {
+  Object bad(InputStream in) throws Exception {
+    return new ObjectInputStream(in).readObject();
+  }
+}
+POS
+	"safefile://SerSafe.java": <<<NEG
+class SerSafe {
+  void ok() {
+    System.out.println("json");
+  }
+}
+NEG
+)
+
+ObjectInputStream(* as $in) as $call
+alert $call for {
+	level: "high",
+	title: "ObjectInputStream Call",
+	title_zh: "ObjectInputStream 调用",
+	message: "结构扫描：Java ObjectInputStream 反序列化",
+	risk: "deserialization",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP md5 调用"
+	title_zh: "检测 PHP md5 调用"
+	type: vuln
+	level: medium
+	rule_id: "source-php-md5"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 md5()。不适合口令存储或安全完整性校验。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+口令使用 password_hash；完整性使用 hash('sha256', ...)。
+SOLUTION
+	alert_min: 1
+	"file://app.php": <<<POS
+<?php
+function digest($s) { return md5($s); }
+
+POS
+	"safefile://app-safe.php": <<<NEG
+<?php
+function digest($s) { return hash('sha256', $s); }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])md5\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 PHP md5 调用",
+	title_zh: "检测 PHP md5 调用",
+	message: "检测 PHP md5 调用",
+	risk: "weak-hash",
+}

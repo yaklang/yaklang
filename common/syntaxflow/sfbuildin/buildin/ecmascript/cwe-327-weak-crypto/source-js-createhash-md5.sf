@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript crypto.createHash MD5"
+	title_zh: "检测 JavaScript crypto.createHash MD5"
+	type: vuln
+	level: medium
+	rule_id: "source-js-createhash-md5"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 createHash('md5')。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 sha256。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+const crypto = require("crypto");
+function digest(data) { return crypto.createHash("md5").update(data).digest("hex"); }
+
+POS
+	"safefile://app-safe.js": <<<NEG
+const crypto = require("crypto");
+function digest(data) { return crypto.createHash("sha256").update(data).digest("hex"); }
+
+NEG
+)
+
+${*.js}.pattern_regex(/createHash\s*\(\s*["']md5["']\s*\)/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 JavaScript crypto.createHash MD5",
+	title_zh: "检测 JavaScript crypto.createHash MD5",
+	message: "检测 JavaScript crypto.createHash MD5",
+	risk: "weak-hash",
+}

@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript document.write"
+	title_zh: "检测 JavaScript document.write"
+	type: vuln
+	level: high
+	rule_id: "source-js-document-write"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 document.write。外部 HTML 可导致 XSS。
+
+### 风险类型
+xss
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免 document.write，改用安全的 DOM API。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+function show(html) { document.write(html); }
+
+POS
+	"safefile://app-safe.js": <<<NEG
+function show(html) { document.body.textContent = html; }
+
+NEG
+)
+
+${*.js}.pattern_regex(/document\.write(ln)?\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 JavaScript document.write",
+	title_zh: "检测 JavaScript document.write",
+	message: "检测 JavaScript document.write",
+	risk: "xss",
+}

@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python os.popen"
+	title_zh: "结构扫描：Python os.popen 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-python-os-popen"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 os.popen。它通过 shell 执行命令，外部输入可导致命令注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 subprocess 列表参数且 shell=False。
+SOLUTION
+	alert_min: 1
+	"file://sh.py": <<<POS
+import os
+def run(user):
+    os.popen("ls " + user)
+
+POS
+	"safefile://sh-safe.py": <<<NEG
+import subprocess
+def run(user):
+    subprocess.run(["ls", user], check=False)
+
+NEG
+)
+
+os.popen as $call
+os.popen(* as $cmd) as $call
+alert $call for {
+	level: "high",
+	title: "Python os.popen()",
+	title_zh: "Python os.popen()",
+	message: "结构扫描：Python os.popen 调用",
+	risk: "command-injection",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "Struct scan: JavaScript vm.runInContext"
+	title_zh: "结构扫描：JavaScript vm.runInContext"
+	type: vuln
+	level: high
+	rule_id: "struct-js-vm-runincontext"
+	risk: "code-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 vm.runInContext/runInNewContext。它们仍可逃逸沙箱并执行代码。
+
+### 风险类型
+code-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要把外部字符串交给 vm 执行。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+const vm = require("vm");
+function run(code) { return vm.runInNewContext(code); }
+
+POS
+	"safefile://app-safe.js": <<<NEG
+function run(code) { return JSON.parse(code); }
+
+NEG
+)
+
+vm.runInContext(* as $code) as $call
+vm.runInNewContext(* as $code) as $call
+alert $call for {
+	level: "high",
+	title: "vm.runInContext",
+	title_zh: "vm.runInContext",
+	message: "结构扫描：JavaScript vm.runInContext",
+	risk: "code-injection",
+}

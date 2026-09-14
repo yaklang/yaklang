@@ -1,0 +1,56 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "Struct scan: Go md5.Sum/New"
+	title_zh: "结构扫描：Go md5.Sum/New"
+	type: vuln
+	level: medium
+	rule_id: "struct-go-md5-sum"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 crypto/md5。MD5 不抗碰撞。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 crypto/sha256。
+SOLUTION
+	alert_min: 1
+	"file://hash.go": <<<POS
+package main
+import "crypto/md5"
+func digest(b []byte) [16]byte {
+	return md5.Sum(b)
+}
+
+POS
+	"safefile://hash-safe.go": <<<NEG
+package main
+import "crypto/sha256"
+func digest(b []byte) [32]byte {
+	return sha256.Sum256(b)
+}
+
+NEG
+)
+
+md5.Sum as $call
+md5.Sum(* as $data) as $call
+md5.New as $call
+md5.New() as $call
+alert $call for {
+	level: "medium",
+	title: "Go md5",
+	title_zh: "Go md5",
+	message: "结构扫描：Go md5.Sum/New",
+	risk: "weak-hash",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP extract 调用"
+	title_zh: "检测 PHP extract 调用"
+	type: vuln
+	level: high
+	rule_id: "source-php-extract"
+	risk: "variable-overwrite"
+	desc: <<<DESC
+### 规则说明
+检测到 extract。
+
+### 风险类型
+variable-overwrite
+
+### 影响
+该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要对请求数据 extract。
+SOLUTION
+	alert_min: 1
+	"file://app.php": <<<POS
+<?php
+function load($arr) { extract($arr); }
+
+POS
+	"safefile://app-safe.php": <<<NEG
+<?php
+function load($arr) { return $arr; }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])extract\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP extract 调用",
+	title_zh: "检测 PHP extract 调用",
+	message: "检测 PHP extract 调用",
+	risk: "variable-overwrite",
+}
