@@ -61,3 +61,8 @@ func CheckBuiltinRiskTypes(dir string, checker *sfrisk.Checker) (*BuiltinRiskChe
 func GetRuleFS() *embed.FS {
 	return nil
 }
+
+// GetEmbedRuleContent 在 irify_exclude 模式下不可用
+func GetEmbedRuleContent(path string) (string, bool) {
+	return "", false
+}
