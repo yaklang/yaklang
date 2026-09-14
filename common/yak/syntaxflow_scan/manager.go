@@ -325,7 +325,7 @@ func (m *scanManager) initByConfig() error {
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
 		db := consts.GetGormProfileDatabase()
 		db = yakit.FilterSyntaxFlowRule(db, filter)
-		db = yakit.ApplySyntaxFlowRuleModeFilter(db, config.GetRuleFilterMode())
+		db = yakit.ApplySyntaxFlowRuleModeFilter(db, ruleFilterModes(config))
 		// get all rule name
 		var ruleNames []string
 		err := db.Pluck("rule_name", &ruleNames).Error
@@ -344,18 +344,7 @@ func (m *scanManager) initByConfig() error {
 		if err != nil {
 			return err
 		}
-		modeFilter := config.GetRuleFilterMode()
-		if len(modeFilter) == 0 {
-			// Source/SSA query targets must never execute mixed-mode rules:
-			// a snapshot can contain both backends, and an SSA rule against
-			// a raw PatternRoot can allocate unbounded result objects.
-			if len(config.QueryTargets) > 0 && len(config.Programs) == 0 {
-				modeFilter = []string{string(schema.SFR_MODE_SOURCE)}
-			} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
-				modeFilter = []string{string(schema.SFR_MODE_SSA)}
-			}
-		}
-		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, modeFilter)
+		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, ruleFilterModes(config))
 		parsedRules = filterTaskLocalSyntaxFlowRulesByNames(parsedRules, config.SyntaxFlowRule)
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
 		for _, rule := range parsedRules {
@@ -377,6 +366,7 @@ func (m *scanManager) initByConfig() error {
 			}
 			rules = append(rules, rule)
 		}
+		rules = filterTaskLocalSyntaxFlowRulesByMode(rules, ruleFilterModes(config))
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(rules))
 		for _, r := range rules {
 			ruleCh <- r
@@ -406,6 +396,44 @@ func (m *scanManager) initByConfig() error {
 
 func (m *scanManager) TaskId() string {
 	return m.taskID
+}
+
+// ruleFilterModes returns the caller-set mode filter, or infers one from the
+// query targets so SSA programs never receive source/struct rules.
+func ruleFilterModes(config *Config) []string {
+	if config == nil {
+		return nil
+	}
+	if modes := config.GetRuleFilterMode(); len(modes) > 0 {
+		return modes
+	}
+	var source, structMode, ssa bool
+	for _, target := range config.QueryTargets {
+		switch target.(type) {
+		case *ssaapi.SourceQueryTarget:
+			source = true
+		case *ssaapi.StructQueryTarget:
+			structMode = true
+		default:
+			if target != nil {
+				ssa = true
+			}
+		}
+	}
+	if len(config.Programs) > 0 {
+		ssa = true
+	}
+	var modes []string
+	if source {
+		modes = append(modes, string(schema.SFR_MODE_SOURCE))
+	}
+	if structMode {
+		modes = append(modes, string(schema.SFR_MODE_STRUCT))
+	}
+	if ssa {
+		modes = append(modes, string(schema.SFR_MODE_SSA))
+	}
+	return modes
 }
 
 func (m *scanManager) Stop(runningID string) {

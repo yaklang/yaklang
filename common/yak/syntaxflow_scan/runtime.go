@@ -124,7 +124,33 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 	return target.GetProgramName()
 }
 
+func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) bool {
+	if rule == nil || target == nil {
+		return false
+	}
+	switch schema.ValidRuleMode(rule.Mode) {
+	case schema.SFR_MODE_SOURCE:
+		_, ok := target.(*ssaapi.SourceQueryTarget)
+		return ok
+	case schema.SFR_MODE_STRUCT:
+		_, ok := target.(*ssaapi.StructQueryTarget)
+		return ok
+	default:
+		if _, ok := target.(*ssaapi.SourceQueryTarget); ok {
+			return false
+		}
+		if _, ok := target.(*ssaapi.StructQueryTarget); ok {
+			return false
+		}
+		return true
+	}
+}
+
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
+	if !ruleMatchesQueryTarget(rule, target) {
+		m.markRuleSkipped()
+		return
+	}
 	if rule.IsStructMode() {
 		if prog, ok := target.(*ssaapi.Program); ok && prog.StructRulesAlreadyRan(rule) {
 			m.markRuleSkipped()
