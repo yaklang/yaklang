@@ -50,6 +50,10 @@ User's original request: {{ .OriginalQuery }}
 This call is part of a multi-step ReAct process. Generate parameters that help the overall task continue to converge.
 
 # Current Response Contract
+{{ if not .IsBlueprint }}- 当前工具已经固定为 `{{ .ToolName }}`，标准响应为一个 JSON 对象：`{"@action":"call-tool","tool":"{{ .ToolName }}","params":{...}}`
+- 所有必填参数必须在本次 JSON `params` 或本次完整 AITAG 中提供；缺失字段会在参数生成阶段退回重试
+- 一次响应只生成这一项调用；不要输出多个 JSON 候选，也不要把参数混放在 `params` 内外
+{{ end }}
 - 如果参数足够简单，直接返回符合下方 Parameter Schema 的 JSON
 - 如果参数需要多行块内容或复杂转义，使用当前 nonce 对应的 AITAG
 - AITAG 内的内容按原样写入，不需要 JSON 转义

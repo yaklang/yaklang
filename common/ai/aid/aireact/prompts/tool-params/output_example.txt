@@ -2,6 +2,7 @@
 ```json
 {
   "@action": "call-tool",
+  "tool": "<selected_tool_name>",
   "identifier": "list_directory",
   "params": {
     "path": "./workspace"
@@ -14,6 +15,7 @@
 ```json
 {
   "@action": "call-tool",
+  "tool": "<selected_tool_name>",
   "identifier": "run_script",
   "params": {
     "timeout": 30
@@ -22,10 +24,12 @@
 ```
 
 ```text
-<|TOOL_PARAM_script|>
+<|TOOL_PARAM_script_CURRENT_NONCE|>
 ... raw block content ...
-<|TOOL_PARAM_script_END|>
+<|TOOL_PARAM_script_END_CURRENT_NONCE|>
 ```
+
+Replace `<selected_tool_name>` with the selected tool name and `CURRENT_NONCE` with the current nonce from the dynamic section. Include the complete block in this response.
 
 # Example 3: AI Blueprint Params
 ```json

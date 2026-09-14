@@ -22,7 +22,7 @@ func TestGenerateParams_ActionTolerance(t *testing.T) {
 		{"missing_marker", `{"tool":"read_file","identifier":"read_config","params":{"path":"/config","action":"read","type":"A"}}`, true},
 		{"nested_business_marker", `{"tool":"read_file","identifier":"read_config","params":{"path":"/config","action":"read","type":"A","@action":"finish"}}`, true},
 		{"wrong_tool", `{"tool":"other_tool","params":{"path":"/config"}}`, false},
-		{"missing_tool", `{"params":{"path":"/config"}}`, false},
+		{"missing_tool", `{"params":{"path":"/config","action":"read","type":"A"},"identifier":"read_config"}`, true},
 		{"missing_params", `{"tool":"read_file"}`, false},
 		{"null_params", `{"tool":"read_file","params":null}`, false},
 		{"array_params", `{"tool":"read_file","params":[]}`, false},
@@ -79,9 +79,9 @@ func TestGenerateParams_ActionTolerance(t *testing.T) {
 }
 
 func TestExtractToolCallAction_EmptyParams(t *testing.T) {
-	action, err := extractToolCallAction(context.Background(), strings.NewReader(`{"tool":"clock","params":{}}`), "clock")
+	parsed, err := extractFixedToolParamResponse(context.Background(), strings.NewReader(`{"tool":"clock","params":{}}`), aitool.NewWithoutCallback("clock"))
 	require.NoError(t, err)
-	require.Equal(t, "call-tool", action.ActionType())
-	require.Equal(t, "call-tool", action.GetParams().GetString(ActionMagicKey))
-	require.Empty(t, action.GetParams().GetObject("params"))
+	require.Equal(t, "call-tool", parsed.Envelope.GetString(ActionMagicKey))
+	require.Equal(t, "clock", parsed.Envelope.GetString("tool"))
+	require.Empty(t, parsed.Envelope.GetObject("params"))
 }
