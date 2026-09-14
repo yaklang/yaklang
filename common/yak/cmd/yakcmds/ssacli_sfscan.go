@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
-	_ "github.com/yaklang/yaklang/common/yak/ssa_compile_plugin"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"

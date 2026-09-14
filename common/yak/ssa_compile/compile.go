@@ -9,9 +9,7 @@ import (
 )
 
 // CompileWithConfig compiles a project in-process via ssaapi.ParseProject.
-// Extra options (struct rules, process callbacks) are applied after JSON
-// round-trip so ExtraInfo is preserved. This is the compile entry used by
-// syntaxflow_scan.ScanProject: syntaxflow-scan -> ssa-compile -> ssaapi.
+// ExtraInfo (struct rules, process callbacks) is copied after JSON round-trip.
 func CompileWithConfig(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
 	if cfg == nil {
 		return nil, utils.Errorf("compile config is nil")
@@ -23,6 +21,7 @@ func CompileWithConfig(ctx context.Context, cfg *ssaconfig.Config, extra ...ssac
 	opts := []ssaconfig.Option{
 		ssaconfig.WithConfigJson(raw),
 		ssaconfig.WithContext(ctx),
+		copyExtraInfo(cfg),
 	}
 	opts = append(opts, extra...)
 	progs, err := ssaapi.ParseProject(opts...)
@@ -33,4 +32,22 @@ func CompileWithConfig(ctx context.Context, cfg *ssaconfig.Config, extra ...ssac
 		return nil, utils.Errorf("compile result is empty")
 	}
 	return progs[0], nil
+}
+
+func extraInfoForcesInProcess(config *ssaconfig.Config) bool {
+	return config != nil && len(config.ExtraInfo) > 0
+}
+
+func copyExtraInfo(src *ssaconfig.Config) ssaconfig.Option {
+	return func(dst *ssaconfig.Config) error {
+		if src == nil || dst == nil {
+			return nil
+		}
+		for key, values := range src.ExtraInfo {
+			for _, value := range values {
+				dst.SetExtraInfo(key, value)
+			}
+		}
+		return nil
+	}
 }

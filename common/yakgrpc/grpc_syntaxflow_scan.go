@@ -8,7 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -78,21 +77,11 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		return safeStream.Send(ret)
 	}
 
-	scanFn := syntaxflow_scan.ScanProject
-	if mode := rawConfig.GetControlMode(); mode == "resume" || mode == "status" || mode == "pause" {
-		scanFn = syntaxflow_scan.Scan
-	}
-	err = scanFn(safeStream.Context(),
+	err = syntaxflow_scan.Scan(safeStream.Context(),
 		ssaconfig.WithScanRaw(rawConfig),
 		syntaxflow_scan.WithCompiledSource(true),
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
-		}),
-		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
-			status := schema.SYNTAXFLOWSCAN_EXECUTING
-			_ = sendExecResult("", status, yaklib.NewYakitStatusCardExecResult(stage.DisplayName(), fmt.Sprintf("%.0f%%", progress*100), "检测流程"))
-			_ = sendExecResult("", status, yaklib.NewYakitStatusCardExecResult("ssa-phase", stage.LegacyPhase(), "检测流程"))
-			_ = sendExecResult("", status, yaklib.NewYakitProgressExecResult("main", overall))
 		}),
 		syntaxflow_scan.WithProcessCallback(func(tid, s string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 			// update rule info
@@ -141,8 +130,5 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 			sendExecResult(taskid, status, yaklib.NewYakitLogExecResult("error", format, args...))
 		}),
 	)
-	if err == nil {
-		_ = sendExecResult("", schema.SYNTAXFLOWSCAN_DONE, yaklib.NewYakitProgressExecResult("main", 1))
-	}
 	return err
 }
