@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-
-	_ "github.com/yaklang/yaklang/common/yak/ssa_compile"
 )
 
 func TestScanProject_CompilesAndRunsSourceFromSnapshot(t *testing.T) {
@@ -131,4 +131,113 @@ alert $hit`,
 	)
 	require.NoError(t, err)
 	require.Greater(t, alerts, 0)
+}
+
+func TestScanProject_WithModeSourceOnly(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.yak"), []byte("key = \"AKIAIOSFODNN7EXAMPLE\"\n"), 0o644))
+
+	var alerts int
+	var stages []string
+	err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("yak"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: general, title: "source-only")
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			Language: string(ssaconfig.General),
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Greater(t, alerts, 0)
+	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageReview))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
+}
+
+func TestScanProject_WithModeStackedSourceAndStruct(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
+
+	var stages []string
+	err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(
+	mode: "struct"
+	language: "python"
+	title: "stacked struct eval"
+)
+eval(* as $arg) as $call
+alert $call`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+	require.Contains(t, stages, string(syntaxflow_scan.StageReview))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
+}
+
+func TestScanProject_ProgramPathSourceFromIrSource(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.yak", "key = \"AKIAIOSFODNN7EXAMPLE\"\n")
+	progs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(t.Name()))
+	require.NoError(t, err)
+	require.NotEmpty(t, progs)
+
+	var alerts int
+	var stages []string
+	err = syntaxflow_scan.ScanProject(context.Background(),
+		syntaxflow_scan.WithPrograms(progs[0]),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: general, title: "program irsource")
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			Language: string(ssaconfig.General),
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Greater(t, alerts, 0)
+	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageReview))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
 }

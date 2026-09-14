@@ -1500,6 +1500,11 @@ and exports structured report (sarif/irify).`,
 			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",
 		},
 
+		cli.StringSliceFlag{
+			Name:  "mode",
+			Usage: "product scan stages, stacked: source, struct, ssa (default all three). Repeat or comma-separate, e.g. --mode source --mode struct",
+		},
+
 		cli.StringFlag{
 			Name:  "debug",
 			Usage: "enable pprof/debug output: specify a directory path; creates structured output with ssadb.db, log, report, cmd.txt, and pprof subdirectories",
@@ -1618,6 +1623,10 @@ and exports structured report (sarif/irify).`,
 			}
 		}
 		log.Infof("[code-scan] rule source: %s (custom-rule-count=%d)", ruleSource, customRuleCount)
+
+		if modes := c.StringSlice("mode"); len(modes) > 0 {
+			scanOpt = append(scanOpt, syntaxflow_scan.WithMode(modes...))
+		}
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithReporter(reportInstance),

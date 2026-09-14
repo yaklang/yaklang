@@ -3,7 +3,9 @@ package syntaxflow_scan
 import (
 	"io"
 	"path/filepath"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
@@ -59,6 +61,12 @@ type ScanTaskCallback struct {
 	// CompiledSource attaches a source-mode target from the program FileList
 	// snapshot so product scans also run source rules on compiled programs.
 	CompiledSource bool `json:"-"`
+
+	// scanModes is the product-stage filter (source/struct/ssa). Empty means all.
+	scanModes []string `json:"-"`
+
+	parsedCustomRules     []*schema.SyntaxFlowRule
+	parsedCustomRulesDone bool
 }
 
 const (
@@ -136,6 +144,47 @@ var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerf
 var WithCompiledSource = ssaconfig.SetOption("syntaxflow-scan/compiledSource", func(c *Config, enable bool) {
 	c.CompiledSource = enable
 })
+
+const (
+	SourceMode = string(schema.SFR_MODE_SOURCE)
+	StructMode = string(schema.SFR_MODE_STRUCT)
+	SSAMode    = string(schema.SFR_MODE_SSA)
+)
+
+func appendScanModes(dst []string, modes ...string) []string {
+	seen := map[string]bool{}
+	for _, m := range dst {
+		seen[strings.ToLower(strings.TrimSpace(m))] = true
+	}
+	for _, raw := range modes {
+		m := strings.ToLower(strings.TrimSpace(raw))
+		if m == "" || seen[m] {
+			continue
+		}
+		seen[m] = true
+		dst = append(dst, m)
+	}
+	return dst
+}
+
+// WithMode selects product scan stages. Values stack: calling it again or
+// passing multiple arguments enables the union of those stages.
+// Default when unset is all three (source + struct + ssa).
+//
+// Example:
+// ```
+// opt = syntaxflow.withMode(syntaxflow.SourceMode, syntaxflow.StructMode)
+// opt2 = syntaxflow.withMode(syntaxflow.SourceMode)
+// opt3 = syntaxflow.withMode(syntaxflow.StructMode)
+// ```
+func WithMode(modes ...string) ssaconfig.Option {
+	return ssaconfig.SetOption("syntaxflow-scan/productMode", func(c *Config, v []string) {
+		if c.ScanTaskCallback == nil {
+			c.ScanTaskCallback = &ScanTaskCallback{}
+		}
+		c.scanModes = appendScanModes(c.scanModes, v...)
+	})(modes)
+}
 
 var withProgramsOption = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs ssaapi.Programs) {
 	c.ScanTaskCallback.Programs = progs

@@ -27,34 +27,6 @@ func GetRuleFS() *embed.FS {
 	return nil
 }
 
-// GetEmbedRuleContent 从内置 embed FS 中按相对路径读取规则文件内容。
-// path 为相对于 buildin/ 目录的路径（如 java/cwe-78-.../rule.sf）。
-func GetEmbedRuleContent(path string) (string, bool) {
-	try := func(rel string) (string, bool) {
-		raw, err := ruleFSWithHash.ReadFile("buildin/" + rel)
-		if err != nil {
-			return "", false
-		}
-		return string(raw), true
-	}
-	if content, ok := try(path); ok {
-		return content, true
-	}
-	for _, prefix := range []string{"ssa/", "source/", "struct/"} {
-		if strings.HasPrefix(path, prefix) {
-			if content, ok := try(strings.TrimPrefix(path, prefix)); ok {
-				return content, true
-			}
-		}
-	}
-	if strings.HasPrefix(path, "javascript/") {
-		if content, ok := try("ecmascript/" + strings.TrimPrefix(path, "javascript/")); ok {
-			return content, true
-		}
-	}
-	return "", false
-}
-
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
 	return SyncRuleFromFileSystemToDB(consts.GetGormProfileDatabase(), fsInstance, buildin, notifies...)
 }
