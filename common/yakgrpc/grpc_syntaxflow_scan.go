@@ -77,11 +77,20 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		return safeStream.Send(ret)
 	}
 
-	err = syntaxflow_scan.Scan(safeStream.Context(),
+	scanFn := syntaxflow_scan.ScanProject
+	if mode := rawConfig.GetControlMode(); mode == "resume" || mode == "status" || mode == "pause" {
+		scanFn = syntaxflow_scan.Scan
+	}
+	err = scanFn(safeStream.Context(),
 		ssaconfig.WithScanRaw(rawConfig),
 		syntaxflow_scan.WithCompiledSource(true),
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			_ = sendExecResult("", string(stage), yaklib.NewYakitStatusCardExecResult(stage.DisplayName(), fmt.Sprintf("%.0f%%", progress*100), "检测流程"))
+			_ = sendExecResult("", string(stage), yaklib.NewYakitStatusCardExecResult("ssa-phase", stage.LegacyPhase(), "检测流程"))
+			_ = sendExecResult("", string(stage), yaklib.NewYakitProgressExecResult("main", overall))
 		}),
 		syntaxflow_scan.WithProcessCallback(func(tid, s string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 			// update rule info
