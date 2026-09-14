@@ -13,7 +13,7 @@ import (
 const maxInlineCodeSourceSnapshotBytes = 64 * 1024
 
 // captureSourceSnapshot only reads node-owned workspace files, never model data.
-// An omitted snapshot means the complete file cannot be represented inline.
+// Findings require complete source text; never truncate or omit an unsupported file.
 func (w *legionCodeWorkspaceRuntime) captureSourceSnapshot(file string) (*aiFocusCodeSourceSnapshot, error) {
 	resolved, rel, err := w.resolve(file)
 	if err != nil {
@@ -51,8 +51,11 @@ func (w *legionCodeWorkspaceRuntime) captureSourceSnapshot(file string) (*aiFocu
 	if err != nil {
 		return nil, err
 	}
-	if len(content) > maxInlineCodeSourceSnapshotBytes || !utf8.Valid(content) || strings.ContainsRune(string(content), '\x00') {
-		return nil, nil
+	if len(content) > maxInlineCodeSourceSnapshotBytes {
+		return nil, fmt.Errorf("source file %q exceeds the 64 KiB (%d bytes) source snapshot limit; finding cannot be submitted without complete source", rel, maxInlineCodeSourceSnapshotBytes)
+	}
+	if !utf8.Valid(content) || strings.ContainsRune(string(content), '\x00') {
+		return nil, fmt.Errorf("source file %q must be valid UTF-8 text without NUL bytes; finding cannot be submitted without complete source", rel)
 	}
 	return &aiFocusCodeSourceSnapshot{Path: rel, Content: string(content), SHA256: fmt.Sprintf("%x", sha256.Sum256(content))}, nil
 }
