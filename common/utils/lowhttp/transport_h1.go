@@ -282,9 +282,11 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 				responseHeaderWriter = io.MultiWriter(responseHeaderWriter, &responseRaw)
 			}
 
+			var headerErr error
 			for {
 				line, err := utils.BufioReadLine(packetReader)
 				if err != nil {
+					headerErr = err
 					if err != io.EOF {
 						log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
 					}
@@ -301,10 +303,14 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 					break
 				}
 			}
-			if option.bodyStreamReaderHandled != nil {
-				option.bodyStreamReaderHandled.Set()
+			if headerErr != nil {
+				log.Warnf("BodyStreamReaderHandler read response header failed: %s", headerErr)
+			} else {
+				if option.bodyStreamReaderHandled != nil {
+					option.bodyStreamReaderHandled.Set()
+				}
+				option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 			}
-			option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 		}()
 
 		if option.NoBodyBuffer {
