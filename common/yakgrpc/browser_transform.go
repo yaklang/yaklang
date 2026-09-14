@@ -1,5 +1,3 @@
-//go:build !yakit_exclude
-
 package yakgrpc
 
 import (
@@ -10,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"sort"
 	"strconv"
@@ -17,7 +16,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 const browserTransformMaxBodyBytes = 8 * 1024 * 1024
@@ -58,12 +62,15 @@ type browserTransformPacket struct {
 }
 
 type browserTransformCall struct {
-	ProfileID string                 `json:"profileId"`
-	Direction string                 `json:"direction"`
-	Packet    browserTransformPacket `json:"packet"`
+	ProfileID    string                 `json:"profileId,omitempty"`
+	ValidationID string                 `json:"validationId,omitempty"`
+	Direction    string                 `json:"direction"`
+	Packet       browserTransformPacket `json:"packet"`
 }
 
 type browserTransformResult struct {
+	Explanation   json.RawMessage          `json:"explanation,omitempty"`
+	ProofLevel    string                   `json:"proofLevel,omitempty"`
 	ProfileID     string                   `json:"profileId"`
 	Direction     string                   `json:"direction"`
 	URL           string                   `json:"url"`
@@ -114,6 +121,7 @@ type browserTransformRuntime struct {
 	caller          browserTransformCaller
 	deviceID        string
 	profileID       string
+	validationID    string
 	profileName     string
 	origin          string
 	methods         []string
@@ -125,6 +133,46 @@ type browserTransformRuntime struct {
 	mu        sync.Mutex
 	pending   map[[32]byte][]*browserTransformTrace
 	completed map[[32]byte][]*browserTransformTrace
+	evidence  map[string]interface{}
+}
+
+func prepareBrowserValidationTransform(
+	caller browserTransformCaller,
+	deviceID string,
+	validationID string,
+	requestEnabled bool,
+	responseEnabled bool,
+	timeout time.Duration,
+) (*browserTransformRuntime, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	validationID = strings.TrimSpace(validationID)
+	if caller == nil {
+		return nil, errors.New("browser transform gateway is unavailable: extension bridge is not running")
+	}
+	if deviceID == "" || validationID == "" {
+		return nil, errors.New("browser transform validation requires a paired browser and validation_id")
+	}
+	if !requestEnabled && !responseEnabled {
+		return nil, errors.New("at least one browser transform direction must be enabled")
+	}
+	if timeout < 2*time.Second {
+		timeout = 2 * time.Second
+	}
+	if timeout > 60*time.Second {
+		timeout = 60 * time.Second
+	}
+	return &browserTransformRuntime{
+		caller:          caller,
+		deviceID:        deviceID,
+		profileID:       "transient-" + validationID,
+		validationID:    validationID,
+		profileName:     "Validated temporary transform",
+		requestEnabled:  requestEnabled,
+		responseEnabled: responseEnabled,
+		timeout:         timeout,
+		pending:         make(map[[32]byte][]*browserTransformTrace),
+		completed:       make(map[[32]byte][]*browserTransformTrace),
+	}, nil
 }
 
 func prepareBrowserTransform(
@@ -269,6 +317,29 @@ func browserTransformHeaders(packet []byte) []browserTransformHeader {
 	return result
 }
 
+func browserTransformPacketFromRequest(packet []byte, isHTTPS bool) (browserTransformPacket, error) {
+	if len(packet) == 0 {
+		return browserTransformPacket{}, errors.New("HTTP request is empty")
+	}
+	if len(lowhttp.GetHTTPPacketBody(packet)) > browserTransformMaxBodyBytes {
+		return browserTransformPacket{}, errors.New("HTTP request body exceeds 8 MiB")
+	}
+	requestURL, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, isHTTPS)
+	if err != nil {
+		return browserTransformPacket{}, fmt.Errorf("parse HTTP request: %w", err)
+	}
+	if requestURL == nil {
+		return browserTransformPacket{}, errors.New("parse HTTP request: URL is empty")
+	}
+	method, _, _ := lowhttp.GetHTTPPacketFirstLine(packet)
+	return browserTransformPacket{
+		Method:     method,
+		URL:        requestURL.String(),
+		Headers:    browserTransformHeaders(packet),
+		BodyBase64: base64.StdEncoding.EncodeToString(lowhttp.GetHTTPPacketBody(packet)),
+	}, nil
+}
+
 func normalizeBrowserTransformResponse(packet []byte) []byte {
 	if strings.TrimSpace(lowhttp.GetHTTPPacketHeader(packet, "Content-Encoding")) == "" {
 		return packet
@@ -311,17 +382,23 @@ func (r *browserTransformRuntime) transformPacket(
 		statusCode, _ = strconv.Atoi(rawStatus)
 	}
 	input := browserTransformCall{
-		ProfileID: r.profileID,
-		Direction: direction,
+		ProfileID:    r.profileID,
+		ValidationID: r.validationID,
+		Direction:    direction,
 		Packet: browserTransformPacket{
 			Method: method, URL: requestURL.String(), StatusCode: statusCode,
 			Headers:    browserTransformHeaders(working),
 			BodyBase64: base64.StdEncoding.EncodeToString(body),
 		},
 	}
+	capability := "browser.transform.execute"
+	if r.validationID != "" {
+		capability = "browser.transform.validation.execute"
+		input.ProfileID = ""
+	}
 	callCtx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
-	raw, err := r.caller.CallDevice(callCtx, r.deviceID, "browser.transform.execute", input)
+	raw, err := r.caller.CallDevice(callCtx, r.deviceID, capability, input)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +435,279 @@ func (r *browserTransformRuntime) transformPacket(
 			return nil, err
 		}
 	}
+	if r.evidence != nil {
+		r.mu.Lock()
+		r.evidence[direction] = map[string]interface{}{"explanation": result.Explanation, "proofLevel": result.ProofLevel}
+		r.mu.Unlock()
+	}
 	return output, nil
+}
+
+const browserAgentPacketResultLimit = 256 * 1024
+
+func browserAgentPacketResult(packet []byte) map[string]interface{} {
+	truncated := len(packet) > browserAgentPacketResultLimit
+	if truncated {
+		packet = packet[:browserAgentPacketResultLimit]
+	}
+	return map[string]interface{}{
+		"raw":       utils.EscapeInvalidUTF8Byte(packet),
+		"truncated": truncated,
+	}
+}
+
+func executeBrowserAgentHTTPRequest(
+	ctx context.Context,
+	bridge browsertools.Bridge,
+	params aitool.InvokeParams,
+	runtimeConfig *aitool.ToolRuntimeConfig,
+) (interface{}, error) {
+	deviceID, browserRef, err := browsertools.ResolveBrowserDevice(
+		bridge,
+		strings.TrimSpace(params.GetString("device_id")),
+		params.GetString("browser_ref"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	profileID := strings.TrimSpace(params.GetString("profile_id"))
+	validationID := strings.TrimSpace(params.GetString("validation_id"))
+	if (profileID == "") == (validationID == "") {
+		return nil, errors.New("provide exactly one of profile_id or validation_id")
+	}
+	plainRequest := []byte(params.GetString("request"))
+	isHTTPS := params.GetBool("is_https")
+	requestPacket, err := browserTransformPacketFromRequest(plainRequest, isHTTPS)
+	if err != nil {
+		return nil, err
+	}
+	timeout := time.Duration(params.GetInt("timeout_seconds", 30)) * time.Second
+	if timeout < 2*time.Second {
+		timeout = 2 * time.Second
+	}
+	if timeout > 60*time.Second {
+		timeout = 60 * time.Second
+	}
+
+	var runtime *browserTransformRuntime
+	if profileID != "" {
+		runtime, err = prepareBrowserTransform(ctx, bridge, deviceID, profileID, timeout)
+	} else {
+		requestEnabled := true
+		if params.Has("transform_request") {
+			requestEnabled = params.GetBool("transform_request")
+		}
+		runtime, err = prepareBrowserValidationTransform(
+			bridge,
+			deviceID,
+			validationID,
+			requestEnabled,
+			params.GetBool("transform_response"),
+			timeout,
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	runtime.evidence = make(map[string]interface{})
+	wireRequest := runtime.beforeHook(ctx)(isHTTPS, nil, plainRequest)
+	if reason := browserTransformRequestFailureReason(wireRequest); reason != "" {
+		return nil, fmt.Errorf("browser request transform failed before network send: %s", reason)
+	}
+	runtimeID := ""
+	if runtimeConfig != nil {
+		runtimeID = strings.TrimSpace(runtimeConfig.RuntimeID)
+	}
+	response, err := lowhttp.HTTPWithoutRedirect(
+		lowhttp.WithPacketBytes(wireRequest),
+		lowhttp.WithHttps(isHTTPS),
+		lowhttp.WithContext(ctx),
+		lowhttp.WithTimeout(timeout),
+		lowhttp.WithMaxContentLength(browserTransformMaxBodyBytes),
+		lowhttp.WithSaveHTTPFlow(false),
+		lowhttp.WithConnPool(false),
+		lowhttp.WithRetryTimes(0),
+		lowhttp.WithNoReadMultiResponse(true),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("send transformed HTTP request: %w", err)
+	}
+	if response == nil || (len(response.BareResponse) == 0 && len(response.RawPacket) == 0) {
+		return nil, errors.New("transformed HTTP request returned an empty response")
+	}
+	wireResponse := response.BareResponse
+	if len(wireResponse) == 0 {
+		wireResponse = response.RawPacket
+	}
+	plainResponse := runtime.afterHook(ctx)(isHTTPS, nil, wireRequest, nil, wireResponse)
+	responseTransformFailure := browserTransformResponseFailureReason(runtime, plainResponse)
+	displayResponse := plainResponse
+	if responseTransformFailure != "" {
+		// The request already reached the network. Keep the real response as
+		// evidence even when the browser-side decryptor fails.
+		displayResponse = wireResponse
+	}
+	duration := time.Duration(0)
+	if response.TraceInfo != nil {
+		duration = response.TraceInfo.TotalTime
+	}
+	savedFlow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
+		isHTTPS,
+		plainRequest,
+		displayResponse,
+		"ai-browser-http",
+		requestPacket.URL,
+		response.RemoteAddr,
+		yakit.CreateHTTPFlowWithRuntimeID(runtimeID),
+		yakit.CreateHTTPFlowWithDuration(duration),
+		yakit.CreateHTTPFlowWithTags(yakit.HTTPFlowTagBrowserPlaintext),
+		yakit.CreateHTTPFlowWithBarePacketsRaw(wireRequest, wireResponse),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build browser HTTP flow: %w", err)
+	}
+	if err := yakit.InsertHTTPFlowEx(savedFlow, true); err != nil {
+		return nil, fmt.Errorf("save browser HTTP flow: %w", err)
+	}
+	gateway := map[string]interface{}{
+		"version": 1, "browserRef": browserRef,
+		"requestEnabled": runtime.requestEnabled, "responseEnabled": runtime.responseEnabled,
+		"responseFailed": responseTransformFailure != "",
+		"directions":     runtime.evidence,
+	}
+	metadata, err := json.Marshal(gateway)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP flow %d already sent and saved; encode gateway evidence: %w", savedFlow.ID, err)
+	}
+	if err := yakit.SetProjectKeyWithGroup(consts.GetGormProjectDatabase(), fmt.Sprintf("%d_browser_gateway", savedFlow.ID), string(metadata), "browser_gateway"); err != nil {
+		return nil, fmt.Errorf("HTTP flow %d already sent and saved; save gateway evidence: %w", savedFlow.ID, err)
+	}
+	if responseTransformFailure != "" {
+		return nil, fmt.Errorf("browser response transform failed: %s", responseTransformFailure)
+	}
+	result := map[string]interface{}{
+		"gateway":                  gateway,
+		"browserRef":               browserRef,
+		"url":                      requestPacket.URL,
+		"statusCode":               lowhttp.GetStatusCodeFromResponse(wireResponse),
+		"profileId":                profileID,
+		"validationId":             validationID,
+		"requestTransformEnabled":  runtime.requestEnabled,
+		"responseTransformEnabled": runtime.responseEnabled,
+		"requestTransformed":       !bytes.Equal(plainRequest, wireRequest),
+		"responseTransformed":      !bytes.Equal(wireResponse, plainResponse),
+		"plaintextRequest":         browserAgentPacketResult(plainRequest),
+		"wireRequest":              browserAgentPacketResult(wireRequest),
+		"wireResponse":             browserAgentPacketResult(wireResponse),
+		"plaintextResponse":        browserAgentPacketResult(plainResponse),
+	}
+	result["httpFlow"] = map[string]interface{}{
+		"id":          savedFlow.ID,
+		"hiddenIndex": savedFlow.HiddenIndex,
+		"runtimeId":   savedFlow.RuntimeId,
+		"source":      savedFlow.SourceType,
+		"view":        "plaintext",
+		"alternate":   "wire",
+	}
+	return result, nil
+}
+
+func buildBrowserHTTPTestTool(bridge browsertools.Bridge) (*aitool.Tool, error) {
+	return aitool.New(
+		"browser.http.test",
+		aitool.WithDescription("Send one raw HTTP request through an A/B/C browser's page transform. The engine encrypts the plaintext request before network I/O, optionally decrypts the response, records the HTTP flow, and returns both plaintext and wire evidence."),
+		aitool.WithVerboseName("Browser Plaintext HTTP Test"),
+		aitool.WithVerboseNameZh("浏览器明文 HTTP 测试"),
+		aitool.WithUsage("Use after browser.transform.prepare returns validationDraft.id, or with an extension-saved Profile. Pass the plaintext raw HTTP request including authentication headers. With several browsers, run once per browser_ref for an A/B authorization comparison. A temporary validation draft is not persisted. Never send the request separately with another HTTP tool. HTTP 200 and requestTransformed do not prove business success; inspect the response body. Do not claim response decryption unless responseTransformEnabled is true. Repeat a test only after an explicit input or mapping change and explain that change."),
+		aitool.WithKeywords([]string{"browser HTTP", "plaintext gateway", "request encryption", "response decryption", "A/B authorization", "明文网关", "加密发包", "响应解密", "越权测试"}),
+		aitool.WithStringParam("browser_ref", aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"), aitool.WithParam_MaxLength(512)),
+		aitool.WithStringParam("profile_id", aitool.WithParam_Description("Saved transform Profile ID; mutually exclusive with validation_id"), aitool.WithParam_MaxLength(512)),
+		aitool.WithStringParam("validation_id", aitool.WithParam_Description("Short-lived ID returned by browser.profile.validate; mutually exclusive with profile_id"), aitool.WithParam_MaxLength(512)),
+		aitool.WithStringParam("request", aitool.WithParam_Description("Complete plaintext HTTP/1.x request, including request line, Host, authentication headers, blank line, and body"), aitool.WithParam_Required(true)),
+		aitool.WithBoolParam("is_https", aitool.WithParam_Description("Whether the upstream request uses TLS; set this explicitly from the captured request URL"), aitool.WithParam_Required(true)),
+		aitool.WithBoolParam("transform_request", aitool.WithParam_Description("For a temporary validation draft, encrypt the request before sending"), aitool.WithParam_Default(true)),
+		aitool.WithBoolParam("transform_response", aitool.WithParam_Description("For a temporary validation draft, decrypt the response after receiving it; enable only when the validated draft has a response direction"), aitool.WithParam_Default(false)),
+		aitool.WithIntegerParam("timeout_seconds", aitool.WithParam_Description("Overall request and page-transform timeout"), aitool.WithParam_Default(30), aitool.WithParam_Min(2), aitool.WithParam_Max(60)),
+		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, _ io.Writer, _ io.Writer) (interface{}, error) {
+			return executeBrowserAgentHTTPRequest(ctx, bridge, params, runtimeConfig)
+		}),
+	)
+}
+
+func buildBrowserTransformPrepareTool(bridge browsertools.Bridge) (*aitool.Tool, error) {
+	return aitool.New(
+		"browser.transform.prepare",
+		aitool.WithDescription("Prepare a temporary plaintext HTTP transform from one browser.crypto.inspect capture. The extension creates the callable, compiles the Profile, and validates it atomically on the same page."),
+		aitool.WithVerboseName("Prepare Browser Plaintext Transform"),
+		aitool.WithVerboseNameZh("准备浏览器明文转换"),
+		aitool.WithUsage("Call directly with gatewayPreparation.candidateId returned by browser.crypto.inspect and one complete plaintext HTTP request. Do not call recording, callable, debugger, browser.profile.*, or reopen the website. On success, pass validationDraft.id to browser.http.test."),
+		aitool.WithKeywords([]string{"browser transform", "plaintext gateway", "page encryption", "明文网关", "加密发包", "页面加密"}),
+		aitool.WithStringParam("browser_ref", aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"), aitool.WithParam_MaxLength(512)),
+		aitool.WithStringParam("candidate_id", aitool.WithParam_Description("gatewayPreparation.candidateId returned by browser.crypto.inspect"), aitool.WithParam_MaxLength(160), aitool.WithParam_Required(true)),
+		aitool.WithStringParam("request", aitool.WithParam_Description("Complete plaintext HTTP/1.x request to validate against the captured operation"), aitool.WithParam_Required(true)),
+		aitool.WithBoolParam("is_https", aitool.WithParam_Description("Whether the captured upstream request uses TLS"), aitool.WithParam_Required(true)),
+		aitool.WithStringArrayParam("input_paths", aitool.WithParam_Description("Optional explicit packet value paths when automatic input mapping is ambiguous")),
+		aitool.WithStringParam("name", aitool.WithParam_Description("Optional local draft name"), aitool.WithParam_MaxLength(120)),
+		aitool.WithIntegerParam("tabId", aitool.WithParam_Description("Target tab ID returned by browser.crypto.inspect"), aitool.WithParam_Min(1)),
+		aitool.WithIntegerParam("frameId", aitool.WithParam_Description("Target frame ID returned by browser.crypto.inspect"), aitool.WithParam_Min(0)),
+		aitool.WithStringParam("documentId", aitool.WithParam_Description("Target document ID returned by browser.crypto.inspect"), aitool.WithParam_MaxLength(160)),
+		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, _ *aitool.ToolRuntimeConfig, _ io.Writer, _ io.Writer) (interface{}, error) {
+			deviceID, browserRef, err := browsertools.ResolveBrowserDevice(
+				bridge,
+				strings.TrimSpace(params.GetString("device_id")),
+				params.GetString("browser_ref"),
+			)
+			if err != nil {
+				return nil, err
+			}
+			packet, err := browserTransformPacketFromRequest([]byte(params.GetString("request")), params.GetBool("is_https"))
+			if err != nil {
+				return nil, err
+			}
+			callParams := map[string]interface{}{
+				"candidateId": params.GetString("candidate_id"),
+				"packet":      packet,
+			}
+			for _, key := range []string{"tabId", "frameId", "documentId", "name"} {
+				if params.Has(key) {
+					callParams[key] = params[key]
+				}
+			}
+			if params.Has("input_paths") {
+				callParams["inputPaths"] = params.GetStringSlice("input_paths")
+			}
+			catalog, connected := bridge.CapabilityCatalog(deviceID)
+			if !connected {
+				return nil, fmt.Errorf("browser %s is offline or has no signed capability catalog", browserRef)
+			}
+			if err := catalog.ValidateCapabilityParams("browser.transform.prepare", callParams); err != nil {
+				return nil, err
+			}
+			callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+			defer cancel()
+			raw, err := bridge.CallDevice(callCtx, deviceID, "browser.transform.prepare", callParams)
+			if err != nil {
+				return nil, err
+			}
+			var result map[string]interface{}
+			if err := json.Unmarshal(raw, &result); err != nil {
+				return nil, fmt.Errorf("decode browser transform preparation: %w", err)
+			}
+			var explanation interface{}
+			if execution, ok := result["execution"].(map[string]interface{}); ok {
+				explanation = execution["explanation"]
+			}
+			return map[string]interface{}{
+				"explanation":     explanation,
+				"browserRef":      browserRef,
+				"valid":           result["valid"],
+				"proofLevel":      result["proofLevel"],
+				"comparison":      result["comparison"],
+				"validationDraft": result["validationDraft"],
+				"next":            result["next"],
+			}, nil
+		}),
+	)
 }
 
 func browserTransformFailureRequest(err error) []byte {

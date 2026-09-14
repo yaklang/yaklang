@@ -50,32 +50,30 @@ func TestPromptPrefixBuilder_AssemblePromptWithDynamicSection_DefaultSections(t 
 	require.Empty(t, sections[aicache.SectionRaw])
 }
 
-func TestSharedToolCallModePromptsPreferReadyIndependentBatch(t *testing.T) {
+func TestSharedToolCallModePromptsUseOneConsistentBatchContract(t *testing.T) {
 	tests := []struct {
-		name     string
-		prompt   string
-		decision string
+		name   string
+		prompt string
 	}{
 		{
-			name:     "high static",
-			prompt:   SharedPlanAndExecHighStaticTemplate,
-			decision: "先枚举本轮已经明确、可立即执行的真实工具调用",
+			name:   "high static",
+			prompt: SharedPlanAndExecHighStaticTemplate,
 		},
 		{
-			name:     "frozen tool inventory",
-			prompt:   SharedFrozenBlockTemplate,
-			decision: "先枚举本轮已经明确、可立即执行的真实调用",
+			name:   "frozen tool inventory",
+			prompt: SharedFrozenBlockTemplate,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Contains(t, test.prompt, test.decision)
-			require.Contains(t, test.prompt, "优先")
-			require.Contains(t, test.prompt, "不得仅为沿用单工具而拆成多轮")
-			require.Contains(t, test.prompt, "任务属于探索阶段")
-			require.NotContains(t, test.prompt, "默认单步")
-			require.NotContains(t, test.prompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
+			require.Contains(t, test.prompt, "默认")
+			require.Contains(t, test.prompt, "directly_call_tool_calls")
+			require.Contains(t, test.prompt, "tool_require_calls")
+			require.Contains(t, test.prompt, "简单无歧义")
+			require.Contains(t, test.prompt, "嵌套 wrapper")
+			require.NotContains(t, test.prompt, "不要先默认单工具")
+			require.NotContains(t, test.prompt, "不得仅为沿用单工具而拆成多轮")
 		})
 	}
 }

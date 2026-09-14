@@ -22,6 +22,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestLowHTTPFlowSourceTypePreservesNamedProducer(t *testing.T) {
+	require.Equal(t, "ai-browser-http", lowHTTPFlowSourceType(" ai-browser-http "))
+	require.Equal(t, schema.HTTPFlow_SourceType_CRAWLER, lowHTTPFlowSourceType("CrawlerX"))
+	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType(""))
+}
+
 func TestCreateHTTPFlowEmptyJSONBodyPostParamsTotal(t *testing.T) {
 	test := assert.New(t)
 	reqInst, err := lowhttp.ParseBytesToHttpRequest(lowhttp.FixHTTPRequest([]byte(`POST /bbs/api/follow/list HTTP/1.1

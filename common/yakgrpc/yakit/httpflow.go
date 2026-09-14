@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -33,6 +34,20 @@ func init() {
 		RegisterLowHTTPLabelingCallback()
 		return nil
 	})
+}
+
+func lowHTTPFlowSourceType(source string) string {
+	source = strings.TrimSpace(source)
+	switch strings.ToLower(source) {
+	case "mitm":
+		return schema.HTTPFlow_SourceType_MITM
+	case "basic-crawler", "crawler", "crawlerx":
+		return schema.HTTPFlow_SourceType_CRAWLER
+	case "", "scan", "port-scan", "plugin":
+		return schema.HTTPFlow_SourceType_SCAN
+	default:
+		return source
+	}
 }
 
 func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
@@ -100,15 +115,7 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 		log.Errorf("create httpflow from lowhttp failed: %s", err)
 		return
 	}
-	switch ret := strings.ToLower(reqSource); ret {
-	case "mitm":
-		flow.SourceType = schema.HTTPFlow_SourceType_MITM
-	case "basic-crawler", "crawler", "crawlerx":
-		flow.SourceType = schema.HTTPFlow_SourceType_CRAWLER
-	case "scan", "port-scan", "plugin":
-		flow.SourceType = schema.HTTPFlow_SourceType_SCAN
-
-	}
+	flow.SourceType = lowHTTPFlowSourceType(reqSource)
 	flow.FromPlugin = fromPlugin
 	flow.RuntimeId = runtimeId
 	flow.HiddenIndex = hiddenIndex
@@ -136,7 +143,9 @@ type CreateHTTPFlowConfig struct {
 	isHttps                   bool
 	reqRaw                    []byte
 	rspRaw                    []byte
+	bareReqRaw                []byte // explicit alternate request packet for the current HTTPFlow
 	bareRspRaw                []byte // wire packet; sidecar KV when it differs from display response
+	forceStoreBarePackets     bool   // preserve explicit request/response packet pairs even when not charset conversion
 	fixRspRaw                 []byte // 如果设置了，则不会再修复rspRaw
 	noFixContentLength        bool   // keep wire in DB (NoFix / 不修复数据包)
 	source                    string
@@ -210,6 +219,17 @@ func CreateHTTPFlowWithRequestRaw(reqRaw []byte) CreateHTTPFlowOptions {
 func CreateHTTPFlowWithResponseRaw(rspRaw []byte) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
 		c.rspRaw = rspRaw
+	}
+}
+
+// CreateHTTPFlowWithBarePacketsRaw preserves alternate request/response packets
+// in the existing GetHTTPFlowBare sidecars. The main HTTPFlow remains the
+// user-facing representation supplied through RequestRaw/ResponseRaw.
+func CreateHTTPFlowWithBarePacketsRaw(bareReqRaw, bareRspRaw []byte) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.bareReqRaw = bareReqRaw
+		c.bareRspRaw = bareRspRaw
+		c.forceStoreBarePackets = true
 	}
 }
 
@@ -351,7 +371,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		isHttps            = c.isHttps
 		reqRaw             = c.reqRaw
 		rspRaw             = c.rspRaw
+		bareReqRaw         = c.bareReqRaw
 		bareRspRaw         = c.bareRspRaw
+		forceStoreBare     = c.forceStoreBarePackets
 		fixRspRaw          = c.fixRspRaw
 		noFixContentLength = c.noFixContentLength
 		source             = c.source
@@ -406,7 +428,10 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	if rspRaw == nil {
 		rspRaw = make([]byte, 0)
 	}
-	storeBareWire := httpFlowShouldStoreBareWire(wireRsp, rspRaw, noFixContentLength)
+	autoFixedBareWire := httpFlowShouldStoreBareWire(wireRsp, rspRaw, noFixContentLength)
+	storeBareWire := autoFixedBareWire ||
+		(forceStoreBare && len(wireRsp) > 0 && !httpFlowResponsePacketsEqual(wireRsp, rspRaw))
+	storeBareRequest := forceStoreBare && len(bareReqRaw) > 0 && !bytes.Equal(bareReqRaw, reqRaw)
 
 	var rspContentType string
 	rspRaw = truncateHTTPPacketBodyForStorage(rspRaw, maxStoredHTTPFlowResponseBodyBytes)
@@ -427,6 +452,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 
 	if storeBareWire {
 		c.afterSaveHandlers = append(c.afterSaveHandlers, afterSaveHTTPFlowBareResponse(wireRsp))
+	}
+	if storeBareRequest {
+		c.afterSaveHandlers = append(c.afterSaveHandlers, afterSaveHTTPFlowBareRequest(bareReqRaw))
 	}
 
 	flow := &schema.HTTPFlow{
@@ -456,7 +484,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		TooLargeRequestHeaderFile:  tooLargeReqHeaderFile,
 		FromPlugin:                 fromPlugin,
 	}
-	if storeBareWire {
+	if autoFixedBareWire {
 		flow.AddTagToFirst(HTTPFlowTagAutoFixResponse)
 	}
 	if len(c.afterSaveHandlers) > 0 {
@@ -1256,6 +1284,7 @@ func cleanupHTTPFlowRequestResources(db *gorm.DB, flow *schema.HTTPFlow) {
 	keys := []string{
 		strconv.Quote(requestKey),
 		strconv.Quote(strconv.FormatUint(uint64(flow.ID), 10) + "_response"),
+		strconv.Quote(strconv.FormatUint(uint64(flow.ID), 10) + "_browser_gateway"),
 	}
 	_ = db.Where("key IN (?)", keys).Unscoped().Delete(&schema.ProjectGeneralStorage{}).Error
 }

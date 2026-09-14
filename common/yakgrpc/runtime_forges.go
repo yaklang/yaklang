@@ -6,6 +6,8 @@ import (
 	"errors"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aiforge/browsercrypto"
 	"github.com/yaklang/yaklang/common/browser"
@@ -44,6 +46,30 @@ func (b serverBrowserExtensionBridge) CapabilityCatalog(
 		}
 	}
 	return nil, false
+}
+
+func (b serverBrowserExtensionBridge) Connections() []browser.ExtensionBridgeConnection {
+	if !b.Available() {
+		return nil
+	}
+	return b.server.browserBridge.Snapshot().Connections
+}
+
+func (s *Server) buildBrowserAgentTools() ([]*aitool.Tool, error) {
+	bridge := serverBrowserExtensionBridge{server: s}
+	tools, err := browsertools.BuildDynamicCapabilityTools(bridge)
+	if err != nil {
+		return nil, err
+	}
+	httpTool, err := buildBrowserHTTPTestTool(bridge)
+	if err != nil {
+		return nil, err
+	}
+	prepareTool, err := buildBrowserTransformPrepareTool(bridge)
+	if err != nil {
+		return nil, err
+	}
+	return append(tools, prepareTool, httpTool), nil
 }
 
 func (s *Server) registerRuntimeForges() error {

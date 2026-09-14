@@ -71,6 +71,22 @@ func toolByName(t *testing.T, tools []*aitool.Tool, name string) *aitool.Tool {
 	return nil
 }
 
+func TestGenericAgentCatalogHidesWorkflowInternals(t *testing.T) {
+	for _, method := range []string{
+		"browser.recording.start",
+		"browser.callable.create",
+		"browser.deep_capture.start",
+		"browser.profile.validate",
+		"browser.transform.prepare",
+		"browser.transform.validation.execute",
+	} {
+		require.False(t, browserCapabilityVisibleToGenericAgent(browser.ExtensionBridgeCapabilityDescriptor{Method: method}), method)
+	}
+	for _, method := range []string{"browser.crypto.inspect", "browser.context"} {
+		require.True(t, browserCapabilityVisibleToGenericAgent(browser.ExtensionBridgeCapabilityDescriptor{Method: method}), method)
+	}
+}
+
 func TestCapabilityToolsUseAdvertisedMethodsReviewAndTargetRules(t *testing.T) {
 	factory := aitool.NewFactory()
 	caller := &fakeCaller{}

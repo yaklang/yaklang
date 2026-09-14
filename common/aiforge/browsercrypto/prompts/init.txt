@@ -11,6 +11,7 @@ First distinguish between these outcomes:
 
 # Capability use
 
+- For **diagnose or explore**, get a fresh page context, choose the exact visible trigger node, and call `browser.crypto.inspect` once when the catalog advertises it. Its atomic result replaces manual recording/status/stop/deep-capture orchestration for that operation.
 - The dedicated recording, evidence, callable, packet, proposal, and validation tools are the shortest path for a plaintext gateway.
 - When those tools are insufficient, query `browser.capability.catalog`, then use `browser.capability.call` for any capability advertised by the connected extension. Do not assume that an unlisted capability exists.
 - The device and page in the input are the default target. Another tab or frame may be selected only when it is already shared by the same extension grant.

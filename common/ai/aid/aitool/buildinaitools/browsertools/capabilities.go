@@ -21,7 +21,7 @@ func browserCapabilityCatalog(
 	query = strings.ToLower(strings.TrimSpace(query))
 	result := make([]browser.ExtensionBridgeCapabilityDescriptor, 0, len(catalog.Capabilities))
 	for _, descriptor := range catalog.Capabilities {
-		if !descriptor.VisibleToAgent() {
+		if !browserCapabilityVisibleToGenericAgent(descriptor) {
 			continue
 		}
 		if domain != "" && domain != "all" && descriptor.Domain != domain {
@@ -43,6 +43,21 @@ func browserCapabilityCatalog(
 	return result
 }
 
+func browserCapabilityVisibleToGenericAgent(descriptor browser.ExtensionBridgeCapabilityDescriptor) bool {
+	if !descriptor.VisibleToAgent() {
+		return false
+	}
+	method := strings.TrimSpace(descriptor.Method)
+	return !(strings.HasPrefix(method, "browser.recording.") ||
+		strings.HasPrefix(method, "browser.callable.") ||
+		strings.HasPrefix(method, "browser.deep_capture.") ||
+		strings.HasPrefix(method, "browser.profile.") ||
+		strings.HasPrefix(method, "browser.transform.recovery.") ||
+		method == "browser.packet.compare" ||
+		method == "browser.transform.prepare" ||
+		method == "browser.transform.validation.execute")
+}
+
 func browserCapabilityDescriptors(
 	catalog *browser.ExtensionBridgeCapabilityCatalog,
 ) (map[string]browser.ExtensionBridgeCapabilityDescriptor, []string, error) {
@@ -59,7 +74,7 @@ func browserCapabilityDescriptors(
 		if _, duplicate := descriptors[method]; duplicate {
 			return nil, nil, fmt.Errorf("browser extension capability catalog contains duplicate method %q", method)
 		}
-		if !descriptor.VisibleToAgent() {
+		if !browserCapabilityVisibleToGenericAgent(descriptor) {
 			continue
 		}
 		descriptors[method] = descriptor
@@ -135,13 +150,14 @@ func RegisterCapabilityTools(
 	if err := factory.RegisterTool(
 		"browser.capability.catalog",
 		aitool.WithDescription("List every capability and parameter schema declared by the connected browser extension. This tool does not read page data."),
-		aitool.WithUsage("Query only the relevant domain. For page cryptography, signatures, encrypted payloads, or a plaintext gateway, use domain=transform: list an existing Profile first; otherwise record one real operation, create a callable, propose a Profile, and validate it. Validation creates a short-lived draft for local user confirmation; the Agent cannot save it. Use network only to observe requests and proxy only to change Chrome traffic routing."),
+		aitool.WithUsage("Query only the relevant domain. For one page cryptography operation, prefer browser.crypto.inspect when advertised. Use the top-level browser.transform.prepare tool for a temporary plaintext transform; recording, callable, debugger, and browser.profile.* are internal workflow steps. Use network only to observe requests and proxy only to change Chrome traffic routing."),
 		aitool.WithKeywords([]string{"browser", "capability catalog", "schema", "debugging", "review", "浏览器", "能力目录", "参数", "调试", "权限"}),
 		aitool.WithDangerousNoNeedUserReview(true),
 		aitool.WithStringParam(
 			"domain",
-			aitool.WithParam_Description("Optional capability-domain filter"),
-			aitool.WithParam_EnumString("all", "page", "isolation", "authorization", "network", "recording", "callable", "debugger", "transform", "handoff", "proxy", "system"),
+			aitool.WithParam_Description("Required capability-domain filter; request one domain at a time"),
+			aitool.WithParam_EnumString("page", "isolation", "authorization", "network", "recording", "transform", "handoff", "proxy", "system"),
+			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
 			"query",
@@ -174,7 +190,7 @@ func RegisterCapabilityTools(
 	return factory.RegisterTool(
 		"browser.capability.call",
 		aitool.WithDescription("Call any Agent-facing capability declared by the connected browser extension. Parameters are checked against that extension version's signed schema before dispatch. The paired instance, target, browser restrictions, enterprise policy, and AI review policy remain authoritative."),
-		aitool.WithUsage("Use browser.capability.catalog with the relevant domain first and follow paramsSchema exactly. Plaintext gateway means transform, not proxy or network. First call browser.transform.profile.list; execute an existing Profile with browser.transform.execute, or generate one through recording/callable/profile.propose/profile.validate and stop for local user confirmation. The Agent cannot save a Profile. When login requires a QR code, MFA, CAPTCHA, or device confirmation, call browser.handoff.request and wait; Yakit presents that interaction locally, so never extract or display its pixels through the Agent."),
+		aitool.WithUsage("Use browser.capability.catalog with the relevant domain first and follow paramsSchema exactly. For one page cryptography operation, prefer browser.crypto.inspect instead of coordinating recording and debugger state. Use the top-level browser.transform.prepare tool for a plaintext transform and do not reopen a page because a dialog appeared. When login requires a QR code, MFA, CAPTCHA, or device confirmation, call browser.handoff.request and wait; Yakit presents that interaction locally, so never extract or display its pixels through the Agent."),
 		aitool.WithKeywords([]string{"browser", "identity isolation", "page interaction", "network", "debugging", "eval", "proxy", "浏览器", "身份隔离", "页面操作", "网络", "调试", "代理"}),
 		aitool.WithStringParam(
 			"method",
