@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java SQL Injection Vulnerability"
 	type: audit
 	severity: mid
-	risk: "SQL注入"
+	risk: "sql-injection"
 	description: <<<DESCRIPTION
 在Java中，SQL语句拼接的不安全写法主要体现在使用字符串拼接来构建SQL查询时，用户输入的参数直接被插入到SQL语句中。
 
@@ -97,7 +97,7 @@ alert $vuln for {
 	title_zh: "检测到Java SQL注入漏洞",
 	name: "vuln",
 	message: "检测到Java SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "SQL注入",
+	risk: "sql-injection",
 }
 
 

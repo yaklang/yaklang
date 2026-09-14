@@ -3,8 +3,8 @@ package aicommon
 import "strings"
 
 const (
-	AttachedResourceTypeDefault         = "default"
-	AttachedResourceTypeFile            = CONTEXT_PROVIDER_TYPE_FILE
+	AttachedResourceTypeDefault = "default"
+	AttachedResourceTypeFile    = CONTEXT_PROVIDER_TYPE_FILE
 	// AttachedResourceTypeCode is a writable code delivery target (e.g. Yak Runner open .yak).
 	// Distinct from Type=file, which is read-only reference/@mention context used across loops.
 	AttachedResourceTypeCode            = "code"
@@ -39,6 +39,18 @@ type AttachedResource struct {
 	Type  string
 	Key   string
 	Value string
+}
+
+// NonEmptyAttachedResources omits empty UI placeholders. Nonempty values are
+// retained even when malformed so the resource parser still validates them.
+func NonEmptyAttachedResources(resources []*AttachedResource) []*AttachedResource {
+	var result []*AttachedResource
+	for _, resource := range resources {
+		if resource != nil && strings.TrimSpace(resource.Value) != "" {
+			result = append(result, resource)
+		}
+	}
+	return result
 }
 
 func NewAttachedResource(typ string, key string, value string) *AttachedResource {

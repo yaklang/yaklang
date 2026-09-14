@@ -1,0 +1,14 @@
+stable = "你Yak好"
+checksum = 0
+for i := 0; i < 4096; i++ {
+    checksum += int(stable[i % len(stable)])
+}
+assert checksum > 0, "repeated unicode string indexing failed"
+
+// A long-lived frame sees many distinct temporary Values here. Correctness is
+// verified in Yak while the VM unit test enforces the cache's entry/byte bound.
+for i := 0; i < 1024; i++ {
+    value = sprintf("你-%d-好", i)
+    assert value[0] == '你', "unicode first rune changed at %d" % i
+    assert value[-1] == '好', "unicode last rune changed at %d" % i
+}

@@ -1,0 +1,90 @@
+desc(
+	title: "Check C#/.NET Weak PRNG via System.Random"
+	title_zh: "检测 C#/.NET System.Random 弱伪随机"
+	type: audit
+	level: mid
+	language: csharp
+	risk: "weak-randomness"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+计算机是确定性机器，只能用伪随机数生成器（PRNG）近似随机。PRNG 分两类：统计学 PRNG 输出容易预测、可复现；密码学 PRNG 的输出应使攻击者无法与真随机区分。`System.Random` 属于前者，未声明带加密保护的生成器都不应出现在安全路径上。
+2. **触发场景**
+用 `Random.Next()` 生成收据页面“唯一”标识：
+```csharp
+string GenerateReceiptURL(string baseUrl)
+{
+    Random gen = new Random();
+    return baseUrl + gen.Next().ToString() + ".html";
+}
+```
+攻击者很容易猜到后续数值，遍历他人收据。同样危险的用法包括：
+```csharp
+return new Random().Next(1, 100000).ToString(); // 口令盐
+rng.NextBytes(key);                             // 当作加密密钥
+```
+3. **潜在影响**
+- **口令或验证码可猜**：暴力或预测绕过。
+- **密钥可预测**：对称加密被还原。
+- **会话劫持 / DNS 欺骗**：会话标识或挑战值可复现。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 安全场景改用密码学 RNG
+不要用 `System.Random` 生成密钥、盐、令牌、验证码或会话标识。
+```csharp
+byte[] salt = RandomNumberGenerator.GetBytes(16);
+int n = RandomNumberGenerator.GetInt32(1, 100000);
+```
+也可使用 `RandomNumberGenerator.Create()` / `RNGCryptoServiceProvider`。
+#### 2. 种子必须有足够熵
+即使使用密码学 PRNG，也不要用当前时间、进程 ID 等低熵值作唯一种子。`DateTime.Now` 提供的熵过低。
+#### 3. 统计用途可以保留 Random
+模拟、乱序展示等不依赖不可预测性的场景可以使用 `System.Random`；一旦输出进入安全决策，就必须换掉。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-338](https://cwe.mitre.org/data/definitions/338.html)
+[System.Random remarks](https://learn.microsoft.com/dotnet/api/system.random)
+[RandomNumberGenerator](https://learn.microsoft.com/dotnet/api/system.security.cryptography.randomnumbergenerator)
+REFERENCE
+	rule_id: "71d32214-1bff-45ca-a1ec-d9ed351a840c"
+)
+
+Random() as $rng
+$rng.Next as $mid
+$rng.NextBytes as $mid
+Random() as $mid
+
+alert $mid for {
+	title: "C#/.NET System.Random weak PRNG",
+	title_zh: "C#/.NET System.Random 弱伪随机",
+	level: "mid",
+	type: "audit",
+	risk: "weak-randomness",
+	message: "检测到 System.Random，输出可预测，不可用于密钥或令牌。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_rng.cs': <<<UNSAFE
+using System;
+
+public class Token {
+    public int Run() {
+        Random r = new Random();
+        return r.Next();
+    }
+}
+UNSAFE
+	'safefile://safe_rng.cs': <<<SAFE
+using System.Security.Cryptography;
+
+public class Token {
+    public byte[] Run() {
+        return RandomNumberGenerator.GetBytes(16);
+    }
+}
+SAFE
+)

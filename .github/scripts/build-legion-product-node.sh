@@ -88,6 +88,15 @@ fi
 binary_sha="$(sha256sum "$binary" | awk '{print $1}')"
 binary_size="$(stat -c %s "$binary")"
 built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+capabilities_file="$repo_root/.github/scripts/legion-product-node-capabilities.json"
+capabilities_json="$(jq -ce '
+  if type == "array" and length > 0 and
+     all(.[]; type == "string" and length > 0) and
+     . == (sort | unique)
+  then .
+  else error("product-node capability contract must be a sorted unique string array")
+  end
+' "$capabilities_file")" || die "invalid Product Node capability contract: $capabilities_file"
 
 jq -n \
   --arg version "$version" \
@@ -102,6 +111,7 @@ jq -n \
   --arg binary_name "$binary_name" \
   --arg binary_sha "$binary_sha" \
   --argjson binary_size "$binary_size" \
+  --argjson capabilities "$capabilities_json" \
   --arg built_at "$built_at" \
   --arg ci_provider "${GITHUB_ACTIONS:+github-actions}" \
   --arg ci_run_id "${GITHUB_RUN_ID:-local}" \
@@ -133,7 +143,7 @@ jq -n \
       module_go_version: $module_go_version,
       go_version: $go_version
     },
-    capabilities: ["ai.runtime.host.v1", "ai.session.bind_epoch.v1", "ai.session.turn_lifecycle.v1", "hids", "ssa.rule_sync.export", "yak.execute"],
+    capabilities: $capabilities,
     binary: {
       path: $binary_name,
       sha256: $binary_sha,

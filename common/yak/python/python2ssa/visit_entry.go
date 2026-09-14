@@ -29,7 +29,17 @@ func (b *singleFileBuilder) VisitRoot(raw pythonparser.IRootContext) interface{}
 			b.registerPythonFileBuild(fileInput)
 		}
 	} else if singleInput := root.Single_input(); singleInput != nil {
-		b.VisitSingleInput(singleInput)
+		// A one-statement source parses as single_input (adaptive prediction
+		// prefers it over file_input). During the pre-handler pass, defer the
+		// statement like registerPythonFileBuild does for file_input — running
+		// it inline would execute imports before the batch's skeletons have
+		// published their exports (out-of-order binding with no on-demand
+		// fallback available, since PreHandler disables it).
+		if b.PreHandler() {
+			b.registerPythonSingleInputBuild(singleInput)
+		} else {
+			b.VisitSingleInput(singleInput)
+		}
 	} else if evalInput := root.Eval_input(); evalInput != nil {
 		b.VisitEvalInput(evalInput)
 	}
@@ -114,6 +124,57 @@ func (b *singleFileBuilder) registerPythonFileBuild(fileInput pythonparser.IFile
 	if len(capturedStmts) == 0 {
 		return
 	}
+	b.registerCapturedBuild(func(build *singleFileBuilder) {
+		for _, stmt := range capturedStmts {
+			build.VisitStmt(stmt)
+			if build.shouldStopStatementWalk() {
+				return
+			}
+		}
+	})
+}
+
+// registerPythonSingleInputBuild defers a one-statement source parsed as
+// single_input (see registerPythonFileBuild): class/func defs compile as
+// skeletons now, everything else runs in the deferred file build.
+func (b *singleFileBuilder) registerPythonSingleInputBuild(singleInput pythonparser.ISingle_inputContext) {
+	if b == nil || singleInput == nil {
+		return
+	}
+	singleInputCtx, ok := singleInput.(*pythonparser.Single_inputContext)
+	if !ok || singleInputCtx == nil {
+		return
+	}
+	var visitStmt func(build *singleFileBuilder)
+	if simple := singleInputCtx.Simple_stmt(); simple != nil {
+		detached := ssa.DetachAST(simple)
+		visitStmt = func(build *singleFileBuilder) { build.VisitSimpleStmt(detached) }
+	} else if compound := singleInputCtx.Compound_stmt(); compound != nil {
+		if isTopLevelClassOrFuncDefCompound(compound) {
+			// skeleton semantics, same as visitFileInputStmtSkeleton
+			if cfd, ok := compound.(*pythonparser.Class_or_func_def_stmtContext); ok {
+				b.VisitClassOrFuncDefStmt(cfd)
+			}
+			return
+		}
+		detached := ssa.DetachAST(compound)
+		visitStmt = func(build *singleFileBuilder) { build.VisitCompoundStmt(detached) }
+	} else {
+		return
+	}
+	b.registerCapturedBuild(func(build *singleFileBuilder) {
+		visitStmt(build)
+		if build.shouldStopStatementWalk() {
+			return
+		}
+	})
+}
+
+// registerCapturedBuild registers a deferred file build over pre-detached
+// statements: the shared plumbing (path/builder capture, fresh per-file
+// singleFileBuilder) of registerPythonFileBuild and
+// registerPythonSingleInputBuild.
+func (b *singleFileBuilder) registerCapturedBuild(visit func(build *singleFileBuilder)) {
 	prog := b.GetProgram()
 	if prog == nil {
 		return
@@ -131,12 +192,7 @@ func (b *singleFileBuilder) registerPythonFileBuild(fileInput pythonparser.IFile
 			globalNames:     make(map[string]bool),
 		}
 		build.SupportClosure = true
-		for _, stmt := range capturedStmts {
-			build.VisitStmt(stmt)
-			if build.shouldStopStatementWalk() {
-				break
-			}
-		}
+		visit(build)
 	})
 }
 
@@ -145,11 +201,14 @@ func isTopLevelClassOrFuncDefStmt(stmt pythonparser.IStmtContext) bool {
 	if !ok || stmtCtx == nil {
 		return false
 	}
-	compoundStmt := stmtCtx.Compound_stmt()
-	if compoundStmt == nil {
+	return isTopLevelClassOrFuncDefCompound(stmtCtx.Compound_stmt())
+}
+
+func isTopLevelClassOrFuncDefCompound(compound pythonparser.ICompound_stmtContext) bool {
+	if compound == nil {
 		return false
 	}
-	_, ok = compoundStmt.(*pythonparser.Class_or_func_def_stmtContext)
+	_, ok := compound.(*pythonparser.Class_or_func_def_stmtContext)
 	return ok
 }
 

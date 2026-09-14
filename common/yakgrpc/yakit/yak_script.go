@@ -8,7 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/gorm"

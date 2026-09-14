@@ -288,6 +288,7 @@ type Program struct {
 	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
 	deferredBuildTotal int
 	currentCompileUnit string
+	CompileUnits       []*CompileUnit
 
 	//consts
 	Consts map[string]Value
@@ -1131,6 +1132,10 @@ type Call struct {
 	// go function
 	Async  bool
 	Unpack bool
+	// IsNonVirtual marks a call whose callee implementation was selected
+	// explicitly by the frontend (for example C# `base.M()`). Data-flow analysis
+	// must not expand override pointers from that selected function.
+	IsNonVirtual bool
 
 	// caller
 	// caller Value

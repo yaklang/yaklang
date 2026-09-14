@@ -186,6 +186,25 @@ func TestPrepareCreatesUniqueWorkspacesConcurrently(t *testing.T) {
 	}
 }
 
+func TestCleanupForOwnerRemovesSourceScanWorkspaces(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv(WorkDirEnv, root)
+	sourceScan, err := os.MkdirTemp(root, "yakgit-node-a-source-scan-")
+	require.NoError(t, err)
+	compile, err := os.MkdirTemp(root, "yakgit-node-a-task-")
+	require.NoError(t, err)
+	other, err := os.MkdirTemp(root, "yakgit-node-b-source-scan-")
+	require.NoError(t, err)
+
+	require.NoError(t, CleanupForOwner("node-a"))
+	_, err = os.Stat(sourceScan)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(compile)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(other)
+	require.NoError(t, err)
+}
+
 func TestCleanupForOwnerScopeRemovesOnlyThatScanNodeInstallation(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv(WorkDirEnv, root)

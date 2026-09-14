@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -183,12 +185,14 @@ type Config struct {
 	HotPatchBroadcaster *chanx.Broadcaster[ConfigOption]
 	HotPatchOptionChan  *chanx.UnlimitedChan[ConfigOption]
 	StartHotPatchOnce   sync.Once
+	hotPatchLoopWG      sync.WaitGroup
 
 	// output Event Handle
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
 	LegionResultRuntime    LegionResultRuntime
+	reActActionPolicy      ReActActionPolicy
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -293,8 +297,10 @@ type Config struct {
 	TimelineTotalContentLimit int // in tokens
 
 	// triage
-	MemoryTriage MemoryTriage
+	MemoryTriage        MemoryTriage
+	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
 
+	// Deprecated: retained for source compatibility; timeline archives are no longer written or recalled.
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
 	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
@@ -361,8 +367,10 @@ type Config struct {
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
 	DisableEnhanceDirectlyAnswer       bool
 	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
+	AllowSyncInitContext               bool // 首轮同步增强上下文，默认 false；后续按需识别意图
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
+	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -704,6 +712,7 @@ func newConfig(ctx context.Context) *Config {
 		GoalMinIterations:                  DefaultGoalMinIterations,
 		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
+		EnableFunctionCallMode:             true,  // 默认开启原生 functioncall 模式
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
@@ -737,6 +746,12 @@ func newConfig(ctx context.Context) *Config {
 		config.Emitter.SetStreamNodeIdI18nProvider(
 			config.buildStreamNodeIdI18nProvider(),
 		)
+	}
+
+	// Sync EnableFunctionCallMode to KeyValueConfig so that NewReActLoop can
+	// read it via config.GetConfigBool("EnableFunctionCallMode").
+	if config.EnableFunctionCallMode {
+		config.SetConfig("EnableFunctionCallMode", true)
 	}
 
 	return config
@@ -2307,6 +2322,23 @@ func WithNoOpMemoryTriage() ConfigOption {
 	return WithMemoryTriage(NewNoOpMemoryTriage())
 }
 
+// WithDisableMemoryTriage disables the built-in memory triage (intelligent memory
+// processing). When enabled, a no-op MemoryTriage is installed instead of the
+// default AIMemory instance, so no embedding/DB/AI calls are made for memory.
+// This is useful for lightweight or stateless sessions where memory overhead
+// is undesired.
+func WithDisableMemoryTriage(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableMemoryTriage = disable
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithMemoryPoolSize(sz int64) ConfigOption {
 	return func(c *Config) error {
 		if sz < 0 {
@@ -2560,6 +2592,23 @@ func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 	}
 }
 
+// WithAllowSyncInitContext opts into synchronous context enrichment before the
+// default loop's first response. It defaults to false; planning, PE tasks and
+// explicit capability discovery can still enrich context during execution.
+// Memory loading remains asynchronous regardless of this option.
+func WithAllowSyncInitContext(allow bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.AllowSyncInitContext = allow
+		c.m.Unlock()
+		c.SetConfig("AllowSyncInitContext", allow)
+		return nil
+	}
+}
+
 // WithDisableIntentRecognition disables intent recognition in loop_default's buildInitTask.
 // This is primarily used in test environments where the mock AI callback cannot handle
 // the intent recognition sub-loop (loop_intent), which would consume mock responses
@@ -2606,6 +2655,23 @@ func WithDisablePerception(disable bool) ConfigOption {
 		c.DisablePerception = disable
 		c.m.Unlock()
 		c.SetConfig("DisablePerception", disable)
+		return nil
+	}
+}
+
+// WithEnableFunctionCallMode enables native functioncall (tool_calls) mode for
+// ReAct loops created from this config. When enabled, each ReAct loop iteration
+// uses a single "execute_action" tool whose arguments are a complete action
+// protocol JSON, instead of the text-based @action JSON parsing.
+func WithEnableFunctionCallMode(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EnableFunctionCallMode = enable
+		c.m.Unlock()
+		c.SetConfig("EnableFunctionCallMode", enable)
 		return nil
 	}
 }
@@ -3246,6 +3312,9 @@ func WithMemoryTriageId(id string) ConfigOption {
 	}
 }
 
+// WithTimelineArchiveStore retains the legacy option for source compatibility.
+//
+// Deprecated: the store is no longer used by timeline compression or ReAct.
 func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
@@ -3255,6 +3324,7 @@ func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
 	}
 }
 
+// Deprecated: the returned legacy store is not used by the runtime.
 func (c *Config) GetTimelineArchiveStore() TimelineArchiveStore {
 	if c == nil {
 		return nil
@@ -3953,6 +4023,10 @@ func (c *Config) restorePersistentSession() {
 
 	runtime, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(c.GetDB(), c.PersistentSessionId)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Debugf("no runtime found for new persistent session [%s]", c.PersistentSessionId)
+			return
+		}
 		log.Warnf("failed to fetch AI runtime for session [%s]: %v", c.PersistentSessionId, err)
 		return
 	}
@@ -4116,6 +4190,11 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
+
+	// Keep the policy with the shared manager: NewConfig applies this flag
+	// to the manager, so a child default must not reopen parent MCP access.
+	opts = append(opts, WithDisallowMCPServers(i.DisallowMCPServers))
+	opts = append(opts, WithReActActionPolicy(i.reActActionPolicy))
 
 	// Capability managers: child configs reuse parent instances when present.
 	if i.AiToolManager != nil {
@@ -4326,6 +4405,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.DisableIntentRecognition {
 		opts = append(opts, WithDisableIntentRecognition(true))
 	}
+	opts = append(opts, WithAllowSyncInitContext(i.AllowSyncInitContext))
 	if i.SyncPerceptionTrigger {
 		opts = append(opts, WithSyncPerceptionTrigger(true))
 	}
@@ -4333,6 +4413,11 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Propagate perception disable flag so sub-loops inherit the setting.
 	if i.DisablePerception {
 		opts = append(opts, WithDisablePerception(true))
+	}
+
+	// Propagate functioncall mode flag so sub-loops inherit the setting.
+	if i.EnableFunctionCallMode {
+		opts = append(opts, WithEnableFunctionCallMode(true))
 	}
 
 	// once init config flag

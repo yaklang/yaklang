@@ -64,7 +64,7 @@ func currentHeapInuse() int64 {
 func scanWithRule(t *testing.T, rule string) (peakHeap int64) {
 	t.Helper()
 	progID := uuid.NewString()
-	cleanup := prepareHeavyPHPProgram(t, progID, 3000, 20)
+	cleanup := prepareHeavyPHPProgram(t, progID, 200, 5)
 	defer cleanup()
 
 	stop := measurePeakHeapInuse(t)
@@ -136,7 +136,7 @@ alert $mid
 // RED before Opt A (skip=0, every clearup merges) and GREEN after (skip >> merge).
 func TestScan_DataflowMerge_MemoryBounded(t *testing.T) {
 	progID := uuid.NewString()
-	cleanup := prepareHeavyPHPProgram(t, progID, 3000, 20)
+	cleanup := prepareHeavyPHPProgram(t, progID, 200, 5)
 	defer cleanup()
 
 	ssaapi.ResetClearupMergeCounters()

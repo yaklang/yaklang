@@ -315,7 +315,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 					}
 				}
 
-				result := v.CallYakFunction(false, f, vmArgs)
+				result := v.nativeCallbackFrame().CallYakFunction(false, f, vmArgs)
 				outCount := targetType.NumOut()
 				if outCount <= 0 {
 					return nil

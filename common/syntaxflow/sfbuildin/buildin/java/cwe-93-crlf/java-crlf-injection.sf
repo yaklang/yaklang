@@ -4,7 +4,7 @@ desc(
 	cwe: 93
 	type: vuln
 	level: mid
-	risk: "CRLF注入",
+	risk: "crlf-injection"
 	harm_zh: "CRLF（回车换行）注入漏洞允许攻击者通过控制 HTTP 响应头的内容插入额外的响应头或响应体，从而实施 HTTP 响应分割攻击。这可能导致跨站脚本攻击（XSS）、缓存投毒、会话劫持等安全问题。",
 	harm: "CRLF (Carriage Return Line Feed) injection vulnerabilities allow attackers to inject additional HTTP headers or body content by controlling parts of the HTTP response header. This can lead to HTTP response splitting, XSS, cache poisoning, and session hijacking."
 	rule_id: "44cc5217-5e06-4b5a-b726-d41bc725e934"
@@ -110,7 +110,7 @@ if (!userInput.matches("^[a-zA-Z0-9_]+$")) {
 - Oracle JDK/OpenJDK: 建议升级到 JDK 7u171+, 8u161+, 11+ 或更高版本。从这些版本开始，java.net.HttpURLConnection 和相关的HTTP客户端库在设置HTTP头时会默认禁止使用 '\r' 和 '\n' 字符，从而在底层防止此类注入。
 - 较早的Java版本（如Java 6及更早版本）已停止官方支持，强烈建议升级。
 SOLUTION
-	risk: "CRLF注入",
+	risk: "crlf-injection",
 }
 
 desc(

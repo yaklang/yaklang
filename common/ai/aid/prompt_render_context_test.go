@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -166,7 +167,7 @@ func TestGenerateDeepThinkPlanPrompt_UsesTaskLocalGoal(t *testing.T) {
 	prompt, err := fixture.taskA.GenerateDeepThinkPlanPrompt("go deeper")
 	require.NoError(t, err)
 
-	currentTask := aicommon.MustExtractAITagBlock(t, prompt, "CURRENT_TASK").Body
+	currentTask := aicommon_testutil.MustExtractAITagBlock(t, prompt, "CURRENT_TASK").Body
 	require.Contains(t, currentTask, "input-from-task-A")
 	require.NotContains(t, currentTask, "input-from-task-B")
 }

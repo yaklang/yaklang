@@ -116,6 +116,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.ChatBaseThinkingOptions(g.Config, g.TargetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.Config),
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
+		aispec.WithChatBase_ToolCallArgumentsStreamHandler(g.Config.ToolCallArgumentsStreamHandler),
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.Config.RawHTTPResponseHeaderCallback),

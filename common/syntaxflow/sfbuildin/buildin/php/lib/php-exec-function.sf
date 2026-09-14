@@ -114,7 +114,7 @@ DESC
 	level: "info",
 	name: "output",
 	message: "检测到PHP代码中使用了可能导致远程命令执行（RCE）的危险函数，且未对输入数据进行验证或转义。",
-	risk: "远程命令执行",
+	risk: "command-execution",
 }
 desc(
 	lang: php

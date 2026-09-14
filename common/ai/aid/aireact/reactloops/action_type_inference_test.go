@@ -3,10 +3,14 @@ package reactloops
 import (
 	"context"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func parseActionForInference(t *testing.T, raw string) *aicommon.Action {
@@ -31,6 +35,88 @@ func TestInferActionTypeFromPayload_UsesPlanPayloadWhenTypeMissing(t *testing.T)
 func TestInferActionTypeFromPayload_UsesFinalAnswerTagAsFallback(t *testing.T) {
 	action := aicommon.NewSimpleAction("", nil)
 	require.Equal(t, "directly_answer", inferActionTypeFromPayload(action, "## final answer"))
+}
+
+func TestInferActionTypeFromPayload_DoesNotPromoteNestedType(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"plain_action", `{"action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
+		{"missing_action", `{"directly_call_tool_calls":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
+		{"object_action", `{"@action":"object","directly_call_tool_calls":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
+		{"nested_only", `{"params":{"type":"A","next_action":{"type":"finish"}}}`, ""},
+		{"legacy_type", `{"params":{"type":"A"},"type":"require_tool"}`, "require_tool"},
+		{"legacy_next_action", `{"next_action":{"params":{"type":"A"},"type":"require_tool"}}`, "require_tool"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			action, err := aicommon.ExtractActionFromStream(context.Background(), strings.NewReader(test.raw), "object",
+				aicommon.WithActionAlias("directly_call_tool", "require_tool"))
+			require.NoError(t, err)
+			require.NoError(t, action.WaitParseResult(context.Background()))
+			require.Equal(t, test.want, inferActionTypeFromPayload(action, ""))
+		})
+	}
+}
+
+func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
+	for _, actionName := range []string{"directly_call_tool", "unsupported"} {
+		for _, functionCall := range []bool{false, true} {
+			mode := "text"
+			if functionCall {
+				mode = "functioncall"
+			}
+			t.Run(actionName+"/"+mode, func(t *testing.T) {
+				baseConfig := mock.NewMockedAIConfig(context.Background()).(*mock.MockedAIConfig)
+				baseConfig.SetConfig("AiTransactionAutoRetry", 1)
+				var calls, verifications atomic.Int32
+				config := &fcTestConfig{
+					MockedAIConfig: baseConfig,
+					aiCallback: func(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
+						calls.Add(1)
+						resp := aicommon.NewAIResponse(baseConfig)
+						resp.EmitOutputStream(strings.NewReader(`{"action":"` + actionName + `","identifier":"initial_recon",
+							"directly_call_tool_calls":[
+								{"tool_name":"dig","params":{"domain":"example.invalid","type":"A"}},
+								{"tool_name":"dig","params":{"domain":"example.invalid","type":"CNAME"}}
+							]}`))
+						resp.Close()
+						return resp, nil
+					},
+				}
+				invoker := mock.NewMockInvoker(context.Background())
+				invoker.SetConfig(config)
+				loop := NewMinimalReActLoop(config, invoker)
+				loop.functionCallMode = functionCall
+				loop.actions = omap.NewEmptyOrderedMap[string, *LoopAction]()
+				loop.actions.Set("directly_call_tool", &LoopAction{
+					ActionType: "directly_call_tool",
+					ActionVerifier: func(_ *ReActLoop, action *aicommon.Action) error {
+						verifications.Add(1)
+						batch, exists, err := action.GetCanonicalObjectArray("directly_call_tool_calls")
+						require.NoError(t, err)
+						require.True(t, exists)
+						require.Len(t, batch, 2)
+						require.Equal(t, "A", batch[0].GetObject("params").GetString("type"))
+						require.Equal(t, "CNAME", batch[1].GetObject("params").GetString("type"))
+						return nil
+					},
+				})
+				action, handler, err := loop.callAITransaction(&sync.WaitGroup{}, "test prompt", "nonce", nil)
+				require.EqualValues(t, 1, calls.Load())
+				if actionName == "unsupported" {
+					require.ErrorContains(t, err, `requested="unsupported"`)
+					require.Zero(t, verifications.Load(), "an explicit unknown alias must not trigger legacy inference")
+					return
+				}
+				require.NoError(t, err)
+				require.EqualValues(t, 1, verifications.Load())
+				require.Equal(t, "directly_call_tool", action.ActionType())
+				require.Equal(t, "directly_call_tool", handler.ActionType)
+			})
+		}
+	}
 }
 
 func TestActionTypeResolutionError_ExplainsRequestedAvailableAndReason(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -82,6 +83,9 @@ func (s *SSARisk) CalcHash() string {
 }
 
 func SSARiskTypeVerbose(s string) string {
+	if definition, ok := sfrisk.Lookup(s); ok {
+		return definition.DisplayName
+	}
 	switch s {
 	case "cwe":
 		return "CWE"

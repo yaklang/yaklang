@@ -44,28 +44,16 @@ message PluginSyncFailed {
   google.protobuf.Timestamp observed_at = 5;
 }
 
-message ListPluginGroupsCommand {
-  legion.node.v1.CommandMetadata metadata = 1;
-  string target_node_id = 2;
-}
-
-message PluginGroupInfo {
-  string group = 1;
-  int32 total = 2;
-  int32 compatible_total = 3;
-}
-
-message PluginGroupScript {
-  string group = 1;
-  string script_name = 2;
-  string script_type = 3;
-}
-
-message ListPluginGroupsResult {
-  repeated PluginGroupInfo groups = 1;
-  repeated PluginGroupScript scripts = 2;
-  string error_code = 3;
-  string error_message = 4;
+// PluginBundleRef identifies one immutable, content-addressed collection of
+// plugin releases. The bundle ID is the catalog identity; artifact_sha256 pins
+// the exact ZIP bytes a job or node must use.
+message PluginBundleRef {
+  string bundle_id = 1;
+  string artifact_sha256 = 2;
+  string archive_format = 3;
+  string schema_version = 4;
+  int32 item_count = 5;
+  int64 artifact_size_bytes = 6;
 }
 
 message SyncPluginStoreCommand {

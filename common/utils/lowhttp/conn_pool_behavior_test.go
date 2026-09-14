@@ -927,7 +927,10 @@ func TestConnPool_H1_RequestContextCancelClosesUpstream(t *testing.T) {
 	// Build an SSE-like server: send the headers + one chunk, flush, then hold
 	// the connection open until the client side closes it.
 	serverClosed := make(chan struct{})
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	serverReady := make(chan struct{})
+	serverCtx, stopServer := context.WithCancel(context.Background())
+	defer stopServer()
+	host, port := utils.DebugMockHTTPHandlerFuncContext(serverCtx, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		flusher, _ := w.(http.Flusher)
@@ -935,6 +938,7 @@ func TestConnPool_H1_RequestContextCancelClosesUpstream(t *testing.T) {
 		if flusher != nil {
 			flusher.Flush()
 		}
+		close(serverReady)
 		// Block until the underlying connection is torn down by the cancel.
 		// r.Context() is done when the client disconnects.
 		<-r.Context().Done()
@@ -970,13 +974,19 @@ func TestConnPool_H1_RequestContextCancelClosesUpstream(t *testing.T) {
 		requestDone <- err
 	}()
 
-	// Give the upstream a moment to start streaming, then cancel.
-	time.Sleep(300 * time.Millisecond)
+	// Cancel only after the upstream is streaming, independent of runner speed.
+	select {
+	case <-serverReady:
+	case <-time.After(3 * time.Second):
+		t.Fatal("upstream did not start streaming")
+	}
 	cancel()
 
 	select {
-	case <-requestDone:
-		// The request must return (with an error) promptly after cancel.
+	case err := <-requestDone:
+		if err == nil {
+			t.Fatal("canceled streaming request returned success")
+		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("streaming request did not return after per-request context cancel")
 	}
@@ -989,9 +999,11 @@ func TestConnPool_H1_RequestContextCancelClosesUpstream(t *testing.T) {
 		t.Fatal("server did not observe upstream connection close after cancel")
 	}
 
-	// No persistConn goroutines should remain stuck in readLoop/writeLoop.
-	if c := countPersistConnGoroutines(); c != 0 {
-		t.Fatalf("expected 0 persistConn goroutines after cancel, got %d\n%s", c, dumpAllGoroutines())
+	// Socket closure wakes the read/write loops asynchronously. Verify they
+	// actually exit within the same bounded teardown budget, rather than racing
+	// their last instructions immediately after the server observes EOF.
+	if !waitCondition(func() bool { return countPersistConnGoroutines() == 0 }, 10*time.Millisecond, 3*time.Second) {
+		t.Fatalf("persistConn goroutines did not exit after cancel\n%s", dumpAllGoroutines())
 	}
 	checker.Check()
 }

@@ -578,7 +578,10 @@ func readCapability(r io.Reader) (Capability, error) {
 		return nil, err
 	}
 	if int(capLen)-4 <= 0 {
-		return nil, err
+		// 空 capability（如 CAPSTYPE_SOUND 常以 len=4 出现）。
+		// 必须返回非 nil 错误：历史上此处返回 (nil, nil)，调用方
+		// 把 nil Capability 追加进列表，后续 caps.Type() nil 接口调用 panic。
+		return nil, fmt.Errorf("empty capability set 0x%04x", capType)
 	}
 
 	capBytes, err := core.ReadBytes(int(capLen)-4, r)

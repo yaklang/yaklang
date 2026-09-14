@@ -65,7 +65,7 @@ func PKCS7UnPaddingFor8ByteBlock(src []byte) []byte {
 }
 
 func FixIV(iv, key []byte, blockSize int) []byte {
-	if iv == nil && len(key) >= blockSize { // iv is nil, use key as iv
+	if len(iv) == 0 && len(key) >= blockSize { // iv is empty, use key as iv
 		iv = key[:blockSize]
 	}
 	if len(iv) > blockSize { // iv is too long, truncate it

@@ -29,7 +29,9 @@
 |`htmlhexenc`|`htmlhex, htmlhexencode, htmlhexescape`|HTML 十六进制实体编码，{{htmlhexenc(abc)}} => &#x61;&#x62;&#x63;|
 |`ico`|  |生成一个 ico 文件头，例如 `{{ico}}`|
 |`int`|`port, ports, integer, i, p`|生成一个整数以及范围，例如 {{int(1,2,3,4,5)}} 生成 1,2,3,4,5 中的一个整数，也可以使用 {{int(1-5)}} 生成 1-5 的整数，也可以使用 `{{int(1-5&#124;4)}}` 生成 1-5 的整数，但是每个整数都是 4 位数，例如 0001, 0002, 0003, 0004, 0005|
-|`jpg`|`jpeg`|生成 jpeg / jpg 文件头|
+|`jpg`|`jpeg`|生成 jpeg / jpg 文件头：`{{jpg()}}` 生成 JFIF 和 Exif 两个变体；`{{jpg:jfif(数据)}}` 只生成 JFIF，`{{jpg:exif(数据)}}` 只生成 Exif|
+|`jpg:jfif`|`jpeg:jfif`|生成 JFIF 文件头，数据可选，例如 `{{jpg:jfif(数据)}}`|
+|`jpg:exif`|`jpeg:exif`|生成 Exif 文件头，数据可选，例如 `{{jpg:exif(数据)}}`|
 |`lower`|  |把传入的内容都设置成小写 {{lower(Abc)}} => abc|
 |`md5`|  |进行 md5 编码，{{md5(abc)}} => 900150983cd24fb0d6963f7d28e17f72|
 |`network`|`host, hosts, cidr, ip, net`|生成一个网络地址，例如 `{{network(192.168.1.1/24)}}` 对应 cidr 192.168.1.1/24 所有地址，可以逗号分隔，例如 `{{network(8.8.8.8,192.168.1.1/25,example.com)}}`|
@@ -56,7 +58,9 @@
 |`sha384`|  ||
 |`sha512`|  |进行 sha512 编码，{{sha512(abc)}} => ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f|
 |`sm3`|  |计算 sm3 哈希值，{{sm3(abc)}} => 66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a3f0b8ddb27d8a7eb3|
-|`tiff`|  |生成一个 tiff 文件头，例如 `{{tiff}}`|
+|`tiff`|  |生成一个 tiff 文件头：`{{tiff()}}` 生成大端 MM 和小端 II 两个变体；`{{tiff:mm()}}` 只生成 MM，`{{tiff:ii()}}` 只生成 II|
+|`tiff:mm`|  |生成大端序 tiff 文件头，例如 `{{tiff:mm()}}`|
+|`tiff:ii`|  |生成小端序 tiff 文件头，例如 `{{tiff:ii()}}`|
 |`timestamp`|  |生成一个时间戳，默认单位为秒，可指定单位：s, ms, ns: {{timestamp(s)}}|
 |`trim`|  |去除字符串两边的空格，一般配合其他 tag 使用，如：{{trim({{x(dict)}})}}|
 |`unquote`|  |把内容进行 strconv.Unquote 转化|

@@ -159,7 +159,7 @@ if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(name) {
 w.Write([]byte("This is a static content page."))
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则描述
 #### 1. **规则目的**

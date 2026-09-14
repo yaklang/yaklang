@@ -52,9 +52,13 @@ func main() {
 			Name:  "root-path,r",
 			Usage: "include root directory name in archive paths (e.g., static/a.png instead of a.png)",
 		},
-		cli.StringFlag{
+		cli.StringSliceFlag{
 			Name:  "source,s",
-			Value: "static",
+			Usage: "source dir to pack, can be given multiple times to merge into a single archive",
+		},
+		cli.StringFlag{
+			Name:  "base,b",
+			Usage: "reference dir used to compute archive paths when packing multiple sources (entries are stored relative to it)",
 		},
 		cli.StringFlag{
 			Name: "gz",
@@ -63,21 +67,37 @@ func main() {
 			Name:  "include-targz",
 			Usage: "include *.tar.gz files from source (default: excluded to avoid packaging nested archives)",
 		},
+		cli.StringFlag{
+			Name:  "xor-key",
+			Usage: "if set, XOR-encode the output tar.gz with this key",
+		},
 	}
 	app.Action = func(c *cli.Context) {
-		sourceDir := c.String("source")
+		sources := c.StringSlice("source")
+		if len(sources) == 0 {
+			sources = []string{"static"}
+		}
+		baseDir := c.String("base")
 		gzName := c.String("gz")
 		withRootPath := c.Bool("root-path")
 		includeTarGz := c.Bool("include-targz")
+		xorKey := c.String("xor-key")
 		if gzName == "" {
-			gzName = fmt.Sprintf("%s.tar.gz", sourceDir)
+			gzName = fmt.Sprintf("%s.tar.gz", sources[0])
 		}
-		err := targz(sourceDir, gzName, withRootPath, includeTarGz)
+		err := targz(sources, baseDir, gzName, withRootPath, includeTarGz)
 		if err != nil {
 			log.Error(err)
+			return
+		}
+		if xorKey != "" {
+			if err := xorEncodeFile(gzName, []byte(xorKey)); err != nil {
+				log.Error(err)
+				return
+			}
 		}
 		if !c.Bool("no-embed") {
-			writeEmbedFile(c.IsSet("cache"), sourceDir, gzName)
+			writeEmbedFile(c.IsSet("cache"), strings.Join(sources, " "), gzName)
 			log.Infof("generate embed file and compress file success, compress file name: %s", gzName)
 		} else {
 			log.Infof("generate compress file success (skip embed file), compress file name: %s", gzName)
@@ -87,6 +107,18 @@ func main() {
 	if err != nil {
 		log.Error(err)
 	}
+}
+
+func xorEncodeFile(path string, key []byte) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	encoded := make([]byte, len(raw))
+	for i, b := range raw {
+		encoded[i] = b ^ key[i%len(key)]
+	}
+	return os.WriteFile(path, encoded, 0o644)
 }
 func writeEmbedFile(cache bool, sourceDir string, gzName string) {
 	dir, _ := os.Getwd()
@@ -101,10 +133,18 @@ func writeEmbedFile(cache bool, sourceDir string, gzName string) {
 	}))
 	os.WriteFile("embed.go", []byte(code), 0644)
 }
-func targz(path string, gzName string, withRootPath bool, includeTarGz bool) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return err
+
+// targz 把若干个源目录合并打包成一个 tar.gz。
+// baseDir 为空时沿用单目录语义：withRootPath 决定条目是否包含源目录名；
+// baseDir 非空时（多源打包），条目路径相对 baseDir 计算，例如
+// --base . --source ./behinder/static 会得到 behinder/static/CmdGo.php。
+func targz(sources []string, baseDir string, gzName string, withRootPath bool, includeTarGz bool) error {
+	for _, source := range sources {
+		if _, err := os.Stat(source); os.IsNotExist(err) {
+			return err
+		}
 	}
+
 	// 读取文件或目录
 	outFile, err := os.Create(gzName)
 	if err != nil {
@@ -123,9 +163,14 @@ func targz(path string, gzName string, withRootPath bool, includeTarGz bool) err
 	// 如果开启 withRootPath，使用父目录作为基准，这样相对路径会包含根目录名称
 	// 例如：path="static", withRootPath=true -> relBase=filepath.Dir("static")="."
 	// 这样 static/a.png 相对于 "." 的路径就是 "static/a.png"
-	relBase := path
-	if withRootPath {
-		relBase = filepath.Dir(path)
+	resolveRelBase := func(path string) string {
+		if baseDir != "" {
+			return baseDir
+		}
+		if withRootPath {
+			return filepath.Dir(path)
+		}
+		return path
 	}
 
 	gzAbs := gzName
@@ -136,15 +181,17 @@ func targz(path string, gzName string, withRootPath bool, includeTarGz bool) err
 	gzInfo, _ := os.Stat(gzAbs)
 
 	// 递归地添加文件夹内容到 tar 归档
-	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
+	for _, source := range sources {
+		relBase := resolveRelBase(source)
+		err = filepath.Walk(source, func(filePath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			return addFileToTarWriter(filePath, info, relBase, tarWriter, gzAbs, gzInfo, includeTarGz)
+		})
 		if err != nil {
 			return err
 		}
-		return addFileToTarWriter(filePath, info, relBase, tarWriter, gzAbs, gzInfo, includeTarGz)
-	})
-
-	if err != nil {
-		return err
 	}
 	return nil
 }

@@ -6,7 +6,7 @@ ReAct 主循环依靠确定性的运行时信号维持长链路稳定，不再�
 |------|------------|------------------|
 | Perception | 按需刷新环境和任务态势 | 仅在既有感知流程需要时 |
 | Verification Gate | 控制用户满意度验证频率 | 仅在验证门放行时 |
-| Finished TODO Checkpoint | 结束前检查遗漏和无痕关闭 | 否，复用下一轮主循环 |
+| Finished TODO Checkpoint | 拦截仍有开放 TODO 的结束请求 | 否，复用下一轮主循环 |
 | CURRENT TODO Checkpoint | 长时间聚焦同一事项时克制地校正路径 | 否，复用下一轮主循环 |
 
 ## 8.1 Perception
@@ -21,13 +21,15 @@ Perception 负责形成当前任务的结构化态势。普通反馈仍通过 ti
 
 ## 8.3 Finished TODO 软检查点
 
-模型第一次选择 `finish` 时，主循环不退出，而是为下一轮排队：
+只有模型选择 `finish` 且当前 task scope 仍有开放 TODO 时，主循环继续，并为下一轮排队简短提示：
 
 ```text
-[SOFT TODO CHECKPOINT]
+[FINISH BLOCKED BY TODO]
 ```
 
-模型可继续工作，也可在处理开放 TODO 后再次选择 `finish`。第二次结束请求仍有开放 TODO 时会被拒绝，但不会重复注入同一个 checkpoint。若模型改选非 `finish` action，本次结束流程重置。
+提示要求推进具体未完成项，不能为结束而清空 TODO。重复 `finish` 不会绕过开放 TODO；当前任务无开放 TODO 时，首次请求即可结束，不再要求固定的确认次数。阶段性 `directly_answer` 不触发这个检查点。提示注入前会重新核对任务作用域和开放 TODO，丢弃已失效的检查点。
+
+默认关闭耗时同步初始化时仍执行本地问候识别。简单问候交付答复后，若本轮无有效 `todo_delta` 且当前任务没有 TODO 历史，宿主直接结束；同任务已有开放或关闭历史时仍走普通 finish 流程。
 
 Goal mode 的最小迭代门禁优先于 Finished checkpoint。
 

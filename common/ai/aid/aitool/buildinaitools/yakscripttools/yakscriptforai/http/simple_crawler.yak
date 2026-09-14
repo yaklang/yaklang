@@ -1,4 +1,4 @@
-__DESC__ = "不执行 JavaScript 的轻量级爬虫，用于有界发现服务端可见 URL。单 URL 状态、响应头或正文优先直接 HTTP 请求；需要站点覆盖时再使用本工具。输出会识别疑似 SPA/重型 JS 页面并给出浏览器或 JS 资产分析建议，避免机械加深爬取。"
+__DESC__ = "不执行站点 JavaScript、无需浏览器的轻量级爬虫，用于有界发现服务端可见 URL 与前端请求面。默认 ai-js=auto：下载站点引用的 JavaScript，先以本地证据决定是否需要 AI，再对命中的有限代码窗口做静态分析；不会运行站点脚本、点击控件或观察浏览器运行时流量。单 URL 状态、响应头或正文优先直接 HTTP 请求；需要站点覆盖时再使用本工具。"
 __VERBOSE_NAME__ = "Crawler"
 __VERBOSE_NAME_ZH__ = "爬虫"
 __KEYWORDS__ = "爬虫,网络抓取,网页采集,http请求,http响应,无头爬虫,数据抓取,轻量级爬虫"
@@ -8,38 +8,69 @@ Simple Crawler Tool - Parameter Description for JSON Tool Calls
 
 This crawler is tuned to get results quickly: it minimizes retries and can
 automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
-It does NOT execute JavaScript. Use it for bounded multi-page discovery from
-server-visible HTML, not merely because the user supplied a URL. For one known
-URL's status, headers, body, or redirect, use one direct HTTP request first.
+It does NOT execute site JavaScript and does not launch a browser. By default,
+ai-js=auto downloads referenced JavaScript and uses bounded, browser-independent
+static analysis: local evidence decides whether a small set of code windows needs
+AI assistance. This can discover request candidates, but it cannot observe a
+rendered DOM, clicks, XHR/fetch traffic, or other browser runtime behavior.
+Use it for bounded multi-page discovery, not merely because the user supplied a
+URL. For one known URL's status, headers, body, or redirect, use one direct HTTP
+request first.
 
 Output includes:
-  1. Crawl summary (requests made, total URLs discovered, pending URLs)
+  1. Crawl summary (logical URL visits, total URLs discovered, pending URLs)
   2. Requested URLs with HTTP method, response status, content type, body size,
      and redirect location when available.
   3. Found URLs discovered in responses but NOT yet requested.
   4. A bounded rendering assessment for likely SPA / JavaScript-heavy shells.
-  5. Follow-up guidance that either deepens useful server-visible coverage or
-     switches to rendered DOM / JavaScript analysis.
+  5. Browser-independent, adaptive static analysis of referenced JavaScript when
+     ai-js is enabled. Structured method/header/body request surfaces are shown
+     separately; unsafe operations are never executed automatically.
+  6. Follow-up guidance that either deepens useful server-visible coverage or
+     switches to rendered DOM / a complete auditable JavaScript artifact workflow.
 
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
                             using comma-separated format.
 
 Optional Parameters:
-  reqs-max        (int)     Maximum number of outbound HTTP requests allowed.
-                            Default: 300. The crawler discovers many more URLs than
-                            it requests; unrequested discoveries appear under Found URLs.
+  reqs-max        (int)     Maximum number of logical crawler requests / URL visits.
+                            Default: 300. Transport retries and HTTPS-to-HTTP fallback
+                            may create additional physical network attempts. The crawler
+                            discovers many more URLs than it visits; unrequested
+                            discoveries appear under Found URLs.
   max-retry       (int)     Maximum retry count per request. Default: 1.
   forbid-for-parent-path (string)  Whether to forbid crawling parent paths.
                             Accepted values: "yes"/"no". Default: "no".
                             Tip: Keep default "no" for better coverage. Only set
                             "yes" when crawling a specific subdirectory.
   user-agent      (string)  Custom User-Agent header for crawler requests.
-  urls-max        (int)     Maximum number of unique URLs to visit.
+  urls-max        (int)     Unique newly discovered URL budget, including
+                            out-of-scope candidates. Seed URLs are free; overflow
+                            URLs are neither reported nor scheduled. Default: 10000.
   max-depth       (int)     Crawl depth limit from the start URL. Default: 5.
   timeout         (int)     Per-request timeout in seconds. Default: 10.
   https-fallback  (bool)    Whether to retry with HTTP when an HTTPS crawl yields
                             no results. Default: true.
+  scope-domains   (string)  Optional comma-separated hostname/glob allowlist, for
+                            example "*.redhaze.top,redhaze.top". Default: empty,
+                            so only the exact seed hostname(s) are crawled. This is
+                            an explicit authorization boundary; it is never
+                            inferred from a shared registrable domain.
+  ai-js           (string)  Browser-independent JavaScript static-analysis mode.
+                            Accepted values: "auto"/"yes"/"no". Default: "auto".
+                            "auto" uses a low-cost 3-call budget; explicit "yes"
+                            uses a deeper 8-call budget; "no" disables analysis.
+  ai-js-max-requests (int)  Optional explicit AI-call budget override (1..20).
+                            It does not change the logical crawler-request budget.
+
+The auto (3) and yes (8) defaults are budgeted coverage profiles, not a claim of
+complete extraction. The deterministic layered local fixture uses ai-js=yes with
+ai-js-max-requests=16 so every expected source can reach its context-scoped mock.
+That CI result measures pipeline coverage; it does not measure model accuracy.
+urls-max governs URL-candidate reporting and scheduling. Structured JavaScript
+request-shape evidence is bounded independently (64 findings per analyzed asset,
+plus the crawler-wide AI-call budget) and is never automatically executed.
 
 Scenario Guidance:
   - One known URL, exact response: use one direct HTTP request; do not crawl
@@ -50,25 +81,62 @@ Scenario Guidance:
   - Deep crawl large site:  set reqs-max=1000, max-depth=8
   - Quick surface check:    set reqs-max=50, max-depth=2
   - Single directory only:  set forbid-for-parent-path=yes
+  - Server-visible only:    set ai-js=no
+  - SPA/API request surface: keep ai-js=auto; browser execution is not required
+  - Deep authorized JS chain: set ai-js=yes and scope-domains explicitly when
+    related application domains are in scope
 USAGE_BLOCK
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))
-reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"), cli.setDefault(300))
+reqsLimit := cli.Int("reqs-max", cli.setHelp("最多处理多少个逻辑爬虫请求 / URL 访问？传输层重试与 HTTPS 回退不单独计数"), cli.setDefault(300))
 maxRetry := cli.Int("max-retry", cli.setHelp("单个请求最多重试多少次？"), cli.setDefault(1))
 noParent := cli.String("forbid-for-parent-path", cli.setHelp("禁止访问父目录，使用[yes/no]来控制"))
 ua = cli.String("user-agent", cli.setHelp("手动设置User-Agent"))
-maxUrls = cli.Int("urls-max", cli.setHelp("最多访问多少URL？"))
+maxUrls = cli.Int("urls-max", cli.setHelp("唯一新发现 URL 配额（包含不调度的越界候选）；种子 URL 不占配额，超限后不回调也不调度，默认 10000"))
 maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(5))
 timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
 httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
+scopeDomainsRaw := cli.String("scope-domains", cli.setHelp("显式允许爬取的逗号分隔 hostname 或 glob；默认仅起始 hostname"))
+aiJSModeRaw := cli.String("ai-js", cli.setHelp("浏览器无关的 JavaScript 静态分析模式: auto/yes/no"), cli.setDefault("auto"))
+aiJSMaxRequestsRaw := cli.Int("ai-js-max-requests", cli.setHelp("AI 分析调用预算覆盖值（1..20）"))
 cli.check()
+
+aiJSMode = str.ToLower(str.TrimSpace(aiJSModeRaw))
+if aiJSMode == "" {
+    aiJSMode = "auto"
+}
+if !(aiJSMode in ["auto", "yes", "y", "true", "on", "no", "n", "false", "off"]) {
+    die("invalid ai-js mode: expected auto/yes/no")
+}
+enableAdaptiveAIJS = aiJSMode in ["auto", "yes", "y", "true", "on"]
+if aiJSMaxRequestsRaw < 0 || aiJSMaxRequestsRaw > 20 {
+    die("invalid ai-js-max-requests: expected 0 (default) or 1..20")
+}
+aiJSRequestBudget = 0
+if enableAdaptiveAIJS {
+    aiJSRequestBudget = 3
+    if aiJSMode in ["yes", "y", "true", "on"] {
+        aiJSRequestBudget = 8
+    }
+    if aiJSMaxRequestsRaw > 0 {
+        aiJSRequestBudget = aiJSMaxRequestsRaw
+    }
+}
 
 discoveredUrls = sync.NewLock()
 discoveredUrlSet = {}
 discoveredUrlList = []
 requestedUrlSet = {}
+requestSurfaces = sync.NewLock()
+requestSurfaceSet = {}
+requestSurfaceLines = []
 
-normalizeDisplayUrl = func(rawUrl) {
+// Raw, fragmentless URLs are the crawler's identity. Never use a redacted URL
+// for requests, deduplication, or pending counts: different credential-bearing
+// URLs may represent different authorized resources even though their display
+// forms are intentionally identical.
+normalizeRawUrl = func(rawUrl) {
+    rawUrl = str.TrimSpace(rawUrl)
     sharpIndex = str.Index(rawUrl, "#")
     if sharpIndex >= 0 {
         return rawUrl[:sharpIndex]
@@ -76,7 +144,56 @@ normalizeDisplayUrl = func(rawUrl) {
     return rawUrl
 }
 
-opts = []
+displayUrl = func(rawUrl) {
+    return crawler.redactURLForDisplay(normalizeRawUrl(rawUrl))
+}
+
+// The CLI accepts comma-separated seeds. Sanitize each seed independently so
+// one harmless query cannot cause credentials in a later seed to be treated as
+// part of its value and echoed by an error/fallback message.
+displayUrlList = func(rawUrls) {
+    displayed = []
+    for rawUrl in str.Split(rawUrls, ",") {
+        displayed.Append(displayUrl(rawUrl))
+    }
+    return str.Join(displayed, ",")
+}
+
+// AI-backed Yak tools receive their parent context through injected params.
+// Reading it with getParam keeps direct/non-AID execution compatible while
+// allowing cancellation, deadlines, and context-scoped AI mocks to propagate
+// through crawler.context.
+crawlerCtx = context.Background()
+injectedCtx = getParam("CTX")
+if injectedCtx != nil && injectedCtx != undefined && injectedCtx != "" {
+    crawlerCtx = injectedCtx
+}
+
+opts = [crawler.context(crawlerCtx)]
+// This tool owns fallback at the whole-crawl level through targetCandidates:
+// only an HTTPS run with no results may start a second HTTP crawl. Disable the
+// core per-request fallback to avoid hidden transport downgrades, duplicate
+// attempts, and incorrect usedFallback attribution.
+opts.Append(crawler.httpsToHttpFallback(false))
+// Avoid synthetic www variants. The public Go crawler retains its historical
+// default; this AID tool reports only hostnames the caller actually supplied.
+opts.Append(crawler.exactOrigins(true))
+scopeDomainList = []
+for rawDomain in str.Split(scopeDomainsRaw, ",") {
+    domain = str.TrimSpace(rawDomain)
+    if domain == "" {
+        continue
+    }
+    if str.Contains(domain, "://") || str.Contains(domain, "/") || str.Contains(domain, "\r") || str.Contains(domain, "\n") {
+        die("invalid scope-domains entry: expected a hostname or glob without scheme/path")
+    }
+    safeDomain = crawler.safeDisplayText(domain)
+    if safeDomain != domain {
+        die("invalid scope-domains entry: control characters and oversized patterns are forbidden")
+    }
+    scopeDomainList.Append(safeDomain)
+    opts.Append(crawler.domainIncludeExact(domain))
+}
 if reqsLimit > 0 {
     opts.Append(crawler.maxRequest(reqsLimit))
 }
@@ -98,9 +215,27 @@ if maxDepth > 0 {
 if timeoutSecond > 0 {
     opts.Append(crawler.connectTimeout(timeoutSecond))
 }
+if enableAdaptiveAIJS {
+    // This is deliberately bounded and browser-independent. The crawler may
+    // download referenced scripts and inspect evidence windows, but never runs
+    // site JavaScript. A single crawler run shares the AI request budget.
+    opts.Append(crawler.aiJSExtract(
+        crawler.aiJSAdaptive(true),
+        crawler.aiJSTriggerThreshold(3),
+        crawler.aiJSMaxRequests(aiJSRequestBudget),
+        crawler.aiJSMaxCandidates(96),
+        crawler.aiJSMaxCandidateBytes(192 * 1024),
+        crawler.aiJSContextBytes(512),
+        crawler.aiJSConcurrency(1),
+        crawler.aiJSMaxTokens(12 * 1024),
+        crawler.aiJSChunkBytes(48 * 1024),
+        crawler.aiJSSmallInputBytes(0),
+        crawler.aiJSSmallInputTokens(0),
+    ))
+}
 
 opts.Append(crawler.onUrlFound(func(urlStr) {
-    urlStr = normalizeDisplayUrl(urlStr)
+    urlStr = normalizeRawUrl(urlStr)
     if urlStr == "" {
         return
     }
@@ -111,6 +246,62 @@ opts.Append(crawler.onUrlFound(func(urlStr) {
     }
     discoveredUrlSet[urlStr] = true
     discoveredUrlList.Append(urlStr)
+}))
+
+opts.Append(crawler.onAIJSRequestFound(func(finding) {
+    method = str.ToUpper(str.TrimSpace(finding.Method))
+    if method == "" {
+        method = "GET"
+    }
+    rawTarget = normalizeRawUrl(str.TrimSpace(finding.URL))
+    if rawTarget == "" {
+        return
+    }
+    displayTarget = displayUrl(rawTarget)
+
+    headerKeys = []
+    for key, _ = range finding.Headers {
+        headerKeys.Append(key)
+    }
+    x.Sort(headerKeys, func(i, j) {
+        return str.ToLower(headerKeys[i]) < str.ToLower(headerKeys[j])
+    })
+    headerParts = []
+    for key in headerKeys {
+        headerParts.Append(sprintf("%v: %v", key, finding.Headers[key]))
+    }
+    headersText = str.Join(headerParts, "; ")
+    bodyText = str.TrimSpace(finding.Body)
+    sourceText = displayUrl(str.TrimSpace(finding.SourceURL))
+
+    safeURLCandidate = method == "GET" && len(headerKeys) == 0 && bodyText == ""
+    disposition = "DISCOVERED, NOT AUTOMATICALLY EXECUTED"
+    if safeURLCandidate {
+        disposition = "SHAPE-SAFE GET CANDIDATE (scope, redaction, and budgets still apply)"
+    }
+
+    displayBody = bodyText
+    if len(displayBody) > 2048 {
+        displayBody = displayBody[:2048] + "... (truncated)"
+    }
+    signature = method + "\x00" + rawTarget + "\x00" + headersText + "\x00" + bodyText
+    requestSurfaces.Lock()
+    defer requestSurfaces.Unlock()
+    if signature in requestSurfaceSet {
+        return
+    }
+    requestSurfaceSet[signature] = true
+    line = sprintf("[%v] [%v] %v", disposition, method, displayTarget)
+    if headersText != "" {
+        line += "\n  Headers: " + headersText
+    }
+    if displayBody != "" {
+        line += "\n  Body: " + displayBody
+    }
+    if sourceText != "" {
+        line += "\n  Source: " + sourceText
+    }
+    requestSurfaceLines.Append(line)
 }))
 
 targetCandidates = [startUrl]
@@ -240,7 +431,10 @@ analyzeClientRendering = func(body) {
 for currentStartUrl in targetCandidates {
     reqCh, err := crawler.Start(currentStartUrl, opts...)
     if err != nil {
-        lastErr = sprintf("crawler failed for %v: %v", currentStartUrl, err)
+        // Transport errors commonly embed the request URL. Keep detailed raw
+        // diagnostics outside the model-visible tool output rather than risk
+        // echoing URL credentials into the next AID turn.
+        lastErr = sprintf("crawler failed for %v", displayUrlList(currentStartUrl))
         yakit.Info(lastErr)
         continue
     }
@@ -250,13 +444,14 @@ for currentStartUrl in targetCandidates {
         currentResults++
         totalResults++
         rawUrlstr := result.Url()
-        urlstr := normalizeDisplayUrl(rawUrlstr)
+        urlKey := normalizeRawUrl(rawUrlstr)
+        urlDisplay := displayUrl(urlKey)
 
         discoveredUrls.Lock()
-        requestedUrlSet[urlstr] = true
-        if !(urlstr in discoveredUrlSet) {
-            discoveredUrlSet[urlstr] = true
-            discoveredUrlList.Append(urlstr)
+        requestedUrlSet[urlKey] = true
+        if !(urlKey in discoveredUrlSet) {
+            discoveredUrlSet[urlKey] = true
+            discoveredUrlList.Append(urlKey)
         }
         discoveredUrls.Unlock()
 
@@ -269,11 +464,11 @@ for currentStartUrl in targetCandidates {
         try {
             rsp, _ := http.dump(result.Response()[0])
             _, statusCode, statusText = poc.GetHTTPPacketFirstLine(rsp)
-            status = str.TrimSpace(sprintf("%v %v", statusCode, statusText))
-            contentType = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Content-Type"))
+            status = crawler.safeDisplayText(str.TrimSpace(sprintf("%v %v", statusCode, statusText)))
+            contentType = crawler.safeDisplayText(str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Content-Type")))
             rspBody = poc.GetHTTPPacketBody(rsp)
             bodySize = len(rspBody)
-            redirectLocation = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Location"))
+            redirectLocation = displayUrl(str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Location")))
 
             bodyPrefix = str.ToLower(str.TrimSpace(string(rspBody)))
             looksLikeHTML = str.Contains(str.ToLower(contentType), "html") ||
@@ -294,7 +489,7 @@ for currentStartUrl in targetCandidates {
                         renderingEvidenceLines.Append(sprintf(
                             "[%v] %v (score=%v; scripts/modules=%v/%v, visible-text=%v chars, anchors/forms=%v/%v, shell/framework/router/bundle=%v/%v/%v/%v)",
                             classification,
-                            urlstr,
+                            urlDisplay,
                             rendering["score"],
                             rendering["script_count"],
                             rendering["module_script_count"],
@@ -316,7 +511,7 @@ for currentStartUrl in targetCandidates {
         // returns a misleading 404 for one; the crawler now strips fragments at
         // request construction time, so this is only a defensive compatibility
         // guard.
-        if rawUrlstr != urlstr && str.HasPrefix(status, "404") {
+        if rawUrlstr != urlKey && str.HasPrefix(status, "404") {
             continue
         }
         responseInfo = [sprintf("bytes=%v", bodySize)]
@@ -326,7 +521,7 @@ for currentStartUrl in targetCandidates {
         if redirectLocation != "" {
             responseInfo.Append("location=" + redirectLocation)
         }
-        requestLines.Append(sprintf("[%v] [%v] [%v] %v", method, status, str.Join(responseInfo, "; "), urlstr))
+        requestLines.Append(sprintf("[%v] [%v] [%v] %v", method, status, str.Join(responseInfo, "; "), urlDisplay))
     }
 
     if currentResults > 0 {
@@ -336,8 +531,8 @@ for currentStartUrl in targetCandidates {
         break
     }
 
-    if currentStartUrl == startUrl && currentStartUrl != str.ReplaceAll(currentStartUrl, "https://", "http://") {
-        yakit.Info("crawler produced no results for %v, trying HTTP fallback", currentStartUrl)
+    if httpsFallback && currentStartUrl == startUrl && currentStartUrl != str.ReplaceAll(currentStartUrl, "https://", "http://") {
+        yakit.Info("crawler produced no results for %v, trying HTTP fallback", displayUrlList(currentStartUrl))
     }
 }
 
@@ -356,7 +551,7 @@ foundUrlLines = []
 discoveredUrls.Lock()
 for u in discoveredUrlList {
     if !(u in requestedUrlSet) {
-        foundUrlLines.Append(u)
+        foundUrlLines.Append(displayUrl(u))
     }
 }
 discoveredUrls.Unlock()
@@ -377,12 +572,32 @@ for u, _ in discoveredUrlSet {
 }
 subdomainCount = len(distinctSubdomains)
 
+requestSurfaces.Lock()
+requestSurfaceLinesSnapshot = []
+for line in requestSurfaceLines {
+    requestSurfaceLinesSnapshot.Append(line)
+}
+structuredSurfaceCount = len(requestSurfaceSet)
+requestSurfaces.Unlock()
+
 output = bufio.NewBuffer()
 
 output.WriteString("=== Crawl Summary ===\n")
-output.WriteString(sprintf("Requests sent:   %v\n", requestedCount))
+output.WriteString(sprintf("Requests sent:   %v logical URL visit(s); transport retries/fallback are not counted separately\n", requestedCount))
 output.WriteString(sprintf("URLs discovered: %v (includes URLs found in responses but not yet requested)\n", discoveredCount))
 output.WriteString(sprintf("Pending:         %v\n", pendingCount))
+if enableAdaptiveAIJS {
+    output.WriteString("JavaScript:      adaptive bounded static analysis (browser-independent; site code was not executed)\n")
+    output.WriteString(sprintf("AI call budget:   %v (maximum model invocations, not HTTP requests)\n", aiJSRequestBudget))
+} else {
+    output.WriteString("JavaScript:      disabled (server-visible crawl only)\n")
+}
+if len(scopeDomainList) == 0 {
+    output.WriteString("Domain scope:     exact seed hostname(s) only\n")
+} else {
+    output.WriteString("Domain scope:     exact seed hostname(s) plus explicit allowlist: " + str.Join(scopeDomainList, ",") + "\n")
+}
+output.WriteString(sprintf("Request surfaces: %v structured JavaScript finding(s)\n", structuredSurfaceCount))
 
 output.WriteString("\n=== Requested URLs ===\n")
 for line in requestLines {
@@ -401,6 +616,19 @@ if len(foundUrlLines) == 0 {
     }
 }
 
+output.WriteString("\n=== JavaScript Request Surfaces ===\n")
+output.WriteString("Statically reconstructed method/URL/header/body shapes. Entries marked NOT AUTOMATICALLY EXECUTED are evidence for follow-up validation, not requests sent by this crawler.\n")
+if !enableAdaptiveAIJS {
+    output.WriteString("(disabled: run with ai-js=auto or ai-js=yes to analyze bounded JavaScript evidence)\n")
+} else if len(requestSurfaceLinesSnapshot) == 0 {
+    output.WriteString("(none)\n")
+} else {
+    for line in requestSurfaceLinesSnapshot {
+        output.WriteString(line)
+        output.WriteString("\n")
+    }
+}
+
 output.WriteString("\n=== Rendering Assessment ===\n")
 if likelyClientRenderedCount > 0 {
     output.WriteString(sprintf("Classification: likely client-rendered SPA / JavaScript-heavy page (%v of %v assessed HTML response(s))\n", likelyClientRenderedCount, assessedHTMLResponseCount))
@@ -414,7 +642,7 @@ if likelyClientRenderedCount > 0 {
 if htmlResponseCount > assessedHTMLResponseCount {
     output.WriteString(sprintf("Assessment budget: sampled the first %v of %v HTML response(s).\n", assessedHTMLResponseCount, htmlResponseCount))
 }
-output.WriteString("Assessment is heuristic, not proof. This crawler does not execute JavaScript, click controls, or observe browser-created DOM/API activity.\n")
+output.WriteString("Assessment is heuristic, not proof. This crawler does not execute JavaScript, click controls, or observe browser-created DOM/API activity; ai-js only performs browser-independent static analysis of downloaded assets.\n")
 for line in renderingEvidenceLines {
     output.WriteString("- ")
     output.WriteString(line)
@@ -425,7 +653,7 @@ output.WriteString("\n=== Follow-up Guidance ===\n")
 if likelyClientRenderedCount > 0 {
     output.WriteString("- [decision] Stop mechanically deepening this crawl: an application shell can return few useful links regardless of `reqs-max` or `max-depth`. Missing URLs here do not prove that the SPA has no routes or APIs.\n")
     output.WriteString("- [recommended next action] Open the original URL once with `use_browser` (`op=open`) to inspect rendered DOM, forms, links, scripts, and visible text. Interact only when the task requires it.\n")
-    output.WriteString("- For routes/APIs, inspect referenced JavaScript assets and validate extracted candidates with one direct HTTP request each. In `infosec_recon`, use `crawl_js_collector` -> `js_static_extract_ai` for this path.\n")
+    output.WriteString("- For routes/APIs, ai-js=auto performs bounded static analysis of referenced JavaScript assets without executing them; validate extracted candidates with one direct HTTP request each. For complete, persisted, auditable JS coverage in `infosec_recon`, use `crawl_js_collector` -> `js_static_extract_ai`.\n")
     output.WriteString("- Keep raw-response questions on an HTTP request tool: rendered DOM is not the raw HTTP status, headers, or body.\n")
 } else {
     output.WriteString("- Select high-value Found URLs and run `simple_crawler` again with them in `urls` only when the task needs broader server-visible coverage; prioritize dynamic pages, APIs, auth/account, admin, and parameterized endpoints before static assets.\n")

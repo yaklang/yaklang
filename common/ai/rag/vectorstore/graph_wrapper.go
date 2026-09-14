@@ -500,23 +500,40 @@ func (gw *GraphWrapper[K]) Delete(uids ...K) {
 }
 
 func (gw *GraphWrapper[K]) DeleteWithError(uids ...K) error {
-	done := make(chan struct{}, 1)
+	return gw.deleteWithCommit(uids, nil)
+}
+
+func (gw *GraphWrapper[K]) deleteWithCommit(uids []K, commit func() error) (err error) {
+	return gw.deleteWithPrecondition(uids, nil, commit)
+}
+
+func (gw *GraphWrapper[K]) deleteWithPrecondition(uids []K, check, commit func() error) (err error) {
+	done := make(chan struct{})
 	if !gw.submit(&graphOp{
 		opType: opTypeWrite,
 		desc:   "Delete",
-		params: fmt.Sprintf("uids=%v", uids),
+		params: fmt.Sprintf("uids_count=%d", len(uids)),
 		fn: func() {
 			defer close(done)
-			for _, uid := range uids {
-				gw.graph.Delete(uid)
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("delete graph nodes: %v", r)
+				}
+			}()
+			// Check after earlier graph writes finish, before traversing or
+			// snapshotting the graph for a now-obsolete maintenance request.
+			if check != nil {
+				if err = check(); err != nil {
+					return
+				}
 			}
-
+			_, err = gw.graph.DeleteBatchWithCommit(uids, commit)
 		},
 	}) {
 		return errors.New("graph wrapper is closed")
 	}
 	<-done
-	return nil
+	return err
 }
 
 func (gw *GraphWrapper[K]) SearchWithDistanceAndFilter(near []float32, k int, filter hnsw.FilterFunc[K]) []hnsw.SearchResult[K] {
@@ -624,7 +641,6 @@ func (gw *GraphWrapper[K]) exportHNSWGraphToBinaryInLock() (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	pers.Dims = 1024
 	return pers.ToBinary(context.Background())
 }
 

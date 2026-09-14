@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"sync"
 )
 
@@ -271,7 +272,7 @@ func NewEmitter() (emitter *Emitter) {
 	emitter.maxListeners = DefaultMaxListeners
 	emitter.onces = make(map[interface{}][]reflect.Value)
 	emitter.RecoverWith(func(i interface{}, i2 interface{}, err error) {
-		log.Errorf("event[%v] listener[%v] failed: %v", i, i2, err)
+		log.Errorf("event[%v] listener[%v] failed: %v\n%s", i, i2, err, debug.Stack())
 	})
 	return
 }

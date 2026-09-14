@@ -43,6 +43,7 @@ func main() {
 		{
 			Name: "gen-request",
 			Action: func(c *cli.Context) error {
+				xlic.EnsureInitialized()
 				req, err := xlic.Machine.GenerateRequest()
 				if err != nil {
 					return err

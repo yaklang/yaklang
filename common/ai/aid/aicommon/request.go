@@ -2,8 +2,10 @@ package aicommon
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type ImageData struct {
@@ -23,6 +25,18 @@ type AIRequest struct {
 	modelTier              string
 	callerLabel            string
 	ctx                    context.Context
+
+	// extraSpecOpts carries additional aispec.AIConfigOption values that
+	// AIChatToAICallbackType will append to its option list when calling the
+	// underlying AI service. This is used by functioncall mode to inject
+	// WithTools / WithToolChoice / WithToolCallCallback.
+	extraSpecOpts []aispec.AIConfigOption
+
+	// enableToolCallArgumentsStream, when true, tells aicaller.go to wire
+	// up ToolCallArgumentsStreamHandler → resp.EmitOutputStream so that
+	// tool_call arguments flow through the same output channel as regular
+	// content. Used by functioncall mode to unify the action parsing pipeline.
+	enableToolCallArgumentsStream bool
 }
 
 func (a *AIRequest) GetStartTime() time.Time {
@@ -201,4 +215,41 @@ func WithAIRequest_CallerLabel(label string) AIRequestOption {
 	return func(req *AIRequest) {
 		req.callerLabel = label
 	}
+}
+
+// WithAIRequest_ExtraSpecOpts sets additional aispec.AIConfigOption values
+// that AIChatToAICallbackType will append to its option list when calling the
+// underlying AI service. Used by functioncall mode to inject WithTools /
+// WithToolChoice / WithToolCallCallback.
+func WithAIRequest_ExtraSpecOpts(opts ...aispec.AIConfigOption) AIRequestOption {
+	return func(req *AIRequest) {
+		req.extraSpecOpts = append(req.extraSpecOpts, opts...)
+	}
+}
+
+// GetExtraSpecOpts returns the extra aispec options carried by this request.
+func (a *AIRequest) GetExtraSpecOpts() []aispec.AIConfigOption {
+	if a == nil {
+		return nil
+	}
+	return a.extraSpecOpts
+}
+
+// WithAIRequest_EnableToolCallArgumentsStream tells aicaller.go to stream
+// tool_call arguments through resp.EmitOutputStream (in addition to the
+// ToolCallCallback). Used by functioncall mode so the postHandler can parse
+// tool_call arguments via the same ExtractActionFromStream path as text mode.
+func WithAIRequest_EnableToolCallArgumentsStream() AIRequestOption {
+	return func(req *AIRequest) {
+		req.enableToolCallArgumentsStream = true
+	}
+}
+
+// IsToolCallArgumentsStreamEnabled returns whether the request asked
+// aicaller.go to stream tool_call arguments into the output channel.
+func (a *AIRequest) IsToolCallArgumentsStreamEnabled() bool {
+	if a == nil {
+		return false
+	}
+	return a.enableToolCallArgumentsStream
 }

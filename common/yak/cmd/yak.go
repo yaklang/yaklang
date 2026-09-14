@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -19,6 +22,7 @@ import (
 	"runtime/pprof"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -38,12 +42,16 @@ import (
 	systemLog "log"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
 	"github.com/yaklang/yaklang/common/consts"
 	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/stdio"
+	"github.com/yaklang/yaklang/common/schema"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/engineendpoint"
 	"github.com/yaklang/yaklang/common/utils/grpc_auth"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/utils/umask"
@@ -72,8 +80,12 @@ const grpcReadyMarkerPrefix = "yak grpc ready "
 const grpcPProfReadyMarkerPrefix = "yak grpc pprof ready "
 
 type grpcReadyEvent struct {
-	SchemaVersion int    `json:"schemaVersion"`
-	Address       string `json:"address"`
+	SchemaVersion int          `json:"schemaVersion"`
+	Address       string       `json:"address"`
+	Transport     string       `json:"transport"`
+	InstanceId    string       `json:"instanceId"`
+	EngineVersion string       `json:"engineVersion"`
+	PhaseI18n     *schema.I18n `json:"phaseI18n"`
 }
 
 type grpcPProfReadyEvent struct {
@@ -81,11 +93,16 @@ type grpcPProfReadyEvent struct {
 	Address       string `json:"address"`
 }
 
-func writeGRPCReadyEvent(writer io.Writer, address string) error {
-	payload, err := json.Marshal(grpcReadyEvent{
-		SchemaVersion: 1,
+func writeGRPCReadyEvent(writer io.Writer, address string, transport string, instanceId string) error {
+	event := grpcReadyEvent{
+		SchemaVersion: 2,
 		Address:       address,
-	})
+		Transport:     transport,
+		InstanceId:    instanceId,
+		EngineVersion: consts.GetYakVersion(),
+		PhaseI18n:     grpcEventPhaseI18n("serve"),
+	}
+	payload, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
@@ -170,6 +187,27 @@ func isVersionCommand() bool {
 	return false
 }
 
+// isHelpCommand 判断本次调用是否只需要输出帮助（help/--help/-h）。
+// 这类调用不应触发数据库初始化：初始化会建库、导入内置插件并输出大量日志，
+// 在 CI 中探测帮助文本时会拖慢命令甚至触发 SIGPIPE 误判。
+func isHelpCommand() bool {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "help", "-h", "--help", "-help", "--help=true":
+			return true
+		}
+	}
+	// 子命令帮助: yak <command> --help / -h（第二参数直接是帮助标志）。
+	// 只检查第二参数，避免把 -c/脚本内容里的 "--help" 误判为帮助调用。
+	if len(os.Args) > 2 {
+		switch os.Args[2] {
+		case "--help", "-h", "-help", "--help=true":
+			return true
+		}
+	}
+	return false
+}
+
 func init() {
 	// 取消掉 0022 的限制，让用户可以创建别人也能写的文件夹
 	umask.Umask(0)
@@ -222,6 +260,9 @@ func init() {
 	/* 初始化数据库: 在 grpc 模式下，数据库应该不在 init 中使用 */
 	ignoreInitDatabase := []string{"grpc", "check-secret-local-grpc", "fixup-database", "ai-http-gateway"}
 	switch {
+	case len(os.Args) > 1 && os.Args[1] == "mcp" && log.IsMCPStdioCommand(os.Args) && !stdio.IsWorker():
+		// The stdio supervisor owns only the client transport. Its worker
+		// initializes databases; this branch must not print the grpc banner.
 	case len(os.Args) > 1 && slices.Contains(ignoreInitDatabase, os.Args[1]):
 		log.Debug("grpc should not initialize database in func:init")
 		fmt.Printf(`
@@ -232,7 +273,7 @@ func init() {
 
 `, consts.GetYakVersion(), "yaklang.io")
 
-	case isVersionCommand():
+	case isVersionCommand(), isHelpCommand():
 		// pass
 
 	default:
@@ -486,7 +527,7 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "disable-reverse-server",
-			Usage: "关闭反连服务器",
+			Usage: "关闭反连服务器（反连服务现在默认按需启动，保留该参数以兼容旧命令行）",
 		},
 		cli.StringFlag{
 			Name:  "common-name",
@@ -495,7 +536,16 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "local-password",
-			Usage: "本地密码模式，使用固定端口 9011，不使用 TLS，与 host/port/secret/tls/gen-tls-crt 互斥",
+			Usage: "本地密码认证，不使用 TLS；TCP 默认 127.0.0.1:9011（可用 --port 修改），unix/npipe 仅监听 --socket-path",
+		},
+		cli.StringFlag{
+			Name:  "transport",
+			Usage: "传输方式：tcp（默认）/ unix / npipe",
+			Value: "tcp",
+		},
+		cli.StringFlag{
+			Name:  "socket-path",
+			Usage: "IPC socket 路径或管道名（仅 unix/npipe）；Unix 新建父目录默认 0700，保留已有目录权限，socket 为 0600",
 		},
 		cli.IntFlag{
 			Name:  "browser-extension-bridge-port",
@@ -507,50 +557,153 @@ var startGRPCServerCommand = cli.Command{
 			Usage: "关闭浏览器插件本机 Bridge",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (finalError error) {
+		grpcStartTime := time.Now()
+		var grpcPhase string = "init"
+		var grpcReasonCode string
+		var grpcReasonI18n *schema.I18n
+		transport := c.String("transport")
+		socketPath := c.String("socket-path")
+		// Windows cache logging redirects os.Stdout asynchronously. Control events
+		// must reach the parent even when a startup failure immediately exits.
+		originalOutput := os.Stdout
+		eventOutput := func() *os.File {
+			if runtime.GOOS == "windows" {
+				return originalOutput
+			}
+			return os.Stdout
+		}
+		defer func() {
+			if finalError != nil {
+				elapsedMs := time.Since(grpcStartTime).Milliseconds()
+				reasonStr := finalError.Error()
+				failedEvent := struct {
+					SchemaVersion int          `json:"schemaVersion"`
+					Phase         string       `json:"phase"`
+					Reason        string       `json:"reason"`
+					ReasonCode    string       `json:"reasonCode"`
+					ElapsedMs     int64        `json:"elapsedMs"`
+					Version       string       `json:"version"`
+					PhaseI18n     *schema.I18n `json:"phaseI18n"`
+					ReasonI18n    *schema.I18n `json:"reasonI18n"`
+				}{
+					SchemaVersion: 1,
+					Phase:         grpcPhase,
+					Reason:        reasonStr,
+					ReasonCode:    grpcReasonCode,
+					ElapsedMs:     elapsedMs,
+					Version:       consts.GetYakVersion(),
+					PhaseI18n:     grpcEventPhaseI18n(grpcPhase),
+					ReasonI18n:    grpcReasonI18n,
+				}
+				payload, _ := json.Marshal(failedEvent)
+				fmt.Fprintf(eventOutput(), "yak grpc failed %s\n", payload)
+				log.Flush()
+			}
+		}()
+
+		if err := validateEngineTransportOptions(c, true); err != nil {
+			grpcReasonCode = "init_failed"
+			grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
+			return err
+		}
+		if transport != "tcp" {
+			if err := engineendpoint.PrepareListener(transport, socketPath); err != nil {
+				grpcPhase = "listen"
+				grpcReasonCode, _ = classifyEndpointListenError(transport, err)
+				grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
+				return err
+			}
+		}
+		// Reserve Windows pipes before database work, not just a racy existence
+		// check. Every early return releases only this process's listener.
+		reservedIPCListener, err := reserveWindowsIPCListener(transport, socketPath)
+		if err != nil {
+			grpcPhase = "listen"
+			grpcReasonCode, _ = classifyEndpointListenError(transport, err)
+			grpcReasonI18n = grpcEventReasonI18n(grpcReasonCode)
+			return err
+		}
+		if reservedIPCListener != nil {
+			defer reservedIPCListener.Close()
+		}
+
 		// 检查 local-password 模式
 		localPassword := c.String("local-password")
 		localRandomPasswordPort := 9011
 		if localPassword != "" {
 			// 检查互斥选项
 			if c.IsSet("host") && c.String("host") != "127.0.0.1" {
-				return utils.Error("local-password is mutually exclusive with host option")
+				grpcPhase = "init"
+				grpcReasonCode = "init_failed"
+				grpcReasonI18n = grpcEventReasonI18n("init_failed")
+				finalError = utils.Error("local-password is mutually exclusive with host option")
+				return
 			}
 			if c.IsSet("port") {
 				manualPort := c.Int("port")
-				if manualPort == 8087 {
-					return utils.Error("local-password is mutually exclusive with port option")
-				}
-				if manualPort <= 0 {
-					return utils.Error("local-password mode port must be positive")
+				if manualPort <= 0 || manualPort > 65535 {
+					grpcPhase = "init"
+					grpcReasonCode = "init_failed"
+					grpcReasonI18n = grpcEventReasonI18n("init_failed")
+					finalError = utils.Error("local-password mode port must be between 1 and 65535")
+					return
 				}
 				localRandomPasswordPort = manualPort
 			}
 			if c.IsSet("secret") {
-				return utils.Error("local-password is mutually exclusive with secret option")
+				grpcPhase = "init"
+				grpcReasonCode = "init_failed"
+				grpcReasonI18n = grpcEventReasonI18n("init_failed")
+				finalError = utils.Error("local-password is mutually exclusive with secret option")
+				return
 			}
 			if c.IsSet("tls") && c.Bool("tls") {
-				return utils.Error("local-password is mutually exclusive with tls option")
+				grpcPhase = "init"
+				grpcReasonCode = "init_failed"
+				grpcReasonI18n = grpcEventReasonI18n("init_failed")
+				finalError = utils.Error("local-password is mutually exclusive with tls option")
+				return
 			}
 			if c.IsSet("gen-tls-crt") && c.String("gen-tls-crt") != "build/" {
-				return utils.Error("local-password is mutually exclusive with gen-tls-crt option")
+				grpcPhase = "init"
+				grpcReasonCode = "init_failed"
+				grpcReasonI18n = grpcEventReasonI18n("init_failed")
+				finalError = utils.Error("local-password is mutually exclusive with gen-tls-crt option")
+				return
 			}
 
 			log.Info("starting grpc server in local-password mode")
-			log.Infof("local-password mode: port=%d, tls=false, password=***", localRandomPasswordPort)
+			if transport == "tcp" {
+				log.Infof("local-password mode: port=%d, tls=false, password=***", localRandomPasswordPort)
+			} else {
+				log.Infof("local-password mode: transport=%s, endpoint=%s, tls=false, password=***", transport, socketPath)
+			}
 		}
 
 		if c.String("home") != "" {
 			os.Setenv("YAKIT_HOME", c.String("home"))
 		}
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
-			return utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
+			grpcPhase = "init"
+			grpcReasonCode = "init_failed"
+			grpcReasonI18n = grpcEventReasonI18n("init_failed")
+			finalError = utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
+			return
 		}
 		if !c.Bool("pprof") && (c.IsSet("pprof-listen") || c.IsSet("pprof-block-rate")) {
-			return utils.Error("Parameters 'pprof-listen' and 'pprof-block-rate' require 'pprof'")
+			grpcPhase = "init"
+			grpcReasonCode = "init_failed"
+			grpcReasonI18n = grpcEventReasonI18n("init_failed")
+			finalError = utils.Error("Parameters 'pprof-listen' and 'pprof-block-rate' require 'pprof'")
+			return
 		}
 		if c.Int("pprof-block-rate") < 0 {
-			return utils.Error("Parameter 'pprof-block-rate' cannot be negative")
+			grpcPhase = "init"
+			grpcReasonCode = "init_failed"
+			grpcReasonI18n = grpcEventReasonI18n("init_failed")
+			finalError = utils.Error("Parameter 'pprof-block-rate' cannot be negative")
+			return
 		}
 		if c.Bool("disable-output") {
 			os.Setenv("YAK_DISABLE", "output")
@@ -567,7 +720,11 @@ var startGRPCServerCommand = cli.Command{
 			runtime.SetBlockProfileRate(c.Int("pprof-block-rate"))
 			_, pprofAddress, err := startGRPCPProfServer(os.Stdout, c.String("pprof-listen"))
 			if err != nil {
-				return err
+				grpcPhase = "pprof"
+				grpcReasonCode = "pprof_failed"
+				grpcReasonI18n = grpcEventReasonI18n("pprof_failed")
+				finalError = err
+				return
 			}
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
@@ -588,10 +745,14 @@ var startGRPCServerCommand = cli.Command{
 		}
 		log.Info("start to initialize database")
 
-		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), c.String("ssa-db"))
+		err = initializeDatabase(c.String("project-db"), c.String("profile-db"), c.String("ssa-db"))
 		if err != nil {
 			log.Errorf("init database failed: %s", err)
-			return err
+			grpcPhase = "database"
+			grpcReasonCode = "database_failed"
+			grpcReasonI18n = grpcEventReasonI18n("database_failed")
+			finalError = err
+			return
 		}
 
 		/* 初始化数据库后进行权限修复 */
@@ -608,7 +769,7 @@ var startGRPCServerCommand = cli.Command{
 		certDir := c.String("gen-tls-crt")
 		var caCertFile string = filepath.Join(certDir, "yakit-grpc-cert.pem")
 		var caKeyFile string = filepath.Join(certDir, "yakit-grpc-key.pem")
-		if certDir != "" {
+		if transport == "tcp" && certDir != "" {
 			err := os.MkdirAll(certDir, 0o777)
 			if err != nil {
 				log.Warnf("mkdir certdir[%s] failed: %s", certDir, err)
@@ -667,7 +828,11 @@ var startGRPCServerCommand = cli.Command{
 		s, err := yakgrpc.NewServer(serverOptions...)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
-			return err
+			grpcPhase = "build_server"
+			grpcReasonCode = "build_server_failed"
+			grpcReasonI18n = grpcEventReasonI18n("build_server_failed")
+			finalError = err
+			return
 		}
 		defer func() {
 			if closeErr := s.CloseBrowserExtensionBridge(); closeErr != nil {
@@ -676,11 +841,11 @@ var startGRPCServerCommand = cli.Command{
 		}()
 		ypb.RegisterYakServer(grpcTrans, s)
 
-		// 确定监听地址和端口
+		// TCP 监听地址和端口；IPC 分支不使用这些值。
 		var host string
 		var port int
 		if localPassword != "" {
-			// local-password 模式：强制使用 127.0.0.1:9011
+			// local-password TCP 模式仅绑定 loopback，默认 9011，可显式指定端口。
 			host = "127.0.0.1"
 			port = localRandomPasswordPort
 		} else {
@@ -688,80 +853,170 @@ var startGRPCServerCommand = cli.Command{
 			port = c.Int("port")
 		}
 
-		log.Infof("start to listen on: %v", utils.HostPort(host, port))
-		var lis net.Listener
+		var lis net.Listener = reservedIPCListener
 
-		// local-password 模式下强制不使用 TLS
-		if localPassword == "" && c.Bool("tls") {
-			// 签发证书
-			var cert []byte
-			var key []byte
-			var err error
-
-			cert, err = ioutil.ReadFile(caCertFile)
-			if err != nil {
-				log.Warnf("open ca-cert failed: %s", err)
+		// IPC endpoints are private; Unix may reclaim a verified stale socket.
+		if transport == "unix" || transport == "npipe" {
+			if socketPath == "" {
+				grpcPhase = "init"
+				grpcReasonCode = "init_failed"
+				grpcReasonI18n = grpcEventReasonI18n("init_failed")
+				finalError = utils.Errorf("socket-path is required when transport is %s", transport)
+				return
 			}
-			key, err = ioutil.ReadFile(caKeyFile)
-			if err != nil {
-				log.Warnf("open ca-key failed: %s", err)
+			log.Infof("start to listen (%s) on: %s", transport, socketPath)
+			if lis == nil {
+				lis, err = engineendpoint.Listen(transport, socketPath)
 			}
-			if cert == nil || key == nil {
-				cert, key, err = tlsutils.GenerateSelfSignedCertKeyWithCommonNameEx(cn+" Root", cn+" Root", "", nil, nil, nil, false)
-				if err != nil {
-					return err
+			if err != nil {
+				listenReason, hint := classifyEndpointListenError(transport, err)
+				if listenReason == "" {
+					listenReason = "listen_failed"
 				}
-				err = ioutil.WriteFile(caCertFile, cert, 0o600)
-				if err != nil {
-					return utils.Errorf("generate caCert[%s] failed: %s", caCertFile, err)
-				}
-				err = ioutil.WriteFile(caKeyFile, key, 0o600)
-				if err != nil {
-					return utils.Errorf("generate caKey[%s] failed: %s", caCertFile, err)
-				}
-			}
-
-			if cert != nil {
-				log.Infof("Root CA (For Yakit)\n\n%v\n\n", string(cert))
-			}
-
-			serverCert, serverKey, err := tlsutils.SignServerCrtNKeyWithParams(cert, key, cn, time.Now().Add(100*365*24*time.Hour), false)
-			if err != nil {
-				return err
-			}
-			serverCertIns, err := tlsutils.ParseCertificate(serverCert)
-			if err == nil {
-				text, err := tlsutils.CertificateText(serverCertIns)
-				if err == nil {
-					log.Infof("Server Certificate Fields \n\n%s\n\n", text)
-				}
-			}
-
-			tlsConfig, err := tlsutils.GetX509ServerTlsConfig(cert, serverCert, serverKey)
-			if err != nil {
-				return err
-			}
-			lis, err = tls.Listen("tcp", utils.HostPort(host, port), tlsConfig)
-			if err != nil {
-				log.Error(err)
-				return err
+				log.Errorf("failed to listen (%s): [%s] %s", transport, listenReason, hint)
+				grpcPhase = "listen"
+				grpcReasonCode = listenReason
+				grpcReasonI18n = grpcEventReasonI18n(listenReason)
+				finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
+				return
 			}
 		} else {
-			lis, err = net.Listen("tcp", utils.HostPort(host, port))
-			if err != nil {
-				log.Error(err)
-				return err
+			// TCP 模式（默认）
+			log.Infof("start to listen on: %v", utils.HostPort(host, port))
+
+			// local-password 模式下强制不使用 TLS
+			if localPassword == "" && c.Bool("tls") {
+				// 签发证书
+				var cert []byte
+				var key []byte
+				var err error
+
+				cert, err = ioutil.ReadFile(caCertFile)
+				if err != nil {
+					log.Warnf("open ca-cert failed: %s", err)
+				}
+				key, err = ioutil.ReadFile(caKeyFile)
+				if err != nil {
+					log.Warnf("open ca-key failed: %s", err)
+				}
+				if cert == nil || key == nil {
+					cert, key, err = tlsutils.GenerateSelfSignedCertKeyWithCommonNameEx(cn+" Root", cn+" Root", "", nil, nil, nil, false)
+					if err != nil {
+						grpcPhase = "cert"
+						grpcReasonCode = "cert_failed"
+						grpcReasonI18n = grpcEventReasonI18n("cert_failed")
+						finalError = err
+						return
+					}
+					err = ioutil.WriteFile(caCertFile, cert, 0o600)
+					if err != nil {
+						grpcPhase = "init"
+						grpcReasonCode = "init_failed"
+						grpcReasonI18n = grpcEventReasonI18n("init_failed")
+						finalError = utils.Errorf("generate caCert[%s] failed: %s", caCertFile, err)
+						return
+					}
+					err = ioutil.WriteFile(caKeyFile, key, 0o600)
+					if err != nil {
+						grpcPhase = "init"
+						grpcReasonCode = "init_failed"
+						grpcReasonI18n = grpcEventReasonI18n("init_failed")
+						finalError = utils.Errorf("generate caKey[%s] failed: %s", caCertFile, err)
+						return
+					}
+				}
+
+				if cert != nil {
+					log.Infof("Root CA (For Yakit)\n\n%v\n\n", string(cert))
+				}
+
+				serverCert, serverKey, err := tlsutils.SignServerCrtNKeyWithParams(cert, key, cn, time.Now().Add(100*365*24*time.Hour), false)
+				if err != nil {
+					grpcPhase = "cert"
+					grpcReasonCode = "cert_failed"
+					grpcReasonI18n = grpcEventReasonI18n("cert_failed")
+					finalError = err
+					return
+				}
+				serverCertIns, err := tlsutils.ParseCertificate(serverCert)
+				if err == nil {
+					text, err := tlsutils.CertificateText(serverCertIns)
+					if err == nil {
+						log.Infof("Server Certificate Fields \n\n%s\n\n", text)
+					}
+				}
+
+				tlsConfig, err := tlsutils.GetX509ServerTlsConfig(cert, serverCert, serverKey)
+				if err != nil {
+					grpcPhase = "cert"
+					grpcReasonCode = "cert_failed"
+					grpcReasonI18n = grpcEventReasonI18n("cert_failed")
+					finalError = err
+					return
+				}
+				lis, err = tls.Listen("tcp", utils.HostPort(host, port), tlsConfig)
+				if err != nil {
+					listenReason, hint := classifyListenError(err)
+					log.Errorf("failed to listen (tls): [%s] %s", listenReason, hint)
+					grpcPhase = "listen"
+					grpcReasonCode = listenReason
+					grpcReasonI18n = grpcEventReasonI18n(listenReason)
+					finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
+					return
+				}
+			} else {
+				lis, err = net.Listen("tcp", utils.HostPort(host, port))
+				if err != nil {
+					listenReason, hint := classifyListenError(err)
+					log.Errorf("failed to listen (tcp): [%s] %s", listenReason, hint)
+					grpcPhase = "listen"
+					grpcReasonCode = listenReason
+					grpcReasonI18n = grpcEventReasonI18n(listenReason)
+					finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
+					return
+				}
 			}
 		}
+		if reservedIPCListener == nil {
+			defer lis.Close()
+		}
+		// IPC paths belong to this listener. A normal interrupt must release the
+		// endpoint so a manual restart can reuse it. Unix also recovers stale
+		// sockets on the next start if the process cannot clean up (e.g. SIGKILL).
+		if transport != "tcp" {
+			signals := []os.Signal{os.Interrupt, syscall.SIGTERM}
+			if transport == "unix" {
+				signals = append(signals, syscall.SIGHUP)
+			}
+			signalCtx, stopSignals := signal.NotifyContext(context.Background(), signals...)
+			defer stopSignals()
+			done := make(chan struct{})
+			defer close(done)
+			go func() {
+				select {
+				case <-signalCtx.Done():
+					grpcTrans.Stop()
+				case <-done:
+				}
+			}()
+		}
+		// Scheduled ReAct is an engine-process service. The gRPC Server below is
+		// only one adapter to it and does not own its lifecycle.
+		reActService := reactservice.Default()
+		reActService.StartScheduler()
+		defer reActService.StopScheduler()
 
 		actualAddress := lis.Addr().String()
+		instanceId := utils.RandStringBytes(8)
 		log.Infof("yak grpc listener ready on: %s", actualAddress)
-		if err := writeGRPCReadyEvent(os.Stdout, actualAddress); err != nil {
+		if err := writeGRPCReadyEvent(eventOutput(), actualAddress, transport, instanceId); err != nil {
 			log.Warnf("write yak grpc ready event failed: %v", err)
 		}
 
 		log.Infof("start to startup grpc server(yak grpc ok)...")
-		if host == "127.0.0.1" {
+		if transport != "tcp" {
+			log.Infof("the current yak grpc listening on %s endpoint %s", transport, actualAddress)
+		} else if host == "127.0.0.1" {
 			if localPassword != "" {
 				log.Infof("the current yak grpc running in local-password mode on '127.0.0.1:%d'", port)
 			} else {
@@ -775,19 +1030,153 @@ var startGRPCServerCommand = cli.Command{
 		err = grpcTrans.Serve(lis)
 		if err != nil {
 			log.Error(err)
-			return err
+			grpcPhase = "serve"
+			grpcReasonCode = "serve_failed"
+			grpcReasonI18n = grpcEventReasonI18n("serve_failed")
+			finalError = err
+			return
 		}
 		return nil
 	},
 }
 
+// Unix keeps its existing preflight/stale-socket lifecycle. Windows can reserve
+// the kernel pipe before opening databases without creating filesystem entries.
+func reserveWindowsIPCListener(transport, endpoint string) (net.Listener, error) {
+	if runtime.GOOS != "windows" || transport != "npipe" {
+		return nil, nil
+	}
+	return engineendpoint.Listen(transport, endpoint)
+}
+
+func newEngineSecret() (string, error) {
+	var secret [32]byte
+	if _, err := rand.Read(secret[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(secret[:]), nil
+}
+
+func legacyCheckReason(code string) string {
+	switch code {
+	case databaseError:
+		return "database error"
+	case dialGrpcServerFailed:
+		return "dial grpc server failed"
+	case callVersionFailed:
+		return "call Version RPC failed"
+	case buildYakGrpcServer:
+		return "build yak grpc server failed"
+	case waitConnectFailed:
+		return "waiting grpc listener failed"
+	case tcpBindDenied, tcpBindInUse, tcpBindGeneric:
+		return "net.Listen(tcp, addr) failed"
+	default:
+		return code
+	}
+}
+
+func validateEngineTransportOptions(ctx *cli.Context, requirePassword bool) error {
+	transport, endpoint := ctx.String("transport"), ctx.String("socket-path")
+	if err := engineendpoint.Validate(transport, endpoint); err != nil {
+		return err
+	}
+	if transport == "tcp" {
+		return nil
+	}
+	if ctx.Bool("tls") || ctx.IsSet("gen-tls-crt") {
+		return utils.Error("IPC transport does not support TLS options")
+	}
+	if ctx.IsSet("host") || ctx.IsSet("port") {
+		return utils.Error("IPC transport uses socket-path; host and port options are not supported")
+	}
+	secret := ctx.String("local-password")
+	if secret == "" {
+		secret = ctx.String("secret")
+	}
+	if requirePassword && strings.Trim(strings.TrimSpace(secret), "*") == "" {
+		return utils.Error("IPC transport requires a non-empty secret or local-password")
+	}
+	return nil
+}
+
 const (
-	databaseError        = "database error"
-	dialGrpcServerFailed = "dial grpc server failed"
-	callVersionFailed    = "call Version RPC failed"
-	netListenFailed      = "net.Listen(tcp, addr) failed"
-	buildYakGrpcServer   = "build yak grpc server failed"
+	databaseError        = "database_error"
+	dialGrpcServerFailed = "dial_failed"
+	callVersionFailed    = "version_rpc_failed"
+	buildYakGrpcServer   = "build_server_failed"
+	waitConnectFailed    = "wait_connect_failed"
+
+	// listen error sub-categories
+	tcpBindDenied      = "tcp_bind_denied"
+	tcpBindInUse       = "tcp_bind_in_use"
+	tcpBindGeneric     = "tcp_bind_failed"
+	ipcEndpointInvalid = "ipc_endpoint_invalid"
+	ipcBindDenied      = "ipc_bind_denied"
+	ipcBindInUse       = "ipc_bind_in_use"
+	ipcBindGeneric     = "ipc_bind_failed"
 )
+
+func classifyEndpointListenError(transport string, err error) (reason string, userHint string) {
+	if transport == "tcp" {
+		return classifyListenError(err)
+	}
+	if errors.Is(err, engineendpoint.ErrInvalidDirectory) {
+		return ipcEndpointInvalid, err.Error()
+	}
+	// Win32 named pipes return ERROR_ACCESS_DENIED (5), not Winsock's
+	// WSAEACCES (10013). os.ErrPermission recognizes both native platforms.
+	if errors.Is(err, os.ErrPermission) {
+		return ipcBindDenied, err.Error()
+	}
+	reason, _ = classifyListenError(err)
+	switch reason {
+	case tcpBindDenied:
+		reason = ipcBindDenied
+	case tcpBindInUse:
+		reason = ipcBindInUse
+	default:
+		reason = ipcBindGeneric
+	}
+	if err != nil {
+		userHint = err.Error()
+	}
+	return
+}
+
+// classifyListenError inspects a net.Listen / tls.Listen error and returns
+// a structured reason string plus a human-readable hint for diagnostics.
+// This avoids lumping permission denials, address-in-use and other failures
+// under a single "port occupied" message.
+func classifyListenError(err error) (reason string, userHint string) {
+	if err == nil {
+		return tcpBindGeneric, ""
+	}
+	if errors.Is(err, syscall.EADDRINUSE) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10048))) {
+		return tcpBindInUse, "Address already in use: choose another endpoint"
+	}
+	if errors.Is(err, syscall.EACCES) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10013))) {
+		return tcpBindDenied, "Permission denied: check the endpoint and system policy"
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if se, ok := opErr.Err.(*os.SyscallError); ok {
+			errno, ok := se.Err.(syscall.Errno)
+			if !ok {
+				return tcpBindGeneric, err.Error()
+			}
+			// WSAEACCES (10013) on Windows, EACCES on Unix
+			if errno == syscall.EACCES || (runtime.GOOS == "windows" && errno == 10013) {
+				return tcpBindDenied, "Permission denied: the port may require elevated privileges or is blocked by system policy"
+			}
+			// WSAEADDRINUSE (10048) on Windows, EADDRINUSE on Unix
+			if errno == syscall.EADDRINUSE || (runtime.GOOS == "windows" && errno == 10048) {
+				return tcpBindInUse, "Address already in use: another process is listening on this port"
+			}
+		}
+	}
+	return tcpBindGeneric, err.Error()
+}
 
 func runCheckSecretCleanupWithTimeout(name string, timeout time.Duration, cleanup func()) {
 	done := make(chan struct{})
@@ -832,6 +1221,15 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			Usage:  "Specific SSA Database  Name, eg default-yakssa.db",
 			EnvVar: "SSA_DATABASE_RAW",
 		},
+		cli.StringFlag{
+			Name:  "transport",
+			Usage: "传输方式：tcp（默认）/ unix / npipe",
+			Value: "tcp",
+		},
+		cli.StringFlag{
+			Name:  "socket-path",
+			Usage: "IPC socket 路径或管道名（仅 unix/npipe）；Unix 新建父目录默认 0700，保留已有目录权限，socket 为 0600",
+		},
 	},
 	Action: func(ctx *cli.Context) (finalError error) {
 		var port = ctx.Int("port")
@@ -839,15 +1237,23 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		addr := utils.HostPort("127.0.0.1", port)
 
 		clientPassword := ctx.String("client-password")
+		transport := ctx.String("transport")
+		socketPath := ctx.String("socket-path")
+		if transport != "tcp" {
+			addr = socketPath
+		}
 
 		projectPath := ctx.String("project-db")
 		profilePath := ctx.String("profile-db")
 		ssaPath := ctx.String("ssa-db")
 
 		var version = consts.GetYakVersion()
-		var secret = utils.RandStringBytes(16)
+		secret, secretErr := newEngineSecret()
 
 		var reason string
+		var phase string = "init"
+		var checkSecretReasonI18n *schema.I18n
+		checkSecretStartTime := time.Now()
 
 		defer func() {
 			const extractorFlag = `50551aa97b5aa5ae8a3c3243ac60a8a7`
@@ -855,6 +1261,14 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			if err := recover(); err != nil {
 				utils.PrintCurrentGoroutineRuntimeStack()
 				finalError = utils.Errorf("panic: %v\n%s", err, spew.Sdump(string(debug.Stack())))
+			}
+
+			// panic fallback: if we crashed without setting reason/phase/i18n,
+			// provide a generic error so front-end always gets usable fields.
+			if !utils.IsNil(finalError) && reason == "" {
+				reason = "unexpected_error"
+				phase = "init"
+				checkSecretReasonI18n = grpcEventReasonI18n("unexpected_error")
 			}
 
 			m := omap.NewGeneralOrderedMap()
@@ -865,22 +1279,56 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			} else {
 				info = utils.InterfaceToString(finalError)
 			}
+			m.Set("schemaVersion", 1)
 			m.Set("ok", ok)
-			m.Set("reason", []string{reason})
+			m.Set("reason", []string{legacyCheckReason(reason)})
+			m.Set("phase", phase)
+			m.Set("elapsedMs", time.Since(checkSecretStartTime).Milliseconds())
 			m.Set("info", info)
-			m.Set("host", "127.0.0.1")
-			m.Set("port", port)
-			m.Set("addr", utils.HostPort("127.0.0.1", port))
+			m.Set("transport", transport)
+			if transport == "tcp" {
+				m.Set("host", "127.0.0.1")
+				m.Set("port", port)
+				m.Set("addr", utils.HostPort("127.0.0.1", port))
+			} else {
+				m.Set("host", "")
+				m.Set("port", 0)
+				m.Set("addr", socketPath)
+			}
+			// This is a machine protocol credential consumed by old Yakit, not a log field.
 			m.Set("secret", secret)
 			m.Set("version", version)
+			m.Set("reasonCode", reason)
+			// i18n: bilingual labels set directly at each failure point.
+			phaseLabel := grpcEventPhaseI18n(phase)
+			if phaseLabel != nil {
+				m.Set("phaseI18n", phaseLabel)
+			}
+			if checkSecretReasonI18n != nil {
+				m.Set("reasonI18n", checkSecretReasonI18n)
+			}
 			result := string(m.Jsonify())
 			fmt.Printf("\n<json-%v>\n%v\n</json-%v>\n\n", extractorFlag, result, extractorFlag)
 		}()
 
+		if secretErr != nil {
+			reason = "unexpected_error"
+			return secretErr
+		}
+		if err := validateEngineTransportOptions(ctx, false); err != nil {
+			reason = "init_failed"
+			checkSecretReasonI18n = grpcEventReasonI18n(reason)
+			return err
+		}
+
 		// 客户端模式：只连接服务器测试
 		if clientPassword != "" {
 			log.Info("running in client mode, connecting to existing server...")
-			log.Infof("target: %s", addr)
+			if transport == "tcp" {
+				log.Infof("target: %s", addr)
+			} else {
+				log.Infof("target: %s (%s)", socketPath, transport)
+			}
 
 			// 创建带超时的 context（10 秒）
 			dialCtx, dialCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -888,26 +1336,60 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 			// 创建客户端连接
 			log.Infof("connecting to grpc server with password (timeout: 10s)...")
-			conn, err := grpc.DialContext(
-				dialCtx,
-				addr,
-				grpc.WithInsecure(),
-				grpc.WithBlock(),
-				grpc.WithDefaultCallOptions(
-					grpc.MaxCallRecvMsgSize(100*1024*1024),
-					grpc.MaxCallSendMsgSize(100*1024*1024),
-				),
-			)
+			var conn *grpc.ClientConn
+			var err error
+			if transport == "tcp" {
+				conn, err = grpc.DialContext(
+					dialCtx,
+					addr,
+					grpc.WithInsecure(),
+					grpc.WithBlock(),
+					grpc.WithDefaultCallOptions(
+						grpc.MaxCallRecvMsgSize(100*1024*1024),
+						grpc.MaxCallSendMsgSize(100*1024*1024),
+					),
+				)
+			} else {
+				conn, err = grpc.DialContext(
+					dialCtx,
+					socketPath,
+					grpc.WithInsecure(),
+					grpc.WithBlock(),
+					grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+						return engineendpoint.DialContext(ctx, transport, socketPath)
+					}),
+					grpc.WithDefaultCallOptions(
+						grpc.MaxCallRecvMsgSize(100*1024*1024),
+						grpc.MaxCallSendMsgSize(100*1024*1024),
+					),
+				)
+			}
 			if err != nil {
 				log.Errorf("failed to dial grpc server: %s", err)
 				fmt.Printf("\n[FAILED] Cannot connect to server at %s\n", addr)
 				fmt.Printf("Error: %s\n", err)
 				fmt.Printf("Please check if:\n")
-				fmt.Printf("  1. Server is running on port %d\n", port)
-				fmt.Printf("  2. Local firewall is not blocking the connection\n")
-				fmt.Printf("  3. Connection timeout (10s exceeded)\n\n")
+				// Distinguish gRPC error codes for better diagnostics
+				if transport != "tcp" {
+					fmt.Printf("  1. The engine is running on this %s endpoint\n", transport)
+					fmt.Printf("  2. The socket path or pipe name matches the engine's ready event\n")
+					fmt.Printf("  3. The current user has permission to connect to the IPC endpoint\n")
+				} else if strings.Contains(err.Error(), "Unavailable") || strings.Contains(err.Error(), "unavailable") {
+					fmt.Printf("  1. The yak engine is not running on port %d\n", port)
+					fmt.Printf("  2. The connection was refused by the target\n")
+				} else if strings.Contains(err.Error(), "DeadlineExceeded") || strings.Contains(err.Error(), "context deadline exceeded") {
+					fmt.Printf("  1. Connection timeout (10s exceeded)\n")
+					fmt.Printf("  2. The server is too slow to respond or network is unreachable\n")
+				} else {
+					fmt.Printf("  1. Server is running on port %d\n", port)
+					fmt.Printf("  2. Local firewall is not blocking the connection\n")
+					fmt.Printf("  3. Connection timeout (10s exceeded)\n")
+				}
+				fmt.Printf("\n")
 				finalError = utils.Wrap(err, dialGrpcServerFailed)
+				phase = "dial"
 				reason = dialGrpcServerFailed
+				checkSecretReasonI18n = grpcEventReasonI18n(dialGrpcServerFailed)
 				return
 			}
 			defer conn.Close()
@@ -933,7 +1415,9 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				fmt.Printf("  1. The password is correct\n")
 				fmt.Printf("  2. The server is running in local-password mode\n\n")
 				finalError = utils.Wrap(err, callVersionFailed)
+				phase = "version_rpc"
 				reason = callVersionFailed
+				checkSecretReasonI18n = grpcEventReasonI18n(callVersionFailed)
 				return
 			}
 
@@ -947,35 +1431,87 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			return
 		}
 
-		// 检查相关文件
+		if transport != "tcp" {
+			if err := engineendpoint.PrepareListener(transport, socketPath); err != nil {
+				phase = "listen"
+				reason, _ = classifyEndpointListenError(transport, err)
+				checkSecretReasonI18n = grpcEventReasonI18n(reason)
+				return err
+			}
+		}
+
+		// Fail on an occupied Windows pipe before opening or migrating databases.
+		reservedIPCListener, err := reserveWindowsIPCListener(transport, socketPath)
+		if err != nil {
+			phase = "listen"
+			reason, _ = classifyEndpointListenError(transport, err)
+			checkSecretReasonI18n = grpcEventReasonI18n(reason)
+			return err
+		}
+		if reservedIPCListener != nil {
+			defer reservedIPCListener.Close()
+		}
+
 		if err := consts.InitializeYakitDatabase(projectPath, profilePath, ssaPath); err != nil {
 			finalError = err
 			log.Errorf("failed to open database: %s", err)
 			fmt.Printf("\nPlease run `%s fixup-database` ", os.Args[0])
+			phase = "database"
 			reason = databaseError
+			checkSecretReasonI18n = grpcEventReasonI18n(databaseError)
 			return
 		}
 
 		// 服务器模式：启动测试服务器
 		log.Info("running in server mode, starting test server...")
 
-		// 检查端口是否被占用
-		lis, err := net.Listen("tcp", addr)
+		// 监听
+		var lis net.Listener = reservedIPCListener
+		if transport == "tcp" {
+			lis, err = net.Listen("tcp", addr)
+		} else if lis == nil {
+			lis, err = engineendpoint.Listen(transport, socketPath)
+		}
 		if err != nil {
-			log.Errorf("failed to listen on port %d: %s", port, err)
-			fmt.Printf("\n[FAILED] Port %d is already in use\n", port)
+			listenReason, hint := classifyEndpointListenError(transport, err)
+			if listenReason == "" {
+				listenReason = "listen_failed"
+			}
+			if transport == "tcp" {
+				log.Errorf("failed to listen on port %d: [%s] %s", port, listenReason, hint)
+			} else {
+				log.Errorf("failed to listen (%s) on %s: [%s] %s", transport, socketPath, listenReason, hint)
+			}
+			if transport == "tcp" {
+				fmt.Printf("\n[FAILED] Cannot listen on port %d\n", port)
+			} else {
+				fmt.Printf("\n[FAILED] Cannot listen on %s endpoint %s\n", transport, socketPath)
+			}
+			fmt.Printf("Reason: %s\n", listenReason)
+			fmt.Printf("Hint: %s\n", hint)
 			fmt.Printf("Please check if:\n")
-			fmt.Printf("  1. Local firewall is blocking the port\n")
-			fmt.Printf("  2. Anti-virus software is preventing yak engine from starting\n")
-			fmt.Printf("  3. Another yak instance is already running\n\n")
-			err = utils.Wrapf(err, "port %d is occupied, please check local firewall or anti-virus software", port)
-			finalError = utils.Wrap(err, netListenFailed)
-			reason = netListenFailed
+			switch listenReason {
+			case tcpBindDenied:
+				fmt.Printf("  1. The port requires elevated privileges\n")
+				fmt.Printf("  2. System policy or firewall is blocking the port\n")
+			case tcpBindInUse:
+				fmt.Printf("  1. Another yak instance is already running on this port\n")
+				fmt.Printf("  2. Another application is using this port\n")
+			default:
+				fmt.Printf("  1. %s\n", hint)
+			}
+			fmt.Printf("\n")
+			finalError = utils.Wrapf(err, "[%s] %s", listenReason, hint)
+			phase = "listen"
+			reason = listenReason
+			checkSecretReasonI18n = grpcEventReasonI18n(listenReason)
 			return
 		}
-		defer lis.Close()
+		if reservedIPCListener == nil {
+			defer lis.Close()
+		}
 
-		log.Infof("generated random secret for testing: %s", secret)
+		log.Info("generated random secret for testing: ***")
 
 		// 创建 GRPC 服务器
 		auth := func(authCtx context.Context) (context.Context, error) {
@@ -1012,7 +1548,9 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
 			finalError = utils.Wrap(err, buildYakGrpcServer)
+			phase = "build_server"
 			reason = buildYakGrpcServer
+			checkSecretReasonI18n = grpcEventReasonI18n(buildYakGrpcServer)
 			return
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
@@ -1028,11 +1566,29 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		defer runCheckSecretCleanupWithTimeout("stop test grpc server", time.Second, grpcTrans.Stop)
 
 		// 等待服务器启动
-		if err := utils.WaitConnect(addr, 5); err != nil {
-			log.Errorf("failed to connect to server, start local port listener failed: %s", err)
-			finalError = utils.Wrap(err, "waiting grpc listener failed")
-			reason = "waiting grpc listener failed"
-			return
+		if transport == "tcp" {
+			if err := utils.WaitConnect(addr, 5); err != nil {
+				log.Errorf("failed to connect to server, start local port listener failed: %s", err)
+				finalError = utils.Wrap(err, "waiting grpc listener failed")
+				phase = "wait_connect"
+				reason = waitConnectFailed
+				checkSecretReasonI18n = grpcEventReasonI18n(waitConnectFailed)
+				return
+			}
+		} else {
+			// Listen has already created the endpoint. One context-bounded dial is enough;
+			// the subsequent authenticated Version RPC verifies server readiness.
+			waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			connection, waitErr := engineendpoint.DialContext(waitCtx, transport, socketPath)
+			waitCancel()
+			if waitErr != nil {
+				finalError = utils.Wrap(waitErr, "waiting ipc listener failed")
+				phase = "wait_connect"
+				reason = waitConnectFailed
+				checkSecretReasonI18n = grpcEventReasonI18n(waitConnectFailed)
+				return
+			}
+			connection.Close()
 		}
 
 		// 创建带超时的 context（10 秒）
@@ -1041,20 +1597,39 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 		// 创建客户端连接
 		log.Infof("connecting to test grpc server (timeout: 10s)...")
-		conn, err := grpc.DialContext(
-			dialCtx,
-			addr,
-			grpc.WithInsecure(),
-			grpc.WithBlock(),
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(100*1024*1024),
-				grpc.MaxCallSendMsgSize(100*1024*1024),
-			),
-		)
+		var conn *grpc.ClientConn
+		if transport == "tcp" {
+			conn, err = grpc.DialContext(
+				dialCtx,
+				addr,
+				grpc.WithInsecure(),
+				grpc.WithBlock(),
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(100*1024*1024),
+					grpc.MaxCallSendMsgSize(100*1024*1024),
+				),
+			)
+		} else {
+			conn, err = grpc.DialContext(
+				dialCtx,
+				socketPath,
+				grpc.WithInsecure(),
+				grpc.WithBlock(),
+				grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+					return engineendpoint.DialContext(ctx, transport, socketPath)
+				}),
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(100*1024*1024),
+					grpc.MaxCallSendMsgSize(100*1024*1024),
+				),
+			)
+		}
 		if err != nil {
 			log.Errorf("failed to dial grpc server: %s", err)
 			finalError = utils.Wrap(err, dialGrpcServerFailed)
+			phase = "dial"
 			reason = dialGrpcServerFailed
+			checkSecretReasonI18n = grpcEventReasonI18n(dialGrpcServerFailed)
 			return
 		}
 		defer runCheckSecretCleanupWithTimeout("close test grpc client", time.Second, func() {
@@ -1077,14 +1652,20 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		if err != nil {
 			log.Errorf("failed to call Version: %s", err)
 			finalError = utils.Wrap(err, callVersionFailed)
+			phase = "version_rpc"
 			reason = callVersionFailed
+			checkSecretReasonI18n = grpcEventReasonI18n(callVersionFailed)
 			return
 		}
 
 		log.Infof("Version RPC successful: %s", versionResp.Version)
 		fmt.Printf("\n[SUCCESS] Local GRPC server with secret authentication test passed\n")
-		fmt.Printf("  Port: %d\n", port)
-		fmt.Printf("  Secret: %s\n", secret)
+		if transport == "tcp" {
+			fmt.Printf("  Port: %d\n", port)
+		} else {
+			fmt.Printf("  Endpoint: %s (%s)\n", socketPath, transport)
+		}
+		fmt.Printf("  Secret: ***\n")
 		fmt.Printf("  Version: %s\n\n", versionResp.Version)
 		version = versionResp.Version
 		finalError = nil
@@ -1415,6 +1996,7 @@ func main() {
 	app.Commands = append(app.Commands, cliGroup("RAG Server", yakcmds.RAGServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("AI Viz Server", yakcmds.VizServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Hot Patch Validators", yakcmds.HotPatchValidatorCommands...)...)
+	app.Commands = append(app.Commands, *yakcmds.MemfitWorkerCommand)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -1569,4 +2151,117 @@ func main() {
 		os.Exit(1)
 		return
 	}
+}
+
+// grpcPhaseI18n maps engine startup phase identifiers to bilingual labels.
+// These are the values emitted in the "phase" field of ready/failed events.
+var grpcPhaseI18n = map[string]*schema.I18n{
+	"init":         schema.NewI18n("初始化", "Initialization"),
+	"pprof":        schema.NewI18n("性能分析服务启动", "pprof server startup"),
+	"database":     schema.NewI18n("数据库初始化", "Database initialization"),
+	"build_server": schema.NewI18n("gRPC 服务构建", "gRPC server build"),
+	"cert":         schema.NewI18n("TLS 证书生成", "TLS certificate generation"),
+	"listen":       schema.NewI18n("网络监听", "Network listen"),
+	"serve":        schema.NewI18n("gRPC 服务运行", "gRPC server serve"),
+	"wait_connect": schema.NewI18n("等待服务就绪", "Waiting for server ready"),
+	"dial":         schema.NewI18n("gRPC 连接", "gRPC dial"),
+	"version_rpc":  schema.NewI18n("认证与版本校验", "Authentication and Version RPC"),
+}
+
+// grpcReasonI18n maps structured reason codes to bilingual user-facing hints.
+// Keys cover both:
+//   - bracketed prefix codes from classifyListenError (e.g. tcp_bind_in_use)
+//   - check-secret reason constants (e.g. database_error, dial_failed)
+var grpcReasonI18n = map[string]*schema.I18n{
+	ipcEndpointInvalid: schema.NewI18n(
+		"Unix socket 的父路径未指向有效目录，请检查目录或符号链接的目标",
+		"The Unix socket parent does not resolve to a directory. Check the directory or symbolic link target",
+	),
+	ipcBindDenied: schema.NewI18n(
+		"无法创建本地 IPC 端点，请检查所选目录或命名管道的访问权限，或换一个可写位置",
+		"Cannot create the local IPC endpoint. Check directory or named-pipe access permissions, or choose a writable location",
+	),
+	ipcBindInUse: schema.NewI18n(
+		"本地 IPC 端点已存在，未覆盖或删除原端点；请选择其他 socket 路径或管道名",
+		"The local IPC endpoint already exists and was left unchanged. Choose another socket path or pipe name",
+	),
+	ipcBindGeneric: schema.NewI18n(
+		"本地 IPC 监听失败，请检查 socket 路径或管道名，以及所选位置的访问权限",
+		"Local IPC listener failed. Check the socket path or pipe name and access permissions at the selected location",
+	),
+	// listen error sub-categories (from classifyListenError)
+	"tcp_bind_denied": schema.NewI18n(
+		"端口被系统策略阻止，请以管理员身份运行 Yakit，或检查防火墙设置",
+		"Permission denied: the port may require elevated privileges or is blocked by system policy. Run Yakit as administrator, or check firewall settings",
+	),
+	"tcp_bind_in_use": schema.NewI18n(
+		"端口被另一个进程占用，请结束占用该端口的旧进程，或切换到其他端口",
+		"Address already in use: another process is listening on this port. Stop the process occupying this port, or switch to another port",
+	),
+	"tcp_bind_failed": schema.NewI18n(
+		"网络监听失败，请检查端口配置或网络环境后重试",
+		"Network listen failed. Check port configuration or network environment and retry",
+	),
+	"listen_failed": schema.NewI18n(
+		"网络监听失败，请检查端口配置或网络环境后重试",
+		"Network listen failed. Check port configuration or network environment and retry",
+	),
+
+	// check-secret reason constants
+	"database_error": schema.NewI18n(
+		"数据库初始化失败，可点击「修复数据库」按钮修复",
+		"Database initialization failed. Click the Fix Database button to repair",
+	),
+	"build_server_failed": schema.NewI18n(
+		"gRPC 服务构建失败，请重启 Yakit 后重试，如问题持续请重新安装引擎",
+		"gRPC server build failed. Restart Yakit and retry; if the problem persists, reinstall the engine",
+	),
+	"dial_failed": schema.NewI18n(
+		"连接 gRPC 服务器失败，请确认引擎进程正常运行，或重启 Yakit 后重试",
+		"Failed to dial gRPC server. Ensure the engine process is running, or restart Yakit and retry",
+	),
+	"version_rpc_failed": schema.NewI18n(
+		"认证或版本校验失败，请确认密码正确，或重启 Yakit 后重试",
+		"Authentication or Version RPC failed. Verify the password is correct, or restart Yakit and retry",
+	),
+	"wait_connect_failed": schema.NewI18n(
+		"等待 gRPC 服务就绪超时，请重启 Yakit 后重试",
+		"Timed out waiting for gRPC server to be ready. Restart Yakit and retry",
+	),
+
+	// phase-fallback reason codes (used when no [xxx] prefix in error message)
+	"init_failed": schema.NewI18n(
+		"引擎初始化失败，请检查启动参数后重试",
+		"Engine initialization failed. Check startup parameters and retry",
+	),
+	"pprof_failed": schema.NewI18n(
+		"性能分析服务启动失败，请检查 pprof 端口配置后重试",
+		"pprof server startup failed. Check pprof port configuration and retry",
+	),
+	"database_failed": schema.NewI18n(
+		"数据库初始化失败，可点击「修复数据库」按钮修复",
+		"Database initialization failed. Click the Fix Database button to repair",
+	),
+	"cert_failed": schema.NewI18n(
+		"TLS 证书生成失败，请重启 Yakit 后重试，如问题持续请重新安装引擎",
+		"TLS certificate generation failed. Restart Yakit and retry; if the problem persists, reinstall the engine",
+	),
+	"serve_failed": schema.NewI18n(
+		"gRPC 服务运行异常，请重启 Yakit 后重试",
+		"gRPC server serve failed. Restart Yakit and retry",
+	),
+	"unexpected_error": schema.NewI18n(
+		"引擎发生意外错误，请重启 Yakit 后重试，如问题持续请重新安装引擎",
+		"Engine encountered an unexpected error. Restart Yakit and retry; if the problem persists, reinstall the engine",
+	),
+}
+
+// grpcEventPhaseI18n returns the bilingual label for a phase, or nil if unknown.
+func grpcEventPhaseI18n(phase string) *schema.I18n {
+	return grpcPhaseI18n[phase]
+}
+
+// grpcEventReasonI18n returns the bilingual hint for a reason code, or nil if unknown.
+func grpcEventReasonI18n(reasonCode string) *schema.I18n {
+	return grpcReasonI18n[reasonCode]
 }

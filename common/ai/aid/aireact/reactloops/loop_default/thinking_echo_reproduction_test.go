@@ -123,7 +123,7 @@ func TestDefaultLoop_ReproducesReasoningReplayPromptExampleEcho(t *testing.T) {
 	callCount := calls
 	mu.Unlock()
 
-	require.GreaterOrEqual(t, callCount, 4, "direct answer must be followed by the two-step finish checkpoint")
+	require.Equal(t, 3, callCount, "after the answer retry, one finish must end the task")
 	require.GreaterOrEqual(t, len(capturedPrompts), 2)
 	require.Equal(t, 1, strings.Count(capturedPrompts[0], "...[your-answer not a markdown].."),
 		"the initial prompt already contains one executable copy in output_example")
@@ -213,7 +213,7 @@ func TestDefaultLoop_PromptExampleEchoDoesNotRequireReasoningReplay(t *testing.T
 	capturedEvents := append([]*schema.AiOutputEvent(nil), events...)
 	callCount := calls
 	mu.Unlock()
-	require.GreaterOrEqual(t, callCount, 3)
+	require.Equal(t, 2, callCount, "one answer and one finish must end the task")
 
 	answerStreamStarts, answerStream, _ := snapshotAnswerStreams(capturedEvents)
 	require.Equal(t, 2, answerStreamStarts)

@@ -90,6 +90,11 @@ type AIConfig struct {
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
 	ToolCallCallback func([]*ToolCall)
+	// ToolCallArgumentsStreamHandler, when set, receives a reader that
+	// streams the incremental function_call arguments as raw bytes.
+	// Used by functioncall mode to feed tool_call arguments into the
+	// same text-parsing pipeline as regular content.
+	ToolCallArgumentsStreamHandler func(io.Reader)
 
 	// Tools defines the available tools that the model may call
 	Tools []Tool
@@ -1266,6 +1271,17 @@ func WithHTTPErrorHandler(h func(error)) AIConfigOption {
 func WithToolCallCallback(cb func([]*ToolCall)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ToolCallCallback = cb
+	}
+}
+
+// WithToolCallArgumentsStreamHandler sets a handler that receives a reader
+// streaming the incremental function_call arguments as raw bytes. When set,
+// tool_call arguments flow through this handler in addition to being
+// delivered via ToolCallCallback. Used by functioncall mode to unify the
+// action parsing pipeline.
+func WithToolCallArgumentsStreamHandler(h func(io.Reader)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ToolCallArgumentsStreamHandler = h
 	}
 }
 

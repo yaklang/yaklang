@@ -49,7 +49,10 @@ func directlyAnswerSyntaxFlowVerifier(loop *reactloops.ReActLoop, action *aicomm
 		payload = action.GetInvokeParams("next_action").GetString("answer_payload")
 	}
 	if payload == "" {
-		tagPayload := loop.Get("tag_final_answer")
+		tagPayload := action.GetString("tag_final_answer")
+		if tagPayload == "" {
+			tagPayload = loop.Get("tag_final_answer")
+		}
 		if tagPayload != "" {
 			payload = tagPayload
 		}

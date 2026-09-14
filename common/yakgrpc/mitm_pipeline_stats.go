@@ -3,6 +3,7 @@
 package yakgrpc
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ type mitmPipelineRequestState struct {
 	stageAt     time.Time
 	dispatched  bool
 	manualDepth int
+	stopCancel  func() bool
 }
 
 // mitmPipelineTracker owns lightweight, process-local metrics for one MITMV2
@@ -71,10 +73,21 @@ func (t *mitmPipelineTracker) requestObserved(req *http.Request) {
 	now := t.now()
 	t.mu.Lock()
 	if _, exists := t.requests[req]; !exists {
-		t.requests[req] = &mitmPipelineRequestState{
+		state := &mitmPipelineRequestState{
 			stage:   mitmPipelineStageRequestProcessing,
 			stageAt: now,
 		}
+		t.requests[req] = state
+		// H2 cancellation and upstream failures may bypass response callbacks.
+		// Capture the original request context: lowhttp later replaces req's
+		// context with a child that finishes before response processing does.
+		state.stopCancel = context.AfterFunc(req.Context(), func() {
+			t.mu.Lock()
+			if t.requests[req] == state {
+				delete(t.requests, req)
+			}
+			t.mu.Unlock()
+		})
 		t.requestTotal.Add(1)
 	}
 	t.mu.Unlock()
@@ -169,6 +182,9 @@ func (t *mitmPipelineTracker) responseProcessingFinished(req *http.Request) {
 		return
 	}
 	t.mu.Lock()
+	if state := t.requests[req]; state != nil && state.stopCancel != nil {
+		state.stopCancel()
+	}
 	delete(t.requests, req)
 	t.mu.Unlock()
 }
@@ -178,7 +194,10 @@ func (t *mitmPipelineTracker) requestDropped(req *http.Request) {
 		return
 	}
 	t.mu.Lock()
-	if _, exists := t.requests[req]; exists {
+	if state, exists := t.requests[req]; exists {
+		if state.stopCancel != nil {
+			state.stopCancel()
+		}
 		delete(t.requests, req)
 		t.droppedTotal.Add(1)
 	}

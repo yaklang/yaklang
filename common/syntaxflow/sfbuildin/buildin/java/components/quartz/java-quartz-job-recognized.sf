@@ -1,4 +1,5 @@
 desc(
+	risk: "information"
 	title: "Audit Java Quartz Job Class Identification"
 	title_zh: "审计 Java Quartz Job 类识别"
 	type: audit
@@ -162,7 +163,7 @@ method.invoke(job);
 #### 5. 并发控制策略
 根据业务需求，正确使用 `@DisallowConcurrentExecution` 注解，防止多个任务实例同时运行导致的问题。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }
 
 desc(

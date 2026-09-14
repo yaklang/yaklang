@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Models SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -32,7 +32,7 @@ func SQLILoginHandler(c *gin.Context) {
 DESC
 	rule_id: "b89f27b3-35ee-48ae-ba75-415da669f60d"
 	title_zh: "检测Golang SQL注入漏洞(Models)"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -106,7 +106,7 @@ alert $high for {
 	title: "Golang SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang SQL注入漏洞",
 	level: "high",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "high",
 	message: "检测到Golang代码中存在SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	solution: <<<SOLUTION

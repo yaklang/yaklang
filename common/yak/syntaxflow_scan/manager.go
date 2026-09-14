@@ -304,6 +304,24 @@ func (m *scanManager) initByConfig() error {
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	}
 
+	// Source query targets never populate BaseInfo.ProgramNames, but task
+	// persistence and progress reporting use program names. Keep them aligned
+	// so SaveTask does not record an empty program for a completed source scan.
+	if len(config.QueryTargets) > 0 && len(config.GetProgramNames()) == 0 {
+		names := make([]string, 0, len(config.QueryTargets))
+		for _, target := range config.QueryTargets {
+			if target == nil {
+				continue
+			}
+			if name := target.GetProgramName(); name != "" {
+				names = append(names, name)
+			}
+		}
+		if len(names) > 0 && config.Config != nil {
+			config.Config.SetProgramName(names[0])
+		}
+	}
+
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
 		db := consts.GetGormProfileDatabase()
 		db = yakit.FilterSyntaxFlowRule(db, filter)
@@ -326,7 +344,19 @@ func (m *scanManager) initByConfig() error {
 		if err != nil {
 			return err
 		}
-		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, config.GetRuleFilterMode())
+		modeFilter := config.GetRuleFilterMode()
+		if len(modeFilter) == 0 {
+			// Source/SSA query targets must never execute mixed-mode rules:
+			// a snapshot can contain both backends, and an SSA rule against
+			// a raw PatternRoot can allocate unbounded result objects.
+			if len(config.QueryTargets) > 0 && len(config.Programs) == 0 {
+				modeFilter = []string{string(schema.SFR_MODE_SOURCE)}
+			} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
+				modeFilter = []string{string(schema.SFR_MODE_SSA)}
+			}
+		}
+		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, modeFilter)
+		parsedRules = filterTaskLocalSyntaxFlowRulesByNames(parsedRules, config.SyntaxFlowRule)
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
 		for _, rule := range parsedRules {
 			ruleCh <- rule

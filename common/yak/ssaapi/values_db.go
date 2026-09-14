@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/dbcache"
@@ -17,6 +18,13 @@ const (
 	MAXTime         = time.Millisecond * 500
 	MaxPathElements = 10
 )
+
+// sanitizeAuditNodeString makes source-derived text safe for UTF-8 databases.
+// Some repositories contain truncated multibyte sequences or non-UTF-8 bytes;
+// PostgreSQL rejects those values and dbcache stops persisting later batches.
+func sanitizeAuditNodeString(value string) string {
+	return strings.ToValidUTF8(value, "�")
+}
 
 type Dtype int
 
@@ -177,7 +185,7 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 
 	setTmpValue := func(an *ssadb.AuditNode, v *Value) {
 		R := value.GetRange()
-		an.TmpValue = yakunquote.TryUnquote(value.String())
+		an.TmpValue = sanitizeAuditNodeString(yakunquote.TryUnquote(value.String()))
 		if R != nil {
 			editor := R.GetEditor()
 			if editor == nil {

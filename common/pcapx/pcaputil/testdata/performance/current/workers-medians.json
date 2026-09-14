@@ -1,0 +1,130 @@
+{
+  "BenchmarkTCPWorkers/sha256=false/workers=1-10": {
+    "ns_op": 11067294.0,
+    "MB_s": 2161.38,
+    "B_op": 31828320.0,
+    "allocs_op": 4296.0,
+    "payload_Gbit_s": 17.291040000000002,
+    "speedup_vs_1_worker": 1.0
+  },
+  "BenchmarkTCPWorkers/sha256=false/workers=2-10": {
+    "ns_op": 7176763.0,
+    "MB_s": 3333.07,
+    "B_op": 34323190.0,
+    "allocs_op": 4365.0,
+    "payload_Gbit_s": 26.66456,
+    "speedup_vs_1_worker": 1.5421027306628172
+  },
+  "BenchmarkTCPWorkers/sha256=false/workers=4-10": {
+    "ns_op": 6867856.0,
+    "MB_s": 3482.99,
+    "B_op": 36814970.0,
+    "allocs_op": 4424.0,
+    "payload_Gbit_s": 27.86392,
+    "speedup_vs_1_worker": 1.6114658227613838
+  },
+  "BenchmarkTCPWorkers/sha256=false/workers=8-10": {
+    "ns_op": 7277310.0,
+    "MB_s": 3287.02,
+    "B_op": 41801542.0,
+    "allocs_op": 4541.0,
+    "payload_Gbit_s": 26.29616,
+    "speedup_vs_1_worker": 1.520796898277952
+  },
+  "BenchmarkTCPWorkers/sha256=true/workers=1-10": {
+    "ns_op": 21686428.0,
+    "MB_s": 1103.02,
+    "B_op": 31838363.0,
+    "allocs_op": 4422.0,
+    "payload_Gbit_s": 8.824160000000001,
+    "speedup_vs_1_worker": 1.0
+  },
+  "BenchmarkTCPWorkers/sha256=true/workers=2-10": {
+    "ns_op": 12494880.0,
+    "MB_s": 1914.44,
+    "B_op": 34333382.0,
+    "allocs_op": 4492.0,
+    "payload_Gbit_s": 15.315520000000001,
+    "speedup_vs_1_worker": 1.7356348932929595
+  },
+  "BenchmarkTCPWorkers/sha256=true/workers=4-10": {
+    "ns_op": 8888158.0,
+    "MB_s": 2691.29,
+    "B_op": 36825100.0,
+    "allocs_op": 4551.0,
+    "payload_Gbit_s": 21.53032,
+    "speedup_vs_1_worker": 2.4399285597722615
+  },
+  "BenchmarkTCPWorkers/sha256=true/workers=8-10": {
+    "ns_op": 7864340.0,
+    "MB_s": 3041.66,
+    "B_op": 41811553.0,
+    "allocs_op": 4667.0,
+    "payload_Gbit_s": 24.33328,
+    "speedup_vs_1_worker": 2.757574658664394
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=false/workers=1-10": {
+    "ns_op": 8788172.0,
+    "MB_s": 2721.91,
+    "B_op": 24322142.0,
+    "allocs_op": 1206.0,
+    "payload_Gbit_s": 21.77528,
+    "speedup_vs_1_worker": 1.0
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=false/workers=2-10": {
+    "ns_op": 6673190.0,
+    "MB_s": 3584.59,
+    "B_op": 26819366.0,
+    "allocs_op": 1273.0,
+    "payload_Gbit_s": 28.676720000000003,
+    "speedup_vs_1_worker": 1.3169392081295856
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=false/workers=4-10": {
+    "ns_op": 6691149.0,
+    "MB_s": 3574.97,
+    "B_op": 29315618.0,
+    "allocs_op": 1328.0,
+    "payload_Gbit_s": 28.59976,
+    "speedup_vs_1_worker": 1.3134049252179536
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=false/workers=8-10": {
+    "ns_op": 6689602.0,
+    "MB_s": 3575.79,
+    "B_op": 34308181.0,
+    "allocs_op": 1438.0,
+    "payload_Gbit_s": 28.60632,
+    "speedup_vs_1_worker": 1.3137061842603173
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=true/workers=1-10": {
+    "ns_op": 19071144.0,
+    "MB_s": 1254.28,
+    "B_op": 24322419.0,
+    "allocs_op": 1209.0,
+    "payload_Gbit_s": 10.03424,
+    "speedup_vs_1_worker": 1.0
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=true/workers=2-10": {
+    "ns_op": 17020125.0,
+    "MB_s": 1405.43,
+    "B_op": 26819582.0,
+    "allocs_op": 1276.0,
+    "payload_Gbit_s": 11.243440000000001,
+    "speedup_vs_1_worker": 1.1205073827215615
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=true/workers=4-10": {
+    "ns_op": 16964335.0,
+    "MB_s": 1410.05,
+    "B_op": 29315712.0,
+    "allocs_op": 1329.0,
+    "payload_Gbit_s": 11.2804,
+    "speedup_vs_1_worker": 1.1241907708007781
+  },
+  "BenchmarkTCPWorkersSingleFlow/sha256=true/workers=8-10": {
+    "ns_op": 17073797.0,
+    "MB_s": 1401.01,
+    "B_op": 34308220.0,
+    "allocs_op": 1439.0,
+    "payload_Gbit_s": 11.20808,
+    "speedup_vs_1_worker": 1.116983448671748
+  }
+}

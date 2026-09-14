@@ -204,7 +204,7 @@ if err != nil {
 fmt.Println(string(content))
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }
 
 desc(

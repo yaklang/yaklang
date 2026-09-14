@@ -277,7 +277,6 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 
 func GetDB() *gorm.DB {
 	db := consts.GetGormSSAProjectDataBase()
-	EnsureDBOpCallbacks(db)
 	return db
 }
 

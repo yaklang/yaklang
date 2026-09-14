@@ -171,7 +171,7 @@ return Jwts.parserBuilder()
 ```
 SOLUTION
 	level: "mid",
-	risk: "身份验证绕过",
+	risk: "authentication-bypass",
 	message_zh: "JWT 使用了不安全的 parse 方法",
 	name: "riskParse",
 	cwe: "347",
@@ -183,7 +183,7 @@ $key?{opcode: call && <getCallee>?{<getObject><name>?{have:base64 || BASE64  || 
 $simpleKey + $base64EncodedKey as $hardcodedKey;
 alert $hardcodedKey for {
 	level: "high",
-	risk: "身份验证绕过",
+	risk: "hardcoded-key",
 	message: "JWT 使用了硬编码的密钥",
 	message_zh: "JWT 使用了硬编码的密钥",
 	title: "Check Java JWT Hardcoded Key",
@@ -272,7 +272,7 @@ JWT（JSON Web Tokens）是一种用于在各方之间安全传输信息的开�
 DESC
 	level: "mid",
 	type: "vuln",
-	risk: "身份验证绕过",
+	risk: "hardcoded-key",
 	message_zh: "JWT 使用了不安全的密钥",
 	title: "Check Java JWT Insecure Key Usage",
 	name: "sink",

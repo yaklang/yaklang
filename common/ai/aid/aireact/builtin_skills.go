@@ -45,9 +45,9 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 // Built-in skills are placed under a "builtin/" subdirectory to separate them from
 // user-created skills that live directly under the target directory.
 //
-// Only files that do not already exist are written. Existing local files are
-// always preserved so users can freely customize built-in skills without their
-// changes being overwritten by later runs. If a file was previously written by
+// Embedded changes replace untouched defaults. Customized skills are first
+// preserved under a single <name>-legacy directory. Edits within the same embedded
+// revision are retained. If a file was previously written by
 // this extractor (tracked in the profile DB) and the user later deletes it from
 // disk, that removal is recorded and the file will not be re-created on future
 // runs. To get the default file back, delete the corresponding
@@ -57,6 +57,18 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 // "builtin/" is prepended, so the output becomes
 // "<targetDir>/builtin/<skill-name>/SKILL.md".
 func ExtractBuiltinSkillsToDir(targetDir string) error {
+	recommendedSkillsMu.Lock()
+	defer recommendedSkillsMu.Unlock()
+	return extractBuiltinSkillsToDir(targetDir)
+}
+
+func extractBuiltinSkillsToDir(targetDir string) error {
+	if err := upgradeBuiltinSkillFiles(targetDir); err != nil {
+		return err
+	}
+	if err := SyncBuiltinSkillsToDB(); err != nil {
+		return err
+	}
 	embedFS := GetBuiltinSkillsFS()
 
 	return filesys.SimpleRecursive(

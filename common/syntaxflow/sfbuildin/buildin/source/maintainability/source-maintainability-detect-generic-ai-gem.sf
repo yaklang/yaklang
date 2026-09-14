@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Gemini AI API 使用"
+	title_zh: "检测到 Gemini AI API 使用"
+	type: maintainability
+	level: low
+	rule_id: "source-maintainability-detect-generic-ai-gem"
+	risk: "code-style"
+	desc: <<<DESC
+### 规则说明
+代码中可能使用了 Gemini AI API。
+
+### 风险类型
+代码规范与兼容性（code-style）
+
+### 影响
+使用了已废弃、不兼容或不符合规范的模式，可能导致后续维护困难或运行环境差异。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+确认该 AI 使用是否符合团队规范与安全策略，按需替换或保留。
+SOLUTION
+	alert_min: 1
+	"file://pos.txt": <<<POS
+google/generative-ai
+POS
+	"safefile://pos.txt": <<<NEG
+hello world
+NEG
+)
+
+${*}.pattern_regex(/(?:google\/generative\-ai)|(?:GoogleGenerativeAI)/) as $hit
+alert $hit for {
+	level: "low",
+	title: "检测到 Gemini AI API 使用",
+	title_zh: "检测到 Gemini AI API 使用",
+	message: "检测到 Gemini AI API 使用",
+}

@@ -9,7 +9,7 @@ COPY scripts/get-yak-version.sh /get-yak-version
 
 # Always fetch version from active_versions.txt (excluding -yakit- and -irify- versions)
 # VERSION build arg is ignored, version is always determined from active_versions.txt
-RUN apt-get update -y && apt-get install -y wget curl iputils-ping libpcap0.8=1.9.1-3 && \
+RUN apt-get update -y && apt-get install -y wget curl iputils-ping && \
     ARCH=$(if [ "$(uname -m)" = "aarch64" ]; then echo "arm64"; else echo "amd64"; fi) && \
     VERSION=$(bash /get-yak-version --quiet || echo "latest") && \
     wget -q -O /app/yak https://aliyun-oss.yaklang.com/yak/${VERSION}/yak_linux_${ARCH} && \

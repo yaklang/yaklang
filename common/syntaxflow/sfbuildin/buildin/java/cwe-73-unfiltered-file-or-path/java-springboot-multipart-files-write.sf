@@ -2,7 +2,7 @@ desc(
 	title: "Check Java MultipartFile Path Traversal Vulnerability"
 	type: audit
 	level: warning
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -208,6 +208,6 @@ private boolean isValidExtension(String extension) {
 限制上传文件存储目录的操作系统权限，仅允许应用程序用户具有写入权限，防止攻击者利用其他途径向该目录写入或修改文件。
 综合运用以上多种防御措施，可以有效地防范通过上传文件实现的路径遍历攻击。
 SOLUTION
-	risk: "路径穿越",
+	risk: "path-traversal",
 	name: "inter",
 }

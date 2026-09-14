@@ -414,7 +414,9 @@ func (n *NTLMv2) GetAuthenticateMessage(s []byte) (*AuthenticateMessage, *NTLMv2
 	if challengeMsg.NegotiateFlags&NTLMSSP_NEGOTIATE_UNICODE != 0 {
 		n.enableUnicode = true
 	}
-	log.Infof("user: %s, passwd:%s", n.user, n.password)
+	// 凭证脱敏：密码绝不进入日志（哨兵扫描项；曾以明文输出被
+	// Shodan 真实目标测试捕获）。
+	log.Infof("user: %s", n.user)
 	domain, user, _ := n.GetEncodedCredentials()
 
 	n.authenticateMessage = NewAuthenticateMessage(challengeMsg.NegotiateFlags,

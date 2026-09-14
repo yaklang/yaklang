@@ -50,7 +50,7 @@ func TestSaveEvidence_IsCoreActionAndWritesSessionStore(t *testing.T) {
 	op := executeSaveEvidence(t, loop, task, `{
 		"@action": "save_evidence",
 		"evidence_id": "refresh-token-replay",
-		"verification_payload": "POST /token/refresh accepted the same refresh token twice and returned two valid access tokens."
+		"evidence_content": "POST /token/refresh accepted the same refresh token twice and returned two valid access tokens."
 	}`)
 
 	assert.True(t, op.IsContinued())
@@ -64,10 +64,10 @@ func TestSaveEvidence_IsCoreActionAndWritesSessionStore(t *testing.T) {
 
 func TestSaveEvidence_RetryAndUpdateAreIdempotent(t *testing.T) {
 	loop, invoker, task := newSaveEvidenceLoop(t)
-	first := `{"@action":"save_evidence","evidence_id":"api-auth","verification_payload":"Unauthenticated GET /api/users returned 401."}`
+	first := `{"@action":"save_evidence","evidence_id":"api-auth","evidence_content":"Unauthenticated GET /api/users returned 401."}`
 	executeSaveEvidence(t, loop, task, first)
 	executeSaveEvidence(t, loop, task, first)
-	executeSaveEvidence(t, loop, task, `{"@action":"save_evidence","evidence_id":"api-auth","verification_payload":"Unauthenticated GET /api/users returned 401 with no response body."}`)
+	executeSaveEvidence(t, loop, task, `{"@action":"save_evidence","evidence_id":"api-auth","evidence_content":"Unauthenticated GET /api/users returned 401 with no response body."}`)
 
 	rendered := invoker.GetConfig().GetSessionEvidenceRendered()
 	assert.Len(t, regexp.MustCompile(`\[id: api-auth\]`).FindAllStringIndex(rendered, -1), 1)
@@ -77,7 +77,7 @@ func TestSaveEvidence_RetryAndUpdateAreIdempotent(t *testing.T) {
 
 func TestSaveEvidence_DerivesStableIDAndRejectsEmptyContent(t *testing.T) {
 	loop, invoker, task := newSaveEvidenceLoop(t)
-	raw := `{"@action":"save_evidence","verification_payload":"Controlled comparison ruled out anonymous access to /admin/."}`
+	raw := `{"@action":"save_evidence","evidence_content":"Controlled comparison ruled out anonymous access to /admin/."}`
 	executeSaveEvidence(t, loop, task, raw)
 	executeSaveEvidence(t, loop, task, raw)
 

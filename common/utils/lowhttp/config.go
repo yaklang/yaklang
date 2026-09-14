@@ -141,6 +141,7 @@ type LowhttpExecConfig struct {
 	RandomJA3FingerPrint bool
 	ClientHelloSpec      *utls.ClientHelloSpec
 	TLSFingerprint       string
+	HTTP2Fingerprint     string
 
 	Tags []string
 
@@ -969,7 +970,9 @@ func WithRedirectHandler(redirectHandler func(bool, []byte, []byte) bool) Lowhtt
 	}
 }
 
-// WithSession 指定 session 标识；cookie jar 在池中跨请求复用，调用方负责 RemoveCookiejar 或 poc.RemoveSession。
+// WithSession 指定 session 标识；cookie jar 在有界 LRU 池中跨请求复用。
+// 调用方仍应在确定不再使用时调用 RemoveCookiejar 或 poc.RemoveSession，
+// 以便及时释放 cookie；池达到容量时会自动淘汰最久未使用的 session。
 func WithSession(session string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Session = session
@@ -1029,6 +1032,16 @@ func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 func WithTLSFingerprint(name string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.TLSFingerprint = name
+	}
+}
+
+// WithHTTP2Fingerprint selects a built-in HTTP/2 framing fingerprint profile
+// (see AvailableHTTP2Profiles). It is independent of WithTLSFingerprint: the
+// default HTTP/2 framing stays compatible with non-conforming servers unless a
+// profile is requested explicitly.
+func WithHTTP2Fingerprint(name string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.HTTP2Fingerprint = name
 	}
 }
 

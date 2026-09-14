@@ -1,4 +1,5 @@
 desc(
+	risk: "ssrf"
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞"
 	title: "Detect Java SpringBoot SSRF Vulnerability"
 	type: vuln
@@ -170,7 +171,7 @@ return "Error: " + e.getMessage();
 DESC
 	level: "mid",
 	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
-	risk: "服务端请求伪造（SSRF）",
+	risk: "ssrf",
 	title: "Detect Java SpringBoot SSRF Vulnerability",
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 	name: "mid",
@@ -260,7 +261,7 @@ return "Error: " + e.getMessage();
 - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
 DESC
 	level: "low",
-	risk: "服务端请求伪造（SSRF）",
+	risk: "ssrf",
 	message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
 	title: "Detect Java SpringBoot SSRF Vulnerability",
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",

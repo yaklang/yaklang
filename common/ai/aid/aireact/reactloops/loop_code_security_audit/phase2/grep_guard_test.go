@@ -104,7 +104,7 @@ func TestScanState_ClearPhaseBGrepsOnMark(t *testing.T) {
 	scan.BumpPhaseBGrep("/tmp/a.go")
 	require.Equal(t, 2, scan.PhaseBGrepCount("/tmp/a.go"))
 
-	scan.MarkFileDone("/tmp/a.go")
+	markFileDoneForTest(scan, "/tmp/a.go")
 	scan.ClearPhaseBGreps("/tmp/a.go")
 	require.Equal(t, 0, scan.PhaseBGrepCount("/tmp/a.go"))
 }

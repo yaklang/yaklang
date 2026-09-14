@@ -89,48 +89,24 @@ func newDynamicPlanningTestConfig(ctx context.Context, aiCallback AICallbackType
 	return NewTestConfig(ctx, baseOpts...)
 }
 
-func collectRequestAndResponseReferenceMaterials(t *testing.T, events <-chan *schema.AiOutputEvent, deadline <-chan time.Time) (string, string, string, string, map[string]bool) {
+// Inspect all events buffered before review completion, including unrelated streams.
+func assertReviewWithoutModelExchangeReferences(t *testing.T, events <-chan *schema.AiOutputEvent, nodeID string) {
 	t.Helper()
-
-	streamStartIDs := make(map[string]bool)
-	var requestPayload string
-	var responsePayload string
-	var requestEventID string
-	var responseEventID string
-
+	var sawReviewStream bool
 	for {
-		if requestPayload != "" && responsePayload != "" && streamStartIDs[requestEventID] && streamStartIDs[responseEventID] {
-			return requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs
-		}
-
 		select {
 		case evt := <-events:
 			if evt == nil {
 				continue
 			}
-			if evt.Type == schema.EVENT_TYPE_STREAM_START {
-				streamStartIDs[evt.GetStreamEventWriterId()] = true
+			require.NotEqual(t, schema.EVENT_TYPE_REFERENCE_MATERIAL, evt.Type,
+				"review prompts and raw responses are not reference materials")
+			if evt.Type == schema.EVENT_TYPE_STREAM_START && evt.NodeId == nodeID {
+				sawReviewStream = true
 			}
-			if evt.Type != schema.EVENT_TYPE_REFERENCE_MATERIAL {
-				continue
-			}
-
-			var payload map[string]any
-			require.NoError(t, json.Unmarshal(evt.Content, &payload))
-
-			payloadStr, _ := payload["payload"].(string)
-			eventID, _ := payload["event_uuid"].(string)
-
-			switch {
-			case strings.Contains(payloadStr, "AI 请求原文"):
-				requestPayload = payloadStr
-				requestEventID = eventID
-			case strings.Contains(payloadStr, "AI 响应原文"):
-				responsePayload = payloadStr
-				responseEventID = eventID
-			}
-		case <-deadline:
-			return requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs
+		default:
+			require.True(t, sawReviewStream, "review result must remain visible")
+			return
 		}
 	}
 }
@@ -426,7 +402,7 @@ func TestYOLO_DynamicPlanning_PlanReview_EmitsStructuredDecision(t *testing.T) {
 	}
 }
 
-func TestYOLO_DynamicPlanning_PlanReview_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
+func TestYOLO_DynamicPlanning_PlanReview_DoesNotEmitModelExchangeReferences(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -435,6 +411,7 @@ func TestYOLO_DynamicPlanning_PlanReview_EmitsRequestAndResponseReferenceMateria
 	rawResponse := `{"@action":"plan_review","suggestion":"continue","reason":"plan review raw response"}`
 
 	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		require.Contains(t, req.GetPrompt(), planToken)
 		rsp := NewUnboundAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(rawResponse))
 		rsp.Close()
@@ -470,16 +447,10 @@ func TestYOLO_DynamicPlanning_PlanReview_EmitsRequestAndResponseReferenceMateria
 		t.Fatal("plan review AI call should complete within timeout")
 	}
 
-	requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs := collectRequestAndResponseReferenceMaterials(t, events, time.After(3*time.Second))
-	require.NotEmpty(t, requestPayload)
-	require.NotEmpty(t, responsePayload)
-	require.Contains(t, requestPayload, planToken)
-	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
-	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
+	assertReviewWithoutModelExchangeReferences(t, events, "plan-review")
 }
 
-func TestYOLO_DynamicPlanning_TaskReview_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
+func TestYOLO_DynamicPlanning_TaskReview_DoesNotEmitModelExchangeReferences(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -488,6 +459,7 @@ func TestYOLO_DynamicPlanning_TaskReview_EmitsRequestAndResponseReferenceMateria
 	rawResponse := `{"@action":"task_review","suggestion":"continue","reason":"task review raw response"}`
 
 	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		require.Contains(t, req.GetPrompt(), taskToken)
 		rsp := NewUnboundAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(rawResponse))
 		rsp.Close()
@@ -525,13 +497,7 @@ func TestYOLO_DynamicPlanning_TaskReview_EmitsRequestAndResponseReferenceMateria
 		t.Fatal("task review AI call should complete within timeout")
 	}
 
-	requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs := collectRequestAndResponseReferenceMaterials(t, events, time.After(3*time.Second))
-	require.NotEmpty(t, requestPayload)
-	require.NotEmpty(t, responsePayload)
-	require.Contains(t, requestPayload, taskToken)
-	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
-	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
+	assertReviewWithoutModelExchangeReferences(t, events, "task-review")
 }
 
 func TestYOLO_DynamicPlanning_CustomPlanReview(t *testing.T) {

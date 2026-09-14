@@ -399,24 +399,7 @@ func cleanProgressMessage(s string) string {
 
 // extractEventMessage 从结构化内容中提取可读消息
 func extractEventMessage(rawContent string, isJson bool) string {
-	if rawContent == "" {
-		return ""
-	}
-	if !isJson {
-		return rawContent
-	}
-	var obj map[string]interface{}
-	if err := json.Unmarshal([]byte(rawContent), &obj); err != nil {
-		return rawContent
-	}
-	for _, key := range []string{"message", "content", "value", "title", "path", "filename", "payload"} {
-		if v, ok := obj[key]; ok {
-			if str := utils.InterfaceToString(v); str != "" {
-				return str
-			}
-		}
-	}
-	return ""
+	return schema.ExtractAIOutputDisplayMessage([]byte(rawContent), isJson)
 }
 
 // classifyEvent 根据事件类型与 nodeId 推导 kind/label; kind 为空表示丢弃

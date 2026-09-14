@@ -2,7 +2,7 @@ desc(
 	title: "Check Java URL Redirect Vulnerability"
 	title_zh: "检测Java URL重定向漏洞"
 	type:vuln
-	risk: "开放重定向"
+	risk: "open-redirect"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -192,7 +192,7 @@ return "redirect:/errorPage?msg=InvalidPath";
 ```
 在上述示例中，`safeRedirect` 方法通过白名单校验目标URL的域名，`safeRelativeRedirect` 限制重定向到应用内的相对路径。实际应用中应根据具体需求选择和组合这些防御方法。
 SOLUTION
-	risk: "URL重定向",
+	risk: "open-redirect",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -296,7 +296,7 @@ return "redirect:/errorPage?msg=InvalidPath";
 ```
 在上述示例中，`safeRedirect` 方法通过白名单校验目标URL的域名，`safeRelativeRedirect` 限制重定向到应用内的相对路径。实际应用中应根据具体需求选择和组合这些防御方法。
 SOLUTION
-	risk: "URL重定向",
+	risk: "open-redirect",
 	name: "low",
 	desc: <<<DESC
 ### 漏洞描述

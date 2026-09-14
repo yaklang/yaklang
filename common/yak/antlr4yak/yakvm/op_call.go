@@ -50,7 +50,6 @@ func (v *Frame) asyncCall(caller *Value, wavy bool, args []*Value) {
 		v.vm.callFuncCallback(caller, wavy, args)
 	}
 	if caller.Callable() {
-		v.vm.AsyncStart()
 		caller.AsyncCall(v, wavy, args...)
 		return
 	}

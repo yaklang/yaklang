@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -10,6 +12,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
+
+func TestDirectlyAnswerUsesParsedTagBeforeEmitterFinishes(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	ctx := context.Background()
+	release := make(chan struct{})
+	defer close(release)
+	action, err := aicommon.ExtractActionFromStream(ctx, strings.NewReader(`{"@action":"directly_answer"}
+<|FINAL_ANSWER_test|>complete answer<|FINAL_ANSWER_END_test|>`), "object",
+		aicommon.WithActionAlias("directly_answer"),
+		aicommon.WithActionNonce("test"),
+		aicommon.WithActionTagToKey("FINAL_ANSWER", "tag_final_answer"),
+		aicommon.WithActionFieldStreamHandler([]string{"tag_final_answer"}, func(_ string, reader io.Reader) {
+			_, _ = io.Copy(io.Discard, reader)
+			<-release // The UI completion callback has not populated loop vars yet.
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, action.WaitParseResult(ctx))
+	require.Empty(t, loop.Get("tag_final_answer"))
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+	require.Equal(t, "complete answer", loop.Get("directly_answer_payload"))
+}
 
 func newMinimalLoopForHelperTest() *ReActLoop {
 	return &ReActLoop{vars: omap.NewEmptyOrderedMap[string, any]()}
@@ -210,4 +234,37 @@ func TestInvalidClosedTodoDeltaCannotBypassDuplicateDirectlyAnswer(t *testing.T)
 	timeline := strings.Join(invoker.timeline, "\n")
 	require.Contains(t, timeline, "TODO_DELTA_ERROR")
 	require.Contains(t, timeline, "use todo_delta.add with a new id")
+}
+
+func TestSimpleQueryDoesNotAutoFinishWithTodoHistory(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	setCurrentTodo(t, cfg, task, "previous-work")
+	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{
+		Close: []aicommon.TodoClose{{ID: "previous-work", Outcome: aicommon.TodoOutcomeResolved, Reason: "completed"}},
+	})
+	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	require.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+
+	other := aicommon.NewStatefulTaskBase("new-task", "你好", context.Background(), cfg.GetEmitter(), true)
+	loop.SetCurrentTask(other)
+	require.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action), "unrelated history must not block a new greeting")
+}
+
+func TestSimpleQueryPreservesGoalAndTodoWork(t *testing.T) {
+	loop, _, cfg, _ := newTodoGateTestLoop(t, nil)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	cfg.enableGoalMode, cfg.goalMinIterations = true, 6
+	loop.currentIterationIndex = 1
+	require.False(t, loop.isSimpleQueryWithoutWork(), "goal work must retain automatic recall")
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	require.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action), "greeting must not bypass the goal finish gate")
+	loop.currentIterationIndex = 6
+	require.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+	cfg.enableGoalMode = false
+	cfg.active = []aicommon.VerificationTodoItem{{ID: "pending", Status: aicommon.VerificationTodoStatusPending}}
+	require.False(t, loop.isSimpleQueryWithoutWork(), "pending TODOs must retain automatic recall")
 }

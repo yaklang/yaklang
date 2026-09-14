@@ -1,0 +1,101 @@
+desc(
+	title: "Check C#/.NET Path Traversal via File and Path.Combine"
+	title_zh: "检测 C#/.NET 文件路径遍历"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "path-traversal"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+路径遍历（Path Manipulation）在两个条件同时成立时出现：攻击者能指定文件系统操作所用的路径；并且通过指定特定资源获得原本没有的权限（读取、覆盖或删除受保护文件）。`File.ReadAllText` / `WriteAllText` / `Delete` / `Open` 等 API 的路径参数若包含用户输入，且未限制在固定基目录内，`../`、绝对路径或 UNC 路径就会逃出预期目录。`Path.Combine` 不会消除 `..`，不能当作净化。
+2. **触发场景**
+```csharp
+string rName = Request["reportName"];
+File.Delete(@"C:\users\reports\" + rName);
+```
+攻击者提供 `..\\..\\Windows\\System32\\krnl386.exe` 即可删除系统文件。
+```csharp
+string name = Request.QueryString["file"];
+string path = Path.Combine(contentRoot, name);
+File.ReadAllText(path);
+```
+`file=../../web.config` 会读到站点配置。Zip 解压时若条目名含 `..`，同样会覆盖基目录外的文件。
+3. **潜在影响**
+- **任意文件读取**：泄露连接串、密钥、源代码。
+- **任意文件写入或删除**：覆盖可执行文件、破坏系统文件。
+- **配置被篡改**：程序随后以攻击者准备的配置运行。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 间接指定资源：只允许文件名
+不要用用户输入直接构成路径。先取出文件名，再与程序控制的基目录拼接，并确认规范化后的路径仍落在基目录内：
+```csharp
+string name = Path.GetFileName(userFile);
+if (name != userFile)
+    throw new InvalidOperationException();
+string full = Path.GetFullPath(Path.Combine(baseDir, name));
+string root = Path.GetFullPath(baseDir);
+if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException();
+```
+#### 2. 必须接受相对路径时用允许列表
+合法资源名集合可控时，让用户只从列表中选择，而不是提交任意路径。
+#### 3. 上传与解压
+不要用客户端提供的完整路径作为落盘路径；校验扩展名与内容类型。解压 Zip 时对每个条目做与上面相同的基目录检查。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+[Path.Combine remarks](https://learn.microsoft.com/dotnet/api/system.io.path.combine)
+REFERENCE
+	rule_id: "f8af00eb-c45b-4a4d-92c8-bb9eadca701c"
+)
+
+<include("csharp-user-input")> as $input
+
+File.ReadAllText as $sink
+File.ReadAllBytes as $sink
+File.WriteAllText as $sink
+File.WriteAllBytes as $sink
+File.Delete as $sink
+File.Open as $sink
+File.OpenRead as $sink
+File.OpenWrite as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET Path Traversal via File API",
+	title_zh: "C#/.NET 文件路径遍历",
+	level: "high",
+	type: "vuln",
+	risk: "path-traversal",
+	message: "检测到用户输入流入文件路径 API，存在路径遍历风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_path.cs': <<<UNSAFE
+using System.IO;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["file"];
+        string path = Path.Combine("/data", q);
+        File.ReadAllText(path);
+    }
+}
+UNSAFE
+	'safefile://safe_path.cs': <<<SAFE
+using System.IO;
+
+public class Controller {
+    public void Handle() {
+        File.ReadAllText("/data/readme.txt");
+    }
+}
+SAFE
+)

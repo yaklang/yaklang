@@ -1,0 +1,55 @@
+desc(
+	title: "C#/.NET OS command execution sinks (lib)"
+	title_zh: "操作系统命令执行入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-command-exec-sink"
+	risk: "command-injection"
+	desc: <<<DESC
+### 说明
+`Process.Start` 与 `ProcessStartInfo` 会在服务器上启动进程。`FileName` 或 `Arguments` 受用户输入影响时，攻击者可以改写要执行的命令或附加参数。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要把用户输入拼进命令字符串。使用 `ProcessStartInfo`，可执行文件用绝对路径并与参数分开传递，关闭 `UseShellExecute`。参数做允许列表校验。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	rule_id: "4adea2c5-4002-4180-9890-76360c3c492e"
+)
+
+Process.Start as $output
+ProcessStartInfo as $output
+
+alert $output for {
+	title: "C#/.NET command execution API",
+	title_zh: "C#/.NET 命令执行类 API",
+	level: "info",
+	type: "audit",
+	risk: "command-injection",
+	message: "检测到可执行系统命令的 API，请检查 FileName/Arguments 是否受用户输入影响。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_cmd_sink.cs': <<<UNSAFE
+using System.Diagnostics;
+
+public class Runner {
+    public void Run() {
+        Process.Start("echo");
+    }
+}
+UNSAFE
+	'safefile://safe_cmd_sink.cs': <<<SAFE
+public class Runner {
+    public void Run() {
+        int n = 1 + 2;
+    }
+}
+SAFE
+)

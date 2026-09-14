@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
@@ -34,11 +33,14 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
+	reassemblyOptions     TCPReassemblyOptions
+	requiresFullStream    bool
 	Context               context.Context
 	mock                  PcapHandleOperation // TEST MOCK
 	trafficPool           *TrafficPool
 	Output                *pcapgo.Writer // output debug info
 	onNetInterfaceCreated func(handle *PcapHandleWrapper)
+	onReassemblyStats     func(TCPReassemblyStats)
 	onFlowCreated         func(*TrafficFlow)
 	wg                    *sync.WaitGroup
 	Filename              string
@@ -330,7 +332,7 @@ func (c *CaptureConfig) Save(pk gopacket.Packet) {
 // pcapx.StartSniff("eth0", pcapx.pcap_onTLSClientHello(func(flow, hello) { println("got tls client hello") }))~
 // ```
 func WithTLSClientHello(h func(flow *TrafficFlow, hello *tlsutils.HandshakeClientHello)) CaptureOption {
-	return withPool(func(pool *TrafficPool) {
+	return withFullStreamPool(func(pool *TrafficPool) {
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
 			if len(frame.Payload) <= 0 {
 				return
@@ -357,7 +359,7 @@ func WithTLSClientHello(h func(flow *TrafficFlow, hello *tlsutils.HandshakeClien
 // pcapx.StartSniff("eth0", pcapx.pcap_onHTTPRequest(func(flow, req) { println("got http request") }))~
 // ```
 func WithHTTPRequest(h func(flow *TrafficFlow, req *http.Request)) CaptureOption {
-	return withPool(func(pool *TrafficPool) {
+	return withFullStreamPool(func(pool *TrafficPool) {
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
 			if len(frame.Payload) <= 0 {
 				return
@@ -384,8 +386,7 @@ func WithHTTPRequest(h func(flow *TrafficFlow, req *http.Request)) CaptureOption
 // pcapx.StartSniff("eth0", pcapx.pcap_onHTTPFlow(func(flow, req, rsp) { println("got http flow") }))~
 // ```
 func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Response)) CaptureOption {
-	runner := omap.NewOrderedMap(make(map[string]*sync.Once))
-	return withPool(func(pool *TrafficPool) {
+	return withFullStreamPool(func(pool *TrafficPool) {
 		pool._onHTTPFlow = h
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
 			if len(frame.Payload) <= 0 {
@@ -414,15 +415,20 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 				}
 			}
 
-			if conn.IsMarkedAsHttpPacket() && !runner.Have(flow.Hash) {
+			if conn.IsMarkedAsHttpPacket() {
 				// recognized http packet direction
-				once := new(sync.Once)
-				runner.Set(flow.Hash, once)
-				once.Do(func() {
+				flow.httpStarted.Do(func() {
 					requestConn := flow.GetHTTPRequestConnection()
 					responseConn := flow.GetHTTPResponseConnection()
 					go func() {
 						defer flow.httpflowWg.Done()
+						defer func() {
+							if flow.pool.parallel != nil {
+								if err := recover(); err != nil {
+									flow.pool.notePanic(err)
+								}
+							}
+						}()
 						reader := bufio.NewReader(requestConn.reader)
 						for {
 							req, err := utils.ReadHTTPRequestFromBufioReader(reader)
@@ -440,6 +446,7 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 						defer func() {
 							if err := recover(); err != nil {
 								log.Errorf("http flow panic with: %v", err)
+								flow.pool.notePanic(err)
 							}
 						}()
 						reader := bufio.NewReader(responseConn.reader)
@@ -468,6 +475,7 @@ func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopack
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("assembly panic with: %s\n    FLOW: %v\n    TCP: \n%v\n    Payload:\n%v", err, flow.String(), spew.Sdump(tcp.LayerContents()), spew.Sdump(tcp.Payload))
+			c.trafficPool.notePanic(err)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
@@ -478,6 +486,9 @@ func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopack
 func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packet) {
 	defer func() {
 		if err := recover(); err != nil {
+			if c.trafficPool != nil {
+				c.trafficPool.notePanic(err)
+			}
 			spew.Dump(err)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
@@ -502,16 +513,40 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	if packet == nil {
 		return
 	}
+	if c.trafficPool.parallel != nil && c.trafficPool.owner == nil {
+		c.trafficPool.parallel.checkTruncation(packet.Metadata().CaptureInfo)
+	}
 
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
+	if !isOk && packet.TransportLayer() != nil {
+		return // Do not decode unrelated UDP applications just to inspect errors.
+	}
+	// A decoder can expose a partially populated TCP layer before returning
+	// an option/header error. Never feed such a layer into stream state.
+	if failure := packet.ErrorLayer(); failure != nil {
+		c.trafficPool.malformedPacket(failure.Error().Error())
+		return
+	}
 	if !isOk || ret == nil {
+		return
+	}
+	if packet.Metadata().Truncated {
+		c.trafficPool.malformedPacket("truncated decoded TCP packet")
 		return
 	}
 
 	if netIPv4Layer, ipv4ok := packet.NetworkLayer().(*layers.IPv4); ipv4ok {
+		if netIPv4Layer.Version != 4 || netIPv4Layer.FragOffset != 0 || netIPv4Layer.Flags&layers.IPv4MoreFragments != 0 {
+			c.trafficPool.malformedPacket("invalid IPv4 version or fragmented TCP packet")
+			return
+		}
 		c.assemblyWithTS(packet, netIPv4Layer, ret, ts)
 	} else if netIPv6Layer, ipv6ok := packet.NetworkLayer().(*layers.IPv6); ipv6ok {
+		if netIPv6Layer.Version != 6 || packet.Layer(layers.LayerTypeIPv6Fragment) != nil {
+			c.trafficPool.malformedPacket("invalid IPv6 version or fragmented TCP packet")
+			return
+		}
 		c.assemblyWithTS(packet, netIPv6Layer, ret, ts)
 	} else {
 		log.Warnf("unknown network layer: %v", packet.NetworkLayer())
@@ -540,5 +575,12 @@ func WithCaptureStartedCallback(callback func()) CaptureOption {
 			}
 		})
 		return nil
+	}
+}
+
+func withFullStreamPool(h func(*TrafficPool)) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.requiresFullStream = true
+		return withPool(h)(c)
 	}
 }

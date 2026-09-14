@@ -163,7 +163,7 @@ http.ListenAndServe(":8080", nil)
 #### 3. 最小权限原则
 运行应用程序的用户应具有最低必要的文件读取权限，限制其访问敏感文件和目录。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

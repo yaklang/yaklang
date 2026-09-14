@@ -164,6 +164,9 @@ custom_rule_groups:
         - name: "ts"
           display_name: "TypeScript"
           canonical_name: "typescript"
+        - name: "csharp"
+          display_name: "C#"
+          canonical_name: "csharp"
 
     - id: "language-library"
       category: "语言库"

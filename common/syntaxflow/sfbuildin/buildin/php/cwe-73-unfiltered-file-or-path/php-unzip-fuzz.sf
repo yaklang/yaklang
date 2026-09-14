@@ -2,7 +2,7 @@ desc(
 	title: "Audit PHP File Unzip Security Risks"
 	title_zh: "审计PHP文件解压安全风险"
 	level: low
-	risk: "zip operator"
+	risk: "archive-operation"
 	desc: <<<DESC
 ### 风险描述
 1. **风险原理**
@@ -178,7 +178,7 @@ unzip($zipFile, $uploadDir);
 - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。
 - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
 DESC
-	risk: "文件路径穿越",
+	risk: "path-traversal",
 	name: "high",
 	message: "检测到PHP未经验证的高危文件解压漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -268,7 +268,7 @@ if ($zip->open($zipFile) === TRUE) {
 6. **使用独立的沙箱环境解压**
 对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
 SOLUTION
-	risk: "文件路径穿越",
+	risk: "path-traversal",
 	name: "mid",
 }
 $sink - $high - $mid as $low
@@ -351,7 +351,7 @@ if ($zip->open($zipFile) === TRUE) {
 6. **使用独立的沙箱环境解压**
 对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "low",
 }
 desc(

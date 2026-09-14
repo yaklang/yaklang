@@ -17,20 +17,32 @@ const (
 
 const (
 	// Node-reported JobFailed.error_code values emitted by scannode.
-	JobFailureCodeNodeCapacityExceeded    = "node_capacity_exceeded"
-	JobFailureCodeInvalidDispatchCommand  = "invalid_dispatch_command"
-	JobFailureCodeScriptExecutionFailed   = "script_execution_failed"
+	JobFailureCodeNodeCapacityExceeded      = "node_capacity_exceeded"
+	JobFailureCodeInvalidDispatchCommand    = "invalid_dispatch_command"
+	JobFailureCodeScriptExecutionFailed     = "script_execution_failed"
 	JobFailureCodeRuleSnapshotPrepareFailed = "rule_snapshot_prepare_failed"
-	JobFailureCodeScriptExecutionPanic    = "script_execution_panic"
+	JobFailureCodeScriptExecutionPanic      = "script_execution_panic"
 	JobFailureCodeStartedEventPublishFailed = "started_event_publish_failed"
 
 	// JobFailureCodeUnknownNodeReported is the canonical bucket for unrecognized
 	// node-reported codes when callers choose to normalize before persistence.
 	JobFailureCodeUnknownNodeReported = "node_reported_failure_unknown"
 
+	// Script-reported failure codes supplied by Legion-owned yak scripts via
+	// ReturnData.error_code. They must stay registered here, otherwise
+	// prepareJobFailureForPublish buckets them as unknown and Legion loses the
+	// fine-grained failure_code its console catalog translates.
+	JobFailureCodeGitCloneError          = "gitCloneError"
+	JobFailureCodeNotFoundFileCanCompile = "notFoundFileCanCompile"
+	JobFailureCodeSourceConfigInvalid    = "sourceConfigInvalid"
+	JobFailureCodeSourceWorkspaceFailed  = "sourceWorkspaceFailed"
+	JobFailureCodeSourceExtractFailed    = "sourceExtractFailed"
+	JobFailureCodeScanFailed             = "scan_failed"
+
 	// Platform-inferred codes: never emitted by scannode, documented here so
 	// Legion and yaklang share one registry for retry decisions.
 	JobFailureCodeAttemptMissingFromHeartbeat = "attempt_missing_from_heartbeat"
+	JobFailureCodeAttemptLeaseExpired         = "attempt_lease_expired"
 )
 
 const (
@@ -45,14 +57,28 @@ type jobFailureCodeSpec struct {
 
 // jobFailureCodeRegistry is the canonical map shared by scannode (emit) and
 // Legion (validate / retry). Add new node-reported codes here before use.
+//
+// Script-reported codes carry policies for the error_detail metadata only;
+// the Legion scheduler makes retry decisions from its dispatch contract plus
+// its own non-retryable code set. gitCloneError is transient because remote
+// Git hosts (e.g. github.com) regularly drop connections mid-clone; the other
+// script codes describe deterministic input or environment problems.
 var jobFailureCodeRegistry = map[string]jobFailureCodeSpec{
-	JobFailureCodeNodeCapacityExceeded:      {policy: JobFailureRetryPolicyReschedule},
-	JobFailureCodeInvalidDispatchCommand:    {policy: JobFailureRetryPolicyNone},
-	JobFailureCodeScriptExecutionFailed:     {policy: JobFailureRetryPolicyNone},
-	JobFailureCodeRuleSnapshotPrepareFailed: {policy: JobFailureRetryPolicyTransient},
-	JobFailureCodeScriptExecutionPanic:      {policy: JobFailureRetryPolicyTransient},
-	JobFailureCodeStartedEventPublishFailed: {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeNodeCapacityExceeded:        {policy: JobFailureRetryPolicyReschedule},
+	JobFailureCodeInvalidDispatchCommand:      {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeScriptExecutionFailed:       {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeRuleSnapshotPrepareFailed:   {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeScriptExecutionPanic:        {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeStartedEventPublishFailed:   {policy: JobFailureRetryPolicyTransient},
 	JobFailureCodeAttemptMissingFromHeartbeat: {policy: JobFailureRetryPolicyReschedule},
+	JobFailureCodeAttemptLeaseExpired:         {policy: JobFailureRetryPolicyReschedule},
+
+	JobFailureCodeGitCloneError:          {policy: JobFailureRetryPolicyTransient},
+	JobFailureCodeNotFoundFileCanCompile: {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeSourceConfigInvalid:    {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeSourceWorkspaceFailed:  {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeSourceExtractFailed:    {policy: JobFailureRetryPolicyNone},
+	JobFailureCodeScanFailed:             {policy: JobFailureRetryPolicyNone},
 }
 
 // JobFailureResolution is the output of ResolveJobFailureCode.

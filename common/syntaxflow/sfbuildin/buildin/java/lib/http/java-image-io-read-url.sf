@@ -166,7 +166,7 @@ return false;
 }
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }
 
 

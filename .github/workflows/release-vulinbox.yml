@@ -44,7 +44,16 @@ jobs:
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
 
       - name: Sync Embed FS Hash to Code
-        run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXT=""
+          if [ "$RUNNER_OS" = "Windows" ]; then EXT=".exe"; fi
+          # relative -o matches the existing "Build For Windows" step and avoids
+          # MSYS path conversion when the tool is launched from Git Bash.
+          go build -o "./yak-hash-tool$EXT" ./common/yak/cmd/yak.go
+          YAK="./yak-hash-tool$EXT" bash scripts/generate-embed-fs-hash.sh
+          rm -f "yak-hash-tool$EXT"
 
       - name: Build For Linux
         if: runner.os == 'Linux'

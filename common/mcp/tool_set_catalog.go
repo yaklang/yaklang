@@ -39,6 +39,7 @@ var mcpToolSetCatalog = []MCPToolSetCatalogEntry{
 	{Name: "fingerprint", Tier: ToolSetTierDefault, Summary: "Service fingerprint query and CRUD"},
 
 	// --- optional: specialized / heavy / UI-oriented ---
+	{Name: "screenshot", Tier: ToolSetTierOptional, Summary: "Capture the visible Yakit frontend with a local-time watermark"},
 	{Name: "hybrid_scan", Tier: ToolSetTierOptional, Summary: "Combined hybrid scan; long-running, task-oriented"},
 	{Name: "payload", Tier: ToolSetTierOptional, Summary: "Payload dictionary CRUD; Yakit dictionary UI workflow"},
 	{Name: "yak_document", Tier: ToolSetTierOptional, Summary: "Yak API/library documentation lookup for script authors"},

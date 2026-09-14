@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-http-response-sink"
-	risk: "跨站脚本（XSS）/ 敏感信息泄露"
+	risk: "xss-information-exposure"
 	desc: <<<DESC
 标记 Flask 的 jsonify、make_response 以及 Django 的 HttpResponse、JsonResponse 等常见响应构造方式。若响应体或头字段直接反映用户输入，可能导致 XSS 或信息泄露。
 DESC
@@ -32,7 +32,7 @@ alert $output for {
 	title_zh: "HTTP 响应构造",
 	level: "info",
 	type: "audit",
-	risk: "跨站脚本（XSS）/ 敏感信息泄露",
+	risk: "xss-information-exposure",
 	message: "检测到 HTTP 响应构造 API，请检查响应体与头是否包含未净化的用户数据。",
 	name: "output",
 }

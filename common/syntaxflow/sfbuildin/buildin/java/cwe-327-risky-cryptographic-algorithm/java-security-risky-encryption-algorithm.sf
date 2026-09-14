@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java java.security.AlgorithmParameters使用不安全的加密算法"
 	title: "Detect Java java.security.AlgorithmParameters Use of Broken or Risky Encryption Algorithm"
-	risk:"不安全加密算法",
+	risk:"weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 [Java AlgorithmParameters Documentation](https://docs.oracle.com/javase/8/docs/api/java/security/AlgorithmParameters.html)
@@ -161,7 +161,7 @@ e.printStackTrace();
 #### 4. 安全配置审计
 定期审计应用程序中使用的加密算法和配置，确保符合最新的安全标准和最佳实践。
 SOLUTION
-	risk: "不安全加密算法",
+	risk: "weak-cryptographic-algorithm",
 }
 
 desc(

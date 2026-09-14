@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -22,6 +21,39 @@ import (
 )
 
 var ActionMagicKey = "@action"
+
+// actionMarker accepts the common missing-@ spelling, but an explicit @action
+// always takes precedence, including when it is empty or invalid.
+func actionMarker(params map[string]any) (string, bool) {
+	value, exists := params[ActionMagicKey]
+	if !exists {
+		value, exists = params["action"]
+	}
+	return actionMarkerValue(value), exists
+}
+
+func actionMarkerValue(value any) string {
+	if schema, ok := value.(map[string]any); ok {
+		// Retain the legacy JSON-schema-shaped action response.
+		value = schema["const"]
+	}
+	name, _ := value.(string)
+	return name
+}
+
+func actionEnvelope(data map[string]any) map[string]any {
+	if _, exists := actionMarker(data); exists {
+		return data
+	}
+	if data["type"] == "object" {
+		if properties, ok := data["properties"].(map[string]any); ok {
+			if _, exists := actionMarker(properties); exists {
+				return properties
+			}
+		}
+	}
+	return data
+}
 
 type Action struct {
 	// meta data
@@ -224,7 +256,7 @@ func (a *Action) ActionType() string {
 	return a.GetString("@action")
 }
 
-// ObservedActionType returns the raw non-empty @action value seen by the
+// ObservedActionType returns the raw non-empty @action (or action alias) seen by the
 // parser, even when it was rejected because it did not match an allowed action
 // or alias. ActionType intentionally remains the admitted/canonical value.
 func (a *Action) ObservedActionType() string {
@@ -693,6 +725,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			action.SetName(hitName)
 			action.Set(ActionMagicKey, hitName)
 		}
+		var fallbackParams map[string]any
+		var pendingActionType string
+		var canonicalKeySeen, canonicalObjectFound bool
 
 		opts := m.jsonCallback
 
@@ -701,30 +736,29 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			if key == "" {
 				return
 			}
-			if utils.InterfaceToString(key) == "@action" {
-				if mapData, ok := data.(map[string]any); ok {
-					for _, v := range mapData {
-						candidate := utils.InterfaceToString(v)
-						action.observeActionType(candidate)
-						if utils.StringArrayContains(actionNames, candidate) {
-							setStart(candidate)
-							return
-						}
+			keyString := utils.InterfaceToString(key)
+			if len(parents) == 0 && !canonicalObjectFound {
+				switch keyString {
+				case ActionMagicKey:
+					canonicalKeySeen = true
+					pendingActionType = actionMarkerValue(data)
+					action.observeActionType(pendingActionType)
+					if utils.StringArrayContains(actionNames, pendingActionType) {
+						setStart(pendingActionType)
 					}
-					return
+				case "action":
+					// Wait for the complete envelope before admitting an alias:
+					// a canonical @action may follow it later in the stream.
+					if !canonicalKeySeen {
+						pendingActionType = actionMarkerValue(data)
+					}
 				}
-				value := utils.InterfaceToString(data)
-				action.observeActionType(value)
-				if utils.StringArrayContains(actionNames, value) {
-					setStart(value)
-				}
-			} else {
-				keyString := utils.InterfaceToString(key)
-
-				if len(parents) > 0 { // build full key with parents
-					fullKeyString := strings.Join(append(parents, keyString), ".")
-					action.Set(fullKeyString, data) // set full key param
-				}
+			}
+			if len(parents) > 0 { // build full key with parents
+				fullKeyString := strings.Join(append(parents, keyString), ".")
+				action.Set(fullKeyString, data)
+			}
+			if keyString != ActionMagicKey {
 				action.Set(keyString, data) // verbose save with simple key, legacy support
 			}
 		}))
@@ -732,32 +766,34 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		fixParams := func(generalParams map[string]any) {
 			action.Set(generalParamsKey, generalParams)
 			for k, v := range generalParams {
-				action.Set(k, v)
+				if k != ActionMagicKey {
+					action.Set(k, v)
+				}
 			}
 		}
 
-		opts = append(opts, jsonextractor.WithObjectCallback(func(data map[string]any) { // set the general object if @action matched
-			dataParams := aitool.InvokeParams(data)
-			if !dataParams.Has("@action") {
+		opts = append(opts, jsonextractor.WithRootMapCallback(func(data map[string]any) {
+			if canonicalObjectFound {
 				return
 			}
-			targetString := dataParams.GetString("@action")
-			action.observeActionType(targetString)
-			if targetString != "" {
-				if utils.StringArrayContains(actionNames, targetString) {
-					fixParams(data)
-					return
+			params := actionEnvelope(data)
+			name, _ := actionMarker(params)
+			action.observeActionType(name)
+			pendingActionType = ""
+			canonicalKeySeen = false
+			if name != "" && utils.StringArrayContains(actionNames, name) {
+				canonical := make(map[string]any, len(params)+1)
+				for k, v := range params {
+					canonical[k] = v
 				}
-			} else {
-				target := dataParams.GetObject("@action")
-				for _, v := range target {
-					candidate := utils.InterfaceToString(v)
-					action.observeActionType(candidate)
-					if utils.StringArrayContains(actionNames, candidate) {
-						fixParams(data)
-						return
-					}
-				}
+				canonical[ActionMagicKey] = name
+				fixParams(canonical)
+				setStart(name)
+				canonicalObjectFound = true
+			} else if fallbackParams == nil {
+				// Preserve only the complete outer object for legacy inference.
+				// Flattened nested fields must never choose the action type.
+				fallbackParams = params
 			}
 		}))
 
@@ -779,13 +815,17 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		if err != nil {
 			log.Errorf("Failed to extract action from stream: %v, buffer: %s", err, buf.String())
 			action.setParseError(utils.Wrap(err, "failed to extract action from stream"))
-		} else if action.hasRecognizedActionWithoutCanonicalObject() {
+		} else if action.hasRecognizedActionWithoutCanonicalObject() ||
+			(!canonicalObjectFound && pendingActionType != "" && utils.StringArrayContains(actionNames, pendingActionType)) {
 			// jsonextractor is intentionally tolerant and returns nil when EOF is
 			// reached inside an unfinished object/array. Flattened callbacks may
 			// already have exposed @action and earlier fields at that point. Treat
 			// the absence of the final canonical object as a parse failure so no
 			// consumer can execute a partial action.
 			action.setParseError(utils.Error("action JSON ended before the complete canonical object was parsed"))
+		}
+		if !canonicalObjectFound && fallbackParams != nil {
+			fixParams(fallbackParams)
 		}
 
 		parserWG.Wait() // wait tag parsers finished
@@ -824,7 +864,7 @@ func ExtractValidActionFromStream(ctx context.Context, reader io.Reader, actionN
 		return nil, parseErr
 	}
 	if !action.ValidCheck(append(maker.alias, actionName)...) {
-		return nil, utils.Errorf("action @action not found or invalid, expect one of: %v", append(maker.alias, actionName))
+		return nil, utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: %v", action.ObservedActionType(), append(maker.alias, actionName))
 	}
 	return action, nil
 }
@@ -855,7 +895,7 @@ func ExtractAction(i string, actionName string, alias ...string) (*Action, error
 	}
 	action.WaitStream(context.Background())
 	if !action.ValidCheck(append(alias, actionName)...) {
-		return nil, utils.Errorf("action @action not found or invalid, expect one of: %v", append(alias, actionName))
+		return nil, utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: %v", action.ObservedActionType(), append(alias, actionName))
 	}
 	return action, nil
 }
@@ -878,13 +918,11 @@ func ExtractAllAction(i string) []*Action {
 		if err != nil {
 			continue
 		}
-		if rawData, ok := i["@action"]; ok && fmt.Sprint(rawData) != "" {
-			action := fmt.Sprint(rawData)
+		if action, _ := actionMarker(i); action != "" {
 			ac.name = action
+			ac.observedAction = action
 			ac.params = i
-			if ac.params == nil {
-				ac.params = make(map[string]any)
-			}
+			ac.params[ActionMagicKey] = action
 			acs = append(acs, ac)
 		}
 	}

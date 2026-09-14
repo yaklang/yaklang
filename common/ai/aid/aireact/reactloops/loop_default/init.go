@@ -2,6 +2,7 @@ package loop_default
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -12,8 +13,22 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		config := r.GetConfig()
 
-		attachedDatas := task.GetAttachedDatas()
+		attachedDatas := aicommon.NonEmptyAttachedResources(task.GetAttachedDatas())
 		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
+		// Local greeting classification must remain available when expensive
+		// synchronous enrichment is disabled. It enables one-answer completion
+		// without restoring model-backed intent or knowledge initialization.
+		if !config.GetConfigBool("DisableIntentRecognition") && len(attachedDatas) == 0 &&
+			greetingPatterns.MatchString(strings.TrimSpace(task.GetUserInput())) {
+			applyFastMatchResult(r, loop, &FastMatchResult{IsSimpleQuery: true})
+			return
+		}
+
+		// Attachments remain available to the main loop. Expensive enrichment is
+		// opt-in so the first response can start before intent/knowledge calls.
+		if !config.GetConfigBool("AllowSyncInitContext") {
+			return
+		}
 
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")

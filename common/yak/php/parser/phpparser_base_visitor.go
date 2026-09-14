@@ -223,6 +223,10 @@ func (v *BasePHPParserVisitor) VisitForeachStatement(ctx *ForeachStatementContex
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitForeachValue(ctx *ForeachValueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitTryCatchFinally(ctx *TryCatchFinallyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -867,7 +871,7 @@ func (v *BasePHPParserVisitor) VisitAssignmentListElement(ctx *AssignmentListEle
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitModifier(ctx *ModifierContext) interface{} {
+func (v *BasePHPParserVisitor) VisitClassModifier(ctx *ClassModifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

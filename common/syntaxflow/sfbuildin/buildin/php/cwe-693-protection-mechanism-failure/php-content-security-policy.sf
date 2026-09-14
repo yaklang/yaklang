@@ -1,4 +1,5 @@
 desc(
+	risk: "csp-misconfiguration"
 	title:"Content Security Policy (CSP) Security Assessment"
 	title_zh:"内容安全策略 (CSP) 安全评估",
 	level:"info"
@@ -50,6 +51,7 @@ $CSPContent?{have:/(script-src|default-src)\s+[^;]*?data:/} as $high_csp_data_ur
 $high_csp_unsafe_inline + $high_csp_wildcard_src + $high_csp_protocol_wildcard + $high_csp_unsafe_eval + $high_csp_data_uri as $CSP_HIGH_RISK 
 
 alert $CSP_HIGH_RISK for {
+	risk: "csp-misconfiguration",
 	title: "High Risk CSP Issues",
 	title_zh: "高风险 CSP 问题",
 	level: "high",
@@ -103,6 +105,7 @@ $CSPContent?{have:/(frame-ancestors)\s+[^;]*?\*/} as $medium_csp_wildcard_frame_
 // 如果以上任一独立中危模式被匹配，则标记为中危 CSP 问题。
 $medium_csp_static_nonce + $medium_csp_missing_frame_ancestors_directive + $medium_csp_wildcard_frame_ancestors as $CSP_MEDIUM_RISK 
 alert $CSP_MEDIUM_RISK for {
+	risk: "csp-misconfiguration",
 	title: "Medium Risk CSP Issues",
 	title_zh: "中风险 CSP 问题",
 	level: "medium",
@@ -148,6 +151,7 @@ $CSPContent?{have:/(img-src|font-src|style-src|media-src)\s+[^;]*?\*/} as $low_c
 $low_csp_missing_report_uri + $low_csp_loose_resource_src as $CSP_LOW_RISK 
 
 alert $CSP_LOW_RISK for {
+	risk: "csp-misconfiguration",
 	title: "Low Risk CSP Issues",
 	title_zh: "低风险 CSP 问题",
 	level: "low",

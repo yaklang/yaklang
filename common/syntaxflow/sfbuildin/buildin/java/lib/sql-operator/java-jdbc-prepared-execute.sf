@@ -134,7 +134,7 @@ throw new IllegalArgumentException("User ID out of valid range.");
 #### 5. 最小权限原则
 数据库用户应遵循最小权限原则，只授予执行应用程序所需操作的最低权限，即使发生SQL注入，也能限制攻击者的能力。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 1. 规则目的
 该规则用于审计Java代码中数据库操作的安全性，重点关注使用 JDBC（Java Database Connectivity）时，通过 `PreparedStatement` 执行SQL查询的代码。

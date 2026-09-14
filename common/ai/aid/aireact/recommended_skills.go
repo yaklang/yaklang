@@ -52,6 +52,9 @@ func GetRecommendedBuiltinSkills() ([]RecommendedSkill, error) {
 }
 
 func getRecommendedBuiltinSkillsAtDir(skillsDir string) ([]RecommendedSkill, error) {
+	if err := extractBuiltinSkillsToDir(skillsDir); err != nil {
+		return nil, err
+	}
 	result := make([]RecommendedSkill, 0, len(recommendedBuiltinSkills))
 	for _, definition := range recommendedBuiltinSkills {
 		defaultSkill, err := readRecommendedDefault(definition.name)
@@ -93,6 +96,11 @@ func updateRecommendedBuiltinSkillAtDir(skillsDir, name, content string) (Recomm
 	if err != nil {
 		return RecommendedSkill{}, err
 	}
+	// Establish the embedded baseline before saving the first user edit. This
+	// also publishes a new release before the editor starts working from it.
+	if err := extractBuiltinSkillsToDir(skillsDir); err != nil {
+		return RecommendedSkill{}, err
+	}
 	updatedDocument, err := defaultSkill.document.ReplaceBody(content)
 	if err != nil {
 		return RecommendedSkill{}, fmt.Errorf("build recommended skill %q: %w", name, err)
@@ -115,6 +123,9 @@ func ResetRecommendedBuiltinSkill(name string) (RecommendedSkill, error) {
 func resetRecommendedBuiltinSkillAtDir(skillsDir, name string) (RecommendedSkill, error) {
 	defaultSkill, err := readRecommendedDefault(name)
 	if err != nil {
+		return RecommendedSkill{}, err
+	}
+	if err := extractBuiltinSkillsToDir(skillsDir); err != nil {
 		return RecommendedSkill{}, err
 	}
 	if err := writeRecommendedSkill(skillsDir, name, defaultSkill.rawDocument); err != nil {

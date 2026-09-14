@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到不安全的 RESTEasy 反序列化"
+	title_zh: "检测到不安全的 RESTEasy 反序列化"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-insecure-resteasy-deserialization"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+REST 服务端点使用 {*/*} 通配 mediaType 作为 @Consumes 值时，攻击者可发送 Content-Type 为 application/x-java-serialized-object 的请求，利用 SerializableProvider 处理恶意序列化载荷，可能导致任意代码执行。
+
+### 风险类型
+不安全反序列化（deserialization）
+
+### 影响
+反序列化不可信数据可能触发任意代码执行或对象注入。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-502
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除 @Consumes 中的通配 mediaType，限制接受的 Content-Type，并禁止反序列化不可信输入。
+SOLUTION
+	alert_min: 1
+	"file://pos.java": <<<POS
+@Consumes({"application/x-java-serialized-object"})
+POS
+	"safefile://pos.java": <<<NEG
+@Consumes({"application/json"})
+NEG
+)
+
+${*.java}.pattern_regex(/(?:@Consumes\(\{"application\/x\-java\-serialized\-object"\}\))|(?:@Consumes\(\{"\*\/\*"\}\))|(?:@Consumes\("\*\/\*"\))|(?:@Consumes\(\{MediaType\.WILDCARD_TYPE\}\))/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到不安全的 RESTEasy 反序列化",
+	title_zh: "检测到不安全的 RESTEasy 反序列化",
+	message: "检测到不安全的 RESTEasy 反序列化",
+}

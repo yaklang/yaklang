@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -122,6 +123,12 @@ func buildSubAgentRuntime(
 	}
 
 	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
+	if job.Timeout > 0 {
+		// 释放上一层的 cancel 句柄再覆盖，避免 cancel 泄漏（go vet lostcancel）。
+		jobCancel()
+		jobCtx, jobCancel = context.WithTimeout(parentTask.GetContext(), job.Timeout)
+		log.Infof("[SubAgent] job %q wall-clock timeout=%s (armed on slot acquisition)", job.Identifier, job.Timeout)
+	}
 
 	userInput := strings.TrimSpace(job.UserInput)
 	if userInput == "" {

@@ -252,6 +252,12 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	batchMinFiles, batchMinBytes := compileUnitBatchThresholds()
 	batches := buildCompileUnitExecutionBatches(plan.Order, batchMinFiles, batchMinBytes)
+	if err := c.prepareStructScan(plan); err != nil {
+		return nil, err
+	}
+	if c.structScan != nil && c.structScan.enabled() {
+		batches = sccExecutionBatches(plan.Order)
+	}
 	// Step mode (compile-unit batching) is the DEFAULT for any project size.
 	// YAK_SSA_COMPILE_UNIT_LEGACY opts back into the monolithic legacy/compat
 	// compile path (no batching).
@@ -323,6 +329,7 @@ func (c *Config) parseProjectWithFSUnits(
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 	defer c.LanguageBuilder.Clearup()
 
+	prog.CompileUnits = flattenCompileUnits(plan)
 	prog.ProcessInfof("compile unit graph built units=%d edges=%d scc=%d", len(plan.Units), len(plan.Edges), len(plan.Order))
 	holdSCCIR := envFlagEnabled(compileUnitHoldSCCIREnv)
 	spillMode := "auto"
@@ -487,6 +494,7 @@ func (c *Config) parseProjectWithFSUnits(
 		flushThreshold := flushCompileUnitThreshold()
 		isIncremental := c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != ""
 		flushedUnits := make(map[string]bool)
+		structScanOn := c.structScan != nil && c.structScan.enabled()
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
 				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
@@ -496,6 +504,9 @@ func (c *Config) parseProjectWithFSUnits(
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
+				if structScanOn {
+					return !c.isStop()
+				}
 				if !isIncremental && prog.Cache != nil && !flushedUnits[unitKey] {
 					if prog.Cache.CountInstruction() > flushThreshold {
 						prog.Cache.FlushCompileUnit(unitKey)
@@ -509,6 +520,27 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		if c.isStop() {
 			return nil, ErrContextCancel
+		}
+		// Second phase of this batch: expand method-body LazyBuilders that
+		// belong to these units. PreHandler already built the skeleton;
+		// without this drain, bodies wait for Application.Finish and the
+		// unit cannot scan or recycle AST/IR on its own.
+		prog.LazyBuildForUnits(unitKeys)
+		if c.isStop() {
+			return nil, ErrContextCancel
+		}
+		if structScanOn {
+			progAPI := NewProgram(prog, c)
+			for _, unit := range batch.units {
+				if unit == nil {
+					continue
+				}
+				processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
+				c.structScan.ScanStruct(progAPI, unit)
+				if c.isStop() {
+					return nil, ErrContextCancel
+				}
+			}
 		}
 		// Per-batch flush: evict ordinary instructions to DB when resident
 		// count exceeds a threshold, keeping Function/Parameter/BasicBlock
@@ -526,7 +558,6 @@ func (c *Config) parseProjectWithFSUnits(
 		// The threshold avoids flushing on small projects where it provides no
 		// memory benefit and only adds DB write overhead.
 		if prog.Cache != nil {
-			// Batch boundary: flush instructions + aux savers.
 			if !isIncremental {
 				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
 			}
@@ -587,6 +618,9 @@ func (c *Config) parseProjectWithFSUnits(
 		since := time.Since(metaStart)
 		log.Infof("program %s save to database cost: %s", prog.Name, since)
 		prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, since)
+	}
+	if c.structScan != nil && c.structScan.enabled() {
+		c.structScan.persistAfterProgramMeta(NewProgram(prog, c))
 	}
 	finishTime = time.Since(finishStart)
 

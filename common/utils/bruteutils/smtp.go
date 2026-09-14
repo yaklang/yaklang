@@ -2,11 +2,11 @@ package bruteutils
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/smtp"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/utils"
 )
 

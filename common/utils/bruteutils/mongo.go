@@ -1,35 +1,44 @@
 package bruteutils
 
 import (
-	"fmt"
+	"context"
 
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/yaklang/yaklang/common/brute/core"
+	"github.com/yaklang/yaklang/common/brute/probes/mongodb"
 )
 
+// MongoDBAuth 使用最小 OP_MSG+SCRAM 探针执行认证探测（不再依赖 mongo-driver）。
 func MongoDBAuth(target, username, password string, needAuth bool) (bool, error) {
-	ctx := utils.TimeoutContextSeconds(float64(defaultTimeout))
-	host, port, _ := utils.ParseStringToHostPort(appendDefaultPort(target, 27017))
-	addr := fmt.Sprintf("mongodb://%s:%d", host, port)
-	clientOptions := options.Client().ApplyURI(addr).SetDialer(defaultDialer)
-	if needAuth {
-		clientOptions = clientOptions.SetAuth(options.Credential{Username: username, Password: password})
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 
-	mgoCli, err := mongo.Connect(ctx, clientOptions)
+	if !needAuth {
+		username, password = "", ""
+	}
+	res := probeMongo(ctx, target, username, password)
+	return res.Outcome == core.OutcomeAuthSuccess, legacyError(res)
+}
+
+func probeMongo(ctx context.Context, target, username, password string) core.Result {
+	ptarget, err := core.ParseTarget(appendDefaultPort(target, 27017))
 	if err != nil {
-		return false, err
+		return core.Result{Outcome: core.OutcomeProtocolMismatch, Err: core.ErrProtocolParse}
 	}
-	defer mgoCli.Disconnect(ctx)
+	var prober mongodb.Prober
+	return prober.Probe(ctx, ptarget, core.Credential{Username: username, Password: password},
+		core.Options{Timeout: defaultTimeout, TLSPolicy: core.TLSOpportunistic})
+}
 
-	err = mgoCli.Ping(ctx, nil)
+// probeMongoUnauth 用需要权限的命令探测真实未授权访问。
+// 注意：旧实现的 Ping 在开启认证的 MongoDB 上也会成功（ping 允许匿名），
+// 会把所有可达实例误报为未授权；新实现使用 listDatabases 判定。
+func probeMongoUnauth(ctx context.Context, target string) core.Result {
+	ptarget, err := core.ParseTarget(appendDefaultPort(target, 27017))
 	if err != nil {
-		return false, err
+		return core.Result{Outcome: core.OutcomeProtocolMismatch, Err: core.ErrProtocolParse}
 	}
-
-	return true, nil
+	var prober mongodb.UnauthProber
+	return prober.Probe(ctx, ptarget, core.Credential{}, core.Options{Timeout: defaultTimeout, TLSPolicy: core.TLSOpportunistic})
 }
 
 var mongoAuth = &DefaultServiceAuthInfo{
@@ -39,24 +48,12 @@ var mongoAuth = &DefaultServiceAuthInfo{
 	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 27017)
-		result := i.Result()
-
-		ok, err := MongoDBAuth(i.Target, "", "", false)
-		if err != nil {
-			log.Errorf("mongodb unauth verify failed: %v", err)
-		}
-		result.Ok = ok
-		return result
+		res := probeMongoUnauth(itemCtx(i), i.Target)
+		return legacyFromCore(i, res)
 	},
 	BrutePass: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 27017)
-		result := i.Result()
-
-		ok, err := MongoDBAuth(i.Target, i.Username, i.Password, true)
-		if err != nil {
-			log.Errorf("mongodb brute pass failed: %v", err)
-		}
-		result.Ok = ok
-		return result
+		res := probeMongo(itemCtx(i), i.Target, i.Username, i.Password)
+		return legacyFromCore(i, res)
 	},
 }

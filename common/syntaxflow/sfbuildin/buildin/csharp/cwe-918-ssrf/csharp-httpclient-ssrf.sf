@@ -1,0 +1,87 @@
+desc(
+	title: "Check C#/.NET SSRF via HttpClient and WebRequest"
+	title_zh: "检测 C#/.NET HttpClient/WebRequest SSRF"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "ssrf"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+服务端请求伪造（SSRF）发生在攻击者能控制应用程序向其他服务器发起的网络连接时。连接源自应用服务器的内部地址，因此可以绕过网络边界，扫描或攻击本不会暴露的内部资源。`HttpClient.GetAsync` / `GetStringAsync` / `PostAsync`、`WebRequest.Create`、`WebClient.DownloadString` / `DownloadFile` 的 URL 若来自请求参数，服务端就会替攻击者发请求。
+2. **触发场景**
+```csharp
+string url = Request.Form["url"];
+HttpClient client = new HttpClient();
+HttpResponseMessage response = await client.GetAsync(url);
+```
+`url=http://127.0.0.1:8080/admin` 打到本机管理面；`http://169.254.169.254/` 读取云实例元数据。攻击者能控制的 URI 部分越多，危害越大：改 scheme 可能用上 `file://`、`ldap://`、`gopher://`、UNC 路径等。
+3. **潜在影响**
+- **内网探测与端口扫描**。
+- **绕过防火墙**，攻击仅服务端可达的程序。
+- **读取本地文件或内部共享**（`file://` / UNC）。
+- **窃取云元数据中的密钥**。
+- **对内部 Web 应用做注入或 CSRF**。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 不要根据用户数据建立连接
+采用间接方法：合法资源名列表，用户只选择其中一项。协议、主机和端口由应用程序固定。
+#### 2. 用固定基址拼接资源 ID
+```csharp
+var url = "https://api.example.com/items/" + Uri.EscapeDataString(id);
+await client.GetAsync(url);
+```
+用户输入只用于路径中的标识，且经过编码。
+#### 3. 必须接受 URL 时用允许列表
+只允许 `https` 以及预定义主机。解析后再拒绝 localhost、RFC1918、链路本地。黑名单容易漏，优先允许列表。用户输入不应控制 URI scheme。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+[OWASP SSRF Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+REFERENCE
+	rule_id: "acd5bdca-2638-4666-8ba6-26de044069e2"
+)
+
+<include("csharp-user-input")> as $input
+<include("csharp-http-request-sink")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET SSRF via outbound HTTP",
+	title_zh: "C#/.NET 出站 HTTP SSRF",
+	level: "high",
+	type: "vuln",
+	risk: "ssrf",
+	message: "检测到用户输入流入出站 HTTP 请求 URL，存在 SSRF 风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_ssrf.cs': <<<UNSAFE
+using System.Net.Http;
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request) {
+        string q = Request.QueryString["url"];
+        HttpClient c = new HttpClient();
+        c.GetAsync(q);
+    }
+}
+UNSAFE
+	'safefile://safe_ssrf.cs': <<<SAFE
+using System.Net.Http;
+
+public class Controller {
+    public void Handle() {
+        HttpClient c = new HttpClient();
+        c.GetAsync("https://example.com/api");
+    }
+}
+SAFE
+)

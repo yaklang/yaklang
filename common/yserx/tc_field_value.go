@@ -2,6 +2,8 @@ package yserx
 
 import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
+	embeddata "github.com/yaklang/yaklang/common/yserx/embed_data"
 	"math"
 )
 
@@ -281,7 +283,7 @@ func NewJavaFieldBytes(rawStr string) *JavaFieldValue {
 		vals = append(vals, NewJavaFieldByteValue(b))
 	}
 
-	raw, _ := codec.DecodeBase64("rPMX+AYIVOA=")
+	raw, _ := codec.DecodeBase64(embeddata.LoadSerializedObjects().ByteArraySerialUID)
 	return NewJavaFieldArrayValue(NewJavaArray(
 		NewJavaClassDesc(
 			"[B",

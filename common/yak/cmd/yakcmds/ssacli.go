@@ -28,6 +28,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -634,11 +635,64 @@ var syncRule = &cli.Command{
 	},
 }
 
+var verifyBuiltinRisk = &cli.Command{
+	Name:    "verify-builtin-risk",
+	Aliases: []string{"verify-risk", "builtin-risk-check"},
+	Usage:   "verify built-in SyntaxFlow rules' risk types against the risk taxonomy",
+	UsageText: "yak verify-builtin-risk [--dir <rule-dir>] [--taxonomy <taxonomy.json>]",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "dir",
+			Usage: "rule directory containing .sf files",
+			Value: "common/syntaxflow/sfbuildin/buildin",
+		},
+		cli.StringFlag{
+			Name:  "taxonomy",
+			Usage: "risk taxonomy JSON file",
+			Value: "common/syntaxflow/sfrisk/taxonomy.json",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		dir := c.String("dir")
+		taxonomyFile := c.String("taxonomy")
+		data, err := os.ReadFile(taxonomyFile)
+		if err != nil {
+			return utils.Wrapf(err, "read risk taxonomy %s failed (pass --taxonomy)", taxonomyFile)
+		}
+		checker, err := sfrisk.NewChecker(data)
+		if err != nil {
+			return utils.Wrapf(err, "parse risk taxonomy %s failed", taxonomyFile)
+		}
+		result, err := sfbuildin.CheckBuiltinRiskTypes(dir, checker)
+		if err != nil {
+			return utils.Wrapf(err, "check built-in risk types failed")
+		}
+		log.Infof("inspected %d rules (%d libraries), %d alerts, %d risk types",
+			result.RuleCount, result.LibraryCount, result.AlertCount, len(result.CanonicalTypes))
+		if len(result.Violations) > 0 {
+			for _, violation := range result.Violations {
+				println(violation)
+			}
+			return utils.Errorf("built-in risk type check failed with %d violation(s)", len(result.Violations))
+		}
+		return nil
+	},
+}
+
 var syntaxflowFormat = &cli.Command{
 	Name:    "syntaxflow-format",
 	Aliases: []string{"sf-format", "sf-fmt"},
 	Usage:   "format SyntaxFlow rule",
-	Flags:   []cli.Flag{},
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "rule-version-output,o",
+			Usage: "generate rule_versions.json from formatted rules to this file",
+		},
+		cli.StringFlag{
+			Name:  "rule-version-baseline",
+			Usage: "existing rule_versions.json used as the version baseline (defaults to --rule-version-output)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		if len(c.Args()) == 0 {
 			log.Errorf("syntaxflow-format: no file provided")
@@ -692,6 +746,44 @@ var syntaxflowFormat = &cli.Command{
 				}))
 			} else {
 				log.Errorf("syntaxflow-format: file %s not found", path)
+			}
+		}
+
+		if output := c.String("rule-version-output"); output != "" && errors == nil {
+			var dirs []string
+			for _, path := range c.Args() {
+				if utils.IsDir(path) {
+					dirs = append(dirs, path)
+				}
+			}
+			if len(dirs) == 0 {
+				return utils.Error("--rule-version-output requires at least one directory argument")
+			}
+			// The baseline carries the previous rule versions. Without it every rule
+			// looks "new" and gets re-versioned to today, rewriting the whole table
+			// for no reason, so refuse instead of silently bumping everything.
+			baseline := c.String("rule-version-baseline")
+			if baseline == "" {
+				baseline = output
+			}
+			if !utils.IsFile(baseline) {
+				return utils.Errorf("rule version baseline not found: %s (pass --rule-version-baseline to point at the existing rule_versions.json)", baseline)
+			}
+			ruleInfos, err := sfbuildin.GenerateRuleVersionsFromLocalFS(dirs, baseline)
+			if err != nil {
+				return err
+			}
+			jsonData, err := json.MarshalIndent(ruleInfos, "", "  ")
+			if err != nil {
+				return err
+			}
+			if old, err := os.ReadFile(output); err == nil && bytes.Equal(old, jsonData) {
+				log.Infof("syntaxflow-format: rule versions unchanged, skip writing %s", output)
+			} else {
+				if err := os.WriteFile(output, jsonData, 0o666); err != nil {
+					return err
+				}
+				log.Infof("syntaxflow-format: rule versions written to %s", output)
 			}
 		}
 		return errors
@@ -1388,7 +1480,7 @@ and exports structured report (sarif/irify).`,
 
 		cli.Int64Flag{
 			Name:  "rule-work-limit",
-			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 200000 (calibrated for javacms-core: 5-concurrent scan completes in ~15min within 24GB, vs hang/OOM at 4M); 0 disables (only --rule-timeout applies)",
+			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 50000 (validated on dotCMS/core: default-concurrency scan finishes in ~2m with ~4GB peak RSS); 0 disables (only --rule-timeout applies)",
 			Value: ssaconfig.DefaultScanRuleWorkLimit,
 		},
 
@@ -2124,6 +2216,7 @@ var SSACompilerCommands = []*cli.Command{
 	syntaxFlowExport,              // export rule to file
 	syntaxFlowImport,              // import rule from file
 	syncRule,                      // sync rule from embed to database
+	verifyBuiltinRisk,             // verify builtin rule risk types from local files
 	// risk manage
 	ssaRisk, // export risk report
 

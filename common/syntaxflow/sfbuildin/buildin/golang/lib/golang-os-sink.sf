@@ -124,6 +124,7 @@ os?{<fullTypeName>?{have: 'os'}} as $entry;
 $entry.Create as $output;
 $entry.Open as $output;
 $entry.OpenFile as $output;
+$entry.Stat as $output;
 $entry.Remove as $output;
 $entry.RemoveAll as $output;
 $entry.Mkdir as $output;
@@ -198,7 +199,7 @@ return nil
 #### 5. 使用沙箱环境
 对于高危操作，考虑使用沙箱环境隔离代码运行，防止对主机造成直接影响。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则描述
 #### 1. 规则目的

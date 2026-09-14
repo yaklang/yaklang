@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到代码包含双向控制字符"
+	title_zh: "检测到代码包含双向控制字符",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-contains-bidirectional-characters"
+	risk: "unicode-direction-control"
+	desc: <<<DESC
+### 规则说明
+代码或源文件中包含 Unicode 双向控制字符，可能被用于隐藏恶意逻辑或伪装代码内容，造成人工审查被绕过。
+
+### 风险类型
+Unicode 双向控制字符（unicode-direction-control）
+
+### 影响
+源码中隐藏双向控制字符，可能使显示内容与真实执行逻辑不一致，形成混淆攻击。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-94
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除隐藏的 Unicode 双向控制字符，并使用可显示隐藏字符的编辑器审查源码。
+SOLUTION
+	alert_min: 1
+	"file://pos.sample": <<<POS
+allow = "admin‮evil"
+POS
+	"safefile://neg.sample": <<<NEG
+allow = "admin-evil"
+NEG
+)
+
+${*}.pattern_regex(/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到代码包含双向控制字符",
+	title_zh: "检测到代码包含双向控制字符",
+	message: "检测到代码包含双向控制字符",
+}

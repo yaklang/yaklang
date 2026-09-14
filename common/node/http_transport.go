@@ -46,13 +46,14 @@ type BootstrapRequest struct {
 
 // SessionState is the session material returned by the platform.
 type SessionState struct {
-	NodeID             string
-	SessionID          string
-	SessionToken       string
-	NATSURL            string
-	CommandSubject     string
-	EventSubjectPrefix string
-	ExpiresAt          time.Time
+	NodeID                      string
+	SessionID                   string
+	SessionToken                string
+	NATSURL                     string
+	CommandSubject              string
+	EventSubjectPrefix          string
+	ExpiresAt                   time.Time
+	RuntimeHostCapacityAccepted bool
 }
 
 // HeartbeatRequest keeps the node session alive and reports runtime state.
@@ -66,6 +67,7 @@ type HeartbeatRequest struct {
 	ObservedAt               time.Time                `json:"observed_at"`
 	HeartbeatIntervalSeconds uint32                   `json:"heartbeat_interval_seconds"`
 	ActiveAttempts           []ActiveAttemptHeartbeat `json:"active_attempts"`
+	RuntimeHostCapacity      *RuntimeHostCapacity     `json:"runtime_host_capacity,omitempty"`
 	HostInfo
 }
 
@@ -145,26 +147,28 @@ func (t *httpTransport) Bootstrap(
 	request BootstrapRequest,
 ) (SessionState, error) {
 	var response struct {
-		NodeID             string    `json:"node_id"`
-		NodeSessionID      string    `json:"node_session_id"`
-		SessionToken       string    `json:"session_token"`
-		NATSURL            string    `json:"nats_url"`
-		CommandSubject     string    `json:"command_subject"`
-		EventSubjectPrefix string    `json:"event_subject_prefix"`
-		ExpiresAt          time.Time `json:"expires_at"`
+		NodeID                      string    `json:"node_id"`
+		NodeSessionID               string    `json:"node_session_id"`
+		SessionToken                string    `json:"session_token"`
+		NATSURL                     string    `json:"nats_url"`
+		CommandSubject              string    `json:"command_subject"`
+		EventSubjectPrefix          string    `json:"event_subject_prefix"`
+		ExpiresAt                   time.Time `json:"expires_at"`
+		RuntimeHostCapacityAccepted bool      `json:"runtime_host_capacity_accepted"`
 	}
 
 	if err := t.postJSON(ctx, bootstrapEndpointPath, "", request, &response); err != nil {
 		return SessionState{}, err
 	}
 	return SessionState{
-		NodeID:             strings.TrimSpace(response.NodeID),
-		SessionID:          response.NodeSessionID,
-		SessionToken:       response.SessionToken,
-		NATSURL:            response.NATSURL,
-		CommandSubject:     response.CommandSubject,
-		EventSubjectPrefix: response.EventSubjectPrefix,
-		ExpiresAt:          response.ExpiresAt,
+		NodeID:                      strings.TrimSpace(response.NodeID),
+		SessionID:                   response.NodeSessionID,
+		SessionToken:                response.SessionToken,
+		NATSURL:                     response.NATSURL,
+		CommandSubject:              response.CommandSubject,
+		EventSubjectPrefix:          response.EventSubjectPrefix,
+		ExpiresAt:                   response.ExpiresAt,
+		RuntimeHostCapacityAccepted: response.RuntimeHostCapacityAccepted,
 	}, nil
 }
 

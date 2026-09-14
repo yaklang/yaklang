@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java SQL String Append Vulnerability"
 	type: audit
 	level: low
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -128,7 +128,7 @@ throw new IllegalArgumentException("Invalid user ID format.");
 // StringBuilder sqlString = new StringBuilder("SELECT * FROM users WHERE id = ").append(userId);
 ```
 SOLUTION
-	risk: "SQL注入",
+	risk: "sql-injection",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

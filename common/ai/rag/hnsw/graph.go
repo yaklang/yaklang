@@ -1164,43 +1164,7 @@ func (h *Graph[K]) Len() int {
 // It tries to preserve the clustering properties of the graph by
 // replenishing connectivity in the affected neighborhoods.
 func (h *Graph[K]) Delete(key K) bool {
-	defer func() {
-		if h.OnLayersChange != nil {
-			h.OnLayersChange(h.Layers)
-		}
-	}()
-	if len(h.Layers) == 0 {
-		return false
-	}
-
-	var deleteLayer = map[int]struct{}{}
-	var deleted bool
-	for i, layer := range h.Layers {
-		node, ok := layer.Nodes[key]
-		if !ok {
-			continue
-		}
-		delete(layer.Nodes, key)
-		if len(layer.Nodes) == 0 {
-			deleteLayer[i] = struct{}{}
-		}
-		node.Isolate(layer.Nodes, h.M, h.nodeDistance)
-		deleted = true
-	}
-
-	if len(deleteLayer) > 0 {
-		var newLayers = make([]*Layer[K], 0, len(h.Layers)-len(deleteLayer))
-		for i, layer := range h.Layers {
-			if _, ok := deleteLayer[i]; ok {
-				continue
-			}
-			newLayers = append(newLayers, layer)
-		}
-
-		h.Layers = newLayers
-	}
-
-	return deleted
+	return h.DeleteBatch(key)
 }
 
 // Lookup returns the vector with the given key.

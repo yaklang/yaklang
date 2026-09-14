@@ -150,11 +150,13 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 					break
 				}
 			}
-
 			nextHost, nextPort, _ := utils.ParseStringToHostPort(targetUrl)
 			log.Debugf("[lowhttp] redirect to: %s", targetUrl)
 
-			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r))
+			// Clear the stale NativeHTTPRequestInstance so HTTPWithoutRetry
+			// re-parses reqIns from the redirected packet instead of reusing
+			// the original request (e.g. POST) that no longer matches.
+			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r), WithNativeHTTPRequestInstance(nil))
 			response, err = HTTPWithoutRedirect(newOpts...)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
@@ -307,6 +309,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		randomJA3FingerPrint    = option.RandomJA3FingerPrint
 		clientHelloSpec         = option.ClientHelloSpec
 		tlsFingerprint          = option.TLSFingerprint
+		http2Fingerprint        = option.HTTP2Fingerprint
 		dialer                  = option.Dialer
 		fixQueryEscape          = option.FixQueryEscape
 	)
@@ -318,6 +321,14 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	if tlsFingerprint != "" {
 		_, err := netx.GetClientHelloProfile(tlsFingerprint)
 		if err != nil {
+			return response, err
+		}
+	}
+	// HTTP/2 framing is opt-in on its own: selecting a TLS fingerprint must not
+	// change it, because the default framing deliberately accommodates servers
+	// that reject browser-style HEADERS.
+	if http2Fingerprint != "" {
+		if _, err := getHTTP2Profile(http2Fingerprint); err != nil {
 			return response, err
 		}
 	}
@@ -739,7 +750,9 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// 初次连接需要的
 	// retry use DialX
 	dnsStart := time.Now()
-	dnsEnd := time.Now()
+	// dnsEnd 由异步 DNS 回调写入、主流程读取，必须原子化（修复数据竞态）
+	var dnsEndNano atomic.Int64
+	dnsEndNano.Store(time.Now().UnixNano())
 	var dnsEndOnce sync.Once
 	dialTraceInfo := netx.NewDialXTraceInfo()
 	dialopts = append(
@@ -752,7 +765,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		netx.DialX_WithDNSOptions(
 			netx.WithDNSOnFinished(func() {
 				dnsEndOnce.Do(func() {
-					dnsEnd = time.Now()
+					dnsEndNano.Store(time.Now().UnixNano())
 				})
 			}),
 			netx.WithDNSServers(dnsServers...),
@@ -778,13 +791,14 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	}
 
 	cacheKey := &connectKey{
-		proxy:           proxy,
-		scheme:          reqSchema,
-		addr:            originAddr,
-		https:           option.Https,
-		gmTls:           option.GmTLS,
-		clientHelloSpec: clientHelloSpec,
-		tlsFingerprint:  tlsFingerprint,
+		proxy:            proxy,
+		scheme:           reqSchema,
+		addr:             originAddr,
+		https:            option.Https,
+		gmTls:            option.GmTLS,
+		clientHelloSpec:  clientHelloSpec,
+		tlsFingerprint:   tlsFingerprint,
+		http2Fingerprint: http2Fingerprint,
 	}
 	if sni != nil {
 		cacheKey.sni = *sni
@@ -842,7 +856,7 @@ RECONNECT:
 		conn, err = dialXWithContext(ctx, originAddr, dialopts...)
 	}
 
-	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
+	traceInfo.DNSTime = time.Unix(0, dnsEndNano.Load()).Sub(dnsStart) // 原子读（修复竞态）
 	traceInfo.ParseDialXTraceInfo(dialTraceInfo)
 	response.Https = https
 
@@ -914,10 +928,7 @@ RECONNECT:
 			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
 			if err != nil {
 				if err == CreateStreamAfterGoAwayErr {
-					// Close first, then decide: the connection is unusable
-					// either way, and running out of reconnects must not leave
-					// it in the pool.
-					pc.closeConn(err) // close old connection to avoid goroutine leak
+					h2Conn.retire()
 					if canReconnect(err) {
 						goto RECONNECT
 					}
@@ -928,33 +939,23 @@ RECONNECT:
 				h2Stream.abort()
 				return nil, ctxErr
 			}
-
 			currentRPS.Add(1)
-			if err := h2Stream.doRequest(); err != nil {
+			serverStart := time.Now()
+			h2Stream.SetReadFirstFrameCallback(func() { traceInfo.ServerTime = time.Since(serverStart) })
+			if err := h2Stream.doRequest(); err != nil && !errors.Is(err, errH2UploadAborted) {
 				h2Stream.abort()
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return nil, ctxErr
 				}
 				if err == CreateStreamAfterGoAwayErr {
-					pc.closeConn(err)
+					h2Conn.retire()
 					if canReconnect(err) {
 						goto RECONNECT
 					}
-					return nil, err
 				}
-				if h2Stream.ID <= 1 { // first stream or ID not yet assigned
-					return nil, err
-				}
-				pc.closeConn(err) // close old connection to avoid goroutine leak
-				if canReconnect(err) {
-					goto RECONNECT
-				}
+				// A partially written upload may already have been processed.
 				return nil, err
 			}
-			serverStart := time.Now()
-			h2Stream.SetReadFirstFrameCallback(func() {
-				traceInfo.ServerTime = time.Now().Sub(serverStart)
-			})
 
 			resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
 			_ = resp
@@ -962,8 +963,9 @@ RECONNECT:
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return nil, ctxErr
 				}
-				if conn.(*persistConn).shouldRetryRequest(err) {
-					pc.closeConn(err) // close old connection to avoid goroutine leak
+				if h2RequestCanRetry(reqIns, err) && (option.bodyStreamReaderHandled == nil || !option.bodyStreamReaderHandled.IsSet()) {
+					// REFUSED_STREAM/GOAWAY rejected only this stream. Other accepted
+					// streams are still allowed to finish on the shared connection.
 					if canReconnect(err) {
 						goto RECONNECT
 					}

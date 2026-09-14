@@ -198,7 +198,7 @@ include('templates/' . $template . '.php'); // 将用户输入拼接到路径中
 DESC
 	name: "high",
 	message: "检测到未过滤的PHP文件包含漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "文件包含",
+	risk: "file-include",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -298,7 +298,7 @@ DESC
 	type: "mid",
 	name: "middle",
 	message: "检测到PHP文件包含漏洞，但从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计确认。",
-	risk: "文件包含",
+	risk: "file-include",
 }
 
 $sink - $high - $middle as $low;
@@ -321,7 +321,7 @@ DESC
 	solution: <<<SOLUTION
 尽管存在过滤函数，但仍可能存在潜在风险，需进一步审查。建议开发人员和安全团队共同评估相关逻辑的安全性。
 SOLUTION
-	risk: "文件包含",
+	risk: "file-include",
 	name: "low",
 }
 
@@ -340,7 +340,7 @@ DESC
 	solution: <<<SOLUTION
 建议开发人员和安全团队共同评估相关逻辑的安全性。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "info",
 	message: "检测到PHP文件包含行为，建议结合上下文进行进一步分析和审查。",
 }

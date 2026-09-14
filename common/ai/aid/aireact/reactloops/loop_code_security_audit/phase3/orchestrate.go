@@ -19,10 +19,8 @@ type findingVerifyJob struct {
 }
 
 type findingVerifyOutcome struct {
-	findingID  string
 	index      int
 	incomplete bool
-	execErr    error
 }
 
 // runAllFindingVerifications executes Phase3 finding verification via forked sub-agents.
@@ -37,10 +35,14 @@ func runAllFindingVerifications(
 		return nil
 	}
 
-	jobs := make([]reactloops.SubAgentJob, 0, len(findings))
-	catalog := make(map[string]findingVerifyJob, len(findings))
+	// Prefer high Phase2 confidence first so limited wall-clock yields high-value
+	// conclusions earlier. Stable sort preserves discovery order for ties.
+	sorted := sortFindingsByConfidenceDesc(findings)
+
+	jobs := make([]reactloops.SubAgentJob, 0, len(sorted))
+	catalog := make(map[string]findingVerifyJob, len(sorted))
 	skipped := 0
-	for i, finding := range findings {
+	for i, finding := range sorted {
 		if finding == nil || finding.ID == "" {
 			continue
 		}
@@ -70,10 +72,10 @@ func runAllFindingVerifications(
 
 	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(jobs))
 
-	log.Infof("[CodeAudit/Phase3] Starting forked sub-agent verify of %d findings (concurrency=%d, skipped=%d)",
+	log.Infof("[CodeAudit/Phase3] Starting forked sub-agent verify of %d findings (concurrency=%d, skipped=%d, ordered=confidence_desc)",
 		len(jobs), concurrency, skipped)
 	r.AddToTimeline("[PHASE3_FORK_START]",
-		fmt.Sprintf("Phase 3 fork 子 Agent 并行验证 %d 个 finding（timeline 分支隔离）。", len(jobs)))
+		fmt.Sprintf("Phase 3 fork 子 Agent 并行验证 %d 个 finding（按 confidence 降序，timeline 分支隔离）。", len(jobs)))
 
 	artifacts := newFindingArtifactStore(state)
 
@@ -101,7 +103,7 @@ func runAllFindingVerifications(
 		outcomes = append(outcomes, outcome)
 
 		if vf := state.GetVerifiedFindingByID(verifyJob.finding.ID); vf != nil {
-			verifiedCount := len(state.GetVerifiedVulns())
+			verifiedCount := state.GetVerifiedVulnCount()
 			emit.Phase3ConcludeFinding(loop, verifyJob.finding.ID, vf.Status, verifiedCount, len(findings), verifyJob.finding.Title)
 		}
 		log.Infof("[CodeAudit/Phase3] [%d/%d] Finding %s verify done (incomplete=%v)",
@@ -144,10 +146,8 @@ func finalizeFindingVerifyAfterFork(
 	}
 
 	return findingVerifyOutcome{
-		findingID:  finding.ID,
 		index:      job.index,
 		incomplete: incomplete,
-		execErr:    forkResult.ExecErr,
 	}
 }
 
@@ -167,4 +167,22 @@ func (b phase3FindingLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) (
 	return buildSingleFindingVerifyLoop(
 		prepared.Invoker, b.state, verifyJob.finding, verifyJob.index, verifyJob.total,
 	)
+}
+
+// sortFindingsByConfidenceDesc returns a copy sorted by Confidence descending
+// (stable: equal confidence keeps original order).
+func sortFindingsByConfidenceDesc(findings []*model.Finding) []*model.Finding {
+	sorted := make([]*model.Finding, len(findings))
+	copy(sorted, findings)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		ci, cj := 0, 0
+		if sorted[i] != nil {
+			ci = sorted[i].Confidence
+		}
+		if sorted[j] != nil {
+			cj = sorted[j].Confidence
+		}
+		return ci > cj
+	})
+	return sorted
 }

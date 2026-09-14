@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java J2EE 使用DriverManager getConnection"
 	title: "Check Java J2EE Usage of DriverManager getConnection"
-	risk:"代码风格",
+	risk:"code-style"
 	level: info
 	reference: <<<REFERENCE
 https://docs.oracle.com/javase/8/docs/api/java/sql/DriverManager.html
@@ -192,7 +192,7 @@ e.printStackTrace();
 #### 3. 避免硬编码数据库连接信息
 无论使用JNDI还是Spring管理，均应将数据库连接URL、用户名、密码等敏感信息从代码中移除，配置在应用服务器、properties文件或环境变量中，通过配置方式获取。
 SOLUTION
-	risk: "代码风格",
+	risk: "code-style",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

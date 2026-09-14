@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -330,9 +329,6 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 
 	var shortSummary, statusSummary, taskSummary, longSummary string
 
-	// reference material emission tracking (once per transaction, not per key)
-	var referenceEmittedOnce sync.Once
-
 	t.planUserStatus(fmt.Sprintf("正在归纳「%s」的结果", t.Name), fmt.Sprintf("Summarizing the results of %q", t.Name), aicommon.WithStatusCode("plan.task_summarizing"))
 	extractStart := time.Now()
 	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
@@ -352,33 +348,9 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 
 					nodeId := "summary-long"
 
-					// Use TeeReader to capture content while streaming
-					var contentBuffer bytes.Buffer
-					teeReader := io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(r)), &contentBuffer)
-
-					var event *schema.AiOutputEvent
-					var emitErr error
-					streamStart := time.Now()
-
-					onEnd := func() {
-						// This callback is called after stream finishes
-						log.Debugf("summary stream callback for field [%s] triggered, buffer size: %d, took: %v", key, contentBuffer.Len(), time.Since(streamStart))
-						// Emit reference material here (once per transaction)
-						if event != nil && summaryPromptWellFormed != "" && contentBuffer.Len() > 0 {
-							referenceEmittedOnce.Do(func() {
-								streamId := event.GetContentJSONPath(`$.event_writer_id`)
-								if streamId != "" {
-									_, refErr := boundEmitter.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
-									if refErr != nil {
-										log.Warnf("emit reference material for summary field [%s] failed: %v", key, refErr)
-									}
-								}
-							})
-						}
-					}
-
-					// Emit stream event with callback for reference material
-					event, emitErr = boundEmitter.EmitTextMarkdownStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
+					_, emitErr := boundEmitter.EmitTextMarkdownStreamEvent(
+						nodeId, utils.JSONStringReader(utils.UTF8Reader(r)), t.GetIndex(),
+					)
 
 					if emitErr != nil {
 						log.Errorf("failed to emit %s stream event: %v", key, emitErr)
@@ -405,22 +377,12 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 		return nil
 	}, aicommon.WithAIRequest_CallerLabel("task-summary"))
 	if longSummary == "" && taskSummary != "" {
-		var event *schema.AiOutputEvent
-		event, err = t.EmitTextMarkdownStreamEvent("summary-long", strings.NewReader(taskSummary), t.GetIndex())
+		_, err = t.EmitTextMarkdownStreamEvent("summary-long", strings.NewReader(taskSummary), t.GetIndex())
 		if err != nil {
 			log.Warnf("emit fallback task summary failed: %v", err)
-		} else if event != nil && summaryPromptWellFormed != "" {
-			referenceEmittedOnce.Do(func() {
-				streamId := event.GetContentJSONPath(`$.event_writer_id`)
-				if streamId != "" {
-					_, refErr := t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
-					if refErr != nil {
-						log.Warnf("emit reference material for fallback task summary failed: %v", refErr)
-					}
-				}
-			})
 		}
 	}
+
 	if statusSummary != "" {
 		t.StatusSummary = statusSummary
 	}

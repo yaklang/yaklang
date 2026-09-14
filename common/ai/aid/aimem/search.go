@@ -1,135 +1,176 @@
 package aimem
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"errors"
 	"strings"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// SearchBySemanticsMemoryIDs 仅执行语义检索并返回命中的 memory_id（不加载数据库实体）
+// SearchBySemanticsMemoryIDs validates hits using only memory IDs, without
+// decoding memory contents or score vectors.
 func (r *AIMemoryTriage) SearchBySemanticsMemoryIDs(query string, limit int) ([]*aicommon.SearchResult, error) {
 	MaybeCleanup(r.db)
-	return r.semanticSearchMemoryIDs(query, limit)
-}
-
-func (r *AIMemoryTriage) semanticSearchMemoryIDs(query string, limit int) ([]*aicommon.SearchResult, error) {
-	// 检查 embedding 服务是否可用
-	if !r.embeddingAvailable {
-		log.Debugf("embedding service not available for session %s, returning empty semantic search results", r.sessionID)
-		return []*aicommon.SearchResult{}, nil
-	}
-
-	// 检查 RAG 系统是否已初始化
-	if r.rag == nil {
-		log.Debugf("RAG system not initialized for session %s, returning empty semantic search results", r.sessionID)
-		return []*aicommon.SearchResult{}, nil
-	}
-
-	// 使用 RAG 搜索相关问题
-	ragResults, err := r.rag.QueryWithPage(query, 1, limit)
-	if err != nil {
-		log.Warnf("RAG search failed for session %s: %v, returning empty results", r.sessionID, err)
-		return []*aicommon.SearchResult{}, nil
-	}
-
-	scoreByMemoryID := make(map[string]float64)
-	orderedMemoryIDs := make([]string, 0, len(ragResults))
-	seen := make(map[string]struct{})
-
-	for _, rr := range ragResults {
-		if rr == nil || rr.Document == nil {
-			continue
-		}
-		memoryID, ok := rr.Document.Metadata["memory_id"].(string)
-		if !ok || strings.TrimSpace(memoryID) == "" {
-			continue
-		}
-		if sid, ok := rr.Document.Metadata["session_id"].(string); ok && sid != "" && sid != r.sessionID {
-			continue
-		}
-
-		if old, exists := scoreByMemoryID[memoryID]; !exists || rr.Score > old {
-			scoreByMemoryID[memoryID] = rr.Score
-		}
-		if _, ok := seen[memoryID]; !ok {
-			seen[memoryID] = struct{}{}
-			orderedMemoryIDs = append(orderedMemoryIDs, memoryID)
-		}
-	}
-
-	results := make([]*aicommon.SearchResult, 0, len(orderedMemoryIDs))
-	for _, memoryID := range orderedMemoryIDs {
-		results = append(results, &aicommon.SearchResult{
-			Entity: &aicommon.MemoryEntity{Id: memoryID},
-			Score:  scoreByMemoryID[memoryID],
-		})
-	}
-	return results, nil
+	return r.searchBySemantics(query, limit, false)
 }
 
 // SearchBySemantics 通过语义搜索记忆
 func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
 	MaybeCleanup(r.db)
-	idResults, err := r.semanticSearchMemoryIDs(query, limit)
-	if err != nil {
-		return nil, err
-	}
+	return r.searchBySemantics(query, limit, true)
+}
 
-	db := r.GetDB()
-	if db == nil {
-		log.Debugf("database connection is nil for session %s, returning empty semantic search results", r.sessionID)
+const semanticSearchBatchSize = 100
+
+var errSemanticOrphanChanged = errors.New("semantic orphan changed before repair")
+
+func (r *AIMemoryTriage) searchBySemantics(query string, limit int, loadEntities bool) ([]*aicommon.SearchResult, error) {
+	if !r.embeddingAvailable || r.rag == nil || r.GetDB() == nil {
 		return []*aicommon.SearchResult{}, nil
 	}
 
 	var results []*aicommon.SearchResult
-	for _, idResult := range idResults {
-		if idResult == nil || idResult.Entity == nil {
-			continue
-		}
-		memoryID := strings.TrimSpace(idResult.Entity.Id)
-		if memoryID == "" {
-			continue
+	// Repair at most one batch and refill once. A large historical backlog must
+	// not turn an interactive search into an unbounded maintenance sweep.
+	for pass := 0; pass < 2; pass++ {
+		ragResults, err := r.rag.QueryWithPage(query, 1, limit)
+		if err != nil {
+			log.Warnf("RAG search failed for session %s: %v", r.sessionID, err)
+			return results, nil
 		}
 
-		// 从数据库获取完整记忆条目
-		var dbEntity schema.AIMemoryEntity
-		if err := db.Table(r.entityTableName()).Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).First(&dbEntity).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				log.Warnf("memory entity not found in database: %s", memoryID)
+		scores := make(map[string]float64)
+		var orderedIDs []string
+		documents := make(map[string]string)
+		for _, rr := range ragResults {
+			if rr == nil || rr.Document == nil {
 				continue
 			}
-			log.Errorf("query memory entity failed: %v", err)
-			continue
+			id, ok := r.semanticMemoryID(rr.Document.Metadata)
+			if !ok {
+				continue
+			}
+			old, exists := scores[id]
+			if !exists {
+				orderedIDs = append(orderedIDs, id)
+			}
+			if !exists || rr.Score > old {
+				scores[id] = rr.Score
+			}
+			documents[rr.Document.ID] = id
 		}
 
-		entity := &aicommon.MemoryEntity{
-			Id:                 dbEntity.MemoryID,
-			CreatedAt:          dbEntity.CreatedAt,
-			Content:            dbEntity.Content,
-			Tags:               []string(dbEntity.Tags),
-			PotentialQuestions: []string(dbEntity.PotentialQuestions),
-			C_Score:            dbEntity.C_Score,
-			O_Score:            dbEntity.O_Score,
-			R_Score:            dbEntity.R_Score,
-			E_Score:            dbEntity.E_Score,
-			P_Score:            dbEntity.P_Score,
-			A_Score:            dbEntity.A_Score,
-			T_Score:            dbEntity.T_Score,
-			CorePactVector:     []float32(dbEntity.CorePactVector),
-			ExpiresAt:          dbEntity.ExpiresAt,
+		entities, err := r.loadSemanticEntities(r.GetDB(), orderedIDs, loadEntities)
+		if err != nil {
+			// A failed query is not evidence of deletion. Do not prune any hits.
+			return nil, utils.Wrap(err, "validate semantic memory hits")
 		}
-
-		results = append(results, &aicommon.SearchResult{
-			Entity: entity,
-			Score:  idResult.Score,
-		})
+		results = make([]*aicommon.SearchResult, 0, len(entities))
+		for _, id := range orderedIDs {
+			if entity, exists := entities[id]; exists {
+				results = append(results, &aicommon.SearchResult{Entity: entity, Score: scores[id]})
+			}
+		}
+		if pass > 0 {
+			return results, nil
+		}
+		orphans := make(map[string]string)
+		for docID, memoryID := range documents {
+			if _, exists := entities[memoryID]; !exists {
+				orphans[docID] = memoryID
+				if len(orphans) == semanticSearchBatchSize {
+					break
+				}
+			}
+		}
+		if len(orphans) == 0 {
+			return results, nil
+		}
+		if err := r.deleteOrphanSemanticDocuments(orphans); err != nil {
+			if !errors.Is(err, errSemanticOrphanChanged) {
+				log.Warnf("repair of %d orphan semantic documents deferred for session %s: %v", len(orphans), r.sessionID, err)
+			}
+			// Maintenance failure must not discard healthy search results.
+			return results, nil
+		}
 	}
-
 	return results, nil
+}
+
+func (r *AIMemoryTriage) semanticMemoryID(metadata schema.MetadataMap) (string, bool) {
+	id, ok := metadata["memory_id"].(string)
+	if !ok || strings.TrimSpace(id) == "" {
+		return "", false
+	}
+	if sid, ok := metadata["session_id"].(string); ok && sid != "" && sid != r.sessionID {
+		return "", false
+	}
+	return id, true
+}
+
+func (r *AIMemoryTriage) loadSemanticEntities(db *gorm.DB, ids []string, full bool) (map[string]*aicommon.MemoryEntity, error) {
+	entities := make(map[string]*aicommon.MemoryEntity, len(ids))
+	for start := 0; start < len(ids); start += semanticSearchBatchSize {
+		end := min(start+semanticSearchBatchSize, len(ids))
+		query := db.Table(r.entityTableName()).
+			Where("session_id = ? AND memory_id IN (?) AND deleted_at IS NULL", r.sessionID, ids[start:end])
+		if !full {
+			query = query.Select("memory_id")
+		}
+		var batch []schema.AIMemoryEntity
+		if err := query.Find(&batch).Error; err != nil {
+			return nil, err
+		}
+		for _, entity := range batch {
+			if full {
+				entities[entity.MemoryID] = memoryEntityFromDBEntity(entity)
+			} else {
+				entities[entity.MemoryID] = &aicommon.MemoryEntity{Id: entity.MemoryID}
+			}
+		}
+	}
+	return entities, nil
+}
+
+func (r *AIMemoryTriage) deleteOrphanSemanticDocuments(orphans map[string]string) error {
+	ids := make([]string, 0, len(orphans))
+	memoryIDs := make([]string, 0, len(orphans))
+	for docID, memoryID := range orphans {
+		ids = append(ids, docID)
+		memoryIDs = append(memoryIDs, memoryID)
+	}
+	store := r.rag.VectorStore
+	collectionID := store.GetCollectionInfo().ID
+	return store.DeleteWithTransactionCheck(func(tx *gorm.DB) error {
+		// A memory may have been restored after the search. Recheck in the
+		// deletion transaction so concurrent writes cannot lose live documents.
+		live, err := r.loadSemanticEntities(tx, memoryIDs, false)
+		if err != nil {
+			return err
+		}
+		if len(live) > 0 {
+			return errSemanticOrphanChanged
+		}
+		var documents []schema.VectorStoreDocument
+		if err := tx.Select("document_id, metadata").
+			Where("collection_id = ? AND document_id IN (?)", collectionID, ids).Find(&documents).Error; err != nil {
+			return err
+		}
+		if len(documents) == 0 {
+			return errSemanticOrphanChanged
+		}
+		for _, doc := range documents {
+			id, ok := r.semanticMemoryID(doc.Metadata)
+			if !ok || id != orphans[doc.DocumentID] {
+				return errSemanticOrphanChanged
+			}
+		}
+		return nil
+	}, ids...)
 }
 
 // SearchByScores 按照C.O.R.E. P.A.C.T.评分搜索
@@ -368,4 +409,3 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 
 	return results, nil
 }
-

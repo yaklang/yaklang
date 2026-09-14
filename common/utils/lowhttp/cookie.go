@@ -11,22 +11,42 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var cookiejarPool = utils.NewSafeMapWithKey[string, http.CookieJar]()
+// Keep persistent sessions reusable without allowing caller-controlled session
+// names to grow a process-wide map forever. A hit refreshes the LRU position,
+// so ordinary long-lived sessions are retained while abandoned sessions are
+// evicted under pressure.
+const cookiejarPoolCapacity = 1024
+
+var (
+	cookiejarPool         = utils.NewLRUCacheWithKey[string, http.CookieJar](cookiejarPoolCapacity)
+	cookiejarPoolCreateMu sync.Mutex
+)
 
 func RemoveCookiejar(session string) {
 	if session == "" {
 		return
 	}
-	cookiejarPool.Delete(session)
+	cookiejarPoolCreateMu.Lock()
+	defer cookiejarPoolCreateMu.Unlock()
+	cookiejarPool.Remove(session)
 }
 
 func GetCookiejar(session string) http.CookieJar {
+	if jar, ok := cookiejarPool.Get(session); ok {
+		return jar
+	}
+
+	// Serialize only cache misses. The second lookup makes creation atomic for
+	// one session while keeping the common hit path concurrent.
+	cookiejarPoolCreateMu.Lock()
+	defer cookiejarPoolCreateMu.Unlock()
 	if jar, ok := cookiejarPool.Get(session); ok {
 		return jar
 	}

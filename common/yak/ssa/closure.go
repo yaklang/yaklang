@@ -85,11 +85,16 @@ func (f *Function) AddForceSideEffect(variable *Variable, value Value, index int
 func (f *Function) AddSideEffect(variable *Variable, v Value) {
 	var bind *Variable = variable
 
-	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
-		parentScope := p.CurrentBlock.ScopeTable
-		if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
-			bind = find
-			break
+	// f.builder is nil for functions rebuilt from DB (compile-unit spill +
+	// lazy reload) or extern functions; the parent-scope walk is compiler-only
+	// bookkeeping, so just keep the original variable as bind.
+	if f.builder != nil {
+		for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
+			parentScope := p.CurrentBlock.ScopeTable
+			if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
+				bind = find
+				break
+			}
 		}
 	}
 
@@ -231,6 +236,12 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
 	builder := function.builder
+
+	// Functions rebuilt from DB have no builder; side effects for them were
+	// already handled at compile time and cannot be re-emitted here.
+	if builder == nil {
+		return
+	}
 
 	for _, se := range funcTyp.SideEffects {
 		if se.Kind == NormalSideEffect && buildPointer {
@@ -419,6 +430,12 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	function := c.GetFunc()
 	builder := function.builder
 
+	// Functions rebuilt from DB have no builder; binding side effects for them
+	// were already handled at compile time and cannot be re-emitted here.
+	if builder == nil {
+		return
+	}
+
 	for _, se := range funcTyp.SideEffects {
 		if se.Kind == PointerSideEffect {
 			continue
@@ -586,6 +603,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 				builder.AssignVariable(variable, sideEffect)
 				sideEffect.SetVerboseName(actualVerboseName)
+				if c.SideEffectValue == nil {
+					c.SideEffectValue = make(map[string]int64)
+				}
 				c.SideEffectValue[actualVerboseName] = sideEffect.GetId()
 			}
 
@@ -851,6 +871,9 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 				}
 				builder.AssignVariable(variable, sideEffect)
 				sideEffect.SetVerboseName(se.VerboseName)
+				if c.SideEffectValue == nil {
+					c.SideEffectValue = make(map[string]int64)
+				}
 				c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
 			}
 		}

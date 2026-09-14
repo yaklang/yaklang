@@ -1,4 +1,5 @@
 desc(
+	risk: "information"
 	title: "Audit Java Springfox Configuration"
 	type: config
 	level: low
@@ -122,7 +123,7 @@ springfox.documentation.enabled: false
 #### 4. 移除不必要的依赖
 如果应用程序不需要API文档功能，应移除Springfox和Swagger相关的依赖。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 风险描述
 1. **风险原理**

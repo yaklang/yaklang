@@ -64,7 +64,7 @@
    - drift = 同一问题域内的 topics 自然漂移（changed 可能是 true，但方向没真正转）
    - pivot = 用户/任务真正切换了方向（changed=true 且应重置下游推荐）
    - 不确定时不要填，系统会回退到 changed 的语义；填错宁可填 drift 也不要随便填 pivot
-   - 这是下游昂贵刷新（capability/knowledge/midterm 召回）的主要门控，pivot 才会重新加载
+   - 这是下游昂贵刷新（capability/knowledge 召回）的主要门控，pivot 才会重新加载
 
 ## 示例
 

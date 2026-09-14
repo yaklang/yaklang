@@ -140,6 +140,9 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			if y.rule.Mode == schema.SFR_MODE_SOURCE {
 				y.rule.Tag = AppendRuleTag(y.rule.Tag, RuleModeSource)
 			}
+			if y.rule.Mode == schema.SFR_MODE_STRUCT {
+				y.rule.Tag = AppendRuleTag(y.rule.Tag, RuleModeStruct)
+			}
 		default:
 			if strings.Contains(key, "://") {
 				haveFileSystem = true

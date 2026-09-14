@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang SQL Injection Vulnerability in Net"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -38,7 +38,7 @@ fmt.Fprintf(w, "User ID: %d", userID)
 DESC
 	rule_id: "1c99dff2-ccc4-452a-8a95-2594dd2340d8"
 	title_zh: "检测Golang SQL注入漏洞database(sql)"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **使用参数化查询（Prepared Statements）**
@@ -96,7 +96,7 @@ $unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	title_zh: "检测Golang SQL注入漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

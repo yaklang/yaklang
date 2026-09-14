@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang暴露pprof调试端点"
 	type: audit
 	level: low
-	risk: "安全配置错误"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 该规则检测 `net/http/pprof` 的显式导入与 HTTP 服务启动组合。
 在生产环境暴露 pprof 端点可能泄露运行时信息（goroutine、heap、profile），可被攻击者用于侦察与性能打点攻击。
@@ -30,7 +30,7 @@ alert $entry for {
 	title: "Golang pprof Endpoint Might Be Exposed",
 	title_zh: "可能暴露Golang pprof调试端点",
 	message: "检测到项目导入 net/http/pprof 且启动 HTTP 服务，若未限制访问可能导致敏感运行时信息泄露。",
-	risk: "安全配置错误",
+	risk: "security-misconfiguration",
 	desc: <<<DESC
 pprof 默认注册 `/debug/pprof/*` 路径。若直接对外开放，攻击者可利用这些端点收集系统与运行时信息。
 DESC

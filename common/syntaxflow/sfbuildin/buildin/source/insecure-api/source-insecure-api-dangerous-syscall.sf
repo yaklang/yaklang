@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到危险的 syscall 调用"
+	title_zh: "检测到危险的 syscall 调用"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-dangerous-syscall"
+	risk: "unsafe-implementation"
+	desc: <<<DESC
+### 规则说明
+Ruby 的 syscall 本质上不安全且不可移植，官方推荐使用 Fiddle 库实现更安全、可移植的系统调用。
+
+### 风险类型
+不安全实现（unsafe-implementation）
+
+### 影响
+使用了不安全或不稳定的底层调用，可能引入内存安全或逻辑风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-94
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 Fiddle 库替代 syscall，或使用经过封装的系统调用 API。
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+syscall
+POS
+	"safefile://pos.rb": <<<NEG
+Fiddle::Function
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:syscall)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到危险的 syscall 调用",
+	title_zh: "检测到危险的 syscall 调用",
+	message: "检测到危险的 syscall 调用",
+}

@@ -85,7 +85,7 @@ Response response = Request.Get(userInputUrl).execute();
 对于敏感场景，考虑使用标准的HttpURLConnection或第三方库（如OkHttp）来代替Fluent API，以减少潜在的安全问题。
 
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则描述
 1. **规则目的**

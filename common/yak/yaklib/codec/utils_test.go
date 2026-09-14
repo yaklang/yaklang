@@ -75,3 +75,32 @@ func TestAesECB(t *testing.T) {
 	}
 	assert.True(t, string(result) == tdata)
 }
+
+func TestFixIV(t *testing.T) {
+	key16 := []byte("1234567890123456")
+	key24 := []byte("123456789012345678901234")
+
+	t.Run("empty iv falls back to key prefix", func(t *testing.T) {
+		assert.Equal(t, key16, FixIV(nil, key16, 16))
+		assert.Equal(t, key16, FixIV([]byte{}, key16, 16))
+		assert.Equal(t, key24[:8], FixIV([]byte{}, key24, 8))
+	})
+
+	t.Run("short iv is zero padded", func(t *testing.T) {
+		got := FixIV([]byte("abc"), key16, 16)
+		assert.Equal(t, 16, len(got))
+		assert.Equal(t, []byte("abc"), got[:3])
+		assert.Equal(t, make([]byte, 13), got[3:])
+	})
+
+	t.Run("overlong iv is truncated", func(t *testing.T) {
+		iv := []byte("abcdefghijklmnopqrstuvwxyz")
+		assert.Equal(t, iv[:16], FixIV(iv, key16, 16))
+		assert.Equal(t, iv[:8], FixIV(iv, key16, 8))
+	})
+
+	t.Run("exact block size iv is unchanged", func(t *testing.T) {
+		iv := []byte("abcdefghijklmnop")
+		assert.Equal(t, iv, FixIV(iv, key16, 16))
+	})
+}

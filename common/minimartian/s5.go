@@ -639,11 +639,16 @@ func (c *S5Config) ServeConn(conn net.Conn) error {
 }
 
 func (c *S5Config) ConnectionFallback(src, proxiedConn net.Conn) error {
+	return connectionFallback(context.Background(), src, proxiedConn, c.Debug)
+}
+
+func connectionFallback(ctx context.Context, src, proxiedConn net.Conn, debug bool) error {
 	// fullback
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 	dst := proxiedConn
-	wCtx, cancel := context.WithCancel(context.Background())
+	wCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	ctxSrc := ctxio.NewReaderWriter(wCtx, src)
 	ctxDst := ctxio.NewReaderWriter(wCtx, dst)
 
@@ -654,12 +659,12 @@ func (c *S5Config) ConnectionFallback(src, proxiedConn net.Conn) error {
 			wg.Done()
 		}()
 		var err error
-		if c.Debug {
+		if debug {
 			_, err = io.Copy(ctxDst, io.TeeReader(ctxSrc, os.Stdout))
 		} else {
 			_, err = io.Copy(ctxDst, ctxSrc)
 		}
-		if err != nil && c.Debug && err != io.EOF {
+		if err != nil && debug && err != io.EOF {
 			log.Warnf("bridge %v -> %v failed: %s", src.RemoteAddr().String(), dst.RemoteAddr().String(), err)
 		}
 	}()
@@ -672,12 +677,12 @@ func (c *S5Config) ConnectionFallback(src, proxiedConn net.Conn) error {
 		}()
 
 		var err error
-		if c.Debug {
+		if debug {
 			_, err = io.Copy(ctxSrc, io.TeeReader(ctxDst, os.Stdout))
 		} else {
 			_, err = io.Copy(ctxSrc, ctxDst)
 		}
-		if err != nil && c.Debug && err != io.EOF {
+		if err != nil && debug && err != io.EOF {
 			log.Warnf("bridge %v -> %v failed: %s", src.RemoteAddr().String(), dst.RemoteAddr().String(), err)
 		}
 	}()

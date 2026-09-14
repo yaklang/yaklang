@@ -239,6 +239,11 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	}
 
 	if c.GetCompilePeepholeSize() != 0 {
+		if c.structScan != nil && c.structScan.wantsScan() {
+			c.structScan.skipped = true
+			c.structScan.skipReason = "peephole compile"
+			log.Warnf("[struct_scan] skipped: peephole compile")
+		}
 		if progs, err = c.peephole(); err != nil {
 			return nil, err
 		}

@@ -272,10 +272,10 @@ func (b *builder) getDeclarationNameText(name *ast.DeclarationName) string {
 	if name == nil {
 		return ""
 	}
-	if id := name.AsIdentifier(); id != nil {
+	if id := name.TryAsIdentifier(); id != nil {
 		return id.Text
 	}
-	if str := name.AsStringLiteral(); str != nil {
+	if str := name.TryAsStringLiteral(); str != nil {
 		return strings.Trim(str.Text, `"'`)
 	}
 	return ""

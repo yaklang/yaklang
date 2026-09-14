@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-base64-decode"
-	risk: "不安全反序列化链路"
+	risk: "deserialization-flow"
 	desc: <<<DESC
 标记 base64.b64decode 等解码调用。攻击者控制的 Base64 载荷解码后常被送入 pickle、yaml、json 等解析逻辑，构成反序列化或解析攻击链的一环。
 DESC
@@ -24,7 +24,7 @@ alert $output for {
 	title_zh: "Base64 解码",
 	level: "info",
 	type: "audit",
-	risk: "不安全反序列化链路",
+	risk: "deserialization-flow",
 	message: "检测到 Base64 解码，请关注下游是否接入不安全的反序列化或解析逻辑。",
 	name: "output",
 }

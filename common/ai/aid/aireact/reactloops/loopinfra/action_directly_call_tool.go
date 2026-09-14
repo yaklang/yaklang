@@ -19,8 +19,6 @@ import (
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
-const directlyCallToolPromptLoopKey = "last_ai_decision_prompt"
-const directlyCallToolResponseLoopKey = "last_ai_decision_response"
 const directlyCallToolNonceLoopKey = "last_ai_decision_nonce"
 
 func getDirectlyCallToolParamNames(loop *reactloops.ReActLoop, toolName string) []string {
@@ -484,16 +482,7 @@ Few-shot example 2 (valid directly_call_tool):
 			finishProgress := func(string) {}
 			if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
 				pr, pw := utils.NewPipe()
-				event, _ := emitter.EmitDefaultSystemStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
-				if event != nil {
-					progressEventID := event.GetStreamEventWriterId()
-					aicommon.EmitAIRequestAndResponseReferenceMaterials(
-						emitter,
-						progressEventID,
-						loop.Get(directlyCallToolPromptLoopKey),
-						loop.Get(directlyCallToolResponseLoopKey),
-					)
-				}
+				_, _ = emitter.EmitDefaultSystemStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
 				defer pw.Close()
 				emitProgress = func(msg string) {
 					_, _ = pw.WriteString(msg)

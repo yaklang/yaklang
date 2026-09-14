@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang SQL Injection Vulnerability in gin.Context"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -29,7 +29,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 DESC
 	rule_id: "137a07c6-00e9-443a-9c2c-f892782d5176"
 	title_zh: "检测Golang SQL注入漏洞gin.Context"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用参数化查询
@@ -157,7 +157,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 #### 3. 避免直接拼接SQL语句
 永远不要直接将用户输入拼接到SQL查询字符串中，即使进行了简单的过滤或转义，也存在绕过的风险。
 SOLUTION
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "high",
 	message: "检测到Golang Gin框架中的SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间没有发现任何过滤函数信息。",
 }

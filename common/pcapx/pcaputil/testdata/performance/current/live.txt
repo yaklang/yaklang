@@ -1,0 +1,16 @@
+# github.com/yaklang/yaklang/common/pcapx/pcaputil.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-1666851952/000058.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+=== RUN   TestLiveCaptureCancellation
+=== RUN   TestLiveCaptureCancellation/workers=1
+[36m[INFO][0m 2026-09-12 12:49:25 [open_device:282] open iface lo0 success
+=== RUN   TestLiveCaptureCancellation/workers=4
+[36m[INFO][0m 2026-09-12 12:49:25 [open_device:282] open iface lo0 success
+--- PASS: TestLiveCaptureCancellation (0.12s)
+    --- PASS: TestLiveCaptureCancellation/workers=1 (0.06s)
+    --- PASS: TestLiveCaptureCancellation/workers=4 (0.07s)
+=== RUN   TestTCPWorkersLiveIntegrity
+[36m[INFO][0m 2026-09-12 12:49:25 [open_device:282] open iface lo0 success
+    reassembly_workers_stress_test.go:242: loopback bytes=221184 SHA256=c9f0ce1de49a447f24911988ffe0e0c3364c3ff32b92e6bf713895bf242cd64c stats={AccountingAvailable:true Workers:4 AcceptedPackets:62 ProcessedPackets:62 RejectedPackets:0 DeliveredBytes:221184 CallbackPanics:0 ResourceLimitEvents:0 DecodeErrors:0 TruncatedCaptures:0 InvalidSegments:0 UnreassembledBytes:0 UnreassembledSegments:0 BackpressureEvents:0 BackpressureTime:0s QueueBufferBytes:4194304 QueuePacketCapacity:4096 Devices:[{Device:lo0 Received:68 Dropped:0 InterfaceDropped:0 Available:true Error:}]}
+--- PASS: TestTCPWorkersLiveIntegrity (0.07s)
+PASS
+ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil	1.680s

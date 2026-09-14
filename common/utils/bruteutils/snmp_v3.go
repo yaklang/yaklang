@@ -77,7 +77,8 @@ func v3Brute(item *BruteItem, alg gosnmp.SnmpV3AuthProtocol) *BruteItemResult {
 			result.UserEliminated = true
 		}
 
-		log.Errorf("brute failed: %s", err)
+		// gosnmp 的错误可能携带凭证内容，日志中必须清洗
+		log.Errorf("brute failed (target=%s): %s", item.Target, RedactText(err.Error(), item.Password))
 		return result
 	}
 

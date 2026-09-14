@@ -1,54 +1,32 @@
 package bruteutils
 
 import (
-	"database/sql"
-	"net/url"
-	"strings"
+	"context"
 
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-
-	mssql "github.com/denisenkom/go-mssqldb"
+	"github.com/yaklang/yaklang/common/brute/core"
+	"github.com/yaklang/yaklang/common/brute/probes/mssql"
 )
 
+// MSSQLAuth 使用最小 TDS 探针执行认证探测（不再依赖 go-mssqldb 驱动）。
 func MSSQLAuth(target, username, password string, needAuth bool) (ok, finished bool, err error) {
-	query := url.Values{}
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 
-	query.Add("encrypt", "disable")
-
-	u := &url.URL{
-		Scheme:   "sqlserver",
-		Host:     target,
-		RawQuery: query.Encode(),
+	if !needAuth {
+		username, password = "", ""
 	}
-	if needAuth {
-		u.User = url.UserPassword(username, password)
-	}
-	connStr := u.String()
+	res := probeMSSQL(ctx, target, username, password)
+	return res.Outcome == core.OutcomeAuthSuccess, res.Outcome.IsFinalForTarget(), legacyError(res)
+}
 
-	connector, err := mssql.NewConnector(connStr)
-	connector.Dialer = defaultDialer
+func probeMSSQL(ctx context.Context, target, username, password string) core.Result {
+	ptarget, err := core.ParseTarget(appendDefaultPort(target, 1433))
 	if err != nil {
-		return false, true, utils.Wrap(err, "sqlserver create connector failed: %v")
+		return core.Result{Outcome: core.OutcomeProtocolMismatch, Err: core.ErrProtocolParse}
 	}
-
-	db := sql.OpenDB(connector)
-	db.SetMaxIdleConns(0)
-	defer db.Close()
-	err = db.Ping()
-	if err != nil {
-		switch true {
-		// connect: connection refused
-		case strings.Contains(err.Error(), "i/o timeout"): // 超时
-			fallthrough
-		case strings.Contains(err.Error(), "invalid packet size"): // 不是mssql协议
-			fallthrough
-		case strings.Contains(err.Error(), "connect: connection refused"):
-			return false, true, err
-		}
-		return false, false, err
-	}
-	return true, false, nil
+	var prober mssql.Prober
+	return prober.Probe(ctx, ptarget, core.Credential{Username: username, Password: password},
+		core.Options{Timeout: defaultTimeout, TLSPolicy: core.TLSOpportunistic})
 }
 
 var mssqlAuth = &DefaultServiceAuthInfo{
@@ -58,26 +36,12 @@ var mssqlAuth = &DefaultServiceAuthInfo{
 	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 1433)
-		result := i.Result()
-
-		ok, finished, err := MSSQLAuth(i.Target, "", "", false)
-		if err != nil {
-			log.Errorf("mssql unauth verify failed: %s", err)
-		}
-		result.Ok = ok
-		result.Finished = finished
-		return result
+		res := probeMSSQL(itemCtx(i), i.Target, "", "")
+		return legacyFromCore(i, res)
 	},
 	BrutePass: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 1433)
-		result := i.Result()
-
-		ok, finished, err := MSSQLAuth(i.Target, i.Username, i.Password, true)
-		if err != nil {
-			log.Errorf("mssql brute pass failed: %s", err)
-		}
-		result.Ok = ok
-		result.Finished = finished
-		return result
+		res := probeMSSQL(itemCtx(i), i.Target, i.Username, i.Password)
+		return legacyFromCore(i, res)
 	},
 }

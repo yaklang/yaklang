@@ -219,6 +219,7 @@ type fetchFuncFromSrcCodeConfig struct {
 	engineHook        func(e *antlr4yak.Engine) error
 	callArgumentHooks map[string]callArgumentHookFunc
 	functionNames     []string
+	disableCache      bool
 }
 
 type fetchFuncFromSrcCodeOptions func(*fetchFuncFromSrcCodeConfig)
@@ -762,7 +763,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		args = append(args, "--"+key, fmt.Sprintf("%s", value))
 	}
 	app := GetHookCliApp(args)
-	cTable, err := y.fetchFunctionFromSourceCode(y.getYakitPluginContext(ctx).WithCliApp(app),
+	fetchOptions := []fetchFuncFromSrcCodeOptions{
 		WithFetchScript(script),
 		WithFetchCode(code),
 		WithFetchEngineHook(func(e *antlr4yak.Engine) error {
@@ -780,7 +781,14 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 			return nil
 		}),
 		WithFetchFunctionNames(funcName...),
-	)
+	}
+	// The MITM hot patch is replaced for every editor revision. Persisting each
+	// unique source as yakc increases reload latency and leaves unbounded cache
+	// files without providing useful hits.
+	if id == HotPatchScriptName {
+		fetchOptions = append(fetchOptions, WithFetchCacheDisabled())
+	}
+	cTable, err := y.fetchFunctionFromSourceCode(y.getYakitPluginContext(ctx).WithCliApp(app), fetchOptions...)
 
 	if err != nil {
 		return err
@@ -1272,10 +1280,17 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 
 	loadCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.loadTimeout)
 	defer cancel()
-	ins, err := engine.ExecuteExWithContext(loadCtx, code, map[string]interface{}{
+	executeParams := map[string]interface{}{
 		"ROOT_CONTEXT": loadCtx,
 		"YAK_FILENAME": scriptName,
-	})
+	}
+	var ins *antlr4yak.Engine
+	var err error
+	if cfg.disableCache {
+		ins, err = engine.ExecuteWithoutCacheWithContext(loadCtx, code, executeParams)
+	} else {
+		ins, err = engine.ExecuteExWithContext(loadCtx, code, executeParams)
+	}
 	if err != nil {
 		log.Errorf("init execute plugin finished: %s", err)
 		return nil, utils.Errorf("load plugin failed: %s", err)
@@ -1307,39 +1322,45 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 					args = callArgHook(funcName, numIn, args)
 				}
 
-				errCh := make(chan error)
-				valueCh := make(chan any)
+				type callResult struct {
+					value any
+					err   error
+				}
+				// The caller may return as soon as subCtx is canceled. Keep one
+				// buffered result slot so the VM goroutine can still publish its
+				// terminal state and exit instead of leaking forever on a channel send.
+				resultCh := make(chan callResult, 1)
 				go func() {
+					result := callResult{}
 					defer func() {
+						printStack := false
 						if err := recover(); err != nil {
 							fmtErr := utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
 							y.Err = fmtErr
-							//log.Error(fmtErr)
-							//fmt.Println()
-							errCh <- fmtErr
-							if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
-								utils.PrintCurrentGoroutineRuntimeStack()
-							}
+							result.err = fmtErr
+							printStack = os.Getenv("YAK_IN_TERMINAL_MODE") == ""
 						}
-						close(errCh)
+						resultCh <- result
+						// Publish the terminal result before potentially expensive
+						// diagnostics so cancellation and timeout callers are never
+						// held up by stack formatting.
+						if printStack {
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
 					}()
-					value, err := nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
-					if err != nil {
-						errCh <- err
-					} else {
-						valueCh <- value
-					}
+					result.value, result.err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
 				}()
 
 				select {
-				case value := <-valueCh:
-					return value
-				case err := <-errCh:
+				case result := <-resultCh:
 					//if err != nil && !errors.Is(err, context.Canceled) {
 					//	log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 					//}
-					// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
-					panic(err)
+					if result.err != nil {
+						// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
+						panic(result.err)
+					}
+					return result.value
 				case <-subCtx.Done():
 					err := subCtx.Err()
 					if errors.Is(err, context.DeadlineExceeded) {
@@ -2378,12 +2399,18 @@ func WithFetchFunctionNames(names ...string) fetchFuncFromSrcCodeOptions {
 	}
 }
 
+func WithFetchCacheDisabled() fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		c.disableCache = true
+	}
+}
+
 func buildHotpatchHandler(ctx context.Context, code string) func(s string, yield func(s string)) (err error) {
 	if strings.TrimSpace(code) == "" {
 		return nil
 	}
 	engine := NewScriptEngine(1)
-	codeEnv, err := engine.ExecuteExWithContext(ctx, code, make(map[string]interface{}))
+	codeEnv, err := engine.ExecuteWithoutCacheWithContext(ctx, code, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("load hotPatch code error: %s", err)
 		return nil

@@ -3,7 +3,7 @@ package base
 import (
 	"github.com/yaklang/yaklang/common/bin-parser/rules"
 	"github.com/yaklang/yaklang/common/utils"
-	"gopkg.in/yaml.v2"
+	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 )
 
 type NodeConfigFun func(config *Config)

@@ -1,0 +1,39 @@
+results = make(chan string, 16)
+
+level2 = func(id) {
+	eval(`
+dynamicOuter = func(base) {
+    dynamicInner = func(delta) {
+        return base + delta
+    }
+    return dynamicInner(3)
+}
+eval('evaluated = sprintf("worker-%d-ok-%d", id, dynamicOuter(id))')
+`)
+    return evaluated
+}
+
+level1 = func(id) {
+    return level2(id)
+}
+
+worker = func(id) {
+    results <- level1(id)
+}
+
+for i := 0; i < 16; i++ {
+    go worker(i)
+}
+
+seen = make(map[string]bool)
+for i := 0; i < 16; i++ {
+    value = <-results
+    seen[value] = true
+}
+waitAllAsyncCallFinish()
+
+assert len(seen) == 16, "async nested/eval results crossed frames: %v" % seen
+for i := 0; i < 16; i++ {
+    expected = sprintf("worker-%d-ok-%d", i, i + 3)
+    assert seen[expected], "missing async result %s" % expected
+}

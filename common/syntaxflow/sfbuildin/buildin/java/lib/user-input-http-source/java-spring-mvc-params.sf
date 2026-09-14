@@ -96,7 +96,7 @@ alert $output for {
 3. 在处理`HttpServletRequest`对象时，避免直接拼接未经验证的用户输入。
 4. 对于复杂场景，建议结合流分析工具进一步检测潜在漏洞。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 该规则用于识别Java Spring MVC框架中控制器（Controller）层处理方法的用户可控输入参数。这些参数是数据流分析的起点，对于检测多种Web安全漏洞至关重要。

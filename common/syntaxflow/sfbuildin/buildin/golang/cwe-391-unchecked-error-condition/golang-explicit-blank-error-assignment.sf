@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang 使用 _ = 显式丢弃错误返回值（类 G104）"
 	type: audit
 	level: low
-	risk: "错误处理不当"
+	risk: "error-handling"
 	desc: <<<DESC
 对应 gosec G104 中常见模式：通过 `_ = ...` 显式丢弃返回的 `error`。本规则在源码上下文中匹配 `_ =` 与 `os.Remove`、`os.WriteFile`、`os.Chmod` 的组合，提示审计是否应记录、返回或中止流程。不覆盖所有未检查错误场景，但误报相对较低、易于落地。
 DESC
@@ -32,7 +32,7 @@ alert $low for {
 	title: "Explicit Error Discard via _ = on os.* Call",
 	title_zh: "os 包调用使用 _ = 丢弃错误",
 	message: "检测到 `_ =` 显式丢弃 os.Remove/os.WriteFile/os.Chmod 的错误返回值，请确认是否符合预期。",
-	risk: "错误处理不当",
+	risk: "error-handling",
 	desc: <<<DESC
 显式丢弃错误可能导致删除失败、写文件失败或权限变更失败被忽略，进而引发安全状态与业务状态不一致。
 DESC

@@ -106,7 +106,7 @@ return
 }
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 1. 规则目的
 该规则主要用于审计Go语言代码中对`github.com/jlaffaye/ftp`包的使用情况。此库提供了Go语言连接和操作FTP服务器的功能，常用于实现文件传输等场景。

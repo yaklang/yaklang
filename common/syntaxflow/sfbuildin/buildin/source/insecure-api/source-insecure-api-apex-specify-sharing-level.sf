@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Apex 类未显式声明共享级别"
+	title_zh: "检测到 Apex 类未显式声明共享级别",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-apex-specify-sharing-level"
+	risk: "access-control"
+	desc: <<<DESC
+### 规则说明
+每个 Apex 类都应显式声明共享模式。使用 with sharing 或 without sharing 指定是否执行共享规则；使用 inherited sharing 使类沿用调用类的共享模式。
+
+### 风险类型
+访问控制缺陷（access-control）
+
+### 影响
+资源或接口的访问权限设置不当，可能允许越权访问。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-284
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+为 Apex 类显式声明 with sharing、without sharing 或 inherited sharing。
+SOLUTION
+	alert_min: 1
+	"file://pos.cls": <<<POS
+public class ExampleController {
+}
+POS
+	"safefile://neg.cls": <<<NEG
+public with sharing class ExampleController {
+}
+NEG
+)
+
+${*.cls}.pattern_regex_not(/(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\b(?:with|without|inherited)\s+sharing\b[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\bextends\s+Exception\b[\s\S]*?\{/) as $p0
+${*.apex}.pattern_regex_not(/(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\b(?:with|without|inherited)\s+sharing\b[\s\S]*?\sclass\s[\s\S]*?\{/, /(?:private|public|global)[\s\S]*?\sclass\s[\s\S]*?\bextends\s+Exception\b[\s\S]*?\{/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 Apex 类未显式声明共享级别",
+	title_zh: "检测到 Apex 类未显式声明共享级别",
+	message: "检测到 Apex 类未显式声明共享级别",
+}

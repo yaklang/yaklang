@@ -1,0 +1,83 @@
+desc(
+	title: "Check C#/.NET Open Redirect via Response.Redirect"
+	title_zh: "检测 C#/.NET Response.Redirect 开放重定向"
+	type: vuln
+	level: mid
+	language: csharp
+	risk: "open-redirect"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+开放重定向出现在 Web 应用把客户端转到攻击者可控制的任意 URL 时。站点常用重定向做站内跳转或记录用户离开方式。若查询参数未经校验就交给 `Response.Redirect` / `Redirect`，攻击者可以把可信域名下的链接变成跳板，用户以为自己还在本站。
+2. **触发场景**
+```csharp
+string redirect = Request["dest"];
+Response.Redirect(redirect);
+```
+邮件里的 `http://trusted.example.com/redirect?dest=www.wilyhacker.com` 看起来属于可信站点，点击后被转到攻击者页面。目标还可以 URL 编码成 `%77%69%6C%79...`，即使用户习惯检查域名也难以发现。`//evil.com` 这类协议相对 URL 常被 `IsLocalUrl` 的错误实现放行。
+3. **潜在影响**
+- **钓鱼**：在可信域名跳转后采集凭证。
+- **OAuth / SSO 回调被盗**：授权码发到攻击者站点。
+- **品牌被冒用**：用户难以从地址栏判断最终站点。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 不要让用户输入直接成为跳转目标
+采用间接方法：维护合法 URL 列表，用户只提交列表中的索引或键。
+#### 2. 只允许本站相对路径
+```csharp
+if (!Url.IsLocalUrl(url))
+    url = "/home";
+return Redirect(url);
+```
+`IsLocalUrl` 必须拒绝 `//evil.com`、`/\evil.com` 以及带 scheme 的绝对 URL。
+#### 3. 必须跳外站时用主机允许列表
+比对规范化后的主机名，失败则回退到固定安全路径，不要拼接用户提供的绝对 URL。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-601](https://cwe.mitre.org/data/definitions/601.html)
+[Url.IsLocalUrl](https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.mvc.routing.urlhelper.islocalurl)
+REFERENCE
+	rule_id: "a019f712-7c6d-442b-83ae-32d88e3aa2d7"
+)
+
+<include("csharp-user-input")> as $input
+
+Response.Redirect as $sink
+*.Redirect as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET Open Redirect via Redirect",
+	title_zh: "C#/.NET Redirect 开放重定向",
+	level: "mid",
+	type: "vuln",
+	risk: "open-redirect",
+	message: "检测到用户输入流入 Redirect，存在开放重定向风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_redirect.cs': <<<UNSAFE
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request, HttpResponse Response) {
+        string q = Request.QueryString["url"];
+        Response.Redirect(q);
+    }
+}
+UNSAFE
+	'safefile://safe_redirect.cs': <<<SAFE
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpResponse Response) {
+        Response.Redirect("/home");
+    }
+}
+SAFE
+)

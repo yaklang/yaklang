@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -59,7 +60,7 @@ func TestReAct_AnswerWithKnowledge_FullFlow_AITAG_ANSWER(t *testing.T) {
 			if !utils.MatchAllOfSubString(prompt, token) {
 				return nil, utils.Errorf("knowledge token should not appear in the final answer prompt")
 			}
-			aitagNonce := aicommon.MustExtractPromptNonce(t, prompt, "FINAL_ANSWER")
+			aitagNonce := aicommon_testutil.MustExtractPromptNonce(t, prompt, "FINAL_ANSWER")
 
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`

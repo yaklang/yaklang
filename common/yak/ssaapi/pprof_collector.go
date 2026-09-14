@@ -58,6 +58,13 @@ const (
 	pprofInitialDelay      = 30 * time.Second
 	pprofHTTPTimeout       = 10 * time.Minute
 	pprofListenAttempts    = 8
+
+	// OOM investigations need early evidence. Large source scans have been
+	// killed by the kernel around 3-5 minutes, before the first periodic
+	// snapshot at 5m30s; capture intermediate runtime/heap/goroutine state at
+	// one minute, then every minute while the task stays below the normal
+	// periodic cadence.
+	pprofEarlyInterval = 1 * time.Minute
 )
 
 // StartPprofCollector creates the output directories, starts the pprof HTTP server,
@@ -172,6 +179,9 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 
 	c.collectSnapshot("initial", false)
 
+	earlyTicker := time.NewTicker(pprofEarlyInterval)
+	defer earlyTicker.Stop()
+	earlySamples := 0
 	ticker := time.NewTicker(pprofInterval)
 	defer ticker.Stop()
 
@@ -179,6 +189,15 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-earlyTicker.C:
+			// Capture the first four one-minute samples, then fall back to
+			// the normal 5-minute cadence.
+			if earlySamples >= 4 {
+				earlyTicker.Stop()
+				continue
+			}
+			earlySamples++
+			c.collectSnapshot(fmt.Sprintf("early%02d", earlySamples), false)
 		case <-ticker.C:
 			c.collectSnapshot(time.Now().Format("150405"), false)
 		}

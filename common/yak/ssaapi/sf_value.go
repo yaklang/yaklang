@@ -227,11 +227,12 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.Values, error
 	if utils.IsNil(rets) {
 		return nil, utils.Errorf("ssa.Value no actual params")
 	}
-	return ToSFVMValues(rets), nil
+	return ToSFVMValues(filterValuesByStructBound(valueStructBound(v), rets)), nil
 }
 
 func (v *Value) GetCalled() (sfvm.Values, error) {
 	ret := v.GetCalledBy()
+	ret = filterValuesByStructBound(valueStructBound(v), ret)
 	results := ToSFVMValues(ret)
 	results.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
 	return results, nil
@@ -239,7 +240,8 @@ func (v *Value) GetCalled() (sfvm.Values, error) {
 
 func (v *Value) GetFields() (sfvm.Values, error) {
 	if v.IsMap() || v.IsObject() {
-		members := lo.Map(v.GetAllMember(), func(item *Value, index int) sfvm.ValueOperator {
+		filtered := filterValuesByStructBound(valueStructBound(v), v.GetAllMember())
+		members := lo.Map(filtered, func(item *Value, index int) sfvm.ValueOperator {
 			return item
 		})
 		return sfvm.NewValues(members), nil
@@ -260,11 +262,21 @@ func (v *Value) GetMembersByString(key string) (sfvm.Values, bool) {
 	return nil, false
 }
 
+func valueStructBound(v *Value) *structBound {
+	if v == nil || v.ParentProgram == nil {
+		return nil
+	}
+	if v.ParentProgram.structScanActive && v.ParentProgram.structBound == nil {
+		return &structBound{files: map[string]struct{}{}} // fail-closed: empty include set rejects all paths
+	}
+	return v.ParentProgram.structBound
+}
+
 func (v *Value) GetSyntaxFlowUse() (sfvm.Values, error) {
-	return ToSFVMValues(v.GetUsers()), nil
+	return ToSFVMValues(filterValuesByStructBound(valueStructBound(v), v.GetUsers())), nil
 }
 func (v *Value) GetSyntaxFlowDef() (sfvm.Values, error) {
-	return ToSFVMValues(v.GetOperands()), nil
+	return ToSFVMValues(filterValuesByStructBound(valueStructBound(v), v.GetOperands())), nil
 }
 func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator

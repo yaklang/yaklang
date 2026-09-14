@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang中使用Sprig的SSTI漏洞"
 	type: vuln
 	level: low
-	risk: "服务器端模板注入（SSTI）"
+	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -185,7 +185,7 @@ DESC
 	title_zh: "检测到Golang中使用Sprig的SSTI漏洞",
 	name: "low",
 	message: "检测到Golang中使用Sprig的SSTI漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
-	risk: "服务器端模板注入（SSTI）",
+	risk: "ssti",
 }
 
 desc(

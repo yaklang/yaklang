@@ -2,6 +2,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -337,7 +338,12 @@ func (s *MCPServer) HandleMessage(
 		ID      interface{} `json:"id,omitempty"`
 	}
 
-	if err := json.Unmarshal(message, &baseMessage); err != nil {
+	// Request IDs must survive a round trip without float64 rounding. Decode
+	// only the envelope with UseNumber; tool argument decoding below keeps its
+	// existing types. Valid also rejects trailing data, as Unmarshal did.
+	decoder := json.NewDecoder(bytes.NewReader(message))
+	decoder.UseNumber()
+	if err := decoder.Decode(&baseMessage); err != nil || !json.Valid(message) {
 		return createErrorResponse(
 			nil,
 			mcp.PARSE_ERROR,
@@ -502,8 +508,8 @@ func (s *MCPServer) HandleMessage(
 		if err := json.Unmarshal(message, &request); err != nil {
 			return createErrorResponse(
 				baseMessage.ID,
-				mcp.INVALID_REQUEST,
-				"Invalid call tool request",
+				mcp.INVALID_PARAMS,
+				"Invalid tool parameters",
 			)
 		}
 		return s.handleToolCall(ctx, baseMessage.ID, request)

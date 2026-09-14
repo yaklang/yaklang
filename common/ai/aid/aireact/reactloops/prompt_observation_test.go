@@ -121,8 +121,11 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 
 	task := newMockSimpleTask("test-task", "test-index")
 	loop.SetCurrentTask(task)
-	loop.softTodoChecked = true
-	loop.softTodoCheckpointPending = true
+	current := "todo-1"
+	config.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{
+		Add: []aicommon.TodoAdd{{ID: current, Text: "unfinished work"}}, Current: &current, CurrentSet: true,
+	})
+	loop.requestFinishTodoCheckpoint()
 	operator := NewActionHandlerOperator(task)
 
 	prompt, err := loop.generateLoopPrompt("nonce1", "raw user input", "", nil, "memory content", operator)
@@ -162,9 +165,9 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Len(t, observation.Sections[5].Children, 4)
 	require.Equal(t, "section.dynamic.todo_checkpoint", observation.Sections[5].Children[3].Key)
 	require.False(t, observation.Sections[5].Children[3].Compressible)
-	require.Contains(t, observation.Sections[5].Children[3].Content, "[SOFT TODO CHECKPOINT]")
-	require.Less(t, strings.Index(prompt, "<|INJECTED_MEMORY_END_nonce1|>"), strings.Index(prompt, "[SOFT TODO CHECKPOINT]"))
-	require.Less(t, strings.Index(prompt, "[SOFT TODO CHECKPOINT]"), strings.Index(prompt, "<|PROMPT_SECTION_dynamic_END_nonce1|>"))
+	require.Contains(t, observation.Sections[5].Children[3].Content, "[FINISH BLOCKED BY TODO]")
+	require.Less(t, strings.Index(prompt, "<|INJECTED_MEMORY_END_nonce1|>"), strings.Index(prompt, "[FINISH BLOCKED BY TODO]"))
+	require.Less(t, strings.Index(prompt, "[FINISH BLOCKED BY TODO]"), strings.Index(prompt, "<|PROMPT_SECTION_dynamic_END_nonce1|>"))
 	require.Len(t, observation.Stats.RoleStats, 6)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleBytes)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleTokens)

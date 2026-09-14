@@ -1,6 +1,7 @@
 package airaghttp
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -161,4 +162,14 @@ func TestIsLightweightAIConfigured(t *testing.T) {
 
 	// 高质与轻量通道相互独立
 	require.False(t, cfg.IsAIConfigured(), "lightweight key should not flip high-quality channel")
+}
+
+func TestExtractEventMessage_DecodesJSONStringEscapes(t *testing.T) {
+	msg := `missing <|GEN_CODE_<nonce>|> after the @action JSON`
+	raw, err := json.Marshal(msg)
+	require.NoError(t, err)
+
+	got := extractEventMessage(string(raw), true)
+	require.Equal(t, msg, got)
+	require.Contains(t, got, "<|GEN_CODE_")
 }

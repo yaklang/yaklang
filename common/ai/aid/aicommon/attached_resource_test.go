@@ -20,3 +20,13 @@ func TestAttachedResourceHasKey(t *testing.T) {
 	require.True(t, res.HasKey(CONTEXT_PROVIDER_KEY_FILE_PATH))
 	require.False(t, res.HasKey(CONTEXT_PROVIDER_KEY_DIRECTORY_PATH))
 }
+
+func TestNonEmptyAttachedResourcesPreservesMalformedValues(t *testing.T) {
+	malformed := NewAttachedResource("http_flow", "id", "not-an-id")
+	valid := NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/a.yak")
+	input := []*AttachedResource{nil, NewAttachedResource("http_flow", "id", " \t\n"), malformed, valid}
+	require.Equal(t, []*AttachedResource{malformed, valid}, NonEmptyAttachedResources(input))
+	require.Len(t, input, 4, "filter must not mutate the caller's attachments")
+	_, err := ParseAttachedResourceData(malformed)
+	require.Error(t, err, "malformed nonempty attachments must still be validated")
+}

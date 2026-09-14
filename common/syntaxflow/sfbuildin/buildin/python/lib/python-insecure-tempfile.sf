@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-insecure-tempfile"
-	risk: "符号链接竞争 / 检查时与使用时竞态"
+	risk: "symlink-toctou"
 	desc: <<<DESC
 标记 tempfile.mktemp。该 API 已弃用且在生成路径与真正创建文件之间存在竞态，易被符号链接攻击利用。
 DESC
@@ -24,7 +24,7 @@ alert $output for {
 	title_zh: "tempfile.mktemp 调用",
 	level: "info",
 	type: "audit",
-	risk: "符号链接竞争 / 检查时与使用时竞态",
+	risk: "symlink-toctou",
 	message: "检测到 tempfile.mktemp，存在竞态与不安全临时路径问题，请替换为 mkstemp 或 NamedTemporaryFile。",
 	name: "output",
 }

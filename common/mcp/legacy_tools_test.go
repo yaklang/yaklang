@@ -300,7 +300,7 @@ var expectedLegacyToolSetOrder = []string{
 	"codec", "cve", "httpflow", "hybrid_scan", "payload", "port_scan",
 	"yak_document", "yak_script", "reverse_shell", "reverse_platform", "http_fuzzer", "brute",
 	"subdomain", "crawler", "dynamic", "ssa", "syntaxflow", "risk", "yso", "mitm",
-	"fingerprint", "project_database", "global_hotpatch", "system_proxy",
+	"fingerprint", "project_database", "global_hotpatch", "system_proxy", "screenshot",
 }
 
 var (
@@ -370,6 +370,8 @@ func registerAllLegacyToolSetCases() {
 			cases = legacyGlobalHotpatchToolCases()
 		case "system_proxy":
 			cases = legacySystemProxyToolCases()
+		case "screenshot":
+			cases = legacyScreenshotToolCases()
 		default:
 			panic(fmt.Sprintf("missing legacy tool cases for tool set %q", toolSet))
 		}
@@ -2002,6 +2004,64 @@ func legacySystemProxyToolCases() map[string][]legacyToolCase {
 	}
 }
 
+// --- ToolSet: screenshot ---
+
+func legacyScreenshotToolCases() map[string][]legacyToolCase {
+	// Invalid options are rejected before capture, so these cases need no Yakit frontend.
+	return map[string][]legacyToolCase{
+		"screenshot": {
+			{
+				name:        "reject_negative_inline_limit",
+				args:        map[string]any{"maxInlineBytes": float64(-1)},
+				wantErr:     true,
+				errContains: []string{"maxInlineBytes must be an integer between 0 and 1048576"},
+			},
+			{
+				name:        "reject_excessive_inline_limit",
+				args:        map[string]any{"maxInlineBytes": float64(1048577)},
+				wantErr:     true,
+				errContains: []string{"maxInlineBytes must be an integer between 0 and 1048576"},
+			},
+			{
+				name:        "reject_fractional_inline_limit",
+				args:        map[string]any{"maxInlineBytes": 1.5},
+				wantErr:     true,
+				errContains: []string{"invalid screenshot arguments"},
+			},
+			{
+				name:        "reject_string_inline_limit",
+				args:        map[string]any{"maxInlineBytes": "1024"},
+				wantErr:     true,
+				errContains: []string{"invalid screenshot arguments"},
+			},
+			{
+				name:        "reject_empty_save_path",
+				args:        map[string]any{"savePath": ""},
+				wantErr:     true,
+				errContains: []string{"savePath must be a non-empty PNG file path"},
+			},
+			{
+				name:        "reject_relative_path_escape",
+				args:        map[string]any{"savePath": "../escape.png"},
+				wantErr:     true,
+				errContains: []string{"relative savePath must stay under YAKIT_HOME/screenshots"},
+			},
+			{
+				name:        "reject_non_png_save_path",
+				args:        map[string]any{"savePath": "report.jpg"},
+				wantErr:     true,
+				errContains: []string{"savePath must be a PNG file path without NUL characters"},
+			},
+			{
+				name:        "reject_nul_save_path",
+				args:        map[string]any{"savePath": "bad\x00.png"},
+				wantErr:     true,
+				errContains: []string{"savePath must be a PNG file path without NUL characters"},
+			},
+		},
+	}
+}
+
 // --- integration tests ---
 
 func TestLegacyBuiltinToolSetsRegistered(t *testing.T) {
@@ -2122,4 +2182,8 @@ func TestLegacyToolSet_GlobalHotpatch(t *testing.T) {
 
 func TestLegacyToolSet_SystemProxy(t *testing.T) {
 	runLegacyToolSetIntegration(t, "system_proxy")
+}
+
+func TestLegacyToolSet_Screenshot(t *testing.T) {
+	runLegacyToolSetIntegration(t, "screenshot")
 }

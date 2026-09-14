@@ -2,7 +2,7 @@ desc(
 	title: "Check Java SAXBuilder Unsafe Use"
 	title_zh: "检测 Java SAXBuilder 非安全使用"
 	type: vuln
-	risk:XXE
+	risk:"xxe"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -175,7 +175,7 @@ DESC
 	title: "Check Java SAXBuilder Unsafe Use",
 	title_zh: "检测 Java SAXBuilder 非安全使用",
 	name: "vulnCall",
-	risk: "XML外部实体（XXE）",
+	risk: "xxe",
 }
 
 desc(

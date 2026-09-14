@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/notify"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/notify/credential"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -782,7 +783,7 @@ func (e *Engine) readAgentOutput(sess *imSession, stream AIReActStream) {
 			continue
 
 		case "fail_react_task", "fail_plan_and_execution", "api_request_failed", "ai_call_failure":
-			content := strings.TrimSpace(string(ev.GetContent()))
+			content := schema.ExtractAIOutputDisplayMessage(ev.GetContent(), ev.GetIsJson())
 			if content != "" {
 				presenter.OnRunError(rc, RunEvent{
 					Type: RunEventError,

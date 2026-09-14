@@ -1,0 +1,93 @@
+desc(
+	title: "Detect Framework Untrusted Deserialization Patterns"
+	title_zh: "检测Java框架级不可信反序列化模式"
+	type: vuln
+	risk: "deserialization"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测框架内部常见的高风险反序列化模式：
+- 启用 Jackson 默认类型信息，如 `enableDefaultTyping`
+- 将不可信数据直接交给 `SerializationUtils.deserialize`
+
+这些模式常见于消息框架、HTTP 序列化或安全模块中，容易演变为反序列化 RCE、类型欺骗或头部驱动的危险对象恢复。
+DESC
+	rule_id: "3a4639ca-bf48-4e16-a6a3-8ca3d0d1c4cf"
+	solution: <<<SOLUTION
+### 修复建议
+- 避免启用 Jackson 默认类型机制。
+- 不要对不可信字节流直接使用通用反序列化入口。
+- 使用显式 allowlist，并绑定到确定的目标类型。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+)
+
+enableDefaultTyping(,* as $defaultTypingArg) as $defaultTypingCall;
+activateDefaultTyping(,* as $defaultTypingArg) as $defaultTypingCall;
+SerializationUtils.deserialize(,* as $deserializeArg) as $deserializeCall;
+
+$defaultTypingCall + $deserializeCall as $risk;
+
+alert $risk for {
+	title: "Detect Framework Untrusted Deserialization Patterns",
+	title_zh: "检测Java框架级不可信反序列化模式",
+	level: "high",
+	message: "发现框架级反序列化高风险模式，可能导致默认类型反序列化、动态类型恢复或消息头驱动的危险对象处理。",
+	risk: "deserialization",
+	name: "risk",
+	desc: <<<DESC
+### 漏洞描述
+本规则检测框架内部常见的高风险反序列化模式：
+- 启用 Jackson 默认类型信息，如 `enableDefaultTyping`
+- 将不可信数据直接交给 `SerializationUtils.deserialize`
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 避免启用 Jackson 默认类型机制。
+- 不要对不可信字节流直接使用通用反序列化入口。
+- 使用显式 allowlist，并绑定到确定的目标类型。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://default-typing.java': <<<CODE
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+class DefaultTypingRisk {
+    void bad(ObjectMapper mapper) {
+        mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
+    }
+}
+CODE
+	'file://serialization-utils.java': <<<CODE
+import java.io.ByteArrayInputStream;
+import org.springframework.util.SerializationUtils;
+
+class DeserializeRisk {
+    Object bad(byte[] data) {
+        return SerializationUtils.deserialize(new ByteArrayInputStream(data));
+    }
+}
+CODE
+	"safefile://safe-jackson.java": <<<CODE
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+class SafeJacksonUsage {
+    Object safe(String json) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readTree(json);
+    }
+}
+
+class SafeClassIdValue {
+    void safe(Object object) {
+        Long classId = object.hashCode() + 1;
+        System.out.println(classId);
+    }
+}
+CODE
+)

@@ -68,10 +68,7 @@ func (r *ReAct) updateRuntimeTasks() {
 	newRuntimeTasks := make([]aicommon.AIStatefulTask, 0)
 
 	for _, task := range r.RuntimeTasks {
-		if task.GetStatus() == aicommon.AITaskState_Completed {
-			continue
-		}
-		if task.GetStatus() == aicommon.AITaskState_Aborted {
+		if task.IsFinished() {
 			continue
 		}
 		newRuntimeTasks = append(newRuntimeTasks, task)
@@ -111,8 +108,11 @@ func (r *ReAct) processReActFromQueue() {
 
 	// 从队列获取下一个任务
 	log.Infof("start to get first task from queue for ReAct instance: %s", r.config.Id)
+	finishHandoff := r.beginTaskQueueHandoff()
+	defer finishHandoff()
 	nextTask := r.taskQueue.GetFirst()
 	if nextTask == nil {
+		finishHandoff()
 		return
 	}
 
@@ -120,6 +120,7 @@ func (r *ReAct) processReActFromQueue() {
 	r.setCurrentTask(nextTask)
 	r.persistTaskUserInput(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)
+	finishHandoff()
 	if r.config.DebugEvent {
 		log.Infof("Processing task from queue: %s", nextTask.GetId())
 	}
@@ -135,6 +136,8 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 		r.processRecoveryTask(task)
 		return
 	}
+	restoreExecutionPolicy := r.applyTaskExecutionPolicy(task)
+	defer restoreExecutionPolicy()
 
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
@@ -178,8 +181,36 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	skipStatusFallback.SetTo(skipStatus)
 }
 
+// applyTaskExecutionPolicy keeps unattended policy scoped to the scheduled
+// task even when it is delivered into an already-open interactive ReAct
+// session. The original chat settings are restored before its next turn.
+func (r *ReAct) applyTaskExecutionPolicy(task aicommon.AIStatefulTask) func() {
+	if r == nil || r.config == nil || task == nil || task.GetInputSource() != aicommon.USER_INPUT_SOURCE_SCHEDULE {
+		return func() {}
+	}
+	previousAgreePolicy := r.config.AgreePolicy
+	previousAllowRequire := r.config.AllowRequireForUserInteract
+	previousAllowPlanInteract := r.config.AllowPlanUserInteract
+	r.config.AgreePolicy = aicommon.AgreePolicyYOLO
+	r.config.AllowRequireForUserInteract = false
+	r.config.AllowPlanUserInteract = false
+	return func() {
+		r.config.AgreePolicy = previousAgreePolicy
+		r.config.AllowRequireForUserInteract = previousAllowRequire
+		r.config.AllowPlanUserInteract = previousAllowPlanInteract
+	}
+}
+
 func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 	parsedQuery, focus, loopOptions := r.selectLoopForTask(task)
+	if task.GetInputSource() == aicommon.USER_INPUT_SOURCE_SCHEDULE {
+		parsedQuery = fmt.Sprintf(`<scheduled_task_context>
+This turn was triggered unattended by scheduled task %q (uuid=%s, scheduled_at=%s, trigger=%s).
+Execute the durable task now. Do not ask the user for approval or clarification; make the safest reasonable unattended decision within existing permissions.
+</scheduled_task_context>
+
+%s`, task.GetScheduleName(), task.GetScheduleUUID(), task.GetScheduledAt(), task.GetScheduleTrigger(), parsedQuery)
+	}
 	task.SetUserInput(parsedQuery)
 	return r.ExecuteLoopTask(focus, task, loopOptions...)
 }
@@ -373,6 +404,10 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 								log.Infof("processing memory flush[%s] for iteration %d with %d pending diffs (%d bytes)", payload.FlushReason, iteration, payload.PendingIterations, payload.PendingBytes)
 							}
 							if err := r.memoryTriage.HandleMemory(payload.ContextualInput); err != nil {
+								if r.config.GetContext().Err() != nil {
+									log.Debugf("memory processing stopped with runtime: %v", err)
+									return
+								}
 								log.Warnf("intelligent memory processing failed: %v", err)
 								return
 							}
@@ -452,8 +487,9 @@ func sanitizeFolderName(name string, maxLen int) string {
 
 // ensureWorkDirectory lazily creates the artifact working directory with a semantic name.
 // This is called at the start of processReActTask, after user input is available.
-// It uses LiteForge to generate a meaningful folder name, falling back to a generic name.
-// It also generates the session title in the same LiteForge call to save overhead.
+// Synchronous enrichment may use LiteForge for the folder name and session title.
+// Otherwise create a stable generic directory immediately; ensureSessionTitle
+// generates the display title asynchronously without delaying the first answer.
 func (r *ReAct) ensureWorkDirectory(userInput string) {
 	cfg := r.config
 	if cfg == nil {
@@ -494,9 +530,9 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 		}
 	}
 
-	// try LiteForge to generate both folder_name and session_title
-	// use a tight timeout to avoid blocking the main flow
-	if trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.GetOriginalAICallback() != nil {
+	// Naming is optional enrichment too. The default first-response path must
+	// not spend a provider round trip here before it can enter the main loop.
+	if cfg.GetConfigBool("AllowSyncInitContext") && trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.GetOriginalAICallback() != nil {
 		func() {
 			defer func() {
 				if err := recover(); err != nil {
@@ -540,12 +576,7 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 	// load existing title for restored session so UI gets it even when generation is skipped.
 	if cfg.GetConfigString("session_title", "") == "" && r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
 		if meta, err := yakit.GetAISessionMetaBySessionID(cfg.GetDB(), r.config.PersistentSessionId); err == nil {
-			if existing := strings.TrimSpace(meta.Title); existing != "" {
-				cfg.SetConfig("session_title", existing)
-				cfg.SetSessionTitle(existing)
-				cfg.SetConfig(sessionTitleGeneratedKey, true)
-				r.Emitter.EmitSessionTitle(existing)
-			}
+			r.restoreInitializedSessionTitle(meta)
 		}
 	}
 
@@ -682,6 +713,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory
 		wg:                   new(sync.WaitGroup),
+		lifecycleWG:          new(sync.WaitGroup),
 		pureInvokerMode:      true,
 	}
 	// Inherit parent tracker when passed via ConvertConfigToOptions; otherwise
@@ -691,18 +723,18 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		cfg.SetBrowserSessionTracker(invoker)
 	}
 
-	if cfg.MemoryTriage != nil {
+	if cfg.DisableMemoryTriage {
+		invoker.memoryTriage = aicommon.NewNoOpMemoryTriage()
+		invoker.config.MemoryTriage = invoker.memoryTriage
+		log.Infof("memory triage disabled (no-op) for invoker instance")
+	} else if cfg.MemoryTriage != nil {
 		invoker.memoryTriage = cfg.MemoryTriage
 	} else {
 		memoryTriageId := cfg.MemoryTriageId
 		if memoryTriageId == "" {
 			memoryTriageId = "default"
 		}
-		var err error
-		invoker.memoryTriage, err = aimem.NewAIMemory(memoryTriageId, aimem.WithInvoker(invoker))
-		if err != nil {
-			return nil, utils.Errorf("create memory triage failed: %v", err)
-		}
+		invoker.memoryTriage = aimem.NewAsyncAIMemory(cfg.GetContext(), memoryTriageId, aimem.WithInvoker(invoker))
 		invoker.config.MemoryTriage = invoker.memoryTriage
 	}
 

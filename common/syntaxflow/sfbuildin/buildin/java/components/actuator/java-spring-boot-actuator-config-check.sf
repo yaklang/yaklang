@@ -1,4 +1,5 @@
 desc(
+	risk: "information-exposure"
 	title: "Check Java Spring Boot Actuator Config"
 	title_zh: "检查Java Spring Boot Actuator配置"
 	type:config
@@ -89,7 +90,7 @@ Spring Boot Actuator提供了一系列生产环境就绪的功能，如监控和
 - 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
 DESC
 	level: "low",
-	risk: "信息泄露",
+	risk: "information-exposure",
 	message: "Java Spring Boot Actuator配置存在安全风险",
 	title: "Check Java Spring Boot Actuator Config",
 	solution: <<<SOLUTION
@@ -180,7 +181,7 @@ http
 DESC
 	level: "mid",
 	message: "Java Spring Boot Actuator配置存在安全风险,并且Spring Security默认允许所有请求访问Actuator端点。",
-	risk: "信息泄露",
+	risk: "information-exposure",
 	name: "sink",
 }
 

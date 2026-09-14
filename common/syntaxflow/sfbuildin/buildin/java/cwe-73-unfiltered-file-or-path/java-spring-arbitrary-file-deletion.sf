@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java Spring Boot Arbitrary File Deletion"
 	title_zh: "检测 Java Spring Boot 任意文件删除"
 	type: audit
-	risk:"任意文件删除"
+	risk:"arbitrary-file-delete"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -120,7 +120,7 @@ SOLUTION
 	type: "vuln",
 	message: "发现Java Spring Boot应用中的任意文件删除漏洞。",
 	name: "high",
-	risk: "任意文件删除",
+	risk: "arbitrary-file-delete",
 }
 
 
@@ -148,5 +148,5 @@ alert $low for {
 3. **触发条件**
 本规则主要关注用户输入是否直接或间接流入上述文件删除方法，且未经过充分的验证和过滤。例如，当用户的输入参数直接传递给这些方法时，将触发告警。
 SOLUTION
-	risk: "任意文件删除",
+	risk: "arbitrary-file-delete",
 }

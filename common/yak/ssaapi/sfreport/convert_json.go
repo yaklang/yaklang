@@ -31,8 +31,14 @@ func (r *Report) SetWriter(writer io.Writer) error {
 }
 
 func (r *Report) Save() error {
+	if r == nil {
+		return utils.Errorf("report is nil")
+	}
 	switch r.ReportType {
 	case IRifyReportType, IRifyFullReportType:
+		if r.writer == nil {
+			return nil
+		}
 		return r.PrettyWrite(r.writer)
 	case IRifyReactReportType:
 		return r.SaveForIRify()

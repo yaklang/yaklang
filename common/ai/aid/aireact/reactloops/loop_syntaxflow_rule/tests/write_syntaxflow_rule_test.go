@@ -10,6 +10,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -43,7 +44,7 @@ func mockedSyntaxFlowWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aic
 
 	// Match main loop prompt asking for write_rule with GEN_RULE tag
 	if utils.MatchAnyOfSubString(prompt, "write_rule", "GEN_RULE", "sf_rule") {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		// Valid SyntaxFlow rule: rule("test") with desc block
 		ruleContent := `rule("test-rule")
@@ -147,7 +148,7 @@ func mockedSyntaxFlowWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf,
 	// Match prompts that ask for rule generation (write or modify)
 	hasRulePrompt := utils.MatchAnyOfSubString(prompt, "write_rule", "modify_rule", "GEN_RULE", "sf_rule")
 	if hasRulePrompt {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		if !stat.writeDone {
 			// 第一次写：故意返回有语法错误的规则（缺少 desc 的闭合括号），

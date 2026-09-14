@@ -206,21 +206,6 @@ func TestTimelineCompress_SizeReduction(t *testing.T) {
 	require.Equal(t, 50, len(activeAfter), "Should have 50 active items left")
 }
 
-func TestTimelineArchiveMergedContent_IncludesTimelineDetails(t *testing.T) {
-	timeline := NewTimeline(nil, nil)
-	timeline.PushText(1, "first timeline note")
-	timeline.PushUserInteraction(UserInteractionStage_Review, 2, "system prompt", "user answer")
-
-	items := timeline.idToTimelineItem.Values()
-	merged := timelineArchiveMergedContent(items)
-
-	require.Contains(t, merged, "id=1")
-	require.Contains(t, merged, "first timeline note")
-	require.Contains(t, merged, "id=2")
-	require.Contains(t, merged, "system prompt")
-	require.Contains(t, merged, "user answer")
-}
-
 // TestTimelineCompress_MultipleCompressions 测试多次压缩（单有效压缩段不变式）
 // 新模型：每次压缩产生新 head，旧 head 入 history，运行态只有一个有效段
 func TestTimelineCompress_MultipleCompressions(t *testing.T) {
@@ -448,7 +433,7 @@ func TestTimelineCompress_SerializationSize(t *testing.T) {
 	require.Less(t, compressedSize, uncompressedSize*6/10, "Compressed serialization should be significantly smaller")
 }
 
-func TestTimelineCompress_EmergencyArchiveWritesMidtermStore(t *testing.T) {
+func TestTimelineCompress_EmergencyPreservesSummaryWithoutArchive(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 	store := &mockTimelineArchiveStore{}
 	cfg := &Config{
@@ -474,13 +459,11 @@ func TestTimelineCompress_EmergencyArchiveWritesMidtermStore(t *testing.T) {
 
 	timeline.emergencyCompress(2 * 1024)
 
-	require.Len(t, store.batches, 1)
-	batch := store.batches[0]
-	require.Equal(t, TimelineArchiveReasonEmergencyCompress, batch.Reason)
-	require.Equal(t, "persistent-session-1", batch.PersistentSessionID)
-	require.Greater(t, batch.ItemCount, 0)
-	require.NotEmpty(t, batch.Summary)
-	require.Len(t, timeline.archiveRefs.Values(), 1)
+	require.Empty(t, store.batches, "compression must not invoke a legacy archive store")
+	require.Empty(t, timeline.archiveRefs.Values())
+	require.NotNil(t, timeline.compressedHead)
+	require.NotEmpty(t, timeline.compressedHead.Text)
+	require.Less(t, len(timeline.getActiveTimelineItemIDs()), 12)
 }
 
 func TestTimelineCompress_SerializationPreservesArchiveRefs(t *testing.T) {

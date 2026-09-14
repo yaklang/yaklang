@@ -169,6 +169,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#foreachStatement.
 	VisitForeachStatement(ctx *ForeachStatementContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#foreachValue.
+	VisitForeachValue(ctx *ForeachValueContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#tryCatchFinally.
 	VisitTryCatchFinally(ctx *TryCatchFinallyContext) interface{}
 
@@ -652,8 +655,8 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#assignmentListElement.
 	VisitAssignmentListElement(ctx *AssignmentListElementContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#modifier.
-	VisitModifier(ctx *ModifierContext) interface{}
+	// Visit a parse tree produced by PHPParser#classModifier.
+	VisitClassModifier(ctx *ClassModifierContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#identifier.
 	VisitIdentifier(ctx *IdentifierContext) interface{}

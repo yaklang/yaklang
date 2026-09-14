@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang使用弱哈希算法（MD5/SHA1）"
 	type: vuln
 	level: mid
-	risk: "不安全加密"
+	risk: "weak-hash"
 	desc: <<<DESC
 该规则检测 MD5/SHA1 的哈希调用。MD5 与 SHA1 已不适用于安全场景（密码、签名、完整性校验等），
 可能遭受碰撞攻击。
@@ -32,7 +32,7 @@ alert $mid for {
 	title: "Golang Weak Hash Algorithm Usage Detected",
 	title_zh: "检测到Golang使用弱哈希算法",
 	message: "检测到 MD5/SHA1 调用，弱哈希在安全场景下可能被碰撞攻击利用。",
-	risk: "不安全加密",
+	risk: "weak-hash",
 	desc: <<<DESC
 MD5/SHA1 已被广泛认为不安全，不应在安全敏感场景中使用。
 DESC

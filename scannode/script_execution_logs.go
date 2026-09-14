@@ -179,6 +179,16 @@ func (s *ScanNode) handleStatusCardLog(
 		return
 	}
 	switch card.Id {
+	case "ssa-source-scan-detail":
+		// Source precheck rules emit the same structured detail shape as deep
+		// scan rules, but with phase=source-scan. Keep the stage explicit so
+		// the platform does not collapse the two execution phases.
+		if reporter != nil {
+			stage := scanDetailStage(card.Data)
+			if pubErr := reporter.PublishScanDetail(stage, card.Data); pubErr != nil {
+				log.Warnf("publish source scan detail failed: %v", pubErr)
+			}
+		}
 	case "ssa-scan-detail":
 		if reporter != nil {
 			stage := scanDetailStage(card.Data)
@@ -231,7 +241,8 @@ func scanDetailStage(detailJSON string) string {
 	}
 	if err := json.Unmarshal([]byte(detailJSON), &detail); err == nil {
 		phase := strings.TrimSpace(detail.Phase)
-		if phase == "compile" || phase == "load-program" || phase == "scan" || phase == "ingest" {
+		switch phase {
+		case "compile", "load-program", "scan", "ingest", "source-scan":
 			return phase
 		}
 	}

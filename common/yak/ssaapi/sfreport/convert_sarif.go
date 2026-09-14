@@ -53,6 +53,12 @@ func (r *SarifReport) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool 
 }
 
 func (r *SarifReport) Save() error {
+	if r == nil {
+		return utils.Errorf("report is nil")
+	}
+	if r.writer == nil {
+		return nil
+	}
 	return r.report.PrettyWrite(r.writer)
 }
 

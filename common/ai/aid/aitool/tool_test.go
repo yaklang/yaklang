@@ -370,6 +370,10 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"description": "你想要选择的工具名",
 						"const":       "noParamTool",
 					},
+					"params": map[string]interface{}{
+						"type":        "object",
+						"description": "工具的参数",
+					},
 				},
 				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,

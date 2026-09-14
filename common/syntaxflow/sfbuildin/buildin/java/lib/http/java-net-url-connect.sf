@@ -194,7 +194,7 @@ e.printStackTrace();
 #### 6. 结合其他安全规则进行审计
 结合检测SSRF、路径遍历等相关安全规则，对URL的构造来源和使用方式进行全面审计。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

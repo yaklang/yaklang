@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP Unfiltered File or Path Operations"
 	title_zh: "审计PHP未过滤文件或路径操作"
-	risk: "审计（Audit）"
+	risk: "audit-check"
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述
@@ -141,7 +141,7 @@ opendir($a);
 - 服务器控制：攻击者可能获得服务器的完全控制权。
 DESC
 	level: "high",
-	risk: "目录遍历",
+	risk: "path-traversal",
 	name: "high",
 	message: "检测到PHP未经验证的文件操作漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -207,7 +207,7 @@ DESC
 	level: "mid",
 	name: "mid",
 	message: "发现PHP文件类型检测存在部分过滤但不完善的情况，可能存在被绕过的风险。",
-	risk: "文件上传",
+	risk: "file-upload",
 }
 $all - $high - $mid as $low
 alert $low for {
@@ -234,7 +234,7 @@ DESC
 2. **区分不同风险等级**：根据过滤情况和数据流分析结果，确认是否存在更高风险的告警。
 3. **配合其他规则共同检测**：本规则属于基础库规则的一部分，需与其他规则（如数据流分析规则）结合使用，以提高检测准确性。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }
 desc(
 	lang: "php"

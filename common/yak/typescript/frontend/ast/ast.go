@@ -279,6 +279,10 @@ func (n *Node) Text() string {
 		return n.AsJsxNamespacedName().Namespace.Text() + ":" + n.AsJsxNamespacedName().name.Text()
 	case KindRegularExpressionLiteral:
 		return n.AsRegularExpressionLiteral().Text
+	case KindComputedPropertyName:
+		// a computed property name ({[expr]: v}) has no static text; callers
+		// treat "" as "no static name" instead of panicking here
+		return ""
 	}
 	panic(fmt.Sprintf("Unhandled case in Node.Text: %T", n.data))
 }
@@ -759,6 +763,31 @@ func (n *Node) Contains(descendant *Node) bool {
 
 func (n *Node) AsIdentifier() *Identifier {
 	return n.data.(*Identifier)
+}
+
+// TryAsIdentifier returns the node data as *Identifier, or nil when the node
+// holds a different kind (e.g. a StringLiteral / NumericLiteral /
+// ComputedPropertyName property name). Use this instead of the
+// `if x := n.AsIdentifier(); x != nil` pattern: AsIdentifier is an unchecked
+// assertion and panics on kind mismatch before the nil check can run.
+func (n *Node) TryAsIdentifier() *Identifier {
+	if n == nil {
+		return nil
+	}
+	if id, ok := n.data.(*Identifier); ok {
+		return id
+	}
+	return nil
+}
+
+func (n *Node) TryAsStringLiteral() *StringLiteral {
+	if n == nil {
+		return nil
+	}
+	if s, ok := n.data.(*StringLiteral); ok {
+		return s
+	}
+	return nil
 }
 
 func (n *Node) AsPrivateIdentifier() *PrivateIdentifier {

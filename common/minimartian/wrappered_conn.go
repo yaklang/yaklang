@@ -5,12 +5,22 @@ import (
 	"sync"
 )
 
+// TransparentConn marks a connection whose original upstream destination is
+// already known by the connection producer (for example, a TUN/netstack TCP
+// interception). Ordinary accepted proxy connections must not implement this
+// interface: their target comes from HTTP CONNECT, the Host header, or SOCKS5.
+type TransparentConn interface {
+	net.Conn
+	OriginalDestination() net.Addr
+}
+
 // WrapperedConn 是一个包装的 net.Conn，用于携带额外的元数据信息
 // 主要用于支持强主机模式和其他连接级别的配置
 type WrapperedConn struct {
 	net.Conn
 	strongHostMode      bool
 	strongHostLocalAddr string // Local IP address for strong host mode binding
+	originalDestination string // Original upstream target for transparently injected connections
 	metaInfo            map[string]any
 	mu                  sync.RWMutex
 	isListened          bool
@@ -53,6 +63,22 @@ func NewWrapperedConnWithStrongLocalHost(conn net.Conn, localAddr string, metaIn
 	}
 }
 
+// NewWrapperedConnWithStrongLocalHostAndOriginalDestination wraps a
+// transparently intercepted connection. originalDestination must be the
+// connection's upstream target, not the address of a MITM listener.
+func NewWrapperedConnWithStrongLocalHostAndOriginalDestination(conn net.Conn, localAddr, originalDestination string, metaInfo map[string]any) *WrapperedConn {
+	if metaInfo == nil {
+		metaInfo = make(map[string]any)
+	}
+	return &WrapperedConn{
+		Conn:                conn,
+		strongHostMode:      true,
+		strongHostLocalAddr: localAddr,
+		originalDestination: originalDestination,
+		metaInfo:            metaInfo,
+	}
+}
+
 // IsStrongHostMode 返回是否启用强主机模式
 func (w *WrapperedConn) IsStrongHostMode() bool {
 	w.mu.RLock()
@@ -65,6 +91,15 @@ func (w *WrapperedConn) GetStrongHostLocalAddr() string {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.strongHostLocalAddr
+}
+
+// GetOriginalDestination returns the upstream target carried by a
+// transparently injected connection. An empty value means the connection must
+// obtain its target from a frontend proxy protocol such as HTTP or SOCKS5.
+func (w *WrapperedConn) GetOriginalDestination() string {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.originalDestination
 }
 
 // GetMetaInfo 返回连接的元数据信息

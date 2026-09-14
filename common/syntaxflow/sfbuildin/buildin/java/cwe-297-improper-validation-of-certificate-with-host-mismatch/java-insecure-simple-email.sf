@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java SimpleEmail证书校验"
 	level: info
 	lang: java
-	risk:"auth-bypass"
+	risk:"certificate-validation"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -146,7 +146,7 @@ DESC
 	title: "Check Java SimpleEmail Certificate Verification",
 	title_zh: "检测Java SimpleEmail证书校验",
 	name: "sink",
-	risk: "证书验证绕过",
+	risk: "certificate-validation",
 }
 
 

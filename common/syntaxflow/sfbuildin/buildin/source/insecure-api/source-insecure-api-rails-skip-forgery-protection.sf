@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Rails 跳过 CSRF 防护"
+	title_zh: "检测到 Rails 跳过 CSRF 防护"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-rails-skip-forgery-protection"
+	risk: "csrf"
+	desc: <<<DESC
+### 规则说明
+该调用关闭了 CSRF 防护，使应用易受跨站请求伪造攻击。
+
+### 风险类型
+跨站请求伪造（csrf）
+
+### 影响
+缺少 CSRF 防护时，攻击者可诱导用户执行非预期操作。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-352
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除跳过 CSRF 防护的调用，保留针对 POST 等请求的令牌校验。
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+skip_forgery_protection
+POS
+	"safefile://pos.rb": <<<NEG
+protect_forgery_protection
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:skip_forgery_protection)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 Rails 跳过 CSRF 防护",
+	title_zh: "检测到 Rails 跳过 CSRF 防护",
+	message: "检测到 Rails 跳过 CSRF 防护",
+}

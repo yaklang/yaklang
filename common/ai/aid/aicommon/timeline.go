@@ -3,7 +3,6 @@ package aicommon
 import (
 	"bytes"
 	"cmp"
-	"context"
 	_ "embed"
 	"fmt"
 	"sort"
@@ -58,12 +57,10 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	compressing               *utils.Once
-	forkProtectedMaxID        int64
-	autoCompressDisabled      bool
-	branchTimeline            bool
-	branchArchiveStore        TimelineArchiveStore
-	branchPersistentSessionID string
+	compressing          *utils.Once
+	forkProtectedMaxID   int64
+	autoCompressDisabled bool
+	branchTimeline       bool
 }
 
 type TimelineCompressedHead struct {
@@ -351,17 +348,6 @@ func (m *Timeline) markBranchTimeline(branch bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.branchTimeline = branch
-}
-
-// SetBranchArchiveContext binds an isolated midterm archive store for branch timelines.
-func (m *Timeline) SetBranchArchiveContext(store TimelineArchiveStore, persistentSessionID string) {
-	if m == nil {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.branchArchiveStore = store
-	m.branchPersistentSessionID = strings.TrimSpace(persistentSessionID)
 }
 
 func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
@@ -710,7 +696,6 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 	// We need to keep at least 1 item
 	removedCount := 0
 	var removedIDs []int64
-	var removedItems []*TimelineItem
 	var emergencySummaries []string
 	var lastRemovedID int64
 	for len(itemIDs) > 1 && currentSize > targetSize {
@@ -727,7 +712,6 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 		// Create a brief summary of what was removed (without AI)
 		briefSummary := m.createEmergencySummary(item, oldestID)
 		removedIDs = append(removedIDs, oldestID)
-		removedItems = append(removedItems, item)
 		if briefSummary != "" {
 			emergencySummaries = append(emergencySummaries, briefSummary)
 		}
@@ -769,13 +753,6 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 				CoveredEndAtMs:   coveredEndAtMs,
 			})
 		}
-		m.attachArchiveRef(lastRemovedID, m.archiveForgottenBatch(
-			TimelineArchiveReasonEmergencyCompress,
-			lastRemovedID,
-			removedIDs,
-			removedItems,
-			strings.Join(emergencySummaries, "\n"),
-		))
 	}
 
 	// Final size check
@@ -1159,190 +1136,6 @@ func (m *Timeline) attachArchiveRef(reducerKeyID int64, ref *TimelineArchiveRef)
 		m.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})
 	}
 	m.archiveRefs.Set(reducerKeyID, ref)
-}
-
-func (m *Timeline) archiveForgottenBatch(reason TimelineArchiveReason, reducerKeyID int64, ids []int64, items []*TimelineItem, summary string) *TimelineArchiveRef {
-	store := m.timelineArchiveStore()
-	if store == nil || len(ids) == 0 || len(items) == 0 {
-		return nil
-	}
-
-	startID := ids[0]
-	endID := ids[len(ids)-1]
-	refID := utils.CalcSha256(
-		fmt.Sprintf("%s", reason),
-		strconv.FormatInt(reducerKeyID, 10),
-		strconv.FormatInt(startID, 10),
-		strconv.FormatInt(endID, 10),
-		strings.TrimSpace(summary),
-	)
-
-	batch := &TimelineArchiveBatch{
-		ArchiveID:           "timeline-archive-" + refID[:16],
-		PersistentSessionID: m.timelinePersistentSessionID(),
-		Reason:              reason,
-		Summary:             strings.TrimSpace(summary),
-		MergedContent:       strings.TrimSpace(timelineArchiveMergedContent(items)),
-		SourceChunks:        timelineArchiveSourceChunks(items),
-		ReducerKeyID:        reducerKeyID,
-		SourceStartID:       startID,
-		SourceEndID:         endID,
-		ItemCount:           len(ids),
-		RepresentativeSnips: timelineArchiveRepresentativeSnippets(items, 3),
-		Tags: []string{
-			"timeline_midterm",
-			fmt.Sprintf("timeline_range_%d_%d", startID, endID),
-			fmt.Sprintf("timeline_reason_%s", reason),
-		},
-	}
-
-	if len(items) > 0 {
-		batch.SourceStartAt = items[0].createdAt
-		batch.SourceEndAt = items[len(items)-1].createdAt
-	}
-
-	ref, err := store.ArchiveCompressedBatch(context.Background(), batch)
-	if err != nil {
-		log.Warnf("archive forgotten timeline batch failed: %v", err)
-		return nil
-	}
-	return ref
-}
-
-func timelineArchiveRepresentativeSnippets(items []*TimelineItem, limit int) []string {
-	if limit <= 0 {
-		limit = 3
-	}
-	result := make([]string, 0, limit)
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		snippet := strings.TrimSpace(utils.ShrinkString(item.String(), 240))
-		if snippet == "" {
-			continue
-		}
-		result = append(result, snippet)
-		if len(result) >= limit {
-			break
-		}
-	}
-	return result
-}
-
-func timelineArchiveMergedContent(items []*TimelineItem) string {
-	if len(items) == 0 {
-		return ""
-	}
-
-	var buf strings.Builder
-	for _, item := range items {
-		if item == nil || item.deleted {
-			continue
-		}
-
-		if !item.createdAt.IsZero() {
-			buf.WriteString("[")
-			buf.WriteString(item.createdAt.Format(time.RFC3339))
-			buf.WriteString("] ")
-		}
-		buf.WriteString("id=")
-		buf.WriteString(strconv.FormatInt(item.GetID(), 10))
-		buf.WriteString("\n")
-
-		raw := strings.TrimSpace(item.String())
-		if raw != "" {
-			for _, line := range utils.ParseStringToRawLines(raw) {
-				line = strings.TrimSpace(line)
-				if line == "" {
-					continue
-				}
-				buf.WriteString("- ")
-				buf.WriteString(line)
-				buf.WriteString("\n")
-			}
-		}
-		buf.WriteString("\n")
-	}
-
-	return strings.TrimSpace(buf.String())
-}
-
-func timelineArchiveSourceChunks(items []*TimelineItem) []string {
-	if len(items) == 0 {
-		return nil
-	}
-
-	chunks := make([]string, 0, len(items))
-	for _, item := range items {
-		if item == nil || item.deleted {
-			continue
-		}
-
-		var buf strings.Builder
-		if !item.createdAt.IsZero() {
-			buf.WriteString("[")
-			buf.WriteString(item.createdAt.Format(time.RFC3339))
-			buf.WriteString("] ")
-		}
-		buf.WriteString("id=")
-		buf.WriteString(strconv.FormatInt(item.GetID(), 10))
-		buf.WriteString("\n")
-
-		raw := strings.TrimSpace(item.String())
-		if raw != "" {
-			for _, line := range utils.ParseStringToRawLines(raw) {
-				line = strings.TrimSpace(line)
-				if line == "" {
-					continue
-				}
-				buf.WriteString("- ")
-				buf.WriteString(line)
-				buf.WriteString("\n")
-			}
-		}
-
-		chunk := strings.TrimSpace(buf.String())
-		if chunk != "" {
-			chunks = append(chunks, chunk)
-		}
-	}
-	return chunks
-}
-
-func (m *Timeline) timelineArchiveStore() TimelineArchiveStore {
-	if m == nil || m.config == nil {
-		return nil
-	}
-	// NOTE: this function can be called while Timeline.mu is already held (e.g. compression apply path),
-	// so it must not call lock-taking helpers like IsBranchTimeline().
-	if m.branchTimeline {
-		if m.branchArchiveStore != nil {
-			return m.branchArchiveStore
-		}
-		return nil
-	}
-	if provider, ok := m.config.(interface{ GetTimelineArchiveStore() TimelineArchiveStore }); ok {
-		return provider.GetTimelineArchiveStore()
-	}
-	return nil
-}
-
-func (m *Timeline) timelinePersistentSessionID() string {
-	if m == nil || m.config == nil {
-		return ""
-	}
-	// NOTE: this function can be called while Timeline.mu is already held.
-	if m.branchTimeline {
-		if m.branchPersistentSessionID != "" {
-			return m.branchPersistentSessionID
-		}
-		return ""
-	}
-	if provider, ok := m.config.(interface{ GetPersistentSessionID() string }); ok {
-		return provider.GetPersistentSessionID()
-	}
-	return ""
 }
 
 //go:embed prompts/timeline/tool_result_history.txt

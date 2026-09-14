@@ -126,6 +126,9 @@ func TestLoadTaskLocalSyntaxFlowRulesRejectsBroadPermissions(t *testing.T) {
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		t.Fatalf("write task-local input: %v", err)
 	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatalf("make task-local input broadly readable: %v", err)
+	}
 	digest := sha256.Sum256(payload)
 	_, _, err = loadTaskLocalSyntaxFlowRules(&ssaconfig.SyntaxFlowRuleConfig{
 		TaskLocal:            true,

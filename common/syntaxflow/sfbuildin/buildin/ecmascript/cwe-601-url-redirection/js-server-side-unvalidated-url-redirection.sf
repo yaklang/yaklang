@@ -3,7 +3,7 @@ desc(
 	title_zh: "服务端未验证的 URL 重定向（开放重定向）"
 	type: vuln
 	level: mid
-	risk: "开放重定向"
+	risk: "open-redirect"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -237,7 +237,7 @@ alert $openRedirect for {
 	title: "Server-Side URL Redirect",
 	title_zh: "服务端未验证的 URL 重定向（开放重定向）",
 	message: "检测到用户可控输入直接流入服务端 HTTP 重定向函数（res.redirect / ctx.redirect），可能导致开放重定向漏洞。攻击者可构造恶意链接将用户重定向至钓鱼站点，或滥用此漏洞绕过 OAuth redirect_uri 校验窃取令牌。请使用服务端白名单映射或校验目标 URL 为同源。",
-	risk: "开放重定向",
+	risk: "open-redirect",
 	name: "openRedirect",
 }
 

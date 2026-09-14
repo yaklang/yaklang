@@ -64,7 +64,7 @@
 - **聚合写入池**：**`api_pool_merge`** — `findings_json` 为 JSON 数组，每项含 `url`、`method`（可省略，默认 GET）、`source`、`evidence`。可在 JS 链路产出后与其它发现合并。
 - **被动 / 网络（按需）**：`web_search`、`dig`、`subdomain_scan`、`network_space_search`（需密钥）、`scan_port`、`banner_grab`。通常**不妨碍**在注册后优先执行 **JS 获取**。
 - **探活**：**`probe_api_candidates`** — 对池中未验证的 `http(s)` URL 限额并发 HEAD/GET；尊重 `scope_hosts`；**放在 JS 分析之后、最终报告之前或报告中体现结果**即可。
-- **Web 面补充（可选）**：仅当需要**与 JS 主链路无关**的页面/文档线索时，再考虑 `simple_crawler`、`url_content_summary`、`do_http_request`；**不要**把它当作注册种子后的默认第二步（默认第二步是 **JS 获取**）。
+- **Web 面补充（可选）**：仅当需要页面/文档线索或低成本、有限的前端请求候选时，再考虑 `simple_crawler`（默认 `ai-js=auto`）、`url_content_summary`、`do_http_request`。`simple_crawler` 只做浏览器无关的有界静态分析，不产出完整落盘工件或结构化请求形状，**不得替代**默认第二步的 **JS 获取与完整分析**。
 
 ### `crawl_js_collector` 细节
 

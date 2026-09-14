@@ -166,7 +166,7 @@ return ALLOWED_PATHS.stream().anyMatch(filePath::startsWith);
 chmod 600 /path/to/sensitive/file
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "output",
 }
 

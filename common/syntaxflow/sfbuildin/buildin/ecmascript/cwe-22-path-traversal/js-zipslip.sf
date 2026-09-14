@@ -3,7 +3,7 @@ desc(
 	title_zh: "压缩包解压时未验证文件路径导致目录穿越（Zip Slip）"
 	type: vuln
 	level: high
-	risk: "路径遍历"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -305,7 +305,7 @@ const safeFileName = path.basename(entry.path);
 fs.createWriteStream(path.join(TARGET_DIR, safeFileName));
 ```
 SOLUTION
-	risk: "任意文件写入/目录穿越",
+	risk: "path-traversal-file-write",
 	name: "high",
 }
 
@@ -337,7 +337,7 @@ alert $mid for {
 推荐修复：使用 `path.resolve(TARGET_DIR, fileName)` + `startsWith(TARGET_DIR + path.sep)` 双重验证。
 DESC
 	message: "审计：压缩包条目路径经中间函数处理后流向文件写操作，需确认是否有效防御 Zip Slip（建议使用 path.resolve + startsWith 双重验证）。",
-	risk: "疑似目录穿越",
+	risk: "potential-path-traversal",
 	name: "mid",
 }
 

@@ -2,7 +2,7 @@ desc(
 	title: "Detect C Command Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "远程代码执行（RCE）"
+	risk: "command-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -28,7 +28,7 @@ desc(
 DESC
 	rule_id: "e02361da-8cd0-4c3d-bcce-db14caabe70e"
 	title_zh: "检测C语言命令注入漏洞"
-	risk: ""
+	risk: "command-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -100,7 +100,7 @@ $cmd_sink & $user_input as $high;
 
 alert $high for {
 	level: "high",
-	risk: "命令注入",
+	risk: "command-injection",
 	type: "vuln",
 	title: "C Command Injection Vulnerability Was Detected",
 	title_zh: "检测到C语言命令注入漏洞",

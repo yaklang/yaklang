@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -202,13 +203,8 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 						log.Debugf("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
 							v.TagName, contentLength, totalCost)
 
-						if totalCost.Milliseconds() <= 300 {
-							log.Warnf("AITag[%s] stream too fast, cost %v (content: %d chars), stream maybe not valid",
-								v.TagName, totalCost, contentLength)
-						} else {
-							log.Infof("AITag[%s] stream processing completed normally, cost %v for %d chars",
-								v.TagName, totalCost, contentLength)
-						}
+						// Buffered responses can drain immediately; latency is not a
+						// validity check. Parsing and action validation report failures.
 					},
 				)
 				if eventErr != nil {
@@ -229,10 +225,16 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 		return ""
 	}
 
+	if candidate := strings.TrimSpace(action.ActionType()); candidate != "" && candidate != "object" {
+		return candidate
+	}
+	// GetString also exposes flattened nested keys for legacy field consumers.
+	// A tool parameter such as params.type="A" is not an action discriminator.
+	params := action.GetParams()
+	nextAction := params.GetObject("next_action")
 	candidates := []string{
-		strings.TrimSpace(action.ActionType()),
-		strings.TrimSpace(action.GetString("next_action.type")),
-		strings.TrimSpace(action.GetString("type")),
+		strings.TrimSpace(nextAction.GetString("type")),
+		strings.TrimSpace(params.GetString("type")),
 	}
 	for _, candidate := range candidates {
 		if candidate != "" && candidate != "object" {
@@ -241,20 +243,19 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 	}
 
 	hasField := func(key string) bool {
-		if strings.TrimSpace(action.GetString(key)) != "" {
+		if strings.TrimSpace(params.GetString(key)) != "" {
 			return true
 		}
-		if strings.TrimSpace(action.GetInvokeParams("next_action").GetString(key)) != "" {
+		if strings.TrimSpace(nextAction.GetString(key)) != "" {
 			return true
 		}
 		return false
 	}
 	hasCanonicalField := func(key string) bool {
-		params := action.GetParams()
 		if _, ok := params[key]; ok {
 			return true
 		}
-		if nextAction := params.GetObject("next_action"); nextAction != nil {
+		if nextAction != nil {
 			_, ok := nextAction[key]
 			return ok
 		}
@@ -339,7 +340,7 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 	return err
 }
 
-func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
+func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	var actionNames = r.GetAllActionNames()
 	// Bind the provider request to the immutable task that owns this
@@ -384,6 +385,37 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if r.useSpeedPriorityAI {
 		aiCallback = r.config.CallSpeedPriorityAI
 	}
+
+	// Build request options common to both modes
+	requestOpts := []aicommon.AIRequestOption{
+		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
+		aicommon.WithAIRequest_Context(activeTaskCtx),
+	}
+
+	// In functioncall mode, inject native tools and tool_call callback.
+	// Tool call arguments are streamed through toolCallArgumentsWriter
+	// (handled in stream.go) and merged into the output stream, so the
+	// postHandler can use the same ExtractActionFromStream path as text mode.
+	// The ToolCallCallback here is only for logging/debugging.
+	if r.functionCallMode {
+		specTools := r.buildFunctionCallTools(operator)
+		if len(specTools) > 0 {
+			requestOpts = append(requestOpts, aicommon.WithAIRequest_ExtraSpecOpts(
+				aispec.WithTools(specTools),
+				aispec.WithToolChoice("auto"),
+				aispec.WithToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+					for _, tc := range toolCalls {
+						log.Debugf("functioncall: tool_call delta: %s", fmtToolCallSummary(tc))
+					}
+				}),
+			))
+			// Enable tool_call arguments streaming so the arguments flow
+			// through resp.EmitOutputStream → GetOutputStreamReader →
+			// ExtractActionFromStream, unifying the action parsing path.
+			requestOpts = append(requestOpts, aicommon.WithAIRequest_EnableToolCallArgumentsStream())
+		}
+	}
+
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -412,7 +444,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
 			// The immediate assignment below is intentionally only a snapshot. Once
 			// the parser consumes EOF, replace it with the full response for
-			// diagnostics/reference material.
+			// diagnostics and action recovery.
 			tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
 				r.Set("last_ai_decision_response", buf.String())
 			}))
@@ -530,7 +562,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				options...,
 			)
 			log.Debugf("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
-			r.Set("last_ai_decision_prompt", prompt)
 			r.Set("last_ai_decision_nonce", nonce)
 
 			if actionErr != nil {
@@ -567,7 +598,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				unsupportedErr := actionTypeResolutionError(
 					observedActionType,
 					actionNames,
-					"a non-empty @action value was parsed, but it did not exactly match any action registered in this loop",
+					"a non-empty @action or action value was parsed, but it did not exactly match any action registered in this loop",
 				)
 				if currentCtxCanceled() {
 					unsupportedErr = utils.Wrap(unsupportedErr, "task context canceled while parsing action")
@@ -585,7 +616,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				missingErr := actionTypeResolutionError(
 					"",
 					actionNames,
-					"no non-empty @action value was found and legacy payload inference found no known action",
+					"no non-empty @action or action value was found and legacy payload inference found no known action",
 				)
 				if currentCtxCanceled() {
 					missingErr = utils.Wrap(missingErr, "task context canceled while parsing action")
@@ -642,8 +673,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			}
 			return nil
 		},
-		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
-		aicommon.WithAIRequest_Context(activeTaskCtx),
+		requestOpts...,
 	)
 	if transactionErr != nil {
 		r.UserStatus(
@@ -1030,25 +1060,20 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	stopStallHeartbeat := r.startStallHeartbeat(task.GetContext(), task)
 	defer stopStallHeartbeat()
 
-	if r.GetCurrentMemoriesContent() == "" {
-		r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
-	}
-
-	// When regular memory is updated, also refresh midterm archive memory in
-	// parallel. Both fire at the same trigger point; midterm queries are based
-	// on the perception snapshot, consumed from the invoker.
-	r.refreshMidtermMemoryAsync()
-
-	go func() {
+	if !r.isSimpleQueryWithoutWork() {
 		if !utils.IsNil(r.memoryTriage) {
-			log.Info("start to handle searching memory for ReActLoop with AI")
-			result, err := r.memoryTriage.SearchMemory(task, 5*1024)
-			if err != nil {
-				log.Warnf("search memory failed: %v", err)
-			}
-			r.PushMemory(result)
+			go func() {
+				log.Info("start to handle searching memory for ReActLoop with AI")
+				result, err := r.memoryTriage.SearchMemory(task, 5*1024)
+				if err != nil {
+					log.Warnf("search memory failed: %v", err)
+				}
+				if task.GetContext().Err() == nil {
+					r.PushMemory(result)
+				}
+			}()
 		}
-	}()
+	}
 
 	needSummary := utils.NewBool(false)
 LOOP:
@@ -1093,36 +1118,10 @@ LOOP:
 			break LOOP
 		}
 
-		waitMem := make(chan struct{})
-		go func() {
-			defer func() {
-				close(waitMem)
-			}()
-			r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
-		}()
-
-		r.UserStatus(
-			"正在回顾相关信息",
-			"Reviewing relevant context",
-			aicommon.WithStatusCode("context.recalling"),
-		)
-		select {
-		case <-task.GetContext().Done():
-			return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
-		case <-waitMem:
-			r.UserStatus(
-				"已经找到相关信息，正在继续",
-				"Relevant context found; continuing",
-				aicommon.WithStatusCode("context.ready"),
-			)
-		case <-time.After(200 * time.Millisecond):
-			r.UserStatus(
-				"已有信息足够，我会先继续处理",
-				"The available context is sufficient to continue",
-				aicommon.WithStatusCode("context.skipped"),
-				aicommon.WithStatusState(aicommon.StatusStateWarning),
-			)
+		if err := task.GetContext().Err(); err != nil {
+			return utils.Errorf("task context done before execute ReActLoop: %v", err)
 		}
+		r.refreshFastMemoryAsync(task)
 
 		r.UserStatus(
 			"正在推进下一步",
@@ -1169,7 +1168,7 @@ LOOP:
 
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
-		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
+		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce, operator)
 
 		streamWg.Wait()
 

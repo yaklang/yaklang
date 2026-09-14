@@ -20,10 +20,8 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 	if utils.IsNil(result) {
 		return
 	}
-	// When regular memory is updated, also refresh midterm archive memory in
-	// parallel. Both fire at the same trigger point; midterm queries are based
-	// on the perception snapshot, consumed from the invoker.
-	r.refreshMidtermMemoryAsync()
+	r.memoryUpdateMu.Lock()
+	defer r.memoryUpdateMu.Unlock()
 	mems := result.Memories
 	for _, m := range mems {
 		//log.Infof("start to handle memory content bytes: %v", utils.ShrinkString(m.Content, 256))

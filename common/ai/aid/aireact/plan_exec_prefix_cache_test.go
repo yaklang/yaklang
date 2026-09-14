@@ -198,8 +198,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 	toolParamStageIdx := 0
 	progressStageIdx := 0
 	// verification 收缩为纯观测角色后, satisfied=true 不再自动结束子任务.
-	// 软 TODO checkpoint 要求子任务主循环连续两次显式 finish：首次请求检查，
-	// 第二次确认终结。remainingSubtaskFinishes 记录这两次模拟响应。
+	// 无开放 TODO 的子任务只需一次显式 finish。
 	remainingSubtaskFinishes := 0
 
 	mockTool, err := aitool.New(
@@ -311,9 +310,9 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 
 		case isVerifySatisfactionPrompt(prompt):
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
-			// 安排首次 finish 和软 checkpoint 后的确认 finish.
+			// 安排一次 finish，当前子任务无开放 TODO 即可结束.
 			stageCursorMu.Lock()
-			remainingSubtaskFinishes = 2
+			remainingSubtaskFinishes = 1
 			stageCursorMu.Unlock()
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action":        "verify-satisfaction",
@@ -324,8 +323,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
 			stageCursorMu.Lock()
 			if remainingSubtaskFinishes > 0 {
-				// 本子任务 verification 已观测到 satisfied；先请求软 checkpoint，
-				// 再确认 finish，让 plan coordinator 推进 progress 流程。
+				// 本子任务 verification 已观测到 satisfied；finish 后推进 progress 流程。
 				remainingSubtaskFinishes--
 				stageCursorMu.Unlock()
 				return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{

@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -25,7 +24,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type templateDesc struct {
@@ -170,7 +169,7 @@ func PullTemplatesFromGithub(giturl string, proxy ...string) (string, error) {
 		}
 	}
 
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, Proxy: http.ProxyFromEnvironment}
+	tr := &http.Transport{Proxy: http.ProxyFromEnvironment}
 	if len(proxy) > 0 {
 		u, err := url.Parse(proxy[0])
 		if err != nil {

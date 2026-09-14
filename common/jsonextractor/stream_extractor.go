@@ -478,6 +478,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		isObject                 bool
 		isArray                  bool
 		objectValueHandledString bool
+		objectValueStarted       bool
 		objectValueInArray       bool
 		arrayCurrentKeyIndex     int
 		legalArrayItem           bool
@@ -698,6 +699,9 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				goto RETRY
 			}
 		case state_objectValue:
+			if !unicode.IsSpace(rune(ch)) {
+				currentStateIns().objectValueStarted = true
+			}
 			switch ch {
 			case ' ', '\t', '\r':
 				writeToFieldStream() // 写入空白字符
@@ -747,6 +751,12 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					goto RETRY
 				}
 			case '\n':
+				// A newline before a value is JSON whitespace, not a missing-comma
+				// recovery boundary. Keep recovery after an actual value unchanged.
+				if !currentStateIns().objectValueStarted {
+					writeToFieldStream()
+					continue
+				}
 				popState()
 				if currentState() == state_jsonArray {
 

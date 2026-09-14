@@ -2,7 +2,7 @@ desc(
 	title_zh: "检测Java java.sql 数据库Statement资源未释放"
 	title: "Check Java java.sql Statement Unreleased Resource"
 	level:high
-	risk:"资源泄漏",
+	risk:"resource-leak"
 	reference: <<<REFERENCE
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 [Java SE Documentation: java.sql.Connection](https://docs.oracle.com/javase/8/docs/api/java/sql/Connection.html)
@@ -188,7 +188,7 @@ id
 ```
 **重要提示:** 在连接池环境下，尽量显式关闭每个 `Statement`，以避免干扰连接复用。
 SOLUTION
-	risk: "资源泄漏",
+	risk: "resource-leak",
 }
 
 desc(

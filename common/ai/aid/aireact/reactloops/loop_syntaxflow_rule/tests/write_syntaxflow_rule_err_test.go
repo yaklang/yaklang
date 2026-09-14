@@ -10,6 +10,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -42,7 +43,7 @@ func mockedSyntaxFlowWritingCauseError(t *testing.T, i aicommon.AICallerConfigIf
 
 	hasRulePrompt := utils.MatchAnyOfSubString(prompt, "write_rule", "modify_rule", "GEN_RULE", "sf_rule")
 	if hasRulePrompt {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		if !stat.writeDone {
 			invalidRule := "rule(\"test\")\ndesc(\n\ttitle: \"Test\"\n\ttype: audit\n"

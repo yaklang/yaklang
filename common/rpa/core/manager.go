@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"runtime"
 	"strings"
 
@@ -57,8 +56,7 @@ type Manager struct {
 
 	channel chan RequestIf
 
-	rfmodel     *randomforest.UrlDetectSys
-	rfmodelpath string
+	rfmodel *randomforest.UrlDetectSys
 
 	// record data sended to ch
 	// sended *filter.StringFilter
@@ -233,12 +231,9 @@ func (m *Manager) init() error {
 
 	// rf model init
 	if m.config.strict_url {
-		_, err = os.Stat(m.rfmodelpath)
-		if err != nil {
-			log.Errorf("random forest model not exist.")
+		if err := m.rfmodel.LoadEmbeddedModel(); err != nil {
+			log.Errorf("load random forest model failed: %s", err)
 			m.rfmodel = nil
-		} else {
-			m.rfmodel.LoadModel(m.rfmodelpath)
 		}
 	} else {
 		m.rfmodel = nil
@@ -277,9 +272,8 @@ func NewManager(urls string, ch chan RequestIf, opts ...ConfigOpt) (*Manager, er
 		concurrent: 20,
 		depth:      config.spider_depth,
 
-		channel:     ch,
-		rfmodel:     &randomforest.UrlDetectSys{},
-		rfmodelpath: "D:\\Workspace\\yak\\common\\rpa\\randomforest\\rf.model",
+		channel: ch,
+		rfmodel: &randomforest.UrlDetectSys{},
 		// captmanager: cap,
 		urlCount: config.url_count,
 

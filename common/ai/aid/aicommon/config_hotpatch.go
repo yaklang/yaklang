@@ -22,14 +22,19 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 			return
 		}
 		validator := make(chan struct{})
+		c.hotPatchLoopWG.Add(1)
 		go func() {
+			defer c.hotPatchLoopWG.Done()
 			for {
 				select {
 				case <-validator:
 					//log.Infof("hotpatch loop for config %s started", c.Id)
 				case <-ctx.Done():
 					return
-				case hotPatchOption := <-c.HotPatchOptionChan.OutputChannel():
+				case hotPatchOption, ok := <-c.HotPatchOptionChan.OutputChannel():
+					if !ok {
+						return
+					}
 					if hotPatchOption == nil {
 						log.Errorf("hotpatch option is nil, will return")
 						return
@@ -49,6 +54,17 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 		case <-ctx.Done():
 		}
 	})
+}
+
+// WaitHotPatchLoopStopped waits until the hot-patch consumer has completely
+// exited. Session lifecycle owners use it before deleting persistent session
+// data, because a final hot-patch may still emit and persist config events while
+// the main input loop is already stopping.
+func (c *Config) WaitHotPatchLoopStopped() {
+	if c == nil {
+		return
+	}
+	c.hotPatchLoopWG.Wait()
 }
 
 func (c *Config) SimpleInfoMap() map[string]interface{} {
@@ -77,9 +93,9 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AIAutoTransactionRetry":      c.AiTransactionAutoRetry,
 		"GenerateReport":              c.GenerateReport,
 		"ForgeName":                   c.ForgeName,
-		"EnablePlan":            c.GetEnablePlanAndExec(),
-		"SyncPerceptionTrigger": c.GetSyncPerceptionTrigger(),
-		"EnabledCapabilities":   c.GetEnabledCapabilities(),
+		"EnablePlan":                  c.GetEnablePlanAndExec(),
+		"SyncPerceptionTrigger":       c.GetSyncPerceptionTrigger(),
+		"EnabledCapabilities":         c.GetEnabledCapabilities(),
 	}
 }
 

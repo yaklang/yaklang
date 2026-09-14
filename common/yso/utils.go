@@ -14,6 +14,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
+
+	embeddata "github.com/yaklang/yaklang/common/yso/embed_data"
 )
 
 type GadgetFunc func(cmd string) (yserx.JavaSerializable, error)
@@ -1022,7 +1024,7 @@ func runWorkFlow(works ...func() error) error {
 }
 
 func GetJavaObjectArrayIns() (yserx.JavaSerializable, error) {
-	data := "rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAA="
+	data := embeddata.LoadSerializedObjects().ObjectArray
 	byts, err := codec.DecodeBase64(data)
 	if err != nil {
 		return nil, err
@@ -1038,12 +1040,12 @@ var dirtyDataHeader []byte
 var dirtyDataHeaderByOverLongString []byte
 
 func init() {
-	bs, err := codec.DecodeBase64("rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cA==")
+	bs, err := codec.DecodeBase64(embeddata.LoadSerializedObjects().ObjectArray)
 	if err != nil {
 		log.Errorf("init dirtyDataHeader failed: %v", err)
 	}
 	dirtyDataHeader = bs
-	bs, err = codec.DecodeBase64("rO0ABXVyACbBm8GMwarBocG2waHArsGswaHBrsGnwK7Bj8GiwarBpcGjwbTAu5DOWJ8QcylsAgAAeHA=")
+	bs, err = codec.DecodeBase64(embeddata.LoadSerializedObjects().DirtyDataHeader)
 	if err != nil {
 		log.Errorf("init dirtyDataHeader failed: %v", err)
 	}

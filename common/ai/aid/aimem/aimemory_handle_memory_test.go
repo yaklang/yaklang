@@ -83,6 +83,25 @@ func TestHandleMemory_Basic(t *testing.T) {
 	}
 }
 
+func TestMemoryTriageEmptyArrayIsSuccessfulNoop(t *testing.T) {
+	invoker := NewAdvancedMockInvoker(context.Background())
+	memory, err := CreateTestAIMemory("empty-memory-"+uuid.NewString(), WithInvoker(invoker))
+	require.NoError(t, err)
+	defer memory.Close()
+	invoker.SetReturnValue("memory-triage", `{"@action":"memory-triage","memory_entities":[]}`)
+	require.NoError(t, memory.HandleMemory("temporary tool call completed"))
+	entities, err := memory.ListAllMemories(10)
+	require.NoError(t, err)
+	require.Empty(t, entities)
+	for _, response := range []string{
+		`{"@action":"memory-triage"}`,
+		`{"@action":"memory-triage","memory_entities":null}`,
+	} {
+		invoker.SetReturnValue("memory-triage", response)
+		require.Error(t, memory.HandleMemory("temporary tool call completed"))
+	}
+}
+
 func TestHandleMemory_Deduplication(t *testing.T) {
 	sessionID := "handle-dedup-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)

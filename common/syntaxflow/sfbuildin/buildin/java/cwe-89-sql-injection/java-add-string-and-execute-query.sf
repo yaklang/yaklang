@@ -1,7 +1,7 @@
 desc(
 	title: "Check Java SQL Statement Concatenation Vulnerability"
 	title_zh: "检测 Java SQL 语句拼接漏洞"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -169,7 +169,7 @@ throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
 }
 ```
 SOLUTION
-	risk: "SQL注入",
+	risk: "sql-injection",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

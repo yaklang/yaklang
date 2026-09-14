@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -221,6 +222,51 @@ func TestDoWaitAgreeWithPolicy_AI_ContextCancel(t *testing.T) {
 			t.Fatal("should have returned after ctx timeout")
 		}
 	})
+}
+
+func TestAIReviewEndReportsHumanEscalation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reviewEnd := make(chan map[string]any, 1)
+	c := NewTestConfig(ctx,
+		WithAgreePolicy(AgreePolicyAI),
+		WithAiAgreeRiskControl(func(_ context.Context, _ *Config, _ *Endpoint) (*Action, error) {
+			return NewSimpleAction("risk-check", aitool.InvokeParams{
+				"risk_score": 0.9,
+				"reason":     "dangerous operation detected",
+			}), nil
+		}),
+		WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event == nil || event.Type != schema.EVENT_TYPE_AI_REVIEW_END {
+				return
+			}
+			payload := make(map[string]any)
+			if json.Unmarshal(event.Content, &payload) == nil {
+				reviewEnd <- payload
+			}
+		}),
+	)
+	c.StartEventLoop(ctx)
+	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
+	ep.SetDefaultSuggestionContinue()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.DoWaitAgreeWithPolicy(ctx, AgreePolicyAI, ep)
+	}()
+
+	select {
+	case payload := <-reviewEnd:
+		require.Equal(t, true, payload["requires_user"])
+		require.Equal(t, "high", payload["level"])
+		require.Equal(t, ep.GetId(), payload["interactive_id"])
+	case <-time.After(testAsyncTimeout):
+		t.Fatal("AI review did not report its user escalation")
+	}
+	cancel()
+	waitForSignal(t, done, testAsyncTimeout, "AI review did not stop after cancellation")
 }
 
 func TestEventLoop_DrainPendingEvents(t *testing.T) {

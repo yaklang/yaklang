@@ -97,7 +97,7 @@ private String sanitize(String input) {
 }
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则目的
 此审计规则旨在识别Java代码中TCP数据接收的位置。TCP数据接收点通常是潜在的攻击面，因为恶意数据可能会通过这些点进入应用程序。

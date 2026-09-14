@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP Hard-coded FTP Password"
 	title_zh: "审计PHP硬编码FTP密码"
-	risk: "审计（Audit）"
+	risk: "audit-check"
 	level: "low"
 	desc: <<<DESC
 ### 风险描述
@@ -92,7 +92,7 @@ ftp_login($ftp_server, $ftp_user_name, $ftp_password);
 #### 4. 代码审查和自动化扫描
 定期进行代码审查，并利用静态应用安全测试（SAST）工具如IRify，自动化检测源代码中硬编码的凭证。
 SOLUTION
-	risk: "硬编码密码",
+	risk: "hardcoded-password",
 	desc: <<<DESC
 ### 风险描述
 1. **风险原理**

@@ -678,3 +678,77 @@ func TestGhostBitsFuzzTag(t *testing.T) {
 		require.Equal(t, 1, len([]rune(results[0])), "单字符编码后应为单个 rune")
 	})
 }
+
+func TestJpgTiffVariantFuzzTags(t *testing.T) {
+	t.Run("jpg default keeps two variants", func(t *testing.T) {
+		results := MutateQuick(`{{jpg()}}`)
+		require.Len(t, results, 2)
+		require.Equal(t, "\xff\xd8\xff\xe0\x00\x10JFIF\xff\xd9", results[0])
+		require.Equal(t, "\xff\xd8\xff\xe1\x00\x1cExif\xff\xd9", results[1])
+	})
+
+	t.Run("jpg:jfif generates only JFIF header", func(t *testing.T) {
+		results := MutateQuick(`{{jpg:jfif()}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "\xff\xd8\xff\xe0\x00\x10JFIF\xff\xd9", results[0])
+	})
+
+	t.Run("jpg:exif generates only Exif header", func(t *testing.T) {
+		results := MutateQuick(`{{jpg:exif()}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "\xff\xd8\xff\xe1\x00\x1cExif\xff\xd9", results[0])
+	})
+
+	t.Run("jpg:jfif embeds data", func(t *testing.T) {
+		results := MutateQuick(`{{jpg:jfif(xx)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "\xff\xd8\xff\xe0\x00\x10JFIFxx\xff\xd9", results[0])
+	})
+
+	t.Run("jpg:exif embeds data", func(t *testing.T) {
+		results := MutateQuick(`{{jpg:exif(xx)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "\xff\xd8\xff\xe1\x00\x1cExifxx\xff\xd9", results[0])
+	})
+
+	t.Run("jpeg aliases work", func(t *testing.T) {
+		require.Equal(t, []string{"\xff\xd8\xff\xe0\x00\x10JFIF\xff\xd9"}, MutateQuick(`{{jpeg:jfif()}}`))
+		require.Equal(t, []string{"\xff\xd8\xff\xe1\x00\x1cExif\xff\xd9"}, MutateQuick(`{{jpeg:exif()}}`))
+	})
+
+	t.Run("jpg with unknown param keeps legacy behavior", func(t *testing.T) {
+		results := MutateQuick(`{{jpg(foo)}}`)
+		require.Len(t, results, 2)
+		require.Equal(t, "\xff\xd8\xff\xe0\x00\x10JFIFfoo\xff\xd9", results[0])
+		require.Equal(t, "\xff\xd8\xff\xe1\x00\x1cExiffoo\xff\xd9", results[1])
+	})
+
+	t.Run("jpg:jfif supports nested fuzztag data", func(t *testing.T) {
+		results := MutateQuick(`{{jpg:jfif({{int(1-2)}})}}`)
+		require.Len(t, results, 2)
+		require.Equal(t, "\xff\xd8\xff\xe0\x00\x10JFIF1\xff\xd9", results[0])
+		require.Equal(t, "\xff\xd8\xff\xe0\x00\x10JFIF2\xff\xd9", results[1])
+	})
+
+	t.Run("tiff default keeps two variants", func(t *testing.T) {
+		results := MutateQuick(`{{tiff()}}`)
+		require.Len(t, results, 2)
+		require.Equal(t, "\x4d\x4d", results[0])
+		require.Equal(t, "\x49\x49", results[1])
+	})
+
+	t.Run("tiff:mm generates only big-endian header", func(t *testing.T) {
+		require.Equal(t, []string{"\x4d\x4d"}, MutateQuick(`{{tiff:mm()}}`))
+	})
+
+	t.Run("tiff:ii generates only little-endian header", func(t *testing.T) {
+		require.Equal(t, []string{"\x49\x49"}, MutateQuick(`{{tiff:ii()}}`))
+	})
+
+	t.Run("tiff with unknown param keeps legacy behavior", func(t *testing.T) {
+		results := MutateQuick(`{{tiff(foo)}}`)
+		require.Len(t, results, 2)
+		require.Equal(t, "\x4d\x4d", results[0])
+		require.Equal(t, "\x49\x49", results[1])
+	})
+}

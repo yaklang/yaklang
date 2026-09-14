@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -31,6 +32,12 @@ type AIMemoryHNSWBackend struct {
 
 	// 保存操作的专用锁 - 确保保存操作的原子性
 	saveMutex sync.Mutex
+
+	// Coalesce bursts of graph changes into one bounded save worker.
+	saveScheduleMutex sync.Mutex
+	savePending       bool
+	saveDone          chan struct{}
+	saveClosed        bool
 
 	// 图操作的全局锁 - 确保所有图操作（Add/Delete/Update/Export）的互斥性
 	graphMutex sync.RWMutex
@@ -121,12 +128,15 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 创建新的collection
 		collection = schema.AIMemoryCollection{
-			SessionID:   sessionID,
-			M:           16,
-			Ml:          0.25,
-			EfSearch:    20,
-			EfConstruct: 200,
-			Dimension:   7,
+			// A fresh generation also distinguishes drop/recreate of the same
+			// session, where SQLite can reuse the old collection primary key.
+			CleanupVersion: time.Now().UnixNano(),
+			SessionID:      sessionID,
+			M:              16,
+			Ml:             0.25,
+			EfSearch:       20,
+			EfConstruct:    200,
+			Dimension:      7,
 		}
 		if err := db.Table(collectionTable).Create(&collection).Error; err != nil {
 			return nil, utils.Errorf("create collection failed: %v", err)
@@ -162,16 +172,7 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 	backend.graph.Store(graph)
 
 	// 设置graph变化回调 - 使用专用锁保证保存操作的原子性
-	graph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
-		if backend.autoSave {
-			// 异步保存，使用专用锁确保原子性
-			go func() {
-				if err := backend.SaveGraph(); err != nil {
-					log.Errorf("auto save graph failed: %v", err)
-				}
-			}()
-		}
-	}
+	graph.OnLayersChange = func([]*hnsw.Layer[string]) { backend.scheduleSave() }
 
 	return backend, nil
 }
@@ -234,48 +235,168 @@ func (b *AIMemoryHNSWBackend) loadGraphFromBinary(graphBinary []byte) (*hnsw.Gra
 
 // SaveGraph 保存HNSW Graph到数据库
 func (b *AIMemoryHNSWBackend) SaveGraph() error {
-	// 使用专用锁确保保存操作的原子性
 	b.saveMutex.Lock()
 	defer b.saveMutex.Unlock()
+	b.graphMutex.Lock()
+	defer b.graphMutex.Unlock()
 
-	// 获取读锁来导出图 - 确保与Add/Delete/Update操作互斥
-	b.graphMutex.RLock()
-	graph := b.graph.Load()
-	if graph == nil {
-		b.graphMutex.RUnlock()
-		return utils.Errorf("graph is nil")
+	// A different backend may have cleaned this session since we loaded it.
+	// Rebase on the durable survivor graph, retaining only locally added nodes
+	// whose authoritative entity rows still exist.
+	var current schema.AIMemoryCollection
+	if err := b.db.Table(b.collectionTable()).Where("session_id = ?", b.sessionID).First(&current).Error; err != nil {
+		return err
 	}
-
-	// 在读锁保护下导出图
-	exportedGraph, err := hnsw.ExportHNSWGraph(graph)
-	b.graphMutex.RUnlock() // Export完成后立即释放锁
-
-	if err != nil {
-		return utils.Errorf("export graph failed: %v", err)
-	}
-
-	exportedGraph.Dims = 7 // 7维向量
-	binaryReader, err := exportedGraph.ToBinary(context.Background())
-	if err != nil {
-		return utils.Errorf("convert to binary failed: %v", err)
-	}
-
-	binaryData, err := io.ReadAll(binaryReader)
-	if err != nil {
-		return utils.Errorf("read binary data failed: %v", err)
-	}
-
-	// 原子更新数据库 - 使用事务确保原子性
-	return utils.GormTransaction(b.db, func(tx *gorm.DB) error {
-		// 使用Update方法避免主键冲突
-		collectionTable := "ai_memory_collections_v1"
-		if b.midtermMode {
-			collectionTable = "ai_midterm_archive_collections_v1"
+	if current.CleanupVersion != b.collection.CleanupVersion {
+		if err := b.rebaseAfterCleanup(&current); err != nil {
+			return err
 		}
-		return tx.Table(collectionTable).
-			Where("session_id = ?", b.sessionID).
-			Update("graph_binary", binaryData).Error
+	}
+	binaryData, err := memoryGraphBinary(b.graph.Load())
+	if err != nil {
+		return err
+	}
+	result := b.db.Table(b.collectionTable()).
+		Where("session_id = ? AND COALESCE(cleanup_version,0) = ?", b.sessionID, current.CleanupVersion).
+		Update("graph_binary", binaryData)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return utils.Error("memory graph changed during cleanup; retry save")
+	}
+	return nil
+}
+
+func (b *AIMemoryHNSWBackend) collectionTable() string {
+	if b.midtermMode {
+		return "ai_midterm_archive_collections_v1"
+	}
+	return "ai_memory_collections_v1"
+}
+
+func (b *AIMemoryHNSWBackend) entityTable() string {
+	if b.midtermMode {
+		return "ai_midterm_archive_entities_v1"
+	}
+	return "ai_memory_entities_v1"
+}
+
+func memoryGraphBinary(graph *hnsw.Graph[string]) ([]byte, error) {
+	if graph == nil {
+		return nil, utils.Error("graph is nil")
+	}
+	if graph.IsEmpty() {
+		// ExportHNSWGraph rejects empty graphs. Persist the empty state explicitly
+		// so deleting the final node cannot leave the previous binary behind.
+		return []byte{}, nil
+	}
+	exported, err := hnsw.ExportHNSWGraph(graph)
+	if err != nil {
+		return nil, err
+	}
+	exported.Dims = 7
+	reader, err := exported.ToBinary(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(reader)
+}
+
+// Called with graphMutex and saveMutex held. Read IDs only, in bounded batches;
+// legacy memory content and embeddings can be arbitrarily large.
+func (b *AIMemoryHNSWBackend) rebaseAfterCleanup(current *schema.AIMemoryCollection) error {
+	graph := b.createNewGraph()
+	if len(current.GraphBinary) > 0 {
+		var err error
+		graph, err = b.loadGraphFromBinary(current.GraphBinary)
+		if err != nil {
+			return err
+		}
+	}
+	old := b.graph.Load()
+	if old != nil && !old.IsEmpty() {
+		ids := make([]string, 0, 200)
+		merge := func() error {
+			var live []schema.AIMemoryEntity
+			if err := b.db.Table(b.entityTable()).Select("memory_id").
+				Where("session_id = ? AND memory_id IN (?)", b.sessionID, ids).Find(&live).Error; err != nil {
+				return err
+			}
+			for _, entity := range live {
+				if !graph.Has(entity.MemoryID) {
+					if vector, ok := old.Lookup(entity.MemoryID); ok {
+						graph.Add(hnsw.InputNode[string]{Key: entity.MemoryID, Value: vector()})
+					}
+				}
+			}
+			ids = ids[:0]
+			return nil
+		}
+		for key := range old.Layers[0].Nodes {
+			ids = append(ids, key)
+			if len(ids) == cap(ids) {
+				if err := merge(); err != nil {
+					return err
+				}
+			}
+		}
+		if len(ids) > 0 {
+			if err := merge(); err != nil {
+				return err
+			}
+		}
+	}
+	graph.OnLayersChange = func([]*hnsw.Layer[string]) { b.scheduleSave() }
+	b.graph.Store(graph)
+	b.collection.CleanupVersion = current.CleanupVersion
+	return nil
+}
+
+// deleteAndSave atomically persists the memory graph, cleanup generation and
+// (for automatic cleanup) entity deletion. RAG deletion must succeed first.
+func (b *AIMemoryHNSWBackend) deleteAndSave(ctx context.Context, ids []string, deleteEntities bool) error {
+	b.saveMutex.Lock()
+	defer b.saveMutex.Unlock()
+	b.graphMutex.Lock()
+	defer b.graphMutex.Unlock()
+	_, err := b.graph.Load().DeleteBatchWithCommit(ids, func() error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		binaryData, err := memoryGraphBinary(b.graph.Load())
+		if err != nil {
+			return err
+		}
+		tx := b.db.BeginTx(ctx, nil)
+		if tx.Error != nil {
+			return tx.Error
+		}
+		defer tx.Rollback()
+		if deleteEntities {
+			for start := 0; start < len(ids); start += 200 {
+				if err := tx.Table(b.entityTable()).Unscoped().
+					Where("session_id = ? AND memory_id IN (?)", b.sessionID, ids[start:min(start+200, len(ids))]).Delete(nil).Error; err != nil {
+					return err
+				}
+			}
+		}
+		result := tx.Table(b.collectionTable()).
+			Where("session_id = ? AND COALESCE(cleanup_version,0) = ?", b.sessionID, b.collection.CleanupVersion).
+			Updates(map[string]interface{}{"graph_binary": binaryData, "cleanup_version": gorm.Expr("COALESCE(cleanup_version,0) + 1")})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return utils.Error("memory graph changed during cleanup; retry cleanup")
+		}
+		if err := tx.Commit().Error; err != nil {
+			return err
+		}
+		b.collection.CleanupVersion++
+		return nil
 	})
+	return err
 }
 
 // HasMemoryID reports whether the graph already contains the memory id.
@@ -342,10 +463,7 @@ func (b *AIMemoryHNSWBackend) Delete(memoryID string) error {
 		return utils.Errorf("graph is nil")
 	}
 
-	deleted := graph.Delete(memoryID)
-	if !deleted {
-		log.Warnf("memory entity not found in graph: %s", memoryID)
-	}
+	graph.DeleteBatch(memoryID) // Missing nodes are an idempotent delete.
 
 	return nil
 }
@@ -480,7 +598,7 @@ func (b *AIMemoryHNSWBackend) RebuildIndex() error {
 
 	// 从数据库加载所有记忆实体
 	var dbEntities []schema.AIMemoryEntity
-	if err := b.db.Where("session_id = ?", b.sessionID).Find(&dbEntities).Error; err != nil {
+	if err := b.db.Table(b.entityTable()).Select("memory_id, core_pact_vector").Where("session_id = ?", b.sessionID).Find(&dbEntities).Error; err != nil {
 		return utils.Errorf("query memory entities failed: %v", err)
 	}
 
@@ -494,23 +612,15 @@ func (b *AIMemoryHNSWBackend) RebuildIndex() error {
 			})
 		}
 
-		// 设置回调函数 - 使用专用锁保证保存操作的原子性
-		newGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
-			if b.autoSave {
-				// 异步保存，使用专用锁确保原子性
-				go func() {
-					if err := b.SaveGraph(); err != nil {
-						log.Errorf("auto save graph failed: %v", err)
-					}
-				}()
-			}
-		}
-
 		newGraph.Add(nodes...)
 	}
 
 	// 原子替换graph
+	b.graphMutex.Lock()
+	newGraph.OnLayersChange = func([]*hnsw.Layer[string]) { b.scheduleSave() }
 	b.graph.Store(newGraph)
+	b.graphMutex.Unlock()
+	b.scheduleSave()
 
 	log.Infof("rebuilt HNSW index for session %s with %d entities", b.sessionID, len(dbEntities))
 
@@ -546,12 +656,57 @@ func (b *AIMemoryHNSWBackend) GetStats() map[string]interface{} {
 	return stats
 }
 
-// Close 关闭后端，保存索引
+// scheduleSave never launches one goroutine per node mutation. Close drains
+// the current worker before its final synchronous save.
+func (b *AIMemoryHNSWBackend) scheduleSave() {
+	if !b.autoSave {
+		return
+	}
+	b.saveScheduleMutex.Lock()
+	defer b.saveScheduleMutex.Unlock()
+	if b.saveClosed {
+		return
+	}
+	b.savePending = true
+	if b.saveDone != nil {
+		return
+	}
+	done := make(chan struct{})
+	b.saveDone = done
+	go func() {
+		for {
+			b.saveScheduleMutex.Lock()
+			if !b.savePending || b.saveClosed {
+				b.saveDone = nil
+				close(done)
+				b.saveScheduleMutex.Unlock()
+				return
+			}
+			b.savePending = false
+			b.saveScheduleMutex.Unlock()
+			if err := b.SaveGraph(); err != nil {
+				log.Errorf("auto save memory graph failed: %v", err)
+			}
+		}
+	}()
+}
+
+// Close drains background saves and persists even an empty graph.
 func (b *AIMemoryHNSWBackend) Close() error {
+	if b.db == nil || b.graph.Load() == nil {
+		return nil
+	}
+	b.saveScheduleMutex.Lock()
+	b.saveClosed = true
+	done := b.saveDone
+	b.saveScheduleMutex.Unlock()
+	if done != nil {
+		<-done
+	}
 	return b.SaveGraph()
 }
 
-// SearchResultWithDistance 搜索结果（包含距离）
+// SearchResultWithDistance 包含距离信息的搜索结果
 type SearchResultWithDistance struct {
 	Entity   *aicommon.MemoryEntity
 	Distance float64

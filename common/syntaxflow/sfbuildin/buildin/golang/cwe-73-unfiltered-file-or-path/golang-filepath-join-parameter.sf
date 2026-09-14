@@ -1,0 +1,96 @@
+desc(
+	title: "Detect Golang Filepath Join With External Parameters"
+	title_zh: "检测Golang外部参数参与的文件路径拼接"
+	type: audit
+	level: low
+	risk: "path-traversal"
+	rule_id: "db4c6369-d6df-4f14-946f-6275f7c53f5f"
+	solution: <<<SOLUTION
+### 修复建议
+1. 把用户或调用方传入的路径片段和基础目录拼接后，使用 `filepath.Clean` 规范化。
+2. 用 `strings.HasPrefix`、`filepath.Rel` 或 `securejoin` 等方式验证最终路径仍在允许目录内。
+3. 在删除、读取、下载等高风险文件操作前增加权限和边界检查。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-73](https://cwe.mitre.org/data/definitions/73.html)
+REFERENCE
+)
+
+<include('golang-file-path')> as $path;
+<include('golang-os-sink')> as $sink;
+
+strings.HasPrefix(* as $check);
+$path.Clean(* as $check);
+$path.Base(* as $check);
+$path.IsAbs(* as $check);
+$path.Rel(* as $check);
+securejoin.SecureJoin(* as $check);
+
+$sink?{<getCall> #{ include: `* & $check` }->} as $safe;
+$sink?{<getCall> #{
+	include: `*?{have: ".Join"}`,
+	until: `*?{opcode:param}`,
+}->} as $all;
+$all - $safe as $low;
+
+alert $low for {
+	type: "vuln",
+	level: "low",
+	name: "low",
+	title: "External Parameters Reach Filepath Join And File Operation",
+	title_zh: "检测到外部参数经文件路径拼接后进入文件操作",
+	message: "函数参数参与 `filepath.Join` 后直接进入文件访问或删除操作，且未看到充分的边界校验。",
+	risk: "path-traversal",
+	desc: <<<DESC
+该规则用于识别 service/DAO/工具层中不经过 HTTP 入口也会出现的通用路径穿越模式：函数参数先参与 `filepath.Join`，随后被用于 `os.Stat`、`os.Remove`、`os.Open` 等文件操作，但中间没有看到可靠的目录边界校验。
+DESC
+	solution: <<<SOLUTION
+对拼接后的最终路径做 `filepath.Clean` 并验证其仍位于安全基目录内；若只需要文件名，应先使用 `filepath.Base` 或等价约束。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://path_join_positive.go': <<<PARAM
+package demo
+
+import (
+	"os"
+	"path/filepath"
+)
+
+func DeleteFile(path string, filename string) error {
+	backupFilePath := filepath.Join(path, filename)
+	if _, err := os.Stat(backupFilePath); err != nil {
+		return err
+	}
+	return os.Remove(backupFilePath)
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://path_join_negative.go': <<<PARAM
+package demo
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func DeleteFile(baseDir string, filename string) error {
+	cleanPath := filepath.Clean(filepath.Join(baseDir, filename))
+	if !strings.HasPrefix(cleanPath, baseDir) {
+		return errors.New("invalid path")
+	}
+	if _, err := os.Stat(cleanPath); err != nil {
+		return err
+	}
+	return os.Remove(cleanPath)
+}
+PARAM
+)

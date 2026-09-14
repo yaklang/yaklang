@@ -186,6 +186,19 @@ func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
 
+func (r *SyntaxFlowResult) GetRisks() []*schema.SSARisk {
+	if r == nil || r.riskMap == nil {
+		return nil
+	}
+	out := make([]*schema.SSARisk, 0, len(r.riskMap))
+	for _, risk := range r.riskMap {
+		if risk != nil {
+			out = append(out, risk)
+		}
+	}
+	return out
+}
+
 func (r *SyntaxFlowResult) SaveRisk(
 	variable string,
 	index int,

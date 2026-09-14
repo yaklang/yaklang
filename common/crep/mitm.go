@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -374,6 +375,10 @@ type MITMServer struct {
 	// TLS fingerprint used for ordinary upstream connections.
 	tlsFingerprint string
 
+	// HTTP/2 framing fingerprint used for ordinary upstream connections.
+	// Empty (the default) keeps the compatibility-oriented framing.
+	http2Fingerprint string
+
 	// SNI (Server Name Indication) configuration
 	sni          string            // SNI 值
 	overwriteSNI bool              // 是否覆盖自动推断的 SNI
@@ -418,7 +423,7 @@ func (m *MITMServer) applyProxyConfig() {
 	if len(m.proxyRouteMap) > 0 {
 		routeCopy = make(map[string][]string, len(m.proxyRouteMap))
 		for pattern, proxies := range m.proxyRouteMap {
-			if len(proxies) == 0 {
+			if len(proxies) == 0 && !strings.HasPrefix(strings.TrimSpace(pattern), "!") {
 				continue
 			}
 			routeCopy[pattern] = append([]string(nil), proxies...)
@@ -479,6 +484,9 @@ func (m *MITMServer) initConfig() error {
 	}
 	if m.tlsFingerprint != "" {
 		config = append(config, lowhttp.WithTLSFingerprint(m.tlsFingerprint))
+	}
+	if m.http2Fingerprint != "" {
+		config = append(config, lowhttp.WithHTTP2Fingerprint(m.http2Fingerprint))
 	}
 
 	m.sniResolver = NewSNIResolver(m.sniMapping, m.overwriteSNI, m.sni)

@@ -80,6 +80,7 @@ message BootstrapResponse {
   string event_subject_prefix = 5;
   google.protobuf.Timestamp expires_at = 6;
   string node_id = 7;
+  bool runtime_host_capacity_accepted = 8;
 }
 
 message ActiveAttemptHeartbeat {
@@ -90,6 +91,20 @@ message ActiveAttemptHeartbeat {
   uint32 completed_units = 5;
   uint32 total_units = 6;
   google.protobuf.Timestamp last_activity_at = 7;
+}
+
+// RuntimeHostCapacity is a host-scoped observation produced by a Runtime Host.
+// Allocatable values are stable admission ceilings after the node's configured
+// system reserve. memory_available_bytes is telemetry only and MUST NOT be used
+// as a durable reservation counter.
+message RuntimeHostCapacity {
+  string scope = 1;
+  uint64 cpu_capacity_millicores = 2;
+  uint64 cpu_allocatable_millicores = 3;
+  uint64 memory_capacity_bytes = 4;
+  uint64 memory_allocatable_bytes = 5;
+  uint64 memory_available_bytes = 6;
+  uint64 sample_sequence = 7;
 }
 
 message NodeHeartbeat {
@@ -104,6 +119,7 @@ message NodeHeartbeat {
   google.protobuf.Timestamp observed_at = 9;
   uint32 heartbeat_interval_seconds = 10;
   NodeHostFacts host_facts = 11;
+  RuntimeHostCapacity runtime_host_capacity = 12;
 }
 
 message NodeLog {

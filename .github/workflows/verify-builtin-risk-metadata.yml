@@ -1,0 +1,37 @@
+name: Verify built-in risk types
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'common/syntaxflow/**'
+      - 'common/schema/ssa_risk.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/verify-builtin-risk-metadata.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: builtin-risk-types-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prepare Yak binary
+        run: |
+          # 优先用列表最新发布版；缺少 verify-builtin-risk 时由脚本从 checkout 编译。
+          echo "YAK=$(bash ./scripts/prepare-yak.sh --out "$RUNNER_TEMP/yak" --require 'verify-builtin-risk --dir')" >> "$GITHUB_ENV"
+
+      - name: Validate local rules against the risk taxonomy
+        run: |
+          "$YAK" verify-builtin-risk \
+            --dir ./common/syntaxflow/sfbuildin/buildin \
+            --taxonomy ./common/syntaxflow/sfrisk/taxonomy.json

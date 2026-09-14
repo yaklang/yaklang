@@ -10,7 +10,7 @@ import (
 var snmp_v2Auth = &DefaultServiceAuthInfo{
 	ServiceName:      "snmp_v2",
 	DefaultPorts:     "161",
-	DefaultUsernames: append([]string{"snmp"}),
+	DefaultUsernames: []string{"snmp"},
 	DefaultPasswords: append([]string{"public"}, CommonPasswords...),
 	UnAuthVerify:     nil,
 	BrutePass: func(item *BruteItem) *BruteItemResult {

@@ -3,8 +3,6 @@ package aireact
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -79,7 +78,7 @@ func TestVerifyUserSatisfaction_TaskCancellationStopsRequestWithoutRetry(t *test
 	}
 }
 
-func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
+func TestVerifyUserSatisfaction_DoesNotEmitModelExchangeReferences(t *testing.T) {
 	var (
 		events   []*schema.AiOutputEvent
 		eventsMu sync.Mutex
@@ -117,49 +116,22 @@ func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *tes
 	eventsMu.Lock()
 	defer eventsMu.Unlock()
 
-	streamStartIDs := make(map[string]bool)
-	var requestPayload string
-	var responsePayload string
-	var requestEventID string
-	var responseEventID string
-
+	var sawVerificationStream bool
 	for _, event := range events {
-		if event.Type == schema.EVENT_TYPE_STREAM_START {
-			streamStartIDs[event.GetStreamEventWriterId()] = true
-		}
-		if event.Type != schema.EVENT_TYPE_REFERENCE_MATERIAL {
-			continue
-		}
-
-		var payload map[string]any
-		require.NoError(t, json.Unmarshal(event.Content, &payload))
-
-		payloadStr, _ := payload["payload"].(string)
-		eventID, _ := payload["event_uuid"].(string)
-
-		switch {
-		case strings.Contains(payloadStr, "AI 请求原文"):
-			requestPayload = payloadStr
-			requestEventID = eventID
-		case strings.Contains(payloadStr, "AI 响应原文"):
-			responsePayload = payloadStr
-			responseEventID = eventID
+		require.NotEqual(t, schema.EVENT_TYPE_REFERENCE_MATERIAL, event.Type,
+			"verification prompts and raw responses are not reference materials")
+		if event.Type == schema.EVENT_TYPE_STREAM_START && event.NodeId == "re-act-verify" {
+			sawVerificationStream = true
 		}
 	}
+	require.True(t, sawVerificationStream, "verification progress must remain visible")
 
-	require.NotEmpty(t, requestPayload)
-	require.NotEmpty(t, responsePayload)
-	require.Contains(t, requestPayload, queryToken)
-	require.Contains(t, requestPayload, payloadToken)
-	require.Contains(t, responsePayload, rawResponse)
-	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
-	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
 }
 
 func TestVerifyUserSatisfaction_AcceptsEvidenceAITag(t *testing.T) {
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			nonce := aicommon.MustExtractPromptNonce(t, req.GetPrompt(), "INPUT")
+			nonce := aicommon_testutil.MustExtractPromptNonce(t, req.GetPrompt(), "INPUT")
 			rawResponse := `{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"still verifying","evidence":[]}
 
 <|EVIDENCE_` + nonce + `|>

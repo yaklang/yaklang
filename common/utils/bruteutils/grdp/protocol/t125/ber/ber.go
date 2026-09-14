@@ -123,6 +123,12 @@ func ReadInteger(r io.Reader) (int, error) {
 	}
 }
 
+func WriteEnumerated(n uint8, w io.Writer) {
+	WriteUniversalTag(TAG_ENUMERATED, false, w)
+	WriteLength(1, w)
+	core.WriteUInt8(n, w)
+}
+
 func WriteInteger(n int, w io.Writer) {
 	WriteUniversalTag(TAG_INTEGER, false, w)
 	if n <= 0xff {

@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到不安全的 Cookie 序列化"
+	title_zh: "检测到不安全的 Cookie 序列化"
+	type: vuln
+	level: high
+	rule_id: "source-insecure-api-cookie-serialization"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到使用 Marshal 反序列化 Cookie 的代码。如果攻击者能构造合法 Cookie，可能导致远程代码执行。
+
+### 风险类型
+不安全反序列化（deserialization）
+
+### 影响
+反序列化不可信数据可能触发任意代码执行或对象注入。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-94
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 JSON 等安全格式序列化 Cookie，禁止反序列化不可信输入。
+SOLUTION
+	alert_min: 1
+	"file://pos.rb": <<<POS
+Rails.application.config.action_dispatch.cookies_serializer = :marshal
+POS
+	"safefile://pos.rb": <<<NEG
+Rails.application.config.action_dispatch.cookies_serializer = :json
+NEG
+)
+
+${*.rb}.pattern_regex(/(?:Rails\.application\.config\.action_dispatch\.cookies_serializer\s+=\s+:marshal)|(?:Rails\.application\.config\.action_dispatch\.cookies_serializer\s+=\s+:hybrid)/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测到不安全的 Cookie 序列化",
+	title_zh: "检测到不安全的 Cookie 序列化",
+	message: "检测到不安全的 Cookie 序列化",
+}

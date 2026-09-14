@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -285,13 +284,11 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 
 	var suggestion string
 	var reason string
-	var rawResponse bytes.Buffer
 
 	_, _ = emitReviewStatus(config, "plan-review-status", "正在审查计划", ep.GetId())
 
 	err = CallAITransaction(config, prompt, config.CallQualityPriorityAI, func(rsp *AIResponse) error {
 		stream := rsp.GetOutputStreamReader("plan-review", true, config.GetEmitter())
-		stream = io.TeeReader(stream, &rawResponse)
 		actionOpts := []ActionMakerOption{
 			WithActionAlias("object"),
 		}
@@ -318,11 +315,8 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		"suggestion": suggestion,
 		"reason":     compactReason,
 	}
-	reviewEvent, _ := emitReviewStatus(config, "plan-review", planReviewDisplayMessage(suggestion, compactReason), ep.GetId())
+	_, _ = emitReviewStatus(config, "plan-review", planReviewDisplayMessage(suggestion, compactReason), ep.GetId())
 	waitForReviewStreams(config)
-	if reviewEvent != nil {
-		EmitAIRequestAndResponseReferenceMaterials(config.GetEmitter(), reviewEvent.GetStreamEventWriterId(), prompt, rawResponse.String())
-	}
 	emitReviewStructured(config, "plan-review-decision", payload)
 	emitReviewStructured(config, "plan-review", payload)
 
@@ -345,14 +339,12 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	var reason string
 	var taskDeltaSummary string
 	var taskDeltasArray []aitool.InvokeParams
-	var rawResponse bytes.Buffer
 
 	_, _ = emitReviewStatus(config, "task-review-status", "正在审查任务，以便任务动态规划 / start to do task/plan review for dynamic plan", ep.GetId())
 
 	err = CallAITransaction(config, prompt, config.CallQualityPriorityAI, func(rsp *AIResponse) error {
 		boundEmitter := rsp.BindEmitter(config.GetEmitter())
 		stream := rsp.GetOutputStreamReader("task-review", true, config.GetEmitter())
-		stream = io.TeeReader(stream, &rawResponse)
 		actionOpts := []ActionMakerOption{
 			WithActionAlias("object"),
 		}
@@ -381,7 +373,7 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	compactReason := compactTaskReviewReason(suggestion, reason)
 	compactDeltaSummary := compactTaskDeltaSummary(taskDeltaSummary, taskDeltasArray)
 	if config.GetEmitter() != nil {
-		reviewEvent, _ := config.GetEmitter().EmitDefaultStreamEvent(
+		_, _ = config.GetEmitter().EmitDefaultStreamEvent(
 			"task-review",
 			strings.NewReader(taskReviewDisplayMessage(suggestion, compactReason, compactDeltaSummary)),
 			ep.GetId(),
@@ -394,9 +386,6 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 			)
 		}
 		waitForReviewStreams(config)
-		if reviewEvent != nil {
-			EmitAIRequestAndResponseReferenceMaterials(config.GetEmitter(), reviewEvent.GetStreamEventWriterId(), prompt, rawResponse.String())
-		}
 		payload := map[string]any{
 			"verdict":    taskReviewVerdict(suggestion),
 			"suggestion": suggestion,

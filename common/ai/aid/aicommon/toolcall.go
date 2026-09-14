@@ -3,6 +3,7 @@ package aicommon
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -21,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"gopkg.in/yaml.v3"
 )
 
@@ -690,6 +692,65 @@ func WithToolCaller_GenerateToolParamsBuilder(
 	}
 }
 
+// buildNativeToolForParamGen constructs an aispec.Tool for R2 (parameter
+// generation) in functioncall mode. The tool's parameters schema mirrors the
+// call-tool action protocol: {"@action":"call-tool","tool":"<name>",
+// "identifier":"...","params":{<InputSchema>},"call_expectations":"..."}.
+// The model outputs the complete action JSON as tool_call arguments, which
+// flows through the same ExtractValidActionFromStream("call-tool") pipeline
+// as text mode — no parsing changes needed.
+func buildNativeToolForParamGen(tool *aitool.Tool) aispec.Tool {
+	props := map[string]any{
+		"@action": map[string]any{
+			"const":       "call-tool",
+			"description": "Action type identifier",
+		},
+		"tool": map[string]any{
+			"type":        "string",
+			"description": "The tool to call",
+			"const":       tool.Name,
+		},
+		"identifier": map[string]any{
+			"type":        "string",
+			"description": "Short snake_case identifier for this tool call",
+		},
+	}
+	paramSchema := map[string]any{
+		"type":        "object",
+		"description": "Tool parameters",
+	}
+	if tool.InputSchema.Properties != nil && tool.InputSchema.Properties.Len() > 0 {
+		paramSchema["properties"] = tool.InputSchema.Properties
+	}
+	if len(tool.InputSchema.Required) > 0 {
+		paramSchema["required"] = tool.InputSchema.Required
+	}
+	props["params"] = paramSchema
+	props["call_expectations"] = map[string]any{
+		"type":        "string",
+		"description": "Expected duration, success criteria, and exception handling",
+	}
+
+	params := map[string]any{
+		"type":                 "object",
+		"properties":           props,
+		"required":             []string{"@action", "tool", "params"},
+		"additionalProperties": false,
+	}
+	description := tool.Description
+	if description == "" {
+		description = tool.GetName()
+	}
+	return aispec.Tool{
+		Type: "function",
+		Function: aispec.ToolFunction{
+			Name:        tool.Name,
+			Description: description,
+			Parameters:  params,
+		},
+	}
+}
+
 // ToolParamsPromptMeta contains the generated prompt and metadata for AITAG parsing
 type ToolParamsPromptMeta struct {
 	Prompt     string
@@ -957,6 +1018,44 @@ type GenerateParamsResult struct {
 	CallExpectations string        // AI-generated expectations for this tool call (timing, success criteria, etc.)
 }
 
+// extractToolCallAction tolerates an omitted discriminator only in R2, where
+// the caller has already selected one tool. Recovery requires a complete outer
+// object with that tool name and object-valued params, and never replaces an
+// explicit action marker.
+func extractToolCallAction(ctx context.Context, stream io.Reader, toolName string, opts ...ActionMakerOption) (*Action, error) {
+	action, err := ExtractActionFromStream(ctx, stream, "call-tool", opts...)
+	if err != nil {
+		return nil, err
+	}
+	parseErr := action.WaitParseResult(ctx)
+	action.WaitStream(ctx)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	if action.ValidCheck("call-tool") {
+		return action, nil
+	}
+
+	params := action.GetParams()
+	_, hasMarker := actionMarker(params)
+	requestedTool, _ := params["tool"].(string)
+	toolParams, hasObjectParams := params["params"].(map[string]any)
+	if !hasMarker && toolName != "" && requestedTool == toolName && hasObjectParams && toolParams != nil {
+		canonical := make(aitool.InvokeParams, len(params)+1)
+		for key, value := range params {
+			canonical[key] = value
+		}
+		canonical[ActionMagicKey] = "call-tool"
+		action.ForceSet(action.generalParamKey, canonical)
+		action.ForceSet(ActionMagicKey, "call-tool")
+		action.SetName("call-tool")
+		action.observeActionType("call-tool")
+		log.Debugf("recovered omitted @action for selected tool[%s] from complete tool/params envelope", toolName)
+		return action, nil
+	}
+	return nil, utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: [call-tool]", action.ObservedActionType())
+}
+
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
 	emitter := t.emitter
 
@@ -983,6 +1082,19 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
 			return nil, err
 		}
+	}
+
+	// Batch children share the task/timeline prompt, but each generates params
+	// for a different invocation. Carry the selected call's intent into R2 so
+	// repeated uses of the same tool do not all target the first task item.
+	if t.reason != "" || t.destinationIdentifier != "" || t.callExpectations != "" {
+		intent, _ := json.Marshal(map[string]string{
+			"tool":              tool.Name,
+			"reason":            t.reason,
+			"identifier":        t.destinationIdentifier,
+			"call_expectations": t.callExpectations,
+		})
+		paramsPrompt += "\n\nGenerate parameters for this specific tool invocation. Use its reason, identifier and expectations to distinguish it from other calls in the task:\n" + string(intent)
 	}
 
 	invokeParams := aitool.InvokeParams{}
@@ -1014,6 +1126,32 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	// instead of replaying the outer transaction checkpoint.
 	paramTransactionSeq := t.paramTransactionSeq
 	t.paramTransactionSeq = 0
+
+	// Check if functioncall mode is enabled. In functioncall mode, R2 injects
+	// a native tool whose parameters schema mirrors the call-tool action
+	// protocol (same as ToJSONSchema: {@action, tool, params, identifier,
+	// call_expectations}). The model outputs the complete action JSON as
+	// tool_call arguments, which flow through the same extractToolCallAction
+	// pipeline as text mode. The native tool uses the tool's real name (not
+	// R1's execute_action), so R2 never sees R1's big tool.
+	functionCallMode := t.config.GetConfigBool("EnableFunctionCallMode")
+	var requestOpts []AIRequestOption
+	if functionCallMode {
+		nativeTool := buildNativeToolForParamGen(tool)
+		requestOpts = append(requestOpts,
+			WithAIRequest_ExtraSpecOpts(
+				aispec.WithTools([]aispec.Tool{nativeTool}),
+				aispec.WithToolChoice("auto"),
+				aispec.WithToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+					for _, tc := range toolCalls {
+						log.Debugf("functioncall R2: tool_call delta: %s", tc.Function.Name)
+					}
+				}),
+			),
+			WithAIRequest_EnableToolCallArgumentsStream(),
+		)
+	}
+
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
@@ -1054,11 +1192,10 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
 		}
 
-		event, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
+		_, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
 		if err != nil {
 			boundEmitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
 		}
-		_ = event
 
 		pw.WriteString("[开始处理参数] → ")
 
@@ -1089,13 +1226,13 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			}),
 		)
 
-		callToolAction, err := ExtractValidActionFromStream(t.ctx, stream, "call-tool", actionOpts...)
+		callToolAction, err := extractToolCallAction(t.ctx, stream, tool.Name, actionOpts...)
 		if err != nil {
 			boundEmitter.EmitError("error extract tool params: %v", err)
 			pw.Close()
 			return utils.Errorf("error extracting action params: %v", err)
 		}
-		// ExtractValidActionFromStream waits for canonical parsing. Wait for field
+		// extractToolCallAction waits for canonical parsing. Wait for field
 		// stream handlers too, then finalize response metadata synchronously. The
 		// old OnReaderFinished callback ran in the parser goroutine after parseDone
 		// and raced these variables under concurrent parameter generation.
@@ -1104,22 +1241,22 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		paramDuration = cost
 		rawAIResponse = response.String()
 		pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
-		boundEmitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
 		pw.Close()
 
 		// Extract identifier from action (destination identifier for this tool call)
-		identifier = sanitizeIdentifier(callToolAction.GetString("identifier"))
+		callToolParams := callToolAction.GetParams()
+		identifier = sanitizeIdentifier(callToolParams.GetString("identifier"))
 		if identifier != "" {
 			log.Debugf("extracted identifier[%s] for tool[%s]", identifier, tool.Name)
 		}
 
-		callExpectations = callToolAction.GetString("call_expectations")
+		callExpectations = callToolParams.GetString("call_expectations")
 		if callExpectations != "" {
 			log.Debugf("extracted call_expectations for tool[%s]: %s", tool.Name, callExpectations)
 		}
 
 		// First, get params from JSON
-		for k, v := range callToolAction.GetInvokeParams("params") {
+		for k, v := range callToolParams.GetObject("params") {
 			invokeParams.Set(k, v)
 		}
 
@@ -1159,7 +1296,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		}
 
 		return nil
-	}, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))
+	}, append(requestOpts, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))...)
 	releaseParamGeneration()
 	if err != nil {
 		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)

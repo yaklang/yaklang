@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java java.io 流资源未释放"
 	title: "Check Java java.io Unreleased Stream Resource"
-	risk:"资源泄漏",
+	risk:"resource-leak"
 	level:mid
 	reference: <<<REFERENCE
 ### 参考资料
@@ -224,7 +224,7 @@ System.err.println("读取文件时发生错误: " + e.getMessage());
 ```
 **总结**: 优先使用 `try-with-resources` 或 Java NIO.2 (`Files` 类)。如果必须在旧版本 Java 或处理未实现 `AutoCloseable` 的资源，使用 `try-finally` 结构。
 SOLUTION
-	risk: "资源泄漏",
+	risk: "resource-leak",
 }
 
 desc(

@@ -32,6 +32,46 @@ func TestExtractSSAArtifactUploadConfigSTS(t *testing.T) {
 	if cfg.STSAccessKey == "" || cfg.STSSecretKey == "" {
 		t.Fatalf("sts creds should be parsed: %+v", cfg)
 	}
+	if !cfg.AllowHTTP {
+		t.Fatal("legacy scheme-less HTTP endpoint should preserve the Legion scheduler contract")
+	}
+	if _, err := validateSSAUploadConfig(cfg); err != nil {
+		t.Fatalf("legacy Legion HTTP config must validate: %v", err)
+	}
+}
+
+func TestExtractSSAArtifactUploadConfig_ExplicitHTTPStillRequiresAllowance(t *testing.T) {
+	cfg := extractSSAArtifactUploadConfig(map[string]interface{}{
+		"_scannode_ssa_object_key":     "ssa/tasks/t1/result.ndjson.zst",
+		"_scannode_ssa_endpoint":       "http://127.0.0.1:9000",
+		"_scannode_ssa_bucket":         "irify-ssa",
+		"_scannode_ssa_use_ssl":        false,
+		"_scannode_ssa_sts_access_key": "ak",
+		"_scannode_ssa_sts_secret_key": "sk",
+	})
+	if cfg == nil {
+		t.Fatal("expected non-nil cfg")
+	}
+	if cfg.AllowHTTP {
+		t.Fatal("an explicit plaintext URL must not be trusted without allow_http")
+	}
+	if _, err := validateSSAUploadConfig(cfg); err == nil {
+		t.Fatal("an explicit plaintext URL must fail validation without allow_http")
+	}
+
+	cfg = extractSSAArtifactUploadConfig(map[string]interface{}{
+		"_scannode_ssa_object_key":         "ssa/tasks/t1/result.ndjson.zst",
+		"_scannode_ssa_endpoint":           "http://127.0.0.1:9000",
+		"_scannode_ssa_bucket":             "irify-ssa",
+		"_scannode_ssa_use_ssl":            false,
+		"_scannode_ssa_allow_http":         true,
+		"_scannode_ssa_allow_insecure_tls": true,
+		"_scannode_ssa_sts_access_key":     "ak",
+		"_scannode_ssa_sts_secret_key":     "sk",
+	})
+	if cfg == nil || !cfg.AllowHTTP || !cfg.AllowInsecureTLS {
+		t.Fatalf("explicit transport allowances were not parsed: %+v", cfg)
+	}
 }
 
 func TestExtractSSAArtifactUploadConfigNoSTS(t *testing.T) {

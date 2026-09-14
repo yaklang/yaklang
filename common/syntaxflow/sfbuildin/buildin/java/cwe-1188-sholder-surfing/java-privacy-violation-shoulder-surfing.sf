@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Privacy Violation - Shoulder Surfing"
 	title_zh: "检查Java隐私泄露 - 肩窥"
 	type:security
-	risk:'信息泄露（Information Exposure）'
+	risk:"information-exposure"
 	level:low
 	desc: <<<DESC
 ### 漏洞描述
@@ -114,7 +114,7 @@ PasswordCallback passwordCallback = new PasswordCallback("Password: ", false);
 - 在命令行应用中，使用 `System.console().readPassword()` 方法，它可以屏蔽用户输入。
 - 在图形界面应用中，使用 `JPasswordField` 组件，它会自动隐藏用户输入的字符。
 SOLUTION
-	risk: "信息泄露",
+	risk: "information-exposure",
 }
 
 desc(

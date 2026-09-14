@@ -45,6 +45,11 @@ type Program struct {
 	// ResetInterRuleState actually cleared the cache. Production code never
 	// reads it; tests assert it moved between rules.
 	InterRuleResetCount int64
+
+	// structBound is stamped for the duration of a mode=struct query so
+	// *Value graph ops (GetCalled / GetUsers) can filter without sfvm.Config.
+	structBound      *structBound
+	structScanActive bool
 }
 
 // resetInterRuleStateCacheThreshold is the default nodeId2ValueCache entry

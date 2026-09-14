@@ -20,6 +20,7 @@ binary_size="$(stat -c %s "$artifact_dir/legion-smoke-node")"
 jq -n \
   --arg source_sha "$source_sha" \
   --arg binary_sha "$binary_sha" \
+  --argjson capabilities "$(jq -c . "$script_dir/legion-product-node-capabilities.json")" \
   --argjson binary_size "$binary_size" '
   {
     schema_version:"1",
@@ -28,7 +29,7 @@ jq -n \
     source:{repository:"yaklang/yaklang",commit:$source_sha,dirty:false},
     ci:{provider:"github-actions",run_id:"123",workflow:"Build Trusted Legion Product Node"},
     recipe:{goos:"linux",goarch:"amd64"},
-    capabilities:["yak.execute","hids"],
+    capabilities:$capabilities,
     binary:{sha256:$binary_sha,size:$binary_size}
   }
 ' >"$artifact_dir/PRODUCT_NODE_MANIFEST.json"
@@ -99,6 +100,8 @@ jq -e \
   .protocol_version == 1 and
   .rollback_safe == true and
   (.capability_keys | index("yak.execute") != null) and
+  (.capability_keys | index("ai.code_workspace.v1") != null) and
+  (.capability_keys | index("ssa.rule_snapshot.execution.v2") != null) and
   .runtime.archive_sha256 == $runtime_archive_sha and
   .runtime.producer_manifest_sha256 == $runtime_manifest_sha and
   .runtime.image_ref == $runtime_image_ref and

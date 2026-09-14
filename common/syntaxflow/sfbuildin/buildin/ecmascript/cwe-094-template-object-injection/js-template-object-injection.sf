@@ -2,7 +2,7 @@ desc(
 	title: "Template Object Injection via User-Controlled Data"
 	title_zh: "用户可控对象传入模板引擎导致模板对象注入"
 	type: vuln
-	risk: "模板对象注入"
+	risk: "template-object-injection"
 	level: high
 	desc: <<<DESC
 ### 漏洞描述
@@ -186,7 +186,7 @@ alert $taintedRender for {
 	title: "Template Object Injection",
 	title_zh: "模板对象注入",
 	message: "检测到用户可控对象直接作为模板引擎 render() 的数据参数传入，且该 Express 应用已配置为使用已知脆弱模板引擎（hbs/ejs/eta/squirrelly 等）。攻击者可以通过在请求体中注入特殊控制属性（如 layout、settings 等）来触发任意本地文件读取（LFR）甚至远程代码执行（RCE）。请显式构造只包含模板所需属性的新对象，而不是直接传入用户可控对象。",
-	risk: "模板对象注入/本地文件读取",
+	risk: "template-object-file-read",
 	name: "taintedRender",
 }
 

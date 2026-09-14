@@ -57,9 +57,16 @@ func (s *typeStore) remember(typ Type) Type {
 	}
 	id := typ.GetId()
 	if id <= 0 {
-		id = s.nextID.Inc()
-		typ.SetId(id)
-	} else {
+		if claimer, ok := typ.(interface {
+			claimIdIfUnset(int64) (int64, bool)
+		}); ok {
+			// Draw a candidate from the shared counter, then let the object
+			// itself decide the single winner.
+			id, _ = claimer.claimIdIfUnset(s.nextID.Inc())
+		} else {
+			id = s.nextID.Inc()
+			typ.SetId(id)
+		}
 		setAtomicMaxIfGreater(s.nextID, id)
 	}
 	s.resident.Set(id, typ)

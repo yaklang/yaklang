@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java 哈希算法使用硬编码的PBE盐值"
 	type: security
 	level: low
-	risk:'不安全加密算法',
+	risk:"weak-cryptographic-algorithm"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -85,7 +85,7 @@ return new PBEParameterSpec(salt, iterationCount);
 #### 3. 增加迭代次数
 更高的迭代次数会显著增加密钥派生所需的时间和计算资源，这使得暴力破解更加困难，即使攻击者知道了盐值。现代推荐的迭代次数通常在数万到数十万之间，具体取决于可接受的计算延迟。
 SOLUTION
-	risk: "不安全加密算法",
+	risk: "weak-cryptographic-algorithm",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -2,11 +2,13 @@ package aiskillloader
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -79,11 +81,14 @@ func ImportAISkillsFromLocalDirToDB(db *gorm.DB, dirPath string) (int, error) {
 // ImportAISkillsFromArchiveFileToDB imports skills from an archive file into ai_forges.
 // Supported archive formats are zip, tar, tar.gz and tgz.
 func ImportAISkillsFromArchiveFileToDB(db *gorm.DB, archivePath string) (int, error) {
-	loader, err := NewAutoSkillLoader(WithAutoLoad_ArchiveFile(archivePath))
+	archiveFS, err := filesys.NewArchiveFSFromLocal(archivePath)
 	if err != nil {
 		return 0, err
 	}
-	return ImportAISkillsToDB(db, loader)
+	if closer, ok := archiveFS.(io.Closer); ok {
+		defer closer.Close()
+	}
+	return ImportAISkillsFromFileSystemToDB(db, archiveFS)
 }
 
 // ImportAISkillsFromZipFileToDB imports skills from an archive file into ai_forges.

@@ -1,0 +1,44 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到未使用二进制模式写入"
+	title_zh: "检测到未使用二进制模式写入"
+	type: portability
+	level: middle
+	rule_id: "source-portability-prefer-write-in-binary-mode"
+	risk: "code-style"
+	desc: <<<DESC
+### 规则说明
+OCaml open_out 在 Windows 与类 Unix 平台上对行尾处理不同。为保持一致行为，应使用 open_out_bin 或 open_out_gen [Open_binary]。
+
+### 风险类型
+代码规范与兼容性（code-style）
+
+### 影响
+使用了已废弃、不兼容或不符合规范的模式，可能导致后续维护困难或运行环境差异。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 open_out_bin 或 open_out_gen [Open_binary]；确实需要 LF 到 CRLF 转换时使用 open_out_gen [Open_text]。
+SOLUTION
+	alert_min: 1
+	"file://pos.ml": <<<POS
+open_out
+POS
+	"safefile://pos.ml": <<<NEG
+Out_channel.with_open_bin
+NEG
+)
+
+${*.ml}.pattern_regex(/(?:open_out)/) as $p0
+${*.mli}.pattern_regex(/(?:open_out)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到未使用二进制模式写入",
+	title_zh: "检测到未使用二进制模式写入",
+	message: "检测到未使用二进制模式写入",
+}

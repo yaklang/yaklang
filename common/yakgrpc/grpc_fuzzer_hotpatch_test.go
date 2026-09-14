@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
@@ -475,6 +476,22 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzWithHotPatch(t *testing.T) {
 			t.Fatal(spew.Sprintf("hotpatch fail: %v,%v", template, code))
 		}
 	}
+}
+
+func TestStringFuzzerTimeoutCancelsHotPatch(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	started := time.Now()
+	_, err = client.StringFuzzer(ctx, &ypb.StringFuzzerRequest{
+		Template:       "{{yak(handle)}}",
+		TimeoutSeconds: 1,
+		HotPatchCode:   `handle = func(params) { for {} }`,
+	})
+	require.NoError(t, err)
+	require.Less(t, time.Since(started), 3*time.Second, "configured StringFuzzer timeout did not stop the hot patch")
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_before_and_after_legacy(t *testing.T) {

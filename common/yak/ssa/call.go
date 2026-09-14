@@ -372,6 +372,13 @@ func (c *Call) handleCalleeFunction() {
 		}
 	}
 
+	// Functions rebuilt from DB (compile-unit spill + lazy reload) have no
+	// builder; their side effects were already handled at compile time and
+	// cannot be re-emitted here (SetCurrent/parent-scope walks need a builder).
+	if builder == nil {
+		return
+	}
+
 	// Handle side effects
 	recoverBuilder := builder.SetCurrent(c)
 	defer func() {
@@ -484,11 +491,20 @@ func (c *Call) handleCalleeFunction() {
 
 func (c *Call) HandleFreeValue(fvs []*Parameter) {
 	builder := c.GetFunc().builder
+
+	// Functions rebuilt from DB have no builder; free-value binding needs the
+	// live scope tables only a builder owns, so skip re-binding for them.
+	if builder == nil {
+		return
+	}
 	recoverBuilder := builder.SetCurrent(c)
 	defer recoverBuilder()
 
 	bindAndHandler := func(name string, val Value) {
 		val.AddUser(c)
+		if c.Binding == nil {
+			c.Binding = make(map[string]int64)
+		}
 		c.Binding[name] = val.GetId()
 	}
 

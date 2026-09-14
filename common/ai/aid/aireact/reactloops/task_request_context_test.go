@@ -70,7 +70,7 @@ func TestReActLoopTransactionBindsProviderRequestToActiveTask(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, _, transactionErr := loop.callAITransaction(&sync.WaitGroup{}, "prompt", "nonce")
+		_, _, transactionErr := loop.callAITransaction(&sync.WaitGroup{}, "prompt", "nonce", nil)
 		done <- transactionErr
 	}()
 

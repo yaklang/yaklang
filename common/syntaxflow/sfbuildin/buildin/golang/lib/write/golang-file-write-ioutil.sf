@@ -174,7 +174,7 @@ DESC
 	level: "info",
 	title: "Audit Golang File Write using ioutil",
 	message: "发现Golang项目中使用了io/ioutil包进行文件写入操作，建议迁移到更安全的现代API。",
-	risk: "信息",
+	risk: "information",
 	name: "output",
 }
 

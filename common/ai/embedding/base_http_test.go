@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -100,10 +101,10 @@ func TestDecodeEmbeddingResponseFormats(t *testing.T) {
 		body string
 		want [][]float32
 	}{
-		{name: "standard", body: `{"data":[{"embedding":[1,2]},{"embedding":[9,9]}],"model":"m"}`, want: [][]float32{{1, 2}}},
-		{name: "object 2d", body: `{"metadata":{"nested":[1,{"skip":true}]},"data":[{"embedding":[[1,2],[3,4]]},{"embedding":[[9,9]]}]}`, want: [][]float32{{1, 2}, {3, 4}}},
+		{name: "standard", body: `{"data":[{"embedding":[1,2]},{"embedding":["must be skipped"]}],"model":"m"}`, want: [][]float32{{1, 2}}},
+		{name: "object 2d", body: `{"metadata":{"nested":[1,{"skip":true}]},"data":[{"embedding":[[1,2],[3,4]]},{"embedding":["must be skipped"]}]}`, want: [][]float32{{1, 2}, {3, 4}}},
 		{name: "top level 1d", body: `[{"embedding":[1,2]},{"embedding":[3,4]}]`, want: [][]float32{{1, 2}, {3, 4}}},
-		{name: "top level 2d", body: `[{"embedding":[[1,2],[3,4]]},{"embedding":[[9,9]]}]`, want: [][]float32{{1, 2}, {3, 4}}},
+		{name: "top level 2d", body: `[{"embedding":[[1,2],[3,4]]},{"embedding":["must be skipped"]}]`, want: [][]float32{{1, 2}, {3, 4}}},
 	}
 
 	for _, test := range tests {
@@ -175,6 +176,38 @@ func TestNormalizeEmbeddingVectorsInPlace(t *testing.T) {
 	}
 	assert.InDelta(t, 1, math.Sqrt(norm), 1e-6)
 	assert.Equal(t, []float32{0, 0}, vectors[1])
+}
+
+var decodeEmbeddingBenchmarkSink [][]float32
+
+func BenchmarkDecodeEmbeddingResponse(b *testing.B) {
+	for _, dimensions := range []int{384, 1024, 1536, 3072} {
+		vector := make([]float32, dimensions)
+		for index := range vector {
+			vector[index] = float32(index%31+1) / 31
+		}
+		bodyBytes, err := json.Marshal(struct {
+			Data []struct {
+				Embedding []float32 `json:"embedding"`
+			} `json:"data"`
+		}{Data: []struct {
+			Embedding []float32 `json:"embedding"`
+		}{{Embedding: vector}}})
+		require.NoError(b, err)
+		body := string(bodyBytes)
+
+		b.Run(fmt.Sprintf("Dim%d", dimensions), func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(body)))
+			for i := 0; i < b.N; i++ {
+				vectors, apiErr, err := decodeEmbeddingResponse(strings.NewReader(body))
+				if err != nil || apiErr != nil || len(vectors) != 1 || len(vectors[0]) != dimensions {
+					b.Fatalf("unexpected decode result: vectors=%d apiErr=%v err=%v", len(vectors), apiErr, err)
+				}
+				decodeEmbeddingBenchmarkSink = vectors
+			}
+		})
+	}
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

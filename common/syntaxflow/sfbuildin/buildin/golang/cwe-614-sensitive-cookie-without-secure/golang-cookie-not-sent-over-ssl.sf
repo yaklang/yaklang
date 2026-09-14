@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Cookie未通过SSL发送漏洞"
 	type: audit
 	level: low
-	risk: "信息泄露（Information Exposure）"
+	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -154,7 +154,7 @@ DESC
 	title: "Golang Cookie Not Sent Over SSL Vulnerability Was Detected",
 	title_zh: "检测到Golang Cookie未通过SSL发送漏洞",
 	message: "检测到Golang Cookie未通过SSL发送漏洞，可能导致会话信息被窃取",
-	risk: "会话安全问题",
+	risk: "session-security",
 	name: "low",
 }
 

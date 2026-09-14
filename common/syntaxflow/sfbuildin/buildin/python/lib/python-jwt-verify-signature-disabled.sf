@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: high
 	lib: "python-jwt-verify-signature-disabled"
-	risk: "身份认证被绕过"
+	risk: "authentication-bypass"
 	desc: <<<DESC
 标记 jwt.decode 等调用。若在 options 中将 verify_signature 设为 False，攻击者可伪造令牌通过校验，导致认证与授权失效。
 DESC
@@ -24,7 +24,7 @@ alert $output for {
 	title_zh: "JWT 关闭签名验证",
 	level: "high",
 	type: "audit",
-	risk: "身份认证被绕过",
+	risk: "authentication-bypass",
 	message: "检测到 jwt.decode；请确认未关闭签名校验（verify_signature 不应为 False）。",
 	name: "output",
 }

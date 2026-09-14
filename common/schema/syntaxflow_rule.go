@@ -121,6 +121,9 @@ const (
 	SFR_MODE_SSA SyntaxFlowRuleModeType = "ssa"
 	// SFR_MODE_SOURCE runs sfpattern against raw source files (no SSA IR).
 	SFR_MODE_SOURCE SyntaxFlowRuleModeType = "source"
+	// SFR_MODE_STRUCT runs SyntaxFlow against the current compile unit's
+	// resident SSA (structure-level, intra-package).
+	SFR_MODE_STRUCT SyntaxFlowRuleModeType = "struct"
 )
 
 func ValidRuleMode(i any) SyntaxFlowRuleModeType {
@@ -129,6 +132,8 @@ func ValidRuleMode(i any) SyntaxFlowRuleModeType {
 	switch strings.ToLower(raw) {
 	case "source", "pattern", "sfpattern":
 		return SFR_MODE_SOURCE
+	case "struct":
+		return SFR_MODE_STRUCT
 	case "ssa", "":
 		return SFR_MODE_SSA
 	default:
@@ -149,9 +154,28 @@ func (s *SyntaxFlowRule) NormalizeMode() {
 		case "source", "pattern", "sfpattern":
 			s.Mode = SFR_MODE_SOURCE
 			return
+		case "struct":
+			s.Mode = SFR_MODE_STRUCT
+			return
 		}
 	}
 	s.Mode = SFR_MODE_SSA
+}
+
+// IsSourceMode reports whether this rule runs via sfpattern on raw source.
+func (s *SyntaxFlowRule) IsSourceMode() bool {
+	if s == nil {
+		return false
+	}
+	return ValidRuleMode(s.Mode) == SFR_MODE_SOURCE
+}
+
+// IsStructMode reports whether this rule runs intra-compile-unit structure scan.
+func (s *SyntaxFlowRule) IsStructMode() bool {
+	if s == nil {
+		return false
+	}
+	return ValidRuleMode(s.Mode) == SFR_MODE_STRUCT
 }
 
 func ValidSeverityType(i any) SyntaxFlowSeverity {
@@ -363,6 +387,7 @@ type SyntaxFlowRule struct {
 
 	// Mode 规则执行模式
 	// source: sfpattern 源码扫描（无需 SSA IR）
+	// struct: 当前 compile unit 内的结构扫描（resident SSA）
 	// ssa: 默认 SSA IR 扫描
 	Mode SyntaxFlowRuleModeType
 

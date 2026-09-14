@@ -1,0 +1,44 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到已废弃的 use Bitwise 用法"
+	title_zh: "检测到已废弃的 use Bitwise 用法"
+	type: audit
+	level: middle
+	rule_id: "source-best-practice-deprecated_use_bitwise"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+`use Bitwise` 语法已废弃，应改用 `import Bitwise`。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+将 `use Bitwise` 替换为 `import Bitwise`。
+SOLUTION
+	alert_min: 1
+	"file://pos.ex": <<<POS
+use Bitwise
+POS
+	"safefile://pos.ex": <<<NEG
+import Bitwise
+NEG
+)
+
+${*.ex}.pattern_regex(/(?:use\s+Bitwise)/) as $p0
+${*.exs}.pattern_regex(/(?:use\s+Bitwise)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到已废弃的 use Bitwise 用法",
+	title_zh: "检测到已废弃的 use Bitwise 用法",
+	message: "检测到已废弃的 use Bitwise 用法",
+}

@@ -137,8 +137,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		// not right for class, u can save as an abnormal!
 	}
 
-	// modifier: final / abstract
-	if i.Modifier() != nil {
+	// modifier: final / abstract / readonly
+	if len(i.AllClassModifier()) > 0 {
 		// handle modifier
 	}
 
@@ -511,8 +511,14 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 	if i == nil {
 		return "", nil
 	}
+	var rawName string
+	if id := i.Identifier(); id != nil {
+		rawName = y.VisitIdentifier(id)
+	} else if fn := i.Function_(); fn != nil {
+		// keyword const name, e.g. "const int FUNCTION = 3;"
+		rawName = fn.GetText()
+	}
 	var unquote string
-	rawName := y.VisitIdentifier(i.Identifier())
 	_unquote, err := yakunquote.Unquote(rawName)
 	if err != nil {
 		unquote = rawName

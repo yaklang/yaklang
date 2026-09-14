@@ -47,6 +47,10 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	if req.GetId() <= 0 {
 		switch req.GetType() {
 		case yakit.TypeProject:
+			s.stopAIReActScheduler()
+			if err := s.retireReActSessionRuntime(ctx); err != nil {
+				return nil, utils.Errorf("stop AI ReAct runtime before closing project: %s", err)
+			}
 			consts.GetGormProjectDatabase().Close()
 		case yakit.TypeSSAProject:
 			consts.GetGormSSAProjectDataBase().Close()
@@ -87,13 +91,29 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	}
 
 	path := proj.DatabasePath
+	// 懒修复：如果数据库文件不存在，尝试按文件名在预期目录中查找
+	if !utils.FileExists(path) {
+		if repaired, ok := yakit.RepairProjectDatabasePath(db, proj); ok {
+			path = repaired
+		} else {
+			return nil, utils.Errorf("project database file not found: %s", path)
+		}
+	}
 	log.Infof("Set project db by grpc: %s", path)
 	switch req.GetType() {
 	case yakit.TypeProject:
+		s.stopAIReActScheduler()
+		if stopErr := s.retireReActSessionRuntime(ctx); stopErr != nil {
+			return nil, utils.Errorf("stop AI ReAct runtime before switching project: %s", stopErr)
+		}
 		consts.SetDefaultYakitProjectDatabaseName(path)
 		err = consts.SetGormProjectDatabase(path)
+		if err == nil {
+			s.resetReActSessionRuntimeAfterProjectSwitch()
+			s.StartAIReActScheduler()
+		}
 	case yakit.TypeSSAProject:
-		raw := proj.DatabasePath
+		raw := path
 		consts.SetSSADatabaseInfo(raw)
 		err = consts.SetGormSSAProjectDatabaseByInfo(raw)
 	}
@@ -305,7 +325,17 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 		return utils.Errorf("cannot found database file in: %s", err.Error())
 	}
 	feedProgress("寻找数据文件", 0.3)
-	fp, err := os.Open(proj.DatabasePath)
+	// 懒修复：如果数据库文件不存在，尝试按文件名在预期目录中查找
+	dbPath := proj.DatabasePath
+	if !utils.FileExists(dbPath) {
+		if repaired, ok := yakit.RepairProjectDatabasePath(s.GetProfileDatabase(), proj); ok {
+			dbPath = repaired
+		} else {
+			feedProgress("找不到数据库文件: "+dbPath, 0.4)
+			return utils.Errorf("open database failed: file not found: %s", dbPath)
+		}
+	}
+	fp, err := os.Open(dbPath)
 	if err != nil {
 		feedProgress("找不到数据库文件"+err.Error(), 0.4)
 		return utils.Errorf("open database failed: %s", err)

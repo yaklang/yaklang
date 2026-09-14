@@ -48,21 +48,21 @@ var loopAction_SaveEvidence = &LoopAction{
 			aitool.WithParam_Description("Optional stable semantic ID (1-128 characters: letters, digits, dot, underscore, colon, or hyphen). Reuse it to update the same finding."),
 		),
 		aitool.WithStringParam(
-			"verification_payload",
+			"evidence_content",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("Concise reusable evidence: what was tested or observed, how it was confirmed, the concrete result, and why it matters. This content is written directly to Session Evidence."),
 		),
 	},
 	StreamFields: []*LoopStreamField{
-		{FieldName: "verification_payload", AINodeId: "verification_payload"},
+		{FieldName: "evidence_content", AINodeId: "evidence_content"},
 	},
 	ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
 		if loop == nil || action == nil {
 			return utils.Error("save_evidence requires a loop and parsed action")
 		}
-		payload := strings.TrimSpace(action.GetString("verification_payload"))
+		payload := strings.TrimSpace(action.GetString("evidence_content"))
 		if payload == "" {
-			payload = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("verification_payload"))
+			payload = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("evidence_content"))
 		}
 		evidenceID := strings.TrimSpace(action.GetString("evidence_id"))
 		if evidenceID == "" {

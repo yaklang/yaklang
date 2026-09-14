@@ -2,8 +2,15 @@ package javaparser
 
 import "github.com/yaklang/antlr/v4"
 
+// GetJavaParserSerializedATN returns the serialized ATN for the Java parser.
+//
+// Like the Python equivalent it must go through JavaParserInit (sync.Once):
+// javaparserParserInit reassigns the package-level atn / decisionToDFA /
+// PredictionContextCache, so calling it directly rebuilds shared static state
+// concurrently with in-flight parsers and defeats the atn.stateMu guard that
+// serializes shared-cache mutation in the ANTLR runtime.
 func GetJavaParserSerializedATN() []int32 {
-	javaparserParserInit()
+	JavaParserInit()
 	return JavaParserParserStaticData.serializedATN
 }
 

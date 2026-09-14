@@ -122,7 +122,20 @@ func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 						r.AddToTimeline("[PHASE4_REPORT_REPAIR]",
 							fmt.Sprintf("报告正文遗漏 %d 个 verified finding，已自动补录附录: %s",
 								len(missingIDs), strings.Join(missingIDs, ", ")))
-						log.Warnf("[CodeAudit/Phase4] Repaired report with %d missing findings: %v", len(missingIDs), missingIDs)
+						log.Warnf("[CodeAudit/Phase4] Repaired report %s with %d missing findings: %v", reportPath, len(missingIDs), missingIDs)
+					}
+				}
+				// 覆盖状态兜底披露：存在未完成类别时强制追加机器准确的覆盖附录
+				// （AI 可能忽略 prompt 中的覆盖表；这一步不依赖 AI 自觉）。
+				if withAppendix, appended := model.AppendMissingCoverageAppendix(reportText, state); appended {
+					if err := os.WriteFile(reportPath, []byte(withAppendix), 0o644); err != nil {
+						log.Warnf("[CodeAudit/Phase4] Failed to write coverage appendix: %v", err)
+					} else {
+						reportText = withAppendix
+						r.AddToTimeline("[PHASE4_COVERAGE_APPENDIX]",
+							fmt.Sprintf("存在 %d 个未完整完成的类别扫描，已自动追加覆盖状态附录",
+								len(model.IncompleteScanObservations(state))))
+						log.Warnf("[CodeAudit/Phase4] Appended coverage appendix for %d incomplete categories", len(model.IncompleteScanObservations(state)))
 					}
 				}
 				state.SetFinalReport(reportText)
@@ -152,6 +165,21 @@ func buildAuditReportWritePrompt(state *model.AuditState, referenceFiles []strin
 		fileListSB.WriteString(fmt.Sprintf("- %s\n", f))
 	}
 
+	// Go 层渲染的类别覆盖状态表：零 finding / 被砍类别对 AI 报告可见，
+	// 报告的"审计覆盖范围"章节必须如实反映（不依赖 AI 自由发挥）。
+	coverageTable := model.BuildCategoryCoverageTable(state, true)
+	coverageSection := ""
+	if coverageTable != "" {
+		coverageSection = fmt.Sprintf(`
+## 各类别扫描覆盖状态（机器统计，报告必须如实披露）
+
+%s
+
+> 上述表格来自扫描系统的结构化记录。**任何非"已完成"的类别都必须在报告「审计范围与覆盖」章节中如实说明**，不得宣称完成了全类别覆盖。Go 层会在报告写完后校验并自动补录覆盖附录。
+
+`, coverageTable)
+	}
+
 	return fmt.Sprintf(`请根据以下审计数据，撰写一份完整的代码安全审计报告（Markdown 格式）。
 
 ## 项目信息
@@ -172,7 +200,7 @@ func buildAuditReportWritePrompt(state *model.AuditState, referenceFiles []strin
 | 中危 | %d |
 | 低危 | %d |
 
-## 可用数据文件（**必须在写报告前依次读取**）
+%s## 可用数据文件（**必须在写报告前依次读取**）
 
 %s
 - verified_vulns.json：包含每个漏洞的详细验证结果（reason / exploit / fix / data_flow）
@@ -198,12 +226,14 @@ func buildAuditReportWritePrompt(state *model.AuditState, referenceFiles []strin
    - 修复建议（含代码示例）
 4. **潜在风险**（uncertain 条目，供人工复核）
 5. **安全建议** — 针对本项目的通用安全加固建议
-6. **审计局限性** — 静态分析的覆盖范围和局限
+6. **审计范围与覆盖** — 按上方覆盖状态表如实说明各漏洞类别是否完整扫描；被中断/未运行的类别必须明确列出并说明影响
+7. **审计局限性** — 静态分析的覆盖范围和局限
 
 ## 写作要求
 
 - 漏洞详情必须基于 verified_vulns.json 的实际数据，不要编造
 - **上述「必须写入报告的 Finding 清单」中每一个 ID 都必须在正文中出现**（confirmed 写漏洞详情，uncertain 写潜在风险）
+- 「审计范围与覆盖」章节必须与上方机器统计的覆盖状态表一致，不得夸大覆盖范围
 - 每个漏洞的修复建议应包含具体代码示例
 - 报告语言：中文
 - 格式：标准 Markdown，使用表格、代码块等元素增强可读性
@@ -218,6 +248,7 @@ func buildAuditReportWritePrompt(state *model.AuditState, referenceFiles []strin
 		stats.HighCount,
 		stats.MediumCount,
 		stats.LowCount,
+		coverageSection,
 		fileListSB.String(),
 		model.BuildMandatoryFindingIDChecklist(state),
 	)

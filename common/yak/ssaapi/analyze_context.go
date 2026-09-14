@@ -84,6 +84,20 @@ type node struct {
 	node *Value
 }
 
+func (a *AnalyzeContext) structAllowValue(v *Value) bool {
+	if a == nil || a.config == nil || a.config.structBound == nil {
+		return true
+	}
+	if v == nil {
+		return true
+	}
+	inst := v.getValue()
+	if inst == nil {
+		return true
+	}
+	return a.config.structBound.Allow(inst)
+}
+
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
 		processAnalysisManager: newAnalysisManager(),

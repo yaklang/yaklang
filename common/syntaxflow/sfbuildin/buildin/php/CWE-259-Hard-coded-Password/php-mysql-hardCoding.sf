@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP Hard-coded MySQL Password"
 	title_zh: "审计PHP硬编码MySQL密码"
-	risk: "审计（Audit）"
+	risk: "audit-check"
 	level: "low"
 	desc: <<<DESC
 ### 1.规则目的
@@ -71,7 +71,7 @@ alert $sink for {
 	title: "Hardcoded MySQL Credentials Detected",
 	title_zh: "检测到MySQL凭据硬编码",
 	level: "low",
-	risk: "硬编码密码",
+	risk: "hardcoded-password",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

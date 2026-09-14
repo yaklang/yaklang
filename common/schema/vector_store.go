@@ -222,11 +222,13 @@ type VectorStoreDocument struct {
 	EntityID        string `gorm:"index"`
 	RelatedEntities string // text split by ","
 
-	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;index;idx_document_id;not null" json:"document_id"`
-	UID        []byte `gorm:"blob"`
+	// GORM v1 uses comma-separated index names; uniqueIndex alone does not
+	// create the composite lookup index. Keep this non-unique for legacy rows.
+	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;index:idx_rag_vector_document_v1_document_id,idx_rag_vector_document_collection_document;not null" json:"document_id"`
+	UID        []byte `gorm:"blob;index:idx_rag_vector_document_uid"`
 
 	// 所属集合的ID，建立外键关系
-	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;index:idx_rag_vector_document_collection_id;not null" json:"collection_id"`
+	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;index:idx_rag_vector_document_collection_id,idx_rag_vector_document_collection_document;not null" json:"collection_id"`
 
 	// 所属集合的 UUID，唯一值
 	CollectionUUID string `gorm:"uniqueIndex"`

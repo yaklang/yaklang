@@ -175,7 +175,7 @@ DESC
 	level: "info",
 	name: "output",
 	message: "发现Golang bufio库的文件写入操作，需要进一步确认是否涉及用户可控路径或敏感数据写入。",
-	risk: "信息",
+	risk: "information",
 }
 
 desc(

@@ -1,4 +1,5 @@
 desc(
+	risk: "code-injection"
 	title: "Detect Java Script Injection Vulnerability in Dynamic Code Execution"
 	title_zh: "检测Java动态代码执行中的脚本注入漏洞"
 	type:vuln
@@ -100,7 +101,7 @@ INCLUDE,
 alert $mid for {
 	level: "mid",
 	message: "发现Java动态代码执行中的脚本注入漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
-	risk: "远程代码执行",
+	risk: "code-injection",
 	title: "Detect Java Script Injection Vulnerability in Dynamic Code Execution",
 	title_zh: "检测Java动态代码执行中的脚本注入漏洞",
 	name: "mid",

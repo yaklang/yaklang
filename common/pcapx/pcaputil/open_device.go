@@ -284,6 +284,7 @@ func OpenIfaceLive(iface string, opts ...LiveConfig) (*pcap.Handle, error) {
 }
 
 type PcapHandleWrapper struct {
+	device     string
 	handle     *pcap.Handle
 	mutex      *sync.RWMutex
 	isClose    bool
@@ -318,11 +319,16 @@ func (w *PcapHandleWrapper) WritePacketData(data []byte) error {
 
 func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
 	w.mutex.RLock()
-	defer w.mutex.RUnlock()
 	if w.isClose {
+		w.mutex.RUnlock()
 		return nil, gopacket.CaptureInfo{}, utils.Errorf("handle is closed")
 	}
-	return w.handle.ReadPacketData()
+	handle := w.handle
+	w.mutex.RUnlock()
+	// libpcap's Handle serializes reads with Close internally. Holding the
+	// wrapper lock during a blocking read prevents Close from setting its stop
+	// flag, so cancelling an idle live capture can otherwise deadlock.
+	return handle.ReadPacketData()
 }
 
 func (w *PcapHandleWrapper) close() {

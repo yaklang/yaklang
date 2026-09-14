@@ -381,7 +381,10 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
-			if b.TryBuildExternValue(variable.GetName()) != nil {
+			// Explicit local declarations are allowed to shadow an external symbol.
+			// Reporting ContAssignExtern here makes ordinary locals such as `x` or
+			// `bin` fail merely because a host/plugin exports the same name.
+			if !variable.GetLocal() && b.TryBuildExternValue(variable.GetName()) != nil {
 				b.NewErrorWithPos(Warn, SSATAG, getAssignExternErrorPos(scope, variable), ContAssignExtern(variable.GetName()))
 			}
 			return
@@ -392,7 +395,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		b.TryBuildValueWithoutParent(variable.GetName(), value)
 	}
 
-	if b.TryBuildExternValue(variable.GetName()) != nil {
+	if !variable.GetLocal() && b.TryBuildExternValue(variable.GetName()) != nil {
 		b.NewErrorWithPos(Warn, SSATAG, getAssignExternErrorPos(scope, variable), ContAssignExtern(variable.GetName()))
 	}
 
@@ -563,6 +566,16 @@ func (b *FunctionBuilder) CreateVariableHeadEx(name string, isLocal bool, pos ..
 
 // --------------- `f.freeValue`
 
+// freeValueMap returns the builder's free-value map, creating it on first
+// use. b.Function may be a function rebuilt from DB (compile-unit spill +
+// lazy reload) whose FreeValues was never initialized.
+func (b *FunctionBuilder) freeValueMap() map[*Variable]int64 {
+	if b.FreeValues == nil {
+		b.FreeValues = make(map[*Variable]int64)
+	}
+	return b.FreeValues
+}
+
 func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	scope := b.CurrentBlock.ScopeTable
 	headScope := scope.GetHead()
@@ -573,7 +586,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 			return freeValue
 		} else {
 			freeValue := NewParam(name, true, b)
-			b.FreeValues[variable.(*Variable)] = freeValue.GetId()
+			b.freeValueMap()[variable.(*Variable)] = freeValue.GetId()
 			return freeValue
 		}
 	}
@@ -581,7 +594,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	freeValue := NewParam(name, true, b)
 	v := b.CreateVariableHead(name)
 	headScope.AssignVariable(v, freeValue)
-	b.FreeValues[v] = freeValue.GetId()
+	b.freeValueMap()[v] = freeValue.GetId()
 
 	// b.WriteVariable(variable, freeValue)
 	return freeValue

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到绕过 TLS 证书校验"
+	title_zh: "检测到绕过 TLS 证书校验"
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-bypass-tls-verification"
+	risk: "certificate-validation"
+	desc: <<<DESC
+### 规则说明
+检测到将 NODE_TLS_REJECT_UNAUTHORIZED 设为 0 或设置 rejectUnauthorized 为 false，这会关闭 TLS 证书校验，导致传输易受中间人攻击，仅可用于调试。
+
+### 风险类型
+证书校验缺失（certificate-validation）
+
+### 影响
+未正确校验 TLS 证书或关闭了证书校验，中间人攻击者可窃听或篡改通信。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-319
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+移除关闭 TLS 校验的环境变量或选项，确保校验信任证书列表。
+SOLUTION
+	alert_min: 1
+	"file://pos.js": <<<POS
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+POS
+	"safefile://pos.js": <<<NEG
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 1;
+NEG
+)
+
+${*.js}.pattern_regex(/(?:process\.env\["NODE_TLS_REJECT_UNAUTHORIZED"\]\s+=\s+0;)|(?:\{rejectUnauthorized:false\})/) as $p0
+${*.ts}.pattern_regex(/(?:process\.env\["NODE_TLS_REJECT_UNAUTHORIZED"\]\s+=\s+0;)|(?:\{rejectUnauthorized:false\})/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到绕过 TLS 证书校验",
+	title_zh: "检测到绕过 TLS 证书校验",
+	message: "检测到绕过 TLS 证书校验",
+}

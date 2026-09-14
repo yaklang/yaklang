@@ -166,7 +166,7 @@ func TestActionParser_PreservesUnsupportedObservedActionType(t *testing.T) {
 	ctx := context.Background()
 	action, err := ExtractActionFromStream(
 		ctx,
-		strings.NewReader(`{"@action":"save_evidence","verification_payload":"confirmed finding"}`),
+		strings.NewReader(`{"@action":"save_evidence","evidence_content":"confirmed finding"}`),
 		"object",
 		WithActionAlias("require_tool", "finish"),
 	)
@@ -174,7 +174,7 @@ func TestActionParser_PreservesUnsupportedObservedActionType(t *testing.T) {
 	require.Empty(t, action.ActionType(), "unsupported action must not become an admitted action")
 	require.Equal(t, "save_evidence", action.ObservedActionType(), "raw action must be available after admitted ActionType resolves")
 	require.NoError(t, action.WaitParseResult(ctx))
-	require.Equal(t, "confirmed finding", action.GetString("verification_payload"))
+	require.Equal(t, "confirmed finding", action.GetString("evidence_content"))
 }
 
 func TestActionParser_ObservedActionMatchesAdmittedAction(t *testing.T) {

@@ -1,0 +1,39 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java Runtime.exec Call"
+	title_zh: "结构扫描：Java Runtime.exec 调用"
+	type: vuln
+	level: medium
+	rule_id: "struct-java-runtime-exec"
+	risk: "command-injection"
+	desc: <<<DESC
+Flags Runtime.getRuntime().exec(...) as a real Call (not a comment or string).
+DESC
+	solution: <<<SOLUTION
+Avoid shelling out; if required, use ProcessBuilder with argument lists and strict allowlists.
+SOLUTION
+	alert_min: 1
+	"file://Run.java": <<<POS
+class Run {
+  void bad(String cmd) throws Exception {
+    Runtime.getRuntime().exec(cmd);
+  }
+}
+POS
+	"safefile://RunSafe.java": <<<NEG
+class RunSafe {
+  void ok() {
+    System.out.println("no exec");
+  }
+}
+NEG
+)
+
+Runtime.getRuntime().exec(* as $cmd) as $call
+alert $call for {
+	level: "medium",
+	title: "Runtime.exec Call",
+	title_zh: "Runtime.exec 调用",
+	message: "Runtime.getRuntime().exec Call detected",
+}

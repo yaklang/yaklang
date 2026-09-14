@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -214,7 +215,7 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 	}
 	// 第二条 prompt 必须包含我们注入的 AITAG retry hint, 且包含 nonce 化模板,
 	// AI 才能照抄正确格式. 这是修 5 次重试黑洞的核心修复点.
-	nonce := aicommon.MustExtractDynamicSectionNonce(t, captured[1])
+	nonce := aicommon_testutil.MustExtractDynamicSectionNonce(t, captured[1])
 	if !strings.Contains(captured[1], "AITAG retry hint") {
 		t.Fatalf("second prompt MUST contain 'AITAG retry hint' (no hint = no self-correction), got prompt[1]: %s", captured[1])
 	}
@@ -235,7 +236,7 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerWithFinalAnswerAITag(t *testing.T
 	var answered int32
 	invoker := newHTTPFuzztestAICallbackInvoker(t, func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompts = append(prompts, req.GetPrompt())
-		nonce := aicommon.MustExtractDynamicSectionNonce(t, req.GetPrompt())
+		nonce := aicommon_testutil.MustExtractDynamicSectionNonce(t, req.GetPrompt())
 
 		// directly_answer 永不 Exit: 发完答复后循环继续, 必须由显式 finish
 		// 终结整个 loop. mock 先发一次结构化答复, 之后用 finish 收口.

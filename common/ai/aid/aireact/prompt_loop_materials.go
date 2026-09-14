@@ -27,8 +27,8 @@ const (
 	// 关键词: promptSectionTimeline, 老 timeline 段名, 兼容
 	promptSectionTimeline = "timeline"
 	// promptSectionTimelineOpen 是 "按稳定性分层" 拆分后的 timeline 易变尾段:
-	// 仅含最末 interval 桶 + 当前时间 + 工作目录 + (可选) midterm 检索结果。
-	// 关键词: promptSectionTimelineOpen, timeline open, midterm
+	// 仅含最末 interval 桶 + 当前时间 + 工作目录。
+	// 关键词: promptSectionTimelineOpen, timeline open
 	promptSectionTimelineOpen = "timeline-open"
 	promptSectionDynamic      = "dynamic"
 	// aiCacheSystemTagName 仅用于 high-static 段：把"跨调用稳定的系统级指令"
@@ -110,8 +110,7 @@ func (pm *PromptManager) GetLoopPromptBaseMaterialsForLoop(
 	materials.UserHistory = pm.UserHistoryContextWithNonce(nonce)
 
 	// Timeline frozen/open 与 Session Artifacts frozen/open 必须共享同一轮
-	// FrozenTimeUnix；midterm memory 现在随 InjectedMemory 在 dynamic 段底部
-	// 拼接，不再注入 timeline-open 段。Generic base materials never expose
+	// FrozenTimeUnix。Generic base materials never expose
 	// model reasoning; AssembleLoopPrompt opts in only for the main decision
 	// call, while every helper prompt continues through this safe default.
 	frozenOpen := aicommon.BuildPromptFrozenOpenMaterials(pm.react.config, nonce)
@@ -776,7 +775,7 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 }
 
 // buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + TodoSnapshot + Workspace +
+// Timeline 末桶 + SessionEvidence + TodoSnapshot + Workspace +
 // UserHistory + Current Time + PlanContext (末尾)。
 //
 // 段内排序原则 (P1-C3 调整):
@@ -1184,10 +1183,10 @@ func renderAutoLoadedSkillsBlock(materials *reactloops.PromptPrefixMaterials) st
 	return strings.TrimSpace(materials.AutoLoadedSkills)
 }
 
-// renderTimelineOpenBlock 渲染 timeline 开放尾段 (最末 interval + midterm prefix)。
+// renderTimelineOpenBlock 渲染 timeline 开放尾段 (最末 interval)。
 // 用于 TimelineOpen 段的观测树。
 //
-// 关键词: renderTimelineOpenBlock, Timeline open, midterm
+// 关键词: renderTimelineOpenBlock, Timeline open
 func renderTimelineOpenBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil || strings.TrimSpace(materials.TimelineOpen) == "" {
 		return ""

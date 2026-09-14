@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang LDAP Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "ldap"
+	risk: "ldap-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -177,7 +177,7 @@ alert $high for {
    escapedUsername := escapeLDAPFilterForBuilder(username)
    ```
 SOLUTION
-	risk: "ldap",
+	risk: "ldap-injection",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

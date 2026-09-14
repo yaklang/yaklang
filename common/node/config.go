@@ -54,10 +54,24 @@ type HostIdentityProvider interface {
 
 // RuntimeStatus is the execution snapshot mixed into heartbeat payloads.
 type RuntimeStatus struct {
-	LifecycleState string
-	RunningJobs    uint32
-	MaxRunningJobs uint32
-	ActiveAttempts []ActiveAttemptHeartbeat
+	LifecycleState      string
+	RunningJobs         uint32
+	MaxRunningJobs      uint32
+	ActiveAttempts      []ActiveAttemptHeartbeat
+	RuntimeHostCapacity *RuntimeHostCapacity
+}
+
+// RuntimeHostCapacity is a host-scoped resource observation. Allocatable is
+// stable capacity after the Runtime Host's configured system reserve;
+// MemoryAvailableBytes is telemetry and is not a reservation counter.
+type RuntimeHostCapacity struct {
+	Scope                    string `json:"scope"`
+	CPUCapacityMillicores    uint64 `json:"cpu_capacity_millicores"`
+	CPUAllocatableMillicores uint64 `json:"cpu_allocatable_millicores"`
+	MemoryCapacityBytes      uint64 `json:"memory_capacity_bytes"`
+	MemoryAllocatableBytes   uint64 `json:"memory_allocatable_bytes"`
+	MemoryAvailableBytes     uint64 `json:"memory_available_bytes"`
+	SampleSequence           uint64 `json:"sample_sequence"`
 }
 
 // RuntimeStatusProvider lets higher-level runtimes report execution state.
@@ -213,4 +227,12 @@ func cloneHostIdentity(input HostIdentity) HostIdentity {
 		SystemUUID: input.SystemUUID,
 		InstanceID: input.InstanceID,
 	}
+}
+
+func cloneRuntimeHostCapacity(input *RuntimeHostCapacity) *RuntimeHostCapacity {
+	if input == nil {
+		return nil
+	}
+	clone := *input
+	return &clone
 }

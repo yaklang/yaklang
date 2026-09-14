@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Command Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "远程代码执行（RCE）"
+	risk: "command-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -117,7 +117,7 @@ $sink?(* ?{ * #{until: "* & $input"}-> }) as $high
 
 alert $high for {
 	type: "vuln",
-	risk: "命令注入",
+	risk: "command-injection",
 	title: "Golang Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang命令注入漏洞",
 	solution: <<<SOLUTION

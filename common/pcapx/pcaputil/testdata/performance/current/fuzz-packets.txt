@@ -1,0 +1,15 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/222 completed
+fuzz: elapsed: 1s, gathering baseline coverage: 222/222 completed, now fuzzing with 4 workers
+fuzz: elapsed: 3s, execs: 24422 (8138/sec), new interesting: 3 (total: 225)
+fuzz: elapsed: 6s, execs: 56907 (10832/sec), new interesting: 7 (total: 229)
+fuzz: elapsed: 9s, execs: 86924 (10005/sec), new interesting: 15 (total: 237)
+fuzz: elapsed: 12s, execs: 129599 (14225/sec), new interesting: 18 (total: 240)
+fuzz: elapsed: 15s, execs: 160322 (10241/sec), new interesting: 24 (total: 246)
+fuzz: elapsed: 18s, execs: 186190 (8620/sec), new interesting: 30 (total: 252)
+fuzz: elapsed: 21s, execs: 210904 (8240/sec), new interesting: 34 (total: 256)
+fuzz: elapsed: 24s, execs: 235958 (8351/sec), new interesting: 38 (total: 260)
+fuzz: elapsed: 27s, execs: 260946 (8327/sec), new interesting: 42 (total: 264)
+fuzz: elapsed: 30s, execs: 289295 (9452/sec), new interesting: 47 (total: 269)
+fuzz: elapsed: 31s, execs: 289295 (0/sec), new interesting: 47 (total: 269)
+PASS
+ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil	31.500s

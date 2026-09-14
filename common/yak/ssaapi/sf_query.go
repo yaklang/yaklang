@@ -48,6 +48,14 @@ type queryConfig struct {
 	vm    *sfvm.SyntaxFlowVirtualMachine
 	frame *sfvm.SFFrame
 
+	// sourceResultCallback lets source-mode bounded hit batches stream to a
+	// consumer immediately. The fallback aggregate path is retained for callers
+	// that do not provide a result callback.
+	sourceResultCallback func(*SyntaxFlowResult)
+
+	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
+	structBound *structBound
+
 	// runtime config
 	opts []sfvm.Option // config
 	// config       *sfvm.Config
@@ -136,6 +144,18 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		}
 	}
 	process(0, "start query syntaxflow")
+	if config.program != nil {
+		prevBound := config.program.structBound
+		prevActive := config.program.structScanActive
+		if config.structBound != nil {
+			config.program.structBound = config.structBound
+			config.program.structScanActive = true
+		}
+		defer func() {
+			config.program.structBound = prevBound
+			config.program.structScanActive = prevActive
+		}()
+	}
 	// handler input  value
 	value := config.value
 	if len(value) == 0 {
@@ -196,12 +216,22 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		if config.program != nil {
 			root.SetProgramName(config.program.GetProgramName())
 		}
-		res, err = frame.Feed(sfvm.ValuesOf(root), config.opts...)
+		res, err = executeSourceFrameBatches(frame, root, config)
+	} else if sfvm.FrameIsStructMode(frame) {
+		if config.structBound == nil {
+			return nil, utils.Errorf("struct rule requires QueryWithStruct")
+		}
+		res, err = frame.Feed(value, config.opts...)
+	} else if config.structBound != nil {
+		return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
 	} else {
 		res, err = frame.Feed(value, config.opts...)
 	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
+	}
+	if config.sourceResultCallback != nil && sfvm.FrameIsSourceMode(frame) {
+		return nil, nil
 	}
 
 	var ret *SyntaxFlowResult
@@ -230,6 +260,43 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 
 	return ret, nil
+}
+
+func executeSourceFrameBatches(
+	frame *sfvm.SFFrame,
+	root *sfvm.PatternRoot,
+	config *queryConfig,
+) (*sfvm.SFFrameResult, error) {
+	batchSize := sfpattern.DefaultSourceHitBatchSize
+	var accumulated *sfvm.SFFrameResult
+	for offset := 0; ; offset += batchSize {
+		root.SetSourceHitBatch(offset, batchSize)
+		batchResult, err := frame.Feed(sfvm.ValuesOf(root), config.opts...)
+		if err != nil {
+			return nil, err
+		}
+		if config.sourceResultCallback != nil {
+			result := CreateResultFromQuery(batchResult, config.Config)
+			result.program = config.program
+			result.TaskID = config.taskID
+			_ = result.CreateRisk()
+			config.sourceResultCallback(result)
+			_, _, total := root.SourceHitBatch()
+			if total == 0 || offset+batchSize >= total {
+				return nil, nil
+			}
+			continue
+		}
+		if accumulated == nil {
+			accumulated = sfvm.NewSFFrameResultAccumulator(batchResult)
+		} else {
+			accumulated.MergeByResult(batchResult)
+		}
+		_, _, total := root.SourceHitBatch()
+		if total == 0 || offset+batchSize >= total {
+			return accumulated, nil
+		}
+	}
 }
 
 type QueryOption func(*queryConfig)
@@ -270,6 +337,33 @@ func QueryWithValues(values sfvm.Values) QueryOption {
 			return
 		}
 		c.program, _ = fetchProgram(values[0])
+	}
+}
+
+// QueryWithStruct binds a compile-unit structure scan: stamps structBound on
+// the query and ResultProgram, and feeds a StructQueryTarget if c.value is empty.
+func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
+	return func(c *queryConfig) {
+		if unit == nil {
+			return
+		}
+		var ssaProg *ssa.Program
+		if c.program != nil {
+			ssaProg = c.program.Program
+		}
+		bound := newStructBound(unit, ssaProg)
+		c.structBound = bound
+		if len(c.value) == 0 && c.program != nil {
+			c.value = sfvm.ValuesOf(NewStructQueryTarget(c.program, unit, bound))
+		}
+		if c.program != nil {
+			c.program.structBound = bound
+			c.program.structScanActive = true
+		}
+		c.opts = append(c.opts,
+			sfvm.WithRuntimeOption(bound),
+			sfvm.WithRuntimeOption(WithStructBound(bound)),
+		)
 	}
 }
 
@@ -429,6 +523,12 @@ func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	}
 }
 
+func QueryWithSourceResultCallback(callback func(*SyntaxFlowResult)) QueryOption {
+	return func(c *queryConfig) {
+		c.sourceResultCallback = callback
+	}
+}
+
 func QueryWithSSAConfig(c *ssaconfig.Config) QueryOption {
 	return func(q *queryConfig) {
 		q.Config = c
@@ -566,13 +666,44 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 }
 
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if p != nil && rule.IsSourceMode() {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
+	if p != nil && rule.IsStructMode() {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute struct rule %s; struct rules require QueryWithStruct",
+			ruleGetRuleName(rule),
+		)
+	}
 	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
 }
 
 func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if rule.IsSourceMode() {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
+	if rule.IsStructMode() {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute struct rule %s; struct rules require QueryWithStruct",
+			ruleGetRuleName(rule),
+		)
+	}
 	opts = append(opts, QueryWithPrograms(ps), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
+}
+
+func ruleGetRuleName(rule *schema.SyntaxFlowRule) string {
+	if rule == nil {
+		return ""
+	}
+	return rule.RuleName
 }
 
 func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {

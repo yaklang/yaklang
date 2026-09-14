@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 S3 存储桶公开读写"
+	title_zh: "检测到 S3 存储桶公开读写"
+	type: vuln
+	level: high
+	rule_id: "source-insecure-api-s3-public-rw-bucket"
+	risk: "access-control"
+	desc: <<<DESC
+### 规则说明
+检测到 S3 存储桶配置为公共读写访问。
+
+### 风险类型
+访问控制缺陷（access-control）
+
+### 影响
+资源或接口的访问权限设置不当，可能允许越权访问。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-200
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+将 S3 存储桶策略改为私有，仅允许经过认证的访问，并审计存储桶对象。
+SOLUTION
+	alert_min: 1
+	"file://pos.tf": <<<POS
+acl = "public-read-write"
+POS
+	"safefile://pos.tf": <<<NEG
+acl = "private"
+NEG
+)
+
+${*.tf}.pattern_regex(/(?:acl\s+=\s+"public\-read\-write")/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测到 S3 存储桶公开读写",
+	title_zh: "检测到 S3 存储桶公开读写",
+	message: "检测到 S3 存储桶公开读写",
+}

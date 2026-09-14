@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-file-read"
-	risk: "路径遍历 / 任意文件读取"
+	risk: "path-traversal-file-read"
 	desc: <<<DESC
 标记 open 读模式、Path.read_text/read_bytes、read/readlines 等读取行为。若路径或缓冲区大小受外部输入影响，可能导致任意文件读取或路径遍历。
 DESC
@@ -28,7 +28,7 @@ alert $output for {
 	title_zh: "文件读取",
 	level: "info",
 	type: "audit",
-	risk: "路径遍历 / 任意文件读取",
+	risk: "path-traversal-file-read",
 	message: "检测到文件读取相关 API，请确认路径来源可信且已做边界校验。",
 	name: "output",
 }

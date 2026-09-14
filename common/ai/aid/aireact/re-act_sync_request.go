@@ -214,7 +214,7 @@ func (r *ReAct) HandleSyncTypeCancelTaskEvent(event *ypb.AIInputEvent) error {
 		return nil
 	}
 	getTaskById := func(taskId string) aicommon.AIStatefulTask {
-		for _, task := range r.RuntimeTasks {
+		for _, task := range r.GetRuntimeTasks() {
 			if task.GetId() == taskId {
 				return task
 			}
@@ -224,6 +224,10 @@ func (r *ReAct) HandleSyncTypeCancelTaskEvent(event *ypb.AIInputEvent) error {
 	targetTask := getTaskById(targetTaskId)
 	if targetTask == nil {
 		sendError(errors.New("no task to cancel"))
+		return nil
+	}
+	if targetTask.IsFinished() {
+		sendError(errors.New("task already finished"))
 		return nil
 	}
 

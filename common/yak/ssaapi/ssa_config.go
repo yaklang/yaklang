@@ -57,6 +57,7 @@ type Config struct {
 	// diagnostics configuration
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
+	structScan          *structScanRuntime
 	// file performance recorder
 	filePerformanceRecorder *diagnostics.Recorder
 

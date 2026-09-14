@@ -1081,8 +1081,28 @@ func init() {
 		Handler: func(s string) []string {
 			return []string{"\x4d\x4d", "\x49\x49"}
 		},
-		Description:         "生成一个 tiff 文件头，例如 `{{tiff}}`",
+		Description:         "生成一个 tiff 文件头：`{{tiff()}}` 生成大端 MM 和小端 II 两个变体；`{{tiff:mm()}}` 只生成 MM，`{{tiff:ii()}}` 只生成 II",
 		TagNameVerbose:      "生成tiff文件头",
+		ArgumentDescription: "",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "tiff:mm",
+		Handler: func(s string) []string {
+			return []string{"\x4d\x4d"}
+		},
+		Description:         "生成大端序 tiff 文件头，例如 `{{tiff:mm()}}`",
+		TagNameVerbose:      "生成大端tiff文件头",
+		ArgumentDescription: "",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "tiff:ii",
+		Handler: func(s string) []string {
+			return []string{"\x49\x49"}
+		},
+		Description:         "生成小端序 tiff 文件头，例如 `{{tiff:ii()}}`",
+		TagNameVerbose:      "生成小端tiff文件头",
 		ArgumentDescription: "",
 	})
 
@@ -1127,8 +1147,30 @@ func init() {
 			}
 		},
 		Alias:               []string{"jpeg"},
-		Description:         "生成 jpeg / jpg 文件头",
+		Description:         "生成 jpeg / jpg 文件头：`{{jpg()}}` 生成 JFIF 和 Exif 两个变体；`{{jpg:jfif(数据)}}` 只生成 JFIF，`{{jpg:exif(数据)}}` 只生成 Exif",
 		TagNameVerbose:      "生成jpeg文件头",
+		ArgumentDescription: "",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "jpg:jfif",
+		Handler: func(s string) []string {
+			return []string{"\xff\xd8\xff\xe0\x00\x10JFIF" + s + "\xff\xd9"}
+		},
+		Alias:               []string{"jpeg:jfif"},
+		Description:         "生成 JFIF 文件头，数据可选，例如 `{{jpg:jfif(数据)}}`",
+		TagNameVerbose:      "生成JFIF文件头",
+		ArgumentDescription: "",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "jpg:exif",
+		Handler: func(s string) []string {
+			return []string{"\xff\xd8\xff\xe1\x00\x1cExif" + s + "\xff\xd9"}
+		},
+		Alias:               []string{"jpeg:exif"},
+		Description:         "生成 Exif 文件头，数据可选，例如 `{{jpg:exif(数据)}}`",
+		TagNameVerbose:      "生成Exif文件头",
 		ArgumentDescription: "",
 	})
 

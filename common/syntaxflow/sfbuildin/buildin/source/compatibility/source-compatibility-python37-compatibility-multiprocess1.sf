@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 Python 3.7 不兼容的 multiprocessing.Process.close 用法"
+	title_zh: "检测到 Python 3.7 不兼容的 multiprocessing.Process.close 用法"
+	type: compatibility
+	level: high
+	rule_id: "source-compatibility-python37-compatibility-multiprocess1"
+	risk: "code-style"
+	desc: <<<DESC
+### 规则说明
+multiprocessing.Process.close() 仅在 Python 3.7 及以上版本可用，在低版本中会报错，存在向后兼容问题。
+
+### 风险类型
+代码规范与兼容性（code-style）
+
+### 影响
+使用了已废弃、不兼容或不符合规范的模式，可能导致后续维护困难或运行环境差异。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 join() 替代 close()，或提升运行环境的 Python 版本到 3.7+。
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+multiprocessing.Process.close()
+POS
+	"safefile://pos.py": <<<NEG
+multiprocessing.Process.join()
+NEG
+)
+
+${*.py}.pattern_regex(/(?:multiprocessing\.Process\.close\(\))/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测到 Python 3.7 不兼容的 multiprocessing.Process.close 用法",
+	title_zh: "检测到 Python 3.7 不兼容的 multiprocessing.Process.close 用法",
+	message: "检测到 Python 3.7 不兼容的 multiprocessing.Process.close 用法",
+}

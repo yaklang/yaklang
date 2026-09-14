@@ -161,7 +161,7 @@ echo "Attempting to read: " . $safe_filepath;
 ?>
 ```
 SOLUTION
-	risk: "文件操作",
+	risk: "file-operation",
 	name: "high",
 	message: "检测到PHP未经验证的文件操作漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -242,7 +242,7 @@ DESC
 	level: "mid",
 	name: "mid",
 	message: "检测到PHP文件操作中可能存在参数过滤不完整的情况，需进一步审计确认。",
-	risk: "文件操作",
+	risk: "file-operation",
 }
 $sink - $high - $mid  as $low
 
@@ -316,7 +316,7 @@ DESC
 	title: "PHP Potential Access Control Bypass Risk Was Detected",
 	title_zh: "检测到PHP潜在访问控制绕过风险",
 	message: "检测到PHP文件操作中可能存在潜在访问控制绕过的情况，需进一步排查过滤函数是否存在被绕过的风险。",
-	risk: "文件操作",
+	risk: "file-operation",
 	name: "low",
 }
 desc(

@@ -94,6 +94,39 @@ type SkillDocument struct {
 	frontmatterDoc string
 }
 
+// Rename changes the skill identity while retaining all frontmatter fields,
+// including extensions unknown to SkillMeta, and the Markdown body.
+func (d *SkillDocument) Rename(name string) (string, error) {
+	if d == nil || d.Meta == nil || strings.TrimSpace(name) == "" {
+		return "", utils.Error("skill document and new name are required")
+	}
+	frontmatter := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(d.frontmatterDoc, frontmatterDelimiter), frontmatterDelimiter))
+	var node yaml.Node
+	if err := yaml.Unmarshal([]byte(frontmatter), &node); err != nil {
+		return "", err
+	}
+	if len(node.Content) == 0 || node.Content[0].Kind != yaml.MappingNode {
+		return "", utils.Error("skill frontmatter must be a mapping")
+	}
+	mapping := node.Content[0]
+	found := false
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == "name" {
+			mapping.Content[i+1] = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name}
+			found = true
+			break
+		}
+	}
+	if !found {
+		mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "name"}, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name})
+	}
+	raw, err := yaml.Marshal(&node)
+	if err != nil {
+		return "", err
+	}
+	return "---\n" + string(raw) + "---\n\n" + d.Meta.Body + "\n", nil
+}
+
 // ReplaceBody renders the document with a new Markdown body while preserving
 // the original, already-validated frontmatter.
 func (d *SkillDocument) ReplaceBody(body string) (string, error) {

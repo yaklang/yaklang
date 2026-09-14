@@ -151,7 +151,7 @@ functionDeclaration
     ;
 
 classDeclaration
-    : attributes? Private? modifier? Partial? (
+    : attributes? Private? classModifier* Partial? (
         classEntryType identifier /*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
             Implements interfaceList
         )?
@@ -194,6 +194,8 @@ callableIdentifier
     : identifier
     | Require
     | RequireOnce
+    | Throw
+    | Set_Include_Path
     ;
 
 //genericDynamicArgs
@@ -347,12 +349,18 @@ unsetStatement
 foreachStatement
     : Foreach (
         '(' expression As arrayDestructuring ')'
-        | '(' chain As '&'? assignable ('=>' '&'? chain)? ')'
-        | '(' expression As '&'? assignable ('=>' '&'? chain)? ')'
+        | '(' chain As '&'? assignable foreachValue? ')'
+        | '(' expression As '&'? assignable foreachValue? ')'
         | '(' expression As List '(' assignmentList ')' ')'
         | '(' expression As '&'? assignable '=>' List '(' assignmentList ')' ')'
         | '(' chain As List '(' assignmentList ')' ')'
     ) (statement | ':' innerStatementList EndForeach SemiColon)
+    ;
+
+// foreachValue is the optional "=> $v" / "=> [$a, $b]" tail of a keyed foreach;
+// the value position accepts a plain chain or array destructuring (PHP 7+).
+foreachValue
+    : '=>' '&'? (chain | arrayDestructuring)
     ;
 
 tryCatchFinally
@@ -496,7 +504,7 @@ variableInitializer
     ;
 
 identifierInitializer
-    : identifier Eq constantInitializer
+    : (identifier | Function_) Eq constantInitializer
     ;
 
 globalConstantDeclaration
@@ -774,7 +782,7 @@ typeRef
     ;
 
 anonymousClass
-    : attributes? Private? modifier? Partial? (
+    : attributes? Private? classModifier* Partial? (
         classEntryType arguments? /*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
             Implements interfaceList
         )?
@@ -985,9 +993,12 @@ assignmentListElement
     | arrayItem
     ;
 
-modifier
+// classModifier allows PHP 8.2 readonly classes in any modifier order, e.g.
+// "final readonly class", "readonly class", "abstract readonly class".
+classModifier
     : Abstract
     | Final
+    | Readonly
     ;
 
 identifier
@@ -1125,6 +1136,7 @@ memberModifier
     | Abstract
     | Final
     | Readonly
+    | (Public | Protected | Private) '(' Label ')' // PHP 8.4 asymmetric visibility, e.g. private(set)
     ;
 
 magicConstant

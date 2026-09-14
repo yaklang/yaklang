@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"strings"
 	"sync/atomic"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -113,7 +113,7 @@ func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.
 			rsp.Close()
 			return rsp, nil
 		}
-		nonce := aicommon.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
+		nonce := aicommon_testutil.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "run_script", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"timeout": 20} },
@@ -299,7 +299,6 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	var toolCallCount int32
 	var capturedCommand atomic.Value
-	var requestReferencePayload string
 	var directCallParamStreamID string
 	bashTool, err := aitool.New(
 		"bash_test",
@@ -336,16 +335,9 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	timeout := time.After(10 * time.Second)
 	taskCompleted := false
-	collectReference := func(e *ypb.AIOutputEvent) {
-		if e.Type != string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
-			return
-		}
-		var payload map[string]any
-		require.NoError(t, json.Unmarshal(e.Content, &payload))
-		payloadStr := utils.InterfaceToString(payload["payload"])
-		if strings.Contains(payloadStr, "AI 请求原文") && strings.Contains(payloadStr, "CACHE_TOOL_CALL") {
-			requestReferencePayload = payloadStr
-		}
+	assertNoModelExchangeReference := func(e *ypb.AIOutputEvent) {
+		require.NotEqual(t, string(schema.EVENT_TYPE_REFERENCE_MATERIAL), e.Type,
+			"direct tool call prompts and raw responses are not reference materials")
 	}
 
 LOOP:
@@ -355,7 +347,7 @@ LOOP:
 			if e.Type == string(schema.EVENT_TYPE_STREAM_START) && e.NodeId == "directly_call_tool_params" {
 				directCallParamStreamID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.event_writer_id"))
 			}
-			collectReference(e)
+			assertNoModelExchangeReference(e)
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				iid := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
 				in <- &ypb.AIInputEvent{
@@ -376,12 +368,12 @@ LOOP:
 		}
 	}
 
-	postTimeout := time.After(2 * time.Second)
-	for requestReferencePayload == "" && directCallParamStreamID != "" {
+	react.WaitForStream()
+	for {
 		select {
 		case e := <-out:
-			collectReference(e)
-		case <-postTimeout:
+			assertNoModelExchangeReference(e)
+		default:
 			goto ASSERT
 		}
 	}
@@ -391,7 +383,6 @@ ASSERT:
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
 	require.Equal(t, "#!/bin/bash\necho hello direct call", capturedCommand.Load())
 	require.NotEmpty(t, directCallParamStreamID, "should emit directly_call_tool params stream id")
-	require.Contains(t, requestReferencePayload, "test directly call tool with aitag block params")
 }
 
 // TestReAct_DirectlyCallTool_RequireThenDirect uses require_tool first, then directly_call_tool.

@@ -79,6 +79,14 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 
 			var content string
 			var err error
+			if asyncMemory, ok := memTriage.(*aimem.AsyncAIMemory); ok {
+				memTriage, err = asyncMemory.WaitReady(op.GetTask().GetContext())
+				if err != nil {
+					op.Feedback(fmt.Sprintf("memory search failed: %v", err))
+					op.Continue()
+					return
+				}
+			}
 
 			if triage, ok := memTriage.(*aimem.AIMemoryTriage); ok {
 				content, err = doMemorySearch(triage, query, searchMode, limit, tokenLimit)

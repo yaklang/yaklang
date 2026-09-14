@@ -489,8 +489,8 @@ func TestReActLoop_DisallowLoopExit(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if callCount != 3 {
-		t.Errorf("Expected 3 calls (1 disallow + finish checkpoint + finish confirmation), got %d", callCount)
+	if callCount != 2 {
+		t.Errorf("Expected 2 calls (1 disallow + finish), got %d", callCount)
 	}
 
 	t.Logf("DisallowExit test completed with %d calls", callCount)
@@ -891,8 +891,8 @@ func TestReActLoop_GetLastNAction_EdgeCases(t *testing.T) {
 
 	// 测试请求超过实际记录数
 	moreThanExists := loop.GetLastNAction(100)
-	if len(moreThanExists) > 2 {
-		t.Errorf("Expected at most 2 records (finish checkpoint and confirmation), got %d", len(moreThanExists))
+	if len(moreThanExists) != 1 {
+		t.Errorf("Expected 1 finish record, got %d", len(moreThanExists))
 	}
 
 	// 测试请求 0 或负数

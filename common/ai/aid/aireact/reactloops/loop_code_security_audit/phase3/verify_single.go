@@ -75,7 +75,23 @@ func buildSingleFindingVerifyLoop(
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
-
+	}
+	preset = append(preset,
+		reactloops.WithDisableLoopPerception(true),
+		reactloops.WithDisablePeriodicVerification(true),
+	)
+	// frozen-block 分区经由子代理自己的 config 注入（aicommon 既有机制，
+	// PromptMaterials 组装时与 config producer 汇合），不新增 loop 层字段。
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok && cfg != nil {
+		cfg.AppendFrozenBlockPartition(
+			"code-audit-phase3-path-rules",
+			"Code Audit Phase3 Path Rules",
+			"路径规则：所有工具路径必须使用项目绝对路径；read_file 用 file；grep 用 path。"+
+				"Finding.file 多为相对路径，调用前需拼接项目根目录。",
+			210,
+		)
+	}
+	preset = append(preset,
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			return utils.RenderTemplate(phase3VerifyInstruction, map[string]any{
 				"Nonce":       nonce,
@@ -97,8 +113,8 @@ func buildSingleFindingVerifyLoop(
 				"FindingSummary":      findingSummary,
 				"FindingIndex":        findingIndex,
 				"FindingTotal":        findingTotal,
-				"GlobalTotalFindings": len(state.GetFindings()),
-				"GlobalVerifiedCount": len(state.GetVerifiedVulns()),
+				"GlobalTotalFindings": state.GetFindingCount(),
+				"GlobalVerifiedCount": state.GetVerifiedVulnCount(),
 				"FeedbackMessages":    feedbacker.String(),
 				"ReconOutline":        state.GetReconOutline(),
 				"ReconFileHint":       reconFileHint,
@@ -130,7 +146,7 @@ func buildSingleFindingVerifyLoop(
 		registerPhase3NoteFilterAction(r),
 		registerPhase3ConcludeFindingAction(r, state, verify, &concluded),
 		registerPhase3ReadReconNotesAction(r, state),
-	}
+	)
 
 	loopName := fmt.Sprintf("code_audit_verify_%s", finding.ID)
 	return reactloops.NewReActLoop(loopName, r, preset...)

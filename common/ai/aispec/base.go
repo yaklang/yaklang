@@ -222,6 +222,15 @@ type ChatBaseContext struct {
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
 	ToolCallCallback func([]*ToolCall)
+	// ToolCallArgumentsStreamHandler, when set, receives a reader that
+	// streams the incremental function_call arguments as raw (unescaped)
+	// bytes. This allows downstream consumers (e.g. the ReAct loop
+	// functioncall mode) to feed tool_call arguments into the same
+	// text-parsing pipeline used for regular content. When nil, the
+	// arguments are NOT streamed (only delivered via ToolCallCallback),
+	// preserving the existing behavior where tool_call data does not
+	// leak into the content stream.
+	ToolCallArgumentsStreamHandler func(io.Reader)
 	// Tools defines the available tools that the model may call
 	Tools []Tool
 	// ToolChoice controls which (if any) tool is called by the model
@@ -440,6 +449,17 @@ func WithChatBase_Modalities(modalities ...string) ChatBaseOption {
 func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.ToolCallCallback = cb
+	}
+}
+
+// WithChatBase_ToolCallArgumentsStreamHandler sets a handler that receives a
+// reader streaming the incremental function_call arguments as raw bytes.
+// When set, tool_call arguments flow through this handler in addition to
+// ToolCallCallback. Used by functioncall mode to unify the action parsing
+// pipeline.
+func WithChatBase_ToolCallArgumentsStreamHandler(h func(io.Reader)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ToolCallArgumentsStreamHandler = h
 	}
 }
 
@@ -1215,7 +1235,7 @@ type chatBaseStreamHandlerAppender func(
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte, *ChatUsage),
 	usageCallback func(*ChatUsage),
-) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
+) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
 
 func executeChatBaseRequest(
 	url string,
@@ -1269,7 +1289,7 @@ func executeChatBaseRequest(
 	opts = append(defaultOpts, opts...) // User options come AFTER defaults, so they can override
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 
-	var pr, reasonPr io.Reader
+	var pr, reasonPr, toolCallArgsReader io.Reader
 	var cancel func()
 	var getStreamReadErr streamReadErrGetter
 	var requestPacket []byte
@@ -1284,7 +1304,7 @@ func executeChatBaseRequest(
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview, usageInfo)
 		}
 	}
-	pr, reasonPr, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
+	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",
@@ -1315,6 +1335,32 @@ func executeChatBaseRequest(
 
 	// 设置流式处理handler（如果需要）
 	var body bytes.Buffer
+
+	// Handle tool_call arguments stream: either route to a dedicated handler
+	// or drain it to prevent the writer side from blocking. When
+	// ToolCallArgumentsStreamHandler is set, arguments flow through it
+	// (e.g. into the AIResponse output channel for functioncall mode).
+	// When nil, arguments are discarded — they are only delivered via
+	// ToolCallCallback, preserving the existing "no leakage" contract.
+	if ctx.ToolCallArgumentsStreamHandler != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("toolCallArgumentsStreamHandler panicked: %v", err)
+				}
+			}()
+			ctx.ToolCallArgumentsStreamHandler(toolCallArgsReader)
+		}()
+	} else {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			io.Copy(io.Discard, toolCallArgsReader)
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

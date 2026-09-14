@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang未过滤文件路径漏洞"
 	type: audit
 	level: low
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -115,7 +115,7 @@ $sink?{<getCall> #{ until: "* & $input - $safe",}->} as $low;
 
 alert $low for {
 	title: "Golang Unfiltered File Path Vulnerability Was Detected",
-	risk: "路径遍历",
+	risk: "path-traversal",
 	title_zh: "检测到Golang未过滤文件路径漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

@@ -2,7 +2,7 @@ desc(
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞"
 	title: "Check Java Spring SPEL Parser Injection"
 	type: vuln
-	risk:"SPEL表达式注入",
+	risk:"spel-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -152,7 +152,7 @@ return "Result: " + result;
 DESC
 	level: "middle",
 	message: "发现Java Framework SPEL表达式注入漏洞",
-	risk: "SPEL表达式注入",
+	risk: "spel-injection",
 	name: "mid",
 }
 
@@ -227,7 +227,7 @@ return "Result: " + result;
 如果业务逻辑允许，尽量避免直接解析用户输入的完整和复杂的SPEL表达式。考虑使用更安全的机制，例如预定义的模板或简单的表达式语言。
 SOLUTION
 	name: "low",
-	risk: "SPEL表达式注入",
+	risk: "spel-injection",
 }
 
 desc(

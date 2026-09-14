@@ -3,6 +3,7 @@ package consts
 import (
 	"database/sql"
 	"fmt"
+	stdlog "log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -161,6 +162,7 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 	if err != nil {
 		return nil, err
 	}
+	configureMCPStdioDatabaseLogger(db)
 	configureAndOptimizeDBWithOptions(driver, db, options)
 	return db, nil
 }
@@ -184,6 +186,7 @@ func createSQLiteReadOnlyDatabase(path string, maxOpenConns int) (*gorm.DB, erro
 	if err != nil {
 		return nil, err
 	}
+	configureMCPStdioDatabaseLogger(db)
 	db.DB().SetConnMaxLifetime(time.Hour)
 	db.DB().SetMaxOpenConns(maxOpenConns)
 	db.DB().SetMaxIdleConns(maxOpenConns)
@@ -192,6 +195,16 @@ func createSQLiteReadOnlyDatabase(path string, maxOpenConns int) (*gorm.DB, erro
 		return nil, err
 	}
 	return db, nil
+}
+
+// configureMCPStdioDatabaseLogger must run immediately after gorm.Open and
+// before callers register callbacks. This GORM fork owns a logger independent
+// from common/log and otherwise writes colored messages to stdout.
+func configureMCPStdioDatabaseLogger(db *gorm.DB) {
+	if db == nil || !log.IsMCPStdioLogging() {
+		return
+	}
+	db.SetLogger(gorm.Logger{LogWriter: stdlog.New(os.Stderr, "\r\n", 0)})
 }
 
 func configureAndOptimizeDB(drive string, db *gorm.DB) {

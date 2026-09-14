@@ -222,7 +222,7 @@ func runPhase2(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 
 	findingsFile := state.GetFindingsFilePath()
 	if findingsFile != "" {
-		r.AddToTimeline("[PHASE2_PERSISTED]", fmt.Sprintf("Phase 2 扫描完成，共 %d 个 finding 已写入: %s", len(state.GetFindings()), findingsFile))
+		r.AddToTimeline("[PHASE2_PERSISTED]", fmt.Sprintf("Phase 2 扫描完成，共 %d 个 finding 已写入: %s", state.GetFindingCount(), findingsFile))
 	}
 	reactloops.EmitStatusI18n(loop, "已经找到需要关注的位置，正在逐一确认", "Potential areas of concern were found; validating each one")
 }
@@ -250,12 +250,12 @@ func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	if filled := state.EnsureVerifyCoverage(); len(filled) > 0 {
 		r.AddToTimeline("[PHASE3_GAP_FILL]", fmt.Sprintf("Phase3 补全 %d 个未验证 finding（uncertain）: %s", len(filled), strings.Join(filled, ", ")))
 	}
-	if len(state.GetFindings()) > 0 {
+	if state.GetFindingCount() > 0 {
 		verifiedFile := filepath.Join(auditDirPath, "verified_vulns.json")
 		if err := state.PersistVerifiedVulns(verifiedFile); err != nil {
 			log.Warnf("[CodeAudit] Failed to persist verified_vulns: %v", err)
 		} else {
-			r.AddToTimeline("[PHASE3_PERSISTED]", fmt.Sprintf("Phase 3 验证完成，共 %d 个结果: %s", len(state.GetVerifiedVulns()), verifiedFile))
+			r.AddToTimeline("[PHASE3_PERSISTED]", fmt.Sprintf("Phase 3 验证完成，共 %d 个结果: %s", state.GetVerifiedVulnCount(), verifiedFile))
 		}
 	}
 	reactloops.EmitStatusI18n(loop, "风险确认已完成，正在汇总结论", "Validation is complete; consolidating the findings")

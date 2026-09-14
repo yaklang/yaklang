@@ -20,6 +20,7 @@ type ScanNode struct {
 	manager           *TaskManager
 	capabilityManager *CapabilityManager
 	ruleSyncClient    ruleSyncer
+	pluginBundles     pluginBundleInstaller
 	httpClient        *http.Client
 	invokeLimiter     *invokeLimiter
 	maxRunningJobs    uint32
@@ -28,20 +29,28 @@ type ScanNode struct {
 	ssaGitOwnerScope  string
 	ssaGitScopeLock   *ssagitworkdir.OwnerScopeLock
 	runtimeHost       *runtimeHostExecutor
+	hostResources     *runtimeHostResourceCollector
 }
 
 var scanNodeTaskDrainTimeout = 30 * time.Second
 
 type ScanNodeOption func(*scanNodeOptions)
 
+const (
+	DefaultHostSystemReservedCPUMillicores uint64 = 500
+	DefaultHostSystemReservedMemoryBytes   uint64 = 512 * 1024 * 1024
+)
+
 type scanNodeOptions struct {
-	runtimeHost          RuntimeHostConfig
-	ruleSnapshotCacheDir string
+	runtimeHost            RuntimeHostConfig
+	ruleSnapshotCacheDir   string
+	hostResourceConfigured bool
 }
 
 func WithRuntimeHost(cfg RuntimeHostConfig) ScanNodeOption {
 	return func(options *scanNodeOptions) {
 		options.runtimeHost = cfg
+		options.hostResourceConfigured = true
 	}
 }
 
@@ -67,6 +76,10 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		if option != nil {
 			option(&resolvedOptions)
 		}
+	}
+	if !resolvedOptions.hostResourceConfigured {
+		resolvedOptions.runtimeHost.SystemReservedCPUMillicores = DefaultHostSystemReservedCPUMillicores
+		resolvedOptions.runtimeHost.SystemReservedMemoryBytes = DefaultHostSystemReservedMemoryBytes
 	}
 	if resolvedOptions.runtimeHost.Enabled {
 		cfg.CapabilityKeys = append(cfg.CapabilityKeys, AIRuntimeHostCapabilityKey)
@@ -110,6 +123,14 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 	}
 
 	agent.node = base
+	agent.pluginBundles, err = NewPluginBundleManager(PluginBundleManagerConfig{
+		BaseDir: base.BaseDir(),
+		Client:  cfg.HTTPClient,
+	})
+	if err != nil {
+		base.Shutdown()
+		return nil, utils.Errorf("initialize plugin bundle manager: %v", err)
+	}
 	agent.ssaGitOwnerScope, agent.ssaGitScopeLock, err = recoverSSAGitWorkspacesForInstallation(base.AgentInstallationID())
 	if err != nil {
 		base.Shutdown()
@@ -134,9 +155,28 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 			agent.capabilityManager.runtimeStatusProviders,
 			agent.runtimeHost,
 		)
+		agent.hostResources = agent.runtimeHost.resources
+	} else if strings.TrimSpace(cfg.Kind) != "ai_session" {
+		agent.hostResources, err = newRuntimeHostResourceCollector(
+			resolvedOptions.runtimeHost.resourceSource,
+			resolvedOptions.runtimeHost.SystemReservedCPUMillicores,
+			resolvedOptions.runtimeHost.SystemReservedMemoryBytes,
+		)
+		if err != nil {
+			base.Shutdown()
+			return nil, utils.Errorf("initialize host resource capacity: %v", err)
+		}
 	}
 	agent.httpClient = cfg.HTTPClient
 	agent.initInvokeLimiter(cfg.MaxRunningJobs)
+	if agent.hostResources != nil {
+		if capacity, capacityErr := agent.hostResources.snapshot(false); capacityErr == nil {
+			agent.invokeLimiter.SetResourceCapacity(
+				capacity.CPUAllocatableMillicores,
+				capacity.MemoryAllocatableBytes,
+			)
+		}
+	}
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
 }
@@ -223,10 +263,20 @@ func (s *ScanNode) releaseSSAGitScopeLockAfterTasks() {
 }
 
 func (s *ScanNode) Snapshot() node.RuntimeStatus {
-	return node.RuntimeStatus{
+	status := node.RuntimeStatus{
 		LifecycleState: node.DefaultLifecycleState,
 		RunningJobs:    s.invokeLimiter.activeCount(),
 		MaxRunningJobs: s.maxRunningJobs,
 		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
 	}
+	if s.hostResources != nil {
+		if capacity, err := s.hostResources.Snapshot(); err == nil {
+			status.RuntimeHostCapacity = &capacity
+			s.invokeLimiter.SetResourceCapacity(
+				capacity.CPUAllocatableMillicores,
+				capacity.MemoryAllocatableBytes,
+			)
+		}
+	}
+	return status
 }

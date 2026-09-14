@@ -138,7 +138,7 @@ DESC
 	type: "vuln",
 	name: "high",
 	message: "检测到PHP代码中存在未经验证的重定向漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "开放重定向",
+	risk: "open-redirect",
 }
 $all<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -166,7 +166,7 @@ DESC
 	solution: <<<SOLUTION
 由于规则为中危级别，建议进一步审查过滤函数是否存在潜在缺陷，并根据业务需求优化重定向逻辑的安全性。例如，增强白名单校验、增加额外的安全层（如Token机制）以及避免依赖简单过滤逻辑。
 SOLUTION
-	risk: "开放重定向",
+	risk: "open-redirect",
 }
 $sink - $high - $mid as $low
 
@@ -187,7 +187,7 @@ DESC
 	solution: <<<SOLUTION
 由于规则为低危级别，建议对现有过滤机制进行安全性评估，检查是否存在边缘情况可能导致绕过。同时，可考虑引入更严格的验证逻辑（如完整白名单、Token绑定）以提高重定向安全性。
 SOLUTION
-	risk: "开放重定向",
+	risk: "open-redirect",
 	name: "low",
 	message: "检测到PHP代码中已具备基本重定向验证机制，但仍需排查复杂攻击场景下的高级绕过风险。",
 }

@@ -74,9 +74,12 @@ func TestReactiveDataDoesNotExposeIterationDeadline(t *testing.T) {
 	}
 }
 
-func TestPostSummaryOnlyOffersNonBlockingFollowUps(t *testing.T) {
-	require.Contains(t, reActPostSummary, "## 可选后续（不属于本次完成条件）")
-	require.Contains(t, reActPostSummary, "finish 前升级为 TODO 并执行")
-	require.Contains(t, reActPostSummary, "没有合适的非阻塞可选项时，省略整个章节")
+func TestPostSummaryAuditsAcceptanceAndUnfinishedWork(t *testing.T) {
+	require.Contains(t, reActPostSummary, "## 验收结果与已关闭工作")
+	require.Contains(t, reActPostSummary, "## 仍未完成的工作")
+	require.Contains(t, reActPostSummary, "不把 deferred 算作执行完成")
+	require.Contains(t, reActPostSummary, "不得推断本次没有 TODO")
+	require.Contains(t, reActPostSummary, "未在 finish 前 add 并执行")
+	require.NotContains(t, reActPostSummary, "## 可选后续")
 	require.NotContains(t, reActPostSummary, "## 下一步建议")
 }

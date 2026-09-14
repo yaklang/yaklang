@@ -3,7 +3,7 @@ desc(
 	title_zh: "审计C语言中的危险输入函数"
 	type: audit
 	level: high
-	risk: "缓冲区溢出（Buffer Overflow）"
+	risk: "buffer-overflow"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -84,7 +84,7 @@ vsscanf(*<slice(index=1)>?{have: "%s"} as $high);
 
 alert $high for {
 	level: "high",
-	risk: "缓冲区溢出",
+	risk: "buffer-overflow",
 	type: "vuln",
 	title: "C Dangerous Input Function Vulnerability Was Detected",
 	title_zh: "检测到C语言中的危险输入函数漏洞",

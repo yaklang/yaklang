@@ -74,6 +74,7 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 		"Please help me discover relevant scanning blueprints, especially " + testForgeName + " related capabilities for penetration testing workflows."
 
 	ins, err := NewTestReAct(
+		aicommon.WithAllowSyncInitContext(true),
 		aicommon.WithDisableIntentRecognition(false), // override default: enable intent recognition
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()

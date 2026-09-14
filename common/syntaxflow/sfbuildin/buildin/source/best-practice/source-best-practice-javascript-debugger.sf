@@ -1,0 +1,44 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "检测到 JavaScript 调试器残留"
+	title_zh: "检测到 JavaScript 调试器残留"
+	type: audit
+	level: middle
+	rule_id: "source-best-practice-javascript-debugger"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+代码中发现 debugger 调试语句，该语句不应出现在生产代码中。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+删除代码中的 debugger 语句，确保生产环境不包含调试残留。
+SOLUTION
+	alert_min: 1
+	"file://pos.js": <<<POS
+debugger;
+POS
+	"safefile://pos.js": <<<NEG
+console.log
+NEG
+)
+
+${*.js}.pattern_regex(/(?:debugger;)/) as $p0
+${*.ts}.pattern_regex(/(?:debugger;)/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 JavaScript 调试器残留",
+	title_zh: "检测到 JavaScript 调试器残留",
+	message: "检测到 JavaScript 调试器残留",
+}

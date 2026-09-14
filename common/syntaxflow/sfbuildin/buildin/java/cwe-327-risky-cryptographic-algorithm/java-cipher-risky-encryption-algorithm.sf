@@ -3,7 +3,7 @@ desc(
 	title: "Check Java Cipher Weak Encryption Algorithm"
 	type: security
 	level: low
-	risk : '不安全加密算法',
+	risk : "weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327: Use of a Broken or Risky Cryptographic Algorithm](https://cwe.mitre.org/data/definitions/327.html)
 [Oracle Java SE 8 Dokumentation: SecretKeySpec](https://docs.oracle.com/javase/8/docs/api/javax/crypto/spec/SecretKeySpec.html)
@@ -121,7 +121,7 @@ return Base64.getEncoder().encodeToString(encrypted);
 #### 4. 及时更新加密库和依赖
 使用最新版本的加密库和相关的依赖，以获取最新的安全修复和性能改进。
 SOLUTION
-	risk: "不安全加密算法",
+	risk: "weak-cryptographic-algorithm",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -14,13 +14,18 @@ func (s *AuditState) UpsertVerifiedFinding(vf *VerifiedFinding) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.verifiedByID == nil {
+		s.verifiedByID = make(map[string]*VerifiedFinding)
+	}
 	for i, v := range s.VerifiedVulns {
 		if v != nil && v.Finding != nil && v.Finding.ID == vf.Finding.ID {
 			s.VerifiedVulns[i] = vf
+			s.verifiedByID[vf.Finding.ID] = vf
 			return
 		}
 	}
 	s.VerifiedVulns = append(s.VerifiedVulns, vf)
+	s.verifiedByID[vf.Finding.ID] = vf
 }
 
 // GetVerifiedFindingByID returns the latest verified record for a finding ID.
@@ -30,12 +35,7 @@ func (s *AuditState) GetVerifiedFindingByID(id string) *VerifiedFinding {
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, v := range s.VerifiedVulns {
-		if v != nil && v.Finding != nil && v.Finding.ID == id {
-			return v
-		}
-	}
-	return nil
+	return s.verifiedByID[id]
 }
 
 // DedupeVerifiedVulns keeps the last record per finding ID (in-order scan).
@@ -46,6 +46,7 @@ func (s *AuditState) DedupeVerifiedVulns() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	seen := make(map[string]int)
+	index := make(map[string]*VerifiedFinding)
 	var out []*VerifiedFinding
 	removed := 0
 	for _, v := range s.VerifiedVulns {
@@ -55,13 +56,16 @@ func (s *AuditState) DedupeVerifiedVulns() int {
 		}
 		if idx, ok := seen[v.Finding.ID]; ok {
 			out[idx] = v
+			index[v.Finding.ID] = v
 			removed++
 			continue
 		}
 		seen[v.Finding.ID] = len(out)
+		index[v.Finding.ID] = v
 		out = append(out, v)
 	}
 	s.VerifiedVulns = out
+	s.verifiedByID = index
 	return removed
 }
 

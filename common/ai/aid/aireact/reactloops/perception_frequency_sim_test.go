@@ -117,7 +117,7 @@ func (s *simController) simHashTopics(topics []string) string {
 }
 
 // applyResult 复刻 perceptionController.applyResult 的核心状态机.
-// 返回 updated=true 时, 等价生产环境下游 (capability/knowledge/midterm)
+// 返回 updated=true 时, 等价生产环境下游 (capability/knowledge)
 // 会被刷新; updated=false 表示无新内容, 是 AI 调用浪费.
 //
 // 关键词: 仿真 applyResult, 下游刷新判定, AI 调用是否浪费
@@ -440,7 +440,7 @@ func writeFrequencyExperimentReport(results []simResult) error {
 	}
 	rNoisy := findResult(results, 2, 30*time.Second, "noisy")
 	if rNoisy != nil {
-		buf.WriteString(fmt.Sprintf("- 在 noisy 上界 (AI 永远 changed=true) 下, fired 达到 %d 次, 全部刷新下游 (capability search + RAG + midterm recall), 是最坏情况.\n",
+		buf.WriteString(fmt.Sprintf("- 在 noisy 上界 (AI 永远 changed=true) 下, fired 达到 %d 次, 全部刷新下游 (capability search + RAG), 是最坏情况.\n",
 			rNoisy.fired))
 	}
 	buf.WriteString("\n")

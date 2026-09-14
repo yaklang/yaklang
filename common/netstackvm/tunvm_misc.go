@@ -2,6 +2,9 @@ package netstackvm
 
 import (
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
@@ -9,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
-	"time"
 )
 
 const (
@@ -127,4 +129,18 @@ type tcpConn struct {
 
 func (c *tcpConn) ID() *stack.TransportEndpointID {
 	return &c.id
+}
+
+// OriginalDestination explicitly exposes the destination carried by the
+// intercepted TCP packet. Do not infer this property from net.Conn.LocalAddr
+// at the MITM boundary: LocalAddr is only an upstream target for connections
+// produced by this transparent netstack, not for ordinary listeners.
+func (c *tcpConn) OriginalDestination() net.Addr {
+	if c == nil {
+		return nil
+	}
+	return &net.TCPAddr{
+		IP:   net.IP(c.id.LocalAddress.AsSlice()),
+		Port: int(c.id.LocalPort),
+	}
 }

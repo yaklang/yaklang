@@ -1,4 +1,5 @@
 desc(
+	risk: "deserialization"
 	title_zh: "检测Java SnakeYAML反序列化漏洞"
 	title: "Check Java SnakeYAML Unserialization Vulnerability"
 	type:vul
@@ -130,7 +131,7 @@ DESC
 	level: "high",
 	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 	name: "high",
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 }
 
 $sink #{
@@ -174,7 +175,7 @@ DESC
 	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
-	risk: "反序列化漏洞",
+	risk: "deserialization",
 	name: "low",
 }
 

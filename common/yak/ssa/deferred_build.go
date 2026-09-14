@@ -205,8 +205,24 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		}
 	}
 
-	completed := 0
+	queue := make([]string, 0, len(keys))
+	queued := make(map[string]struct{}, len(keys))
 	for _, id := range keys {
+		task, ok := app.deferredBuilds.Get(id)
+		if !ok || task == nil {
+			continue
+		}
+		if _, match := units[task.unitKey]; !match {
+			continue
+		}
+		queue = append(queue, id)
+		queued[id] = struct{}{}
+	}
+
+	completed := 0
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
 		task, ok := app.deferredBuilds.Get(id)
 		if !ok || task == nil {
 			continue
@@ -229,6 +245,22 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 			if !afterEach(completed, total) {
 				return false
 			}
+		}
+		for _, nid := range app.deferredBuilds.Keys() {
+			if _, seen := queued[nid]; seen {
+				continue
+			}
+			ntask, ok := app.deferredBuilds.Get(nid)
+			if !ok || ntask == nil {
+				continue
+			}
+			if _, match := units[ntask.unitKey]; !match {
+				continue
+			}
+			queued[nid] = struct{}{}
+			queue = append(queue, nid)
+			total++
+			unitRemaining[ntask.unitKey]++
 		}
 		// Per-unit completion: decrement this unit's remaining count.
 		// When it reaches zero, all tasks for this unit are done.

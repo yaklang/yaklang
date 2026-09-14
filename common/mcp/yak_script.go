@@ -395,10 +395,12 @@ func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {
 			return nil, utils.Wrap(err, "failed to query yak script")
 		}
 		results := make([]any, 0, 4)
+		var executionFailed bool
 		for {
 			exec, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
+					executionFailed = true
 					results = append(results, mcp.TextContent{
 						Type: "text",
 						Text: fmt.Sprintf("[Error] %v", err),
@@ -431,7 +433,10 @@ func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {
 			})
 		}
 
-		return NewCommonCallToolResult(results)
+		return &mcp.CallToolResult{
+			Content: results,
+			IsError: executionFailed,
+		}, nil
 	}
 }
 

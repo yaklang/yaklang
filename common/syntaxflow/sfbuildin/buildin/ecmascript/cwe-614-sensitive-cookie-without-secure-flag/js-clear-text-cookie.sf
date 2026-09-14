@@ -3,7 +3,7 @@ desc(
 	title_zh: "Cookie 未设置 Secure 标志，可能被明文传输"
 	type: vuln
 	level: warning
-	risk: "敏感Cookie明文传输"
+	risk: "cleartext-cookie"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -132,7 +132,7 @@ res.setHeader("Set-Cookie", "sessionToken=abc123; HttpOnly");
 res.setHeader("Set-Cookie", "sessionToken=abc123; Secure; HttpOnly");
 ```
 SOLUTION
-	risk: "会话劫持/敏感信息明文传输",
+	risk: "session-cleartext",
 	name: "setHeader-static-missing-secure",
 }
 
@@ -169,7 +169,7 @@ res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; HttpOnly`);
 res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; Secure; HttpOnly`);
 ```
 SOLUTION
-	risk: "会话劫持/敏感信息明文传输",
+	risk: "session-cleartext",
 	name: "setHeader-template-missing-secure",
 }
 
@@ -202,7 +202,7 @@ res.cookie('sessionId', token, { httpOnly: true, secure: false });
 res.cookie('sessionId', token, { httpOnly: true, secure: true });
 ```
 SOLUTION
-	risk: "会话劫持/敏感信息明文传输",
+	risk: "session-cleartext",
 	name: "express-cookie-secure-false",
 }
 

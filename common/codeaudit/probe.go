@@ -1,10 +1,9 @@
 package codeaudit
 
 import (
-	"os"
 	"fmt"
+	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -260,8 +259,8 @@ func detectCmsProducts(idx *FSIndex, o *ProbeOptions) []CmsDetection {
 				continue
 			}
 			for _, marker := range fp.ContentMarkers {
-				re, err := regexp.Compile(marker)
-				if err != nil {
+				re := regexpCompileCached(marker)
+				if re == nil {
 					// Fall back to plain string match
 					if strings.Contains(content, marker) {
 						contentHit = true

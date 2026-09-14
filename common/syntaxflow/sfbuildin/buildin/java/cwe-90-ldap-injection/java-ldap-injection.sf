@@ -2,7 +2,7 @@ desc(
 	title: "Check Java LDAP Injection Vulnerability"
 	title_zh: "检测Java LDAP注入漏洞"
 	type: vuln
-	risk: "LDAP注入"
+	risk: "ldap-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -116,7 +116,7 @@ DESC
 	message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
 	title: "Java LDAP Injection Vulnerability Was Detected",
 	title_zh: "检测到Java LDAP注入漏洞",
-	risk: "LDAP注入",
+	risk: "ldap-injection",
 	name: "high",
 }
 
@@ -166,7 +166,7 @@ NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchC
 DESC
 	level: "low",
 	message: "发现Java代码中可能存在LDAP注入漏洞。",
-	risk: "LDAP注入",
+	risk: "ldap-injection",
 	name: "low",
 }
 

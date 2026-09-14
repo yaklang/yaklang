@@ -75,8 +75,7 @@ type ReActLoop struct {
 	outputExampleProvider         ContextProviderFunc
 	reactiveDataBuilder           FeedbackProviderFunc
 	todoCheckpointMu              sync.Mutex
-	softTodoChecked               bool
-	softTodoCheckpointPending     bool
+	finishTodoCheckpointScope     string
 	currentTodoProgress           map[string]*currentTodoProgress
 
 	allowAIForge       func() bool
@@ -109,16 +108,12 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// memory management
-	memorySizeLimit int
-	currentMemories *omap.OrderedMap[string, *aicommon.MemoryEntity]
-	memoryTriage    aicommon.MemoryTriage
-
-	// midterm archive memory: loaded/updated alongside regular memory,
-	// rendered together with InjectedMemory in the dynamic section.
-	currentMidtermMemory string
-	midtermMemoryMu      sync.Mutex
-
-	midtermMemorySearchInFlight bool
+	memorySizeLimit          int
+	currentMemories          *omap.OrderedMap[string, *aicommon.MemoryEntity]
+	memoryTriage             aicommon.MemoryTriage
+	memoryUpdateMu           sync.Mutex
+	fastMemorySearchMu       sync.Mutex
+	fastMemorySearchInFlight bool
 
 	// task status control
 	onTaskCreated         func(task aicommon.AIStatefulTask)
@@ -258,6 +253,15 @@ type ReActLoop struct {
 	// 变更; registry 内部并发安全 (自带 mutex).
 	// 关键词: subAgentProgressRegistry, 子 Agent 进度追踪, stall heartbeat 旁路
 	subAgentProgressRegistry *ProgressRegistry
+
+	// functionCallMode enables native functioncall (tool_calls) instead of
+	// the text-based @action JSON contract. When true, each LoopAction is
+	// converted to an aispec.Tool and injected via aispec.WithTools; the model
+	// responds with tool_calls deltas which are accumulated and converted back
+	// to aicommon.Action after the stream completes. This lets the model service
+	// set stop_reason="tool_calls" and naturally reduce thinking on subsequent
+	// calls.
+	functionCallMode bool
 }
 
 // GetScenarioToolWhitelist 返回当前 loop 声明的 scenario 工具拉回名单.
@@ -522,6 +526,14 @@ func (r *ReActLoop) GetSubAgentProgressRegistry() *ProgressRegistry {
 	return r.subAgentProgressRegistry
 }
 
+// FunctionCallModeEnabled reports whether native functioncall mode is enabled.
+func (r *ReActLoop) FunctionCallModeEnabled() bool {
+	if r == nil {
+		return false
+	}
+	return r.functionCallMode
+}
+
 // SetSubAgentProgressRegistry sets the sub-agent progress registry.
 func (r *ReActLoop) SetSubAgentProgressRegistry(reg *ProgressRegistry) {
 	if r == nil || reg == nil {
@@ -640,7 +652,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		taskMutex:                    new(sync.Mutex),
 		currentMemories:              omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit:              10 * 1024,
-		currentMidtermMemory:         "",
 		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
 		actionHistory:                make([]*ActionRecord, 0),
 		actionHistoryMutex:           new(sync.Mutex),
@@ -681,6 +692,11 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {
 		r.perception = nil
+	}
+
+	// Config-level functioncall mode enable (e.g. production via WithEnableFunctionCallMode)
+	if config.GetConfigBool("EnableFunctionCallMode") {
+		r.functionCallMode = true
 	}
 
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)
@@ -935,6 +951,9 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 }
 
 func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
+	if !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		return nil, utils.Errorf("action[%s] denied by runtime policy", actionName)
+	}
 	ac, ok := r.actions.Get(actionName)
 	if ok {
 		return ac, nil
@@ -951,9 +970,14 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 }
 
 func (r *ReActLoop) GetAllActionNames() []string {
-	actionNames := r.actions.Keys()
+	var actionNames []string
+	for _, name := range r.actions.Keys() {
+		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, name) {
+			actionNames = append(actionNames, name)
+		}
+	}
 	for _, actionName := range r.loopActions.Keys() {
-		if !r.actions.Have(actionName) {
+		if !r.actions.Have(actionName) && aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
 			actionNames = append(actionNames, actionName)
 		}
 	}
@@ -961,14 +985,18 @@ func (r *ReActLoop) GetAllActionNames() []string {
 }
 
 func (r *ReActLoop) NoActions() bool {
-	return r.actions.Len() == 0 && r.loopActions.Len() == 0
+	return len(r.GetAllActionNames()) == 0
 }
 
 func (r *ReActLoop) GetAllActions() []*LoopAction {
 	var actions []*LoopAction
-	actions = append(actions, r.actions.Values()...)
+	for _, action := range r.actions.Values() {
+		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, action.ActionType) {
+			actions = append(actions, action)
+		}
+	}
 	for _, actionName := range r.loopActions.Keys() {
-		if r.actions.Have(actionName) {
+		if r.actions.Have(actionName) || !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
 			continue
 		}
 		actionFac, ok := r.loopActions.Get(actionName)

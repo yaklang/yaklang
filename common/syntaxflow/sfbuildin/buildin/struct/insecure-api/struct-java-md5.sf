@@ -1,0 +1,40 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java MD5 MessageDigest"
+	title_zh: "结构扫描：Java MD5 MessageDigest"
+	type: vuln
+	level: medium
+	rule_id: "struct-java-md5"
+	risk: "weak-cryptography"
+	desc: <<<DESC
+Flags MessageDigest.getInstance("MD5") as a Call.
+DESC
+	solution: <<<SOLUTION
+Use SHA-256 or stronger algorithms; prefer password hashing APIs for passwords.
+SOLUTION
+	alert_min: 1
+	"file://Hash.java": <<<POS
+import java.security.MessageDigest;
+class Hash {
+  void bad() throws Exception {
+    MessageDigest.getInstance("MD5");
+  }
+}
+POS
+	"safefile://HashSafe.java": <<<NEG
+class HashSafe {
+  void ok() {
+    System.out.println("sha256");
+  }
+}
+NEG
+)
+
+MessageDigest.getInstance(*?{have: "MD5"}) as $call
+alert $call for {
+	level: "medium",
+	title: "Weak MD5 Digest",
+	title_zh: "弱哈希 MD5",
+	message: "MessageDigest MD5 Call detected",
+}

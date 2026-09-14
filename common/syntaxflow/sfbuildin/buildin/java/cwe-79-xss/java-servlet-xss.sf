@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java Servlet XSS漏洞"
 	type:vuln
 	level: mid
-	risk:XSS
+	risk:"xss"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -165,7 +165,7 @@ protected void doPost(HttpServletRequest request, HttpServletResponse response)
 #### 5. 审查已有的代码
 对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
 SOLUTION
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -259,7 +259,7 @@ protected void doPost(HttpServletRequest request, HttpServletResponse response)
 #### 5. 审查已有的代码
 对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
 SOLUTION
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

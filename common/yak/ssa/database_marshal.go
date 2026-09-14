@@ -207,6 +207,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["call_arg_member"] = ret.ArgMember
 		params["call_async"] = ret.Async
 		params["call_unpack"] = ret.Unpack
+		params["call_non_virtual"] = ret.IsNonVirtual
 		params["call_drop_error"] = ret.IsDropError
 		params["call_ellipsis"] = ret.IsEllipsis
 		//params["mark_parameter_member"] = fetchIds(ret.MarkParameterMember)
@@ -419,6 +420,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 		ret.Binding = utils.MapGetMapStringInt64(params, "call_binding")
 		ret.Async = utils.MapGetBool(params, "call_async")
 		ret.Unpack = utils.MapGetBool(params, "call_unpack")
+		ret.IsNonVirtual = utils.MapGetBool(params, "call_non_virtual")
 		ret.IsDropError = utils.MapGetBool(params, "call_drop_error")
 		ret.IsEllipsis = utils.MapGetBool(params, "call_ellipsis")
 	case *Next:

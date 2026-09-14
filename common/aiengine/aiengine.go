@@ -504,6 +504,12 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 }
 
 func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
+	// Raw-event clients such as Memfit already consume the live deltas. Only
+	// read persisted content when a caller actually registered an end callback;
+	// this runs on the same queue that forwards answers and task completion.
+	if e.config.OnStreamEnd == nil && e.config.OnStreamEndWithTotal == nil {
+		return
+	}
 	streamWriterID := event.GetStreamEventWriterId()
 	if streamWriterID == "" {
 		return
@@ -532,8 +538,12 @@ func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
 	}
 
 	streamEvent := streamEvents[0]
-	e.config.OnStreamEnd(e.operator, streamEvent, streamEvent.NodeId)
-	e.config.OnStreamEndWithTotal(e.operator, streamEvent, streamEvent.NodeId, streamEvent.StreamDelta)
+	if e.config.OnStreamEnd != nil {
+		e.config.OnStreamEnd(e.operator, streamEvent, streamEvent.NodeId)
+	}
+	if e.config.OnStreamEndWithTotal != nil {
+		e.config.OnStreamEndWithTotal(e.operator, streamEvent, streamEvent.NodeId, streamEvent.StreamDelta)
+	}
 }
 
 // buildReActOptions 构建 ReAct 配置选项
@@ -553,6 +563,7 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		// S3c: PersistentSessionId/MemoryTriageId 移到字面量后 append,以便
 		// 无状态模式短路(留空 → re-act.go 四个落盘分支跳过)。
 		aicommon.WithEnablePETaskAnalyze(true),
+		aicommon.WithAllowSyncInitContext(config.AllowSyncInitContext),
 
 		// 事件处理
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

@@ -73,17 +73,18 @@ func formatPathListForFeedback(paths []string, maxShow int) string {
 // Reads of non-target paths or already-marked files are not counted (see phase2_read_file_guard.go).
 func buildPhase2PhaseBReadRepeatGuard(scan *ScanState) reactloops.ToolInvokeGuard {
 	return func(toolName string, params aitool.InvokeParams) (bool, string) {
-		if toolName != "read_file" || scan.CurrentPhase() != ScanPhaseAudit {
+		if toolName != "read_file" {
 			return true, ""
 		}
 		if len(params) == 0 {
 			return true, ""
 		}
 		file := strings.TrimSpace(utils.InterfaceToString(params["file"]))
-		if file == "" || !scan.IsTargetFile(file) || scan.IsFileAudited(file) {
+		// 单次读锁取齐 guard 所需状态（原为 phase/target/audited/count 4 次独立加锁）。
+		phase, isTarget, audited, count := scan.PhaseBReadGuardSnapshot(file)
+		if phase != ScanPhaseAudit || file == "" || !isTarget || audited {
 			return true, ""
 		}
-		count := scan.PhaseBReadCount(file)
 		if count < phase2MaxPhaseBReadsPerFile {
 			return true, ""
 		}

@@ -149,6 +149,10 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 	log.Infof("测试完成: 任务ID=%s, 规则进度回调次数=%d", taskID, ruleProgress.Count())
 }
 
+func TestExportsExposeProcessRuleDetail(t *testing.T) {
+	require.NotNil(t, Exports["withProcessRuleDetail"])
+}
+
 func TestStartScan_CustomRuleInput_NoLanguage_NotSkipped(t *testing.T) {
 	progID := uuid.NewString()
 	f := prepareTestProgram(t, progID)

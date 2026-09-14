@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -26,12 +25,10 @@ import (
 
 	"github.com/antchfx/xmlquery"
 	"github.com/yaklang/pcap"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/twofa"
-	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/utils/xmlfmt"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -54,6 +51,61 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/scannode"
 )
+
+type embedHashConfig struct {
+	constName     string
+	defaultOutput string
+	comment       string
+	exts          []string
+}
+
+var embedHashConfigs = map[string]*embedHashConfig{
+	"coreplugin": {
+		constName:     "ExistedCorePluginEmbedFSHash",
+		defaultOutput: "common/consts/coreplugin-hash.go",
+		comment: `// ExistedCorePluginEmbedFSHash contains the SHA256 hash of the embedded core plugin filesystem.
+// This hash is used to verify the integrity of core plugins and detect changes in the plugin bundle.
+// The hash is automatically generated during the build process and should not be manually modified.`,
+		exts: []string{".yak"},
+	},
+	"syntaxflow": {
+		constName:     "ExistedSyntaxFlowEmbedFSHash",
+		defaultOutput: "common/consts/syntaxflow-hash.go",
+		comment: `// ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
+// This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
+// The hash is automatically calculated from the SyntaxFlow rule files during compilation.`,
+		exts: []string{".sf"},
+	},
+	"forge": {
+		constName:     "ExistedBuildInForgeEmbedFSHash",
+		defaultOutput: "common/consts/forge-hash.go",
+		comment: `// ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
+// This hash is used to verify the integrity of the built-in forge templates and resources.
+// The forge system provides templates for code generation and vulnerability testing scenarios.`,
+	},
+	"aitool": {
+		constName:     "ExistedBuildInAIToolEmbedFSHash",
+		defaultOutput: "common/consts/aitool-hash.go",
+		comment: `// ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
+// This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
+// These tools include AI-powered analysis engines and machine learning models for security testing.`,
+		exts: []string{".yak"},
+	},
+}
+
+func resolveHashOutputFile(config *embedHashConfig) string {
+	candidates := []string{
+		config.defaultOutput,
+		"consts/" + filepath.Base(config.defaultOutput),
+		filepath.Base(config.defaultOutput),
+	}
+	for _, p := range candidates {
+		if utils.IsFile(p) {
+			return p
+		}
+	}
+	return config.defaultOutput
+}
 
 var UtilsCommands = []*cli.Command{
 	VacuumSQLiteCommand,
@@ -87,8 +139,8 @@ var UtilsCommands = []*cli.Command{
 		},
 	},
 	{
-		Name:  "embed-fs-hash", // 此命令会被CI调用，用于自动生成hash.go文件。如果希望在提交代码时自动更新静态资源的哈希值，需要在.github/workflows/update-embed-fs.yml中添加对应的静态资源路径
-		Usage: `Generate Current Embed File System(yak/syntaxflow/aiforge/aitool) Hash`,
+		Name:  "embed-fs-hash", // 此命令会被CI调用，用于自动生成hash文件。如果希望在提交代码时自动更新静态资源的哈希值，需要在.github/workflows/update-embed-fs.yml中添加对应的静态资源路径
+		Usage: `Generate Embed File System Hash (coreplugin/syntaxflow/aiforge/aitool)`,
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name: "type",
@@ -99,163 +151,105 @@ var UtilsCommands = []*cli.Command{
 			cli.BoolFlag{
 				Name: "all",
 			},
+			cli.StringFlag{
+				Name: "dir",
+			},
+			cli.StringFlag{
+				Name: "output-file",
+			},
 		},
 		Action: func(c *cli.Context) error {
-			templs := []string{
-				"common/consts/hash.go",
-				"consts/hash.go",
+			typ := strings.ToLower(c.String("type"))
+			useAll := c.Bool("all")
+			dir := c.String("dir")
+			outputFile := c.String("output-file")
+
+			if useAll && dir != "" {
+				return utils.Error("--all cannot be combined with --dir")
 			}
-			template := utils.GetFirstExistedFile(templs...)
-			if c.Bool("override") && template == "" {
-				return utils.Errorf("template not found, in %v", templs)
+
+			var types []string
+			switch {
+			case useAll:
+				types = []string{"coreplugin", "syntaxflow", "forge", "aitool"}
+			case typ == "coreplugin" || typ == "yak" || typ == "yaklang":
+				types = []string{"coreplugin"}
+			case typ == "sf" || typ == "syntaxflow" || typ == "sast":
+				types = []string{"syntaxflow"}
+			case typ == "forge":
+				types = []string{"forge"}
+			case typ == "aitool":
+				types = []string{"aitool"}
+			case typ == "":
+				return utils.Error("--type is required (or use --all)")
+			default:
+				return utils.Errorf("invalid type: %s", typ)
 			}
 
-			rets := []string{strings.ToLower(c.String("type"))}
-			if c.Bool("all") {
-				rets = []string{"yak", "syntaxflow", "forge", "aitool"}
-			}
-			for _, ret := range rets {
-				switch ret {
-				case "coreplugin", "yak", "yaklang":
-					result, err := coreplugin.CorePluginHash()
-					if err != nil {
-						return err
-					}
-					fmt.Println(result)
-					if c.Bool("override") {
-						if consts.ExistedCorePluginEmbedFSHash == result {
-							continue
-						}
-						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
-							return utils.Errorf("invalid hash: %v", result)
-						}
-						templ, err := os.ReadFile(template)
-						if err != nil {
-							return err
-						}
-
-						re := regexp.MustCompile(`(const ExistedCorePluginEmbedFSHash string = ")([a-zA-Z0-9]+)(")`)
-						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
-						err = os.RemoveAll(template + ".bak")
-						if err != nil {
-							return err
-						}
-						err = os.Rename(template, template+".bak")
-						if err != nil {
-							return err
-						}
-						err = os.WriteFile(template, []byte(newContent), 0o644)
-						if err != nil {
-							return err
-						}
-						continue
-					}
-				case "sf", "syntaxflow", "sast":
-					result, err := sfbuildin.SyntaxFlowRuleHash()
-					if err != nil {
-						return err
-					}
-					fmt.Println(result)
-					if c.Bool("override") {
-						if consts.ExistedSyntaxFlowEmbedFSHash == result {
-							continue
-						}
-						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
-							return utils.Errorf("invalid hash: %v", result)
-						}
-						templ, err := os.ReadFile(template)
-						if err != nil {
-							return err
-						}
-
-						re := regexp.MustCompile(`(const ExistedSyntaxFlowEmbedFSHash string = ")([a-zA-Z0-9]+)(")`)
-						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
-						err = os.RemoveAll(template + ".bak")
-						if err != nil {
-							return err
-						}
-						err = os.Rename(template, template+".bak")
-						if err != nil {
-							return err
-						}
-						err = os.WriteFile(template, []byte(newContent), 0o644)
-						if err != nil {
-							return err
-						}
-					}
-				case "forge":
-					result, err := aiforge.BuildInForgeHash()
-					if err != nil {
-						return err
-					}
-					fmt.Println(result)
-					if c.Bool("override") {
-						if consts.ExistedBuildInForgeEmbedFSHash == result {
-							continue
-						}
-						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
-							return utils.Errorf("invalid hash: %v", result)
-						}
-						templ, err := os.ReadFile(template)
-						if err != nil {
-							return err
-						}
-
-						re := regexp.MustCompile(`(const ExistedBuildInForgeEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
-						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
-						err = os.RemoveAll(template + ".bak")
-						if err != nil {
-							return err
-						}
-						err = os.Rename(template, template+".bak")
-						if err != nil {
-							return err
-						}
-						err = os.WriteFile(template, []byte(newContent), 0o644)
-						if err != nil {
-							return err
-						}
-					}
-				case "aitool":
-					result, err := yakscripttools.BuildInAIToolHash()
-					if err != nil {
-						return err
-					}
-					fmt.Println(result)
-					if c.Bool("override") {
-						if consts.ExistedBuildInAIToolEmbedFSHash == result {
-							continue
-						}
-						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
-							return utils.Errorf("invalid hash: %v", result)
-						}
-						templ, err := os.ReadFile(template)
-						if err != nil {
-							return err
-						}
-
-						re := regexp.MustCompile(`(const ExistedBuildInAIToolEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
-						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
-						err = os.RemoveAll(template + ".bak")
-						if err != nil {
-							return err
-						}
-						err = os.Rename(template, template+".bak")
-						if err != nil {
-							return err
-						}
-						err = os.WriteFile(template, []byte(newContent), 0o644)
-						if err != nil {
-							return err
-						}
-					}
-				default:
-					if ret == "" {
-						return utils.Error("empty type")
-					}
-					return utils.Error("invalid type: " + c.String("type"))
+			for _, t := range types {
+				config := embedHashConfigs[t]
+				if config == nil {
+					return utils.Errorf("unsupported type: %s", t)
 				}
-				continue
+
+				var hash string
+				var err error
+				if dir != "" {
+					if len(config.exts) > 0 {
+						hash, err = filesys.CreateLocalFSHash(dir, filesys.WithIncludeExts(config.exts...))
+					} else {
+						hash, err = filesys.CreateLocalFSHash(dir)
+					}
+					if err != nil {
+						return utils.Wrapf(err, "calculate %s hash failed", config.constName)
+					}
+				} else {
+					switch t {
+					case "coreplugin":
+						hash, err = coreplugin.CorePluginHash()
+					case "syntaxflow":
+						hash, err = sfbuildin.SyntaxFlowRuleHash()
+					case "forge":
+						hash, err = aiforge.BuildInForgeHash()
+					case "aitool":
+						hash, err = yakscripttools.BuildInAIToolHash()
+					}
+					if err != nil {
+						return err
+					}
+				}
+				fmt.Println(hash)
+
+				target := outputFile
+				if target == "" {
+					if dir != "" {
+						continue // --dir without --output-file: print only
+					}
+					if !c.Bool("override") {
+						continue // legacy mode: print only without --override
+					}
+					target = resolveHashOutputFile(config)
+				}
+
+				content := fmt.Sprintf(`// Code generated by yak embed-fs-hash DO NOT EDIT.
+// nolint: golint
+package consts
+
+%s
+const %s string = %q
+`, config.comment, config.constName, hash)
+
+				if old, err := os.ReadFile(target); err == nil && string(old) == content {
+					log.Infof("%s hash unchanged, skip writing %s", config.constName, target)
+					continue
+				}
+				if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+					return err
+				}
+				log.Infof("write %s hash to %s", config.constName, target)
 			}
 			return nil
 		},
