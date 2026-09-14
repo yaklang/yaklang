@@ -5,12 +5,31 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+func TestLanguageFromRuleFileName(t *testing.T) {
+	t.Run("source prefix", func(t *testing.T) {
+		lang, err := languageFromRuleFileName("source-java-cookie-httponly-false.sf")
+		require.NoError(t, err)
+		require.Equal(t, ssaconfig.JAVA, lang)
+	})
+	t.Run("struct prefix", func(t *testing.T) {
+		lang, err := languageFromRuleFileName("struct-java-system-load.sf")
+		require.NoError(t, err)
+		require.Equal(t, ssaconfig.JAVA, lang)
+	})
+	t.Run("plain language prefix", func(t *testing.T) {
+		lang, err := languageFromRuleFileName("golang-database-sql.sf")
+		require.NoError(t, err)
+		require.Equal(t, ssaconfig.GO, lang)
+	})
+}
 
 func AddGroupForRule(db *gorm.DB, ruleName, groupName string) error {
 	_, err := BatchAddGroupsForRules(db, []string{ruleName}, []string{groupName})

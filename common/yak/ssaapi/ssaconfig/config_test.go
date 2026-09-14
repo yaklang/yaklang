@@ -176,6 +176,15 @@ func TestWithScanRaw(t *testing.T) {
 	require.Equal(t, "project", cfg.BaseInfo.ProjectName)
 	require.Same(t, req.Filter, cfg.GetRuleFilter())
 	require.Same(t, req.RuleInput, cfg.GetRuleInput()[0])
+
+	cfg, err = New(ModeSyntaxFlowScan)
+	require.NoError(t, err)
+	err = WithScanRaw(&ypb.SyntaxFlowScanRequest{
+		ControlMode: string(ControlModeStart),
+		ProgramName: []string{"only-prog"},
+	})(cfg)
+	require.NoError(t, err)
+	require.Equal(t, []string{"only-prog"}, cfg.BaseInfo.ProgramNames)
 }
 
 func TestExtraInfo(t *testing.T) {

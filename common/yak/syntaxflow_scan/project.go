@@ -123,20 +123,26 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		emit(StageReview, 1, nil)
 	}
 
-	if wantSource && hasProgram && !inspectedLive {
-		emit(StageInspect, 0, nil)
-		if err := StartScan(ctx, inspectCompiledSourceOptions(cfg, emit)...); err != nil {
+	// Already-compiled programs (gRPC/program name) must use one StartScan so
+	// clients keep a single task ID. Source rules attach via IrSource; SSA
+	// rules run on the program. After a live inspect, only SSA remains.
+	if hasProgram && (wantAnalyze || (wantSource && !inspectedLive)) {
+		runSource := wantSource && !inspectedLive
+		if runSource {
+			emit(StageInspect, 0, nil)
+		}
+		if wantAnalyze {
+			emit(StageAnalyze, 0, nil)
+		}
+		if err := StartScan(ctx, compiledProgramScanOptions(cfg, emit, runSource, wantAnalyze)...); err != nil {
 			return err
 		}
-		emit(StageInspect, 1, nil)
-	}
-
-	if wantAnalyze && hasProgram {
-		emit(StageAnalyze, 0, nil)
-		if err := StartScan(ctx, analyzeOptions(cfg, emit)...); err != nil {
-			return err
+		if runSource {
+			emit(StageInspect, 1, nil)
 		}
-		emit(StageAnalyze, 1, nil)
+		if wantAnalyze {
+			emit(StageAnalyze, 1, nil)
+		}
 	}
 
 	if !wantSource && !wantReview && !wantAnalyze {
@@ -334,21 +340,41 @@ func inspectLiveSourceOptions(cfg *Config, emit func(ProductStage, float64, *Rul
 }
 
 func inspectCompiledSourceOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {
-	opts := programScanOptions(cfg)
-	opts = append(opts,
-		WithCompiledSource(true),
-		ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SOURCE)),
-		WithProcessCallback(wrapStageProcess(cfg, StageInspect, emit)),
-	)
-	return opts
+	return compiledProgramScanOptions(cfg, emit, true, false)
 }
 
 func analyzeOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {
+	return compiledProgramScanOptions(cfg, emit, false, true)
+}
+
+func compiledProgramScanOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList), wantSource, wantAnalyze bool) []ssaconfig.Option {
 	opts := programScanOptions(cfg)
-	opts = append(opts,
-		ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SSA)),
-		WithProcessCallback(wrapStageProcess(cfg, StageAnalyze, emit)),
-	)
+	if wantSource {
+		opts = append(opts, WithCompiledSource(true))
+	}
+	switch {
+	case wantSource && !wantAnalyze:
+		opts = append(opts, ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SOURCE)))
+	case wantAnalyze && !wantSource:
+		opts = append(opts, ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SSA)))
+	}
+	opts = append(opts, WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+		switch {
+		case wantSource && wantAnalyze:
+			if progress < 0.5 {
+				emit(StageInspect, progress*2, info)
+			} else {
+				emit(StageAnalyze, (progress-0.5)*2, info)
+			}
+		case wantSource:
+			emit(StageInspect, progress, info)
+		case wantAnalyze:
+			emit(StageAnalyze, progress, info)
+		}
+		if cfg != nil && cfg.ProcessCallback != nil {
+			cfg.ProcessCallback(taskID, status, progress, info)
+		}
+	}))
 	return opts
 }
 
@@ -393,6 +419,9 @@ func programScanOptions(cfg *Config) []ssaconfig.Option {
 	}
 	if len(cfg.Programs) > 0 {
 		opts = append(opts, WithPrograms(cfg.Programs...))
+	}
+	if names := cfg.GetProgramNames(); len(names) > 0 {
+		opts = append(opts, ssaconfig.WithProgramNames(names...))
 	}
 	if len(cfg.QueryTargets) > 0 {
 		opts = append(opts, WithQueryTargets(cfg.QueryTargets...))

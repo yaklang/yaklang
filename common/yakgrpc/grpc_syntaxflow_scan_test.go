@@ -419,11 +419,14 @@ func startScanWithConcurrency(client ypb.YakClient, t *testing.T, progID string,
 		},
 	})
 
-	resp, err := stream.Recv()
-	require.NoError(t, err)
-	log.Infof("resp: %v", resp)
-	taskID := resp.TaskID
-	return taskID, stream
+	for {
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		if resp.TaskID != "" {
+			return resp.TaskID, stream
+		}
+	}
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
@@ -591,10 +594,16 @@ func checkGRPCScanWithContentTest(t *testing.T, client ypb.YakClient, config GRP
 		},
 	})
 
-	resp, err := stream.Recv()
-	require.NoError(t, err, "[checkGRPCScanWithContentTest] Failed to receive initial response")
-	log.Infof("[checkGRPCScanWithContentTest] Step 2: Scan started, task ID: %s", resp.TaskID)
-	taskID := resp.TaskID
+	var taskID string
+	for {
+		resp, err := stream.Recv()
+		require.NoError(t, err, "[checkGRPCScanWithContentTest] Failed to receive initial response")
+		log.Infof("[checkGRPCScanWithContentTest] Step 2: Scan started, task ID: %s", resp.TaskID)
+		if resp.TaskID != "" {
+			taskID = resp.TaskID
+			break
+		}
+	}
 
 	// 检查扫描消息
 	log.Infof("[checkGRPCScanWithContentTest] Step 3: Checking scan messages")
