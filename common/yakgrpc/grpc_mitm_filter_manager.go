@@ -128,7 +128,7 @@ func (m *MITMFilter) updateMatcher() {
 	m.Filters.ExcludeSuffixMatcher = FilterDataToMatchers(m.Data.ExcludeSuffix)
 	m.Filters.IncludeSuffixMatcher = FilterDataToMatchers(m.Data.IncludeSuffix)
 
-	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames, true) // 支持逗号分隔多域名
+	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames, true) // 支持逗号/分号/换行分隔多域名
 	m.Filters.IncludeHostnamesMatcher = FilterDataToMatchers(m.Data.IncludeHostnames, true)
 
 	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(m.Data.ExcludeUri)
@@ -159,21 +159,30 @@ func (m *MITMFilter) Update(data *ypb.MITMFilterData) {
 	m.updateMatcher()
 }
 
-// expandGroupByComma 将 Group 中逗号分隔的字符串展开为多个独立项，便于一条规则内支持多域名输入
-func expandGroupByComma(group []string) []string {
+// expandGroupByDelimiter 将 Group 中以逗号/分号/换行分隔的字符串展开为多个独立项，
+// 便于一条规则内支持多值输入（与前端「逗号、分号或换行分隔」提示一致）。
+func expandGroupByDelimiter(group []string) []string {
 	var result []string
 	for _, s := range group {
-		if strings.Contains(s, ",") {
-			for _, part := range strings.Split(s, ",") {
-				if trimmed := strings.TrimSpace(part); trimmed != "" {
-					result = append(result, trimmed)
-				}
-			}
-		} else {
+		if !strings.ContainsAny(s, ",;\n\r") {
 			result = append(result, s)
+			continue
+		}
+		for _, part := range splitByCommaSemicolonNewline(s) {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				result = append(result, trimmed)
+			}
 		}
 	}
 	return result
+}
+
+// splitByCommaSemicolonNewline 按「逗号 / 分号 / 换行（含 CRLF）」拆分字符串，
+// 各分隔符地位等同，连续分隔符不会产生空段。
+func splitByCommaSemicolonNewline(s string) []string {
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\r'
+	})
 }
 
 func FilterDataToMatchers(data []*ypb.FilterDataItem, expandCommaSeparated ...bool) *httptpl.YakMatcher {
@@ -182,7 +191,7 @@ func FilterDataToMatchers(data []*ypb.FilterDataItem, expandCommaSeparated ...bo
 	for _, datum := range data {
 		group := datum.Group
 		if doExpand {
-			group = expandGroupByComma(group)
+			group = expandGroupByDelimiter(group)
 		}
 		matcher := &httptpl.YakMatcher{
 			MatcherType: datum.MatcherType,
