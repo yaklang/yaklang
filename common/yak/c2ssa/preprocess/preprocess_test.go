@@ -1,11 +1,16 @@
 package preprocess
 
 import (
+	"archive/zip"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 func TestApplyDefineLineObject(t *testing.T) {
@@ -132,7 +137,9 @@ func TestTU_PreservesMultilineComment(t *testing.T) {
 int main() { return 0; }
 `
 	require.NoError(t, fs.WriteFile("apps/configutl.c", []byte(src), 0o644))
-	project := BuildProject(fs, DefaultConfig())
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{}
+	project := BuildProject(fs, cfg)
 	out, err := project.PreprocessTU("apps/configutl.c", src)
 	require.NoError(t, err)
 	require.Contains(t, out, "/*")
@@ -333,6 +340,228 @@ func TestLookupObject_ChainMatchesFlatten(t *testing.T) {
 		require.Equal(t, wantOK, gotOK, "name=%s", name)
 		require.Equal(t, want, got, "name=%s", name)
 	}
+}
+
+func TestTU_ExternalInclude_ListForeach(t *testing.T) {
+	ext := filesys.NewVirtualFs()
+	require.NoError(t, ext.WriteFile("sys/queue.h", []byte(`
+#define LIST_FOREACH(var, head, field) \
+	for ((var) = ((head)->lh_first); (var); (var) = ((var)->field.le_next))
+`), 0o644))
+
+	fs := filesys.NewVirtualFs()
+	src := `#include <sys/queue.h>
+void walk(void) {
+	LIST_FOREACH(n, &head, next) { use(n); }
+}
+`
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{}
+	cfg.ExternalIncludeFS = []fi.FileSystem{ext}
+	project := BuildProject(fs, cfg)
+
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.NotContains(t, out, `#include <sys/queue.h>`)
+	require.NotContains(t, out, "LIST_FOREACH")
+	require.Contains(t, out, "lh_first")
+	require.Contains(t, out, "le_next")
+}
+
+func TestTU_ProjectHeaderFollowsExternalInclude(t *testing.T) {
+	ext := filesys.NewVirtualFs()
+	require.NoError(t, ext.WriteFile("sys/queue.h", []byte("#define LIST_EMPTY(head) ((head)->lh_first == NULL)\n"), 0o644))
+
+	fs := filesys.NewVirtualFs()
+	require.NoError(t, fs.WriteFile("include/event-internal.h", []byte("#include <sys/queue.h>\n"), 0o644))
+	src := "int empty = LIST_EMPTY(&head);\n"
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.IncludeDirs = []string{"include"}
+	cfg.ExternalIncludeDirs = []string{}
+	cfg.ExternalIncludeFS = []fi.FileSystem{ext}
+	project := BuildProject(fs, cfg)
+
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.NotContains(t, out, "LIST_EMPTY")
+	require.Contains(t, out, "lh_first")
+}
+
+func TestTU_ExternalInclude_NestedWindowsMacros(t *testing.T) {
+	ext := filesys.NewVirtualFs()
+	require.NoError(t, ext.WriteFile("windef.h", []byte("#define WINAPI __stdcall\n"), 0o644))
+	require.NoError(t, ext.WriteFile("windows.h", []byte(`#include <windef.h>
+#define CALLBACK WINAPI
+`), 0o644))
+
+	fs := filesys.NewVirtualFs()
+	src := `#include <windows.h>
+typedef void (WINAPI *handler)(void);
+typedef void (CALLBACK *cb)(void);
+`
+	require.NoError(t, fs.WriteFile("apps/win.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{}
+	cfg.ExternalIncludeFS = []fi.FileSystem{ext}
+	project := BuildProject(fs, cfg)
+
+	out, err := project.PreprocessTU("apps/win.c", src)
+	require.NoError(t, err)
+	require.NotContains(t, out, "WINAPI")
+	require.NotContains(t, out, "CALLBACK")
+	require.Contains(t, out, "__stdcall")
+}
+
+func TestTU_ExternalInclude_ZipRoot(t *testing.T) {
+	zipPath := filepath.Join(t.TempDir(), "c-headers.zip")
+	writeTestZip(t, zipPath, map[string]string{
+		"include/sys/queue.h": "#define LIST_END(head) ((void *)0)\n",
+	})
+
+	fs := filesys.NewVirtualFs()
+	src := `#include <sys/queue.h>
+void *p = LIST_END(&head);
+`
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{zipPath}
+	project := BuildProject(fs, cfg)
+	t.Cleanup(func() { _ = project.Close() })
+
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.NotContains(t, out, "LIST_END")
+	require.Contains(t, strings.ReplaceAll(out, " ", ""), "p=((void*)0)")
+}
+
+func TestTU_ExternalInclude_DirRoot(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sys"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "sys", "queue.h"), []byte("#define Q_EMPTY 1\n"), 0o644))
+
+	fs := filesys.NewVirtualFs()
+	src := `#include <sys/queue.h>
+int x = Q_EMPTY;
+`
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{dir}
+	project := BuildProject(fs, cfg)
+
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.Contains(t, strings.ReplaceAll(out, " ", ""), "x=1")
+}
+
+func TestTU_SkipSystemInclude_WithoutExternal(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	src := `#include <stdio.h>
+int x = LIST_FOREACH;
+`
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{}
+	project := BuildProject(fs, cfg)
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.NotContains(t, out, `#include <stdio.h>`)
+	require.Contains(t, out, "LIST_FOREACH")
+}
+
+func TestTU_ExternalInclude_KeepsTypesDropsFunctions(t *testing.T) {
+	ext := filesys.NewVirtualFs()
+	require.NoError(t, ext.WriteFile("sys/demo.h", []byte(`
+#define DEMO_MAGIC 7
+typedef unsigned int demo_size_t;
+struct demo_node {
+	int value;
+};
+int demo_library_func(int x);
+static inline int demo_inline(void) { return 1; }
+`), 0o644))
+
+	fs := filesys.NewVirtualFs()
+	src := `#include <sys/demo.h>
+demo_size_t n = DEMO_MAGIC;
+`
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.ExternalIncludeDirs = []string{}
+	cfg.ExternalIncludeFS = []fi.FileSystem{ext}
+	project := BuildProject(fs, cfg)
+
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.Contains(t, strings.ReplaceAll(out, " ", ""), "n=7")
+	require.Contains(t, out, "typedef unsigned int demo_size_t")
+	require.Contains(t, out, "struct demo_node")
+	require.NotContains(t, out, "demo_library_func")
+	require.NotContains(t, out, "demo_inline")
+}
+
+func TestTU_YakitHomeCHeaders_CopyAndExpand(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("YAKIT_HOME", home)
+
+	headerSrcDir := t.TempDir()
+	srcHeader := filepath.Join(headerSrcDir, "demo.h")
+	require.NoError(t, os.WriteFile(srcHeader, []byte(`
+#define HOME_MAGIC 99
+typedef unsigned long home_size_t;
+int home_library_should_not_import(void);
+`), 0o644))
+
+	dstHeader := filepath.Join(consts.GetDefaultCHeadersDir(), "sys", "demo.h")
+	copyFileTo(t, srcHeader, dstHeader)
+
+	fs := filesys.NewVirtualFs()
+	src := `#include <sys/demo.h>
+home_size_t n = HOME_MAGIC;
+`
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	require.Contains(t, cfg.ExternalIncludeDirs, consts.GetDefaultCHeadersDir())
+	project := BuildProject(fs, cfg)
+	t.Cleanup(func() { _ = project.Close() })
+
+	out, err := project.PreprocessTU("apps/foo.c", src)
+	require.NoError(t, err)
+	require.Contains(t, strings.ReplaceAll(out, " ", ""), "n=99")
+	require.Contains(t, out, "typedef unsigned long home_size_t")
+	require.NotContains(t, out, "home_library_should_not_import")
+	require.NotContains(t, out, "HOME_MAGIC")
+}
+
+func copyFileTo(t *testing.T, src, dst string) {
+	t.Helper()
+	data, err := os.ReadFile(src)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(dst), 0o755))
+	require.NoError(t, os.WriteFile(dst, data, 0o644))
+}
+
+func writeTestZip(t *testing.T, zipPath string, files map[string]string) {
+	t.Helper()
+	f, err := os.Create(zipPath)
+	require.NoError(t, err)
+	defer f.Close()
+	w := zip.NewWriter(f)
+	for name, content := range files {
+		fw, err := w.Create(name)
+		require.NoError(t, err)
+		_, err = fw.Write([]byte(content))
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
 }
 
 func ppMustRead(fs *filesys.VirtualFS, path string) string {

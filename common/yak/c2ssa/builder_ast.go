@@ -493,6 +493,38 @@ func (b *astbuilder) buildMacroCallStatement(ast *cparser.MacroCallStatementCont
 	}
 }
 
+func (b *astbuilder) buildMacroIterationStatement(ast *cparser.MacroIterationStatementContext) {
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if mal := ast.MacroArgumentList(); mal != nil {
+		_ = b.buildMacroArgumentList(mal.(*cparser.MacroArgumentListContext))
+	}
+	if c := ast.CompoundStatement(); c != nil {
+		b.buildCompoundStatement(c.(*cparser.CompoundStatementContext), true)
+		return
+	}
+	if s := ast.SelectionStatement(); s != nil {
+		b.buildSelectionStatement(s.(*cparser.SelectionStatementContext))
+		return
+	}
+	if i := ast.IterationStatement(); i != nil {
+		b.buildIterationStatement(i.(*cparser.IterationStatementContext))
+		return
+	}
+	if j := ast.JumpStatement(); j != nil {
+		b.buildJumpStatement(j.(*cparser.JumpStatementContext))
+		return
+	}
+	if e := ast.ExpressionStatement(); e != nil {
+		b.buildExpressionStatement(e.(*cparser.ExpressionStatementContext))
+		return
+	}
+	if nested := ast.MacroIterationStatement(); nested != nil {
+		b.buildMacroIterationStatement(nested.(*cparser.MacroIterationStatementContext))
+	}
+}
+
 // applyPointerModifiers 应用指针修饰符到类型上
 func (b *astbuilder) applyPointerModifiers(pointer *cparser.PointerContext, value ssa.Value) {
 	if pointer == nil || value == nil {
@@ -924,6 +956,9 @@ func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifier
 				ret = ssa.CreateAnyType()
 			}
 		}
+	} else if mce := ast.MacroCallExpression(); mce != nil {
+		_ = b.buildMacroCallExpression(mce.(*cparser.MacroCallExpressionContext))
+		ret = ssa.CreateAnyType()
 	}
 
 	if ret == nil {
@@ -1103,33 +1138,36 @@ func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext, defaultValu
 	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if id := ast.Identifier(); id != nil {
-		enumName := id.GetText()
-		var enumValue ssa.Value
-
-		// 处理显式值或使用默认值
-		if e := ast.Expression(); e != nil {
-			// 有显式值
-			enumValue, _ = b.buildExpression(e.(*cparser.ExpressionContext), false)
-			if enumValue == nil {
-				enumValue = b.EmitConstInst(defaultValue)
-			}
-		} else {
-			// 没有显式值，使用默认值（自动递增）
+	finish := func(name string, enumValue ssa.Value) ssa.Value {
+		if enumValue == nil {
 			enumValue = b.EmitConstInst(defaultValue)
 		}
-
-		// 确保值是整数类型
-		if enumValue != nil {
-			enumValue.SetType(ssa.CreateNumberType())
-			// 将枚举常量添加到特殊值中，使其可以作为常量使用
-			b.addSpecialValue(enumName, enumValue)
+		enumValue.SetType(ssa.CreateNumberType())
+		if name != "" {
+			b.addSpecialValue(name, enumValue)
 		}
-
 		return enumValue
 	}
 
-	return nil
+	if id := ast.Identifier(); id != nil {
+		var enumValue ssa.Value
+		if e := ast.Expression(0); e != nil {
+			enumValue, _ = b.buildExpression(e.(*cparser.ExpressionContext), false)
+		}
+		return finish(id.GetText(), enumValue)
+	}
+
+	// Parenthesized enumerator names from expanded macros: `(1U << 0) = (int)(1U << 0)`
+	exprs := ast.AllExpression()
+	if len(exprs) >= 2 {
+		enumValue, _ := b.buildExpression(exprs[1].(*cparser.ExpressionContext), false)
+		return finish("", enumValue)
+	}
+	if len(exprs) == 1 {
+		enumValue, _ := b.buildExpression(exprs[0].(*cparser.ExpressionContext), false)
+		return finish("", enumValue)
+	}
+	return finish("", nil)
 }
 
 func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpecifierContext) ssa.Type {
@@ -1189,6 +1227,19 @@ func (b *astbuilder) buildStructDeclaration(ast *cparser.StructDeclarationContex
 		}
 	} else if sa := ast.StaticAssertDeclaration(); sa != nil {
 		b.buildStaticAssertDeclaration(sa.(*cparser.StaticAssertDeclarationContext))
+	} else if mce := ast.MacroCallExpression(); mce != nil {
+		_ = b.buildMacroCallExpression(mce.(*cparser.MacroCallExpressionContext))
+		if sd := ast.StructDeclaratorList(); sd != nil {
+			fieldType := ssa.CreateAnyType()
+			for _, s := range sd.AllStructDeclarator() {
+				sc := s.(*cparser.StructDeclaratorContext)
+				l := b.buildStructDeclarator(sc)
+				if utils.IsNil(l) {
+					continue
+				}
+				structTyp.AddField(b.EmitConstInst(l.GetName()), fieldType)
+			}
+		}
 	}
 }
 
@@ -1308,6 +1359,8 @@ func (b *astbuilder) buildStatement(ast *cparser.StatementContext) {
 	} else if mcs := ast.MacroCallStatement(); mcs != nil {
 		// 处理宏调用语句（如 FF_DISABLE_DEPRECATION_WARNINGS）
 		b.buildMacroCallStatement(mcs.(*cparser.MacroCallStatementContext))
+	} else if mi := ast.MacroIterationStatement(); mi != nil {
+		b.buildMacroIterationStatement(mi.(*cparser.MacroIterationStatementContext))
 	} else if id := ast.Identifier(); id != nil {
 		b.buildLabeledStatement(ast, id.GetText())
 	}

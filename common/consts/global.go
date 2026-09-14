@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	YAK_BRIDGE_REMOTE_REVERSE_ADDR = "YAK_BRIDGE_REMOTE_REVERSE_ADDR"
-	YAK_BRIDGE_LOCAL_REVERSE_ADDR      = "YAK_BRIDGE_LOCAL_REVERSE_ADDR"
-	YAK_CONFIGURED_LOCAL_REVERSE_HOST  = "YAK_CONFIGURED_LOCAL_REVERSE_HOST"
-	YAK_BRIDGE_ADDR                = "YAK_BRIDGE_ADDR"
-	YAK_BRIDGE_SECRET              = "YAK_BRIDGE_SECRET"
-	YAK_DNSLOG_BRIDGE_ADDR         = "YAK_DNSLOG_BRIDGE_ADDR"
-	YAK_DNSLOG_BRIDGE_PASSWORD     = "YAK_DNSLOG_BRIDGE_PASSWORD"
+	YAK_BRIDGE_REMOTE_REVERSE_ADDR    = "YAK_BRIDGE_REMOTE_REVERSE_ADDR"
+	YAK_BRIDGE_LOCAL_REVERSE_ADDR     = "YAK_BRIDGE_LOCAL_REVERSE_ADDR"
+	YAK_CONFIGURED_LOCAL_REVERSE_HOST = "YAK_CONFIGURED_LOCAL_REVERSE_HOST"
+	YAK_BRIDGE_ADDR                   = "YAK_BRIDGE_ADDR"
+	YAK_BRIDGE_SECRET                 = "YAK_BRIDGE_SECRET"
+	YAK_DNSLOG_BRIDGE_ADDR            = "YAK_DNSLOG_BRIDGE_ADDR"
+	YAK_DNSLOG_BRIDGE_PASSWORD        = "YAK_DNSLOG_BRIDGE_PASSWORD"
 	// 这个是用于绑定 runtime id 到 Risk 上的方式
 	YAK_RUNTIME_ID             = "YAK_RUNTIME_ID"
 	YAKIT_PLUGIN_ID            = "YAKIT_PLUGIN_ID"
@@ -446,6 +446,17 @@ func GetDefaultYakitAIFocusDir() string {
 // Path: ~/yakit-projects/openapi-documents  (or $YAKIT_HOME/openapi-documents)
 func GetDefaultYakitOpenAPIDocumentsDir() string {
 	pt := filepath.Join(GetDefaultYakitBaseDir(), "openapi-documents")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
+// GetDefaultCHeadersDir returns the directory for downloaded C header packs
+// used by c2ssa macro/type expansion (not library function import).
+// Path: ~/yakit-projects/c-headers  (or $YAKIT_HOME/c-headers)
+func GetDefaultCHeadersDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "c-headers")
 	if !utils.IsDir(pt) {
 		os.MkdirAll(pt, 0o777)
 	}
