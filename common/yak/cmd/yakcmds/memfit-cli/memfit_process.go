@@ -74,7 +74,7 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 		ShutdownTimeout: 3 * time.Second,
 		Ready: func(ctx context.Context, p *subprocess.ManagedProcess) error {
 			// Start reading stdout/stderr from tap readers.
-			go client.readProtocol(p.Stdout())
+			go client.readProtocol(p.Stdout(), p.Done())
 			go client.readLogs(p.Stderr(), "")
 
 			// Send start configuration and wait for "ready".
@@ -117,7 +117,7 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 	return client, nil
 }
 
-func (c *memfitProcessClient) readProtocol(reader io.Reader) {
+func (c *memfitProcessClient) readProtocol(reader io.Reader, done <-chan struct{}) {
 	if reader == nil {
 		return
 	}
@@ -131,7 +131,7 @@ func (c *memfitProcessClient) readProtocol(reader io.Reader) {
 		}
 		select {
 		case c.events <- envelope:
-		case <-c.mp.Done():
+		case <-done:
 			return
 		}
 	}
