@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java sendRedirect"
+	title_zh: "检测 Java sendRedirect"
+	type: vuln
+	level: medium
+	rule_id: "source-java-send-redirect"
+	risk: "open-redirect"
+	desc: <<<DESC
+### 规则说明
+检测到 sendRedirect。URL 若外部可控可导致开放重定向。
+
+### 风险类型
+open-redirect
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只允许站内路径。
+SOLUTION
+	alert_min: 1
+	"file://R.java": <<<POS
+import javax.servlet.http.HttpServletResponse;
+class R { void bad(HttpServletResponse resp, String u) throws Exception { resp.sendRedirect(u); } }
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("home"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/sendRedirect\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Java sendRedirect",
+	title_zh: "检测 Java sendRedirect",
+	message: "检测 Java sendRedirect",
+	risk: "open-redirect",
+}

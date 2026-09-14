@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP proc_open"
+	title_zh: "检测 PHP proc_open"
+	type: vuln
+	level: high
+	rule_id: "source-php-proc-open"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 proc_open()。参数含外部输入时可导致命令注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免执行系统命令，或使用参数数组且不走 shell。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function r($cmd) { proc_open($cmd, [], $pipes); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function r($cmd) { echo htmlspecialchars($cmd); }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])proc_open\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP proc_open",
+	title_zh: "检测 PHP proc_open",
+	message: "检测 PHP proc_open",
+	risk: "command-injection",
+}

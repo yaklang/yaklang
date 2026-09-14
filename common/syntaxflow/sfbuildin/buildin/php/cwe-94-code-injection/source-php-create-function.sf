@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP create_function"
+	title_zh: "检测 PHP create_function"
+	type: vuln
+	level: high
+	rule_id: "source-php-create-function"
+	risk: "code-injection"
+	desc: <<<DESC
+### 规则说明
+检测到已废弃的 create_function，等价于 eval。
+
+### 风险类型
+code-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用闭包，不要动态生成函数体。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function r($b) { return create_function('', $b); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function r($b) { return htmlspecialchars($b); }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])create_function\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP create_function",
+	title_zh: "检测 PHP create_function",
+	message: "检测 PHP create_function",
+	risk: "code-injection",
+}

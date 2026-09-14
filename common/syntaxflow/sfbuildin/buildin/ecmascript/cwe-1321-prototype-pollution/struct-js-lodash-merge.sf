@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "Struct scan: JavaScript lodash merge"
+	title_zh: "结构扫描：JavaScript lodash merge"
+	type: vuln
+	level: high
+	rule_id: "struct-js-lodash-merge"
+	risk: "input-validation"
+	desc: <<<DESC
+### 规则说明
+检测到 lodash merge。未过滤 __proto__ 可导致原型污染。
+
+### 风险类型
+input-validation
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 Object.create(null) 或不合并不可信对象。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const _ = require("lodash");
+function m(a, b) { return _.merge(a, b); }
+
+POS
+	"safefile://s.js": <<<NEG
+function m(a, b) { return Object.assign({}, a, b); }
+
+NEG
+)
+
+_.merge(* as $a) as $call
+lodash.merge(* as $a) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: JavaScript lodash merge",
+	title_zh: "结构扫描：JavaScript lodash merge",
+	message: "结构扫描：JavaScript lodash merge",
+	risk: "input-validation",
+}

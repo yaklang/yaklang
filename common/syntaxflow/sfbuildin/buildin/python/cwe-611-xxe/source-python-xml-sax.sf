@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python xml.sax 解析"
+	title_zh: "检测 Python xml.sax 解析"
+	type: vuln
+	level: medium
+	rule_id: "source-python-xml-sax"
+	risk: "xxe"
+	desc: <<<DESC
+### 规则说明
+检测到 xml.sax 解析。默认可能解析外部实体。
+
+### 风险类型
+xxe
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 defusedxml。
+SOLUTION
+	alert_min: 1
+	"file://x.py": <<<POS
+import xml.sax
+def p(f):
+    xml.sax.parse(f, xml.sax.ContentHandler())
+
+POS
+	"safefile://s.py": <<<NEG
+def p(f):
+    return f
+
+NEG
+)
+
+${*.py}.pattern_regex(/xml\.sax/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Python xml.sax 解析",
+	title_zh: "检测 Python xml.sax 解析",
+	message: "检测 Python xml.sax 解析",
+	risk: "xxe",
+}

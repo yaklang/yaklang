@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP CORS 通配 Origin"
+	title_zh: "检测 PHP CORS 通配 Origin"
+	type: vuln
+	level: medium
+	rule_id: "source-php-cors-star"
+	risk: "cors"
+	desc: <<<DESC
+### 规则说明
+检测到 Access-Control-Allow-Origin。
+
+### 风险类型
+cors
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 Origin 白名单。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+header("Access-Control-Allow-Origin: *");
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+echo "ok";
+
+NEG
+)
+
+${*.php}.pattern_regex(/Access-Control-Allow-Origin/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 PHP CORS 通配 Origin",
+	title_zh: "检测 PHP CORS 通配 Origin",
+	message: "检测 PHP CORS 通配 Origin",
+	risk: "cors",
+}

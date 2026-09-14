@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# 证书回调"
+	title_zh: "检测 C# 证书回调"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-ssl-callback"
+	risk: "certificate-validation"
+	desc: <<<DESC
+### 规则说明
+检测到 ServerCertificateValidationCallback。实现若恒 true 会关闭证书校验。
+
+### 风险类型
+certificate-validation
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+校验 SslPolicyErrors.None。
+SOLUTION
+	alert_min: 1
+	"file://T.cs": <<<POS
+class T {
+  void Bad() { var x = "ServerCertificateValidationCallback"; }
+}
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+${*.cs}.pattern_regex(/ServerCertificateValidationCallback/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 C# 证书回调",
+	title_zh: "检测 C# 证书回调",
+	message: "检测 C# 证书回调",
+	risk: "certificate-validation",
+}

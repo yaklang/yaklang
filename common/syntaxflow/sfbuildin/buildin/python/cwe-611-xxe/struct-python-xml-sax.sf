@@ -1,0 +1,48 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python xml.sax parse"
+	title_zh: "结构扫描：Python xml.sax 解析"
+	type: vuln
+	level: medium
+	rule_id: "struct-python-xml-sax"
+	risk: "xxe"
+	desc: <<<DESC
+### 规则说明
+检测到 xml.sax 解析。默认可能解析外部实体。
+
+### 风险类型
+xxe
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 defusedxml。
+SOLUTION
+	alert_min: 1
+	"file://x.py": <<<POS
+import xml.sax
+def p(f):
+    xml.sax.parse(f, xml.sax.ContentHandler())
+
+POS
+	"safefile://s.py": <<<NEG
+def p(f):
+    return f
+
+NEG
+)
+
+xml.sax.parse as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: Python xml.sax parse",
+	title_zh: "结构扫描：Python xml.sax 解析",
+	message: "结构扫描：Python xml.sax 解析",
+	risk: "xxe",
+}

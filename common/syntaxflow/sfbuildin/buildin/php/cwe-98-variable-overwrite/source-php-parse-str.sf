@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP parse_str"
+	title_zh: "检测 PHP parse_str"
+	type: vuln
+	level: high
+	rule_id: "source-php-parse-str"
+	risk: "variable-overwrite"
+	desc: <<<DESC
+### 规则说明
+检测到 parse_str。无第二个参数时会写入当前符号表。
+
+### 风险类型
+variable-overwrite
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+始终传入目标数组。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function p($s) { parse_str($s); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function p($s) { return $s; }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])parse_str\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP parse_str",
+	title_zh: "检测 PHP parse_str",
+	message: "检测 PHP parse_str",
+	risk: "variable-overwrite",
+}

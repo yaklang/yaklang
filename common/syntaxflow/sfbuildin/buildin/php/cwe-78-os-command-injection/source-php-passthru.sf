@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP passthru"
+	title_zh: "检测 PHP passthru"
+	type: vuln
+	level: high
+	rule_id: "source-php-passthru"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 passthru()。参数含外部输入时可导致命令注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免执行系统命令。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function r($cmd) { passthru($cmd); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function r($cmd) { echo htmlspecialchars($cmd); }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])passthru\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP passthru",
+	title_zh: "检测 PHP passthru",
+	message: "检测 PHP passthru",
+	risk: "command-injection",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# Path.Combine"
+	title_zh: "结构扫描：C# Path.Combine"
+	type: vuln
+	level: medium
+	rule_id: "struct-csharp-path-combine"
+	risk: "path-traversal"
+	desc: <<<DESC
+### 规则说明
+检测到 Path.Combine。用户片段若含 .. 可逃出基目录。
+
+### 风险类型
+path-traversal
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+Combine 后用 FullPath 检查仍位于基目录下。
+SOLUTION
+	alert_min: 1
+	"file://F.cs": <<<POS
+using System.IO;
+class F { string Bad(string a, string b) { return Path.Combine(a, b); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+Path.Combine as $call
+Path.Combine(* as $a) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: C# Path.Combine",
+	title_zh: "结构扫描：C# Path.Combine",
+	message: "结构扫描：C# Path.Combine",
+	risk: "path-traversal",
+}

@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "Struct scan: Go http.ListenAndServe"
+	title_zh: "结构扫描：Go http.ListenAndServe"
+	type: vuln
+	level: medium
+	rule_id: "struct-go-listen-and-serve"
+	risk: "cleartext-transmission"
+	desc: <<<DESC
+### 规则说明
+检测到 http.ListenAndServe。明文 HTTP。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+生产环境使用 ListenAndServeTLS。
+SOLUTION
+	alert_min: 1
+	"file://m.go": <<<POS
+package main
+import "net/http"
+func main() { http.ListenAndServe(":80", nil) }
+
+POS
+	"safefile://s.go": <<<NEG
+package main
+func main() {}
+
+NEG
+)
+
+http.ListenAndServe as $call
+http.ListenAndServe(* as $a) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: Go http.ListenAndServe",
+	title_zh: "结构扫描：Go http.ListenAndServe",
+	message: "结构扫描：Go http.ListenAndServe",
+	risk: "cleartext-transmission",
+}

@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python ftplib.FTP"
+	title_zh: "检测 Python ftplib.FTP"
+	type: vuln
+	level: medium
+	rule_id: "source-python-ftplib"
+	risk: "cleartext-transmission"
+	desc: <<<DESC
+### 规则说明
+检测到 ftplib.FTP。FTP 明文传输。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 FTP_TLS 或 SFTP。
+SOLUTION
+	alert_min: 1
+	"file://f.py": <<<POS
+import ftplib
+def c(h):
+    return ftplib.FTP(h)
+
+POS
+	"safefile://s.py": <<<NEG
+def c(h):
+    return h
+
+NEG
+)
+
+${*.py}.pattern_regex(/ftplib\.FTP\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Python ftplib.FTP",
+	title_zh: "检测 Python ftplib.FTP",
+	message: "检测 Python ftplib.FTP",
+	risk: "cleartext-transmission",
+}

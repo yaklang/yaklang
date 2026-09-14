@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python asyncio create_subprocess_shell"
+	title_zh: "结构扫描：Python asyncio 子进程 shell"
+	type: vuln
+	level: high
+	rule_id: "struct-python-asyncio-shell"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 create_subprocess_shell。通过 shell 执行，外部输入可注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 create_subprocess_exec 和参数列表。
+SOLUTION
+	alert_min: 1
+	"file://a.py": <<<POS
+import asyncio
+async def r(c):
+    return await asyncio.create_subprocess_shell(c)
+
+POS
+	"safefile://s.py": <<<NEG
+def r(c):
+    return c
+
+NEG
+)
+
+create_subprocess_shell as $call
+create_subprocess_shell(* as $c) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: Python asyncio create_subprocess_shell",
+	title_zh: "结构扫描：Python asyncio 子进程 shell",
+	message: "结构扫描：Python asyncio 子进程 shell",
+	risk: "command-injection",
+}

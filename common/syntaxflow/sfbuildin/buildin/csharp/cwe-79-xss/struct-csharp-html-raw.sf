@@ -1,0 +1,46 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# Html.Raw"
+	title_zh: "结构扫描：C# Html.Raw"
+	type: vuln
+	level: high
+	rule_id: "struct-csharp-html-raw"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 Html.Raw。会关闭 HTML 转义。
+
+### 风险类型
+xss
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只对已消毒内容使用 Html.Raw。
+SOLUTION
+	alert_min: 1
+	"file://X.cs": <<<POS
+class X { object Bad(string s) { return Html.Raw(s); } class Html { public static object Raw(string s){ return s; } } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+Html.Raw as $call
+Html.Raw(* as $s) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: C# Html.Raw",
+	title_zh: "结构扫描：C# Html.Raw",
+	message: "结构扫描：C# Html.Raw",
+	risk: "xss",
+}

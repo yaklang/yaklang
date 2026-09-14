@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript vm.Script"
+	title_zh: "检测 JavaScript vm.Script"
+	type: vuln
+	level: high
+	rule_id: "source-js-vm-script"
+	risk: "code-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 vm.Script。动态编译字符串可导致代码执行。
+
+### 风险类型
+code-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要对外部字符串使用 vm。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const vm = require("vm");
+function r(c) { return new vm.Script(c); }
+
+POS
+	"safefile://s.js": <<<NEG
+function r(c) { return c; }
+
+NEG
+)
+
+${*.js}.pattern_regex(/vm\.Script\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 JavaScript vm.Script",
+	title_zh: "检测 JavaScript vm.Script",
+	message: "检测 JavaScript vm.Script",
+	risk: "code-injection",
+}

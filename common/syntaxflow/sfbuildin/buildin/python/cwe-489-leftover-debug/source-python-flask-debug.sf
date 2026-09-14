@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python Flask debug=True"
+	title_zh: "检测 Python Flask debug=True"
+	type: vuln
+	level: high
+	rule_id: "source-python-flask-debug"
+	risk: "security-misconfiguration"
+	desc: <<<DESC
+### 规则说明
+检测到 Flask 以 debug=True 运行，调试器可导致代码执行。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+生产环境设置 debug=False。
+SOLUTION
+	alert_min: 1
+	"file://a.py": <<<POS
+from flask import Flask
+app = Flask(__name__)
+app.run(debug=True)
+
+POS
+	"safefile://s.py": <<<NEG
+from flask import Flask
+app = Flask(__name__)
+app.run(debug=False)
+
+NEG
+)
+
+${*.py}.pattern_regex(/run\s*\(\s*debug\s*=\s*True/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python Flask debug=True",
+	title_zh: "检测 Python Flask debug=True",
+	message: "检测 Python Flask debug=True",
+	risk: "security-misconfiguration",
+}

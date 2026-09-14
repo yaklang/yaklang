@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript lodash merge"
+	title_zh: "检测 JavaScript lodash merge"
+	type: vuln
+	level: high
+	rule_id: "source-js-lodash-merge"
+	risk: "input-validation"
+	desc: <<<DESC
+### 规则说明
+检测到 lodash merge。未过滤 __proto__ 可导致原型污染。
+
+### 风险类型
+input-validation
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 Object.create(null) 或不合并不可信对象。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const _ = require("lodash");
+function m(a, b) { return _.merge(a, b); }
+
+POS
+	"safefile://s.js": <<<NEG
+function m(a, b) { return Object.assign({}, a, b); }
+
+NEG
+)
+
+${*.js}.pattern_regex(/_\.merge\s*\(|lodash\.merge\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 JavaScript lodash merge",
+	title_zh: "检测 JavaScript lodash merge",
+	message: "检测 JavaScript lodash merge",
+	risk: "input-validation",
+}

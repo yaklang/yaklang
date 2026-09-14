@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# XmlDocument.LoadXml"
+	title_zh: "检测 C# XmlDocument.LoadXml"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-xmldocument-loadxml"
+	risk: "xxe"
+	desc: <<<DESC
+### 规则说明
+检测到 XmlDocument.LoadXml。默认可能解析外部实体。
+
+### 风险类型
+xxe
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+禁止 DTD，XmlResolver 设为 null。
+SOLUTION
+	alert_min: 1
+	"file://X.cs": <<<POS
+using System.Xml;
+class X { void Bad(string xml) { new XmlDocument().LoadXml(xml); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+${*.cs}.pattern_regex(/LoadXml\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 C# XmlDocument.LoadXml",
+	title_zh: "检测 C# XmlDocument.LoadXml",
+	message: "检测 C# XmlDocument.LoadXml",
+	risk: "xxe",
+}

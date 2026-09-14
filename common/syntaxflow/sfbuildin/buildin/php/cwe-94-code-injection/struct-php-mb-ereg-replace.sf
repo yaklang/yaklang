@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "php"
+	title: "Struct scan: PHP mb_ereg_replace eval"
+	title_zh: "结构扫描：PHP mb_ereg_replace"
+	type: vuln
+	level: high
+	rule_id: "struct-php-mb-ereg-replace"
+	risk: "code-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 mb_ereg_replace。若使用 eval 选项等价于代码执行。
+
+### 风险类型
+code-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要使用 eval 选项，改用 preg_replace。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function r($p, $s) { return mb_ereg_replace($p, "", $s); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function r($p, $s) { return htmlspecialchars($s); }
+
+NEG
+)
+
+mb_ereg_replace(* as $p) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: PHP mb_ereg_replace eval",
+	title_zh: "结构扫描：PHP mb_ereg_replace",
+	message: "结构扫描：PHP mb_ereg_replace",
+	risk: "code-injection",
+}

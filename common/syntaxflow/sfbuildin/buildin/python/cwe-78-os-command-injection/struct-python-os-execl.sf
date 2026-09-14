@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python os.execl"
+	title_zh: "结构扫描：Python os.execl"
+	type: vuln
+	level: high
+	rule_id: "struct-python-os-execl"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 os.execl/execv。参数若外部可控可导致命令执行。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用参数列表且不要拼接 shell 字符串。
+SOLUTION
+	alert_min: 1
+	"file://e.py": <<<POS
+import os
+def r(p):
+    os.execl(p, p)
+
+POS
+	"safefile://s.py": <<<NEG
+def r(p):
+    return p
+
+NEG
+)
+
+os.execl as $call
+os.execv as $call
+os.execl(* as $a) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: Python os.execl",
+	title_zh: "结构扫描：Python os.execl",
+	message: "结构扫描：Python os.execl",
+	risk: "command-injection",
+}
