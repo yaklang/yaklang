@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"container/list"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -15,15 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
 	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
 )
 
 var (
@@ -46,12 +42,11 @@ func NewHttpConnPool(ctx context.Context, idleCount int, perHostCount int) *LowH
 		connCount:          0,
 		idleConnTimeout:    90 * time.Second,
 		idleConnMap:        make(map[string][]*persistConn),
-		h2ConnMap:          make(map[string]*persistConn),
-		h2Tombstones:       newTombstoneQueue(defaultTombstoneQueueSize),
 		keepAliveTimeout:   30 * time.Second,
 		ctx:                ctx,
 		debugNotify:        make(chan struct{}, 1),
 	}
+	pool.h2Pool = NewH2ConnPool(ctx, idleCount, pool.idleConnTimeout, pool.keepAliveTimeout)
 	if idleCount > 0 {
 		pool.connSem = make(chan struct{}, idleCount)
 	}
@@ -72,13 +67,7 @@ type LowHttpConnPool struct {
 
 	// H2 连接独立管理：多路复用特性使得单连接承载所有并发 stream，
 	// Idle connections are bounded independently of active multiplexed streams.
-	h2Dials      map[string]*h2DialCall
-	h2Idle       map[*persistConn]*list.Element
-	h2IdleLRU    *list.List
-	h2Generation uint64
-	h2Mu         sync.Mutex
-	h2ConnMap    map[string]*persistConn // per-host 缓存单个 H2 persistConn
-	h2Tombstones *tombstoneQueue         // bounded ring-buffer of recent close events (protected by h2Mu)
+	h2Pool *H2ConnPool
 
 	// debug: 每 5s 打印连接池状态；通过 EnableConnPoolDebug(true) 开启。
 	debugEnabled int32         // atomic bool (1 = on). controls the printer goroutine.
@@ -107,24 +96,8 @@ func (l *LowHttpConnPool) clear() {
 	}
 	l.idleConnMux.Unlock()
 
-	// Clear H2 connections: snapshot map first to avoid holding lock while closing,
-	// which would deadlock if closeNetConn triggers removeConn → h2Mu.
-	l.h2Mu.Lock()
-	h2Conns := make([]*persistConn, 0, len(l.h2ConnMap))
-	for _, pc := range l.h2ConnMap {
-		h2Conns = append(h2Conns, pc)
-	}
-	l.h2ConnMap = make(map[string]*persistConn)
-	l.h2Idle = nil
-	l.h2IdleLRU = nil
-	l.h2Generation++
-	for _, call := range l.h2Dials {
-		call.cancel()
-	}
-	l.h2Mu.Unlock()
-	for _, pc := range h2Conns {
-		pc.closeNetConn()
-	}
+	// Clear H2 connections via the standalone H2ConnPool.
+	l.h2Pool.Clear()
 }
 
 // Clear clears all connections in the pool (public method)
@@ -160,7 +133,7 @@ func addGetIdleConnFinishedCounter() {
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
-func (l *LowHttpConnPool) getIdleConn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getIdleConn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (net.Conn, error) {
 	//addGetIdleConnRequiredCounter()
 	if err := requestContextError(ctx); err != nil {
 		return nil, err
@@ -171,9 +144,10 @@ func (l *LowHttpConnPool) getIdleConn(ctx context.Context, key *connectKey, opts
 
 	l.startDebugPrinter()
 
-	// H2 connections are managed separately and do not consume the H1 semaphore.
+	// H2 connections are managed by the standalone H2ConnPool and do not
+	// consume the H1 semaphore.
 	if key.scheme == H2 {
-		return l.getOrCreateH2Conn(ctx, key, opts...)
+		return l.h2Pool.GetOrCreate(ctx, key, opts)
 	}
 
 	// 尝试获取复用连接（H1）
@@ -211,152 +185,6 @@ func (l *LowHttpConnPool) getIdleConn(ctx context.Context, key *connectKey, opts
 		return nil, err
 	}
 	//addGetIdleConnFinishedCounter()
-	return pConn, nil
-}
-
-// getOrCreateH2Conn retrieves an existing usable H2 connection for the given host,
-// or creates a new one. H2 connections are stored in h2ConnMap and do NOT consume
-// the H1 semaphore (connSem): a single H2 TCP connection multiplexes all streams,
-// so it must never be blocked by the H1 connection-count limit.
-//
-// Concurrent-stream throttling (SETTINGS_MAX_CONCURRENT_STREAMS) is handled
-// inside newStream via streamsCond.Wait() — this function only needs to check
-// whether the connection itself is still structurally usable.
-func (l *LowHttpConnPool) getOrCreateH2Conn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := requestContextError(ctx); err != nil {
-		return nil, err
-	}
-	hash := key.hash()
-
-	// connUsable returns true when the connection can accept new streams.
-	// 'full' means the stream-ID space is exhausted (requires a new TCP conn);
-	// closed/readGoAway mean the server signalled it won't process any more work.
-	// activeStreams being at the concurrent limit is NOT checked here — newStream
-	// will block until a slot is available via streamsCond.
-	connUsable := func(pc *persistConn) bool {
-		if pc.alt == nil {
-			return false
-		}
-		pc.alt.mu.Lock()
-		defer pc.alt.mu.Unlock()
-		return !pc.alt.readGoAway && !pc.alt.closed && !pc.alt.full
-	}
-
-retryH2Dial:
-	if err := requestContextError(ctx); err != nil {
-		return nil, err
-	}
-	if l.contextDone() {
-		return nil, utils.Error("lowhttp: pool context done")
-	}
-	// Fast path: reuse an existing, healthy H2 connection.
-	l.h2Mu.Lock()
-	if pc, ok := l.h2ConnMap[hash]; ok {
-		if connUsable(pc) {
-			l.h2Mu.Unlock()
-			if err := requestContextError(ctx); err != nil {
-				return nil, err
-			}
-			return pc, nil
-		}
-		// Existing connection is no longer usable; evict it.
-		delete(l.h2ConnMap, hash)
-		if e := l.h2Idle[pc]; e != nil {
-			l.h2IdleLRU.Remove(e)
-			delete(l.h2Idle, pc)
-		}
-	}
-	if call := l.h2Dials[hash]; call != nil {
-		l.h2Mu.Unlock()
-		select {
-		case <-call.done:
-			goto retryH2Dial
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-l.ctx.Done():
-			return nil, l.ctx.Err()
-		}
-	}
-	if l.h2Dials == nil {
-		l.h2Dials = make(map[string]*h2DialCall)
-	}
-	dialCtx, cancelDial := context.WithCancel(ctx)
-	call := &h2DialCall{done: make(chan struct{}), cancel: cancelDial}
-	l.h2Dials[hash] = call
-	generation := l.h2Generation
-	l.h2Mu.Unlock()
-	stopPoolCancel := context.AfterFunc(l.ctx, cancelDial)
-	defer func() {
-		stopPoolCancel()
-		cancelDial()
-		l.h2Mu.Lock()
-		delete(l.h2Dials, hash)
-		close(call.done)
-		l.h2Mu.Unlock()
-	}()
-
-	// One in-flight dial per origin; waiting callers retain independent contexts.
-	pConn, err := newPersistConn(dialCtx, key, l, opts...)
-	if err != nil {
-		if ctxErr := requestContextError(ctx); ctxErr != nil {
-			return nil, ctxErr
-		}
-		// Another goroutine may have concurrently established a usable connection.
-		l.h2Mu.Lock()
-		if pc, ok := l.h2ConnMap[hash]; ok {
-			if connUsable(pc) {
-				l.h2Mu.Unlock()
-				if ctxErr := requestContextError(ctx); ctxErr != nil {
-					return nil, ctxErr
-				}
-				return pc, nil
-			}
-		}
-		l.h2Mu.Unlock()
-		return nil, err
-	}
-
-	// Downgrade: newPersistConn changed key.scheme to H1 (ALPN negotiation or
-	// preface failure). Return the conn directly; exec.go detects the scheme
-	// change and switches to the non-pool H1 path.
-	if key.scheme != H2 {
-		if err := requestContextError(ctx); err != nil {
-			pConn.closeNetConn()
-			return nil, err
-		}
-		return pConn, nil
-	}
-
-	// Store the new H2 connection. Handle the race where another goroutine
-	// already stored a usable conn while we were dialing.
-	l.h2Mu.Lock()
-	if existing, ok := l.h2ConnMap[hash]; ok {
-		if connUsable(existing) {
-			// Prefer the already-stored connection; discard our duplicate.
-			l.h2Mu.Unlock()
-			pConn.closeNetConn()
-			if err := requestContextError(ctx); err != nil {
-				return nil, err
-			}
-			return existing, nil
-		}
-	}
-	if err := requestContextError(ctx); err != nil {
-		l.h2Mu.Unlock()
-		pConn.closeNetConn()
-		return nil, err
-	}
-	if l.h2Generation != generation || l.contextDone() || pConn.alt.isClosed() {
-		l.h2Mu.Unlock()
-		pConn.closeNetConn()
-		return nil, errH2ConnClosed
-	}
-	l.h2ConnMap[hash] = pConn
-	l.h2Mu.Unlock()
-	l.markH2Idle(pConn)
 	return pConn, nil
 }
 
@@ -515,7 +343,6 @@ func (l *LowHttpConnPool) removeConnLocked(pc *persistConn, needClose bool) erro
 type persistConn struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
-	alt      *http2ClientConn
 	conn     net.Conn // conn本体
 	mu       sync.Mutex
 	p        *LowHttpConnPool // 连接对应的连接池
@@ -727,57 +554,6 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 		//numExpectedResponses: 0,
 	}
 
-	if key.scheme == H2 {
-		if key.https { // Negotiation fail downgrade
-			switch conn := newConn.(type) {
-			case *tls.Conn:
-				key.scheme = conn.ConnectionState().NegotiatedProtocol
-			case *utls.UConn:
-				key.scheme = conn.ConnectionState().NegotiatedProtocol
-			case *gmtls.Conn:
-				key.scheme = conn.ConnectionState().NegotiatedProtocol
-			}
-			if key.scheme != H2 { // downgrade conn should not reuse
-				key.scheme = H1
-				return pc, nil
-			}
-		}
-
-		pc.h2Conn()
-		pc.alt.writeCtx = requestCtx
-		err = pc.alt.preface()
-		pc.alt.writeCtx = nil
-		if err == nil {
-			go pc.alt.readLoop()
-			// Watch for a server that negotiates h2 and then never sends its
-			// SETTINGS frame; see watchServerPreface for why this must not
-			// gate setup. Requests on such a conn fail fast and the caller
-			// falls back to HTTP/1.1.
-			pc.alt.watchServerPreface()
-			// H2 conn is registered in h2ConnMap by getOrCreateH2Conn after this call returns.
-			return pc, nil
-		}
-		// client preface failure: tear down the broken h2 conn and
-		// downgrade to HTTP/1.1 (downgraded conns are not reused for h2)
-		if pc.alt != nil {
-			pc.alt.setClose()
-		}
-		pc.alt = nil
-		if err := requestContextError(requestCtx); err != nil {
-			return nil, err
-		}
-		key.scheme = H1
-		if pc.conn != nil {
-			pc.conn.Close()
-		}
-		newH1Conn, err := dialXWithContext(requestCtx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
-		if err != nil {
-			return nil, err
-		}
-		pc.conn = newH1Conn
-		return pc, nil
-	}
-
 	pc.br = bufio.NewReader(pc)
 	pc.bw = bufio.NewWriter(persistConnWriter{pc})
 
@@ -785,85 +561,6 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 	go pc.writeLoop()
 	go pc.readLoop()
 	return pc, nil
-}
-
-func (pc *persistConn) h2Conn() {
-	// The framer is initialized below after its bounded writer has a connection.
-	// Keep the parser limit in sync with SETTINGS_MAX_FRAME_SIZE sent in
-	// preface. NewFramer defaults to the HTTP/2 protocol maximum (16 MiB - 1),
-	// which lets a non-compliant peer pin a multi-megabyte read buffer on every
-	// cached H2 connection.
-
-	var profile *http2Profile
-	if pc.cacheKey != nil && pc.cacheKey.http2Fingerprint != "" {
-		resolved, err := getHTTP2Profile(pc.cacheKey.http2Fingerprint)
-		if err != nil {
-			// exec.go validates the name up front; falling back to the default
-			// framing keeps an unexpected value from breaking the connection.
-			log.Warnf("lowhttp: %v, falling back to default HTTP/2 framing", err)
-		} else {
-			profile = resolved
-		}
-	}
-
-	newH2Conn := &http2ClientConn{
-		conn:                   pc.conn,
-		ctx:                    pc.p.ctx,
-		mu:                     new(sync.Mutex),
-		streams:                make(map[uint32]*http2ClientStream),
-		currentStreamID:        1,
-		idleTimeout:            pc.p.idleConnTimeout,
-		pingInterval:           pc.p.keepAliveTimeout, // default 30 s
-		pingTimeout:            15 * time.Second,
-		pendingPings:           make(map[[8]byte]chan struct{}),
-		maxFrameSize:           defaultMaxFrameSize,
-		initialWindowSize:      65535,
-		headerListMaxSize:      ^uint32(0),
-		sendWindow:             65535,
-		receiveUpdateThreshold: 32 << 10,
-		maxStreamsCount:        defaultMaxConcurrentStreamSize,
-		frWriteMutex:           new(sync.Mutex),
-		hDec:                   hpack.NewDecoder(4096, nil),
-		clientPrefaceOk:        utils.NewAtomicBool(),
-		closeCh:                make(chan struct{}),
-		readLoopExited:         make(chan struct{}),
-		serverPrefaceCh:        make(chan struct{}, 1),
-		http2Profile:           profile,
-		// pc back-reference: used by setClose() to evict this connection from
-		// the pool's h2ConnMap when it transitions to closed state.
-		pc: pc,
-		http2StreamPool: &sync.Pool{
-			New: func() interface{} {
-				return new(http2ClientStream)
-			},
-		},
-	}
-
-	// The peer may grow its encoder table to our advertised limit. Keep the
-	// initial table at the protocol default until its HPACK size update arrives.
-	newH2Conn.hDec.SetAllowedMaxDynamicTableSize(profile.settingValue(http2.SettingHeaderTableSize, 4096))
-
-	// Initialize synchronization before starting any timer callback.
-	newH2Conn.streamsCond = sync.NewCond(newH2Conn.mu)
-	newH2Conn.bw = bufio.NewWriterSize(&h2DeadlineWriter{conn: newH2Conn}, 4096)
-	newH2Conn.fr = http2.NewFramer(newH2Conn.bw, bufio.NewReader(pc.conn))
-	newH2Conn.fr.SetMaxReadFrameSize(defaultMaxFrameSize)
-	pc.alt = newH2Conn
-	newH2Conn.mu.Lock()
-	if newH2Conn.idleTimeout > 0 {
-		newH2Conn.idleTimer = time.AfterFunc(newH2Conn.idleTimeout, func() {
-			newH2Conn.mu.Lock()
-			if newH2Conn.activeStreams != 0 || newH2Conn.closed {
-				newH2Conn.mu.Unlock()
-				return
-			}
-			newH2Conn.closed = true
-			newH2Conn.mu.Unlock()
-			newH2Conn.setCloseReason(fmt.Sprintf("idle-timeout: no activity for %v", newH2Conn.idleTimeout))
-			newH2Conn.setClose()
-		})
-	}
-	newH2Conn.mu.Unlock()
 }
 
 type deadlineExtendingReader struct {
@@ -1250,62 +947,12 @@ func (pc *persistConn) closeConn(err error) { // when write loop break or read l
 	default:
 		pc.closed = err
 		pc.cancel()
-		if pc.alt != nil {
-			pc.alt.setClose()
-		} else {
-			pc.removeConn()
-		}
+		pc.removeConn()
 	}
 }
 
 func (pc *persistConn) removeConn() {
 	l := pc.p
-	if pc.IsH2Conn() {
-		// H2 connections are tracked in h2ConnMap under h2Mu.
-		// Check pointer equality to avoid evicting a newer connection that
-		// may have replaced this one concurrently.
-		hash := pc.cacheKey.hash()
-		l.h2Mu.Lock()
-		if e := l.h2Idle[pc]; e != nil {
-			l.h2IdleLRU.Remove(e)
-			delete(l.h2Idle, pc)
-		}
-		_, evicted := l.h2ConnMap[hash]
-		if evicted && l.h2ConnMap[hash] == pc {
-			delete(l.h2ConnMap, hash)
-		} else {
-			evicted = false
-		}
-		l.h2Mu.Unlock()
-
-		// Record tombstone only after the readLoop goroutine has fully exited
-		// so that readLoopRunning is guaranteed to be 0 in the snapshot.
-		// This is done asynchronously to avoid blocking setClose / removeConn.
-		if evicted && pc.alt != nil && atomic.LoadInt32(&l.debugEnabled) != 0 {
-			alt := pc.alt
-			go func() {
-				// Wait for readLoop to complete its defer (sets readLoopRunning=0
-				// then closes readLoopExited).
-				<-alt.readLoopExited
-
-				alt.mu.Lock()
-				tombstone := h2ConnTombstone{
-					host:                pc.cacheKey.addr,
-					closedAt:            time.Now(),
-					finalActiveStreams:  alt.activeStreams,
-					totalStreamsCreated: atomic.LoadUint32(&alt.currentStreamID) / 2,
-					maxStreams:          alt.maxStreamsCount,
-					closeReason:         alt.closeReason,
-				}
-				alt.mu.Unlock()
-
-				l.h2Mu.Lock()
-				l.recordH2Tombstone(tombstone)
-				l.h2Mu.Unlock()
-			}()
-		}
-		return
-	}
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
 	err := l.removeConnLocked(pc, true)
@@ -1319,11 +966,6 @@ func (pc *persistConn) closeNetConn() error {
 	// This prevents goroutine leak when connection is closed from pool
 	if pc.cancel != nil {
 		pc.cancel()
-	}
-	if pc.IsH2Conn() && pc.alt != nil {
-		pc.alt.setClose()
-		pc.releaseConnSlot()
-		return nil
 	}
 	err := pc.conn.Close()
 	pc.releaseConnSlot()
@@ -1402,9 +1044,7 @@ func (pc *persistConn) markReused() {
 func (pc *persistConn) isReused() bool {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
-	if pc.alt != nil {
-		return atomic.LoadUint32(&pc.alt.currentStreamID) > 1
-	}
+	// H2 connections are now managed by h2ConnEntry, not persistConn.
 	return pc.reused
 }
 

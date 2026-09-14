@@ -236,7 +236,7 @@ func (c *http2ClientConn) retire() {
 	c.streamsCond.Broadcast()
 	c.mu.Unlock()
 	if c.pc != nil {
-		c.pc.removeConn()
+		c.pc.pool.removeEntry(c.pc)
 	}
 	if idle {
 		c.setClose()

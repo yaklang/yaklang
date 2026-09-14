@@ -1,0 +1,498 @@
+package lowhttp
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	errorspkg "github.com/pkg/errors"
+)
+
+// h1Transport implements Transport for HTTP/1.1.
+//
+// It supports two connection modes:
+//   - Pooled: requests are dispatched through persistConn's read/write loops.
+//   - Direct: a one-off connection is dialed, written, and read inline.
+//
+// Stale-connection retries are handled internally: a dead pooled connection is
+// closed and the request reconnects (bounded by maxReconnectTimes).
+type h1Transport struct {
+	pool *LowHttpConnPool
+}
+
+// NewH1Transport returns a Transport that executes requests over HTTP/1.1.
+// pool may be nil; it defaults to DefaultLowHttpConnPool.
+func NewH1Transport(pool *LowHttpConnPool) Transport {
+	if pool == nil {
+		pool = DefaultLowHttpConnPool
+	}
+	return &h1Transport{pool: pool}
+}
+
+func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
+	requestPacket := tr.packet
+	connPool := tr.connPool
+	if connPool == nil {
+		connPool = t.pool
+	}
+	withConnPool := connPool != nil && tr.option.WithConnPool
+
+	reconnectTimes := 0
+	maxReconnects := maxReconnectTimes
+
+	canReconnect := func(err error) bool {
+		var poolReadErr connPoolReadFromServerError
+		if errors.Is(err, errServerClosedIdle) || errors.As(err, &poolReadErr) {
+			return true
+		}
+		if reconnectTimes >= maxReconnects {
+			log.Warnf("h1 transport: giving up after %d reconnects to %v: %v", reconnectTimes, tr.cacheKey.addr, err)
+			return false
+		}
+		reconnectTimes++
+		return true
+	}
+
+	var conn net.Conn
+	var err error
+
+	if withConnPool {
+		conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.dialOpts...)
+	} else {
+		conn, err = dialXWithContext(ctx, tr.originAddr, tr.dialOpts...)
+	}
+
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		// old version proxy fallback
+		errMsg := err.Error()
+		if !containsNoProxyAvailable(errMsg) {
+			return nil, err
+		}
+		conn, err = t.tryLegacyProxy(ctx, tr, connPool, withConnPool)
+		if err != nil {
+			return nil, err
+		}
+		// legacy proxy: rewrite packet
+		requestPacket, err = BuildLegacyProxyRequest(requestPacket, tr.option.Https)
+		if err != nil {
+			return nil, err
+		}
+		withConnPool = false // legacy proxy cannot use pool
+	}
+
+	result := &transportResult{portIsOpen: true}
+	if conn != nil {
+		result.remoteAddr = conn.RemoteAddr().String()
+	}
+
+	if withConnPool {
+		return t.roundTripPooled(ctx, tr, conn, requestPacket, canReconnect)
+	}
+	return t.roundTripDirect(ctx, tr, conn, requestPacket, canReconnect)
+}
+
+
+// containsNoProxyAvailable checks if the error message indicates no proxy
+// is available.
+func containsNoProxyAvailable(msg string) bool {
+	return strings.Contains(msg, `no proxy available`)
+}
+
+func (t *h1Transport) tryLegacyProxy(ctx context.Context, tr *transportRequest, connPool *LowHttpConnPool, withConnPool bool) (net.Conn, error) {
+	noProxyDial := make([]netx.DialXOption, len(tr.dialOpts), len(tr.dialOpts)+1)
+	copy(noProxyDial, tr.dialOpts)
+	noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
+	merged := append([]string{}, tr.option.Proxy...)
+	for _, basicProxy := range merged {
+		if !utils.IsHttpOrHttpsUrl(basicProxy) {
+			continue
+		}
+		addr := utils.ExtractHostPort(basicProxy)
+		if withConnPool {
+			tr.cacheKey.addr = addr
+			conn, err := connPool.getIdleConn(ctx, tr.cacheKey, noProxyDial...)
+			if err == nil {
+				return conn, nil
+			}
+		} else {
+			conn, err := dialXWithContext(ctx, addr, noProxyDial...)
+			if err == nil {
+				return conn, nil
+			}
+		}
+	}
+	return nil, utils.Error("no proxy available")
+}
+
+// roundTripPooled executes an H1 request through the connection pool.
+func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest, conn net.Conn, requestPacket []byte, canReconnect func(error) bool) (*transportResult, error) {
+	option := tr.option
+	reqIns := tr.reqIns
+	connPool := tr.connPool
+
+	pc, ok := conn.(*persistConn)
+	if !ok {
+		return nil, utils.Error("h1 transport: pooled conn is not a persistConn")
+	}
+
+	writeErrCh := make(chan error, 2)
+	if option.BeforeDoRequest != nil {
+		requestPacket = option.BeforeDoRequest(requestPacket)
+	}
+
+	resc := make(chan responseInfo, 1)
+	pc.reqCh <- requestAndResponseCh{
+		reqPacket:   requestPacket,
+		ch:          resc,
+		reqInstance: reqIns,
+		option:      option,
+		writeErrCh:  writeErrCh,
+	}
+	pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option}
+
+	var rawBytes []byte
+	var firstResponse *http.Response
+	select {
+	case re := <-resc:
+		if re.err != nil && len(rawBytes) == 0 {
+			if pc.shouldRetryRequest(re.err) {
+				pc.closeConn(re.err)
+				// Signal reconnect to caller
+				return nil, &reconnectError{err: re.err}
+			}
+			return nil, re.err
+		}
+		firstResponse = re.resp
+		rawBytes = re.respBytes
+		tr.traceInfo.ServerTime = re.info.ServerTime
+		if option != nil && option.BodyStreamReaderHandler != nil {
+			if option.bodyStreamReaderHandled != nil {
+				option.bodyStreamReaderHandled.Set()
+			}
+		}
+	case <-ctx.Done():
+		pc.closeConn(ctx.Err())
+		return nil, ctx.Err()
+	case <-pc.ctx.Done():
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		if pc.closed == nil {
+			return nil, utils.Error("BUG: closeCh but closed is nil")
+		}
+		if pc.shouldRetryRequest(pc.closed) {
+			return nil, &reconnectError{err: pc.closed}
+		}
+		return nil, pc.closed
+	}
+
+	_ = connPool // used for future reconnection; kept for reference
+	return &transportResult{
+		rawBytes:       rawBytes,
+		firstResponse:  firstResponse,
+		multiResponses: nil,
+		remoteAddr:     conn.RemoteAddr().String(),
+		portIsOpen:     true,
+	}, nil
+}
+
+// roundTripDirect executes an H1 request on a one-off (non-pooled) connection.
+func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest, conn net.Conn, requestPacket []byte, canReconnect func(error) bool) (*transportResult, error) {
+	option := tr.option
+	reqIns := tr.reqIns
+	timeout := tr.timeout
+
+	var responseRaw bytes.Buffer
+
+	if conn != nil {
+		readConnEndCtx, readConnEnd := context.WithCancel(ctx)
+		defer readConnEnd()
+		go func() {
+			<-readConnEndCtx.Done()
+			conn.Close()
+		}()
+	}
+
+	if option.BeforeDoRequest != nil {
+		requestPacket = option.BeforeDoRequest(requestPacket)
+	}
+
+	if reqIns != nil {
+		httpctx.SetBareRequestBytes(reqIns, requestPacket)
+	}
+	currentRPS.Add(1)
+
+	if option.EnableRandomChunked {
+		chunkSender, err := option.GetOrCreateChunkSender()
+		if err != nil {
+			return nil, errorspkg.Wrap(err, "get or create chunk sender failed")
+		}
+		err = chunkSender.Send(requestPacket, conn)
+		if err != nil {
+			return nil, errorspkg.Wrap(err, "write request failed")
+		}
+	} else {
+		_, err := conn.Write(requestPacket)
+		if err != nil {
+			return nil, errorspkg.Wrap(err, "write request failed")
+		}
+	}
+
+	if option.DefaultBufferSize <= 0 {
+		option.DefaultBufferSize = 4096
+	}
+
+	var mirrorWriter io.Writer = &responseRaw
+
+	// BodyStreamReaderHandler for non-pool connection
+	if option != nil && option.BodyStreamReaderHandler != nil {
+		reader, writer := utils.NewBufPipe(nil)
+		defer writer.Close()
+
+		streamHandlerDone := make(chan struct{})
+		go func() {
+			bodyReader, bodyWriter := utils.NewBufPipe(nil)
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("BodyStreamReaderHandler panic: %v", r)
+				}
+				bodyWriter.Close()
+				close(streamHandlerDone)
+			}()
+
+			packetReader := bufio.NewReader(reader)
+			responseHeader := bytes.NewBufferString("")
+			var responseHeaderWriter io.Writer = responseHeader
+			if option.NoBodyBuffer {
+				responseHeaderWriter = io.MultiWriter(responseHeaderWriter, &responseRaw)
+			}
+
+			for {
+				line, err := utils.BufioReadLine(packetReader)
+				if err != nil {
+					if err != io.EOF {
+						log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
+					}
+					bodyWriter.Close()
+					break
+				}
+				responseHeaderWriter.Write(line)
+				responseHeaderWriter.Write([]byte("\r\n"))
+				if len(line) == 0 {
+					go func() {
+						io.Copy(bodyWriter, packetReader)
+						bodyWriter.Close()
+					}()
+					break
+				}
+			}
+			if option.bodyStreamReaderHandled != nil {
+				option.bodyStreamReaderHandled.Set()
+			}
+			option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
+		}()
+
+		if option.NoBodyBuffer {
+			mirrorWriter = writer
+		} else {
+			rawWriter := io.Writer(&responseRaw)
+			if option.AutoDetectSSE {
+				rawWriter = &responseRawCaptureWriter{
+					dst:           &responseRaw,
+					req:           reqIns,
+					autoDetectSSE: true,
+				}
+			}
+			mirrorWriter = io.MultiWriter(rawWriter, writer)
+		}
+	}
+
+	httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
+	if timeout > 0 && option != nil && !option.ExtendReadDeadline {
+		hardTimeoutTimer := time.AfterFunc(timeout, func() {
+			_ = conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
+		})
+		defer hardTimeoutTimer.Stop()
+	}
+
+	// Read response
+	serverTimeStart := time.Now()
+	_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
+	firstByte, err := httpResponseReader.Peek(1)
+	if err != nil {
+		return nil, errorspkg.Wrap(err, "read first byte failed")
+	}
+
+	if firstByte[0] == 0x15 {
+		tlsHeader, err := httpResponseReader.Peek(6)
+		if err == nil && bytes.Equal(tlsHeader, []byte("\x15\x03\x01\x00\x02\x02")) {
+			return nil, utils.Errorf("tls record header error detected... raw: %v", spew.Sdump(tlsHeader))
+		}
+	}
+
+	tr.traceInfo.ServerTime = time.Since(serverTimeStart)
+
+	var firstResponse *http.Response
+	if option.DiscardIntermediateResponseBody {
+		firstResponse, err = utils.ReadHTTPResponseMetadataFromBufioReader(httpResponseReader, reqIns, responseRaw.Grow)
+	} else {
+		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
+	}
+	if err != nil {
+		log.Warnf("[lowhttp] read response failed: %s", err)
+	}
+	if utils.HTTPResponseHasDiscardedIntermediateBody(firstResponse) {
+		firstResponse.Body = http.NoBody
+	}
+
+	// Digest auth (401 retry)
+	if tr.option != nil && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
+		if authHeader := IGetHeader(firstResponse, "WWW-Authenticate"); len(authHeader) > 0 {
+			if auth := GetHttpAuth(authHeader[0], tr.option); auth != nil {
+				authReq, authErr := auth.Authenticate(conn, tr.option)
+				if authErr == nil {
+					_, wErr := conn.Write(authReq)
+					responseRaw.Reset()
+					if wErr != nil {
+						return nil, errorspkg.Wrap(wErr, "write request failed")
+					}
+					// Re-read response after auth
+					_ = conn.SetReadDeadline(time.Now().Add(timeout))
+					if tr.option.DiscardIntermediateResponseBody {
+						firstResponse, err = utils.ReadHTTPResponseMetadataFromBufioReader(httpResponseReader, reqIns, responseRaw.Grow)
+					} else {
+						firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
+					}
+					if err != nil {
+						log.Warnf("[lowhttp] read response after auth failed: %s", err)
+					}
+				}
+			}
+		}
+	}
+
+	responseBodySize := httpctx.GetResponseBodySize(reqIns)
+	_ = responseBodySize // caller reads from httpctx
+
+	var multiResponses []*http.Response
+	var isMultiResponses bool
+	respClose := false
+	if firstResponse != nil {
+		respClose = firstResponse.Close
+		multiResponses = append(multiResponses, firstResponse)
+	}
+
+	noFixContentLength := tr.option.NoFixContentLength
+	if firstResponse == nil || respClose {
+		if len(responseRaw.Bytes()) == 0 {
+			return nil, errorspkg.Wrap(err, "empty result.")
+		} else {
+			// Drain any remaining bytes from the bufio reader through the
+			// TeeReader so that responseRaw captures the full wire packet.
+			// Without this, bytes buffered in httpResponseReader but not yet
+			// consumed by ReadHTTPResponseFromBufioReader are lost.
+			stableTimeout := timeout
+			if respClose && timeout < 1*time.Second {
+				stableTimeout = 1 * time.Second
+			}
+			restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, stableTimeout, 300*time.Millisecond)
+			if len(restBytes) > 0 {
+				if len(restBytes) > 256 {
+					restBytes = restBytes[:256]
+				}
+				log.Warnf("unhandled rest data in connection: %#v ...", string(restBytes))
+			}
+		}
+	} else {
+		firstResponse.Request = reqIns
+		for noFixContentLength && !tr.option.NoReadMultiResponse {
+			nextResponse, nextErr := utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, conn, nil)
+			var nextRespClose bool
+			if nextResponse != nil {
+				nextRespClose = nextResponse.Close
+			}
+			if nextErr != nil || nextRespClose {
+				if errors.Is(nextErr, io.EOF) || errors.Is(nextErr, io.ErrUnexpectedEOF) {
+					break
+				}
+				break
+			}
+			if nextResponse != nil {
+				multiResponses = append(multiResponses, nextResponse)
+				isMultiResponses = true
+			}
+		}
+	}
+
+	// Drain any remaining bytes from the bufio reader through the TeeReader
+	// so that responseRaw captures the full wire packet, including pipeline
+	// responses that were not consumed by ReadHTTPResponseFromBufioReader.
+	// Use a short stable timeout to avoid blocking on keep-alive connections
+	// that have no more data to send.
+	drainTimeout := 500 * time.Millisecond
+	if respClose {
+		drainTimeout = timeout
+		if drainTimeout < 1*time.Second {
+			drainTimeout = 1 * time.Second
+		}
+	}
+	restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, drainTimeout, 300*time.Millisecond)
+	_ = restBytes // bytes are already written to responseRaw via TeeReader
+
+	return &transportResult{
+		rawBytes:        responseRaw.Bytes(),
+		firstResponse:   firstResponse,
+		multiResponses:  multiResponses,
+		isMultiResponse: isMultiResponses,
+		remoteAddr:      conn.RemoteAddr().String(),
+		portIsOpen:      true,
+	}, nil
+}
+
+func (t *h1Transport) CanRetry(req *http.Request, err error) bool {
+	// H1 stale-connection retries are handled inside the transport via
+	// shouldRetryRequest → reconnectError.  When an error reaches the
+	// orchestration layer, it means the transport already decided the error
+	// is not retryable (e.g. first-use connection timeout).  Do not retry.
+	return false
+}
+
+func (t *h1Transport) ShouldDowngrade(err error) bool {
+	return false
+}
+
+// reconnectError wraps an error to signal that the caller should reconnect
+// and retry the request.
+type reconnectError struct{ err error }
+
+func (e *reconnectError) Error() string { return fmt.Sprintf("reconnect: %v", e.err) }
+func (e *reconnectError) Unwrap() error { return e.err }
+
+// isReconnectError reports whether err is a reconnect signal.
+func isReconnectError(err error) bool {
+	var re *reconnectError
+	return errors.As(err, &re)
+}
+
+func reconnectErrorUnwrap(err error) error {
+	var re *reconnectError
+	if errors.As(err, &re) {
+		return re.err
+	}
+	return err
+}
