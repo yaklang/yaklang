@@ -77,7 +77,7 @@ type DownloadRiskItem struct {
 	VerifierUid     string  `json:"verifierUid"`
 	FixTime         int64   `json:"fixTime"`
 	FixSuggestion   string  `json:"fixSuggestion"`
-	TagReason    string  `json:"tagReason"`
+	TagReason       string  `json:"tagReason"`
 	IsPotential     bool    `json:"isPotential"`
 	CVE             string  `json:"cve"`
 	SeverityScore   float64 `json:"severityScore"`
@@ -202,13 +202,13 @@ type setRiskTagsRequest struct {
 	VerifierUid     string   `json:"verifierUid,omitempty"`
 	FixTime         int64    `json:"fixTime,omitempty"`
 	FixSuggestion   string   `json:"fixSuggestion,omitempty"`
-	TagReason    string   `json:"tagReason,omitempty"`
+	TagReason       string   `json:"tagReason,omitempty"`
 	RiskTypeVerbose string   `json:"riskTypeVerbose,omitempty"`
-	Severity        string   `json:"severity,omitempty"`
+	SetSeverity     string   `json:"setSeverity,omitempty"`
 	SeverityScore   float64  `json:"severityScore,omitempty"`
 }
 
-func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, hashes []string, setTags, verifierUid, fixSuggestion, tagReason, riskTypeVerbose, severity string, fixTime int64, severityScore float64) error {
+func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, hashes []string, setTags, verifierUid, fixSuggestion, tagReason, riskTypeVerbose, setSeverity string, fixTime int64, severityScore float64) error {
 	if token == "" {
 		return utils.Errorf("token is empty")
 	}
@@ -228,9 +228,9 @@ func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, ha
 		VerifierUid:     verifierUid,
 		FixTime:         fixTime,
 		FixSuggestion:   fixSuggestion,
-		TagReason:    tagReason,
+		TagReason:       tagReason,
 		RiskTypeVerbose: riskTypeVerbose,
-		Severity:        severity,
+		SetSeverity:     setSeverity,
 		SeverityScore:   severityScore,
 	})
 	if err != nil {
