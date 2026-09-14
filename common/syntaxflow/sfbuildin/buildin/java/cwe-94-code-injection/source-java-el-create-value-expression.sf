@@ -1,0 +1,51 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java EL createValueExpression"
+	title_zh: "检测 Java EL createValueExpression"
+	type: vuln
+	level: high
+	rule_id: "source-java-el-create-value-expression"
+	risk: "el-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 ExpressionFactory.createValueExpression。表达式字符串若外部可控可注入。
+
+### 风险类型
+el-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要把用户输入拼进 EL；使用固定模板加参数。
+SOLUTION
+	alert_min: 1
+	"file://E.java": <<<POS
+import javax.el.ExpressionFactory;
+import javax.el.ELContext;
+class E {
+  void bad(ExpressionFactory f, ELContext c, String e) {
+    f.createValueExpression(c, e, Object.class);
+  }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("static-el"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/createValueExpression\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Java EL createValueExpression",
+	title_zh: "检测 Java EL createValueExpression",
+	message: "检测 Java EL createValueExpression",
+	risk: "el-injection",
+}

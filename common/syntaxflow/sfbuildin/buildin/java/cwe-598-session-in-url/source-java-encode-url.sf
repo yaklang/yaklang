@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java encodeURL 会话重写"
+	title_zh: "检测 Java encodeURL 会话重写"
+	type: vuln
+	level: medium
+	rule_id: "source-java-encode-url"
+	risk: "session-hijacking"
+	desc: <<<DESC
+### 规则说明
+检测到 encodeURL/encodeRedirectURL。会话 ID 进入 URL 后易被泄露。
+
+### 风险类型
+session-hijacking
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+关闭 URL 会话重写，仅使用 Cookie 传递会话。
+SOLUTION
+	alert_min: 1
+	"file://U.java": <<<POS
+import javax.servlet.http.HttpServletResponse;
+class U {
+  String bad(HttpServletResponse r, String u) { return r.encodeURL(u); }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("cookie-session"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/encode(Redirect)?URL\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Java encodeURL 会话重写",
+	title_zh: "检测 Java encodeURL 会话重写",
+	message: "检测 Java encodeURL 会话重写",
+	risk: "session-hijacking",
+}

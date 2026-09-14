@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java CORS 通配 Origin"
+	title_zh: "检测 Java CORS 通配 Origin"
+	type: vuln
+	level: medium
+	rule_id: "source-java-permissive-cors"
+	risk: "cors"
+	desc: <<<DESC
+### 规则说明
+检测到 Access-Control-Allow-Origin 为 *。
+
+### 风险类型
+cors
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+反射允许的 Origin 白名单，不要使用 * 搭配凭证。
+SOLUTION
+	alert_min: 1
+	"file://C.java": <<<POS
+class C {
+  void bad() { String h = "Access-Control-Allow-Origin"; }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("origin-allowlist"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/Access-Control-Allow-Origin/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Java CORS 通配 Origin",
+	title_zh: "检测 Java CORS 通配 Origin",
+	message: "检测 Java CORS 通配 Origin",
+	risk: "cors",
+}

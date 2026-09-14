@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java System.load"
+	title_zh: "检测 Java System.load"
+	type: vuln
+	level: high
+	rule_id: "source-java-system-load"
+	risk: "dynamic-code-loading"
+	desc: <<<DESC
+### 规则说明
+检测到 System.load 或 loadLibrary。路径若外部可控可加载恶意本地库。
+
+### 风险类型
+dynamic-code-loading
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只加载打包内的本地库，路径不要来自用户输入。
+SOLUTION
+	alert_min: 1
+	"file://N.java": <<<POS
+class N {
+  void bad(String p) { System.load(p); }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("no-jni"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/System\.load(Library)?\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Java System.load",
+	title_zh: "检测 Java System.load",
+	message: "检测 Java System.load",
+	risk: "dynamic-code-loading",
+}
