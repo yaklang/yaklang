@@ -161,14 +161,15 @@ func (m *MITMFilter) Update(data *ypb.MITMFilterData) {
 
 // expandGroupByDelimiter 将 Group 中以逗号/分号/换行分隔的字符串展开为多个独立项，
 // 便于一条规则内支持多值输入（与前端「逗号、分号或换行分隔」提示一致）。
+//
+// 注意：逗号在 glob 花括号语法 {a,b} 中是「或」逻辑操作符，直接按逗号拆分会
+// 破坏 *.{js,css} 这类合法 glob 模式。因此拆分时会跳过位于 {...} 内部的逗号，
+// 仅在花括号层级为 0 时才将各分隔符视为分隔符。分号和换行在任何 matcher 中
+// 都没有逻辑含义，但为保持 {...} 语法完整性，花括号内部的分隔符一律不拆分。
 func expandGroupByDelimiter(group []string) []string {
 	var result []string
 	for _, s := range group {
-		if !strings.ContainsAny(s, ",;\n\r") {
-			result = append(result, s)
-			continue
-		}
-		for _, part := range splitByCommaSemicolonNewline(s) {
+		for _, part := range splitMultiValue(s) {
 			if trimmed := strings.TrimSpace(part); trimmed != "" {
 				result = append(result, trimmed)
 			}
@@ -177,12 +178,32 @@ func expandGroupByDelimiter(group []string) []string {
 	return result
 }
 
-// splitByCommaSemicolonNewline 按「逗号 / 分号 / 换行（含 CRLF）」拆分字符串，
-// 各分隔符地位等同，连续分隔符不会产生空段。
-func splitByCommaSemicolonNewline(s string) []string {
-	return strings.FieldsFunc(s, func(r rune) bool {
-		return r == ',' || r == ';' || r == '\n' || r == '\r'
-	})
+// splitMultiValue 按「逗号 / 分号 / 换行（含 CRLF）」拆分字符串。
+// 位于 glob 花括号 {...} 内部的分隔符不拆分，以保留 {a,b} 等语法完整性。
+func splitMultiValue(s string) []string {
+	if !strings.ContainsAny(s, ",;\n\r") {
+		return []string{s}
+	}
+	var parts []string
+	braceDepth := 0
+	start := 0
+	for i, r := range s {
+		switch r {
+		case '{':
+			braceDepth++
+		case '}':
+			if braceDepth > 0 {
+				braceDepth--
+			}
+		case ',', ';', '\n', '\r':
+			if braceDepth == 0 {
+				parts = append(parts, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	parts = append(parts, s[start:])
+	return parts
 }
 
 func FilterDataToMatchers(data []*ypb.FilterDataItem, expandCommaSeparated ...bool) *httptpl.YakMatcher {
