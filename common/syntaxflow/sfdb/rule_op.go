@@ -259,7 +259,7 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
 	// Prefer filename language only when valid; keep desc(language) otherwise
-	// (e.g. source-*.sf under buildin/source/ must not wipe language: general).
+	// (e.g. source-*.sf under general/secrets must not wipe language: general).
 	if language != "" {
 		rule.Language = language
 	}
