@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python cryptography hashes.MD5"
+	title_zh: "结构扫描：Python cryptography MD5"
+	type: vuln
+	level: medium
+	rule_id: "struct-python-cryptography-md5"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 cryptography.hazmat hashes.MD5。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 SHA256。
+SOLUTION
+	alert_min: 1
+	"file://h.py": <<<POS
+from cryptography.hazmat.primitives import hashes
+def d():
+    return hashes.MD5()
+
+POS
+	"safefile://s.py": <<<NEG
+from cryptography.hazmat.primitives import hashes
+def d():
+    return hashes.SHA256()
+
+NEG
+)
+
+hashes.MD5 as $call
+hashes.MD5() as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: Python cryptography hashes.MD5",
+	title_zh: "结构扫描：Python cryptography MD5",
+	message: "结构扫描：Python cryptography MD5",
+	risk: "weak-hash",
+}

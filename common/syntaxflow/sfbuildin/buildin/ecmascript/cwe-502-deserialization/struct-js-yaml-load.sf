@@ -1,0 +1,46 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "Struct scan: JavaScript js-yaml load"
+	title_zh: "结构扫描：JavaScript js-yaml load"
+	type: vuln
+	level: high
+	rule_id: "struct-js-yaml-load"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 yaml.load。未限制 schema 时可执行任意类型。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 yaml.safeLoad 或 JSON。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const yaml = require("js-yaml");
+function p(d) { return yaml.load(d); }
+
+POS
+	"safefile://s.js": <<<NEG
+function p(d) { return JSON.parse(d); }
+
+NEG
+)
+
+yaml.load(* as $d) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: JavaScript js-yaml load",
+	title_zh: "结构扫描：JavaScript js-yaml load",
+	message: "结构扫描：JavaScript js-yaml load",
+	risk: "deserialization",
+}

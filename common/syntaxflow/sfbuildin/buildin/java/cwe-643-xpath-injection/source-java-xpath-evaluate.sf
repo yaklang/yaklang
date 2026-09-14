@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java XPath.evaluate"
+	title_zh: "检测 Java XPath.evaluate"
+	type: vuln
+	level: high
+	rule_id: "source-java-xpath-evaluate"
+	risk: "xpath-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 XPath.evaluate。表达式拼接用户输入可导致注入。
+
+### 风险类型
+xpath-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要拼接 XPath，使用变量或白名单。
+SOLUTION
+	alert_min: 1
+	"file://X.java": <<<POS
+import javax.xml.xpath.XPath;
+class X { void bad(XPath xp, String e) throws Exception { xp.evaluate(e, new Object()); } }
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("static-xpath"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/\.evaluate\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Java XPath.evaluate",
+	title_zh: "检测 Java XPath.evaluate",
+	message: "检测 Java XPath.evaluate",
+	risk: "xpath-injection",
+}

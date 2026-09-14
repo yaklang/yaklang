@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python Django mark_safe"
+	title_zh: "检测 Python Django mark_safe"
+	type: vuln
+	level: medium
+	rule_id: "source-python-django-mark-safe"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 mark_safe。外部 HTML 可导致 XSS。
+
+### 风险类型
+xss
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对用户内容做转义，不要把不可信字符串标为 safe。
+SOLUTION
+	alert_min: 1
+	"file://v.py": <<<POS
+from django.utils.safestring import mark_safe
+def v(s):
+    return mark_safe(s)
+
+POS
+	"safefile://s.py": <<<NEG
+from django.utils.html import escape
+def v(s):
+    return escape(s)
+
+NEG
+)
+
+${*.py}.pattern_regex(/mark_safe\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Python Django mark_safe",
+	title_zh: "检测 Python Django mark_safe",
+	message: "检测 Python Django mark_safe",
+	risk: "xss",
+}

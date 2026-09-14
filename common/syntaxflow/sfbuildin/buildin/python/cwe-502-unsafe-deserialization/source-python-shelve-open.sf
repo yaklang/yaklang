@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python shelve.open"
+	title_zh: "检测 Python shelve.open"
+	type: vuln
+	level: high
+	rule_id: "source-python-shelve-open"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 shelve.open。shelve 基于 pickle，不可信文件可导致代码执行。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要打开不可信 shelve 文件。
+SOLUTION
+	alert_min: 1
+	"file://s.py": <<<POS
+import shelve
+def load(p):
+    return shelve.open(p)
+
+POS
+	"safefile://ok.py": <<<NEG
+def load(p):
+    return p
+
+NEG
+)
+
+${*.py}.pattern_regex(/shelve\.open\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python shelve.open",
+	title_zh: "检测 Python shelve.open",
+	message: "检测 Python shelve.open",
+	risk: "deserialization",
+}

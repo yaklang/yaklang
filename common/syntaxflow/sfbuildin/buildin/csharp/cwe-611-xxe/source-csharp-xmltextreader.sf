@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# XmlTextReader"
+	title_zh: "检测 C# XmlTextReader"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-xmltextreader"
+	risk: "xxe"
+	desc: <<<DESC
+### 规则说明
+检测到 XmlTextReader。默认可能解析 DTD/外部实体。
+
+### 风险类型
+xxe
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 XmlReaderSettings 并 Prohibit DTD。
+SOLUTION
+	alert_min: 1
+	"file://X.cs": <<<POS
+using System.Xml;
+class X { void Bad(string p) { new XmlTextReader(p); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+${*.cs}.pattern_regex(/new\s+XmlTextReader\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 C# XmlTextReader",
+	title_zh: "检测 C# XmlTextReader",
+	message: "检测 C# XmlTextReader",
+	risk: "xxe",
+}

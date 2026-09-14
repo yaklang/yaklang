@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python hashlib.sha1"
+	title_zh: "结构扫描：Python hashlib.sha1"
+	type: vuln
+	level: medium
+	rule_id: "struct-python-hashlib-sha1"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 hashlib.sha1。SHA-1 不抗碰撞。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 hashlib.sha256。
+SOLUTION
+	alert_min: 1
+	"file://h.py": <<<POS
+import hashlib
+def d(x):
+    return hashlib.sha1(x).hexdigest()
+
+POS
+	"safefile://s.py": <<<NEG
+import hashlib
+def d(x):
+    return hashlib.sha256(x).hexdigest()
+
+NEG
+)
+
+hashlib.sha1 as $call
+hashlib.sha1(* as $d) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: Python hashlib.sha1",
+	title_zh: "结构扫描：Python hashlib.sha1",
+	message: "结构扫描：Python hashlib.sha1",
+	risk: "weak-hash",
+}

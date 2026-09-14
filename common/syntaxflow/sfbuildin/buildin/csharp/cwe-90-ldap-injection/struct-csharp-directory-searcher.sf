@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# DirectorySearcher"
+	title_zh: "结构扫描：C# DirectorySearcher"
+	type: vuln
+	level: high
+	rule_id: "struct-csharp-directory-searcher"
+	risk: "ldap-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 DirectorySearcher。Filter 拼接用户输入可导致 LDAP 注入。
+
+### 风险类型
+ldap-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对 Filter 做转义，不要拼接。
+SOLUTION
+	alert_min: 1
+	"file://L.cs": <<<POS
+using System.DirectoryServices;
+class L { void Bad() { new DirectorySearcher(); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+DirectorySearcher as $call
+DirectorySearcher() as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: C# DirectorySearcher",
+	title_zh: "结构扫描：C# DirectorySearcher",
+	message: "结构扫描：C# DirectorySearcher",
+	risk: "ldap-injection",
+}

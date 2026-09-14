@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python hashlib.new 弱哈希"
+	title_zh: "检测 Python hashlib.new 弱哈希"
+	type: vuln
+	level: medium
+	rule_id: "source-python-hashlib-new-md5-sha1"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 hashlib.new('md5') 或 hashlib.new('sha1')。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 sha256 或专门的口令哈希。
+SOLUTION
+	alert_min: 1
+	"file://h.py": <<<POS
+import hashlib
+def d(x):
+    return hashlib.new("md5", x).hexdigest()
+
+POS
+	"safefile://s.py": <<<NEG
+import hashlib
+def d(x):
+    return hashlib.new("sha256", x).hexdigest()
+
+NEG
+)
+
+${*.py}.pattern_regex(/hashlib\.new\s*\(\s*['\"](md5|sha1)['\"]/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Python hashlib.new 弱哈希",
+	title_zh: "检测 Python hashlib.new 弱哈希",
+	message: "检测 Python hashlib.new 弱哈希",
+	risk: "weak-hash",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# Response.Write"
+	title_zh: "结构扫描：C# Response.Write"
+	type: vuln
+	level: high
+	rule_id: "struct-csharp-response-write"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 Response.Write。外部字符串未经编码可导致 XSS。
+
+### 风险类型
+xss
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+先 HtmlEncode，或使用编码过的视图引擎。
+SOLUTION
+	alert_min: 1
+	"file://X.cs": <<<POS
+using System.Web;
+class X { void Bad(HttpResponse Response, string q) { Response.Write(q); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+Response.Write as $call
+Response.Write(* as $s) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: C# Response.Write",
+	title_zh: "结构扫描：C# Response.Write",
+	message: "结构扫描：C# Response.Write",
+	risk: "xss",
+}

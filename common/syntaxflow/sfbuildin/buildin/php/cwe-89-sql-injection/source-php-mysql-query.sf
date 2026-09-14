@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP mysql_query"
+	title_zh: "检测 PHP mysql_query"
+	type: vuln
+	level: high
+	rule_id: "source-php-mysql-query"
+	risk: "sql-injection"
+	desc: <<<DESC
+### 规则说明
+检测到已废弃的 mysql_query。字符串拼接易导致 SQL 注入。
+
+### 风险类型
+sql-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用预处理语句（PDO/mysqli）。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function q($sql) { mysql_query($sql); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function q($sql) { return $sql; }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])mysql_query\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP mysql_query",
+	title_zh: "检测 PHP mysql_query",
+	message: "检测 PHP mysql_query",
+	risk: "sql-injection",
+}

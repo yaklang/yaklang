@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# Response.Redirect"
+	title_zh: "结构扫描：C# Response.Redirect"
+	type: vuln
+	level: medium
+	rule_id: "struct-csharp-response-redirect"
+	risk: "open-redirect"
+	desc: <<<DESC
+### 规则说明
+检测到 Response.Redirect。URL 若外部可控可导致开放重定向。
+
+### 风险类型
+open-redirect
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只允许站内路径或白名单主机。
+SOLUTION
+	alert_min: 1
+	"file://R.cs": <<<POS
+using System.Web;
+class R { void Bad(HttpResponse Response, string u) { Response.Redirect(u); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+Response.Redirect as $call
+Response.Redirect(* as $u) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: C# Response.Redirect",
+	title_zh: "结构扫描：C# Response.Redirect",
+	message: "结构扫描：C# Response.Redirect",
+	risk: "open-redirect",
+}

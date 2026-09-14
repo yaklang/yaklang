@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java DigestUtils MD5"
+	title_zh: "检测 Java DigestUtils MD5"
+	type: vuln
+	level: medium
+	rule_id: "source-java-digestutils-md5"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 Apache DigestUtils.md5/md5Hex。MD5 不抗碰撞。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 sha256Hex 或 MessageDigest SHA-256。
+SOLUTION
+	alert_min: 1
+	"file://H.java": <<<POS
+import org.apache.commons.codec.digest.DigestUtils;
+class H { String bad(byte[] d) { return DigestUtils.md5Hex(d); } }
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("sha256"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/DigestUtils\.md5(Hex)?\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Java DigestUtils MD5",
+	title_zh: "检测 Java DigestUtils MD5",
+	message: "检测 Java DigestUtils MD5",
+	risk: "weak-hash",
+}

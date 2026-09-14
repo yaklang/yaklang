@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# File.ReadAllText"
+	title_zh: "结构扫描：C# File.ReadAllText"
+	type: vuln
+	level: medium
+	rule_id: "struct-csharp-file-readalltext"
+	risk: "path-traversal"
+	desc: <<<DESC
+### 规则说明
+检测到 File.ReadAllText。路径若外部可控可导致路径遍历。
+
+### 风险类型
+path-traversal
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+规范化路径并限制在基目录内。
+SOLUTION
+	alert_min: 1
+	"file://F.cs": <<<POS
+using System.IO;
+class F { string Bad(string p) { return File.ReadAllText(p); } }
+
+POS
+	"safefile://S.cs": <<<NEG
+class S { void Ok() {} }
+
+NEG
+)
+
+File.ReadAllText as $call
+File.ReadAllText(* as $p) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: C# File.ReadAllText",
+	title_zh: "结构扫描：C# File.ReadAllText",
+	message: "结构扫描：C# File.ReadAllText",
+	risk: "path-traversal",
+}

@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "Struct scan: Go http.Get"
+	title_zh: "结构扫描：Go http.Get"
+	type: vuln
+	level: medium
+	rule_id: "struct-go-http-get"
+	risk: "ssrf"
+	desc: <<<DESC
+### 规则说明
+检测到 http.Get。URL 若外部可控可导致 SSRF。
+
+### 风险类型
+ssrf
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+固定主机或使用允许列表。
+SOLUTION
+	alert_min: 1
+	"file://h.go": <<<POS
+package main
+import "net/http"
+func g(u string) { http.Get(u) }
+
+POS
+	"safefile://s.go": <<<NEG
+package main
+func g(u string) {}
+
+NEG
+)
+
+http.Get as $call
+http.Get(* as $u) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: Go http.Get",
+	title_zh: "结构扫描：Go http.Get",
+	message: "结构扫描：Go http.Get",
+	risk: "ssrf",
+}

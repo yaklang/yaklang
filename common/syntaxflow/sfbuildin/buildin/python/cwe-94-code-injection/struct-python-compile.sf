@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "Struct scan: Python compile call"
+	title_zh: "结构扫描：Python compile 调用"
+	type: vuln
+	level: high
+	rule_id: "struct-python-compile"
+	risk: "code-injection"
+	desc: <<<DESC
+### 规则说明
+检测到内置 compile()。配合 exec/eval 可执行动态代码。
+
+### 风险类型
+code-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要 compile 外部字符串。
+SOLUTION
+	alert_min: 1
+	"file://c.py": <<<POS
+def r(s):
+    return compile(s, "<s>", "exec")
+
+POS
+	"safefile://s.py": <<<NEG
+def r(s):
+    return s.strip()
+
+NEG
+)
+
+compile(* as $c) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: Python compile call",
+	title_zh: "结构扫描：Python compile 调用",
+	message: "结构扫描：Python compile 调用",
+	risk: "code-injection",
+}

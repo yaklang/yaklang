@@ -1,0 +1,45 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "Struct scan: React dangerouslySetInnerHTML"
+	title_zh: "结构扫描：React dangerouslySetInnerHTML"
+	type: vuln
+	level: high
+	rule_id: "struct-js-dangerously-set-innerhtml"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 dangerouslySetInnerHTML。外部 HTML 可导致 XSS。
+
+### 风险类型
+xss
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用文本节点或经过消毒的 HTML。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+function V(html) { return { dangerouslySetInnerHTML: { __html: html } }; }
+
+POS
+	"safefile://s.js": <<<NEG
+function V(t) { return { children: t }; }
+
+NEG
+)
+
+dangerouslySetInnerHTML as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: React dangerouslySetInnerHTML",
+	title_zh: "结构扫描：React dangerouslySetInnerHTML",
+	message: "结构扫描：React dangerouslySetInnerHTML",
+	risk: "xss",
+}

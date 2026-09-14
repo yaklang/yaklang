@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript jwt.decode"
+	title_zh: "检测 JavaScript jwt.decode"
+	type: vuln
+	level: high
+	rule_id: "source-js-jwt-decode"
+	risk: "improper-authentication"
+	desc: <<<DESC
+### 规则说明
+检测到 jwt.decode。只解码不验签。
+
+### 风险类型
+improper-authentication
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 jwt.verify 并限定算法。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const jwt = require("jsonwebtoken");
+function v(t) { return jwt.decode(t); }
+
+POS
+	"safefile://s.js": <<<NEG
+function v(t) { return t; }
+
+NEG
+)
+
+${*.js}.pattern_regex(/jwt\.decode\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 JavaScript jwt.decode",
+	title_zh: "检测 JavaScript jwt.decode",
+	message: "检测 JavaScript jwt.decode",
+	risk: "improper-authentication",
+}

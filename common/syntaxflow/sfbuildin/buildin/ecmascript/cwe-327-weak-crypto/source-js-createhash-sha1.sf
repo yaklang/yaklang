@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript createHash SHA1"
+	title_zh: "检测 JavaScript createHash SHA1"
+	type: vuln
+	level: medium
+	rule_id: "source-js-createhash-sha1"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 crypto.createHash('sha1')。SHA-1 不抗碰撞。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 sha256。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const crypto = require("crypto");
+function d(x) { return crypto.createHash("sha1").update(x).digest("hex"); }
+
+POS
+	"safefile://s.js": <<<NEG
+function d(x) { return x; }
+
+NEG
+)
+
+${*.js}.pattern_regex(/createHash\s*\(\s*['"]sha1['"]\s*\)/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 JavaScript createHash SHA1",
+	title_zh: "检测 JavaScript createHash SHA1",
+	message: "检测 JavaScript createHash SHA1",
+	risk: "weak-hash",
+}

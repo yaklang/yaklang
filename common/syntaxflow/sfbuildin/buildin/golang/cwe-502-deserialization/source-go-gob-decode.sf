@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "检测 Go gob.Decode"
+	title_zh: "检测 Go gob.Decode"
+	type: vuln
+	level: medium
+	rule_id: "source-go-gob-decode"
+	risk: "deserialization"
+	desc: <<<DESC
+### 规则说明
+检测到 gob.NewDecoder/Decode。不可信 gob 流可实例化意外类型。
+
+### 风险类型
+deserialization
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要对不可信数据使用 gob；改用明确 schema 的编码。
+SOLUTION
+	alert_min: 1
+	"file://g.go": <<<POS
+package main
+import (
+  "encoding/gob"
+  "bytes"
+)
+func d(b []byte) {
+  gob.NewDecoder(bytes.NewReader(b))
+}
+
+POS
+	"safefile://s.go": <<<NEG
+package main
+func d(b []byte) {}
+
+NEG
+)
+
+${*.go}.pattern_regex(/gob\.NewDecoder\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Go gob.Decode",
+	title_zh: "检测 Go gob.Decode",
+	message: "检测 Go gob.Decode",
+	risk: "deserialization",
+}

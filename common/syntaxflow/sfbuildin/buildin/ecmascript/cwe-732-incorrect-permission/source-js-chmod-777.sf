@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript chmod 777"
+	title_zh: "检测 JavaScript chmod 777"
+	type: vuln
+	level: medium
+	rule_id: "source-js-chmod-777"
+	risk: "access-control"
+	desc: <<<DESC
+### 规则说明
+检测到 0o777/0777 文件权限。
+
+### 风险类型
+access-control
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 0o600 或 0o644。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const fs = require("fs");
+function w(p) { fs.chmodSync(p, 0o777); }
+
+POS
+	"safefile://s.js": <<<NEG
+const fs = require("fs");
+function w(p) { fs.chmodSync(p, 0o600); }
+
+NEG
+)
+
+${*.js}.pattern_regex(/0o777|0777/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 JavaScript chmod 777",
+	title_zh: "检测 JavaScript chmod 777",
+	message: "检测 JavaScript chmod 777",
+	risk: "access-control",
+}

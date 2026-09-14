@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP ftp_connect"
+	title_zh: "检测 PHP ftp_connect"
+	type: vuln
+	level: medium
+	rule_id: "source-php-ftp-connect"
+	risk: "cleartext-transmission"
+	desc: <<<DESC
+### 规则说明
+检测到 ftp_connect。FTP 明文传输。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 ftp_ssl_connect 或 SFTP。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function c($h) { return ftp_connect($h); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function c($h) { return $h; }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])ftp_connect\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 PHP ftp_connect",
+	title_zh: "检测 PHP ftp_connect",
+	message: "检测 PHP ftp_connect",
+	risk: "cleartext-transmission",
+}

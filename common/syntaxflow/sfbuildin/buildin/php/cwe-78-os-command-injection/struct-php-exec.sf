@@ -1,0 +1,47 @@
+desc(
+	mode: "struct"
+	language: "php"
+	title: "Struct scan: PHP exec"
+	title_zh: "结构扫描：PHP exec"
+	type: vuln
+	level: high
+	rule_id: "struct-php-exec"
+	risk: "command-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 exec()。参数含外部输入时可导致命令注入。
+
+### 风险类型
+command-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免执行系统命令；必要时使用 escapeshellarg 并做白名单。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function r($cmd) { exec($cmd); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function r($cmd) { echo htmlspecialchars($cmd); }
+
+NEG
+)
+
+exec(* as $cmd) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: PHP exec",
+	title_zh: "结构扫描：PHP exec",
+	message: "结构扫描：PHP exec",
+	risk: "command-injection",
+}

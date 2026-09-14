@@ -1,0 +1,51 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "Struct scan: C# CipherMode.ECB"
+	title_zh: "结构扫描：C# CipherMode.ECB"
+	type: vuln
+	level: medium
+	rule_id: "struct-csharp-ciphermode-ecb"
+	risk: "weak-cryptography"
+	desc: <<<DESC
+### 规则说明
+检测到 CipherMode.ECB。相同明文块产生相同密文。
+
+### 风险类型
+weak-cryptography
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 AesGcm 等认证加密。
+SOLUTION
+	alert_min: 1
+	"file://C.cs": <<<POS
+using System.Security.Cryptography;
+class C {
+  void Bad() { var m = CipherMode.ECB; }
+}
+
+POS
+	"safefile://S.cs": <<<NEG
+using System.Security.Cryptography;
+class S {
+  void Ok() { var m = CipherMode.CBC; }
+}
+
+NEG
+)
+
+CipherMode.ECB as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: C# CipherMode.ECB",
+	title_zh: "结构扫描：C# CipherMode.ECB",
+	message: "结构扫描：C# CipherMode.ECB",
+	risk: "weak-cryptography",
+}

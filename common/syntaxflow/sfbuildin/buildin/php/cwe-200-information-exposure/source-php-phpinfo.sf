@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP phpinfo"
+	title_zh: "检测 PHP phpinfo"
+	type: vuln
+	level: medium
+	rule_id: "source-php-phpinfo"
+	risk: "information-exposure"
+	desc: <<<DESC
+### 规则说明
+检测到 phpinfo()，会泄露配置与路径。
+
+### 风险类型
+information-exposure
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+删除 phpinfo 调用。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function d() { phpinfo(); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function d() { echo "ok"; }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])phpinfo\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 PHP phpinfo",
+	title_zh: "检测 PHP phpinfo",
+	message: "检测 PHP phpinfo",
+	risk: "information-exposure",
+}

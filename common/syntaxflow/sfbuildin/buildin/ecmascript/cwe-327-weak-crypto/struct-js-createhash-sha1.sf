@@ -1,0 +1,46 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "Struct scan: JavaScript createHash SHA1"
+	title_zh: "结构扫描：JavaScript createHash SHA1"
+	type: vuln
+	level: medium
+	rule_id: "struct-js-createhash-sha1"
+	risk: "weak-hash"
+	desc: <<<DESC
+### 规则说明
+检测到 crypto.createHash('sha1')。SHA-1 不抗碰撞。
+
+### 风险类型
+weak-hash
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 sha256。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const crypto = require("crypto");
+function d(x) { return crypto.createHash("sha1").update(x).digest("hex"); }
+
+POS
+	"safefile://s.js": <<<NEG
+function d(x) { return x; }
+
+NEG
+)
+
+crypto.createHash(*?{have: "sha1"}) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: JavaScript createHash SHA1",
+	title_zh: "结构扫描：JavaScript createHash SHA1",
+	message: "结构扫描：JavaScript createHash SHA1",
+	risk: "weak-hash",
+}

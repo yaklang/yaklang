@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "检测 JavaScript crypto.createCipher"
+	title_zh: "检测 JavaScript crypto.createCipher"
+	type: vuln
+	level: high
+	rule_id: "source-js-createcipher"
+	risk: "weak-cryptographic-algorithm"
+	desc: <<<DESC
+### 规则说明
+检测到已废弃的 crypto.createCipher，密钥派生使用弱哈希。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 createCipheriv 并显式提供 IV 与认证模式。
+SOLUTION
+	alert_min: 1
+	"file://a.js": <<<POS
+const crypto = require("crypto");
+function e(k, x) { return crypto.createCipher("aes192", k).update(x); }
+
+POS
+	"safefile://s.js": <<<NEG
+function e(k, x) { return x; }
+
+NEG
+)
+
+${*.js}.pattern_regex(/createCipher(?!iv)\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 JavaScript crypto.createCipher",
+	title_zh: "检测 JavaScript crypto.createCipher",
+	message: "检测 JavaScript crypto.createCipher",
+	risk: "weak-cryptographic-algorithm",
+}

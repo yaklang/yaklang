@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "检测 Python Django csrf_exempt"
+	title_zh: "检测 Python Django csrf_exempt"
+	type: vuln
+	level: high
+	rule_id: "source-python-django-csrf-exempt"
+	risk: "csrf"
+	desc: <<<DESC
+### 规则说明
+检测到 csrf_exempt，视图跳过 CSRF 校验。
+
+### 风险类型
+csrf
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要对状态变更视图使用 csrf_exempt。
+SOLUTION
+	alert_min: 1
+	"file://v.py": <<<POS
+from django.views.decorators.csrf import csrf_exempt
+@csrf_exempt
+def v(request):
+    return None
+
+POS
+	"safefile://s.py": <<<NEG
+def v(request):
+    return None
+
+NEG
+)
+
+${*.py}.pattern_regex(/csrf_exempt/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 Python Django csrf_exempt",
+	title_zh: "检测 Python Django csrf_exempt",
+	message: "检测 Python Django csrf_exempt",
+	risk: "csrf",
+}

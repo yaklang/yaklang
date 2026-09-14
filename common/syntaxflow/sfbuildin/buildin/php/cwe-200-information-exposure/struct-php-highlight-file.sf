@@ -1,0 +1,48 @@
+desc(
+	mode: "struct"
+	language: "php"
+	title: "Struct scan: PHP highlight_file"
+	title_zh: "结构扫描：PHP highlight_file"
+	type: vuln
+	level: medium
+	rule_id: "struct-php-highlight-file"
+	risk: "information-exposure"
+	desc: <<<DESC
+### 规则说明
+检测到 highlight_file/show_source，可能泄露源码。
+
+### 风险类型
+information-exposure
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+删除源码展示调用。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function d($f) { highlight_file($f); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function d($f) { echo "ok"; }
+
+NEG
+)
+
+highlight_file(* as $f) as $call
+show_source(* as $f) as $call
+alert $call for {
+	level: "medium",
+	title: "Struct scan: PHP highlight_file",
+	title_zh: "结构扫描：PHP highlight_file",
+	message: "结构扫描：PHP highlight_file",
+	risk: "information-exposure",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "检测 PHP unlink"
+	title_zh: "检测 PHP unlink"
+	type: vuln
+	level: high
+	rule_id: "source-php-unlink"
+	risk: "arbitrary-file-delete"
+	desc: <<<DESC
+### 规则说明
+检测到 unlink。路径若外部可控可删除任意文件。
+
+### 风险类型
+arbitrary-file-delete
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+限制在基目录内，并做允许列表。
+SOLUTION
+	alert_min: 1
+	"file://a.php": <<<POS
+<?php
+function d($p) { unlink($p); }
+
+POS
+	"safefile://s.php": <<<NEG
+<?php
+function d($p) { echo htmlspecialchars($p); }
+
+NEG
+)
+
+${*.php}.pattern_regex(/(?m)(?<![\w>])unlink\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 PHP unlink",
+	title_zh: "检测 PHP unlink",
+	message: "检测 PHP unlink",
+	risk: "arbitrary-file-delete",
+}
