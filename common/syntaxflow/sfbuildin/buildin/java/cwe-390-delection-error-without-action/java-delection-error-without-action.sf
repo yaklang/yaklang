@@ -1,4 +1,6 @@
 desc(
+	mode: "struct"
+	language: "java"
 	title: "Check Java Empty Catch Block"
 	title_zh: "检测Java空Catch块"
 	type: "Code Vulnerability"
