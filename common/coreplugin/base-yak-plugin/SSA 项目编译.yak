@@ -3,6 +3,7 @@ yakit.AutoInitYakit()
 configJSON := cli.Text("config", cli.setRequired(true), cli.setVerboseName("SSA 配置"), cli.setHelp("SSA 项目的配置 JSON 字符串"))
 programNameFromParam := cli.Text("program_name", cli.setVerboseName("程序名称（可选）"), cli.setHelp("显式指定程序名称；不填则自动生成时间戳程序名"))
 disableTimestampProgramName := cli.Bool("disable_timestamp_program_name", cli.setVerboseName("禁用程序名称时间戳（可选）"), cli.setHelp("默认 false；为 true 时不附加时间戳"))
+enableStructRule := cli.Bool("struct-rule", cli.setDefault(false), cli.setVerboseName("编译期语义检测"), cli.setHelp("默认关闭。仅编译；为 true 时才在编译单元上运行 struct 规则"))
 
 cli.check()
 
@@ -67,7 +68,11 @@ if projectName != "" {
 opts = [ssa.withProcess((msg, process) => {
     yakit.SetProgressEx("compile", process)
     yakit.Info("%s: %f", msg, process)
-}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withSetProgramName(programName), ssa.withStructRule(true)]
+}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withSetProgramName(programName)]
+if enableStructRule {
+    opts = append(opts, ssa.withStructRule(true))
+    yakit.Info("已开启编译期语义检测（struct-rule）")
+}
 
 if enableIncrementalCompile {
     opts = append(opts, ssa.withEnableIncrementalCompile(true))

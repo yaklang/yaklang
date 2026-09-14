@@ -6,14 +6,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 )
 
-func init() {
-	syntaxflow_scan.CompileProject = compileForProductScan
-}
-
-func compileForProductScan(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+// CompileWithConfig compiles a project in-process via ssaapi.ParseProject.
+// Extra options (struct rules, process callbacks) are applied after JSON
+// round-trip so ExtraInfo is preserved. This is the compile entry used by
+// syntaxflow_scan.ScanProject: syntaxflow-scan -> ssa-compile -> ssaapi.
+func CompileWithConfig(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
 	if cfg == nil {
 		return nil, utils.Errorf("compile config is nil")
 	}

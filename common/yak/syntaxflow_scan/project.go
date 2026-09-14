@@ -2,24 +2,16 @@ package syntaxflow_scan
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-)
-
-// CompileProject, when set, compiles a local code source with struct rules.
-// ssa_compile registers this in init to avoid an import cycle.
-var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error)
-
-var (
-	sourceModeRe = regexp.MustCompile(`(?m)mode:\s*"?source"?`)
-	structModeRe = regexp.MustCompile(`(?m)mode:\s*"?struct"?`)
 )
 
 // ScanProjectFromJSON is the script/platform entry: one ssaconfig JSON blob
@@ -31,7 +23,13 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 }
 
 // ScanProject is the product pipeline for CLI, gRPC, and yak scripts.
+//
+//	cli/grpc/script → syntaxflow-scan → (ssa-compile → ssaapi | syntaxflow)
+//
+// Project input: live source inspect → compile+struct review → SSA analyze.
+// Program input: IrSource inspect → stored/program struct review → SSA analyze.
 // Stages: 收集代码 → 代码检测 → 语义检测 → 深度分析.
+// Mode is selected by WithMode (stacked); default is source+struct+ssa.
 func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	cfg := &Config{ScanTaskCallback: &ScanTaskCallback{}}
 	var err error
@@ -58,9 +56,15 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	hasLoaded := len(cfg.Programs) > 0
 	hasCode := hasCodeSource(cfg)
 	localDir := localSourceDir(cfg)
-	// A program name with a code source is the name to compile into, not a DB load.
+	// Program names without a code source load an already-compiled IR.
 	namedOnly := !hasLoaded && len(cfg.GetProgramNames()) > 0 && !hasCode
-	hasProgram := hasLoaded || namedOnly
+	if namedOnly {
+		if err := loadNamedPrograms(cfg); err != nil {
+			return err
+		}
+		hasLoaded = len(cfg.Programs) > 0
+	}
+	hasProgram := hasLoaded
 	needCompile := !hasLoaded && hasCode && (wantReview || wantAnalyze || (wantSource && localDir == ""))
 
 	emit(StageCollect, 0, nil)
@@ -82,31 +86,41 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	}
 
 	if needCompile {
-		if CompileProject == nil {
-			return utils.Errorf("ScanProject: compiler is not registered")
-		}
-		emit(StageReview, 0, nil)
-		if !hasProgram && localDir == "" {
+		if wantReview {
+			emit(StageReview, 0, nil)
+		} else if localDir == "" {
 			emit(StageCollect, 0.5, nil)
 		}
-		compileOpts := structCompileOptions(cfg)
+		var compileOpts []ssaconfig.Option
+		if wantReview {
+			compileOpts = structCompileOptions(cfg)
+		}
 		compileOpts = append(compileOpts, ssaapi.WithProcess(func(msg string, process float64) {
-			emit(StageReview, process, nil)
+			if wantReview {
+				emit(StageReview, process, nil)
+			} else if localDir == "" {
+				emit(StageCollect, 0.5+process*0.5, nil)
+			}
 		}))
-		prog, err := CompileProject(ctx, cfg.Config, compileOpts...)
+		prog, err := compileProductProject(ctx, cfg.Config, compileOpts...)
 		if err != nil {
 			return err
 		}
-		if prog == nil {
-			return utils.Errorf("compile result is empty")
-		}
 		cfg.Programs = append(cfg.Programs, prog)
-		emitStructResults(cfg, prog)
-		emit(StageReview, 1, nil)
+		if wantReview {
+			emitStructResults(cfg, prog)
+			emit(StageReview, 1, nil)
+		}
 		if localDir == "" {
 			emit(StageCollect, 1, nil)
 		}
 		hasProgram = true
+	} else if wantReview && hasLoaded {
+		emit(StageReview, 0, nil)
+		for _, prog := range cfg.Programs {
+			emitStructResults(cfg, prog)
+		}
+		emit(StageReview, 1, nil)
 	}
 
 	if wantSource && hasProgram && !inspectedLive {
@@ -132,86 +146,67 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 }
 
 func productModes(cfg *Config) (source, review, analyze bool) {
-	if cfg == nil {
+	if cfg == nil || len(cfg.scanModes) == 0 {
 		return true, true, true
 	}
-	if modes := cfg.GetRuleFilterMode(); len(modes) > 0 {
-		for _, m := range modes {
-			switch strings.ToLower(strings.TrimSpace(m)) {
-			case string(schema.SFR_MODE_SOURCE):
-				source = true
-			case string(schema.SFR_MODE_STRUCT):
-				review = true
-			case string(schema.SFR_MODE_SSA):
-				analyze = true
-			}
-		}
-		return source, review, analyze
-	}
-	if inferred := inferModesFromCustomRules(cfg); inferred != nil {
-		return inferred[0], inferred[1], inferred[2]
-	}
-	return true, true, true
-}
-
-func inferModesFromCustomRules(cfg *Config) []bool {
-	contents := customRuleContents(cfg)
-	if len(contents) == 0 {
-		return nil
-	}
-	var source, review, analyze bool
-	for _, raw := range contents {
-		switch peekRuleMode(raw) {
-		case schema.SFR_MODE_SOURCE:
+	for _, m := range cfg.scanModes {
+		switch strings.ToLower(strings.TrimSpace(m)) {
+		case SourceMode:
 			source = true
-		case schema.SFR_MODE_STRUCT:
+		case StructMode:
 			review = true
-		default:
+		case SSAMode:
 			analyze = true
 		}
 	}
-	return []bool{source, review, analyze}
+	return source, review, analyze
 }
 
-func customRuleContents(cfg *Config) []string {
-	if cfg == nil {
+func compileRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
+	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(raw)
+	if err != nil {
+		return nil, err
+	}
+	rule := frame.GetRule()
+	if rule == nil {
+		return nil, utils.Error("compiled rule has no schema")
+	}
+	rule.Content = raw
+	rule.NormalizeMode()
+	return rule, nil
+}
+
+func (c *Config) customRules() []*schema.SyntaxFlowRule {
+	if c == nil {
 		return nil
 	}
-	if cfg.IsTaskLocalRuleInput() {
-		rules, _, err := loadTaskLocalSyntaxFlowRules(cfg.SyntaxFlowRule)
+	if c.parsedCustomRulesDone {
+		return c.parsedCustomRules
+	}
+	c.parsedCustomRulesDone = true
+	var raws []string
+	if c.IsTaskLocalRuleInput() {
+		rules, _, err := loadTaskLocalSyntaxFlowRules(c.SyntaxFlowRule)
 		if err != nil {
 			return nil
 		}
-		out := make([]string, 0, len(rules))
-		for _, rule := range rules {
-			if rule != nil && strings.TrimSpace(rule.Content) != "" {
-				out = append(out, rule.Content)
-			}
-		}
-		return out
+		c.parsedCustomRules = rules
+		return rules
 	}
-	inputs := cfg.GetRuleInput()
-	if len(inputs) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(inputs))
-	for _, in := range inputs {
+	for _, in := range c.GetRuleInput() {
 		if in == nil || strings.TrimSpace(in.Content) == "" {
 			continue
 		}
-		out = append(out, in.Content)
+		raws = append(raws, in.Content)
 	}
-	return out
-}
-
-func peekRuleMode(raw string) schema.SyntaxFlowRuleModeType {
-	if sourceModeRe.MatchString(raw) {
-		return schema.SFR_MODE_SOURCE
+	for _, raw := range raws {
+		rule, err := compileRuleContent(raw)
+		if err != nil {
+			continue
+		}
+		c.parsedCustomRules = append(c.parsedCustomRules, rule)
 	}
-	if structModeRe.MatchString(raw) {
-		return schema.SFR_MODE_STRUCT
-	}
-	return schema.SFR_MODE_SSA
+	return c.parsedCustomRules
 }
 
 func hasCodeSource(cfg *Config) bool {
@@ -256,31 +251,53 @@ func wrapStageProcess(cfg *Config, stage ProductStage, emit func(ProductStage, f
 	}
 }
 
+func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+	return ssa_compile.CompileWithConfig(ctx, cfg, extra...)
+}
+
+func loadNamedPrograms(cfg *Config) error {
+	if cfg == nil {
+		return utils.Errorf("scan config is nil")
+	}
+	for _, name := range cfg.GetProgramNames() {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		prog, err := ssaapi.FromDatabase(name)
+		if err != nil {
+			return utils.Wrapf(err, "load program %s", name)
+		}
+		if prog != nil {
+			cfg.Programs = append(cfg.Programs, prog)
+		}
+	}
+	if len(cfg.Programs) == 0 {
+		return utils.Errorf("no compiled program loaded")
+	}
+	return nil
+}
+
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
-	raws := customStructRuleRaws(cfg)
-	if len(raws) > 0 {
-		for _, raw := range raws {
+	rules := cfg.customRules()
+	var structRaws []string
+	for _, rule := range rules {
+		if rule != nil && rule.IsStructMode() && strings.TrimSpace(rule.Content) != "" {
+			structRaws = append(structRaws, rule.Content)
+		}
+	}
+	if len(structRaws) > 0 {
+		for _, raw := range structRaws {
 			opts = append(opts, ssaapi.WithStructRuleRaw(raw))
 		}
 		return opts
 	}
-	if len(customRuleContents(cfg)) > 0 {
-		// Exclusive custom pack with no struct rules: do not load builtin struct.
+	if len(rules) > 0 {
 		return opts
 	}
 	opts = append(opts, ssaapi.WithStructRule(true))
 	return opts
-}
-
-func customStructRuleRaws(cfg *Config) []string {
-	var raws []string
-	for _, raw := range customRuleContents(cfg) {
-		if peekRuleMode(raw) == schema.SFR_MODE_STRUCT {
-			raws = append(raws, raw)
-		}
-	}
-	return raws
 }
 
 func attachLiveSourceTarget(cfg *Config, dir string) error {
