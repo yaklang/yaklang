@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/subprocess"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 func TestMemfitProtocolRoundTrip(t *testing.T) {

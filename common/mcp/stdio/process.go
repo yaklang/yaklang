@@ -14,7 +14,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/yaklang/yaklang/common/subprocess"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 const (

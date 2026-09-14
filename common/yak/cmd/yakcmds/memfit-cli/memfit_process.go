@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/subprocess"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
