@@ -355,6 +355,9 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 		"<|TOOL_USAGE|>",
 		"target path",
 		"<|TOOL_PARAM_path_"+result.Nonce+"|>",
+		`"tool":"query-file"`,
+		"每次响应必须独立提供所有必填参数",
+		"<|TOOL_PARAM_script_CURRENT_NONCE|>",
 	) {
 		t.Fatalf("tool params prompt should be composed by prompt sections. Got:\n%s", prompt)
 	}
@@ -607,6 +610,8 @@ func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSect
 		"<|OLD_PARAMS_"+result.Nonce+"|>",
 		"<|TOOL_DESC|>",
 		"<|TOOL_PARAM_command_"+result.Nonce+"|>",
+		`"tool":"bash-tool"`,
+		"重试时重新给出完整参数和内容块",
 	) {
 		t.Fatalf("re-generate tool params prompt should be composed by prompt sections. Got:\n%s", result.Prompt)
 	}

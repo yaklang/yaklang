@@ -1,12 +1,10 @@
 package aicommon
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -25,14 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"gopkg.in/yaml.v3"
 )
-
-// toolParamAITagStartRegexp nonce 段允许 [a-zA-Z0-9_\-\[\]], 既支持历史
-// turn nonce (uuid 风格 a-f0-9-), 又支持新引入的占位符字面量 nonce
-// "[current-nonce]" (含方括号). 包含 `[` `]` 是正则字符类内字面量,
-// 已用 `[A-Za-z0-9_\[\]\-]+` 写法明确表达.
-//
-// 关键词: toolParamAITagStartRegexp, nonce 占位符, [current-nonce]
-var toolParamAITagStartRegexp = regexp.MustCompile(`<\|TOOL_PARAM_([A-Za-z0-9_]+)_([A-Za-z0-9_\[\]\-]+)\|>`)
 
 const toolParamAITagActionKeyPrefix = "__aitag__"
 
@@ -144,82 +134,6 @@ func normalizeAITAGBlockContent(content string) string {
 	content = strings.TrimSuffix(content, "\r\n")
 	content = strings.TrimSuffix(content, "\n")
 	return content
-}
-
-func extractKnownToolParamAITagBlocks(raw string, knownParams []string) []toolParamAITagBlock {
-	if raw == "" {
-		return nil
-	}
-
-	allowedParams := make(map[string]struct{}, len(knownParams))
-	for _, paramName := range knownParams {
-		allowedParams[paramName] = struct{}{}
-	}
-
-	matches := toolParamAITagStartRegexp.FindAllStringSubmatchIndex(raw, -1)
-	blocks := make([]toolParamAITagBlock, 0, len(matches))
-	for _, match := range matches {
-		if len(match) != 6 {
-			continue
-		}
-		paramName := raw[match[2]:match[3]]
-		if len(allowedParams) > 0 {
-			if _, ok := allowedParams[paramName]; !ok {
-				continue
-			}
-		}
-		nonce := raw[match[4]:match[5]]
-		contentStart := match[1]
-		endTag := fmt.Sprintf("<|TOOL_PARAM_%s_END_%s|>", paramName, nonce)
-		endOffset := strings.Index(raw[contentStart:], endTag)
-		if endOffset < 0 {
-			continue
-		}
-		contentEnd := contentStart + endOffset
-		blocks = append(blocks, toolParamAITagBlock{
-			ParamName: paramName,
-			Nonce:     nonce,
-			Content:   normalizeAITAGBlockContent(raw[contentStart:contentEnd]),
-		})
-	}
-	return blocks
-}
-
-func recoverSingleMismatchedAITagParam(invokeParams aitool.InvokeParams, rawAIResponse string, expectedNonce string, knownParams []string, mergedParams map[string]struct{}) (*toolParamAITagBlock, string) {
-	if expectedNonce == "" {
-		return nil, "expected nonce is empty"
-	}
-	if len(mergedParams) > 0 {
-		return nil, "exact nonce aitag already merged"
-	}
-
-	blocks := extractKnownToolParamAITagBlocks(rawAIResponse, knownParams)
-	if len(blocks) == 0 {
-		return nil, "no known aitag blocks found"
-	}
-
-	var mismatched []toolParamAITagBlock
-	for _, block := range blocks {
-		if block.Nonce == expectedNonce {
-			return nil, "found exact nonce aitag block"
-		}
-		mismatched = append(mismatched, block)
-	}
-
-	if len(mismatched) != 1 {
-		return nil, fmt.Sprintf("found %d mismatched aitag blocks", len(mismatched))
-	}
-
-	candidate := mismatched[0]
-	if candidate.Content == "" {
-		return nil, "mismatched aitag block is empty"
-	}
-	if invokeParams.GetString(candidate.ParamName) != "" {
-		return nil, fmt.Sprintf("param %s already has a non-empty value", candidate.ParamName)
-	}
-
-	invokeParams.Set(candidate.ParamName, candidate.Content)
-	return &candidate, ""
 }
 
 type ToolCaller struct {
@@ -697,8 +611,8 @@ func WithToolCaller_GenerateToolParamsBuilder(
 // call-tool action protocol: {"@action":"call-tool","tool":"<name>",
 // "identifier":"...","params":{<InputSchema>},"call_expectations":"..."}.
 // The model outputs the complete action JSON as tool_call arguments, which
-// flows through the same ExtractValidActionFromStream("call-tool") pipeline
-// as text mode — no parsing changes needed.
+// flows through the same fixed-tool normalization and schema validation as
+// text mode. The declared schema remains the preferred response format.
 func buildNativeToolForParamGen(tool *aitool.Tool) aispec.Tool {
 	props := map[string]any{
 		"@action": map[string]any{
@@ -1018,44 +932,6 @@ type GenerateParamsResult struct {
 	CallExpectations string        // AI-generated expectations for this tool call (timing, success criteria, etc.)
 }
 
-// extractToolCallAction tolerates an omitted discriminator only in R2, where
-// the caller has already selected one tool. Recovery requires a complete outer
-// object with that tool name and object-valued params, and never replaces an
-// explicit action marker.
-func extractToolCallAction(ctx context.Context, stream io.Reader, toolName string, opts ...ActionMakerOption) (*Action, error) {
-	action, err := ExtractActionFromStream(ctx, stream, "call-tool", opts...)
-	if err != nil {
-		return nil, err
-	}
-	parseErr := action.WaitParseResult(ctx)
-	action.WaitStream(ctx)
-	if parseErr != nil {
-		return nil, parseErr
-	}
-	if action.ValidCheck("call-tool") {
-		return action, nil
-	}
-
-	params := action.GetParams()
-	_, hasMarker := actionMarker(params)
-	requestedTool, _ := params["tool"].(string)
-	toolParams, hasObjectParams := params["params"].(map[string]any)
-	if !hasMarker && toolName != "" && requestedTool == toolName && hasObjectParams && toolParams != nil {
-		canonical := make(aitool.InvokeParams, len(params)+1)
-		for key, value := range params {
-			canonical[key] = value
-		}
-		canonical[ActionMagicKey] = "call-tool"
-		action.ForceSet(action.generalParamKey, canonical)
-		action.ForceSet(ActionMagicKey, "call-tool")
-		action.SetName("call-tool")
-		action.observeActionType("call-tool")
-		log.Debugf("recovered omitted @action for selected tool[%s] from complete tool/params envelope", toolName)
-		return action, nil
-	}
-	return nil, utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: [call-tool]", action.ObservedActionType())
-}
-
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
 	emitter := t.emitter
 
@@ -1131,7 +1007,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	// a native tool whose parameters schema mirrors the call-tool action
 	// protocol (same as ToJSONSchema: {@action, tool, params, identifier,
 	// call_expectations}). The model outputs the complete action JSON as
-	// tool_call arguments, which flow through the same extractToolCallAction
+	// tool_call arguments, which flow through the same extractFixedToolParamResponse
 	// pipeline as text mode. The native tool uses the tool's real name (not
 	// R1's execute_action), so R2 never sees R1's big tool.
 	functionCallMode := t.config.GetConfigBool("EnableFunctionCallMode")
@@ -1142,17 +1018,18 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			WithAIRequest_ExtraSpecOpts(
 				aispec.WithTools([]aispec.Tool{nativeTool}),
 				aispec.WithToolChoice("auto"),
-				aispec.WithToolCallCallback(func(toolCalls []*aispec.ToolCall) {
-					for _, tc := range toolCalls {
-						log.Debugf("functioncall R2: tool_call delta: %s", tc.Function.Name)
-					}
-				}),
 			),
 			WithAIRequest_EnableToolCallArgumentsStream(),
 		)
 	}
 
+	validateNativeIdentity := func() error { return nil }
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
+		if functionCallMode {
+			identity := &fixedToolCallIdentity{expected: tool.Name}
+			WithAIRequest_ExtraSpecOpts(aispec.WithToolCallCallback(identity.observe))(request)
+			validateNativeIdentity = identity.validate
+		}
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
 	}, func(rsp *AIResponse) error {
@@ -1170,9 +1047,6 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		pr, pw := utils.NewPipe()
 
 		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
-
-		var response bytes.Buffer
-		stream = io.TeeReader(stream, &response)
 
 		var paramNames []string
 
@@ -1226,74 +1100,62 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			}),
 		)
 
-		callToolAction, err := extractToolCallAction(t.ctx, stream, tool.Name, actionOpts...)
+		parsed, err := extractFixedToolParamResponse(t.ctx, stream, tool, actionOpts...)
 		if err != nil {
 			boundEmitter.EmitError("error extract tool params: %v", err)
 			pw.Close()
 			return utils.Errorf("error extracting action params: %v", err)
 		}
-		// extractToolCallAction waits for canonical parsing. Wait for field
-		// stream handlers too, then finalize response metadata synchronously. The
-		// old OnReaderFinished callback ran in the parser goroutine after parseDone
-		// and raced these variables under concurrent parameter generation.
-		callToolAction.WaitStream(t.ctx)
+		// Parsing joins the source and field streams before exposing parameters.
 		cost := time.Since(start)
-		paramDuration = cost
-		rawAIResponse = response.String()
 		pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
 		pw.Close()
 
 		// Extract identifier from action (destination identifier for this tool call)
-		callToolParams := callToolAction.GetParams()
-		identifier = sanitizeIdentifier(callToolParams.GetString("identifier"))
-		if identifier != "" {
-			log.Debugf("extracted identifier[%s] for tool[%s]", identifier, tool.Name)
+		callToolParams := parsed.Envelope
+		attemptIdentifier := sanitizeIdentifier(callToolParams.GetString("identifier"))
+		if attemptIdentifier != "" {
+			log.Debugf("extracted identifier[%s] for tool[%s]", attemptIdentifier, tool.Name)
 		}
 
-		callExpectations = callToolParams.GetString("call_expectations")
-		if callExpectations != "" {
-			log.Debugf("extracted call_expectations for tool[%s]: %s", tool.Name, callExpectations)
+		attemptExpectations := callToolParams.GetString("call_expectations")
+		if attemptExpectations != "" {
+			log.Debugf("extracted call_expectations for tool[%s]: %s", tool.Name, attemptExpectations)
 		}
 
+		// Each attempt owns a fresh candidate. Commit only after the complete
+		// JSON + AITAG payload passes the selected tool schema.
+		attemptParams := make(aitool.InvokeParams)
 		// First, get params from JSON
 		for k, v := range callToolParams.GetObject("params") {
-			invokeParams.Set(k, v)
+			attemptParams.Set(k, v)
 		}
 
-		// Then, merge AITAG params (they take precedence over JSON params)
-		mergedAITagParams := make(map[string]struct{})
-		if promptMeta != nil && len(promptMeta.ParamNames) > 0 {
-			for _, paramName := range MergeActionAITagParams(callToolAction, invokeParams, promptMeta.ParamNames) {
-				mergedAITagParams[paramName] = struct{}{}
-				log.Debugf("merged AITAG param[%s] for tool[%s]", paramName, tool.Name)
-			}
-
-			rawAIResponse = response.String()
-			blocks := extractKnownToolParamAITagBlocks(rawAIResponse, promptMeta.ParamNames)
-			var mismatched []toolParamAITagBlock
-			for _, block := range blocks {
+		if promptMeta != nil {
+			for _, block := range parsed.Blocks {
 				if block.Nonce != promptMeta.Nonce {
-					mismatched = append(mismatched, block)
+					message := fmt.Sprintf("tool[%s] generated mismatched AITAG nonce for param[%s], expected=%s observed=%s; applying bounded nonce recovery", tool.Name, block.ParamName, promptMeta.Nonce, block.Nonce)
+					log.Warn(message)
+					boundEmitter.EmitWarning(message)
 				}
-			}
-			if len(mismatched) > 0 {
-				parts := make([]string, 0, len(mismatched))
-				for _, block := range mismatched {
-					parts = append(parts, fmt.Sprintf("%s:%s", block.ParamName, block.Nonce))
-				}
-				message := fmt.Sprintf("tool[%s] generated mismatched AITAG nonce, expected=%s observed=%s", tool.Name, promptMeta.Nonce, strings.Join(parts, ", "))
-				log.Warn(message)
-				emitter.EmitWarning(message)
-			}
-
-			if recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, rawAIResponse, promptMeta.Nonce, promptMeta.ParamNames, mergedAITagParams); recovered != nil {
-				message := fmt.Sprintf("tool[%s] recovered single AITAG param[%s] from mismatched nonce[%s], expected nonce[%s]", tool.Name, recovered.ParamName, recovered.Nonce, promptMeta.Nonce)
-				log.Warn(message)
-				emitter.EmitWarning(message)
-			} else if len(mismatched) > 0 {
-				log.Debugf("tool[%s] skipped AITAG nonce fallback: %s", tool.Name, reason)
 			}
 		}
+		if err := mergeFixedToolParamBlocks(attemptParams, parsed.Blocks, promptMeta); err != nil {
+			return err
+		}
+		if err := validateNativeIdentity(); err != nil {
+			return err
+		}
+
+		normalizeToolParamBooleans(tool, attemptParams)
+		if valid, errors := tool.ValidateParams(attemptParams); !valid {
+			return utils.Errorf("generated parameters for fixed tool %q failed schema validation: %s; regenerate the complete params object and all required AITAG blocks in this response", tool.Name, strings.Join(errors, "; "))
+		}
+		invokeParams = attemptParams
+		identifier = attemptIdentifier
+		callExpectations = attemptExpectations
+		paramDuration = cost
+		rawAIResponse = parsed.Raw
 
 		return nil
 	}, append(requestOpts, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))...)

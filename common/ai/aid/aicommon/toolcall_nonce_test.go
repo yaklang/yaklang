@@ -7,83 +7,54 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-func TestExtractKnownToolParamAITagBlocks(t *testing.T) {
-	raw := `{"@action":"call-tool","params":{}}
-<|TOOL_PARAM_command_bad12|>
-echo "hello"
-<|TOOL_PARAM_command_END_bad12|>
-<|TOOL_PARAM_unknown_bad12|>
-ignored
-<|TOOL_PARAM_unknown_END_bad12|>`
-
-	blocks := extractKnownToolParamAITagBlocks(raw, []string{"command"})
-	require.Len(t, blocks, 1)
-	require.Equal(t, "command", blocks[0].ParamName)
-	require.Equal(t, "bad12", blocks[0].Nonce)
-	require.Equal(t, `echo "hello"`, blocks[0].Content)
-}
-
-func TestRecoverSingleMismatchedAITagParam(t *testing.T) {
-	invokeParams := aitool.InvokeParams{}
-	raw := `{"@action":"call-tool","params":{}}
-<|TOOL_PARAM_command_bad12|>
-#!/bin/bash
-echo "hello"
-<|TOOL_PARAM_command_END_bad12|>`
-
-	recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, raw, "good99", []string{"command"}, map[string]struct{}{})
-	require.Empty(t, reason)
-	require.NotNil(t, recovered)
-	require.Equal(t, "command", recovered.ParamName)
-	require.Equal(t, "bad12", recovered.Nonce)
-	require.Equal(t, "#!/bin/bash\necho \"hello\"", invokeParams.GetString("command"))
-}
-
-func TestRecoverSingleMismatchedAITagParamRejectsMultipleBlocks(t *testing.T) {
-	invokeParams := aitool.InvokeParams{}
-	raw := `{"@action":"call-tool","params":{}}
-<|TOOL_PARAM_command_bad12|>
+func TestFixedToolParamNonceRecovery(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		params aitool.InvokeParams
+		raw    string
+		want   aitool.InvokeParams
+	}{
+		{"single_mismatch", aitool.InvokeParams{}, `<|TOOL_PARAM_command_bad12|>
+echo hello
+<|TOOL_PARAM_command_END_bad12|>`, aitool.InvokeParams{"command": "echo hello"}},
+		{"multiple_mismatches", aitool.InvokeParams{}, `<|TOOL_PARAM_command_bad12|>
 echo one
 <|TOOL_PARAM_command_END_bad12|>
 <|TOOL_PARAM_script_bad34|>
 echo two
-<|TOOL_PARAM_script_END_bad34|>`
-
-	recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, raw, "good99", []string{"command", "script"}, map[string]struct{}{})
-	require.Nil(t, recovered)
-	require.Equal(t, "found 2 mismatched aitag blocks", reason)
-	require.Empty(t, invokeParams.GetString("command"))
-	require.Empty(t, invokeParams.GetString("script"))
-}
-
-func TestRecoverSingleMismatchedAITagParamRejectsWhenExactMergedExists(t *testing.T) {
-	invokeParams := aitool.InvokeParams{}
-	raw := `{"@action":"call-tool","params":{}}
-<|TOOL_PARAM_command_bad12|>
-echo one
-<|TOOL_PARAM_command_END_bad12|>`
-
-	recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, raw, "good99", []string{"command"}, map[string]struct{}{"command": {}})
-	require.Nil(t, recovered)
-	require.Equal(t, "exact nonce aitag already merged", reason)
-}
-
-func TestRecoverSingleMismatchedAITagParamRejectsWhenJSONParamIsNonEmpty(t *testing.T) {
-	invokeParams := aitool.InvokeParams{"command": "new JSON proposal"}
-	raw := `{"@action":"call-tool","params":{"command":"new JSON proposal"}}
-<|TOOL_PARAM_command_stale12|>
+<|TOOL_PARAM_script_END_bad34|>`, aitool.InvokeParams{}},
+		{"exact_blocks_prevent_mismatch_recovery", aitool.InvokeParams{}, `<|TOOL_PARAM_command_good99|>
+echo current
+<|TOOL_PARAM_command_END_good99|>
+<|TOOL_PARAM_script_bad12|>
+echo stale
+<|TOOL_PARAM_script_END_bad12|>`, aitool.InvokeParams{"command": "echo current"}},
+		{"nonempty_json_wins_over_mismatch", aitool.InvokeParams{"command": "new JSON proposal"}, `<|TOOL_PARAM_command_stale12|>
 old checkpoint block
-<|TOOL_PARAM_command_END_stale12|>`
-
-	recovered, reason := recoverSingleMismatchedAITagParam(
-		invokeParams,
-		raw,
-		"fresh99",
-		[]string{"command"},
-		map[string]struct{}{},
-	)
-	require.Nil(t, recovered)
-	require.Equal(t, "param command already has a non-empty value", reason)
-	require.Equal(t, "new JSON proposal", invokeParams.GetString("command"),
-		"a stale-nonce checkpoint block must not overwrite a new non-empty proposal")
+<|TOOL_PARAM_command_END_stale12|>`, aitool.InvokeParams{"command": "new JSON proposal"}},
+		{"exact_tag_wins_over_json", aitool.InvokeParams{"command": "old JSON proposal"}, `<|TOOL_PARAM_command_good99|>
+new block
+<|TOOL_PARAM_command_END_good99|>`, aitool.InvokeParams{"command": "new block"}},
+		{"nonce_with_underscores", aitool.InvokeParams{}, `<|TOOL_PARAM_command_bad_nonce_12|>
+echo hello
+<|TOOL_PARAM_command_END_bad_nonce_12|>`, aitool.InvokeParams{"command": "echo hello"}},
+		{"parameter_name_with_underscores", aitool.InvokeParams{}, `<|TOOL_PARAM_command_line_bad_nonce_12|>
+echo hello
+<|TOOL_PARAM_command_line_END_bad_nonce_12|>`, aitool.InvokeParams{"command_line": "echo hello"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Prefix-related names must be disambiguated by the matching end tag.
+			names := []string{"command", "command_bad", "command_line", "script"}
+			_, blocks, err := decodeToolParamObject("{}\n"+test.raw, names)
+			require.NoError(t, err)
+			err = mergeFixedToolParamBlocks(test.params, blocks, &ToolParamsPromptMeta{Nonce: "good99", ParamNames: names})
+			require.NoError(t, err)
+			require.Equal(t, test.want, test.params)
+		})
+	}
+	_, _, err := decodeToolParamObject(`{} <|TOOL_PARAM_command_line_nonce|>
+text
+<|TOOL_PARAM_command_END_line_nonce|>
+<|TOOL_PARAM_command_line_END_nonce|>`, []string{"command", "command_line"})
+	require.ErrorContains(t, err, "ambiguous parameter AITAG")
 }
