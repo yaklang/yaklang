@@ -40,6 +40,8 @@ type ScanTaskCallback struct {
 
 	pauseCheck func() bool `json:"-"`
 
+	stageCallback StageCallback `json:"-"`
+
 	Reporter       sfreport.IReport `json:"-"`
 	ReporterWriter io.Writer        `json:"-"`
 

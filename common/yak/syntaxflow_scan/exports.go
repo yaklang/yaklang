@@ -3,11 +3,17 @@ package syntaxflow_scan
 import "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 var Exports = map[string]any{
-	"StartScan":     StartScan,
-	"ScanProject":   ScanProject,
-	"ResumeScan":    ResumeScan,
-	"GetScanStatus": GetScanStatus,
-	// 进度
+	"StartScan":                    StartScan,
+	"ScanProject":                  ScanProject,
+	"ScanProjectFromJSON":          ScanProjectFromJSON,
+	"ResumeScan":                   ResumeScan,
+	"GetScanStatus":                GetScanStatus,
+	"stageCollect":                 StageCollect,
+	"stageInspect":                 StageInspect,
+	"stageReview":                  StageReview,
+	"stageAnalyze":                 StageAnalyze,
+	"stageName":                    func(s string) string { return ProductStage(s).DisplayName() },
+	"withStageCallback":            WithStageCallback,
 	"withScanProcessCallback":      WithProcessCallback,
 	"withProcessRuleDetail":        WithProcessRuleDetail,
 	"withScanResultCallback":       WithScanResultCallback,
@@ -21,11 +27,12 @@ var Exports = map[string]any{
 	"withScanRuleWorkLimit":        ssaconfig.WithScanRuleWorkLimit,
 	"withScanRuleWorkLimitDefault": ssaconfig.WithScanRuleWorkLimitDefault,
 	"withReporter":                 WithReporter,
-	// Rule filter (builtin DB rules; prefer Tag=source for source-mode)
-	"withRuleFilter":            ssaconfig.WithRuleFilter,
-	"withRuleFilterTag":         ssaconfig.WithRuleFilterTag,
-	"withRuleFilterMode":        ssaconfig.WithRuleFilterMode,
-	"withRuleFilterKeyword":     ssaconfig.WithRuleFilterKeyword,
-	"withRuleFilterGroupNames":  ssaconfig.WithRuleFilterGroupNames,
-	"withRuleFilterLibRuleKind": ssaconfig.WithRuleFilterLibRuleKind,
+	"withRuleInput":                ssaconfig.WithRuleInput,
+	"withRuleInputRaw":             ssaconfig.WithRuleInputRaw,
+	"withRuleFilter":               ssaconfig.WithRuleFilter,
+	"withRuleFilterTag":            ssaconfig.WithRuleFilterTag,
+	"withRuleFilterMode":           ssaconfig.WithRuleFilterMode,
+	"withRuleFilterKeyword":        ssaconfig.WithRuleFilterKeyword,
+	"withRuleFilterGroupNames":     ssaconfig.WithRuleFilterGroupNames,
+	"withRuleFilterLibRuleKind":    ssaconfig.WithRuleFilterLibRuleKind,
 }

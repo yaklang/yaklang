@@ -445,24 +445,30 @@ func loadSyntaxFlowInputs(input string) ([]string, bool, error) {
 	}
 
 	if utils.IsDir(input) {
-		entries, err := utils.ReadDir(input)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "read syntaxflow dir %s failed", input)
-		}
 		var flows []string
-		for _, entry := range entries {
-			ext := strings.ToLower(filepath.Ext(entry.Path))
-			if ext != ".sf" && ext != ".syntaxflow" {
-				continue
-			}
-			contentRaw, err := os.ReadFile(entry.Path)
+		err := filepath.Walk(input, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return nil, true, utils.Wrapf(err, "read syntaxflow file %s failed", entry.Path)
+				return err
+			}
+			if info == nil || info.IsDir() {
+				return nil
+			}
+			ext := strings.ToLower(filepath.Ext(path))
+			if ext != ".sf" && ext != ".syntaxflow" {
+				return nil
+			}
+			contentRaw, err := os.ReadFile(path)
+			if err != nil {
+				return utils.Wrapf(err, "read syntaxflow file %s failed", path)
 			}
 			if len(contentRaw) <= 0 {
-				continue
+				return nil
 			}
 			flows = append(flows, string(contentRaw))
+			return nil
+		})
+		if err != nil {
+			return nil, true, utils.Wrapf(err, "read syntaxflow dir %s failed", input)
 		}
 		return flows, true, nil
 	}
@@ -1537,7 +1543,7 @@ and exports structured report (sarif/irify).`,
 		} else {
 			log.Infof("============= start to scan code ==============")
 		}
-		log.Infof("[code-scan] mode: compile + scan via syntaxflow_scan.StartScan (batch/CI report path)")
+		log.Infof("[code-scan] mode: compile + scan via syntaxflow_scan.ScanProject")
 
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()
@@ -1570,13 +1576,6 @@ and exports structured report (sarif/irify).`,
 			useConfigMode, config.Format, config.GetOutputFile(),
 		)
 
-		var progs []*ssaapi.Program
-		progs, err = getProgram(ctx, config)
-		if err != nil {
-			log.Errorf("get program failed: %s", err)
-			return err
-		}
-
 		log.Infof("================= get or parse rule ================")
 
 		opt := []sfreport.Option{}
@@ -1594,6 +1593,11 @@ and exports structured report (sarif/irify).`,
 		reportInstance.SetWriter(config.OutputWriter)
 
 		scanOpt := make([]ssaconfig.Option, 0)
+		if config != nil && config.Config != nil {
+			if raw, jsonErr := config.Config.ToJSONRaw(); jsonErr == nil && len(raw) > 0 {
+				scanOpt = append(scanOpt, ssaconfig.WithJsonRawConfig(raw))
+			}
+		}
 		ruleSource := "database builtin rules (with filter)"
 		customRuleCount := 0
 		if path := c.String("syntaxflow"); path != "" {
@@ -1616,10 +1620,12 @@ and exports structured report (sarif/irify).`,
 		log.Infof("[code-scan] rule source: %s (custom-rule-count=%d)", ruleSource, customRuleCount)
 
 		scanOpt = append(scanOpt,
-			syntaxflow_scan.WithPrograms(progs...),
-			syntaxflow_scan.WithCompiledSource(true),
 			syntaxflow_scan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessRuleDetail(true),
+			syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+				log.Infof("[code-scan] %s (%s) stage=%.0f%% overall=%.0f%%",
+					stage.DisplayName(), stage, progress*100, overall*100)
+			}),
 		)
 
 		if useConfigMode {
@@ -1730,7 +1736,7 @@ and exports structured report (sarif/irify).`,
 			}),
 		)
 
-		err = syntaxflow_scan.StartScan(ctx, scanOpt...)
+		err = syntaxflow_scan.ScanProject(ctx, scanOpt...)
 		if err != nil {
 			log.Errorf("scan failed: %s", err)
 			return err

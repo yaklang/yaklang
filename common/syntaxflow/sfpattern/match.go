@@ -378,7 +378,7 @@ func DefaultLoadOptions() LoadOptions {
 	}
 	ext := map[string]struct{}{}
 	for _, e := range []string{
-		".java", ".kt", ".kts", ".go", ".py", ".js", ".jsx", ".ts", ".tsx", ".vue",
+		".java", ".kt", ".kts", ".go", ".py", ".yak", ".js", ".jsx", ".ts", ".tsx", ".vue",
 		".php", ".rb", ".rs", ".c", ".cc", ".cpp", ".h", ".hpp", ".cs",
 		".xml", ".yml", ".yaml", ".json", ".properties", ".env", ".ini",
 		".toml", ".conf", ".cfg", ".txt", ".md", ".gradle", ".sql",
