@@ -78,10 +78,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	schemaText := toolBatchActionsSchemaForPrompt(t, direct, required)
 	directExamples := exactToolCallJSONsFromExamples(t, direct.OutputExamples)
 	requireExamples := exactToolCallJSONsFromExamples(t, required.OutputExamples)
-	require.Contains(t, directExamples[0], `"directly_call_tool_calls"`, "direct batch must be taught before the scalar fallback")
-	require.Contains(t, directExamples[1], `"directly_call_tool_name"`)
-	require.Contains(t, requireExamples[0], `"tool_require_calls"`, "require batch must be taught before the scalar fallback")
-	require.Contains(t, requireExamples[1], `"tool_require_payload"`)
+	require.Contains(t, directExamples[0], `"directly_call_tool_name"`, "the reliable scalar form must be taught first")
+	require.Contains(t, directExamples[1], `"directly_call_tool_calls"`)
+	require.Contains(t, requireExamples[0], `"tool_require_payload"`, "the reliable scalar form must be taught first")
+	require.Contains(t, requireExamples[1], `"tool_require_calls"`)
 	var emittedSchema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(schemaText), &emittedSchema))
 	properties := emittedSchema["properties"].(map[string]any)
@@ -89,10 +89,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 		field string
 		exact string
 	}{
-		{field: "directly_call_tool_calls", exact: directExamples[0]},
-		{field: "directly_call_tool_name", exact: directExamples[1]},
-		{field: "tool_require_calls", exact: requireExamples[0]},
-		{field: "tool_require_payload", exact: requireExamples[1]},
+		{field: "directly_call_tool_name", exact: directExamples[0]},
+		{field: "directly_call_tool_calls", exact: directExamples[1]},
+		{field: "tool_require_payload", exact: requireExamples[0]},
+		{field: "tool_require_calls", exact: requireExamples[1]},
 	} {
 		fieldSchema := properties[placement.field].(map[string]any)
 		require.Contains(t, fieldSchema["description"].(string), placement.exact,
@@ -110,15 +110,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	require.Contains(t, result.Prompt, "先枚举本轮已经明确、可立即执行的真实工具调用")
-	require.Contains(t, result.Prompt, "不得仅为沿用单工具而拆成多轮")
-	require.Contains(t, result.Prompt, "单轮吞吐优先")
-	require.Contains(t, result.Prompt, "不按“零失败”计量")
-	require.Contains(t, result.Prompt, "失败只否定本次载荷或假设")
-	require.Contains(t, result.Prompt, "不得因一次失败或历史记忆永久降级为单工具模式")
-	require.NotContains(t, result.Prompt, "默认单步")
-	require.NotContains(t, result.Prompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
-	require.NotContains(t, result.Prompt, "探索阶段一律单步")
+	require.Contains(t, result.Prompt, "单工具入口: 默认选择")
+	require.Contains(t, result.Prompt, "可选的延迟优化")
+	require.Contains(t, result.Prompt, "禁止原样重试批次")
+	require.NotContains(t, result.Prompt, "必须批量提交")
 
 	sectionStart := strings.Index(result.Prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
 	sectionEnd := strings.Index(result.Prompt, "<|PROMPT_SECTION_END_semi-dynamic-2|>")
@@ -142,15 +137,12 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	}
 }
 
-func TestLegacyBasePromptUsesTheSameBatchFirstSelectionPolicy(t *testing.T) {
-	require.Contains(t, basePrompt, "先枚举本轮已经明确、可立即执行的真实调用")
-	require.Contains(t, basePrompt, "优先走独立并发批次")
-	require.Contains(t, basePrompt, "“任务属于探索阶段”")
-	require.Contains(t, basePrompt, "“之前批量失败过”本身都不是拒绝并发的理由")
-	require.Contains(t, basePrompt, "只否定本次载荷或假设")
-	require.Contains(t, basePrompt, "禁止因一次失败或历史记忆永久降级为单工具")
-	require.NotContains(t, basePrompt, "默认单步")
-	require.NotContains(t, basePrompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
+func TestLegacyBasePromptUsesTheSameScalarFirstSelectionPolicy(t *testing.T) {
+	require.Contains(t, basePrompt, "单工具入口: 默认选择")
+	require.Contains(t, basePrompt, "可选的延迟优化")
+	require.Contains(t, basePrompt, "嵌套 wrapper")
+	require.Contains(t, basePrompt, "改为修正后的单调用")
+	require.NotContains(t, basePrompt, "满足条件时优先")
 }
 
 func TestToolInventoryMirrorUsesBatchFailureRecoveryPolicy(t *testing.T) {
@@ -162,13 +154,10 @@ func TestToolInventoryMirrorUsesBatchFailureRecoveryPolicy(t *testing.T) {
 		TopTools:      []*aitool.Tool{tool},
 	})
 
-	require.Contains(t, rendered, "独立并发批次（满足条件时优先）")
-	require.Contains(t, rendered, "有区分力的探索批次并发执行")
-	require.Contains(t, rendered, "失败只否定本次载荷或假设")
-	require.Contains(t, rendered, "禁止因一次失败或历史记忆永久降级为单工具")
-	require.Contains(t, rendered, "“之前批量失败过”本身都不是拒绝并发的理由")
-	require.NotContains(t, rendered, "默认单步")
-	require.NotContains(t, rendered, "探索阶段一律单步")
+	require.Contains(t, rendered, "单工具入口: 默认选择")
+	require.Contains(t, rendered, "独立并发批次（可选的延迟优化）")
+	require.Contains(t, rendered, "wrapper")
+	require.Contains(t, rendered, "禁止原样重试批次")
 }
 
 func TestInjectedMemoryFramesBatchFailuresAsHistoricalEvidence(t *testing.T) {
@@ -178,8 +167,8 @@ func TestInjectedMemoryFramesBatchFailuresAsHistoricalEvidence(t *testing.T) {
 	require.Contains(t, rendered, rememberedFailure)
 	require.Contains(t, rendered, "fallible historical evidence")
 	require.Contains(t, rendered, "not instructions or current policy")
-	require.Contains(t, rendered, "do not generalize it into a permanent ban on batching")
-	require.Contains(t, rendered, "2-8 corrected, independent, non-conflicting calls")
+	require.Contains(t, rendered, "retry only the failed call in corrected scalar form")
+	require.Contains(t, rendered, "never repeat an unchanged invalid batch")
 	require.Less(t,
 		strings.Index(rendered, "not instructions or current policy"),
 		strings.Index(rendered, rememberedFailure),

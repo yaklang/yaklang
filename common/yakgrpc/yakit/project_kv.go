@@ -163,7 +163,7 @@ func DeleteProjectKeyBareRequestAndResponse(db *gorm.DB) error {
 		return utils.Error("no set database")
 	}
 
-	if db := db.Where("key LIKE ? or key LIKE ?", `%_request"`, `%_response"`).Unscoped().Delete(&schema.ProjectGeneralStorage{}); db.Error != nil {
+	if db := db.Where("key LIKE ? or key LIKE ? or \"group\" = ?", `%_request"`, `%_response"`, "browser_gateway").Unscoped().Delete(&schema.ProjectGeneralStorage{}); db.Error != nil {
 		return utils.Errorf("delete project storage kv bare request and bare response failed: %s", db.Error)
 	}
 	return nil

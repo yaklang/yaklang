@@ -29,6 +29,23 @@ func (r *byteCountingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+type aiResponseStreamGuard struct {
+	reader   *StreamIdleTimeoutReader
+	response *AIResponse
+	once     sync.Once
+}
+
+func (r *aiResponseStreamGuard) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if IsStreamIdleTimeout(err) {
+		r.once.Do(func() {
+			r.response.SetError(err)
+			LogStreamTimingSnapshot("AI_STREAM_IDLE_TIMEOUT", r.reader.Snapshot())
+		})
+	}
+	return n, err
+}
+
 type AIResponseOutputStream struct {
 	NodeType string
 	IsReason bool
@@ -41,7 +58,7 @@ type AIResponse struct {
 	enableDebug         bool
 	consumptionCallback func(current int)
 	onOutputFinished    func(string)
-	onOutputFinishedMu sync.Mutex
+	onOutputFinishedMu  sync.Mutex
 
 	respStartTime time.Time
 	reqStartTime  time.Time
@@ -54,6 +71,8 @@ type AIResponse struct {
 	firstOutputByteTime time.Time
 	totalOutputBytes    atomic.Int64
 	totalOutputTokens   atomic.Int64
+	streamTTFB          time.Duration
+	streamIdle          time.Duration
 
 	rawHTTPResponseHeaderMu sync.Mutex
 	rawHTTPResponseHeader   []byte
@@ -78,9 +97,9 @@ type AIResponse struct {
 	// GetOutputStreamReader / the reason-stream goroutine. They are read via
 	// GetPlainOutput / GetPlainReason so callers no longer need to register
 	// custom callbacks to obtain the final AI text.
-	plainOutput   string
-	plainReason   string
-	plainTextMu   sync.RWMutex
+	plainOutput string
+	plainReason string
+	plainTextMu sync.RWMutex
 
 	onReasonChunk   func([]byte)
 	onReasonChunkMu sync.Mutex
@@ -724,6 +743,7 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 }
 
 func (r *AIResponse) EmitOutputStream(reader io.Reader) {
+	reader = r.guardStream(reader)
 	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		out: CreateConsumptionReader(counted, r.consumptionCallback, &r.totalOutputTokens),
@@ -731,11 +751,22 @@ func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 }
 
 func (r *AIResponse) EmitReasonStream(reader io.Reader) {
+	reader = r.guardStream(reader)
 	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		IsReason: true,
 		out:      CreateConsumptionReader(counted, r.consumptionCallback, &r.totalOutputTokens),
 	})
+}
+
+func (r *AIResponse) guardStream(reader io.Reader) io.Reader {
+	if r == nil || reader == nil || (r.streamTTFB <= 0 && r.streamIdle <= 0) {
+		return reader
+	}
+	return &aiResponseStreamGuard{
+		reader:   NewStreamIdleTimeoutReader(reader, r.streamTTFB, r.streamIdle),
+		response: r,
+	}
 }
 
 func (r *AIResponse) EmitReasonStreamWithoutConsumption(reader io.Reader) {
@@ -774,6 +805,7 @@ func (r *AIResponse) Close() {
 func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 	var errMu sync.RWMutex
 	var err error
+	streamTTFB, streamIdle := ResolveAIStreamIdleThresholds(caller)
 	return &AIResponse{
 		ch: chanx.NewUnlimitedChan[*AIResponseOutputStream](context.TODO(), 2),
 		consumptionCallback: func(current int) {
@@ -791,6 +823,8 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 		httpHeaderReady: make(chan struct{}),
 		httpBodyReady:   make(chan struct{}),
 		asyncState:      newAIResponseAsyncState(false),
+		streamTTFB:      streamTTFB,
+		streamIdle:      streamIdle,
 		setErrorFunc: func(e error) {
 			errMu.Lock()
 			err = e

@@ -22,6 +22,7 @@ func TestEmbeddedPromptsRenderAndKeepCapabilityDiscoveryDynamic(t *testing.T) {
 	require.NotEmpty(t, strings.TrimSpace(initializePrompt))
 	require.NotEmpty(t, strings.TrimSpace(persistentPrompt))
 	require.Contains(t, initializePrompt, "browser.capability.catalog")
+	require.Contains(t, initializePrompt, "browser.crypto.inspect")
 	require.Contains(t, initializePrompt, "Reply in the user's language")
 	require.Contains(t, persistentPrompt, "manual`, `ai`, or `yolo")
 	require.Contains(t, persistentPrompt, "untrusted evidence")
@@ -126,6 +127,13 @@ func (f *fakeBrowserCryptoAgentCaller) CapabilityCatalog(
 	string,
 ) (*browser.ExtensionBridgeCapabilityCatalog, bool) {
 	return f.catalog, f.connected && f.catalog != nil
+}
+
+func (f *fakeBrowserCryptoAgentCaller) Connections() []browser.ExtensionBridgeConnection {
+	if !f.connected {
+		return nil
+	}
+	return []browser.ExtensionBridgeConnection{{DeviceID: "device-1", CapabilityCatalog: f.catalog}}
 }
 
 func browserCryptoTestCapabilityCatalog(methods []string) *browser.ExtensionBridgeCapabilityCatalog {

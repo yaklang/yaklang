@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"io"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,18 +14,22 @@ func TestAttachedBrowserResourceData(t *testing.T) {
 	resource, err := ParseAttachedResourceData(NewAttachedResource(
 		AttachedResourceTypeBrowser,
 		AttachedResourceKeyBrowserDevice,
-		`{"deviceId":"device-1","name":"Login debugging"}`,
+		`{"deviceId":"device-1","name":"Login debugging","reference":"A"}`,
 	))
 	require.NoError(t, err)
 	browserResource, ok := resource.(*AttachedBrowserResourceData)
 	require.True(t, ok)
 	require.Equal(t, "device-1", browserResource.DeviceID)
 	require.Contains(t, browserResource.ToAttachData(nil), "browser.capability.catalog")
-	require.Contains(t, browserResource.ToAttachData(nil), "device-1")
+	require.NotContains(t, browserResource.ToAttachData(nil), "device-1")
 	require.Contains(t, browserResource.ToAttachData(nil), "do not use use_browser")
 	require.Contains(t, browserResource.ToAttachData(nil), "method browser.tabs")
+	require.Contains(t, browserResource.ToAttachData(nil), `{"browser_ref":"...","method":"browser.*","params":{...}}`)
+	require.Contains(t, browserResource.ToAttachData(nil), attachedBrowserCryptoToolName)
+	require.Contains(t, browserResource.ToAttachData(nil), "postAction.sameDocument")
 	require.Contains(t, browserResource.ToAttachData(nil), "domain=transform")
-	require.Contains(t, browserResource.ToAttachData(nil), "The Agent must not persist a Profile itself")
+	require.Contains(t, browserResource.ToAttachData(nil), attachedBrowserHTTPToolName)
+	require.Contains(t, browserResource.ToAttachData(nil), "without permanently saving a Profile")
 }
 
 func TestAttachedBrowserResourcePromotesBridgeTools(t *testing.T) {
@@ -38,26 +43,50 @@ func TestAttachedBrowserResourcePromotesBridgeTools(t *testing.T) {
 		aitool.WithDescription("call"),
 		aitool.WithStringParam("device_id"),
 	)
+	cryptoTool := aitool.NewWithoutCallback(
+		attachedBrowserCryptoToolName,
+		aitool.WithDescription("crypto"),
+		aitool.WithStringParam("device_id"),
+	)
+	prepareTool := aitool.NewWithoutCallback(
+		attachedBrowserPrepareToolName,
+		aitool.WithDescription("prepare"),
+		aitool.WithStringParam("device_id"),
+	)
 	handoffTool := aitool.NewWithoutCallback(
 		attachedBrowserHandoffToolName,
 		aitool.WithDescription("handoff"),
 		aitool.WithStringParam("device_id"),
 	)
-	cfg := NewConfig(context.Background(), WithTools(catalogTool, callTool, handoffTool))
+	httpTool := aitool.NewWithoutCallback(
+		attachedBrowserHTTPToolName,
+		aitool.WithDescription("http"),
+		aitool.WithStringParam("device_id"),
+	)
+	cfg := NewConfig(context.Background(), WithTools(catalogTool, callTool, cryptoTool, prepareTool, handoffTool, httpTool))
 	cfg.GetAiToolManager().DisableTool(attachedBrowserCatalogToolName)
 	cfg.GetAiToolManager().DisableTool(attachedBrowserCallToolName)
+	cfg.GetAiToolManager().DisableTool(attachedBrowserCryptoToolName)
+	cfg.GetAiToolManager().DisableTool(attachedBrowserPrepareToolName)
 	cfg.GetAiToolManager().DisableTool(attachedBrowserHandoffToolName)
+	cfg.GetAiToolManager().DisableTool(attachedBrowserHTTPToolName)
 	loop := &attachedBrowserTestLoop{config: cfg}
 	resource := &AttachedBrowserResourceData{DeviceID: "device-1", Name: "Chrome Browser"}
 
 	require.NoError(t, resource.BindLoopData(loop))
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserCatalogToolName))
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserCallToolName))
+	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserCryptoToolName))
+	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserPrepareToolName))
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserHandoffToolName))
+	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserHTTPToolName))
 	promptMaterials := BuildPromptFrozenOpenMaterials(cfg)
 	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCatalogToolName)
 	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCallToolName)
+	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCryptoToolName)
+	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserPrepareToolName)
 	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserHandoffToolName)
+	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserHTTPToolName)
 	require.Contains(t, resource.ToAttachData(loop), "tools are available and have been promoted")
 }
 
@@ -86,7 +115,10 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 	require.False(t, allow)
 	require.Contains(t, feedback, attachedBrowserCatalogToolName)
 	require.Contains(t, feedback, attachedBrowserCallToolName)
+	require.Contains(t, feedback, attachedBrowserCryptoToolName)
+	require.Contains(t, feedback, attachedBrowserPrepareToolName)
 	require.Contains(t, feedback, attachedBrowserHandoffToolName)
+	require.Contains(t, feedback, attachedBrowserHTTPToolName)
 	require.Contains(t, feedback, "Do not call op=open")
 
 	allow, feedback = CheckAttachedBrowserToolRoute(task, attachedBrowserCatalogToolName)
@@ -109,14 +141,66 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 	require.Equal(t, "device-1", params.GetString("device_id"))
 	require.NotContains(t, params, "browser_ref")
 
+	params, err = BindAttachedBrowserToolParams(task, attachedBrowserCryptoToolName, aitool.InvokeParams{
+		"browser_ref": "device-1",
+		"captureId":   "capture-1",
+		"nodeId":      "n1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "device-1", params.GetString("device_id"))
+	require.NotContains(t, params, "browser_ref")
+
 	task.SetAttachedDatas(nil)
 	allow, feedback = CheckAttachedBrowserToolRoute(task, attachedBrowserRodToolName)
 	require.True(t, allow)
 	require.Empty(t, feedback)
 
 	allow, feedback = CheckAttachedBrowserToolRoute(task, attachedBrowserCallToolName)
+	require.True(t, allow)
+	require.Empty(t, feedback)
+}
+
+func TestBrowserExtensionIntentBlocksRodWithoutMentionAttachment(t *testing.T) {
+	task := NewStatefulTaskBase(
+		"browser-route",
+		"我打开了实例A，请着重测试浏览器插件能力，必须通过浏览器插件",
+		context.Background(),
+		nil,
+		true,
+	)
+
+	allow, feedback := CheckAttachedBrowserToolRoute(task, attachedBrowserRodToolName)
 	require.False(t, allow)
-	require.Contains(t, feedback, "requires at least one attached")
+	require.Contains(t, feedback, attachedBrowserCatalogToolName)
+	require.Contains(t, feedback, "instead of creating a replacement Rod browser")
+}
+
+func TestBrowserBridgeToolsArePrioritizedInInventory(t *testing.T) {
+	tools := make([]*aitool.Tool, 0, 30)
+	for index := 0; index < 24; index++ {
+		tools = append(tools, aitool.NewWithoutCallback("filler-"+strconv.Itoa(index)))
+	}
+	browserToolNames := []string{
+		"browser.instances.list",
+		attachedBrowserCatalogToolName,
+		attachedBrowserCallToolName,
+		attachedBrowserCryptoToolName,
+		attachedBrowserPrepareToolName,
+		attachedBrowserHandoffToolName,
+		attachedBrowserHTTPToolName,
+	}
+	for _, name := range browserToolNames {
+		tools = append(tools, aitool.NewWithoutCallback(name))
+	}
+
+	prioritized := PrioritizeToolsForInventory(tools, ToolInventoryMinCount)
+	prioritizedNames := make([]string, 0, len(prioritized))
+	for _, tool := range prioritized {
+		prioritizedNames = append(prioritizedNames, tool.Name)
+	}
+	for _, name := range browserToolNames {
+		require.Contains(t, prioritizedNames, name)
+	}
 }
 
 func TestAttachedBrowserResourceRoutesMultipleMentionsByReference(t *testing.T) {
@@ -129,7 +213,7 @@ func TestAttachedBrowserResourceRoutesMultipleMentionsByReference(t *testing.T) 
 	})
 
 	params, err := BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
-		"browser_ref": "B",
+		"browser_ref": "@B",
 		"method":      "browser.tabs",
 	})
 	require.NoError(t, err)
@@ -183,6 +267,35 @@ func TestToolCallerBindsAttachedBrowserDevice(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.Success)
 	require.Equal(t, "device-1", invokedDeviceID)
+}
+
+func TestToolCallerBlocksRodForBrowserExtensionIntent(t *testing.T) {
+	ctx := context.Background()
+	invoked := false
+	tool, err := aitool.New(
+		attachedBrowserRodToolName,
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithNoRuntimeCallback(func(context.Context, aitool.InvokeParams, io.Writer, io.Writer) (any, error) {
+			invoked = true
+			return "unexpected", nil
+		}),
+	)
+	require.NoError(t, err)
+	cfg := NewTestConfig(ctx, WithWorkdir(t.TempDir()))
+	task := NewStatefulTaskBase("browser-call", "我用 YTray 打开了实例 A，只能通过浏览器插件测试", ctx, cfg.Emitter, true)
+	caller, err := NewToolCaller(
+		ctx,
+		WithToolCaller_AICallerConfig(cfg),
+		WithToolCaller_AICaller(cfg),
+		WithToolCaller_Task(task),
+		WithToolCaller_Emitter(cfg.Emitter),
+		WithToolCaller_RuntimeId("browser-call"),
+	)
+	require.NoError(t, err)
+
+	_, _, err = caller.CallToolWithExistedParams(tool, true, nil)
+	require.ErrorContains(t, err, "explicitly requested an existing browser-extension/YTray instance")
+	require.False(t, invoked)
 }
 
 func TestAttachedBrowserResourceRejectsMissingDevice(t *testing.T) {

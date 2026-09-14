@@ -27,6 +27,17 @@ type fakeBrowserTransformCaller struct {
 	urlPattern string
 }
 
+type browserTransformCallerFunc func(context.Context, string, string, interface{}) (json.RawMessage, error)
+
+func (f browserTransformCallerFunc) CallDevice(
+	ctx context.Context,
+	deviceID string,
+	method string,
+	params interface{},
+) (json.RawMessage, error) {
+	return f(ctx, deviceID, method, params)
+}
+
 func (f *fakeBrowserTransformCaller) CallDevice(
 	_ context.Context,
 	_ string,
@@ -71,6 +82,69 @@ func encodedTransformBody(value string) string {
 	return base64.StdEncoding.EncodeToString([]byte(value))
 }
 
+func TestBrowserValidationTransformRuntime(t *testing.T) {
+	caller := browserTransformCallerFunc(func(
+		_ context.Context,
+		deviceID string,
+		method string,
+		params interface{},
+	) (json.RawMessage, error) {
+		require.Equal(t, "browser-a", deviceID)
+		require.Equal(t, "browser.transform.validation.execute", method)
+		raw, err := json.Marshal(params)
+		require.NoError(t, err)
+		var input browserTransformCall
+		require.NoError(t, json.Unmarshal(raw, &input))
+		require.Empty(t, input.ProfileID)
+		require.Equal(t, "validation-1", input.ValidationID)
+		body := `{"wire":true}`
+		if input.Direction == "response" {
+			body = `{"plain":true}`
+		}
+		return json.Marshal(browserTransformResult{
+			ProfileID:  "transient-validation-1",
+			Direction:  input.Direction,
+			URL:        input.Packet.URL,
+			BodyBase64: encodedTransformBody(body),
+		})
+	})
+	runtime, err := prepareBrowserValidationTransform(caller, "browser-a", "validation-1", true, true, 5*time.Second)
+	require.NoError(t, err)
+	plainRequest := []byte("POST /api HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\n\r\n{\"plain\":true}")
+	wireRequest := runtime.beforeHook(context.Background())(true, nil, plainRequest)
+	require.JSONEq(t, `{"wire":true}`, string(lowhttp.GetHTTPPacketBody(wireRequest)))
+	wireResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"cipher\":true}")
+	plainResponse := runtime.afterHook(context.Background())(true, nil, wireRequest, nil, wireResponse)
+	require.JSONEq(t, `{"plain":true}`, string(lowhttp.GetHTTPPacketBody(plainResponse)))
+}
+
+func TestBrowserHTTPTestToolContract(t *testing.T) {
+	tool, err := buildBrowserHTTPTestTool(nil)
+	require.NoError(t, err)
+	require.False(t, tool.NoNeedUserReview)
+	schema := tool.ToJSONSchemaString()
+	require.Contains(t, schema, "browser_ref")
+	require.Contains(t, schema, "validation_id")
+	require.Contains(t, schema, "profile_id")
+	require.Contains(t, schema, "is_https")
+	require.NotContains(t, schema, "device_id")
+}
+
+func TestBrowserTransformPrepareToolContractAndPacket(t *testing.T) {
+	tool, err := buildBrowserTransformPrepareTool(nil)
+	require.NoError(t, err)
+	require.Contains(t, tool.ToJSONSchemaString(), "candidate_id")
+	require.NotContains(t, tool.ToJSONSchemaString(), "device_id")
+
+	packet, err := browserTransformPacketFromRequest([]byte(
+		"POST /api/login HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\n\r\n{\"username\":\"admin\"}",
+	), true)
+	require.NoError(t, err)
+	require.Equal(t, "POST", packet.Method)
+	require.Equal(t, "https://example.test/api/login", packet.URL)
+	require.JSONEq(t, `{"username":"admin"}`, string(mustDecodeBase64(t, packet.BodyBase64)))
+}
+
 func TestBrowserTransformRuntimeRequestResponse(t *testing.T) {
 	caller := &fakeBrowserTransformCaller{
 		profileID: "profile-1", requestOn: true, responseOn: true,
@@ -82,9 +156,11 @@ func TestBrowserTransformRuntimeRequestResponse(t *testing.T) {
 				require.JSONEq(t, `{"password":"plain"}`, string(mustDecodeBase64(t, input.Packet.BodyBase64)))
 				return browserTransformResult{
 					ProfileID: input.ProfileID, Direction: input.Direction,
-					URL:        "https://example.test/api/login?channel=browser&signature=a%2Bb",
-					BodyBase64: encodedTransformBody(`{"password":"cipher"}`),
-					SetHeaders: []browserTransformHeader{{Name: "X-Sign", Value: "signed"}},
+					Explanation: json.RawMessage(`{"version":1,"directions":[{"direction":"request","stages":[]}]}`),
+					ProofLevel:  "structure",
+					URL:         "https://example.test/api/login?channel=browser&signature=a%2Bb",
+					BodyBase64:  encodedTransformBody(`{"password":"cipher"}`),
+					SetHeaders:  []browserTransformHeader{{Name: "X-Sign", Value: "signed"}},
 				}, nil
 			}
 			require.Equal(t, "https://example.test/api/login?channel=browser&signature=a%2Bb", input.Packet.URL)
@@ -100,6 +176,7 @@ func TestBrowserTransformRuntimeRequestResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	plainRequest := []byte("POST /api/login HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{\"password\":\"plain\"}")
+	runtime.evidence = make(map[string]interface{})
 	wireRequest := runtime.beforeHook(context.Background())(true, nil, plainRequest)
 	require.JSONEq(t, `{"password":"cipher"}`, string(lowhttp.GetHTTPPacketBody(wireRequest)))
 	require.Equal(t, "signed", lowhttp.GetHTTPPacketHeader(wireRequest, "X-Sign"))
@@ -115,6 +192,9 @@ func TestBrowserTransformRuntimeRequestResponse(t *testing.T) {
 	require.Equal(t, plainRequest, displayRequest)
 	require.Equal(t, wireRequest, savedWireRequest)
 	require.Equal(t, wireResponse, savedWireResponse)
+	evidence, err := json.Marshal(runtime.evidence["request"])
+	require.NoError(t, err)
+	require.JSONEq(t, `{"proofLevel":"structure","explanation":{"version":1,"directions":[{"direction":"request","stages":[]}]}}`, string(evidence))
 }
 
 func TestBrowserTransformAgentContractReachesWebFuzzer(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp"
 	mcpclient "github.com/yaklang/yaklang/common/mcp/mcp-go/client"
@@ -111,6 +112,11 @@ func startMCPListToolNames(t *testing.T, req *ypb.StartMcpServerRequest) []strin
 
 	client, err := NewLocalClient()
 	require.NoError(t, err)
+	return startMCPListToolNamesWithClient(t, client, req)
+}
+
+func startMCPListToolNamesWithClient(t *testing.T, client ypb.YakClient, req *ypb.StartMcpServerRequest) []string {
+	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -495,4 +501,80 @@ func TestGRPCMUSTPASS_StartMcpServer_DisabledAIToolNotExposed(t *testing.T) {
 		EnableBridgeExternalMCP: false,
 	})
 	assert.False(t, containsTool(names, aitoolName), "disabled aitool builtin must be filtered on start")
+}
+
+func TestGRPCMUSTPASS_GetMCPToolListIncludesBrowserExtensionTools(t *testing.T) {
+	manager, err := browser.NewExtensionBridgeManager(
+		browser.NewExtensionBridgeFileIdentityStore(t.TempDir()+"/identity.json"),
+		nil,
+	)
+	require.NoError(t, err)
+	server := &Server{browserBridge: manager}
+	t.Cleanup(func() {
+		syncMCPToolConfigSources(consts.GetGormProfileDatabase())
+	})
+
+	response, err := server.GetMCPToolList(context.Background(), &ypb.GetMCPToolListRequest{
+		Source:     schema.MCPClientToolSourceBuiltin,
+		Pagination: &ypb.Paging{Page: 1, Limit: 500},
+	})
+	require.NoError(t, err)
+
+	tools := make(map[string]*ypb.MCPClientToolConfig, len(response.GetTools()))
+	for _, tool := range response.GetTools() {
+		tools[tool.GetToolName()] = tool
+	}
+	for _, name := range []string{
+		"browser.instances.list",
+		"browser.capability.catalog",
+		"browser.capability.call",
+		"browser.crypto.inspect",
+		"browser.transform.prepare",
+		"browser.handoff.request",
+		"browser.http.test",
+	} {
+		require.Contains(t, tools, name)
+		require.Equal(t, schema.MCPClientToolSourceBuiltin, tools[name].GetSource())
+		require.True(t, tools[name].GetEnable())
+		require.NotEmpty(t, tools[name].GetDescription())
+	}
+
+	response, err = server.GetMCPToolList(context.Background(), &ypb.GetMCPToolListRequest{
+		Source:     schema.MCPClientToolSourceBuiltin,
+		Pagination: &ypb.Paging{Page: 1, Limit: 500},
+	})
+	require.NoError(t, err)
+	for _, tool := range response.GetTools() {
+		if strings.HasPrefix(tool.GetToolName(), "browser.") {
+			require.True(t, tool.GetEnable(), tool.GetToolName())
+		}
+	}
+}
+
+func TestGRPCMUSTPASS_StartMcpServerExposesBrowserExtensionTools(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	manager, err := browser.NewExtensionBridgeManager(
+		browser.NewExtensionBridgeFileIdentityStore(t.TempDir()+"/identity.json"),
+		nil,
+	)
+	require.NoError(t, err)
+	server.browserBridge = manager
+
+	names := startMCPListToolNamesWithClient(t, client, &ypb.StartMcpServerRequest{
+		Host:        "127.0.0.1",
+		Port:        0,
+		DisableTool: append([]string{}, mcp.DefaultMCPToolSets...),
+	})
+	for _, name := range []string{
+		"browser.instances.list",
+		"browser.capability.catalog",
+		"browser.capability.call",
+		"browser.crypto.inspect",
+		"browser.transform.prepare",
+		"browser.handoff.request",
+		"browser.http.test",
+	} {
+		require.Contains(t, names, name)
+	}
 }

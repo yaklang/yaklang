@@ -324,11 +324,19 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithEnableDispatchSubReactAgent(true), // 仅仅允许顶层 ReAct 分发子 ReAct Agent，子 Agent 仍然可以使用原始的 AI 回调。
 	}
 	if startParams.GetSource() == "ai" && s.browserBridge != nil {
-		browserTools, toolErr := browsertools.BuildDynamicCapabilityTools(serverBrowserExtensionBridge{server: s})
+		bridge := serverBrowserExtensionBridge{server: s}
+		browserTools, toolErr := s.buildBrowserAgentTools()
 		if toolErr != nil {
 			log.Warnf("build AI Agent browser capability tools failed: %v", toolErr)
 		} else {
-			configOptions = append(configOptions, aicommon.WithTools(browserTools...))
+			configOptions = append(configOptions,
+				aicommon.WithTools(browserTools...),
+				aicommon.WithDynamicContextProvider("browser_runtime", func(
+					aicommon.AICallerConfigIf, *aicommon.Emitter, string,
+				) (string, error) {
+					return browsertools.RuntimeContext(bridge), nil
+				}),
+			)
 		}
 	}
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
