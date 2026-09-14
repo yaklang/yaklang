@@ -11,6 +11,7 @@ var Exports = map[string]any{
 	"withProcessRuleDetail":        WithProcessRuleDetail,
 	"withScanResultCallback":       WithScanResultCallback,
 	"withScanPrograms":             withPrograms,
+	"withCompiledSource":           WithCompiledSource,
 	"withScanSourceFiles":          WithSourceFiles,
 	"withScanSourceDir":            WithSourceDir,
 	"withScanQueryTargets":         WithQueryTargets,
