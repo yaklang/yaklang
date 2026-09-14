@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "检测 Java AES CBC PKCS5Padding"
+	title_zh: "检测 Java AES CBC PKCS5Padding"
+	type: vuln
+	level: medium
+	rule_id: "source-java-aes-cbc-pkcs5"
+	risk: "weak-cryptographic-algorithm"
+	desc: <<<DESC
+### 规则说明
+检测到 AES/CBC/PKCS5Padding。CBC 填充模式存在填充预言攻击风险。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 AES/GCM/NoPadding。
+SOLUTION
+	alert_min: 1
+	"file://C.java": <<<POS
+import javax.crypto.Cipher;
+class C {
+  void bad() throws Exception { Cipher.getInstance("AES/CBC/PKCS5Padding"); }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("gcm"); } }
+
+NEG
+)
+
+${*.java}.pattern_regex(/AES\/CBC\/PKCS5Padding/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 Java AES CBC PKCS5Padding",
+	title_zh: "检测 Java AES CBC PKCS5Padding",
+	message: "检测 Java AES CBC PKCS5Padding",
+	risk: "weak-cryptographic-algorithm",
+}

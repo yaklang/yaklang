@@ -1,0 +1,48 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java NullCipher"
+	title_zh: "结构扫描：Java NullCipher"
+	type: vuln
+	level: high
+	rule_id: "struct-java-null-cipher"
+	risk: "insecure-cryptography"
+	desc: <<<DESC
+### 规则说明
+检测到 javax.crypto.NullCipher。它不做加密，密文等于明文。
+
+### 风险类型
+insecure-cryptography
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 AES-GCM 等真实加密算法，不要使用 NullCipher。
+SOLUTION
+	alert_min: 1
+	"file://C.java": <<<POS
+import javax.crypto.NullCipher;
+class C {
+  void bad() { new NullCipher(); }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("aes-gcm"); } }
+
+NEG
+)
+
+NullCipher() as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: Java NullCipher",
+	title_zh: "结构扫描：Java NullCipher",
+	message: "结构扫描：Java NullCipher",
+	risk: "insecure-cryptography",
+}

@@ -1,0 +1,48 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "Struct scan: Java RC2 Cipher"
+	title_zh: "结构扫描：Java RC2 加密"
+	type: vuln
+	level: high
+	rule_id: "struct-java-rc2-cipher"
+	risk: "weak-cryptographic-algorithm"
+	desc: <<<DESC
+### 规则说明
+检测到 Cipher 使用 RC2。RC2 密钥过短，已被淘汰。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 AES-GCM。
+SOLUTION
+	alert_min: 1
+	"file://C.java": <<<POS
+import javax.crypto.Cipher;
+class C {
+  void bad() throws Exception { Cipher.getInstance("RC2"); }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S { void ok() { System.out.println("aes-gcm"); } }
+
+NEG
+)
+
+Cipher.getInstance(*?{have: "RC2"}) as $call
+alert $call for {
+	level: "high",
+	title: "Struct scan: Java RC2 Cipher",
+	title_zh: "结构扫描：Java RC2 加密",
+	message: "结构扫描：Java RC2 加密",
+	risk: "weak-cryptographic-algorithm",
+}
