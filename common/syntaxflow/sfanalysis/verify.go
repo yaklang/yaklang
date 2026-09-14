@@ -43,6 +43,25 @@ func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame, opts ...Option) erro
 	return runEmbeddedVerifyWithFrame(frame, newConfig(opts...)).Error
 }
 
+// applyModeAwareVerifyDefaults forces POS+NEG checks for source/struct rules.
+// Those modes exist to catch API/config issues on embedded fixtures; skipping
+// the negative filesystem would let a too-broad regex or selector ship.
+func applyModeAwareVerifyDefaults(frame *sfvm.SFFrame, cfg *config) {
+	if frame == nil || cfg == nil {
+		return
+	}
+	if sfvm.FrameIsSourceMode(frame) || sfvm.FrameIsStructMode(frame) {
+		cfg.requirePositive = true
+		cfg.requireNegative = true
+		cfg.verifyNegative = true
+		cfg.strictAlertHigh = true
+	}
+}
+
+// EvaluateVerifyFilesystemWithRule compiles rule content and checks embedded
+// POS/NEG filesystems. Dispatch is by desc(mode): source uses sfpattern,
+// struct compiles with WithStructRule, SSA runs full IR query. source/struct
+// always require a matching POS and a clean NEG.
 func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, opts ...Option) error {
 	if rule == nil {
 		return utils.Error("syntaxflow rule is nil")
@@ -65,6 +84,7 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 		report.Error = utils.Error("syntaxflow frame is nil")
 		return report
 	}
+	applyModeAwareVerifyDefaults(frame, &cfg)
 
 	// Source-mode rules: verify on raw files via sfpattern (no SSA compile).
 	if sfvm.FrameIsSourceMode(frame) {
