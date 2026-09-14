@@ -1,0 +1,65 @@
+endian: big
+Package:
+  WebSocket:
+    operator: |
+      this.ProcessSubNode("FIN")
+      this.ProcessSubNode("RSV")
+      this.ProcessSubNode("Opcode")
+      op = getNodeResult("Opcode").Value
+      if getNodeResult("RSV").Value != 0 {
+        panic("websocket: RSV must be 0")
+      }
+      if op > 0x0a || (op >= 3 && op <= 7) {
+        panic("websocket: reserved opcode")
+      }
+      this.ProcessSubNode("Mask")
+      this.ProcessSubNode("Payload Len")
+      n = getNodeResult("Payload Len").Value
+      if n == 126 {
+        this.ProcessSubNode("Extended Length 16")
+        n = getNodeResult("Extended Length 16").Value
+      } else {
+        if n == 127 {
+          this.ProcessSubNode("Extended Length 64")
+          n = getNodeResult("Extended Length 64").Value
+        }
+      }
+      if n > 0x100000 {
+        panic("websocket: payload too large")
+      }
+      if getNodeResult("Mask").Value == 1 {
+        this.ProcessSubNode("Masking Key")
+      }
+      if op == 1 {
+        if n > 0 && n < 1048576 {
+          this.GetSubNode("Text").SetMaxLength(n)
+          this.ProcessSubNode("Text")
+        }
+        return
+      }
+      if op == 8 {
+        if n >= 2 {
+          this.ProcessSubNode("Close Code")
+          if n > 2 && n < 1048576 {
+            this.GetSubNode("Reason").SetMaxLength(n-2)
+            this.ProcessSubNode("Reason")
+          }
+        }
+        return
+      }
+      if n > 0 && n < 1048576 {
+        this.GetSubNode("Octets").SetMaxLength(n)
+        this.ProcessSubNode("Octets")
+      }
+    FIN: uint8,1bit
+    RSV: uint8,3bit
+    Opcode: uint8,4bit
+    Mask: uint8,1bit
+    Payload Len: uint8,7bit
+    Extended Length 16: uint16
+    Extended Length 64: uint64
+    Masking Key: raw,4
+    Text: string
+    Close Code: uint16
+    Reason: string
+    Octets: string

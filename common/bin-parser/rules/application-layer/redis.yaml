@@ -1,0 +1,85 @@
+Package:
+  Redis:
+    unpack: true
+    operator: |
+      this.ProcessByType("RESP")
+RESP:
+  operator: |
+    p = this.ProcessSubNode("Prefix").Value
+    switch p {
+      case 0x2a:
+        this.ProcessSubNode("Array")
+      case 0x24:
+        this.ProcessSubNode("Bulk")
+      case 0x2b:
+        this.ProcessSubNode("Simple")
+      case 0x2d:
+        this.ProcessSubNode("Error")
+      case 0x3a:
+        this.ProcessSubNode("Integer")
+      default:
+        panic("redis: invalid RESP prefix")
+    }
+  Prefix: uint8
+  Array:
+    operator: |
+      nstr = this.ProcessSubNode("Count").Value
+      n = int(nstr)
+      if n < 0 {
+        return
+      }
+      if n >= 1 {
+        this.ProcessByType("RedisCommand")
+      }
+      rest = n - 1
+      if rest > 0 {
+        this.GetSubNode("Arguments").SetCfg("list-length", rest)
+        this.ProcessSubNode("Arguments")
+      }
+      return
+    Count: "del:\r\n;type:string"
+    Arguments:
+      list: true
+      Element: RESP
+  Bulk:
+    operator: |
+      nstr = this.ProcessSubNode("Len").Value
+      n = int(nstr)
+      if n < 0 {
+        return
+      }
+      if n > 0 && n < 1048576 {
+        this.GetSubNode("Bulk").SetMaxLength(n)
+        this.ProcessSubNode("Bulk")
+      }
+      this.ProcessSubNode("CRLF")
+    Len: "del:\r\n;type:string"
+    Bulk: string
+    CRLF: raw,2
+  Simple:
+    Message: "del:\r\n;type:string"
+  Error:
+    Message: "del:\r\n;type:string"
+  Integer:
+    Message: "del:\r\n;type:string"
+RedisCommand:
+  operator: |
+    p = this.ProcessSubNode("Prefix").Value
+    if p != 0x24 {
+      panic("redis: command must be a bulk string")
+    }
+    nstr = this.ProcessSubNode("Len").Value
+    n = int(nstr)
+    if n < 0 {
+      return
+    }
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Command").SetMaxLength(n)
+      this.ProcessSubNode("Command")
+    }
+    this.ProcessSubNode("CRLF")
+    return
+  Prefix: uint8
+  Len: "del:\r\n;type:string"
+  Command: string
+  CRLF: raw,2

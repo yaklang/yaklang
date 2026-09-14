@@ -1,0 +1,138 @@
+endian: big
+Package:
+  TDS:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ != 1 && typ != 2 && typ != 3 && typ != 4 && typ != 6 && typ != 7 && typ != 8 && typ != 14 && typ != 16 && typ != 17 && typ != 18 {
+        panic("tds: unknown packet type")
+      }
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 8 {
+        panic("tds: length smaller than header")
+      }
+      this.SetMaxLength(l)
+      this.ProcessSubNode("SPID")
+      this.ProcessSubNode("PacketID")
+      this.ProcessSubNode("Window")
+      if l > 8 {
+        rest = l - 8
+        if rest > 0 && rest < 1048576 {
+          if typ == 18 {
+            this.ProcessSubNode("Prelogin")
+            if this.GetMaxLength() > this.Length() {
+              r2 = this.GetMaxLength() - this.Length()
+              if r2 >= 6 && r2 < 1048576 {
+                this.ProcessByType("TDSVersionData")
+              }
+            }
+            return
+          }
+          if typ == 16 {
+            this.ProcessByType("TDSLogin7")
+            return
+          }
+          if typ == 1 {
+            this.GetSubNode("Query").SetMaxLength(rest)
+            this.ProcessSubNode("Query")
+            return
+          }
+          this.GetSubNode("Octets").SetMaxLength(rest)
+          this.ProcessSubNode("Octets")
+        }
+      }
+      return
+    Type: uint8
+    Status: uint8
+    Length: uint16
+    SPID: uint16
+    PacketID: uint8
+    Window: uint8
+    Prelogin:
+      list: true
+      exception-plan: stopList
+      Token: Token
+      operator: |
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+          if ele.GetSubNode("Type").Result().Value == 0xff {
+            break
+          }
+        }
+    Query: string
+    Octets: string
+Token:
+  operator: |
+    this.ProcessSubNode("Type")
+    if getNodeResult("Type").Value == 0xff {
+      return
+    }
+    this.ProcessSubNode("Offset")
+    this.ProcessSubNode("Length")
+  Type: uint8
+  Offset: uint16
+  Length: uint16
+TDSVersionData:
+  Version Major: uint8
+  Version Minor: uint8
+  Build: uint16
+  SubBuild: uint16
+TDSLogin7:
+  endian: little
+  operator: |
+    this.ProcessSubNode("Login Length")
+    this.ProcessSubNode("TDS Version")
+    this.ProcessSubNode("Packet Size")
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+      if rest >= 24 && rest < 1048576 {
+        this.ProcessSubNode("Client Prog Ver")
+        this.ProcessSubNode("Client PID")
+        this.ProcessSubNode("Connection ID")
+        this.ProcessSubNode("Option Flags1")
+        this.ProcessSubNode("Option Flags2")
+        this.ProcessSubNode("Type Flags")
+        this.ProcessSubNode("Option Flags3")
+        this.ProcessSubNode("Client Time Zone")
+        this.ProcessSubNode("Client LCID")
+        this.ProcessSubNode("HostName Offset")
+        this.ProcessSubNode("HostName Chars")
+        ib = getNodeResult("HostName Offset").Value
+        used = this.Length()
+        if ib >= used {
+          skip = ib - used
+          if skip > 0 && skip < 1048576 {
+            this.GetSubNode("Skip").SetMaxLength(skip)
+            this.ProcessSubNode("Skip")
+          }
+          n = getNodeResult("HostName Chars").Value * 2
+          if n > 0 && n < 1048576 {
+            this.GetSubNode("HostName").SetMaxLength(n)
+            this.ProcessSubNode("HostName")
+          }
+        }
+      }
+    }
+    return
+  Login Length: uint32
+  TDS Version: uint32
+  Packet Size: uint32
+  Client Prog Ver: uint32
+  Client PID: uint32
+  Connection ID: uint32
+  Option Flags1: uint8
+  Option Flags2: uint8
+  Type Flags: uint8
+  Option Flags3: uint8
+  Client Time Zone: int32
+  Client LCID: uint32
+  HostName Offset: uint16
+  HostName Chars: uint16
+  Skip: string
+  HostName: string

@@ -1,0 +1,71 @@
+# Google QUIC Q035, pinned Chromium 57.0.2987.133 implementation profile.
+# This is NOT IETF QUIC, HTTP/3, TLS, or an application-specific protocol.
+# Primary sources under this fixed release:
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/quic_framer.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/quic_data_reader.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/quic_types.h
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/quic_versions.h
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/quic_utils.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/crypto/null_decrypter.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/crypto/crypto_framer.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/crypto/crypto_protocol.h
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/crypto/crypto_handshake_message.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/crypto/quic_crypto_client_config.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/quic_crypto_client_stream.cc
+# https://raw.githubusercontent.com/chromium/chromium/57.0.2987.133/net/quic/core/crypto/common_cert_set.cc
+#
+# Caller explicitly supplies Q035 and sending direction; a missing wire version
+# or CID is not inferred from earlier packets. Packet numbers are truncated
+# little-endian wire values, NOT reconstructed absolute numbers (zero may wrap).
+# Client bit 0x04 is the ignored old CID compatibility bit; only server packets
+# carry its 32-byte nonce. Public reset, server version negotiation, multipath,
+# extended flags and versions other than an explicitly present Q035 are unsupported.
+# Packet entries preserve every body byte, without checking its protected format,
+# choosing an algorithm, trying null mode, or calling a failed hash corruption.
+#
+# ClientHello explicitly checks the Q035 null checksum: low 96 bits of FNV-1a-128
+# (header || plaintext), serialized little-endian; Q037's direction suffix is NOT
+# used. Checksum agreement does not authenticate a peer or establish a session.
+# One complete non-FIN stream 1 CHLO at offset 0 is supported (no reassembly or
+# additional non-padding frames). CHLO minimum 1024 bytes, maximum 128 tag entries,
+# strictly increasing uint32-LE tags, monotonic cumulative ends and exact values.
+# Both tag-table padding and the bytes following a terminating padding frame
+# are preserved without inventing a zero constraint absent from this reader.
+# Known uint32/uint64/list/string value layouts are decoded. SMHL is uint32;
+# CTIM/XLCT and CCS/CCRT hashes are little-endian uint64. NONC is the Chromium
+# client layout: big-endian timestamp, eight orbit bytes and twenty random bytes.
+# NONP is a separate 32-byte opaque value, not a timestamp structure. Empty CSCT
+# is a request marker, not an SCT list. No clock, orbit or hash matching occurs.
+# Single-client PUBS, tokens, server-config identifiers, CETV, nonempty CSCT and
+# unknown options remain raw; SCFG's u24 PUBS vector is not used here. Required
+# parameter completeness, hostname validity, parameter negotiation, protected
+# body content, identity, and outcome are NOT verified. Structured generation is
+# unsupported; NodeToBytes of parsed packets preserves the complete wire input.
+# Exact byte boundary is required, with the Chromium 1452-byte packet ceiling.
+Package:
+  GQUIC35ClientPacket:
+    operator: |
+      err = parseGQUIC35(false, false)
+      if err != nil { panic(err) }
+  GQUIC35ServerPacket:
+    operator: |
+      err = parseGQUIC35(true, false)
+      if err != nil { panic(err) }
+  GQUIC35ClientHello:
+    operator: |
+      err = parseGQUIC35(false, true)
+      if err != nil { panic(err) }
+  GQUIC35ClientHelloCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("gquic35: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("gquic35: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("gquic35: empty carrier") }
+      if this.GetMaxLength() > 1452 { panic("gquic35: carrier exceeds 1452-byte resource limit") }
+      candidate, trial = this.TryProcessByType("GQUIC35CHLOFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed GQUIC35 Client Hello")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+GQUIC35CHLOFrame: "import:application-layer/gquic.yaml;node:GQUIC35ClientHello"

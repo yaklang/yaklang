@@ -1,0 +1,160 @@
+# IAX2 datagram framing. Media stays encoded bytes; mini-frame codecs and full
+# timestamps require an external, peer-scoped call history. This rule does not
+# infer negotiation, decrypt packets or decode media/application data formats.
+endian: big
+Package:
+  IAX2:
+    operator: |
+      if !this.HasMaxLength() { panic("iax2: datagram boundary is required") }
+      size = this.GetMaxLength()
+      limit = getCtx("iax2DatagramLimit")
+      if !hasCtx("iax2DatagramLimit") { limit = 65507 }
+      if size < 4 || size > 65507 || limit <= 0 || size > limit { panic("iax2: invalid datagram size") }
+      if hasCtx("iax2DatagramLength") && size != getCtx("iax2DatagramLength") { panic("iax2: datagram length differs from external boundary") }
+      if getCtx("iax2Encrypted") == true { panic("iax2: encrypted frames require prior decoding") }
+      source = this.ProcessSubNode("Source Word").Value
+      this.AddInfo("Full Frame", source & 0x8000 != 0)
+      this.AddInfo("Source Call", source & 0x7fff)
+      if source & 0x8000 != 0 {
+        if source & 0x7fff == 0 { panic("iax2: zero full-frame source call") }
+        this.AddInfo("Frame Kind", "full")
+        destination = this.ProcessSubNode("Destination Word").Value
+        this.AddInfo("Destination Call", destination & 0x7fff)
+        this.AddInfo("Retransmission", destination & 0x8000 != 0)
+        this.ProcessSubNode("Timestamp")
+        this.ProcessSubNode("Outbound Sequence")
+        this.ProcessSubNode("Inbound Sequence")
+        kind = this.ProcessSubNode("Frame Type").Value
+        subclass = this.ProcessSubNode("Subclass").Value
+        if kind < 1 || kind > 12 { panic("iax2: unsupported full-frame type") }
+        compressed = subclass & 0x80 != 0
+        code = subclass & 0x7f
+        if kind == 3 {
+          this.AddInfo("Video Marker", subclass & 0x40 != 0)
+          code = subclass & 0x3f
+        }
+        this.AddInfo("Subclass Is Power", compressed)
+        this.AddInfo("Subclass Code", code)
+        if compressed {
+          // The exponent itself is exact, including values beyond native
+          // machine integers. Never wrap an oversized bit shift into a codec.
+          this.AddInfo("Subclass Exponent", code)
+        } else { this.AddInfo("Subclass Value", code) }
+        if kind == 6 {
+          if compressed || code == 0 { panic("iax2: invalid signaling subclass") }
+          if code == 4 && size != 12 { panic("iax2: ACK must not contain information elements") }
+          if this.Length() < size { this.ProcessSubNode("Information Elements") }
+          return
+        }
+      } else if source != 0 {
+        this.AddInfo("Frame Kind", "mini-voice")
+        this.AddInfo("Media Context Required", true)
+        this.ProcessSubNode("Short Timestamp")
+      } else {
+        meta = this.ProcessSubNode("Meta Word").Value
+        if meta & 0x8000 != 0 {
+          if meta & 0x7fff == 0 { panic("iax2: zero mini-video source call") }
+          this.AddInfo("Frame Kind", "mini-video")
+          this.AddInfo("Source Call", meta & 0x7fff)
+          stamp = this.ProcessSubNode("Short Timestamp").Value
+          this.AddInfo("Video Marker", stamp & 0x8000 != 0)
+          this.AddInfo("Video Timestamp", stamp & 0x7fff)
+          this.AddInfo("Media Context Required", true)
+        } else {
+          if meta >> 8 != 1 || meta & 0xff > 1 { panic("iax2: unsupported trunk command or flags") }
+          this.AddInfo("Frame Kind", "trunk")
+          this.AddInfo("Trunk Timestamps", meta & 1 != 0)
+          setCtx("iax2TrunkTimestamps", meta & 1 != 0)
+          this.ProcessSubNode("Timestamp")
+          if this.Length() == size { panic("iax2: empty trunk") }
+          this.ProcessSubNode("Trunk Records")
+          return
+        }
+      }
+      if this.Length() < size { this.ProcessSubNode("Frame Data") }
+    Source Word: uint16
+    Destination Word: uint16
+    Timestamp: uint32
+    Outbound Sequence: uint8
+    Inbound Sequence: uint8
+    Frame Type: uint8
+    Subclass: uint8
+    Short Timestamp: uint16
+    Meta Word: uint16
+    Frame Data: raw
+    Information Elements:
+      list: true
+      Element: IAX2InformationElement
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+    Trunk Records:
+      list: true
+      Record: IAX2TrunkRecord
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+IAX2TrunkRecord:
+  operator: |
+    timestamped = getCtx("iax2TrunkTimestamps") == true
+    length = 0
+    if timestamped { length = this.ProcessSubNode("Data Length").Value }
+    source = this.ProcessSubNode("Call Word").Value
+    if source & 0x7fff == 0 { panic("iax2: zero trunk source call") }
+    this.AddInfo("Source Call", source & 0x7fff)
+    this.AddInfo("Retransmission", source & 0x8000 != 0)
+    this.AddInfo("Media Context Required", true)
+    if !timestamped { length = this.ProcessSubNode("Data Length").Value }
+    if timestamped { this.ProcessSubNode("Short Timestamp") }
+    if length > this.GetMaxLength()-this.Length() { panic("iax2: trunk data exceeds datagram") }
+    this.SetMaxLength(this.Length()+length)
+    if length > 0 { this.ProcessSubNode("Frame Data") }
+  Call Word: uint16
+  Data Length: uint16
+  Short Timestamp: uint16
+  Frame Data: raw
+IAX2InformationElement:
+  operator: |
+    kind = int(this.ProcessSubNode("IE Type").Value)
+    length = this.ProcessSubNode("IE Length").Value
+    if length > this.GetMaxLength()-2 { panic("iax2: information element exceeds datagram") }
+    this.SetMaxLength(length+2)
+    expected = -1
+    if kind in [11,12,14,19,20,21,24,34,40,41,43,49] { expected = 2 }
+    if kind in [8,9,27,31,35,37,46,47,48,50,51,255] { expected = 4 }
+    if kind in [23,38,39,42] { expected = 1 }
+    if kind == 25 { expected = 0 }
+    if expected != -1 && length != expected { panic("iax2: incorrect fixed information-element length") }
+    if expected == 2 {
+      value = this.ProcessSubNode("Unsigned 16").Value
+      if kind == 11 && value != 2 { panic("iax2: unsupported protocol version") }
+    } else if expected == 1 {
+      this.ProcessSubNode("Unsigned 8")
+    } else if expected == 4 {
+      value = this.ProcessSubNode("Unsigned 32").Value
+      if kind == 31 {
+        second = (value & 31)*2
+        minute = (value >> 5) & 63
+        hour = (value >> 11) & 31
+        day = (value >> 16) & 31
+        month = (value >> 21) & 15
+        year = 2000+(value >> 25)
+        if second > 59 || minute > 59 || hour > 23 || month < 1 || month > 12 || day < 1 { panic("iax2: invalid packed date/time") }
+        days = [31,28,31,30,31,30,31,31,30,31,30,31]
+        if year%4 == 0 && (year%100 != 0 || year%400 == 0) { days[1] = 29 }
+        if day > days[month-1] { panic("iax2: invalid packed calendar day") }
+        this.AddInfo("Date Components", [year,month,day,hour,minute,second])
+      }
+    } else if kind in [1,2,3,4,5,6,7,10,13,15,16,17,22,26,28,32,33,45,52] {
+      text = ""
+      if length > 0 { text = this.ProcessSubNode("Text").Value }
+      this.AddInfo("Text Value", text)
+    } else if length > 0 {
+      // Unknown and compound IE values retain their tag, length and bytes.
+      this.ProcessSubNode("Value Bytes")
+    }
+  IE Type: uint8
+  IE Length: uint8
+  Unsigned 8: uint8
+  Unsigned 16: uint16
+  Unsigned 32: uint32
+  Text: string
+  Value Bytes: raw

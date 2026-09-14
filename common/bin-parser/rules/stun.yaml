@@ -1,0 +1,111 @@
+endian: big
+Package:
+  STUN:
+    operator: |
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Magic Cookie")
+      if getNodeResult("Magic Cookie").Value != 0x2112a442 {
+        panic("stun: magic cookie mismatch")
+      }
+      this.ProcessSubNode("Transaction ID")
+      l = getNodeResult("Length").Value
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Attributes").SetMaxLength(l)
+        this.ProcessSubNode("Attributes")
+      }
+    Message Type: uint16
+    Length: uint16
+    Magic Cookie: uint32
+    Transaction ID: raw,12
+    Attributes:
+      list: true
+      Attribute: STUNAttr
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 || ele.GetMaxLength() > 1048576 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+        }
+STUNAttr:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    t = getNodeResult("Type").Value
+    l = getNodeResult("Length").Value
+    if t == 0x8022 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Software").SetMaxLength(l)
+        this.ProcessSubNode("Software")
+      }
+    }
+    if t == 0x0006 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Username").SetMaxLength(l)
+        this.ProcessSubNode("Username")
+      }
+    }
+    if t == 0x0024 {
+      if l != 4 {
+        panic("stun: PRIORITY length must be 4")
+      }
+      this.ProcessSubNode("Priority")
+    }
+    if t == 0x8029 {
+      if l != 8 {
+        panic("stun: ICE-CONTROLLED length must be 8")
+      }
+      this.ProcessSubNode("Ice Controlled")
+    }
+    if t == 0x0008 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Message Integrity").SetMaxLength(l)
+        this.ProcessSubNode("Message Integrity")
+      }
+    }
+    if t == 0x8028 {
+      if l != 4 {
+        panic("stun: FINGERPRINT length must be 4")
+      }
+      this.ProcessSubNode("Fingerprint")
+    }
+    if t == 0x0020 {
+      if l < 8 {
+        panic("stun: XOR-MAPPED-ADDRESS too short")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Family")
+      this.ProcessSubNode("X-Port")
+      this.ProcessSubNode("X-Address")
+    }
+    if t != 0x8022 && t != 0x0006 && t != 0x0024 && t != 0x8029 && t != 0x0008 && t != 0x8028 && t != 0x0020 {
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Octets").SetMaxLength(l)
+        this.ProcessSubNode("Octets")
+      }
+    }
+    pad = (4 - (l % 4)) % 4
+    if pad > 0 && this.GetRemainingSpace() >= pad {
+      this.GetSubNode("Padding").SetMaxLength(pad)
+      this.ProcessSubNode("Padding")
+    }
+  Type: uint16
+  Length: uint16
+  Software: string
+  Username: string
+  Priority: uint32
+  Ice Controlled: uint64
+  Message Integrity: string
+  Fingerprint: uint32
+  Reserved: uint8
+  Family: uint8
+  X-Port: uint16
+  X-Address: raw,4
+  Octets: string
+  Padding: string

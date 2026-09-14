@@ -1,24 +1,56 @@
 Package:
   BER Element:
     operator: |
-      type = this.ProcessSubNode("Type").Value
-      l = this.ProcessSubNode("Length").Value
-      if l.Value == 0{
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l == 0 {
         return
       }
-      var nextNode
-      if type.Child("Constructed").Value {
-        this.GetSubNode("Children").SetMaxLength(l.Value)
+      typ = getNodeResult("Type")
+      if typ.Child("Constructed").Value {
+        this.GetSubNode("Children").SetMaxLength(l)
         this.ProcessSubNode("Children")
-      }else{
-        if type.Child("Tag").Value == 2 && type.Child("Class").Value == 0{
-            this.GetSubNode("Integer").SetMaxLength(l.Value)
-            this.ProcessSubNode("Integer")
-        }else{
-            this.GetSubNode("Value").SetMaxLength(l.Value)
-            this.ProcessSubNode("Value")
-        }
+        return
       }
+      tag = typ.Child("Tag").Value
+      cset = typ.Child("Class").Value
+      if cset == 0 && tag == 1 {
+        this.ProcessSubNode("Boolean")
+        return
+      }
+      if cset == 0 && tag == 2 {
+        this.GetSubNode("Integer").SetMaxLength(l)
+        this.ProcessSubNode("Integer")
+        return
+      }
+      if cset == 0 && tag == 4 {
+        this.GetSubNode("OCTET STRING").SetMaxLength(l)
+        this.ProcessSubNode("OCTET STRING")
+        return
+      }
+      if cset == 0 && tag == 6 {
+        this.GetSubNode("OBJECT IDENTIFIER").SetMaxLength(l)
+        this.ProcessSubNode("OBJECT IDENTIFIER")
+        return
+      }
+      if cset == 0 && tag == 19 {
+        this.GetSubNode("PrintableString").SetMaxLength(l)
+        this.ProcessSubNode("PrintableString")
+        return
+      }
+      if cset == 0 && tag == 22 {
+        this.GetSubNode("IA5String").SetMaxLength(l)
+        this.ProcessSubNode("IA5String")
+        return
+      }
+      if cset == 0 && tag == 23 {
+        this.GetSubNode("UTCTime").SetMaxLength(l)
+        this.ProcessSubNode("UTCTime")
+        return
+      }
+      this.GetSubNode("Value").SetMaxLength(l)
+      this.ProcessSubNode("Value")
       return
     Type:
       type: uint8
@@ -97,10 +129,22 @@ Package:
           }
         }
     Value: raw
-    Integer: uint32
+    Boolean: uint8
+    Integer:
+      type: raw
+      out: |
+        b = data.Value
+        res = 0
+        for _, x = range b {
+          res = (res << 8) + x
+        }
+        return res
     OCTET STRING: string
     NULL: raw,0
     OBJECT IDENTIFIER: string
+    PrintableString: string
+    IA5String: string
+    UTCTime: string
     Children:
       list: true
       Value: "ref-type:@BER Element"

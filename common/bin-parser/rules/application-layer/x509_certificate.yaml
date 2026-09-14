@@ -1,0 +1,62 @@
+# Explicit complete X.509 Certificate DER, RFC 5280 section 4.1.
+# Local limits: 1 MiB, 32 constructed levels, 16384 DER elements,
+# 1024 extension entries and 1024 serial-number bytes. Parse-only.
+# Checks bounded DER framing and selected primitive/certificate grammar;
+# not an exhaustive DER or RFC 5280 conformance validator. Unknown algorithm
+# parameters/name attribute types remain structurally visible. The base entry
+# retains extension contents opaque. WithExtensions decodes 12 observed OIDs,
+# including RFC 6962 SCT vectors (at most 1024 entries); unknown OIDs and SCT
+# versions remain opaque. WithPublicKey additionally expands RSA modulus/exponent
+# (NULL parameters, each encoded integer <=8193 bytes) and P-256/P-384/P-521
+# point fields (named-curve OID parameters). Unknown key/parameter profiles stay
+# raw. No mathematical checks, decompression or signature-bit decoding.
+# No signature, trust, identity, current validity or handshake outcome checks.
+# TLS vector/record entries are unchanged. Caller supplies exact DER boundary.
+endian: big
+unit: byte
+Package:
+  X509CertificateDERWithPublicKey:
+    operator: |
+      err = parseX509CertificateDERPublicKey()
+      if err != nil { panic(err) }
+  X509CertificateDERWithPublicKeyCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("x509-public-key: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("x509-public-key: carrier exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("X509CertificateDERWithPublicKeyExact", "X509CertificateDERWithPublicKey")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed X509 Certificate With Public Key")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  X509CertificateDERWithExtensions:
+    operator: |
+      err = parseX509CertificateDERExtensions()
+      if err != nil { panic(err) }
+  X509CertificateDERWithExtensionsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("x509-extensions: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("x509-extensions: carrier exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("X509CertificateDERWithExtensionsExact", "X509CertificateDERWithExtensions")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed X509 Certificate With Extensions")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  X509CertificateDER:
+    operator: |
+      err = parseX509CertificateDER()
+      if err != nil { panic(err) }
+  X509CertificateDERCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("x509-der: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("x509-der: carrier exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("X509CertificateDERExact", "X509CertificateDER")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed X509 Certificate DER")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+X509CertificateDERExact: "import:application-layer/x509_certificate.yaml;node:X509CertificateDER"
+X509CertificateDERWithExtensionsExact: "import:application-layer/x509_certificate.yaml;node:X509CertificateDERWithExtensions"
+X509CertificateDERWithPublicKeyExact: "import:application-layer/x509_certificate.yaml;node:X509CertificateDERWithPublicKey"

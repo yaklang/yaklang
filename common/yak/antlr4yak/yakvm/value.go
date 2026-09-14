@@ -763,6 +763,12 @@ func (v *Value) AssignBySymbol(table *Scope, val *Value) {
 	if v == nil && !v.IsLeftValueRef() {
 		panic("assign failed, must assign to yakvm.IsLeftValueRef()")
 	}
+	// The nil sentinel is shared by every VM. Assignment metadata belongs to
+	// this binding, never to the sentinel (including native nil returns).
+	if val == undefined {
+		val = NewUndefined(0)
+	}
+	val.CallerRef = v
 
 	current := table
 	for {
@@ -779,13 +785,16 @@ func (v *Value) AssignBySymbol(table *Scope, val *Value) {
 			current = current.parent
 		}
 	}
-	val.CallerRef = v
 }
 
 func (v *Value) GlobalAssignBySymbol(table *Scope, val *Value) {
 	if v == nil && !v.IsLeftValueRef() {
 		panic("global assign failed, must assign to yakvm.IsLeftValueRef()")
 	}
+	if val == undefined {
+		val = NewUndefined(0)
+	}
+	val.CallerRef = v
 
 	current := table
 	for {
@@ -802,7 +811,6 @@ func (v *Value) GlobalAssignBySymbol(table *Scope, val *Value) {
 			current = current.parent
 		}
 	}
-	val.CallerRef = v
 }
 
 func (v *Value) IsIterable() bool {

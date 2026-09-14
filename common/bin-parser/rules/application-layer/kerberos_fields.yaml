@@ -1,0 +1,35 @@
+# Exact RFC 4120 DER message or single TCP record. RFC 6113 FAST outer
+# layouts are decoded; cipher/checksum bytes are never verified or decrypted.
+# Signed DER integers are raw wire leaves plus numeric scope metadata.
+# Local limits: 1 MiB, 1024 list entries, 16384 DER nodes, depth 32.
+endian: big
+unit: byte
+Package:
+  KerberosMessageFields:
+    operator: |
+      err = parseKerberosFields(false)
+      if err != nil { panic(err) }
+  KerberosTCPFields:
+    operator: |
+      err = parseKerberosFields(true)
+      if err != nil { panic(err) }
+  KerberosMessageFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("kerberos-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("KerberosExact", "KerberosMessageFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Kerberos Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  KerberosTCPFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("kerberos-fields: explicit 1..1048576 byte boundary required") }
+      candidate, trial = this.TryProcessByType("KerberosTCPExact", "KerberosTCPFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Kerberos Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+KerberosExact: "import:application-layer/kerberos_fields.yaml;node:KerberosMessageFields"
+KerberosTCPExact: "import:application-layer/kerberos_fields.yaml;node:KerberosTCPFields"

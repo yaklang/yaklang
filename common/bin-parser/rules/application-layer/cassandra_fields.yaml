@@ -1,0 +1,112 @@
+# Explicit passive CQL v4 / pre-READY v5 and modern internode Initiate layouts.
+# Complete uncompressed, unflagged envelope; caller supplies TCP/frame context.
+# No later v5 CRC24 framing, queries, compression or session inference.
+# Internode checksum uses the Apache CRC32 initialization prefix.
+endian: big
+unit: byte
+Package:
+  CQLOptions4Fields:
+    operator: |
+      err = parseCassandraFields("options4")
+      if err != nil { panic(err) }
+  CQLOptions4FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CQLOptions4FieldsExact", "CQLOptions4Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  CQLSupported4Fields:
+    operator: |
+      err = parseCassandraFields("supported4")
+      if err != nil { panic(err) }
+  CQLSupported4FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CQLSupported4FieldsExact", "CQLSupported4Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  CQLStartup4Fields:
+    operator: |
+      err = parseCassandraFields("startup4")
+      if err != nil { panic(err) }
+  CQLStartup4FieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CQLStartup4FieldsExact", "CQLStartup4Fields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  CQLOptions5InitialFields:
+    operator: |
+      err = parseCassandraFields("options5-initial")
+      if err != nil { panic(err) }
+  CQLOptions5InitialFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CQLOptions5InitialFieldsExact", "CQLOptions5InitialFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  CQLSupported5InitialFields:
+    operator: |
+      err = parseCassandraFields("supported5-initial")
+      if err != nil { panic(err) }
+  CQLSupported5InitialFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CQLSupported5InitialFieldsExact", "CQLSupported5InitialFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  CQLStartup5InitialFields:
+    operator: |
+      err = parseCassandraFields("startup5-initial")
+      if err != nil { panic(err) }
+  CQLStartup5InitialFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CQLStartup5InitialFieldsExact", "CQLStartup5InitialFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  CassandraInternodeInitiateFields:
+    operator: |
+      err = parseCassandraFields("internode-initiate-modern")
+      if err != nil { panic(err) }
+  CassandraInternodeInitiateFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("cassandra-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("cassandra-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("CassandraInternodeInitiateFieldsExact", "CassandraInternodeInitiateFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Cassandra Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+CQLOptions4FieldsExact: "import:application-layer/cassandra_fields.yaml;node:CQLOptions4Fields"
+CQLSupported4FieldsExact: "import:application-layer/cassandra_fields.yaml;node:CQLSupported4Fields"
+CQLStartup4FieldsExact: "import:application-layer/cassandra_fields.yaml;node:CQLStartup4Fields"
+CQLOptions5InitialFieldsExact: "import:application-layer/cassandra_fields.yaml;node:CQLOptions5InitialFields"
+CQLSupported5InitialFieldsExact: "import:application-layer/cassandra_fields.yaml;node:CQLSupported5InitialFields"
+CQLStartup5InitialFieldsExact: "import:application-layer/cassandra_fields.yaml;node:CQLStartup5InitialFields"
+CassandraInternodeInitiateFieldsExact: "import:application-layer/cassandra_fields.yaml;node:CassandraInternodeInitiateFields"

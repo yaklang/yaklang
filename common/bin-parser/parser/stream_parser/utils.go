@@ -62,6 +62,84 @@ func newNodeValue(node *base.Node, v any) *base.NodeValue {
 		},
 	}
 }
+
+func newNamedValue(name string, v any) *base.NodeValue {
+	return &base.NodeValue{
+		Name:  name,
+		Value: v,
+		AppendSub: func(value *base.NodeValue) error {
+			return errors.New("current node is complex node")
+		},
+	}
+}
+
+func newNamedStruct(name string, children []*base.NodeValue) *base.NodeValue {
+	var v *base.NodeValue
+	v = &base.NodeValue{
+		Name:  name,
+		Value: children,
+		AppendSub: func(value *base.NodeValue) error {
+			val, ok := v.Value.([]*base.NodeValue)
+			if !ok {
+				return errors.New("current node is complex node")
+			}
+			v.Value = append(val, value)
+			return nil
+		},
+	}
+	return v
+}
+
+func collectNodeValues(rest []any) []*base.NodeValue {
+	var out []*base.NodeValue
+	for _, r := range rest {
+		switch x := r.(type) {
+		case *base.NodeValue:
+			out = append(out, x)
+		case []*base.NodeValue:
+			out = append(out, x...)
+		case []any:
+			out = append(out, collectNodeValues(x)...)
+		default:
+			rv := reflect.ValueOf(r)
+			if rv.Kind() == reflect.Slice {
+				for i := 0; i < rv.Len(); i++ {
+					out = append(out, collectNodeValues([]any{rv.Index(i).Interface()})...)
+				}
+			} else {
+				panic(fmt.Sprintf("newStructValue: unexpected child %T", r))
+			}
+		}
+	}
+	return out
+}
+
+// newValueAny accepts either (*base.Node, value) or (name string, value).
+func newValueAny(a any, v any) *base.NodeValue {
+	switch x := a.(type) {
+	case *base.Node:
+		return newNodeValue(x, v)
+	case string:
+		return newNamedValue(x, v)
+	default:
+		panic(fmt.Sprintf("newValue: first arg must be *Node or string, got %T", a))
+	}
+}
+
+func newStructValueAny(args ...any) *base.NodeValue {
+	if len(args) == 0 {
+		panic("newStructValue: missing name")
+	}
+	children := collectNodeValues(args[1:])
+	switch x := args[0].(type) {
+	case *base.Node:
+		return newStructNodeValue(x, children...)
+	case string:
+		return newNamedStruct(x, children)
+	default:
+		panic(fmt.Sprintf("newStructValue: first arg must be *Node or string, got %T", x))
+	}
+}
 func ListNodeNewElement(node *base.Node) (*base.Node, error) {
 	if !node.Cfg.GetBool(CfgIsList) {
 		return nil, errors.New("not list node")
@@ -92,7 +170,11 @@ func ParseRefNode(node *base.Node) (*base.Node, error) {
 		return nil, fmt.Errorf("new node by type error: %w", err)
 	}
 	parentCfg := base.CopyConfig(node.Cfg)
+	// The reference type names the template to resolve; it is not an override.
+	// Primitive and alias templates supply their own type, while structs and
+	// imports intentionally have none.
 	parentCfg.DeleteItem(CfgRefType)
+	parentCfg.DeleteItem(CfgType)
 	typeNode.Cfg = base.AppendConfig(parentCfg, typeNode.Cfg)
 	typeNode.Name = node.Name
 	return typeNode, nil
@@ -115,6 +197,12 @@ func NewNodeByType(node *base.Node, typeName string) (*base.Node, error) {
 	}
 	newNode, err := base.NewNodeTreeWithConfig(node.Cfg, node.Name, v.Origin, node.Ctx)
 	if err != nil {
+		return nil, err
+	}
+	// A referenced template may itself contain references. NewNodeTreeWithConfig
+	// builds fresh children from YAML; initialize those children just as OnRoot
+	// does, before treating custom type names as primitive terminals.
+	if err := InitNode(newNode); err != nil {
 		return nil, err
 	}
 	newNode.Cfg.SetItem(CfgParent, node.Cfg.GetItem(CfgParent))
@@ -397,59 +485,46 @@ func GetParentNode(node *base.Node) *base.Node {
 	return getParent(node)
 }
 func GetSubNodes(node *base.Node) []*base.Node {
-	isPackage := func(node *base.Node) bool {
-		if node.Name == "Package" && node.Cfg.GetItem("parent") == node.Ctx.GetItem("root") {
-			return true
-		}
-		return false
-	}
-	var getSubs func(node *base.Node) []*base.Node
-	getSubs = func(node *base.Node) []*base.Node {
-		children := []*base.Node{}
-		for _, sub := range node.Children {
-			if sub.Cfg.GetBool(CfgIsRefType) || sub.Cfg.GetBool("unpack") || isPackage(sub) {
-				children = append(children, getSubs(sub)...)
-			} else {
-				children = append(children, sub)
-			}
-		}
-		return children
-	}
-	return getSubs(node)
+	// Preserve the public non-nil empty result, while flattening into one
+	// destination instead of allocating a slice at every transparent wrapper.
+	return collectResultChildren([]*base.Node{}, node)
 }
-func getNodeByPath(node *base.Node, key string) *base.Node {
-	splits := strings.Split(key, "/")
-	var findChildByPath func(node *base.Node, path ...string) *base.Node
-	findChildByPath = func(node *base.Node, path ...string) *base.Node {
-		if node == nil {
-			return nil
+
+// Path lookups need one child, not a materialized list of every sibling.
+// Scan all siblings even after a match: the old flattened traversal chooses
+// the LAST duplicate and still visits malformed later wrappers.
+func findLastSubNode(node *base.Node, name string) (found *base.Node) {
+	for _, child := range node.Children {
+		if child.Cfg.GetBool(CfgIsRefType) || child.Cfg.GetBool("unpack") ||
+			child.Name == "Package" && child.Cfg.GetItem(CfgParent) == child.Ctx.GetItem("root") {
+			if candidate := findLastSubNode(child, name); candidate != nil {
+				found = candidate
+			}
+		} else if child.Name == name {
+			found = child
 		}
-		if len(path) == 0 {
+	}
+	return
+}
+
+func getNodeByPath(node *base.Node, key string) *base.Node {
+	if strings.HasPrefix(key, "@") {
+		node = node.Ctx.GetItem("root").(*base.Node)
+		key = key[1:]
+	}
+	for node != nil {
+		part, remaining, more := strings.Cut(key, "/")
+		if part == ".." {
+			node = node.Cfg.GetItem(CfgParent).(*base.Node)
+		} else {
+			node = findLastSubNode(node, part)
+		}
+		if !more {
 			return node
 		}
-		var child1 *base.Node
-		if path[0] == ".." {
-			child1 = node.Cfg.GetItem(CfgParent).(*base.Node)
-		} else {
-			for _, child := range GetSubNodes(node) {
-				if child.Name == path[0] {
-					child1 = child
-				}
-			}
-		}
-		return findChildByPath(child1, path[1:]...)
+		key = remaining
 	}
-	var targetNode *base.Node
-	if strings.HasPrefix(splits[0], "@") {
-		splits[0] = splits[0][1:]
-		targetNode = findChildByPath(node.Ctx.GetItem("root").(*base.Node), splits...)
-	} else {
-		targetNode = findChildByPath(node, splits...)
-	}
-	if targetNode == nil {
-		return nil
-	}
-	return targetNode
+	return nil
 }
 
 func getNodeAttrByPath(node *base.Node, key string) (*base.Node, string) {
@@ -464,13 +539,17 @@ func SetParentLengthCache(parentNode *base.Node, childName string, l uint64) {
 	parentNode.Cfg.GetItem(CfgLengthCacheMap).(map[string]uint64)[childName] = l
 }
 func GetParentLengthCache(parentNode *base.Node, childName string) (uint64, bool) {
-	if parentNode.Cfg.Has(CfgLengthCacheMap) {
-		return parentNode.Cfg.GetItem(CfgLengthCacheMap).(map[string]uint64)[childName], true
+	if cache, ok := parentNode.Cfg.LookupItem(CfgLengthCacheMap); ok {
+		return cache.(map[string]uint64)[childName], true
 	}
 	return 0, false
 }
 func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	if node.Name == "root" {
+		if value, present := node.Cfg.LookupItem(CfgLength); present {
+			length, _ := base.InterfaceToUint64(value)
+			return length, true, nil
+		}
 		return math.MaxUint64, false, nil
 	}
 	iparent := node.Cfg.GetItem(CfgParent)
@@ -497,12 +576,13 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	//parentRemaininigLength := uint64(0)
 	var length uint64
 	getLengthOK := false
-	if node.Cfg.Has(CfgLength) {
-		length = node.Cfg.GetUint64(CfgLength)
+	settings := node.Cfg.LengthSettings()
+	if settings.HasLength {
+		length = settings.Length
 		getLengthOK = true
 	} else {
-		if node.Cfg.Has(CfgType) {
-			typeName := node.Cfg.GetString(CfgType)
+		if settings.HasType {
+			typeName := settings.Type
 			ok := true
 			switch typeName {
 			case "int":
@@ -533,10 +613,10 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 			}
 		}
 		if !getLengthOK {
-			if node.Cfg.Has(CfgLengthFromField) {
+			if settings.HasField {
 				// 从field 读取length
-				if node.Cfg.Has(CfgLengthFromField) {
-					fieldName := node.Cfg.GetString(CfgLengthFromField)
+				{
+					fieldName := settings.Field
 					target := getNodeByPath(node, fieldName)
 					if target.Cfg.Has(CfgNodeResult) {
 						res := GetResultByNode(target)
@@ -587,6 +667,10 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	}
 
 	var currentNodeLength uint64
+	consumedLength := calcNodeConsumedLength
+	if node.Ctx != nil && node.Ctx.GetBool("parseConsumedLengthLegacy") {
+		consumedLength = calcNodeConsumedLengthLegacy
+	}
 	startField := parentNode.Cfg.GetString(CfgLengthForStartField)
 	var startN = -1
 	for i, sub := range parentNode.Children {
@@ -602,7 +686,10 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 		if i < startN {
 			continue
 		}
-		currentNodeLength += CalcNodeResultLength(sub)
+		currentNodeLength += consumedLength(sub)
+	}
+	if currentNodeLength > parentLength {
+		return 0, false, fmt.Errorf("consumed length %d exceeds parent boundary %d", currentNodeLength, parentLength)
 	}
 	remainingLength := parentLength - currentNodeLength
 	if getLengthOK {
@@ -682,6 +769,56 @@ func CalcNodeResultLength(node *base.Node) uint64 {
 	})
 	return length
 }
+
+// CalcNodeConsumedLength includes wire framing without changing a terminal's
+// returned value. A missing optional delimiter contributes no imaginary bytes.
+func CalcNodeConsumedLength(node *base.Node) uint64 {
+	if node.Ctx != nil && node.Ctx.GetBool("parseConsumedLengthLegacy") {
+		return calcNodeConsumedLengthLegacy(node)
+	}
+	return calcNodeConsumedLength(node)
+}
+
+// Keep every read live: rule operators and output expressions can replace a
+// previously parsed node's configuration or children. Memoizing completed
+// subtrees would change those semantics, including after a failed transaction.
+// The result lookup also determines presence: a present nil result is not an
+// unparsed node, and an explicit consumed-bits value shadows its result span.
+func calcNodeConsumedLength(node *base.Node) uint64 {
+	result, consumed, hasResult, hasConsumed := node.Cfg.LookupConsumedResult()
+	if hasResult {
+		if hasConsumed {
+			length, _ := base.InterfaceToUint64(consumed)
+			return length
+		}
+		position := result.([2]uint64)
+		return position[1] - position[0]
+	}
+	var length uint64
+	for _, child := range node.Children {
+		length += calcNodeConsumedLength(child)
+	}
+	return length
+}
+
+// Retain the original traversal as a differential and benchmark oracle. The
+// opt-in context setting applies to imported rules like other caller settings.
+func calcNodeConsumedLengthLegacy(node *base.Node) uint64 {
+	var length uint64
+	walkNode(node, func(current *base.Node) bool {
+		if !NodeHasResult(current) {
+			return true
+		}
+		if current.Cfg.Has(CfgConsumedBits) {
+			length += current.Cfg.GetUint64(CfgConsumedBits)
+		} else {
+			position := GetNodeResultPos(current)
+			length += position[1] - position[0]
+		}
+		return false
+	})
+	return length
+}
 func cfgDeleteItem(node *base.Node, key string) {
 	for _, child := range node.Children {
 		cfgDeleteItem(child, key)
@@ -709,11 +846,56 @@ func GetNodeResult(node *base.Node) any {
 }
 
 func getNodeResult(node *base.Node, isByte bool) (any, error) {
-	endian := node.Cfg.GetString(CfgEndian)
+	return getNodeResultWithSettings(node, isByte, node.Cfg.ResultSettings())
+}
+
+func getNodeResultWithSettings(node *base.Node, isByte bool, settings base.ResultSettings) (any, error) {
+	var source nodeResultSource
+	return getNodeResultWithSource(node, isByte, settings, &source)
+}
+
+// A projection performs no writes or custom out expressions. Resolve the two
+// shared context objects once per contiguous context, rather than taking two
+// context locks for every leaf. The cache lives only for this traversal; mixed
+// contexts and replacements between separate projections remain observable.
+type nodeResultSource struct {
+	ctx    *base.NodeContext
+	buffer *bytes.Buffer
+	writer *base.BitWriter
+}
+
+func (s *nodeResultSource) resolve(ctx *base.NodeContext) {
+	if s.ctx == ctx && s.buffer != nil {
+		return
+	}
+	s.buffer = ctx.GetItem("buffer").(*bytes.Buffer)
+	s.writer = ctx.GetItem("writer").(*base.BitWriter)
+	s.ctx = ctx
+}
+
+// Both projection and discarded-result validation use this exact boundary
+// check, including the readable padding in a pending writer octet.
+func (s *nodeResultSource) checkedSpan(ctx *base.NodeContext, span [2]uint64) ([]byte, *base.BitWriter, error) {
+	s.resolve(ctx)
+	data, writer := s.buffer.Bytes(), s.writer
+	available := uint64(len(data))
+	if writer.PreIsBit {
+		available++
+	}
+	if span[1] < span[0] || span[1] > available*8 {
+		return nil, nil, fmt.Errorf("read bits error: invalid result span [%d, %d) for %d bytes", span[0], span[1], available)
+	}
+	return data, writer, nil
+}
+
+func getNodeResultWithSource(node *base.Node, isByte bool, settings base.ResultSettings, source *nodeResultSource) (any, error) {
+	endian := settings.Endian
 	if endian != "little" {
 		endian = "big"
 	}
-	if !node.Cfg.Has(CfgNodeResult) {
+	var resPoint [2]uint64
+	composite := !settings.Present
+	if composite {
 		var start, end uint64
 		first := true
 		walkNode(node, func(n *base.Node) bool {
@@ -730,34 +912,90 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 			}
 			return true
 		})
-		buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
-		byts := buffer.Bytes()
-		if start > end {
-			return nil, nil
-		}
-		return byts[start/8 : end/8], nil
+		// Composite nodes have a derived span, not an integral-byte slice.
+		// Use the same checked bit extraction as leaves, including pending
+		// writer bits. Composite values historically return raw bytes here.
+		resPoint = [2]uint64{start, end}
+		isByte = true
+	} else {
+		resPoint = settings.Position.([2]uint64)
 	}
-	resPoint := node.Cfg.GetItem(CfgNodeResult).([2]uint64)
-	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
-	byts := buffer.Bytes()
-	writer := node.Ctx.GetItem("writer").(*base.BitWriter)
-	if writer.PreIsBit {
-		byts = append(byts, writer.PreByte<<(8-writer.PreByteLen))
-	}
-	reader := base.NewBitReader(bytes.NewBuffer(byts))
-	reader.ReadBits(resPoint[0])
-	buf, err := reader.ReadBits(resPoint[1] - resPoint[0])
+	// Seek directly to the containing octet. Reading and discarding the whole
+	// prefix allocates in proportion to the field offset for every Result call.
+	// Keep the pending writer octet (including its padding) readable as before.
+	byts, writer, err := source.checkedSpan(node.Ctx, resPoint)
 	if err != nil {
-		return nil, fmt.Errorf("read bits error: %w", err)
+		return nil, err
+	}
+	byteStart, byteEnd := resPoint[0]/8, (resPoint[1]+7)/8
+	if composite && resPoint[0]%8 == 0 && resPoint[1]%8 == 0 && byteEnd <= uint64(len(byts)) {
+		// Preserve the existing zero-copy behavior of aligned composites.
+		return byts[byteStart:byteEnd], nil
+	}
+	bitLength := resPoint[1] - resPoint[0]
+	// Numeric and string leaves can consume an aligned immutable window without
+	// creating a reader or a temporary byte slice. Returned byte values still own
+	// their storage, including a non-nil empty slice for a zero-width leaf.
+	if !isByte && resPoint[0]%8 == 0 && bitLength%8 == 0 && byteEnd <= uint64(len(byts)) {
+		window := byts[byteStart:byteEnd]
+		typ := settings.Type
+		switch typ {
+		case "string":
+			return string(window), nil
+		case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "bytes":
+			return ConvertToVar(window, uint64(len(window)), endian, typ), nil
+		}
+	}
+	buf := make([]byte, (bitLength+7)/8)
+	if resPoint[0]%8 == 0 && bitLength%8 == 0 && byteEnd <= uint64(len(byts)) {
+		copy(buf, byts[byteStart:byteEnd])
+	} else {
+		// A final partial octet is right aligned, matching BitReader.ReadBits. Read
+		// the pending writer octet without appending to or mutating the buffer.
+		octet := func(index uint64) byte {
+			if index < uint64(len(byts)) {
+				return byts[index]
+			}
+			return writer.PreByte << (8 - writer.PreByteLen)
+		}
+		for i := uint64(0); i < uint64(len(buf)); i++ {
+			at := resPoint[0] + i*8
+			width := min(uint64(8), resPoint[1]-at)
+			value := uint16(octet(at/8)) << 8
+			if at%8+width > 8 {
+				value |= uint16(octet(at/8 + 1))
+			}
+			buf[i] = byte(value>>(16-at%8-width)) & byte((uint16(1)<<width)-1)
+		}
+
 	}
 	if isByte {
 		return buf, nil
 	} else {
-		if node.Cfg.GetString(CfgType) == "string" {
+		if settings.Type == "string" {
 			return string(buf), nil
 		}
 		_ = endian
-		return ConvertToVar(buf, uint64(len(buf)), endian, node.Cfg.GetString(CfgType)), nil
+		typeName := settings.Type
+		bitLength := resPoint[1] - resPoint[0]
+		// ReadBits returns full octets followed by a right-aligned final
+		// partial octet. A big-endian integer needs the entire value aligned
+		// right instead: 14 bits 00000100 100011 mean 0x0123, not 0x0423.
+		// Raw bit results and little-endian octet interpretation are unchanged.
+		if endian == "big" && bitLength%8 != 0 && len(buf) > 1 {
+			switch typeName {
+			case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+				padding := 8 - bitLength%8
+				aligned := make([]byte, len(buf))
+				for index := 0; index < len(buf)-1; index++ {
+					aligned[index] |= buf[index] >> padding
+					aligned[index+1] = buf[index] << (8 - padding)
+				}
+				aligned[len(buf)-1] |= buf[len(buf)-1]
+				buf = aligned
+			}
+		}
+		return ConvertToVar(buf, uint64(len(buf)), endian, typeName), nil
 	}
 }
 func getNodeValue(node *base.Node) (any, error) {

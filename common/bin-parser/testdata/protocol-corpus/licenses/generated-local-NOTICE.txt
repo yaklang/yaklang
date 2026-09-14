@@ -1,0 +1,6 @@
+These packet captures were synthesized locally with Scapy and/or loopback
+clients for Yaklang bin-parser protocol identification. They are not recordings
+of third-party production traffic.
+
+License: CC0 1.0 Universal. No copyright is asserted in the generated packet
+bytes or this notice. Recipe: tools/generate-local/generate.py

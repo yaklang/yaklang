@@ -1,0 +1,46 @@
+# Explicit generic record framing, not a vendor protocol identification:
+# 4-byte big-endian compressed length, exactly one zlib member, one JSON value.
+# The pre-existing LengthPrefixedZlibRecord remains unchanged and independent.
+# https://www.rfc-editor.org/rfc/rfc1950.html (2.2 / 2.3)
+# https://www.rfc-editor.org/rfc/rfc8259.html (2..9)
+# https://github.com/golang/go/blob/go1.22.12/src/compress/zlib/reader.go
+# https://pkg.go.dev/compress/zlib#NewReader
+#
+# CM=8, FCHECK and Adler32 are verified. Preset dictionaries are unsupported.
+# This profile supports CINFO=7 (32KiB window), matching the original records.
+# The standard library validates CINFO<=7 but always decodes with a 32KiB
+# DEFLATE window; it does not enforce a smaller advertised history distance.
+# CINFO0..6 are explicitly unsupported here, not declared malformed generally.
+# bytes.Reader implements io.ByteReader, so the inflater cannot hide a trailing
+# member in read-ahead buffering. Success requires verified EOF and no suffix.
+# Limits: 64KiB compressed, 1MiB decompressed, 128 nested JSON containers and
+# 65536 values plus object names. These are implementation resource limits.
+# JSON is UTF-8, has one root value of any RFC8259 kind and no BOM/trailing value.
+# Numbers retain json.Number text. Ordered member lists preserve duplicate names.
+# Go's documented unpaired-UTF16 replacement behavior is explicit in metadata;
+# the unchanged decoded bytes preserve original spelling and whitespace.
+#
+# Only the compressed length/CMF/FLG/DEFLATE/Adler bytes get physical wire spans.
+# Decompressed bytes and the ordered JSON value tree live in separate metadata
+# with explicit source provenance and NO fabricated compressed-wire bit spans.
+# No application identity, schema, command outcome, or TCP reassembly is inferred.
+# Structured GenerateBinary is unsupported; parsed NodeToBytes remains exact.
+Package:
+  ZlibJSONRecord:
+    operator: |
+      err = parseZlibJSONRecord()
+      if err != nil { panic(err) }
+  ZlibJSONCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("zlib-json: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("zlib-json: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("zlib-json: empty carrier") }
+      if this.GetMaxLength() > 65540 { panic("zlib-json: carrier exceeds 65540-byte resource boundary") }
+      candidate, trial = this.TryProcessByType("ZlibJSONFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Zlib JSON Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+ZlibJSONFrame: "import:application-layer/zlib_json.yaml;node:ZlibJSONRecord"
