@@ -4,6 +4,7 @@ import "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 var Exports = map[string]any{
 	"StartScan":     StartScan,
+	"ScanProject":   ScanProject,
 	"ResumeScan":    ResumeScan,
 	"GetScanStatus": GetScanStatus,
 	// 进度
