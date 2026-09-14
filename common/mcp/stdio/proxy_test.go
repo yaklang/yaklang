@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/subprocess"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 var cachedStdout = os.Stdout

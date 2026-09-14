@@ -6,7 +6,7 @@ package yaklib
 import (
 	"os/exec"
 
-	"github.com/yaklang/yaklang/common/subprocess"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 // setupProcessGroup configures the command for proper cleanup when context is cancelled.
