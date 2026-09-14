@@ -46,6 +46,12 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#castExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#builtinCastType.
+	VisitBuiltinCastType(ctx *BuiltinCastTypeContext) interface{}
+
+	// Visit a parse tree produced by CParser#builtinScalarType.
+	VisitBuiltinScalarType(ctx *BuiltinScalarTypeContext) interface{}
+
 	// Visit a parse tree produced by CParser#coreExpression.
 	VisitCoreExpression(ctx *CoreExpressionContext) interface{}
 
@@ -234,6 +240,9 @@ type CParserVisitor interface {
 
 	// Visit a parse tree produced by CParser#statement.
 	VisitStatement(ctx *StatementContext) interface{}
+
+	// Visit a parse tree produced by CParser#macroIterationStatement.
+	VisitMacroIterationStatement(ctx *MacroIterationStatementContext) interface{}
 
 	// Visit a parse tree produced by CParser#macroCallStatement.
 	VisitMacroCallStatement(ctx *MacroCallStatementContext) interface{}

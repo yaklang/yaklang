@@ -43,7 +43,7 @@ func (mc *macroCollector) scanSource(filePath, src string, defs map[string]strin
 	mc.depth++
 
 	// Flat local tables for this file — no nested MacroEnvironment Flatten/Clone.
-	// Includes are skipped during collection; #if only sees this file's macros + config.Defines.
+	// Nested #include is followed for macro collection (project + external roots).
 	local := NewMacroTables()
 	localEnv := &MacroEnvironment{tables: local}
 	cond := NewConditionalStackWithGlobal(localEnv, nil, defs)
@@ -55,7 +55,8 @@ func (mc *macroCollector) scanSource(filePath, src string, defs map[string]strin
 		if !cond.Active() {
 			continue
 		}
-		if _, _, ok := ParseIncludePath(line); ok {
+		if incPath, system, ok := ParseIncludePath(line); ok {
+			mc.ingestHeader(filePath, incPath, system, defs)
 			continue
 		}
 		switch DirectiveName(line) {
@@ -72,6 +73,17 @@ func (mc *macroCollector) scanSource(filePath, src string, defs map[string]strin
 
 	mc.tables.MergeFrom(local)
 	mc.depth--
+}
+
+func (mc *macroCollector) ingestHeader(fromPath, incPath string, system bool, defs map[string]string) {
+	if mc.project == nil || mc.project.resolver == nil {
+		return
+	}
+	h, ok := mc.project.resolver.ResolveHeader(incPath, system, fromPath)
+	if !ok {
+		return
+	}
+	mc.scanSource(h.Path, string(h.Content), defs)
 }
 
 func handleCondDirective(cond *ConditionalStack, line string) bool {

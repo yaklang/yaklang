@@ -59,6 +59,14 @@ func (v *BaseCParserVisitor) VisitCastExpression(ctx *CastExpressionContext) int
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitBuiltinCastType(ctx *BuiltinCastTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitBuiltinScalarType(ctx *BuiltinScalarTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitCoreExpression(ctx *CoreExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -308,6 +316,10 @@ func (v *BaseCParserVisitor) VisitStaticAssertDeclaration(ctx *StaticAssertDecla
 }
 
 func (v *BaseCParserVisitor) VisitStatement(ctx *StatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitMacroIterationStatement(ctx *MacroIterationStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

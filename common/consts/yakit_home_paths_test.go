@@ -20,6 +20,7 @@ func TestPathsRespectYakitHome(t *testing.T) {
 	require.True(t, strings.HasPrefix(GetDefaultYakitBaseTempDir(), yakitHome))
 	require.True(t, strings.HasPrefix(GetNucleiTemplatesDir(), yakitHome))
 	require.Equal(t, filepath.Join(yakitHome, "nuclei-templates"), GetNucleiTemplatesDir())
+	require.Equal(t, filepath.Join(yakitHome, "c-headers"), GetDefaultCHeadersDir())
 	require.Equal(t, filepath.Join(yakitHome, ".ym-id"), utils.GetMachineIdFilePath())
 
 	f, err := utils.OpenTempFile("yakit-home-path-probe.tmp")

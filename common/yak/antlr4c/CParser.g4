@@ -163,13 +163,40 @@ castExpression
     | DigitSequence
     ;
 
+// Keyword-only casts. Used by coreExpression so `(void) x;` / `(int) y`
+// are not predicted as `'(' expression ')'` (type keywords are not in
+// expression FIRST, which would otherwise fail SLL on unused-var casts).
+builtinCastType
+    : typeQualifier* builtinScalarType+ typeQualifier* pointer?
+    ;
+
+builtinScalarType
+    : 'void'
+    | 'char'
+    | 'short'
+    | 'int'
+    | 'long'
+    | 'long long'
+    | 'float'
+    | 'double'
+    | 'long double'
+    | '_Bool'
+    | '_Complex'
+    | 'signed'
+    | 'unsigned'
+    | '__m128'
+    | '__m128d'
+    | '__m128i'
+    ;
+
 // --- Binary Expressions ---
 /*
 coreExpression 消歧 (SLL):
 assignPrefix 统一 cast 与 *cast 左值前缀，判别点后移到 assignmentOperator。
 */
 coreExpression
-    : assignPrefix (assignmentOperator eos* expression)?
+    : '(' eos* builtinCastType eos* ')' eos* expression (assignmentOperator eos* expression)?
+    | assignPrefix (assignmentOperator eos* expression)?
     | complexCoreExpression
     ;
 
@@ -227,6 +254,7 @@ expression
     | expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) eos* expression
     | expression AndAnd eos* expression
     | expression OrOr eos* expression
+    | '(' eos* builtinCastType eos* ')' eos* expression
     | '(' eos* expression eos* ')'
     | '(' eos* coreExpressions eos* ')'
     | expression ('?' eos* expression ':' eos* expression)
@@ -259,6 +287,7 @@ declarationSpecifiers2
 declarationSpecifier
     : (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
         typeSpecifier
+        | macroCallExpression
         | Identifier
     ) typeQualifier*
     | alignmentSpecifier
@@ -323,6 +352,7 @@ structDeclaration
     : specifierQualifierList eos* structDeclaratorList eos* Semi
     | specifierQualifierList eos* Semi
     | staticAssertDeclaration
+    | macroCallExpression eos* structDeclaratorList eos* Semi
     ;
 
 specifierQualifierList
@@ -350,6 +380,7 @@ enumeratorList
 enumerator
     : Identifier eos* gccAttributeSpecifier ('=' eos* expression)?
     | Identifier ('=' eos* expression)?
+    | '(' eos* expression eos* ')' ('=' eos* expression)?
     ;
 
 atomicTypeSpecifier
@@ -547,8 +578,24 @@ statement
     | iterationStatement
     | jumpStatement
     | asmStatement
+    | macroIterationStatement
     | macroCallStatement  // Support macro calls as statements (e.g., FF_DISABLE_DEPRECATION_WARNINGS)
     | Semi
+    ;
+
+// BSD queue/hash foreach macros (LIST_FOREACH, TAILQ_FOREACH, ...) expand to
+// `for (...) stmt`. Unexpanded they look like a call followed by a body.
+// Body is not `statement` (which includes lone `;`) so `foo(x);` stays an
+// expressionStatement.
+macroIterationStatement
+    : Identifier '(' eos* macroArgumentList? eos* ')' eos* (
+        compoundStatement
+        | selectionStatement
+        | iterationStatement
+        | jumpStatement
+        | expressionStatement
+        | macroIterationStatement
+    )
     ;
 
 // Macro call as a statement (identifier without parentheses, possibly followed by semicolon)
@@ -571,6 +618,7 @@ asmExprList
 labeledStatement
     : 'case' expression ':' eos* statement*
     | 'default' ':' eos* statement*
+    | macroCallExpression eos* Semi?
     ;
 
 compoundStatement

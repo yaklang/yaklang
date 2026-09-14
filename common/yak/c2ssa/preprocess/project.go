@@ -30,6 +30,9 @@ func BuildProject(fs fi.FileSystem, config PreprocessConfig) *CPreprocessProject
 	if config.MaxIncludeDepth == 0 {
 		config.MaxIncludeDepth = 64
 	}
+	if config.ExternalIncludeDirs == nil {
+		config.ExternalIncludeDirs = DetectExternalIncludeDirs()
+	}
 	reg := BuildHeaderRegistry(fs)
 	return &CPreprocessProject{
 		fs:       fs,
@@ -74,4 +77,12 @@ func (p *CPreprocessProject) ReadHeader(storedPath string) ([]byte, bool) {
 		return nil, false
 	}
 	return e.Content, true
+}
+
+// Close releases external include roots (zip archives).
+func (p *CPreprocessProject) Close() error {
+	if p == nil || p.resolver == nil {
+		return nil
+	}
+	return p.resolver.Close()
 }

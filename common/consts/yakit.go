@@ -390,6 +390,7 @@ func initializeYakitDirectories() {
 	GetDefaultYakitBaseTempDir()         // yakit-projects/temp
 	GetDefaultAISkillsDir()              // yakit-projects/ai-skills
 	GetDefaultYakitOpenAPIDocumentsDir() // yakit-projects/openapi-documents
+	GetDefaultCHeadersDir()              // yakit-projects/c-headers
 
 	utils.RegisterTempFileOpener(func(name string) (*os.File, error) {
 		dir := GetDefaultYakitBaseTempDir()
