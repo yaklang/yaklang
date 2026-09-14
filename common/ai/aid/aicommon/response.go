@@ -564,7 +564,9 @@ func (a *AIResponse) GetUnboundStreamReaderEx(onFirstByte func(), onClose func()
 	callClose := new(sync.Once)
 	callError := new(sync.Once)
 
-	syncCh := make(chan struct{})
+	// Retain readiness even if the stream goroutine produces its first byte
+	// (or closes empty) before the caller reaches the receive below.
+	syncCh := make(chan struct{}, 1)
 	haveFirstByte := utils.NewBool(false)
 	go func() {
 		defer func() {

@@ -313,12 +313,12 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 
 			if isTestToolParamPrompt(prompt) {
 
-				if utils.MatchAllOfSubString(request.GetPrompt(), `echo`) {
+				if isToolParamGenerationPrompt(prompt, "echo") {
 					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "call-tool", "tool": "echo", "params": {"input": "%s"}}`, echoToken[echoToolRequestCount])))
 					if echoToolRequestCount < 2 {
 						echoToolRequestCount++
 					}
-				} else if utils.MatchAllOfSubString(request.GetPrompt(), `error`) {
+				} else if isToolParamGenerationPrompt(prompt, "error") {
 					rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "error", "params": {}}`))
 				}
 				return rsp, nil
