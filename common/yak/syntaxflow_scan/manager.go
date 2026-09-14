@@ -304,6 +304,10 @@ func (m *scanManager) initByConfig() error {
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	}
 
+	if config.CompiledSource {
+		attachCompiledSourceTargets(config)
+	}
+
 	// Source query targets never populate BaseInfo.ProgramNames, but task
 	// persistence and progress reporting use program names. Keep them aligned
 	// so SaveTask does not record an empty program for a completed source scan.
@@ -396,6 +400,33 @@ func (m *scanManager) initByConfig() error {
 
 func (m *scanManager) TaskId() string {
 	return m.taskID
+}
+
+func attachCompiledSourceTargets(config *Config) {
+	if config == nil || len(config.Programs) == 0 {
+		return
+	}
+	have := map[string]bool{}
+	for _, target := range config.QueryTargets {
+		if src, ok := target.(*ssaapi.SourceQueryTarget); ok && src != nil {
+			have[src.GetProgramName()] = true
+		}
+	}
+	for _, prog := range config.Programs {
+		if prog == nil {
+			continue
+		}
+		name := prog.GetProgramName()
+		if have[name] {
+			continue
+		}
+		src := ssaapi.NewSourceQueryTargetFromProgram(prog)
+		if src == nil || len(src.Files()) == 0 {
+			continue
+		}
+		config.QueryTargets = append(config.QueryTargets, src)
+		have[name] = true
+	}
 }
 
 // ruleFilterModes returns the caller-set mode filter, or infers one from the

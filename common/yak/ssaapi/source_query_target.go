@@ -44,6 +44,38 @@ func NewSourceQueryTargetFromFS(name string, fsys fi.FileSystem) (*SourceQueryTa
 	return NewSourceQueryTarget(name, files), nil
 }
 
+// NewSourceQueryTargetFromProgram builds a source-mode target from the
+// compiled program snapshot (FileList / ExtraFile / IrSource editors).
+// Live workspace files are not used; the snapshot is what was compiled.
+func NewSourceQueryTargetFromProgram(prog *Program) *SourceQueryTarget {
+	if prog == nil || prog.Program == nil {
+		return NewSourceQueryTarget("", nil)
+	}
+	name := prog.GetProgramName()
+	files := make(map[string]string)
+	for _, listing := range []map[string]string{prog.Program.FileList, prog.Program.ExtraFile} {
+		for path, hash := range listing {
+			key := normalizeOverlayFilePath(path, name)
+			if key == "" || files[key] != "" {
+				continue
+			}
+			editor, err := prog.getEditor(path, hash)
+			if err != nil || editor == nil {
+				if content, ok := readProgramFileContent(prog, path); ok {
+					files[key] = content
+				}
+				continue
+			}
+			files[key] = editor.GetSourceCode()
+		}
+	}
+	target := NewSourceQueryTarget(name, files)
+	if lang := prog.GetLanguage(); lang != "" {
+		target.lang = lang
+	}
+	return target
+}
+
 func (t *SourceQueryTarget) GetProgramName() string {
 	if t == nil {
 		return ""

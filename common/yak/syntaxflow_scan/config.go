@@ -53,6 +53,10 @@ type ScanTaskCallback struct {
 	// QueryTargets are assembled via ssaapi.PrepareSyntaxFlowQueryTargets so
 	// scan runtime only uses SyntaxFlowQueryInstance (no GetOverlay branches).
 	QueryTargets []ssaapi.SyntaxFlowQueryInstance `json:"-"`
+
+	// CompiledSource attaches a source-mode target from the program FileList
+	// snapshot so product scans also run source rules on compiled programs.
+	CompiledSource bool `json:"-"`
 }
 
 const (
@@ -125,6 +129,10 @@ var WithProcessRuleDetail = ssaconfig.SetOption("syntaxflow-scan/processRuleDeta
 
 var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerformanceLog", func(c *Config, enable bool) {
 	c.EnableRulePerformanceLog = enable
+})
+
+var WithCompiledSource = ssaconfig.SetOption("syntaxflow-scan/compiledSource", func(c *Config, enable bool) {
+	c.CompiledSource = enable
 })
 
 var withProgramsOption = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs ssaapi.Programs) {
