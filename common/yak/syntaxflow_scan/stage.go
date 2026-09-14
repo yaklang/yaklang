@@ -59,7 +59,7 @@ func (s ProductStage) overallRange() (start, end float64) {
 	case StageReview:
 		return 0.30, 0.60
 	case StageAnalyze:
-		return 0.60, 0.99
+		return 0.60, 1.00
 	default:
 		return 0, 1
 	}

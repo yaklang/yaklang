@@ -241,3 +241,39 @@ alert $hit`,
 	require.NotContains(t, stages, string(syntaxflow_scan.StageReview))
 	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
 }
+
+func TestScanProject_NamedProgramFromDatabase(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("A.java", `class A {
+	public static void main(String[] args) {
+		Runtime.getRuntime().exec(args[0]);
+	}
+}
+`)
+	progs, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(t.Name()),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, progs)
+
+	var alerts int
+	err = syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithProgramNames(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SSAMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: java, title: "named program exec")
+Runtime.getRuntime().exec(* as $cmd)
+alert $cmd`,
+			Language: "java",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Greater(t, alerts, 0)
+}

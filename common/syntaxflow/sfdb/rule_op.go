@@ -221,8 +221,7 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	if db == nil {
 		return nil, utils.Errorf("profile db is nil")
 	}
-	languageRaw, _, _ := strings.Cut(ruleFileName, "-")
-	language, err := ssaconfig.ValidateLanguage(languageRaw)
+	language, err := languageFromRuleFileName(ruleFileName)
 	if err != nil {
 		log.Error(err)
 	}
@@ -322,8 +321,7 @@ func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, 
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
-	languageRaw, _, _ := strings.Cut(ruleName, "-")
-	language, err := ssaconfig.ValidateLanguage(languageRaw)
+	language, err := languageFromRuleFileName(ruleName)
 	if err != nil {
 		log.Error(err)
 	}
@@ -336,7 +334,9 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 	if err != nil {
 		return err
 	}
-	rule.Language = language
+	if language != "" {
+		rule.Language = language
+	}
 	rule.Type = ruleType
 
 	err = LoadFileSystem(rule, system)
@@ -356,6 +356,23 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
 	return nil
+}
+
+func languageFromRuleFileName(ruleFileName string) (ssaconfig.Language, error) {
+	name := strings.TrimSpace(ruleFileName)
+	name = strings.TrimSuffix(name, path.Ext(name))
+	for _, part := range strings.Split(name, "-") {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if part == "" || part == "source" || part == "struct" || part == "ssa" {
+			continue
+		}
+		lang, err := ssaconfig.ValidateLanguage(part)
+		if err != nil || lang == "" {
+			return "", nil
+		}
+		return lang, nil
+	}
+	return "", nil
 }
 
 func CheckSyntaxFlowRuleType(ruleName string) (schema.SyntaxFlowRuleType, error) {

@@ -357,13 +357,12 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 				c.BaseInfo = defaultBaseInfo()
 			}
 			if len(req.ProgramName) > 0 {
-				c.BaseInfo.ProgramNames = req.GetProjectName()
+				c.BaseInfo.ProgramNames = req.GetProgramName()
 			}
 			if len(req.ProjectName) > 0 {
 				c.BaseInfo.ProjectName = req.GetProjectName()[0]
 			}
 			c.BaseInfo.ProjectID = req.GetSSAProjectId()
-			c.BaseInfo.ProgramNames = req.GetProgramName()
 		}
 
 		// 提取规则配置

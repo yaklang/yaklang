@@ -266,7 +266,11 @@ func (m *scanManager) initByConfig() error {
 		return utils.Errorf("config is nil")
 	}
 
-	if len(config.GetProgramNames()) > 0 {
+	if len(config.Programs) > 0 {
+		if len(config.QueryTargets) == 0 {
+			config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		}
+	} else if len(config.GetProgramNames()) > 0 {
 		for _, name := range config.GetProgramNames() {
 			prog, err := ssaapi.FromDatabase(name)
 			if err != nil {
@@ -300,8 +304,6 @@ func (m *scanManager) initByConfig() error {
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
 		}
-	} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
-		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	}
 
 	if config.CompiledSource {
