@@ -85,8 +85,7 @@ func TestRunningProcessStruct(t *testing.T) {
 	// 测试RunningProcess结构体
 	process := &RunningProcess{
 		Name:     "test",
-		Cmd:      nil,
-		Cancel:   nil,
+		MP:       nil,
 		Callback: nil,
 	}
 

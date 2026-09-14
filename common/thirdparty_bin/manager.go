@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 // ProcessCallback 进程回调函数类型
@@ -18,8 +19,7 @@ type ProcessCallback func(reader io.Reader)
 // RunningProcess 运行中的进程信息
 type RunningProcess struct {
 	Name     string
-	Cmd      *exec.Cmd
-	Cancel   context.CancelFunc
+	MP       *subprocess.ManagedProcess
 	Callback ProcessCallback
 }
 
@@ -377,70 +377,45 @@ func (m *Manager) Start(ctx context.Context, name string, args []string, callbac
 	// 获取可执行文件路径
 	execPath := m.installer.GetInstallPath(descriptor, nil)
 
-	// 创建带取消功能的上下文
-	processCtx, cancel := context.WithCancel(ctx)
-
-	// 创建命令
-	cmd := exec.CommandContext(processCtx, execPath, args...)
-
-	// 设置输出管道
-	stdout, err := cmd.StdoutPipe()
+	mp, err := subprocess.Launch(ctx, &subprocess.LaunchConfig{
+		Cmd: &exec.Cmd{
+			Path: execPath,
+			Args: append([]string{execPath}, args...),
+		},
+	})
 	if err != nil {
-		cancel()
-		return utils.Errorf("create stdout pipe failed: %v", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		cancel()
-		return utils.Errorf("create stderr pipe failed: %v", err)
-	}
-
-	// 启动进程
-	if err := cmd.Start(); err != nil {
-		cancel()
 		return utils.Errorf("start process failed: %v", err)
 	}
 
-	// 创建运行进程信息
 	runningProcess := &RunningProcess{
 		Name:     name,
-		Cmd:      cmd,
-		Cancel:   cancel,
+		MP:       mp,
 		Callback: callback,
 	}
 
-	// 添加到运行列表
 	m.mutex.Lock()
 	m.runningProcesses[name] = runningProcess
 	m.mutex.Unlock()
 
 	// 启动输出处理goroutine
+	if callback != nil {
+		go callback(io.MultiReader(mp.Stdout(), mp.Stderr()))
+	}
+
+	// 进程结束时清理
 	go func() {
-		defer func() {
-			// 进程结束时清理
-			m.mutex.Lock()
-			delete(m.runningProcesses, name)
-			m.mutex.Unlock()
-			cancel()
-		}()
-
-		// 合并stdout和stderr
-		if callback != nil {
-			// 创建多路复用Reader
-			multiReader := io.MultiReader(stdout, stderr)
-			callback(multiReader)
-		}
-
-		// 等待进程结束
-		if err := cmd.Wait(); err != nil {
+		<-mp.Done()
+		m.mutex.Lock()
+		delete(m.runningProcesses, name)
+		m.mutex.Unlock()
+		if err := mp.WaitError(); err != nil {
 			log.Warnf("process %s exited with error: %v", name, err)
 		} else {
 			log.Infof("process %s exited successfully", name)
 		}
 	}()
 
-	log.Infof("binary %s started with PID %d", name, cmd.Process.Pid)
+	log.Infof("binary %s started with PID %d", name, mp.PID())
 	return nil
 }
 
@@ -455,15 +430,8 @@ func (m *Manager) Stop(name string) error {
 	delete(m.runningProcesses, name)
 	m.mutex.Unlock()
 
-	// 取消上下文，这会发送SIGTERM信号
-	runningProcess.Cancel()
-
-	// 等待进程结束
-	if runningProcess.Cmd.Process != nil {
-		if err := runningProcess.Cmd.Wait(); err != nil {
-			log.Warnf("process %s stopped with error: %v", name, err)
-		}
-	}
+	// Kill 强杀进程组并等待退出
+	runningProcess.MP.Kill()
 
 	log.Infof("binary %s stopped", name)
 	return nil
