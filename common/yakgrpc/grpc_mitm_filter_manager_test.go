@@ -79,6 +79,42 @@ func TestExpandGroupByDelimiter(t *testing.T) {
 			group: []string{"*.example.com\n*.test.com"},
 			want:  []string{"*.example.com", "*.test.com"},
 		},
+		// glob brace syntax: comma inside {...} must NOT be split
+		{
+			name:  "glob brace: comma inside braces preserved",
+			group: []string{"*.{js,css}"},
+			want:  []string{"*.{js,css}"},
+		},
+		{
+			name:  "glob brace: multiple values in braces preserved",
+			group: []string{"*.{js,css,html}"},
+			want:  []string{"*.{js,css,html}"},
+		},
+		{
+			name:  "glob brace: comma outside braces splits",
+			group: []string{"a.com,*.{js,css}"},
+			want:  []string{"a.com", "*.{js,css}"},
+		},
+		{
+			name:  "glob brace: multiple brace groups split by outer comma",
+			group: []string{"{GET,POST},{PUT,DELETE}"},
+			want:  []string{"{GET,POST}", "{PUT,DELETE}"},
+		},
+		{
+			name:  "glob brace: semicolon inside braces preserved",
+			group: []string{"*.{js;css}"},
+			want:  []string{"*.{js;css}"},
+		},
+		{
+			name:  "glob brace: nested braces comma preserved",
+			group: []string{"*.{a{b,c},d}"},
+			want:  []string{"*.{a{b,c},d}"},
+		},
+		{
+			name:  "glob brace: brace group followed by comma value",
+			group: []string{"/api/{v1,v2}/*,test"},
+			want:  []string{"/api/{v1,v2}/*", "test"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
