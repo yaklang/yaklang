@@ -2344,6 +2344,15 @@ message AIExecutionStrategy {
   // Multi 模式下子 Agent 最大并发数（同时运行数量）。
   // <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
   int64 MaxSubAgents = 4;
+
+  // Goal 模式时间窗口（秒）。>0 时在时间窗口内无条件拒绝 finish；-1 表示永不自动放行。
+  // 0 或省略表示不启用时间窗口 gate，仅依赖迭代数和验收条件。
+  int64 GoalDurationSeconds = 5;
+
+  // Goal 模式验收条件。非空时，时间窗口过后（或未设时间窗口时）每次 finish
+  // 会通过 LLM review 检查当前产出是否满足此条件；不满足则拒绝退出并 feedback 缺失项。
+  // 留空表示不启用验收条件 gate。
+  string GoalAcceptanceCriteria = 6;
 }
 
 message AITaskFilter {

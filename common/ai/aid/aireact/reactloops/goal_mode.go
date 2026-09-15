@@ -1,6 +1,14 @@
 package reactloops
 
-import "github.com/yaklang/yaklang/common/ai/aid/aicommon"
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+)
 
 func (r *ReActLoop) IsGoalModeEnabled() bool {
 	if r == nil || r.config == nil {
@@ -70,4 +78,115 @@ func (r *ReActLoop) ApplyGoalModeGate(operator *LoopActionHandlerOperator, itera
 	if r.ShouldBlockFinishAtIteration(iteration) {
 		operator.DisallowNextLoopExit()
 	}
+}
+
+// --- Gate 2: Time Window ---
+
+// ShouldBlockFinishByDeadline reports whether the finish should be blocked
+// because the goal time window has not elapsed yet. Returns false if the
+// time window gate is disabled (GoalDurationSeconds == 0) or not yet started.
+//
+// The deadline is started lazily on the first call via StartGoalDeadline,
+// so the window measures actual execution time from the first finish attempt
+// rather than from session creation.
+func (r *ReActLoop) ShouldBlockFinishByDeadline() bool {
+	if !r.IsGoalModeEnabled() {
+		return false
+	}
+	cfg, ok := r.config.(*aicommon.Config)
+	if !ok {
+		return false
+	}
+	if cfg.GetGoalDurationSeconds() == 0 {
+		return false // time window gate disabled
+	}
+	// Lazily start the deadline on first check
+	cfg.StartGoalDeadline()
+	return !cfg.IsGoalDeadlinePassed()
+}
+
+// --- Gate 3: Acceptance Criteria ---
+
+// GoalAcceptanceReviewResult holds the result of an LLM review against the
+// acceptance criteria.
+type GoalAcceptanceReviewResult struct {
+	Passed bool
+	Reason string // why it failed (empty when passed)
+}
+
+// CheckGoalAcceptanceCriteria performs an LLM review of the current timeline
+// against the configured acceptance criteria. Returns passed=true if the
+// criteria are satisfied, or passed=false with a reason describing what is
+// missing. Returns passed=true (no-op) if the acceptance criteria gate is
+// disabled or goal mode is not enabled.
+func (r *ReActLoop) CheckGoalAcceptanceCriteria(ctx context.Context) *GoalAcceptanceReviewResult {
+	result := &GoalAcceptanceReviewResult{Passed: true}
+	if r == nil || !r.IsGoalModeEnabled() {
+		return result
+	}
+	cfg, ok := r.config.(*aicommon.Config)
+	if !ok {
+		return result
+	}
+	criteria := strings.TrimSpace(cfg.GetGoalAcceptanceCriteria())
+	if criteria == "" {
+		return result // acceptance criteria gate disabled
+	}
+
+	// Gather timeline context for the review
+	timelineDiff := r.GetTimelineDiffWithoutUpdate()
+	if strings.TrimSpace(timelineDiff) == "" {
+		timelineDiff = "(no timeline content available)"
+	}
+
+	// Truncate to avoid excessive token usage
+	const maxTimelineChars = 8000
+	if len(timelineDiff) > maxTimelineChars {
+		timelineDiff = timelineDiff[:maxTimelineChars] + "\n... (truncated)"
+	}
+
+	prompt := fmt.Sprintf(`You are a strict acceptance reviewer. Determine whether the work done so far satisfies the acceptance criteria.
+
+## Acceptance Criteria
+%s
+
+## Work Done (Timeline Summary)
+%s
+
+## Task
+Review the timeline evidence against the acceptance criteria. If ALL criteria are satisfied, set "passed" to true. If any criterion is not met, set "passed" to false and explain exactly what is missing or incomplete in "reason".
+
+Be rigorous: only pass when there is concrete evidence in the timeline that each criterion is satisfied. Do not infer completion from absence of information.`, criteria, timelineDiff)
+
+	invoker := r.GetInvoker()
+	if invoker == nil {
+		log.Warnf("goal acceptance check: invoker is nil, skipping")
+		return result
+	}
+
+	action, err := invoker.InvokeSpeedPriorityLiteForge(
+		ctx,
+		"goal-acceptance-review",
+		prompt,
+		[]aitool.ToolOption{
+			aitool.WithBoolParam("passed",
+				aitool.WithParam_Description("true if all acceptance criteria are satisfied"),
+			),
+			aitool.WithStringParam("reason",
+				aitool.WithParam_Description("when passed=false, explain what is missing or incomplete; leave empty when passed=true"),
+			),
+		},
+	)
+	if err != nil {
+		log.Warnf("goal acceptance review failed: %v, allowing finish", err)
+		return result // on error, allow finish (fail-open)
+	}
+	if action == nil {
+		return result
+	}
+
+	params := action.GetParams()
+	result.Passed = params.GetBool("passed")
+	result.Reason = strings.TrimSpace(params.GetString("reason"))
+	return result
 }

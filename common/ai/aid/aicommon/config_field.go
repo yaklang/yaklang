@@ -1,6 +1,8 @@
 package aicommon
 
 import (
+	"fmt"
+	"time"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -175,6 +177,75 @@ func NormalizeGoalMinIterations(n int64) int64 {
 	return n
 }
 
+func (c *Config) GetGoalDurationSeconds() int64 {
+	if c == nil {
+		return 0
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	return c.GoalDurationSeconds
+}
+
+func (c *Config) GetGoalAcceptanceCriteria() string {
+	if c == nil {
+		return ""
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	return c.GoalAcceptanceCriteria
+}
+
+// GetGoalDeadline returns the computed deadline for the goal time window.
+// Returns the zero time if the time window has not been started or is disabled.
+func (c *Config) GetGoalDeadline() time.Time {
+	if c == nil {
+		return time.Time{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	return c.GoalDeadline
+}
+
+// StartGoalDeadline computes and stores the goal-mode deadline from the
+// current time + GoalDurationSeconds. If GoalDurationSeconds is 0 the
+// deadline is not set (gate disabled). If -1 the deadline is set to a
+// far-future sentinel (never-ending). This is called lazily on the first
+// finish attempt, not at config creation, so the window measures actual
+// execution time rather than session start time.
+func (c *Config) StartGoalDeadline() {
+	if c == nil {
+		return
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.GoalDurationSeconds == 0 {
+		return
+	}
+	if !c.GoalDeadline.IsZero() {
+		return // already started
+	}
+	if c.GoalDurationSeconds == -1 {
+		c.GoalDeadline = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+		return
+	}
+	c.GoalDeadline = time.Now().Add(time.Duration(c.GoalDurationSeconds) * time.Second)
+}
+
+// IsGoalDeadlinePassed reports whether the goal time window has elapsed.
+// Returns false if the deadline has not been started or is disabled.
+func (c *Config) IsGoalDeadlinePassed() bool {
+	if c == nil {
+		return false
+	}
+	c.m.Lock()
+	deadline := c.GoalDeadline
+	c.m.Unlock()
+	if deadline.IsZero() {
+		return false
+	}
+	return time.Now().After(deadline)
+}
+
 func (c *Config) GetExecutionPolicy() string {
 	if c == nil {
 		return ""
@@ -193,6 +264,23 @@ func (c *Config) GetExecutionPolicy() string {
 			"- Goal mode is enabled: finish is controlled by a host-side completion gate. Keep producing evidence-backed progress while finish is unavailable; decide from the task state rather than the gate.",
 			"- Before the finish gate opens, only emit progress updates via directly_answer when necessary; keep pushing execution forward instead of wrapping up early or administratively clearing TODOs.",
 		)
+		if c.GetGoalDurationSeconds() != 0 {
+			if c.GetGoalDurationSeconds() == -1 {
+				lines = append(lines,
+					"- Goal time window: NEVER-ENDING. finish will never be auto-accepted by the time gate; keep working until the acceptance criteria are met (if set) or the user stops the session.",
+				)
+			} else {
+				lines = append(lines,
+					fmt.Sprintf("- Goal time window: %d seconds. finish is blocked until the time window elapses; use the time to explore deeper, verify results, and address edge cases.", c.GetGoalDurationSeconds()),
+				)
+			}
+		}
+		if criteria := c.GetGoalAcceptanceCriteria(); criteria != "" {
+			lines = append(lines,
+				fmt.Sprintf("- Goal acceptance criteria: %s", criteria),
+				"- After the time window (if set) passes, finish still requires the acceptance criteria to be satisfied. The system will review your work against the criteria before allowing finish.",
+			)
+		}
 	}
 	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
 		lines = append(lines,

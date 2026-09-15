@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"fmt"
+	"time"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -29,6 +30,14 @@ func buildFinishBlockedByGoalModeMessage() string {
 	return "goal mode's host-side completion gate is not open yet. Do not retry finish or clear unfinished TODOs to satisfy it. Continue the most valuable evidence-producing work, and use directly_answer only for a necessary progress update."
 }
 
+func buildFinishBlockedByDeadlineMessage(remaining time.Duration) string {
+	return fmt.Sprintf("goal mode time window is still active (%s remaining). Do not retry finish. Continue the most valuable evidence-producing work; explore deeper angles, verify earlier results, or address remaining TODOs.", remaining.Round(time.Second))
+}
+
+func buildFinishBlockedByAcceptanceMessage(reason string) string {
+	return fmt.Sprintf("goal mode acceptance criteria are not satisfied yet: %s. Do not retry finish or clear unfinished TODOs to bypass this. Address the gaps above with concrete tool actions and evidence, then attempt finish again.", reason)
+}
+
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
 	Description: "Request completion of the current task. Exit immediately when no open TODO remains and the host completion gate permits it. " +
@@ -46,6 +55,30 @@ var loopAction_Finish = &LoopAction{
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
 			msg := buildFinishBlockedByGoalModeMessage()
 			loop.invoker.AddToTimeline("[GOAL_MODE_FINISH_BLOCKED]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
+		// Gate 2: Time window — reject finish until the goal deadline passes.
+		if loop.ShouldBlockFinishByDeadline() {
+			cfg, _ := loop.GetConfig().(*aicommon.Config)
+			remaining := time.Duration(0)
+			if cfg != nil {
+				deadline := cfg.GetGoalDeadline()
+				if !deadline.IsZero() {
+					remaining = time.Until(deadline)
+				}
+			}
+			msg := buildFinishBlockedByDeadlineMessage(remaining)
+			loop.invoker.AddToTimeline("[GOAL_MODE_DEADLINE_BLOCKED]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
+		// Gate 3: Acceptance criteria — LLM review of work quality.
+		if review := loop.CheckGoalAcceptanceCriteria(loop.GetCurrentTask().GetContext()); review != nil && !review.Passed {
+			msg := buildFinishBlockedByAcceptanceMessage(review.Reason)
+			loop.invoker.AddToTimeline("[GOAL_MODE_ACCEPTANCE_BLOCKED]", msg)
 			operator.Feedback(msg)
 			operator.Continue()
 			return

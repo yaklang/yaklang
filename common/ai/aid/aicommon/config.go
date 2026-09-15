@@ -370,6 +370,9 @@ type Config struct {
 	MaxIterationCount        int64
 	EnableGoalMode           bool
 	GoalMinIterations        int64
+	GoalDurationSeconds      int64 // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
+	GoalAcceptanceCriteria   string // Goal mode acceptance criteria; non-empty enables LLM review gate
+	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
 	DisableIncreaseIteration bool
 
 	// task config
@@ -2573,6 +2576,37 @@ func WithGoalMinIterations(n int64) ConfigOption {
 		}
 		c.m.Lock()
 		c.GoalMinIterations = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithGoalDurationSeconds sets the goal-mode time window in seconds.
+// >0: finish is unconditionally rejected until the deadline passes.
+// -1: finish is never auto-accepted (never-ending mode).
+// 0: time window gate is disabled (default).
+func WithGoalDurationSeconds(seconds int64) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.GoalDurationSeconds = seconds
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithGoalAcceptanceCriteria sets the goal-mode acceptance criteria.
+// When non-empty, a finish attempt after the time window (or when no
+// time window is set) triggers an LLM review against this criteria.
+func WithGoalAcceptanceCriteria(criteria string) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.GoalAcceptanceCriteria = strings.TrimSpace(criteria)
 		c.m.Unlock()
 		return nil
 	}

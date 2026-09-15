@@ -100,6 +100,8 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"EnableGoalMode":              c.GetEnableGoalMode(),
 		"GoalMinIterations":           c.GetGoalMinIterations(),
 		"MaxSubAgents":                c.GetMaxSubAgents(),
+		"GoalDurationSeconds":          c.GetGoalDurationSeconds(),
+		"GoalAcceptanceCriteria":       c.GetGoalAcceptanceCriteria(),
 	}
 }
 
@@ -257,6 +259,8 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 			WithEnableGoalMode(strategy.GetEnableGoalMode()),
 			WithGoalMinIterations(strategy.GetGoalMinIterations()),
 			WithMaxSubAgents(strategy.GetMaxSubAgents()),
+			WithGoalDurationSeconds(strategy.GetGoalDurationSeconds()),
+			WithGoalAcceptanceCriteria(strategy.GetGoalAcceptanceCriteria()),
 		)
 	}
 	return aiOption
