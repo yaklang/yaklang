@@ -80,6 +80,85 @@ func NewEmbedFS(fs embed.FS) fi.FileSystem {
 	return &embedFs{fs}
 }
 
+// NewEmbedSubFS creates a FileSystem from an embed.FS, rooted at the given subdirectory.
+// This is useful when //go:embed mydir embeds files under "mydir/", but the caller
+// wants to read files relative to "mydir/" (e.g. ReadFile("file.txt") instead of
+// ReadFile("mydir/file.txt")). In CI, gzip-embed transform replaces this with
+// PreprocessingEmbed which naturally strips the directory prefix.
+func NewEmbedSubFS(emb embed.FS, subDir string) fi.FileSystem {
+	sub, err := fs.Sub(emb, subDir)
+	if err != nil {
+		return &embedFs{emb} // fallback: use full path
+	}
+	return &subFS{sub}
+}
+
+type subFS struct {
+	fs fs.FS
+}
+
+func (f *subFS) ReadFile(name string) ([]byte, error) {
+	return fs.ReadFile(f.fs, name)
+}
+
+func (f *subFS) Open(name string) (fs.File, error) {
+	return f.fs.Open(name)
+}
+
+func (f *subFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	return f.fs.Open(name)
+}
+
+func (f *subFS) Stat(name string) (fs.FileInfo, error) {
+	return fs.Stat(f.fs, name)
+}
+
+func (f *subFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return fs.ReadDir(f.fs, name)
+}
+
+func (f *subFS) PathSplit(s string) (string, string) {
+	return SplitWithSeparator(s, f.GetSeparators())
+}
+
+func (f *subFS) Ext(s string) string {
+	return getExtension(s)
+}
+
+func (f *subFS) GetSeparators() rune { return '/' }
+func (f *subFS) Join(elem ...string) string { return path.Join(elem...) }
+func (f *subFS) Base(name string) string { return path.Base(name) }
+func (f *subFS) IsAbs(name string) bool { return len(name) > 0 && name[0] == '/' }
+func (f *subFS) Getwd() (string, error) { return ".", nil }
+func (f *subFS) Exists(name string) (bool, error) {
+	_, err := fs.Stat(f.fs, name)
+	return err == nil, err
+}
+func (f *subFS) Rel(basepath, targpath string) (string, error) {
+	if strings.HasPrefix(targpath, basepath) {
+		return strings.TrimPrefix(targpath, basepath), nil
+	}
+	return "", errors.New("cannot make relative path")
+}
+func (f *subFS) Rename(oldname, newname string) error {
+	return errors.New("rename not supported in read-only embed sub filesystem")
+}
+func (f *subFS) WriteFile(name string, data []byte, perm os.FileMode) error {
+	return errors.New("write not supported in read-only embed sub filesystem")
+}
+func (f *subFS) Delete(name string) error {
+	return errors.New("delete not supported in read-only embed sub filesystem")
+}
+func (f *subFS) MkdirAll(path string, perm os.FileMode) error {
+	return errors.New("mkdir not supported in read-only embed sub filesystem")
+}
+func (f *subFS) ExtraInfo(name string) map[string]any {
+	return map[string]any{"type": "embed_sub_fs"}
+}
+func (f *subFS) GetHash() (string, error) {
+	return "", nil
+}
+
 func CreateEmbedFSHash(f embed.FS, opts ...Option) (string, error) {
 	var hashes []string
 
