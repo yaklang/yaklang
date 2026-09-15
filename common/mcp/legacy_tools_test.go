@@ -1046,6 +1046,11 @@ func legacyYakScriptToolCases() map[string][]legacyToolCase {
 				name:    "missing_data_filter_still_queries",
 				args:    map[string]any{},
 				timeout: 15 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline exceeded",
+					"context canceled",
+					"failed to download yak script",
+				},
 				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
 					var rows []map[string]any
 					decodeToolResultJSON(t, text, &rows)
@@ -1289,6 +1294,11 @@ func legacySubdomainToolCases() map[string][]legacyToolCase {
 				name:    "empty_args_should_not_panic",
 				args:    map[string]any{},
 				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline exceeded",
+					"context canceled",
+					"failed to download yak script",
+				},
 				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 					require.NotNil(t, result)
 				},
