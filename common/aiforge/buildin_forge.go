@@ -205,16 +205,45 @@ const buildInForgeEmbedKey = "6ef3c850244a2b26ed0b163d1fda9600"
 // syncBuildInForgeInternal 将内置 AI forge 从 embed 同步到数据库，不更新 hash（由调用方决定）
 func syncBuildInForgeInternal() error {
 	resetBuildInForgeRegisterTrace()
-	registerBuildInForge("web_log_monitor")
-	registerBuildInForge("flow_report") // 流量分析报告生成
 
-	registerBuildInForge("hostscan") // 主机体检，主要用于测试
-	registerBuildInForge("ssapoc")
-	registerBuildInForge("ssa_vulnerability_analyzer")
-	registerBuildInForge("scan_risk_analysis_project")
-	registerBuildInForge("alert_denoising")
-	registerBuildInForge("sf_rule_completion")
-	registerBuildInForge("sf_project_scan_check")
+	// xdr_yx 分支：本地维护的安全智能体 forge（AI SenSo 数字员工），
+	// 替代上游默认 forge。与 main 同步源码时，仅保留本清单。
+	registerBuildInForge("vuln_warning_intelligence")
+	registerBuildInForge("single_alert_triage")
+	registerBuildInForge("异常行为狩猎")
+	registerBuildInForge("安全事件响应编排")
+	registerBuildInForge("安全运营报告生成")
+	registerBuildInForge("安全成熟度评估")
+	registerBuildInForge("security_awareness_training")
+	registerBuildInForge("XDR告警研判")
+	registerBuildInForge("TDA威胁研判")
+	registerBuildInForge("主机安全研判")
+	registerBuildInForge("资产测绘")
+	registerBuildInForge("指纹识别")
+	registerBuildInForge("端口扫描")
+	registerBuildInForge("子域名枚举")
+	registerBuildInForge("域名情报分析")
+	registerBuildInForge("敏感信息发现")
+	registerBuildInForge("弱口令评估")
+	registerBuildInForge("Web漏洞分析")
+	registerBuildInForge("接口安全检测")
+	registerBuildInForge("爬虫任务编排")
+	registerBuildInForge("钓鱼邮件分析")
+	registerBuildInForge("流量包分析")
+	registerBuildInForge("主机取证分析")
+	registerBuildInForge("日志关联分析")
+	registerBuildInForge("基线合规核查")
+	registerBuildInForge("云安全评估")
+	registerBuildInForge("容器镜像扫描")
+	registerBuildInForge("移动应用分析")
+	registerBuildInForge("供应链风险评估")
+	registerBuildInForge("数据泄露排查")
+	registerBuildInForge("用户行为审计")
+	registerBuildInForge("威胁情报预警")
+	registerBuildInForge("应急响应助手")
+	registerBuildInForge("代码审计")
+	registerBuildInForge("渗透测试")
+
 	cleanupRemovedBuildInForges()
 	return nil
 }

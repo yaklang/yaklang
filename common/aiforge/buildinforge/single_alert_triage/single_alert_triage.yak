@@ -1,0 +1,2 @@
+alert_content = cli.Text("alert-content", cli.setVerboseName("告警信息"), cli.setHelp("粘贴单条告警摘要、原始日志或两者的组合文本"))
+alert_files = cli.FileNames("alert-files", cli.setVerboseName("告警文件"), cli.setHelp("上传一个包含单条告警的文本、日志、JSON、CSV 或表格文件"))

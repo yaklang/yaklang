@@ -1,0 +1,6 @@
+audience_category = cli.String("audience-category", cli.setVerboseName("人员类别"), cli.setHelp("十五类人员之一"), cli.setDefault("新员工"))
+job_role = cli.String("job-role", cli.setVerboseName("具体岗位"), cli.setHelp("可选填写岗位名称，用于生成针对性内容"), cli.setDefault(""))
+work_plan = cli.Text("work-plan", cli.setVerboseName("作业计划"), cli.setHelp("可选填写近期工作、项目或作业安排，用于关联风险场景"))
+task_type = cli.String("task-type", cli.setVerboseName("任务类型"), cli.setHelp("完整宣贯包、培训教案、试题、案例、智能问答"), cli.setDefault("完整宣贯包"))
+question = cli.Text("question", cli.setVerboseName("安全问题"), cli.setHelp("任务类型为智能问答时填写"))
+max_length = cli.String("max-length", cli.setVerboseName("篇幅上限"), cli.setHelp("默认4000字，详细版可设为6000字"), cli.setDefault("4000"))

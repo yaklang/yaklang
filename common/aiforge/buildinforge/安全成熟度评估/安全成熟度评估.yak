@@ -1,0 +1,4 @@
+evidence_text = cli.Text("evidence-text", cli.setVerboseName("评估材料"), cli.setHelp("直接粘贴制度内容、运营情况、自评材料或 JSON；与评估材料文件二选一"))
+evidence_file = cli.File("evidence-file", cli.setVerboseName("评估材料文件"), cli.setHelp("上传 JSON 或 XLSX 评估材料；与评估材料二选一"))
+query = cli.Text("query", cli.setVerboseName("补充要求"), cli.setDefault(""), cli.setHelp("可选：说明评估侧重点，例如“重点看应急响应和资产管理”"))
+cli.check()
