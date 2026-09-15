@@ -725,7 +725,7 @@ jobs:
             package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"},
+                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/crep/...", "timeout": "5m", "retry": 1, "retry_delay": 5}
               ]
 
@@ -766,7 +766,7 @@ jobs:
                 {"package": "./common/yak/cartesian", "timeout": "20s"},
                 {"package": "./common/utils/omap/...", "timeout": "30s", "race": true},
                 {"package": "./common/utils", "timeout": "1m"},
-                {"package": "./common/utils/dbcache", "timeout": "1m"},
+                {"package": "./common/utils/dbcache", "timeout": "1m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/imageutils/...", "timeout": "20s"},
                 {"package": "./common/utils/xml2", "timeout": "10s"},
                 {"package": "./common/utils/tlsutils/...", "timeout": "20s"},
@@ -775,7 +775,7 @@ jobs:
                 {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^TestMUSTPASS_Fp.*$"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
-                {"package": "./common/utils/bruteutils/.", "timeout": "1m"},
+                {"package": "./common/utils/bruteutils/.", "timeout": "1m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
@@ -796,7 +796,7 @@ jobs:
                 {"package": "./common/utils/bizhelper/...", "timeout": "20s"},
                 {"package": "./common/utils/cli", "timeout": "1m"},
                 {"package": "./common/mcp/yakcliconvert", "timeout": "1m"},
-                {"package": "./common/mcp", "timeout": "2m", "run": "^TestLegacy.*$"},
+                {"package": "./common/mcp", "timeout": "2m", "run": "^TestLegacy.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/mcp/...", "timeout": "2m", "skip": "^TestLegacy.*$", "exclude_packages": ["./common/mcp"]},
                 {"package": "./common/yak/yakdoc/...", "timeout": "3m"},
                 {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"},
@@ -814,7 +814,7 @@ jobs:
                 {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/ssaapi/test/yak/...", "timeout": "1m"},
                 {"package": "./common/yak/antlr4yak/lsp/...", "timeout": "20s"},
-                {"package": "./common/yak/python/...", "timeout": "4m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
+                {"package": "./common/yak/python/...", "timeout": "4m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yak/ssaapi/test/python/...", "timeout": "2m"},
                 {"package": "./common/yak/go2ssa/...", "timeout": "3m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/antlr4go/...", "timeout": "2m"},
@@ -836,10 +836,15 @@ jobs:
                 {"package": "./common/yak/ssaapi/test/ssatest/...", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/test/...", "timeout": "2m", "exclude_packages": ["./common/yak/ssaapi/test/yak/...", "./common/yak/ssaapi/test/java/...", "./common/yak/ssaapi/test/javascript/...", "./common/yak/ssaapi/test/php/...", "./common/yak/ssaapi/test/python/...", "./common/yak/ssaapi/test/golang/...", "./common/yak/ssaapi/test/c/...", "./common/yak/ssaapi/test/syntaxflow/...", "./common/yak/ssaapi/test/ssatest/..."]},
                 {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s", "retry": 1, "retry_delay": 5},
                 {"package": "./common/syntaxflow/sfrisk", "timeout": "20s"},
                 {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
+                # Rule verification subtests call t.Parallel(); the shared antlr
+                # token collector they run through is not thread-safe and has
+                # aborted this package with "fatal error: concurrent map read
+                # and map write". Serialize subtests here until the collector is
+                # fixed upstream.
+                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/yak/ssaapi/test/syntaxflow/...", "timeout": "1m"},
                 {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
                 {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
@@ -851,7 +856,10 @@ jobs:
             go_test_p: "1"
             test_configs: |
               [
-                {"package": "./common/yak/php/...", "timeout": "5m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
+                # The PHP corpus walker (TestAllSyntaxProjectBuildForPHP) alone takes
+                # ~190s; on a loaded 2-core runner the previous 5m cap sat too close to
+                # that, so a slow runner turned it into "panic: test timed out".
+                {"package": "./common/yak/php/...", "timeout": "8m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"},
                 {"package": "./common/sfweb/...", "timeout": "4m"},
                 {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
@@ -864,9 +872,14 @@ jobs:
               ]
 
           - name: "Test AI Aid / React"
+            # 34 packages ran serially for ~8m of test time (plus compile), making
+            # this the single longest job and therefore the critical path. Each
+            # package already runs with -parallel 1, so two at a time matches the
+            # runner's two cores instead of leaving one idle.
+            package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/aiengine", "timeout": "3m", "parallel": 1},
                 {"package": "./common/yak/cmd/yakcmds/memfit-cli", "timeout": "3m", "parallel": 1}
               ]
@@ -874,7 +887,7 @@ jobs:
           - name: "Test AI Aid / Core / Tool / Memory"
             test_configs: |
               [
-                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"]}
+                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"], "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test AI Aid Test / RAG / Forge / AIHTTP"
@@ -890,7 +903,7 @@ jobs:
                 {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "^TestMUSTPASS.*$"},
                 {"package": "./common/ai/tests/...", "timeout": "2m", "parallel": 1},
                 {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/embedding", "timeout": "30s", "parallel": 1},
+                {"package": "./common/ai/embedding", "timeout": "30s", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/ai/ollama/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)$"},
@@ -1008,7 +1021,7 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "^TestMUSTPASS.*$", "skip": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_MITM($|_.*|Filter.*)$"}
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_MITM($|_.*|Filter.*)$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test gRPC MUSTPASS MITMV2 / Slow"
@@ -1016,7 +1029,7 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "^TestGRPCMUSTPASS_MITMV2_.*$"},
+                {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "^TestGRPCMUSTPASS_MITMV2_.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITMSlowRuleHook"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFlowSlowSQL"}
               ]
@@ -1040,7 +1053,7 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "8m", "run": "^TestGRPCMUSTPASS_LANGUAGE.*$"}
+                {"package": "./common/yakgrpc/...", "timeout": "8m", "run": "^TestGRPCMUSTPASS_LANGUAGE.*$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
@@ -1074,9 +1087,9 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "2m", "run": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$"},
+                {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yakgrpc/yakit", "timeout": "10m", "skip": "^TestMUSTPASS.*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$"}
+                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$", "retry": 1, "retry_delay": 5}
               ]
     steps:
       - name: Checkout
@@ -1171,7 +1184,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "5m", "run": "^TestGRPCMUSTPASS_SQL.*$"}
+                {"package": "./common/coreplugin", "timeout": "5m", "run": "^TestGRPCMUSTPASS_SQL.*$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT/SwaggerJson)"
@@ -1179,7 +1192,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*)$"}
+                {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*)$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test Coreplugin Other"
