@@ -731,8 +731,13 @@ jobs:
               ]
 
           - name: "Test Utils Infra / Parser / Net / Misc"
-            # chaosmaker's traffic generator is timing-sensitive under package
-            # parallelism on a 2-core runner, so this suite stays serial.
+            # chaosmaker's traffic generator was previously believed to be
+            # timing-sensitive under package parallelism on a 2-core runner, so
+            # this suite used to stay serial. It is the largest suite here (42
+            # packages), so run it with two workers and let CI decide: if the
+            # chaosmaker cases or the tight 15-20s per-package budgets start
+            # timing out, revert this to serial rather than raising the budgets.
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/chunkmaker/...", "timeout": "20s"},
@@ -760,6 +765,7 @@ jobs:
               ]
 
           - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
@@ -805,6 +811,7 @@ jobs:
               ]
 
           - name: "Test SSA Frontend Java / JS(TS|ES) / Yak / Python / Golang / C / CSharp"
+            package_workers: "2"
             go_test_p: "1"
             test_configs: |
               [
@@ -827,6 +834,7 @@ jobs:
               ]
 
           - name: "Test SSA / SSAAPI Core / SyntaxFlow / StaticAnalyze / SFDB / SFVM"
+            package_workers: "2"
             sync_rule: "1"
             go_test_p: "1"
             test_configs: |
@@ -886,12 +894,14 @@ jobs:
               ]
 
           - name: "Test AI Aid / Core / Tool / Memory"
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"], "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test AI Aid Test / RAG / Forge / AIHTTP"
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
