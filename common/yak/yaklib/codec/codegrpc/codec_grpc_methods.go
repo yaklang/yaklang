@@ -90,11 +90,11 @@ func init() {
 	mutate.AddFuzzTagToGlobal(&mutate.FuzzTagDescription{
 		TagName: "codecflow",
 		Handler: func(s string) []string {
-			lastDividerIndex := strings.LastIndexByte(s, '|')
-			if lastDividerIndex < 0 {
+			parts := strings.SplitN(s, "|", 2)
+			if len(parts) < 2 {
 				return []string{}
 			}
-			flowName, input := s[:lastDividerIndex], s[lastDividerIndex+1:]
+			flowName, input := parts[0], parts[1]
 			codecFlow, err := yakit.GetCodecFlowByName(consts.GetGormProfileDatabase(), flowName)
 			if err != nil {
 				return []string{}
@@ -135,7 +135,7 @@ func init() {
 			}
 			return []string{res.GetResult()}
 		},
-		Description:         "调用codec模块保存的codec flow，例如 {{codecflow(flowname|test)}}，其中flowname是保存的codecflow名，input是需要编码的输入",
+		Description:         "调用codec模块保存的 codec flow，例如 {{codecflow(flowname|test)}}，其中 flowname 是保存的 codecflow 名，input 是需要编码的输入。使用第一个 | 分隔，input 中可以包含 | 字符。当输入中包含保留字符（如 {{ }} | 等）时，可配合 rawtag 使用：{{codecflow(flowname|{{=复杂{{输入}}=}})}}，rawtag 内的内容不会被解析为 fuzztag 语法",
 		TagNameVerbose:      "调用codec模块保存的codec flow",
 		ArgumentDescription: "{{string_split(name:codecflow名)}}{{string(abc:输入)}}",
 	})
