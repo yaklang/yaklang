@@ -30,6 +30,33 @@ func getDocsDir() string {
 	return filepath.Join(filepath.Dir(filename), "..", "reactloops", "docs")
 }
 
+// benchReportFiles tracks report filenames written by the current test so that
+// they can be cleaned up via t.Cleanup.
+var benchReportFiles []string
+
+// cleanupBenchArtifacts registers a t.Cleanup that removes the bench_results
+// directory and any report markdown files produced during the test. This
+// prevents benchmark runs from leaving residual artifacts in the workspace.
+func cleanupBenchArtifacts(t *testing.T) {
+	t.Helper()
+	t.Cleanup(func() {
+		// Remove bench_results directory
+		resultsDir := getResultsDir()
+		if err := os.RemoveAll(resultsDir); err != nil {
+			t.Logf("cleanup bench_results: %v", err)
+		}
+		// Remove report markdown files written to docs/
+		docsDir := getDocsDir()
+		for _, name := range benchReportFiles {
+			path := filepath.Join(docsDir, name)
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				t.Logf("cleanup report %s: %v", name, err)
+			}
+		}
+		benchReportFiles = nil
+	})
+}
+
 func loadBenchQueries(t *testing.T) []*BenchQuery {
 	t.Helper()
 	fixturesDir := getFixturesDir()
@@ -71,6 +98,11 @@ func TestExportPotentialQuestionFixtures(t *testing.T) {
 	}
 
 	outPath := filepath.Join(getFixturesDir(), "queries_from_pq.jsonl")
+	t.Cleanup(func() {
+		if err := os.Remove(outPath); err != nil && !os.IsNotExist(err) {
+			t.Logf("cleanup exported fixtures: %v", err)
+		}
+	})
 	if err := SaveFixtures(outPath, queries); err != nil {
 		t.Fatalf("save failed: %v", err)
 	}
@@ -83,6 +115,7 @@ func TestExportPotentialQuestionFixtures(t *testing.T) {
 // This is the first phase: isolate retrieval quality without compression.
 // Run: go test -run TestPhase1_SearchProfileSweep -v -timeout 20m ./common/ai/aid/aireact/knowledgebench/
 func TestPhase1_SearchProfileSweep(t *testing.T) {
+	cleanupBenchArtifacts(t)
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		t.Skip("no profile database available")
@@ -120,6 +153,7 @@ func TestPhase1_SearchProfileSweep(t *testing.T) {
 // TestPhase1_SearchLimitSweep runs limit variations on the best search profile.
 // Run: go test -run TestPhase1_SearchLimitSweep -v -timeout 15m ./common/ai/aid/aireact/knowledgebench/
 func TestPhase1_SearchLimitSweep(t *testing.T) {
+	cleanupBenchArtifacts(t)
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		t.Skip("no profile database available")
@@ -163,6 +197,7 @@ func TestPhase1_SearchLimitSweep(t *testing.T) {
 // Requires a configured AIInvokeRuntime for LiteForge calls.
 // Run: go test -run TestPhase2_CompressProfileSweep -v -timeout 30m ./common/ai/aid/aireact/knowledgebench/
 func TestPhase2_CompressProfileSweep(t *testing.T) {
+	cleanupBenchArtifacts(t)
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		t.Skip("no profile database available")
@@ -213,6 +248,7 @@ func TestPhase2_CompressProfileSweep(t *testing.T) {
 // TestPhase3_LLMRerankSweep runs rerank strategy comparisons.
 // Run: go test -run TestPhase3_LLMRerankSweep -v -timeout 20m ./common/ai/aid/aireact/knowledgebench/
 func TestPhase3_LLMRerankSweep(t *testing.T) {
+	cleanupBenchArtifacts(t)
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		t.Skip("no profile database available")
@@ -321,6 +357,7 @@ func runWithLLMRerank(
 // TestPhase5_GenerateFullReport reads all saved metrics and generates the combined report.
 // Run: go test -run TestPhase5_GenerateFullReport -v ./common/ai/aid/aireact/knowledgebench/
 func TestPhase5_GenerateFullReport(t *testing.T) {
+	cleanupBenchArtifacts(t)
 	resultsDir := getResultsDir()
 	entries, err := os.ReadDir(resultsDir)
 	if err != nil {
@@ -368,6 +405,7 @@ func writeReport(t *testing.T, allMetrics []*RunMetrics, filename string) {
 		t.Logf("write report failed: %v", err)
 	} else {
 		t.Logf("report written to %s", reportPath)
+		benchReportFiles = append(benchReportFiles, filename)
 	}
 }
 
