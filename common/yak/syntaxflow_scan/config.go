@@ -44,6 +44,8 @@ type ScanTaskCallback struct {
 
 	stageCallback StageCallback `json:"-"`
 
+	projectResultCallback ProjectResultCallback `json:"-"`
+
 	Reporter       sfreport.IReport `json:"-"`
 	ReporterWriter io.Writer        `json:"-"`
 

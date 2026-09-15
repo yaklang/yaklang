@@ -38,7 +38,10 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 //   - ssa: always on a DB-loaded program (-t reloads after SaveToDatabase)
 //
 // Stages: 收集代码 → 代码检测 → 语义检测 → 深度分析.
-// Mode is selected by WithMode (stacked); default is source+struct+ssa.
+// Mode is selected by WithMode (stacked). An empty mode list is compile-only:
+// it persists IR, reports StageCompile, and skips every rule set so platforms
+// can reuse the program later. Callers that want rule sets (code-scan, gRPC)
+// pass the modes they need explicitly.
 func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	cfg := &Config{ScanTaskCallback: &ScanTaskCallback{}}
 	var err error
@@ -47,6 +50,12 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		return err
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
+
+	recorder := newStageOutcomeRecorder()
+	report := func(stage ProductStage, err error) { recorder.record(stage, err) }
+	// programName is published through ProjectResult so compile-only runs can
+	// hand the persisted IR name back to the platform.
+	programName := strings.TrimSpace(cfg.GetProgramName())
 
 	emit := func(stage ProductStage, progress float64, info *RuleProcessInfoList) {
 		if cfg.stageCallback == nil {
@@ -61,7 +70,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		cfg.stageCallback(stage, stage.OverallProgress(progress), progress, info)
 	}
 
-	wantSource, wantReview, wantAnalyze := productModes(cfg)
+	mode := resolveProductModes(cfg)
+	wantSource, wantReview, wantAnalyze := mode.source, mode.review, mode.analyze
+	compileOnly := mode.compileOnly
 	hasLoaded := len(cfg.Programs) > 0
 	hasCode := hasCodeSource(cfg)
 	localDir := localSourceDir(cfg)
@@ -74,28 +85,38 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		hasLoaded = len(cfg.Programs) > 0
 	}
 	hasProgram := hasLoaded
-	needCompile := !hasLoaded && hasCode && (wantReview || wantAnalyze || (wantSource && localDir == ""))
+	needCompile := !hasLoaded && hasCode &&
+		(compileOnly || wantReview || wantAnalyze || (wantSource && localDir == ""))
 
 	emit(StageCollect, 0, nil)
 	if hasProgram || localDir != "" {
 		emit(StageCollect, 1, nil)
 	}
+	report(StageCollect, nil)
 
 	inspectedLive := false
 	if wantSource && localDir != "" && !hasProgram {
 		if err := attachLiveSourceTarget(cfg, localDir); err != nil {
-			return err
+			return finishScanProject(cfg, recorder, programName, err)
 		}
 		emit(StageInspect, 0, nil)
-		if err := StartScan(ctx, inspectLiveSourceOptions(cfg, emit)...); err != nil {
-			return err
+		err := StartScan(ctx, inspectLiveSourceOptions(cfg, emit)...)
+		report(StageInspect, err)
+		if err != nil {
+			return finishScanProject(cfg, recorder, programName, err)
 		}
 		emit(StageInspect, 1, nil)
 		inspectedLive = true
 	}
 
 	if needCompile {
-		if wantReview {
+		compileStage := StageReview
+		if compileOnly {
+			compileStage = StageCompile
+		}
+		if compileOnly {
+			emit(StageCompile, 0, nil)
+		} else if wantReview {
 			emit(StageReview, 0, nil)
 		} else if localDir == "" {
 			emit(StageCollect, 0.5, nil)
@@ -105,34 +126,51 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 			compileOpts = structCompileOptions(cfg)
 		}
 		compileOpts = append(compileOpts, ssaapi.WithProcess(func(msg string, process float64) {
-			if wantReview {
+			if compileOnly {
+				emit(StageCompile, process, nil)
+			} else if wantReview {
 				emit(StageReview, process, nil)
 			} else if localDir == "" {
 				emit(StageCollect, 0.5+process*0.5, nil)
 			}
 		}))
 		prog, err := compileProductProject(ctx, cfg.Config, compileOpts...)
+		report(compileStage, err)
 		if err != nil {
-			return err
+			return finishScanProject(cfg, recorder, programName, err)
 		}
 		if wantReview {
 			emitStructResults(cfg, prog)
 			emit(StageReview, 1, nil)
 		}
+		if prog != nil {
+			if name := strings.TrimSpace(prog.GetProgramName()); name != "" {
+				programName = name
+			}
+		}
 		// SaveToDatabase closes the compile cache. SSA must load a DBRead
 		// program; scanning the closed DBWrite program skips every SSA rule.
 		cfg.Programs = append(cfg.Programs, reloadCompiledProgram(prog))
+		if compileOnly {
+			emit(StageCompile, 1, nil)
+		}
 		if localDir == "" {
 			emit(StageCollect, 1, nil)
 		}
 		hasProgram = true
 	} else if wantReview && hasLoaded {
 		emit(StageReview, 0, nil)
+		var reviewErr error
 		for _, prog := range cfg.Programs {
 			if err := scanLoadedProgramStruct(cfg, prog); err != nil {
-				return err
+				reviewErr = err
+				break
 			}
 			emitStructResults(cfg, prog)
+		}
+		report(StageReview, reviewErr)
+		if reviewErr != nil {
+			return finishScanProject(cfg, recorder, programName, reviewErr)
 		}
 		emit(StageReview, 1, nil)
 	}
@@ -147,8 +185,17 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		if wantAnalyze {
 			emit(StageAnalyze, 0, nil)
 		}
-		if err := StartScan(ctx, compiledProgramScanOptions(cfg, emit, runSource, wantAnalyze)...); err != nil {
-			return err
+		// One StartScan serves both remaining stages; a failure marks them all
+		// failed because the engine cannot attribute it to a single stage.
+		err := StartScan(ctx, compiledProgramScanOptions(cfg, emit, runSource, wantAnalyze)...)
+		if runSource {
+			report(StageInspect, err)
+		}
+		if wantAnalyze {
+			report(StageAnalyze, err)
+		}
+		if err != nil {
+			return finishScanProject(cfg, recorder, programName, err)
 		}
 		if runSource {
 			emit(StageInspect, 1, nil)
@@ -158,27 +205,75 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		}
 	}
 
-	if !wantSource && !wantReview && !wantAnalyze {
-		return StartScan(ctx, scanOptionsFromProjectConfig(cfg)...)
+	// No product stage selected and not a compile-only run: fall back to a
+	// plain scan over whatever targets the caller configured.
+	if !compileOnly && !wantSource && !wantReview && !wantAnalyze {
+		err := StartScan(ctx, scanOptionsFromProjectConfig(cfg)...)
+		if err != nil {
+			return finishScanProject(cfg, recorder, programName, err)
+		}
 	}
-	return nil
+	return finishScanProject(cfg, recorder, programName, nil)
 }
 
-func productModes(cfg *Config) (source, review, analyze bool) {
-	if cfg == nil || len(cfg.scanModes) == 0 {
-		return true, true, true
+// finishScanProject decides the aggregate result and publishes the terminal
+// ProjectResult. A project scan counts as successful when the source was
+// collected and at least one detection stage succeeded; later stage failures
+// stay visible through stage outcomes instead of turning an already-useful
+// result into a failed job.
+func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName string, err error) error {
+	result := ProjectResult{
+		Stages:      recorder.Outcomes(),
+		ProgramName: programName,
+		Succeeded:   recorder.Succeeded(),
 	}
+	if err != nil {
+		result.Error = err.Error()
+	}
+	if cfg != nil && cfg.projectResultCallback != nil {
+		cfg.projectResultCallback(result)
+	}
+	if err == nil {
+		return nil
+	}
+	if result.Succeeded {
+		return nil
+	}
+	return err
+}
+
+// productModeSelection is the resolved product intent for one ScanProject run.
+type productModeSelection struct {
+	source  bool
+	review  bool
+	analyze bool
+	// compileOnly persists IR without running any rule set. It is selected by
+	// passing no mode at all, so platforms can compile once and scan later.
+	compileOnly bool
+}
+
+// resolveProductModes maps the stacked mode list onto product stages. An empty
+// list means compile-only: collect source and persist IR, run no rules.
+func resolveProductModes(cfg *Config) productModeSelection {
+	if cfg == nil || cfg.ScanTaskCallback == nil || len(cfg.scanModes) == 0 {
+		return productModeSelection{compileOnly: true}
+	}
+	var selection productModeSelection
 	for _, m := range cfg.scanModes {
 		switch strings.ToLower(strings.TrimSpace(m)) {
 		case SourceMode:
-			source = true
+			selection.source = true
 		case StructMode:
-			review = true
+			selection.review = true
 		case SSAMode:
-			analyze = true
+			selection.analyze = true
 		}
 	}
-	return source, review, analyze
+	if !selection.source && !selection.review && !selection.analyze {
+		// Unrecognized values must not silently become compile-only.
+		return productModeSelection{source: true, review: true, analyze: true}
+	}
+	return selection
 }
 
 func compileRuleContent(raw string) (*schema.SyntaxFlowRule, error) {

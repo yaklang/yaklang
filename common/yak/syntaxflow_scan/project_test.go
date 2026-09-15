@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	_ "github.com/yaklang/yaklang/common/yak/ssa_compile"
@@ -26,6 +27,8 @@ func TestScanProject_CompilesAndRunsSourceFromSnapshot(t *testing.T) {
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("yak"),
 		ssaconfig.WithSetProgramName(t.Name()),
+		// Explicit mode: an empty mode list is compile-only.
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
 			Content: `desc(mode: "source", language: general, title: "scan-project source")
 ${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
@@ -43,6 +46,72 @@ alert $hit`,
 	require.Greater(t, alerts, 0)
 }
 
+// Compile-only runs persist IR and report the compile stage without executing
+// any rule set, so a platform can compile once and scan later.
+func TestScanProject_CompileOnlyReportsProgramName(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
+
+	// Unique name per run: a reused worktree-local IR DB must not make a stale
+	// program satisfy this test.
+	programName := fmt.Sprintf("%s-%s", t.Name(), uuid.NewString())
+	var result *syntaxflow_scan.ProjectResult
+	var stages []string
+	var alerts int
+	err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(programName),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: python, title: "must not run")
+eval(* as $arg) as $call
+alert $call`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		syntaxflow_scan.WithProjectResultCallback(func(r syntaxflow_scan.ProjectResult) {
+			copied := r
+			result = &copied
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.Succeeded, "compile-only run must succeed")
+	require.Equal(t, programName, result.ProgramName)
+	require.Empty(t, alerts, "compile-only must not execute rule sets")
+	require.Contains(t, stages, string(syntaxflow_scan.StageCompile))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
+
+	// The persisted IR must be reloadable by name: that is the contract a
+	// platform relies on to reuse a compile-only run for a later scan.
+	reloaded, reloadErr := ssaapi.FromDatabase(result.ProgramName)
+	require.NoError(t, reloadErr)
+	require.NotNil(t, reloaded, "compile-only must persist a reloadable program")
+	require.True(t, reloaded.IsFromDatabase(), "reloaded program must come from the IR DB")
+	require.Positive(t, reloaded.TotalLines(), "persisted IR must carry compiled source lines")
+
+	var reported []syntaxflow_scan.StageOutcome
+	for _, outcome := range result.Stages {
+		if outcome.Succeeded() {
+			reported = append(reported, outcome)
+		}
+	}
+	require.Len(t, reported, 2, "collect + compile are the only successful stages")
+	require.Equal(t, syntaxflow_scan.StageCollect, reported[0].Stage)
+	require.Equal(t, syntaxflow_scan.StageCompile, reported[1].Stage)
+}
+
 func TestScanProject_EmitsProductStages(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
@@ -53,6 +122,8 @@ func TestScanProject_EmitsProductStages(t *testing.T) {
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("python"),
 		ssaconfig.WithSetProgramName(t.Name()),
+		// Explicit mode: an empty mode list is compile-only.
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
 			Content: `desc(mode: "source", language: python, title: "stage source")
 ${*.py}.pattern_regex(/eval\s*\(/) as $hit
@@ -85,6 +156,8 @@ func TestScanProject_ExternalStructRule(t *testing.T) {
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("python"),
 		ssaconfig.WithSetProgramName(t.Name()),
+		// Explicit mode: an empty mode list is compile-only.
+		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
 			Content: `desc(
 	mode: "struct"
@@ -118,6 +191,8 @@ func TestScanProjectFromJSON_UsesConfigBlob(t *testing.T) {
 
 	var alerts int
 	err := syntaxflow_scan.ScanProjectFromJSON(context.Background(), raw,
+		// Explicit mode: an empty mode list is compile-only.
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
 			Content: `desc(mode: "source", language: general, title: "json source")
 ${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
@@ -258,6 +333,8 @@ func TestScanProject_TargetReloadsThenRunsSSA(t *testing.T) {
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("java"),
 		ssaconfig.WithSetProgramName(t.Name()),
+		// Explicit mode: an empty mode list is compile-only.
+		syntaxflow_scan.WithMode(syntaxflow_scan.SSAMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
 			Content: `desc(mode: "ssa", language: java, title: "target reload ssa")
 Runtime.getRuntime().exec(* as $cmd)
@@ -296,6 +373,8 @@ func TestScanProject_ProgramPathRunsStructWithoutCompile(t *testing.T) {
 	var stages []string
 	err = syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithProgramNames(t.Name()),
+		// Explicit mode: an empty mode list is compile-only.
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
 			Content: `desc(
 	mode: "struct"
