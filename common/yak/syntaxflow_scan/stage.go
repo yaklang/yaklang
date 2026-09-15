@@ -1,6 +1,10 @@
 package syntaxflow_scan
 
-import "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+import (
+	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+)
 
 // ProductStage is a product-facing scan phase. IDs stay stable for StatusCard
 // / CLI / gRPC; DisplayName is what operators see.
@@ -114,11 +118,19 @@ const (
 	StageStatusFailed    StageStatus = "failed"
 )
 
-// StageOutcome is the terminal result of one executed product stage.
+// StageOutcome is the terminal result of one executed product stage. Only
+// stages that actually ran are reported, so product surfaces can render
+// "successful stages only" without re-deriving what ran.
 type StageOutcome struct {
 	Stage  ProductStage `json:"stage"`
 	Status StageStatus  `json:"status"`
 	Error  string       `json:"error,omitempty"`
+	// DurationMs is the wall time this stage occupied. Absent when unknown.
+	DurationMs int64 `json:"duration_ms,omitempty"`
+	// RuleCount / RiskCount come from the stage's own process and result
+	// callbacks, so a reader gets one authoritative per-stage summary.
+	RuleCount int64 `json:"rule_count,omitempty"`
+	RiskCount int64 `json:"risk_count,omitempty"`
 }
 
 func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded }
@@ -128,9 +140,59 @@ func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded
 // whole run successful even when a sibling stage failed.
 type stageOutcomeRecorder struct {
 	outcomes []StageOutcome
+	started  map[ProductStage]time.Time
+	metrics  map[ProductStage]stageMetrics
 }
 
-func newStageOutcomeRecorder() *stageOutcomeRecorder { return &stageOutcomeRecorder{} }
+// stageMetrics accumulates what one stage actually did while it ran.
+type stageMetrics struct {
+	ruleCount int64
+	riskCount int64
+}
+
+func newStageOutcomeRecorder() *stageOutcomeRecorder {
+	return &stageOutcomeRecorder{
+		started: map[ProductStage]time.Time{},
+		metrics: map[ProductStage]stageMetrics{},
+	}
+}
+
+// enter marks a stage as running so its wall time can be reported once it
+// reaches a terminal state. Repeated calls keep the first timestamp, matching
+// the first progress callback the stage emits.
+func (r *stageOutcomeRecorder) enter(stage ProductStage) {
+	if r == nil {
+		return
+	}
+	if _, seen := r.started[stage]; !seen {
+		r.started[stage] = time.Now()
+	}
+}
+
+// observe folds one process callback into the running stage's counters.
+func (r *stageOutcomeRecorder) observe(stage ProductStage, info *RuleProcessInfoList) {
+	if r == nil || info == nil {
+		return
+	}
+	metrics := r.metrics[stage]
+	if info.TotalQuery > 0 {
+		metrics.ruleCount = info.TotalQuery
+	}
+	if info.RiskCount > 0 {
+		metrics.riskCount = info.RiskCount
+	}
+	r.metrics[stage] = metrics
+}
+
+// addRisk counts risks a stage streamed through the result callback.
+func (r *stageOutcomeRecorder) addRisk(stage ProductStage, count int64) {
+	if r == nil || count <= 0 {
+		return
+	}
+	metrics := r.metrics[stage]
+	metrics.riskCount += count
+	r.metrics[stage] = metrics
+}
 
 func (r *stageOutcomeRecorder) record(stage ProductStage, err error) {
 	if r == nil {
@@ -140,6 +202,15 @@ func (r *stageOutcomeRecorder) record(stage ProductStage, err error) {
 	if err != nil {
 		outcome.Status = StageStatusFailed
 		outcome.Error = err.Error()
+	}
+	if startedAt, ok := r.started[stage]; ok {
+		if elapsed := time.Since(startedAt).Milliseconds(); elapsed > 0 {
+			outcome.DurationMs = elapsed
+		}
+	}
+	if metrics, ok := r.metrics[stage]; ok {
+		outcome.RuleCount = metrics.ruleCount
+		outcome.RiskCount = metrics.riskCount
 	}
 	r.outcomes = append(r.outcomes, outcome)
 }

@@ -1752,10 +1752,15 @@ Exports structured report (sarif/irify).`,
 			}),
 		)
 
-		err = syntaxflow_scan.ScanProject(ctx, scanOpt...)
+		projectResult, err := syntaxflow_scan.ScanProject(ctx, scanOpt...)
 		if err != nil {
 			log.Errorf("scan failed: %s", err)
 			return err
+		}
+		for _, outcome := range projectResult.Stages {
+			log.Infof("[code-scan] stage %s (%s) status=%s duration_ms=%d rules=%d risks=%d",
+				outcome.Stage.DisplayName(), outcome.Stage, outcome.Status,
+				outcome.DurationMs, outcome.RuleCount, outcome.RiskCount)
 		}
 		return nil
 	},
