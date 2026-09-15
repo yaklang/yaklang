@@ -1,0 +1,4 @@
+report_text = cli.Text("report-text", cli.setVerboseName("运营数据"), cli.setHelp("直接粘贴运营日报、周报、月报正文或 JSON；与运营报告文件二选一"))
+report_file = cli.File("report-file", cli.setVerboseName("运营报告文件"), cli.setHelp("上传 JSON 或 XLSX 运营数据；与运营数据二选一"))
+query = cli.Text("query", cli.setVerboseName("补充要求"), cli.setDefault(""), cli.setHelp("可选：说明报告类型或关注重点，例如“按周报输出”“重点看事件工单”"))
+cli.check()

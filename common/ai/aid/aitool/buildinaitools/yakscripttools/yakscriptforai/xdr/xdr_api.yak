@@ -1,0 +1,315 @@
+__DESC__ = "XDR 开放接口统一查询工具。通过 action 区分两种操作：action=query_alerts 查询告警列表，action=get_intel 查询威胁情报。工具内部固定使用 POST 请求 XDR 开放接口，地址、鉴权头、参数转换、分页、毫秒时间戳归一化与 code/state 校验全部内置，AI 只传查询条件即可。告警查询传 start-time/end-time/alert-name/attack-ip/victim-ip/risk-level/handle-states/page-size/max-pages，时间留空默认拉取最近 5 小时；情报查询传 search-content。"
+__VERBOSE_NAME__ = "XDR OpenAPI Query Tool"
+__VERBOSE_NAME_ZH__ = "XDR 开放接口查询工具"
+__KEYWORDS__ = "xdr,alarm,alert,intel,ioc,threat intelligence,soar,siem,openapi,query,security"
+__USAGE__ = <<<USAGE_BLOCK
+XDR 开放接口统一查询工具。
+
+## 操作
+- `action=query_alerts`：查询告警列表，固定调用 POST {base}/maxs/rv/openapi/alarm/query。
+- `action=get_intel`：查询威胁情报，固定调用 POST {base}/maxs/intel/openapi/getIntel。
+
+## query_alerts 参数
+- `xdr-base-url`：平台地址，默认 https://10.21.17.218:8686，通常无需修改。
+- `xdr-token`：Bearer Token，默认 5a57ff89-e77e-46da-9172-9c1536c098c8，通常无需修改。
+- `start-time` / `end-time`：格式 yyyy-MM-dd HH:mm:ss；两者都留空时默认拉取最近 5 小时。
+- `alert-name`、`attack-ip`、`victim-ip`：筛选条件，可留空。
+- `risk-level`：威胁等级，逗号分隔字符串（如 "高危,超危"），可留空。
+- `handle-states`：处置状态，逗号分隔字符串（如 "-1,0"），可留空。
+- `page-size`：每页条数，默认 10，最大 1000。
+- `max-pages`：最大查询页数，默认 5。
+
+## get_intel 参数
+- `search-content`：要查询的 IOC 或攻击者 IP。
+
+## 输出
+工具返回 JSON：{ok, action, code, message, page_size, pages, total_rows, alerts[] 或 intel}。
+alerts 中每条已提取 SNOW_ID、ALERT_NAME、RISK_LEVEL、ALERT_DESC、ATTACKER_IP、VICTIM_IP、SRC_PORT、DST_PORT、PROTOCOL、DIRECTION、KILL_CHAIN、ATTCKLIST、PARENTUUID_S、ALERT_CAT_FIRST、ALERT_CAT_SECOND、HANDLE_RESULT、HANDLE_STATUS、DETECTION_ENGINE、IOC_RESOURCE、IOC_RISK_LEVEL、COUNT、MERGE_NUM、VICTIM_ASSET_NAME、ATTACKER_INFO、VICTIM_INFO，START_TIME/END_TIME 已由毫秒时间戳转为 yyyy-MM-dd HH:mm:ss。
+接口失败时返回 {ok:false, code, message}，不得把错误字段当作数据。
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// --- 参数 ---
+action = cli.String("action", cli.setVerboseName("操作"), cli.setDefault("query_alerts"), cli.setHelp("query_alerts 查询告警 / get_intel 查询情报"))
+xdrBaseUrl = cli.String("xdr-base-url", cli.setVerboseName("XDR 平台地址"), cli.setDefault("https://10.21.17.218:8686"), cli.setHelp("协议、IP 和端口，默认 https://10.21.17.218:8686"))
+xdrToken = cli.String("xdr-token", cli.setVerboseName("访问令牌"), cli.setDefault("5a57ff89-e77e-46da-9172-9c1536c098c8"), cli.setHelp("XDR Bearer Token，默认 5a57ff89-e77e-46da-9172-9c1536c098c8"))
+startTime = cli.String("start-time", cli.setVerboseName("起始时间"), cli.setDefault(""), cli.setHelp("格式 yyyy-MM-dd HH:mm:ss，留空默认最近 5 小时"))
+endTime = cli.String("end-time", cli.setVerboseName("结束时间"), cli.setDefault(""), cli.setHelp("格式 yyyy-MM-dd HH:mm:ss，留空默认当前时刻"))
+alertName = cli.String("alert-name", cli.setVerboseName("告警名称"), cli.setDefault(""), cli.setHelp("告警名称模糊查询，可留空"))
+attackIp = cli.String("attack-ip", cli.setVerboseName("攻击者 IP"), cli.setDefault(""), cli.setHelp("攻击者 IP 精确查询，可留空"))
+victimIp = cli.String("victim-ip", cli.setVerboseName("受害者 IP"), cli.setDefault(""), cli.setHelp("受害者 IP 精确查询，可留空"))
+riskLevel = cli.String("risk-level", cli.setVerboseName("威胁等级"), cli.setDefault(""), cli.setHelp("逗号分隔，例如 高危,超危，可留空"))
+handleStates = cli.String("handle-states", cli.setVerboseName("处置状态"), cli.setDefault(""), cli.setHelp("逗号分隔，例如 -1,0，可留空"))
+pageSize = cli.Int("page-size", cli.setVerboseName("每页条数"), cli.setDefault(10), cli.setHelp("最大 1000"))
+maxPages = cli.Int("max-pages", cli.setVerboseName("最大页数"), cli.setDefault(5), cli.setHelp("最多查询页数，避免请求过多"))
+searchContent = cli.String("search-content", cli.setVerboseName("情报检索内容"), cli.setDefault(""), cli.setHelp("get_intel 使用的 IOC 或攻击者 IP"))
+cli.check()
+
+// --- 工具函数 ---
+
+// 逗号分隔字符串（或 JSON 数组字符串）-> JSON 数组
+toStrArray = func(raw) {
+    if raw == "" || raw == nil {
+        return []
+    }
+    s = str.TrimSpace(sprint(raw))
+    if str.HasPrefix(s, "[") && str.HasSuffix(s, "]") {
+        try {
+            parsed = json.loads(s)
+            if parsed != nil {
+                return parsed
+            }
+        } catch e {}
+    }
+    out = []
+    for _, item := range str.Split(s, ",") {
+        item = str.TrimSpace(item)
+        if item != "" {
+            out.Push(item)
+        }
+    }
+    return out
+}
+
+// 逗号分隔字符串（或 JSON 数组字符串）-> 整数数组
+toIntArray = func(raw) {
+    if raw == "" || raw == nil {
+        return []
+    }
+    s = str.TrimSpace(sprint(raw))
+    if str.HasPrefix(s, "[") && str.HasSuffix(s, "]") {
+        try {
+            parsed = json.loads(s)
+            if parsed != nil {
+                return parsed
+            }
+        } catch e {}
+    }
+    out = []
+    for _, item := range str.Split(s, ",") {
+        item = str.TrimSpace(item)
+        if item != "" {
+            out.Push(int(item))
+        }
+    }
+    return out
+}
+
+// 毫秒时间戳 -> yyyy-MM-dd HH:mm:ss
+fmtMs = func(ms) {
+    if ms == nil {
+        return ""
+    }
+    try {
+        n = int64(float64(ms))
+        if n <= 0 {
+            return ""
+        }
+        return time.Unix(n/1000, (n%1000)*1000000).Format("2006-01-02 15:04:05")
+    } catch e {
+        return sprint(ms)
+    }
+}
+
+// 发送一个 POST JSON 请求，返回解析后的响应 map
+postJson = func(fullUrl, bodyMap) {
+    opts = [poc.timeout(15)]
+    autoHttps, packet, err := poc.ParseUrlToHTTPRequestRaw("POST", fullUrl)
+    if err != nil {
+        return {"err": sprintf("parse url failed: %v", err)}
+    }
+    // ParseUrlToHTTPRequestRaw 返回的报文是 origin-form，不含协议头；必须把 autoHttps
+    // 传回 HTTPEx，否则 https 地址会被当成明文 HTTP 发送
+    if autoHttps {
+        opts = append(opts, poc.https(true))
+    }
+    packet = poc.ReplaceHTTPPacketHeader(packet, "Content-Type", "application/json")
+    packet = poc.ReplaceHTTPPacketHeader(packet, "Authorization", sprintf("Bearer %v", xdrToken))
+    packet = poc.ReplaceHTTPPacketBody(packet, []byte(json.dumps(bodyMap)))
+    rspIns, _, err := poc.HTTPEx(packet, opts...)
+    if err != nil {
+        return {"err": sprintf("http request failed: %v", err)}
+    }
+    status = poc.GetStatusCodeFromResponse(rspIns.RawPacket)
+    body = poc.GetHTTPPacketBody(rspIns.RawPacket)
+    parsed = {}
+    try {
+        parsed = json.loads(string(body))
+    } catch e {
+        return {"err": sprintf("response not json (status %v): %v", status, e)}
+    }
+    parsed["_http_status"] = status
+    return parsed
+}
+
+// 从告警行提取字段并归一化时间
+normalizeAlert = func(row) {
+    get = func(k) {
+        v = row[k]
+        if v == nil {
+            return ""
+        }
+        return sprint(v)
+    }
+    return {
+        "SNOW_ID": get("SNOW_ID"),
+        "ALERT_NAME": get("ALERT_NAME"),
+        "RISK_LEVEL": get("RISK_LEVEL"),
+        "ALERT_DESC": get("ALERT_DESC"),
+        "ATTACKER_IP": get("ATTACKER_IP"),
+        "VICTIM_IP": get("VICTIM_IP"),
+        "SRC_PORT": get("SRC_PORT"),
+        "DST_PORT": get("DST_PORT"),
+        "PROTOCOL": get("PROTOCOL"),
+        "DIRECTION": get("DIRECTION"),
+        "KILL_CHAIN": get("KILL_CHAIN"),
+        "ATTCKLIST": get("ATTCKLIST"),
+        "PARENTUUID_S": get("PARENTUUID_S"),
+        "ALERT_CAT_FIRST": get("ALERT_CAT_FIRST"),
+        "ALERT_CAT_SECOND": get("ALERT_CAT_SECOND"),
+        "HANDLE_RESULT": get("HANDLE_RESULT"),
+        "HANDLE_STATUS": get("HANDLE_STATUS"),
+        "DETECTION_ENGINE": get("DETECTION_ENGINE"),
+        "IOC_RESOURCE": get("IOC_RESOURCE"),
+        "IOC_RISK_LEVEL": get("IOC_RISK_LEVEL"),
+        "COUNT": get("COUNT"),
+        "MERGE_NUM": get("MERGE_NUM"),
+        "VICTIM_ASSET_NAME": get("VICTIM_ASSET_NAME"),
+        "ATTACKER_INFO": get("ATTACKER_INFO"),
+        "VICTIM_INFO": get("VICTIM_INFO"),
+        "START_TIME": fmtMs(row["START_TIME"]),
+        "END_TIME": fmtMs(row["END_TIME"]),
+    }
+}
+
+// --- 主流程 ---
+
+if str.ToLower(str.TrimSpace(action)) == "get_intel" {
+    if searchContent == "" {
+        yakit.Error("get_intel 需要 search-content 参数")
+        return
+    }
+    url = sprintf("%v/maxs/intel/openapi/getIntel", str.TrimRight(xdrBaseUrl, "/"))
+    resp = postJson(url, {"searchContent": searchContent})
+    if resp["err"] != nil {
+        yakit.Error("getIntel 失败: %v", resp["err"])
+        return
+    }
+    code = resp["code"]
+    state = resp["state"]
+    if code != 200 || !(state == true || state == "true") {
+        yakit.Error("getIntel 返回异常: code=%v state=%v message=%v", code, state, resp["message"])
+        return
+    }
+    yakit.Info("XDR_INTEL_RESULT %v", json.dumps({"ok": true, "action": "get_intel", "search_content": searchContent, "intel": resp["data"]}))
+    return
+}
+
+// --- 查询告警 ---
+
+if pageSize <= 0 {
+    pageSize = 10
+}
+if pageSize > 1000 {
+    pageSize = 1000
+}
+if maxPages <= 0 {
+    maxPages = 5
+}
+
+now = time.Now()
+start = now.Add(time.ParseDuration("-5h")~)
+end = now
+if startTime != "" {
+    try {
+        parsed, err := time.Parse("2006-01-02 15:04:05", startTime)
+        if err == nil {
+            start = parsed
+        } else {
+            yakit.Warn("start-time 解析失败，使用默认最近 5 小时: %v", err)
+        }
+    } catch e {}
+}
+if endTime != "" {
+    try {
+        parsed, err := time.Parse("2006-01-02 15:04:05", endTime)
+        if err == nil {
+            end = parsed
+        } else {
+            yakit.Warn("end-time 解析失败，使用默认当前时刻: %v", err)
+        }
+    } catch e {}
+}
+
+body = {
+    "pageIndex": 1,
+    "pageSize": pageSize,
+    "startTime": start.Format("2006-01-02 15:04:05"),
+    "endTime": end.Format("2006-01-02 15:04:05"),
+}
+if alertName != "" {
+    body["alertName"] = alertName
+}
+if attackIp != "" {
+    body["attackIp"] = attackIp
+}
+if victimIp != "" {
+    body["victimIp"] = victimIp
+}
+if riskLevel != "" {
+    body["riskLevel"] = toStrArray(riskLevel)
+}
+if handleStates != "" {
+    body["handleStates"] = toIntArray(handleStates)
+}
+
+url = sprintf("%v/maxs/rv/openapi/alarm/query", str.TrimRight(xdrBaseUrl, "/"))
+alerts = []
+hasNext = true
+page = 0
+lastError = ""
+for hasNext {
+    page += 1
+    if page > maxPages {
+        break
+    }
+    body["pageIndex"] = page
+    resp = postJson(url, body)
+    if resp["err"] != nil {
+        lastError = resp["err"]
+        break
+    }
+    code = resp["code"]
+    state = resp["state"]
+    if code != 200 || !(state == true || state == "true") {
+        lastError = sprintf("code=%v state=%v message=%v", code, state, resp["message"])
+        break
+    }
+    data = resp["data"]
+    if data == nil {
+        data = {}
+    }
+    rowData = data["rowData"]
+    if rowData == nil {
+        rowData = []
+    }
+    for _, row := range rowData {
+        alerts.Push(normalizeAlert(row))
+    }
+    hasNext = data["hasNextPage"] == true
+}
+if lastError != "" && len(alerts) == 0 {
+    yakit.Error("告警查询失败: %v", lastError)
+    return
+}
+yakit.Info("XDR_ALERT_RESULT %v", json.dumps({
+    "ok": true,
+    "action": "query_alerts",
+    "code": 200,
+    "page_size": pageSize,
+    "pages": page,
+    "total_rows": len(alerts),
+    "error": lastError,
+    "alerts": alerts,
+}))

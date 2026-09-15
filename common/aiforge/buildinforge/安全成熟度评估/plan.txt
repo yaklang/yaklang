@@ -1,0 +1,1 @@
+{"@action":"plan","query":"-","main_task":"生成安全成熟度评估报告","main_task_goal":"读取评估材料并调用一次成熟度模型，输出分领域评级与改进建议。","tasks":[{"subtask_name":"对照指标完成评估","subtask_goal":"先完整解析 evidence-text 或读取 evidence-file，再调用一次 security_maturity_model_catalog，传入 standalone-tool=true、target=ops；依据文件证据对运营能力指标判定状态；输出总体级别、分领域评级、重点指标符合情况、证据缺口与改进建议；禁止无证据定高级别。"}]}

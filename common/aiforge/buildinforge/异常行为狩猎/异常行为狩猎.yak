@@ -1,0 +1,4 @@
+log_text = cli.Text("log-text", cli.setVerboseName("行为数据"), cli.setHelp("直接粘贴行为日志、外发记录或 JSON；与行为日志文件二选一"))
+log_file = cli.File("log-file", cli.setVerboseName("行为日志文件"), cli.setHelp("上传 JSON 或 XLSX 行为数据；与行为数据二选一"))
+query = cli.Text("query", cli.setVerboseName("补充要求"), cli.setDefault(""), cli.setHelp("可选：说明关注重点，例如“重点看远控和网盘外发”"))
+cli.check()

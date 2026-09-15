@@ -1,0 +1,1 @@
+{"@action":"plan","query":"-","main_task":"生成个性化安全意识宣贯内容","main_task_goal":"调用一次培训知识工具并直接生成最终材料。完整宣贯包必须包含九个规定部分、四个课程模块、至少四个岗位或作业案例、六道单选题、两道多选题、两道场景判断题及答案解析；事实性要求只能来自工具返回内容。","tasks":[{"subtask_name":"查询培训知识并生成完整材料","subtask_goal":"调用一次 security_awareness_training_catalog；依据 matrix、modules、generation_contract、岗位和作业计划生成最终正文；逐项检查完整性，满足全部数量与来源约束后结束。"}]}
