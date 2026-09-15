@@ -1,5 +1,3 @@
-//go:build !gzip_embed
-
 package coreplugin
 
 import (
@@ -12,7 +10,7 @@ import (
 var basePlugin embed.FS
 
 func InitEmbedFS() {
-	basePluginFS = resources_monitor.NewStandardResourceMonitor(basePlugin, ".yak")
+	basePluginFS = resources_monitor.NewStandardResourceMonitor(basePlugin, "")
 }
 
 func init() {

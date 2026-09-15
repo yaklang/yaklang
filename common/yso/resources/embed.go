@@ -1,13 +1,15 @@
-//go:build !gzip_embed
-
 package resources
 
 import (
 	"embed"
 
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
+
+// ysoXorKey 用于 XOR 编码嵌入的 static.tar.gz
+const ysoXorKey = "yaklang-yso-v1"
 
 //go:embed static
 var resourceFS embed.FS

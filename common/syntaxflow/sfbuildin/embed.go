@@ -1,5 +1,3 @@
-//go:build !gzip_embed && !irify_exclude
-
 package sfbuildin
 
 import (
@@ -26,7 +24,7 @@ var (
 )
 
 func InitEmbedFS() {
-	ruleFSWithHash = resources_monitor.NewStandardResourceMonitor(ruleFS, ".sf")
+	ruleFSWithHash = resources_monitor.NewStandardResourceMonitor(ruleFS, "")
 }
 
 func init() {

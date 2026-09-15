@@ -1,5 +1,3 @@
-//go:build !gzip_embed
-
 package aireact
 
 import (

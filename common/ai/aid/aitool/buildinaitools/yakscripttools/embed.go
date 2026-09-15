@@ -1,12 +1,11 @@
-//go:build !gzip_embed
-
 package yakscripttools
 
 import (
 	"embed"
 
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 //go:embed yakscriptforai
@@ -28,7 +27,7 @@ func (e *embedFSWithHash) GetHash() (string, error) {
 func InitEmbedFS() {
 	yakScriptFS = &embedFSWithHash{
 		FileSystem: filesys.NewEmbedFS(resourceFS),
-		fs:         resourceFS,
+		fs: resourceFS,
 	}
 }
 
