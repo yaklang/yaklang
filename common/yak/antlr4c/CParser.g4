@@ -285,7 +285,10 @@ declarationSpecifiers2
     ;
 
 declarationSpecifier
-    : (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
+    // Unexpanded declspec macros before a real type: `WEPOLL_EXPORT int foo()`.
+    // More specific than Identifier-as-typedef (`size_t n`), so it is listed first.
+    : Identifier+ (storageClassSpecifier | typeQualifier | functionSpecifier)* typeSpecifier typeQualifier*
+    | (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
         typeSpecifier
         | macroCallExpression
         | Identifier
@@ -418,10 +421,15 @@ declarator
 directDeclarator
     : Identifier declaratorSuffix*
     | macroCallExpression declaratorSuffix*  // Support macro calls as function names, e.g., ARRAY_RENAME(3d_array)(...)
+    // MSVC calling-convention pointers must precede '(' declarator ')'.
+    // Otherwise SLL treats `(__cdecl *_fn)` as '(' + vcSpecificModifer + Identifier
+    // and fails on '*'.
+    | '(' eos* vcSpecificModifer eos* declarator eos* ')' declaratorSuffix*
+    // Unexpanded WINAPI/NTAPI/CALLBACK: require '*' so `(foo)` stays a grouped name.
+    | '(' eos* Identifier eos* pointer directDeclarator eos* ')' declaratorSuffix*
     | '(' eos* declarator eos* ')' declaratorSuffix*
     | Identifier ':' eos* DigitSequence
     | vcSpecificModifer eos* Identifier declaratorSuffix*
-    | '(' eos* vcSpecificModifer eos* declarator eos* ')' declaratorSuffix*
     ;
 
 // Declarator suffix: array dimensions or function parameters

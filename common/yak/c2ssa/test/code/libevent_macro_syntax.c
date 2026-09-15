@@ -1,4 +1,13 @@
-/* Grammar coverage for unexpanded BSD queue/hash macros and unused-value casts. */
+/* Grammar coverage for unexpanded BSD queue/hash macros, unused-value casts,
+ * MSVC calling-convention function pointers, and declspec-like export macros.
+ */
+
+typedef void (__cdecl *_invalid_parameter_handler)(const wchar_t *, const wchar_t *, const wchar_t *, unsigned int, uintptr_t);
+typedef void (__cdecl *_PVFV)(void);
+typedef void (__cdecl * _PHNDLR)(int);
+typedef void (WINAPI *GetSystemTimePreciseAsFileTime_fn_t)(LPFILETIME);
+
+WEPOLL_EXPORT int epoll_wait(HANDLE ephnd, struct epoll_event *events, int maxevents, int timeout);
 
 static HT_HEAD(event_debug_map, event_debug_entry) global_debug_map = HT_INITIALIZER();
 LIST_HEAD(client_list, client_tcp_connection) client_connections;

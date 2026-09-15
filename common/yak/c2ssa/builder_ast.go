@@ -196,6 +196,18 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		kind = kinds[0]
 	}
 
+	// '(' Identifier pointer directDeclarator ')' — unexpanded WINAPI *name
+	if p := ast.Pointer(); p != nil {
+		if inner := ast.DirectDeclarator(); inner != nil {
+			variable, value, types := b.buildDirectDeclarator(inner.(*cparser.DirectDeclaratorContext), kind)
+			b.applyPointerModifiers(p.(*cparser.PointerContext), value)
+			for _, suffix := range ast.AllDeclaratorSuffix() {
+				variable, value, types = b.buildDeclaratorSuffix(suffix.(*cparser.DeclaratorSuffixContext), variable, value, types, kind)
+			}
+			return variable, value, types
+		}
+	}
+
 	// directDeclarator: Identifier declaratorSuffix*
 	if id := ast.Identifier(); id != nil {
 		// Identifier 本身只是一个名字，不根据 kind 创建值
@@ -942,9 +954,9 @@ func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifier
 	// 处理 typeSpecifier 或 Identifier
 	if ts := ast.TypeSpecifier(); ts != nil {
 		ret = b.buildTypeSpecifier(ts.(*cparser.TypeSpecifierContext))
-	} else if id := ast.Identifier(); id != nil {
-		// Identifier 可能是 typedef 定义的类型名
-		name := id.GetText()
+	} else if ids := ast.AllIdentifier(); len(ids) > 0 {
+		// Identifier 可能是 typedef 定义的类型名；declspec 宏在有 typeSpecifier 时已走上一支。
+		name := ids[len(ids)-1].GetText()
 		if bp := b.GetBluePrint(name); bp != nil {
 			container := bp.Container()
 			ret = container.GetType()
