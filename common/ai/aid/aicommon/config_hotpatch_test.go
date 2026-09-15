@@ -282,3 +282,105 @@ func TestHotPatch_ExecutionStrategy_NilStrategyNoOp(t *testing.T) {
 	})
 	require.Empty(t, opts, "nil Strategy should produce no options")
 }
+
+func TestHotPatch_ExecutionStrategy_WithDurationAndCriteria(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	c := NewTestConfig(ctx)
+	c.StartEventLoop(ctx)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableMultiAgent:        true,
+				EnableGoalMode:          true,
+				GoalMinIterations:       3,
+				MaxSubAgents:            5,
+				GoalDurationSeconds:     3600,
+				GoalAcceptanceCriteria:  "must produce at least 3 vulnerability findings with evidence",
+			},
+		},
+	})
+	time.Sleep(time.Second)
+
+	require.True(t, c.GetEnableGoalMode())
+	require.Equal(t, int64(3600), c.GetGoalDurationSeconds())
+	require.Equal(t, "must produce at least 3 vulnerability findings with evidence", c.GetGoalAcceptanceCriteria())
+
+	// Deadline should not be started yet (lazy start)
+	require.True(t, c.GetGoalDeadline().IsZero(), "deadline should be lazily started")
+
+	// Start deadline and check it's in the future
+	c.StartGoalDeadline()
+	deadline := c.GetGoalDeadline()
+	require.False(t, deadline.IsZero())
+	require.True(t, deadline.After(time.Now()))
+	require.False(t, c.IsGoalDeadlinePassed())
+}
+
+func TestHotPatch_ExecutionStrategy_NeverEndingDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	c := NewTestConfig(ctx)
+	c.StartEventLoop(ctx)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableGoalMode:      true,
+				GoalMinIterations:   3,
+				GoalDurationSeconds: -1, // never-ending
+			},
+		},
+	})
+	time.Sleep(time.Second)
+
+	require.Equal(t, int64(-1), c.GetGoalDurationSeconds())
+
+	c.StartGoalDeadline()
+	deadline := c.GetGoalDeadline()
+	require.False(t, deadline.IsZero())
+	// Far-future sentinel
+	require.True(t, deadline.Year() >= 9999)
+	require.False(t, c.IsGoalDeadlinePassed())
+}
+
+func TestHotPatch_ExecutionStrategy_PersistWithDurationAndCriteria(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sessionID := "session-strategy-duration-persist"
+	c := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
+	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
+		TimelineSessionID: sessionID,
+	})
+	require.NoError(t, err)
+	c.StartEventLoop(ctx)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableGoalMode:         true,
+				GoalMinIterations:      3,
+				GoalDurationSeconds:    1800,
+				GoalAcceptanceCriteria: "must complete code audit with risk ratings",
+			},
+		},
+	})
+	time.Sleep(time.Second)
+
+	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.NotNil(t, got.GetStrategy())
+	require.Equal(t, int64(1800), got.GetStrategy().GetGoalDurationSeconds())
+	require.Equal(t, "must complete code audit with risk ratings", got.GetStrategy().GetGoalAcceptanceCriteria())
+}

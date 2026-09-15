@@ -11353,9 +11353,16 @@ type AIExecutionStrategy struct {
 	GoalMinIterations int64 `protobuf:"varint,3,opt,name=GoalMinIterations,proto3" json:"GoalMinIterations,omitempty"`
 	// Multi 模式下子 Agent 最大并发数（同时运行数量）。
 	// <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
-	MaxSubAgents  int64 `protobuf:"varint,4,opt,name=MaxSubAgents,proto3" json:"MaxSubAgents,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MaxSubAgents int64 `protobuf:"varint,4,opt,name=MaxSubAgents,proto3" json:"MaxSubAgents,omitempty"`
+	// Goal 模式时间窗口（秒）。>0 时在时间窗口内无条件拒绝 finish；-1 表示永不自动放行。
+	// 0 或省略表示不启用时间窗口 gate，仅依赖迭代数和验收条件。
+	GoalDurationSeconds int64 `protobuf:"varint,5,opt,name=GoalDurationSeconds,proto3" json:"GoalDurationSeconds,omitempty"`
+	// Goal 模式验收条件。非空时，时间窗口过后（或未设时间窗口时）每次 finish
+	// 会通过 LLM review 检查当前产出是否满足此条件；不满足则拒绝退出并 feedback 缺失项。
+	// 留空表示不启用验收条件 gate。
+	GoalAcceptanceCriteria string `protobuf:"bytes,6,opt,name=GoalAcceptanceCriteria,proto3" json:"GoalAcceptanceCriteria,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AIExecutionStrategy) Reset() {
@@ -11414,6 +11421,20 @@ func (x *AIExecutionStrategy) GetMaxSubAgents() int64 {
 		return x.MaxSubAgents
 	}
 	return 0
+}
+
+func (x *AIExecutionStrategy) GetGoalDurationSeconds() int64 {
+	if x != nil {
+		return x.GoalDurationSeconds
+	}
+	return 0
+}
+
+func (x *AIExecutionStrategy) GetGoalAcceptanceCriteria() string {
+	if x != nil {
+		return x.GoalAcceptanceCriteria
+	}
+	return ""
 }
 
 type AITaskFilter struct {
@@ -78074,12 +78095,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Attach\x18. \x01(\bR\x06Attach\x12.\n" +
 	"\x12EnableDetachedPlan\x18/ \x01(\bR\x12EnableDetachedPlan\x124\n" +
 	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\x120\n" +
-	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\"\xbb\x01\n" +
+	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
 	"\x0eEnableGoalMode\x18\x02 \x01(\bR\x0eEnableGoalMode\x12,\n" +
 	"\x11GoalMinIterations\x18\x03 \x01(\x03R\x11GoalMinIterations\x12\"\n" +
-	"\fMaxSubAgents\x18\x04 \x01(\x03R\fMaxSubAgents\"\x9e\x01\n" +
+	"\fMaxSubAgents\x18\x04 \x01(\x03R\fMaxSubAgents\x120\n" +
+	"\x13GoalDurationSeconds\x18\x05 \x01(\x03R\x13GoalDurationSeconds\x126\n" +
+	"\x16GoalAcceptanceCriteria\x18\x06 \x01(\tR\x16GoalAcceptanceCriteria\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +

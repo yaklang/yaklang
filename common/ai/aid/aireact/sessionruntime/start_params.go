@@ -120,6 +120,15 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 			aicommon.WithEnableGoalMode(true),
 			aicommon.WithGoalMinIterations(goalMinIterations),
 		)
+		strategy := i.GetStrategy()
+		if strategy != nil {
+			if strategy.GetGoalDurationSeconds() != 0 {
+				opts = append(opts, aicommon.WithGoalDurationSeconds(strategy.GetGoalDurationSeconds()))
+			}
+			if strategy.GetGoalAcceptanceCriteria() != "" {
+				opts = append(opts, aicommon.WithGoalAcceptanceCriteria(strategy.GetGoalAcceptanceCriteria()))
+			}
+		}
 	}
 
 	if i.GetUserPresetPrompt() != "" {
