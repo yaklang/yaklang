@@ -1,0 +1,1 @@
+{"@action":"plan","query":"-","main_task":"生成安全事件响应编排方案","main_task_goal":"调用一次响应剧本工具并直接输出固定版式编排方案。","tasks":[{"subtask_name":"查询剧本并生成编排方案","subtask_goal":"调用一次 incident_response_playbook_catalog，传入 standalone-tool=true、target 与可选 current-phase；等待 status=completed 后，按指定版式输出事件定性、编排总览、分阶段动作、审批协同、证据保全与关闭条件；禁止再次调用工具，禁止声称已执行处置。"}]}

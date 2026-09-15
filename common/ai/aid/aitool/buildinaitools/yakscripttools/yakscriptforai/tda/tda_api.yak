@@ -1,0 +1,381 @@
+__DESC__ = "TDA (信桅高级威胁监测系统) 开放接口统一查询工具。通过 action 区分操作：query_alerts 查询实时告警、query_events 查询事件、query_attackers 查询攻击视角、query_asset_risks 查询资产风险、query_assets 查询资产列表、get_system_resource 查询设备资源。工具内部使用 HmacSHA256 签名认证并固定 POST 请求，地址、ApiKey、Secret、参数转换与分页全部内置，AI 只传查询条件即可。"
+__VERBOSE_NAME__ = "TDA OpenAPI Query Tool"
+__VERBOSE_NAME_ZH__ = "TDA 开放接口查询工具"
+__KEYWORDS__ = "tda,信桅,威胁监测,告警,事件,攻击者,资产风险,attck,network detection,query"
+__USAGE__ = <<<USAGE_BLOCK
+TDA (信桅高级威胁监测系统) 开放接口统一查询工具。仅查询，不执行任何写操作。
+
+## 操作
+- `action=query_alerts`：POST /ngtda/diagnosis/alert_list，查询实时告警
+- `action=query_events`：POST /ngtda/diagnosis/event_list，查询事件列表
+- `action=query_attackers`：POST /ngtda/attacker/list，查询攻击视角（攻击者画像）
+- `action=query_asset_risks`：POST /ngtda/asset_rating_v3/list，查询资产风险列表
+- `action=query_assets`：POST /ngtda/asset/list，查询资产管理列表
+- `action=get_system_resource`：POST /ngtda/dashboard/system_resource_overview，查询设备硬件资源使用信息
+
+## 通用参数
+- `tda-base-url`：平台地址，默认 https://172.17.20.51，通常无需修改
+- `tda-api-key`：API Key，从 TDA 管理台 API 联动页面获取
+- `tda-secret`：API Secret，与 ApiKey 配对获取
+- `time-window`：人类可读时间窗口，优先于 time-type/start-time/end-time（推荐，时间戳由工具内部精确换算）：
+  `today`=今日（time-type=1）；`7d`/`3d`/`30d`=最近 N 天；`24h`/`2h`=最近 N 小时；`30m`=最近 N 分钟
+- `time-type`：时间类型，1今日 / 2最近7日 / 3最近14日 / 4最近30日 / 5自定义时间，默认 1（今日）
+- `start-time` / `end-time`：Unix 秒时间戳（10位），time-type=5 时生效；end-time 超过当前时间会被截断为当前时间
+- `page`：页码，默认 1，max-pages>1 时作为起始页
+- `limit`：每页条数，默认 10，最大 100
+- `max-pages`：自动翻页页数，默认 1 不翻页；传 N（1-10）时工具自动从 page 起连续拉 N 页并合并结果；
+  返回的 data 中额外带 total（全量总数）、pages_fetched（实际拉取页数）、items_fetched（实际拉取条数）、
+  has_more（是否还有未拉取数据）。研判查询建议传 limit=100、max-pages=5~10
+
+## query_alerts 额外参数（格式：字段=值，多个用逗号分隔）
+- `severity`：威胁等级，0x1低危 0x2中危 0x3高危 0x4超危，逗号分隔如 "0x3,0x4"
+- `attack-res`：攻击结果，0侦察 1失败 2成功 3攻陷，逗号分隔如 "2,3"
+- `confidence-level`：置信度，1低 2中 3高，逗号分隔如 "3"
+- `attck-tac`：ATT&CK 战术编号，逗号分隔
+- `attck-tec`：ATT&CK 技术编号，逗号分隔如 "T1557,T1530"
+- `detected-source`：检测来源，1流量检测 2文件检测 3威胁情报，逗号分隔
+- `mine-host`：挖矿主机 IP，逗号分隔
+- `file-hash-md5`：恶意文件 MD5，逗号分隔
+
+## 输出
+工具返回 JSON：{ok, action, code, message, data}，data 内含结果数组与 total。
+query_alerts/query_events 的结果数组为 data.alarm_list；query_attackers/query_asset_risks 的结果数组为 data.ar_list。
+接口失败时返回 {ok:false, code, message}，不得把错误字段当作数据。
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// --- 参数 ---
+action = cli.String("action", cli.setVerboseName("操作"), cli.setDefault("query_alerts"), cli.setHelp("query_alerts 实时告警 / query_events 事件 / query_attackers 攻击视角 / query_asset_risks 资产风险 / query_assets 资产列表 / get_system_resource 设备资源"))
+// ============ 环境配置（DEMO 默认值，替换真实环境时只改这三个 setDefault）============
+// demo: 指向本地 tda-mock 服务（/Users/ws/Downloads/产品接口文档/tda-mock，python3 mock_server.py 8687）
+// 真实环境: https://172.17.20.51 + 管理台「API联动页面」申请的 ApiKey/Secret
+tdaBaseUrl = cli.String("tda-base-url", cli.setVerboseName("TDA 平台地址"), cli.setDefault("http://127.0.0.1:8687"), cli.setHelp("协议、IP 和端口；demo 默认指向本地 mock（8687），生产替换为 https://172.17.20.51"))
+tdaApiKey = cli.String("tda-api-key", cli.setVerboseName("API Key"), cli.setDefault("WIliwrBel9UojXJo5mLUInnMAbcHBmMk"), cli.setHelp("TDA ApiKey；demo 使用 mock 密钥，生产替换为管理台 API 联动页面申请的真实值"))
+tdaSecret = cli.String("tda-secret", cli.setVerboseName("API Secret"), cli.setDefault("dpgGjIH6eBmqr7eUPGhVD04dmDRNKFYE"), cli.setHelp("TDA Secret，与 ApiKey 配对；demo 使用 mock 密钥，生产替换为真实值"))
+// ============================== 环境配置结束 ==============================
+timeType = cli.Int("time-type", cli.setVerboseName("时间类型"), cli.setDefault(1), cli.setHelp("1今日 2最近7日 3最近14日 4最近30日 5自定义时间；优先用 time-window 参数"))
+startTime = cli.Int("start-time", cli.setVerboseName("起始时间戳"), cli.setDefault(0), cli.setHelp("Unix 秒时间戳，time-type=5 时生效；优先用 time-window 参数避免手工换算"))
+endTime = cli.Int("end-time", cli.setVerboseName("结束时间戳"), cli.setDefault(0), cli.setHelp("Unix 秒时间戳，time-type=5 时生效；优先用 time-window 参数避免手工换算"))
+timeWindow = cli.String("time-window", cli.setVerboseName("时间窗口"), cli.setDefault(""), cli.setHelp("人类可读时间窗口，优先于 time-type/start-time/end-time：today=今日 / 7d / 3d / 24h / 12h / 2h / 30m 等格式（数字+单位 d/h/m），工具内部用当前时间换算成精确时间戳，避免手工计算出错"))
+page = cli.Int("page", cli.setVerboseName("页码"), cli.setDefault(1), cli.setHelp("从 1 开始，max-pages>1 时作为起始页"))
+limit = cli.Int("limit", cli.setVerboseName("每页条数"), cli.setDefault(10), cli.setHelp("默认 10，最大 100"))
+maxPages = cli.Int("max-pages", cli.setVerboseName("自动翻页页数"), cli.setDefault(1), cli.setHelp("默认 1 不翻页；传 N 时工具自动从 page 开始连续拉 N 页并合并结果（1-10），返回中带 total/pages_fetched/items_fetched/has_more"))
+
+// query_alerts 筛选参数（逗号分隔字符串 -> {"value":[...],"op":"default"}）
+severity = cli.String("severity", cli.setVerboseName("威胁等级"), cli.setDefault(""), cli.setHelp("0x1低危 0x2中危 0x3高危 0x4超危，逗号分隔如 0x3,0x4"))
+attackRes = cli.String("attack-res", cli.setVerboseName("攻击结果"), cli.setDefault(""), cli.setHelp("0侦察 1失败 2成功 3攻陷，逗号分隔如 2,3"))
+confidenceLevel = cli.String("confidence-level", cli.setVerboseName("置信度"), cli.setDefault(""), cli.setHelp("1低 2中 3高，逗号分隔如 3"))
+attckTac = cli.String("attck-tac", cli.setVerboseName("ATT&CK战术"), cli.setDefault(""), cli.setHelp("战术编号，逗号分隔"))
+attckTec = cli.String("attck-tec", cli.setVerboseName("ATT&CK技术"), cli.setDefault(""), cli.setHelp("技术编号，逗号分隔如 T1557,T1530"))
+detectedSource = cli.String("detected-source", cli.setVerboseName("检测来源"), cli.setDefault(""), cli.setHelp("1流量检测 2文件检测 3威胁情报，逗号分隔"))
+mineHost = cli.String("mine-host", cli.setVerboseName("挖矿主机"), cli.setDefault(""), cli.setHelp("挖矿主机 IP，逗号分隔"))
+fileHashMd5 = cli.String("file-hash-md5", cli.setVerboseName("文件MD5"), cli.setDefault(""), cli.setHelp("恶意文件 MD5，逗号分隔"))
+
+cli.check()
+
+if tdaApiKey == "" || tdaSecret == "" {
+    yakit.Error("缺少 tda-api-key 或 tda-secret 参数（从 TDA 管理台 API 联动页面获取）")
+    return
+}
+if limit <= 0 {
+    limit = 10
+}
+if limit > 100 {
+    limit = 100
+}
+if page <= 0 {
+    page = 1
+}
+if maxPages <= 0 {
+    maxPages = 1
+}
+if maxPages > 10 {
+    maxPages = 10
+}
+if timeType <= 0 {
+    timeType = 1
+}
+
+// --- time-window 换算：AI 只传人话，时间戳由工具内部生成（避免 LLM 心算时间戳出错）---
+// today -> time_type=1；Nd/Nh/Nm -> time_type=5 + [now-N, now]
+if timeWindow != "" {
+    tw = str.ToLower(str.TrimSpace(timeWindow))
+    now = int(time.Now().Unix())
+    if tw == "today" {
+        timeType = 1
+    } else {
+        numStr = ""
+        unit = ""
+        for _, ch := range tw {
+            if str.Contains("0123456789", string(ch)) {
+                numStr += string(ch)
+            } else {
+                unit += string(ch)
+            }
+        }
+        n = int(numStr)
+        seconds = 0
+        if unit == "d" { seconds = n * 86400 }
+        if unit == "h" { seconds = n * 3600 }
+        if unit == "m" { seconds = n * 60 }
+        if seconds > 0 && now > seconds {
+            timeType = 5
+            startTime = now - seconds
+            endTime = now
+        }
+    }
+}
+// 兜底：end-time 超过当前时间则截断为当前时间；start-time 晚于 end-time 则报错
+nowSec = int(time.Now().Unix())
+if timeType == 5 && endTime > nowSec {
+    endTime = nowSec
+}
+if timeType == 5 && startTime > 0 && endTime > 0 && startTime >= endTime {
+    yakit.Error("start-time 必须早于 end-time（start=%v end=%v）；建议改用 time-window 参数（如 time-window=7d），由工具自动换算时间戳", startTime, endTime)
+    return
+}
+
+// --- 工具函数 ---
+
+// 逗号分隔字符串 -> 字符串数组
+toStrList = func(raw) {
+    out = []
+    if raw == "" || raw == nil {
+        return out
+    }
+    for _, item := range str.Split(sprint(raw), ",") {
+        item = str.TrimSpace(item)
+        if item != "" {
+            out.Push(item)
+        }
+    }
+    return out
+}
+
+// 逗号分隔字符串 -> 整数数组
+toIntList = func(raw) {
+    out = []
+    if raw == "" || raw == nil {
+        return out
+    }
+    for _, item := range str.Split(sprint(raw), ",") {
+        item = str.TrimSpace(item)
+        if item != "" {
+            out.Push(int(item))
+        }
+    }
+    return out
+}
+
+// 生成带签名的完整 URL：Sign = Base64URLSafe(hex(HmacSHA256(Timestamp+ApiKey, Secret)))
+// 注意：TDA 要求先取 HMAC 的十六进制字符串，再对该字符串做 Base64（与官方测试脚本一致）
+buildSignedUrl = func(path) {
+    ts = sprint(int(time.Now().Unix()))
+    signData = ts + tdaApiKey
+    mac = codec.HmacSha256(tdaSecret, signData)
+    macHex = codec.EncodeToHex(mac)
+    sign = codec.EncodeBase64Url(macHex)
+    // Base64URLSafe 需带 padding，补回 EncodeBase64Url 省略的 '='
+    pad = (4 - (len(sign) % 4)) % 4
+    sign = sign + str.Repeat("=", pad)
+    return sprintf("%v%v?api_key=%v&auth_timestamp=%v&sign=%v",
+        str.TrimRight(tdaBaseUrl, "/"), path,
+        codec.EscapeQueryUrl(tdaApiKey), ts, codec.EscapeQueryUrl(sign))
+}
+
+// 发送 POST JSON 请求，返回解析后的响应 map
+postJson = func(path, bodyMap) {
+    url = buildSignedUrl(path)
+    autoHttps, packet, err := poc.ParseUrlToHTTPRequestRaw("POST", url)
+    if err != nil {
+        return {"err": sprintf("parse url failed: %v", err)}
+    }
+    opts = [poc.timeout(15)]
+    if autoHttps {
+        opts = append(opts, poc.https(true))
+    }
+    packet = poc.ReplaceHTTPPacketHeader(packet, "Content-Type", "application/json")
+    packet = poc.ReplaceHTTPPacketBody(packet, []byte(json.dumps(bodyMap)))
+    rspIns, _, err := poc.HTTPEx(packet, opts...)
+    if err != nil {
+        return {"err": sprintf("http request failed: %v", err)}
+    }
+    status = poc.GetStatusCodeFromResponse(rspIns.RawPacket)
+    body = poc.GetHTTPPacketBody(rspIns.RawPacket)
+    parsed = {}
+    try {
+        parsed = json.loads(string(body))
+    } catch e {
+        return {"err": sprintf("response not json (status %v): %v", status, e)}
+    }
+    parsed["_http_status"] = status
+    return parsed
+}
+
+// 基础分页请求体
+// 注意：必须用空 map（map[string]interface{}）；字面量 {"time_type": timeType,...} 会被推断成
+// map[string]int，后续塞入字符串字段（如 time_limit）会触发 "cannot convert string to int" panic
+baseBody = func(pageNo) {
+    body = {}
+    body["time_type"] = timeType
+    body["page"] = pageNo
+    body["limit"] = limit
+    if timeType == 5 {
+        if startTime > 0 && endTime > 0 {
+            body["time_limit"] = sprintf("%v,%v", startTime, endTime)
+        }
+    }
+    return body
+}
+
+// 自动翻页执行器：从 page 开始连续拉 maxPages 页，合并列表字段，附加分页元数据
+// listKey 为响应中的列表字段名（alarm_list / ar_list 等）
+fetchWithPaging = func(path, bodyBuilder, listKey) {
+    items = []
+    total = -1
+    pagesFetched = 0
+    lastResp = {}
+    for i := 0; i < maxPages; i++ {
+        pageNo = page + i
+        body = bodyBuilder(pageNo)
+        resp = postJson(path, body)
+        if resp["err"] != nil {
+            return {"err": sprintf("第 %v 页请求失败: %v", pageNo, resp["err"])}
+        }
+        lastResp = resp
+        pagesFetched = pagesFetched + 1
+        // TDA 响应结构：{res, message, data:{total, alarm_list/ar_list}}
+        // 注意：yak 中 map 值为 0/""/false 时 `!= nil` 也为 false，须用值存在性判断
+        inner = resp["data"]
+        if inner == nil { inner = {} }
+        tv = inner["total"]
+        if tv != 0 || str.Contains(sprintf("%v", inner), `"total"`) {
+            total = int(tv)
+        }
+        lst = inner[listKey]
+        if lst == nil { lst = [] }
+        for _, item := range lst {
+            items.Push(item)
+        }
+        // 已拉满 total 则提前停止
+        if total >= 0 && len(items) >= total {
+            break
+        }
+        // 空页提前停止
+        if len(lst) == 0 {
+            break
+        }
+    }
+    hasMore = false
+    if total >= 0 && len(items) < total {
+        hasMore = true
+    }
+    // 构造合并结果：保留原始响应外层字段 + 合并列表 + 分页元数据
+    out = {}
+    for k, v := range lastResp {
+        out[k] = v
+    }
+    if out["data"] == nil { out["data"] = {} }
+    out["data"][listKey] = items
+    out["data"]["total"] = total
+    out["data"]["pages_fetched"] = pagesFetched
+    out["data"]["items_fetched"] = len(items)
+    out["data"]["has_more"] = hasMore
+    out["data"]["page_from"] = page
+    out["data"]["page_to"] = page + pagesFetched - 1
+    return out
+}
+
+// 主流程：按 action 路由
+actionLower = str.ToLower(str.TrimSpace(action))
+
+if actionLower == "get_system_resource" {
+    resp = postJson("/ngtda/dashboard/system_resource_overview", {})
+    if resp["err"] != nil {
+        yakit.Error("get_system_resource 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TDA_SYSTEM_RESOURCE %v", json.dumps({"ok": true, "action": "get_system_resource", "data": resp}))
+    return
+}
+
+if actionLower == "query_alerts" {
+    buildBody = func(pageNo) {
+        body = baseBody(pageNo)
+        if severity != "" {
+            body["severity"] = {"value": toStrList(severity), "op": "default"}
+        }
+        if attackRes != "" {
+            body["attack_res"] = {"value": toIntList(attackRes), "op": "default"}
+        }
+        if confidenceLevel != "" {
+            body["confidence_level"] = {"value": toIntList(confidenceLevel), "op": "default"}
+        }
+        if attckTac != "" {
+            body["attck_tac"] = {"value": toStrList(attckTac), "op": "default"}
+        }
+        if attckTec != "" {
+            body["attck_tec"] = {"value": toStrList(attckTec), "op": "default"}
+        }
+        if detectedSource != "" {
+            body["detected_source"] = {"value": toIntList(detectedSource), "op": "default"}
+        }
+        if mineHost != "" {
+            body["mine_host"] = {"value": toStrList(mineHost), "op": "default"}
+        }
+        if fileHashMd5 != "" {
+            body["file_hash_md5"] = {"value": toStrList(fileHashMd5), "op": "default"}
+        }
+        return body
+    }
+    resp = fetchWithPaging("/ngtda/diagnosis/alert_list", buildBody, "alarm_list")
+    if resp["err"] != nil {
+        yakit.Error("query_alerts 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TDA_ALERT_RESULT %v", json.dumps({"ok": true, "action": "query_alerts", "data": resp}))
+    return
+}
+
+if actionLower == "query_events" {
+    resp = fetchWithPaging("/ngtda/diagnosis/event_list", baseBody, "alarm_list")
+    if resp["err"] != nil {
+        yakit.Error("query_events 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TDA_EVENT_RESULT %v", json.dumps({"ok": true, "action": "query_events", "data": resp}))
+    return
+}
+
+if actionLower == "query_attackers" {
+    resp = fetchWithPaging("/ngtda/attacker/list", baseBody, "ar_list")
+    if resp["err"] != nil {
+        yakit.Error("query_attackers 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TDA_ATTACKER_RESULT %v", json.dumps({"ok": true, "action": "query_attackers", "data": resp}))
+    return
+}
+
+if actionLower == "query_asset_risks" {
+    resp = fetchWithPaging("/ngtda/asset_rating_v3/list", baseBody, "ar_list")
+    if resp["err"] != nil {
+        yakit.Error("query_asset_risks 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TDA_ASSET_RISK_RESULT %v", json.dumps({"ok": true, "action": "query_asset_risks", "data": resp}))
+    return
+}
+
+if actionLower == "query_assets" {
+    resp = fetchWithPaging("/ngtda/asset/list", baseBody, "ar_list")
+    if resp["err"] != nil {
+        yakit.Error("query_assets 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TDA_ASSET_RESULT %v", json.dumps({"ok": true, "action": "query_assets", "data": resp}))
+    return
+}
+
+yakit.Error("不支持的操作: %v，支持的操作: query_alerts, query_events, query_attackers, query_asset_risks, query_assets, get_system_resource", action)

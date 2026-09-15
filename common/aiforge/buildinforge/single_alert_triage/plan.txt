@@ -1,0 +1,1 @@
+{"@action":"plan","query":"-","main_task":"生成威胁分析报告","main_task_goal":"自动识别单告警或文件模式，完成证据校验、威胁研判和处置建议。","tasks":[{"subtask_name":"读取并研判告警","subtask_goal":"直接输入时完整分析单条告警；上传文件时读取全部可识别记录，电子表格或结构化数组调用一次 alert_noise_reduction_compute，输出统计、聚合事件、重点明细和证据缺口；不得只处理第一条，不得虚构字段或处置结果。"}]}
