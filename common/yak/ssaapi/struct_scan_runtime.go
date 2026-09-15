@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -335,4 +336,126 @@ func (p *Program) StructScanTaskID() string {
 		return ""
 	}
 	return p.config.structScan.taskID
+}
+
+// ScanProgramStruct runs mode=struct rules on an already-compiled program.
+// Each application/library is a separate unit: matches stay inside that
+// program and do not cross into other applications or libraries.
+func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
+	if p == nil || p.Program == nil {
+		return utils.Error("nil program")
+	}
+	cfg := p.config
+	if cfg == nil {
+		cfg = &Config{}
+		p.config = cfg
+	}
+	if cfg.Config == nil {
+		sc, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(p.GetProgramName()))
+		if err != nil {
+			return err
+		}
+		cfg.Config = sc
+	}
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(cfg.Config); err != nil {
+			return err
+		}
+	}
+	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
+	s := cfg.ensureStructScan()
+	if !s.wantsScan() {
+		return nil
+	}
+	if err := s.resolveRules(); err != nil {
+		return err
+	}
+	if len(s.rules) == 0 {
+		log.Warnf("[struct_scan] no struct rules loaded for program %s", p.GetProgramName())
+		return nil
+	}
+	units := programStructUnits(p)
+	if len(units) == 0 {
+		log.Warnf("[struct_scan] program %s has no application/library unit", p.GetProgramName())
+		return nil
+	}
+	for _, unit := range units {
+		if unit == nil {
+			continue
+		}
+		s.ScanStruct(p, unit)
+	}
+	s.persistAfterProgramMeta(p)
+	return nil
+}
+
+func programStructUnits(prog *Program) []*ssa.CompileUnit {
+	if prog == nil || prog.Program == nil {
+		return nil
+	}
+	app := prog.Program.GetApplication()
+	if app == nil {
+		app = prog.Program
+	}
+	if len(app.CompileUnits) > 0 {
+		return app.CompileUnits
+	}
+	var units []*ssa.CompileUnit
+	if app.UpStream != nil {
+		app.UpStream.ForEach(func(name string, lib *ssa.Program) bool {
+			if lib == nil || lib.ProgramKind != ssa.Library {
+				return true
+			}
+			files := libraryUnitFiles(app, name, lib)
+			if len(files) == 0 {
+				return true
+			}
+			units = append(units, &ssa.CompileUnit{
+				Key:      "library:" + name,
+				Files:    files,
+				Language: lib.Language,
+			})
+			return true
+		})
+	}
+	if len(units) > 0 {
+		return units
+	}
+	files := fileListKeys(app)
+	if len(files) == 0 {
+		return nil
+	}
+	return []*ssa.CompileUnit{{
+		Key:      "application:" + app.GetProgramName(),
+		Files:    files,
+		Language: app.Language,
+	}}
+}
+
+func libraryUnitFiles(app *ssa.Program, name string, lib *ssa.Program) []string {
+	if app != nil && app.LibraryFile != nil {
+		if files := append([]string(nil), app.LibraryFile[name]...); len(files) > 0 {
+			sort.Strings(files)
+			return files
+		}
+	}
+	return fileListKeys(lib)
+}
+
+func fileListKeys(prog *ssa.Program) []string {
+	if prog == nil || len(prog.FileList) == 0 {
+		return nil
+	}
+	files := make([]string, 0, len(prog.FileList))
+	for path := range prog.FileList {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		files = append(files, path)
+	}
+	sort.Strings(files)
+	return files
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -30,8 +31,12 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 //	cli/script → syntaxflow-scan → (ssa-compile → yak 编译脚本 | syntaxflow)
 //
 // gRPC SyntaxFlowScan stays on Scan: the frontend compiles first, then scans.
-// Project input: live source inspect → compile+struct review → SSA analyze.
-// Program input: IrSource inspect → stored/program struct review → SSA analyze.
+//
+// code-scan runs all three modes by default:
+//   - source: live local FS (-t) or IrSource snapshot (-p)
+//   - struct: compile-time unit scan (-t) or intra application/library scan (-p, no compile)
+//   - ssa: always on a DB-loaded program (-t reloads after SaveToDatabase)
+//
 // Stages: 收集代码 → 代码检测 → 语义检测 → 深度分析.
 // Mode is selected by WithMode (stacked); default is source+struct+ssa.
 func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
@@ -110,11 +115,13 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 		if err != nil {
 			return err
 		}
-		cfg.Programs = append(cfg.Programs, prog)
 		if wantReview {
 			emitStructResults(cfg, prog)
 			emit(StageReview, 1, nil)
 		}
+		// SaveToDatabase closes the compile cache. SSA must load a DBRead
+		// program; scanning the closed DBWrite program skips every SSA rule.
+		cfg.Programs = append(cfg.Programs, reloadCompiledProgram(prog))
 		if localDir == "" {
 			emit(StageCollect, 1, nil)
 		}
@@ -122,14 +129,16 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	} else if wantReview && hasLoaded {
 		emit(StageReview, 0, nil)
 		for _, prog := range cfg.Programs {
+			if err := scanLoadedProgramStruct(cfg, prog); err != nil {
+				return err
+			}
 			emitStructResults(cfg, prog)
 		}
 		emit(StageReview, 1, nil)
 	}
 
-	// Already-compiled programs (gRPC/program name) must use one StartScan so
-	// clients keep a single task ID. Source rules attach via IrSource; SSA
-	// rules run on the program. After a live inspect, only SSA remains.
+	// -p / reloaded -t: one StartScan. Source attaches via IrSource; SSA runs
+	// on the program. After a live inspect, only SSA remains.
 	if hasProgram && (wantAnalyze || (wantSource && !inspectedLive)) {
 		runSource := wantSource && !inspectedLive
 		if runSource {
@@ -268,6 +277,30 @@ func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...
 	return CompileProject(ctx, cfg, extra...)
 }
 
+func reloadCompiledProgram(prog *ssaapi.Program) *ssaapi.Program {
+	if prog == nil || prog.Program == nil {
+		return prog
+	}
+	if prog.Program.DatabaseKind == ssa.ProgramCacheMemory {
+		return prog
+	}
+	if strings.TrimSpace(prog.GetProgramName()) == "" {
+		return prog
+	}
+	return ssaapi.ReloadProgramFromDatabase(prog)
+}
+
+func scanLoadedProgramStruct(cfg *Config, prog *ssaapi.Program) error {
+	if prog == nil {
+		return nil
+	}
+	opts := structCompileOptions(cfg)
+	if len(opts) == 0 {
+		return nil
+	}
+	return prog.ScanProgramStruct(opts...)
+}
+
 func loadNamedPrograms(cfg *Config) error {
 	if cfg == nil {
 		return utils.Errorf("scan config is nil")
@@ -338,7 +371,10 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 }
 
 func inspectLiveSourceOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {
-	opts := programScanOptions(cfg)
+	opts := sharedScanCallbackOptions(cfg)
+	if cfg != nil && len(cfg.QueryTargets) > 0 {
+		opts = append(opts, WithQueryTargets(cfg.QueryTargets...))
+	}
 	opts = append(opts,
 		ssaconfig.WithRuleFilterMode(string(schema.SFR_MODE_SOURCE)),
 		WithProcessCallback(wrapStageProcess(cfg, StageInspect, emit)),
@@ -355,7 +391,15 @@ func analyzeOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessIn
 }
 
 func compiledProgramScanOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList), wantSource, wantAnalyze bool) []ssaconfig.Option {
-	opts := programScanOptions(cfg)
+	opts := sharedScanCallbackOptions(cfg)
+	if cfg != nil {
+		if len(cfg.Programs) > 0 {
+			opts = append(opts, WithPrograms(cfg.Programs...))
+		}
+		if names := cfg.GetProgramNames(); len(names) > 0 {
+			opts = append(opts, ssaconfig.WithProgramNames(names...))
+		}
+	}
 	if wantSource {
 		opts = append(opts, WithCompiledSource(true))
 	}

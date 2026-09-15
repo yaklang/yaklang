@@ -183,6 +183,47 @@ alert $hit
 	require.Contains(t, err.Error(), "QueryWithStruct only accepts struct rules")
 }
 
+func TestScanProgramStructFromDatabase(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("a/app.py", "def f(x):\n    eval(x)\n")
+	progName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+
+	progs, err := ParseProjectWithFS(vf,
+		WithLanguage(ssaconfig.PYTHON),
+		WithProgramName(progName),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, progs)
+
+	loaded, err := FromDatabase(progName)
+	require.NoError(t, err)
+	require.NoError(t, loaded.ScanProgramStruct(WithStructRuleRaw(`
+desc(
+	mode: "struct"
+	language: "python"
+	title: "db struct eval"
+)
+eval(* as $arg) as $call
+alert $call for {
+	title: "eval"
+}
+`)))
+	require.GreaterOrEqual(t, len(loaded.StructScanResults()), 1)
+	found := false
+	for _, res := range loaded.StructScanResults() {
+		if res == nil {
+			continue
+		}
+		for _, name := range res.GetAlertVariables() {
+			if len(res.GetValues(name)) > 0 {
+				found = true
+			}
+		}
+	}
+	require.True(t, found, "struct scan on a DB-loaded program must hit eval")
+}
+
 func TestStructScanPythonEval(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("a/app.py", "def f(x):\n    eval(x)\n")
