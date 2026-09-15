@@ -1237,6 +1237,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		return nil
 	}
 	event.SourceStatistics = meta.SourceStatistics
+	event.ScanStages = meta.ScanStages
 	if err := reporter.PublishSSAArtifactReady(event); err != nil {
 		return err
 	}
@@ -1372,6 +1373,7 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 
 type ssaResultMeta struct {
 	SourceStatistics json.RawMessage
+	ScanStages       json.RawMessage
 	ProgramName      string
 	TotalLines       int64
 	RiskCount        int64
@@ -1390,6 +1392,12 @@ func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
 
 	if statistics := dataMap["source_statistics"]; statistics != nil {
 		meta.SourceStatistics, _ = json.Marshal(statistics)
+	}
+	// Product stage outcomes come straight from syntaxflow.ScanProject through
+	// the script. Persisting them with the artifact keeps the scan list and
+	// diagnostics page reading one authoritative "what ran" answer.
+	if stages := dataMap["stages"]; stages != nil {
+		meta.ScanStages, _ = json.Marshal(stages)
 	}
 	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
 		utils.MapGetFirstRaw(dataMap, "program_name", "programName", "ProgramName"),
@@ -1415,6 +1423,9 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 	// Add risk/file/flow counts
 	if len(event.SourceStatistics) > 0 && json.Valid(event.SourceStatistics) {
 		merged["source_statistics"] = event.SourceStatistics
+	}
+	if len(event.ScanStages) > 0 && json.Valid(event.ScanStages) {
+		merged["scan_stages"] = event.ScanStages
 	}
 	merged["risk_count"] = event.RiskCount
 	merged["file_count"] = event.FileCount
