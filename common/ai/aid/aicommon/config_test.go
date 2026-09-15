@@ -361,3 +361,4 @@ func TestConfig_CreateOrUpdateRuntimeRecord_Disabled(t *testing.T) {
 	require.NoError(t, config.GetDB().Model(&schema.AIAgentRuntime{}).Where("uuid = ?", runtimeUUID).Count(&count).Error)
 	require.Zero(t, count)
 }
+

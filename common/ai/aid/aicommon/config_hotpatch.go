@@ -96,6 +96,10 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"EnablePlan":                  c.GetEnablePlanAndExec(),
 		"SyncPerceptionTrigger":       c.GetSyncPerceptionTrigger(),
 		"EnabledCapabilities":         c.GetEnabledCapabilities(),
+		"EnableMultiAgent":            c.GetPreferDispatchSubReactAgents(),
+		"EnableGoalMode":              c.GetEnableGoalMode(),
+		"GoalMinIterations":           c.GetGoalMinIterations(),
+		"MaxSubAgents":                c.GetMaxSubAgents(),
 	}
 }
 
@@ -108,6 +112,7 @@ var (
 	HotPatchType_EnablePlan                  = "EnablePlan"
 	HotPatchType_AllowPlanUserInteract       = "AllowPlanUserInteract"
 	HotPatchType_SyncPerceptionTrigger       = "SyncPerceptionTrigger"
+	HotPatchType_ExecutionStrategy          = "ExecutionStrategy"
 
 	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
 		mgr := aiconfig.GetGlobalManager()
@@ -234,6 +239,26 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 			"model info is now auto-detected from the actual AI gateway call")
 	}
 
+
+	if e.HotpatchType == HotPatchType_ExecutionStrategy {
+		strategy := hotPatchParams.GetStrategy()
+		if strategy == nil {
+			return aiOption
+		}
+		// Sub-agents run in pureInvokerMode and never start the HotPatchLoop,
+		// so hotpatch options only execute on the top-level Config. The
+		// "sub-agent cannot call sub-agent" invariant is already enforced by
+		// ConvertConfigToOptions (which omits EnableDispatchSubReactAgents /
+		// PreferDispatchSubReactAgents / MaxSubAgents) and by
+		// buildSubAgentStrategyOptions (which explicitly sets them to false).
+		// No additional guard is needed here.
+		aiOption = append(aiOption,
+			WithEnableMultiAgentMode(strategy.GetEnableMultiAgent()),
+			WithEnableGoalMode(strategy.GetEnableGoalMode()),
+			WithGoalMinIterations(strategy.GetGoalMinIterations()),
+			WithMaxSubAgents(strategy.GetMaxSubAgents()),
+		)
+	}
 	return aiOption
 }
 
@@ -295,6 +320,12 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 			return base, false
 		}
 		next.AIModelName = p.GetAIModelName()
+	case HotPatchType_ExecutionStrategy:
+		incoming := p.GetStrategy()
+		if incoming == nil {
+			return base, false
+		}
+		next.Strategy = proto.Clone(incoming).(*ypb.AIExecutionStrategy)
 	default:
 		return base, false
 	}
