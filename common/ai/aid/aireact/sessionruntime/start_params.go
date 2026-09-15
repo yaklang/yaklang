@@ -142,9 +142,9 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 		opts = append(opts, aicommon.WithEnabledCapabilities(caps...))
 	}
 
-	if i.GetDisableMemoryTriage() {
-		opts = append(opts, aicommon.WithDisableMemoryTriage(true))
-	}
+	// 记忆 triage 后端强制禁用（本次需求：默认关闭记忆，不构建/入库/检索记忆）。
+	// 前端将来如需开启，需显式解除此处强制并恢复按 proto 值传参。
+	opts = append(opts, aicommon.WithDisableMemoryTriage(true))
 
 	return opts
 }

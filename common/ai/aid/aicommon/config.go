@@ -298,7 +298,7 @@ type Config struct {
 
 	// triage
 	MemoryTriage        MemoryTriage
-	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
+	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认 true（即默认禁用，除非前端显式传 false 启用）
 
 	// Deprecated: retained for source compatibility; timeline archives are no longer written or recalled.
 	TimelineArchiveStore TimelineArchiveStore
@@ -715,6 +715,7 @@ func newConfig(ctx context.Context) *Config {
 		EnableFunctionCallMode:             true,  // 默认开启原生 functioncall 模式
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
+		DisableMemoryTriage:                true, // 默认禁用记忆 triage，除非前端显式传 DisableMemoryTriage=false 启用
 		m:                                  new(sync.Mutex),
 		InitStatus:                         initStatus,
 		AiCallTokenLimit:                   40 * 1024, // Default to 40 k
