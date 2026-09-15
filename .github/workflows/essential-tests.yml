@@ -22,8 +22,9 @@ on:
       - "common/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
-      - "scripts/ci/test-yak-startup.sh"
-      - "scripts/ci/test-ipc-smoke.ps1"
+      # The suite/runner scripts below drive this workflow, so a change to them
+      # must exercise it; otherwise a broken edit merges without ever running.
+      - "scripts/ci/**"
       - "go.mod"
 
 concurrency:
