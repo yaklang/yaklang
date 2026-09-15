@@ -46,6 +46,14 @@ func (b *astbuilder) applyBuiltinCast(ast *cparser.BuiltinCastTypeContext, value
 		}
 	}
 	value = b.ensureValue(value)
+	existingType := value.GetType()
+	// Same skip as buildCastExpression. Always emitting TypeCast for
+	// `(int*)malloc(...)` splits the heap pointer's SSA identity and
+	// loop-local alloc/free is reported as UAF.
+	if !utils.IsNil(existingType) && (ssa.TypeEqual(existingType, typ) ||
+		(existingType.GetTypeKind() == ssa.PointerKind && typ != nil && typ.GetTypeKind() == ssa.PointerKind)) {
+		return value
+	}
 	if casted := b.EmitTypeCast(value, typ); !utils.IsNil(casted) {
 		return casted
 	}

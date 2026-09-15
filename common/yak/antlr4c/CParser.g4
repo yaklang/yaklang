@@ -585,10 +585,11 @@ statement
 
 // BSD queue/hash foreach macros (LIST_FOREACH, TAILQ_FOREACH, ...) expand to
 // `for (...) stmt`. Unexpanded they look like a call followed by a body.
-// Body is not `statement` (which includes lone `;`) so `foo(x);` stays an
-// expressionStatement.
+// Do not use `eos*` after `)`: `eos` includes Semi, which would let
+// `malloc(x); *p = 1;` parse as a foreach whose body is the next statement.
+// Newlines/comments (EOS) between `)` and the body are still allowed.
 macroIterationStatement
-    : Identifier '(' eos* macroArgumentList? eos* ')' eos* (
+    : Identifier '(' eos* macroArgumentList? eos* ')' EOS* (
         compoundStatement
         | selectionStatement
         | iterationStatement
@@ -697,13 +698,16 @@ translationUnit
     : (externalDeclaration ws*)+
     ;
 
+// declaration / functionDefinition must precede a bare declarationSpecifier.
+// Otherwise `extern int foo(int);` is split into specifier `extern int` plus
+// leftover `foo(int)` (macroCallExpression) and never creates Function-foo.
 externalDeclaration
-    : declarationSpecifier
-    | functionDefinition
+    : functionDefinition
     | declaration
     | macroCallExpression  // Allow macro calls like FUN(fmin, double, <) at top level
     | macroCallStatement  // Allow macro calls without parentheses at top level (e.g., FF_DISABLE_DEPRECATION_WARNINGS)
     | Semi
+    | declarationSpecifier
     ;
 
 // Macro call expression: function call that may contain operators as arguments

@@ -184,8 +184,12 @@ func TestC_SLLBailDiagnostic(t *testing.T) {
 		}
 	}
 	t.Logf("total=%d, SLL-bailed(fallback to LL)=%d: %v", len(fixtures), len(bailedList), bailedList)
-	if len(bailedList) > 12 {
-		t.Fatalf("SLL bail regression: got %d bailed fixtures, baseline is 12", len(bailedList))
+	// 12 was the pre-macro/builtin-cast baseline. Keyword casts, BSD
+	// foreach macros, and libevent_macro_syntax.c add SLL conflicts;
+	// those files still parse via LL fallback.
+	const sllBailBaseline = 17
+	if len(bailedList) > sllBailBaseline {
+		t.Fatalf("SLL bail regression: got %d bailed fixtures, baseline is %d", len(bailedList), sllBailBaseline)
 	}
 }
 
