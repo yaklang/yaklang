@@ -59,9 +59,12 @@ type VerificationTodoItem struct {
 	Reason         string      `json:"reason,omitempty"`
 	Refs           []string    `json:"refs,omitempty"`
 
-	CreatedTs      int64 `json:"created_ts,omitempty"`
-	FocusStartedTs int64 `json:"focus_started_ts,omitempty"`
-	ClosedTs       int64 `json:"closed_ts,omitempty"`
+	CreatedTs       int64 `json:"created_ts,omitempty"`
+	FocusStartedTs  int64 `json:"focus_started_ts,omitempty"`
+	ClosedTs        int64 `json:"closed_ts,omitempty"`
+	SurvivalSeconds int64 `json:"survival_seconds,omitempty"`
+	FocusSeconds    int64 `json:"focus_seconds,omitempty"`
+	AgeSeconds      int64 `json:"age_seconds,omitempty"`
 }
 
 func (i VerificationTodoItem) scope() VerificationTodoScope {
@@ -75,19 +78,24 @@ type TodoOpenItem struct {
 	UpdatedAt      int    `json:"updated_at"`
 	CreatedTs      int64  `json:"created_ts,omitempty"`
 	FocusStartedTs int64  `json:"focus_started_ts,omitempty"`
+	FocusSeconds   int64  `json:"focus_seconds,omitempty"`
+	AgeSeconds     int64  `json:"age_seconds,omitempty"`
 }
 
 type TodoClosedItem struct {
-	ID             string      `json:"id"`
-	Text           string      `json:"text"`
-	Outcome        TodoOutcome `json:"outcome"`
-	Reason         string      `json:"reason"`
-	Refs           []string    `json:"refs"`
-	CreatedAt      int         `json:"created_at"`
-	UpdatedAt      int         `json:"updated_at"`
-	CreatedTs      int64       `json:"created_ts,omitempty"`
-	FocusStartedTs int64       `json:"focus_started_ts,omitempty"`
-	ClosedTs       int64       `json:"closed_ts,omitempty"`
+	ID              string      `json:"id"`
+	Text            string      `json:"text"`
+	Outcome         TodoOutcome `json:"outcome"`
+	Reason          string      `json:"reason"`
+	Refs            []string    `json:"refs"`
+	CreatedAt       int         `json:"created_at"`
+	UpdatedAt       int         `json:"updated_at"`
+	CreatedTs       int64       `json:"created_ts,omitempty"`
+	FocusStartedTs  int64       `json:"focus_started_ts,omitempty"`
+	ClosedTs        int64       `json:"closed_ts,omitempty"`
+	SurvivalSeconds int64       `json:"survival_seconds,omitempty"`
+	FocusSeconds    int64       `json:"focus_seconds,omitempty"`
+	AgeSeconds      int64       `json:"age_seconds,omitempty"`
 }
 
 type TodoScopeState struct {
@@ -818,80 +826,85 @@ func SanitizeVerificationTodoMarkdownContent(content string) string {
 }
 
 // nowTs returns the current unix timestamp in seconds. It is the single
-// injection point for wall-clock time in the todo store so that tests can
-// monkey-patch it if needed via build tags.
+// injection point for wall-clock time in the todo store.
 func nowTs() int64 {
 	return time.Now().Unix()
 }
 
-// TodoLifecycle captures the derived duration information for a single TODO
-// item at emit time. All durations are in seconds.
-//
-//   - SurvivalSeconds: time from creation to closure (closed_ts - created_ts).
-//     Zero when the todo is still open.
-//   - FocusSeconds: time spent in DOING state. For a still-open DOING todo
-//     this is (now - focus_started_ts); for a closed todo that was ever
-//     focused this is (closed_ts - focus_started_ts). Zero when the todo was
-//     never selected as current.
-//   - AgeSeconds: time since creation (now - created_ts).
-type TodoLifecycle struct {
-	CreatedTs       int64 `json:"created_ts,omitempty"`
-	FocusStartedTs  int64 `json:"focus_started_ts,omitempty"`
-	ClosedTs        int64 `json:"closed_ts,omitempty"`
-	SurvivalSeconds int64 `json:"survival_seconds,omitempty"`
-	FocusSeconds    int64 `json:"focus_seconds,omitempty"`
-	AgeSeconds      int64 `json:"age_seconds,omitempty"`
+// nonNeg clamps a duration to zero if clock skew produced a negative value.
+func nonNeg(v int64) int64 {
+	if v < 0 {
+		return 0
+	}
+	return v
 }
 
-// ComputeTodoLifecycle derives the TodoLifecycle for a VerificationTodoItem
-// given the current wall-clock timestamp. It is called at emit time so that
-// open items reflect up-to-the-second durations.
-func ComputeTodoLifecycle(item VerificationTodoItem, now int64) TodoLifecycle {
-	lc := TodoLifecycle{
-		CreatedTs:      item.CreatedTs,
-		FocusStartedTs: item.FocusStartedTs,
-		ClosedTs:       item.ClosedTs,
+// enrichItemLifecycle fills SurvivalSeconds, FocusSeconds and AgeSeconds
+// directly onto a VerificationTodoItem using the given wall-clock reference.
+//   - AgeSeconds:      now - created_ts (all statuses)
+//   - FocusSeconds:    now - focus_started_ts (DOING); closed_ts - focus_started_ts (closed)
+//   - SurvivalSeconds: closed_ts - created_ts (closed only)
+func enrichItemLifecycle(item *VerificationTodoItem, now int64) {
+	if item == nil {
+		return
 	}
 	if item.CreatedTs > 0 {
-		lc.AgeSeconds = now - item.CreatedTs
-		if lc.AgeSeconds < 0 {
-			lc.AgeSeconds = 0
-		}
+		item.AgeSeconds = nonNeg(now - item.CreatedTs)
 	}
 	switch item.Status {
-	case VerificationTodoStatusPending:
-		// not focused yet
 	case VerificationTodoStatusDoing:
 		if item.FocusStartedTs > 0 {
-			lc.FocusSeconds = now - item.FocusStartedTs
-			if lc.FocusSeconds < 0 {
-				lc.FocusSeconds = 0
-			}
+			item.FocusSeconds = nonNeg(now - item.FocusStartedTs)
 		}
 	case VerificationTodoStatusDone, VerificationTodoStatusDeleted, VerificationTodoStatusSkipped:
 		if item.ClosedTs > 0 {
 			if item.CreatedTs > 0 {
-				lc.SurvivalSeconds = item.ClosedTs - item.CreatedTs
-				if lc.SurvivalSeconds < 0 {
-					lc.SurvivalSeconds = 0
-				}
+				item.SurvivalSeconds = nonNeg(item.ClosedTs - item.CreatedTs)
 			}
 			if item.FocusStartedTs > 0 {
-				lc.FocusSeconds = item.ClosedTs - item.FocusStartedTs
-				if lc.FocusSeconds < 0 {
-					lc.FocusSeconds = 0
-				}
+				item.FocusSeconds = nonNeg(item.ClosedTs - item.FocusStartedTs)
 			}
 		}
 	}
-	return lc
 }
 
-// ComputeTodoLifecycleBatch maps ComputeTodoLifecycle over a slice of items.
-func ComputeTodoLifecycleBatch(items []VerificationTodoItem, now int64) []TodoLifecycle {
-	out := make([]TodoLifecycle, 0, len(items))
-	for _, item := range items {
-		out = append(out, ComputeTodoLifecycle(item, now))
+// EnrichItemsLifecycle fills lifecycle duration fields in-place on a slice
+// of VerificationTodoItem using the current wall-clock time.
+func EnrichItemsLifecycle(items []VerificationTodoItem, now int64) {
+	for i := range items {
+		enrichItemLifecycle(&items[i], now)
 	}
-	return out
+}
+
+// enrichOpenItemLifecycle fills FocusSeconds and AgeSeconds directly onto a
+// TodoOpenItem. For a non-current (PENDING) open item FocusSeconds stays zero.
+func enrichOpenItemLifecycle(item *TodoOpenItem, isCurrent bool, now int64) {
+	if item == nil {
+		return
+	}
+	if item.CreatedTs > 0 {
+		item.AgeSeconds = nonNeg(now - item.CreatedTs)
+	}
+	if isCurrent && item.FocusStartedTs > 0 {
+		item.FocusSeconds = nonNeg(now - item.FocusStartedTs)
+	}
+}
+
+// enrichClosedItemLifecycle fills SurvivalSeconds, FocusSeconds and
+// AgeSeconds directly onto a TodoClosedItem.
+func enrichClosedItemLifecycle(item *TodoClosedItem, now int64) {
+	if item == nil {
+		return
+	}
+	if item.CreatedTs > 0 {
+		item.AgeSeconds = nonNeg(now - item.CreatedTs)
+	}
+	if item.ClosedTs > 0 {
+		if item.CreatedTs > 0 {
+			item.SurvivalSeconds = nonNeg(item.ClosedTs - item.CreatedTs)
+		}
+		if item.FocusStartedTs > 0 {
+			item.FocusSeconds = nonNeg(item.ClosedTs - item.FocusStartedTs)
+		}
+	}
 }
