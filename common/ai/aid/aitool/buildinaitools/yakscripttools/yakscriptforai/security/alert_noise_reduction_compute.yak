@@ -1,0 +1,912 @@
+alertData = cli.String("alert-data", cli.setVerboseName("告警数据"), cli.setHelp("统一结构的JSON数组或包含alerts字段的JSON对象"), cli.setDefault(""))
+filePath = cli.String("file-path", cli.setVerboseName("告警文件路径"), cli.setHelp("XLSX或XLS文件路径，工具内部直接解析"), cli.setDefault(""))
+hasHeader = cli.String("has-header", cli.setVerboseName("是否包含表头"), cli.setHelp("auto、true或false"), cli.setDefault("auto"))
+columnMap = cli.String("column-map", cli.setVerboseName("列映射"), cli.setHelp("可选JSON对象，统一字段对应一开始的列序号或表头名称"), cli.setDefault(""))
+maxRows = cli.String("max-rows", cli.setVerboseName("最大读取行数"), cli.setHelp("默认10000"), cli.setDefault("10000"))
+windowMinutes = cli.String("window-minutes", cli.setVerboseName("聚合窗口"), cli.setHelp("聚合时间窗口，单位为分钟"), cli.setDefault("60"))
+groupFields = cli.String("group-fields", cli.setVerboseName("聚合字段"), cli.setHelp("逗号分隔，支持rule_id、source_ip、destination_ip、destination_port、indicator、host、user"), cli.setDefault("rule_id,source_ip,destination_ip,destination_port,indicator"))
+standaloneTool = cli.Bool("standalone-tool", cli.setVerboseName("人工智能工具模式"), cli.setDefault(false))
+
+fieldAliases = {
+    "alert_id": ["alert_id", "event_id", "log_id", "id"],
+    "alert_name": ["alert_name", "event_name", "rule_name", "name", "threat_desc", "威胁名称", "告警名称"],
+    "rule_id": ["rule_id", "signature_id", "sub_threat_type", "threat_type", "威胁情报ioc/规则id", "规则ID"],
+    "source_ip": ["source_ip", "src_ip", "src_addr_v4", "src_addr", "real_src", "源IP", "攻击IP"],
+    "destination_ip": ["destination_ip", "dst_ip", "dst_addr_v4", "dst_addr", "目的IP", "受害IP"],
+    "source_port": ["source_port", "src_port", "源端口"],
+    "destination_port": ["destination_port", "dst_port", "目的端口"],
+    "host": ["host", "hostname", "host_name", "device_name"],
+    "user": ["user", "username", "account", "user_name"],
+    "indicator": ["indicator", "ioc", "ioc_resource", "ioc_ptn_content"],
+    "event_time": ["event_time", "alert_time", "timestamp", "time", "Logtime", "最近发生时间", "告警时间"],
+    "severity": ["severity", "level", "risk_level", "severity_name", "威胁级别", "告警级别"],
+    "asset_criticality": ["asset_criticality", "asset_level", "asset_importance"],
+    "privileged": ["privileged", "is_privileged", "high_privilege"],
+    "threat_intel_hit": ["threat_intel_hit", "ioc_hit", "intel_hit"],
+    "historical_verdict": ["historical_verdict", "analyst_verdict", "review_result", "人工结论", "研判结论"],
+    "whitelist_hit": ["whitelist_hit", "is_whitelisted", "white_list", "白名单命中"],
+    "behavior_evidence": ["behavior_evidence", "attack_evidence", "execution_evidence", "行为证据"],
+    "confidence": ["confidence", "detect_confidence", "置信度"],
+    "attack_result": ["attack_result", "attack_res", "攻击结果"],
+    "request_headers": ["request_headers", "request_header", "请求头"],
+    "request_body": ["request_body", "请求体"],
+    "response_headers": ["response_headers", "response_header", "响应头"],
+    "response_body": ["response_body", "响应体"],
+    "source_ref": ["source_ref", "source", "file", "row"],
+}
+
+toText = func(value) {
+    if value == nil {
+        return ""
+    }
+    return str.TrimSpace(string(value))
+}
+
+pickFirst = func(record, aliases) {
+    for _, key = range aliases {
+        value = record[key]
+        text = toText(value)
+        if text != "" && text != "<nil>" {
+            return text
+        }
+    }
+    return ""
+}
+
+normalizeBool = func(value) {
+    text = str.ToLower(toText(value))
+    return text == "true" || text == "1" || text == "yes" || text == "是" || text == "命中"
+}
+
+normalizeSeverity = func(value) {
+    text = str.ToLower(toText(value))
+    if text == "critical" || text == "严重" || text == "致命" || text == "4" || text == "5" {
+        return "严重", 90
+    }
+    if text == "high" || text == "高" || text == "高危" || text == "3" {
+        return "高危", 70
+    }
+    if text == "medium" || text == "middle" || text == "中" || text == "中危" || text == "2" {
+        return "中危", 45
+    }
+    if text == "low" || text == "低" || text == "低危" || text == "1" {
+        return "低危", 20
+    }
+    return "信息", 10
+}
+
+normalizeAlert = func(record, index) {
+    normalized = make(map[string]any)
+    for field, aliases = range fieldAliases {
+        normalized[field] = pickFirst(record, aliases)
+    }
+    severity, baseScore = normalizeSeverity(normalized["severity"])
+    normalized["severity"] = severity
+    normalized["base_risk_score"] = baseScore
+    normalized["privileged"] = normalizeBool(pickFirst(record, fieldAliases["privileged"]))
+    normalized["threat_intel_hit"] = normalizeBool(pickFirst(record, fieldAliases["threat_intel_hit"]))
+    normalized["whitelist_hit"] = normalizeBool(pickFirst(record, fieldAliases["whitelist_hit"]))
+    normalized["input_index"] = index
+    normalized["raw_record"] = record
+    if normalized["alert_id"] == "" {
+        normalized["alert_id"] = sprintf("INPUT-%06d", index)
+    }
+    if normalized["alert_name"] == "" {
+        normalized["alert_name"] = "未命名告警"
+    }
+    return normalized
+}
+
+isMapValue = func(value) {
+    if value == nil {
+        return false
+    }
+    typeName = typeof(value).String()
+    return str.HasPrefix(typeName, "map[") || str.Contains(typeName, "orderedmap.OrderedMap")
+}
+
+isSliceValue = func(value) {
+    if value == nil {
+        return false
+    }
+    return str.HasPrefix(typeof(value).String(), "[]")
+}
+
+parseAlertData = func(raw) {
+    text = str.TrimSpace(raw)
+    if text == "" {
+        return nil, error("告警数据不能为空")
+    }
+    lowerText = str.ToLower(text)
+    if str.HasPrefix(text, "/") || str.HasPrefix(lowerText, "file://") || str.HasSuffix(lowerText, ".xlsx") || str.HasSuffix(lowerText, ".xls") || str.HasSuffix(lowerText, ".csv") || str.HasSuffix(lowerText, ".tsv") || str.HasSuffix(lowerText, ".json") || str.HasSuffix(lowerText, ".jsonl") || str.HasSuffix(lowerText, ".txt") || str.HasSuffix(lowerText, ".log") {
+        return nil, error("alert-data收到文件路径；必须先由Forge读取文件并转换为JSON告警数组")
+    }
+
+    if str.Contains(text, "}\n{") || str.Contains(text, "}\r\n{") {
+        lineRecords = []
+        for _, line = range str.Split(str.ReplaceAll(text, "\r\n", "\n"), "\n") {
+            lineText = str.TrimSpace(line)
+            if lineText == "" {
+                continue
+            }
+            lineRecord = nil
+            try {
+                lineRecord = json.loads(lineText)
+            } catch err {
+                return nil, error("逐行JSON包含无法解析的记录")
+            }
+            if !isMapValue(lineRecord) {
+                return nil, error("逐行JSON的每一行必须是对象")
+            }
+            lineRecords.Append(lineRecord)
+        }
+        return lineRecords, nil
+    }
+
+    decoded = nil
+    decodeError = nil
+    try {
+        decoded = json.loads(text)
+    } catch err {
+        decodeError = err
+    }
+    if decodeError == nil {
+        if isSliceValue(decoded) {
+            return decoded, nil
+        }
+        if isMapValue(decoded) {
+            alerts = decoded["alerts"]
+            if isSliceValue(alerts) {
+                return alerts, nil
+            }
+            return [decoded], nil
+        }
+        return nil, error("告警数据顶层必须是JSON数组或JSON对象")
+    }
+
+    records = []
+    for _, line = range str.Split(text, "\n") {
+        lineText = str.TrimSpace(line)
+        if lineText == "" {
+            continue
+        }
+        record = nil
+        lineError = nil
+        try {
+            record = json.loads(lineText)
+        } catch err {
+            lineError = err
+        }
+        if lineError != nil || !isMapValue(record) {
+            return nil, error("告警数据必须是JSON数组、包含alerts字段的JSON对象或每行一条JSON")
+        }
+        records.Append(record)
+    }
+    if len(records) == 0 {
+        return nil, error("没有解析到告警记录")
+    }
+    return records, nil
+}
+
+parseGroupFields = func(raw) {
+    supported = {
+        "rule_id": true,
+        "source_ip": true,
+        "destination_ip": true,
+        "destination_port": true,
+        "indicator": true,
+        "host": true,
+        "user": true,
+    }
+    fields = []
+    seen = make(map[string]any)
+    for _, item = range str.Split(raw, ",") {
+        field = str.TrimSpace(item)
+        if supported[field] && !seen[field] {
+            fields.Append(field)
+            seen[field] = true
+        }
+    }
+    if len(fields) == 0 {
+        return nil, error("聚合字段不能为空")
+    }
+    return fields, nil
+}
+
+buildFingerprint = func(alert, fields) {
+    parts = []
+    nonEmptyCount = 0
+    for _, field = range fields {
+        value = toText(alert[field])
+        if value != "" {
+            nonEmptyCount++
+        }
+        parts.Append(field + "=" + value)
+    }
+    if nonEmptyCount == 0 {
+        return "alert_id=" + toText(alert["alert_id"])
+    }
+    return str.Join(parts, "|")
+}
+
+parseEventUnix = func(rawTime) {
+    text = str.TrimSpace(rawTime)
+    if text == "" {
+        return 0, error("时间为空")
+    }
+    for _, layout = range [
+        "2006-01-02 15:04:05",
+        "2006/01/02 15:04:05",
+        "1/2/06 15:04",
+        "1/2/06 15:04:05",
+        "2006-01-02T15:04:05Z07:00",
+        "2006-01-02T15:04:05Z",
+    ] {
+        parsed, parseError = time.Parse(layout, text)
+        if parseError == nil {
+            return parsed.Unix(), nil
+        }
+    }
+    return 0, error("无法识别时间格式")
+}
+
+knownHeaderField = func(rawHeader) {
+    header = str.ToLower(str.TrimSpace(rawHeader))
+    for field, aliases = range fieldAliases {
+        if header == str.ToLower(field) {
+            return field
+        }
+        for _, alias = range aliases {
+            if header == str.ToLower(alias) {
+                return field
+            }
+        }
+    }
+    return ""
+}
+
+detectHeader = func(headers, mode) {
+    lowerMode = str.ToLower(str.TrimSpace(mode))
+    if lowerMode == "true" {
+        return true
+    }
+    if lowerMode == "false" {
+        return false
+    }
+    hitCount = 0
+    for _, header = range headers {
+        if knownHeaderField(toText(header)) != "" {
+            hitCount++
+        }
+    }
+    return hitCount >= 2
+}
+
+parseColumnMap = func(raw) {
+    text = str.TrimSpace(raw)
+    if text == "" {
+        return make(map[string]any), nil
+    }
+    mapping = nil
+    try {
+        mapping = json.loads(text)
+    } catch err {
+        return nil, error("列映射必须是JSON对象")
+    }
+    if !isMapValue(mapping) {
+        return nil, error("列映射必须是JSON对象")
+    }
+    return mapping, nil
+}
+
+rowValue = func(row, index) {
+    if index < 0 || index >= len(row) {
+        return ""
+    }
+    return toText(row[index])
+}
+
+extractCefFields = func(rawLog) {
+    result = make(map[string]any)
+    for field, pattern = range {
+        "alert_id": `log_id='([^']+)'`,
+        "rule_id": `sub_threat_type='([^']+)'`,
+        "source_ip": `src_addr_v4='([^']+)'`,
+        "destination_ip": `dst_addr_v4='([^']+)'`,
+        "source_port": `src_port=([0-9]+)`,
+        "destination_port": `dst_port=([0-9]+)`,
+        "indicator": `ioc_resource='([^']+)'`,
+        "alert_name": `ioc_rule_name='([^']+)'`,
+        "confidence": `confidence=([0-9]+)`,
+        "attack_result": `attack_res=([0-9]+)`,
+    } {
+        matched = re.FindSubmatch(rawLog, pattern)
+        if len(matched) >= 2 {
+            result[field] = matched[1]
+        }
+    }
+    severityMatch = re.FindSubmatch(rawLog, `severity=([0-9]+)`)
+    if len(severityMatch) >= 2 {
+        result["severity"] = severityMatch[1]
+    }
+    return result
+}
+
+buildRowRecord = func(row, headers, headered, mapping, sourcePath, sheetName, rowNumber) {
+    record = make(map[string]any)
+    for index, value = range row {
+        if headered && index < len(headers) {
+            header = toText(headers[index])
+            if header == "" {
+                header = sprintf("Col%d", index + 1)
+            }
+            record[header] = value
+            normalizedField = knownHeaderField(header)
+            if normalizedField != "" {
+                record[normalizedField] = value
+            }
+        } else {
+            record[sprintf("Col%d", index + 1)] = value
+        }
+    }
+
+    if !headered {
+        record["alert_id"] = rowValue(row, 0)
+        record["alert_name"] = rowValue(row, 3)
+        record["severity"] = rowValue(row, 5)
+        record["source_ip"] = rowValue(row, 6)
+        record["destination_ip"] = rowValue(row, 7)
+        record["event_time"] = rowValue(row, 8)
+        record["indicator"] = rowValue(row, 10)
+        record["historical_verdict"] = rowValue(row, 15)
+    }
+
+    rawLogIndex = -1
+    for index, value = range row {
+        text = toText(value)
+        if str.Contains(text, "CEF:") || str.Contains(text, "src_addr_v4=") {
+            rawLogIndex = index
+            cefFields = extractCefFields(text)
+            for field, cefValue = range cefFields {
+                if toText(cefValue) != "" {
+                    record[field] = cefValue
+                }
+            }
+            break
+        }
+    }
+    if rawLogIndex >= 0 {
+        record["raw_log_column"] = rawLogIndex + 1
+    }
+
+    for field, target = range mapping {
+        targetText = toText(target)
+        targetIndex = -1
+        if re.Match(`^[0-9]+$`, targetText) {
+            targetIndex = int(targetText) - 1
+        }
+        if targetIndex >= 0 && targetIndex < len(row) {
+            record[field] = row[targetIndex]
+        } elif headered {
+            for index, header = range headers {
+                if toText(header) == targetText && index < len(row) {
+                    record[field] = row[index]
+                    break
+                }
+            }
+        }
+    }
+
+    record["source_ref"] = sprintf("%s:%s:%d", sourcePath, sheetName, rowNumber)
+    return record
+}
+
+parseExcelAlerts = func(path, headerMode, rawColumnMap, rowLimit) {
+    lowerPath = str.ToLower(path)
+    if !str.HasSuffix(lowerPath, ".xlsx") && !str.HasSuffix(lowerPath, ".xls") {
+        return nil, nil, error("文件解析第一版仅支持XLSX和XLS")
+    }
+    mapping, mappingError = parseColumnMap(rawColumnMap)
+    if mappingError != nil {
+        return nil, nil, mappingError
+    }
+    nodes, parseError = excel.ParseTableFast(path, rowLimit)
+    if parseError != nil {
+        return nil, nil, parseError
+    }
+    classifier = excel.ClassifyNodes(nodes)
+    if classifier == nil || len(classifier.Tables) == 0 {
+        return nil, nil, error("电子表格中没有可读取的数据表")
+    }
+
+    records = []
+    sheets = []
+    for _, table = range classifier.Tables {
+        headered = detectHeader(table.Headers, headerMode)
+        sheetName = toText(table.SheetName)
+        sheetRowCount = 0
+        if !headered {
+            records.Append(buildRowRecord(table.Headers, table.Headers, false, mapping, path, sheetName, 1))
+            sheetRowCount++
+        }
+        startRow = 2
+        for rowIndex, row = range table.Rows {
+            rowNumber = startRow + rowIndex
+            records.Append(buildRowRecord(row, table.Headers, headered, mapping, path, sheetName, rowNumber))
+            sheetRowCount++
+        }
+        sheets.Append({
+            "sheet_name": sheetName,
+            "has_header": headered,
+            "header_count": len(table.Headers),
+            "parsed_row_count": sheetRowCount,
+        })
+    }
+    mappingMode = "automatic"
+    if str.TrimSpace(rawColumnMap) != "" {
+        mappingMode = "user"
+    }
+    return records, {
+        "file_path": path,
+        "sheet_count": len(sheets),
+        "sheets": sheets,
+        "column_map_mode": mappingMode,
+    }, nil
+}
+
+buildWindowKey = func(alert, fields, window) {
+    fingerprint = buildFingerprint(alert, fields)
+    eventUnix, timeError = parseEventUnix(toText(alert["event_time"]))
+    if timeError != nil {
+        return fingerprint + "|window=input-batch", "input-batch", false
+    }
+    bucketSeconds = window * 60
+    bucket = int(eventUnix / int64(bucketSeconds))
+    return fingerprint + "|window=" + string(bucket), string(bucket), true
+}
+
+calculateRisk = func(alert, count) {
+    score = alert["base_risk_score"]
+    reasons = [sprintf("设备等级基础分%d", score)]
+    criticality = str.ToLower(toText(alert["asset_criticality"]))
+    if criticality == "critical" || criticality == "核心" || criticality == "高" || criticality == "高危" {
+        score += 15
+        reasons.Append("高重要性资产加15分")
+    }
+    if alert["privileged"] {
+        score += 15
+        reasons.Append("高权限身份加15分")
+    }
+    if alert["threat_intel_hit"] {
+        score += 20
+        reasons.Append("明确威胁情报命中加20分")
+    }
+    if containsAny(alert["attack_result"], ["攻击成功", "成功"]) {
+        score += 20
+        reasons.Append("设备标记攻击成功加20分")
+    } elif containsAny(alert["attack_result"], ["企图", "尝试", "attempt"]) {
+        score += 10
+        reasons.Append("设备标记攻击企图加10分")
+    }
+    if count >= 10 {
+        score += 10
+        reasons.Append("重复次数达到10次加10分")
+    } elif count >= 3 {
+        score += 5
+        reasons.Append("重复次数达到3次加5分")
+    }
+    if score > 100 {
+        score = 100
+    }
+    return score, reasons
+}
+
+decideDisposition = func(alert, count, score) {
+    if score >= 70 || alert["threat_intel_hit"] || alert["privileged"] {
+        if count > 1 {
+            return "保留并聚合", "存在高风险上下文，保留主事件并将重复告警并入"
+        }
+        return "保留", "风险分或关键上下文达到人工研判条件"
+    }
+    if count > 1 {
+        return "聚合", "相同指纹告警在窗口内只保留一个主事件，原始记录继续保留"
+    }
+    return "观察", "当前仅有一条低风险信号，保留记录并等待关联证据"
+}
+
+containsAny = func(raw, values) {
+    text = str.ToLower(toText(raw))
+    for _, value = range values {
+        if str.Contains(text, str.ToLower(value)) {
+            return true
+        }
+    }
+    return false
+}
+
+hasSuccessfulResponseEvidence = func(alert) {
+    attackResult = alert["attack_result"]
+    if !containsAny(attackResult, ["攻击成功", "成功", "succeeded", "success"]) {
+        return false
+    }
+    responseHeaders = alert["response_headers"]
+    responseBody = alert["response_body"]
+    statusSuccess = re.Match(`(?i)HTTP/[0-9.]+[ ]+2[0-9]{2}`, toText(responseHeaders))
+    bodyText = str.TrimSpace(toText(responseBody))
+    if !statusSuccess || bodyText == "" {
+        return false
+    }
+    if containsAny(bodyText, ["user not found", "unauthorized", "forbidden", "access denied", "登录失败", "认证失败"]) {
+        return false
+    }
+    return true
+}
+
+triageEvent = func(alerts, representative, score) {
+    reasons = []
+    missing = []
+    maliciousLabel = false
+    falsePositiveLabel = false
+    whitelistEvidence = false
+    behaviorEvidence = false
+    successfulResponseEvidence = false
+    intelEvidence = false
+
+    for _, alert = range alerts {
+        verdict = alert["historical_verdict"]
+        if containsAny(verdict, ["正报", "确认恶意", "真实攻击", "恶意事件"]) {
+            maliciousLabel = true
+        }
+        if containsAny(verdict, ["误报", "无需关注", "正常业务", "正常行为"]) {
+            falsePositiveLabel = true
+        }
+        if alert["whitelist_hit"] {
+            whitelistEvidence = true
+        }
+        if toText(alert["behavior_evidence"]) != "" {
+            behaviorEvidence = true
+        }
+        if hasSuccessfulResponseEvidence(alert) {
+            successfulResponseEvidence = true
+        }
+        if alert["threat_intel_hit"] {
+            intelEvidence = true
+        }
+    }
+
+    if maliciousLabel {
+        reasons.Append("存在历史人工正报或确认恶意结论")
+        return "真实攻击", "高", reasons, missing, "优先调查受影响资产并核实攻击范围；确认处置动作后保留证据"
+    }
+    if behaviorEvidence {
+        reasons.Append("存在明确行为或执行证据")
+        return "真实攻击", "高", reasons, missing, "优先调查行为证据对应的主机、账号和进程，并保留相关日志"
+    }
+    if successfulResponseEvidence {
+        reasons.Append("设备标记攻击成功")
+        reasons.Append("服务端返回成功状态且响应正文包含实际结果")
+        return "真实攻击", "高", reasons, missing, "立即核验受害资产、泄露数据或执行结果，并保留请求与响应证据"
+    }
+    if falsePositiveLabel && !intelEvidence {
+        reasons.Append("存在历史人工误报或无需关注结论")
+        return "误报", "高", reasons, missing, "保留历史研判依据并定期复查规则适用范围"
+    }
+    if whitelistEvidence && !intelEvidence {
+        reasons.Append("存在明确白名单命中记录")
+        return "误报", "中", reasons, missing, "复查白名单有效期、资产范围和业务负责人后维持降噪"
+    }
+
+    if representative["indicator"] != "" {
+        reasons.Append("告警包含威胁指标")
+    }
+    if containsAny(representative["attack_result"], ["攻击成功", "成功"]) {
+        reasons.Append("设备标记攻击成功，但缺少可独立验证的成功响应证据")
+    }
+    if score >= 70 {
+        reasons.Append("告警风险等级达到人工调查条件")
+    }
+    if representative["source_ip"] == "" {
+        missing.Append("源IP")
+    }
+    if representative["event_time"] == "" {
+        missing.Append("事件时间")
+    }
+    if !intelEvidence {
+        missing.Append("独立威胁情报核验")
+    }
+    missing.Append("终端或流量行为证据")
+    return "待确认", "中", reasons, missing, "核验资产角色、威胁情报和终端或流量行为；证据充分前不得自动忽略"
+}
+
+buildTriageProcess = func(representative, verdict, reasons) {
+    process = []
+    attackResult = toText(representative["attack_result"])
+    if attackResult == "" {
+        process.Append("设备结论：未提供攻击结果")
+    } else {
+        process.Append("设备结论：" + attackResult)
+    }
+
+    responseHeaders = toText(representative["response_headers"])
+    if responseHeaders == "" {
+        process.Append("响应状态验证：未提供响应头")
+    } elif re.Match(`(?i)HTTP/[0-9.]+[ ]+2[0-9]{2}`, responseHeaders) {
+        process.Append("响应状态验证：服务端返回成功状态")
+    } elif re.Match(`(?i)HTTP/[0-9.]+[ ]+[45][0-9]{2}`, responseHeaders) {
+        process.Append("响应状态验证：服务端返回失败状态")
+    } else {
+        process.Append("响应状态验证：无法识别状态码")
+    }
+
+    responseBody = str.TrimSpace(toText(representative["response_body"]))
+    if responseBody == "" {
+        process.Append("响应内容验证：未提供响应正文")
+    } elif containsAny(responseBody, ["user not found", "unauthorized", "forbidden", "access denied", "登录失败", "认证失败"]) {
+        process.Append("响应内容验证：响应正文包含明确失败信息")
+    } else {
+        process.Append("响应内容验证：存在实际响应内容，需结合规则语义确认")
+    }
+
+    if len(reasons) == 0 {
+        process.Append("证据综合：当前证据不足")
+    } else {
+        process.Append("证据综合：" + str.Join(reasons, "；"))
+    }
+    process.Append("最终研判：" + verdict)
+    return process
+}
+
+reduceAlerts = func(records, fields, window) {
+    groupsByFingerprint = make(map[string]any)
+    groupOrder = []
+    normalizedAlerts = []
+
+    index = 0
+    for _, record = range records {
+        index++
+        if !isMapValue(record) {
+            return nil, error(sprintf("第%d条告警不是对象", index))
+        }
+        alert = normalizeAlert(record, index)
+        normalizedAlerts.Append(alert)
+        fingerprint = buildFingerprint(alert, fields)
+        groupKey, windowBucket, timeParsed = buildWindowKey(alert, fields, window)
+        group = groupsByFingerprint[groupKey]
+        if group == nil {
+            group = {
+                "fingerprint": fingerprint,
+                "window_bucket": windowBucket,
+                "time_parsed": timeParsed,
+                "representative": alert,
+                "alerts": [],
+                "alert_ids": [],
+                "source_refs": [],
+            }
+            groupsByFingerprint[groupKey] = group
+            groupOrder.Append(groupKey)
+        }
+        groupAlerts = group["alerts"]
+        groupAlerts.Append(alert)
+        group["alerts"] = groupAlerts
+        groupAlertIds = group["alert_ids"]
+        groupAlertIds.Append(alert["alert_id"])
+        group["alert_ids"] = groupAlertIds
+        if alert["source_ref"] != "" {
+            groupSourceRefs = group["source_refs"]
+            groupSourceRefs.Append(alert["source_ref"])
+            group["source_refs"] = groupSourceRefs
+        }
+    }
+
+    events = []
+    suppressedCount = 0
+    retainedCount = 0
+    observedCount = 0
+    confirmedAttackCount = 0
+    falsePositiveCount = 0
+    pendingTriageCount = 0
+    for _, groupKey = range groupOrder {
+        group = groupsByFingerprint[groupKey]
+        count = len(group["alerts"])
+        representative = group["representative"]
+        score, reasons = calculateRisk(representative, count)
+        disposition, dispositionReason = decideDisposition(representative, count, score)
+        triageVerdict, triageConfidence, triageReasons, evidenceGaps, responseAdvice = triageEvent(group["alerts"], representative, score)
+        triageProcess = buildTriageProcess(representative, triageVerdict, triageReasons)
+        if triageVerdict == "真实攻击" {
+            confirmedAttackCount++
+            if count > 1 {
+                disposition = "保留并聚合"
+            } else {
+                disposition = "保留"
+            }
+            dispositionReason = "研判识别为真实攻击，禁止自动忽略"
+        } elif triageVerdict == "误报" {
+            falsePositiveCount++
+        } else {
+            pendingTriageCount++
+        }
+        if count > 1 {
+            suppressedCount += count - 1
+        }
+        if disposition == "保留" || disposition == "保留并聚合" {
+            retainedCount++
+        } elif disposition == "观察" {
+            observedCount++
+        }
+        events.Append({
+            "event_id": sprintf("NOISE-%06d", len(events) + 1),
+            "fingerprint": group["fingerprint"],
+            "window_bucket": group["window_bucket"],
+            "time_parsed": group["time_parsed"],
+            "disposition": disposition,
+            "disposition_reason": dispositionReason,
+            "risk_score": score,
+            "risk_reasons": reasons,
+            "triage_verdict": triageVerdict,
+            "triage_confidence": triageConfidence,
+            "triage_reasons": triageReasons,
+            "triage_process": triageProcess,
+            "evidence_gaps": evidenceGaps,
+            "response_advice": responseAdvice,
+            "attack_result": representative["attack_result"],
+            "severity": representative["severity"],
+            "alert_name": representative["alert_name"],
+            "rule_id": representative["rule_id"],
+            "source_ip": representative["source_ip"],
+            "destination_ip": representative["destination_ip"],
+            "destination_port": representative["destination_port"],
+            "indicator": representative["indicator"],
+            "host": representative["host"],
+            "user": representative["user"],
+            "event_time": representative["event_time"],
+            "alert_count": count,
+            "duplicate_count": count - 1,
+            "alert_ids": group["alert_ids"],
+            "source_refs": group["source_refs"],
+            "raw_alerts": group["alerts"],
+        })
+    }
+
+    return {
+        "status": "completed",
+        "processing_mode": "deterministic_fixed_window_grouping",
+        "window_minutes": window,
+        "group_fields": fields,
+        "summary": {
+            "input_alert_count": len(normalizedAlerts),
+            "event_count": len(events),
+            "duplicate_suppressed_count": suppressedCount,
+            "retained_event_count": retainedCount,
+            "observed_event_count": observedCount,
+            "noise_reduction_rate": sprintf("%.2f%%", float64(suppressedCount) * 100.0 / float64(len(normalizedAlerts))),
+            "confirmed_attack_event_count": confirmedAttackCount,
+            "false_positive_event_count": falsePositiveCount,
+            "pending_triage_event_count": pendingTriageCount,
+        },
+        "events": events,
+        "limitations": [
+            "第一版仅执行确定性同指纹聚合，不自动删除原始告警",
+            "时间字段无法可靠解析时仍按输入批次聚合，并保留原始时间",
+            "当前研判基于输入证据和历史人工标签，不替代终端取证、流量核验与人工复审",
+            "没有人工标签的事件不计算准确率、召回率或漏报率",
+            "待确认状态不等于误报或安全",
+        ],
+    }, nil
+}
+
+runNoiseReduction = func(rawData, rawGroupFields, rawWindow) {
+    records, parseError = parseAlertData(rawData)
+    if parseError != nil {
+        return nil, parseError
+    }
+    fields, fieldsError = parseGroupFields(rawGroupFields)
+    if fieldsError != nil {
+        return nil, fieldsError
+    }
+    window = int(rawWindow)
+    if window <= 0 || window > 10080 {
+        return nil, error("聚合窗口必须在1至10080分钟之间")
+    }
+    return reduceAlerts(records, fields, window)
+}
+
+runFileNoiseReduction = func(path, rawGroupFields, rawWindow, headerMode, rawColumnMap, rawMaxRows) {
+    normalizedPath = str.TrimSpace(path)
+    if normalizedPath == "" {
+        return nil, error("告警文件路径不能为空")
+    }
+    rowLimit = int(rawMaxRows)
+    if rowLimit <= 0 || rowLimit > 100000 {
+        return nil, error("最大读取行数必须在1至100000之间")
+    }
+    records, inputMetadata, parseError = parseExcelAlerts(normalizedPath, headerMode, rawColumnMap, rowLimit)
+    if parseError != nil {
+        return nil, parseError
+    }
+    fields, fieldsError = parseGroupFields(rawGroupFields)
+    if fieldsError != nil {
+        return nil, fieldsError
+    }
+    window = int(rawWindow)
+    if window <= 0 || window > 10080 {
+        return nil, error("聚合窗口必须在1至10080分钟之间")
+    }
+    result, reduceError = reduceAlerts(records, fields, window)
+    if reduceError != nil {
+        return nil, reduceError
+    }
+    result["input_mode"] = "excel_file"
+    result["input_metadata"] = inputMetadata
+    return result, nil
+}
+
+emitFinalResult = func(content) {
+    result = str.TrimSpace(string(content))
+    if result == "" {
+        return error("最终结果不能为空")
+    }
+    yakit.AIOutput("%s", result)
+    return nil
+}
+
+forgeHandle = func(params, opts...) {
+    rawData = alertData
+    rawFilePath = filePath
+    rawWindow = windowMinutes
+    rawFields = groupFields
+    rawHeaderMode = hasHeader
+    rawColumnMap = columnMap
+    rawMaxRows = maxRows
+    if params != nil {
+        if params["alert-data"] != nil && toText(params["alert-data"]) != "" {
+            rawData = toText(params["alert-data"])
+        }
+        if params["window-minutes"] != nil && toText(params["window-minutes"]) != "" {
+            rawWindow = toText(params["window-minutes"])
+        }
+        if params["group-fields"] != nil && toText(params["group-fields"]) != "" {
+            rawFields = toText(params["group-fields"])
+        }
+        if params["file-path"] != nil && toText(params["file-path"]) != "" {
+            rawFilePath = toText(params["file-path"])
+        }
+        if params["has-header"] != nil && toText(params["has-header"]) != "" {
+            rawHeaderMode = toText(params["has-header"])
+        }
+        if params["column-map"] != nil {
+            rawColumnMap = toText(params["column-map"])
+        }
+        if params["max-rows"] != nil && toText(params["max-rows"]) != "" {
+            rawMaxRows = toText(params["max-rows"])
+        }
+    }
+
+    result = nil
+    runError = nil
+    if str.TrimSpace(rawFilePath) != "" {
+        result, runError = runFileNoiseReduction(rawFilePath, rawFields, rawWindow, rawHeaderMode, rawColumnMap, rawMaxRows)
+    } else {
+        result, runError = runNoiseReduction(rawData, rawFields, rawWindow)
+    }
+    if runError != nil {
+        message = "告警降噪处理失败: " + sprint(runError)
+        yakit.Error("%s", message)
+        emitFinalResult(message)
+        return message
+    }
+    resultBytes, marshalError = json.Marshal(result)
+    if marshalError != nil {
+        message = "告警降噪结果序列化失败: " + sprint(marshalError)
+        yakit.Error("%s", message)
+        emitFinalResult(message)
+        return message
+    }
+    resultText = string(resultBytes)
+    emitFinalResult(resultText)
+    return resultText
+}
+
+if standaloneTool {
+    println(forgeHandle({}))
+}
