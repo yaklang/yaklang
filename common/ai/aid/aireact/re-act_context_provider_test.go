@@ -344,13 +344,7 @@ func TestReActInlineAttachmentContextDerivedTaskSnapshot(t *testing.T) {
 
 func TestReActInlineAttachmentContextDerivedTaskBudget(t *testing.T) {
 	react := newInlineContextQueueReAct(t)
-	manager := react.config.ContextProviderManager
-	ordinary := strings.Repeat("ordinary ", 26000)
 	inline := strings.Repeat("attached ", 26000) + "BUDGET_INLINE_TAIL"
-	if aicommon.MeasureTokens(ordinary) >= 48*1024 || aicommon.MeasureTokens(inline) >= 48*1024 || aicommon.MeasureTokens(ordinary+inline) <= 48*1024 {
-		t.Fatal("budget fixture must exceed one shared budget but fit two separate budgets")
-	}
-	manager.Register("ordinary-budget", aicommon.FileContentContextProvider(ordinary))
 	if err := react.handleFreeValue(inlineContextEvent(inline)); err != nil {
 		t.Fatal(err)
 	}
@@ -359,11 +353,28 @@ func TestReActInlineAttachmentContextDerivedTaskBudget(t *testing.T) {
 		child = applyInlineContextConfigOptions(t, aicommon.ConvertConfigToOptions(react.config))
 	}, false)
 	rendered := child.ContextProviderManager.Execute(nil, nil)
-	if aicommon.MeasureTokens(rendered) > 48*1024 || !strings.Contains(rendered, "...") {
-		t.Error("derived ordinary and inline providers did not share the existing 48k token budget")
+	if len(rendered) > 12*1024 || strings.Contains(rendered, "BUDGET_INLINE_TAIL") {
+		t.Fatal("large attachment was injected in full instead of a bounded preview")
 	}
-	if !strings.Contains(rendered, "BUDGET_INLINE_TAIL") {
-		t.Error("derived budgeted context lost task A's inline snapshot")
+	prefix := "Full content saved to file: "
+	_, after, found := strings.Cut(rendered, prefix)
+	if !found {
+		t.Fatal("derived context lost attachment read-back reference")
+	}
+	path, _, _ := strings.Cut(after, "\n")
+	t.Cleanup(func() { _ = os.Remove(path) })
+	full, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(full) != inline {
+		t.Fatal("derived attachment did not preserve complete original bytes")
+	}
+	again := child.ContextProviderManager.Execute(nil, nil)
+	_, after, found = strings.Cut(again, prefix)
+	nextPath, _, _ := strings.Cut(after, "\n")
+	if !found || nextPath != path {
+		t.Fatal("context refresh rematerialized attachment")
 	}
 }
 
