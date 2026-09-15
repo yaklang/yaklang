@@ -30,13 +30,15 @@ var builtinToolDescriptionI18n = map[string]*schema.I18n{
 	"web_crawler":          schema.NewI18n("网站爬虫，用于爬取站点页面", "Crawl websites"),
 
 	// http / fuzzer
-	"http_fuzzer":                 schema.NewI18n("按参数发送 HTTP 数据包，可直接使用 fuzztag", "Send HTTP packets; fuzztag supported"),
-	"create_web_fuzzer_tab":       schema.NewI18n("在 Yakit 中创建单个 Web Fuzzer 标签页；多步复现请用 create_web_fuzzer_tabs", "Create one Web Fuzzer tab; use create_web_fuzzer_tabs for multi-step flows"),
-	"create_web_fuzzer_tabs":      schema.NewI18n("批量创建多个 Web Fuzzer 标签页并一次推送到 Yakit，适合漏洞复现多步骤展示", "Create multiple Web Fuzzer tabs in one push for multi-step repro"),
-	"query_web_fuzzer_tabs":       schema.NewI18n("查询当前用户可见的 Web Fuzzer 标签页/分组状态与可用颜色，修改前应先调用", "List visible Web Fuzzer tabs/groups and colors; call before mutations"),
-	"update_web_fuzzer_tab":       schema.NewI18n("部分更新已有 Web Fuzzer 标签页；可用 targetGroupId 移入分组，或 \"0\" 取消分组", "Partially update a Web Fuzzer tab; targetGroupId moves/ungroups"),
-	"delete_web_fuzzer_tabs":      schema.NewI18n("按 pageId 删除 Web Fuzzer 标签页；空分组会自动清理", "Delete Web Fuzzer tabs by pageId; empty groups are cleaned up"),
-	"manage_web_fuzzer_tab_group": schema.NewI18n("创建/更新/删除 Web Fuzzer 标签页分组；先 query_web_fuzzer_tabs，再选不冲突的颜色", "Create/update/delete Web Fuzzer tab groups"),
+	"http_fuzzer":                       schema.NewI18n("按参数发送 HTTP 数据包，可直接使用 fuzztag", "Send HTTP packets; fuzztag supported"),
+	"create_web_fuzzer_tab":             schema.NewI18n("在 Yakit 中创建单个 Web Fuzzer 标签页；多步复现请用 create_web_fuzzer_tabs", "Create one Web Fuzzer tab; use create_web_fuzzer_tabs for multi-step flows"),
+	"execute_web_fuzzer_tab":            schema.NewI18n("执行指定的 Web Fuzzer 标签页请求并等待完成", "Execute one existing Web Fuzzer tab request and wait for completion"),
+	"query_web_fuzzer_execution_result": schema.NewI18n("查询 Web Fuzzer 已完成任务的响应摘要", "Query response summaries for a completed Web Fuzzer task"),
+	"create_web_fuzzer_tabs":            schema.NewI18n("批量创建多个 Web Fuzzer 标签页并一次推送到 Yakit，适合漏洞复现多步骤展示", "Create multiple Web Fuzzer tabs in one push for multi-step repro"),
+	"query_web_fuzzer_tabs":             schema.NewI18n("查询当前用户可见的 Web Fuzzer 标签页/分组状态与可用颜色，修改前应先调用", "List visible Web Fuzzer tabs/groups and colors; call before mutations"),
+	"update_web_fuzzer_tab":             schema.NewI18n("部分更新已有 Web Fuzzer 标签页；可用 targetGroupId 移入分组，或 \"0\" 取消分组", "Partially update a Web Fuzzer tab; targetGroupId moves/ungroups"),
+	"delete_web_fuzzer_tabs":            schema.NewI18n("按 pageId 删除 Web Fuzzer 标签页；空分组会自动清理", "Delete Web Fuzzer tabs by pageId; empty groups are cleaned up"),
+	"manage_web_fuzzer_tab_group":       schema.NewI18n("创建/更新/删除 Web Fuzzer 标签页分组；先 query_web_fuzzer_tabs，再选不冲突的颜色", "Create/update/delete Web Fuzzer tab groups"),
 
 	// httpflow
 	"query_http_flow":       schema.NewI18n("按条件查询 HTTP 流量记录", "Query HTTP flows with filters"),
