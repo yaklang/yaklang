@@ -731,13 +731,13 @@ jobs:
               ]
 
           - name: "Test Utils Infra / Parser / Net / Misc"
-            # chaosmaker's traffic generator was previously believed to be
-            # timing-sensitive under package parallelism on a 2-core runner, so
-            # this suite used to stay serial. It is the largest suite here (42
-            # packages), so run it with two workers and let CI decide: if the
-            # chaosmaker cases or the tight 15-20s per-package budgets start
-            # timing out, revert this to serial rather than raising the budgets.
-            package_workers: "2"
+            # Stays serial. Two parallel CI runs showed this suite is not a
+            # candidate: jsonextractor asserts that a subtest finishes within a
+            # hardcoded 3s, which it hit at 3.35s when sharing the runner
+            # (fail), then passed on the next attempt. That is a ~50% flake for
+            # no end-to-end gain, because this suite finishes around 5.5m while
+            # the run is gated by suites that take 12m+. The chaosmaker cases
+            # were not the problem; the timing assertion was.
             test_configs: |
               [
                 {"package": "./common/chunkmaker/...", "timeout": "20s"},
@@ -765,12 +765,12 @@ jobs:
               ]
 
           - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
-            # Left serial: bruteutils already runs 57s against its 60s budget when
-            # it owns both cores, and it exercises real network timeouts rather
-            # than pure CPU work, so splitting the runner across two packages
-            # pushes it over the budget (observed on run 34945422391: timed out
-            # twice, and the 60s retry did not help). Raise this package's budget
-            # before enabling package parallelism for the suite.
+            # This suite gates the whole run (11.9m in run 34947532528), so it is
+            # worth parallelizing: 51 packages, mostly compilation-bound. The
+            # blocker was bruteutils, which already uses 57s of its 60s budget
+            # while owning both cores and times out once it shares the runner, so
+            # its budget is raised below rather than leaving the suite serial.
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
@@ -787,7 +787,7 @@ jobs:
                 {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^TestMUSTPASS_Fp.*$"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
-                {"package": "./common/utils/bruteutils/.", "timeout": "1m", "retry": 1, "retry_delay": 5},
+                {"package": "./common/utils/bruteutils/.", "timeout": "2m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
