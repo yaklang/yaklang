@@ -127,8 +127,7 @@ func TestDirectToolScalarParamsSchema_AcceptsObjectAndLegacyJSONString(t *testin
 // are not documentation-only pseudo-JSON. This test makes CI run all four exact
 // payloads through the production streaming parser, verifier and action-schema
 // validator. The same strings remain together in OutputExamples for custom
-// renderers, with the preferred independent-batch form taught before the
-// single-call fallback.
+// renderers, with the reliable scalar form taught before optional batching.
 func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 	t.Run("directly_call_tool scalar", func(t *testing.T) {
 		loop, _ := newToolBatchTestLoop(t)
@@ -139,9 +138,9 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		assert.Nil(t, loop.GetVariable(loopVarDirectToolBatch))
 		assert.Equal(t, "read_file", loop.Get("directly_call_tool_name"))
 		assert.Less(t,
-			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON),
 			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolScalarOutputExampleJSON),
-			"the preferred independent-batch form should be taught before the scalar fallback",
+			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON),
+			"the reliable scalar form should be taught before optional batching",
 		)
 		assert.Contains(t, loopAction_directlyCallTool.OutputExamples, directlyCallToolScalarOutputExampleJSON)
 		assert.Contains(t, loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON)
@@ -173,9 +172,9 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		assert.Nil(t, loop.GetVariable(loopVarRequireToolBatch))
 		assert.Equal(t, "grep", loop.Get("tool_require_payload"))
 		assert.Less(t,
-			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON),
 			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON),
-			"the preferred independent-batch form should be taught before the scalar fallback",
+			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON),
+			"the reliable scalar form should be taught before optional batching",
 		)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
@@ -230,7 +229,7 @@ func TestToolCallPromptExamples_MatchProductionReadFileParameter(t *testing.T) {
 	}
 }
 
-func TestToolCallActionDescriptionsUseChineseBatchFirstPolicy(t *testing.T) {
+func TestToolCallActionDescriptionsUseScalarFirstPolicy(t *testing.T) {
 	tests := []struct {
 		name        string
 		action      *reactloops.LoopAction
@@ -253,9 +252,8 @@ func TestToolCallActionDescriptionsUseChineseBatchFirstPolicy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Contains(t, test.action.Description, "先枚举本轮已明确的真实调用")
-			require.Contains(t, test.action.Description, "优先使用")
-			require.Contains(t, test.action.Description, "不要拆成多个单工具轮次")
+			require.Contains(t, test.action.Description, "默认使用")
+			require.Contains(t, test.action.Description, "参数未完整的嵌套 wrapper")
 			require.NotContains(t, test.action.Description, "For one call")
 			require.NotContains(t, test.action.Description, "Required only")
 
@@ -268,9 +266,9 @@ func TestToolCallActionDescriptionsUseChineseBatchFirstPolicy(t *testing.T) {
 			properties := root["properties"].(map[string]any)
 			batchDescription := properties[test.batchField].(map[string]any)["description"].(string)
 			scalarDescription := properties[test.scalarField].(map[string]any)["description"].(string)
-			require.Contains(t, batchDescription, "优先使用本数组")
-			require.Contains(t, batchDescription, "不要为了沿用单工具而拆成多轮")
-			require.Contains(t, scalarDescription, "仅当本轮恰好一个")
+			require.Contains(t, batchDescription, "可选的延迟优化")
+			require.Contains(t, batchDescription, "嵌套 wrapper")
+			require.Contains(t, scalarDescription, "选择单调用形式时填写")
 		})
 	}
 }

@@ -8,7 +8,8 @@ import (
 
 const (
 	// ConfigKeyEnableAIStreamIdleTimeout toggles the StreamIdleTimeoutReader
-	// wrap around post-action synchronous AI calls such as verification.
+	// wrap around every provider stream, including the main ReAct response and
+	// post-action synchronous calls such as verification.
 	// Default is true; the operator can flip it
 	// off via SetConfig at runtime to restore the pre-fix behavior in case a
 	// regression is suspected.
@@ -48,7 +49,7 @@ const (
 )
 
 // ResolveAIStreamIdleThresholds returns the effective (ttfb, idle) thresholds
-// for wrapping post-action AI streams. When the feature flag is off both
+// for wrapping AI provider streams. When the feature flag is off both
 // return values are 0 — the wrapper still tracks timing stats but never
 // aborts, which matches the P0 "observe only" mode.
 //

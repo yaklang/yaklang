@@ -112,6 +112,9 @@ type ReAct struct {
 
 	browserSessionsMu sync.Mutex
 	browserSessionIDs map[string]struct{}
+
+	attachedBrowsersMu sync.Mutex
+	attachedBrowsers   []*aicommon.AttachedResource
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
@@ -452,6 +455,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		Seq:               cfg.Seq,
 		TypeName:          schema.AIAgentRuntimeType_ReAct,
 		PersistentSession: cfg.PersistentSessionId,
+		ForgeName:         cfg.GetForgeName(),
 	}); err != nil {
 		return nil, err
 	}

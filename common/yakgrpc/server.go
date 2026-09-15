@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
+	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/imcontrol"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -39,6 +42,10 @@ type Server struct {
 
 	reActServiceMu sync.Mutex
 	reActService   *reactservice.Service
+
+	browserBridge *browser.ExtensionBridgeManager
+	browserTasks  chan struct{}
+	runtimeForges *aiforge.RuntimeForgeRegistry
 }
 
 type ServerOpts func(config *ServerConfig)
@@ -49,6 +56,8 @@ type ServerConfig struct {
 	startCacheLog       bool
 	profileDatabasePath string
 	projectDatabasePath string
+	browserBridge       bool
+	browserBridgePort   int
 }
 
 func WithReverseServerPort(port int) ServerOpts {
@@ -78,6 +87,13 @@ func WithProfileDatabasePath(p string) ServerOpts {
 func WithProjectDatabasePath(p string) ServerOpts {
 	return func(config *ServerConfig) {
 		config.projectDatabasePath = p
+	}
+}
+
+func WithBrowserExtensionBridge(port int) ServerOpts {
+	return func(config *ServerConfig) {
+		config.browserBridge = true
+		config.browserBridgePort = port
 	}
 }
 
@@ -159,7 +175,12 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0o777)
 	s := &Server{
-		cacheDir: yakitBase,
+		cacheDir:      yakitBase,
+		browserTasks:  make(chan struct{}, 2),
+		runtimeForges: aiforge.NewRuntimeForgeRegistry(),
+	}
+	if err := s.registerRuntimeForges(); err != nil {
+		return nil, err
 	}
 
 	if len(serverConfig.profileDatabasePath) > 0 {
@@ -197,7 +218,39 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 	if serverConfig.startCacheLog {
 		utils.StartCacheLog(context.Background(), 200)
 	}
+	if serverConfig.browserBridge {
+		identityPath := filepath.Join(s.cacheDir, "browser-extension", "identity.json")
+		manager, managerErr := browser.NewExtensionBridgeManager(
+			browser.NewExtensionBridgeFileIdentityStore(identityPath),
+			func(revision uint64, event string) {
+				yakit.BroadcastData(yakit.ServerPushType_BrowserExtension, map[string]interface{}{
+					"revision": revision,
+					"event":    event,
+				})
+			},
+		)
+		if managerErr != nil {
+			log.Errorf("initialize browser extension bridge identity failed: %v", managerErr)
+		} else {
+			s.browserBridge = manager
+			browser.SetActiveExtensionBridgeManager(manager)
+			if startErr := manager.Start(serverConfig.browserBridgePort); startErr != nil {
+				log.Warnf("start browser extension bridge failed: %v", startErr)
+			}
+		}
+	}
 	return s, nil
+}
+
+func (s *Server) CloseBrowserExtensionBridge() error {
+	if s == nil {
+		return nil
+	}
+	if s.browserBridge == nil {
+		return nil
+	}
+	browser.SetActiveExtensionBridgeManager(nil)
+	return s.browserBridge.Close()
 }
 
 var YakitProfileTables = schema.ProfileTables

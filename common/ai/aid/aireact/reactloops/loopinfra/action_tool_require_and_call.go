@@ -12,11 +12,11 @@ import (
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "申请工具并由运行时阅读工具文档、生成参数。先枚举本轮已明确的真实调用：存在 2-8 个互不依赖、互不干扰且都需要生成参数的调用时，优先使用 tool_require_calls 一次并发申请，不要拆成多个单工具轮次；只有本轮恰好一个调用时才使用 tool_require_payload。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+	Description: "申请工具并由运行时阅读工具文档、生成参数。默认使用 tool_require_payload 单次生成参数；工具是参数未完整的嵌套 wrapper 时必须使用单调用。仅当 2-8 个调用低风险、互不依赖、互不干扰，且每个工具 Schema 都简单无歧义时，才可使用 tool_require_calls。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
-			aitool.WithParam_Description("仅当本轮恰好一个 require_tool 调用时填写；存在 tool_require_calls 时必须省略。只填写一个需要生成参数的工具准确名称，严禁包含参数。下面是经过 CI 校验且可执行的单调用格式：\n"+requireToolScalarOutputExampleJSON),
+			aitool.WithParam_Description("选择单调用形式时填写；存在 tool_require_calls 时必须省略。只填写一个需要生成参数的工具准确名称，严禁包含参数。下面是经过 CI 校验且可执行的单调用格式：\n"+requireToolScalarOutputExampleJSON),
 		),
 		aitool.WithStringParam(
 			"tool_call_reason",

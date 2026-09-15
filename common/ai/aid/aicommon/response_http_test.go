@@ -2,11 +2,25 @@ package aicommon
 
 import (
 	"context"
+	"errors"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestAIResponseGuardStreamPropagatesIdleTimeout(t *testing.T) {
+	reader, writer := io.Pipe()
+	defer writer.Close()
+	response := NewAIResponse(nil)
+	response.streamTTFB = 30 * time.Millisecond
+	response.streamIdle = 30 * time.Millisecond
+
+	_, err := response.guardStream(reader).Read(make([]byte, 1))
+	assert.ErrorIs(t, err, ErrStreamIdleTimeout)
+	assert.True(t, errors.Is(response.GetError(), ErrStreamIdleTimeout))
+}
 
 func TestAIResponse_GetHTTPStatusCode_Nil(t *testing.T) {
 	var resp *AIResponse

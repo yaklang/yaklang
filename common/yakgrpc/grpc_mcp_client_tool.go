@@ -60,7 +60,7 @@ func ensureMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig) {
 // their per-tool enable/disable state. The result is paged and filterable.
 //
 // Tool discovery strategy:
-//   - "builtin" tools: legacy MCP registry (common/mcp globalTools).
+//   - "builtin" tools: engine-native MCP tools, including the live browser-extension bridge.
 //   - "aitool" tools: aitool-framework builtin registry.
 //     Both are synced in-memory on each call; stale rows are pruned per source.
 //   - "bridge" tools: two modes controlled by ForceSync:
@@ -79,7 +79,15 @@ func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequ
 	db := s.GetProfileDatabase()
 
 	// 1. Sync legacy builtin and aitool-framework builtin rows separately.
-	aitoolBuiltinMap := syncMCPToolConfigSources(db)
+	var runtimeTools []*aitool.Tool
+	if s.browserBridge != nil {
+		var err error
+		runtimeTools, err = s.buildBrowserAgentTools()
+		if err != nil {
+			log.Warnf("GetMCPToolList: build browser extension tools failed: %v", err)
+		}
+	}
+	aitoolBuiltinMap := syncMCPToolConfigSources(db, runtimeTools...)
 
 	// 2. Reconcile bridge tools only when explicitly requested.
 	// ForceSync=false: skip all network calls, serve from DB cache.
@@ -230,10 +238,16 @@ func lookupAIToolFrameworkBuiltin(db *gorm.DB, toolName string) map[string]*aito
 	return result
 }
 
-func syncMCPToolConfigSources(db *gorm.DB) map[string]*aitool.Tool {
+func syncMCPToolConfigSources(db *gorm.DB, runtimeTools ...*aitool.Tool) map[string]*aitool.Tool {
 	legacyNames := make(map[string]struct{})
 	aitoolNames := make(map[string]struct{})
 	aitoolBuiltinMap := make(map[string]*aitool.Tool)
+	runtimeNames := make(map[string]struct{}, len(runtimeTools))
+	for _, tool := range runtimeTools {
+		if tool != nil && tool.Name != "" {
+			runtimeNames[tool.Name] = struct{}{}
+		}
+	}
 
 	for name := range mcp.GlobalBuiltinTools() {
 		legacyNames[name] = struct{}{}
@@ -243,8 +257,24 @@ func syncMCPToolConfigSources(db *gorm.DB) map[string]*aitool.Tool {
 		}
 	}
 
-	if err := yakit.ReconcileMCPBuiltinToolTierDefaults(db, mcp.IsDefaultBuiltinTool); err != nil {
+	if err := yakit.ReconcileMCPBuiltinToolTierDefaults(db, func(name string) bool {
+		_, runtimeBuiltin := runtimeNames[name]
+		return runtimeBuiltin || mcp.IsDefaultBuiltinTool(name)
+	}); err != nil {
 		log.Warnf("GetMCPToolList: reconcile builtin tier defaults: %v", err)
+	}
+
+	for _, t := range runtimeTools {
+		if t == nil || t.Name == "" {
+			continue
+		}
+		legacyNames[t.Name] = struct{}{}
+		aitoolBuiltinMap[t.Name] = t
+		if _, err := yakit.GetOrCreateMCPClientToolConfigWithDefaultEnable(db, t.Name, schema.MCPClientToolSourceBuiltin, "", t.Description, true); err != nil {
+			log.Warnf("GetMCPToolList: upsert runtime builtin tool config %q: %v", t.Name, err)
+		} else if err := yakit.EnsureMCPClientToolConfigSource(db, t.Name, schema.MCPClientToolSourceBuiltin); err != nil {
+			log.Warnf("GetMCPToolList: migrate runtime builtin source for %q: %v", t.Name, err)
+		}
 	}
 
 	for _, t := range buildinaitools.GetAllToolsDynamically(db) {
@@ -299,23 +329,24 @@ func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string, a
 	switch source {
 	case schema.MCPClientToolSourceBuiltin:
 		twh := mcp.GetBuiltinToolByName(toolName)
-		if twh == nil {
+		if twh != nil {
+			t := twh.Tool()
+			if t == nil {
+				return
+			}
+			item.Description = t.Description
+			if i18n := resolveMCPToolDescriptionI18nForExport(source, toolName, t.Description); i18n != nil {
+				item.DescriptionI18N = i18n.I18nToYPB_I18n()
+			}
+			params, err := parseMCPToolInputSchema(&t.InputSchema)
+			if err != nil {
+				log.Warnf("attachToolMeta: parse legacy schema for %q: %v", toolName, err)
+				return
+			}
+			item.Params = params
 			return
 		}
-		t := twh.Tool()
-		if t == nil {
-			return
-		}
-		item.Description = t.Description
-		if i18n := resolveMCPToolDescriptionI18nForExport(source, toolName, t.Description); i18n != nil {
-			item.DescriptionI18N = i18n.I18nToYPB_I18n()
-		}
-		params, err := parseMCPToolInputSchema(&t.InputSchema)
-		if err != nil {
-			log.Warnf("attachToolMeta: parse legacy schema for %q: %v", toolName, err)
-			return
-		}
-		item.Params = params
+		fallthrough
 	case schema.MCPClientToolSourceAITool:
 		at, ok := aitoolBuiltin[toolName]
 		if !ok || at == nil || at.Tool == nil {

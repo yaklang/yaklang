@@ -29,6 +29,8 @@ func createYakitAction(schema string) Action {
 		return java_decompiler.NewJavaDecompilerAction()
 	case "openapi":
 		return newOpenAPIAction()
+	case "browser-extension":
+		return newBrowserExtensionAction()
 	default:
 		return nil
 	}

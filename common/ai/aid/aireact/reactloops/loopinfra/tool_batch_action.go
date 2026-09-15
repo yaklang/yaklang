@@ -92,7 +92,7 @@ const requireToolBatchOutputExampleJSON = `{
 const directlyCallToolScalarOutputExamples = `
 ### directly_call_tool 单次调用
 
-仅当本轮恰好一个已明确调用时，使用标量字段 directly_call_tool_name 和 directly_call_tool_params，不要为了一个调用创建 directly_call_tool_calls 数组。只有在工具已启用且参数能够按照工具 Schema 完整给出时才使用 directly_call_tool；参数不确定时改用 require_tool。
+默认使用标量字段 directly_call_tool_name 和 directly_call_tool_params。只有在工具已启用且参数能够按照工具 Schema 完整给出时才使用 directly_call_tool；参数不确定时改用 require_tool。
 
 下面的 JSON 是完整可解析格式（工具名和参数值应替换为当前可用工具的真实 Schema）：
 
@@ -102,7 +102,7 @@ const directlyCallToolScalarOutputExamples = `
 const directlyCallToolBatchOutputExamples = `
 ### directly_call_tool 并发调用
 
-先枚举本轮已经明确、可立即执行的真实调用。当存在 2-8 个已启用工具调用，且这些调用彼此独立、互不干扰、都能立即给出完整 JSON 参数时，优先使用一个 directly_call_tool action 和 directly_call_tool_calls 数组；不要为了沿用单工具而拆成多个 ReAct 轮次。多 URL、多文件、多目标和多个只读探测是典型场景。优先选择 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；运行时也能解析已启用但未缓存的工具。数组中的调用会并发执行，并在全部结束后统一进入下一轮。不要为凑数量发明调用，不要放置有先后依赖的调用，不要同时输出旧的 directly_call_tool_name 字段。批量参数不支持 AI-TAG；包含长文本参数的调用改用单次调用。
+这是可选的延迟优化。仅当 2-8 个已启用工具调用都低风险、彼此独立且每层完整 JSON 参数都已从真实 Schema 确定时，才使用 directly_call_tool_calls。嵌套 wrapper、页面状态操作、长文本参数或任一参数不确定时改用单调用。不要为凑数量发明调用，不要放置有先后依赖的调用，不要同时输出旧的 directly_call_tool_name 字段。批量参数不支持 AI-TAG。
 
 下面的 JSON 是完整可解析格式（工具名和参数值应替换为当前已启用的真实工具，优先使用 CACHE_TOOL_CALL 中已展示 Schema 的工具）：
 
@@ -112,7 +112,7 @@ const directlyCallToolBatchOutputExamples = `
 const requireToolScalarOutputExamples = `
 ### require_tool 单次调用
 
-仅当本轮恰好一个已明确调用且仍需运行时生成参数时，使用标量字段 tool_require_payload，不要为了一个调用创建 tool_require_calls 数组。tool_require_payload 只填写工具名，严禁在该字段中携带参数。
+当一个调用仍需运行时生成参数，或工具参数有嵌套 wrapper/语义歧义时，使用标量字段 tool_require_payload。tool_require_payload 只填写工具名，严禁在该字段中携带参数。
 
 下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
 
@@ -122,22 +122,22 @@ const requireToolScalarOutputExamples = `
 const requireToolBatchOutputExamples = `
 ### require_tool 并发调用
 
-先枚举本轮已经明确、可立即执行的真实调用。当存在 2-8 个彼此独立、互不干扰，但都需要运行时分别生成参数的调用时，优先使用一个 require_tool action 和 tool_require_calls 数组；不要为了沿用单工具而拆成多个 ReAct 轮次。多 URL、多文件、多目标和多个只读探测是典型场景。每项只提供工具名、identifier 和 reason，严禁提供 params。运行时会并发生成参数并有界并发执行。不要为凑数量发明调用；有依赖的调用必须拆到后续 ReAct 轮次；不要同时输出旧的 tool_require_payload 字段。
+这是可选的延迟优化。仅当 2-8 个调用低风险、彼此独立且每个工具 Schema 都简单无歧义时，才使用 tool_require_calls。嵌套 wrapper 或参数语义不明时改用单调用。每项只提供工具名、identifier 和 reason，严禁提供 params。不要为凑数量发明调用，不要同时输出旧的 tool_require_payload 字段。
 
 下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
 
 ` + requireToolBatchOutputExampleJSON + `
 `
 
-const directlyCallToolOutputExamples = directlyCallToolBatchOutputExamples + directlyCallToolScalarOutputExamples
+const directlyCallToolOutputExamples = directlyCallToolScalarOutputExamples + directlyCallToolBatchOutputExamples
 
-const requireToolOutputExamples = requireToolBatchOutputExamples + requireToolScalarOutputExamples
+const requireToolOutputExamples = requireToolScalarOutputExamples + requireToolBatchOutputExamples
 
 func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 	return aitool.WithStructArrayParam(
 		directlyCallToolBatchField,
 		[]aitool.PropertyOption{
-			aitool.WithParam_Description("当本轮已明确 2-8 个互不依赖、互不干扰且参数完整的直接调用时，优先使用本数组，不要为了沿用单工具而拆成多轮。必须与 directly_call_tool_name/directly_call_tool_params 二选一，严禁混用。每项必须包含已启用工具的准确名称和完整内联 JSON 参数；优先选择 CACHE_TOOL_CALL 中已展示 Params Schema 的工具，未缓存但已启用的工具仍可解析并产生告警。批量参数不支持 AI-TAG；不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + directlyCallToolBatchOutputExampleJSON),
+			aitool.WithParam_Description("可选的延迟优化。仅当本轮已明确 2-8 个低风险、互不依赖、互不干扰且参数完整的直接调用时使用。必须与 directly_call_tool_name/directly_call_tool_params 二选一，严禁混用。每项必须包含已启用工具的准确名称和从真实 Schema 确定的完整内联 JSON 参数；嵌套 wrapper 的每层参数都必须完整。批量参数不支持 AI-TAG；不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + directlyCallToolBatchOutputExampleJSON),
 			aitool.WithParam_Raw("minItems", 2),
 			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
 		},
@@ -164,7 +164,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 	return aitool.WithStructArrayParam(
 		requireToolBatchField,
 		[]aitool.PropertyOption{
-			aitool.WithParam_Description("当本轮已明确 2-8 个互不依赖、互不干扰且都需要生成参数的调用时，优先使用本数组，不要为了沿用单工具而拆成多轮。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；运行时会分别生成参数。不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + requireToolBatchOutputExampleJSON),
+			aitool.WithParam_Description("可选的延迟优化。仅当本轮有 2-8 个低风险、互不干扰且每个工具 Schema 都简单无歧义的调用时使用；嵌套 wrapper 或参数语义不明时改用单调用。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；运行时会分别生成参数。不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + requireToolBatchOutputExampleJSON),
 			aitool.WithParam_Raw("minItems", 2),
 			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
 		},

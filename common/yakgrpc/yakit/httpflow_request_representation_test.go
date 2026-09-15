@@ -736,7 +736,11 @@ func TestDeleteHTTPFlowCleansCurrentAndBareRequestResources(t *testing.T) {
 
 	t.Run("single delete", func(t *testing.T) {
 		flow, barePath := createFlowWithBare(t, 0xfa)
+		gatewayKey := strconv.FormatUint(uint64(flow.ID), 10) + "_browser_gateway"
+		require.NoError(t, SetProjectKeyWithGroup(db, gatewayKey, `{"version":1}`, "browser_gateway"))
 		require.NoError(t, DeleteHTTPFlowByID(db, int64(flow.ID)))
+		_, gatewayErr := GetProjectKeyWithError(db, gatewayKey)
+		require.Error(t, gatewayErr)
 		require.NoFileExists(t, flow.TooLargeRequestBodyFile)
 		require.NoFileExists(t, flow.TooLargeRequestHeaderFile)
 		require.NoFileExists(t, barePath)
