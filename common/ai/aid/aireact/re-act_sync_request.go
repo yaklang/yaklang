@@ -49,6 +49,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeLoadSkillEvent(event)
 	case SYNC_TYPE_AI_MINI_TASK:
 		return r.HandleSyncTypeAIMiniTaskEvent(event)
+	case SYNC_TYPE_ADD_TODO:
+		return r.HandleSyncTypeAddTodoEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -70,6 +72,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER, r.HandleSyncTypeCloseBrowserEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL, r.HandleSyncTypeLoadSkillEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_AI_MINI_TASK, r.HandleSyncTypeAIMiniTaskEvent)
+	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_ADD_TODO, r.HandleSyncTypeAddTodoEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -88,6 +91,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_AI_MINI_TASK)
+	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_ADD_TODO)
 }
 
 func (r *ReAct) HandleSyncTypeQueueInfoEvent(event *ypb.AIInputEvent) error {
