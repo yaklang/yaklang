@@ -36,6 +36,31 @@ func TestBroadcastAISessionChanged(t *testing.T) {
 	}
 }
 
+func TestBroadcastWebFuzzerExecution(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	responses := make(chan *ypb.DuplexConnectionResponse, 1)
+	registerServerPushCallback(t.Name(), ctx, 2, func(response *ypb.DuplexConnectionResponse) error {
+		responses <- response
+		return nil
+	})
+	t.Cleanup(func() { UnRegisterServerPushCallback(t.Name()) })
+
+	BroadcastWebFuzzerExecution("mcp-execution", "mcp-tab", 123456789)
+	select {
+	case response := <-responses:
+		require.Equal(t, ServerPushType_WebFuzzerExecution, response.GetMessageType())
+		var push WebFuzzerExecutionPush
+		require.NoError(t, json.Unmarshal(response.GetData(), &push))
+		require.Equal(t, "mcp-execution", push.ExecutionID)
+		require.Equal(t, "mcp-tab", push.PageID)
+		require.EqualValues(t, 123456789, push.ExpiresAt)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Web Fuzzer execution server push")
+	}
+}
+
 func TestServerPushSlowClientDoesNotBlockOtherClients(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
