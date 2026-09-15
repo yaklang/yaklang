@@ -4,22 +4,16 @@ package plugin
 import (
 	"embed"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 const pluginXorKey = "yaklang-plugin-v1"
 
-//go:embed static.tar.gz
-var pluginEncFS embed.FS
+//go:embed static
+var pluginRawFS embed.FS
 
-var pluginFS = func() *gzip_embed.PreprocessingEmbed {
-	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(&pluginEncFS, "static.tar.gz", true, []byte(pluginXorKey))
-	if err != nil {
-		panic(err)
-	}
-	return ins
-}()
+var pluginFS = filesys.NewEmbedSubFS(pluginRawFS, "static")
 
 func loadPluginB64(filename string) []byte {
 	raw, err := pluginFS.ReadFile(filename)

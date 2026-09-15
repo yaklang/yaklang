@@ -2,21 +2,22 @@ package payloads
 
 import (
 	"embed"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"encoding/hex"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"sync"
+
+	// payloads 包含 behinder/static、yakshell/static、yakshell/encrypt、godzilla/static
+	// 四个目录的明文 payload，CI 构建时由 gzip-embed transform 自动加密。
+	//
 )
 
-// payloads.tar.gz 由构建期的 gzip-embed 生成（见 init.go 的 go:generate），
-// 内容是 behinder/static、yakshell/static、yakshell/encrypt、godzilla/static
-// 四个明文目录，条目路径保持与源码目录一致，因此二进制内不再出现明文 payload，
-// 开发者仍然可以直接编辑原始脚本文件。
-//
-//go:embed payloads.tar.gz
+//go:embed behinder/static yakshell/static yakshell/encrypt godzilla/static
 var payloadsFS embed.FS
 
 const payloadXorKey = "yaklang-payload-v1"
@@ -30,17 +31,8 @@ const (
 )
 
 // FS 是所有 wsm payload 的统一文件系统，路径相对 common/wsm/payloads 目录。
-var FS = mustNewPayloadFS(&payloadsFS, "payloads.tar.gz")
+var FS = filesys.NewEmbedFS(payloadsFS)
 
-func mustNewPayloadFS(fs *embed.FS, fileName string) *gzip_embed.PreprocessingEmbed {
-	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(fs, fileName, true, []byte(payloadXorKey))
-	if err != nil {
-		panic(fmt.Sprintf("init payload fs %s failed: %v", fileName, err))
-	}
-	return ins
-}
-
-// ReadGodzillaPayload 读取打包在 payloads.tar.gz 中的 Godzilla 静态 payload。
 func ReadGodzillaPayload(name string) ([]byte, error) {
 	return FS.ReadFile(godzillaStaticDir + "/" + name)
 }

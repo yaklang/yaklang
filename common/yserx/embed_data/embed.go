@@ -3,25 +3,20 @@ package embeddata
 
 import (
 	"embed"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"encoding/json"
 	"fmt"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 const yserxXorKey = "yaklang-yserx-v1"
 
-//go:embed static.tar.gz
-var yserxEncFS embed.FS
+//go:embed static
+var yserxRawFS embed.FS
 
-var yserxFS = func() *gzip_embed.PreprocessingEmbed {
-	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(&yserxEncFS, "static.tar.gz", true, []byte(yserxXorKey))
-	if err != nil {
-		panic(fmt.Sprintf("init yserx embed failed: %v", err))
-	}
-	return ins
-}()
+var yserxFS = filesys.NewEmbedSubFS(yserxRawFS, "static")
 
 type SerializedObjects struct {
 	ObjectArray        string `json:"object_array"`

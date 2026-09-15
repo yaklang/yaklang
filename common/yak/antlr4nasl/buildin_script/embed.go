@@ -2,20 +2,11 @@ package buildin_script
 
 import (
 	"embed"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-//go:embed static.tar.gz
+//go:embed static
 var resourceFS embed.FS
 
-var FS *gzip_embed.PreprocessingEmbed
-
-func init() {
-	var err error
-	FS, err = gzip_embed.NewPreprocessingEmbed(&resourceFS, "static.tar.gz", true)
-	if err != nil {
-		log.Errorf("init embed failed: %v", err)
-		FS = gzip_embed.NewEmptyPreprocessingEmbed()
-	}
-}
+var FS = filesys.NewEmbedSubFS(resourceFS, "static")

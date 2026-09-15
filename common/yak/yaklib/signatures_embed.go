@@ -3,26 +3,20 @@ package yaklib
 
 import (
 	"embed"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"encoding/json"
 	"fmt"
-
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 const sigsXorKey = "yaklang-sigs-v1"
 
-//go:embed static.tar.gz
-var sigsEncFS embed.FS
+//go:embed static
+var sigsRawFS embed.FS
 
-var sigsFS = func() *gzip_embed.PreprocessingEmbed {
-	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(&sigsEncFS, "static.tar.gz", true, []byte(sigsXorKey))
-	if err != nil {
-		panic(err)
-	}
-	return ins
-}()
+var sigsFS = filesys.NewEmbedSubFS(sigsRawFS, "static")
 
-// loadSignaturesFromEmbed 从 XOR 编码的 embed 文件加载恶意文件特征库。
 func loadSignaturesFromEmbed() ([]*MaliciousSignature, error) {
 	raw, err := sigsFS.ReadFile("malicious_signatures.json")
 	if err != nil {

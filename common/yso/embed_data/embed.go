@@ -3,36 +3,31 @@ package embeddata
 
 import (
 	"embed"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"encoding/json"
 	"fmt"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 const ysoXorKey = "yaklang-yso-v1"
 
-//go:embed static.tar.gz
-var ysoEncFS embed.FS
+//go:embed static
+var ysoRawFS embed.FS
 
-var ysoFS = func() *gzip_embed.PreprocessingEmbed {
-	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(&ysoEncFS, "static.tar.gz", true, []byte(ysoXorKey))
-	if err != nil {
-		panic(fmt.Sprintf("init yso embed failed: %v", err))
-	}
-	return ins
-}()
+var ysoFS = filesys.NewEmbedSubFS(ysoRawFS, "static")
 
 type SerializedObjects struct {
-	ObjectArray        string `json:"object_array"`
-	DirtyDataHeader    string `json:"dirty_data_header"`
+	ObjectArray     string `json:"object_array"`
+	DirtyDataHeader string `json:"dirty_data_header"`
 }
 
 var (
-	checkListCache    map[string]string
-	serializedCache   *SerializedObjects
-	checkListOnce     sync.Once
-	serializedOnce    sync.Once
+	checkListCache  map[string]string
+	serializedCache *SerializedObjects
+	checkListOnce   sync.Once
+	serializedOnce  sync.Once
 )
 
 // LoadCheckList 从 XOR 编码的 embed 文件加载 gadget 检测类名列表。

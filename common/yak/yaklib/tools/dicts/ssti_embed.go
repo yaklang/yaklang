@@ -4,22 +4,17 @@ package dicts
 import (
 	"embed"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 const sstiXorKey = "yaklang-dicts-v1"
 
-//go:embed static.tar.gz
-var sstiEncFS embed.FS
+//go:embed static
+var sstiRawFS embed.FS
 
-var sstiFS = func() *gzip_embed.PreprocessingEmbed {
-	ins, err := gzip_embed.NewPreprocessingEmbedWithXORKey(&sstiEncFS, "static.tar.gz", true, []byte(sstiXorKey))
-	if err != nil {
-		panic(err)
-	}
-	return ins
-}()
+var sstiFS = filesys.NewEmbedSubFS(sstiRawFS, "static")
 
 func loadSSTIPayloads() string {
 	raw, err := sstiFS.ReadFile("ssti.txt")
