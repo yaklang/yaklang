@@ -765,7 +765,12 @@ jobs:
               ]
 
           - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
-            package_workers: "2"
+            # Left serial: bruteutils already runs 57s against its 60s budget when
+            # it owns both cores, and it exercises real network timeouts rather
+            # than pure CPU work, so splitting the runner across two packages
+            # pushes it over the budget (observed on run 34945422391: timed out
+            # twice, and the 60s retry did not help). Raise this package's budget
+            # before enabling package parallelism for the suite.
             test_configs: |
               [
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
@@ -837,6 +842,10 @@ jobs:
             package_workers: "2"
             sync_rule: "1"
             go_test_p: "1"
+            # sfbuildin's rule-verification subtests call t.Parallel() and share an
+            # antlr token collector that is not thread-safe, which aborted the
+            # package with "fatal error: concurrent map read and map write". Its
+            # entry below sets parallel:1 until that collector is fixed upstream.
             test_configs: |
               [
                 {"package": "./common/yak/ssa/...", "timeout": "20s"},
@@ -848,11 +857,6 @@ jobs:
                 {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s", "retry": 1, "retry_delay": 5},
                 {"package": "./common/syntaxflow/sfrisk", "timeout": "20s"},
                 {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
-                # Rule verification subtests call t.Parallel(); the shared antlr
-                # token collector they run through is not thread-safe and has
-                # aborted this package with "fatal error: concurrent map read
-                # and map write". Serialize subtests here until the collector is
-                # fixed upstream.
                 {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/yak/ssaapi/test/syntaxflow/...", "timeout": "1m"},
                 {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
@@ -863,11 +867,11 @@ jobs:
           - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
             sync_rule: "1"
             go_test_p: "1"
+            # The PHP corpus walker (TestAllSyntaxProjectBuildForPHP) alone takes
+            # ~190s, so the old 5m cap was too tight on a loaded runner and
+            # surfaced as "panic: test timed out"; php/... now gets 8m.
             test_configs: |
               [
-                # The PHP corpus walker (TestAllSyntaxProjectBuildForPHP) alone takes
-                # ~190s; on a loaded 2-core runner the previous 5m cap sat too close to
-                # that, so a slow runner turned it into "panic: test timed out".
                 {"package": "./common/yak/php/...", "timeout": "8m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"},
                 {"package": "./common/sfweb/...", "timeout": "4m"},
