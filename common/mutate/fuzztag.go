@@ -2314,8 +2314,8 @@ func CodecTag() []*FuzzTagDescription {
 					return []string{s}
 				}
 
-				lastDividerIndex := strings.LastIndexByte(s, '|')
-				if lastDividerIndex < 0 {
+				parts := strings.SplitN(s, "|", 2)
+				if len(parts) < 2 {
 					script, err := codecCaller(s, "")
 					if err != nil {
 						log.Errorf("codec caller error: %s", err)
@@ -2324,7 +2324,7 @@ func CodecTag() []*FuzzTagDescription {
 					// log.Errorf("fuzz.codec no plugin / param specific")
 					return []string{script}
 				}
-				name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
+				name, params := parts[0], parts[1]
 				script, err := codecCaller(name, params)
 				if err != nil {
 					log.Errorf("codec caller error: %s", err)
@@ -2332,7 +2332,7 @@ func CodecTag() []*FuzzTagDescription {
 				}
 				return []string{script}
 			},
-			Description:         "调用 Yakit Codec 插件",
+			Description:         "调用 Yakit Codec 插件，使用第一个 | 分隔插件名和参数，参数中可以包含 | 字符。当参数中包含保留字符（如 {{ }} | 等）时，可配合 rawtag 使用：{{codec(pluginName|{{=复杂{{参数}}=}})}}",
 			TagNameVerbose:      "调用Codec插件",
 			ArgumentDescription: "{{string_split(name:插件名)}}{{string(params:参数)}}",
 		},
@@ -2344,12 +2344,12 @@ func CodecTag() []*FuzzTagDescription {
 				}
 
 				s = strings.Trim(s, " ()")
-				lastDividerIndex := strings.LastIndexByte(s, '|')
-				if lastDividerIndex < 0 {
+				parts := strings.SplitN(s, "|", 2)
+				if len(parts) < 2 {
 					log.Errorf("fuzz.codec no plugin / param specific")
 					return fuzztagfallback
 				}
-				name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
+				name, params := parts[0], parts[1]
 				script, err := codecCaller(name, params)
 				if err != nil {
 					log.Errorf("codec caller error: %s", err)
@@ -2361,7 +2361,7 @@ func CodecTag() []*FuzzTagDescription {
 				}
 				return results
 			},
-			Description:         "调用 Yakit Codec 插件，把结果解析成行",
+			Description:         "调用 Yakit Codec 插件，把结果解析成行，使用第一个 | 分隔插件名和参数，参数中可以包含 | 字符。当参数中包含保留字符（如 {{ }} | 等）时，可配合 rawtag 使用：{{codec:line(pluginName|{{=复杂{{参数}}=}})}}",
 			TagNameVerbose:      "调用Codec插件，结果按行解析",
 			ArgumentDescription: "{{string_split(name:插件名)}}{{string(params:参数)}}",
 		},
