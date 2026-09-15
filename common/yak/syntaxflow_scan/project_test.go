@@ -260,6 +260,41 @@ alert $hit`,
 	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
 }
 
+// A run without struct mode still compiles for SSA, but that compile must not
+// be reported as a successful 语义检测 stage: the product result lists what
+// actually ran, so a phantom review stage would misinform the operator.
+func TestScanProject_SSAOnlyDoesNotReportReview(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
+
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SSAMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: python, title: "ssa only")
+eval(* as $arg) as $call
+alert $call`,
+			Language: "python",
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+
+	stageKeys := make([]string, 0, len(result.Stages))
+	for _, outcome := range result.Stages {
+		stageKeys = append(stageKeys, string(outcome.Stage))
+	}
+	require.Contains(t, stageKeys, string(syntaxflow_scan.StageCollect))
+	require.Contains(t, stageKeys, string(syntaxflow_scan.StageAnalyze))
+	require.NotContains(t, stageKeys, string(syntaxflow_scan.StageReview),
+		"compile for SSA-only must not claim 语义检测 ran")
+	require.NotContains(t, stageKeys, string(syntaxflow_scan.StageInspect))
+}
+
 func TestScanProject_WithModeStackedSourceAndStruct(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
