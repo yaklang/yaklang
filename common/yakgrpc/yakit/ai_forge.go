@@ -188,8 +188,20 @@ func GetAIForgeByNameAndTypes(db *gorm.DB, name string, forgeTypes ...string) (*
 		query = query.Where("forge_type IN (?)", forgeTypes)
 	}
 	var forge schema.AIForge
-	if db := query.First(&forge); db.Error != nil {
-		return nil, db.Error
+	if err := query.First(&forge).Error; err == nil {
+		return &forge, nil
+	} else if !gorm.IsRecordNotFoundError(err) {
+		return nil, err
+	}
+
+	// 回退：前端 mention 智能体时传入的是显示名（forge_verbose_name），
+	// 而 forge_name 才是唯一键，二者不一致时按显示名精确匹配一次。
+	query = db.Where("forge_verbose_name = ?", name)
+	if len(forgeTypes) > 0 {
+		query = query.Where("forge_type IN (?)", forgeTypes)
+	}
+	if err := query.First(&forge).Error; err != nil {
+		return nil, err
 	}
 	return &forge, nil
 }
