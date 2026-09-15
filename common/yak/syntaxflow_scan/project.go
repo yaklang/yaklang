@@ -143,9 +143,18 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	}
 
 	if needCompile {
-		compileStage := StageReview
-		if compileOnly {
+		// A compile serves whichever product stage asked for it. Compile-only
+		// runs report StageCompile; review runs own it because struct rules run
+		// during compile; analyze-only runs fold it into the analyze stage and
+		// must NOT report review, which would claim 语义检测 ran.
+		compileStage := ProductStage("")
+		switch {
+		case compileOnly:
 			compileStage = StageCompile
+		case wantReview:
+			compileStage = StageReview
+		case wantAnalyze:
+			recorder.enter(StageAnalyze)
 		}
 		if compileOnly {
 			emit(StageCompile, 0, nil)
@@ -168,7 +177,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 			}
 		}))
 		prog, err := compileProductProject(ctx, cfg.Config, compileOpts...)
-		report(compileStage, err)
+		if compileStage != "" {
+			report(compileStage, err)
+		}
 		if err != nil {
 			return finishScanProject(cfg, recorder, programName, err)
 		}
