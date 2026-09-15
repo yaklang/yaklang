@@ -31,6 +31,27 @@ func TestLanguageFromRuleFileName(t *testing.T) {
 	})
 }
 
+func TestApplyFilenameLanguageFallback_KeepsDescLanguage(t *testing.T) {
+	rule, err := CheckSyntaxFlowRuleContent(`desc(
+	mode: "source"
+	language: general
+	title: "keep desc language"
+)
+${*}.pattern_regex(/x/) as $hit
+alert $hit
+`)
+	require.NoError(t, err)
+	require.Equal(t, ssaconfig.General, rule.Language)
+	applyFilenameLanguageFallback(rule, "source-java-cookie-httponly-false.sf")
+	require.Equal(t, ssaconfig.General, rule.Language, "desc(language) must win over filename")
+}
+
+func TestApplyFilenameLanguageFallback_FillsEmptyLanguage(t *testing.T) {
+	rule := &schema.SyntaxFlowRule{}
+	applyFilenameLanguageFallback(rule, "source-java-cookie-httponly-false.sf")
+	require.Equal(t, ssaconfig.JAVA, rule.Language)
+}
+
 func AddGroupForRule(db *gorm.DB, ruleName, groupName string) error {
 	_, err := BatchAddGroupsForRules(db, []string{ruleName}, []string{groupName})
 	return err
