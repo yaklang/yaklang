@@ -4,14 +4,21 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/authhack"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var (
@@ -499,4 +506,78 @@ func TestCodecSymmetricEmptyRawIV(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCodecflowFuzzTagWithPipeInInput 测试 codecflow fuzztag 的完整链路：
+// 使用临时数据库保存 codecflow，通过 FuzzTagExec 执行，验证 SplitN 切分后 input 中可以包含 | 字符
+func TestCodecflowFuzzTagWithPipeInInput(t *testing.T) {
+	// 使用临时数据库，避免污染全局数据库
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test-profile.db")
+	db, err := consts.CreateProfileDatabase(dbPath)
+	require.NoError(t, err)
+	consts.BindProfileDatabase(db, dbPath)
+	flowName := utils.RandStringBytes(10)
+	// 测试结束后清理：删除测试数据、关闭临时数据库、恢复全局数据库状态
+	t.Cleanup(func() {
+		// 删除测试用的 codecflow 记录
+		_ = yakit.DeleteCodecFlow(db, flowName)
+		// 关闭临时数据库并清除全局绑定（profileDatabase 置 nil，下次使用时惰性重建）
+		consts.CloseProfileDatabase()
+	})
+
+	// WorkFlowUI 需要设置合法的 JSON，否则 jsonpath.Find 解析空字符串会报错
+	// rightItems 需要包含与 workFlow 数量一致的元素，且每个元素需要有 status 字段
+	// status 为空字符串表示正常执行（非 suspend/shield）
+	workFlowUI := `{"rightItems":[{"status":""}]}`
+
+	// 创建一个简单的 Base64Encode codec flow
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType:  "Base64Encode",
+			Script:     "",
+			PluginName: "",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "Alphabet",
+					Value: "standard",
+				},
+			},
+		},
+	}
+	workFlowJSON, err := json.Marshal(workFlow)
+	require.NoError(t, err)
+
+	err = yakit.CreateOrUpdateCodecFlow(db, &schema.CodecFlow{
+		FlowName:   flowName,
+		WorkFlow:   workFlowJSON,
+		WorkFlowUI: workFlowUI,
+	})
+	require.NoError(t, err)
+
+	t.Run("input with pipe character should not be split", func(t *testing.T) {
+		// input 中包含 | 字符，SplitN 只在第一个 | 处切分
+		// flowName=flowName, input=a|b|c
+		data := "a|b|c"
+		expected := codec.EncodeBase64(data)
+
+		res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + data + ")}}")
+		require.NoError(t, err)
+		require.Len(t, res, 1)
+		require.Equal(t, expected, res[0])
+	})
+
+	t.Run("input with rawtag for reserved chars", func(t *testing.T) {
+		// 配合 rawtag 使用：rawtag 内的 {{ }} 不会被解析为 fuzztag
+		// {{codecflow(flowName|{{=复杂{{输入}}=}})}}
+		// rawtag 输出 "复杂{{输入}}"，然后传给 codecflow
+		rawInput := `{{=复杂{{输入}}=}}`
+		expectedInput := `复杂{{输入}}`
+		expected := codec.EncodeBase64(expectedInput)
+
+		res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + rawInput + ")}}")
+		require.NoError(t, err)
+		require.Len(t, res, 1)
+		require.Equal(t, expected, res[0])
+	})
 }

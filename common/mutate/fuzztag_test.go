@@ -752,3 +752,46 @@ func TestJpgTiffVariantFuzzTags(t *testing.T) {
 		require.Equal(t, "\x49\x49", results[1])
 	})
 }
+
+
+// TestCodecFuzzTagWithPipeInParams 测试 codec 和 codec:line 标签使用 SplitN 后
+// 参数中可以包含 | 字符，不会被错误地当作分隔符
+func TestCodecFuzzTagWithPipeInParams(t *testing.T) {
+	// mock codecCaller: 返回 name + "|" + params 以便验证切分是否正确
+	originalCaller := codecCaller
+	InitCodecCaller(func(name string, s interface{}) (string, error) {
+		return name + "|" + utils.InterfaceToString(s), nil
+	})
+	defer func() { codecCaller = originalCaller }()
+
+	t.Run("codec params with pipe character", func(t *testing.T) {
+		// input 中包含 | 字符，SplitN 只在第一个 | 处切分
+		// name=pluginName, params=a|b|c
+		results, err := FuzzTagExec(`{{codec(pluginName|a|b|c)}}`, Fuzz_WithEnableCodectag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.Equal(t, "pluginName|a|b|c", results[0])
+	})
+
+	t.Run("codec:line params with pipe character", func(t *testing.T) {
+		// input 中包含 | 字符，SplitN 只在第一个 | 处切分
+		// name=pluginName, params=line1|line2|line3
+		// mock 返回 "pluginName|line1|line2|line3"（无换行，整体作为一行）
+		// 验证 params 正确包含了 | 字符
+		results, err := FuzzTagExec(`{{codec:line(pluginName|line1|line2|line3)}}`, Fuzz_WithEnableCodectag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.Equal(t, "pluginName|line1|line2|line3", results[0])
+	})
+
+	t.Run("codec with rawtag for reserved chars", func(t *testing.T) {
+		// 配合 rawtag 使用：rawtag 内的 {{ }} 不会被解析为 fuzztag
+		// {{codec(pluginName|{{=复杂{{参数}}=}})}}
+		// rawtag 输出 "复杂{{参数}}"，然后传给 codec
+		// name=pluginName, params=复杂{{参数}}
+		results, err := FuzzTagExec(`{{codec(pluginName|{{=复杂{{参数}}=}})}}`, Fuzz_WithEnableCodectag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.Equal(t, "pluginName|复杂{{参数}}", results[0])
+	})
+}
