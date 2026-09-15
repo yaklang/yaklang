@@ -1388,11 +1388,13 @@ Use --severity and --rule to filter output.`,
 var ssaCodeScan = &cli.Command{
 	Name:      "code-scan",
 	Aliases:   []string{"codescan,sfscan"},
-	Usage:     "Compile and batch-scan code with SyntaxFlow rules",
+	Usage:     "Scan code with source/struct/ssa SyntaxFlow rules",
 	UsageText: `yak code-scan (--target <path> | --program <name> | --config <json>) [options]`,
 	Description: `Recommended scanning command for CI and batch jobs.
-It compiles code (same compile pipeline as ssa-compile), executes SyntaxFlow rules,
-and exports structured report (sarif/irify).`,
+code-scan is scan-only: both --target and --program run source, struct, and ssa.
+--target inspects live local files, compiles (struct at compile time), reloads IR, then SSA.
+--program does not compile: source from IrSource, struct inside one application/library, then SSA.
+Exports structured report (sarif/irify).`,
 	Flags: []cli.Flag{
 		// Input {{{
 		// config file (when specified, use config-scan mode)
@@ -1403,12 +1405,12 @@ and exports structured report (sarif/irify).`,
 		// program name
 		cli.StringFlag{
 			Name:  "program,p",
-			Usage: "existing program name in SSA database",
+			Usage: "existing program name in SSA database (scan only, no compile)",
 		},
 		// target path
 		cli.StringFlag{
 			Name:  "target,t",
-			Usage: "target source path to compile before scan",
+			Usage: "live source path: inspect local files, compile+struct, reload, then SSA",
 		},
 
 		cli.StringFlag{
@@ -1548,7 +1550,7 @@ and exports structured report (sarif/irify).`,
 		} else {
 			log.Infof("============= start to scan code ==============")
 		}
-		log.Infof("[code-scan] mode: compile + scan via syntaxflow_scan.ScanProject")
+		log.Infof("[code-scan] mode: scan source/struct/ssa via syntaxflow_scan.ScanProject (-t compiles then reloads; -p does not compile)")
 
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()

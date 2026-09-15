@@ -243,6 +243,88 @@ alert $hit`,
 	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
 }
 
+func TestScanProject_TargetReloadsThenRunsSSA(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "A.java"), []byte(`class A {
+	public static void main(String[] args) {
+		Runtime.getRuntime().exec(args[0]);
+	}
+}
+`), 0o644))
+
+	var alerts int
+	err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("java"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: java, title: "target reload ssa")
+Runtime.getRuntime().exec(* as $cmd)
+alert $cmd`,
+			Language: "java",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Greater(t, alerts, 0, "SSA after -t must run on the reloaded DB program")
+}
+
+func TestScanProject_ProgramPathRunsStructWithoutCompile(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("app.py", "def run(x):\n    return eval(x)\n")
+	progs, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(ssaconfig.PYTHON),
+		ssaapi.WithProgramName(t.Name()),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, progs)
+
+	orig := syntaxflow_scan.CompileProject
+	t.Cleanup(func() { syntaxflow_scan.CompileProject = orig })
+	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+		t.Fatal("code-scan -p must not compile")
+		return nil, fmt.Errorf("must not compile")
+	}
+
+	var alerts int
+	var stages []string
+	err = syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithProgramNames(t.Name()),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(
+	mode: "struct"
+	language: "python"
+	title: "program struct eval"
+)
+eval(* as $arg) as $call
+alert $call`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Greater(t, alerts, 0, "code-scan -p must struct-scan the loaded program")
+	require.Contains(t, stages, string(syntaxflow_scan.StageReview))
+	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+	require.Contains(t, stages, string(syntaxflow_scan.StageAnalyze))
+}
+
 func TestScanProject_NamedProgramFromDatabase(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("A.java", `class A {

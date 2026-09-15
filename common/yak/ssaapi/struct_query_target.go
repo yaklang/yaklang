@@ -135,8 +135,38 @@ func (t *StructQueryTarget) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (s
 	if t == nil || t.prog == nil || t.prog.Program == nil || opcodeItems == nil {
 		return sfvm.NewEmptyValues(), nil
 	}
-	insts := ssa.MatchInstructionByOpcodesResident(t.prog.Program, opcodeItems.Opcodes...)
-	return ToSFVMValues(t.allowedInsts(insts)), nil
+	return ToSFVMValues(t.allowedInsts(t.matchOpcodes(opcodeItems.Opcodes...))), nil
+}
+
+func (t *StructQueryTarget) matchOpcodes(opcodes ...ssa.Opcode) []ssa.Instruction {
+	if t == nil || t.prog == nil || t.prog.Program == nil {
+		return nil
+	}
+	prog := t.prog.Program
+	if structScanUseDatabase(prog) {
+		return ssa.MatchInstructionByOpcodesWithFileFilter(t.queryCtx(), prog, t.includeFiles(), nil, opcodes...)
+	}
+	return ssa.MatchInstructionByOpcodesResident(prog, opcodes...)
+}
+
+func (t *StructQueryTarget) queryCtx() context.Context {
+	if t != nil && t.prog != nil && t.prog.config != nil && t.prog.config.ctx != nil {
+		return t.prog.config.ctx
+	}
+	return context.Background()
+}
+
+func structScanUseDatabase(prog *ssa.Program) bool {
+	if prog == nil {
+		return false
+	}
+	if prog.DatabaseKind == ssa.ProgramCacheDBRead {
+		return true
+	}
+	if prog.Cache == nil {
+		return false
+	}
+	return prog.Cache.IsClosed() || prog.Cache.IsCleaned()
 }
 
 func (t *StructQueryTarget) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
