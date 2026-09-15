@@ -65,12 +65,23 @@ common/xlic/*.gzip
 .ace-tool/
 *.a
 
-# gzip_embed generated archives (built by scripts/workflows, do not commit)
+# gzip_embed generated archives (built by CI transform, do not commit)
 common/ai/aid/aitool/buildinaitools/yakscripttools/*.tar.gz
+common/ai/aid/aireact/*.tar.gz
 common/aiforge/*.tar.gz
 common/coreplugin/*.tar.gz
+common/fp/fingerprint/rule_resources/*.tar.gz
 common/syntaxflow/sfbuildin/*.tar.gz
+common/utils/fileparser/resources/*.tar.gz
+common/wsm/payloads/*.tar.gz
+common/wsm/payloads/godzilla/plugin/*.tar.gz
+common/wsm/payloads/templates/*.tar.gz
+common/yak/antlr4nasl/buildin_script/*.tar.gz
+common/yak/yaklib/*.tar.gz
+common/yak/yaklib/tools/dicts/*.tar.gz
 common/yso/resources/*.tar.gz
+common/yso/embed_data/*.tar.gz
+common/yserx/embed_data/*.tar.gz
 common/yak/ssa2llvm/runtime/embed/*.tar.gz
 common/yak/ssa2llvm/runtime/embed/ssa2llvm-runtime/
 

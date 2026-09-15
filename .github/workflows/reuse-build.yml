@@ -299,24 +299,13 @@ jobs:
           # old `embed-fs-hash --override --all` behaviour through a throw-away template.
           YAK="$YAK" bash scripts/sync-embed-fs-hash.sh
 
-      - name: Install gzip-embed tool
-        run: go install ./common/utils/gzip_embed/gzip-embed
-
-      - name: Generate tar.gz resources
+      - name: Install gzip-embed tool and transform embed resources
+        # Auto-detect all embed files in the gzip_embed ecosystem, generate
+        # tar.gz archives (with XOR where applicable), and rewrite source
+        # code from plaintext embed to gzip-encrypted embed.
         run: |
-          gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
-          gzip-embed -cache --source ./common/ai/aid/aireact/skills --gz ./common/ai/aid/aireact/skills.tar.gz --root-path --no-embed
-          gzip-embed -cache --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --xor-key yaklang-yso-v1 --no-embed --root-path
-          gzip-embed -cache --source ./common/coreplugin/base-yak-plugin --gz ./common/coreplugin/base-yak-plugin.tar.gz --root-path --no-embed
-          gzip-embed -cache --source ./common/syntaxflow/sfbuildin/buildin --gz ./common/syntaxflow/sfbuildin/buildin.tar.gz --root-path --no-embed
-          gzip-embed -cache --source ./common/aiforge/buildinforge --gz ./common/aiforge/buildinforge.tar.gz --root-path --no-embed
-          gzip-embed -cache --source ./common/wsm/payloads/templates/static --gz ./common/wsm/payloads/templates/static.tar.gz --xor-key yaklang-wsm-v1 --no-embed
-          gzip-embed -cache --source ./common/yak/yaklib/tools/dicts/static --gz ./common/yak/yaklib/tools/dicts/static.tar.gz --xor-key yaklang-dicts-v1 --no-embed
-          gzip-embed -cache --source ./common/yak/yaklib/static --gz ./common/yak/yaklib/static.tar.gz --xor-key yaklang-sigs-v1 --no-embed
-          gzip-embed -cache --source ./common/yso/embed_data/static --gz ./common/yso/embed_data/static.tar.gz --xor-key yaklang-yso-v1 --no-embed
-          gzip-embed -cache --source ./common/yserx/embed_data/static --gz ./common/yserx/embed_data/static.tar.gz --xor-key yaklang-yserx-v1 --no-embed
-          gzip-embed -cache --source ./common/wsm/payloads/godzilla/plugin/static --gz ./common/wsm/payloads/godzilla/plugin/static.tar.gz --xor-key yaklang-plugin-v1 --no-embed
-          gzip-embed -cache --base ./common/wsm/payloads --source ./common/wsm/payloads/behinder/static --source ./common/wsm/payloads/yakshell/static --source ./common/wsm/payloads/yakshell/encrypt --source ./common/wsm/payloads/godzilla/static --gz ./common/wsm/payloads/payloads.tar.gz --xor-key yaklang-payload-v1 --no-embed
+          go install ./common/utils/gzip_embed/gzip-embed
+          gzip-embed transform ./common/...
 
       - name: Initialize License Machine
         # yak-slim is a Yakit engine drop-in and must share the official license
