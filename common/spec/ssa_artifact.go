@@ -42,6 +42,10 @@ type SSAArtifactManifestV1 struct {
 // notification and run async import from object storage.
 type SSAArtifactReadyEvent struct {
 	SourceStatistics json.RawMessage `json:"source_statistics,omitempty"`
+	// ScanStages carries the product stage outcomes reported by the scan
+	// script (which stages ran, their status, duration, and counts). The
+	// platform renders them directly instead of inferring stage state.
+	ScanStages       json.RawMessage `json:"scan_stages,omitempty"`
 	ObjectKey        string          `json:"object_key"`
 	Codec            string          `json:"codec"` // "zstd" | "gzip" | "identity"
 	ArtifactFormat   string          `json:"artifact_format,omitempty"`
