@@ -29,6 +29,12 @@ func TestApplyTodoDeltaBottomLineForNormalToolAction(t *testing.T) {
 	applyTodoDeltaBottomLine(loop, task, 3, action)
 	open, current, closed := cfg.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
 	require.Equal(t, "todo-1", current)
-	require.Equal(t, []aicommon.TodoOpenItem{{ID: "todo-1", Text: "verify token reuse", CreatedAt: 1, UpdatedAt: 1}}, open)
+	require.Len(t, open, 1)
+	require.Equal(t, "todo-1", open[0].ID)
+	require.Equal(t, "verify token reuse", open[0].Text)
+	require.Equal(t, 1, open[0].CreatedAt)
+	require.Equal(t, 1, open[0].UpdatedAt)
+	require.NotZero(t, open[0].CreatedTs, "CreatedTs should be set on add")
+	require.NotZero(t, open[0].FocusStartedTs, "FocusStartedTs should be set when made current")
 	require.Empty(t, closed)
 }

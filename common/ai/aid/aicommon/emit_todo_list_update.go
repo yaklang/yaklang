@@ -56,6 +56,7 @@ func BuildCurrentTaskTodoListPayload(
 	payload.Items = cfg.SnapshotVerificationTodoItemsByScope(scope)
 	payload.Stats = cfg.GetVerificationTodoStatsByScope(scope)
 	payload.OpenTodos, payload.CurrentTodoID, payload.ClosedTodos = cfg.SnapshotCanonicalTodos(scope)
+	enrichPayloadLifecycle(&payload)
 	return payload
 }
 
@@ -73,6 +74,24 @@ func normalizeTodoListUpdatePayload(payload TodoListUpdatePayload) TodoListUpdat
 		payload.ClosedTodos = []TodoClosedItem{}
 	}
 	return payload
+}
+
+// enrichPayloadLifecycle fills survival_seconds / focus_seconds / age_seconds
+// directly onto each todo item in the payload using the current wall-clock
+// time. This is called at emit time so open items reflect up-to-the-second
+// durations.
+func enrichPayloadLifecycle(payload *TodoListUpdatePayload) {
+	if payload == nil {
+		return
+	}
+	now := nowTs()
+	EnrichItemsLifecycle(payload.Items, now)
+	for i := range payload.OpenTodos {
+		enrichOpenItemLifecycle(&payload.OpenTodos[i], payload.OpenTodos[i].ID == payload.CurrentTodoID, now)
+	}
+	for i := range payload.ClosedTodos {
+		enrichClosedItemLifecycle(&payload.ClosedTodos[i], now)
+	}
 }
 
 // EmitCurrentTaskTodoList emits EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE with
@@ -106,6 +125,7 @@ func (r *Emitter) EmitTodoListUpdate(payload TodoListUpdatePayload) (*schema.AiO
 		return nil, nil
 	}
 	payload = normalizeTodoListUpdatePayload(payload)
+	enrichPayloadLifecycle(&payload)
 	return r.EmitJSON(schema.EVENT_TYPE_TODO_LIST_UPDATE, "todo_list", payload)
 }
 

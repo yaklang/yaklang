@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 )
@@ -57,6 +58,13 @@ type VerificationTodoItem struct {
 	Outcome        TodoOutcome `json:"outcome,omitempty"`
 	Reason         string      `json:"reason,omitempty"`
 	Refs           []string    `json:"refs,omitempty"`
+
+	CreatedTs       int64 `json:"created_ts,omitempty"`
+	FocusStartedTs  int64 `json:"focus_started_ts,omitempty"`
+	ClosedTs        int64 `json:"closed_ts,omitempty"`
+	SurvivalSeconds int64 `json:"survival_seconds,omitempty"`
+	FocusSeconds    int64 `json:"focus_seconds,omitempty"`
+	AgeSeconds      int64 `json:"age_seconds,omitempty"`
 }
 
 func (i VerificationTodoItem) scope() VerificationTodoScope {
@@ -64,20 +72,30 @@ func (i VerificationTodoItem) scope() VerificationTodoScope {
 }
 
 type TodoOpenItem struct {
-	ID        string `json:"id"`
-	Text      string `json:"text"`
-	CreatedAt int    `json:"created_at"`
-	UpdatedAt int    `json:"updated_at"`
+	ID             string `json:"id"`
+	Text           string `json:"text"`
+	CreatedAt      int    `json:"created_at"`
+	UpdatedAt      int    `json:"updated_at"`
+	CreatedTs      int64  `json:"created_ts,omitempty"`
+	FocusStartedTs int64  `json:"focus_started_ts,omitempty"`
+	FocusSeconds   int64  `json:"focus_seconds,omitempty"`
+	AgeSeconds     int64  `json:"age_seconds,omitempty"`
 }
 
 type TodoClosedItem struct {
-	ID        string      `json:"id"`
-	Text      string      `json:"text"`
-	Outcome   TodoOutcome `json:"outcome"`
-	Reason    string      `json:"reason"`
-	Refs      []string    `json:"refs"`
-	CreatedAt int         `json:"created_at"`
-	UpdatedAt int         `json:"updated_at"`
+	ID              string      `json:"id"`
+	Text            string      `json:"text"`
+	Outcome         TodoOutcome `json:"outcome"`
+	Reason          string      `json:"reason"`
+	Refs            []string    `json:"refs"`
+	CreatedAt       int         `json:"created_at"`
+	UpdatedAt       int         `json:"updated_at"`
+	CreatedTs       int64       `json:"created_ts,omitempty"`
+	FocusStartedTs  int64       `json:"focus_started_ts,omitempty"`
+	ClosedTs        int64       `json:"closed_ts,omitempty"`
+	SurvivalSeconds int64       `json:"survival_seconds,omitempty"`
+	FocusSeconds    int64       `json:"focus_seconds,omitempty"`
+	AgeSeconds      int64       `json:"age_seconds,omitempty"`
 }
 
 type TodoScopeState struct {
@@ -292,6 +310,7 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 	state := s.ensureScope(scope)
 	state.Revision++
 	revision := state.Revision
+	now := nowTs()
 	results := make([]VerificationTodoApplyResult, 0, len(delta.Add)+len(delta.Update)+len(delta.Close)+1)
 	generatedAddIDs := make(map[string]struct{})
 	for index := range delta.Add {
@@ -313,7 +332,7 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 			results = append(results, todoDeltaFailure(operation, state.closedTodoRecoveryHint(closed)))
 			continue
 		}
-		state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Text, CreatedAt: revision, UpdatedAt: revision})
+		state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Text, CreatedAt: revision, UpdatedAt: revision, CreatedTs: now})
 		results = append(results, todoDeltaSuccess(operation))
 	}
 	for _, item := range delta.Update {
@@ -349,6 +368,7 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 		state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{
 			ID: open.ID, Text: open.Text, Outcome: item.Outcome, Reason: item.Reason,
 			Refs: append([]string(nil), item.Refs...), CreatedAt: open.CreatedAt, UpdatedAt: revision,
+			CreatedTs: open.CreatedTs, FocusStartedTs: open.FocusStartedTs, ClosedTs: now,
 		})
 		if state.CurrentTodoID == item.ID {
 			state.CurrentTodoID = ""
@@ -372,6 +392,11 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 		} else if state.CurrentTodoID == current {
 			results = append(results, todoDeltaNoOp(operation, "current focus already matches"))
 		} else {
+			// Record focus-start timestamp on the newly focused todo so that
+			// focus duration can be derived at emit time (now - focus_started_ts).
+			if newCurrent := state.findOpen(current); newCurrent != nil {
+				newCurrent.FocusStartedTs = now
+			}
 			state.CurrentTodoID = current
 			results = append(results, todoDeltaSuccess(operation))
 		}
@@ -504,14 +529,14 @@ func projectScope(state *TodoScopeState) []VerificationTodoItem {
 		if item.ID == state.CurrentTodoID {
 			status = VerificationTodoStatusDoing
 		}
-		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex})
+		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs})
 	}
 	for _, item := range state.ClosedTodos {
 		if item == nil {
 			continue
 		}
 		status := map[TodoOutcome]VerificationTodoStatus{TodoOutcomeResolved: VerificationTodoStatusDone, TodoOutcomeDismissed: VerificationTodoStatusDeleted, TodoOutcomeDeferred: VerificationTodoStatusSkipped}[item.Outcome]
-		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, Outcome: item.Outcome, Reason: item.Reason, Refs: append([]string(nil), item.Refs...)})
+		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, Outcome: item.Outcome, Reason: item.Reason, Refs: append([]string(nil), item.Refs...), CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs, ClosedTs: item.ClosedTs})
 	}
 	return items
 }
@@ -764,13 +789,13 @@ func migrateLegacyTodoItems(items []*VerificationTodoItem) *VerificationTodoStor
 		}
 		switch item.Status {
 		case VerificationTodoStatusPending, VerificationTodoStatusDoing:
-			state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Content, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+			state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Content, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs})
 			if item.Status == VerificationTodoStatusDoing && newestDoing[state.TaskID] == item {
 				state.CurrentTodoID = item.ID
 			}
 		case VerificationTodoStatusDone, VerificationTodoStatusDeleted, VerificationTodoStatusSkipped:
 			outcome := map[VerificationTodoStatus]TodoOutcome{VerificationTodoStatusDone: TodoOutcomeResolved, VerificationTodoStatusDeleted: TodoOutcomeDismissed, VerificationTodoStatusSkipped: TodoOutcomeDeferred}[item.Status]
-			state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{ID: item.ID, Text: item.Content, Outcome: outcome, Reason: legacyTodoReason, Refs: []string{}, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+			state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{ID: item.ID, Text: item.Content, Outcome: outcome, Reason: legacyTodoReason, Refs: []string{}, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs, ClosedTs: item.ClosedTs})
 		}
 	}
 	return store
@@ -798,4 +823,88 @@ func FormatVerificationTodoMarkdownLine(item VerificationTodoItem, marker string
 
 func SanitizeVerificationTodoMarkdownContent(content string) string {
 	return strings.Join(strings.Fields(content), " ")
+}
+
+// nowTs returns the current unix timestamp in seconds. It is the single
+// injection point for wall-clock time in the todo store.
+func nowTs() int64 {
+	return time.Now().Unix()
+}
+
+// nonNeg clamps a duration to zero if clock skew produced a negative value.
+func nonNeg(v int64) int64 {
+	if v < 0 {
+		return 0
+	}
+	return v
+}
+
+// enrichItemLifecycle fills SurvivalSeconds, FocusSeconds and AgeSeconds
+// directly onto a VerificationTodoItem using the given wall-clock reference.
+//   - AgeSeconds:      now - created_ts (all statuses)
+//   - FocusSeconds:    now - focus_started_ts (DOING); closed_ts - focus_started_ts (closed)
+//   - SurvivalSeconds: closed_ts - created_ts (closed only)
+func enrichItemLifecycle(item *VerificationTodoItem, now int64) {
+	if item == nil {
+		return
+	}
+	if item.CreatedTs > 0 {
+		item.AgeSeconds = nonNeg(now - item.CreatedTs)
+	}
+	switch item.Status {
+	case VerificationTodoStatusDoing:
+		if item.FocusStartedTs > 0 {
+			item.FocusSeconds = nonNeg(now - item.FocusStartedTs)
+		}
+	case VerificationTodoStatusDone, VerificationTodoStatusDeleted, VerificationTodoStatusSkipped:
+		if item.ClosedTs > 0 {
+			if item.CreatedTs > 0 {
+				item.SurvivalSeconds = nonNeg(item.ClosedTs - item.CreatedTs)
+			}
+			if item.FocusStartedTs > 0 {
+				item.FocusSeconds = nonNeg(item.ClosedTs - item.FocusStartedTs)
+			}
+		}
+	}
+}
+
+// EnrichItemsLifecycle fills lifecycle duration fields in-place on a slice
+// of VerificationTodoItem using the current wall-clock time.
+func EnrichItemsLifecycle(items []VerificationTodoItem, now int64) {
+	for i := range items {
+		enrichItemLifecycle(&items[i], now)
+	}
+}
+
+// enrichOpenItemLifecycle fills FocusSeconds and AgeSeconds directly onto a
+// TodoOpenItem. For a non-current (PENDING) open item FocusSeconds stays zero.
+func enrichOpenItemLifecycle(item *TodoOpenItem, isCurrent bool, now int64) {
+	if item == nil {
+		return
+	}
+	if item.CreatedTs > 0 {
+		item.AgeSeconds = nonNeg(now - item.CreatedTs)
+	}
+	if isCurrent && item.FocusStartedTs > 0 {
+		item.FocusSeconds = nonNeg(now - item.FocusStartedTs)
+	}
+}
+
+// enrichClosedItemLifecycle fills SurvivalSeconds, FocusSeconds and
+// AgeSeconds directly onto a TodoClosedItem.
+func enrichClosedItemLifecycle(item *TodoClosedItem, now int64) {
+	if item == nil {
+		return
+	}
+	if item.CreatedTs > 0 {
+		item.AgeSeconds = nonNeg(now - item.CreatedTs)
+	}
+	if item.ClosedTs > 0 {
+		if item.CreatedTs > 0 {
+			item.SurvivalSeconds = nonNeg(item.ClosedTs - item.CreatedTs)
+		}
+		if item.FocusStartedTs > 0 {
+			item.FocusSeconds = nonNeg(item.ClosedTs - item.FocusStartedTs)
+		}
+	}
 }
