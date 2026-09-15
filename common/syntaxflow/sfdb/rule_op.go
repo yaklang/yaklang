@@ -221,10 +221,6 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	if db == nil {
 		return nil, utils.Errorf("profile db is nil")
 	}
-	language, err := languageFromRuleFileName(ruleFileName)
-	if err != nil {
-		log.Error(err)
-	}
 	ruleType, err := CheckSyntaxFlowRuleType(ruleFileName)
 	if err != nil {
 		log.Error(err)
@@ -233,6 +229,7 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	if err != nil {
 		return nil, err
 	}
+	applyFilenameLanguageFallback(rule, ruleFileName)
 
 	cweList := make([]string, 0)
 
@@ -257,11 +254,6 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
-	// Prefer filename language only when valid; keep desc(language) otherwise
-	// (e.g. source-*.sf under general/secrets must not wipe language: general).
-	if language != "" {
-		rule.Language = language
-	}
 	contentTag := rule.Tag
 	merged := ""
 	for _, t := range tags {
@@ -321,10 +313,6 @@ func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, 
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
-	language, err := languageFromRuleFileName(ruleName)
-	if err != nil {
-		log.Error(err)
-	}
 	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
 	if err != nil {
 		log.Error(err)
@@ -334,9 +322,7 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 	if err != nil {
 		return err
 	}
-	if language != "" {
-		rule.Language = language
-	}
+	applyFilenameLanguageFallback(rule, ruleName)
 	rule.Type = ruleType
 
 	err = LoadFileSystem(rule, system)
@@ -358,6 +344,22 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 	return nil
 }
 
+func applyFilenameLanguageFallback(rule *schema.SyntaxFlowRule, ruleFileName string) {
+	if rule == nil || strings.TrimSpace(string(rule.Language)) != "" {
+		return
+	}
+	lang, err := languageFromRuleFileName(ruleFileName)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	if lang != "" {
+		rule.Language = lang
+	}
+}
+
+// languageFromRuleFileName infers language from a filename token (java-foo.sf,
+// source-java-foo.sf). Used only when desc(language) is empty.
 func languageFromRuleFileName(ruleFileName string) (ssaconfig.Language, error) {
 	name := strings.TrimSpace(ruleFileName)
 	name = strings.TrimSuffix(name, path.Ext(name))

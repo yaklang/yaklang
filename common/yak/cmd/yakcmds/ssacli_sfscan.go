@@ -251,14 +251,13 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 			CompileImmediately:          true,
 			ForceProgramName:            config.forceProgramName,
 			DisableTimestampProgramName: true,
-			Options:                     []ssaconfig.Option{ssaapi.WithStructRule(true)},
 		}
 		if config.preferConfigCompile {
 			req.Config = config.Config
 		} else {
 			req.Target = targetPath
 			req.Language = string(config.GetLanguage())
-			req.Options = append(req.Options, buildCompileOptionsForDetect(config.Config)...)
+			req.Options = buildCompileOptionsForDetect(config.Config)
 		}
 
 		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, req)
@@ -448,8 +447,7 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	if cfg == nil {
 		return nil
 	}
-	opts := make([]ssaconfig.Option, 0, 12)
-	opts = append(opts, ssaapi.WithStructRule(true))
+	opts := make([]ssaconfig.Option, 0, 10)
 	if programName := cfg.GetProgramName(); programName != "" {
 		opts = append(opts, ssaconfig.WithSetProgramName(programName))
 	}

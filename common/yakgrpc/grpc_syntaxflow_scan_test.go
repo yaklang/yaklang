@@ -315,10 +315,11 @@ func checkGRPCCancelScanTest(t *testing.T, client ypb.YakClient, config GRPCCanc
 		},
 	})
 	require.NoError(t, err, "[checkGRPCCancelScanTest] Failed to query scan task")
-	require.Equal(t, len(rsp.Data), 1, "[checkGRPCCancelScanTest] Should have one task")
+	require.Equal(t, 1, len(rsp.Data), "[checkGRPCCancelScanTest] Should have one task")
 	task := rsp.Data[0]
-	require.Equal(t, task.Programs, []string{progID}, "[checkGRPCCancelScanTest] Task programs mismatch")
-	require.Equal(t, task.Status, "done", "[checkGRPCCancelScanTest] Task status should be done")
+	require.Equal(t, []string{progID}, task.Programs, "[checkGRPCCancelScanTest] Task programs mismatch")
+	require.Contains(t, []string{schema.SYNTAXFLOWSCAN_DONE, schema.SYNTAXFLOWSCAN_PAUSED}, task.Status,
+		"[checkGRPCCancelScanTest] cancel should leave the task paused, or done if the scan finished first")
 
 	log.Infof("[checkGRPCCancelScanTest] Completed test: %s, task ID: %s", config.Name, id)
 }
