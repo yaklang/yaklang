@@ -103,6 +103,19 @@ func main() {
 			log.Infof("generate compress file success (skip embed file), compress file name: %s", gzName)
 		}
 	}
+	app.Commands = []cli.Command{
+		{
+			Name:            "transform",
+			Usage:           "scan .go files for //gzip:transform markers, pack directories to tar.gz, and rewrite embed code",
+			SkipFlagParsing: true,
+			Action: func(c *cli.Context) {
+				if err := runTransform(c.Args()); err != nil {
+					log.Error(err)
+					os.Exit(1)
+				}
+			},
+		},
+	}
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Error(err)
