@@ -112,6 +112,8 @@ type ReAct struct {
 
 	browserSessionsMu sync.Mutex
 	browserSessionIDs map[string]struct{}
+
+	miniAITaskRegistry *MiniAITaskRegistry
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
@@ -242,6 +244,10 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		lifecycleWG:          new(sync.WaitGroup),
 		browserSessionIDs:    make(map[string]struct{}),
 	}
+
+	// Initialize mini AI task registry and register built-in handlers
+	react.miniAITaskRegistry = NewMiniAITaskRegistry()
+	RegisterBuiltinMiniAITasks(react.miniAITaskRegistry)
 
 	cfg.SetBrowserSessionTracker(react)
 	var rollbackExtraMCPServers func()
