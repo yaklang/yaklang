@@ -1234,7 +1234,7 @@ func cparserParserInit() {
 		0, 0, 2147, 2151, 1, 0, 0, 0, 2148, 2150, 3, 210, 105, 0, 2149, 2148, 1,
 		0, 0, 0, 2150, 2153, 1, 0, 0, 0, 2151, 2149, 1, 0, 0, 0, 2151, 2152, 1,
 		0, 0, 0, 2152, 2154, 1, 0, 0, 0, 2153, 2151, 1, 0, 0, 0, 2154, 2158, 5,
-		48, 0, 0, 2155, 2157, 3, 210, 105, 0, 2156, 2155, 1, 0, 0, 0, 2157, 2160,
+		48, 0, 0, 2155, 2157, 5, 126, 0, 0, 2156, 2155, 1, 0, 0, 0, 2157, 2160,
 		1, 0, 0, 0, 2158, 2156, 1, 0, 0, 0, 2158, 2159, 1, 0, 0, 0, 2159, 2167,
 		1, 0, 0, 0, 2160, 2158, 1, 0, 0, 0, 2161, 2168, 3, 166, 83, 0, 2162, 2168,
 		3, 174, 87, 0, 2163, 2168, 3, 176, 88, 0, 2164, 2168, 3, 192, 96, 0, 2165,
@@ -1433,9 +1433,9 @@ func cparserParserInit() {
 		2642, 1, 0, 0, 0, 2644, 2647, 1, 0, 0, 0, 2645, 2643, 1, 0, 0, 0, 2645,
 		2646, 1, 0, 0, 0, 2646, 2649, 1, 0, 0, 0, 2647, 2645, 1, 0, 0, 0, 2648,
 		2641, 1, 0, 0, 0, 2649, 2650, 1, 0, 0, 0, 2650, 2648, 1, 0, 0, 0, 2650,
-		2651, 1, 0, 0, 0, 2651, 197, 1, 0, 0, 0, 2652, 2659, 3, 56, 28, 0, 2653,
-		2659, 3, 204, 102, 0, 2654, 2659, 3, 50, 25, 0, 2655, 2659, 3, 200, 100,
-		0, 2656, 2659, 3, 158, 79, 0, 2657, 2659, 5, 75, 0, 0, 2658, 2652, 1, 0,
+		2651, 1, 0, 0, 0, 2651, 197, 1, 0, 0, 0, 2652, 2659, 3, 204, 102, 0, 2653,
+		2659, 3, 50, 25, 0, 2654, 2659, 3, 200, 100, 0, 2655, 2659, 3, 158, 79,
+		0, 2656, 2659, 5, 75, 0, 0, 2657, 2659, 3, 56, 28, 0, 2658, 2652, 1, 0,
 		0, 0, 2658, 2653, 1, 0, 0, 0, 2658, 2654, 1, 0, 0, 0, 2658, 2655, 1, 0,
 		0, 0, 2658, 2656, 1, 0, 0, 0, 2658, 2657, 1, 0, 0, 0, 2659, 199, 1, 0,
 		0, 0, 2660, 2661, 5, 95, 0, 0, 2661, 2665, 5, 47, 0, 0, 2662, 2664, 3,
@@ -24716,6 +24716,8 @@ type IMacroIterationStatementContext interface {
 	AllEos() []IEosContext
 	Eos(i int) IEosContext
 	MacroArgumentList() IMacroArgumentListContext
+	AllEOS() []antlr.TerminalNode
+	EOS(i int) antlr.TerminalNode
 
 	// IsMacroIterationStatementContext differentiates from other interfaces.
 	IsMacroIterationStatementContext()
@@ -24918,6 +24920,14 @@ func (s *MacroIterationStatementContext) MacroArgumentList() IMacroArgumentListC
 	return t.(IMacroArgumentListContext)
 }
 
+func (s *MacroIterationStatementContext) AllEOS() []antlr.TerminalNode {
+	return s.GetTokens(CParserEOS)
+}
+
+func (s *MacroIterationStatementContext) EOS(i int) antlr.TerminalNode {
+	return s.GetToken(CParserEOS, i)
+}
+
 func (s *MacroIterationStatementContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -25039,10 +25049,14 @@ func (p *CParser) MacroIterationStatement() (localctx IMacroIterationStatementCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CParserSemi || _la == CParserEOS {
+	for _la == CParserEOS {
 		{
 			p.SetState(2155)
-			p.Eos()
+			p.Match(CParserEOS)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(2160)
@@ -30780,12 +30794,12 @@ type IExternalDeclarationContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	DeclarationSpecifier() IDeclarationSpecifierContext
 	FunctionDefinition() IFunctionDefinitionContext
 	Declaration() IDeclarationContext
 	MacroCallExpression() IMacroCallExpressionContext
 	MacroCallStatement() IMacroCallStatementContext
 	Semi() antlr.TerminalNode
+	DeclarationSpecifier() IDeclarationSpecifierContext
 
 	// IsExternalDeclarationContext differentiates from other interfaces.
 	IsExternalDeclarationContext()
@@ -30822,22 +30836,6 @@ func NewExternalDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleC
 }
 
 func (s *ExternalDeclarationContext) GetParser() antlr.Parser { return s.parser }
-
-func (s *ExternalDeclarationContext) DeclarationSpecifier() IDeclarationSpecifierContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IDeclarationSpecifierContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IDeclarationSpecifierContext)
-}
 
 func (s *ExternalDeclarationContext) FunctionDefinition() IFunctionDefinitionContext {
 	var t antlr.RuleContext
@@ -30907,6 +30905,22 @@ func (s *ExternalDeclarationContext) Semi() antlr.TerminalNode {
 	return s.GetToken(CParserSemi, 0)
 }
 
+func (s *ExternalDeclarationContext) DeclarationSpecifier() IDeclarationSpecifierContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IDeclarationSpecifierContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IDeclarationSpecifierContext)
+}
+
 func (s *ExternalDeclarationContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -30942,46 +30956,46 @@ func (p *CParser) ExternalDeclaration() (localctx IExternalDeclarationContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(2652)
-			p.DeclarationSpecifier()
+			p.FunctionDefinition()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(2653)
-			p.FunctionDefinition()
+			p.Declaration()
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(2654)
-			p.Declaration()
+			p.MacroCallExpression()
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(2655)
-			p.MacroCallExpression()
+			p.MacroCallStatement()
 		}
 
 	case 5:
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(2656)
-			p.MacroCallStatement()
+			p.Match(CParserSemi)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
 		p.EnterOuterAlt(localctx, 6)
 		{
 			p.SetState(2657)
-			p.Match(CParserSemi)
-			if p.HasError() {
-				// Recognition error - abort rule
-				goto errorExit
-			}
+			p.DeclarationSpecifier()
 		}
 
 	case antlr.ATNInvalidAltNumber:
