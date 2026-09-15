@@ -1504,7 +1504,7 @@ Exports structured report (sarif/irify).`,
 
 		cli.StringSliceFlag{
 			Name:  "mode",
-			Usage: "product scan stages, stacked: source, struct, ssa (default all three). Repeat or comma-separate, e.g. --mode source --mode struct",
+			Usage: "product scan stages, stacked: source, struct, ssa. Repeat or comma-separate, e.g. --mode source --mode struct. code-scan defaults to all three; the ScanProject primitive defaults to compile-only when no mode is given",
 		},
 
 		cli.StringFlag{
@@ -1626,9 +1626,14 @@ Exports structured report (sarif/irify).`,
 		}
 		log.Infof("[code-scan] rule source: %s (custom-rule-count=%d)", ruleSource, customRuleCount)
 
-		if modes := c.StringSlice("mode"); len(modes) > 0 {
-			scanOpt = append(scanOpt, syntaxflow_scan.WithMode(modes...))
+		// code-scan is the human-facing scan command, so an omitted --mode keeps
+		// scanning everything. The ScanProject primitive itself treats an empty
+		// mode list as compile-only for reuse-driven callers.
+		modes := c.StringSlice("mode")
+		if len(modes) == 0 {
+			modes = []string{syntaxflow_scan.SourceMode, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode}
 		}
+		scanOpt = append(scanOpt, syntaxflow_scan.WithMode(modes...))
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithReporter(reportInstance),
