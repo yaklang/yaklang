@@ -12,8 +12,9 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 const (
@@ -69,19 +70,6 @@ type workerProcess struct {
 	waitErr error // published by closing done
 }
 
-func childEnvironment(parent []string, address, token string) []string {
-	result := make([]string, 0, len(parent)+4)
-	for _, entry := range parent {
-		key, _, _ := strings.Cut(entry, "=")
-		switch strings.ToUpper(key) {
-		case workerEnv, addressEnv, tokenEnv, "YAK_MCP_STDIO":
-			continue
-		}
-		result = append(result, entry)
-	}
-	return append(result, workerEnv+"=1", addressEnv+"="+address, tokenEnv+"="+token, "YAK_MCP_STDIO=1")
-}
-
 func startWorker(ctx context.Context, cmd *exec.Cmd, logs *os.File) (_ *workerProcess, retErr error) {
 	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
@@ -97,7 +85,15 @@ func startWorker(ctx context.Context, cmd *exec.Cmd, logs *os.File) (_ *workerPr
 	if environment == nil {
 		environment = os.Environ()
 	}
-	cmd.Env = childEnvironment(environment, listener.Addr().String(), token)
+	cmd.Env = subprocess.BuildChildEnvironment(environment,
+		[]string{workerEnv, addressEnv, tokenEnv, "YAK_MCP_STDIO"},
+		[]string{
+			workerEnv + "=1",
+			addressEnv + "=" + listener.Addr().String(),
+			tokenEnv + "=" + token,
+			"YAK_MCP_STDIO=1",
+		},
+	)
 	cmd.Stdin = nil
 	// Pass the diagnostic descriptor directly to the child. Wrapping it in an
 	// io.Writer makes exec.Cmd start copying goroutines; a full client stderr
@@ -106,7 +102,7 @@ func startWorker(ctx context.Context, cmd *exec.Cmd, logs *os.File) (_ *workerPr
 	if logs != nil {
 		cmd.Stdout, cmd.Stderr = logs, logs
 	}
-	configureProcess(cmd)
+	subprocess.ConfigureProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start MCP worker: %w", err)
 	}
@@ -167,6 +163,6 @@ func (p *workerProcess) close() {
 	if p.conn != nil {
 		_ = p.conn.Close()
 	}
-	killProcess(p.cmd)
+	subprocess.KillProcessGroup(p.cmd)
 	<-p.done
 }

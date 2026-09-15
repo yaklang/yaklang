@@ -10,22 +10,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type memfitProcessClient struct {
-	cmd      *exec.Cmd
+	mp       *subprocess.ManagedProcess
 	stdin    io.WriteCloser
 	protocol *memfitProtocolWriter
 
 	events chan memfitEnvelope
 	logs   chan string
-	done   chan struct{}
-
-	waitMu  sync.RWMutex
-	waitErr error
-	closeMu sync.Mutex
-	closed  bool
 
 	logMu   sync.Mutex
 	logTail []string
@@ -52,93 +47,80 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 	if err != nil {
 		return nil, utils.Wrap(err, "resolve yak executable for memfit worker")
 	}
-	cmd := exec.Command(executable, "memfit-worker")
-	cmd.Dir = config.Workdir
-	cmd.Env = memfitChildEnvironment(os.Environ())
-	configureMemfitChildProcess(cmd)
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, utils.Wrap(err, "open memfit worker stdin")
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		_ = stdin.Close()
-		return nil, utils.Wrap(err, "open memfit worker stdout")
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		_ = stdin.Close()
-		return nil, utils.Wrap(err, "open memfit worker stderr")
-	}
+	// Create an io.Pipe for stdin so we can write protocol messages to the child.
+	stdinReader, stdinWriter := io.Pipe()
 
 	client := &memfitProcessClient{
-		cmd:      cmd,
-		stdin:    stdin,
-		protocol: newMemfitProtocolWriter(stdin),
+		stdin:    stdinWriter,
+		protocol: newMemfitProtocolWriter(stdinWriter),
 		events:   make(chan memfitEnvelope, 512),
 		logs:     make(chan string, 256),
-		done:     make(chan struct{}),
 		secret:   config.APIKey,
 	}
-	if err := cmd.Start(); err != nil {
-		_ = stdin.Close()
-		return nil, utils.Wrap(err, "start isolated memfit worker")
-	}
 
-	go client.readProtocol(stdout)
-	go client.readLogs(stderr, "")
-	go func() {
-		err := cmd.Wait()
-		client.waitMu.Lock()
-		client.waitErr = err
-		client.waitMu.Unlock()
-		close(client.done)
-	}()
+	mp, err := subprocess.Launch(ctx, &subprocess.LaunchConfig{
+		Cmd: &exec.Cmd{
+			Path: executable,
+			Args: []string{executable, "memfit-worker"},
+			Dir:  config.Workdir,
+		},
+		EnvExclude: []string{"YAK_AI_API_KEY", memfitWorkerEnvironment},
+		EnvExtra:   []string{memfitWorkerEnvironment + "=1"},
+		Stdio: subprocess.StdioConfig{
+			Stdin: stdinReader,
+		},
+		StartupTimeout:  60 * time.Second,
+		ShutdownTimeout: 3 * time.Second,
+		Ready: func(ctx context.Context, p *subprocess.ManagedProcess) error {
+			// Start reading stdout/stderr from tap readers.
+			go client.readProtocol(p.Stdout(), p.Done())
+			go client.readLogs(p.Stderr(), "")
 
-	startID := fmt.Sprintf("start-%d", memfitNowMillis())
-	if err := client.send("start", startID, config); err != nil {
-		client.Close()
-		return nil, utils.Wrap(err, "send memfit worker configuration")
-	}
-
-	timer := time.NewTimer(60 * time.Second)
-	defer timer.Stop()
-	for {
-		select {
-		case envelope := <-client.events:
-			switch envelope.Type {
-			case "ready":
-				return client, nil
-			case "error":
-				status, _ := decodeMemfitPayload[memfitStatus](envelope)
-				client.Close()
-				return nil, utils.Errorf("memfit worker initialization failed: %s%s", status.Message, client.formattedLogTail())
+			// Send start configuration and wait for "ready".
+			startID := fmt.Sprintf("start-%d", memfitNowMillis())
+			if err := client.protocol.send("start", startID, config); err != nil {
+				return utils.Wrap(err, "send memfit worker configuration")
 			}
-		case <-client.done:
-			return nil, utils.Errorf("memfit worker exited during initialization: %v%s", client.WaitError(), client.formattedLogTail())
-		case <-ctx.Done():
-			client.Close()
-			return nil, ctx.Err()
-		case <-timer.C:
-			client.Close()
-			return nil, utils.Errorf("timed out waiting for memfit worker%s", client.formattedLogTail())
-		}
+
+			timer := time.NewTimer(60 * time.Second)
+			defer timer.Stop()
+			for {
+				select {
+				case envelope := <-client.events:
+					switch envelope.Type {
+					case "ready":
+						return nil
+					case "error":
+						status, _ := decodeMemfitPayload[memfitStatus](envelope)
+						return utils.Errorf("memfit worker initialization failed: %s%s", status.Message, client.formattedLogTail())
+					}
+				case <-p.Done():
+					return utils.Errorf("memfit worker exited during initialization: %v%s", p.WaitError(), client.formattedLogTail())
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-timer.C:
+					return utils.Errorf("timed out waiting for memfit worker%s", client.formattedLogTail())
+				}
+			}
+		},
+		GracefulShutdown: func(p *subprocess.ManagedProcess) error {
+			_ = client.protocol.send("shutdown", fmt.Sprintf("shutdown-%d", memfitNowMillis()), nil)
+			_ = stdinWriter.Close()
+			return nil
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
+	client.mp = mp
+	return client, nil
 }
 
-func memfitChildEnvironment(parent []string) []string {
-	child := make([]string, 0, len(parent)+1)
-	for _, entry := range parent {
-		if strings.HasPrefix(entry, "YAK_AI_API_KEY=") || strings.HasPrefix(entry, memfitWorkerEnvironment+"=") {
-			continue
-		}
-		child = append(child, entry)
+func (c *memfitProcessClient) readProtocol(reader io.Reader, done <-chan struct{}) {
+	if reader == nil {
+		return
 	}
-	return append(child, memfitWorkerEnvironment+"=1")
-}
-
-func (c *memfitProcessClient) readProtocol(reader io.Reader) {
 	scanner := newMemfitFrameScanner(reader)
 	for scanner.Scan() {
 		line := append([]byte(nil), scanner.Bytes()...)
@@ -149,7 +131,7 @@ func (c *memfitProcessClient) readProtocol(reader io.Reader) {
 		}
 		select {
 		case c.events <- envelope:
-		case <-c.done:
+		case <-done:
 			return
 		}
 	}
@@ -159,6 +141,9 @@ func (c *memfitProcessClient) readProtocol(reader io.Reader) {
 }
 
 func (c *memfitProcessClient) readLogs(reader io.Reader, prefix string) {
+	if reader == nil {
+		return
+	}
 	scanner := newMemfitFrameScanner(reader)
 	for scanner.Scan() {
 		c.recordLog(prefix + scanner.Text())
@@ -195,14 +180,9 @@ func (c *memfitProcessClient) Events() <-chan memfitEnvelope { return c.events }
 
 func (c *memfitProcessClient) Logs() <-chan string { return c.logs }
 
-func (c *memfitProcessClient) Done() <-chan struct{} { return c.done }
+func (c *memfitProcessClient) Done() <-chan struct{} { return c.mp.Done() }
 
-func (c *memfitProcessClient) PID() int {
-	if c.cmd == nil || c.cmd.Process == nil {
-		return 0
-	}
-	return c.cmd.Process.Pid
-}
+func (c *memfitProcessClient) PID() int { return c.mp.PID() }
 
 func (c *memfitProcessClient) formattedLogTail() string {
 	logs := c.LogTail()
@@ -217,40 +197,13 @@ func (c *memfitProcessClient) formattedLogTail() string {
 
 func (c *memfitProcessClient) send(typ, id string, payload any) error {
 	select {
-	case <-c.done:
-		return utils.Errorf("memfit worker is not running: %v", c.WaitError())
+	case <-c.mp.Done():
+		return utils.Errorf("memfit worker is not running: %v", c.mp.WaitError())
 	default:
 	}
 	return c.protocol.send(typ, id, payload)
 }
 
-func (c *memfitProcessClient) WaitError() error {
-	c.waitMu.RLock()
-	defer c.waitMu.RUnlock()
-	return c.waitErr
-}
+func (c *memfitProcessClient) WaitError() error { return c.mp.WaitError() }
 
-func (c *memfitProcessClient) Close() {
-	c.closeMu.Lock()
-	if c.closed {
-		c.closeMu.Unlock()
-		return
-	}
-	c.closed = true
-	c.closeMu.Unlock()
-
-	_ = c.protocol.send("shutdown", fmt.Sprintf("shutdown-%d", memfitNowMillis()), nil)
-	_ = c.stdin.Close()
-	timer := time.NewTimer(2 * time.Second)
-	defer timer.Stop()
-	select {
-	case <-c.done:
-		return
-	case <-timer.C:
-		killMemfitChildProcess(c.cmd)
-		select {
-		case <-c.done:
-		case <-time.After(time.Second):
-		}
-	}
-}
+func (c *memfitProcessClient) Close() { c.mp.Close() }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 )
 
@@ -22,20 +23,14 @@ type ScreenRecorder struct {
 	device     *ScreenDevice
 	filename   string
 	file       *os.File
-	cmd        *exec.Cmd
+	mp         *subprocess.ManagedProcess
+	stdin      io.WriteCloser
 	err        error
 	isStop     bool
 	isStarted  bool
 	startTime  time.Time
 	stopTime   time.Time
 	recordTime int
-
-	// Context for graceful shutdown
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	// Stdin pipe to send commands to ffmpeg
-	stdin io.WriteCloser
 }
 
 func NewScreenRecorder(config *Config, dev *ScreenDevice) (*ScreenRecorder, error) {
@@ -47,77 +42,66 @@ func NewScreenRecorder(config *Config, dev *ScreenDevice) (*ScreenRecorder, erro
 		return nil, err
 	}
 
-	// Create context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &ScreenRecorder{
 		config:   config,
 		filename: file.Name(),
 		file:     file,
 		device:   dev,
-		ctx:      ctx,
-		cancel:   cancel,
 	}, nil
 }
 
 func (r *ScreenRecorder) startRecordProcess(procCtx context.Context) {
-	// Build ffmpeg command manually to have better control over stdin
 	ffmpegPath := consts.GetFfmpegPath()
 	if ffmpegPath == "" {
 		r.setError(errors.New("ffmpeg binary path is not configured"))
 		return
 	}
 
-	// Get framerate from config, fallback to 24 if not set
 	framerate := r.config.Framerate
 	if framerate <= 0 {
-		framerate = 24 // Fallback to 24fps if not configured
+		framerate = 24
 	}
 	framerateStr := strconv.Itoa(framerate)
 
-	// Build ffmpeg arguments based on platform
 	var args []string
 
 	if r.device.PlatformDemuxer == "avfoundation" {
-		// macOS parameters - use original fast settings
 		args = []string{
-			"-y", // Automatically overwrite output files
+			"-y",
 			"-f", "avfoundation",
 			"-r", framerateStr,
 			"-i", r.device.FfmpegInputName,
 			"-c:v", "libx264",
 			"-preset", "ultrafast",
-			"-an",                                    // No audio
-			"-movflags", "+frag_keyframe+empty_moov", // Make the mp4 streamable
+			"-an",
+			"-movflags", "+frag_keyframe+empty_moov",
 			r.filename,
 		}
 	} else if r.device.PlatformDemuxer == "gdigrab" {
-		// Windows parameters - restore original ultrafast preset for speed
 		args = []string{
-			"-y", // Automatically overwrite output files
+			"-y",
 			"-f", "gdigrab",
 			"-r", framerateStr,
 			"-i", r.device.FfmpegInputName,
-			"-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setpts=1*PTS", // Fix odd dimensions + original PTS
+			"-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setpts=1*PTS",
 			"-c:v", "libx264",
-			"-preset", "ultrafast", // Original Windows setting for speed
-			"-pix_fmt", "yuv420p", // Keep yuv420p for compatibility
-			"-an",                     // No audio
-			"-movflags", "+faststart", // Standard MP4 with metadata at beginning for Windows compatibility
+			"-preset", "ultrafast",
+			"-pix_fmt", "yuv420p",
+			"-an",
+			"-movflags", "+faststart",
 			r.filename,
 		}
 	} else {
-		// Generic fallback
 		args = []string{
-			"-y", // Automatically overwrite output files
+			"-y",
 			"-f", r.device.PlatformDemuxer,
 			"-r", framerateStr,
 			"-i", r.device.FfmpegInputName,
 			"-c:v", "libx264",
 			"-preset", "medium",
 			"-pix_fmt", "yuv420p",
-			"-an",                                    // No audio
-			"-movflags", "+frag_keyframe+empty_moov", // Make the mp4 streamable
+			"-an",
+			"-movflags", "+frag_keyframe+empty_moov",
 			r.filename,
 		}
 	}
@@ -130,51 +114,60 @@ func (r *ScreenRecorder) startRecordProcess(procCtx context.Context) {
 		}
 	}
 
-	cmd := exec.CommandContext(r.ctx, ffmpegPath, args...)
+	// Create an io.Pipe for stdin so we can send the 'q' quit command later.
+	stdinReader, stdinWriter := io.Pipe()
 
-	// Set up stdin pipe BEFORE starting the process
-	stdin, err := cmd.StdinPipe()
+	log.Infof("starting ffmpeg screen recording: %s %s", ffmpegPath, strings.Join(args, " "))
+
+	mp, err := subprocess.Launch(procCtx, &subprocess.LaunchConfig{
+		Cmd: &exec.Cmd{
+			Path: ffmpegPath,
+			Args: append([]string{ffmpegPath}, args...),
+		},
+		Stdio: subprocess.StdioConfig{
+			Stdin:  stdinReader,
+			Stdout: log.NewLogWriter(log.InfoLevel),
+			Stderr: log.NewLogWriter(log.InfoLevel),
+		},
+		ShutdownTimeout: 5 * time.Second,
+		GracefulShutdown: func(p *subprocess.ManagedProcess) error {
+			if _, err := stdinWriter.Write([]byte("q\n")); err != nil {
+				log.Warnf("failed to send quit command to ffmpeg: %v", err)
+			}
+			_ = stdinWriter.Close()
+			return nil
+		},
+	})
 	if err != nil {
+		_ = stdinWriter.Close()
 		r.setError(err)
 		return
 	}
 
-	// Set up debug output
-	cmd.Stdout = log.NewLogWriter(log.InfoLevel)
-	cmd.Stderr = log.NewLogWriter(log.InfoLevel)
-	log.Infof("starting ffmpeg screen recording: %s", cmd.String())
-
-	// Start the process
-	if err := cmd.Start(); err != nil {
-		r.setError(err)
-		return
-	}
-
-	r.cmd = cmd
-	r.stdin = stdin
+	r.Lock()
+	r.mp = mp
+	r.stdin = stdinWriter
 	r.startTime = time.Now()
 	r.recordTime = 0
+	r.Unlock()
 
+	// Wait for the process to exit and handle errors.
 	go func() {
-		err := r.cmd.Wait()
-		r.stopRecord()
+		<-mp.Done()
+		err := mp.WaitError()
 		if err != nil {
-			// A non-zero exit code is expected when we stop the process.
-			// We log only unexpected errors.
 			if exitErr, ok := err.(*exec.ExitError); !ok {
-				// Not an ExitError, this is an unexpected kind of error.
 				log.Errorf("screen recording process finished with unexpected error: %v", err)
 				r.setError(err)
 			} else {
-				// It is an ExitError, check if it's one of the expected signals from graceful/forceful stop.
 				errMsg := exitErr.Error()
 				if !strings.Contains(errMsg, "signal: killed") && !strings.Contains(errMsg, "signal: interrupt") && !strings.Contains(errMsg, "exit status 255") {
 					log.Errorf("screen recording process finished with error: %v", err)
 					r.setError(err)
 				}
-				// Otherwise, it's an expected shutdown signal, so we don't log it as an error.
 			}
 		}
+		r.stopRecord()
 	}()
 }
 
@@ -194,7 +187,6 @@ func (r *ScreenRecorder) Start(ctx context.Context) error {
 }
 
 func (r *ScreenRecorder) stopRecord() {
-	// Call the main Stop method which handles all cleanup logic
 	r.Stop()
 }
 
@@ -202,7 +194,6 @@ func (r *ScreenRecorder) Stop() {
 	r.Lock()
 	defer r.Unlock()
 
-	// Prevent multiple calls to Stop()
 	if r.isStop {
 		return
 	}
@@ -210,15 +201,9 @@ func (r *ScreenRecorder) Stop() {
 	r.stopTime = time.Now()
 	r.recordTime = int(r.stopTime.Sub(r.startTime).Seconds())
 
-	// Send 'q' command to ffmpeg stdin for graceful shutdown
-	if r.stdin != nil {
-		_, err := r.stdin.Write([]byte("q\n"))
-		if err != nil {
-			log.Warnf("failed to send quit command to ffmpeg: %v", err)
-		}
-		_ = r.stdin.Close()
-		r.stdin = nil // Prevent double close
-	}
+	mp := r.mp
+	r.mp = nil
+	r.stdin = nil
 
 	// Close file handle early
 	if r.file != nil {
@@ -226,35 +211,13 @@ func (r *ScreenRecorder) Stop() {
 		r.file = nil
 	}
 
-	// Give ffmpeg some time to finish writing the file gracefully
-	if r.cmd != nil && r.cmd.Process != nil {
-		// Wait a bit for graceful shutdown
-		timeout := time.NewTimer(5 * time.Second) // 5 seconds for Windows
-		done := make(chan bool, 1)                // Buffered channel to prevent goroutine leak
-
-		go func() {
-			r.cmd.Wait()
-			done <- true
-		}()
-
-		select {
-		case <-done:
-			// Process exited gracefully
-			timeout.Stop()
-			log.Infof("ffmpeg exited gracefully")
-		case <-timeout.C:
-			// Timeout, force kill
-			log.Warnf("ffmpeg did not exit gracefully within 5 seconds, force killing")
-			if r.cmd.Process != nil {
-				_ = r.cmd.Process.Kill()
-			}
-		}
+	r.Unlock()
+	// Close gracefully shuts down the process: sends 'q' via stdin,
+	// waits up to 5 seconds, then force-kills the process group.
+	if mp != nil {
+		mp.Close()
 	}
-
-	// Cancel context as backup
-	if r.cancel != nil {
-		r.cancel()
-	}
+	r.Lock()
 }
 
 func (r *ScreenRecorder) IsRecording() bool {
@@ -294,14 +257,7 @@ func (r *ScreenRecorder) Close() {
 		_ = r.file.Close()
 		_ = os.Remove(r.file.Name())
 	}
-
-	// Clean up stdin
 	if r.stdin != nil {
 		_ = r.stdin.Close()
-	}
-
-	// Clean up context
-	if r.cancel != nil {
-		r.cancel()
 	}
 }

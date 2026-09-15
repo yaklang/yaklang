@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 func TestMemfitProtocolRoundTrip(t *testing.T) {
@@ -106,11 +107,11 @@ func TestMemfitReviewHotpatchUpdatesPolicyAndInteraction(t *testing.T) {
 }
 
 func TestMemfitChildEnvironmentKeepsAPIKeyOutOfWorkerEnvironment(t *testing.T) {
-	child := memfitChildEnvironment([]string{
+	child := subprocess.BuildChildEnvironment([]string{
 		"PATH=/bin",
 		"YAK_AI_API_KEY=secret",
 		memfitWorkerEnvironment + "=stale",
-	})
+	}, []string{"YAK_AI_API_KEY", memfitWorkerEnvironment}, []string{memfitWorkerEnvironment + "=1"})
 	require.Contains(t, child, "PATH=/bin")
 	require.Contains(t, child, memfitWorkerEnvironment+"=1")
 	for _, entry := range child {

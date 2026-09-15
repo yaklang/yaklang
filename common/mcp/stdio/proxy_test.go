@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 var cachedStdout = os.Stdout
@@ -363,7 +365,11 @@ func TestRunShutdownReapsBusyWorker(t *testing.T) {
 }
 
 func TestChildEnvironment(t *testing.T) {
-	child := childEnvironment([]string{"KEEP=value", workerEnv + "=stale", addressEnv + "=stale", strings.ToLower(tokenEnv) + "=stale", "YAK_MCP_STDIO=0"}, "127.0.0.1:1234", "secret")
+	child := subprocess.BuildChildEnvironment(
+		[]string{"KEEP=value", workerEnv + "=stale", addressEnv + "=stale", strings.ToLower(tokenEnv) + "=stale", "YAK_MCP_STDIO=0"},
+		[]string{workerEnv, addressEnv, tokenEnv, "YAK_MCP_STDIO"},
+		[]string{workerEnv + "=1", addressEnv + "=127.0.0.1:1234", tokenEnv + "=secret", "YAK_MCP_STDIO=1"},
+	)
 	joined := strings.Join(child, "\n")
 	if strings.Contains(joined, "stale") || !strings.Contains(joined, "KEEP=value") || !strings.Contains(joined, "YAK_MCP_STDIO=1") || !strings.Contains(joined, workerEnv+"=1") {
 		t.Fatalf("incorrect worker environment: %v", child)
