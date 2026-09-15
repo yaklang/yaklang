@@ -865,6 +865,11 @@ jobs:
               ]
 
           - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
+            # Two packages dominate this suite (php/tests ~122s, sfweb ~108s) and
+            # they are independent, so two workers put them on separate cores and
+            # roughly halve the suite. It became the critical path once the other
+            # suites were parallelized.
+            package_workers: "2"
             sync_rule: "1"
             go_test_p: "1"
             # The PHP corpus walker (TestAllSyntaxProjectBuildForPHP) alone takes
