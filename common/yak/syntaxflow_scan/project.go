@@ -20,8 +20,8 @@ var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssa
 
 // ScanProjectFromJSON is the script/platform entry: one ssaconfig JSON blob
 // plus optional callbacks. CLI and gRPC parse their inputs into the same
-// JSON/options and call ScanProject.
-func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Option) error {
+// JSON/options and call ScanProject. It returns the same ProjectResult.
+func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Option) (ProjectResult, error) {
 	opts := append([]ssaconfig.Option{ssaconfig.WithJsonRawConfig([]byte(raw))}, extra...)
 	return ScanProject(ctx, opts...)
 }
@@ -42,12 +42,17 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 // it persists IR, reports StageCompile, and skips every rule set so platforms
 // can reuse the program later. Callers that want rule sets (code-scan, gRPC)
 // pass the modes they need explicitly.
-func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
+//
+// It returns either the terminal ProjectResult (what ran, per-stage status,
+// metrics, aggregate success) or an error. A run whose useful stages succeeded
+// returns a result with Succeeded=true even when a sibling stage failed, so
+// callers render the outcome instead of re-deriving success from job state.
+func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, error) {
 	cfg := &Config{ScanTaskCallback: &ScanTaskCallback{}}
 	var err error
 	cfg.Config, err = ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
-		return err
+		return ProjectResult{}, err
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 
@@ -58,6 +63,12 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	programName := strings.TrimSpace(cfg.GetProgramName())
 
 	emit := func(stage ProductStage, progress float64, info *RuleProcessInfoList) {
+		// Every product signal flows through here, so this is the one place
+		// that keeps per-stage timing and counters current.
+		if progress <= 0 {
+			recorder.enter(stage)
+		}
+		recorder.observe(stage, info)
 		if cfg.stageCallback == nil {
 			return
 		}
@@ -73,6 +84,28 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	mode := resolveProductModes(cfg)
 	wantSource, wantReview, wantAnalyze := mode.source, mode.review, mode.analyze
 	compileOnly := mode.compileOnly
+
+	// Stage risk counts come from the result stream, attributed by the rule's
+	// own mode. This keeps per-stage metrics authoritative without Legion
+	// re-deriving them from job chains.
+	if cfg.resultCallback != nil {
+		userResultCallback := cfg.resultCallback
+		cfg.resultCallback = func(result *ScanResult) {
+			if result != nil && result.Result != nil {
+				if count := int64(result.Result.RiskCount()); count > 0 {
+					switch resultModeStage(result) {
+					case StageInspect:
+						recorder.addRisk(StageInspect, count)
+					case StageReview:
+						recorder.addRisk(StageReview, count)
+					default:
+						recorder.addRisk(StageAnalyze, count)
+					}
+				}
+			}
+			userResultCallback(result)
+		}
+	}
 	hasLoaded := len(cfg.Programs) > 0
 	hasCode := hasCodeSource(cfg)
 	localDir := localSourceDir(cfg)
@@ -80,7 +113,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 	namedOnly := !hasLoaded && len(cfg.GetProgramNames()) > 0 && !hasCode
 	if namedOnly {
 		if err := loadNamedPrograms(cfg); err != nil {
-			return err
+			return finishScanProject(cfg, recorder, programName, err)
 		}
 		hasLoaded = len(cfg.Programs) > 0
 	}
@@ -221,7 +254,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) error {
 // collected and at least one detection stage succeeded; later stage failures
 // stay visible through stage outcomes instead of turning an already-useful
 // result into a failed job.
-func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName string, err error) error {
+func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName string, err error) (ProjectResult, error) {
 	result := ProjectResult{
 		Stages:      recorder.Outcomes(),
 		ProgramName: programName,
@@ -234,15 +267,35 @@ func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName 
 		cfg.projectResultCallback(result)
 	}
 	if err == nil {
-		return nil
+		return result, nil
 	}
 	if result.Succeeded {
-		return nil
+		return result, nil
 	}
-	return err
+	return result, err
 }
 
 // productModeSelection is the resolved product intent for one ScanProject run.
+// resultModeStage attributes one streamed result to its product stage by the
+// rule's own mode, so per-stage risk counts stay traceable to that rule set.
+func resultModeStage(result *ScanResult) ProductStage {
+	if result == nil || result.Result == nil {
+		return StageAnalyze
+	}
+	rule := result.Result.GetRule()
+	if rule == nil {
+		return StageAnalyze
+	}
+	switch rule.Mode {
+	case schema.SFR_MODE_SOURCE:
+		return StageInspect
+	case schema.SFR_MODE_STRUCT:
+		return StageReview
+	default:
+		return StageAnalyze
+	}
+}
+
 type productModeSelection struct {
 	source  bool
 	review  bool

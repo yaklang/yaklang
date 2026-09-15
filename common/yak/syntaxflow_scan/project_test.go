@@ -22,7 +22,7 @@ func TestScanProject_CompilesAndRunsSourceFromSnapshot(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.yak"), []byte("key = \"AKIAIOSFODNN7EXAMPLE\"\n"), 0o644))
 
 	var alerts int
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("yak"),
@@ -55,10 +55,9 @@ func TestScanProject_CompileOnlyReportsProgramName(t *testing.T) {
 	// Unique name per run: a reused worktree-local IR DB must not make a stale
 	// program satisfy this test.
 	programName := fmt.Sprintf("%s-%s", t.Name(), uuid.NewString())
-	var result *syntaxflow_scan.ProjectResult
 	var stages []string
 	var alerts int
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("python"),
@@ -79,16 +78,19 @@ alert $call`,
 				stages = append(stages, string(stage))
 			}
 		}),
-		syntaxflow_scan.WithProjectResultCallback(func(r syntaxflow_scan.ProjectResult) {
-			copied := r
-			result = &copied
-		}),
 		ssaconfig.WithScanIgnoreLanguage(true),
 	)
 	require.NoError(t, err)
-	require.NotNil(t, result)
 	require.True(t, result.Succeeded, "compile-only run must succeed")
 	require.Equal(t, programName, result.ProgramName)
+
+	// The returned stage list is the authoritative "what ran" answer: no
+	// inspect/analyze outcome exists, so a platform renders successful stages
+	// directly instead of inferring them.
+	require.Len(t, result.Stages, 2)
+	require.Equal(t, syntaxflow_scan.StageCollect, result.Stages[0].Stage)
+	require.Equal(t, syntaxflow_scan.StageCompile, result.Stages[1].Stage)
+	require.True(t, result.Stages[1].Succeeded())
 	require.Empty(t, alerts, "compile-only must not execute rule sets")
 	require.Contains(t, stages, string(syntaxflow_scan.StageCompile))
 	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
@@ -117,7 +119,7 @@ func TestScanProject_EmitsProductStages(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
 
 	var stages []string
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	projectResult, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("python"),
@@ -140,6 +142,18 @@ alert $hit`,
 	require.NoError(t, err)
 	require.Contains(t, stages, string(syntaxflow_scan.StageCollect))
 	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+
+	// The returned stages must carry per-stage evidence, not just status: that
+	// is what a platform renders instead of re-deriving stage state.
+	var inspectOutcome *syntaxflow_scan.StageOutcome
+	for i := range projectResult.Stages {
+		if projectResult.Stages[i].Stage == syntaxflow_scan.StageInspect {
+			inspectOutcome = &projectResult.Stages[i]
+		}
+	}
+	require.NotNil(t, inspectOutcome, "inspect stage must be reported")
+	require.True(t, inspectOutcome.Succeeded())
+	require.NotEmpty(t, inspectOutcome.RuleCount, "inspect must report how many rules ran")
 	require.Equal(t, "收集代码", syntaxflow_scan.StageCollect.DisplayName())
 	require.Equal(t, "代码检测", syntaxflow_scan.StageInspect.DisplayName())
 	require.Equal(t, "语义检测", syntaxflow_scan.StageReview.DisplayName())
@@ -151,7 +165,7 @@ func TestScanProject_ExternalStructRule(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
 
 	var alerts int
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("python"),
@@ -190,7 +204,7 @@ func TestScanProjectFromJSON_UsesConfigBlob(t *testing.T) {
 	}`, dir, t.Name())
 
 	var alerts int
-	err := syntaxflow_scan.ScanProjectFromJSON(context.Background(), raw,
+	_, err := syntaxflow_scan.ScanProjectFromJSON(context.Background(), raw,
 		// Explicit mode: an empty mode list is compile-only.
 		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
@@ -215,7 +229,7 @@ func TestScanProject_WithModeSourceOnly(t *testing.T) {
 
 	var alerts int
 	var stages []string
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("yak"),
@@ -251,7 +265,7 @@ func TestScanProject_WithModeStackedSourceAndStruct(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
 
 	var stages []string
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("python"),
@@ -290,7 +304,7 @@ func TestScanProject_ProgramPathSourceFromIrSource(t *testing.T) {
 
 	var alerts int
 	var stages []string
-	err = syntaxflow_scan.ScanProject(context.Background(),
+	_, err = syntaxflow_scan.ScanProject(context.Background(),
 		syntaxflow_scan.WithPrograms(progs[0]),
 		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
@@ -328,7 +342,7 @@ func TestScanProject_TargetReloadsThenRunsSSA(t *testing.T) {
 `), 0o644))
 
 	var alerts int
-	err := syntaxflow_scan.ScanProject(context.Background(),
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
 		ssaconfig.WithProjectRawLanguage("java"),
@@ -371,7 +385,7 @@ func TestScanProject_ProgramPathRunsStructWithoutCompile(t *testing.T) {
 
 	var alerts int
 	var stages []string
-	err = syntaxflow_scan.ScanProject(context.Background(),
+	_, err = syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithProgramNames(t.Name()),
 		// Explicit mode: an empty mode list is compile-only.
 		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode),
@@ -420,7 +434,7 @@ func TestScanProject_NamedProgramFromDatabase(t *testing.T) {
 	require.NotEmpty(t, progs)
 
 	var alerts int
-	err = syntaxflow_scan.ScanProject(context.Background(),
+	_, err = syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithProgramNames(t.Name()),
 		syntaxflow_scan.WithMode(syntaxflow_scan.SSAMode),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{

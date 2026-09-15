@@ -79,3 +79,34 @@ func TestResolveProductModes_UnknownValueFallsBackToAll(t *testing.T) {
 	require.True(t, selected.review)
 	require.True(t, selected.analyze)
 }
+
+// A stage outcome carries the evidence a platform renders: status, error,
+// wall time, and the rule/risk counters observed while the stage ran.
+func TestStageOutcomeRecorder_CarriesStageMetrics(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	recorder.enter(StageInspect)
+	recorder.observe(StageInspect, &RuleProcessInfoList{TotalQuery: 12, RiskCount: 3})
+	recorder.record(StageInspect, fmt.Errorf("rule set aborted"))
+
+	require.Len(t, recorder.Outcomes(), 1)
+	outcome := recorder.Outcomes()[0]
+	require.Equal(t, StageInspect, outcome.Stage)
+	require.Equal(t, StageStatusFailed, outcome.Status)
+	require.Equal(t, "rule set aborted", outcome.Error)
+	require.EqualValues(t, 12, outcome.RuleCount)
+	require.EqualValues(t, 3, outcome.RiskCount)
+}
+
+// Streamed risks are attributed to the stage that produced them, and counted
+// cumulatively when a stage streams several batches.
+func TestStageOutcomeRecorder_AccumulatesStreamedRisks(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	recorder.enter(StageAnalyze)
+	recorder.addRisk(StageAnalyze, 2)
+	recorder.addRisk(StageAnalyze, 5)
+	recorder.record(StageAnalyze, nil)
+
+	outcome := recorder.Outcomes()[0]
+	require.True(t, outcome.Succeeded())
+	require.EqualValues(t, 7, outcome.RiskCount)
+}
