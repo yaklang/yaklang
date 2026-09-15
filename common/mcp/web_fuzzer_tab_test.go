@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -24,6 +27,8 @@ func TestCreateWebFuzzerTabToolRegistered(t *testing.T) {
 		"update_web_fuzzer_tab",
 		"delete_web_fuzzer_tabs",
 		"manage_web_fuzzer_tab_group",
+		"execute_web_fuzzer_tab",
+		"query_web_fuzzer_execution_result",
 	} {
 		if _, exists := set.Tools[name]; !exists {
 			t.Fatalf("tool not registered: %s", name)
@@ -32,6 +37,67 @@ func TestCreateWebFuzzerTabToolRegistered(t *testing.T) {
 	if _, exists := set.Tools["http_fuzzer"]; !exists {
 		t.Fatalf("tool not registered: http_fuzzer")
 	}
+}
+
+func TestWaitForWebFuzzerExecutionReturnsOnlyMatchingCompletedTask(t *testing.T) {
+	yakit.CallPostInitDatabase()
+	srv, err := NewMCPServer(WithEnableAllToolSets())
+	require.NoError(t, err)
+	db := consts.GetGormProjectDatabase()
+	require.NotNil(t, db)
+
+	executionID := uuid.NewString()
+	task := &schema.WebFuzzerTask{
+		FuzzerIndex:          executionID,
+		FuzzerTabIndex:       "mcp-tab",
+		HTTPFlowTotal:        1,
+		HTTPFlowSuccessCount: 1,
+		Ok:                   true,
+		Reason:               "normal exit / user canceled",
+	}
+	require.NoError(t, db.Create(task).Error)
+	t.Cleanup(func() { _ = db.Delete(task).Error })
+
+	completed, err := waitForWebFuzzerExecution(context.Background(), srv, "mcp-tab", executionID, time.Second)
+	require.NoError(t, err)
+	require.Equal(t, task.ID, completed.ID)
+	require.True(t, completed.Ok)
+}
+
+func TestQueryWebFuzzerExecutionResultReturnsResponseMetadataWithoutBody(t *testing.T) {
+	yakit.CallPostInitDatabase()
+	srv, err := NewMCPServer(WithEnableAllToolSets())
+	require.NoError(t, err)
+	db := consts.GetGormProjectDatabase()
+	require.NotNil(t, db)
+
+	task := &schema.WebFuzzerTask{Ok: true, Reason: "normal exit", HTTPFlowTotal: 1, HTTPFlowSuccessCount: 1}
+	require.NoError(t, db.Create(task).Error)
+	response := &schema.WebFuzzerResponse{
+		WebFuzzerTaskId: int(task.ID),
+		OK:              true,
+		StatusCode:      201,
+		DurationMs:      42,
+		Url:             "https://example.test/api",
+		Content:         "sensitive response body must not be returned",
+	}
+	require.NoError(t, db.Create(response).Error)
+	t.Cleanup(func() {
+		_ = db.Delete(response).Error
+		_ = db.Delete(task).Error
+	})
+
+	result := invokeWebFuzzerTool(t, context.Background(), srv, "query_web_fuzzer_execution_result", map[string]any{
+		"taskId": float64(task.ID),
+		"limit":  float64(1),
+	})
+	require.EqualValues(t, task.ID, result["taskId"])
+	require.EqualValues(t, 1, result["returnedResponses"])
+	responses := result["responses"].([]any)
+	metadata := responses[0].(map[string]any)
+	require.EqualValues(t, 201, metadata["statusCode"])
+	require.EqualValues(t, 42, metadata["durationMs"])
+	require.NotContains(t, metadata, "body")
 }
 
 func TestWebFuzzerGroupToolSchemaEncouragesConciseColoredGroups(t *testing.T) {
@@ -375,6 +441,11 @@ func invokeWebFuzzerTool(t *testing.T, ctx context.Context, srv *MCPServer, name
 	t.Helper()
 	result, err := InvokeBuiltinTool(ctx, srv, name, args)
 	require.NoError(t, err)
+	return decodeWebFuzzerToolResult(t, result)
+}
+
+func decodeWebFuzzerToolResult(t *testing.T, result *rawmcp.CallToolResult) map[string]any {
+	t.Helper()
 	require.NotNil(t, result)
 	require.NotEmpty(t, result.Content)
 	text, ok := result.Content[0].(rawmcp.TextContent)

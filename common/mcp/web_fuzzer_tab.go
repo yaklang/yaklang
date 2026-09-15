@@ -5,10 +5,15 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -114,6 +119,152 @@ func handleCreateWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 		result["type"] = fuzzerConfig.GetType()
 		result["config"] = fuzzerConfig.GetConfig()
 		return NewCommonCallToolResult(result)
+	}
+}
+
+func handleExecuteWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := s.ensureLocalClient(); err != nil {
+			return nil, err
+		}
+		var args struct {
+			PageID         string `mapstructure:"pageId"`
+			TimeoutSeconds int64  `mapstructure:"timeoutSeconds"`
+		}
+		if err := decodeWebFuzzerArguments(request.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+		state, err := loadWebFuzzerState(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+		item, err := state.requireTab(args.PageID)
+		if err != nil {
+			return nil, err
+		}
+		pageID := item.Config.GetPageId()
+		timeout := args.TimeoutSeconds
+		if timeout == 0 {
+			timeout = 60
+		}
+		if timeout < 1 || timeout > 300 {
+			return nil, utils.Error("timeoutSeconds must be between 1 and 300")
+		}
+		executionID := uuid.NewString()
+		startedAt := time.Now()
+		yakit.BroadcastWebFuzzerExecution(executionID, pageID, startedAt.Add(time.Duration(timeout)*time.Second).UnixMilli())
+		task, err := waitForWebFuzzerExecution(ctx, s, pageID, executionID, time.Duration(timeout)*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		return NewCommonCallToolResult(map[string]any{
+			"operation":        "completed",
+			"executionId":      executionID,
+			"pageId":           pageID,
+			"taskId":           task.ID,
+			"elapsedMs":        time.Since(startedAt).Milliseconds(),
+			"ok":               task.Ok,
+			"reason":           task.Reason,
+			"totalResponses":   task.HTTPFlowTotal,
+			"successResponses": task.HTTPFlowSuccessCount,
+			"failedResponses":  task.HTTPFlowFailedCount,
+		})
+	}
+}
+
+func handleQueryWebFuzzerExecutionResult(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			TaskID int64 `mapstructure:"taskId"`
+			Limit  int64 `mapstructure:"limit"`
+		}
+		if err := decodeWebFuzzerArguments(request.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+		if args.TaskID < 1 {
+			return nil, utils.Error("taskId must be positive")
+		}
+		if args.Limit == 0 {
+			args.Limit = 10
+		}
+		if args.Limit < 1 || args.Limit > 100 {
+			return nil, utils.Error("limit must be between 1 and 100")
+		}
+		db, err := webFuzzerProjectDatabase(s)
+		if err != nil {
+			return nil, err
+		}
+		var task schema.WebFuzzerTask
+		if err := db.Where("id = ?", args.TaskID).First(&task).Error; err != nil {
+			if gorm.IsRecordNotFoundError(err) {
+				return nil, utils.Errorf("Web Fuzzer task %d was not found", args.TaskID)
+			}
+			return nil, utils.Wrap(err, "query Web Fuzzer task")
+		}
+		var responses []schema.WebFuzzerResponse
+		if err := db.Where("web_fuzzer_task_id = ?", task.ID).Order("id ASC").Limit(int(args.Limit)).Find(&responses).Error; err != nil {
+			return nil, utils.Wrap(err, "query Web Fuzzer responses")
+		}
+		summaries := make([]map[string]any, 0, len(responses))
+		for _, response := range responses {
+			summaries = append(summaries, map[string]any{
+				"responseId":  response.ID,
+				"ok":          response.OK,
+				"statusCode":  response.StatusCode,
+				"durationMs":  response.DurationMs,
+				"url":         response.Url,
+				"storedBytes": len(response.Content),
+			})
+		}
+		return NewCommonCallToolResult(map[string]any{
+			"taskId":            task.ID,
+			"ok":                task.Ok,
+			"reason":            task.Reason,
+			"totalResponses":    task.HTTPFlowTotal,
+			"successResponses":  task.HTTPFlowSuccessCount,
+			"failedResponses":   task.HTTPFlowFailedCount,
+			"returnedResponses": len(summaries),
+			"responses":         summaries,
+		})
+	}
+}
+
+func webFuzzerProjectDatabase(s *MCPServer) (*gorm.DB, error) {
+	db := s.getProjectDatabase()
+	if db == nil {
+		db = consts.GetGormProjectDatabase()
+	}
+	if db == nil {
+		return nil, utils.Error("project database is unavailable for Web Fuzzer execution")
+	}
+	return db, nil
+}
+
+func waitForWebFuzzerExecution(ctx context.Context, s *MCPServer, pageID, executionID string, timeout time.Duration) (*schema.WebFuzzerTask, error) {
+	db, err := webFuzzerProjectDatabase(s)
+	if err != nil {
+		return nil, err
+	}
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var task schema.WebFuzzerTask
+		err := db.Where("fuzzer_index = ? AND fuzzer_tab_index = ?", executionID, pageID).Order("id DESC").First(&task).Error
+		if err == nil {
+			return &task, nil
+		}
+		if !gorm.IsRecordNotFoundError(err) {
+			return nil, utils.Wrap(err, "query Web Fuzzer execution")
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-deadline.C:
+			return nil, utils.Errorf("Web Fuzzer execution %s did not finish within %s; ensure a compatible Yakit UI is connected", executionID, timeout)
+		case <-ticker.C:
+		}
 	}
 }
 
