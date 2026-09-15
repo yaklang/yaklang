@@ -49,22 +49,27 @@ var (
 	signalWithTypeMutex   = new(sync.Mutex)
 	signalTypeCallerTable = make(map[string]func(func()))
 
-	ServerPushType_Global           = "global"
-	ServerPushType_HttpFlow         = "httpflow"
-	ServerPushType_YakScript        = "yakscript"
-	ServerPushType_Risk             = "risk"
-	ServerPushType_AIMemory         = "ai_memory"
-	ServerPushType_File_Monitor     = "file_monitor"
-	ServerPushType_Error            = "error"
-	ServerPushType_Warning          = "warning"
-	ServerPushType_RPS              = "rps"
-	ServerPushType_CPS              = "cps"
-	ServerPushType_Fuzzer           = "fuzzer_server_push"
-	ServerPushType_WebFuzzerTab     = "web_fuzzer_tab"
-	ServerPushType_Project          = "project"
-	ServerPushType_AISession        = "ai_session"
-	ServerPushType_OpenAPIParse     = "openapi_parse"
-	ServerPushType_BrowserExtension = "browser_extension"
+	ServerPushType_Global       = "global"
+	ServerPushType_HttpFlow     = "httpflow"
+	ServerPushType_YakScript    = "yakscript"
+	ServerPushType_Risk         = "risk"
+	ServerPushType_AIMemory     = "ai_memory"
+	ServerPushType_File_Monitor = "file_monitor"
+	ServerPushType_Error        = "error"
+	ServerPushType_Warning      = "warning"
+	ServerPushType_RPS          = "rps"
+	ServerPushType_CPS          = "cps"
+	ServerPushType_Fuzzer       = "fuzzer_server_push"
+	ServerPushType_WebFuzzerTab = "web_fuzzer_tab"
+	// ServerPushType_WebFuzzerExecution is an ephemeral command for the
+	// renderer. It deliberately does not share the tab-management channel:
+	// tab pushes mutate persisted UI state, whereas this asks an existing tab
+	// to run its normal request pipeline.
+	ServerPushType_WebFuzzerExecution = "web_fuzzer_execution"
+	ServerPushType_Project            = "project"
+	ServerPushType_AISession          = "ai_session"
+	ServerPushType_OpenAPIParse       = "openapi_parse"
+	ServerPushType_BrowserExtension   = "browser_extension"
 
 	ProjectPushActionPromptEnter = "prompt_enter"
 	ProjectPushActionAutoEnter   = "auto_enter"
@@ -279,6 +284,12 @@ type WebFuzzerTabPush struct {
 	PageIDs     []string            `json:"pageIds,omitempty"`
 }
 
+type WebFuzzerExecutionPush struct {
+	ExecutionID string `json:"executionId"`
+	PageID      string `json:"pageId"`
+	ExpiresAt   int64  `json:"expiresAt"`
+}
+
 type ProjectPush struct {
 	Action      string `json:"action"`
 	ID          int64  `json:"id"`
@@ -334,6 +345,23 @@ func BroadcastWebFuzzerTabChanged(action string, openFlag bool, changedData []*y
 		OpenFlag:    openFlag,
 		ChangedData: changedData,
 		PageIDs:     pageIDs,
+	})
+}
+
+// BroadcastWebFuzzerExecution asks Yakit to activate and execute one existing
+// Web Fuzzer tab through its normal UI request pipeline. executionID is later
+// written into FuzzerIndex by the renderer, allowing MCP to wait for this
+// exact task rather than an unrelated manual request in the same tab.
+func BroadcastWebFuzzerExecution(executionID, pageID string, expiresAt int64) {
+	executionID = strings.TrimSpace(executionID)
+	pageID = strings.TrimSpace(pageID)
+	if executionID == "" || pageID == "" || expiresAt <= 0 {
+		return
+	}
+	BroadcastData(ServerPushType_WebFuzzerExecution, &WebFuzzerExecutionPush{
+		ExecutionID: executionID,
+		PageID:      pageID,
+		ExpiresAt:   expiresAt,
 	})
 }
 

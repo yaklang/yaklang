@@ -130,6 +130,16 @@ func init() {
 				mcp.Description("Actual address to send, if different from Host header"),
 			),
 		), handleCreateWebFuzzerTab),
+		WithTool(mcp.NewTool("execute_web_fuzzer_tab",
+			mcp.WithDescription("Activate and execute one existing Web Fuzzer tab through Yakit's normal UI request pipeline, then wait for that exact task to finish. The target tab is always activated so the completed response can be captured by screenshot. This tool never sends a second MCP-side HTTP request."),
+			mcp.WithString("pageId", mcp.Description("Stable Web Fuzzer tab id from create_web_fuzzer_tab or query_web_fuzzer_tabs"), mcp.Required()),
+			mcp.WithNumber("timeoutSeconds", mcp.Description("Maximum seconds to wait for the UI task to finish"), mcp.Default(60), mcp.Min(1), mcp.Max(300)),
+		), handleExecuteWebFuzzerTab),
+		WithTool(mcp.NewTool("query_web_fuzzer_execution_result",
+			mcp.WithDescription("Read the persisted summary for one completed Web Fuzzer task. Returns response metadata only; use the visible Web Fuzzer UI and screenshot for full response bodies."),
+			mcp.WithNumber("taskId", mcp.Description("Completed taskId returned by execute_web_fuzzer_tab"), mcp.Required(), mcp.Min(1)),
+			mcp.WithNumber("limit", mcp.Description("Maximum response summaries to return"), mcp.Default(10), mcp.Min(1), mcp.Max(100)),
+		), handleQueryWebFuzzerExecutionResult),
 		WithTool(mcp.NewTool("create_web_fuzzer_tabs",
 			mcp.WithDescription("Create multiple Web Fuzzer tabs in one operation and one Yakit push. "+
 				"Prefer this tool when users want to reproduce a vulnerability or inspect exploit steps: "+
