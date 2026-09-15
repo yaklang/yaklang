@@ -606,3 +606,104 @@ func TestMiniAITaskRegistry_Descriptors_CustomHandlerWithoutBuiltinDesc(t *testi
 	// Should fall back to name as description when not in builtin map
 	require.Equal(t, "custom_no_desc", descs[0].Description)
 }
+
+// ---------------------------------------------------------------------------
+// todo_draft handler tests
+// ---------------------------------------------------------------------------
+
+func TestBuiltinMiniAITasks_TodoDraftRegistered(t *testing.T) {
+	reg := NewMiniAITaskRegistry()
+	RegisterBuiltinMiniAITasks(reg)
+
+	_, ok := reg.Get("todo_draft")
+	require.True(t, ok, "todo_draft should be registered")
+}
+
+func TestHandleTodoDraft_MissingUserInput(t *testing.T) {
+	r, err := NewTestReAct(
+		aicommon.WithSpeedPriorityAICallback(mockSpeedTextAI("dummy")),
+	)
+	require.NoError(t, err)
+
+	taskCtx := &MiniAITaskContext{
+		ReAct:    r,
+		Config:   r.config,
+		Timeline: r.config.GetTimeline(),
+	}
+
+	_, err = handleTodoDraft(context.Background(), taskCtx, map[string]any{})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "user_input is required")
+}
+
+func TestHandleTodoDraft_Success(t *testing.T) {
+	r, err := NewTestReAct(
+		aicommon.WithSpeedPriorityAICallback(mockSpeedActionAI("todo_draft", map[string]any{
+			"todo_text":            "对目标网站 example.com 执行端口扫描，确认开放端口及服务版本。来源：用户要求。验收：扫描结果中列出所有开放端口及其服务版本标识，无开放端口需注明。",
+			"target":              "对 example.com 执行端口扫描并确认开放端口",
+			"source":              "用户要求",
+			"acceptance_criteria": "扫描结果列出所有开放端口及服务版本，无端口需注明",
+		})),
+	)
+	require.NoError(t, err)
+
+	// Add some timeline entries so LiteForge has context to work with
+	r.AddToTimeline("test_entry", "已对目标执行了子域名收集")
+
+	taskCtx := &MiniAITaskContext{
+		ReAct:    r,
+		Config:   r.config,
+		Timeline: r.config.GetTimeline(),
+	}
+
+	result, err := handleTodoDraft(context.Background(), taskCtx, map[string]any{
+		"user_input": "帮我扫一下这个网站的端口",
+	})
+	require.NoError(t, err)
+
+	resultMap, ok := result.(map[string]any)
+	require.True(t, ok)
+
+	// All three elements should be present
+	require.NotEmpty(t, resultMap["todo_text"])
+	require.NotEmpty(t, resultMap["target"])
+	require.NotEmpty(t, resultMap["source"])
+	require.NotEmpty(t, resultMap["acceptance_criteria"])
+
+	// todo_text should contain the full three-element description
+	todoText, ok := resultMap["todo_text"].(string)
+	require.True(t, ok)
+	require.Contains(t, todoText, "端口扫描")
+}
+
+func TestHandleTodoDraft_ViaSyncEvent(t *testing.T) {
+	r, err := NewTestReAct(
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {}),
+		aicommon.WithSpeedPriorityAICallback(mockSpeedActionAI("todo_draft", map[string]any{
+			"todo_text":            "测试 todo 草稿文本",
+			"target":              "测试目标",
+			"source":              "用户要求",
+			"acceptance_criteria": "验收标准",
+		})),
+	)
+	require.NoError(t, err)
+
+	captured := captureSyncEvents(r)
+	err = r.HandleSyncTypeAIMiniTaskEvent(&ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      SYNC_TYPE_AI_MINI_TASK,
+		SyncJsonInput: `{"task_name":"todo_draft","user_input":"帮我看看这个网站有没有漏洞"}`,
+		SyncID:        "todo-draft-1",
+	})
+	require.NoError(t, err)
+
+	events := captured()
+	resp := findSyncResponse(t, events, "todo-draft-1")
+	require.Equal(t, "todo_draft", resp["task_name"])
+	result, ok := resp["result"].(map[string]any)
+	require.True(t, ok)
+	require.NotEmpty(t, result["todo_text"])
+	require.NotEmpty(t, result["target"])
+	require.NotEmpty(t, result["source"])
+	require.NotEmpty(t, result["acceptance_criteria"])
+}
