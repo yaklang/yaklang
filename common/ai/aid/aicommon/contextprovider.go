@@ -254,13 +254,17 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 	}
 }
 
-// FileContentContextProvider renders an inline input snapshot without creating
-// temporary files or applying the file-path preview limit. The context manager
-// still enforces its shared token budget on the complete rendered context.
+// FileContentContextProvider retains one bounded preview and a readable full-content
+// file across prompt refreshes and inherited task contexts.
 func FileContentContextProvider(content string, userPrompt ...string) ContextProvider {
-	return func(AICallerConfigIf, *Emitter, string) (string, error) {
-		return fmt.Sprintf("User Prompt: %s\nFile: inline content\nMIME Type: text/plain\nFile Size: %d bytes\n\n--- File Content ---\n%s\n--- End of File Content ---\n",
-			strings.Join(userPrompt, " "), len(content), content), nil
+	resource := &AttachedFileContentResourceData{}
+	_ = resource.Unmarshal(content)
+	return func(_ AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
+		rendered, err := resource.render(emitter)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("User Prompt: %s\n%s", strings.Join(userPrompt, " "), rendered), nil
 	}
 }
 
@@ -363,6 +367,9 @@ func AISkillContextProvider(skillName string, userPrompt ...string) ContextProvi
 }
 
 func NewContextProvider(typ string, key string, value string, userPrompt ...string) ContextProvider {
+	if typ == CONTEXT_PROVIDER_TYPE_FILE && key == CONTEXT_PROVIDER_KEY_FILE_CONTENT {
+		return FileContentContextProvider(value, userPrompt...)
+	}
 	return func(config AICallerConfigIf, emitter *Emitter, providerKey string) (string, error) {
 		// 构建基本信息（即使出错也要包含）
 		baseInfo := fmt.Sprintf("User Prompt: %s\nType: %s\nKey: %s\nValue: %s\n", strings.Join(userPrompt, " "), typ, key, value)
@@ -375,8 +382,6 @@ func NewContextProvider(typ string, key string, value string, userPrompt ...stri
 			switch key {
 			case CONTEXT_PROVIDER_KEY_FILE_PATH:
 				return FileContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			case CONTEXT_PROVIDER_KEY_FILE_CONTENT:
-				return FileContentContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
 				return baseInfo + fmt.Sprintf("[Error: unknown file context provider key: %s]", key), utils.Errorf("unknown file context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}

@@ -121,3 +121,22 @@ func (d *AttachedExampleResourceData) ToAttachData(loop ReActLoopIF) string {
 - 不在通用资源 registry 中注册 focus-loop 专用结构，避免同一个资源 type 在不同 loop 中语义漂移。
 - `Type` 是稳定协议字段，新增或改名需要考虑前端和历史 payload。
 - `BindLoopData` 应保持轻量、可失败可记录；复杂 loop 状态迁移优先放到对应 loop 包。
+
+## Literal file content
+
+`Type=file, Key=file_content` is parsed as `AttachedFileContentResourceData`,
+not as a filesystem path. Small inputs remain inline. Inputs above the existing
+8 KiB text budget keep a UTF-8-safe preview and save the exact original bytes
+to an AI-space file, referenced for on-demand reading. Write failures are
+reported instead of advertising an incomplete file.
+
+`FileContentContextProvider` uses the same renderer and retains its result across
+prompt refreshes and inherited task contexts. The existing task-scoped provider
+and structured loop timeline remain separate consumers; both use bounded
+previews instead of injecting the full large input. Files remain available under
+the existing AI-space lifecycle so inherited contexts can still read them after
+the parent task returns.
+
+This handles bytes delivered to the engine. It does not change Scan Node's
+ordinary-session attachment download cap or the separate read-only workspace
+used for Professional Task log attachments.

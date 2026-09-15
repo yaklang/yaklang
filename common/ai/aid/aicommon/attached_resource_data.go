@@ -44,6 +44,11 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 		return nil, utils.Error("attached resource is nil")
 	}
 
+	if data.HasType(AttachedResourceTypeFile) && data.HasKey(CONTEXT_PROVIDER_KEY_FILE_CONTENT) {
+		resource := &AttachedFileContentResourceData{}
+		return resource, resource.Unmarshal(data.Value)
+	}
+
 	attachedResourceDataFactories.RLock()
 	factory := attachedResourceDataFactories.items[data.NormalizedType()]
 	attachedResourceDataFactories.RUnlock()
