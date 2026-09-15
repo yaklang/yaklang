@@ -57,6 +57,15 @@ var enabledHooks = yak.MITMAndPortScanHooks
 
 var mitmSaveToDBLock = new(sync.Mutex)
 
+const mitmConditionalHijackContextKey = "yakit_mitm_conditional_hijack"
+
+func resolveMITMHijackTaskSource(conditionalHijack bool) ypb.MITMHijackTaskSource {
+	if conditionalHijack {
+		return ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_CONDITIONAL
+	}
+	return ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_MANUAL
+}
+
 func feedbackFactory(db *gorm.DB, caller func(result *ypb.ExecResult) error, saveToDb bool, yakScriptName string) func(i interface{}) {
 	return func(i interface{}) {
 		if caller == nil {
@@ -726,7 +735,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			})
 		}()
 
-		if autoForward.IsSet() {
+		conditionalHijack := httpctx.GetContextBoolInfoFromRequest(req, mitmConditionalHijackContextKey)
+		if autoForward.IsSet() && !conditionalHijack {
 			// 自动转发的内容，按理说这儿应该接入内部规则
 			return originRspRaw
 		}
@@ -750,14 +760,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		wsReq := getPlainRequestBytes(req)
 		responseCounter := time.Now().UnixNano()
 		feedbackRspIns := &ypb.MITMResponse{
-			ForResponse: true,
-			Payload:     raw,
-			Url:         urlStr,
-			ResponseId:  responseCounter,
-			Request:     wsReq,
-			IsHttps:     httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS,
-			RemoteAddr:  httpctx.GetRemoteAddr(req),
-			IsWebsocket: true,
+			ForResponse:      true,
+			Payload:          raw,
+			Url:              urlStr,
+			ResponseId:       responseCounter,
+			Request:          wsReq,
+			IsHttps:          httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS,
+			RemoteAddr:       httpctx.GetRemoteAddr(req),
+			IsWebsocket:      true,
+			HijackTaskSource: resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalHijack),
 		}
 
 		err = mitmSendResp(feedbackRspIns)
@@ -893,8 +904,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			rsp = httpctx.GetHijackedResponseBytes(req)
 		}
 
+		conditionalResponseHijack := httpctx.GetContextBoolInfoFromRequest(req, mitmConditionalHijackContextKey) &&
+			httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest)
+
 		// 自动转发与否
-		if autoForward.IsSet() { // 如果其请求是自动转发的，响应也不应该劫持
+		if autoForward.IsSet() && !conditionalResponseHijack { // 如果其请求是自动转发的，响应也不应该劫持
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_AutoFoward, true)
 			/*
 				自动过滤下，不是所有 response 都应该替换
@@ -1012,12 +1026,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		feedbackRspIns := &ypb.MITMResponse{
-			ForResponse: true,
-			Response:    rsp,
-			Request:     plainRequest,
-			ResponseId:  responseCounter,
-			RemoteAddr:  remoteAddr,
-			TraceInfo:   model.ToLowhttpTraceInfoGRPCModel(traceInfo),
+			ForResponse:      true,
+			Response:         rsp,
+			Request:          plainRequest,
+			ResponseId:       responseCounter,
+			RemoteAddr:       remoteAddr,
+			TraceInfo:        model.ToLowhttpTraceInfoGRPCModel(traceInfo),
+			HijackTaskSource: resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalResponseHijack),
 		}
 		err = mitmSendResp(feedbackRspIns)
 		if err != nil {
@@ -1027,7 +1042,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		httpctx.SetResponseViewedByUser(req)
 		for {
-			if autoForward.IsSet() {
+			if autoForward.IsSet() && !conditionalResponseHijack {
 				return rsp
 			}
 			reqInstance, ok := <-messageChan
@@ -1113,14 +1128,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			})
 		}()
-		// 条件劫持
-		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+		// 条件劫持只作用于当前请求，不能改变会话级自动转发状态。
+		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName)
+		if conditionalHijack {
 			log.Infof("[mitm] hijack ws request by hijack filter")
-			autoForward.SetTo(false)
+			httpctx.SetContextValueInfoFromRequest(req, mitmConditionalHijackContextKey, true)
 		}
 
 		// MITM 自动转发
-		if autoForward.IsSet() {
+		if autoForward.IsSet() && !conditionalHijack {
 			return raw
 		}
 
@@ -1170,6 +1186,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					Replacers:           replacer.GetRules(),
 					IsWebsocket:         true,
 					RemoteAddr:          httpctx.GetRemoteAddr(req),
+					HijackTaskSource:    resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalHijack),
 				}
 				err = mitmSendResp(feedbackOrigin)
 				if err != nil {
@@ -1405,14 +1422,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
 		}
 
-		// 条件劫持
-		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName) {
+		// 条件劫持只作用于当前请求，不能改变会话级自动转发状态。
+		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName)
+		if conditionalHijack {
 			log.Infof("[mitm] hijack request by hijack filter")
-			autoForward.SetTo(false)
+			httpctx.SetContextValueInfoFromRequest(originReqIns, mitmConditionalHijackContextKey, true)
 		}
 
 		// MITM 手动劫持放行
-		if autoForward.IsSet() {
+		if autoForward.IsSet() && !conditionalHijack {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
@@ -1463,6 +1481,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
+					HijackTaskSource:    resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalHijack),
 				}
 
 				if lowhttp.IsMultipartFormDataRequest(displayReq) || !utf8.Valid(displayReq) {
