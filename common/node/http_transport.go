@@ -54,6 +54,7 @@ type SessionState struct {
 	EventSubjectPrefix          string
 	ExpiresAt                   time.Time
 	RuntimeHostCapacityAccepted bool
+	ResourcePolicyRequired      bool
 }
 
 // HeartbeatRequest keeps the node session alive and reports runtime state.
@@ -154,6 +155,7 @@ func (t *httpTransport) Bootstrap(
 		CommandSubject              string    `json:"command_subject"`
 		EventSubjectPrefix          string    `json:"event_subject_prefix"`
 		ExpiresAt                   time.Time `json:"expires_at"`
+		ResourcePolicyRequired      bool      `json:"resource_policy_required"`
 		RuntimeHostCapacityAccepted bool      `json:"runtime_host_capacity_accepted"`
 	}
 
@@ -169,6 +171,7 @@ func (t *httpTransport) Bootstrap(
 		EventSubjectPrefix:          response.EventSubjectPrefix,
 		ExpiresAt:                   response.ExpiresAt,
 		RuntimeHostCapacityAccepted: response.RuntimeHostCapacityAccepted,
+		ResourcePolicyRequired:      response.ResourcePolicyRequired,
 	}, nil
 }
 
@@ -177,8 +180,8 @@ func (t *httpTransport) Heartbeat(
 	session SessionState,
 	request HeartbeatRequest,
 ) error {
-	endpoint := fmt.Sprintf(heartbeatEndpointFmt, url.PathEscape(session.SessionID))
-	return t.postJSON(ctx, endpoint, session.SessionToken, request, nil)
+	_, err := t.HeartbeatWithResponse(ctx, session, request)
+	return err
 }
 
 func (t *httpTransport) Shutdown(
@@ -229,6 +232,14 @@ func (t *httpTransport) postJSON(
 		return nil
 	}
 	if err := json.NewDecoder(response.Body).Decode(responseBody); err != nil {
+		if errors.Is(err, io.EOF) {
+			if _, optional := responseBody.(*HeartbeatResponse); optional {
+				return nil
+			}
+		}
+		if _, optional := responseBody.(*HeartbeatResponse); optional {
+			return &resourcePolicyResponseError{err: err}
+		}
 		return fmt.Errorf("decode transport response: %w", err)
 	}
 	return nil
