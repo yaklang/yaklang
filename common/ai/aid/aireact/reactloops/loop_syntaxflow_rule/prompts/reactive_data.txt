@@ -1,7 +1,7 @@
 ## 当前 SyntaxFlow 规则
 
 {{ if .SfHasCodeSample }}
-**⚠️ 【有正例（file://、UNSAFE）】必须完成**：用户提供的漏洞样例即为正例。在 directly_answer 或回答任务完成之前，**必须调用** `check-syntaxflow-syntax` 并传入 path、sample_code=sf_sample_code、filename=sf_sample_filename、language=sf_sample_language 进行正例自检，得到 matched=true。严禁跳过此步骤。
+**⚠️ 【有正例（file://、UNSAFE）】必须完成**：用户提供的漏洞样例即为正例。`write_rule`/`modify_rule` 语法通过后，系统会**自动**做正例自检并写入 `sf_verify_matched`。当前状态：`sf_verify_matched={{ .SfVerifyMatched }}`。仅当 `sf_verify_matched=true` 后才可 `directly_answer`。不确定算符/include/NativeCall 时用 `syntaxflowdoc_*` 查文档；也可手动 `check-syntaxflow-syntax` 传入 path、sample_code、filename、language 复查。
 {{ end }}
 
 {{ if .Code }}
@@ -12,13 +12,22 @@
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_SF_RULE_END_{{ .Nonce }}|>
 
+{{ if .SfVerifyFeedback }}
+
+## 正例自检反馈（自动）
+
+{{ .SfVerifyFeedback }}
+
+**⚠️ 【正例未匹配】**：优先看 **diagnostic_hint** / **result_vars_diagnostic**。理解变量依赖后用 `modify_rule` 修复；语法通过后系统会再次自动自检。不确定语法时用 `syntaxflowdoc_search` / `syntaxflowdoc_builtin_lib_details`。
+{{ end }}
+
 {{ if .FeedbackMessages }}
 
 ## 反馈/错误信息
 
 {{ .FeedbackMessages }}
 
-**⚠️ 【必须验证】修改后请立即调用 `check-syntaxflow-syntax` 验证**（传入 path 或 syntaxflow-code）{{ if .SfHasCodeSample }}，并传入 sample_code、filename、language 做正例自检{{ end }}。禁止在未调用验证工具的情况下再次 modify_rule。验证通过或得到 matched=true 后方可 directly_answer。
+**⚠️ 【语法/反馈】**：有语法错误时用 `modify_rule` 修复。语法通过后系统会自动正例自检（若有样例）。禁止在未处理反馈的情况下盲目再次大改。需要文档时用 `syntaxflowdoc_*`。
 {{ if .IterationHigh }}
 
 **⚠️ 当前修复路径已持续多次但仍未通过**：禁止继续叠加条件或重写复杂逻辑。必须**回归 initial_rule_samples** 中与漏洞类型最接近的规则（如 SSTI→golang-template-ssti.sf），复制其规则体结构，仅调整方法名以适配样例，或先用最小模式 `.dangerousMethod(* #-> as $x); alert $x` 验证 sink 能否匹配。
@@ -26,12 +35,16 @@
 
 **若反馈涉及 desc、heredoc 或元数据语法错误**：请根据任务开始时已提供的规则样例及 golang-reflected-xss-gin-context.sf 确认正确结构。heredoc 结束符（TEXT、DESC 等）必须**行首无空格**。禁止盲目继续修改。
 
-**若 verify 返回 matched=false**：优先查看 **diagnostic_hint**。理解变量依赖：$param 依赖 $context，$context 依赖 $gin；从下往上分析（$sink:0 因 $source:0，$source:0 因 $context:0，根因多为链首）。**标注 [未定义] 的变量**（如 $gin）不应存在，include 必须带 as $var。**若链首为 0**：拆分复合模式逐段验证。**若 include 相关变量为 0**：读取 awesome-rule 对应 lib 查看内部模式。迭代多次未通过时：**回归 initial_rule_samples**，用最小模式重试。
+**若自检 matched=false**：优先查看 **diagnostic_hint**。理解变量依赖：$param 依赖 $context，$context 依赖 $gin；从下往上分析（$sink:0 因 $source:0，$source:0 因 $context:0，根因多为链首）。**标注 [未定义] 的变量**（如 $gin）不应存在，include 必须带 as $var。**若链首为 0**：拆分复合模式逐段验证。**若 include 相关变量为 0**：用 `syntaxflowdoc_builtin_lib_details` 或读取 awesome-rule 对应 lib。迭代多次未通过时：**回归 initial_rule_samples**，用最小模式重试。
 {{ else }}
-**下一步**：必须调用 `check-syntaxflow-syntax` 验证{{ if .SfFilename }}，传入 path=`{{ .SfFilename }}`{{ else }}（可传 syntaxflow-code 为上方规则内容）{{ end }}{{ if .SfHasCodeSample }}，并传入 sample_code=sf_sample_code、filename=sf_sample_filename、language=sf_sample_language 进行正例（file://、UNSAFE）自检，matched=true 后{{ end }}方可 directly_answer。
+{{ if .SfHasCodeSample }}
+**下一步**：若 `sf_verify_matched` 尚未为 true，根据上方自检反馈 `modify_rule`；语法通过后系统自动重跑正例自检。通过后即可 `directly_answer`。可选手动 `check-syntaxflow-syntax`（path=`{{ .SfFilename }}` + sample 参数）复查。
+{{ else }}
+**下一步**：语法已通过且无需正例时，可 `directly_answer`。不确定语法时用 `syntaxflowdoc_*` 或 `check-syntaxflow-syntax`。
+{{ end }}
 
 **directly_answer 时**：**禁止输出任何规则代码**（禁止 ```syntaxflow、flow(、pattern、source=、match: 等）。系统将自动从 `{{ .SfFilename }}` 读取规则文件并展示。你只需输出 1-3 句话的简要总结（本规则检测目标、数据流要点），不要输出任何规则正文。
 {{ end }}
 {{ else }}
-等待生成规则。使用 write_rule 创建新规则。
+等待生成规则。使用 write_rule 创建新规则。不确定算符/include 时先用 `syntaxflowdoc_search` / `syntaxflowdoc_list_builtin_libs`。
 {{ end }}
