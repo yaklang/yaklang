@@ -39,3 +39,32 @@ check(detail.Status == "decoded")
 		require.Len(t, events, 2)
 	}
 }
+
+func TestLiveProtocolYakSubscription(t *testing.T) {
+	for _, name := range []string{"http2-multiplex", "mysql-classic"} {
+		t.Run(name, func(t *testing.T) {
+			engine := yaklang.New()
+			count := 0
+			engine.SetVars(map[string]any{
+				"pcapx":   Exports,
+				"capture": filepath.Join("testdata", "protocol-sessions", name+".pcap"),
+				"validate": func(e *ProtocolEvent) {
+					count++
+					require.Equal(t, "decoded", e.Status)
+					require.NotEmpty(t, e.Session)
+					require.NotEmpty(t, e.Fields)
+				},
+			})
+			require.NoError(t, engine.SafeEval(context.Background(), `
+pcapx.ReplayPcapFile(capture,
+    pcapx.pcap_onProtocolMessage(func(event) { validate(event) }),
+)~
+`))
+			if name == "http2-multiplex" {
+				require.Equal(t, 12, count)
+			} else {
+				require.Equal(t, 14, count)
+			}
+		})
+	}
+}

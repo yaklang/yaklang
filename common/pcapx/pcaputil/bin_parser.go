@@ -26,10 +26,13 @@ type ProtocolEvent struct {
 	Fields                                   map[string]any // complete protocol fields; owned by this event
 	Metadata                                 any
 	Structured                               map[string]any
-	plan                                     *binparser.StructuredPlan
-	decodeSkip                               int
-	decodeConfig                             map[string]any
-	historySequence                          uint64
+	// Session is an owned snapshot of observed connection context. Decoded
+	// headers have no fabricated byte spans and never imply TLS decryption.
+	Session         map[string]any
+	plan            *binparser.StructuredPlan
+	decodeSkip      int
+	decodeConfig    map[string]any
+	historySequence uint64
 }
 
 // BinParserEvent is retained for source compatibility. Use ProtocolEvent.
@@ -38,7 +41,17 @@ type BinParserEvent = ProtocolEvent
 // Decode parses a complete event on demand. Incomplete/unrecognized samples
 // cannot be decoded as if they were messages. The returned object belongs to
 // the caller; no JSON conversion takes place.
-func (e *ProtocolEvent) Decode() (map[string]any, error) {
+func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
+	defer func() {
+		if err == nil && result != nil && e.Session != nil {
+			owned := make(map[string]any, len(result)+1)
+			for k, v := range result {
+				owned[k] = v
+			}
+			owned["session"] = cloneSession(e.Session)
+			result = owned
+		}
+	}()
 	if e.Structured != nil {
 		return e.Structured, nil
 	}
@@ -270,15 +283,18 @@ type binDirection struct {
 	stopped bool
 }
 type binFlow struct {
-	httpMethods []string
-	a           *binParser
-	id          uint64
-	endpoints   [2]string
-	ports       [2]uint16
-	protocol    string
-	level       byte
-	binding     *BinParserBinding
-	directions  [2]binDirection
+	sessionBytes int64
+	h2           *binHTTP2
+	mysql        *binMySQL
+	httpMethods  []string
+	a            *binParser
+	id           uint64
+	endpoints    [2]string
+	ports        [2]uint16
+	protocol     string
+	level        byte
+	binding      *BinParserBinding
+	directions   [2]binDirection
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
@@ -359,6 +375,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			d.stopped = true
 			f.release(d)
 		}
+		// Resource exhaustion and panic containment invalidate connection-wide
+		// dictionaries/sequence state just as a malformed session message does.
+		if d.stopped && (f.h2 != nil || f.mysql != nil) {
+			f.invalidateSession(1 - dir)
+			f.closeSession()
+		}
 	}()
 	a.input.Add(uint64(len(data)))
 	if d.stopped {
@@ -412,7 +434,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	for len(wire) > 0 {
 		if f.protocol == "" {
 			a.probes.Add(1)
-			f.detect(wire[:min(len(wire), a.config.ProbeBytes)])
+			f.detectDirection(dir, wire[:min(len(wire), a.config.ProbeBytes)])
 			detected = f.protocol != ""
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
@@ -429,10 +451,18 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				status = "context-required"
 			}
 			f.stop(dir, wire, status, err.Error())
+			if f.h2 != nil || f.mysql != nil {
+				f.invalidateSession(1 - dir)
+				f.closeSession()
+			}
 			return
 		}
 		if n < 0 || n > a.config.MaxMessageBytes {
 			f.stop(dir, wire, "limited", "declared message exceeds limit")
+			if f.h2 != nil || f.mysql != nil {
+				f.invalidateSession(1 - dir)
+				f.closeSession()
+			}
 			return
 		}
 		if n == 0 || n > len(wire) {
@@ -454,11 +484,22 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		if !a.config.Deferred {
+		stateful := f.h2 != nil && f.protocol == "http2" || f.mysql != nil && f.protocol == "mysql"
+		if !a.config.Deferred || stateful {
 			result, err := e.Decode()
+			if err == nil && stateful {
+				err = f.consumeSession(dir, e, result)
+			}
 			if err != nil {
 				e.Status, e.Error = "malformed", err.Error()
-				a.malformed.Add(1)
+				if errors.Is(err, errBinContext) {
+					e.Status = "context-required"
+					a.contextRequired.Add(1)
+				} else {
+					a.malformed.Add(1)
+				}
+			} else if a.config.Deferred {
+				a.deferred.Add(1)
 			} else {
 				e.Status, e.Structured = "decoded", result
 				a.decoded.Add(1)
@@ -471,6 +512,10 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		failed := e.Error != ""
 		a.emit(e)
 		if failed {
+			if stateful {
+				f.invalidateSession(1 - dir)
+				f.closeSession()
+			}
 			if len(wire) > 0 {
 				f.stop(dir, wire, "context-required", "decode failure invalidated stream affinity")
 			} else {
@@ -479,6 +524,19 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			return
 		}
+		// A peer SETTINGS already captured before a complete client preface
+		// must be applied before subsequent coalesced request header blocks.
+		// Never replay the peer after only a partial greeting/preface.
+		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream") {
+			detected = false
+			other := &f.directions[1-dir]
+			if len(other.buffer) > 0 && !other.stopped {
+				f.feed(1-dir, nil, other.ts)
+			}
+			if d.stopped {
+				return
+			}
+		}
 		d.ts = ts
 	}
 	if len(wire) == 0 {
@@ -486,7 +544,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	} else if !f.retain(d, wire) {
 		f.stop(dir, wire, "limited", "capture buffer limit reached")
 	}
-	if detected && f.protocol != "" {
+	if detected && f.protocol != "" && f.h2 == nil && f.mysql == nil {
 		other := &f.directions[1-dir]
 		if len(other.buffer) > 0 && !other.stopped {
 			f.feed(1-dir, nil, other.ts)
@@ -495,6 +553,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 }
 
 func (f *binFlow) close(reason TrafficFlowCloseReason) {
+	hadBuffered := len(f.directions[0].buffer) > 0 || len(f.directions[1].buffer) > 0
+	defer func() {
+		if !hadBuffered && !f.directions[0].stopped && !f.directions[1].stopped {
+			f.finishSession(reason)
+		}
+		f.closeSession()
+	}()
 	for dir := range f.directions {
 		d := &f.directions[dir]
 		if len(d.buffer) != 0 {
@@ -550,6 +615,7 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	row := *e
+	row.Session = cloneSession(e.Session)
 	row.Structured, row.Fields = nil, nil
 	row.Metadata = nil
 	row.Raw = append([]byte(nil), e.Raw...)
@@ -557,12 +623,12 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	defer v.mu.Unlock()
 	v.received++
 	row.historySequence = v.received
-	if len(row.Raw) > v.maxBytes {
+	if protocolHistoryBytes(&row) > v.maxBytes {
 		v.evicted++
 		return
 	}
-	for v.count > 0 && (v.count == len(v.rows) || v.bytes+len(row.Raw) > v.maxBytes) {
-		v.bytes -= len(v.rows[v.head].Raw)
+	for v.count > 0 && (v.count == len(v.rows) || v.bytes+protocolHistoryBytes(&row) > v.maxBytes) {
+		v.bytes -= protocolHistoryBytes(v.rows[v.head])
 		v.rows[v.head] = nil
 		v.head = (v.head + 1) % len(v.rows)
 		v.count--
@@ -570,7 +636,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	}
 	v.rows[(v.head+v.count)%len(v.rows)] = &row
 	v.count++
-	v.bytes += len(row.Raw)
+	v.bytes += protocolHistoryBytes(&row)
 }
 
 // Rows returns metadata only, oldest first, optionally filtered by protocol and
@@ -584,6 +650,7 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 		if (protocol == "" || protocol == e.Protocol) && (flow == 0 || flow == e.FlowID) {
 			row := *e
 			row.Raw = nil
+			row.Session = nil
 			rows = append(rows, &row)
 		}
 	}
@@ -597,6 +664,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 		e := v.rows[(v.head+i)%len(v.rows)]
 		if e.ID == id {
 			copyEvent := *e
+			copyEvent.Session = cloneSession(e.Session)
 			copyEvent.Raw = append([]byte(nil), e.Raw...)
 			row = &copyEvent
 			break
@@ -642,7 +710,7 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 			matching++
 			if len(rows) < limit {
 				row := *e
-				row.Raw, row.Structured = nil, nil
+				row.Raw, row.Structured, row.Session = nil, nil, nil
 				rows = append(rows, &row)
 			}
 		}

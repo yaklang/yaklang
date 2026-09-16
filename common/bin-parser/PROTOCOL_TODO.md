@@ -12,8 +12,10 @@ CLI 和回放基础。每次交付应把一个明确协议阶段的字段、状�
 
 | 优先顺序 | 协议/家族 | 已有基础 | 待交付 |
 |---|---|---|---|
-| 1 | MySQL/MariaDB、PostgreSQL、LDAP | 明确方向/阶段的字段模型和结构化入口 | 握手/能力/认证状态、双向阶段迁移、完整消息分帧、pcapx binding；缺少上下文必须明确报出 |
-| 1 | HTTP/2、WebSocket | 现有帧/消息规则及协议样本 | HTTP Upgrade/ALPN 选择、跨帧/多路流状态、头压缩或分片消息、完整实时链路回归 |
+| 1 | PostgreSQL、LDAP | 明确方向/阶段的字段模型和结构化入口 | 握手/能力/认证状态、双向阶段迁移、完整消息分帧、pcapx binding；缺少上下文必须明确报出 |
+| 2 | MySQL/MariaDB | 已接实时握手、认证、经典命令、文本结果集、多结果及 TLS 切换 | prepared/binary、压缩传输、查询属性、LOCAL INFILE、结果中途 ERR；范围见 HTTP2_MYSQL.md |
+| 1 | WebSocket | 现有帧规则及协议样本 | HTTP Upgrade、掩码、分片消息、完整实时链路回归 |
+| 2 | HTTP/2 | 已接明文 preface、双向 SETTINGS/ACK、持续 HPACK、多路流和消息关联 | PUSH_PROMISE、扩展 CONNECT、完整 HTTP 语义及外部解密数据接入；范围见 HTTP2_MYSQL.md |
 | 1 | SMTP、IMAP、POP3 | 显式请求/响应字段入口 | 行与多行响应、IMAP literal、状态/方向关联、STARTTLS 转换及自动准入 |
 | 1 | TLS | 记录分帧、ClientHello，另有显式证书入口 | 更多握手类型、跨记录握手重组、证书入口接入和协商状态；密文保持边界，不伪称已解密 |
 | 1 | DNS | UDP/TCP 实时入口、完整现有规则投影 | 扩展具名 RDATA 类型与复杂组合覆盖；DoH/DoT/DoQ 须先完成对应加密/传输层上下文 |
@@ -22,7 +24,7 @@ CLI 和回放基础。每次交付应把一个明确协议阶段的字段、状�
 | 2 | TDS、TNS、SMB、Kerberos | 显式 PDU/版本/方向模型，Kerberos 已有实时入口 | 真实会话协商、方向/事务状态、后续 PDU、对应实时 binding；密文/未知能力仍显式保留 |
 | 3 | 企业网、工控、存储与长尾 | 下方目录中的字段规则、样本和部分负例 | 按一个家族完成具名字段、规范约束、真实捕获、坏包验证，再接自动分发 |
 
-当前 pcapx 自动准入仅覆盖 HTTP/1.x、TLS、MQTT 3.1/3.1.1、DNS、Kerberos 以及
+当前 pcapx 自动准入覆盖 HTTP/1.x、明文 HTTP/2、MySQL/MariaDB 经典协议、TLS、MQTT 3.1/3.1.1、DNS、Kerberos 以及
 Memcached/Cassandra 的上述限定范围。其他规则需要显式入口，不能仅按端口猜测
 会话状态。用法与精确边界见 [抓包分析指南](../pcapx/pcaputil/BIN_PARSER.md)。
 
@@ -37,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **616** 项：限定范围 `done` **211**，`partial` **0**，`todo` **405**。目录共 **465** 个入口：`stable` **15**，`partial` **265**，`new` **185**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **616** 项：限定范围 `done` **211**，`partial` **0**，`todo` **405**。目录共 **471** 个入口：`stable` **15**，`partial` **271**，`new` **185**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -494,7 +496,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/hl7.yaml](rules/application-layer/hl7.yaml) | HL7 v2 MLLP (`HL7Message`, partial) |
 | [application-layer/http.yaml](rules/application-layer/http.yaml) | HTTP (``, new)<br>HTTP Proxy CONNECT (`HTTP`, new)<br>SOAP (`HTTP`, partial)<br>WebDAV (`HTTP`, partial)<br>Yakit proxy framing (``, new) |
 | [application-layer/http2.yaml](rules/application-layer/http2.yaml) | HTTP/2 (``, new) |
-| [application-layer/http2_fields.yaml](rules/application-layer/http2_fields.yaml) | HTTP/2 Frame Fields (`HTTP2FrameFields`, partial)<br>HTTP/2 Initial Client Direction (`HTTP2InitialClientStream`, partial)<br>HTTP/2 Initial Server Direction (`HTTP2InitialServerStream`, partial) |
+| [application-layer/http2_fields.yaml](rules/application-layer/http2_fields.yaml) | HTTP/2 Frame Fields (`HTTP2FrameFields`, partial)<br>HTTP/2 Frame Sequence Fields (`HTTP2FrameSequenceFields`, partial)<br>HTTP/2 Initial Client Direction (`HTTP2InitialClientStream`, partial)<br>HTTP/2 Initial Server Direction (`HTTP2InitialServerStream`, partial) |
 | [application-layer/http3.yaml](rules/application-layer/http3.yaml) | HTTP/3 (`HTTP3RequestStream`, partial) |
 | [application-layer/iax2.yaml](rules/application-layer/iax2.yaml) | IAX2 (`IAX2`, partial) |
 | [application-layer/iiop.yaml](rules/application-layer/iiop.yaml) | IIOP (`GIOP`, partial)<br>IIOP Locate (`GIOP`, partial)<br>IIOP/GIOP (`GIOP`, partial) |
@@ -518,7 +520,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/mqtt_fields.yaml](rules/application-layer/mqtt_fields.yaml) | MQTT 3.1 Packet Fields (`MQTT31PacketFields`, partial)<br>MQTT 3.1.1 Packet Fields (`MQTT311PacketFields`, partial) |
 | [application-layer/msrdp.yaml](rules/application-layer/msrdp.yaml) | MSRdp (``, new)<br>RDP (`RDPConnectionRequest`, new) |
 | [application-layer/mysql.yaml](rules/application-layer/mysql.yaml) | MariaDB (`MySQLPacket`, partial)<br>MySQL (``, partial) |
-| [application-layer/mysql_fields.yaml](rules/application-layer/mysql_fields.yaml) | MariaDB Greeting Fields (`MySQLGreetingFields`, partial)<br>MariaDB Handshake Response Fields (`MariaDBHandshakeResponse41Fields`, partial)<br>MariaDB Text Result Set Fields (`MariaDBTextResultSetFields`, partial)<br>MySQL Command Fields (`MySQLCommandFields`, partial)<br>MySQL Greeting Fields (`MySQLGreetingFields`, partial)<br>MySQL OK Session Track Fields (`MySQLOKSessionTrackFields`, partial)<br>MySQL SSL Request Fields (`MySQLSSLRequestFields`, partial) |
+| [application-layer/mysql_fields.yaml](rules/application-layer/mysql_fields.yaml) | MariaDB Greeting Fields (`MySQLGreetingFields`, partial)<br>MariaDB Handshake Response Fields (`MariaDBHandshakeResponse41Fields`, partial)<br>MariaDB Text Result Set Fields (`MariaDBTextResultSetFields`, partial)<br>MySQL Auth More Fields (`MySQLAuthMoreFields`, partial)<br>MySQL Auth Response Fields (`MySQLAuthResponseFields`, partial)<br>MySQL Auth Switch Fields (`MySQLAuthSwitchFields`, partial)<br>MySQL Command Fields (`MySQLCommandFields`, partial)<br>MySQL Deprecated EOF Result Fields (`MySQLTextResultSetDeprecatedFields`, partial)<br>MySQL Deprecated EOF Tracked Result Fields (`MySQLTextResultSetDeprecatedTrackFields`, partial)<br>MySQL Greeting Fields (`MySQLGreetingFields`, partial)<br>MySQL OK Session Track Fields (`MySQLOKSessionTrackFields`, partial)<br>MySQL SSL Request Fields (`MySQLSSLRequestFields`, partial) |
 | [application-layer/nbns.yaml](rules/application-layer/nbns.yaml) | LLMNR (`LLMNR`, partial)<br>LLMNR response (``, new)<br>LLMNR-MDNS collision (`LLMNR`, partial)<br>NBNS (``, new)<br>NBT NS (``, new)<br>NBT-NS response (``, new) |
 | [application-layer/nbss.yaml](rules/application-layer/nbss.yaml) | NBT SS (``, new)<br>NetBIOS (``, new) |
 | [application-layer/ncp.yaml](rules/application-layer/ncp.yaml) | NCP (`NCP`, partial) |

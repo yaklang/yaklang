@@ -51,11 +51,11 @@ func parseOptions(args []string, stderr io.Writer) (o options, err error) {
 	f.IntVar(&o.rows, "rows", 30, "maximum displayed rows per refresh/final table")
 	f.IntVar(&o.snaplen, "snaplen", 262144, "live snapshot length in bytes")
 	f.IntVar(&o.captureBuffer, "capture-buffer-mib", 32, "native buffer MiB per live interface; 0 uses backend default, maximum 256")
-	f.StringVar(&o.protocol, "protocol", "", "message display filter, e.g. http, tls, mqtt, dns")
+	f.StringVar(&o.protocol, "protocol", "", "message display filter, e.g. http, http2, mysql, tls, mqtt, dns")
 	f.Uint64Var(&o.flow, "flow", 0, "display one TCP flow")
 	f.Uint64Var(&o.detail, "detail", 0, "show retained message raw bytes and full fields at exit")
 	f.BoolVar(&o.full, "full", true, "parse full structured fields during capture (default)")
-	f.BoolVar(&o.deferred, "deferred", false, "capture first; parse only requested details")
+	f.BoolVar(&o.deferred, "deferred", false, "retain raw messages; decode requested details (sessions still validate)")
 	f.BoolVar(&o.follow, "follow", false, "show new messages in bounded refresh batches")
 	f.BoolVar(&o.quiet, "quiet", false, "disable periodic console output")
 	if err = f.Parse(args); err != nil {

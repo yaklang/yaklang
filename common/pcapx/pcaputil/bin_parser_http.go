@@ -24,6 +24,14 @@ func (h *binHTTPState) config() map[string]any {
 }
 
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
+	if f.binding == nil {
+		if f.protocol == "http2" {
+			return f.frameHTTP2(dir, w)
+		}
+		if f.protocol == "mysql" {
+			return f.frameMySQL(dir, w)
+		}
+	}
 	if f.protocol != "http" || f.binding != nil {
 		return f.frame(w)
 	}

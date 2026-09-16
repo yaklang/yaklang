@@ -309,10 +309,10 @@ func decodeHTTP2Fields(wire []byte, mode string) ([]http2WireField, map[string]a
 	if len(wire) < 9 || len(wire) > http2FieldsMaxBytes {
 		return fail("input outside 9..1048576 bytes")
 	}
-	if mode != "frame" && mode != "client" && mode != "server" {
+	if mode != "frame" && mode != "frames" && mode != "client" && mode != "server" {
 		return fail("unknown profile")
 	}
-	info := map[string]any{"Profile": "HTTP/2 " + mode, "Initial Direction Supplied By Caller": mode != "frame", "HPACK Decoded": mode != "frame", "HPACK Table Limit": uint64(4096), "Peer Settings Applied": false, "Peer Frame Limit Validated": false, "HTTP Semantics Validated": false, "Flow Control Validated": false, "Connection Lifecycle Validated": false, "TCP Reassembly Performed": false, "Structured Generation Supported": false}
+	info := map[string]any{"Profile": "HTTP/2 " + mode, "Initial Direction Supplied By Caller": (mode == "client" || mode == "server"), "HPACK Decoded": (mode == "client" || mode == "server"), "HPACK Table Limit": uint64(4096), "Peer Settings Applied": false, "Peer Frame Limit Validated": false, "HTTP Semantics Validated": false, "Flow Control Validated": false, "Connection Lifecycle Validated": false, "TCP Reassembly Performed": false, "Structured Generation Supported": false}
 	var fields []http2WireField
 	at := 0
 	if mode == "client" {
@@ -326,7 +326,7 @@ func decodeHTTP2Fields(wire []byte, mode string) ([]http2WireField, map[string]a
 	var headers []map[string]any
 	headerCount, headerBytes := 0, 0
 	var headerErr error
-	if mode != "frame" {
+	if mode == "client" || mode == "server" {
 		decoder = hpack.NewDecoder(4096, func(h hpack.HeaderField) {
 			if headerErr != nil {
 				return
@@ -355,7 +355,7 @@ func decodeHTTP2Fields(wire []byte, mode string) ([]http2WireField, map[string]a
 		if err != nil {
 			return nil, nil, err
 		}
-		if frameCount == 0 && mode != "frame" && (frame.typ != 4 || frame.flags&1 != 0) {
+		if frameCount == 0 && (mode == "client" || mode == "server") && (frame.typ != 4 || frame.flags&1 != 0) {
 			return fail("initial direction must start with non-ACK SETTINGS")
 		}
 		if mode == "frame" && frame.end != len(wire) {

@@ -66,7 +66,7 @@ func binTestPcap(t testing.TB, steps []tcpStep, port layers.TCPPort, ipv6 bool, 
 			eth.EthernetType = layers.EthernetTypeIPv6
 			ip = &layers.IPv6{Version: 6, HopLimit: 64, NextHeader: layers.IPProtocolTCP, SrcIP: src, DstIP: dst}
 		}
-		tcp := &layers.TCP{SrcPort: sport, DstPort: dport, Seq: s.seq, SYN: s.syn, FIN: s.fin, RST: s.rst, ACK: !s.syn}
+		tcp := &layers.TCP{SrcPort: sport, DstPort: dport, Seq: s.seq, Ack: s.ack, Window: s.window, SYN: s.syn, FIN: s.fin, RST: s.rst, ACK: !s.syn || s.synack}
 		require.NoError(t, tcp.SetNetworkLayerForChecksum(ip.(gopacket.NetworkLayer)))
 		buf := gopacket.NewSerializeBuffer()
 		require.NoError(t, gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, tcp, gopacket.Payload(s.data)))

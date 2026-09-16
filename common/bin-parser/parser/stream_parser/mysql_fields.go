@@ -255,8 +255,9 @@ func (r *mysqlFieldsReader) command(info map[string]any) {
 		r.fail("unsupported command grammar")
 	}
 }
-func (r *mysqlFieldsReader) ok(info map[string]any, tracked bool) {
-	if r.number("OK Marker", 1) != 0 {
+func (r *mysqlFieldsReader) ok(info map[string]any, tracked bool) { r.okMarker(info, tracked, 0) }
+func (r *mysqlFieldsReader) okMarker(info map[string]any, tracked bool, marker uint64) {
+	if r.number("OK Marker", 1) != marker {
 		r.fail("not classic OK packet")
 	}
 	info["Affected Rows"], _ = r.length("Affected Rows", false)
@@ -357,7 +358,7 @@ func (r *mysqlFieldsReader) column(maria bool) map[string]any {
 	r.zero("Column Reserved", 2)
 	return info
 }
-func (r *mysqlFieldsReader) resultset(info map[string]any, maria bool) {
+func (r *mysqlFieldsReader) resultset(info map[string]any, maria, deprecated, tracked bool) {
 	start, index, seq := r.packet()
 	count, _ := r.length("Column Count", false)
 	if count == 0 || count > mysqlFieldsMaxItems {
@@ -392,11 +393,14 @@ func (r *mysqlFieldsReader) resultset(info map[string]any, maria bool) {
 	if r.err != nil {
 		return
 	}
-	s, i := next()
-	columnEnd := map[string]any{}
-	r.eof(columnEnd)
-	r.finishPacket(s, i, "Column EOF Packet")
-	info["Column EOF"] = columnEnd
+	var s, i int
+	if !deprecated {
+		s, i = next()
+		columnEnd := map[string]any{}
+		r.eof(columnEnd)
+		r.finishPacket(s, i, "Column EOF Packet")
+		info["Column EOF"] = columnEnd
+	}
 	a, f = r.at, len(r.fields)
 	rows := make([][]map[string]any, 0)
 	values := 0
@@ -405,7 +409,7 @@ func (r *mysqlFieldsReader) resultset(info map[string]any, maria bool) {
 		if r.err != nil {
 			break
 		}
-		if r.end-r.at == 5 && r.wire[r.at] == 0xfe {
+		if r.wire[r.at] == 0xfe && (r.end-r.at == 5 && !deprecated || r.end-r.at >= 7 && r.end-r.at < 0xffffff && deprecated) {
 			// Group rows before appending their terminator's packet fields.
 			header := append([]tlsCertificateField(nil), r.fields[i:]...)
 			r.fields = r.fields[:i]
@@ -416,7 +420,11 @@ func (r *mysqlFieldsReader) resultset(info map[string]any, maria bool) {
 			i = len(r.fields)
 			r.fields = append(r.fields, header...)
 			last := map[string]any{}
-			r.eof(last)
+			if deprecated {
+				r.okMarker(last, tracked, 0xfe)
+			} else {
+				r.eof(last)
+			}
 			r.finishPacket(s, i, "Result EOF Packet")
 			info["Result EOF"] = last
 			break
@@ -440,7 +448,7 @@ func (r *mysqlFieldsReader) resultset(info map[string]any, maria bool) {
 
 func mysqlFieldsProfileValid(p string) bool {
 	switch p {
-	case "greeting", "response41", "mariadb-response41", "ssl-request", "mariadb-ssl-request", "command", "ok41", "ok41-session-track", "error41", "eof41", "text-resultset41", "mariadb-text-resultset":
+	case "greeting", "response41", "mariadb-response41", "ssl-request", "mariadb-ssl-request", "command", "ok41", "ok41-session-track", "error41", "eof41", "text-resultset41", "mariadb-text-resultset", "text-resultset-deprecated", "text-resultset-deprecated-track", "auth-switch", "auth-more", "auth-response":
 		return true
 	}
 	return false
@@ -454,12 +462,31 @@ func decodeMySQLFields(wire []byte, profile string) ([]tlsCertificateField, map[
 	}
 	r := &mysqlFieldsReader{wire: wire, end: len(wire)}
 	info := map[string]any{"Layout Context": profile, "Session State Validated": false, "Payload Decrypted": false, "Query Executed": false}
-	if profile == "text-resultset41" || profile == "mariadb-text-resultset" {
-		r.resultset(info, profile == "mariadb-text-resultset")
+	if profile == "text-resultset41" || profile == "mariadb-text-resultset" || profile == "text-resultset-deprecated" || profile == "text-resultset-deprecated-track" {
+		r.resultset(info, profile == "mariadb-text-resultset", profile == "text-resultset-deprecated" || profile == "text-resultset-deprecated-track", profile == "text-resultset-deprecated-track")
 	} else {
+		if profile == "auth-response" && len(wire) == 4 && wire[0] == 0 && wire[1] == 0 && wire[2] == 0 {
+			r.number("Payload Length", 3)
+			info["Sequence ID"] = r.number("Sequence ID", 1)
+			r.take("Auth Response", "raw", 0)
+			return r.fields, info, r.err
+		}
 		s, i, seq := r.packet()
 		info["Sequence ID"] = seq
 		switch profile {
+		case "auth-switch":
+			if r.number("Auth Switch Marker", 1) != 0xfe {
+				r.fail("invalid auth switch")
+			}
+			info["Plugin Name"] = string(r.nul("Plugin Name", "string"))
+			r.take("Plugin Data", "raw", r.end-r.at)
+		case "auth-more":
+			if r.number("Auth More Marker", 1) != 1 {
+				r.fail("invalid auth more")
+			}
+			info["Auth Data"] = bytes.Clone(r.take("Auth Data", "raw", r.end-r.at))
+		case "auth-response":
+			r.take("Auth Response", "raw", r.end-r.at)
 		case "greeting":
 			r.greeting(info)
 		case "response41", "mariadb-response41":

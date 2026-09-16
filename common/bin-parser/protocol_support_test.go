@@ -99,6 +99,9 @@ func TestProtocolRoadmapIntegrity(t *testing.T) {
 	for _, item := range ProtocolCatalog {
 		_, ok := seen[item.Name]
 		if !ok {
+			if requireLiveSupplementalProfile(t, item.Name, item.RuleFile, item.EntryNode, item.Layer) {
+				continue
+			}
 			// A specialized entry must not replace an established broad alias.
 			if item.Name == "CIFS Negotiate Request" {
 				contract := protocolCorpusParseContracts["CIFS"]

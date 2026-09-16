@@ -12,6 +12,10 @@ Package:
     operator: |
       err = parseHTTP2Fields("frame")
       if err != nil { panic(err) }
+  HTTP2FrameSequenceFields:
+    operator: |
+      err = parseHTTP2Fields("frames")
+      if err != nil { panic(err) }
   HTTP2InitialClientStream:
     operator: |
       err = parseHTTP2Fields("client")

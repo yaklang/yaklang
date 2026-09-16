@@ -54,6 +54,7 @@ Windows 将 `yak` 换成对应的 `yak.exe` 路径。`-i` 支持网卡编号或�
 | `Length` / `Raw` | 消息长度 / 自有原始字节；错误样本的 Raw 可能受上限裁剪 |
 | `Fields` | 完整结构化字段，正常情况下 `Status == "decoded"` |
 | `Metadata` | 与字段分开的解析附加信息 |
+| `Session` | 观察到的会话上下文快照，包含解压头或事务关联；不代表认证凭证或 TLS 已验证 |
 
 回调返回后可以保留消息，原始字节和字段不借用重组池。每次捕获内的新协议回调默认
 串行执行，包括多个 TCP worker 与 UDP 投递，脚本可直接维护自己的计数或列表。
@@ -73,7 +74,7 @@ pcapx.pcap_outputFile("session.pcap")
 默认完整解码。需要有界历史时：
 
 ```javascript
-history = pcapx.NewProtocolInspector()~ // 默认 4096 条、32 MiB 原始字节
+history = pcapx.NewProtocolInspector()~ // 默认 4096 条、32 MiB 原始字节与会话快照
 pcapx.OpenPcapFile("session.pcap", pcapx.pcap_onProtocolMessage(history.OnEvent))~
 rows = history.Rows("http", 0)
 if len(rows) > 0 {
@@ -96,6 +97,10 @@ if len(rows) > 0 {
 
 协议订阅使用有界 TCP 流式重组，与禁用重组、抓包缓存或旧的全流 HTTP/TLS helper
 不能同时使用；只有原包/旧 helper 的脚本无需修改。
-目前实时准入覆盖 HTTP/1.x、TLS、MQTT 3.1/3.1.1、DNS、Kerberos，以及 Memcached /
+目前实时准入覆盖 HTTP/1.x、明文 HTTP/2、MySQL/MariaDB 经典协议、TLS、MQTT 3.1/3.1.1、DNS、Kerberos，以及 Memcached /
 Cassandra 的限定阶段。未知、缺上下文、不完整、非法和资源受限样本都保留明确状态；
 TLS 密文保持不透明。扩展范围见 [协议 TODO](../../bin-parser/PROTOCOL_TODO.md)。
+
+## HTTP/2 与 MySQL 会话解析
+
+详见 [会话范围、样本和验证](HTTP2_MYSQL.md)。`ProtocolEvent.Session` 提供独立的连接上下文快照：HTTP/2 解压头、stream ID 与结束状态，MySQL 角色、阶段与事务 ID。`Decode()` 的 `session` 项返回该快照；不为解压数据虚构原始字节位置。延迟模式仍校验并推进会话状态，延迟的是字段投影的交付。历史内存预算包含原始字节和会话快照。

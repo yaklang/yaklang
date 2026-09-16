@@ -15,6 +15,26 @@
 endian: little
 unit: byte
 Package:
+  MySQLTextResultSetDeprecatedTrackFields:
+    operator: |
+      err = parseMySQLFields("text-resultset-deprecated-track")
+      if err != nil { panic(err) }
+  MySQLAuthSwitchFields:
+    operator: |
+      err = parseMySQLFields("auth-switch")
+      if err != nil { panic(err) }
+  MySQLAuthMoreFields:
+    operator: |
+      err = parseMySQLFields("auth-more")
+      if err != nil { panic(err) }
+  MySQLAuthResponseFields:
+    operator: |
+      err = parseMySQLFields("auth-response")
+      if err != nil { panic(err) }
+  MySQLTextResultSetDeprecatedFields:
+    operator: |
+      err = parseMySQLFields("text-resultset-deprecated")
+      if err != nil { panic(err) }
   MySQLGreetingFields:
     operator: |
       err = parseMySQLFields("greeting")

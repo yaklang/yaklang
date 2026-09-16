@@ -15,7 +15,7 @@ func parseHTTP2Fields(node *base.Node, process func(*base.Node) (func(bool), err
 	if !bounded || bits < 72 || bits%8 != 0 || bits > http2FieldsMaxBytes*8 {
 		return fmt.Errorf("http2-fields: explicit 9..1048576 byte boundary required")
 	}
-	if mode != "frame" && mode != "client" && mode != "server" {
+	if mode != "frame" && mode != "frames" && mode != "client" && mode != "server" {
 		return fmt.Errorf("http2-fields: unknown profile")
 	}
 	raw, err := base.NewNodeTreeWithConfig(node.Cfg, "HTTP2 staged wire", "raw", node.Ctx)

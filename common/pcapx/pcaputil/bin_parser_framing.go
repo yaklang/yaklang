@@ -12,6 +12,26 @@ import (
 )
 
 var builtinBinSpecs = [][2]string{
+	{"application-layer.mysql_fields", "MySQLTextResultSetDeprecatedTrackFields"},
+	{"application-layer.mysql_fields", "MySQLGreetingFields"},
+	{"application-layer.mysql_fields", "MySQLHandshakeResponse41Fields"},
+	{"application-layer.mysql_fields", "MariaDBHandshakeResponse41Fields"},
+	{"application-layer.mysql_fields", "MySQLSSLRequestFields"},
+	{"application-layer.mysql_fields", "MariaDBSSLRequestFields"},
+	{"application-layer.mysql_fields", "MySQLCommandFields"},
+	{"application-layer.mysql_fields", "MySQLOK41Fields"},
+	{"application-layer.mysql_fields", "MySQLOKSessionTrackFields"},
+	{"application-layer.mysql_fields", "MySQLError41Fields"},
+	{"application-layer.mysql_fields", "MySQLTextResultSet41Fields"},
+	{"application-layer.mysql_fields", "MariaDBTextResultSetFields"},
+	{"application-layer.mysql_fields", "MySQLAuthSwitchFields"},
+	{"application-layer.mysql_fields", "MySQLAuthMoreFields"},
+	{"application-layer.mysql_fields", "MySQLAuthResponseFields"},
+	{"application-layer.mysql_fields", "MySQLTextResultSetDeprecatedFields"},
+	{"application-layer.http2_fields", "HTTP2FrameSequenceFields"},
+	{"application-layer.http2_fields", "HTTP2InitialClientStream"},
+	{"application-layer.http2_fields", "HTTP2InitialServerStream"},
+
 	{"application-layer.http", "HTTPExact"},
 	{"application-layer.mqtt_fields", "MQTT31PacketFields"},
 	{"application-layer.mqtt_fields", "MQTT311PacketFields"},

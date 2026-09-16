@@ -260,3 +260,7 @@ The ClientHello adapter preserves cipher suites, compression methods, SNI and
 unknown extension bytes with the same concrete types. Ambiguous lengths retain
 the interpreter path. Current capture/replay results and capacity limits are
 recorded in [PERFORMANCE.md](../../bin-parser/PERFORMANCE.md).
+
+## HTTP/2 与 MySQL 会话解析
+
+详见 [会话范围、样本和验证](HTTP2_MYSQL.md)。`ProtocolEvent.Session` 提供独立的连接上下文快照：HTTP/2 解压头、stream ID 与结束状态，MySQL 角色、阶段与事务 ID。`Decode()` 的 `session` 项返回该快照；不为解压数据虚构原始字节位置。延迟模式仍校验并推进会话状态，延迟的是字段投影的交付。历史内存预算包含原始字节和会话快照。

@@ -72,3 +72,36 @@ func TestInspectOptions(t *testing.T) {
 	require.False(t, o.deferred)
 	require.NoError(t, run(context.Background(), []string{"-help"}, io.Discard, io.Discard))
 }
+
+func TestInspectHTTP2AndMySQLSessions(t *testing.T) {
+	for _, tc := range []struct {
+		name, protocol, detail, field string
+		count                         uint64
+	}{
+		{"http2-multiplex", "http2", "5", "Header Kind", 12},
+		{"mysql-classic", "mysql", "8", "More Results", 14},
+	} {
+		for _, mode := range []string{"full", "deferred"} {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				input := filepath.Join("..", "..", "pcaputil", "testdata", "protocol-sessions", tc.name+".pcap")
+				metrics := filepath.Join(t.TempDir(), "report.json")
+				var out bytes.Buffer
+				require.NoError(t, run(context.Background(), []string{"-read", input, "-" + mode, "-quiet", "-protocol", tc.protocol, "-detail", tc.detail, "-report", metrics}, &out, io.Discard))
+				require.Contains(t, out.String(), `"session"`)
+				require.Contains(t, out.String(), tc.field)
+				data, err := os.ReadFile(metrics)
+				require.NoError(t, err)
+				var result report
+				require.NoError(t, json.Unmarshal(data, &result))
+				require.Equal(t, tc.count, result.Analysis.Messages)
+				require.Zero(t, result.Analysis.Malformed)
+				require.Zero(t, result.Analysis.ContextRequired)
+				if mode == "full" {
+					require.Equal(t, tc.count, result.Analysis.Decoded)
+				} else {
+					require.Equal(t, tc.count, result.Analysis.Deferred)
+				}
+			})
+		}
+	}
+}
