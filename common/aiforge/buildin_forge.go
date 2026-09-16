@@ -243,6 +243,7 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("应急响应助手")
 	registerBuildInForge("代码审计")
 	registerBuildInForge("渗透测试")
+	registerBuildInForge("银狐木马排查")
 
 	cleanupRemovedBuildInForges()
 	return nil
