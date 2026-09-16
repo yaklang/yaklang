@@ -884,8 +884,8 @@
   {
     "rule_id": "e1315696-3f1e-404c-9906-06c1db41a6b0",
     "rule_name": "审计Java 使用System.out输出流",
-    "hash": "e40c6696a9c60a298b9323965379720f0285919fbd92b893d92e34146b39b269",
-    "version": "20260914.0001"
+    "hash": "56ff05c075f9b6525c49e379b438bc9684aa9c66a6dea58592499bb80133d8d6",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "084c0adc-69ef-42ed-aeb4-5c24603634af",
@@ -1136,26 +1136,26 @@
   {
     "rule_id": "761c9e67-552c-44bf-a241-e90829057c88",
     "rule_name": "检测Java空Catch块",
-    "hash": "0d65c73006b1cf106e3a7f6ca9b857f5e5a1a0acd3554a62a9b8a82763f6bc9d",
-    "version": "20260914.0001"
+    "hash": "9244c08dafd7bf6036ca8f0ee967d434f5a028b31d7028c0dc8eb679090a4a48",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "0f9bad23-cac6-4ec9-8509-5c96c2b72175",
     "rule_name": "检测Java泛型异常捕获",
-    "hash": "5a96a0f9ee885d34b03a22fd3f4df4da1a5bc68a594a464050ef398938e68d5c",
-    "version": "20260914.0001"
+    "hash": "8e8672c1e20c18edf217fcd74cb6938720f394b9dfd36175a8fb94d6e932a67f",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "99ae5b5c-905a-412c-bbbf-a14bfd488563",
     "rule_name": "审计Java捕获NullPointerException",
-    "hash": "dffb89c6c092b667cff0947d0c07d226a71d9d1da6ba28227ef7462193812a1f",
-    "version": "20260914.0001"
+    "hash": "0d782e05b0a794bc1f7dac4f9b5955ff11b8707e12f8536793f4fc81a3182a27",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "8b5be577-f8ad-45a4-ab1f-5f50188fa33b",
     "rule_name": "审计Java方法声明中抛出过于宽泛的异常",
-    "hash": "231a811cba5c5316542ac8e6bfe95266d4a7152e9d0c77e5049576751353e096",
-    "version": "20260914.0001"
+    "hash": "4aea247893403712363de890aadbb8c19eec61b251efc22ac057bf71922f9207",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "5a737536-4f00-45e7-aa92-75ab7f4bd971",
@@ -4688,38 +4688,38 @@
   {
     "rule_id": "struct-java-md5",
     "rule_name": "结构扫描：Java MD5 MessageDigest",
-    "hash": "4faa052c0c9f727ae185f10062b0170305ef3076d0d250e5ca02c657a47c9c45",
-    "version": "20260914.0001"
+    "hash": "f89d46647b9be218af9903278c634eaed42eb02b7a94894ff2769b78338c66c0",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-runtime-exec",
     "rule_name": "结构扫描：Java Runtime.exec 调用",
-    "hash": "d3a0d0a3941fa917ff033fe4746e96dba1f15d6e855255ef387b83657d11cb23",
-    "version": "20260914.0001"
+    "hash": "d1016b64d818f3b692ed5e809e663be052c31326b4dabbe1e11b6fc3b43c807e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-eval",
     "rule_name": "结构扫描：JavaScript eval 调用",
-    "hash": "b60fefdb79792acd5a1ac5ca22cadc15ae8a838f2449b7d18e60e5b979b383f9",
-    "version": "20260914.0001"
+    "hash": "dedc33dfff34885270f04a5d11e12bc1a57a5ec490d08d4f0aee901197b3aa89",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-eval",
     "rule_name": "结构扫描：Python eval 调用",
-    "hash": "f069d30aa3302a424aaf262b7b7dc972312f3d49d540ad8c1b6ee4a364b97797",
-    "version": "20260914.0001"
+    "hash": "98e0dda7676e5a0d58f2766a565555cbb8e0dc0400234fc6d2b4289c0c1b2f23",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-os-system",
     "rule_name": "结构扫描：Python os.system 调用",
-    "hash": "4693ea5643e8b0d17970d4a14db9cf8d61ff5ece5d1f3f3dd19ec350a3036342",
-    "version": "20260914.0001"
+    "hash": "d4638c0aa142f2b6225a1357b97660c32b44eff57761352da01f20a94a0b1746",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-pickle-load",
     "rule_name": "结构扫描：Python pickle.load",
-    "hash": "fd12d297beb23432a3786f8992cfaeb41df9924835fad15861edc89c4c51c45a",
-    "version": "20260914.0001"
+    "hash": "e6853e52ee20c0c792941bb94060ef3e3be0226b48e756dcfc008efc4ab95bb2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "source-csharp-assembly-load",
@@ -5798,787 +5798,787 @@
   {
     "rule_id": "struct-csharp-assembly-load",
     "rule_name": "结构扫描：C# Assembly.Load",
-    "hash": "2aff8fdf2632171b00a1b8e451b9215d6ddcda833e506e146944759a4be2560d",
-    "version": "20260914.0001"
+    "hash": "b3d889bcde65024fdcafef25c3c6b7a1057ca9aea7cab402d95a231660eb76ec",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-binaryformatter",
     "rule_name": "结构扫描：C# BinaryFormatter.Deserialize",
-    "hash": "999827f242ae33111da4863e98c1f4dcd7fbf0780555b90d092d77e773485df1",
-    "version": "20260914.0001"
+    "hash": "1e638f9a6b292f8ef8cd0d2d860b23a8f22a0adf4d4d8e394efe7d590596eeba",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-ciphermode-ecb",
     "rule_name": "结构扫描：C# CipherMode.ECB",
-    "hash": "853ddd99eabe0624b79f7ac92116b794f3af4c81b689cedcd5d39f558858c6c9",
-    "version": "20260914.0001"
+    "hash": "9a94e54ee990f964cf2b07e1f0b03e6b7f9ee4c6444d2fb04dbc9cfab6070fde",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-des-create",
     "rule_name": "结构扫描：C# DES.Create",
-    "hash": "b2176582667b1a24bf876e10769e359bc01c4f5c7c61880c2d3cc91663bb1776",
-    "version": "20260914.0001"
+    "hash": "eee72bbebdefb15e1237dc1c1db8b569c62659cd2140b77dc080ab7cd1b77b19",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-directory-searcher",
     "rule_name": "结构扫描：C# DirectorySearcher",
-    "hash": "88ce3c1b4571305a8c4c8b9b4115e671ecfb0201279cd602e39c2847745ff3ca",
-    "version": "20260914.0001"
+    "hash": "42b5a5b01274976431d5ee5653d903bd9b5657395fdf04c619735a5e859879f1",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-file-readalltext",
     "rule_name": "结构扫描：C# File.ReadAllText",
-    "hash": "8ffe493f7d0d7cf69f4d6d1be543d7b9ddf5a64fbb63de41f247fab4829a1c04",
-    "version": "20260914.0001"
+    "hash": "6193f226c54b46b8c29c72685c0c92db2abe1f731d6e0fcb837e6321c2d57f76",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-html-raw",
     "rule_name": "结构扫描：C# Html.Raw",
-    "hash": "73bc70ac682175c13a648d1ef4ac2fbe419dd6e5d8c5f91b8ac33266b21ec330",
-    "version": "20260914.0001"
+    "hash": "bcd99a3fac019096eed96681a4cc50f9dba4a0398c36c181eda7cca13cdc258b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-httpclient-getasync",
     "rule_name": "结构扫描：C# HttpClient.GetAsync",
-    "hash": "b68ea12bd324c796b9c3491f7e77e73665eeec560c54d1b3d56f66319fbb370c",
-    "version": "20260914.0001"
+    "hash": "cbad4db9d1cc1726f2f158f036c31aacc5b6bd3f03315ce3484b27e7ba9daf86",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-md5-create",
     "rule_name": "结构扫描：C# MD5.Create",
-    "hash": "25e7cd82afcfde0b5cf252e80c021b330f345b0ee9012c695842b5bed0de0e15",
-    "version": "20260914.0001"
+    "hash": "08325b04385ddc0a7699eb2ed97aa8b5358d55b8b5efb95c7c5b35c32ff1b5b4",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-path-combine",
     "rule_name": "结构扫描：C# Path.Combine",
-    "hash": "da5c8f8e92a6d48922cbeb3c628e8c1112202a0476b9bc4ab88b9fa92fb18c72",
-    "version": "20260914.0001"
+    "hash": "bfe3fc854bb6958d05e7e4d909e31342e221b82d9d0b30056c33462dae68a139",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-process-start",
     "rule_name": "结构扫描：C# Process.Start",
-    "hash": "6a038faba2156fee64e7989ca608f0909db3858d4ff2dc186e0dc0769e50c7f7",
-    "version": "20260914.0001"
+    "hash": "920f68e4634b3401f79061095b183ed9057b41e448f17e95316454855714d5eb",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-rc2-create",
     "rule_name": "结构扫描：C# RC2.Create",
-    "hash": "c5f5acdb71c223770b66a761676e08dde8a2b0c368bfdc7cd65336f302fe8849",
-    "version": "20260914.0001"
+    "hash": "ad6a1c82c5344dc7be21ac3b1c05eab3d05d7ec4145134d5989032beaab952df",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-response-redirect",
     "rule_name": "结构扫描：C# Response.Redirect",
-    "hash": "68e127c3794a4bd15774b7d26b8cf8dcb839ce74d43949a45ae44de4ba2a461a",
-    "version": "20260914.0001"
+    "hash": "8eb692f56cd4b01cb1b7fedc747a28c994fed410e385cbd6737358f882d1be36",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-response-write",
     "rule_name": "结构扫描：C# Response.Write",
-    "hash": "5ab1eafcf3f71687e7164c9ca377f7d1eea01f73ce4ef2c8be29a8fbf03558a0",
-    "version": "20260914.0001"
+    "hash": "7ef2e7cbfdcaf913eeca5dbc818907425996fb3aa61c1861026a7e4e65439882",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-rsa-pkcs1",
     "rule_name": "结构扫描：C# RSA PKCS1 填充",
-    "hash": "c4e4c41923da31861da5e8e1011ea14484e1fe5a8eb4e2991ffbf3dfcf84ecc3",
-    "version": "20260914.0001"
+    "hash": "347fee4eb611e3016c3e7337cecfc15aa6e1fb052be2ff921918b841cbf30a81",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-selectsinglenode",
     "rule_name": "结构扫描：C# SelectSingleNode",
-    "hash": "5f426f12efb0f6c7c056e514433120fb92ca33c45222390aea9a7c0270475744",
-    "version": "20260914.0001"
+    "hash": "936012b2fece318f46b2964af47199470703a7c3b0ad8ba9fae3b51611c8bf38",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-sha1-create",
     "rule_name": "结构扫描：C# SHA1.Create",
-    "hash": "34f41eb089a20b910a5aecd97eb5d1418c6575aa07b1e92bba77f29424cbca10",
-    "version": "20260914.0001"
+    "hash": "5526f3380871dbb5690fead1be19ddf4c0e23dc546d53842c35150c34195e91d",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-soap-los-formatter",
     "rule_name": "结构扫描：C# SoapFormatter 或 LosFormatter",
-    "hash": "0b41a4bc1e64132516f8eb461d415eb200ad35a9c8d86a1db97dc2cff8d1e791",
-    "version": "20260914.0001"
+    "hash": "3c087194aaff05206f3420c84135774f72af395f7e765eedb803a76d6e0ad7f2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-sqlcommand",
     "rule_name": "结构扫描：C# SqlCommand",
-    "hash": "68da10925b33ed0793e663a0c30c4c959e6a2fcc56aaefc8065052f429366220",
-    "version": "20260914.0001"
+    "hash": "42bf0414a04ccad059a526c4fe31821a87d7496e04391bbe79d52b21e60e9900",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-system-random",
     "rule_name": "结构扫描：C# System.Random",
-    "hash": "0a8681e21747d7e576f1bb284148268fb79567988dd445f6a9e4dfe9c3eb539d",
-    "version": "20260914.0001"
+    "hash": "f74680c84593b8bd9c3c8251c5c6beba4c7eff3b59786a316e71d5d62d16a847",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-triple-des",
     "rule_name": "结构扫描：C# TripleDES.Create",
-    "hash": "3e61475217185b4c857161e3bb6f2e29180d77d1883480c2dd659b4bc9ec3c05",
-    "version": "20260914.0001"
+    "hash": "ad3b67959801fc497f1e41e6c6532bdeaff9b731d1103be0f7706c5e5332576a",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-typenamehandling-all",
     "rule_name": "结构扫描：C# TypeNameHandling.All",
-    "hash": "d015e85167febc9bca4f0f5a21559ca8877fd5f35183db0b5b7029719daa66bc",
-    "version": "20260914.0001"
+    "hash": "cde4dd861ecd7ddc6fc53ff9d3b95427ba14485be4397cb14c0c3f677abe3b9e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-xmldocument-loadxml",
     "rule_name": "结构扫描：C# XmlDocument.LoadXml",
-    "hash": "762ab48b85ef8bff7854951a7c77f6424ec3a48e6db738c99d046678008d6900",
-    "version": "20260914.0001"
+    "hash": "71168c5e44af288e745c681a8ba41ee0b7632c2f9a0cf0e4e151500604b5044a",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-csharp-xmltextreader",
     "rule_name": "结构扫描：C# XmlTextReader",
-    "hash": "91281268229876fc2403e1bc6b91155545aa6209c619cbae945453e8ac52c0fa",
-    "version": "20260914.0001"
+    "hash": "ed76a70ac6f5cae8854896966cbb42df41a34ddc62a3cc36e3f3a67c947144e0",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-des",
     "rule_name": "结构扫描：Go crypto/des",
-    "hash": "2df4bed63a84c318d323e97ea316ac58a29528da208fff3557337d65e64950dc",
-    "version": "20260914.0001"
+    "hash": "e818fd06f8b49fd4423fdee246d6c66ce6cecc4775e58b51fb592d5486ffd827",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-exec-command",
     "rule_name": "结构扫描：Go exec.Command",
-    "hash": "c7eeafaf52dc92c51cdecab8f543ef1012f29adf018f6b7151836c4221b6f566",
-    "version": "20260914.0001"
+    "hash": "93998ba25e7f5bb278648128d1c71ebf2bade046e7265cf02ab00a21108b9d35",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-gob-decode",
     "rule_name": "结构扫描：Go gob.Decode",
-    "hash": "c849d83df837d6bc16acce5d50c7e64028f356513d2dcba91daaf0705dd1a789",
-    "version": "20260914.0001"
+    "hash": "bf2dbd81d9c3ed397a6e553f5254c3c8dc88f905339ecc1c40c93e668f3fae2a",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-http-get",
     "rule_name": "结构扫描：Go http.Get",
-    "hash": "a3d8a36f250b66e43228213729dd61ae8d5562b2ad3d81dd9d60659a6fdc8650",
-    "version": "20260914.0001"
+    "hash": "0fcd867874a5479562417765b6e9b331320bb1f08a26f11e07f5a946bb33101b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-listen-and-serve",
     "rule_name": "结构扫描：Go http.ListenAndServe",
-    "hash": "fd25d5301a82618ef2cde6a2d6fbc29f117604a8eab0baf1381f2a5bb5550333",
-    "version": "20260914.0001"
+    "hash": "5d63a9bef9571f96fe58ba93040499032e2f31729184a802ffd4b66a29c559f7",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-md5-sum",
     "rule_name": "结构扫描：Go md5.Sum/New",
-    "hash": "e6bb5df7eb7d2d21cec60a5e4421474d6f2f43cb6ae41b5c411ea5a1119143a7",
-    "version": "20260914.0001"
+    "hash": "6c102f54514478b1ff43732c88b29f277a9f4c13cf4391081ad0ceb1c134e6cf",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-rc4",
     "rule_name": "结构扫描：Go crypto/rc4",
-    "hash": "0b8901e4264326664a0e42a400c28f30ff6a4f645edcadac05af1464aff9dc12",
-    "version": "20260914.0001"
+    "hash": "bc6e4ceff445a9a1adb56f398b66ca5c46f302424da70574cf1a9afb91cc4664",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-sha1",
     "rule_name": "结构扫描：Go crypto/sha1",
-    "hash": "72c26a92a3092f79f11f4c082a47b9a66bebcc05e1c2303dd5ce6732a1a8023f",
-    "version": "20260914.0001"
+    "hash": "58d5bc28f91f76fc2d2d9618e0de5a2dc503f317cf4761dd54c418cbfc8d2272",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-ssh-insecure-ignore",
     "rule_name": "结构扫描：Go SSH 忽略主机密钥",
-    "hash": "827e924f5568c7875a0c10ea3c5529f3f3d55ecf1a252a3b33027bd1916b62a5",
-    "version": "20260914.0001"
+    "hash": "bd0125bed993b0e56f3c755fb145bba5ebf95998e49543c645a1c9d8ec09562f",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-syscall-exec",
     "rule_name": "结构扫描：Go syscall.Exec",
-    "hash": "79fb68c1fef7ed76bba7fb4174586fe25ae55e0e8a273d72e9a2d3d4c4943e27",
-    "version": "20260914.0001"
+    "hash": "b8ca29e35972da435e40d16309992dbbfa78107e732a69d06135ae2ca8cd3e38",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-go-template-html",
     "rule_name": "结构扫描：Go template.HTML",
-    "hash": "796e06f28f374e3fcaf2f8ee212b577ba20210d4c8b9474623651db51de03615",
-    "version": "20260914.0001"
+    "hash": "fbc380fa8269780f3d142d25654e300b0ad33f13c1523237a01df3135de0b640",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-aes-cbc-pkcs5",
     "rule_name": "结构扫描：Java AES CBC PKCS5Padding",
-    "hash": "d16f5aa05091557a3286e351858c1d8684406463c1541cb0fda1ced88321c60a",
-    "version": "20260914.0001"
+    "hash": "0134c5eaa623fab72464a576281b2fb07d90bde47898e2a1134ec8490c4158c4",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-aes-ecb",
     "rule_name": "结构扫描：Java AES/ECB 模式",
-    "hash": "5081495f7ff02c800ecfb9d6ccea0aa8af813f8d8f58ca63cc718f50591547e4",
-    "version": "20260914.0001"
+    "hash": "1967b1dd04a39e63cee27f77d0380cfbcc84001805aa7b037b0c42f530fe9c33",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-blowfish-cipher",
     "rule_name": "结构扫描：Java Blowfish 加密",
-    "hash": "ea008366ef364d81bc0ebf30f9e80c9c996976ca1fde499fbff78271cacf4ca7",
-    "version": "20260914.0001"
+    "hash": "02a68ab8f856b69aea6c38a4670ea663448ec47f5e7e1c3992485fe6668e6907",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-class-forname",
     "rule_name": "结构扫描：Java Class.forName",
-    "hash": "7ee4f31f56a910fcda075148073c617f4f294e8be1fb4df5051bd4c58dbd9e05",
-    "version": "20260914.0001"
+    "hash": "2cdb672521714171397fd9e66cc413afd658b50909f7d647ed3a77c99f9605f2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-defaulthttpclient",
     "rule_name": "结构扫描：Java DefaultHttpClient",
-    "hash": "ae9a4c7b0feda0f72c783491964b436f7409af5cf150ddddf6fe9f7ac61c498c",
-    "version": "20260914.0001"
+    "hash": "199c14c9fac209ac9ef73ce7dcce43760cae685a1241d7141b910b9156aa14db",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-des-cipher",
     "rule_name": "结构扫描：Java DES 加密算法",
-    "hash": "0cfda188f54849fa4be173b6092918ff94a89096c65c438400d1a0631a34c33e",
-    "version": "20260914.0001"
+    "hash": "50b2aa1f2abf710623d9e9955460b83fdb53d6ac93716ec0ad3fa8c6950368ef",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-desede-cipher",
     "rule_name": "结构扫描：Java 3DES 加密",
-    "hash": "4c1f7c8bf6bc3fff459d86ae841da55cffbd2c64b8200556403496e263ba3a67",
-    "version": "20260914.0001"
+    "hash": "640be1e27cf486ca55bf749adc12351e658bbfca3466d21371f1175fa75ee0fb",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-digestutils-md5",
     "rule_name": "结构扫描：Java DigestUtils MD5",
-    "hash": "5d324163dee1b454fd9cda9912b1f05ab29c39f560aeef58499ad2548630a737",
-    "version": "20260914.0001"
+    "hash": "4e3078cd3e59576c38b4b6f36bfa46cdb4024e7e7c915bf7ae25a15ac79123f3",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-el-create-value-expression",
     "rule_name": "结构扫描：Java EL createValueExpression",
-    "hash": "2451c5ec220742501803c9e656a84398a6465aaa7a17981cfd53791ed4cf823f",
-    "version": "20260914.0001"
+    "hash": "23fc3344db800f0df5213a7dd40cd9c7d40eeadf1355b7ee3c4bc0377c9433d2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-encode-url",
     "rule_name": "结构扫描：Java encodeURL 会话重写",
-    "hash": "d7d3ab455795cab8c1b355430962084f2aca20d52ea076753aca8ef66aae2ece",
-    "version": "20260914.0001"
+    "hash": "58d587a37d795a40b06a1be0fbd69f6d709cdc946c3727a5581ca1bcd62d1d5f",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-groovyshell-evaluate",
     "rule_name": "结构扫描：Java GroovyShell.evaluate",
-    "hash": "9f1392a88139c7cf12029e6e80ca951287c676f477d33235ecf068a5d78ce810",
-    "version": "20260914.0001"
+    "hash": "10a4f7fd5895cb9f4ee0c47ded510d878c0115fe0d5fa8807316ea3853fd8fec",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-ivparameterspec",
     "rule_name": "结构扫描：Java IvParameterSpec",
-    "hash": "aef4783a75ee4648417bee4ba093f16820a56f47767a502c99a3b667574ade70",
-    "version": "20260914.0001"
+    "hash": "62bf0bf055d50eca99c9bec81f3f58abfb4e9be8c654692942b52d54465e9fa9",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-jackson-default-typing",
     "rule_name": "结构扫描：Jackson enableDefaultTyping",
-    "hash": "a9c5af5a4d3eb20735d85d9048a3541594c53a8228fe4191e27e90365c595186",
-    "version": "20260914.0001"
+    "hash": "ef9cceb477786737163dedd483e7cf3eb0aafbf26c73752152175ee4ea88dcdd",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-jwt-decode",
     "rule_name": "结构扫描：Java JWT.decode 未校验",
-    "hash": "b6a1900b741a2a6834cddeef554be1ce14b44a944cca13d4643ff0126b2d5005",
-    "version": "20260914.0001"
+    "hash": "7d424e1d95a8ec3d43ddfa4eb32dfb17b38d13a69d741436c9fb09891e4ca1e6",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-math-random",
     "rule_name": "结构扫描：Java Math.random",
-    "hash": "38a4124f0fcb938d56884bdca534cc92ea58b485aeea18dae4ff0507719000a7",
-    "version": "20260914.0001"
+    "hash": "82beadddc2d5e9e9cdc929dc9f099f1d1bea763e431aea83d6a2efc2eb1d1e55",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-null-cipher",
     "rule_name": "结构扫描：Java NullCipher",
-    "hash": "896750371dcf7fa63e79ad790d5c18ffc500f7bda508c51887f53fe9c7c54a15",
-    "version": "20260914.0001"
+    "hash": "ab95bfb9075c751ea8afbee55201668518622e0dd9d1a71888ad4397363eff49",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-objectinputstream",
     "rule_name": "结构扫描：Java ObjectInputStream 反序列化",
-    "hash": "0e7d60dc9dfafbf608cd183a470f2dc55318389107cdb3a27ec0d7d4cc7d3d1b",
-    "version": "20260914.0001"
+    "hash": "b5aed60a7f7c9590e9e5317817c391ec684b855f171e9d3cd20d78259b9f16ae",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-ognl-getvalue",
     "rule_name": "结构扫描：Java OGNL getValue",
-    "hash": "ecfc9af7059f5b4dea57e54466680bb9a3a4cc87a336a662df3496e23a224955",
-    "version": "20260914.0001"
+    "hash": "ba422fbd34ffda0f626fd959c87dff5788ac784e81874eb1220376c1004e4242",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-plain-socket",
     "rule_name": "结构扫描：Java 明文 Socket",
-    "hash": "95cdd51697578cffd339b9bbece82ec76736d07e08ab2f890f766b53f7650fc0",
-    "version": "20260914.0001"
+    "hash": "0a0bb54018754180647779d86a647d3921daff0e7d1cc51a37e527d6943294fd",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-process-builder",
     "rule_name": "结构扫描：Java ProcessBuilder 调用",
-    "hash": "ab7c65aeff0a2bf3e78d9ffce24b40da857e2ac63d256d861153ea0025505168",
-    "version": "20260914.0001"
+    "hash": "c4eaa5fa5388d70b4e732d4bf1c1568cbfbc342b889b5200a213dba473de5b02",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-rc2-cipher",
     "rule_name": "结构扫描：Java RC2 加密",
-    "hash": "e9fab5c7a5d99cdad34dcde6231b587882001b4eae042e2e5f331746242da47a",
-    "version": "20260914.0001"
+    "hash": "65bd69275c956db9391fd810608078a9d2af901fbb20ca8670bd0ab244af500e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-rc4-cipher",
     "rule_name": "结构扫描：Java RC4/ARCFOUR 加密",
-    "hash": "bee92dcab244267504c55a8ca27ba305917a63191389664c9b8ebec082ac20b1",
-    "version": "20260914.0001"
+    "hash": "87805e7f829377a3005102dcabb18bac5f38ad16ccd772ed0fd2c0d979a0744c",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-rsa-pkcs1",
     "rule_name": "结构扫描：Java RSA PKCS1Padding",
-    "hash": "d1527f953c41c29a62ca4f3dfd530c6bb2d4444fbdfae2524e2145cff5e837c0",
-    "version": "20260914.0001"
+    "hash": "9451b1e86c360706211c4e0170221cfbeb1d61fde5974a13e632184a2af7d1f0",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-script-engine-eval",
     "rule_name": "结构扫描：Java ScriptEngine.eval 调用",
-    "hash": "0bace695bdee763e756702dbe98fa4ad7f05730845c3c1fc9cd504925bc86e55",
-    "version": "20260914.0001"
+    "hash": "d37f7aac1f804dac032b860a4b0f00fce570c56afaaed003dac641bd6a99af05",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-secretkeyspec",
     "rule_name": "结构扫描：Java SecretKeySpec",
-    "hash": "6ae20978bfdf0cf66b4a698c26cda1e6c39d5b0244887287c092674f51a8299a",
-    "version": "20260914.0001"
+    "hash": "39be65178ab72c326b2a31e256723532adc3f9587cbdcf541428fc6bdbcb7444",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-send-redirect",
     "rule_name": "结构扫描：Java sendRedirect",
-    "hash": "0f3a7df3eab10868bef01a779e2cf4f4224978351e1fb0d4fc3bd3830980ccbd",
-    "version": "20260914.0001"
+    "hash": "159f3dafa176ee6b6431123ec84e67b4eb47fcfaacff0191b0f0b0d494422eff",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-sha1",
     "rule_name": "结构扫描：Java SHA-1 消息摘要",
-    "hash": "5db374618cc965ff742f55450ea36a8df64d53d96d3bda462ebba340f1555f5f",
-    "version": "20260914.0001"
+    "hash": "43a7eb993dce418ff0707146ffdf13e0eb2f85aa697f57cf2f9be5d53edce3ef",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-snakeyaml-load",
     "rule_name": "结构扫描：Java SnakeYAML load",
-    "hash": "a251b5354b32c9243bccbe69a1240926c282b2cf339d43f1ebf62557de41b29d",
-    "version": "20260914.0001"
+    "hash": "3038b10164657dc73cad900fdc0eb691b91e50d9240f3fa5b1bae4988fa3fd37",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-system-load",
     "rule_name": "结构扫描：Java System.load",
-    "hash": "67c3f093648ff73b65531aec31803452af809a39053c832f1edde39c5558fe32",
-    "version": "20260914.0001"
+    "hash": "afd96d0f593378abd290d25c73500465493d93943b637d573aed834680106d35",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-thread-stop",
     "rule_name": "结构扫描：Java Thread.stop",
-    "hash": "3a9b10f8c3e8443b47ba087ae0a6eabf3cb664caa4b7267beaace14a058da5e3",
-    "version": "20260914.0001"
+    "hash": "675d1e48287785694e632db561c08b60f1cc3783aca8601c44f9f094f9397183",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-trust-all-hosts",
     "rule_name": "结构扫描：Java setTrustAllHosts true",
-    "hash": "9c37ac9532072f0d3d0391a3fc333421c903440ee8ccbf6453ab1d666fe4a10d",
-    "version": "20260914.0001"
+    "hash": "3e9fe0bb42b034c71638a53adf9007e1e330851f94c449f8562dc937d595017b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-util-random",
     "rule_name": "结构扫描：Java java.util.Random",
-    "hash": "22966722ad926c852415713bae17cdbcfa69f252b2acc72e0650df36c05a0e06",
-    "version": "20260914.0001"
+    "hash": "ec4333bb5ac236192b25d38a5329ee18f32e1f12bd97481f9e22cf947ce9265e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-xmldecoder",
     "rule_name": "结构扫描：Java XMLDecoder 反序列化",
-    "hash": "e08bce56e1c7ed068b4feeff87bb3c4e059caea47ccd4f332f686837bad7eeec",
-    "version": "20260914.0001"
+    "hash": "a2f2308ce2b8a5683c289ef596fdaca909f67d58d64daa3335f94f5d372deda8",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-xmlinputfactory",
     "rule_name": "结构扫描：Java XMLInputFactory 默认实例",
-    "hash": "6c555ed105e55d1c4d3cb049650198fb42fe4888c90c440d7f735cb04131f2b6",
-    "version": "20260914.0001"
+    "hash": "738af83ab7a15e2acdaea0757bcd0680b87bb31559300e6e84ec651e0accfb20",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-java-xpath-evaluate",
     "rule_name": "结构扫描：Java XPath.evaluate",
-    "hash": "8b823844353158c17fd25c407fd21377e0502d8033abd396f5d0a51c16e6e54c",
-    "version": "20260914.0001"
+    "hash": "84c4ddcf8242fcc6eeabe3aaed52b19d0abfc6c864ade14fd7c14421f375dca7",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-child-process-exec",
     "rule_name": "结构扫描：JavaScript child_process.exec",
-    "hash": "cfa4a78b0e0d3af7770b7fdb6eebc69fa0e00538335e5c57ea657b52c1badb35",
-    "version": "20260914.0001"
+    "hash": "bdd774778003957ec7f016642ede46069ba191dc9b28a23ea6b1a03cdfb73d27",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-createcipher",
     "rule_name": "结构扫描：JavaScript crypto.createCipher",
-    "hash": "099a83150c42427f32778d78fba8fc29861949fd3ff081894b030ff90a9195f0",
-    "version": "20260914.0001"
+    "hash": "027ee08b92f3e925067d40a383ca33a6f11dbf29957d67d7ed2db39ead5521fd",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-createhash-md5",
     "rule_name": "结构扫描：JavaScript crypto.createHash MD5",
-    "hash": "27b88227643c892364533127cbdac15b69a2b55803addddb2ec1a3263b146db4",
-    "version": "20260914.0001"
+    "hash": "eea13df7c4b1ac5ebb6941a4a8a58bc553c40059d44d433edca7b14c17ea0740",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-createhash-sha1",
     "rule_name": "结构扫描：JavaScript createHash SHA1",
-    "hash": "e78b46775cdfd3e61440d1c450e2cc718fbf8276f96ac90cbc273ed8a5c60deb",
-    "version": "20260914.0001"
+    "hash": "b0b1cf2e7b5996bf178d7748acb99a3644286882f9fc3c950b59de34abe7f61b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-dangerously-set-innerhtml",
     "rule_name": "结构扫描：React dangerouslySetInnerHTML",
-    "hash": "29cf336c62cb9cce8d9c7d7b948b93aba0143e8bcfe18c5e289d3a48db057d6c",
-    "version": "20260914.0001"
+    "hash": "49a44e52b678c183fd5418102c5681b79cf9b917cb026b3ac6599f667e82f503",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-ejs-render",
     "rule_name": "结构扫描：JavaScript ejs.render",
-    "hash": "18a8330e5bdbece023eea35253777f1f9d7953e68af390794474a8115fdcffec",
-    "version": "20260914.0001"
+    "hash": "1fb9460151558c47b105d53f58333f9cddd0639d7ec69e4068fe8927f8d6b3b0",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-function-constructor",
     "rule_name": "结构扫描：JavaScript Function 构造器",
-    "hash": "d133d8eec2e130db4d8ff9b717a19ef9c73332b8ef056f2188b8354225468442",
-    "version": "20260914.0001"
+    "hash": "941e8303575de4d5aec23b572b11eaa1fe53b584149d6a1d9da855e4e41b5392",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-jwt-decode",
     "rule_name": "结构扫描：JavaScript jwt.decode",
-    "hash": "befe2847e074d01e40d07eee84e7ee3244722555fc115141e9fc4a8e0c8b315c",
-    "version": "20260914.0001"
+    "hash": "edf8c32b4fbb4f47e5cc5c322991bafba3e5d52f3b22c760d0707ea0c4b29b2d",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-lodash-merge",
     "rule_name": "结构扫描：JavaScript lodash merge",
-    "hash": "ee5974ad32832bd51899d0d3d935bb5a752ee5ca88c580c05eb04cc1dbec8a39",
-    "version": "20260914.0001"
+    "hash": "0c4a0bc2fba2eb28cffe3f7007433d626b75d48fc3a86e97526729000f51155a",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-math-random",
     "rule_name": "结构扫描：JavaScript Math.random",
-    "hash": "76868c5a2c134c6157cb0b16375e1db3db987470f7f0672f385fead55cd5f0f2",
-    "version": "20260914.0001"
+    "hash": "112a2d00ff984f52b85320cf712ed0be688e1fb92f7f4237b9a3ad14eea4f2df",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-node-serialize",
     "rule_name": "结构扫描：JavaScript unserialize",
-    "hash": "0db3cca12bc3b5c3b67239b7a4a871ae58063498d5d9d85668fde3dd39824f7a",
-    "version": "20260914.0001"
+    "hash": "4777beb983339e696f189c28f8a85b87147056450b75020f672265fbe8640e59",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-vm-runincontext",
     "rule_name": "结构扫描：JavaScript vm.runInContext",
-    "hash": "d03e4ecac7903af83a8695a3bca6c6e1137e31401f5b2b3af605210e88986a02",
-    "version": "20260914.0001"
+    "hash": "267b98ea8d26b8339292928b666e3f9f523fea9c6be461c93b7c858864e23104",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-js-yaml-load",
     "rule_name": "结构扫描：JavaScript js-yaml load",
-    "hash": "abf58db904c0d8e2c2bd8f314548efe79853a72c51a1670636a3754fed474fcb",
-    "version": "20260914.0001"
+    "hash": "199a8ee8d244fad2b2b6ed5bb2eec7f1e1b5de6e451e39e2ad03c672541f4682",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-assert",
     "rule_name": "结构扫描：PHP assert 调用",
-    "hash": "f17d3dc1c7abf9d2d3b0428c9dfdef40bcb540c6d83f731c6c41fb29d853530c",
-    "version": "20260914.0001"
+    "hash": "edc2a51eab313eb48181885c32c39c93c12d56ed18edc97fec4ae69a8fc02c4b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-create-function",
     "rule_name": "结构扫描：PHP create_function",
-    "hash": "2c70e25ccc5aa8bc8db4b2bac04e7a227e238e489d43f25cb215975bfed45d96",
-    "version": "20260914.0001"
+    "hash": "5047d596fa2f8162a239d6a969c8b9707fd6c295aa03c65f51d2b20d637f1dd4",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-eval",
     "rule_name": "结构扫描：PHP eval 调用",
-    "hash": "63a6fff54c369f9c462d0b705861a72c3ab19f951d76228a4fd75bdbfd87a663",
-    "version": "20260914.0001"
+    "hash": "ebab95bf4787e8d29e5cce37b4b4e8cdda8721e66f23523ca7fd5ee2285164ad",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-exec",
     "rule_name": "结构扫描：PHP exec",
-    "hash": "ca333514f7f12d84a9dcf80d9a0791471f58743d78adb6370cca2b0a3b4c5226",
-    "version": "20260914.0001"
+    "hash": "ed46efdc2dbbeefe2c19a173a94c91540316db8858fb5ef599c6f136a7154a4f",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-extract",
     "rule_name": "结构扫描：PHP extract",
-    "hash": "9dec63fa34eb2926c5a19d1cc4167153673b173cce09be6779efc2ac2919ebff",
-    "version": "20260914.0001"
+    "hash": "b598705343fc80bfd2d7d85135c4cf6fc4b88e71d65c3d6cb173f998b82dd29e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-ftp-connect",
     "rule_name": "结构扫描：PHP ftp_connect",
-    "hash": "5632d551ef7fda04d092441c6820e10559262ed3e563da70e500cd5a365b7f21",
-    "version": "20260914.0001"
+    "hash": "e7a51e54160aa273142f310bdaec6c163e8823ae80534eb8cccfa25c52737911",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-highlight-file",
     "rule_name": "结构扫描：PHP highlight_file",
-    "hash": "c3463d410e41e10c2d05f82f2a721221ad487e384292962b0bbf8867e1e1db33",
-    "version": "20260914.0001"
+    "hash": "6729c16d8265bab4849542755148c38ce088d33a30c3a40d89adec19742ed8ec",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-include",
     "rule_name": "结构扫描：PHP include/require",
-    "hash": "60cef98835b86e62ff3bb69839164d4c5b6fbf4648cc21826efc024d8db9b50e",
-    "version": "20260914.0001"
+    "hash": "ad0a710f225f8364b7b31d10ba31b071858ee4e6e6a4d8078d6f44f50129b283",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-ldap-bind",
     "rule_name": "结构扫描：PHP ldap_bind",
-    "hash": "c5fa6abd202389ba1226eb85a4357bce639da1ccec7459e423f43478b01682ce",
-    "version": "20260914.0001"
+    "hash": "b1d0b5da56b7b65f9b89951dc747ec0f3b8e002a404aaf63cf624afa18db7008",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-mb-ereg-replace",
     "rule_name": "结构扫描：PHP mb_ereg_replace",
-    "hash": "174fe3be086e838514e3781179d4881354123068f6c5548f88a6c8217165d3b6",
-    "version": "20260914.0001"
+    "hash": "b5ff0edab2f4b6ea8ddcc42691ee82757138538b42a1aa28182864705e56f69e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-mt-rand",
     "rule_name": "结构扫描：PHP mt_rand",
-    "hash": "7c7c5e93061f5fa20c81fa126121113da6c0ed62b76676d4210e85e113ff103e",
-    "version": "20260914.0001"
+    "hash": "2871f228ead5daf71d688a87490ec8cf32e4a756bda7b2047cabb1c9a1ddad9b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-mysql-query",
     "rule_name": "结构扫描：PHP mysql_query",
-    "hash": "90973612fdc1347d9c99e0e86fd53e8e199ea10a8463b689d0696bfb07235e08",
-    "version": "20260914.0001"
+    "hash": "2786d16a6434b93f1a1f872be7779baba2c6480fe8376e440f7bfcda3eae4fe2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-parse-str",
     "rule_name": "结构扫描：PHP parse_str",
-    "hash": "188424db51708ab9b542f056affbe5e7f112355df6c24c732a037c652d39a66a",
-    "version": "20260914.0001"
+    "hash": "eb4a3bb7b329e044d3e09375dcf745136f210e3d1e221ccd4273c043cbad7947",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-passthru",
     "rule_name": "结构扫描：PHP passthru",
-    "hash": "95ced36c5611caa64e09c89cce183c8b05a324dc0a0fa0fb5293a1e0fd051dbb",
-    "version": "20260914.0001"
+    "hash": "969e1ec57a13f1773639bc1eacc0525fe05cd40fd6ab811fa1c41f319ba6a4b4",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-pcntl-exec",
     "rule_name": "结构扫描：PHP pcntl_exec",
-    "hash": "49223e9133f0952b49d3759e4619e66bcb27da2790c9ec1fbd81204e47bd7f3c",
-    "version": "20260914.0001"
+    "hash": "5af0bd43cd74a891a8c77e7194e33522f25c52cfdcc5ee636423d68f7b68e830",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-phpinfo",
     "rule_name": "结构扫描：PHP phpinfo",
-    "hash": "592307c3cb93bd21273dc309826776b92fc345f397a44c7ab21ea276b103c01a",
-    "version": "20260914.0001"
+    "hash": "80d5b2337f951bee5114f9ac111d765302f14cc09077f9390a9597a6207aac8c",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-popen",
     "rule_name": "结构扫描：PHP popen",
-    "hash": "c5e4a1e19e2b3b5520849497afb23a3624b002d977f7495089b01545f9de2c20",
-    "version": "20260914.0001"
+    "hash": "f4d5816cad8d6ce57a5fc3230db1918b8ae0ef66bff754365224b7d08339dd78",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-proc-open",
     "rule_name": "结构扫描：PHP proc_open",
-    "hash": "997df135380c25d08d277a0df693a32fcb86e37e79e7a51f53e0034341514ecb",
-    "version": "20260914.0001"
+    "hash": "61319b515c3d0082e774ea0beafa3737be0180018af9a3dbb1d520cbf1595fd3",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-sha1",
     "rule_name": "结构扫描：PHP sha1",
-    "hash": "bd04fead266735adead6c967a1942d73f046e3932d44eef1cf2ba4d5ecb5db72",
-    "version": "20260914.0001"
+    "hash": "1ed2a15555fb429a089a1be213657767c1d1b46e4b95d83d8f429f4ce62a2f0c",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-shell-exec",
     "rule_name": "结构扫描：PHP shell_exec/exec/passthru",
-    "hash": "ea5a89b2a4ad5ea004cd2dafc8fd9b4a1c94f9d0571d6c479c139f51d70f5c02",
-    "version": "20260914.0001"
+    "hash": "2187e644f1d9cdcc21c478fce04ce7626a368310db83f2b24087a905dfcdf533",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-simplexml-load-string",
     "rule_name": "结构扫描：PHP simplexml_load_string",
-    "hash": "6e23a74292835e0c472f34479ac7e3877630c75829c44227e8cdad37a0b5dddd",
-    "version": "20260914.0001"
+    "hash": "e262c13460452f7753643b1e9d6549fa582244dca0c1db441b8c2fafaa81f0e9",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-system",
     "rule_name": "结构扫描：PHP system 调用",
-    "hash": "f20fa5a9399e20c71f90611dd9cc69632ca8aff83692c73b87c1a623a40542e1",
-    "version": "20260914.0001"
+    "hash": "2560b109e0a314d07f9326486daa5790d4af86d27bb97a08608bd3126ef7079b",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-unlink",
     "rule_name": "结构扫描：PHP unlink",
-    "hash": "1b18b4b464f04d9a4f2d297e315a77e4dfb4518d616a61af237da2e9cc2edf9f",
-    "version": "20260914.0001"
+    "hash": "cfb8faab177c489109331df1c8fcf91efc4f54e0ab8dfc355de93eb51392cabe",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-php-unserialize",
     "rule_name": "结构扫描：PHP unserialize",
-    "hash": "736d45dcb84af1940590cce5056f1edcceb8f0f4192f0e7b540f0e82b86913dd",
-    "version": "20260914.0001"
+    "hash": "b2444f998cf21853cf0f633ea1de4c12792157102a775bb90346680bff27bfc7",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-asyncio-shell",
     "rule_name": "结构扫描：Python asyncio 子进程 shell",
-    "hash": "74e940e5556eb21ca7dbbeba792a462d573ca13c3fe4facaef392f7e8e944a32",
-    "version": "20260914.0001"
+    "hash": "56fc8a523c9071d035faa05388c13951854beb02fd22196bc52456334cb60a44",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-compile",
     "rule_name": "结构扫描：Python compile 调用",
-    "hash": "b0988cf5b9b1af92a85a596954c5f589fd2898170104a0ba2741d480f10564f4",
-    "version": "20260914.0001"
+    "hash": "9a27268cdcef183f80b16ed44cdb3199bde24b4c7fd040c47e045a7e4fc87aa2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-cryptography-ecb",
     "rule_name": "结构扫描：Python cryptography ECB",
-    "hash": "b2c3d5a49e7feb53f0add3555a654df6495c0625fe980db531590d185c5f66e1",
-    "version": "20260914.0001"
+    "hash": "6c40d2aecdb920e4f51ff2a09fa5be62b54ab5065d2d7aa8cda512b3e88dad38",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-cryptography-md5",
     "rule_name": "结构扫描：Python cryptography MD5",
-    "hash": "e3c48f25f38e19615152c41dc0cbe289c23457a82e3e0432cbf40ba02095cc4b",
-    "version": "20260914.0001"
+    "hash": "b32cbbb8f2e67f1328b4dc032130fa8b44a09604f7bed4aca770e5d0111b7284",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-exec",
     "rule_name": "结构扫描：Python exec 调用",
-    "hash": "877bef6ddee34b84bf9a41883d7b2bafe268282c02a18208a075c3ef8a7ee30d",
-    "version": "20260914.0001"
+    "hash": "b58bd278a38f1dbfbc22e4445dd9819a73ef507cafc5a652809d68cfa689a697",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-ftplib",
     "rule_name": "结构扫描：Python ftplib.FTP",
-    "hash": "41e475ebdaaab4108646cf3302528386d5cb8aee9363b0e176ee81747d88d000",
-    "version": "20260914.0001"
+    "hash": "12936803f5eb1778aed6fc65295a5f494eb0286b951329c57b3f3d16f3f7fc38",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-hashlib-md5",
     "rule_name": "结构扫描：Python hashlib.md5",
-    "hash": "16d86ec84a7910663369e835cea3bcc1288d1699b493da006c45cef372f7b1ff",
-    "version": "20260914.0001"
+    "hash": "6ae29a74d2a69071a8743205eed78cdcb85446539ad77e03d5eff65825c65736",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-hashlib-sha1",
     "rule_name": "结构扫描：Python hashlib.sha1",
-    "hash": "6bab1a9a01a6413a0a60191094ce12cff39d5d5dd0b88fc4199d7b027e7f8848",
-    "version": "20260914.0001"
+    "hash": "2134f660c7a2b3b08c53df9b51c88044200ed00cd18e32982a676bc7a4d9124e",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-jinja2-from-string",
     "rule_name": "结构扫描：Python jinja2 from_string",
-    "hash": "4c9b6b33741d85c7ffb6d3bdfc57147ba1dbc3e9118cb295e1911e55fc4eaf2b",
-    "version": "20260914.0001"
+    "hash": "cbee71717659a51bb03104b6a265c85a76c1011f04641cd8363c5286c03dfcf1",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-jsonpickle",
     "rule_name": "结构扫描：Python jsonpickle.decode",
-    "hash": "1537120951b7e88488e8d8b5de16f1f8a29c8c582320805a6275ed010e236039",
-    "version": "20260914.0001"
+    "hash": "0aa2b3c75e2ba4b4b86a5d98ea7aa69d4f3fbc6ac03446849809f909a5520eb8",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-marshal-loads",
     "rule_name": "结构扫描：Python marshal.loads",
-    "hash": "c8954f8e3cca603009783b8ba599ab38cf56402a424d4fc4f5ef7d0089c9b8af",
-    "version": "20260914.0001"
+    "hash": "782020ced05bed5ea5c8cdf0735f1ac619c9415804a6a95739d2ec848dc14a77",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-os-execl",
     "rule_name": "结构扫描：Python os.execl",
-    "hash": "91db735e6c1bb51b2635a599cb43b9490244bf910203c90d7dd3f4e9c4c276d5",
-    "version": "20260914.0001"
+    "hash": "5e2d5d9c06093fce4af455092a3cdf8c814583892f4171c7fbfe820426d01986",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-os-popen",
     "rule_name": "结构扫描：Python os.popen 调用",
-    "hash": "3aeec4b896d4b2aeffb394972d940598ff7d822bd17ed9908b6560ce2d2dc3f2",
-    "version": "20260914.0001"
+    "hash": "6775affbb0cc637542875d3cfa193bba85070b9b4127d646095c21590114b9e7",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-os-spawn",
     "rule_name": "结构扫描：Python os.spawn",
-    "hash": "f9135c14f32baad2e31f5bdccd86e2bba34d8dff058c87731970a1fee1cfbcff",
-    "version": "20260914.0001"
+    "hash": "2753955d51c7e66d514b3cb0eda90ce4e560a2e86e8bc1ce3eeea9d96973adf2",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-pandas-read-pickle",
     "rule_name": "结构扫描：Python pandas.read_pickle",
-    "hash": "4c885de45cf63d50d72d2c996b3439dbb3d68f7fd77b8bf2481a3136497d013b",
-    "version": "20260914.0001"
+    "hash": "dd7b7e735aea7c616f3d5959dc2aa1e694bc98987a8ba48dc44bad51aafb9976",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-paramiko-autoadd",
     "rule_name": "结构扫描：Python paramiko AutoAddPolicy",
-    "hash": "3a7adb66ec2d1f1e8e9d71d16f682e72e691c3e82fc9e0e4026e211552a50213",
-    "version": "20260914.0001"
+    "hash": "c2be9661bc0cd6e9e0759132bd4be1bdbf251d276e6a8aeb6f63ffb256a787e8",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-random-random",
     "rule_name": "结构扫描：Python random.random",
-    "hash": "b71e6c75ddc115576d89d7541e2734191e62caf86496777193cc1341a713d4b7",
-    "version": "20260914.0001"
+    "hash": "45ff8aa0a1a246230146b0259346fbca21f9e241270c74ea6288c193a4c52b57",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-shelve-open",
     "rule_name": "结构扫描：Python shelve.open",
-    "hash": "54b6b806fd4a3f26d31b018625f81447bb4dbc944c4f6038e60de2de7caa2376",
-    "version": "20260914.0001"
+    "hash": "1dac31465fdec1dac447e5ce0b7f194fb138b5991babaa0528795045f0187ff5",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-ssl-unverified-context",
     "rule_name": "结构扫描：Python ssl 未校验上下文",
-    "hash": "f0bea6705cda31703ec6091d194a2da616b28ac4735d331ab7c8106f81c8850d",
-    "version": "20260914.0001"
+    "hash": "d70f3a7af1813dfe5e1b56e9b0435cfa5d95bdc6ac149994e1c26f146084840f",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-subprocess-popen",
     "rule_name": "结构扫描：Python subprocess.Popen",
-    "hash": "71301a909d8ae84bfe6ae95b7dd8d97cdfa6b888c7b2c6b512bde3598addabc9",
-    "version": "20260914.0001"
+    "hash": "54a0421c4df7538ce7fe9f6f14eaba136e613cad8049a4633c6d347b693dc61c",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-telnetlib",
     "rule_name": "结构扫描：Python telnetlib",
-    "hash": "aa575a21e7ef0bbb83947d9b26319b1efc4666220e675d45d185daf784a3ac46",
-    "version": "20260914.0001"
+    "hash": "73f574a57ec438dbaa07976258fd2dc9fbf44cc6d87c4ea3565312de9c57e3f4",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-xml-etree",
     "rule_name": "结构扫描：Python xml.etree 解析",
-    "hash": "3359ed1fc2103afeafad72edddcb86626085c7588e425c2c917a7b166ec9b89b",
-    "version": "20260914.0001"
+    "hash": "0d0ad4b97be61f1ab27adfe19dc80dc6e932d1db011815b9873400015638c3ab",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-xml-sax",
     "rule_name": "结构扫描：Python xml.sax 解析",
-    "hash": "cbb191e73525f795eb7fd56143441bc8e58b998f103f5530d1f4cc462b830397",
-    "version": "20260914.0001"
+    "hash": "b79dece228a1d309a45fc15f0c851bac152dbafcbca995357fcd28fb09c07d4a",
+    "version": "20260916.0001"
   },
   {
     "rule_id": "struct-python-yaml-load",
     "rule_name": "结构扫描：Python yaml.load",
-    "hash": "f7940532a62f76765dd4a2cb3bf051d02ffbb6fa1ffbdd2e7208cdee761d055b",
-    "version": "20260914.0001"
+    "hash": "4c51bea16f8d613bd8ba766e49dd26ce77c2ba757989187f2299ada424d8962a",
+    "version": "20260916.0001"
   }
 ]
