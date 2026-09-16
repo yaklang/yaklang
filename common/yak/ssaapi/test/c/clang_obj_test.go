@@ -42,7 +42,7 @@ int main() {
 		int c;
 	};
 
-	struct void  f() {
+	void f() {
 		struct t result = {1, 3};
 	}
 	`, `result.b as $target `, map[string][]string{
