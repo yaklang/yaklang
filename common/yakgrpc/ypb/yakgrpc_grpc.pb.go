@@ -534,6 +534,8 @@ const (
 	Yak_GroupTableColumn_FullMethodName                           = "/ypb.Yak/GroupTableColumn"
 	Yak_UploadHotPatchTemplateToOnline_FullMethodName             = "/ypb.Yak/UploadHotPatchTemplateToOnline"
 	Yak_DownloadHotPatchTemplate_FullMethodName                   = "/ypb.Yak/DownloadHotPatchTemplate"
+	Yak_ExportHotPatchTemplateStream_FullMethodName               = "/ypb.Yak/ExportHotPatchTemplateStream"
+	Yak_ImportHotPatchTemplateStream_FullMethodName               = "/ypb.Yak/ImportHotPatchTemplateStream"
 	Yak_SetMITMHijackFilter_FullMethodName                        = "/ypb.Yak/SetMITMHijackFilter"
 	Yak_GetMITMHijackFilter_FullMethodName                        = "/ypb.Yak/GetMITMHijackFilter"
 	Yak_ResetMITMHijackFilter_FullMethodName                      = "/ypb.Yak/ResetMITMHijackFilter"
@@ -1343,6 +1345,9 @@ type YakClient interface {
 	GroupTableColumn(ctx context.Context, in *GroupTableColumnRequest, opts ...grpc.CallOption) (*GroupTableColumnResponse, error)
 	UploadHotPatchTemplateToOnline(ctx context.Context, in *UploadHotPatchTemplateToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
 	DownloadHotPatchTemplate(ctx context.Context, in *DownloadHotPatchTemplateRequest, opts ...grpc.CallOption) (*Empty, error)
+	// hot-patch template import/export
+	ExportHotPatchTemplateStream(ctx context.Context, in *ExportHotPatchTemplateStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	ImportHotPatchTemplateStream(ctx context.Context, in *ImportHotPatchTemplateStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	// MITM hijack filter
 	SetMITMHijackFilter(ctx context.Context, in *SetMITMFilterRequest, opts ...grpc.CallOption) (*SetMITMFilterResponse, error)
 	GetMITMHijackFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
@@ -7406,6 +7411,44 @@ func (c *yakClient) DownloadHotPatchTemplate(ctx context.Context, in *DownloadHo
 	return out, nil
 }
 
+func (c *yakClient) ExportHotPatchTemplateStream(ctx context.Context, in *ExportHotPatchTemplateStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_ExportHotPatchTemplateStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExportHotPatchTemplateStreamRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportHotPatchTemplateStreamClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) ImportHotPatchTemplateStream(ctx context.Context, in *ImportHotPatchTemplateStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_ImportHotPatchTemplateStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ImportHotPatchTemplateStreamRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ImportHotPatchTemplateStreamClient = grpc.ServerStreamingClient[ExecResult]
+
 func (c *yakClient) SetMITMHijackFilter(ctx context.Context, in *SetMITMFilterRequest, opts ...grpc.CallOption) (*SetMITMFilterResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SetMITMFilterResponse)
@@ -7438,7 +7481,7 @@ func (c *yakClient) ResetMITMHijackFilter(ctx context.Context, in *Empty, opts .
 
 func (c *yakClient) ExportHTTPFlowStream(ctx context.Context, in *ExportHTTPFlowStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportHTTPFlowStreamResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_ExportHTTPFlowStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_ExportHTTPFlowStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7457,7 +7500,7 @@ type Yak_ExportHTTPFlowStreamClient = grpc.ServerStreamingClient[ExportHTTPFlowS
 
 func (c *yakClient) ImportHTTPFlowStream(ctx context.Context, in *ImportHTTPFlowStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportHTTPFlowStreamResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_ImportHTTPFlowStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_ImportHTTPFlowStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7526,7 +7569,7 @@ func (c *yakClient) SearchNoteContent(ctx context.Context, in *SearchNoteContent
 
 func (c *yakClient) ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_ImportNote_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_ImportNote_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7545,7 +7588,7 @@ type Yak_ImportNoteClient = grpc.ServerStreamingClient[ImportNoteResponse]
 
 func (c *yakClient) ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_ExportNote_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_ExportNote_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7564,7 +7607,7 @@ type Yak_ExportNoteClient = grpc.ServerStreamingClient[ExportNoteResponse]
 
 func (c *yakClient) StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_StartAIReAct_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_StartAIReAct_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7577,7 +7620,7 @@ type Yak_StartAIReActClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEve
 
 func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_StartAITask_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_StartAITask_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7830,7 +7873,7 @@ func (c *yakClient) CountAIMemoryEntityTags(ctx context.Context, in *CountAIMemo
 
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_StartAITriage_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[97], Yak_StartAITriage_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7893,7 +7936,7 @@ func (c *yakClient) GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts 
 
 func (c *yakClient) ExportAIForge(ctx context.Context, in *ExportAIForgeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_ExportAIForge_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[98], Yak_ExportAIForge_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7912,7 +7955,7 @@ type Yak_ExportAIForgeClient = grpc.ServerStreamingClient[GeneralProgress]
 
 func (c *yakClient) ImportAIForge(ctx context.Context, in *ImportAIForgeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[97], Yak_ImportAIForge_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_ImportAIForge_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7941,7 +7984,7 @@ func (c *yakClient) QueryAIFocus(ctx context.Context, in *QueryAIFocusRequest, o
 
 func (c *yakClient) StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[98], Yak_StartMcpServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[100], Yak_StartMcpServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8040,7 +8083,7 @@ func (c *yakClient) AIToolGenerateMetadata(ctx context.Context, in *AIToolGenera
 
 func (c *yakClient) ExportAITool(ctx context.Context, in *ExportAIToolRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_ExportAITool_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[101], Yak_ExportAITool_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8059,7 +8102,7 @@ type Yak_ExportAIToolClient = grpc.ServerStreamingClient[GeneralProgress]
 
 func (c *yakClient) ImportAITool(ctx context.Context, in *ImportAIToolRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[100], Yak_ImportAITool_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[102], Yak_ImportAITool_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8098,7 +8141,7 @@ func (c *yakClient) IsLocalModelReady(ctx context.Context, in *IsLocalModelReady
 
 func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[101], Yak_InstallLlamaServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[103], Yak_InstallLlamaServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8117,7 +8160,7 @@ type Yak_InstallLlamaServerClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[102], Yak_StartLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[104], Yak_StartLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8146,7 +8189,7 @@ func (c *yakClient) StopLocalModel(ctx context.Context, in *StopLocalModelReques
 
 func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[103], Yak_DownloadLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[105], Yak_DownloadLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8235,7 +8278,7 @@ func (c *yakClient) IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearc
 
 func (c *yakClient) InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[104], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[106], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8334,7 +8377,7 @@ func (c *yakClient) ListThirdPartyBinary(ctx context.Context, in *Empty, opts ..
 
 func (c *yakClient) InstallThirdPartyBinary(ctx context.Context, in *InstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[105], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[107], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8373,7 +8416,7 @@ func (c *yakClient) IsThirdPartyBinaryReady(ctx context.Context, in *IsThirdPart
 
 func (c *yakClient) StartThirdPartyBinary(ctx context.Context, in *StartThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[106], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[108], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8392,7 +8435,7 @@ type Yak_StartThirdPartyBinaryClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[107], Yak_PluginTrace_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[109], Yak_PluginTrace_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8515,7 +8558,7 @@ func (c *yakClient) SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnow
 
 func (c *yakClient) QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[108], Yak_QueryKnowledgeBaseByAI_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[110], Yak_QueryKnowledgeBaseByAI_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8554,7 +8597,7 @@ func (c *yakClient) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, i
 
 func (c *yakClient) GenerateQuestionIndexForKnowledgeBase(ctx context.Context, in *GenerateQuestionIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GenerateQuestionIndexForKnowledgeBaseResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[109], Yak_GenerateQuestionIndexForKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[111], Yak_GenerateQuestionIndexForKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8683,7 +8726,7 @@ func (c *yakClient) GenerateERMDot(ctx context.Context, in *GenerateERMDotReques
 
 func (c *yakClient) ExportKnowledgeBase(ctx context.Context, in *ExportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[110], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[112], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8702,7 +8745,7 @@ type Yak_ExportKnowledgeBaseClient = grpc.ServerStreamingClient[GeneralProgress]
 
 func (c *yakClient) ImportKnowledgeBase(ctx context.Context, in *ImportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[111], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[113], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8831,7 +8874,7 @@ func (c *yakClient) DeleteMCPToolCallHistory(ctx context.Context, in *DeleteMCPT
 
 func (c *yakClient) RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[112], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[114], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8850,7 +8893,7 @@ type Yak_RAGCollectionSearchClient = grpc.ServerStreamingClient[RAGCollectionSea
 
 func (c *yakClient) DownloadRAGs(ctx context.Context, in *DownloadRAGsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[113], Yak_DownloadRAGs_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[115], Yak_DownloadRAGs_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8909,7 +8952,7 @@ func (c *yakClient) TestIMBot(ctx context.Context, in *TestIMBotRequest, opts ..
 
 func (c *yakClient) StartIMOnboarding(ctx context.Context, in *StartIMOnboardingRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMOnboardingEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[114], Yak_StartIMOnboarding_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[116], Yak_StartIMOnboarding_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8948,7 +8991,7 @@ func (c *yakClient) StopIMControl(ctx context.Context, in *StopIMControlRequest,
 
 func (c *yakClient) SubscribeIMControlState(ctx context.Context, in *SubscribeIMControlStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMControlStateEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[115], Yak_SubscribeIMControlState_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[117], Yak_SubscribeIMControlState_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8977,7 +9020,7 @@ func (c *yakClient) UpdateIMControlConfig(ctx context.Context, in *UpdateIMContr
 
 func (c *yakClient) SubscribeHTTPFlows(ctx context.Context, in *SubscribeHTTPFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[HTTPFlowLiveEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[116], Yak_SubscribeHTTPFlows_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[118], Yak_SubscribeHTTPFlows_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9046,7 +9089,7 @@ func (c *yakClient) SetContextMenuActionBinding(ctx context.Context, in *SetCont
 
 func (c *yakClient) ExecuteContextMenuAction(ctx context.Context, in *ExecuteContextMenuActionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContextMenuActionEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[117], Yak_ExecuteContextMenuAction_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[119], Yak_ExecuteContextMenuAction_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9065,7 +9108,7 @@ type Yak_ExecuteContextMenuActionClient = grpc.ServerStreamingClient[ContextMenu
 
 func (c *yakClient) UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[118], Yak_UploadToTemporaryFile_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[120], Yak_UploadToTemporaryFile_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9740,6 +9783,9 @@ type YakServer interface {
 	GroupTableColumn(context.Context, *GroupTableColumnRequest) (*GroupTableColumnResponse, error)
 	UploadHotPatchTemplateToOnline(context.Context, *UploadHotPatchTemplateToOnlineRequest) (*Empty, error)
 	DownloadHotPatchTemplate(context.Context, *DownloadHotPatchTemplateRequest) (*Empty, error)
+	// hot-patch template import/export
+	ExportHotPatchTemplateStream(*ExportHotPatchTemplateStreamRequest, grpc.ServerStreamingServer[ExecResult]) error
+	ImportHotPatchTemplateStream(*ImportHotPatchTemplateStreamRequest, grpc.ServerStreamingServer[ExecResult]) error
 	// MITM hijack filter
 	SetMITMHijackFilter(context.Context, *SetMITMFilterRequest) (*SetMITMFilterResponse, error)
 	GetMITMHijackFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
@@ -11474,6 +11520,12 @@ func (UnimplementedYakServer) UploadHotPatchTemplateToOnline(context.Context, *U
 }
 func (UnimplementedYakServer) DownloadHotPatchTemplate(context.Context, *DownloadHotPatchTemplateRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DownloadHotPatchTemplate not implemented")
+}
+func (UnimplementedYakServer) ExportHotPatchTemplateStream(*ExportHotPatchTemplateStreamRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method ExportHotPatchTemplateStream not implemented")
+}
+func (UnimplementedYakServer) ImportHotPatchTemplateStream(*ImportHotPatchTemplateStreamRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method ImportHotPatchTemplateStream not implemented")
 }
 func (UnimplementedYakServer) SetMITMHijackFilter(context.Context, *SetMITMFilterRequest) (*SetMITMFilterResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetMITMHijackFilter not implemented")
@@ -20520,6 +20572,28 @@ func _Yak_DownloadHotPatchTemplate_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ExportHotPatchTemplateStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportHotPatchTemplateStreamRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExportHotPatchTemplateStream(m, &grpc.GenericServerStream[ExportHotPatchTemplateStreamRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportHotPatchTemplateStreamServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_ImportHotPatchTemplateStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ImportHotPatchTemplateStreamRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ImportHotPatchTemplateStream(m, &grpc.GenericServerStream[ImportHotPatchTemplateStreamRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ImportHotPatchTemplateStreamServer = grpc.ServerStreamingServer[ExecResult]
+
 func _Yak_SetMITMHijackFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SetMITMFilterRequest)
 	if err := dec(in); err != nil {
@@ -25485,6 +25559,16 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "ImportSyntaxFlows",
 			Handler:       _Yak_ImportSyntaxFlows_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportHotPatchTemplateStream",
+			Handler:       _Yak_ExportHotPatchTemplateStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ImportHotPatchTemplateStream",
+			Handler:       _Yak_ImportHotPatchTemplateStream_Handler,
 			ServerStreams: true,
 		},
 		{
