@@ -33,6 +33,33 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func getThirdPartyAPIKey(appType string) string {
+	appType = strings.TrimSpace(strings.ToLower(appType))
+	if appType == "" {
+		return ""
+	}
+	cfg := &ypb.ThirdPartyApplicationConfig{}
+	if err := consts.GetThirdPartyApplicationConfig(appType, cfg); err == nil {
+		if key := strings.TrimSpace(cfg.GetAPIKey()); key != "" {
+			return key
+		}
+		if key := strings.TrimSpace(cfg.GetUserSecret()); key != "" {
+			return key
+		}
+	}
+	switch appType {
+	case "github":
+		if v := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); v != "" {
+			return v
+		}
+		return strings.TrimSpace(os.Getenv("GH_TOKEN"))
+	case "gitee":
+		return strings.TrimSpace(os.Getenv("GITEE_TOKEN"))
+	default:
+		return ""
+	}
+}
+
 var notifyEmtpyVirtualClientOnce = utils.NewOnce()
 
 var emptyVirtualClient = NewVirtualYakitClient(func(i *ypb.ExecResult) error {
@@ -63,6 +90,7 @@ var YakitExports = map[string]interface{}{
 	"GetHomeTempDir":               consts.GetDefaultYakitBaseTempDir,
 	"GetOnlineBaseUrl":             consts.GetOnlineBaseUrl,
 	"SetOnlineBaseUrl":             consts.SetOnlineBaseUrl,
+	"GetThirdPartyAPIKey":          getThirdPartyAPIKey,
 
 	"MockHTTPFlowSlowSQL": mockHTTPFlowSlowSQL,
 
@@ -208,23 +236,24 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 
 func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 	YakitExports := map[string]interface{}{
-		"Info":           client.YakitInfo,
-		"Warn":           client.YakitWarn,
-		"Error":          client.YakitError,
-		"Text":           client.YakitTextBlock,
-		"Success":        client.YakitSuccess,
-		"Code":           client.YakitCode,
-		"Markdown":       client.YakitMarkdown,
-		"Report":         client.YakitReport,
-		"File":           client.YakitFile,
-		"Output":         client.Output,
-		"AIOutput":       client.AIOutput,
-		"AIAgentSession": client.AIAgentSession,
-		"SetProgress":    client.YakitSetProgress,
-		"SetProgressEx":  client.YakitSetProgressEx,
-		"Stream":         client.Stream,
-		"SSAStream":      client.SSAStream,
-		"EmitSSAResult":  client.EmitSSAResult,
+		"Info":                client.YakitInfo,
+		"Warn":                client.YakitWarn,
+		"Error":               client.YakitError,
+		"Text":                client.YakitTextBlock,
+		"Success":             client.YakitSuccess,
+		"Code":                client.YakitCode,
+		"Markdown":            client.YakitMarkdown,
+		"Report":              client.YakitReport,
+		"File":                client.YakitFile,
+		"Output":              client.Output,
+		"AIOutput":            client.AIOutput,
+		"AIAgentSession":      client.AIAgentSession,
+		"SetProgress":         client.YakitSetProgress,
+		"SetProgressEx":       client.YakitSetProgressEx,
+		"Stream":              client.Stream,
+		"SSAStream":           client.SSAStream,
+		"EmitSSAResult":       client.EmitSSAResult,
+		"GetThirdPartyAPIKey": getThirdPartyAPIKey,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}
