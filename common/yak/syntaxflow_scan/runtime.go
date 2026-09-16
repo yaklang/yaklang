@@ -230,6 +230,14 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			}),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
+		// A read-only scan (--no-result-db) keeps risks / audit nodes and edges
+		// out of the SSA database while still producing them for --output. When
+		// the flag is on the query saves to memory instead of the database.
+		if m.Config.IsSyntaxFlowResultNoDB() {
+			option = append(option, ssaapi.QueryWithMemory())
+		} else {
+			option = append(option, ssaapi.QueryWithSave(m.kind))
+		}
 		if workBudget != nil {
 			option = append(option, ssaapi.QueryWithWorkBudget(workBudget))
 		}

@@ -24,8 +24,14 @@ const (
 const DefaultScanRuleWorkLimit int64 = 50_000
 
 type SyntaxFlowConfig struct {
-	Memory          bool                  `json:"memory"`
-	ResultSaveKind  SFResultSaveKind      `json:"result_save_kind"`
+	Memory         bool             `json:"memory"`
+	ResultSaveKind SFResultSaveKind `json:"result_save_kind"`
+	// NoResultDB keeps scan results (risks, audit nodes and edges) out of the
+	// SSA database. Scanning an existing IR database normally writes results
+	// back into that same database; when the IR database is a shared or
+	// read-only artifact that must stay byte-for-byte intact, this keeps the
+	// scan read-only while still producing results for --output.
+	NoResultDB      bool                  `json:"no_result_db"`
 	ProcessCallback func(float64, string) `json:"-"`
 }
 
@@ -70,7 +76,22 @@ func (c *Config) GetSyntaxFlowResultKind() SFResultSaveKind {
 	if c == nil || c.SyntaxFlow == nil {
 		return SFResultSaveNone
 	}
+	// NoResultDB forces in-memory results regardless of how the caller set the
+	// save kind: the scan still builds risks for --output, it just never writes
+	// them into the SSA database.
+	if c.SyntaxFlow.NoResultDB {
+		return SFResultSaveMemory
+	}
 	return c.SyntaxFlow.ResultSaveKind
+}
+
+// IsSyntaxFlowResultNoDB reports whether scan results must be kept out of the
+// SSA database. See SyntaxFlowConfig.NoResultDB.
+func (c *Config) IsSyntaxFlowResultNoDB() bool {
+	if c == nil || c.SyntaxFlow == nil {
+		return false
+	}
+	return c.SyntaxFlow.NoResultDB
 }
 
 func (c *Config) SetSyntaxFlowResultKind(resultKind SFResultSaveKind) {
@@ -203,6 +224,31 @@ func WithSyntaxFlowMemory(memory bool) Option {
 			return err
 		}
 		c.SyntaxFlow.Memory = memory
+		return nil
+	}
+}
+
+// WithSyntaxFlowResultKind declares how a scan result is persisted: database
+// (default for scan tasks), memory (kept in process only), or none.
+func WithSyntaxFlowResultKind(kind SFResultSaveKind) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlow("Result Save Kind"); err != nil {
+			return err
+		}
+		c.SyntaxFlow.ResultSaveKind = kind
+		return nil
+	}
+}
+
+// WithSyntaxFlowNoResultDB keeps scan results (risks, audit nodes/edges) out of
+// the SSA database while still producing them for the report output. Use it
+// when the SSA database holds the IR to analyse and must not be modified.
+func WithSyntaxFlowNoResultDB(noDB bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlow("No Result DB"); err != nil {
+			return err
+		}
+		c.SyntaxFlow.NoResultDB = noDB
 		return nil
 	}
 }
