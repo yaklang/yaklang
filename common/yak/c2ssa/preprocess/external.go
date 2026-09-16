@@ -39,6 +39,11 @@ func openExternalIncludeFS(dirs []string) []fi.FileSystem {
 	return out
 }
 
+// OpenExternalRoot opens a host directory or zip/jar as an include filesystem.
+func OpenExternalRoot(path string) (fi.FileSystem, error) {
+	return openOneExternalRoot(path)
+}
+
 func openOneExternalRoot(path string) (fi.FileSystem, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".zip" || ext == ".jar" {
