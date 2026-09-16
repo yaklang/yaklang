@@ -1,0 +1,146 @@
+name: Test Runner Performance
+
+# 测试 Windows runner 编译速度对比
+# Windows 构建是 cross-build CI 中的长尾瓶颈
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_type:
+        description: "Runner type to test"
+        required: true
+        type: choice
+        options:
+          - "both"
+          - "standard-4core"
+          - "larger-8core"
+        default: "both"
+
+jobs:
+  benchmark-windows-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: "windows-latest"
+            cores: "4-core (standard windows)"
+            label: "standard-4core"
+          - runner: "windows-latest-8-cores"
+            cores: "8-core (larger windows)"
+            label: "larger-8core"
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.label == 'larger-8core' }}
+    steps:
+      - name: Check if this job should run
+        id: should_run
+        shell: bash
+        run: |
+          INPUT="${{ github.event.inputs.runner_type }}"
+          LABEL="${{ matrix.label }}"
+          if [ "$INPUT" = "both" ] || [ "$INPUT" = "$LABEL" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.should_run.outputs.should_run == 'true'
+
+      - name: Set up Go
+        if: steps.should_run.outputs.should_run == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+        id: go
+
+      - name: Show runner info
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "=== Runner: ${{ matrix.cores }} ==="
+          echo "CPU count: $(nproc 2>/dev/null || echo $NUMBER_OF_PROCESSORS)"
+          echo "GOMAXPROCS: ${GOMAXPROCS:-auto}"
+          echo "NUMBER_OF_PROCESSORS: $NUMBER_OF_PROCESSORS"
+
+      - name: Download Go modules
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "::group::go mod download"
+          time go mod download
+          echo "::endgroup::"
+
+      - name: Benchmark go build (GOMAXPROCS=auto)
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "::group::go build - GOMAXPROCS=auto (default)"
+          go clean -cache
+          START=$(date +%s)
+          go build -trimpath -tags "gzip_embed" -ldflags "-s -w" -o /tmp/yak.exe common/yak/cmd/yak.go
+          END=$(date +%s)
+          DURATION=$((END - START))
+          echo "Build duration: ${DURATION}s"
+          echo "BUILD_DURATION_AUTO=${DURATION}" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      - name: Benchmark go build (GOMAXPROCS=2)
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "::group::go build - GOMAXPROCS=2"
+          go clean -cache
+          START=$(date +%s)
+          GOMAXPROCS=2 go build -trimpath -tags "gzip_embed" -ldflags "-s -w" -o /tmp/yak.exe common/yak/cmd/yak.go
+          END=$(date +%s)
+          DURATION=$((END - START))
+          echo "Build duration: ${DURATION}s"
+          echo "BUILD_DURATION_2=${DURATION}" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      - name: Benchmark go build (GOMAXPROCS=1)
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "::group::go build - GOMAXPROCS=1 (single core)"
+          go clean -cache
+          START=$(date +%s)
+          GOMAXPROCS=1 go build -trimpath -tags "gzip_embed" -ldflags "-s -w" -o /tmp/yak.exe common/yak/cmd/yak.go
+          END=$(date +%s)
+          DURATION=$((END - START))
+          echo "Build duration: ${DURATION}s"
+          echo "BUILD_DURATION_1=${DURATION}" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      - name: Benchmark go install gzip-embed
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "::group::go install gzip-embed"
+          go clean -cache
+          START=$(date +%s)
+          go install ./common/utils/gzip_embed/gzip-embed
+          END=$(date +%s)
+          DURATION=$((END - START))
+          echo "go install duration: ${DURATION}s"
+          echo "INSTALL_DURATION=${DURATION}" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      - name: Report results
+        if: steps.should_run.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "## Build Performance Results: ${{ matrix.cores }}"
+          echo ""
+          echo "| Metric | Duration |"
+          echo "|--------|----------|"
+          echo "| go build (GOMAXPROCS=auto) | ${{ env.BUILD_DURATION_AUTO }}s |"
+          echo "| go build (GOMAXPROCS=2)    | ${{ env.BUILD_DURATION_2 }}s |"
+          echo "| go build (GOMAXPROCS=1)    | ${{ env.BUILD_DURATION_1 }}s |"
+          echo "| go install gzip-embed      | ${{ env.INSTALL_DURATION }}s |"
+          echo ""
+          echo "Runner cores: $(nproc 2>/dev/null || echo $NUMBER_OF_PROCESSORS)"
+          echo "GOMAXPROCS auto = $(go env GOMAXPROCS)"
+          echo ""
+          echo "::notice::${{ matrix.label }}: auto=${{ env.BUILD_DURATION_AUTO }}s, 2core=${{ env.BUILD_DURATION_2 }}s, 1core=${{ env.BUILD_DURATION_1 }}s, install=${{ env.INSTALL_DURATION }}s"
