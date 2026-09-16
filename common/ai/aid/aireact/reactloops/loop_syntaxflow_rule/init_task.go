@@ -21,6 +21,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
 
+		// Seed from IRify UI attachments (规则编写草稿 / 选中源码) before requirement analysis
+		hasAttachedRuleDraft, hasAttachedCodeSample := seedSyntaxFlowFromAttached(r, loop, task.GetAttachedDatas())
+
 		// Step 1: 分析用户需求，生成搜索关键字和判断文件路径
 		log.Infof("init task step 1: analyzing user requirements and generating search patterns for SyntaxFlow rules")
 
@@ -179,7 +182,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		}
 
 		// 当用户提供漏洞样例时：保存到文件，供规则嵌入和 verify 工具使用
-		if hasCodeSample && extractedSampleCode != "" {
+		// （若附件已种下样例，则跳过重复写入）
+		if hasCodeSample && extractedSampleCode != "" && !hasAttachedCodeSample {
 			lang, _ := ssaconfig.ValidateLanguage(sampleLanguage)
 			ext := lang.GetFileExt()
 			if ext == "" {
@@ -201,6 +205,18 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				samplePreview,
 			))
 			log.Infof("saved vulnerability sample to %s (lang=%s, virtual_filename=%s)", samplePath, sampleLanguage, sampleFilename)
+		}
+		if hasAttachedCodeSample {
+			hasCodeSample = true
+			if sampleFilename == "" {
+				sampleFilename = utils.InterfaceToString(loop.Get("sf_sample_filename"))
+			}
+			if sampleLanguage == "" {
+				sampleLanguage = utils.InterfaceToString(loop.Get("sf_sample_language"))
+			}
+			if extractedSampleCode == "" {
+				extractedSampleCode = utils.InterfaceToString(loop.Get("sf_sample_code"))
+			}
 		}
 
 		sampleHint := ""
@@ -498,6 +514,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			if len(content) > 0 {
 				log.Infof("identified target file: %s, file size: %v", targetPath, len(content))
 				loop.Set("full_sf_code", string(content))
+			} else if hasAttachedRuleDraft && strings.TrimSpace(loop.Get("full_sf_code")) != "" {
+				log.Infof("keeping attached syntaxflow_rule draft for empty target file: %s", targetPath)
 			}
 			emitter.EmitPinFilename(filename)
 			loop.Set("sf_filename", filename)
@@ -505,9 +523,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			return
 		}
 
+		// 无磁盘目标：虚拟文件名（DeferDiskWrite 下不落 aispace）；保留附件种下的规则草稿
 		filename := r.EmitFileArtifactWithExt("gen_code", ".sf", "")
 		emitter.EmitPinFilename(filename)
 		loop.Set("sf_filename", filename)
+		if hasAttachedRuleDraft {
+			log.Infof("create mode with attached rule draft (%d bytes)", len(loop.Get("full_sf_code")))
+		}
 		operator.Continue()
 	}
 }

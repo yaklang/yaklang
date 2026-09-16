@@ -119,6 +119,7 @@ func init() {
 					return errMsg, blocking
 				}),
 				loopinfra.WithEventType("syntaxflow_rule_editor"),
+				loopinfra.WithDeferDiskWrite(true),  // 规则交付到前端「规则编写」编辑器，不写 aispace gen_code_*.sf
 				loopinfra.WithExitAfterWrite(false), // 验证通过后不立即退出，保留迭代以便 AI 调用 check-syntaxflow-syntax 进行样例自检
 			)
 
