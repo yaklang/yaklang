@@ -56,6 +56,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		return ProjectResult{}, err
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
+	cfg.SetSyntaxFlowResultSaveMemory()
 
 	recorder := newStageOutcomeRecorder()
 	report := func(stage ProductStage, err error) { recorder.record(stage, err) }
@@ -651,6 +652,9 @@ func copySyntaxFlowRuleOptions(cfg *Config) []ssaconfig.Option {
 	}
 	raw, err := json.Marshal(map[string]any{
 		"SyntaxFlowRule": cfg.SyntaxFlowRule,
+		"SyntaxFlow": map[string]any{
+			"result_save_kind": string(ssaconfig.SFResultSaveMemory),
+		},
 	})
 	if err != nil {
 		return nil
