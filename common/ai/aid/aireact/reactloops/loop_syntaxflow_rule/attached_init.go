@@ -168,6 +168,7 @@ func applySyntaxFlowSampleToLoop(
 	loop.Set("sf_sample_language", sampleLanguage)
 	loop.Set("sf_sample_filename", sampleFilename)
 	loop.Set("sf_has_code_sample", true)
+	resetSfVerifyMatchedAfterCodeChange(loop)
 	samplePreview := utils.ShrinkTextBlock(sampleCode, 500)
 	r.AddToTimeline("vulnerability_sample", fmt.Sprintf(
 		"【漏洞样例】\n保存路径: %s\n虚拟文件名: %s\n语言: %s\n大小: %s\n\n预览:\n%s",
