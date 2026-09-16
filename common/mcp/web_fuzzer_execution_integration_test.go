@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -19,7 +20,9 @@ import (
 
 func TestExecuteWebFuzzerTabWaitsForThePushedExecution(t *testing.T) {
 	yakit.CallPostInitDatabase()
-	srv, err := mcp.NewMCPServer(mcp.WithEnableAllToolSets())
+	srv, err := mcp.NewMCPServer(mcp.WithEnableAllToolSets(), mcp.WithDatabaseProvider(nil, func() *gorm.DB {
+		return consts.GetGormProjectDatabase()
+	}))
 	require.NoError(t, err)
 	db := consts.GetGormProjectDatabase()
 	require.NotNil(t, db)

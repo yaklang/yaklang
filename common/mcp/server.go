@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type MCPServer struct {
@@ -153,7 +154,7 @@ func (s *MCPServer) recordToolCall(
 		history.ClientName = notificationContext.ClientName
 		history.ClientVersion = notificationContext.ClientVersion
 	}
-	if err := db.Create(history).Error; err != nil {
+	if err := yakit.SaveMCPToolCallHistory(db, history); err != nil {
 		log.Errorf("record mcp tool call history failed: %v", err)
 	}
 }

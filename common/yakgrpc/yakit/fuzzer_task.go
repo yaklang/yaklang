@@ -173,10 +173,35 @@ func DeleteWebFuzzerTaskByWebFuzzerIndex(db *gorm.DB, index string) error {
 
 func GetWebFuzzerTaskById(db *gorm.DB, id int) (*schema.WebFuzzerTask, error) {
 	var t schema.WebFuzzerTask
-	if db := db.Model(&schema.WebFuzzerTask{}).Where("id = ?", id).First(&t); db.Error != nil {
-		return nil, utils.Errorf("get web fuzzer task failed: %s", db.Error)
+	if err := db.Model(&schema.WebFuzzerTask{}).Where("id = ?", id).First(&t).Error; err != nil {
+		return nil, err
 	}
 	return &t, nil
+}
+
+// GetLatestWebFuzzerTaskByFuzzerIndex returns the most recent WebFuzzerTask
+// matching the given fuzzerIndex (executionID) and fuzzerTabIndex (pageID).
+// It returns gorm.ErrRecordNotFound when no matching task exists yet.
+func GetLatestWebFuzzerTaskByFuzzerIndex(db *gorm.DB, fuzzerIndex, fuzzerTabIndex string) (*schema.WebFuzzerTask, error) {
+	var t schema.WebFuzzerTask
+	if err := db.Where("fuzzer_index = ? AND fuzzer_tab_index = ?", fuzzerIndex, fuzzerTabIndex).
+		Order("id DESC").First(&t).Error; err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+// QueryWebFuzzerResponsesByTaskId returns up to limit WebFuzzerResponse records
+// for the given task, ordered by id ascending. Unlike QueryWebFuzzerResponse,
+// this does not require pagination params and is suitable for lightweight
+// metadata-only lookups.
+func QueryWebFuzzerResponsesByTaskId(db *gorm.DB, taskId int64, limit int) ([]*schema.WebFuzzerResponse, error) {
+	var ret []*schema.WebFuzzerResponse
+	if err := db.Where("web_fuzzer_task_id = ?", taskId).
+		Order("id ASC").Limit(limit).Find(&ret).Error; err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func GetWebFuzzerRetryRootID(db *gorm.DB, id uint) (uint, error) {
