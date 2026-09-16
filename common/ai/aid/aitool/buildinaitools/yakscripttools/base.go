@@ -179,6 +179,14 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	}
 
 	tool := yakcliconvert.ConvertCliParameterToTool(name, prog)
+	if ins.InputConstraints != "" {
+		var constraints map[string]any
+		if err := json.Unmarshal([]byte(ins.InputConstraints), &constraints); err != nil || constraints == nil {
+			log.Errorf("invalid input constraints for Yak tool %q: %v", name, err)
+			return nil
+		}
+		tool.InputSchema.AllOf = append(tool.InputSchema.AllOf, constraints)
+	}
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
 		Name:          name,

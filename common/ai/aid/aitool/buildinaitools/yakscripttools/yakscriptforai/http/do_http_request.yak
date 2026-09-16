@@ -1,3 +1,39 @@
+__INPUT_CONSTRAINTS__ = `{
+  "description": "Provide either 'url' or 'packet', exclusively. Callback is not started on validation failure.",
+  "oneOf": [
+    {
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    {
+      "required": [
+        "packet"
+      ],
+      "properties": {
+        "packet": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    }
+  ],
+  "properties": {
+    "headers": {
+      "propertyNames": {
+        "pattern": "^[!#$%&'*+.^_\u0060|~0-9A-Za-z-]+$"
+      },
+      "pattern": "^(?:[ \\t]*(?:[!#$%&'*+.^_\u0060|~0-9A-Za-z-]+[ \\t]*:[^\\r\\n]*)?(?:\\r?\\n|$))*$"
+    }
+  }
+}`
+
 __DESC__ = "Send one HTTP request. Prefer URL mode with structured query/form objects: pass original unescaped values and the tool URL-encodes them safely. Use body for a raw JSON/XML/text body. Use packet when exact bytes, duplicate parameters, ordering, or custom encoding matter. Use batch_do_http_request for multiple requests. 发送单个 HTTP 请求。优先使用 URL 模式的 query/form 对象，传原始未转义值，由工具安全编码；JSON/XML/文本使用 body；需要精确数据包、重复参数、顺序或自定义编码时使用 packet；多请求使用 batch_do_http_request。"
 __VERBOSE_NAME__ = "HTTP Request"
 __VERBOSE_NAME_ZH__ = "HTTP请求"
@@ -71,7 +107,7 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 urlStr = cli.String("url", cli.setHelp("target URL for URL mode"), cli.setRequired(false))
-method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
+method = cli.String("method", cli.setHelp("HTTP method"), cli.setJsonSchema(`{"type":"string","pattern":"^[!#$%&'*+.^_~\u00600-9A-Za-z|-]+$"}`), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers; accept 'Key: Value' per line OR a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{
     "oneOf": [
         {"type":"string"},
@@ -175,7 +211,7 @@ normalizeMapLike = func(raw, pairSep, kvSep) {
     trimmed = str.TrimSpace(s)
     // 形如 map[k1:v1 k2:v2] (Go fmt.Sprint of a map) -> 拆成 pair 列表
     if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
-        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        inner = str.TrimSpace(str.TrimSuffix(str.TrimPrefix(trimmed, "map["), "]"))
         out = []
         for _, kv := range str.Split(inner, " ") {
             kv = str.TrimSpace(kv)
@@ -185,7 +221,7 @@ normalizeMapLike = func(raw, pairSep, kvSep) {
             // map 字面量里 key/value 用第一个冒号 ":" 分隔
             colonIdx = str.Index(kv, ":")
             if colonIdx > 0 {
-                out.Push(sprintf("%v%v%v", str.TrimSpace(kv[:colonIdx]), kvSep, str.TrimSpace(kv[colonIdx+1:])))
+                out.Push(sprintf("%v%v%v", str.TrimSpace(str.SplitN(kv, ":", 2)[0]), kvSep, str.TrimSpace(str.SplitN(kv, ":", 2)[1])))
             } else {
                 out.Push(sprintf("%v%v", kv, kvSep))
             }
@@ -213,7 +249,7 @@ normalizeHeaders = func(raw) {
         } catch e {}
     }
     if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
-        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        inner = str.TrimSpace(str.TrimSuffix(str.TrimPrefix(trimmed, "map["), "]"))
         out = []
         for _, kv := range str.Split(inner, " ") {
             kv = str.TrimSpace(kv)
@@ -222,7 +258,7 @@ normalizeHeaders = func(raw) {
             }
             colonIdx = str.Index(kv, ":")
             if colonIdx > 0 {
-                out.Push(sprintf("%v: %v", str.TrimSpace(kv[:colonIdx]), str.TrimSpace(kv[colonIdx+1:])))
+                out.Push(sprintf("%v: %v", str.TrimSpace(str.SplitN(kv, ":", 2)[0]), str.TrimSpace(str.SplitN(kv, ":", 2)[1])))
             }
         }
         return str.Join(out, "\n")
@@ -359,8 +395,8 @@ if packet != "" {
                 yakit.Warn("ignored malformed header line #%v: expected 'Name: value'. Fix the headers parameter and retry if this header is required.", headerLineIndex)
                 continue
             }
-            hKey = str.TrimSpace(line[:idx])
-            hVal = str.TrimSpace(line[idx+1:])
+            hKey = str.TrimSpace(str.SplitN(line, ":", 2)[0])
+            hVal = str.TrimSpace(str.SplitN(line, ":", 2)[1])
             if hKey != "" {
                 rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, hKey, hVal)
             }
@@ -691,7 +727,7 @@ if hasPattern {
             keywordMatchCount++
             matchContent := rg.GetTextContextWithPrompt(3)
             if len(matchContent) > 30000 {
-                yakit.Info("keyword match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+                yakit.Info("keyword match [size:%v]:\n%v\n... (truncated)", len(matchContent), codec.FixUTF8([]byte(matchContent)[:30000]))
             } else {
                 yakit.Info("keyword match:\n%v", matchContent)
             }
@@ -707,7 +743,7 @@ if hasPattern {
                 regexpMatchCount++
                 matchContent := rg.GetTextContextWithPrompt(3)
                 if len(matchContent) > 30000 {
-                    yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+                    yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), codec.FixUTF8([]byte(matchContent)[:30000]))
                 } else {
                     yakit.Info("regexp match:\n%v", matchContent)
                 }

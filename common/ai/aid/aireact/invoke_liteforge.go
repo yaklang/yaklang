@@ -34,6 +34,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if staticInstruction := gconfig.GetLiteForgeStaticInstruction(); staticInstruction != "" {
 		fopts = append(fopts, aiforge.WithLiteForge_StaticInstruction(staticInstruction))
 	}
+	if validate := gconfig.GetLiteForgeOutputValidator(); validate != nil {
+		fopts = append(fopts, aiforge.WithLiteForge_OutputValidator(validate))
+	}
 	if gconfig.GetLiteForgeDisableTimeline() {
 		fopts = append(fopts, aiforge.WithLiteForge_DisableTimeline())
 	}
@@ -65,6 +68,8 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	// 一并继承, 否则 raw chat 末帧 token usage 不会触达 ai.usageCallback(...).
 	execOpts := []aicommon.ConfigOption{
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
+		aicommon.WithAIAutoRetry(r.config.AiAutoRetry),
 		aicommon.WithFastAICallback(execCb),
 		aicommon.WithPersistentSessionId(r.config.PersistentSessionId),
 		aicommon.WithDisableCreateDBRuntime(true), // disable create db runtime because ReAct loop will create it before invoking liteforge, and creating it again in liteforge may

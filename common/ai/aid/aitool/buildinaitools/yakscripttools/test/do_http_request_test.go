@@ -130,7 +130,8 @@ func TestDoHTTPRequest_HTTPAndTransportOutcomesStillCompleteInvocationProtocol(t
 
 func TestDoHTTPRequest_MissingRequestIsProtocolFailure(t *testing.T) {
 	result, err := getDoHTTPRequestTool(t).InvokeWithParams(aitool.InvokeParams{})
-	assert.ErrorContains(t, err, "either 'url'")
+	assert.ErrorContains(t, err, "missing property 'url'")
+	assert.ErrorContains(t, err, "工具回调尚未执行")
 	assert.Equal(t, result.Success, false)
 	assert.Assert(t, result.Data == nil, "a failed invocation must not expose a result envelope")
 }

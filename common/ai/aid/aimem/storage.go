@@ -121,9 +121,11 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 
 		// 索引 potential_questions 到 RAG 系统
 		// 每个问题作为一个文档，关联到同一个 memory_id
+		indexRequested, indexSucceeded, indexFailed, indexSkipped := len(dbEntity.PotentialQuestions), 0, 0, 0
 		if r.rag != nil {
 			for _, question := range dbEntity.PotentialQuestions {
 				if strings.TrimSpace(question) == "" {
+					indexSkipped++
 					continue
 				}
 
@@ -136,15 +138,26 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 					rag.WithDocumentMetadataKeyValue("session_id", r.sessionID),
 				)
 				if err != nil {
+					indexFailed++
 					log.Errorf("index question to RAG failed: %v", err)
 					// RAG 失败时仍然继续保存记忆实体，但记录错误
 					log.Warnf("continuing despite RAG indexing failure for memory entity: %s", entity.Id)
+				} else {
+					indexSucceeded++
 				}
 			}
-
-			log.Infof("indexed %d questions for memory entity: %s", len(dbEntity.PotentialQuestions), entity.Id)
 		} else {
+			indexSkipped = indexRequested
 			log.Debugf("RAG system not initialized, skipping question indexing for memory entity: %s", entity.Id)
+		}
+		log.Infof("memory entity %s: entity_saved=true index_requested=%d index_succeeded=%d index_failed=%d index_skipped=%d",
+			entity.Id, indexRequested, indexSucceeded, indexFailed, indexSkipped)
+		if emitter != nil {
+			emitter.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "memory-index", map[string]any{
+				"memory_session_id": r.sessionID, "memory_id": entity.Id, "entity_saved": true,
+				"index_requested": indexRequested, "index_succeeded": indexSucceeded,
+				"index_failed": indexFailed, "index_skipped": indexSkipped,
+			})
 		}
 	}
 
@@ -356,7 +369,7 @@ func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*aicommon.MemoryEntity, e
 			A_Score:            dbEntity.A_Score,
 			T_Score:            dbEntity.T_Score,
 			CorePactVector:     []float32(dbEntity.CorePactVector),
-		ExpiresAt:          dbEntity.ExpiresAt,
+			ExpiresAt:          dbEntity.ExpiresAt,
 		}
 		results = append(results, entity)
 	}

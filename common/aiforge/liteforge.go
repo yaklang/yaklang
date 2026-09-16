@@ -72,7 +72,14 @@ type LiteForge struct {
 	fieldStreamCallbacks []*fieldStreamCallbackItem // user-defined callbacks for streaming fields
 	emitter              *aicommon.Emitter
 
-	OutputJsonHook []jsonextractor.CallbackOption
+	OutputJsonHook  []jsonextractor.CallbackOption
+	OutputValidator func(*aicommon.Action) error
+}
+
+// WithLiteForge_OutputValidator adds caller-specific validation to the existing
+// transaction retry loop. It must not perform persistence or other side effects.
+func WithLiteForge_OutputValidator(validate func(*aicommon.Action) error) LiteForgeOption {
+	return func(l *LiteForge) error { l.OutputValidator = validate; return nil }
 }
 
 func WithLiteForge_Emitter(emitter *aicommon.Emitter) LiteForgeOption {
@@ -455,6 +462,12 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			if action == nil {
 				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
 			}
+			if l.OutputValidator != nil {
+				if err := l.OutputValidator(action); err != nil {
+					action = nil
+					return utils.Errorf("auxiliary output validation failed: %w", err)
+				}
+			}
 			return nil
 		},
 		map[string]any{
@@ -463,7 +476,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		reqOpts...,
 	)
 	if transactionErr != nil {
-		return nil, utils.Errorf("liteforge execute failed: %v", transactionErr)
+		return nil, utils.Errorf("liteforge execute failed: %w", transactionErr)
 	}
 	result := &ForgeResult{Action: action}
 	return result, nil

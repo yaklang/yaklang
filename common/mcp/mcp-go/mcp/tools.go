@@ -89,6 +89,8 @@ type Tool struct {
 }
 
 type ToolInputSchema struct {
+	// AllOf preserves cross-field constraints through conversion and validation.
+	AllOf      []any                         `json:"allOf,omitempty"`
 	Type       string                        `json:"type"`
 	Properties *omap.OrderedMap[string, any] `json:"properties,omitempty"`
 	Required   []string                      `json:"required,omitempty"`
@@ -125,10 +127,12 @@ func normalizeSchemaValue(v any) any {
 
 func (t ToolInputSchema) MarshalJSON() ([]byte, error) {
 	temp := struct {
+		AllOf      []any          `json:"allOf,omitempty"`
 		Type       string         `json:"type"`
 		Properties map[string]any `json:"properties"`
 		Required   []string       `json:"required,omitempty"`
 	}{
+		AllOf:      t.AllOf,
 		Type:       t.Type,
 		Properties: make(map[string]any),
 		Required:   t.Required,
@@ -539,6 +543,9 @@ func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOpt
 func (s *ToolInputSchema) ToMap() *omap.OrderedMap[string, any] {
 	result := omap.NewEmptyOrderedMap[string, any]()
 	result.Set("type", s.Type)
+	if len(s.AllOf) > 0 {
+		result.Set("allOf", s.AllOf)
+	}
 
 	properties := make(map[string]any)
 	if s.Properties != nil {
@@ -591,7 +598,16 @@ func (s *ToolInputSchema) FromMap(m map[string]any) error {
 		}
 	}
 
+	s.AllOf = nil
+	if v, exists := m["allOf"]; exists {
+		var ok bool
+		s.AllOf, ok = v.([]any)
+		if !ok {
+			return fmt.Errorf("allOf is not an array")
+		}
+	}
 	// required
+	s.Required = nil
 	if v, ok := m["required"]; ok {
 		s.Required = utils.InterfaceToStringSlice(v)
 	}

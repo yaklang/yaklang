@@ -65,6 +65,9 @@ func (p *BrowserPage) Navigate(urlStr string) error {
 	timedPage := p.page.Timeout(p.timeout)
 	err := timedPage.Navigate(urlStr)
 	if err != nil {
+		if d, ok := p.GetPendingDialog(); ok {
+			return dialogBlockingError(d, err)
+		}
 		return fmt.Errorf("navigate to %s: %w", urlStr, err)
 	}
 	err = timedPage.WaitLoad()
@@ -90,6 +93,9 @@ func (p *BrowserPage) NavigateAndWait(urlStr string, waitSelector string) error 
 	timedPage := p.page.Timeout(p.timeout)
 	err := timedPage.Navigate(urlStr)
 	if err != nil {
+		if d, ok := p.GetPendingDialog(); ok {
+			return dialogBlockingError(d, err)
+		}
 		return fmt.Errorf("navigate to %s: %w", urlStr, err)
 	}
 	if waitSelector != "" {

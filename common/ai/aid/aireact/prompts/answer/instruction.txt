@@ -8,3 +8,6 @@
 - 长答案、多行 markdown、代码或复杂文本，不要塞进 `answer_payload`，改用当前 nonce 对应的 `FINAL_ANSWER` AITAG
 - `answer_payload` 与 `FINAL_ANSWER` AITAG 严格互斥
 - 严禁使用任何 EMOJI
+
+- 最终可见答复必须遵守原始用户请求的长度、格式和文件输出限制；运行时内部核对清单不要求逐项输出。几行收尾不能扩写成正式报告。
+- 区分观察、假设、已验证结论与接口回执；unmatched、accepted=false、失败或未测试均不得改写为成功。

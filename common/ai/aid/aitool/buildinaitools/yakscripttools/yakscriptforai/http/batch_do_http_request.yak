@@ -1,3 +1,99 @@
+__INPUT_CONSTRAINTS__ = `{
+  "description": "Provide non-empty 'paths' and either 'base-url', 'packet', or only full HTTP(S) URLs in paths.",
+  "allOf": [
+    {
+      "required": [
+        "paths"
+      ],
+      "properties": {
+        "paths": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "required": [
+                "packet"
+              ],
+              "properties": {
+                "packet": {
+                  "type": "string",
+                  "pattern": "\\S"
+                }
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "base-url"
+                ],
+                "properties": {
+                  "base-url": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "packet"
+                ],
+                "properties": {
+                  "packet": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                }
+              }
+            },
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "base-url"
+                  ],
+                  "properties": {
+                    "base-url": {
+                      "type": "string",
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "paths": {
+                      "pattern": "^\\s*https?://[^\\s]+(?:[\\r\\n]+\\s*https?://[^\\s]+)*\\s*$"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "headers": {
+      "propertyNames": {
+        "pattern": "^[!#$%&'*+.^_\u0060|~0-9A-Za-z-]+$"
+      },
+      "pattern": "^(?:[ \\t]*(?:[!#$%&'*+.^_\u0060|~0-9A-Za-z-]+[ \\t]*:[^\\r\\n]*)?(?:\\r?\\n|$))*$"
+    }
+  }
+}`
+
 __DESC__ = "Send multiple HTTP requests for endpoint probing and API batch validation (IDOR included). URL mode requires `base-url` plus newline-separated `paths`; concurrency is `concurrent`. Responses are included automatically. Prefer structured query/form objects with original unescaped values. Use a packet template only for exact bytes or custom encoding. 用于端点探测、接口批量验证（含 IDOR）的批量 HTTP 请求。URL 模式必须传 `base-url` 和换行分隔的 `paths`，并发参数名是 `concurrent`，响应会自动输出；query/form 传原始未转义值。仅在需要精确报文或自定义编码时使用 packet 模板。"
 __VERBOSE_NAME__ = "Batch HTTP Request"
 __VERBOSE_NAME_ZH__ = "批量HTTP请求"
@@ -69,7 +165,7 @@ yakit.AutoInitYakit()
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
 pathsStr = cli.String("paths", cli.setHelp("paths to test, REQUIRED with base-url, as one newline-separated string (use AITAG for multiple paths; do not pass a JSON array or a requests field). In Packet mode query strings must already be encoded"), cli.setRequired(false))
-method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
+method = cli.String("method", cli.setHelp("HTTP method"), cli.setJsonSchema(`{"type":"string","pattern":"^[!#$%&'*+.^_~\u00600-9A-Za-z|-]+$"}`), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers, one per line: 'Key: Value'; ALSO accepts a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{
     "oneOf": [
         {"type":"string"},
@@ -119,7 +215,7 @@ proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080")
 excludeCode = cli.String("exclude-code", cli.setHelp("exclude status codes, comma-separated"), cli.setRequired(false))
 includeCode = cli.String("include-code", cli.setHelp("include only these status codes"), cli.setRequired(false))
 excludeSize = cli.String("exclude-size", cli.setHelp("exclude content-length ranges"), cli.setRequired(false))
-maxBodySize = cli.Int("max-body-size", cli.setHelp("max response body size to display"), cli.setDefault(4096))
+maxBodySize = cli.Int("max-body-size", cli.setHelp("max raw response bytes to preview; 0 hides preview; invalid UTF-8 bytes are escaped; full responses are saved separately"), cli.setDefault(4096), cli.setJsonSchema(`{"type":"integer","minimum":0}`))
 cli.check()
 
 // --- 参数归一化 ---
@@ -133,7 +229,7 @@ normalizeMapLike = func(raw, pairSep, kvSep) {
     s = sprint(raw)
     trimmed = str.TrimSpace(s)
     if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
-        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        inner = str.TrimSpace(str.TrimSuffix(str.TrimPrefix(trimmed, "map["), "]"))
         out = []
         for _, kv := range str.Split(inner, " ") {
             kv = str.TrimSpace(kv)
@@ -142,7 +238,7 @@ normalizeMapLike = func(raw, pairSep, kvSep) {
             }
             colonIdx = str.Index(kv, ":")
             if colonIdx > 0 {
-                out.Push(sprintf("%v%v%v", str.TrimSpace(kv[:colonIdx]), kvSep, str.TrimSpace(kv[colonIdx+1:])))
+                out.Push(sprintf("%v%v%v", str.TrimSpace(str.SplitN(kv, ":", 2)[0]), kvSep, str.TrimSpace(str.SplitN(kv, ":", 2)[1])))
             } else {
                 out.Push(sprintf("%v%v", kv, kvSep))
             }
@@ -170,7 +266,7 @@ normalizeHeaders = func(raw) {
         } catch e {}
     }
     if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
-        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        inner = str.TrimSpace(str.TrimSuffix(str.TrimPrefix(trimmed, "map["), "]"))
         out = []
         for _, kv := range str.Split(inner, " ") {
             kv = str.TrimSpace(kv)
@@ -179,7 +275,7 @@ normalizeHeaders = func(raw) {
             }
             colonIdx = str.Index(kv, ":")
             if colonIdx > 0 {
-                out.Push(sprintf("%v: %v", str.TrimSpace(kv[:colonIdx]), str.TrimSpace(kv[colonIdx+1:])))
+                out.Push(sprintf("%v: %v", str.TrimSpace(str.SplitN(kv, ":", 2)[0]), str.TrimSpace(str.SplitN(kv, ":", 2)[1])))
             }
         }
         return str.Join(out, "\n")
@@ -232,6 +328,7 @@ legacyQueryValues = normalizedQueryParams["values"]
 pathsStr = normalizePaths(pathsStr)
 
 // --- validation ---
+if maxBodySize < 0 { die("max-body-size must be non-negative") }
 if packet == "" && baseUrl == "" && pathsStr == "" {
     die("at least one of 'base-url', 'packet', or 'paths' must be provided")
 }
@@ -273,14 +370,20 @@ if prefix != "" && len(paths) > 0 {
     }
     newPaths = make([]string)
     for _, p := range paths {
+        if str.HasPrefix(p, "http://") || str.HasPrefix(p, "https://") {
+            newPaths = append(newPaths, p)
+            continue
+        }
         // If path starts with /, remove leading / to avoid double slash
         trimmedPath = p
         if str.HasPrefix(p, "/") {
-            trimmedPath = p[1:]
+            trimmedPath = str.TrimPrefix(p, "/")
         }
         // If trimmed path is empty, just use prefix (remove trailing /)
         if trimmedPath == "" {
-            newPaths = append(newPaths, prefix[:len(prefix)-1])
+            rootPath = str.TrimSuffix(prefix, "/")
+            if rootPath == "" { rootPath = "/" }
+            newPaths = append(newPaths, rootPath)
         } else {
             newPaths = append(newPaths, prefix + trimmedPath)
         }
@@ -305,15 +408,15 @@ if len(curlHeaders) > 0 {
         // Support both "Key: Value" and "Key=Value" formats
         idx = str.Index(h, ":")
         if idx > 0 {
-            hKey = str.TrimSpace(h[:idx])
-            hVal = str.TrimSpace(h[idx+1:])
+            hKey = str.TrimSpace(str.SplitN(h, ":", 2)[0])
+            hVal = str.TrimSpace(str.SplitN(h, ":", 2)[1])
             curlHeadersStr += hKey + ": " + hVal + "\n"
         } else {
             // Try = format
             idx2 = str.Index(h, "=")
             if idx2 > 0 {
-                hKey = str.TrimSpace(h[:idx2])
-                hVal = str.TrimSpace(h[idx2+1:])
+                hKey = str.TrimSpace(str.SplitN(h, "=", 2)[0])
+                hVal = str.TrimSpace(str.SplitN(h, "=", 2)[1])
                 curlHeadersStr += hKey + ": " + hVal + "\n"
             }
         }
@@ -472,8 +575,8 @@ buildRequestFromUrlMode = fn(path, base) {
             if idx <= 0 {
                 continue
             }
-            hKey = str.TrimSpace(line[:idx])
-            hVal = str.TrimSpace(line[idx+1:])
+            hKey = str.TrimSpace(str.SplitN(line, ":", 2)[0])
+            hVal = str.TrimSpace(str.SplitN(line, ":", 2)[1])
             if hKey != "" {
                 rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, hKey, hVal)
             }
@@ -683,6 +786,20 @@ if concurrent > 1 {
 yakit.Info("=== Batch Request Summary ===")
 yakit.Info("Total: %d, Responses: %d, Filtered: %d, Transport errors: %d", len(paths), responseCount, filteredCount, errorCount)
 
+// Save complete response bytes before rendering previews. Never replay a request
+// because presentation or artifact persistence failed.
+for _, item := range results {
+    if item["response_received"] != true { continue }
+    responseFile, saveErr = file.TempFileName("batch-http-response-*.bin")
+    if saveErr == nil { saveErr = file.Save(responseFile, item["response"]) }
+    if saveErr != nil {
+        item["artifact_error"] = sprint(saveErr)
+        yakit.Error("Failed to save response #%d: %v", item["idx"], saveErr)
+    } else {
+        item["response_file"] = responseFile
+    }
+}
+
 // --- output results ---
 outputFile, err := file.TempFileName("batch-http-results-*.txt")
 if err != nil {
@@ -716,12 +833,13 @@ if err != nil {
         rsp = result["response"]
         rspStr = string(rsp)
 
-        // Print response (with size limit)
-        if len(rsp) > 0 {
+        outputContent += sprintf("Full response: %v\n", result["response_file"])
+        // Limit bytes before converting to text: Yak string slicing indexes runes.
+        if len(rsp) > 0 && maxBodySize > 0 {
             if len(rsp) <= maxBodySize {
-                outputContent += sprintf("Response:\n%s\n", rspStr)
+                outputContent += sprintf("Response:\n%s\n", codec.FixUTF8(rsp))
             } else {
-                outputContent += sprintf("Response (truncated to %d bytes):\n%s\n... (truncated)\n", maxBodySize, rspStr[:maxBodySize])
+                outputContent += sprintf("Response (truncated to %d bytes):\n%s\n... (truncated)\n", maxBodySize, codec.FixUTF8([]byte(rsp)[:maxBodySize]))
             }
         }
 
@@ -732,7 +850,7 @@ if err != nil {
                 edt.FindStringRange(keyword, rg => {
                     matchContent := rg.GetTextContextWithPrompt(3)
                     if len(matchContent) > 5000 {
-                        matchContent = matchContent[:5000] + "\n... (truncated)"
+                        matchContent = codec.FixUTF8([]byte(matchContent)[:5000]) + "\n... (truncated)"
                     }
                     outputContent += sprintf("\nKeyword Match [%s]:\n%s\n", keyword, matchContent)
                     yakit.Info("Request #%d: Found keyword '%s' in response", result["idx"], keyword)
@@ -742,7 +860,7 @@ if err != nil {
                 edt.FindRegexpRange(regexpMatch, rg => {
                     matchContent := rg.GetTextContextWithPrompt(3)
                     if len(matchContent) > 5000 {
-                        matchContent = matchContent[:5000] + "\n... (truncated)"
+                        matchContent = codec.FixUTF8([]byte(matchContent)[:5000]) + "\n... (truncated)"
                     }
                     outputContent += sprintf("\nRegexp Match [%s]:\n%s\n", regexpMatch, matchContent)
                     yakit.Info("Request #%d: Found regexp '%s' in response", result["idx"], regexpMatch)
@@ -760,7 +878,7 @@ if err != nil {
     if len(outputContent) <= maxInlineOutput {
         yakit.Info("%s", outputContent)
     } else {
-        yakit.Info("%s\n... (output truncated at %d bytes, see full results in saved file)", outputContent[:maxInlineOutput], maxInlineOutput)
+        yakit.Info("%s\n... (output truncated at %d bytes, see full results in saved file)", codec.FixUTF8([]byte(outputContent)[:maxInlineOutput]), maxInlineOutput)
     }
 }
 
@@ -775,13 +893,13 @@ for _, result:= range results {
     if result["response_received"] == true {
         path = result["path"]
         if len(path) > 48 {
-            path = path[:45] + "..."
+            path = codec.FixUTF8([]byte(path)[:45]) + "..."
         }
         yakit.Info("%-6d %-50s %-8d %-10d", result["idx"], path, result["status"], result["size"])
     } else {
         path = result["path"]
         if len(path) > 48 {
-            path = path[:45] + "..."
+            path = codec.FixUTF8([]byte(path)[:45]) + "..."
         }
         yakit.Info("%-6d %-50s %-8s %-10s", result["idx"], path, "ERROR", "-")
     }
@@ -810,6 +928,8 @@ for _, item := range results {
         "filtered": item["filtered"],
         "filter_reason": item["reason"],
         "transport_error": item["transport_error"],
+        "response_file": item["response_file"],
+        "artifact_error": item["artifact_error"],
     })
 }
 

@@ -290,3 +290,18 @@ func TestHandleMemory_KeepDurableGeneralizedFact(t *testing.T) {
 		t.Fatalf("expected durable generalized fact to be kept, got %d memories", len(allMemories))
 	}
 }
+
+func TestMemoryFeedbackInvalidArrayDoesNotPartiallySave(t *testing.T) {
+	invoker := NewAdvancedMockInvoker(context.Background())
+	memory, err := CreateTestAIMemory("invalid-memory-"+uuid.NewString(), WithInvoker(invoker))
+	require.NoError(t, err)
+	defer memory.Close()
+	invoker.SetReturnValue("memory-triage", `{"@action":"memory-triage","memory_entities":[{"content":"must not persist"},[{"content":"nested invalid item"}]]}`)
+	err = memory.HandleMemory("untrusted auxiliary output")
+	require.ErrorContains(t, err, "array item 1")
+	entities, err := memory.ListAllMemories(10)
+	require.NoError(t, err)
+	require.Empty(t, entities, "valid prefix must not be committed before validating the whole array")
+	invoker.SetReturnValue("memory-triage", `{"@action":"memory-triage","memory_entities":[]}`)
+	require.NoError(t, memory.HandleMemory("recovery"))
+}

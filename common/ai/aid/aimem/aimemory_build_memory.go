@@ -21,6 +21,20 @@ import (
 // request must stay bounded as the parent session grows.
 const memoryTriageInputTokenLimit = 4 * 1024
 
+func validateMemoryTriageAction(action *aicommon.Action) error {
+	if action == nil {
+		return utils.Error("memory triage returned no action")
+	}
+	_, present, err := action.GetCanonicalObjectArray("memory_entities")
+	if err != nil {
+		return err
+	}
+	if !present {
+		return utils.Error("memory triage response is missing memory_entities")
+	}
+	return nil
+}
+
 // AddRawText 从原始文本生成记忆条目
 func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) {
 	nonce := utils.RandStringBytes(4)
@@ -73,9 +87,9 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 			aitool.WithNumberParam("r", aitool.WithParam_Description("相关性评分，这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("c", aitool.WithParam_Description("关联度评分，这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 		),
-	}, aicommon.WithLiteForgeDisableTimeline())
+	}, aicommon.WithLiteForgeDisableTimeline(), aicommon.WithLiteForgeOutputValidator(validateMemoryTriageAction))
 	if err != nil {
-		return nil, utils.Errorf("InvokeLiteForge failed: %v", err)
+		return nil, utils.Errorf("InvokeLiteForge failed: %w", err)
 	}
 	if ac == nil {
 		return nil, utils.Error("memory triage returned no action")

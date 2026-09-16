@@ -52,6 +52,10 @@ Optional Parameters:
   timeout         (int)     Per-request timeout in seconds. Default: 10.
   https-fallback  (bool)    Whether to retry with HTTP when an HTTPS crawl yields
                             no results. Default: true.
+  scope-urls      (string)  Optional newline-separated HTTP(S) origin/path allowlist,
+                            e.g. http://host:18080/cms. Restricts scheme, host, port
+                            and path subtree, intersecting hostname scope. Other
+                            discovered services remain Found URLs, not requests.
   scope-domains   (string)  Optional comma-separated hostname/glob allowlist, for
                             example "*.redhaze.top,redhaze.top". Default: empty,
                             so only the exact seed hostname(s) are crawled. This is
@@ -96,6 +100,7 @@ maxUrls = cli.Int("urls-max", cli.setHelp("唯一新发现 URL 配额（包含�
 maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(5))
 timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
 httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
+scopeURLsRaw := cli.String("scope-urls", cli.setHelp("可选，换行分隔的 HTTP(S) origin/path 白名单，限制 scheme/host/port/path 子树；与 hostname 范围取交集，范围外候选只发现不访问"))
 scopeDomainsRaw := cli.String("scope-domains", cli.setHelp("显式允许爬取的逗号分隔 hostname 或 glob；默认仅起始 hostname"))
 aiJSModeRaw := cli.String("ai-js", cli.setHelp("浏览器无关的 JavaScript 静态分析模式: auto/yes/no"), cli.setDefault("auto"))
 aiJSMaxRequestsRaw := cli.Int("ai-js-max-requests", cli.setHelp("AI 分析调用预算覆盖值（1..20）"))
@@ -178,6 +183,12 @@ opts.Append(crawler.httpsToHttpFallback(false))
 // Avoid synthetic www variants. The public Go crawler retains its historical
 // default; this AID tool reports only hostnames the caller actually supplied.
 opts.Append(crawler.exactOrigins(true))
+scopeURLList = str.SplitAndTrim(scopeURLsRaw, "\n")
+if len(scopeURLList) > 0 {
+    scopeOpt, scopeErr = crawler.urlScope(scopeURLList...)
+    if scopeErr != nil { die(scopeErr) }
+    opts.Append(scopeOpt)
+}
 scopeDomainList = []
 for rawDomain in str.Split(scopeDomainsRaw, ",") {
     domain = str.TrimSpace(rawDomain)
@@ -591,6 +602,9 @@ if enableAdaptiveAIJS {
     output.WriteString(sprintf("AI call budget:   %v (maximum model invocations, not HTTP requests)\n", aiJSRequestBudget))
 } else {
     output.WriteString("JavaScript:      disabled (server-visible crawl only)\n")
+}
+if len(scopeURLList) > 0 {
+    output.WriteString("URL scope:        " + crawler.safeDisplayText(str.Join(scopeURLList, ", ")) + "\n")
 }
 if len(scopeDomainList) == 0 {
     output.WriteString("Domain scope:     exact seed hostname(s) only\n")

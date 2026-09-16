@@ -543,7 +543,8 @@ func TestBatchDoHTTPRequest_EmptyPathsValidation(t *testing.T) {
 
 func TestBatchDoHTTPRequest_MissingRequestIsProtocolFailure(t *testing.T) {
 	result, err := getBatchDoHTTPRequestTool(t).InvokeWithParams(aitool.InvokeParams{})
-	assert.ErrorContains(t, err, "at least one of")
+	assert.ErrorContains(t, err, "missing property 'paths'")
+	assert.ErrorContains(t, err, "工具回调尚未执行")
 	assert.Equal(t, result.Success, false)
 	assert.Assert(t, result.Data == nil, "a failed invocation must not expose a result envelope")
 }

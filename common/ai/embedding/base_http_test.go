@@ -215,3 +215,38 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return function(request)
 }
+
+func TestOpenaiEmbeddingClient_ProviderErrorContract(t *testing.T) {
+	for _, code := range []string{`"all_providers_failed"`, `"429"`, `429`, `null`, ``} {
+		for _, status := range []int{200, 401, 429, 503} {
+			t.Run(fmt.Sprintf("%d/%s", status, code), func(t *testing.T) {
+				codeField := ""
+				if code != "" {
+					codeField = `"code":` + code + `,`
+				}
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(status)
+					_, _ = io.WriteString(w, `{"data":[{"embedding":[1,0]}],"error":{`+codeField+`"message":"upstream unavailable","type":"provider_error"}}`)
+				}))
+				defer server.Close()
+				vectors, err := NewOpenaiEmbeddingClient(aispec.WithBaseURL(server.URL)).EmbeddingRaw("test")
+				require.Nil(t, vectors, "error envelope must win over vectors")
+				var apiErr *EmbeddingAPIError
+				require.ErrorAs(t, err, &apiErr)
+				require.Equal(t, status, apiErr.StatusCode)
+				require.Equal(t, code, string(apiErr.Code))
+				require.Contains(t, err.Error(), "upstream unavailable")
+			})
+		}
+	}
+	for _, body := range []string{"<html>service unavailable</html>", `{"error":{"code":"unavailable"}}`, `{"data":[{"embedding":[1,0]}]}`} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(503); _, _ = io.WriteString(w, body) }))
+		vectors, err := NewOpenaiEmbeddingClient(aispec.WithBaseURL(server.URL)).EmbeddingRaw("test")
+		require.Nil(t, vectors)
+		var apiErr *EmbeddingAPIError
+		require.ErrorAs(t, err, &apiErr)
+		require.Equal(t, 503, apiErr.StatusCode)
+		require.Contains(t, err.Error(), "503")
+		server.Close()
+	}
+}

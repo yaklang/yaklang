@@ -115,6 +115,10 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
 		requestCtx, stopRequestCtx := combineAIRequestAndConfigContext(c.Ctx, request.GetContext())
 		defer stopRequestCtx()
+		budget := request.rateLimitBudget
+		if budget == nil {
+			budget = newRateLimitBudget()
+		}
 		// check if callback is nil before calling
 		if i == nil {
 			return nil, utils.Error("AI callback is not set, please configure AI service first")
@@ -152,25 +156,29 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		}
 		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
+		maxAttempts := int(c.AiAutoRetry)
+		if maxAttempts <= 0 {
+			maxAttempts = 1
+		}
 		// 不需要 checkpoint 的请求直接执行就好
 		if request.IsDetachedCheckpoint() {
-			if c.AiAutoRetry <= 0 {
-				c.AiAutoRetry = 1
-			}
-			for _idx := 0; _idx < int(c.AiAutoRetry); {
+			for _idx := 0; _idx < maxAttempts; {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
+				if is429, shouldRetry, done := handle429RateLimitContext(requestCtx, c, rsp, budget); is429 {
 					if done {
 						return nil, requestCtx.Err()
 					}
 					if !shouldRetry {
-						_idx++
+						return rsp, rateLimitError(budget, rsp)
 					}
 					continue
 				}
+				if rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
+					return rsp, aiHTTPResponseError(rsp)
+				}
 				if err != nil || rsp == nil {
 					_idx++
-					if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, int(c.AiAutoRetry)); waitErr != nil {
+					if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, maxAttempts); waitErr != nil {
 						return nil, waitErr
 					}
 					continue
@@ -188,7 +196,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			if rsp != nil {
 				rsp.SetTaskIndex(request.GetTaskIndex())
 			}
-			return rsp, utils.Errorf("ai request err with max retry: %v", err)
+			return rsp, utils.Errorf("ai request err with max retry: %w", err)
 		}
 
 		var seq = request.GetSeqId()
@@ -222,9 +230,6 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if err != nil {
 			c.EmitWarning("ai request save request checkpoint failed err: %v", err)
 		}
-		if c.AiAutoRetry <= 0 {
-			c.AiAutoRetry = 1
-		}
 
 		callerLabel := request.GetCallerLabel()
 		if callerLabel == "" {
@@ -233,20 +238,23 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		}
 
 		start := time.Now()
-		for _idx := 0; _idx < int(c.AiAutoRetry); {
+		for _idx := 0; _idx < maxAttempts; {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
+			if is429, shouldRetry, done := handle429RateLimitContext(requestCtx, c, rsp, budget); is429 {
 				if done {
 					return nil, requestCtx.Err()
 				}
 				if !shouldRetry {
-					_idx++
+					return rsp, rateLimitError(budget, rsp)
 				}
 				continue
 			}
+			if rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
+				return rsp, aiHTTPResponseError(rsp)
+			}
 			if err != nil || rsp == nil {
 				_idx++
-				if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, int(c.AiAutoRetry)); waitErr != nil {
+				if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, maxAttempts); waitErr != nil {
 					return nil, waitErr
 				}
 				continue
@@ -401,7 +409,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if rsp != nil {
 			rsp.SetTaskIndex(request.GetTaskIndex())
 		}
-		return rsp, utils.Errorf("ai request err with max retry: %v", err)
+		return rsp, utils.Errorf("ai request err with max retry: %w", err)
 	}
 }
 

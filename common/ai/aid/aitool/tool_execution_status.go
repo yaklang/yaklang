@@ -69,6 +69,14 @@ func (t *ToolResult) GetExecutionStatus() (ToolExecutionStatus, string) {
 			"process_error", "exit_code", "termination_reason")
 	}
 
+	if operationStatus, ok := fields["operation_status"].(string); ok {
+		switch operationStatus {
+		case "error", "dialog_open":
+			return ToolExecutionStatusFailed, executionStatusDetail(fields, "operation", "operation_status", "session", "error", "recovery_operation")
+		case "completed":
+			return ToolExecutionStatusSucceeded, executionStatusDetail(fields, "operation", "operation_status", "session")
+		}
+	}
 	return ToolExecutionStatusUnknown, ""
 }
 

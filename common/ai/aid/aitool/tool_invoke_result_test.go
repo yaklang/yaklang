@@ -225,3 +225,16 @@ func TestToolResult_String_EmptyParam(t *testing.T) {
 		"empty param branch should fall through to jsonify, got: %q", out)
 	require.NotContains(t, out, "param:\n", "empty param branch should NOT take yaml path")
 }
+
+func TestBrowserOperationStatusSurvivesProtocolCompletion(t *testing.T) {
+	for _, status := range []string{"error", "dialog_open", "completed"} {
+		result := &ToolResult{Success: true, Data: &ToolExecutionResult{Result: map[string]any{"operation": "open", "session": "browser-1", "operation_status": status}}}
+		got, detail := result.GetExecutionStatus()
+		want := ToolExecutionStatusFailed
+		if status == "completed" {
+			want = ToolExecutionStatusSucceeded
+		}
+		require.Equal(t, want, got)
+		require.Contains(t, detail, "operation_status="+status)
+	}
+}

@@ -349,6 +349,16 @@ func handleLargeContentToFile(content string, contentType string) string {
 
 // ValidateParams 验证参数 - 内部方法支持两种参数类型
 func (t *Tool) validate(iSchema any, params any) (valid bool, errs []string) {
+	// The compiler accepts decoded JSON values, not OrderedMap instances.
+	// Normalize both parameter-only and full action schemas at this boundary.
+	schemaJSON, err := json.Marshal(iSchema)
+	if err != nil {
+		return false, []string{fmt.Sprintf("Failed to marshal schema: %v", err)}
+	}
+	var plainSchema any
+	if err := json.Unmarshal(schemaJSON, &plainSchema); err != nil {
+		return false, []string{fmt.Sprintf("Failed to unmarshal schema: %v", err)}
+	}
 	// 将参数转换为普通 map 用于验证
 	var paramMap map[string]any
 	switch p := params.(type) {
@@ -373,7 +383,7 @@ func (t *Tool) validate(iSchema any, params any) (valid bool, errs []string) {
 		return err
 	}
 	compiler := jsonschema.NewCompiler()
-	err := compiler.AddResource("schema.json", iSchema)
+	err = compiler.AddResource("schema.json", plainSchema)
 	if err != nil {
 		return false, []string{fmt.Sprintf("JSON Schema AddResource failed: %v", trimErrorFirstLine(err.Error()))}
 	}
@@ -387,8 +397,7 @@ func (t *Tool) validate(iSchema any, params any) (valid bool, errs []string) {
 	err = schema.Validate(paramMap)
 	valid = err == nil
 	if !valid {
-		validationError := err.(*jsonschema.ValidationError)
-		validationErrorStr := trimErrorFirstLine(validationError.Error())
+		validationErrorStr := trimErrorFirstLine(err.Error())
 		errs = strings.Split(validationErrorStr, "\n")
 	}
 
@@ -407,21 +416,7 @@ func (t *Tool) ValidateOrderedParams(params *omap.OrderedMap[string, any]) (bool
 
 // validateWithSchema 内部通用验证方法
 func (t *Tool) validateWithSchema(params any) (bool, []string) {
-	// Convert OrderedMap to regular map for JSON schema validation
-	// First serialize to JSON then deserialize to get plain Go structures
-	schemaMap := t.Tool.InputSchema.ToMap()
-	jsonBytes, err := json.Marshal(schemaMap)
-	if err != nil {
-		return false, []string{fmt.Sprintf("Failed to marshal schema: %v", err)}
-	}
-
-	var plainSchema any
-	err = json.Unmarshal(jsonBytes, &plainSchema)
-	if err != nil {
-		return false, []string{fmt.Sprintf("Failed to unmarshal schema: %v", err)}
-	}
-
-	return t.validate(plainSchema, params)
+	return t.validate(t.Tool.InputSchema.ToMap(), params)
 }
 
 func (t *Tool) Validate(params map[string]any) (bool, []string) {
