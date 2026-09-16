@@ -285,10 +285,13 @@ declarationSpecifiers2
     ;
 
 declarationSpecifier
-    // Unexpanded declspec macros before a real type: `WEPOLL_EXPORT int foo()`.
-    // More specific than Identifier-as-typedef (`size_t n`), so it is listed first.
-    : Identifier+ (storageClassSpecifier | typeQualifier | functionSpecifier)* typeSpecifier typeQualifier*
-    | (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
+    // Unexpanded declspec macros before a real type: `WEPOLL_EXPORT int foo()`
+    // and `WEPOLL_EXPORT HANDLE foo()`. One Identifier, not Identifier+:
+    // greedy Identifier+ would eat HANDLE and leave no typeSpecifier.
+    // Do not prefix typeSpecifier with optional structOrUnion: that steals
+    // `struct tag {` from structOrUnionSpecifier after SLL sees many `struct tag;`.
+    : Identifier (storageClassSpecifier | typeQualifier | functionSpecifier)* typeSpecifier typeQualifier*
+    | (storageClassSpecifier | typeQualifier | functionSpecifier)* (
         typeSpecifier
         | macroCallExpression
         | Identifier
@@ -301,7 +304,11 @@ initDeclaratorList
     ;
 
 initDeclarator
-    : declarator ('=' initializer)?
+    // More specific alts first so SLL sees LA(2)='*' for
+    // `IMAGE_SYMBOL_EX, UNALIGNED *PIMAGE_SYMBOL_EX`.
+    : typeQualifier+ pointer directDeclarator ('=' initializer)?
+    | Identifier pointer directDeclarator ('=' initializer)?
+    | declarator ('=' initializer)?
     ;
 
 storageClassSpecifier
@@ -314,7 +321,14 @@ storageClassSpecifier
     ;
 
 typeSpecifier
-    : 'void'
+    : 'unsigned' 'long' 'long' 'int'?
+    | 'unsigned' 'long' 'int'?
+    | 'unsigned' 'short' 'int'?
+    | 'signed' 'long' 'long' 'int'?
+    | 'signed' 'long' 'int'?
+    | 'long' 'int'
+    | 'short' 'int'
+    | 'void'
     | 'char'
     | 'short'
     | 'int'
@@ -339,7 +353,17 @@ typeSpecifier
     ;
 
 structOrUnionSpecifier
-    : structOrUnion eos* Identifier? '{' eos* structDeclarationList eos* '}' eos* Identifier?
+    // Trailing names after `}` belong to initDeclaratorList (`typedef struct { } A, *B`).
+    // Left-factor `{` onto the named form so SLL uses LA(1) after the tag
+    // instead of uniquely predicting the no-brace alt after many `struct tag;`.
+    : structOrUnion eos* structAttr* eos* Identifier ( '{' eos* structDeclarationList eos* '}' )?
+    | structOrUnion eos* structAttr* eos* '{' eos* structDeclarationList eos* '}'
+    ;
+
+structAttr
+    : gccAttributeSpecifier
+    | macroCallExpression
+    | '__declspec' '(' eos* Identifier (eos* '(' eos* argumentExpressionList? eos* ')')? eos* ')'
     ;
 
 structOrUnion
@@ -352,10 +376,17 @@ structDeclarationList
     ;
 
 structDeclaration
-    : specifierQualifierList eos* structDeclaratorList eos* Semi
+    // COM vtable members must beat macroCallExpression: after many
+    // LIST_ENTRY(foo) fields, SLL uniquely predicts HRESULT(...) as a macro.
+    : Identifier '(' eos* vcSpecificModifer eos* pointer directDeclarator eos* ')' gccDeclaratorExtension* declaratorSuffix* eos* Semi
+    | Identifier '(' eos* Identifier eos* pointer directDeclarator eos* ')' gccDeclaratorExtension* declaratorSuffix* eos* Semi
+    | specifierQualifierList eos* structDeclaratorList eos* Semi
     | specifierQualifierList eos* Semi
     | staticAssertDeclaration
     | macroCallExpression eos* structDeclaratorList eos* Semi
+    // Unexpanded OLE/COM vtable wrappers around stdcall function-pointer members.
+    | 'BEGIN_INTERFACE'
+    | 'END_INTERFACE'
     ;
 
 specifierQualifierList
@@ -372,8 +403,8 @@ structDeclarator
     ;
 
 enumSpecifier
-    : 'enum' eos* Identifier? '{' eos* enumeratorList eos* ','? eos* '}'
-    | 'enum' eos* Identifier
+    : 'enum' eos* Identifier ( '{' eos* enumeratorList eos* ','? eos* '}' )?
+    | 'enum' eos* '{' eos* enumeratorList eos* ','? eos* '}'
     ;
 
 enumeratorList
@@ -397,6 +428,8 @@ typeQualifier
     | '_Atomic'
     | 'signed'
     | 'unsigned'
+    | 'UNALIGNED'
+    | '__unaligned'
     ;
 
 functionSpecifier
@@ -419,7 +452,7 @@ declarator
 // Optimized: Use arraySuffix and functionSuffix to reduce recursion depth
 // This significantly improves performance for multi-dimensional arrays like int arr[2][32][32][2]
 directDeclarator
-    : Identifier declaratorSuffix*
+    : Identifier ('.' Identifier)* declaratorSuffix*
     | macroCallExpression declaratorSuffix*  // Support macro calls as function names, e.g., ARRAY_RENAME(3d_array)(...)
     // MSVC calling-convention pointers must precede '(' declarator ')'.
     // Otherwise SLL treats `(__cdecl *_fn)` as '(' + vcSpecificModifer + Identifier
@@ -517,13 +550,18 @@ typeName
     ;
 
 abstractDeclarator
-    : pointer
+    : vcSpecificModifer pointer
+    | pointer
     | pointer? directAbstractDeclarator gccDeclaratorExtension*
     ;
 
 // Optimized: Use abstractDeclaratorSuffix to reduce recursion depth
 directAbstractDeclarator
-    : '(' eos* abstractDeclarator eos* ')' gccDeclaratorExtension* abstractDeclaratorSuffix*
+    // MSVC/WINAPI function-pointer casts: `(NTSTATUS(__stdcall*) (HANDLE, ...))`
+    // and unexpanded `(NTSTATUS(NTAPI*) (HANDLE, ...))`.
+    : '(' eos* vcSpecificModifer eos* abstractDeclarator eos* ')' gccDeclaratorExtension* abstractDeclaratorSuffix*
+    | '(' eos* Identifier eos* pointer eos* ')' gccDeclaratorExtension* abstractDeclaratorSuffix*
+    | '(' eos* abstractDeclarator eos* ')' gccDeclaratorExtension* abstractDeclaratorSuffix*
     | abstractDeclaratorSuffix+
     ;
 
@@ -547,7 +585,9 @@ abstractFunctionSuffix
     ;
 
 typedefName
-    : structOrUnion? Identifier
+    // Identifier only. `struct tag` is structOrUnionSpecifier; an optional
+    // structOrUnion here uniquely predicts SLL on large TUs and then rejects `{`.
+    : Identifier
     ;
 
 initializer
@@ -580,6 +620,9 @@ staticAssertDeclaration
 statement
     : Identifier ':' eos* statement?  // Labeled statement
     | compoundStatement
+    // Only `(void)`, not builtinCastType: `(const struct T*)` would otherwise
+    // train the `(` decision and later reject `(void) x;`.
+    | '(' 'void' pointer? ')' expression eos* Semi
     | expressionStatement
     | statementsExpression
     | selectionStatement
@@ -639,15 +682,16 @@ blockItemList
     ;
 
 blockItem
-    // statement first: call-like `free(p);` must not become a declaration.
-    // Safe once type keywords are not in expression FIRST (see expression rule).
-    // `int *p = 0;` then falls through to declaration.
-    : statement
+    // `(void) x;` first so SLL uses LA(2)=void even after `(const struct*)` casts.
+    : '(' 'void' pointer? ')' expression eos* Semi
+    | statement
     | declaration
     ;
 
 expressionStatement
-    : coreExpressions eos* Semi
+    // Adjacent `(void)` so SLL can use LA(2)=void vs `'(' expression ')'`.
+    : '(' 'void' pointer? ')' expression eos* Semi
+    | coreExpressions eos* Semi
     ;
 
 selectionStatement
@@ -710,12 +754,29 @@ translationUnit
 // Otherwise `extern int foo(int);` is split into specifier `extern int` plus
 // leftover `foo(int)` (macroCallExpression) and never creates Function-foo.
 externalDeclaration
-    : functionDefinition
-    | declaration
+    : functionOrDeclaration
+    | '(' 'void' pointer? ')' expression eos* Semi
     | macroCallExpression  // Allow macro calls like FUN(fmin, double, <) at top level
     | macroCallStatement  // Allow macro calls without parentheses at top level (e.g., FF_DISABLE_DEPRECATION_WARNINGS)
     | Semi
     | declarationSpecifier
+    ;
+
+// Split AFTER the declarator so `{` vs `;` is an LA(1) decision.
+// Competing functionDefinition/declaration alts share a long prefix and
+// SLL/LL would skip function bodies or demand `{` on prototypes.
+functionOrDeclaration
+    : declarationSpecifier? declarator functionOrDeclarationRest
+    | declarationSpecifier eos* Semi
+    ;
+
+functionOrDeclarationRest
+    : declarationList? compoundStatement
+    | ('=' initializer)? (',' eos* initDeclarator)* eos* Semi
+    ;
+
+functionDefinition
+    : declarationSpecifier? declarator declarationList? compoundStatement
     ;
 
 // Macro call expression: function call that may contain operators as arguments
@@ -727,10 +788,6 @@ macroCallExpression
 
 macroArgumentList
     : macroArgument (',' eos* macroArgument)*
-    ;
-
-functionDefinition
-    : declarationSpecifier? declarator declarationList? compoundStatement?
     ;
 
 declarationList

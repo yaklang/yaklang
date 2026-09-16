@@ -109,6 +109,9 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#structOrUnionSpecifier.
 	VisitStructOrUnionSpecifier(ctx *StructOrUnionSpecifierContext) interface{}
 
+	// Visit a parse tree produced by CParser#structAttr.
+	VisitStructAttr(ctx *StructAttrContext) interface{}
+
 	// Visit a parse tree produced by CParser#structOrUnion.
 	VisitStructOrUnion(ctx *StructOrUnionContext) interface{}
 
@@ -307,14 +310,20 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#externalDeclaration.
 	VisitExternalDeclaration(ctx *ExternalDeclarationContext) interface{}
 
+	// Visit a parse tree produced by CParser#functionOrDeclaration.
+	VisitFunctionOrDeclaration(ctx *FunctionOrDeclarationContext) interface{}
+
+	// Visit a parse tree produced by CParser#functionOrDeclarationRest.
+	VisitFunctionOrDeclarationRest(ctx *FunctionOrDeclarationRestContext) interface{}
+
+	// Visit a parse tree produced by CParser#functionDefinition.
+	VisitFunctionDefinition(ctx *FunctionDefinitionContext) interface{}
+
 	// Visit a parse tree produced by CParser#macroCallExpression.
 	VisitMacroCallExpression(ctx *MacroCallExpressionContext) interface{}
 
 	// Visit a parse tree produced by CParser#macroArgumentList.
 	VisitMacroArgumentList(ctx *MacroArgumentListContext) interface{}
-
-	// Visit a parse tree produced by CParser#functionDefinition.
-	VisitFunctionDefinition(ctx *FunctionDefinitionContext) interface{}
 
 	// Visit a parse tree produced by CParser#declarationList.
 	VisitDeclarationList(ctx *DeclarationListContext) interface{}
