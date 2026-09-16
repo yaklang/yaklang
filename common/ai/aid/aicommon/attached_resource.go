@@ -13,9 +13,10 @@ const (
 	AttachedResourceTypeSelected        = "selected"
 	AttachedResourceTypeHTTPFuzzRequest = "http_fuzz_request"
 
-	AttachedResourceKeyID      = "id"
-	AttachedResourceKeyContent = "content"
-	AttachedResourceKeyIsHTTPS = "is_https"
+	AttachedResourceKeyID             = "id"
+	AttachedResourceKeyContent        = "content"
+	AttachedResourceKeyIsHTTPS        = "is_https"
+	AttachedResourceKeySyntaxFlowRule = "syntaxflow_rule" // IRify 代码审计「规则编写」草稿，Type=selected
 
 	AttachedHTTPFlowRequestInlineLimit  = 3 * 1024
 	AttachedHTTPFlowResponseInlineLimit = 3 * 1024

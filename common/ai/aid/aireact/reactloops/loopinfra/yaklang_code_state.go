@@ -180,9 +180,20 @@ func resolveLoopYaklangCodeEventOp(explicitOp string, previousState *loopYaklang
 	}
 }
 
+// supportsYaklangCodeChangeEvent reports whether this suite should emit yaklang_code_change.
+// Yak Runner (code/yaklang) and SyntaxFlow rule editor (text/syntaxflow) both deliver full content to the UI.
+func (f *SingleFileModificationSuiteFactory) supportsYaklangCodeChangeEvent() bool {
+	switch f.contentType {
+	case "code/yaklang", "text/syntaxflow":
+		return true
+	default:
+		return false
+	}
+}
+
 // applyLoopYaklangCodeChange updates loop file state and optionally emits yaklang_code_change (same pattern as http_fuzz_request_change).
 func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *reactloops.ReActLoop, input *loopYaklangCodeChange) (*loopYaklangCodeChangeResult, error) {
-	if f.contentType != "code/yaklang" {
+	if !f.supportsYaklangCodeChangeEvent() {
 		return nil, nil
 	}
 	if loop == nil {
