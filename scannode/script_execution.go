@@ -1209,7 +1209,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	meta := parseSSAResultMeta(result)
 	cfg := reporter.ssaUploadCfg
 	if cfg == nil {
-		if reporter.ssaCollector.HasData() {
+		if reporter.ssaCollector.HasData() || len(meta.ScanStages) > 0 {
 			return utils.Errorf("ssa artifact upload config missing")
 		}
 		return nil
@@ -1256,16 +1256,31 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	return nil
 }
 
+// shouldPreserveFailedSSAArtifact is true when a failed script still has a
+// customer-visible result: streamed findings, or the engine's stage verdict.
+// Clone failures produce no ssa-stream payload, but they do report stages.
+func shouldPreserveFailedSSAArtifact(collector *SSAArtifactCollector, result *ScriptExecutionResult) bool {
+	if collector == nil {
+		return false
+	}
+	if collector.HasData() {
+		return true
+	}
+	return len(parseSSAResultMeta(result).ScanStages) > 0
+}
+
 // preserveFailedSSAArtifactUpload publishes a finalized continuous-upload
 // manifest after a source precheck failure. The source stage is customer-visible
 // even when a later rule is cancelled or killed, so rules that already emitted
-// ssa-stream payloads must not be discarded with the local spool.
+// ssa-stream payloads must not be discarded with the local spool. Stage
+// outcomes are persisted the same way when the script failed before any
+// finding was streamed.
 func (s *ScanNode) preserveFailedSSAArtifactUpload(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
 	result *ScriptExecutionResult,
 ) {
-	if reporter == nil || reporter.ssaCollector == nil || !reporter.ssaCollector.HasData() {
+	if reporter == nil || !shouldPreserveFailedSSAArtifact(reporter.ssaCollector, result) {
 		return
 	}
 	preserveCtx := context.WithoutCancel(ctx)
@@ -1397,7 +1412,17 @@ func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
 	// the script. Persisting them with the artifact keeps the scan list and
 	// diagnostics page reading one authoritative "what ran" answer.
 	if stages := dataMap["stages"]; stages != nil {
-		meta.ScanStages, _ = json.Marshal(stages)
+		// Persist the engine verdict as one object so the platform can render
+		// both "which stages ran" and "did the run succeed" without inferring
+		// success from a bare stage list.
+		wrapped := map[string]any{"stages": stages}
+		if value, ok := dataMap["succeeded"]; ok {
+			wrapped["succeeded"] = value
+		}
+		if errMsg := strings.TrimSpace(utils.InterfaceToString(dataMap["error"])); errMsg != "" {
+			wrapped["error"] = errMsg
+		}
+		meta.ScanStages, _ = json.Marshal(wrapped)
 	}
 	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
 		utils.MapGetFirstRaw(dataMap, "program_name", "programName", "ProgramName"),

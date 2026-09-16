@@ -488,3 +488,57 @@ alert $cmd`,
 	require.NoError(t, err)
 	require.Greater(t, alerts, 0)
 }
+
+// A remote clone failure is collect failing: the project tree never arrived,
+// so the run must not claim 语义检测 ran.
+func TestScanProject_RemoteCloneFailureReportsCollectFailed(t *testing.T) {
+	orig := syntaxflow_scan.CompileProject
+	t.Cleanup(func() { syntaxflow_scan.CompileProject = orig })
+	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+		return nil, fmt.Errorf("SSA Git clone failed: workspace=%q: git clone: connection refused", t.TempDir())
+	}
+
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceGit),
+		ssaconfig.WithCodeSourceURL("https://127.0.0.1:1/no-such-repo.git"),
+		ssaconfig.WithProjectRawLanguage("php"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SSAMode),
+	)
+	require.Error(t, err)
+	require.False(t, result.Succeeded)
+	require.Len(t, result.Stages, 1)
+	require.Equal(t, syntaxflow_scan.StageCollect, result.Stages[0].Stage)
+	require.False(t, result.Stages[0].Succeeded())
+	require.Contains(t, result.Stages[0].Error, "SSA Git clone failed")
+}
+
+// A local tree that fails to compile already finished collect. The compile
+// error belongs to the detection stage that asked for compile.
+func TestScanProject_LocalCompileFailureKeepsCollect(t *testing.T) {
+	orig := syntaxflow_scan.CompileProject
+	t.Cleanup(func() { syntaxflow_scan.CompileProject = orig })
+	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+		return nil, fmt.Errorf("php parse failed")
+	}
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.php"), []byte("<?php echo 1;\n"), 0o644))
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("php"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode),
+	)
+	require.Error(t, err)
+	require.False(t, result.Succeeded)
+	require.Len(t, result.Stages, 2)
+	require.Equal(t, syntaxflow_scan.StageCollect, result.Stages[0].Stage)
+	require.True(t, result.Stages[0].Succeeded())
+	require.Equal(t, syntaxflow_scan.StageReview, result.Stages[1].Stage)
+	require.False(t, result.Stages[1].Succeeded())
+	require.Contains(t, result.Stages[1].Error, "php parse failed")
+}
