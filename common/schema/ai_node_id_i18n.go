@@ -1056,6 +1056,16 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "系统通知",
 		En: "System Notification",
 	},
+	// 429 通知类型：与 aicommon.notify429Type* 常量对齐，作为 notify 事件的
+	// NodeId，由 NodeIdAndTypeToI18n 翻译为 NodeIdVerbose 供前端 i18n 展示。
+	"rate_limited": {
+		Zh: "限流",
+		En: "Rate Limited",
+	},
+	"quota_exceeded": {
+		Zh: "额度耗尽",
+		En: "Quota Exceeded",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{

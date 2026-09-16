@@ -179,8 +179,8 @@ func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
 	assert.True(t, ctxDone)
 
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "限流", payload["type"])
-	require.Equal(t, "限流", payload["warning_type"])
+	require.Equal(t, "rate_limited", payload["type"])
+	require.Equal(t, "rate_limited", payload["warning_type"])
 	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
 	require.Equal(t, float64(6), payload["duration"])
 	require.Equal(t, float64(6000), payload["duration_ms"])
@@ -203,8 +203,8 @@ func TestHandle429_Generic429_EmitsNotifyEvent(t *testing.T) {
 
 	payload := requireNotifyPayload(t, snapshot())
 	// No Retry-After → quota-exceeded type
-	require.Equal(t, "额度耗尽", payload["type"])
-	require.Equal(t, "额度耗尽", payload["warning_type"])
+	require.Equal(t, "quota_exceeded", payload["type"])
+	require.Equal(t, "quota_exceeded", payload["warning_type"])
 	require.Contains(t, payload["content"], "HTTP 429")
 	require.GreaterOrEqual(t, payload["duration"].(float64), float64(5))
 	require.LessOrEqual(t, payload["duration"].(float64), float64(15))
@@ -344,4 +344,63 @@ func TestHandle429_ContextCancelBeforeHeaders(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("handle429RateLimit did not return after context cancellation")
 	}
+}
+
+// requireNotifyEvent 返回第一个 notify 事件，便于断言 NodeId 等 meta 字段。
+func requireNotifyEvent(t *testing.T, events []*schema.AiOutputEvent) *schema.AiOutputEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.Type == schema.EVENT_TYPE_NOTIFY {
+			return event
+		}
+	}
+	t.Fatalf("notify event not found in %d events", len(events))
+	return nil
+}
+
+// TestHandle429_NotifyNodeIdIsEnglishEnum 验证 429 通知事件的 NodeId 使用英文
+// 稳定枚举标识（而非中文字符串），以便 schema.NodeIdAndTypeToI18n 正确翻译。
+func TestHandle429_NotifyNodeIdIsEnglishEnum(t *testing.T) {
+	t.Run("rate_limited", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+		rsp := make429ResponseWithBody(
+			[]string{"Retry-After: 10"},
+			`{"error":{"message":"too many requests"}}`,
+		)
+		_, _, _ = cfg.handle429RateLimit(rsp)
+		cfg.Emitter.WaitForStream()
+
+		event := requireNotifyEvent(t, snapshot())
+		// NodeId 应为英文枚举，而非中文
+		require.Equal(t, "rate_limited", event.NodeId)
+
+		// i18n 翻译应返回中英双语
+		i18n := schema.NodeIdAndTypeToI18n(event.NodeId, event.Type, event.IsStream)
+		require.NotNil(t, i18n)
+		require.Equal(t, "限流", i18n.Zh)
+		require.Equal(t, "Rate Limited", i18n.En)
+	})
+
+	t.Run("quota_exceeded", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+		// 无 Retry-After → quota_exceeded
+		rsp := make429ResponseWithBody(
+			nil,
+			`{"error":{"message":"token exhausted"}}`,
+		)
+		_, _, _ = cfg.handle429RateLimit(rsp)
+		cfg.Emitter.WaitForStream()
+
+		event := requireNotifyEvent(t, snapshot())
+		require.Equal(t, "quota_exceeded", event.NodeId)
+
+		i18n := schema.NodeIdAndTypeToI18n(event.NodeId, event.Type, event.IsStream)
+		require.NotNil(t, i18n)
+		require.Equal(t, "额度耗尽", i18n.Zh)
+		require.Equal(t, "Quota Exceeded", i18n.En)
+	})
 }
