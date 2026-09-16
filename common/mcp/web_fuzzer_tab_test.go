@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
@@ -41,8 +42,6 @@ func TestCreateWebFuzzerTabToolRegistered(t *testing.T) {
 
 func TestWaitForWebFuzzerExecutionReturnsOnlyMatchingCompletedTask(t *testing.T) {
 	yakit.CallPostInitDatabase()
-	srv, err := NewMCPServer(WithEnableAllToolSets())
-	require.NoError(t, err)
 	db := consts.GetGormProjectDatabase()
 	require.NotNil(t, db)
 
@@ -58,7 +57,7 @@ func TestWaitForWebFuzzerExecutionReturnsOnlyMatchingCompletedTask(t *testing.T)
 	require.NoError(t, db.Create(task).Error)
 	t.Cleanup(func() { _ = db.Delete(task).Error })
 
-	completed, err := waitForWebFuzzerExecution(context.Background(), srv, "mcp-tab", executionID, time.Second)
+	completed, err := waitForWebFuzzerExecution(context.Background(), db, "mcp-tab", executionID, time.Second)
 	require.NoError(t, err)
 	require.Equal(t, task.ID, completed.ID)
 	require.True(t, completed.Ok)
@@ -66,7 +65,9 @@ func TestWaitForWebFuzzerExecutionReturnsOnlyMatchingCompletedTask(t *testing.T)
 
 func TestQueryWebFuzzerExecutionResultReturnsResponseMetadataWithoutBody(t *testing.T) {
 	yakit.CallPostInitDatabase()
-	srv, err := NewMCPServer(WithEnableAllToolSets())
+	srv, err := NewMCPServer(WithEnableAllToolSets(), WithDatabaseProvider(nil, func() *gorm.DB {
+		return consts.GetGormProjectDatabase()
+	}))
 	require.NoError(t, err)
 	db := consts.GetGormProjectDatabase()
 	require.NotNil(t, db)

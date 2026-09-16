@@ -147,3 +147,14 @@ func DeleteMCPToolCallHistories(db *gorm.DB, req *ypb.DeleteMCPToolCallHistoryRe
 	}
 	return nil
 }
+
+// SaveMCPToolCallHistory persists a single MCP tool call history record.
+func SaveMCPToolCallHistory(db *gorm.DB, history *schema.MCPToolCallHistory) error {
+	if history == nil {
+		return utils.Error("mcp tool call history is nil")
+	}
+	if err := db.Create(history).Error; err != nil {
+		return utils.Wrap(err, "save mcp tool call history failed")
+	}
+	return nil
+}

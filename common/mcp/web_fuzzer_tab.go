@@ -10,7 +10,6 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
@@ -150,10 +149,14 @@ func handleExecuteWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 		if timeout < 1 || timeout > 300 {
 			return nil, utils.Error("timeoutSeconds must be between 1 and 300")
 		}
+		db := s.getProjectDatabase()
+		if db == nil {
+			return nil, utils.Error("project database is unavailable")
+		}
 		executionID := uuid.NewString()
 		startedAt := time.Now()
 		yakit.BroadcastWebFuzzerExecution(executionID, pageID, startedAt.Add(time.Duration(timeout)*time.Second).UnixMilli())
-		task, err := waitForWebFuzzerExecution(ctx, s, pageID, executionID, time.Duration(timeout)*time.Second)
+		task, err := waitForWebFuzzerExecution(ctx, db, pageID, executionID, time.Duration(timeout)*time.Second)
 		if err != nil {
 			return nil, err
 		}
@@ -174,6 +177,9 @@ func handleExecuteWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 
 func handleQueryWebFuzzerExecutionResult(s *MCPServer) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if err := s.ensureLocalClient(); err != nil {
+			return nil, err
+		}
 		var args struct {
 			TaskID int64 `mapstructure:"taskId"`
 			Limit  int64 `mapstructure:"limit"`
@@ -190,19 +196,19 @@ func handleQueryWebFuzzerExecutionResult(s *MCPServer) server.ToolHandlerFunc {
 		if args.Limit < 1 || args.Limit > 100 {
 			return nil, utils.Error("limit must be between 1 and 100")
 		}
-		db, err := webFuzzerProjectDatabase(s)
-		if err != nil {
-			return nil, err
+		db := s.getProjectDatabase()
+		if db == nil {
+			return nil, utils.Error("project database is unavailable")
 		}
-		var task schema.WebFuzzerTask
-		if err := db.Where("id = ?", args.TaskID).First(&task).Error; err != nil {
+		task, err := yakit.GetWebFuzzerTaskById(db, int(args.TaskID))
+		if err != nil {
 			if gorm.IsRecordNotFoundError(err) {
 				return nil, utils.Errorf("Web Fuzzer task %d was not found", args.TaskID)
 			}
 			return nil, utils.Wrap(err, "query Web Fuzzer task")
 		}
-		var responses []schema.WebFuzzerResponse
-		if err := db.Where("web_fuzzer_task_id = ?", task.ID).Order("id ASC").Limit(int(args.Limit)).Find(&responses).Error; err != nil {
+		responses, err := yakit.QueryWebFuzzerResponsesByTaskId(db, int64(task.ID), int(args.Limit))
+		if err != nil {
 			return nil, utils.Wrap(err, "query Web Fuzzer responses")
 		}
 		summaries := make([]map[string]any, 0, len(responses))
@@ -229,31 +235,15 @@ func handleQueryWebFuzzerExecutionResult(s *MCPServer) server.ToolHandlerFunc {
 	}
 }
 
-func webFuzzerProjectDatabase(s *MCPServer) (*gorm.DB, error) {
-	db := s.getProjectDatabase()
-	if db == nil {
-		db = consts.GetGormProjectDatabase()
-	}
-	if db == nil {
-		return nil, utils.Error("project database is unavailable for Web Fuzzer execution")
-	}
-	return db, nil
-}
-
-func waitForWebFuzzerExecution(ctx context.Context, s *MCPServer, pageID, executionID string, timeout time.Duration) (*schema.WebFuzzerTask, error) {
-	db, err := webFuzzerProjectDatabase(s)
-	if err != nil {
-		return nil, err
-	}
+func waitForWebFuzzerExecution(ctx context.Context, db *gorm.DB, pageID, executionID string, timeout time.Duration) (*schema.WebFuzzerTask, error) {
 	deadline := time.NewTimer(timeout)
 	defer deadline.Stop()
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		var task schema.WebFuzzerTask
-		err := db.Where("fuzzer_index = ? AND fuzzer_tab_index = ?", executionID, pageID).Order("id DESC").First(&task).Error
+		task, err := yakit.GetLatestWebFuzzerTaskByFuzzerIndex(db, executionID, pageID)
 		if err == nil {
-			return &task, nil
+			return task, nil
 		}
 		if !gorm.IsRecordNotFoundError(err) {
 			return nil, utils.Wrap(err, "query Web Fuzzer execution")
