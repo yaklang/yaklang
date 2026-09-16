@@ -18,17 +18,17 @@ GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 REPOSITORY="${REPOSITORY:-${GITHUB_REPOSITORY:-}}"
 
 if [[ -z "$CACHE_KEY_PREFIX" ]]; then
-  echo "ERROR: CACHE_KEY_PREFIX must be set"
-  exit 1
+  echo "::warning::CACHE_KEY_PREFIX is unset, skipping cache prune"
+  exit 0
 fi
 
 if [[ -z "$GITHUB_TOKEN" || -z "$REPOSITORY" ]]; then
-  echo "ERROR: GITHUB_TOKEN and REPOSITORY must be set"
-  exit 1
+  echo "::warning::GITHUB_TOKEN or REPOSITORY is unset, skipping cache prune for $CACHE_KEY_PREFIX"
+  exit 0
 fi
 
 api() {
-  curl -fsSL \
+  curl -fsSL --connect-timeout 10 --max-time 60 \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "X-GitHub-Api-Version: 2022-11-28" \

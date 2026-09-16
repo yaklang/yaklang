@@ -16,10 +16,19 @@ runs:
       run: |
         SHA="${{ github.event.pull_request.head.sha || github.sha }}"
         CONTEXT="${{ inputs.cache-key-prefix }}"
-        gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
-          -f state=success \
-          -f context="$CONTEXT" \
-          -f description="All tests passed" \
-          -f target_url="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-          --jq '.context + " = " + .state'
-        echo "Commit status $CONTEXT=success saved for $SHA"
+        # This status is only an optimisation for pre-check: a later run on the
+        # same commit can skip work that already passed. It must never decide
+        # whether the run is green, because pull requests from forks get a
+        # read-only GITHUB_TOKEN and every status write is rejected with
+        # "Resource not accessible by integration" (HTTP 403). That turned
+        # otherwise all-green runs red on four fork PRs before this change.
+        if gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+             -f state=success \
+             -f context="$CONTEXT" \
+             -f description="All tests passed" \
+             -f target_url="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+             --jq '.context + " = " + .state'; then
+          echo "Commit status $CONTEXT=success saved for $SHA"
+        else
+          echo "::warning::Could not record commit status $CONTEXT for $SHA (read-only token, e.g. fork PR). Tests results are unaffected; a later run on this commit will simply not be skipped."
+        fi
