@@ -275,6 +275,25 @@ func TestManagedExtensionBridgeRePairingReusesTrustedDevice(t *testing.T) {
 	require.Len(t, manager.Snapshot().Devices, 1)
 }
 
+func TestManagedExtensionBridgeRefreshesBrowserProductOnConnect(t *testing.T) {
+	manager, err := NewExtensionBridgeManager(
+		NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json")), nil,
+	)
+	require.NoError(t, err)
+	pending, err := manager.beginPairing(
+		"chrome-extension://managed-test-extension",
+		managedTestPairingInput(t, "browser-product-installation"),
+	)
+	require.NoError(t, err)
+	device, err := manager.ApprovePairing(pending.request.ID, "Browser", "")
+	require.NoError(t, err)
+
+	manager.markDeviceSeen(device.ID, "Microsoft Edge", "152.0.1234.5")
+	refreshed := manager.Snapshot().Devices[0]
+	require.Equal(t, "Microsoft Edge", refreshed.Client)
+	require.Equal(t, "152.0.1234.5", refreshed.ClientVersion)
+}
+
 func TestManagedExtensionBridgeIdentityPersists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "identity.json")
 	first, err := NewExtensionBridgeManager(NewExtensionBridgeFileIdentityStore(path), nil)

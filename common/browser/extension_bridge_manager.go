@@ -637,20 +637,28 @@ func (m *ExtensionBridgeManager) authenticateDevice(installationID, origin, payl
 	return device, nil
 }
 
-func (m *ExtensionBridgeManager) markDeviceSeen(deviceID, version string) {
+func (m *ExtensionBridgeManager) markDeviceSeen(deviceID, client, version string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := time.Now().UnixMilli()
+	client = strings.TrimSpace(client)
+	version = strings.TrimSpace(version)
 	updated := m.identity
 	updated.Devices = append([]ExtensionBridgeDevice(nil), m.identity.Devices...)
 	changed := false
 	for index := range updated.Devices {
-		if updated.Devices[index].ID == deviceID && now-updated.Devices[index].LastSeenAt > int64(time.Minute/time.Millisecond) {
-			updated.Devices[index].LastSeenAt = now
-			updated.Devices[index].ClientVersion = version
-			changed = true
+		if updated.Devices[index].ID != deviceID {
+			continue
+		}
+		if now-updated.Devices[index].LastSeenAt <= int64(time.Minute/time.Millisecond) &&
+			updated.Devices[index].Client == client && updated.Devices[index].ClientVersion == version {
 			break
 		}
+		updated.Devices[index].LastSeenAt = now
+		updated.Devices[index].Client = client
+		updated.Devices[index].ClientVersion = version
+		changed = true
+		break
 	}
 	if !changed || m.store.Save(&updated) != nil {
 		return
