@@ -2,6 +2,7 @@ package syntaxflow_scan
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -633,18 +634,28 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.GetScanIgnoreLanguage() {
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(true))
 	}
-	if filter := cfg.GetRuleFilter(); filter != nil {
-		opts = append(opts, ssaconfig.WithRuleFilter(filter))
-	}
-	for _, input := range cfg.GetRuleInput() {
-		if input != nil {
-			opts = append(opts, ssaconfig.WithRuleInput(input))
-		}
-	}
+	opts = append(opts, copySyntaxFlowRuleOptions(cfg)...)
 	if cfg.GetScanConcurrency() > 0 {
 		opts = append(opts, ssaconfig.WithScanConcurrency(cfg.GetScanConcurrency()))
 	}
 	return opts
+}
+
+// copySyntaxFlowRuleOptions keeps the dispatch-scoped snapshot (task_local)
+// and any inline rule_input / rule_filter when ScanProject starts a nested
+// StartScan. Dropping them made product scans query the empty node sfdb and
+// finish with Total Rules = 0.
+func copySyntaxFlowRuleOptions(cfg *Config) []ssaconfig.Option {
+	if cfg == nil || cfg.Config == nil || cfg.SyntaxFlowRule == nil {
+		return nil
+	}
+	raw, err := json.Marshal(map[string]any{
+		"SyntaxFlowRule": cfg.SyntaxFlowRule,
+	})
+	if err != nil {
+		return nil
+	}
+	return []ssaconfig.Option{ssaconfig.WithJsonRawConfig(raw)}
 }
 
 func programScanOptions(cfg *Config) []ssaconfig.Option {

@@ -2,6 +2,9 @@ package syntaxflow_scan_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -541,4 +544,59 @@ func TestScanProject_LocalCompileFailureKeepsCollect(t *testing.T) {
 	require.Equal(t, syntaxflow_scan.StageReview, result.Stages[1].Stage)
 	require.False(t, result.Stages[1].Succeeded())
 	require.Contains(t, result.Stages[1].Error, "php parse failed")
+}
+
+// Nested StartScan must keep the dispatch snapshot. Without that copy the
+// product pipeline queries the empty node sfdb and reports Total Rules = 0.
+func TestScanProject_ForwardsTaskLocalRulesToStartScan(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "leak.env"), []byte("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n"), 0o644))
+
+	const ruleName = "task-local-source.sf"
+	payload, err := json.Marshal(ssaconfig.TaskLocalRuleInputFile{
+		Version: ssaconfig.TaskLocalRuleInputFileVersionV1,
+		Rules: []*ypb.SyntaxFlowRuleInput{{
+			RuleName: ruleName,
+			Content: `desc(mode: "source", language: general, title: "task-local source")
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			Language: string(ssaconfig.General),
+		}},
+		Metadata: map[string]ssaconfig.TaskLocalRuleMetadata{
+			ruleName: {AssetID: "asset-source"},
+		},
+	})
+	require.NoError(t, err)
+	inputPath := filepath.Join(t.TempDir(), "task-local-rules.json")
+	require.NoError(t, os.WriteFile(inputPath, payload, 0o600))
+	sum := sha256.Sum256(payload)
+	configJSON, err := json.Marshal(map[string]any{
+		"Mode": int(ssaconfig.ModeAll),
+		"SyntaxFlowRule": map[string]any{
+			"task_local":              true,
+			"task_local_input_file":   inputPath,
+			"task_local_input_sha256": hex.EncodeToString(sum[:]),
+			"task_local_input_count":  1,
+		},
+	})
+	require.NoError(t, err)
+
+	var alerts int
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithJsonRawConfig(configJSON),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("yak"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+	require.Greater(t, alerts, 0)
 }
