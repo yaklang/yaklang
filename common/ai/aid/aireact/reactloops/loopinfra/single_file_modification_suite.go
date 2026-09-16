@@ -333,7 +333,8 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	return false
 }
 
-// CommitAfterCodeEdit persists code, runs lint, and records yaklang code change state.
+// CommitAfterCodeEdit persists code, runs lint, and records editor delivery state
+// (yaklang_code_change or syntaxflow_rule_change depending on content type).
 func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
