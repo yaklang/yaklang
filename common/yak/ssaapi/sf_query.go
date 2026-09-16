@@ -393,8 +393,15 @@ func QueryWithFrame(f *sfvm.SFFrame) QueryOption {
 
 func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 	return func(c *queryConfig) {
-		c.SetSyntaxFlowResultSaveDataBase()
 		c.kind = kind
+		// A read-only scan (NoResultDB) keeps results in memory: the IR
+		// database must not be modified, but the caller still needs the result
+		// object (and its risks) for report output.
+		if c.IsSyntaxFlowResultNoDB() {
+			c.SetSyntaxFlowResultSaveMemory()
+			return
+		}
+		c.SetSyntaxFlowResultSaveDataBase()
 	}
 }
 

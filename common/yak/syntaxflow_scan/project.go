@@ -892,6 +892,13 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.GetScanConcurrency() > 0 {
 		opts = append(opts, ssaconfig.WithScanConcurrency(cfg.GetScanConcurrency()))
 	}
+	// Propagate the read-only scan switch to every stage. ScanProject rebuilds
+	// its options per stage from this shared set, so a flag that is not listed
+	// here silently disappears and the stage writes results back into the IR
+	// database.
+	if cfg.IsSyntaxFlowResultNoDB() {
+		opts = append(opts, ssaconfig.WithSyntaxFlowNoResultDB(true))
+	}
 	return opts
 }
 

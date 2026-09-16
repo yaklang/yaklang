@@ -34,6 +34,9 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 	}
 	if ret.Count() > dataflowValueLimit {
 		log.Warnf("Value BottomUse too many: %d:\n\t%s", ret.Count(), v.StringWithRange())
+		if report := actx.widenReport(); report != "" {
+			log.Warnf("Value BottomUse widening: %s", report)
+		}
 		return nil
 	}
 	ret = MergeValues(ret)
@@ -60,7 +63,9 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			return true
 		})
 		if !exist {
-			v.GetAllMember().ForEach(func(value *Value) {
+			members := v.GetAllMember()
+			actx.traceObjectExpansion(len(members))
+			members.ForEach(func(value *Value) {
 				_ = actx.pushObject(v, value.GetKey(), value)
 				vals = append(vals, value.getBottomUses(actx, opt...)...)
 				actx.popObject()
@@ -85,6 +90,9 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		}
 	}
 	// log.Infof("current Value: %s", v)
+	if users := len(v.GetUsers()); users > 0 {
+		actx.traceUserFanout(users)
+	}
 	v.GetUsers().ForEach(func(value *Value) {
 		// log.Infof("value %s", value)
 		if ret := value.getBottomUses(actx, opt...); len(ret) > 0 {
@@ -109,6 +117,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	defer func() {
 		actx.depth--
 	}()
+	actx.traceNodeVisit()
 
 	// if not shadow value return i self
 	v = actx.CovertShadowValue(v)

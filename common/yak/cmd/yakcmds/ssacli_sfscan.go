@@ -154,6 +154,11 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(true))
 	}
 
+	// Keep results out of the SSA database (read-only scan of an existing IR db)
+	if c.Bool("no-result-db") {
+		opts = append(opts, ssaconfig.WithSyntaxFlowNoResultDB(true))
+	}
+
 	// Output file (auto-redirect to <debugDir>/report when --debug is set and --output is not)
 	outputFile := c.String("output")
 	if outputFile == "" && c.String("debug") != "" {
@@ -501,6 +506,9 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 			ssaconfig.WithCompileMemoryCompile(enable),
 			ssaconfig.WithSyntaxFlowMemory(enable),
 		)
+	}
+	if cliCtx.IsSet("no-result-db") {
+		opts = append(opts, ssaconfig.WithSyntaxFlowNoResultDB(cliCtx.Bool("no-result-db")))
 	}
 	if cliCtx.IsSet("re-compile") {
 		opts = append(opts, ssaconfig.WithCompileReCompile(cliCtx.Bool("re-compile")))
