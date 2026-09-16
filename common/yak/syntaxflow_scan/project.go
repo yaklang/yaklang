@@ -121,11 +121,16 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	needCompile := !hasLoaded && hasCode &&
 		(compileOnly || wantReview || wantAnalyze || (wantSource && localDir == ""))
 
+	// Collect is "the project tree is here". A local directory or loaded IR is
+	// already collected; a remote URL is not collected until clone/extract
+	// succeeds inside compile. Reporting collect success before that made a
+	// clone failure look like a 语义检测 failure.
+	sourceReady := hasProgram || localDir != ""
 	emit(StageCollect, 0, nil)
-	if hasProgram || localDir != "" {
+	if sourceReady {
 		emit(StageCollect, 1, nil)
+		report(StageCollect, nil)
 	}
-	report(StageCollect, nil)
 
 	inspectedLive := false
 	if wantSource && localDir != "" && !hasProgram {
@@ -158,9 +163,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		}
 		if compileOnly {
 			emit(StageCompile, 0, nil)
-		} else if wantReview {
+		} else if wantReview && sourceReady {
 			emit(StageReview, 0, nil)
-		} else if localDir == "" {
+		} else if !sourceReady {
 			emit(StageCollect, 0.5, nil)
 		}
 		var compileOpts []ssaconfig.Option
@@ -170,13 +175,21 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		compileOpts = append(compileOpts, ssaapi.WithProcess(func(msg string, process float64) {
 			if compileOnly {
 				emit(StageCompile, process, nil)
-			} else if wantReview {
+			} else if wantReview && sourceReady {
 				emit(StageReview, process, nil)
-			} else if localDir == "" {
+			} else if !sourceReady {
 				emit(StageCollect, 0.5+process*0.5, nil)
 			}
 		}))
 		prog, err := compileProductProject(ctx, cfg.Config, compileOpts...)
+		if !sourceReady {
+			if isSourceCollectError(err) {
+				report(StageCollect, err)
+				return finishScanProject(cfg, recorder, programName, err)
+			}
+			report(StageCollect, nil)
+			emit(StageCollect, 1, nil)
+		}
 		if compileStage != "" {
 			report(compileStage, err)
 		}
@@ -427,6 +440,18 @@ func wrapStageProcess(cfg *Config, stage ProductStage, emit func(ProductStage, f
 			user(taskID, status, stage.OverallProgress(progress), info)
 		}
 	}
+}
+
+// isSourceCollectError is a clone/extract failure that happened before the
+// project tree existed. Those belong to collect, not to the detection stage
+// that compile would have served after the tree was in place.
+func isSourceCollectError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "SSA Git clone failed") ||
+		strings.Contains(msg, "git clone:")
 }
 
 func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {

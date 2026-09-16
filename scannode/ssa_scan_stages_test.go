@@ -1,6 +1,7 @@
 package scannode
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -18,6 +19,8 @@ func TestScanStagesReachArtifactMetrics(t *testing.T) {
 	meta := parseSSAResultMeta(&ScriptExecutionResult{Data: map[string]any{
 		"program_name": "project-a",
 		"risk_count":   2,
+		"succeeded":    true,
+		"error":        "rule set aborted",
 		"stages":       stages,
 	}})
 	require.NotEmpty(t, meta.ScanStages)
@@ -32,8 +35,12 @@ func TestScanStagesReachArtifactMetrics(t *testing.T) {
 	require.NoError(t, json.Unmarshal(metrics, &payload))
 	require.EqualValues(t, 7, payload["upload_ms"])
 
-	reported, ok := payload["scan_stages"].([]any)
-	require.True(t, ok, "scan_stages must survive as a list")
+	verdict, ok := payload["scan_stages"].(map[string]any)
+	require.True(t, ok, "scan_stages must be the wrapped engine verdict")
+	require.Equal(t, true, verdict["succeeded"])
+	require.Equal(t, "rule set aborted", verdict["error"])
+	reported, ok := verdict["stages"].([]any)
+	require.True(t, ok, "wrapped stages must survive as a list")
 	require.Len(t, reported, 3)
 	last := reported[2].(map[string]any)
 	require.Equal(t, "analyze", last["stage"])
@@ -50,4 +57,23 @@ func TestScanStagesAbsentWhenNotReported(t *testing.T) {
 	metrics, err := buildSSAArtifactMetricsPayload(&SSAArtifactReadyEvent{})
 	require.NoError(t, err)
 	require.NotContains(t, string(metrics), "scan_stages")
+}
+
+// A clone failure has no streamed findings, but the engine still reported
+// which stages ran. That verdict must be persisted so diagnostics can show it.
+func TestShouldPreserveFailedSSAArtifactWhenOnlyStagesExist(t *testing.T) {
+	require.False(t, shouldPreserveFailedSSAArtifact(nil, nil))
+
+	collector := NewSSAArtifactCollectorWithContext(context.Background(), "task", "runtime", "sub")
+	t.Cleanup(func() { collector.Cleanup() })
+	require.False(t, shouldPreserveFailedSSAArtifact(collector, &ScriptExecutionResult{}))
+	require.True(t, shouldPreserveFailedSSAArtifact(collector, &ScriptExecutionResult{
+		Data: map[string]any{
+			"succeeded": false,
+			"error":     "SSA Git clone failed",
+			"stages": []map[string]any{
+				{"stage": "collect", "status": "failed", "error": "SSA Git clone failed"},
+			},
+		},
+	}))
 }
