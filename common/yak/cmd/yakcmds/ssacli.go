@@ -1499,6 +1499,13 @@ Exports structured report (sarif/irify).`,
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
 
+		cli.BoolFlag{
+			Name: "no-result-db",
+			Usage: "do not persist scan results (risks / audit nodes and edges) into the SSA database; " +
+				"results are still produced in memory and written to --output. Use this when scanning an " +
+				"existing IR database that must not be modified, e.g. a shared or read-only project database",
+		},
+
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
 			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",

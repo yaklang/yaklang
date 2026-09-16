@@ -69,7 +69,30 @@ type AnalyzeContext struct {
 	// is discarded, so it never leaks across rules / paths (design principle 1).
 	// A descent is single-threaded, so no locking is needed.
 	resolvedInstCache map[resolvedInstKey]ssa.Instruction
+
+	// widen counts object/member widening done during THIS descent. It exists
+	// only to explain a "too many values" limit hit and is nil unless the
+	// opt-in tracer is enabled (YAK_SSA_DATAFLOW_TRACE), so the hot path pays
+	// a single nil check in the normal case.
+	widen *widenTrace
 }
+
+// widenTrace records object/member widening for one descent. A descent runs on
+// one goroutine; the atomics only guard against an aborted descent leaving a
+// half-updated trace behind.
+type widenTrace struct {
+	objectsExpanded     atomic.Int64
+	membersEnumerated   atomic.Int64
+	maxMembersPerObject atomic.Int64
+	nodeVisits          atomic.Int64
+	userFanout          atomic.Int64
+	calledByFanout      atomic.Int64
+}
+
+// dataflowTraceEnabled turns on the widening tracer for limit-hit diagnostics.
+// Off by default: the counters are useless in a healthy run and the extra
+// bookkeeping is unnecessary on a hot path.
+var dataflowTraceEnabled = envFlagEnabled("YAK_SSA_DATAFLOW_TRACE")
 
 // resolvedInstKey identifies a resolved instruction by program + inst-id. The
 // program pointer is stable for the lifetime of a Program; inst-id is unique
@@ -107,7 +130,64 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 		callStack:              utils.NewStack[*ssa.Call](),
 		recursiveStatusIsLeaf:  utils.NewStack[node](),
 	}
+	if dataflowTraceEnabled {
+		actx.widen = &widenTrace{}
+	}
 	return actx
+}
+
+// traceObjectExpansion records one object member enumeration for the opt-in
+// limit-hit tracer. It is a no-op in a normal run.
+func (a *AnalyzeContext) traceObjectExpansion(members int) {
+	if a == nil || a.widen == nil {
+		return
+	}
+	a.widen.objectsExpanded.Add(1)
+	a.widen.membersEnumerated.Add(int64(members))
+	for {
+		max := a.widen.maxMembersPerObject.Load()
+		if int64(members) <= max || a.widen.maxMembersPerObject.CompareAndSwap(max, int64(members)) {
+			break
+		}
+	}
+}
+
+// traceNodeVisit counts one entry into the recursive descent.
+func (a *AnalyzeContext) traceNodeVisit() {
+	if a == nil || a.widen == nil {
+		return
+	}
+	a.widen.nodeVisits.Add(1)
+}
+
+// traceUserFanout counts values reached by following users (bottom-use) and
+// traceCalledByFanout counts values reached by following callers
+// (top-def ignore-call-stack fallback).
+func (a *AnalyzeContext) traceUserFanout(n int) {
+	if a == nil || a.widen == nil || n <= 0 {
+		return
+	}
+	a.widen.userFanout.Add(int64(n))
+}
+
+func (a *AnalyzeContext) traceCalledByFanout(n int) {
+	if a == nil || a.widen == nil || n <= 0 {
+		return
+	}
+	a.widen.calledByFanout.Add(int64(n))
+}
+
+// widenReport renders the widening counters for a limit-hit diagnostic. It
+// returns "" when the tracer is off.
+func (a *AnalyzeContext) widenReport() string {
+	if a == nil || a.widen == nil {
+		return ""
+	}
+	return fmt.Sprintf("objectsExpanded=%d membersEnumerated=%d maxMembersPerObject=%d "+
+		"nodeVisits=%d userFanout=%d calledByFanout=%d",
+		a.widen.objectsExpanded.Load(), a.widen.membersEnumerated.Load(),
+		a.widen.maxMembersPerObject.Load(),
+		a.widen.nodeVisits.Load(), a.widen.userFanout.Load(), a.widen.calledByFanout.Load())
 }
 
 // getResolvedValue returns the resolved ssa.Value for (inst, id), memoizing the
