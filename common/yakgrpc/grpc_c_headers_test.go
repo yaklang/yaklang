@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"archive/zip"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -185,4 +187,56 @@ func TestCHeaders_ImportDirectory(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Contains(t, string(preview.GetContent()), "#define Q")
+}
+
+func TestCHeaders_DownloadOfficial(t *testing.T) {
+	withTempCHeadersHome(t)
+	s := &Server{}
+	ctx := context.Background()
+
+	zipPath := filepath.Join(t.TempDir(), "src.zip")
+	writeZip(t, zipPath, map[string]string{"stdio.h": "#define STDIO 1\n"})
+	raw, err := os.ReadFile(zipPath)
+	require.NoError(t, err)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/c-headers/latest/c-std-headers.zip", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write(raw)
+	})
+	mux.HandleFunc("/c-headers/latest/version.txt", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("1.0.0-test\n"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	oldZip, oldVer := officialCHeadersZipURL, officialCHeadersVersionURL
+	officialCHeadersZipURL = srv.URL + "/c-headers/latest/c-std-headers.zip"
+	officialCHeadersVersionURL = srv.URL + "/c-headers/latest/version.txt"
+	t.Cleanup(func() {
+		officialCHeadersZipURL = oldZip
+		officialCHeadersVersionURL = oldVer
+	})
+
+	first, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{})
+	require.NoError(t, err)
+	require.True(t, first.GetOk(), first.GetReason())
+	require.Equal(t, "1.0.0-test", first.GetVersion())
+	require.FileExists(t, first.GetPackPath())
+	require.Equal(t, "c-std-headers.zip", filepath.Base(first.GetPackPath()))
+
+	dup, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{})
+	require.NoError(t, err)
+	require.False(t, dup.GetOk())
+
+	again, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{Force: true})
+	require.NoError(t, err)
+	require.True(t, again.GetOk(), again.GetReason())
+
+	preview, err := s.PreviewCHeaderFile(ctx, &ypb.PreviewCHeaderFileRequest{
+		PackName:     "c-std-headers.zip",
+		RelativePath: "stdio.h",
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(preview.GetContent()), "STDIO")
 }
