@@ -136,6 +136,16 @@ func QueryHotPatchTemplate(db *gorm.DB, filter *ypb.HotPatchTemplateRequest) ([]
 	return templates, nil
 }
 
+// YieldHotPatchTemplates yields hot patch templates from a (already filtered)
+// gorm.DB in a streaming fashion (chunked pagination) so that callers can
+// iterate over large result sets without loading everything into memory.
+//
+// The caller is expected to apply FilterHotPatchTemplate to db beforehand,
+// mirroring the YieldYakScripts convention.
+func YieldHotPatchTemplates(ctx context.Context, db *gorm.DB) chan *schema.HotPatchTemplate {
+	return bizhelper.YieldModel[*schema.HotPatchTemplate](ctx, db)
+}
+
 func QueryHotPatchTemplateList(db *gorm.DB, filter *ypb.HotPatchTemplateRequest, p *ypb.Paging) (*bizhelper.Paginator, []string, error) {
 	var templates []*schema.HotPatchTemplate
 
