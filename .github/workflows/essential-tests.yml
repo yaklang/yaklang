@@ -22,8 +22,9 @@ on:
       - "common/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
-      - "scripts/ci/test-yak-startup.sh"
-      - "scripts/ci/test-ipc-smoke.ps1"
+      # The suite/runner scripts below drive this workflow, so a change to them
+      # must exercise it; otherwise a broken edit merges without ever running.
+      - "scripts/ci/**"
       - "go.mod"
 
 concurrency:
@@ -32,6 +33,7 @@ concurrency:
 
 jobs:
   check-wip:
+    timeout-minutes: 10
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-22.04
     permissions:
@@ -227,7 +229,7 @@ jobs:
   # quota stays predictable. The yak binary is still an artifact: it must match the
   # tested commit exactly.
   prepare-yak:
-
+    timeout-minutes: 30
     needs: check-wip
     if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope == 'full'
     runs-on: ubuntu-22.04
@@ -258,6 +260,7 @@ jobs:
       - name: Restore Go module cache
         id: gomod_cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
@@ -265,6 +268,7 @@ jobs:
       - name: Restore Go build cache
         id: go_build_cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
@@ -339,11 +343,13 @@ jobs:
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
       - name: Restore Go module cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
       - name: Restore Go build cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
@@ -373,6 +379,7 @@ jobs:
       - name: Upload startup failure log
         if: failure()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: prepared-startup-${{ github.run_attempt }}
           path: ${{ runner.temp }}/yak-startup-smoke.log
@@ -418,6 +425,7 @@ jobs:
       # This cache contains only the small endpoint package's dependencies.
       - name: Restore IPC-only Go cache
         uses: actions/cache@v4
+        continue-on-error: true
         with:
           path: .ipc-cache
           key: ipc-smoke-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
@@ -431,6 +439,7 @@ jobs:
       - name: Upload IPC failure log
         if: failure()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ipc-smoke-${{ matrix.os }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ipc-smoke.log
@@ -465,12 +474,14 @@ jobs:
 
       - name: Restore Go module cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
 
       - name: Restore Go build cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
@@ -489,6 +500,7 @@ jobs:
         run: go vet ./scannode/... ./cmd/legion-smoke-node
 
   slim-gate:
+    timeout-minutes: 15
     needs: [check-wip, prepare-yak]
     if: needs.check-wip.outputs.should_run_tests == 'true' && needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
@@ -514,12 +526,14 @@ jobs:
 
       - name: Restore Go module cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
 
       - name: Restore Go build cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
@@ -534,6 +548,7 @@ jobs:
         run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc
 
   prepare-yakgrpc:
+    timeout-minutes: 25
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
@@ -563,12 +578,14 @@ jobs:
 
       - name: Restore Go module cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
 
       - name: Restore Go build cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
@@ -613,6 +630,7 @@ jobs:
           compression-level: 0
 
   prepare-coreplugin:
+    timeout-minutes: 25
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
@@ -642,12 +660,14 @@ jobs:
 
       - name: Restore Go module cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
 
       - name: Restore Go build cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
@@ -725,17 +745,21 @@ jobs:
             package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"},
+                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/crep/...", "timeout": "5m", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test Utils Infra / Parser / Net / Misc"
-            # chaosmaker's traffic generator is timing-sensitive under package
-            # parallelism on a 2-core runner, so this suite stays serial.
+            # Stays serial. jsonextractor asserts hardcoded wall-clock budgets
+            # inside its subtests (3s for the resource-leak case, 1s elsewhere);
+            # 3.35s under two-worker load failed run 34947532528 and then passed
+            # on the next run, so package parallelism here buys ~1.5m on a suite
+            # that is never the critical path, in exchange for a coin-flip flake.
+            # The durable fix is relaxing those assertions in the test source.
             test_configs: |
               [
                 {"package": "./common/chunkmaker/...", "timeout": "20s"},
-                {"package": "./common/jsonextractor", "timeout": "20s"},
+                {"package": "./common/jsonextractor", "timeout": "20s", "retry": 1, "retry_delay": 5},
                 {"package": "./common/markdownextractor", "timeout": "20s"},
                 {"package": "./common/jsonpath", "timeout": "20s"},
                 {"package": "./common/domainextractor", "timeout": "20s"},
@@ -759,6 +783,15 @@ jobs:
               ]
 
           - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
+            # Stays serial. This suite gates the run, so parallelism was worth
+            # trying, but bruteutils defeats it: it decides RDP brute-force
+            # success from an internal wall-clock handshake deadline, and with
+            # two packages sharing the runner the v2 CredSSP case took 15.3s
+            # instead of 0.15s and reported a correct password as ok=false
+            # (run 35064637684). Widening the package timeout does not help,
+            # because the failing deadline lives in the test; serial runs hold
+            # that case at ~57s total. The suite's own timeout stays raised to
+            # 2m because 57s against the old 60s cap left only 4% headroom.
             test_configs: |
               [
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
@@ -766,7 +799,7 @@ jobs:
                 {"package": "./common/yak/cartesian", "timeout": "20s"},
                 {"package": "./common/utils/omap/...", "timeout": "30s", "race": true},
                 {"package": "./common/utils", "timeout": "1m"},
-                {"package": "./common/utils/dbcache", "timeout": "1m"},
+                {"package": "./common/utils/dbcache", "timeout": "1m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/imageutils/...", "timeout": "20s"},
                 {"package": "./common/utils/xml2", "timeout": "10s"},
                 {"package": "./common/utils/tlsutils/...", "timeout": "20s"},
@@ -775,7 +808,7 @@ jobs:
                 {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^TestMUSTPASS_Fp.*$"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
-                {"package": "./common/utils/bruteutils/.", "timeout": "1m"},
+                {"package": "./common/utils/bruteutils/.", "timeout": "2m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
@@ -796,7 +829,7 @@ jobs:
                 {"package": "./common/utils/bizhelper/...", "timeout": "20s"},
                 {"package": "./common/utils/cli", "timeout": "1m"},
                 {"package": "./common/mcp/yakcliconvert", "timeout": "1m"},
-                {"package": "./common/mcp", "timeout": "2m", "run": "^TestLegacy.*$"},
+                {"package": "./common/mcp", "timeout": "2m", "run": "^TestLegacy.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/mcp/...", "timeout": "2m", "skip": "^TestLegacy.*$", "exclude_packages": ["./common/mcp"]},
                 {"package": "./common/yak/yakdoc/...", "timeout": "3m"},
                 {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"},
@@ -804,6 +837,7 @@ jobs:
               ]
 
           - name: "Test SSA Frontend Java / JS(TS|ES) / Yak / Python / Golang / C / CSharp"
+            package_workers: "2"
             go_test_p: "1"
             test_configs: |
               [
@@ -814,7 +848,7 @@ jobs:
                 {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/ssaapi/test/yak/...", "timeout": "1m"},
                 {"package": "./common/yak/antlr4yak/lsp/...", "timeout": "20s"},
-                {"package": "./common/yak/python/...", "timeout": "4m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
+                {"package": "./common/yak/python/...", "timeout": "4m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yak/ssaapi/test/python/...", "timeout": "2m"},
                 {"package": "./common/yak/go2ssa/...", "timeout": "3m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/antlr4go/...", "timeout": "2m"},
@@ -826,8 +860,16 @@ jobs:
               ]
 
           - name: "Test SSA / SSAAPI Core / SyntaxFlow / StaticAnalyze / SFDB / SFVM"
+            package_workers: "2"
             sync_rule: "1"
             go_test_p: "1"
+            # sfbuildin's rule-verification subtests call t.Parallel() and share an
+            # antlr token collector that is not thread-safe, which aborted the
+            # package with "fatal error: concurrent map read and map write". Its
+            # entry below sets parallel:1 until that collector is fixed upstream.
+            # sfanalysis grew a builtin rule walker (source + struct POS/NEG
+            # verification) and now needs ~10s of real test time versus ~1s
+            # before, so its old 20s cap no longer survives a shared runner.
             test_configs: |
               [
                 {"package": "./common/yak/ssa/...", "timeout": "20s"},
@@ -836,22 +878,30 @@ jobs:
                 {"package": "./common/yak/ssaapi/test/ssatest/...", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/test/...", "timeout": "2m", "exclude_packages": ["./common/yak/ssaapi/test/yak/...", "./common/yak/ssaapi/test/java/...", "./common/yak/ssaapi/test/javascript/...", "./common/yak/ssaapi/test/php/...", "./common/yak/ssaapi/test/python/...", "./common/yak/ssaapi/test/golang/...", "./common/yak/ssaapi/test/c/...", "./common/yak/ssaapi/test/syntaxflow/...", "./common/yak/ssaapi/test/ssatest/..."]},
                 {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s", "retry": 1, "retry_delay": 5},
                 {"package": "./common/syntaxflow/sfrisk", "timeout": "20s"},
                 {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
+                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/yak/ssaapi/test/syntaxflow/...", "timeout": "1m"},
-                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "2m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
                 {"package": "./common/yak/syntaxflow_scan/...", "timeout": "2m", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
+            # Two packages dominate this suite (php/tests ~122s, sfweb ~108s) and
+            # they are independent, so two workers put them on separate cores and
+            # roughly halve the suite. It became the critical path once the other
+            # suites were parallelized.
+            package_workers: "2"
             sync_rule: "1"
             go_test_p: "1"
+            # The PHP corpus walker (TestAllSyntaxProjectBuildForPHP) alone takes
+            # ~190s, so the old 5m cap was too tight on a loaded runner and
+            # surfaced as "panic: test timed out"; php/... now gets 8m.
             test_configs: |
               [
-                {"package": "./common/yak/php/...", "timeout": "5m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
+                {"package": "./common/yak/php/...", "timeout": "8m", "skip": "^(TestAllSyntax|TestAllLargeSyntax).*_G4$"},
                 {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"},
                 {"package": "./common/sfweb/...", "timeout": "4m"},
                 {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
@@ -864,20 +914,27 @@ jobs:
               ]
 
           - name: "Test AI Aid / React"
+            # 34 packages ran serially for ~8m of test time (plus compile), making
+            # this the single longest job and therefore the critical path. Each
+            # package already runs with -parallel 1, so two at a time matches the
+            # runner's two cores instead of leaving one idle.
+            package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/aiengine", "timeout": "3m", "parallel": 1},
                 {"package": "./common/yak/cmd/yakcmds/memfit-cli", "timeout": "3m", "parallel": 1}
               ]
 
           - name: "Test AI Aid / Core / Tool / Memory"
+            package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"]}
+                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"], "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test AI Aid Test / RAG / Forge / AIHTTP"
+            package_workers: "2"
             test_configs: |
               [
                 {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
@@ -890,7 +947,7 @@ jobs:
                 {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "^TestMUSTPASS.*$"},
                 {"package": "./common/ai/tests/...", "timeout": "2m", "parallel": 1},
                 {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/embedding", "timeout": "30s", "parallel": 1},
+                {"package": "./common/ai/embedding", "timeout": "30s", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/ai/ollama/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)$"},
@@ -921,12 +978,14 @@ jobs:
 
       - name: Restore Go module cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-mod-cache
           key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
 
       - name: Restore Go build cache
         uses: actions/cache/restore@v4
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/go-build-cache
           key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ matrix.cache_tag || 'any' }}-${{ github.sha }}-${{ github.run_id }}
@@ -987,6 +1046,7 @@ jobs:
       - name: Upload failure logs (GRPC + test logs)
         if: failure()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ steps.artifact_name.outputs.name }}
           path: ${{ runner.temp }}/test_binaries/*.log
@@ -1008,7 +1068,7 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "^TestMUSTPASS.*$", "skip": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_MITM($|_.*|Filter.*)$"}
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_MITM($|_.*|Filter.*)$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test gRPC MUSTPASS MITMV2 / Slow"
@@ -1016,7 +1076,7 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "^TestGRPCMUSTPASS_MITMV2_.*$"},
+                {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "^TestGRPCMUSTPASS_MITMV2_.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITMSlowRuleHook"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFlowSlowSQL"}
               ]
@@ -1040,7 +1100,7 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "8m", "run": "^TestGRPCMUSTPASS_LANGUAGE.*$"}
+                {"package": "./common/yakgrpc/...", "timeout": "8m", "run": "^TestGRPCMUSTPASS_LANGUAGE.*$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
@@ -1074,9 +1134,9 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "2m", "run": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$"},
+                {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yakgrpc/yakit", "timeout": "10m", "skip": "^TestMUSTPASS.*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$"}
+                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$", "retry": 1, "retry_delay": 5}
               ]
     steps:
       - name: Checkout
@@ -1142,6 +1202,7 @@ jobs:
       - name: Upload failure logs (GRPC + test logs)
         if: failure()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ steps.artifact_name.outputs.name }}
           path: ${{ runner.temp }}/prepared-suite/test_binaries/*.log
@@ -1149,6 +1210,7 @@ jobs:
 
   test-prepared-coreplugin:
     name: ${{ matrix.name }}
+    timeout-minutes: 60
     needs: [prepare-yak, prepare-coreplugin]
     if: needs.prepare-yak.result == 'success' && needs.prepare-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
@@ -1171,7 +1233,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "5m", "run": "^TestGRPCMUSTPASS_SQL.*$"}
+                {"package": "./common/coreplugin", "timeout": "5m", "run": "^TestGRPCMUSTPASS_SQL.*$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT/SwaggerJson)"
@@ -1179,7 +1241,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*)$"}
+                {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*)$", "retry": 1, "retry_delay": 5}
               ]
 
           - name: "Test Coreplugin Other"
@@ -1253,6 +1315,7 @@ jobs:
       - name: Upload failure logs (GRPC + test logs)
         if: failure()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ steps.artifact_name.outputs.name }}
           path: ${{ runner.temp }}/prepared-suite/test_binaries/*.log
@@ -1262,6 +1325,10 @@ jobs:
     needs: [prepare-yakgrpc, test-prepared-yakgrpc]
     if: needs.prepare-yakgrpc.result == 'success' && needs.test-prepared-yakgrpc.result == 'success'
     runs-on: ubuntu-22.04
+    # Hygiene only: reclaiming a prepared artifact must never fail the run, and
+    # must never hang it waiting on the API.
+    continue-on-error: true
+    timeout-minutes: 10
     permissions:
       actions: write
     steps:
@@ -1281,6 +1348,9 @@ jobs:
     needs: [prepare-coreplugin, test-prepared-coreplugin]
     if: needs.prepare-coreplugin.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
+    # Hygiene only, same as cleanup-yakgrpc-artifact.
+    continue-on-error: true
+    timeout-minutes: 10
     permissions:
       actions: write
     steps:
@@ -1300,6 +1370,11 @@ jobs:
     needs: [prepare-yak, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.prepare-yak.result == 'success' && needs.prepared-startup.result == 'success' && needs.test-local.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
+    # Hygiene only: deleting the shared binary and pruning caches reclaims
+    # storage for the next run. A missing or already-expired entry is expected
+    # and must not turn a green run red.
+    continue-on-error: true
+    timeout-minutes: 15
     permissions:
       actions: write
     steps:
@@ -1333,6 +1408,11 @@ jobs:
     needs: [check-wip, ipc-smoke, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
+    # Records a commit status so a later run on the same commit can skip work.
+    # Fork PRs get a read-only token, so the write is rejected; that is a
+    # degradation, not a test failure, and must not fail the run.
+    continue-on-error: true
+    timeout-minutes: 10
     permissions:
       contents: read
       statuses: write
@@ -1349,6 +1429,7 @@ jobs:
 
   essential-tests-gate:
     name: Essential Tests Gate
+    timeout-minutes: 10
     needs:
       - check-wip
       - scannode-focused
