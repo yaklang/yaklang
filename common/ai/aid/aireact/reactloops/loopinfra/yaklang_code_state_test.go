@@ -97,34 +97,6 @@ func TestApplyLoopYaklangCodeChange_NonYaklangContentType_NoOp(t *testing.T) {
 	assert.Empty(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE))
 }
 
-func TestApplyLoopYaklangCodeChange_SyntaxFlowContentType_EmitsEvent(t *testing.T) {
-	runtime := newTestRuntimeForSingleFile(t)
-	factory := NewSingleFileModificationSuiteFactory(runtime,
-		WithLoopVarsPrefix("sf"),
-		WithActionSuffix("rule"),
-		WithFileExtension(".sf"),
-		WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", "text/syntaxflow"),
-	)
-	loop, capture, _ := newLoopWithCapturedEvents(t, runtime, factory)
-
-	rule := `rule("test")
-desc(title: "t")`
-	result, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
-		Content:      rule,
-		Path:         "/tmp/demo.sf",
-		SourceAction: "write_rule",
-		EmitEvent:    true,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, rule, loop.Get("full_sf_code"))
-	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
-	require.Len(t, events, 1)
-	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, "create", payload.Op)
-	assert.Equal(t, rule, payload.Code.Content)
-}
-
 func TestApplyLoopYaklangCodeChange_UpdatesLoopStateAndVersion(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	factory := newYaklangFactory(t, runtime)

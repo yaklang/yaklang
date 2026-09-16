@@ -205,6 +205,8 @@ const (
 	EVENT_TYPE_YAKIT_HTTPFLOW_COUNT               = "yak_httpflow_count"
 	EVENT_TYPE_HTTP_FUZZ_REQUEST_CHANGE EventType = "http_fuzz_request_change"
 	EVENT_TYPE_YAKLANG_CODE_CHANGE      EventType = "yaklang_code_change"
+	// SyntaxFlow 规则编写交付（payload 结构与 yaklang_code_change 对齐，独立事件类型便于前端分流）
+	EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE EventType = "syntaxflow_rule_change"
 
 	EVENT_TYPE_HTTP_FLOW_FUZZ_STATUS = "http_flow_fuzz_status"
 	// report_generating 子 loop 写完报告后的终稿标记（不重复流正文，不表示会话结束）
