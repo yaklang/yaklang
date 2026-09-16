@@ -11,6 +11,11 @@ TEST_VERBOSE="${TEST_VERBOSE:-1}"
 SKIP_SYNC_EMBED_RULE_IN_GITHUB="${SKIP_SYNC_EMBED_RULE_IN_GITHUB:-true}"
 TEST_LOG_DIR="${TEST_LOG_DIR:-$TEST_BIN_DIR}"
 SUITE_TIMEOUT="${SUITE_TIMEOUT:-50m}"
+# How long to wait for the engine to bind its listener and emit the structured
+# ready event. Cold runners rebuild the coreplugin DB and engine caches, which
+# has been observed to take well over 90s under load, so the window is generous
+# and the failure path reports *why* the wait ended instead of a generic message.
+GRPC_READY_TIMEOUT="${GRPC_READY_TIMEOUT:-240}"
 
 if [[ -z "$YAK_BINARY_PATH" || -z "$TEST_BIN_DIR" || -z "$TEST_CONFIG" ]]; then
   echo "ERROR: YAK_BINARY_PATH, TEST_BIN_DIR, and TEST_CONFIG must be set"
@@ -62,26 +67,37 @@ echo "Suite timeout: ${SUITE_TIMEOUT}"
 nohup env SKIP_SYNC_EMBED_RULE_IN_GITHUB="$SKIP_SYNC_EMBED_RULE_IN_GITHUB" "$YAK_BINARY_PATH" grpc >"$grpc_log" 2>&1 < /dev/null &
 grpc_pid=$!
 
-# 90s 就绪窗口：慢 runner 上 yak 引擎初始化（coreplugin DB 同步 + 引擎
-# 缓存重建）可达 50s+，60s 窗口偶发超时（进程实际健康，仅初始化慢）。
-for _ in {1..90}; do
+# Wait for the structured ready event, which the engine writes immediately after
+# the listener is bound. Polling only the port is not enough: a healthy engine
+# can hold the listener open while still initializing, and `grep` on a log that
+# is being written concurrently can transiently miss the marker line.
+grpc_exited=0
+waited=0
+for ((waited = 0; waited < GRPC_READY_TIMEOUT; waited++)); do
   if ! kill -0 "$grpc_pid" 2>/dev/null; then
+    grpc_exited=1
     break
   fi
-  # The structured ready event is written immediately after the listener is
-  # bound. Do not wait for the later human-readable startup log: initialization
-  # between those two messages may be slow even though gRPC is already ready.
-  if nc -z localhost 8087 && grep -q '^yak grpc ready {' "$grpc_log" 2>/dev/null; then
+  if grep -q '^yak grpc ready {' "$grpc_log" 2>/dev/null; then
     grpc_ready=1
     break
   fi
-  # 兜底：端口已监听且进程存活超过 60s（初始化仍在进行但 TCP 已可连），
-  # 附加等待结构化事件再宽限；进程死亡则由 kill -0 分支处理。
   sleep 1
 done
 
 if [[ "$grpc_ready" -ne 1 ]]; then
-  echo "GRPC server failed to start" | tee -a "$suite_log"
+  # Distinguish "engine reported a startup failure" from "engine never became
+  # ready in time" so the log and the exit code point at the real cause.
+  # `|| true` matters: grep exits 1 when the marker is absent, and under
+  # `set -e`/pipefail that would abort before the diagnostic below is printed.
+  grpc_failure_event="$(grep -a '^yak grpc failed ' "$grpc_log" 2>/dev/null | tail -1 || true)"
+  if [[ -n "$grpc_failure_event" ]]; then
+    echo "GRPC server failed to start: $grpc_failure_event" | tee -a "$suite_log"
+  elif [[ "$grpc_exited" -eq 1 ]]; then
+    echo "GRPC server exited before becoming ready (after ${waited}s)" | tee -a "$suite_log"
+  else
+    echo "GRPC server did not become ready within ${GRPC_READY_TIMEOUT}s" | tee -a "$suite_log"
+  fi
   cat "$grpc_log" | tee -a "$suite_log"
   exit 1
 fi
