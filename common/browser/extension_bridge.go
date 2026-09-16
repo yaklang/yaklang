@@ -591,7 +591,7 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 		return
 	}
 	if s.manager != nil && device != nil {
-		s.manager.markDeviceSeen(device.ID, hello.Version)
+		s.manager.markDeviceSeen(device.ID, hello.Client, hello.Version)
 		s.manager.notifyStateChange("device_connected")
 	}
 
