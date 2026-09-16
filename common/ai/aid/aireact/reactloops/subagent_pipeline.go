@@ -1,4 +1,4 @@
-﻿package reactloops
+package reactloops
 
 import (
 	"context"
@@ -34,7 +34,9 @@ type PreparedSubAgent struct {
 	StartedAt time.Time
 	// runtimeErr 记录 prepare 期 timeline 构建失败的原因；此时 Invoker/Task
 	// 为 nil，阶段 2 直接按失败兜底，不再尝试构建 runtime。
-	runtimeErr error
+	runtimeErr    error
+	configOptions []aicommon.ConfigOption // captured with the timeline, before queueing
+	parentEmitter *aicommon.Emitter
 }
 
 // ExecutedSubAgent 是阶段 2（执行任务）的产物：一个已执行（或执行失败）的子
@@ -104,10 +106,21 @@ func prepareSubAgents(
 	prepared := make([]*PreparedSubAgent, 0, len(jobs))
 	for _, job := range jobs {
 		startedAt := time.Now()
+		mode := opts.TimelineMode
+		switch job.ContextMode {
+		case "": // Existing internal callers keep their TimelineMode contract.
+		case SubAgentContextFork:
+			mode = SubAgentTimelineFork
+		case SubAgentContextTaskOnly:
+			mode = SubAgentTimelineClean
+		default:
+			prepared = append(prepared, &PreparedSubAgent{Job: job, StartedAt: startedAt, runtimeErr: utils.Errorf("invalid sub-agent context_mode %q", job.ContextMode)})
+			continue
+		}
 		handle, err := buildTimelineHandle(
 			parentCfg, parentTimeline,
 			BuildForkTaskID(parentTask, job), subAgentTaskName(job),
-			opts.TimelineMode,
+			mode,
 		)
 		if err != nil {
 			// timeline 容器构建失败：记录 runtimeErr，让阶段 2/3 兜底。
@@ -121,10 +134,12 @@ func prepareSubAgents(
 		}
 
 		prepared = append(prepared, &PreparedSubAgent{
-			Job:       job,
-			Timeline:  handle,
-			Release:   func() {},
-			StartedAt: startedAt,
+			Job:           job,
+			Timeline:      handle,
+			Release:       func() {},
+			StartedAt:     startedAt,
+			configOptions: snapshotSubAgentConfig(parentCfg, job.ContextMode),
+			parentEmitter: parentCfg.GetEmitter(),
 		})
 	}
 	return prepared
@@ -153,6 +168,8 @@ func armPreparedSubAgentRuntime(
 		return utils.Errorf("timeline handle is nil: %s", p.Job.Identifier)
 	}
 
+	opts.childConfigOptions = p.configOptions
+	opts.parentEmitter = p.parentEmitter
 	invoker, task, release, err := buildSubAgentRuntime(parentInvoker, parentTask, p.Job, p.Timeline, opts)
 	if err != nil {
 		p.Timeline.Release()
@@ -239,7 +256,9 @@ func executeSubAgents(
 	var mu sync.Mutex
 	for _, p := range prepared {
 		if err := swg.AddWithContext(ctx, 1); err != nil {
+			mu.Lock()
 			executed = append(executed, failedExecuted(p, "cancelled", err))
+			mu.Unlock()
 			continue
 		}
 		p := p
@@ -309,6 +328,9 @@ func executeSubAgent(prepared *PreparedSubAgent, opts SubAgentOptions) *Executed
 			goal = prepared.Job.Goal
 			contract = ""
 		}
+		if contract == "" {
+			contract = prepared.Job.ResultContract
+		}
 		prepared.Task.SetUserInput(buildUserInput(goal, contract))
 	}
 
@@ -322,7 +344,7 @@ func executeSubAgent(prepared *PreparedSubAgent, opts SubAgentOptions) *Executed
 		return failedExecuted(prepared, "failed", utils.Wrap(buildErr, "build sub-loop"))
 	}
 	if prepared.Handle != nil {
-		prepared.Handle.SubLoop = loop
+		prepared.Handle.SetSubLoop(loop)
 	}
 
 	// 2c. 执行 loop。
@@ -454,8 +476,17 @@ func BuildSubAgentResult(executed *ExecutedSubAgent, opts SubAgentOptions) *SubA
 	record.Result = utils.ShrinkTextBlock(resultText, 4000)
 
 	// 统一落盘 reference：所有路径都享受，不再只有 dispatch 路径。
-	if strings.TrimSpace(record.Result) != "" && opts.ParentLoop != nil {
-		ref, preview := SaveContentReference(opts.ParentLoop, "sub_react_agent_"+record.SubAgentID, record.Result, 800)
+	if resultText != "" && opts.resultWriter != nil {
+		ref, err := opts.resultWriter(record.SubAgentID, resultText)
+		if err != nil {
+			record.Status = "failed"
+			record.Error = fmt.Sprintf("save sub-agent result: %v", err)
+		} else {
+			record.ResultReference = ref
+			record.Result = utils.ShrinkTextBlock(resultText, 800)
+		}
+	} else if resultText != "" && opts.ParentLoop != nil {
+		ref, preview := SaveContentReference(opts.ParentLoop, "sub_react_agent_"+record.SubAgentID, resultText, 800)
 		if ref != "" {
 			record.ResultReference = ref
 			record.Result = preview
@@ -511,12 +542,8 @@ func (defaultGoalElaborator) Elaborate(ctx context.Context, prepared *PreparedSu
 	if prepared == nil || prepared.Invoker == nil || prepared.Task == nil {
 		return "", "", utils.Error("prepared sub-agent is not ready for elaboration")
 	}
-	// 默认使用父 loop 的 base frame context 构造润色 prompt；若无父 loop，传 nil。
-	var parentLoop *ReActLoop
-	// prepared 不持有 parentLoop，这里用 task context 中的 invoker 已足够——
-	// elaborateGoal 内部读 parentLoop.GetBaseFrameContext()，parentLoop 为 nil
-	// 时 templateData 仅含 job 字段，仍可工作。
-	return elaborateGoal(ctx, prepared.Invoker, parentLoop, prepared.Task.GetId(), prepared.Job)
+	// Use the child's frozen context, never the concurrently advancing parent loop.
+	return elaborateGoal(ctx, prepared.Invoker, nil, prepared.Task.GetId(), prepared.Job)
 }
 
 const (
@@ -551,14 +578,15 @@ type TimelineRecord struct {
 
 // --- goal 润色 ---
 
-const goalElaborationPrompt = `You are preparing a task brief for an autonomous sub ReAct agent that will run in an isolated timeline fork, inheriting the parent agent's current context snapshot.
+const goalElaborationPrompt = `You are preparing a task brief for an autonomous sub ReAct agent.
+{{ if .TaskOnly }}Context mode: task_only. This child does NOT inherit the parent conversation, evidence or task attachments. Use only the explicit brief and result contract below; do not invent missing context.{{ else }}This child runs with its prepared timeline snapshot.{{ end }}
 
 Parent context (the sub agent will see this snapshot):
 - Current time: {{.CurrentTime}}
 - OS/Arch: {{.OSArch}}{{ if .WorkingDir }}
 - Working directory: {{.WorkingDir}}{{end}}
 
-Parent timeline snapshot (the sub agent inherits this as its starting context):
+Prepared child timeline:
 {{ if .Timeline }}{{.Timeline}}{{else}}<empty>{{end}}
 
 The parent agent has decided to dispatch a sub agent with the following brief intent. Your job is to elaborate that brief intent into a COMPLETE, self-contained task goal the sub agent can execute without re-reading the parent's reasoning, plus a result contract describing the output format / acceptance criteria the sub agent's final answer should satisfy.
@@ -566,6 +594,7 @@ The parent agent has decided to dispatch a sub agent with the following brief in
 Sub agent name: {{ if .SubTaskName }}{{.SubTaskName}}{{else}}<unspecified>{{end}}
 Sub agent identifier: {{ if .SubTaskIdentifier }}{{.SubTaskIdentifier}}{{else}}<unspecified>{{end}}
 Brief intent: {{ if .BriefGoal }}{{.BriefGoal}}{{else}}<unspecified>{{end}}
+Required result contract: {{.ResultContract}}
 
 Write the elaborated goal so it stands alone (the sub agent does not see this prompt). Keep it focused and actionable; do not invent scope beyond the intent. The result contract is optional — omit it if no specific output format is needed.`
 
@@ -580,7 +609,15 @@ func elaborateGoal(
 		return "", "", utils.Error("child invoker is nil")
 	}
 	templateData := map[string]any{}
-	if parentLoop != nil {
+	// The child owns the frozen branch; never consult a concurrently advancing parent.
+	if cfg, ok := childInvoker.GetConfig().(*aicommon.Config); ok {
+		templateData["WorkingDir"] = cfg.Workdir
+		templateData["CurrentTime"] = time.Now().Format(time.RFC3339)
+		if timeline := cfg.GetTimeline(); timeline != nil {
+			templateData["Timeline"] = timeline.Dump()
+		}
+	}
+	if parentLoop != nil && job.ContextMode != SubAgentContextTaskOnly {
 		for k, v := range parentLoop.GetBaseFrameContext() {
 			templateData[k] = v
 		}
@@ -588,6 +625,8 @@ func elaborateGoal(
 	templateData["SubTaskName"] = strings.TrimSpace(job.TaskName)
 	templateData["SubTaskIdentifier"] = strings.TrimSpace(job.Identifier)
 	templateData["BriefGoal"] = strings.TrimSpace(job.Goal)
+	templateData["ResultContract"] = job.ResultContract
+	templateData["TaskOnly"] = job.ContextMode == SubAgentContextTaskOnly
 
 	prompt, err := utils.RenderTemplate(goalElaborationPrompt, templateData)
 	if err != nil {
@@ -607,6 +646,9 @@ func elaborateGoal(
 				aitool.WithParam_Description("Optional acceptance criteria / output format for the sub agent result."),
 			),
 		},
+		// The prepared child snapshot is already in prompt. Never add a second
+		// timeline restored by LiteForge from the parent's persistent session.
+		aicommon.WithLiteForgeDisableTimeline(),
 		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
 			[]string{"goal"},
 			func(key string, r io.Reader, emitter *aicommon.Emitter) {
@@ -638,22 +680,25 @@ func elaborateGoal(
 // ParseDispatchJobs 从 AI action 的 "dispatches" 参数中提取 dispatch 任务。
 // 单次 dispatch 的任务数硬上限为 aicommon.AbsoluteMaxSubAgentConcurrency。
 func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
-	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
-	if err != nil {
-		return nil, err
-	}
-	if len(jobs) > 0 {
-		return jobs, nil
-	}
-
-	raw := strings.TrimSpace(action.GetString("dispatches"))
-	if raw == "" {
+	raw, exists := action.LookupCanonicalParam("dispatches")
+	if !exists {
 		return nil, utils.Error("dispatches is required and must be a non-empty array")
 	}
-	if err := json.Unmarshal([]byte(raw), &jobs); err != nil {
-		return nil, utils.Wrap(err, "dispatches must be a valid array")
+	// Preserve the legacy JSON-string representation without coercing arrays
+	// through the streaming field cache, which loses per-job field boundaries.
+	if encoded, ok := raw.(string); ok {
+		if err := json.Unmarshal([]byte(encoded), &raw); err != nil {
+			return nil, utils.Wrap(err, "dispatches must be a valid array")
+		}
 	}
-	return NormalizeDispatchJobs(jobs)
+	params, err := aicommon.DecodeStrictObjectArray(raw)
+	if err != nil {
+		return nil, utils.Wrap(err, "invalid dispatches")
+	}
+	if len(params) == 0 {
+		return nil, utils.Error("dispatches must contain at least one sub agent job")
+	}
+	return parseDispatchJobsFromArray(params)
 }
 
 func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error) {
@@ -665,11 +710,18 @@ func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error
 		if item == nil {
 			continue
 		}
+		if rawMode, exists := item["context_mode"]; exists {
+			if mode, ok := rawMode.(string); !ok || (mode != SubAgentContextFork && mode != SubAgentContextTaskOnly) {
+				return nil, utils.Error("context_mode must be a string: fork or task_only")
+			}
+		}
 		jobs = append(jobs, SubAgentJob{
-			Identifier: strings.TrimSpace(item.GetString("identifier")),
-			Goal:       strings.TrimSpace(item.GetString("goal")),
-			TaskName:   strings.TrimSpace(item.GetString("task_name")),
-			LoopName:   strings.TrimSpace(item.GetString("loop_name")),
+			Identifier:     strings.TrimSpace(item.GetString("identifier")),
+			Goal:           strings.TrimSpace(item.GetString("goal")),
+			ResultContract: strings.TrimSpace(item.GetString("result_contract")),
+			TaskName:       strings.TrimSpace(item.GetString("task_name")),
+			LoopName:       strings.TrimSpace(item.GetString("loop_name")),
+			ContextMode:    item.GetString("context_mode"),
 		})
 	}
 	return NormalizeDispatchJobs(jobs)
@@ -687,6 +739,12 @@ func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
 	}
 
 	for i := range jobs {
+		if jobs[i].ContextMode == "" {
+			jobs[i].ContextMode = SubAgentContextFork
+		}
+		if jobs[i].ContextMode != SubAgentContextFork && jobs[i].ContextMode != SubAgentContextTaskOnly {
+			return nil, utils.Errorf("dispatches[%d].context_mode must be fork or task_only", i)
+		}
 		jobs[i].Order = i + 1
 		jobs[i].Goal = strings.TrimSpace(jobs[i].Goal)
 		if jobs[i].Goal == "" {
@@ -824,7 +882,7 @@ func sortSubAgentResultsByOrder(results []*SubAgentResult) {
 
 const (
 	defaultSubAgentConcurrency = 5
-	maxSubAgentConcurrency     = 10
+	maxSubAgentConcurrency     = int(aicommon.AbsoluteMaxSubAgentConcurrency)
 )
 
 // SubAgentTimelineMode 决定子 Agent 的 timeline 容器方式。
@@ -849,6 +907,13 @@ const (
 // SubAgentOptions 是下发一组子 Agent 的统一选项，替代原 dispatch / fork /
 // nested 三条路径各自的隐式默认值。零值是安全的（走默认）。
 type SubAgentOptions struct {
+	childConfigOptions []aicommon.ConfigOption
+	parentEmitter      *aicommon.Emitter
+	// Background workers use frozen scope and callbacks, never mutable parent loop state.
+	runtimeContext context.Context
+	taskReady      func(aicommon.AIStatefulTask)
+	observeEvent   func(*schema.AiOutputEvent)
+	resultWriter   func(id, content string) (string, error)
 	// TimelineMode 决定子 Agent 的 timeline 容器。默认 SubAgentTimelineFork。
 	TimelineMode SubAgentTimelineMode
 
@@ -865,7 +930,7 @@ type SubAgentOptions struct {
 	GoalElaborator GoalElaborator
 
 	// ExecuteConcurrency 单 worker 内 [可选润色 → 子 loop 执行] 的并发度。
-	// <=0 默认 5，上限 10。润色与子 loop 共享此并发度。
+	// <=0 默认 5，上限为配置的绝对上限。润色与子 loop 共享此并发度。
 	ExecuteConcurrency int
 
 	// ConfigureLoop 在 loop 创建后、执行前配置 loop（设置 loop 变量等）。
@@ -923,7 +988,7 @@ func DefaultSubAgentLoopOptions() []ReActLoopOption {
 		WithAllowPlanAndExec(false),
 		WithAllowAIForge(false),
 		WithActionFilter(func(action *LoopAction) bool {
-			return action.ActionType != schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS
+			return action.ActionType != schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS && !IsSubAgentControlAction(action.ActionType)
 		}),
 	}
 }
@@ -955,19 +1020,27 @@ func ensureSubAgentProgressRegistry(parentLoop *ReActLoop) *ProgressRegistry {
 	if parentLoop == nil {
 		return nil
 	}
-	registry := parentLoop.GetSubAgentProgressRegistry()
-	if registry == nil {
-		registry = NewProgressRegistry()
-		parentLoop.SetSubAgentProgressRegistry(registry)
+	parentLoop.subAgentMutex.Lock()
+	defer parentLoop.subAgentMutex.Unlock()
+	if parentLoop.subAgentProgressRegistry == nil {
+		parentLoop.subAgentProgressRegistry = NewProgressRegistry()
 	}
-	return registry
+	return parentLoop.subAgentProgressRegistry
 }
+
+const (
+	SubAgentContextFork     = "fork"
+	SubAgentContextTaskOnly = "task_only"
+)
 
 // SubAgentJob 是子 Agent 运行的统一描述符。它涵盖了原先 DispatchJob /
 // ForkJob / NestedJob 三种类型所携带的全部字段；不同的行为差异（fork 与
 // in-place、AI 润色 goal 与原始 goal、loop-factory 与 loop-name）由调用方 /
 // runner 选择，而非由类型区分。
 type SubAgentJob struct {
+	// ContextMode overrides timeline and conversation inheritance per job.
+	// Empty preserves legacy internal TimelineMode behavior; model dispatch defaults to fork.
+	ContextMode string `json:"context_mode,omitempty"`
 	// Order 是 1 起的序号，用于结果排序 / 展示。
 	Order int `json:"order"`
 	// Identifier 是子 Agent 的稳定标签（如 "scan_host_a"）。
@@ -1029,7 +1102,7 @@ func BuildForkTaskID(parentTask aicommon.AIStatefulTask, job SubAgentJob) string
 	if segment == "" {
 		segment = fmt.Sprintf("job-%d", job.Order)
 	}
-	return fmt.Sprintf("%s-sub-%s-%s", parentID, segment, utils.RandStringBytes(4))
+	return fmt.Sprintf("%s-sub-%s-%s", parentID, segment, utils.RandStringBytes(12))
 }
 
 // SanitizeIDSegment 将 job identifier 规范化，使其可用于任务 ID。

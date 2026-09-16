@@ -22,4 +22,7 @@ func init() {
 	reactloops.RegisterAction(loopAction_QueryMCPTools)
 	reactloops.RegisterAction(loopAction_ListAsyncTasks)
 	reactloops.RegisterAction(loopAction_DispatchSubReactAgents)
+	reactloops.RegisterAction(loopAction_InspectSubAgents)
+	reactloops.RegisterAction(loopAction_WaitSubAgents)
+	reactloops.RegisterAction(loopAction_CancelSubAgents)
 }

@@ -65,7 +65,7 @@ func directlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop) bool {
 // state change. A directly_answer with an effective todo_delta remains valid:
 // it is a progress handoff rather than an accidental replay.
 func RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) error {
-	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) || !directlyAnswerDeliveredWithoutTodoDelta(loop) {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) || !directlyAnswerDeliveredWithoutTodoDelta(loop) || loop.subAgentModelSeen > loop.subAgentAnswerSeen {
 		return nil
 	}
 	return utils.Error(errDuplicateDirectlyAnswerWithoutTodoDelta)
@@ -86,6 +86,7 @@ func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicomm
 		return
 	}
 	loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+	loop.subAgentAnswerSeen = loop.subAgentModelSeen
 }
 
 // ShouldAutoFinishAfterSimpleQueryDirectlyAnswer identifies the narrow host
@@ -93,7 +94,7 @@ func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicomm
 // inquiries. No extra model round is useful when the answer was delivered and
 // neither todo_delta nor the current task TODO history indicates work.
 func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
-	return action != nil && !directlyAnswerHasTodoDelta(action) && loop.isSimpleQueryWithoutWork()
+	return action != nil && !directlyAnswerHasTodoDelta(action) && loop.isSimpleQueryWithoutWork() && loop.SubAgentFinishBlockReason() == ""
 }
 
 // Share the trivial-turn boundary between automatic recall and completion.

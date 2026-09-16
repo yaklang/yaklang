@@ -35,6 +35,13 @@ func ConvertReActLoopFactoryToActionFactory(
 				return nil
 			},
 			ActionHandler: func(oldLoop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+				// The nested loop owns the same task, so its completion cancels the
+				// parent's context. Admit this handoff before invoking its factory.
+				if reason := oldLoop.SubAgentFinishBlockReason(); reason != "" {
+					operator.Feedback(reason)
+					operator.Continue()
+					return
+				}
 				var err error
 				loop, err := factory(r, WithOnPostIteraction(oldLoop.onPostIteration...))
 				if err != nil {

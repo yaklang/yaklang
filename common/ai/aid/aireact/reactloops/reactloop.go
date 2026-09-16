@@ -253,6 +253,17 @@ type ReActLoop struct {
 	// 变更; registry 内部并发安全 (自带 mutex).
 	// 关键词: subAgentProgressRegistry, 子 Agent 进度追踪, stall heartbeat 旁路
 	subAgentProgressRegistry *ProgressRegistry
+	subAgentMutex            sync.Mutex
+	subAgentManager          *SubAgentManager
+	subAgentClosing          bool
+	subAgentShutdown         sync.Once
+	// Parent-loop-thread-only delivery/decision cursors.
+	subAgentModelSeen         uint64
+	subAgentCommitted         uint64
+	subAgentAnswerSeen        uint64
+	subAgentControlRounds     int
+	subAgentControlIterations int
+	subAgentControlRevision   uint64
 
 	// functionCallMode enables native functioncall (tool_calls) instead of
 	// the text-based @action JSON contract. When true, each LoopAction is
@@ -304,6 +315,7 @@ func (r *ReActLoop) Release() {
 	if r == nil {
 		return
 	}
+	r.shutdownSubAgents()
 	r.onReleaseMutex.Lock()
 	if r.released {
 		r.onReleaseMutex.Unlock()
@@ -523,6 +535,8 @@ func (r *ReActLoop) GetSubAgentProgressRegistry() *ProgressRegistry {
 	if r == nil {
 		return nil
 	}
+	r.subAgentMutex.Lock()
+	defer r.subAgentMutex.Unlock()
 	return r.subAgentProgressRegistry
 }
 
@@ -539,6 +553,8 @@ func (r *ReActLoop) SetSubAgentProgressRegistry(reg *ProgressRegistry) {
 	if r == nil || reg == nil {
 		return
 	}
+	r.subAgentMutex.Lock()
+	defer r.subAgentMutex.Unlock()
 	r.subAgentProgressRegistry = reg
 }
 
@@ -747,6 +763,13 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 					return nil, err
 				}
 				r.actions.Set(dispatchSubReactAgents.ActionType, dispatchSubReactAgents)
+				for _, name := range []string{SubAgentInspectAction, SubAgentWaitAction, SubAgentCancelAction} {
+					action, err := requireRegisteredLoopAction(name, "background sub-agent control")
+					if err != nil {
+						return nil, err
+					}
+					r.actions.Set(name, action)
+				}
 			}
 		}
 	}

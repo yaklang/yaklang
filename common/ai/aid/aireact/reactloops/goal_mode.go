@@ -52,7 +52,7 @@ func (r *ReActLoop) ShouldBlockFinishAtIteration(iteration int) bool {
 	if iteration <= 0 {
 		return true
 	}
-	return iteration < r.GetGoalMinIterations()
+	return iteration-r.subAgentControlIterations < r.GetGoalMinIterations()
 }
 
 // ApplyGoalModeGate enforces the goal-mode finish gate for the given iteration

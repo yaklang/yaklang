@@ -67,6 +67,7 @@ func handleToolCallResult(
 	}
 
 	if directly {
+		loop.StopSubAgentsForUser()
 		answer, answerErr := invoker.DirectlyAnswer(ctx,
 			"在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题。一般这种情况出现在用户认为这个任务不应该使用工具或者工具无法满足需求的情况下。", nil)
 		if answerErr != nil {
@@ -74,7 +75,7 @@ func handleToolCallResult(
 			return
 		}
 		invoker.AddToTimeline("directly-answer", answer)
-		operator.Exit()
+		operator.ExitForUser()
 		return
 	}
 

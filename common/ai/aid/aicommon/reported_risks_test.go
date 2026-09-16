@@ -432,6 +432,17 @@ func TestSessionPromptState_ForkForSubAgent_SharesReportedRisks(t *testing.T) {
 	require.Contains(t, childRendered2, "rce", "child should see parent's new risk (shared store)")
 }
 
+func TestSessionPromptState_ForkForSubAgent_SharesInitiallyEmptyReportedRisks(t *testing.T) {
+	parent := NewSessionPromptState()
+	child := parent.ForkForSubAgent()
+	sibling := parent.ForkForSubAgent()
+	risk := &schema.Risk{Url: "https://example.com/child-first", RiskType: "xss", Parameter: "q", Title: "child-first", Severity: "high"}
+	require.True(t, child.AppendReportedRisk(risk))
+	require.Contains(t, parent.GetReportedRisksRendered(), "child-first")
+	require.Contains(t, sibling.GetReportedRisksRendered(), "child-first")
+	require.False(t, sibling.AppendReportedRisk(risk), "deduplication must work even when the first risk comes from a child")
+}
+
 // ---------------------------------------------------------------------------
 // Prompt injection: ReportedRisks appears in timeline-open section, at end
 // ---------------------------------------------------------------------------

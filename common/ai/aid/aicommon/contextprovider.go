@@ -588,6 +588,22 @@ func (r *ContextProviderManager) snapshotForChild() *ContextProviderManager {
 	return child
 }
 
+// WithoutTaskContext retains host providers but excludes the parent's input-
+// scoped providers, including inline attachments. Keep an explicit empty task
+// scope so nested child snapshots cannot inherit a later parent's attachments.
+func (r *ContextProviderManager) WithoutTaskContext() *ContextProviderManager {
+	if r == nil {
+		return nil
+	}
+	r.m.RLock()
+	defer r.m.RUnlock()
+	ordinary := r.ordinary
+	if ordinary == nil {
+		ordinary = r
+	}
+	return &ContextProviderManager{maxTokens: r.maxTokens, ordinary: ordinary}
+}
+
 func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextProvider) {
 	var m = new(sync.Mutex)
 	var firstCall = utils.NewOnce()

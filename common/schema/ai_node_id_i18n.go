@@ -159,6 +159,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "子 Agent 执行汇报",
 		En: "Sub Agents Execution Report",
 	},
+	"sub_react_agents_wait": {
+		Zh: "等待子 Agent",
+		En: "Waiting for Sub Agents",
+	},
 	"dispatch_sub_react_agents": {
 		Zh: "下发子 Agent",
 		En: "Dispatch Sub Agents",

@@ -308,8 +308,9 @@ func wrapMockPromptSectionWithNonce(sectionName string, content string, nonce st
 	if content == "" {
 		return ""
 	}
-	sectionName = fmt.Sprintf("%s_%s", sectionName, nonce)
-	return fmt.Sprintf("<|PROMPT_SECTION_%s|>\n%s\n<|PROMPT_SECTION_END_%s|>", sectionName, content, sectionName)
+	// Match production's tagName=PROMPT_SECTION_dynamic, nonce=<nonce>.
+	// END precedes the nonce, not the dynamic part of the tag name.
+	return fmt.Sprintf("<|PROMPT_SECTION_%s_%s|>\n%s\n<|PROMPT_SECTION_%s_END_%s|>", sectionName, nonce, content, sectionName, nonce)
 }
 
 func wrapMockPromptSection(sectionName string, content string) string {

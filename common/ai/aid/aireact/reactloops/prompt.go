@@ -240,6 +240,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
+	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
 		tools = []*aitool.Tool{}
@@ -284,6 +285,9 @@ func (r *ReActLoop) generateLoopPrompt(
 			})
 		}
 	}
+	// Keep deliveries in the formal dynamic section so prompt analysis and the
+	// model request agree about which evidence belongs to this iteration.
+	reactiveData += subAgentInput
 	todoCheckpoint := r.consumeTodoCheckpoint()
 
 	// Render skills context if the manager is available.
@@ -359,6 +363,8 @@ func (r *ReActLoop) generateLoopPrompt(
 	if result == nil {
 		return "", utils.Error("assemble loop prompt returned nil result")
 	}
+	r.commitSubAgentPrompt(subAgentRevision)
+	r.subAgentModelSeen = subAgentRevision
 	// observation（UI 上下文成分面板）是旁路需求，不参与 AI call 主流程。
 	// 同步只写入 PromptTokens 供 verification gate 使用，完整 observation
 	// 构建 + BuildStatus + emit 全部异步执行，不阻塞主循环。

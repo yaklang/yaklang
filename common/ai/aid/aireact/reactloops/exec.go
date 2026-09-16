@@ -806,6 +806,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}()
 	}
 	defer r.Release()
+	defer r.shutdownSubAgents()
 
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")
@@ -962,6 +963,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	done := utils.NewOnce()
 	abort := func(err error) {
+		r.shutdownSubAgents()
 		done.Do(func() {
 			// 用户通过 sync 事件主动取消/跳过时，不覆盖已设的终止状态，
 			// 也不追加 [Error] 到 result，避免污染用户可见的取消语义。
@@ -975,6 +977,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		})
 	}
 	complete := func(err any) {
+		r.shutdownSubAgents()
 		if !utils.IsNil(err) {
 			result := task.GetResult()
 			result += "\n\n[Reason]: " + utils.InterfaceToString(err)
@@ -996,7 +999,12 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	defer func() {
 		if err := recover(); err != nil {
 			utils.PrintCurrentGoroutineRuntimeStack()
-			abort(utils.Errorf("ReActLoop panicked: %v", err))
+			finalError = utils.Errorf("ReActLoop panicked: %v", err)
+		}
+		// Recover before choosing a terminal state. A separate, later defer
+		// would see a nil finalError during panic unwinding and commit Completed.
+		if finalError != nil {
+			abort(finalError)
 		} else {
 			complete(nil)
 		}
@@ -1024,13 +1032,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 
 	var operator = newLoopActionHandlerOperator(task)
-	defer func() {
-		if finalError != nil {
-			abort(finalError)
-		} else {
-			complete(nil)
-		}
-	}()
 
 	if task.GetStatus() == aicommon.AITaskState_Skipped {
 		return utils.Errorf("ReActLoop task is skipped")
@@ -1234,7 +1235,23 @@ LOOP:
 
 		// 落地 todo_delta 并判定本轮是否为有效推进 (空转轮不计入迭代预算).
 		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
-		r.advanceEffectiveIteration(task, appliedTodoDelta)
+		if IsSubAgentControlAction(actionName) {
+			r.subAgentControlIterations++
+		} else {
+			r.advanceEffectiveIteration(task, appliedTodoDelta)
+		}
+
+		// Handoffs can complete/cancel the same parent task inside their handler.
+		// Check before these side effects, even for synchronous blueprint/plan calls.
+		if handler.AsyncMode || actionName == schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT ||
+			actionName == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN || actionName == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION {
+			if reason := r.SubAgentFinishBlockReason(); reason != "" {
+				operator = newLoopActionHandlerOperator(task)
+				operator.Feedback(reason)
+				operator.Continue()
+				continue
+			}
+		}
 
 		if handler.AsyncMode {
 			r.UserStatus(
@@ -1319,6 +1336,11 @@ LOOP:
 		// fact after it settles. This keeps rejected/cancelled/zero-invoke batches
 		// in history without falsely turning them into iteration_end training data.
 		r.applyActionExecutionRecord(actionRecord, operator)
+		if err := r.recordSubAgentControl(actionName, operator, appliedTodoDelta); err != nil {
+			finalError = err
+			r.finishIterationLoopWithError(iterationCount, task, finalError)
+			return finalError
+		}
 		if handler.ActionType != loopAction_Finish.ActionType {
 			r.recordCurrentTodoIteration(task)
 		}
@@ -1345,6 +1367,12 @@ LOOP:
 				fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
+			if reason := r.admitSubAgentExit(operator); reason != "" {
+				operator = newLoopActionHandlerOperator(task)
+				operator.Feedback(reason)
+				operator.Continue()
+				continue
+			}
 			r.finishIterationLoopWithError(iterationCount, task, nil)
 			return nil
 		}
@@ -1387,6 +1415,12 @@ LOOP:
 				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
+			if reason := r.admitSubAgentExit(operator); reason != "" {
+				operator = newLoopActionHandlerOperator(task)
+				operator.Feedback(reason)
+				operator.Continue()
+				continue
+			}
 			r.finishIterationLoopWithError(iterationCount, task, nil)
 			return nil
 		}
@@ -1447,6 +1481,12 @@ LOOP:
 			postOp := r.doneCurrentIteration(iterationCount, task)
 			// Check if post-iteration callback requested to end the loop
 			if postOp.ShouldEndIteration() {
+				if reason := r.tryFinishSubAgents(); reason != "" {
+					operator = newLoopActionHandlerOperator(task)
+					operator.Feedback(reason)
+					operator.Continue()
+					continue
+				}
 				log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
 				needSummary.SetTo(true)
 				break LOOP
@@ -1463,6 +1503,12 @@ LOOP:
 		postOp := r.doneCurrentIteration(iterationCount, task)
 		// Check if post-iteration callback requested to end the loop
 		if postOp.ShouldEndIteration() {
+			if reason := r.tryFinishSubAgents(); reason != "" {
+				operator = newLoopActionHandlerOperator(task)
+				operator.Feedback(reason)
+				operator.Continue()
+				continue
+			}
 			log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
 			needSummary.SetTo(true)
 			break LOOP
@@ -1509,6 +1555,8 @@ func (r *ReActLoop) callOnPostIteration(current int, task aicommon.AIStatefulTas
 }
 
 func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
+	// Final summaries must see cancelled/unresolved children before task completion.
+	r.shutdownSubAgents()
 	operator := newOnPostIterationOperator()
 	if r.onPostIteration != nil {
 		if err != nil {

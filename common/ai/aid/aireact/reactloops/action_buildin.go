@@ -43,6 +43,11 @@ var loopAction_Finish = &LoopAction{
 		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
 		"Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+		if reason := loop.SubAgentFinishBlockReason(); reason != "" {
+			operator.Feedback(reason)
+			operator.Continue()
+			return
+		}
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
 			msg := buildFinishBlockedByGoalModeMessage()
 			loop.invoker.AddToTimeline("[GOAL_MODE_FINISH_BLOCKED]", msg)
@@ -72,7 +77,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +
 		"A classifier-approved simple_query with no effective todo_delta and no current-task TODO history is closed by the host immediately after delivery. " +
-		"Do not call directly_answer twice without an effective todo_delta in the same CURRENT-TASK; repeated or rephrased answers are rejected. " +
+		"Do not repeat an answer without an effective todo_delta or newly delivered sub-agent results; repeated or rephrased answers on unchanged evidence are rejected. " +
 		"Carry a non-empty 'todo_delta' alongside a progress answer whenever it changes or schedules follow-up TODO state.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
