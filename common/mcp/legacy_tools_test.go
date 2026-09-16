@@ -1220,6 +1220,22 @@ func legacyHTTPFuzzerToolCases() map[string][]legacyToolCase {
 				errContains: []string{"request is required"},
 			},
 		},
+		"execute_web_fuzzer_tab": {
+			{
+				name:        "reject_missing_page_id",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"pageId"},
+			},
+		},
+		"query_web_fuzzer_execution_result": {
+			{
+				name:        "reject_missing_task_id",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"taskId"},
+			},
+		},
 		"create_web_fuzzer_tabs": {
 			{
 				name:        "reject_empty_tabs",
