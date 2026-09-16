@@ -9,7 +9,7 @@ field coverage does not earn YAML schema or unmeasured branch points.
 
 | Protocol | Explicit completed message scope | Executable evidence |
 | --- | --- | --- |
-| LDAP | LDAPv3 BindRequest/BindResponse, UnbindRequest, SearchRequest, SearchResultEntry/Done/Reference; definite BER, all ten filter choices, ordered attribute/value lists and controls | `TestP0LDAPOperationEntries`, `TestLDAPOperation*`, original BindRequest and CLDAP rejection audits |
+| LDAP | LDAPv3 BindRequest/BindResponse, UnbindRequest, SearchRequest, SearchResultEntry/Done/Reference, Modify/Add/Del/ModifyDN/Compare/Abandon/Extended request and result layouts; definite BER, all ten filter choices, ordered attribute/value lists and controls | `TestP0LDAPOperationEntries`, `TestLDAPOperation*`, original BindRequest and CLDAP rejection audits |
 | MySQL | V10/41 greeting/response, SSLRequest, supported classic commands, OK/ERR/EOF and existing fresh-column text resultset profiles | Original 49-record audit, twelve-profile boundaries/fallback and wide-integer checks |
 | PostgreSQL | Existing sixteen bounded startup/SSL/GSS, authentication, frontend/backend and SCRAM message profiles | Original 88-record audit and direction/phase boundary/isolation checks |
 | SMB3 | Existing 3.0/3.0.2/3.1.1 NEGOTIATE profiles and full bounded Transform carrier | Original and seven-companion negotiate checks, receive-context checks, `TestP0SMB3TransformEntry`, `TestSMB3TransformFieldsBoundariesAndTransactions` |

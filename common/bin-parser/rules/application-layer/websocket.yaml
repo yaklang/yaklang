@@ -27,29 +27,74 @@ Package:
       if n > 0x100000 {
         panic("websocket: payload too large")
       }
-      if getNodeResult("Mask").Value == 1 {
+      if op >= 8 {
+        if getNodeResult("FIN").Value != 1 {
+          panic("websocket: control frames must not be fragmented")
+        }
+        if n > 125 {
+          panic("websocket: control payload too large")
+        }
+      }
+      masked = getNodeResult("Mask").Value == 1
+      if masked {
         this.ProcessSubNode("Masking Key")
+      }
+      applyMask = (name, off) => {
+        if masked {
+          setCfg(name + ".raw result", unmaskWebSocket(getNodeResult("Masking Key").Value, getNodeResult(name).Value, off))
+        }
       }
       if op == 1 {
         if n > 0 && n < 1048576 {
           this.GetSubNode("Text").SetMaxLength(n)
           this.ProcessSubNode("Text")
+          applyMask("Text", 0)
+        }
+        return
+      }
+      if op == 2 {
+        if n > 0 && n < 1048576 {
+          this.GetSubNode("Binary").SetMaxLength(n)
+          this.ProcessSubNode("Binary")
+          applyMask("Binary", 0)
+        }
+        return
+      }
+      if op == 0 {
+        if n > 0 && n < 1048576 {
+          this.GetSubNode("Continuation").SetMaxLength(n)
+          this.ProcessSubNode("Continuation")
+          applyMask("Continuation", 0)
         }
         return
       }
       if op == 8 {
         if n >= 2 {
           this.ProcessSubNode("Close Code")
+          applyMask("Close Code", 0)
           if n > 2 && n < 1048576 {
             this.GetSubNode("Reason").SetMaxLength(n-2)
             this.ProcessSubNode("Reason")
+            applyMask("Reason", 2)
           }
         }
         return
       }
-      if n > 0 && n < 1048576 {
-        this.GetSubNode("Octets").SetMaxLength(n)
-        this.ProcessSubNode("Octets")
+      if op == 9 {
+        if n > 0 && n < 1048576 {
+          this.GetSubNode("Ping").SetMaxLength(n)
+          this.ProcessSubNode("Ping")
+          applyMask("Ping", 0)
+        }
+        return
+      }
+      if op == 10 {
+        if n > 0 && n < 1048576 {
+          this.GetSubNode("Pong").SetMaxLength(n)
+          this.ProcessSubNode("Pong")
+          applyMask("Pong", 0)
+        }
+        return
       }
     FIN: uint8,1bit
     RSV: uint8,3bit
@@ -60,6 +105,9 @@ Package:
     Extended Length 64: uint64
     Masking Key: raw,4
     Text: string
+    Binary: string
+    Continuation: string
+    Ping: string
+    Pong: string
     Close Code: uint16
     Reason: string
-    Octets: string

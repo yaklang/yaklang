@@ -19,14 +19,51 @@ func ldapOperationTestSearch(filter []byte) []byte {
 	return ldapOperationTestMessage(0x63, append(body, 0x30, 0))
 }
 
+func ldapOperationTestJoin(parts ...[]byte) []byte {
+	var out []byte
+	for _, p := range parts {
+		out = append(out, p...)
+	}
+	return out
+}
+
 func ldapOperationTestFixtures() map[string][]byte {
+	modifyBody := ldapOperationTestJoin(
+		ldapFieldsTestTLV(4, []byte("cn=x")),
+		ldapFieldsTestTLV(0x30, ldapFieldsTestTLV(0x30, ldapOperationTestJoin(
+			[]byte{10, 1, 0},
+			ldapFieldsTestTLV(0x30, ldapOperationTestJoin(ldapFieldsTestTLV(4, []byte("cn")), ldapFieldsTestTLV(0x31, ldapFieldsTestTLV(4, []byte("y"))))),
+		))),
+	)
+	addBody := ldapOperationTestJoin(
+		ldapFieldsTestTLV(4, []byte("cn=x")),
+		ldapFieldsTestTLV(0x30, ldapFieldsTestTLV(0x30, ldapOperationTestJoin(ldapFieldsTestTLV(4, []byte("cn")), ldapFieldsTestTLV(0x31, ldapFieldsTestTLV(4, []byte("x")))))),
+	)
+	compareBody := ldapOperationTestJoin(
+		ldapFieldsTestTLV(4, []byte("cn=x")),
+		ldapFieldsTestTLV(0x30, ldapOperationTestJoin(ldapFieldsTestTLV(4, []byte("cn")), ldapFieldsTestTLV(4, []byte("x")))),
+	)
+	modifyDNBody := ldapOperationTestJoin(ldapFieldsTestTLV(4, []byte("cn=old")), ldapFieldsTestTLV(4, []byte("cn=new")), []byte{1, 1, 255})
 	return map[string][]byte{
-		"bind-response":    ldapOperationTestMessage(0x61, []byte{10, 1, 0, 4, 0, 4, 0, 0x87, 2, 0, 255}),
-		"unbind-request":   ldapOperationTestMessage(0x42, nil),
-		"search-request":   ldapOperationTestSearch([]byte{0x87, 2, 'c', 'n'}),
-		"search-entry":     ldapOperationTestMessage(0x64, []byte{4, 0, 0x30, 12, 0x30, 10, 4, 2, 'c', 'n', 0x31, 4, 4, 0, 4, 0}),
-		"search-done":      ldapOperationTestMessage(0x65, []byte{10, 1, 0, 4, 0, 4, 0}),
-		"search-reference": ldapOperationTestMessage(0x73, append([]byte{4, 8}, []byte("ldap://x")...)),
+		"bind-response":     ldapOperationTestMessage(0x61, []byte{10, 1, 0, 4, 0, 4, 0, 0x87, 2, 0, 255}),
+		"unbind-request":    ldapOperationTestMessage(0x42, nil),
+		"search-request":    ldapOperationTestSearch([]byte{0x87, 2, 'c', 'n'}),
+		"search-entry":      ldapOperationTestMessage(0x64, []byte{4, 0, 0x30, 12, 0x30, 10, 4, 2, 'c', 'n', 0x31, 4, 4, 0, 4, 0}),
+		"search-done":       ldapOperationTestMessage(0x65, []byte{10, 1, 0, 4, 0, 4, 0}),
+		"search-reference":  ldapOperationTestMessage(0x73, append([]byte{4, 8}, []byte("ldap://x")...)),
+		"modify-request":    ldapOperationTestMessage(0x66, modifyBody),
+		"modify-response":   ldapOperationTestMessage(0x67, []byte{10, 1, 0, 4, 0, 4, 0}),
+		"add-request":       ldapOperationTestMessage(0x68, addBody),
+		"add-response":      ldapOperationTestMessage(0x69, []byte{10, 1, 0, 4, 0, 4, 0}),
+		"del-request":       ldapOperationTestMessage(0x4a, []byte("cn=x")),
+		"del-response":      ldapOperationTestMessage(0x6b, []byte{10, 1, 0, 4, 0, 4, 0}),
+		"modifydn-request":  ldapOperationTestMessage(0x6c, modifyDNBody),
+		"modifydn-response": ldapOperationTestMessage(0x6d, []byte{10, 1, 0, 4, 0, 4, 0}),
+		"compare-request":   ldapOperationTestMessage(0x6e, compareBody),
+		"compare-response":  ldapOperationTestMessage(0x6f, []byte{10, 1, 5, 4, 0, 4, 0}),
+		"abandon-request":   ldapOperationTestMessage(0x50, []byte{2}),
+		"extended-request":  ldapOperationTestMessage(0x77, ldapOperationTestJoin(ldapFieldsTestTLV(0x80, []byte("1.3.6.1.4.1.1466.20037")), ldapFieldsTestTLV(0x81, []byte{0xff}))),
+		"extended-response": ldapOperationTestMessage(0x78, ldapOperationTestJoin([]byte{10, 1, 0, 4, 0, 4, 0}, ldapFieldsTestTLV(0x8a, []byte("1.3.6.1.4.1.1466.20037")))),
 	}
 }
 
@@ -120,6 +157,9 @@ func TestLDAPOperationResourcesAndTransactions(t *testing.T) {
 		require.NoError(t, err)
 		tlsCertificateTestCoverage(t, fs, len(wire))
 	}
-	profiles := []string{"bind-response", "unbind-request", "search-request", "search-entry", "search-done", "search-reference"}
+	profiles := make([]string, 0, len(ldapOperationTestFixtures()))
+	for profile := range ldapOperationTestFixtures() {
+		profiles = append(profiles, profile)
+	}
 	testExactByteFieldsBridgeTransactions(t, profiles, func(p string) []byte { return ldapOperationTestFixtures()[p] }, parseLDAPFields)
 }

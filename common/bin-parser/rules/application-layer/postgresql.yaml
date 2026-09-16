@@ -42,6 +42,26 @@ Package:
           this.ProcessSubNode("Ready")
           return
         }
+        if first == 0x50 {
+          this.ProcessByType("PostgreSQLParse")
+          return
+        }
+        if first == 0x42 {
+          this.ProcessByType("PostgreSQLBind")
+          return
+        }
+        if first == 0x54 {
+          this.ProcessByType("PostgreSQLRowDescription")
+          return
+        }
+        if first == 0x44 {
+          this.ProcessByType("PostgreSQLDataRow")
+          return
+        }
+        if first == 0x43 {
+          this.ProcessByType("PostgreSQLCommandComplete")
+          return
+        }
         rem = 0
         if this.GetMaxLength() > this.Length() {
           rem = this.GetMaxLength() - this.Length()
@@ -114,6 +134,127 @@ Package:
     SecretKey: uint32
 PostgreSQLQuery:
   SQL: "del:\0;type:string"
+PostgreSQLParse:
+  operator: |
+    this.ProcessSubNode("Statement")
+    this.ProcessSubNode("Query")
+    this.ProcessSubNode("Parameter Type Count")
+    n = getNodeResult("Parameter Type Count").Value
+    if n > 4096 {
+      panic("postgresql: too many parameter types")
+    }
+    i = 0
+    for i < n {
+      this.ProcessByType("PostgreSQLParamOID", "Type OID")
+      i = i + 1
+    }
+  Statement: "del:\0;type:string"
+  Query: "del:\0;type:string"
+  Parameter Type Count: uint16
+PostgreSQLBind:
+  operator: |
+    this.ProcessSubNode("Portal")
+    this.ProcessSubNode("Statement")
+    this.ProcessSubNode("Parameter Format Count")
+    fc = getNodeResult("Parameter Format Count").Value
+    if fc > 4096 {
+      panic("postgresql: too many parameter formats")
+    }
+    i = 0
+    for i < fc {
+      this.ProcessByType("PostgreSQLFormat", "Parameter Format")
+      i = i + 1
+    }
+    this.ProcessSubNode("Parameter Count")
+    pc = getNodeResult("Parameter Count").Value
+    if pc > 4096 {
+      panic("postgresql: too many parameters")
+    }
+    i = 0
+    for i < pc {
+      this.ProcessByType("PostgreSQLValue", "Parameter")
+      i = i + 1
+    }
+    this.ProcessSubNode("Result Format Count")
+    rc = getNodeResult("Result Format Count").Value
+    if rc > 4096 {
+      panic("postgresql: too many result formats")
+    }
+    i = 0
+    for i < rc {
+      this.ProcessByType("PostgreSQLFormat", "Result Format")
+      i = i + 1
+    }
+  Portal: "del:\0;type:string"
+  Statement: "del:\0;type:string"
+  Parameter Format Count: uint16
+  Parameter Count: uint16
+  Result Format Count: uint16
+PostgreSQLParamOID:
+  operator: |
+    this.ProcessSubNode("OID")
+  OID: uint32
+PostgreSQLFormat:
+  operator: |
+    this.ProcessSubNode("Format Code")
+  Format Code: uint16
+PostgreSQLValue:
+  operator: |
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    if n == 0xffffffff {
+      return
+    }
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Value").SetMaxLength(n)
+      this.ProcessSubNode("Value")
+    }
+  Length: uint32
+  Value: string
+PostgreSQLRowDescription:
+  operator: |
+    this.ProcessSubNode("Column Count")
+    n = getNodeResult("Column Count").Value
+    if n > 4096 {
+      panic("postgresql: too many columns")
+    }
+    i = 0
+    for i < n {
+      this.ProcessByType("PostgreSQLColumn", "Column")
+      i = i + 1
+    }
+  Column Count: uint16
+PostgreSQLColumn:
+  operator: |
+    this.ProcessSubNode("Column Name")
+    this.ProcessSubNode("Table OID")
+    this.ProcessSubNode("Attribute Number")
+    this.ProcessSubNode("Type OID")
+    this.ProcessSubNode("Type Size")
+    this.ProcessSubNode("Type Modifier")
+    this.ProcessSubNode("Format Code")
+  Column Name: "del:\0;type:string"
+  Table OID: uint32
+  Attribute Number: int16
+  Type OID: uint32
+  Type Size: int16
+  Type Modifier: int32
+  Format Code: uint16
+PostgreSQLDataRow:
+  operator: |
+    this.ProcessSubNode("Column Count")
+    n = getNodeResult("Column Count").Value
+    if n > 4096 {
+      panic("postgresql: too many columns")
+    }
+    i = 0
+    for i < n {
+      this.ProcessByType("PostgreSQLValue", "Column")
+      i = i + 1
+    }
+  Column Count: uint16
+PostgreSQLCommandComplete:
+  Tag: "del:\0;type:string"
 PostgreSQLError:
   list: true
   Field: PGErrorField

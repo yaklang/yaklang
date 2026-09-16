@@ -105,6 +105,188 @@ Package:
       raw = this.NewUnknownNode("Unparsed LDAP Wire")
       raw.SetMaxLength(this.GetMaxLength())
       raw.Process()
+  LDAPModifyRequestFields:
+    operator: |
+      err = parseLDAPFields("modify-request")
+      if err != nil { panic(err) }
+  LDAPModifyRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPModifyRequestFieldsExact", "LDAPModifyRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPModifyResponseFields:
+    operator: |
+      err = parseLDAPFields("modify-response")
+      if err != nil { panic(err) }
+  LDAPModifyResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPModifyResponseFieldsExact", "LDAPModifyResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPAddRequestFields:
+    operator: |
+      err = parseLDAPFields("add-request")
+      if err != nil { panic(err) }
+  LDAPAddRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPAddRequestFieldsExact", "LDAPAddRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPAddResponseFields:
+    operator: |
+      err = parseLDAPFields("add-response")
+      if err != nil { panic(err) }
+  LDAPAddResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPAddResponseFieldsExact", "LDAPAddResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPDelRequestFields:
+    operator: |
+      err = parseLDAPFields("del-request")
+      if err != nil { panic(err) }
+  LDAPDelRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPDelRequestFieldsExact", "LDAPDelRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPDelResponseFields:
+    operator: |
+      err = parseLDAPFields("del-response")
+      if err != nil { panic(err) }
+  LDAPDelResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPDelResponseFieldsExact", "LDAPDelResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPModifyDNRequestFields:
+    operator: |
+      err = parseLDAPFields("modifydn-request")
+      if err != nil { panic(err) }
+  LDAPModifyDNRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPModifyDNRequestFieldsExact", "LDAPModifyDNRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPModifyDNResponseFields:
+    operator: |
+      err = parseLDAPFields("modifydn-response")
+      if err != nil { panic(err) }
+  LDAPModifyDNResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPModifyDNResponseFieldsExact", "LDAPModifyDNResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPCompareRequestFields:
+    operator: |
+      err = parseLDAPFields("compare-request")
+      if err != nil { panic(err) }
+  LDAPCompareRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPCompareRequestFieldsExact", "LDAPCompareRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPCompareResponseFields:
+    operator: |
+      err = parseLDAPFields("compare-response")
+      if err != nil { panic(err) }
+  LDAPCompareResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPCompareResponseFieldsExact", "LDAPCompareResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPAbandonRequestFields:
+    operator: |
+      err = parseLDAPFields("abandon-request")
+      if err != nil { panic(err) }
+  LDAPAbandonRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPAbandonRequestFieldsExact", "LDAPAbandonRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPExtendedRequestFields:
+    operator: |
+      err = parseLDAPFields("extended-request")
+      if err != nil { panic(err) }
+  LDAPExtendedRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPExtendedRequestFieldsExact", "LDAPExtendedRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  LDAPExtendedResponseFields:
+    operator: |
+      err = parseLDAPFields("extended-response")
+      if err != nil { panic(err) }
+  LDAPExtendedResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("ldap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("ldap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("LDAPExtendedResponseFieldsExact", "LDAPExtendedResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed LDAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
 LDAPBindRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPBindRequestFields"
 LDAPBindResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPBindResponseFields"
 LDAPUnbindRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPUnbindRequestFields"
@@ -112,3 +294,16 @@ LDAPSearchRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LD
 LDAPSearchEntryFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPSearchEntryFields"
 LDAPSearchDoneFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPSearchDoneFields"
 LDAPSearchReferenceFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPSearchReferenceFields"
+LDAPModifyRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPModifyRequestFields"
+LDAPModifyResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPModifyResponseFields"
+LDAPAddRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPAddRequestFields"
+LDAPAddResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPAddResponseFields"
+LDAPDelRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPDelRequestFields"
+LDAPDelResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPDelResponseFields"
+LDAPModifyDNRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPModifyDNRequestFields"
+LDAPModifyDNResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPModifyDNResponseFields"
+LDAPCompareRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPCompareRequestFields"
+LDAPCompareResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPCompareResponseFields"
+LDAPAbandonRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPAbandonRequestFields"
+LDAPExtendedRequestFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPExtendedRequestFields"
+LDAPExtendedResponseFieldsExact: "import:application-layer/ldap_fields.yaml;node:LDAPExtendedResponseFields"

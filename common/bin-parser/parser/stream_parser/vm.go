@@ -707,6 +707,7 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 		"decodePrometheusText":      decodePrometheusText,
 		"decodeEtherSBusDatagram":   decodeEtherSBusDatagram,
 		"decodeIPCompPayload":       decodeIPCompPayload,
+		"unmaskWebSocket":           unmaskWebSocketPayload,
 		"len": func(i interface{}) int {
 			return reflect.ValueOf(i).Len()
 		},

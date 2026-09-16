@@ -166,12 +166,13 @@ func TestWebSocketFramesAndEdges(t *testing.T) {
 	e := parseRule(t, ext, "application-layer.websocket", "WebSocket")
 	require.Equal(t, uint64(2), uintVal(t, e.Child("Opcode")))
 	require.Equal(t, uint64(126), uintVal(t, e.Child("Payload Len")))
-	require.Equal(t, "world", strVal(t, e.Child("Octets")))
+	require.Equal(t, "world", strVal(t, e.Child("Binary")))
 
 	masked := []byte{0x81, 0x85, 1, 2, 3, 4, 'h' ^ 1, 'e' ^ 2, 'l' ^ 3, 'l' ^ 4, 'o' ^ 1}
 	m := parseRule(t, masked, "application-layer.websocket", "WebSocket")
 	require.Equal(t, uint64(1), uintVal(t, m.Child("Mask")))
 	require.Equal(t, []byte{1, 2, 3, 4}, bytesVal(t, m.Child("Masking Key")))
+	require.Equal(t, "hello", strVal(t, m.Child("Text")))
 
 	parseMustFail(t, nil, "application-layer.websocket", "WebSocket")
 	parseMustFail(t, []byte{0x83, 0x00}, "application-layer.websocket", "WebSocket")
