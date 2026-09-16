@@ -4,16 +4,25 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+const officialCHeadersZipName = "c-std-headers.zip"
+
+var (
+	officialCHeadersZipURL     = "https://yaklang.oss-accelerate.aliyuncs.com/c-headers/latest/c-std-headers.zip"
+	officialCHeadersVersionURL = "https://yaklang.oss-accelerate.aliyuncs.com/c-headers/latest/version.txt"
 )
 
 const defaultCHeaderPreviewMaxBytes = 512 * 1024
@@ -204,6 +213,73 @@ func (s *Server) PreviewCHeaderFile(ctx context.Context, req *ypb.PreviewCHeader
 		data = data[:maxBytes]
 	}
 	return &ypb.PreviewCHeaderFileResponse{Content: data, Truncated: truncated}, nil
+}
+
+func (s *Server) DownloadOfficialCHeaders(ctx context.Context, req *ypb.DownloadOfficialCHeadersRequest) (*ypb.DownloadOfficialCHeadersResponse, error) {
+	if req == nil {
+		req = &ypb.DownloadOfficialCHeadersRequest{}
+	}
+	dest, err := confinedCHeaderChild(officialCHeadersZipName)
+	if err != nil {
+		return &ypb.DownloadOfficialCHeadersResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	if _, err := os.Stat(dest); err == nil && !req.GetForce() {
+		return &ypb.DownloadOfficialCHeadersResponse{
+			Ok:       false,
+			Reason:   "c-std-headers.zip already exists (set Force to overwrite)",
+			PackPath: dest,
+			Version:  fetchOfficialCHeadersVersion(ctx),
+		}, nil
+	}
+
+	tmp := dest + ".download"
+	_ = os.Remove(tmp)
+	client := newCHeadersHTTPClient()
+	if err := utils.DownloadFile(ctx, client, officialCHeadersZipURL, tmp); err != nil {
+		_ = os.Remove(tmp)
+		return &ypb.DownloadOfficialCHeadersResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	if err := os.RemoveAll(dest); err != nil {
+		_ = os.Remove(tmp)
+		return &ypb.DownloadOfficialCHeadersResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	if err := os.Rename(tmp, dest); err != nil {
+		_ = os.Remove(tmp)
+		return &ypb.DownloadOfficialCHeadersResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	return &ypb.DownloadOfficialCHeadersResponse{
+		Ok:       true,
+		Version:  fetchOfficialCHeadersVersion(ctx),
+		PackPath: dest,
+	}, nil
+}
+
+func newCHeadersHTTPClient() *http.Client {
+	client := utils.NewDefaultHTTPClient()
+	client.Timeout = 10 * time.Minute
+	return client
+}
+
+func fetchOfficialCHeadersVersion(ctx context.Context) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, officialCHeadersVersionURL, nil)
+	if err != nil {
+		return ""
+	}
+	client := newCHeadersHTTPClient()
+	client.Timeout = 15 * time.Second
+	rsp, err := client.Do(req)
+	if err != nil || rsp == nil || rsp.Body == nil {
+		return ""
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode < 200 || rsp.StatusCode >= 300 {
+		return ""
+	}
+	raw, err := io.ReadAll(io.LimitReader(rsp.Body, 256))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(raw))
 }
 
 func absCHeadersDir() (string, error) {

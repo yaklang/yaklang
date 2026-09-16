@@ -417,6 +417,7 @@ const (
 	Yak_ImportCHeaderPack_FullMethodName                          = "/ypb.Yak/ImportCHeaderPack"
 	Yak_DeleteCHeaderPack_FullMethodName                          = "/ypb.Yak/DeleteCHeaderPack"
 	Yak_PreviewCHeaderFile_FullMethodName                         = "/ypb.Yak/PreviewCHeaderFile"
+	Yak_DownloadOfficialCHeaders_FullMethodName                   = "/ypb.Yak/DownloadOfficialCHeaders"
 	Yak_GetPcapMetadata_FullMethodName                            = "/ypb.Yak/GetPcapMetadata"
 	Yak_PcapX_FullMethodName                                      = "/ypb.Yak/PcapX"
 	Yak_QueryTrafficSession_FullMethodName                        = "/ypb.Yak/QueryTrafficSession"
@@ -1197,6 +1198,7 @@ type YakClient interface {
 	ImportCHeaderPack(ctx context.Context, in *ImportCHeaderPackRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	DeleteCHeaderPack(ctx context.Context, in *DeleteCHeaderPackRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	PreviewCHeaderFile(ctx context.Context, in *PreviewCHeaderFileRequest, opts ...grpc.CallOption) (*PreviewCHeaderFileResponse, error)
+	DownloadOfficialCHeaders(ctx context.Context, in *DownloadOfficialCHeadersRequest, opts ...grpc.CallOption) (*DownloadOfficialCHeadersResponse, error)
 	// Wireshark
 	GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error)
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PcapXRequest, PcapXResponse], error)
@@ -6114,6 +6116,16 @@ func (c *yakClient) PreviewCHeaderFile(ctx context.Context, in *PreviewCHeaderFi
 	return out, nil
 }
 
+func (c *yakClient) DownloadOfficialCHeaders(ctx context.Context, in *DownloadOfficialCHeadersRequest, opts ...grpc.CallOption) (*DownloadOfficialCHeadersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DownloadOfficialCHeadersResponse)
+	err := c.cc.Invoke(ctx, Yak_DownloadOfficialCHeaders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PcapMetadata)
@@ -9583,6 +9595,7 @@ type YakServer interface {
 	ImportCHeaderPack(context.Context, *ImportCHeaderPackRequest) (*GeneralResponse, error)
 	DeleteCHeaderPack(context.Context, *DeleteCHeaderPackRequest) (*GeneralResponse, error)
 	PreviewCHeaderFile(context.Context, *PreviewCHeaderFileRequest) (*PreviewCHeaderFileResponse, error)
+	DownloadOfficialCHeaders(context.Context, *DownloadOfficialCHeadersRequest) (*DownloadOfficialCHeadersResponse, error)
 	// Wireshark
 	GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error)
 	PcapX(grpc.BidiStreamingServer[PcapXRequest, PcapXResponse]) error
@@ -11110,6 +11123,9 @@ func (UnimplementedYakServer) DeleteCHeaderPack(context.Context, *DeleteCHeaderP
 }
 func (UnimplementedYakServer) PreviewCHeaderFile(context.Context, *PreviewCHeaderFileRequest) (*PreviewCHeaderFileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PreviewCHeaderFile not implemented")
+}
+func (UnimplementedYakServer) DownloadOfficialCHeaders(context.Context, *DownloadOfficialCHeadersRequest) (*DownloadOfficialCHeadersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadOfficialCHeaders not implemented")
 }
 func (UnimplementedYakServer) GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPcapMetadata not implemented")
@@ -18526,6 +18542,24 @@ func _Yak_PreviewCHeaderFile_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DownloadOfficialCHeaders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DownloadOfficialCHeadersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DownloadOfficialCHeaders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DownloadOfficialCHeaders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DownloadOfficialCHeaders(ctx, req.(*DownloadOfficialCHeadersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetPcapMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PcapMetadataRequest)
 	if err := dec(in); err != nil {
@@ -24136,6 +24170,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PreviewCHeaderFile",
 			Handler:    _Yak_PreviewCHeaderFile_Handler,
+		},
+		{
+			MethodName: "DownloadOfficialCHeaders",
+			Handler:    _Yak_DownloadOfficialCHeaders_Handler,
 		},
 		{
 			MethodName: "GetPcapMetadata",
