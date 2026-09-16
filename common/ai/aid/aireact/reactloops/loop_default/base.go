@@ -3,6 +3,7 @@ package loop_default
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -22,21 +23,27 @@ var outputExample string
 var reactiveDataTemplate string
 
 const reActPostSummary = `
-请根据实际执行记录, 用 Markdown 输出结构化总结, 禁止 Emoji。
+请根据实际执行记录给出收尾答复，严格遵守当前用户请求的语言、长度、格式和文件输出限制，禁止 Emoji。
+用户要求几行简短说明时，只输出几行；用户要求完整报告时才展开结构化报告。不要把以下内部核对项变成用户必须阅读的章节，不要因收尾而额外创建用户禁止的文件。
+以下是回答前的内部事实核对，不是强制输出模板：
 
-先写本次目标、完成情况和核心产出。finish 是模型的完成声明, 不自动证明目标已完成; 存在未执行工作或外部阻塞时必须如实写未完成或部分完成。
+先核对本次目标、完成情况和核心产出。finish 是模型的完成声明, 不自动证明目标已完成; 存在未执行工作或外部阻塞时必须如实写未完成或部分完成。
 
-## 验收结果与已关闭工作
+验收结果与已关闭工作：
 
-将每项用户验收要求对应到实际产出和 Observation/交付物位置。存在 TODO 历史时逐项对应 id、outcome、关闭所依据的证据; 不另写一套故事, 不把 deferred 算作执行完成。当前上下文缺少 TODO 明细时, 明确写“TODO 明细未提供, 无法逐项核对”; 不得推断本次没有 TODO 或未启用 todo_delta, 不编造 id 或工具调用。
+将每项用户验收要求对应到实际产出和 Observation/交付物位置。存在 TODO 历史时逐项对应 id、outcome、关闭所依据的证据; 不另写一套故事, 不把 deferred 算作执行完成。当前上下文缺少 TODO 明细时, 内部标记“TODO 明细未提供, 无法逐项核对”; 不得推断本次没有 TODO 或未启用 todo_delta, 不编造 id 或工具调用。
 
-## 仍未完成的工作
+仍未完成的工作：
 
-核对 timeline、evidence、工具结果和已投递答复中, 属于当前目标却没有作为开放 TODO 被执行关闭的具体对象, 以及仍受外部阻塞的 deferred 项。逐项写对象、原目标、缺少的执行/验证、阻塞及恢复条件。存在漏项时说明为何未在 finish 前 add 并执行, 本次不得称为全部完成; 没有则写“无”。
+核对 timeline、evidence、工具结果和已投递答复中, 属于当前目标却没有作为开放 TODO 被执行关闭的具体对象, 以及仍受外部阻塞的 deferred 项。逐项核对对象、原目标、缺少的执行/验证、阻塞及恢复条件。对用户只按其要求的篇幅说明影响结论的未完成项。存在漏项时说明为何未在 finish 前 add 并执行, 本次不得称为全部完成; 没有则无需额外输出空章节。
 
-禁止设置“可选后续”“不属于本次完成条件”“下一步建议”等章节来降级范围内未执行的工作。不要用“主产出已交付”“深度优先”“置信已够”解释遗漏, 不虚构检查结果。
+禁止设置“可选后续”“不属于本次完成条件”“下一步建议”等章节来降级范围内未执行的工作。不要用“主产出已交付”“深度优先”“置信已够”解释遗漏, 不虚构检查结果。严格保留提交接口的实际 receipt/status；unmatched、accepted=false 或失败不能总结为 accepted。
 
 `
+
+func buildPostSummaryPrompt(userInput string) string {
+	return fmt.Sprintf("%s\n当前任务的原始用户请求（其中的输出约束必须保留）：\n%s", reActPostSummary, userInput)
+}
 
 // resolveMaxIterations computes the iteration ceiling for a loop from the
 // caller config. When goal mode is enabled it raises a too-small ceiling to
@@ -105,7 +112,7 @@ func init() {
 					}
 
 					directlySummary, _ := loop.GetInvoker().DirectlyAnswer(
-						task.GetContext(), reActPostSummary, nil, nil,
+						task.GetContext(), buildPostSummaryPrompt(task.GetUserInput()), nil, nil,
 					)
 					if directlySummary != "" {
 						loop.GetInvoker().AddToTimeline("final_summary", directlySummary)

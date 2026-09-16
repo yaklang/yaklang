@@ -92,3 +92,9 @@ func WithGeneralConfigStreamableFieldEmitterCallback(fieldKeys []string, callbac
 		c.config.Set("streamFieldCallbacks", callbacks)
 	}
 }
+
+// WithLiteForgeOutputValidator validates a complete auxiliary action inside the
+// bounded transaction retry loop, before the caller can persist its contents.
+func WithLiteForgeOutputValidator(validate func(*Action) error) GeneralKVConfigOption {
+	return func(c *GeneralKVConfig) { c.config.Set("liteForgeOutputValidator", validate) }
+}

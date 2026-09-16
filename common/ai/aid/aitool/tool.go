@@ -906,6 +906,9 @@ func (t *Tool) ToJSONSchema() *omap.OrderedMap[string, any] {
 	if len(t.InputSchema.Required) > 0 {
 		paramsSchema["required"] = t.InputSchema.Required
 	}
+	if len(t.InputSchema.AllOf) > 0 {
+		paramsSchema["allOf"] = t.InputSchema.AllOf
+	}
 	properties.Set("params", paramsSchema)
 
 	// 构建最终的JSON Schema - 使用 OrderedMap 保证顺序

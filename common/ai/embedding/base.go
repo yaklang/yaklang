@@ -196,10 +196,39 @@ func isJSONSpace(character byte) bool {
 // 错误响应结构体
 type errorResponse struct {
 	Error struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-		Type    string `json:"type"`
+		Code    json.RawMessage `json:"code"`
+		Message string          `json:"message"`
+		Type    string          `json:"type"`
 	} `json:"error"`
+}
+
+// EmbeddingAPIError preserves provider codes without imposing a numeric type.
+// Body is a bounded preview; Code retains the original JSON representation.
+type EmbeddingAPIError struct {
+	StatusCode int
+	Code       json.RawMessage
+	Message    string
+	Type       string
+	Body       string
+}
+
+func (e *EmbeddingAPIError) Error() string {
+	code := string(e.Code)
+	if code == "" {
+		code = "<missing>"
+	}
+	message := e.Message
+	if message == "" {
+		message = e.Body
+	}
+	return fmt.Sprintf("embedding API error (HTTP %d, code: %s, type: %s): %s", e.StatusCode, code, e.Type, message)
+}
+
+func (e *EmbeddingAPIError) Unwrap() error {
+	if strings.Contains(strings.ToLower(e.Message), "input is too large") {
+		return ErrInputTooLarge
+	}
+	return nil
 }
 
 // 预定义的错误类型
@@ -254,7 +283,7 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 	rsp, err := c.doEmbeddingRequest(targetUrl, jsonData)
 	if err != nil {
 		log.Errorf("Embedding request failed: %v", err)
-		return nil, utils.Errorf("request embeddings failed: %v", err)
+		return nil, utils.Errorf("request embeddings failed: %w", err)
 	}
 	defer rsp.Body.Close()
 
@@ -270,23 +299,23 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 	} else if rsp.StatusCode != http.StatusOK {
 		log.Infof("Embedding response status: %d, content length: %d", rsp.StatusCode, rsp.ContentLength)
 	}
+	if errResp != nil || rsp.StatusCode < 200 || rsp.StatusCode >= 300 {
+		apiErr := &EmbeddingAPIError{StatusCode: rsp.StatusCode, Body: preview.String()}
+		if errResp != nil {
+			apiErr.Code = errResp.Error.Code
+			apiErr.Message = errResp.Error.Message
+			apiErr.Type = errResp.Error.Type
+		}
+		return nil, apiErr
+	}
+	if decodeErr != nil {
+		return nil, utils.Errorf("failed to parse embedding response (HTTP %d): %v; body: %s", rsp.StatusCode, decodeErr, preview.String())
+	}
 	if len(vectors) > 0 {
 		normalizeEmbeddingVectors(vectors)
 		return vectors, nil
 	}
-	if errResp != nil && errResp.Error.Message != "" {
-		// 检查是否包含 "input is too large" 错误
-		if strings.Contains(strings.ToLower(errResp.Error.Message), "input is too large") {
-			return nil, ErrInputTooLarge
-		}
-		// 返回其他API错误
-		return nil, utils.Errorf("API error: %s (code: %d, type: %s)",
-			errResp.Error.Message, errResp.Error.Code, errResp.Error.Type)
-	}
-	if decodeErr != nil {
-		return nil, utils.Errorf("failed to parse embedding response: %v; body: %s", decodeErr, preview.String())
-	}
-	return nil, utils.Errorf("failed to parse embedding response in any known format: %s", preview.String())
+	return nil, utils.Errorf("failed to parse embedding response in any known format (HTTP %d): %s", rsp.StatusCode, preview.String())
 }
 
 func (c *OpenaiEmbeddingClient) doEmbeddingRequest(targetURL string, body []byte) (*http.Response, error) {
@@ -391,6 +420,7 @@ func decodeEmbeddingResponse(reader io.Reader) ([][]float32, *errorResponse, err
 	case '{':
 		var vectors [][]float32
 		var apiError errorResponse
+		hasAPIError := false
 		for decoder.More() {
 			keyToken, err := decoder.Token()
 			if err != nil {
@@ -404,7 +434,12 @@ func decodeEmbeddingResponse(reader io.Reader) ([][]float32, *errorResponse, err
 			case "data":
 				vectors, err = decodeEmbeddingItems(decoder, false, true)
 			case "error":
-				err = decoder.Decode(&apiError.Error)
+				var raw json.RawMessage
+				err = decoder.Decode(&raw)
+				hasAPIError = string(raw) != "null"
+				if err == nil && hasAPIError {
+					err = json.Unmarshal(raw, &apiError.Error)
+				}
 			default:
 				err = skipJSONValue(decoder)
 			}
@@ -415,7 +450,7 @@ func decodeEmbeddingResponse(reader io.Reader) ([][]float32, *errorResponse, err
 		if _, err := decoder.Token(); err != nil {
 			return nil, nil, err
 		}
-		if apiError.Error.Message != "" {
+		if hasAPIError {
 			return vectors, &apiError, nil
 		}
 		return vectors, nil, nil

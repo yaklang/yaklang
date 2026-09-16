@@ -95,3 +95,9 @@ func (g *GeneralKVConfig) GetLiteForgeDisableTimeline() bool {
 	disabled, _ := result.(bool)
 	return disabled
 }
+
+func (g *GeneralKVConfig) GetLiteForgeOutputValidator() func(*Action) error {
+	value, _ := g.config.Get("liteForgeOutputValidator")
+	validate, _ := value.(func(*Action) error)
+	return validate
+}

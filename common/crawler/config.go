@@ -76,7 +76,8 @@ func (c *Config) init() {
 }
 
 type Config struct {
-	ctx context.Context
+	urlScopes []*url.URL
+	ctx       context.Context
 	// 基础认证
 	BasicAuth    bool
 	AuthUsername string
@@ -246,6 +247,9 @@ func (c *Config) DoHTTPRequest(https bool, runtimeID string, extra ...lowhttp.Lo
 }
 
 func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
+	if len(c.urlScopes) > 0 && !inURLScopes(u, c.urlScopes) {
+		return false
+	}
 	pass := false
 
 	// 只要有一个通过就通过

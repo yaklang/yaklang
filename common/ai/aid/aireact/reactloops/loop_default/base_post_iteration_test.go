@@ -156,8 +156,21 @@ func TestDefaultLoop_PostIterationGeneratesSummaryAfterOtherAction(t *testing.T)
 
 	require.Equal(t, 1, invoker.directAnswerCalls(),
 		"last valid action is not directly_answer; post-iteration summary must be generated")
-	require.Equal(t, reActPostSummary, invoker.directAnswerQueries[0],
+	require.Equal(t, buildPostSummaryPrompt("执行一个任务"), invoker.directAnswerQueries[0],
 		"summary must use the post-summary prompt")
 	require.Contains(t, invoker.timelineValues("final_summary"), "mocked final summary",
 		"summary result must be recorded to the final_summary timeline entry")
+}
+
+func TestDefaultLoopFinalSummaryPreservesUserOutputConstraints(t *testing.T) {
+	for _, query := range []string{"只输出几行简短收尾，不要生成正式报告", "生成完整报告", "不要生成本地文件"} {
+		invoker := newPostIterationTestInvoker(scriptedCallback(`{"@action":"record_note"}`, `{"@action":"finish"}`))
+		loop := newPostIterationTestLoop(t, invoker, reactloops.WithRegisterLoopAction("record_note", "record", nil, nil, func(_ *reactloops.ReActLoop, _ *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		}))
+		require.NoError(t, loop.Execute("output-constraints", context.Background(), query))
+		require.Equal(t, 1, invoker.directAnswerCalls())
+		require.Contains(t, invoker.directAnswerQueries[0], query)
+		require.Contains(t, invoker.directAnswerQueries[0], "不是强制输出模板")
+	}
 }

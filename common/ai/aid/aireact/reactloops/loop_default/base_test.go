@@ -75,8 +75,8 @@ func TestReactiveDataDoesNotExposeIterationDeadline(t *testing.T) {
 }
 
 func TestPostSummaryAuditsAcceptanceAndUnfinishedWork(t *testing.T) {
-	require.Contains(t, reActPostSummary, "## 验收结果与已关闭工作")
-	require.Contains(t, reActPostSummary, "## 仍未完成的工作")
+	require.Contains(t, reActPostSummary, "验收结果与已关闭工作")
+	require.Contains(t, reActPostSummary, "仍未完成的工作")
 	require.Contains(t, reActPostSummary, "不把 deferred 算作执行完成")
 	require.Contains(t, reActPostSummary, "不得推断本次没有 TODO")
 	require.Contains(t, reActPostSummary, "未在 finish 前 add 并执行")

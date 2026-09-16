@@ -5,6 +5,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"sync"
@@ -1055,4 +1056,28 @@ func TestSimpleCrawler_BoundsRenderingAssessmentWork(t *testing.T) {
 		"rendering assessment should stop after 20 HTML responses; got:\n%s", stdout)
 	assert.Assert(t, strings.Contains(stdout, "Assessment budget: sampled the first 20 of "),
 		"rendering assessment should report its stable work cap without depending on concurrent crawl completion order; got:\n%s", stdout)
+}
+
+func TestSimpleCrawlerExplicitURLScopeKeepsOtherPortsDiscoveryOnly(t *testing.T) {
+	var outsideCalls atomic.Int32
+	outside := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { outsideCalls.Add(1); _, _ = w.Write([]byte("outside")) }))
+	defer outside.Close()
+	var insideCalls atomic.Int32
+	inside := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		insideCalls.Add(1)
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<a href="` + outside.URL + `/linked">related</a><a href="/unrelated">other subtree</a><a href="/cms/child">inside</a>`))
+		if !strings.HasPrefix(r.URL.Path, "/cms") {
+			t.Errorf("out of subtree request: %s", r.URL.Path)
+		}
+	}))
+	defer inside.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	stdout, stderr, err := execCrawlerToolWithContext(t, ctx, getSimpleCrawlerTool(t), aitool.InvokeParams{"urls": inside.URL + "/cms", "scope-urls": inside.URL + "/cms", "ai-js": "no", "reqs-max": 5, "max-depth": 2, "timeout": 2})
+	assert.NilError(t, err, "stderr=%s", stderr)
+	assert.Equal(t, outsideCalls.Load(), int32(0))
+	assert.Assert(t, insideCalls.Load() >= 1)
+	assert.Assert(t, strings.Contains(stdout, outside.URL+"/linked"), "out-of-scope discovery must remain visible")
+	assert.Assert(t, strings.Contains(stdout, "URL scope:"))
 }

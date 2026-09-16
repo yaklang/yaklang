@@ -52,7 +52,8 @@ func (p *BrowserPage) HandleJavaScriptDialog(accept bool, promptText string) err
 		p.dialogMu.Unlock()
 		return fmt.Errorf("no pending javascript dialog on this page")
 	}
-	d := *p.pendingDialog
+	handled := p.pendingDialog
+	d := *handled
 	p.dialogMu.Unlock()
 
 	err := proto.PageHandleJavaScriptDialog{
@@ -64,18 +65,32 @@ func (p *BrowserPage) HandleJavaScriptDialog(accept bool, promptText string) err
 	}
 
 	p.dialogMu.Lock()
-	p.pendingDialog = nil
+	if p.pendingDialog == handled {
+		p.pendingDialog = nil
+	}
 	p.dialogMu.Unlock()
 	log.Infof("javascript dialog handled: type=%s accept=%v", d.Type, accept)
 	return nil
 }
 
+// DialogBlockingError signals that the operation failed but the page can be
+// recovered by handling the pending dialog. It is not evidence of a vulnerability.
+type DialogBlockingError struct {
+	Dialog JavaScriptDialog
+	Err    error
+}
+
+func (e *DialogBlockingError) Error() string {
+	return fmt.Sprintf("blocked by javascript dialog (type=%s message=%q): call HandleJavaScriptDialog then retry: %v", e.Dialog.Type, e.Dialog.Message, e.Err)
+}
+
+func (e *DialogBlockingError) Unwrap() error { return e.Err }
+
 func dialogBlockingError(d *JavaScriptDialog, wrapped error) error {
 	if d == nil {
 		return wrapped
 	}
-	return fmt.Errorf("blocked by javascript dialog (type=%s message=%q): call HandleJavaScriptDialog then retry: %w",
-		d.Type, d.Message, wrapped)
+	return &DialogBlockingError{Dialog: *d, Err: wrapped}
 }
 
 func (p *BrowserPage) requireNoDialog(op string) error {

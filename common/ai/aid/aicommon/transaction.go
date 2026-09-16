@@ -2,10 +2,10 @@ package aicommon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -91,6 +91,8 @@ func callAITransaction(
 	seedRequest := NewAIRequest("", requestOpts...)
 	transactionCtx, stopTransactionCtx := combineAIRequestAndConfigContext(c.GetContext(), seedRequest.GetContext())
 	defer stopTransactionCtx()
+	budget := newRateLimitBudget()
+	requestOpts = append(requestOpts, WithAIRequest_Context(transactionCtx))
 	seq := seedRequest.GetSeqId()
 	var saver CheckpointCommitHandler
 	var transactionStateMu sync.Mutex
@@ -160,6 +162,7 @@ func callAITransaction(
 			finalPrompt,
 			append(requestOpts, WithAIRequest_SeqId(getSeq()))...,
 		)
+		aiReq.rateLimitBudget = budget
 		lastReq = aiReq
 		rsp, err := callAi(aiReq)
 		// A request-scoped cancellation is a terminal control signal, not an AI
@@ -169,26 +172,36 @@ func callAITransaction(
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
+		if err == nil && rsp != nil && rsp.GetHTTPStatusCode() == 429 {
+			err = aiHTTPResponseError(rsp)
+		}
 		if err != nil {
 			lastErr = err
 			lastCallAiErr = err
 			lastRsp = rsp
 			rspEmitter := bindEmitter(rsp)
 
-			if is429Response(transactionCtx, rsp) {
-				if is429Retryable(transactionCtx, rsp) {
-					// 频率限流/过载类：可重试，不消耗重试次数。
-					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
+			var terminalRateLimit *AIRateLimitError
+			if errors.As(err, &terminalRateLimit) {
+				attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
+				nonRetryableHTTPFailure = true
+				break
+			}
+			// Tier callbacks already handle 429 in Config.wrapper. Only raw custom
+			// callbacks reach this fallback; reuse the same policy and budget.
+			if is429, shouldRetry, done := handle429RateLimitContext(transactionCtx, c, rsp, budget); is429 {
+				if done {
+					return transactionCtx.Err()
+				}
+				if shouldRetry {
 					attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
-					retryAfter := parseRetryAfterSeconds(rsp, 5)
-					waitSec := capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
-					if waitErr := waitBeforeAIRetry(transactionCtx, c, time.Duration(waitSec)*time.Second); waitErr != nil {
-						return waitErr
-					}
 					continue
 				}
-				// 额度耗尽类 429：不可重试，消耗重试次数让上层暴露错误。
-				rspEmitter.EmitWarning("429 quota exceeded in transaction layer (seq=%d), not retryable", getSeq())
+				lastErr = rateLimitError(budget, rsp)
+				lastCallAiErr = lastErr
+				attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, lastErr, rsp))
+				nonRetryableHTTPFailure = true
+				break
 			}
 
 			i++
@@ -223,7 +236,7 @@ func callAITransaction(
 		if ctxErr := transactionCtx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		if rsp.GetHTTPStatusCode() >= 400 && rsp.GetHTTPStatusCode() != 429 {
+		if rsp.GetHTTPStatusCode() >= 400 {
 			// An HTTP error body is not model output. Do not send it through
 			// action parsing and generate secondary "missing @action" errors.
 			postHandlerErr = aiHTTPResponseError(rsp)

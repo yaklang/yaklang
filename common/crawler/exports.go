@@ -27,6 +27,7 @@ var Exports = map[string]interface{}{
 	"proxy":               WithProxy,
 	"responseTimeout":     WithResponseTimeout,
 	"urlRegexpExclude":    WithUrlRegexpBlackList,
+	"urlScope":            WithURLScope,
 	"urlRegexpInclude":    WithUrlRegexpWhiteList,
 	"userAgent":           WithUserAgent,
 	"ua":                  WithUserAgent,

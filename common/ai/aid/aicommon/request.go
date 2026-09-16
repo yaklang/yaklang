@@ -26,6 +26,10 @@ type AIRequest struct {
 	callerLabel            string
 	ctx                    context.Context
 
+	// rateLimitBudget is assigned by CallAITransaction and shared by its callback
+	// attempts. Standalone callbacks allocate their own budget in Config.wrapper.
+	rateLimitBudget *rateLimitBudget
+
 	// extraSpecOpts carries additional aispec.AIConfigOption values that
 	// AIChatToAICallbackType will append to its option list when calling the
 	// underlying AI service. This is used by functioncall mode to inject

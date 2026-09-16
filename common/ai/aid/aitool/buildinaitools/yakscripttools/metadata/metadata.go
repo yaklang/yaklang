@@ -27,8 +27,9 @@ type YakScriptMetadata struct {
 	Description   string
 	Keywords      []string
 	// Usage 工具使用说明，在参数生成阶段(第2阶段)披露给 AI
-	Usage       string
-	EnableForAI bool
+	Usage            string
+	EnableForAI      bool
+	InputConstraints string // __INPUT_CONSTRAINTS__: JSON Schema applied in addition to CLI properties
 }
 
 func firstConstString(prog *ssaapi.Program, ref string) string {
@@ -85,13 +86,14 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 	})
 
 	return &YakScriptMetadata{
-		Name:          name,
-		VerboseName:   verboseName,
-		VerboseNameZh: verboseNameZh,
-		Description:   strings.Join(desc, "; "),
-		Keywords:      keywords,
-		Usage:         strings.Join(usage, "; "),
-		EnableForAI:   enableForAI,
+		InputConstraints: firstConstString(prog, "__INPUT_CONSTRAINTS__"),
+		Name:             name,
+		VerboseName:      verboseName,
+		VerboseNameZh:    verboseNameZh,
+		Description:      strings.Join(desc, "; "),
+		Keywords:         keywords,
+		Usage:            strings.Join(usage, "; "),
+		EnableForAI:      enableForAI,
 	}, nil
 }
 

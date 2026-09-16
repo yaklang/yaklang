@@ -171,6 +171,12 @@ func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {
 	bp := newBrowserPage(page, inst, inst.config.timeout)
 	err = bp.Navigate(urlStr)
 	if err != nil {
+		// A dialog is recoverable through CurrentPage/HandleJavaScriptDialog.
+		// Keep both the page and its watcher alive after the operation timeout.
+		if _, pending := bp.GetPendingDialog(); pending && !isBrokenCDPError(err) {
+			inst.pages = append(inst.pages, bp)
+			return bp, err
+		}
 		_ = page.Close()
 		if isBrokenCDPError(err) {
 			evictAfter = true
