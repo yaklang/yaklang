@@ -433,6 +433,90 @@ Attribute__
     : '__attribute__'
     ;
 
+// MSVC/Windows unexpanded macros. Must precede Identifier so they are not
+// swallowed as ordinary names (UNALIGNED *PFOO, COM vtable wrappers).
+Unaligned
+    : 'UNALIGNED'
+    ;
+
+UnalignedAttr
+    : '__unaligned'
+    ;
+
+BeginInterface
+    : 'BEGIN_INTERFACE'
+    ;
+
+EndInterface
+    : 'END_INTERFACE'
+    ;
+
+// GCC/MSVC keywords must precede Identifier; otherwise `__cdecl` is lexed as
+// a name and `int * __cdecl f2();` stops before `f2`.
+Extension
+    : '__extension__'
+    ;
+
+BuiltinVaArg
+    : '__builtin_va_arg'
+    ;
+
+BuiltinOffsetof
+    : '__builtin_offsetof'
+    ;
+
+M128
+    : '__m128'
+    ;
+
+M128d
+    : '__m128d'
+    ;
+
+M128i
+    : '__m128i'
+    ;
+
+Typeof
+    : '__typeof__'
+    ;
+
+Inline__
+    : '__inline__'
+    ;
+
+Stdcall
+    : '__stdcall'
+    ;
+
+Declspec
+    : '__declspec'
+    ;
+
+Cdecl
+    : '__cdecl'
+    ;
+
+Clrcall
+    : '__clrcall'
+    ;
+
+Fastcall
+    : '__fastcall'
+    ;
+
+Thiscall
+    : '__thiscall'
+    ;
+
+Vectorcall
+    : '__vectorcall'
+    ;
+
+Volatile__
+    : '__volatile__'
+    ;
+
 // --- Identifiers ---
 Identifier
     : IdentifierNondigit (IdentifierNondigit | Digit)*
@@ -641,75 +725,6 @@ LINE_COMMENT
     : '//' ~[\r\n]* -> skip
     ;
 
-BLOCK_COMMENT
-    : '/*' .*? '*/' -> skip
-    ;
-
-// --- GCC/Clang Extensions and Builtins ---
-Extension
-    : '__extension__'
-    ;
-
-BuiltinVaArg
-    : '__builtin_va_arg'
-    ;
-
-BuiltinOffsetof
-    : '__builtin_offsetof'
-    ;
-
-M128
-    : '__m128'
-    ;
-
-M128d
-    : '__m128d'
-    ;
-
-M128i
-    : '__m128i'
-    ;
-
-Typeof
-    : '__typeof__'
-    ;
-
-Inline__
-    : '__inline__'
-    ;
-
-Stdcall
-    : '__stdcall'
-    ;
-
-Declspec
-    : '__declspec'
-    ;
-
-Cdecl
-    : '__cdecl'
-    ;
-
-Clrcall
-    : '__clrcall'
-    ;
-
-Fastcall
-    : '__fastcall'
-    ;
-
-Thiscall
-    : '__thiscall'
-    ;
-
-Vectorcall
-    : '__vectorcall'
-    ;
-
-Volatile__
-    : '__volatile__'
-    ;
-
 MultiLineMacro
     : '#' (~[\n]*? '\\' '\r'? '\n')+ ~ [\n]+ -> channel (HIDDEN)
     ;
@@ -742,7 +757,8 @@ Newline
 // The .*? pattern matches any character including backslash-newline sequences
 // We use a more explicit pattern to ensure it matches everything including backslash-newline
 BlockComment
-    : '/*' (BlockComment | ~[*] | '*' ~[/])* '*/' -> channel(HIDDEN)
+    // '*'+ '/' so `**/` closes the comment (extra stars before the terminator).
+    : '/*' (~[*] | '*'+ ~[/])* '*'+ '/' -> channel(HIDDEN)
     ;
 
 LineComment

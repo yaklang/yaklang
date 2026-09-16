@@ -143,6 +143,10 @@ func (v *BaseCParserVisitor) VisitStructOrUnionSpecifier(ctx *StructOrUnionSpeci
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitStructAttr(ctx *StructAttrContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitStructOrUnion(ctx *StructOrUnionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -407,15 +411,23 @@ func (v *BaseCParserVisitor) VisitExternalDeclaration(ctx *ExternalDeclarationCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitFunctionOrDeclaration(ctx *FunctionOrDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitFunctionOrDeclarationRest(ctx *FunctionOrDeclarationRestContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitFunctionDefinition(ctx *FunctionDefinitionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitMacroCallExpression(ctx *MacroCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseCParserVisitor) VisitMacroArgumentList(ctx *MacroArgumentListContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseCParserVisitor) VisitFunctionDefinition(ctx *FunctionDefinitionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

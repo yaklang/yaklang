@@ -277,15 +277,30 @@ func expandMacroBody(body []macroToken, argMap map[string][]macroToken) []macroT
 			}
 		}
 		// token pasting: lhs ## rhs (whitespace around ## is ignored, as in ISO C)
+		// Chains such as EVUTIL_##name##_ are folded in one go (a##b##c).
 		hashPos := skipWhitespaceTokens(body, i+1)
 		if hashPos < len(body) && body[hashPos].kind == macroTokPunct && body[hashPos].text == "##" {
 			left := resolveBodyToken(body[i], argMap)
 			k := skipWhitespaceTokens(body, hashPos+1)
 			if k < len(body) {
-				right := resolveBodyToken(body[k], argMap)
-				merged := pasteMacroTokens(left, right)
+				merged := pasteMacroTokens(left, resolveBodyToken(body[k], argMap))
+				k++
+				for {
+					next := skipWhitespaceTokens(body, k)
+					if next >= len(body) || body[next].kind != macroTokPunct || body[next].text != "##" {
+						k = next
+						break
+					}
+					rhs := skipWhitespaceTokens(body, next+1)
+					if rhs >= len(body) {
+						k = next
+						break
+					}
+					merged = pasteMacroTokens(merged, resolveBodyToken(body[rhs], argMap))
+					k = rhs + 1
+				}
 				out = append(out, merged...)
-				i = k + 1
+				i = k
 				continue
 			}
 		}

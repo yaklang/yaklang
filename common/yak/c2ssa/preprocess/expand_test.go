@@ -29,6 +29,18 @@ int result = CUBE(num);
 	require.Contains(t, out, "((num) * (num))")
 }
 
+func TestExpandFunctionMacros_TokenPasteChain(t *testing.T) {
+	src := `
+#define IMPL_CTYPE_FN(name) int EVUTIL_##name##_(char c) { return 1; }
+IMPL_CTYPE_FN(ISALPHA)
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	require.Contains(t, out, "int EVUTIL_ISALPHA_(char c)")
+	require.NotContains(t, out, "IMPL_CTYPE_FN")
+	require.NotContains(t, out, "##")
+}
+
 func TestExpandFunctionMacros_TokenPaste(t *testing.T) {
 	src := `
 #define CONCAT(a, b) a##b
@@ -62,6 +74,19 @@ LOG("x=%d", x);
 	out, err := ExpandFunctionMacros(src)
 	require.NoError(t, err)
 	require.Contains(t, out, `printf("x=%d", x)`)
+}
+
+func TestExpandFunctionMacros_EmptyObjectMacro(t *testing.T) {
+	src := `
+#define WEPOLL_EXPORT
+WEPOLL_EXPORT HANDLE epoll_create(int size);
+WEPOLL_EXPORT HANDLE epoll_create1(int flags);
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	require.NotContains(t, out, "WEPOLL_EXPORT")
+	require.Contains(t, out, "HANDLE epoll_create(int size);")
+	require.Contains(t, out, "HANDLE epoll_create1(int flags);")
 }
 
 func TestExpandFunctionMacros_ObjectMacro(t *testing.T) {

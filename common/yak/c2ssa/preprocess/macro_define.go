@@ -138,17 +138,14 @@ func parseObjectDefineSafe(directive string) (name, body string, ok bool) {
 	for i < len(rest) && unicode.IsSpace(rune(rest[i])) {
 		i++
 	}
+	// `#define WEPOLL_EXPORT` (empty replacement) is valid and must expand to nothing.
 	if i >= len(rest) {
-		return "", "", false
+		return name, "", true
 	}
 	if rest[i] == '(' && findMatchingParen(rest, i) < 0 {
 		return "", "", false
 	}
-	body = strings.TrimSpace(rest[i:])
-	if body == "" {
-		return "", "", false
-	}
-	return name, body, true
+	return name, strings.TrimSpace(rest[i:]), true
 }
 
 func parseFunctionDefine(directive string) (name string, fm functionMacro, ok bool, err error) {
