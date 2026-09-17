@@ -80,7 +80,7 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.ssh", "SSH"},
 	{"application-layer.ssh", "SSHPacket"},
 	{"onc_rpc", "ONCRPC"},
-	{"onc_rpc", "ONCRPCTCP"},
+	{"onc_rpc_tcp", "ONCRPCTCP"},
 	{"application-layer.snmpv3", "SNMPv3"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
