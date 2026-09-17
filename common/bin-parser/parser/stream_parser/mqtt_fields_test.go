@@ -43,7 +43,7 @@ func mqttTestConnect(level int, flags byte, id string, extra ...[]byte) []byte {
 }
 
 func TestMQTT5FieldsConnectPublishSubscribe(t *testing.T) {
-	connect := mqttTestPacket(0x10, append(append(append(mqttTestVector([]byte("MQTT")), 5, 0x02, 0, 60, 3, 0x22, 0, 10), mqttTestVector([]byte("dev"))...)))
+	connect := mqttTestPacket(0x10, append(append(mqttTestVector([]byte("MQTT")), 5, 0x02, 0, 60, 3, 0x22, 0, 10), mqttTestVector([]byte("dev"))...))
 	_, info, err := decodeMQTTFields(connect, 5)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), info["Packet Type"])

@@ -217,7 +217,7 @@ func TestProtocolSessionKafkaFailClosed(t *testing.T) {
 
 func TestProtocolSessionKafkaFragmentation(t *testing.T) {
 	req := kafkaRequest(18, 0, 1, "", nil)
-	resp := kafkaResponse(1, append(append(kafkaBE16(0), kafkaBE32(0)...)))
+	resp := kafkaResponse(1, append(kafkaBE16(0), kafkaBE32(0)...))
 	steps := []sessionStep{{0, req}, {1, resp}}
 	assertFragmentation(t, steps, func(chunk int) []string {
 		s, err := NewProtocolSession(DefaultParserBudget())
