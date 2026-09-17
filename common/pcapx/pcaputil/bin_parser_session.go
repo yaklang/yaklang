@@ -202,6 +202,10 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("RTP %v ssrc %v", e.Session["Packet Name"], e.Session["SSRC"])
 		case "quic":
 			e.Summary = fmt.Sprintf("QUIC %v", e.Session["Packet Name"])
+			if e.Session["HTTP3"] == true {
+				e.Protocol = "http3"
+				e.Summary = fmt.Sprintf("HTTP/3 stream %v %v", e.Session["HTTP3 Stream ID"], e.Session["HTTP3 Stream Kind"])
+			}
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
