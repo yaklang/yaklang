@@ -5,7 +5,7 @@
 ## 版本、环境与口径
 
 - 基线：`2de6e21e4e8aabcb343440bbe4dc7e023e6594f9`，包含评审固定版本之后其他 worker 的 LDAP/PostgreSQL/WebSocket 提交。
-- 优化代码：`59de5abdef`；后续文档提交只保存验证记录。
+- 优化代码：`59de5abdef`；后续提交同步补全文档并保存验证记录，未再修改解析热路径。
 - Apple M1 Max，macOS 14.1.2，Go 1.22.12，darwin/arm64。共享开发机，不是隔离实验室；不在基准期间运行本任务的编译、测试或 profile。
 - 前后版本分别编译 test binary，基线复制**同一份基准代码**，按 A/B、B/A 顺序交替运行五轮；每项 300 ms，GOMAXPROCS=4。表中报告中位数与最小/最大值。时间下降与吞吐提升不是相同百分比。
 - 在观察正式结果前确定复查规则：同语义重复样本中位数退化超过 5% 必须复查。单轮调度矩阵仅用于探索，不能判断小幅性能回归。
@@ -49,6 +49,7 @@
 - `go test ./common/bin-parser/... ./common/pcapx/pcaputil ./common/pcapx/cmd/pcap-inspect -count=1 -timeout=10m` 全部通过。
 - H2/HTTP/Inspector/写盘/CLI/会话定向测试与 race 全部通过。macOS race 链接器有既存 LC_DYSYMTAB warning，运行通过，无 race 报告。
 - 10 份语料、141 个完整公开事件逐份 SHA-256 一致：包含所有 Fields、Metadata、Structured、Raw、时间戳、Session，而不只对比消息数。范围为 8 份既有回放 corpus + HTTP/2/MySQL 会话；其中既有 TLS/CONNECT 缺口保持原分类。不能据此外推全部协议语义。
+- 最后整包复测曾发现新增 `WithOutputFile` 注释与嵌入式 Yak 补全文档不一致；已只更新 `pcapx.pcap_outputFile.Document`，对整个文档解码对象做 JSON 比对确认没有其他字段变化。修复后 pcaputil、CLI、yakdoc/doc 三包全部通过，失败和最终通过日志一并保留。
 - 新测试覆盖 H2 类型/flags/stream/长度验证一致性、有效 layout 零分配、历史覆盖/超预算/到达顺序/输入修改隔离、HTTP 多切片分帧和 pipelining、Flush/Close 双错误、调度参数保留及恢复。
 
 ## 复现
