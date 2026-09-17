@@ -101,6 +101,14 @@ Package:
             Transfer Version: uint32
       Request:
         operator: |
+          if this.HasMaxLength() && this.GetMaxLength() < 8 {
+            rem = this.GetMaxLength()
+            if rem > 0 && rem < 1048576 {
+              this.GetSubNode("Stub").SetMaxLength(rem)
+              this.ProcessSubNode("Stub")
+            }
+            return
+          }
           this.ProcessSubNode("Alloc Hint")
           this.ProcessSubNode("Context ID")
           this.ProcessSubNode("OpNum")
@@ -122,10 +130,19 @@ Package:
           this.ProcessSubNode("Context ID")
           this.ProcessSubNode("Cancel Count")
           this.ProcessSubNode("Reserved")
+          if this.GetSubNode("Stub").GetRemainingSpace() != 0 {
+            rem = this.GetSubNode("Stub").GetRemainingSpace()
+            if rem > 0x100000 {
+              panic("dcerpc: stub too large")
+            }
+            this.GetSubNode("Stub").SetMaxLength(rem)
+            this.ProcessSubNode("Stub")
+          }
         Alloc Hint: uint32
         Context ID: uint16
         Cancel Count: uint8
         Reserved: uint8
+        Stub: raw
       Fault:
         operator: |
           this.ProcessSubNode("Alloc Hint")

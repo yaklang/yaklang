@@ -76,6 +76,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "dcerpc-epm-srvsvc.pcap",
+      "protocol": "dcerpc",
+      "sha256": "c23f3bec06a192aafa7079ddfb38ba37510a14f33b562220a05100efdb3cdf75",
+      "bytes": 1342,
+      "decode_as_port": 13500,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",

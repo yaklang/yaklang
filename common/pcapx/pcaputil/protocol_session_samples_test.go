@@ -94,6 +94,16 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, smb2Create(4, 0x11, 1, "file.txt")},
 			{1, smb2CreateResp(4, 0x11, 1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})},
 		}},
+		{"dcerpc-epm-srvsvc", "dcerpc", 13500, []sessionStep{
+			{0, dcerpcBind(dcerpcEPM, 0, 1)},
+			{1, dcerpcBindAck(1)},
+			{0, dcerpcRequest(2, 0, 3, []byte{1, 2, 3, 4})},
+			{1, dcerpcResponse(2, 0, []byte{9, 9})},
+			{0, dcerpcBind(dcerpcSRVSVC, 1, 3)},
+			{1, dcerpcBindAck(3)},
+			{0, dcerpcRequest(4, 1, 15, []byte{0, 0, 0, 0})},
+			{1, dcerpcResponse(4, 1, nil)},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},
