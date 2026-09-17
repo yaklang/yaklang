@@ -67,6 +67,10 @@ type AICallerConfigIf interface {
 
 	GetBrowserSessionTracker() BrowserSessionTracker
 
+	// IsSingleAIModelMode reports whether single-model simple mode is enabled.
+	// Used by the auxiliary task scheduler to decide skip/litecall/passthrough.
+	IsSingleAIModelMode() bool
+
 	// Reported risks: session-level "已报告漏洞清单" accumulator.
 	// AppendReportedRisk is called from toolcall_invoke.go FeedBacker when a
 	// json-risk message is emitted, adding a compact summary to the store.
