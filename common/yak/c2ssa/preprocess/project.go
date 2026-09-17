@@ -31,7 +31,7 @@ func BuildProject(fs fi.FileSystem, config PreprocessConfig) *CPreprocessProject
 		config.MaxIncludeDepth = 64
 	}
 	if config.ExternalIncludeDirs == nil {
-		config.ExternalIncludeDirs = DetectExternalIncludeDirs()
+		config.ExternalIncludeDirs = EnsureExternalIncludeDirs()
 	}
 	reg := BuildHeaderRegistry(fs)
 	return &CPreprocessProject{

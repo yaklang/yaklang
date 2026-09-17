@@ -24,17 +24,19 @@ type PreprocessConfig struct {
 }
 
 // DefaultConfig returns sensible defaults for project preprocessing.
-// External include roots come from $YAKIT_HOME/c-headers.
+// External include roots come from $YAKIT_HOME/c-headers; when the library is
+// missing, EnsureExternalIncludeDirs may download the official pack from OSS.
 func DefaultConfig() PreprocessConfig {
 	return PreprocessConfig{
 		SkipSystemIncludes:  true,
 		MaxIncludeDepth:     64,
 		Defines:             make(map[string]string),
-		ExternalIncludeDirs: DetectExternalIncludeDirs(),
+		ExternalIncludeDirs: EnsureExternalIncludeDirs(),
 	}
 }
 
-// DetectExternalIncludeDirs finds downloaded C header packs under YAKIT_HOME.
+// DetectExternalIncludeDirs finds downloaded C header packs under YAKIT_HOME
+// without triggering OSS download.
 func DetectExternalIncludeDirs() []string {
 	dir := consts.GetDefaultCHeadersDir()
 	return collectCHeaderRoots(dir)

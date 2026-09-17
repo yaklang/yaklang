@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -210,20 +211,17 @@ func TestCHeaders_DownloadOfficial(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	oldZip, oldVer := officialCHeadersZipURL, officialCHeadersVersionURL
-	officialCHeadersZipURL = srv.URL + "/c-headers/latest/c-std-headers.zip"
-	officialCHeadersVersionURL = srv.URL + "/c-headers/latest/version.txt"
-	t.Cleanup(func() {
-		officialCHeadersZipURL = oldZip
-		officialCHeadersVersionURL = oldVer
-	})
+	oldZip := srv.URL + "/c-headers/latest/c-std-headers.zip"
+	oldVer := srv.URL + "/c-headers/latest/version.txt"
+	restore := preprocess.SetOfficialCHeadersURLs(oldZip, oldVer)
+	t.Cleanup(restore)
 
 	first, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{})
 	require.NoError(t, err)
 	require.True(t, first.GetOk(), first.GetReason())
 	require.Equal(t, "1.0.0-test", first.GetVersion())
 	require.FileExists(t, first.GetPackPath())
-	require.Equal(t, "c-std-headers.zip", filepath.Base(first.GetPackPath()))
+	require.Equal(t, preprocess.OfficialCHeadersZipName, filepath.Base(first.GetPackPath()))
 
 	dup, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{})
 	require.NoError(t, err)
