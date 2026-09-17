@@ -147,6 +147,12 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, dnsQuery(0x22, "ietf.org", 1)},
 			{1, dnsAResponse(0x22, "ietf.org", [4]byte{4, 31, 198, 44})},
 		}},
+		{"doh-http-get-post", "doh", 18443, []sessionStep{
+			{0, dohPOST("dns.example.test", dnsWire(dnsQuery(0x1234, "example.com", 1)))},
+			{1, dohHTTPResp(200, dnsWire(dnsAResponse(0x1234, "example.com", [4]byte{93, 184, 216, 34})))},
+			{0, dohGET("dns.example.test", "ietf.org", 0x22)},
+			{1, dohHTTPResp(200, dnsWire(dnsAResponse(0x22, "ietf.org", [4]byte{4, 31, 198, 44})))},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

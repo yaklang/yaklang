@@ -15,6 +15,8 @@ type binH2Stream struct {
 	method         string
 	grpc           [2][]byte
 	grpcEnabled    [2]bool
+	doh            [2]bool
+	dohBuf         [2][]byte
 }
 
 type binH2Settings struct {
