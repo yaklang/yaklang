@@ -58,6 +58,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "amqp-publish-deliver.pcap",
+      "protocol": "amqp",
+      "sha256": "6e1a89c345f4d67f9d8dad40bfbc318decb4c8b265f63fec96b11b9784c9d45d",
+      "bytes": 1580,
+      "decode_as_port": 15672,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",

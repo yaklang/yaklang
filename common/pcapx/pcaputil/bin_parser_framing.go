@@ -73,6 +73,7 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.tds_fields", "TDSRPC72Fields"},
 	{"application-layer.tds_fields", "TDSResponse71Fields"},
 	{"application-layer.tds_fields", "TDSResponse72Fields"},
+	{"amqp", "AMQP"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
 	{"application-layer.memcached_fields", "MemcachedBinaryGetRequestFields"},
