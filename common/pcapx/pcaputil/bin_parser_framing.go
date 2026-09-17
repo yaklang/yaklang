@@ -163,7 +163,10 @@ func (f *binFlow) detect(w []byte) {
 		f.protocol = "memcached"
 		return
 	}
-	if f.port(9042) && len(w) >= 9 && (w[0] == 4 || w[0] == 0x84) && w[1]&1 == 0 && (w[4] == 1 || w[4] == 5 || w[4] == 6) {
+	// The v5 handshake shares the v4 header. Recognize its protocol even
+	// though frame() has no v5 profile, so it remains context-required
+	// instead of falling through to the much weaker RTP version-bit probe.
+	if f.port(9042) && len(w) >= 9 && (w[0] == 4 || w[0] == 0x84 || w[0] == 5 || w[0] == 0x85) && w[1]&1 == 0 && (w[4] == 1 || w[4] == 5 || w[4] == 6) {
 		f.protocol = "cassandra"
 		return
 	}
