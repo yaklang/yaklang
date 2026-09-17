@@ -46,6 +46,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.tds = "tds", &binTDS{client: -1, encrypt: tdsEncryptUnknown}
 	case "amqp":
 		f.protocol, f.amqp = "amqp", &binAMQP{client: -1, pending: map[uint16][]string{}, delivers: map[uint64]uint16{}, chans: map[uint16]*amqpChan{}}
+	case "smb2":
+		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir, pending: map[uint64]string{}}
 	}
 }
 
@@ -102,6 +104,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+	case "smb2":
+		e.Session, err = f.smb2.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -134,6 +138,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("TDS %v", e.Session["Packet Name"])
 		case "amqp":
 			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
+		case "smb2":
+			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])
 		}
 	}
 	return err
@@ -153,7 +159,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2 = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -214,6 +220,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		if n > 0 {
 			emit(max(q.client, 0), map[string]any{"Outstanding": n}, "AMQP exchange ended with unmatched methods or deliveries")
 		}
+	}
+	if s := f.smb2; s != nil && len(s.pending) > 0 {
+		emit(max(s.client, 0), map[string]any{"Outstanding": len(s.pending)}, "SMB2 exchange ended with unmatched MessageIds")
 	}
 }
 
