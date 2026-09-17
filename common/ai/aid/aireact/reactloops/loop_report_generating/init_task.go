@@ -132,7 +132,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 4. 如果用户提到现有报告需要"补充"、"完善" → is_modify=true
 
 请分析并返回结果。`
-			r.ScheduleAuxiliaryTask(task.GetContext(),
+			config.ScheduleAuxiliaryTask(task.GetContext(),
 				aicommon.CallerLabelAnalyzeReportIntent,
 				func() string {
 					return utils.MustRenderTemplate(analysisPrompt, map[string]any{
