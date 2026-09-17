@@ -1,0 +1,294 @@
+FILE after-engine-0.txt
+COMMAND ["/tmp/yakvm-core-review/after-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21661	     27408 ns/op	   19957 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21620	     27785 ns/op	   19957 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   70651	      8374 ns/op	    2754 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     169	   3542085 ns/op	 3179734 B/op	   76027 allocs/op
+PASS
+
+FILE after-engine-1.txt
+COMMAND ["/tmp/yakvm-core-review/after-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21735	     27846 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21082	     28101 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   71635	      8396 ns/op	    2755 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     166	   3731932 ns/op	 3179718 B/op	   76027 allocs/op
+PASS
+
+FILE after-engine-2.txt
+COMMAND ["/tmp/yakvm-core-review/after-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21614	     27847 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21282	     28224 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   71038	      8351 ns/op	    2755 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     165	   3590699 ns/op	 3179722 B/op	   76027 allocs/op
+PASS
+
+FILE after-engine-3.txt
+COMMAND ["/tmp/yakvm-core-review/after-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21894	     27524 ns/op	   19959 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21453	     27832 ns/op	   19959 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   71269	      8354 ns/op	    2755 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     166	   3589078 ns/op	 3179732 B/op	   76027 allocs/op
+PASS
+
+FILE after-engine-4.txt
+COMMAND ["/tmp/yakvm-core-review/after-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21859	     27546 ns/op	   19957 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21381	     27804 ns/op	   19957 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   71346	      8371 ns/op	    2754 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     168	   3593713 ns/op	 3179740 B/op	   76027 allocs/op
+PASS
+
+FILE after-vm-0.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  113661	      5201 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  115480	      5233 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18298958	        32.84 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE after-vm-1.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  119648	      5150 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  114277	      5249 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18264122	        32.89 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE after-vm-2.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  116925	      4988 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  114745	      5222 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18277102	        32.84 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE after-vm-3.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  119568	      4991 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  114432	      5245 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	17953813	        32.81 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE after-vm-4.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  118317	      4991 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  114607	      5231 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18108060	        32.83 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE after-vm-controls-0.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkNativeMethodLookup|BenchmarkSynchronousFrameLifecycle)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkNativeMethodLookup/reflect-4  	 1639507	       366.5 ns/op	     192 B/op	       6 allocs/op
+BenchmarkNativeMethodLookup/cached-4   	 4403802	       136.6 ns/op	      72 B/op	       2 allocs/op
+BenchmarkSynchronousFrameLifecycle/ordinary-4         	   13638	     43814 ns/op	    1496 B/op	      25 allocs/op
+BenchmarkSynchronousFrameLifecycle/private-synchronous-4         	 1000000	       538.3 ns/op	     984 B/op	      15 allocs/op
+PASS
+
+FILE after-vm-controls-1.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkNativeMethodLookup|BenchmarkSynchronousFrameLifecycle)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkNativeMethodLookup/reflect-4  	 1693921	       353.2 ns/op	     192 B/op	       6 allocs/op
+BenchmarkNativeMethodLookup/cached-4   	 4473582	       139.0 ns/op	      72 B/op	       2 allocs/op
+BenchmarkSynchronousFrameLifecycle/ordinary-4         	   13504	     43538 ns/op	    1496 B/op	      25 allocs/op
+BenchmarkSynchronousFrameLifecycle/private-synchronous-4         	 1000000	       524.1 ns/op	     984 B/op	      15 allocs/op
+PASS
+
+FILE after-vm-controls-2.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkNativeMethodLookup|BenchmarkSynchronousFrameLifecycle)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkNativeMethodLookup/reflect-4  	 1650496	       362.1 ns/op	     192 B/op	       6 allocs/op
+BenchmarkNativeMethodLookup/cached-4   	 4414467	       136.5 ns/op	      72 B/op	       2 allocs/op
+BenchmarkSynchronousFrameLifecycle/ordinary-4         	   13678	     43695 ns/op	    1496 B/op	      25 allocs/op
+BenchmarkSynchronousFrameLifecycle/private-synchronous-4         	 1000000	       531.9 ns/op	     984 B/op	      15 allocs/op
+PASS
+
+FILE after-vm-controls-3.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkNativeMethodLookup|BenchmarkSynchronousFrameLifecycle)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkNativeMethodLookup/reflect-4  	 1506571	       365.7 ns/op	     192 B/op	       6 allocs/op
+BenchmarkNativeMethodLookup/cached-4   	 4420742	       136.4 ns/op	      72 B/op	       2 allocs/op
+BenchmarkSynchronousFrameLifecycle/ordinary-4         	   13536	     43713 ns/op	    1496 B/op	      25 allocs/op
+BenchmarkSynchronousFrameLifecycle/private-synchronous-4         	 1000000	       532.5 ns/op	     984 B/op	      15 allocs/op
+PASS
+
+FILE after-vm-controls-4.txt
+COMMAND ["/tmp/yakvm-core-review/after-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkNativeMethodLookup|BenchmarkSynchronousFrameLifecycle)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkNativeMethodLookup/reflect-4  	 1651654	       362.6 ns/op	     192 B/op	       6 allocs/op
+BenchmarkNativeMethodLookup/cached-4   	 4329984	       138.5 ns/op	      72 B/op	       2 allocs/op
+BenchmarkSynchronousFrameLifecycle/ordinary-4         	   13662	     43661 ns/op	    1496 B/op	      25 allocs/op
+BenchmarkSynchronousFrameLifecycle/private-synchronous-4         	 1000000	       535.2 ns/op	     984 B/op	      15 allocs/op
+PASS
+
+FILE before-engine-0.txt
+COMMAND ["/tmp/yakvm-core-review/before-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21949	     27691 ns/op	   19956 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21578	     27530 ns/op	   19956 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   72085	      8292 ns/op	    2753 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     158	   3764820 ns/op	 3299749 B/op	   80027 allocs/op
+PASS
+
+FILE before-engine-1.txt
+COMMAND ["/tmp/yakvm-core-review/before-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21643	     27471 ns/op	   19959 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21550	     27759 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   72432	      8331 ns/op	    2754 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     156	   3797284 ns/op	 3299743 B/op	   80027 allocs/op
+PASS
+
+FILE before-engine-2.txt
+COMMAND ["/tmp/yakvm-core-review/before-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   22057	     27363 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21680	     27607 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   71152	      8313 ns/op	    2755 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     158	   3823529 ns/op	 3299762 B/op	   80027 allocs/op
+PASS
+
+FILE before-engine-3.txt
+COMMAND ["/tmp/yakvm-core-review/before-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21838	     27574 ns/op	   19957 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21291	     28033 ns/op	   19958 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   71599	      8321 ns/op	    2755 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     156	   3799119 ns/op	 3299756 B/op	   80027 allocs/op
+PASS
+
+FILE before-engine-4.txt
+COMMAND ["/tmp/yakvm-core-review/before-engine.test", "-test.run=^$", "-test.bench=^(BenchmarkVMMemberLoop|BenchmarkAnonymousFunctionDirectAssignment|BenchmarkCallYakFunctionBackgroundContext|BenchmarkCallYakFunctionCancelableContext)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCallYakFunctionBackgroundContext-4    	   21715	     27654 ns/op	   19957 B/op	     441 allocs/op
+BenchmarkCallYakFunctionCancelableContext-4    	   21177	     27864 ns/op	   19956 B/op	     441 allocs/op
+BenchmarkAnonymousFunctionDirectAssignment-4   	   70983	      8334 ns/op	    2754 B/op	      34 allocs/op
+BenchmarkVMMemberLoop-4                        	     156	   3792839 ns/op	 3299750 B/op	   80027 allocs/op
+PASS
+
+FILE before-vm-0.txt
+COMMAND ["/tmp/yakvm-core-review/before-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  119724	      4926 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  115998	      5142 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18572616	        32.66 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE before-vm-1.txt
+COMMAND ["/tmp/yakvm-core-review/before-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  119680	      4928 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  115491	      5167 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18268918	        32.66 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE before-vm-2.txt
+COMMAND ["/tmp/yakvm-core-review/before-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  120384	      4957 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  116958	      5463 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18138555	        33.29 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE before-vm-3.txt
+COMMAND ["/tmp/yakvm-core-review/before-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  120741	      4949 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  115958	      5185 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18325459	        32.91 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FILE before-vm-4.txt
+COMMAND ["/tmp/yakvm-core-review/before-vm.test", "-test.run=^$", "-test.bench=^(BenchmarkExecFrameLifecycle|BenchmarkNestedFrameLifecycle|BenchmarkIdleGetVar)$", "-test.benchtime=500ms", "-test.benchmem", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+BenchmarkExecFrameLifecycle-4     	  119104	      4929 ns/op	     720 B/op	      14 allocs/op
+BenchmarkNestedFrameLifecycle-4   	  115383	      5183 ns/op	    1112 B/op	      19 allocs/op
+BenchmarkIdleGetVar-4             	18245724	        32.77 ns/op	       0 B/op	       0 allocs/op
+PASS
+
+FULL TESTS
+?   	github.com/yaklang/yaklang/common/yak/antlr4yak/cmd	[no test files]
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak	43.919s
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak/dap	3.739s
+?   	github.com/yaklang/yaklang/common/yak/antlr4yak/parser	[no test files]
+?   	github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack	[no test files]
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak/lsp	3.975s
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak/yakast	0.537s
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm	0.988s
+
+FOCUSED RACE
+# github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-2166091175/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+# github.com/yaklang/yaklang/common/yak/antlr4yak.test
+ld: warning: '/private/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/go-link-2841791676/000056.o' has malformed LC_DYSYMTAB, expected 98 undefined symbols to start at index 1626, found 95 undefined symbols starting at index 1626
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm	1.705s
+ok  	github.com/yaklang/yaklang/common/yak/antlr4yak	6.135s
+
+FULL YAKVM PACKAGE RACE
+ok github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm 2.001s
+BASELINE REPRODUCED RACE FIXTURES
+--- FAIL: TestNewExecutor4 (1.18s)
+    testing.go:1398: race detected during execution of test
+--- FAIL: TestNewExecutor4_Scope_Go (2.31s)
+    testing.go:1398: race detected during execution of test
+--- FAIL: TestForLoopVar_Go122Semantics (3.17s)
+    testing.go:1398: race detected during execution of test
+--- FAIL: TestNewExecutor4_OpGo_N (1.04s)
+    testing.go:1398: race detected during execution of test
