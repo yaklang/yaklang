@@ -49,7 +49,7 @@ func structuredNativeDecoder(source string) StructuredDecoder {
 	} else {
 		switch name {
 		case "parseMQTTFields":
-			if arg == "3" || arg == "4" {
+			if arg == "3" || arg == "4" || arg == "5" {
 				level := int(arg[0] - '0')
 				decode = func(w []byte) ([]tlsCertificateField, map[string]any, error) { return decodeMQTTFields(w, level) }
 			}

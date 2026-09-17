@@ -12,6 +12,10 @@ Package:
     operator: |
       err = parseMQTTFields(4)
       if err != nil { panic(err) }
+  MQTT5PacketFields:
+    operator: |
+      err = parseMQTTFields(5)
+      if err != nil { panic(err) }
   MQTT31PacketFieldsCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 || this.GetMaxLength() > 1048576 { panic("mqtt-fields: explicit 1..1048576 byte boundary required") }
@@ -32,3 +36,4 @@ Package:
       raw.Process()
 MQTT31Exact: "import:application-layer/mqtt_fields.yaml;node:MQTT31PacketFields"
 MQTT311Exact: "import:application-layer/mqtt_fields.yaml;node:MQTT311PacketFields"
+MQTT5Exact: "import:application-layer/mqtt_fields.yaml;node:MQTT5PacketFields"

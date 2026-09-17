@@ -57,6 +57,12 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, []byte("+PONG\r\n")},
 			{1, []byte("%1\r\n+key\r\n+val\r\n")},
 		}},
+		{"mqtt5-connect-qos", "mqtt", 18830, []sessionStep{
+			{0, mqtt5Connect("dev", []byte{3, 0x22, 0, 10})},
+			{1, mqtt5Connack(10)},
+			{0, mqttPkt(0x32, append(append(append(mqttUTF("a/b"), 0, 1), 0), []byte("x")...))},
+			{1, mqttPkt(0x40, []byte{0, 1, 0, 0})},
+		}},
 		{"grpc-unary-http2", "http2", 18081, []sessionStep{
 			{0, append([]byte(binH2Preface), h2TestFrame(4, 0, 0, nil)...)},
 			{1, h2TestFrame(4, 0, 0, nil)},

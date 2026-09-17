@@ -40,6 +40,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "mqtt5-connect-qos.pcap",
+      "protocol": "mqtt",
+      "sha256": "d8a7a21673a7572d3cafe289c0c64fcaa6acf625d3c7c8dec3363a2815b35215",
+      "bytes": 806,
+      "decode_as_port": 18830,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "grpc-unary-http2.pcap",
       "protocol": "http2",
       "sha256": "8b05a8b1293dce8c0f0ba1e4084e2fbb9e6390bff13d4a89e82ae382b6ee09a1",

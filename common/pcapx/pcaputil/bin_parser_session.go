@@ -31,6 +31,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.redis = "redis", &binRedis{}
 	case "websocket":
 		f.protocol, f.ws = "websocket", &binWebSocket{client: dir, phase: wsPhaseFromProbe(w)}
+	case "mqtt":
+		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: 5, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 	}
 }
 
@@ -70,6 +72,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 				"Reason":              "101 Switching Protocols",
 			}
 		}
+	case "mqtt":
+		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -92,6 +96,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("Redis %v", e.Session["RESP Type"])
 		case "websocket":
 			e.Summary = fmt.Sprintf("WebSocket %v", e.Session["Opcode Name"])
+		case "mqtt":
+			e.Summary = fmt.Sprintf("MQTT %v", e.Session["Packet Name"])
 		}
 	}
 	return err
@@ -111,7 +117,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis = nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt = nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -141,6 +147,12 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if l := f.ldap; l != nil && len(l.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(l.pending)}, "LDAP exchange ended with unmatched MessageIDs")
+	}
+	if q := f.mqtt; q != nil {
+		n := len(q.pending[0]) + len(q.pending[1])
+		if n > 0 {
+			emit(q.client, map[string]any{"Outstanding": n}, "MQTT exchange ended with unmatched packet identifiers")
+		}
 	}
 }
 

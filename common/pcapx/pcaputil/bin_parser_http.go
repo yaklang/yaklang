@@ -38,6 +38,10 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameRedis(w)
 		case "websocket":
 			return f.frameWebSocket(w)
+		case "mqtt":
+			if f.mqtt != nil {
+				return f.frameMQTT(w)
+			}
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {
