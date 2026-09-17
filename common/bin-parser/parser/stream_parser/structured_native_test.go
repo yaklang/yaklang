@@ -11,12 +11,13 @@ import (
 func TestStructuredNativeCompletePrograms(t *testing.T) {
 	const source = "err = parseMQTTFields(4)\nif err != nil { panic(err) }\n"
 	require.NotNil(t, StructuredDecoderForProgram(source))
+	require.NotNil(t, StructuredDecoderForProgram("err = parseMQTTFields(5)\nif err != nil { panic(err) }\n"))
 	for _, bad := range []string{
 		source + "panic(1)", "panic(1)\n" + source,
 		"err = parseMQTTFields(level)\nif err != nil { panic(err) }\n",
 		"err = parseMQTTFields(3+1)\nif err != nil { panic(err) }\n",
 		"err = arbitraryNative(4)\nif err != nil { panic(err) }\n",
-		"err = parseMQTTFields(5)\nif err != nil { panic(err) }\n",
+		"err = parseMQTTFields(6)\nif err != nil { panic(err) }\n",
 	} {
 		require.Nil(t, StructuredDecoderForProgram(bad))
 	}

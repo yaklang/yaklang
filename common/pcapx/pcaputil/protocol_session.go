@@ -237,7 +237,7 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
-	return f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil
+	return f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil
 }
 
 func probeNeed(protocol, version string, have, want int) ProbeResult {
@@ -268,6 +268,9 @@ func probeWire(w []byte, limit int) ProbeResult {
 		return p
 	}
 	if p := probeWebSocket(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeMQTT(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	return ProbeResult{Verdict: ProbeReject, Reason: "no protocol match"}
