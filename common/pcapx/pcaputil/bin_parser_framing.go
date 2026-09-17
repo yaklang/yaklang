@@ -79,6 +79,8 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.dcerpc", "DCERPC"},
 	{"application-layer.ssh", "SSH"},
 	{"application-layer.ssh", "SSHPacket"},
+	{"onc_rpc", "ONCRPC"},
+	{"onc_rpc", "ONCRPCTCP"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
 	{"application-layer.memcached_fields", "MemcachedBinaryGetRequestFields"},
@@ -130,7 +132,7 @@ func (f *binFlow) detect(w []byte) {
 			}
 		}
 	}
-	if bytes.HasPrefix(w, []byte("stats\r\n")) || bytes.HasPrefix(w, []byte("STAT ")) || (len(w) >= 24 && w[0] == 0x80 && w[1] == 0 && w[4] == 0 && w[5] == 0) {
+	if bytes.HasPrefix(w, []byte("stats\r\n")) || bytes.HasPrefix(w, []byte("STAT ")) || (len(w) >= 24 && w[0] == 0x80 && w[1] == 0 && w[4] == 0 && w[5] == 0 && binary.BigEndian.Uint32(w[8:12]) >= uint32(binary.BigEndian.Uint16(w[2:4]))) {
 		f.protocol = "memcached"
 		return
 	}

@@ -52,6 +52,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.dcerpc = "dcerpc", &binDCERPC{client: dir, ctx: map[uint16]string{}, uuid: map[uint16][]byte{}, pending: map[uint32]string{}, frags: map[uint32][]byte{}}
 	case "ssh":
 		f.protocol, f.ssh = "ssh", &binSSH{client: dir}
+	case "nfs":
+		f.protocol, f.nfs = "nfs", &binNFS{client: dir, pending: map[uint32]string{}}
 	}
 }
 
@@ -114,6 +116,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.dcerpc.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "ssh":
 		e.Session, err = f.ssh.consume(dir, e.Raw)
+	case "nfs":
+		e.Session, err = f.nfs.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -152,6 +156,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("DCE/RPC %v call %v", e.Session["Packet Name"], e.Session["Call ID"])
 		case "ssh":
 			e.Summary = fmt.Sprintf("SSH %v", e.Session["Packet Name"])
+		case "nfs":
+			e.Summary = fmt.Sprintf("NFS %v xid %v", e.Session["Packet Name"], e.Session["XID"])
 		}
 	}
 	return err
@@ -171,7 +177,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -243,6 +249,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		if !sh.banner[0] || !sh.banner[1] || !sh.haveKEX[0] || !sh.haveKEX[1] || !sh.newkeys[0] || !sh.newkeys[1] {
 			emit(max(sh.client, 0), map[string]any{"Identification": sh.ident}, "SSH handshake ended before NEWKEYS")
 		}
+	}
+	if n := f.nfs; n != nil && len(n.pending) > 0 {
+		emit(max(n.client, 0), map[string]any{"Outstanding": len(n.pending)}, "NFS exchange ended with unmatched XIDs")
 	}
 }
 
