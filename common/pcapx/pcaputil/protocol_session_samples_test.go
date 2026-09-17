@@ -153,6 +153,13 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, dohGET("dns.example.test", "ietf.org", 0x22)},
 			{1, dohHTTPResp(200, dnsWire(dnsAResponse(0x22, "ietf.org", [4]byte{4, 31, 198, 44})))},
 		}},
+		{"rtp-seq-sr-rr", "rtp", 15004, []sessionStep{
+			{0, rtpPkt(0, 1, 0, 0x12345678)},
+			{0, rtpPkt(0, 2, 160, 0x12345678)},
+			{0, rtpPkt(0, 3, 320, 0x12345678)},
+			{1, rtcpSR(0x12345678, 0x11121418, 320, 3, 48)},
+			{1, rtcpRR(0xabcdef01, 0x12345678, 0, 0)},
+		}},
 		{"sip-invite-ack-bye", "sip", 15060, []sessionStep{
 			{0, sipInvite()},
 			{1, sipResp("100", "Trying", "z9hG4bK776asdhds", "314159 INVITE", "a84b4c76e66710@pc33.atlanta.example.com", "Alice <sip:alice@atlanta.example.com>;tag=1928301774", "Bob <sip:bob@biloxi.example.com>")},

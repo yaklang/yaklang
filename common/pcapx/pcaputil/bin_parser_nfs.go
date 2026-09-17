@@ -30,6 +30,12 @@ func probeNFS(w []byte, limit int) ProbeResult {
 	if n < 20 || n > 1<<20 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	if len(w) >= 12 {
+		mt := binary.BigEndian.Uint32(w[8:12])
+		if mt != 0 && mt != 1 {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+	}
 	if len(w) < 24 {
 		return probeNeed("nfs", "v3", len(w), 24)
 	}
