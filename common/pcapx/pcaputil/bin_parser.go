@@ -304,6 +304,7 @@ type binFlow struct {
 	smb2             *binSMB2
 	dcerpc           *binDCERPC
 	ssh              *binSSH
+	nfs              *binNFS
 	httpUpgrades     []bool
 	httpMethods      []string
 	a                *binParser
@@ -506,7 +507,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp" || f.protocol == "smb2" || f.protocol == "dcerpc" || f.protocol == "ssh")
+		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp" || f.protocol == "smb2" || f.protocol == "dcerpc" || f.protocol == "ssh" || f.protocol == "nfs")
 		if !a.config.Deferred || stateful {
 			result, err := e.Decode()
 			if err == nil && stateful {

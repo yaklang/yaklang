@@ -26,6 +26,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `smb2-negotiate-create.pcap` | SMB 3.1.1 Negotiate, SessionSetup, TreeConnect and Create on non-445 port 1445 |
 | `dcerpc-epm-srvsvc.pcap` | DCE/RPC v5 Bind/BindAck plus EPM ept_map and SRVSVC NetrShareEnum on non-135 port 13500 |
 | `ssh-kex-newkeys.pcap` | RFC 4253 identification, KEXINIT, DH/ECDH exchange, NEWKEYS on non-22 port 10022 |
+| `nfsv3-lookup-read.pcap` | NFSv3 ONC RPC LOOKUP/GETATTR/READ/WRITE with XID pairing on non-2049 port 12049 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

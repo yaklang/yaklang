@@ -94,6 +94,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "nfsv3-lookup-read.pcap",
+      "protocol": "nfs",
+      "sha256": "4776939711962023d859e1434eb33dfd39c743a43ee06bcec67d991facb024f0",
+      "bytes": 1704,
+      "decode_as_port": 12049,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",

@@ -114,6 +114,16 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, sshNewKeys()},
 			{1, sshNewKeys()},
 		}},
+		{"nfsv3-lookup-read", "nfs", 12049, []sessionStep{
+			{0, nfsLookupCall(1, "foo")},
+			{1, nfsLookupOK(1)},
+			{0, nfsGetattrCall(2)},
+			{1, nfsGetattrOK(2, 42)},
+			{0, nfsReadCall(3, 0, 4)},
+			{1, nfsReadOK(3, []byte("abcd"), true)},
+			{0, nfsWriteCall(4, 8, []byte("efgh"))},
+			{1, nfsWriteOK(4, 4)},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},
