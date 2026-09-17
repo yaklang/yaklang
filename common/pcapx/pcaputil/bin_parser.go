@@ -287,6 +287,11 @@ type binFlow struct {
 	sessionBytes int64
 	h2           *binHTTP2
 	mysql        *binMySQL
+	pg           *binPostgres
+	ws           *binWebSocket
+	ldap         *binLDAP
+	redis        *binRedis
+	wsPending    bool
 	httpMethods  []string
 	a            *binParser
 	id           uint64
@@ -379,7 +384,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Resource exhaustion and panic containment invalidate connection-wide
 		// dictionaries/sequence state just as a malformed session message does.
-		if d.stopped && (f.h2 != nil || f.mysql != nil) {
+		if d.stopped && f.hasSession() {
 			f.invalidateSession(1 - dir)
 			f.closeSession()
 		}
@@ -453,7 +458,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				status = "context-required"
 			}
 			f.stop(dir, wire, status, err.Error())
-			if f.h2 != nil || f.mysql != nil {
+			if f.hasSession() {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
 			}
@@ -461,7 +466,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		if n < 0 || n > a.config.MaxMessageBytes {
 			f.stop(dir, wire, "limited", "declared message exceeds limit")
-			if f.h2 != nil || f.mysql != nil {
+			if f.hasSession() {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
 			}
@@ -486,7 +491,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		stateful := f.h2 != nil && f.protocol == "http2" || f.mysql != nil && f.protocol == "mysql"
+		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket")
 		if !a.config.Deferred || stateful {
 			result, err := e.Decode()
 			if err == nil && stateful {
@@ -529,7 +534,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// A peer SETTINGS already captured before a complete client preface
 		// must be applied before subsequent coalesced request header blocks.
 		// Never replay the peer after only a partial greeting/preface.
-		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream") {
+		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields") {
 			detected = false
 			other := &f.directions[1-dir]
 			if len(other.buffer) > 0 && !other.stopped {
@@ -546,7 +551,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	} else if !f.retain(d, wire) {
 		f.stop(dir, wire, "limited", "capture buffer limit reached")
 	}
-	if detected && f.protocol != "" && f.h2 == nil && f.mysql == nil {
+	if detected && f.protocol != "" && !f.hasSession() {
 		other := &f.directions[1-dir]
 		if len(other.buffer) > 0 && !other.stopped {
 			f.feed(1-dir, nil, other.ts)

@@ -13,6 +13,7 @@ type binH2Stream struct {
 	headers, ended [2]bool
 	window         [2]int64
 	method         string
+	grpc           []byte
 }
 
 type binH2Settings struct {
