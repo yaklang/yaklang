@@ -57,6 +57,11 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, []byte("+PONG\r\n")},
 			{1, []byte("%1\r\n+key\r\n+val\r\n")},
 		}},
+		{"kafka-apiversions-metadata", "kafka", 19092, []sessionStep{
+			{0, kafkaRequest(18, 0, 1, "", nil)},
+			{1, kafkaResponse(1, append(append(kafkaBE16(0), kafkaBE32(0)...)))},
+			{0, kafkaRequest(3, 0, 2, "test", append(kafkaBE32(1), kafkaStr("foo")...))},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

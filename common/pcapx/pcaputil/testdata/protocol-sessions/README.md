@@ -20,6 +20,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `grpc-unary-http2.pcap` | HTTP/2 preface/SETTINGS plus unary gRPC DATA prefix and trailers (port 18081) |
 | `mqtt5-connect-qos.pcap` | MQTT 5.0 CONNECT with Topic Alias Maximum, CONNACK, QoS 1 PUBLISH/PUBACK (port 18830) |
 | `mongodb-opmsg-compressed.pcap` | MongoDB OP_MSG ping/ok correlation on non-27017 port 27018 |
+| `kafka-apiversions-metadata.pcap` | Kafka ApiVersions + Metadata v0 on non-9092 port 19092 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

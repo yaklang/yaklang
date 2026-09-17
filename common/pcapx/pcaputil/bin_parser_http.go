@@ -44,6 +44,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			}
 		case "mongodb":
 			return f.frameMongo(w)
+		case "kafka":
+			return f.frameKafka(dir, w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {
