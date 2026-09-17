@@ -88,6 +88,11 @@ now retains the v5 protocol identity while its unsupported profile remains
 context-required. The original corpus assertions stay unchanged at 108 decoded
 messages and 78,033 message bytes; a dedicated regression rejects RTP claims
 on that capture and checks the explicit unsupported-version context.
+QUIC integration exposed a malformed STREAM/ACK positive fixture: type `0x0b`
+does not set OFF, but the fixture included an Offset byte. Per RFC 9000 section
+19.8, the corrected test covers both implicit and explicit zero offsets and
+checks stream data, length and FIN. The original malformed bytes remain a
+negative case alongside truncated stream data; parser acceptance is unchanged.
 
 ## Boundaries
 
