@@ -135,6 +135,12 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, snmpInform(4)},
 			{1, snmpGetResponse(4, "ack")},
 		}},
+		{"rdp-tpkt-negotiate-mcs", "rdp", 13389, []sessionStep{
+			{0, rdpCR("eltons", rdpProtoRDP)},
+			{1, rdpCC(rdpNegRsp, rdpProtoRDP)},
+			{0, rdpConnectInitial("rdpdr", "cliprdr")},
+			{1, rdpConnectResponse("rdpdr", "cliprdr")},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

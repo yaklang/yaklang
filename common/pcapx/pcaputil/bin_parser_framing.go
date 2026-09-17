@@ -82,6 +82,8 @@ var builtinBinSpecs = [][2]string{
 	{"onc_rpc", "ONCRPC"},
 	{"onc_rpc_tcp", "ONCRPCTCP"},
 	{"application-layer.snmpv3", "SNMPv3"},
+	{"application-layer.msrdp", "RDP"},
+	{"application-layer.msrdp", "TPKT"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
 	{"application-layer.memcached_fields", "MemcachedBinaryGetRequestFields"},
