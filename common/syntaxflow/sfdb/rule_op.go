@@ -221,6 +221,7 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	if db == nil {
 		return nil, utils.Errorf("profile db is nil")
 	}
+
 	ruleType, err := CheckSyntaxFlowRuleType(ruleFileName)
 	if err != nil {
 		log.Error(err)
@@ -228,6 +229,20 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
 		return nil, err
+	}
+	return FinalizeCompiledRuleWithDB(db, ruleFileName, content, filePath, buildIn, rule, ruleType, tags...)
+}
+
+// FinalizeCompiledRuleWithDB stores an already-compiled rule. The sync path
+// compiles rules in parallel (the ANTLR parse dominates a cold import) and then
+// funnels every rule through this single-writer path, so the profile DB is
+// never hit by concurrent writers.
+func FinalizeCompiledRuleWithDB(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, rule *schema.SyntaxFlowRule, ruleType schema.SyntaxFlowRuleType, tags ...string) (*schema.SyntaxFlowRule, error) {
+	if db == nil {
+		return nil, utils.Errorf("profile db is nil")
+	}
+	if rule == nil {
+		return nil, utils.Errorf("compiled syntax flow rule is nil")
 	}
 	applyFilenameLanguageFallback(rule, ruleFileName)
 
@@ -310,6 +325,87 @@ func ImportRuleWithoutValidExWithDB(db *gorm.DB, ruleName string, content string
 
 func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	return ImportRuleWithoutValidExWithDB(consts.GetGormProfileDatabase(), ruleName, content, filePath, buildin, tags...)
+}
+
+// CompileRuleForSync compiles a rule without touching the database. The embed
+// sync compiles rules on worker goroutines and writes them through
+// FinalizeCompiledRuleWithDB on a single writer.
+func CompileRuleForSync(content string) (*schema.SyntaxFlowRule, error) {
+	return CheckSyntaxFlowRuleContent(content)
+}
+
+// ImportCompiledRuleWithDB stores a rule that CompileRuleForSync already parsed.
+func ImportCompiledRuleWithDB(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, rule *schema.SyntaxFlowRule, tags ...string) error {
+	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
+	if err != nil {
+		log.Error(err)
+	}
+	if _, err := FinalizeCompiledRuleWithDB(db, ruleName, content, filePath, buildin, rule, ruleType, tags...); err != nil {
+		return utils.Wrapf(err, "create build in rule failed: %s", err)
+	}
+	return nil
+}
+
+// RuleContentHash is the content fingerprint used to decide whether a stored
+// rule still matches the file on disk.
+func RuleContentHash(content string) string {
+	return utils.CalcSha256(content)
+}
+
+// LoadStoredContentHashesByRuleName returns rule_name -> sha256(content) for
+// rules already stored in the profile DB. The embed sync uses it to skip rules
+// whose bytes did not change: the stored row already carries compiled opcodes,
+// so re-importing identical content only redoes the parse.
+//
+// Only rules with a compiled opcode payload are reported, so a rule that was
+// stored before opcode caching existed is re-imported once and gains them.
+type StoredRuleFingerprint struct {
+	// ContentHash is sha256 of the rule content as stored.
+	ContentHash string
+	// Tag is the rule's stored tag string. The sync compares the tags derived
+	// from the rule's directory (plus the compiler's mode tag) against it, so
+	// moving a file between tag folders is not mistaken for an unchanged rule.
+	Tag string
+	// Mode is the stored rule mode ("source" / "struct" / "ssa"), which the
+	// compiler derives from desc(mode: ...) and folds into the tag string.
+	Mode string
+}
+
+// LoadStoredContentHashesByRuleName returns rule_name -> stored fingerprint for
+// rules already in the profile DB. The embed sync uses it to skip rules whose
+// bytes did not change: the stored row already carries compiled opcodes, so
+// re-importing identical content only redoes the parse.
+//
+// Only rules with a compiled opcode payload are reported, so a rule that was
+// stored before opcode caching existed is re-imported once and gains them.
+func LoadStoredContentHashesByRuleName(db *gorm.DB, buildin bool) (map[string]StoredRuleFingerprint, error) {
+	if db == nil {
+		return nil, utils.Error("profile db is nil")
+	}
+	var rows []struct {
+		RuleName string `gorm:"column:rule_name"`
+		Content  string `gorm:"column:content"`
+		Tag      string `gorm:"column:tag"`
+		Mode     string `gorm:"column:mode"`
+	}
+	if err := db.Raw(
+		"SELECT rule_name, content, tag, mode FROM syntax_flow_rules WHERE is_build_in_rule = ? AND op_codes IS NOT NULL AND op_codes != ''",
+		buildin,
+	).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string]StoredRuleFingerprint, len(rows))
+	for _, row := range rows {
+		if row.RuleName == "" {
+			continue
+		}
+		out[row.RuleName] = StoredRuleFingerprint{
+			ContentHash: RuleContentHash(row.Content),
+			Tag:         row.Tag,
+			Mode:        row.Mode,
+		}
+	}
+	return out, nil
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
