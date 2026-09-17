@@ -256,6 +256,60 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "tns-connect-accept.pcap",
+      "protocol": "tns",
+      "sha256": "192bf0d04b860cfeb29320dd1e8c578fe5671ad848cfde15f4b4597a353e48fa",
+      "bytes": 758,
+      "decode_as_port": 11521,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "radius-access-accept.pcap",
+      "protocol": "radius",
+      "sha256": "6c8b3979d9061a37e1cd035984ed2c4d6c761d73b7e5e80a8864b9c636952ff6",
+      "bytes": 667,
+      "decode_as_port": 11812,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "dhcp-discover-ack.pcap",
+      "protocol": "dhcp",
+      "sha256": "c3b6a4a49a1dbb841ec09c632457a3f519878d78f999a4132b8f42d136ed363f",
+      "bytes": 1736,
+      "decode_as_port": 10067,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "ntp-client-server.pcap",
+      "protocol": "ntp",
+      "sha256": "8da66093342128e43437c3164e9bcacf1b41323eb9944a46261d713346c67754",
+      "bytes": 716,
+      "decode_as_port": 10123,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "coap-get-content.pcap",
+      "protocol": "coap",
+      "sha256": "15f5d57f572068855eead5d8ecd5d187ff0086bc9931286461ad030696abc017",
+      "bytes": 635,
+      "decode_as_port": 10568,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "modbus-read-holding.pcap",
+      "protocol": "modbus",
+      "sha256": "06c6ce3c1eb84084e6a78907a2bfe63880ba5ae45292db7eac2d915cee7a59f5",
+      "bytes": 645,
+      "decode_as_port": 10502,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "grpc-unary-http2.pcap",
       "protocol": "http2",
       "sha256": "8b05a8b1293dce8c0f0ba1e4084e2fbb9e6390bff13d4a89e82ae382b6ee09a1",

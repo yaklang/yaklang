@@ -42,6 +42,12 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `imap-capability-login.pcap` | RFC 3501 greeting, tagged CAPABILITY and tagged OK on non-143 port 10143 |
 | `pop3-capa-stat.pcap` | RFC 1939 +OK greeting and STAT on non-110 port 10110 |
 | `ftp-user-pass-pasv.pcap` | RFC 959 220 FTP greeting, USER/PASS on non-21 port 10021 |
+| `tns-connect-accept.pcap` | Oracle TNS Connect/Accept/Data on non-1521 port 11521 |
+| `radius-access-accept.pcap` | RFC 2865 Access-Request/Accept Identifier pairing on non-1812 port 11812 |
+| `dhcp-discover-ack.pcap` | RFC 2131 Discover/Offer/Request/Ack xid pairing on non-67 port 10067 |
+| `ntp-client-server.pcap` | RFC 5905 NTPv4 mode 3/4 timestamps on non-123 port 10123 |
+| `coap-get-content.pcap` | RFC 7252 CON GET Uri-Path then ACK 2.05 on non-5683 port 10568 |
+| `modbus-read-holding.pcap` | Modbus TCP FC 3 read holding registers on non-502 port 10502 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

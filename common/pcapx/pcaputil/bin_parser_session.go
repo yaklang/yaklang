@@ -74,6 +74,18 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.pop3 = "pop3", &binPOP3{}
 	case "ftp":
 		f.protocol, f.ftp = "ftp", &binFTP{}
+	case "tns":
+		f.protocol, f.tns = "tns", &binTNS{}
+	case "radius":
+		f.protocol, f.radius = "radius", &binRADIUS{pending: map[uint8]string{}}
+	case "dhcp":
+		f.protocol, f.dhcp = "dhcp", &binDHCP{pending: map[uint32]string{}}
+	case "ntp":
+		f.protocol, f.ntp = "ntp", &binNTP{}
+	case "coap":
+		f.protocol, f.coap = "coap", &binCoAP{pending: map[uint16]string{}}
+	case "modbus":
+		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]string{}}
 	}
 }
 
@@ -166,6 +178,18 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.pop3.consume(e.Raw)
 	case "ftp":
 		e.Session, err = f.ftp.consume(e.Raw)
+	case "tns":
+		e.Session, err = f.tns.consume(e.Raw)
+	case "radius":
+		e.Session, err = f.radius.consume(e.Raw, f.a.budget.MaxCollectionElements)
+	case "dhcp":
+		e.Session, err = f.dhcp.consume(e.Raw)
+	case "ntp":
+		e.Session, err = f.ntp.consume(e.Raw)
+	case "coap":
+		e.Session, err = f.coap.consume(e.Raw)
+	case "modbus":
+		e.Session, err = f.modbus.consume(e.Raw)
 	}
 	if e.Session != nil {
 		switch e.Protocol {
@@ -234,6 +258,18 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("POP3 %v", e.Session["Packet Name"])
 		case "ftp":
 			e.Summary = fmt.Sprintf("FTP %v", e.Session["Packet Name"])
+		case "tns":
+			e.Summary = fmt.Sprintf("TNS %v", e.Session["Packet Name"])
+		case "radius":
+			e.Summary = fmt.Sprintf("RADIUS %v id %v", e.Session["Packet Name"], e.Session["Identifier"])
+		case "dhcp":
+			e.Summary = fmt.Sprintf("DHCP %v xid %v", e.Session["Packet Name"], e.Session["Xid"])
+		case "ntp":
+			e.Summary = fmt.Sprintf("NTP %v stratum %v", e.Session["Packet Name"], e.Session["Stratum"])
+		case "coap":
+			e.Summary = fmt.Sprintf("CoAP %v %v mid %v", e.Session["Packet Name"], e.Session["Code"], e.Session["Message ID"])
+		case "modbus":
+			e.Summary = fmt.Sprintf("Modbus %v tid %v", e.Session["Packet Name"], e.Session["Transaction ID"])
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
@@ -257,7 +293,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp, f.tns, f.radius, f.dhcp, f.ntp, f.coap, f.modbus = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -359,6 +395,21 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if t := f.ftp; t != nil && t.pending != "" && !t.encrypted {
 		emit(0, map[string]any{"Outstanding": t.pending}, "FTP exchange ended with unmatched command")
+	}
+	if n := f.tns; n != nil && n.pending > 0 {
+		emit(0, map[string]any{"Outstanding": n.pending}, "TNS exchange ended with unmatched Connect")
+	}
+	if r := f.radius; r != nil && len(r.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(r.pending)}, "RADIUS exchange ended with unmatched Identifiers")
+	}
+	if d := f.dhcp; d != nil && len(d.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DHCP exchange ended with unmatched xids")
+	}
+	if c := f.coap; c != nil && len(c.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(c.pending)}, "CoAP exchange ended with unmatched Message IDs")
+	}
+	if m := f.modbus; m != nil && len(m.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(m.pending)}, "Modbus exchange ended with unmatched Transaction IDs")
 	}
 }
 

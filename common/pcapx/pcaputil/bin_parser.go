@@ -317,6 +317,12 @@ type binFlow struct {
 	imap             *binIMAP
 	pop3             *binPOP3
 	ftp              *binFTP
+	tns              *binTNS
+	radius           *binRADIUS
+	dhcp             *binDHCP
+	ntp              *binNTP
+	coap             *binCoAP
+	modbus           *binModbus
 	httpUpgrades     []bool
 	httpDoH          []bool
 	httpMethods      []string
