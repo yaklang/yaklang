@@ -42,6 +42,8 @@ func structuredNativeDecoder(source string) StructuredDecoder {
 			f = decodeIMAPFields
 		case "parsePOP3Fields":
 			f = decodePOP3Fields
+		case "parseKafkaFields":
+			f = decodeKafkaFields
 		}
 		if f != nil {
 			decode = func(w []byte) ([]tlsCertificateField, map[string]any, error) { return f(w, profile) }

@@ -40,7 +40,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: 5, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 	case "mongodb":
 		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
-
+	case "kafka":
+		f.protocol, f.kafka = "kafka", &binKafka{client: -1, pending: map[int32]int16{}}
 	}
 }
 
@@ -88,6 +89,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
 	case "mongodb":
 		e.Session, err = f.mongo.consume(e.Raw, result)
+	case "kafka":
+		e.Session, err = f.kafka.consume(dir, e.Raw, result)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -114,6 +117,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("MQTT %v", e.Session["Packet Name"])
 		case "mongodb":
 			e.Summary = fmt.Sprintf("MongoDB %v id %v", e.Session["Opcode Name"], e.Session["Request ID"])
+		case "kafka":
+			e.Summary = fmt.Sprintf("Kafka %v corr %v", e.Session["API Name"], e.Session["Correlation ID"])
 		}
 	}
 	return err
@@ -133,7 +138,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo = nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka = nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -179,6 +184,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if g := f.mongo; g != nil && len(g.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(g.pending)}, "MongoDB exchange ended with unmatched request IDs")
+	}
+	if k := f.kafka; k != nil && len(k.pending) > 0 {
+		emit(max(k.client, 0), map[string]any{"Outstanding": len(k.pending)}, "Kafka exchange ended with unmatched correlation IDs")
 	}
 }
 

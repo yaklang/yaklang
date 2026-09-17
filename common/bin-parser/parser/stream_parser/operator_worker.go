@@ -197,6 +197,7 @@ func reusableBridgeName(name string) bool {
 		"parseSMTPFields",
 		"parseMQTTFields",
 		"parseMongoDBFields",
+		"parseKafkaFields",
 		"parseKerberosFields",
 		"parseHTTP2Fields",
 		"parseSSHPlaintextPacket",

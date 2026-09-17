@@ -451,6 +451,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseSMTPFields(invocation.node, invocation.operator, data)
 		},
+		"parseKafkaFields": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("kafka-fields: structured generation is not supported")
+			}
+			return parseKafkaFields(invocation.node, invocation.operator, profile)
+		},
 		"parseMongoDBFields": func() error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("mongodb-fields: structured generation is not supported")
