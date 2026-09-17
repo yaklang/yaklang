@@ -276,11 +276,12 @@ func (a *binParser) emit(e *BinParserEvent) {
 }
 
 type binDirection struct {
-	http    *binHTTPState
-	buffer  []byte
-	offset  uint64
-	ts      time.Time
-	stopped bool
+	headerScan int
+	http       *binHTTPState
+	buffer     []byte
+	offset     uint64
+	ts         time.Time
+	stopped    bool
 }
 type binFlow struct {
 	sessionBytes int64
@@ -309,6 +310,7 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 func (f *binFlow) release(d *binDirection) {
 	f.a.buffered.Add(-int64(cap(d.buffer)))
 	d.buffer = nil
+	d.headerScan = 0
 }
 
 // Capacity, not length, is charged to the shared capture budget. Partial
@@ -597,10 +599,15 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 // decode outside the capture lock. Eviction is observable, never capture loss.
 type ProtocolInspector struct {
 	mu                           sync.Mutex
-	rows                         []*BinParserEvent
+	rows                         []*protocolHistoryEntry
 	head, count, bytes, maxBytes int
 	evicted                      uint64
 	received                     uint64
+}
+
+type protocolHistoryEntry struct {
+	BinParserEvent
+	retainedCost int
 }
 
 // BinParserInspector is retained for source compatibility. Use ProtocolInspector.
@@ -610,25 +617,30 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 	if messages <= 0 || messages > 1000000 || bytes <= 0 {
 		return nil, errors.New("inspector requires positive bounded message/byte limits")
 	}
-	return &BinParserInspector{rows: make([]*BinParserEvent, messages), maxBytes: bytes}, nil
+	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes}, nil
 }
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
-	row := *e
+	// The callback input remains caller-owned. Reject obviously oversized rows
+	// before cloning. The logical retained cost is computed once per arrival.
+	cost := protocolHistoryBytes(e)
+	if cost > v.maxBytes {
+		v.mu.Lock()
+		v.received++
+		v.evicted++
+		v.mu.Unlock()
+		return
+	}
+	row := protocolHistoryEntry{BinParserEvent: *e, retainedCost: cost}
 	row.Session = cloneSession(e.Session)
-	row.Structured, row.Fields = nil, nil
-	row.Metadata = nil
+	row.Structured, row.Fields, row.Metadata = nil, nil, nil
 	row.Raw = append([]byte(nil), e.Raw...)
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.received++
 	row.historySequence = v.received
-	if protocolHistoryBytes(&row) > v.maxBytes {
-		v.evicted++
-		return
-	}
-	for v.count > 0 && (v.count == len(v.rows) || v.bytes+protocolHistoryBytes(&row) > v.maxBytes) {
-		v.bytes -= protocolHistoryBytes(v.rows[v.head])
+	for v.count > 0 && (v.count == len(v.rows) || row.retainedCost > v.maxBytes-v.bytes) {
+		v.bytes -= v.rows[v.head].retainedCost
 		v.rows[v.head] = nil
 		v.head = (v.head + 1) % len(v.rows)
 		v.count--
@@ -636,7 +648,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	}
 	v.rows[(v.head+v.count)%len(v.rows)] = &row
 	v.count++
-	v.bytes += protocolHistoryBytes(&row)
+	v.bytes += row.retainedCost
 }
 
 // Rows returns metadata only, oldest first, optionally filtered by protocol and
@@ -646,7 +658,7 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 	defer v.mu.Unlock()
 	var rows []*BinParserEvent
 	for i := 0; i < v.count; i++ {
-		e := v.rows[(v.head+i)%len(v.rows)]
+		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
 		if (protocol == "" || protocol == e.Protocol) && (flow == 0 || flow == e.FlowID) {
 			row := *e
 			row.Raw = nil
@@ -661,7 +673,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 	v.mu.Lock()
 	var row *BinParserEvent
 	for i := 0; i < v.count; i++ {
-		e := v.rows[(v.head+i)%len(v.rows)]
+		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
 		if e.ID == id {
 			copyEvent := *e
 			copyEvent.Session = cloneSession(e.Session)
@@ -701,7 +713,7 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 	}
 	var retained, matching uint64
 	for i := v.count - 1; i >= 0; i-- {
-		e := v.rows[(v.head+i)%len(v.rows)]
+		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
 		if e.historySequence <= after {
 			break
 		}

@@ -20,6 +20,10 @@ import (
 // 24 flows, MQTT/HTTP/TLS, 512-byte application bodies, 128 rounds, with SYNs,
 // automatic detection and full structured outputs. No rule/entry hints.
 func binBenchmarkCapture(b testing.TB, mix bool) ([]byte, int64, uint64) {
+	return binBenchmarkCaptureFlows(b, mix, 24)
+}
+
+func binBenchmarkCaptureFlows(b testing.TB, mix bool, flows int) ([]byte, int64, uint64) {
 	b.Helper()
 	var out bytes.Buffer
 	w := pcapgo.NewWriter(&out)
@@ -40,7 +44,7 @@ func binBenchmarkCapture(b testing.TB, mix bool) ([]byte, int64, uint64) {
 	var total int64
 	var messages uint64
 	for round := -1; round < 128; round++ {
-		for flow := 0; flow < 24; flow++ {
+		for flow := 0; flow < flows; flow++ {
 			tcp.SrcPort = layers.TCPPort(10000 + flow)
 			tcp.SYN = round < 0
 			tcp.ACK = round >= 0
@@ -78,11 +82,9 @@ func binBenchmarkCapture(b testing.TB, mix bool) ([]byte, int64, uint64) {
 func BenchmarkPcapBinParser(b *testing.B) {
 	for _, mix := range []bool{false, true} {
 		pcap, payload, want := binBenchmarkCapture(b, mix)
-		for _, mode := range []string{"reassembly", "full", "deferred-view"} {
+		for _, mode := range []string{"reassembly", "full", "full-history", "deferred-view"} {
 			for _, workers := range []int{1, 2, 4} {
 				b.Run(fmt.Sprintf("mixed=%v/%s/workers=%d", mix, mode, workers), func(b *testing.B) {
-					old := runtime.GOMAXPROCS(workers)
-					defer runtime.GOMAXPROCS(old)
 					b.SetBytes(payload)
 					b.ReportAllocs()
 					proc, err := process.NewProcess(int32(os.Getpid()))
@@ -107,6 +109,11 @@ func BenchmarkPcapBinParser(b *testing.B) {
 								}
 								count.Add(1)
 							}
+							if mode == "full-history" {
+								view, _ := NewBinParserInspector(2048, 2<<20)
+								fullCallback := callback
+								callback = func(e *BinParserEvent) { fullCallback(e); view.OnEvent(e) }
+							}
 							if mode == "deferred-view" {
 								view, _ := NewBinParserInspector(2048, 2<<20)
 								callback = view.OnEvent
@@ -124,11 +131,20 @@ func BenchmarkPcapBinParser(b *testing.B) {
 						} else if stats.Messages != want || stats.Malformed != 0 || stats.Unknown != 0 || stats.Incomplete != 0 {
 							b.Fatalf("incomplete analysis: %+v want=%d", stats, want)
 						}
+						if (mode == "full" || mode == "full-history") && (stats.Decoded != want || count.Load() != want) {
+							b.Fatal("missing full fields")
+						}
 					}
 					b.StopTimer()
+					b.ReportMetric(float64(runtime.GOMAXPROCS(0)), "gomaxprocs")
 					end, err := proc.Times()
 					if err != nil {
 						b.Fatal(err)
+					}
+					if mode != "reassembly" {
+						b.ReportMetric(float64(want), "messages/batch")
+						b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N)/float64(want), "ns/message")
+						b.ReportMetric((end.User+end.System-cpu.User-cpu.System)*1e9/float64(b.N)/float64(want), "cpu-ns/message")
 					}
 					b.ReportMetric((end.User+end.System-cpu.User-cpu.System)*1e3/float64(b.N), "cpu-ms/batch")
 				})

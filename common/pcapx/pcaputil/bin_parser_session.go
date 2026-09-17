@@ -159,7 +159,11 @@ func cloneSession(v map[string]any) map[string]any {
 	return cloneSessionValue(v).(map[string]any)
 }
 
-func sessionSnapshotBytes(v any) int {
+func sessionSnapshotBytes(v any) int { return sessionSnapshotSize(v, true) }
+
+// History budgets count logical owned byte lengths, not spare input capacity.
+// Both forms remain approximate budgets rather than exact Go heap sizes.
+func sessionSnapshotSize(v any, byteCapacity bool) int {
 	switch x := v.(type) {
 	case map[string]any:
 		if x == nil {
@@ -167,19 +171,22 @@ func sessionSnapshotBytes(v any) int {
 		}
 		n := 64
 		for k, v := range x {
-			n += len(k) + 32 + sessionSnapshotBytes(v)
+			n += len(k) + 32 + sessionSnapshotSize(v, byteCapacity)
 		}
 		return n
 	case []map[string]any:
 		n := 24 + len(x)*8
 		for _, v := range x {
-			n += sessionSnapshotBytes(v)
+			n += sessionSnapshotSize(v, byteCapacity)
 		}
 		return n
 	case string:
 		return len(x) + 16
 	case []byte:
-		return cap(x) + 24
+		if byteCapacity {
+			return cap(x) + 24
+		}
+		return len(x) + 24
 	case nil:
 		return 0
 	default:
@@ -187,4 +194,6 @@ func sessionSnapshotBytes(v any) int {
 	}
 }
 
-func protocolHistoryBytes(e *ProtocolEvent) int { return len(e.Raw) + sessionSnapshotBytes(e.Session) }
+func protocolHistoryBytes(e *ProtocolEvent) int {
+	return len(e.Raw) + sessionSnapshotSize(e.Session, false)
+}

@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -165,4 +166,31 @@ func TestBinParserInspectorCursor(t *testing.T) {
 	rows, _, omitted = v.RowsAfter(next, 10, "", 0)
 	require.Empty(t, rows)
 	require.Zero(t, omitted)
+}
+
+type reviewCloser struct {
+	closed bool
+	err    error
+}
+
+func (c *reviewCloser) Close() error { c.closed = true; return c.err }
+
+func TestCaptureOutputFlushAndCloseErrors(t *testing.T) {
+	writeErr, closeErr := errors.New("flush failed"), errors.New("close failed")
+	for _, fail := range []bool{false, true} {
+		var dst io.Writer = io.Discard
+		if fail {
+			dst = &failingCaptureWriter{err: writeErr}
+		}
+		buffer := bufio.NewWriterSize(dst, 32)
+		_, err := buffer.Write([]byte("buffered"))
+		require.NoError(t, err)
+		c := &reviewCloser{err: closeErr}
+		err = flushCaptureOutput(buffer, c)
+		require.True(t, c.closed)
+		require.ErrorIs(t, err, closeErr)
+		if fail {
+			require.ErrorIs(t, err, writeErr)
+		}
+	}
 }

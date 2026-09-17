@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -104,4 +106,29 @@ func TestInspectHTTP2AndMySQLSessions(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestInspectSchedulerIndependentOfWorkers(t *testing.T) {
+	old := runtime.GOMAXPROCS(3)
+	defer runtime.GOMAXPROCS(old)
+	input := filepath.Join("..", "..", "pcaputil", "testdata", "protocol-sessions", "http2-multiplex.pcap")
+	for _, procs := range []int{0, 2} {
+		file := filepath.Join(t.TempDir(), "report.json")
+		require.NoError(t, run(context.Background(), []string{"-read", input, "-quiet", "-workers", "1", "-gomaxprocs", strconv.Itoa(procs), "-report", file}, io.Discard, io.Discard))
+		data, err := os.ReadFile(file)
+		require.NoError(t, err)
+		var got report
+		require.NoError(t, json.Unmarshal(data, &got))
+		want := procs
+		if want == 0 {
+			want = 3
+		}
+		require.Equal(t, want, got.GOMAXPROCS)
+		require.Equal(t, runtime.Version(), got.GoVersion)
+		require.Equal(t, 3, runtime.GOMAXPROCS(0))
+		require.Equal(t, 1, got.Workers)
+		require.EqualValues(t, 12, got.Analysis.Decoded)
+	}
+	_, err := parseOptions([]string{"-read", input, "-gomaxprocs", "-1"}, io.Discard)
+	require.Error(t, err)
 }

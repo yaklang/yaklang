@@ -1,6 +1,8 @@
 package pcaputil
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -60,7 +62,8 @@ func WithCaptureWriter(w io.Writer) CaptureOption {
 // pcap_outputFile 将捕获到的原始包保存为新的 pcap 文件，配合 StartSniff 或 OpenPcapFile 使用。
 // 文件在捕获/回放开始时创建，结束或出错时由 pcapx 关闭；已存在的文件不会被覆盖。
 // 保存发生在协议分析前，回调中的显示筛选不影响保存内容，BPF 输入过滤仍生效。
-// 输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。写入失败会返回错误。
+// 输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。使用 256 KiB 有界缓冲，
+// 结束时 Flush 并关闭文件，写入和关闭失败均返回错误；Flush 不承诺 fsync 耐久性。
 //
 // 参数:
 //   - filename: 尚不存在的非空输出文件路径，父目录必须存在。不能与 pcap_captureWriter 同时使用。
@@ -93,8 +96,9 @@ func (c *CaptureConfig) openCaptureOutput() (func() error, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.recorder = &captureWriter{output: f}
-	return f.Close, nil
+	buffer := bufio.NewWriterSize(f, 256<<10)
+	c.recorder = &captureWriter{output: buffer}
+	return func() error { return flushCaptureOutput(buffer, f) }, nil
 }
 
 type captureWriter struct {
@@ -132,4 +136,9 @@ func (r *captureWriter) write(raw []byte, ci gopacket.CaptureInfo, link layers.L
 	}
 	r.err = r.writer.WritePacket(ci, raw)
 	return r.err
+}
+
+// Always close the owned file, including after a buffered write failure.
+func flushCaptureOutput(buffer *bufio.Writer, file io.Closer) error {
+	return errors.Join(buffer.Flush(), file.Close())
 }

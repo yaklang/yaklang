@@ -28,7 +28,7 @@ type options struct {
 	cpuProfile                                 string
 	duration, interval                         time.Duration
 	workers, history, memory, rows, snaplen    int
-	captureBuffer                              int
+	captureBuffer, gomaxprocs                  int
 	flow, detail                               uint64
 	list, full, deferred, follow, quiet        bool
 }
@@ -45,7 +45,8 @@ func parseOptions(args []string, stderr io.Writer) (o options, err error) {
 	f.StringVar(&o.cpuProfile, "cpu-profile", "", "save Go CPU profile to a NEW file; profiling affects throughput")
 	f.DurationVar(&o.duration, "duration", 30*time.Second, "live duration; 0 runs until Ctrl-C")
 	f.DurationVar(&o.interval, "interval", time.Second, "console refresh interval, minimum 100ms")
-	f.IntVar(&o.workers, "workers", 1, "TCP workers and GOMAXPROCS: 1, 2 or 4")
+	f.IntVar(&o.workers, "workers", 1, "TCP workers: 1, 2 or 4")
+	f.IntVar(&o.gomaxprocs, "gomaxprocs", 0, "Go scheduler parallelism; 0 preserves runtime/environment setting")
 	f.IntVar(&o.history, "history", 4096, "retained messages; 0 disables history")
 	f.IntVar(&o.memory, "memory-mib", 32, "retained raw-message MiB")
 	f.IntVar(&o.rows, "rows", 30, "maximum displayed rows per refresh/final table")
@@ -73,6 +74,9 @@ func parseOptions(args []string, stderr io.Writer) (o options, err error) {
 	if o.workers != 1 && o.workers != 2 && o.workers != 4 {
 		return o, errors.New("workers must be 1, 2 or 4")
 	}
+	if o.gomaxprocs < 0 {
+		return o, errors.New("gomaxprocs must be nonnegative")
+	}
 	if o.captureBuffer < 0 || o.captureBuffer > 256 {
 		return o, errors.New("capture-buffer-mib must be 0 through 256")
 	}
@@ -88,7 +92,8 @@ func parseOptions(args []string, stderr io.Writer) (o options, err error) {
 type liveCounts struct{ decoded, bytes, events atomic.Uint64 }
 type report struct {
 	Mode                                                    string
-	Workers                                                 int
+	Workers, GOMAXPROCS                                     int
+	GoVersion                                               string
 	ElapsedSeconds, CPUSeconds                              float64
 	CPUAvailable                                            bool
 	RateAvailable                                           bool
@@ -139,8 +144,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (resultEr
 			o.device = devs[index-1].Name
 		}
 	}
-	old := runtime.GOMAXPROCS(o.workers)
-	defer runtime.GOMAXPROCS(old)
+	if o.gomaxprocs > 0 {
+		old := runtime.GOMAXPROCS(o.gomaxprocs)
+		defer runtime.GOMAXPROCS(old)
+	}
 	var view *pcaputil.BinParserInspector
 	if o.history > 0 {
 		view, err = pcaputil.NewBinParserInspector(o.history, o.memory<<20)
@@ -156,6 +163,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (resultEr
 		defer stop()
 	}
 	var metrics report
+	metrics.GOMAXPROCS, metrics.GoVersion = runtime.GOMAXPROCS(0), runtime.Version()
 	metrics.Workers, metrics.Mode = o.workers, "full"
 	if o.deferred || !o.full {
 		metrics.Mode = "deferred"
@@ -305,7 +313,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (resultEr
 	if resultErr != nil {
 		metrics.Error = resultErr.Error()
 	}
-	fmt.Fprintf(stderr, "finished: mode=%s workers=%d elapsed=%.3fs decoded=%.3f Mbps delivered=%.3f Mbps CPU=%.3fs cores=%.3f cpu_available=%v\nanalysis: %+v\nreassembly: %+v\nhistory_evicted=%d\n", metrics.Mode, metrics.Workers, metrics.ElapsedSeconds, metrics.DecodedMbps, metrics.DeliveredMbps, metrics.CPUSeconds, metrics.CPUCores, metrics.CPUAvailable, metrics.Analysis, metrics.Reassembly, metrics.HistoryEvicted)
+	fmt.Fprintf(stderr, "finished: mode=%s workers=%d gomaxprocs=%d elapsed=%.3fs decoded=%.3f Mbps delivered=%.3f Mbps CPU=%.3fs cores=%.3f cpu_available=%v\nanalysis: %+v\nreassembly: %+v\nhistory_evicted=%d\n", metrics.Mode, metrics.Workers, metrics.GOMAXPROCS, metrics.ElapsedSeconds, metrics.DecodedMbps, metrics.DeliveredMbps, metrics.CPUSeconds, metrics.CPUCores, metrics.CPUAvailable, metrics.Analysis, metrics.Reassembly, metrics.HistoryEvicted)
 	if reportFile != nil {
 		enc := json.NewEncoder(reportFile)
 		enc.SetIndent("", "  ")

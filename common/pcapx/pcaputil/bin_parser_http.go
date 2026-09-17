@@ -13,7 +13,7 @@ import (
 var errBinContext = errors.New("protocol context required")
 
 type binHTTPState struct {
-	header, total, cursor, next                         int
+	header, total, cursor, next, search                 int
 	chunked, trailers, closeDelimited, response, tunnel bool
 	method, summary                                     string
 	status                                              int
@@ -38,7 +38,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	d := &f.directions[dir]
 	h := d.http
 	if h == nil {
-		end := bytes.Index(w, []byte("\r\n\r\n"))
+		end := incrementalHTTPIndex(w, 0, &d.headerScan, "\r\n\r\n")
 		if end < 0 {
 			if len(w) > 32<<10 {
 				return 0, nil, fmt.Errorf("HTTP header exceeds 32 KiB")
@@ -122,14 +122,14 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			if bytes.Equal(w[h.cursor:h.cursor+2], []byte("\r\n")) {
 				return h.cursor + 2, f.spec("http", "HTTPExact"), nil
 			}
-			end := bytes.Index(w[h.cursor:], []byte("\r\n\r\n"))
+			end := incrementalHTTPIndex(w, h.cursor, &h.search, "\r\n\r\n")
 			if end < 0 {
 				if len(w)-h.cursor > 32<<10 {
 					return 0, nil, fmt.Errorf("HTTP trailers exceed limit")
 				}
 				return 0, nil, nil
 			}
-			return h.cursor + end + 4, f.spec("http", "HTTPExact"), nil
+			return end + 4, f.spec("http", "HTTPExact"), nil
 		}
 		if h.next > 0 {
 			if len(w) < h.next+2 {
@@ -140,20 +140,20 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			}
 			h.cursor, h.next = h.next+2, 0
 		}
-		end := bytes.Index(w[h.cursor:], []byte("\r\n"))
+		end := incrementalHTTPIndex(w, h.cursor, &h.search, "\r\n")
 		if end < 0 {
 			if len(w)-h.cursor > 4096 {
 				return 0, nil, fmt.Errorf("HTTP chunk header exceeds limit")
 			}
 			return 0, nil, nil
 		}
-		line := string(w[h.cursor : h.cursor+end])
+		line := string(w[h.cursor:end])
 		sizeText, _, _ := strings.Cut(line, ";")
 		size, err := strconv.ParseUint(sizeText, 16, 32)
 		if err != nil {
 			return 0, nil, fmt.Errorf("invalid HTTP chunk size")
 		}
-		h.cursor += end + 2
+		h.cursor = end + 2
 		if size == 0 {
 			h.trailers = true
 			continue
@@ -174,10 +174,29 @@ func (f *binFlow) finishHTTP(dir int) {
 		}
 	}
 	f.directions[dir].http = nil
+	f.directions[dir].headerScan = 0
 	if h.tunnel {
 		// A confirmed CONNECT/101 response is an explicit protocol boundary.
 		// Re-probe the next ordered bytes once; keep the capture flow identity.
 		f.protocol, f.binding, f.level = "", nil, 0
 		f.httpMethods = nil
 	}
+}
+
+// Search only new bytes plus the separator overlap. Coordinates are relative to
+// the current message, so buffer reallocation preserves them; finish/release
+// resets the direction before a pipelined message or protocol re-probe.
+func incrementalHTTPIndex(w []byte, start int, cursor *int, separator string) int {
+	at := *cursor
+	if at < start || at > len(w) {
+		at = start
+	}
+	if end := bytes.Index(w[at:], []byte(separator)); end >= 0 {
+		return at + end
+	}
+	*cursor = len(w) - len(separator) + 1
+	if *cursor < start {
+		*cursor = start
+	}
+	return -1
 }

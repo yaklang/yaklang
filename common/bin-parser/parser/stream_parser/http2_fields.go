@@ -116,6 +116,12 @@ func decodeHTTP2HPACKBlock(decoder *hpack.Decoder, block []byte) error {
 	if err != nil {
 		return err
 	}
+	return decodeHTTP2HPACKScanned(decoder, block, updates)
+}
+
+// Only callers holding boundaries from http2HPACKLeadingUpdates may use this
+// executor. Keeping scanning outside it lets session validation reuse the scan.
+func decodeHTTP2HPACKScanned(decoder *hpack.Decoder, block []byte, updates []int) error {
 	at := 0
 	for _, end := range updates {
 		if _, err := decoder.Write(block[at:end]); err != nil {
@@ -143,6 +149,11 @@ type http2ObservedFrame struct {
 // Frame syntax only. The settings advertised here apply in the reverse
 // direction and must not alter this sender's HPACK decoder or flow window.
 func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
+	return inspectHTTP2WireFrame(wire, start, true)
+}
+
+// Both modes run the same validator; layout inspection skips field materialization.
+func inspectHTTP2WireFrame(wire []byte, start int, fields bool) (http2ObservedFrame, error) {
 	var out http2ObservedFrame
 	fail := func(why string) (http2ObservedFrame, error) { return out, fmt.Errorf("http2-fields: %s", why) }
 	if start < 0 || start > len(wire) || len(wire)-start < 9 {
@@ -155,20 +166,28 @@ func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
 	out.end, out.typ, out.flags = start+9+size, wire[start+3], wire[start+4]
 	out.stream = binary.BigEndian.Uint32(wire[start+5:]) & 0x7fffffff
 	out.fragmentStart, out.fragmentEnd = -1, -1
-	info := map[string]any{"Type": uint64(out.typ), "Stream Identifier": uint64(out.stream), "Payload Layout Decoded": true}
-	f := http2WireField{Name: "Frame", Start: start * 8, End: out.end * 8, Info: info}
-	f.Children = []http2WireField{
-		http2WireLeaf("Length", "uint32", start, start+3), http2WireLeaf("Type", "uint8", start+3, start+4), http2WireLeaf("Flags", "uint8", start+4, start+5),
-		{Name: "Reserved", Type: "uint8", Start: (start + 5) * 8, End: (start+5)*8 + 1},
-		{Name: "Stream Identifier", Type: "uint32", Start: (start+5)*8 + 1, End: (start + 9) * 8},
+	var info map[string]any
+	var f http2WireField
+	if fields {
+		info = map[string]any{"Type": uint64(out.typ), "Stream Identifier": uint64(out.stream), "Payload Layout Decoded": true}
+		f = http2WireField{Name: "Frame", Start: start * 8, End: out.end * 8, Info: info}
+		f.Children = []http2WireField{
+			http2WireLeaf("Length", "uint32", start, start+3), http2WireLeaf("Type", "uint8", start+3, start+4), http2WireLeaf("Flags", "uint8", start+4, start+5),
+			{Name: "Reserved", Type: "uint8", Start: (start + 5) * 8, End: (start+5)*8 + 1},
+			{Name: "Stream Identifier", Type: "uint32", Start: (start+5)*8 + 1, End: (start + 9) * 8},
+		}
 	}
 	at, end := start+9, out.end
 	add := func(name, typ string, n int) {
-		f.Children = append(f.Children, http2WireLeaf(name, typ, at, at+n))
+		if fields {
+			f.Children = append(f.Children, http2WireLeaf(name, typ, at, at+n))
+		}
 		at += n
 	}
 	word31 := func(reserved, name string) {
-		f.Children = append(f.Children, http2WireField{Name: reserved, Type: "uint8", Start: at * 8, End: at*8 + 1}, http2WireField{Name: name, Type: "uint32", Start: at*8 + 1, End: (at + 4) * 8})
+		if fields {
+			f.Children = append(f.Children, http2WireField{Name: reserved, Type: "uint8", Start: at * 8, End: at*8 + 1}, http2WireField{Name: name, Type: "uint32", Start: at*8 + 1, End: (at + 4) * 8})
+		}
 		at += 4
 	}
 	if out.typ == 4 || out.typ == 6 || out.typ == 7 {
@@ -199,17 +218,25 @@ func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
 			return fmt.Errorf("http2-fields: self-dependent priority")
 		}
 		word31("Exclusive", "Stream Dependency")
-		info["Effective Weight"] = uint64(wire[at]) + 1
+		if fields {
+			info["Effective Weight"] = uint64(wire[at]) + 1
+		}
 		add("Weight", "uint8", 1)
 		return nil
 	}
 	switch out.typ {
 	case 0:
-		info["End Stream"] = out.flags&1 != 0
+		if fields {
+			info["End Stream"] = out.flags&1 != 0
+		}
 		add("Data", "raw", end-at)
 	case 1:
-		info["End Stream"] = out.flags&1 != 0
-		info["End Headers"] = out.flags&4 != 0
+		if fields {
+			info["End Stream"] = out.flags&1 != 0
+		}
+		if fields {
+			info["End Headers"] = out.flags&4 != 0
+		}
 		if out.flags&32 != 0 {
 			if err := priority(); err != nil {
 				return out, err
@@ -236,7 +263,9 @@ func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
 		if out.flags&1 != 0 && size != 0 {
 			return fail("SETTINGS ACK has a payload")
 		}
-		info["ACK"] = out.flags&1 != 0
+		if fields {
+			info["ACK"] = out.flags&1 != 0
+		}
 		if size == 0 {
 			add("Settings", "raw", 0)
 		}
@@ -245,8 +274,10 @@ func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
 			if id == 2 && value > 1 || id == 4 && value > 0x7fffffff || id == 5 && (value < 16384 || value > 0xffffff) {
 				return fail("invalid defined SETTINGS value")
 			}
-			setting := http2WireField{Name: fmt.Sprintf("Setting %d", i), Start: at * 8, End: (at + 6) * 8, Children: []http2WireField{http2WireLeaf("Identifier", "uint16", at, at+2), http2WireLeaf("Value", "uint32", at+2, at+6)}}
-			f.Children = append(f.Children, setting)
+			if fields {
+				setting := http2WireField{Name: fmt.Sprintf("Setting %d", i), Start: at * 8, End: (at + 6) * 8, Children: []http2WireField{http2WireLeaf("Identifier", "uint16", at, at+2), http2WireLeaf("Value", "uint32", at+2, at+6)}}
+				f.Children = append(f.Children, setting)
+			}
 			at += 6
 		}
 	case 5:
@@ -258,14 +289,18 @@ func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
 			return fail("zero promised stream identifier")
 		}
 		word31("Promised Reserved", "Promised Stream Identifier")
-		info["End Headers"] = out.flags&4 != 0
+		if fields {
+			info["End Headers"] = out.flags&4 != 0
+		}
 		out.fragmentStart, out.fragmentEnd = at, end
 		add("Field Block Fragment", "raw", end-at)
 	case 6:
 		if size != 8 {
 			return fail("PING length must be eight")
 		}
-		info["ACK"] = out.flags&1 != 0
+		if fields {
+			info["ACK"] = out.flags&1 != 0
+		}
 		add("Ping Data", "raw", 8)
 	case 7:
 		if size < 8 {
@@ -283,11 +318,15 @@ func decodeHTTP2WireFrame(wire []byte, start int) (http2ObservedFrame, error) {
 		}
 		word31("Window Reserved", "Window Size Increment")
 	case 9:
-		info["End Headers"] = out.flags&4 != 0
+		if fields {
+			info["End Headers"] = out.flags&4 != 0
+		}
 		out.fragmentStart, out.fragmentEnd = at, end
 		add("Field Block Fragment", "raw", end-at)
 	default:
-		info["Payload Layout Decoded"] = false
+		if fields {
+			info["Payload Layout Decoded"] = false
+		}
 		add("Unknown Frame Data", "raw", end-at)
 	}
 	if padded {

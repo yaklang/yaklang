@@ -14,7 +14,7 @@ type HTTP2FrameLayout struct {
 }
 
 func InspectHTTP2Frame(wire []byte) (HTTP2FrameLayout, error) {
-	f, err := decodeHTTP2WireFrame(wire, 0)
+	f, err := inspectHTTP2WireFrame(wire, 0, false)
 	if err != nil {
 		return HTTP2FrameLayout{}, err
 	}
@@ -92,7 +92,7 @@ func (x *HTTP2HeaderDecoder) Decode(block []byte) ([]map[string]any, error) {
 	}
 	x.headers, x.bytes, x.err = nil, 0, nil
 	x.d.SetEmitEnabled(true)
-	if err := decodeHTTP2HPACKBlock(x.d, block); err != nil {
+	if err := decodeHTTP2HPACKScanned(x.d, block, updates); err != nil {
 		x.headers = nil
 		return nil, err
 	}
