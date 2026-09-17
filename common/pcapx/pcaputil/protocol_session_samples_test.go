@@ -141,6 +141,12 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, rdpConnectInitial("rdpdr", "cliprdr")},
 			{1, rdpConnectResponse("rdpdr", "cliprdr")},
 		}},
+		{"dot-dns-tcp-length", "dot", 1853, []sessionStep{
+			{0, dnsQuery(0x1234, "example.com", 1)},
+			{1, dnsAResponse(0x1234, "example.com", [4]byte{93, 184, 216, 34})},
+			{0, dnsQuery(0x22, "ietf.org", 1)},
+			{1, dnsAResponse(0x22, "ietf.org", [4]byte{4, 31, 198, 44})},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

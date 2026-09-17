@@ -58,6 +58,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.snmp = "snmp", &binSNMP{pending: map[int64]string{}}
 	case "rdp":
 		f.protocol, f.rdp = "rdp", &binRDP{client: dir}
+	case "dot":
+		f.protocol, f.dot = "dot", &binDoT{pending: map[uint16]string{}}
 	}
 }
 
@@ -129,6 +131,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil && e.Session["TLS Expected"] == true {
 			f.protocol = "tls"
 		}
+	case "dot":
+		e.Session, err = f.dot.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -173,6 +177,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("SNMPv3 %v id %v", e.Session["Packet Name"], e.Session["Request ID"])
 		case "rdp":
 			e.Summary = fmt.Sprintf("RDP %v", e.Session["Packet Name"])
+		case "dot":
+			e.Summary = fmt.Sprintf("DoT %v id %v %v", e.Session["Packet Name"], e.Session["Transaction ID"], e.Session["QNAME"])
 		}
 	}
 	return err
@@ -192,7 +198,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -273,6 +279,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if r := f.rdp; r != nil && r.sawCR && !r.sawCC {
 		emit(max(r.client, 0), map[string]any{"Cookie": r.cookie}, "RDP exchange ended before X.224 Connection Confirm")
+	}
+	if d := f.dot; d != nil && len(d.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DoT exchange ended with unmatched DNS transaction IDs")
 	}
 }
 

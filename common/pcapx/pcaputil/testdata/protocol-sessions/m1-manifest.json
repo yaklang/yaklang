@@ -121,6 +121,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "dot-dns-tcp-length.pcap",
+      "protocol": "dot",
+      "sha256": "ca073f1abebf0c0ded92297722a867db895ff3fe3a28a04084d25c7fa1ae5c92",
+      "bytes": 910,
+      "decode_as_port": 1853,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",
