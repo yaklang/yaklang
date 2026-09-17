@@ -222,21 +222,13 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 	defer m.wg.Done()
 	defer entry.cancel()
 	var result *SubAgentResult
-	acquired := false
-	var executionCancel context.CancelFunc
 	// Covers runtime construction and finalization panics as well as model work.
-	defer func() {
+	finalize := func() {
 		defer func() {
 			if rec := recover(); rec != nil {
 				result = &SubAgentResult{Record: TimelineRecord{Status: "failed", Error: fmt.Sprintf("finalize sub-agent: %v", rec)}}
 			}
 			m.settle(entry, result, ctx.Err())
-			if acquired {
-				<-m.slots
-			}
-			if executionCancel != nil {
-				executionCancel()
-			}
 		}()
 		if rec := recover(); rec != nil {
 			result = &SubAgentResult{Record: TimelineRecord{Status: "failed", Error: fmt.Sprint(rec)}}
@@ -276,16 +268,18 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 				}
 			})
 		}
-	}()
+	}
 	select {
 	case m.slots <- struct{}{}:
-		acquired = true
+		defer func() { <-m.slots }()
 	case <-ctx.Done():
+		defer finalize()
 		return
 	}
 	m.mu.Lock()
 	if ctx.Err() != nil || entry.snapshot.State != "queued" {
 		m.mu.Unlock()
+		defer finalize()
 		return
 	}
 	now := time.Now()
@@ -294,9 +288,13 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 	entry.snapshot.LastActivityAt = now
 	m.mu.Unlock()
 	if p.Job.Timeout > 0 {
+		var executionCancel context.CancelFunc
 		ctx, executionCancel = context.WithTimeout(ctx, p.Job.Timeout)
+		// Register before finalization so settle observes the execution outcome
+		// before we cancel this context to release its timer (defers run LIFO).
+		defer executionCancel()
 	}
-
+	defer finalize()
 	opts.runtimeContext = ctx
 	opts.taskReady = func(task aicommon.AIStatefulTask) {
 		m.mu.Lock()

@@ -33,6 +33,15 @@ task_only是“不自动注入父会话事实”，不是文件系统沙箱或�
 
 旧内部`SubAgentOptions.TimelineMode=Clean`且job未指定context_mode时，继续表示“只清Timeline”。审计与内部搜索的调用语义保持兼容，不把它悄悄改成task_only。
 
+### 操作系统和架构信息的历史核查
+
+`OSArch` 是运行环境事实，两种上下文模式都保留，目标扩写直接使用 `runtime.GOOS/runtime.GOARCH`，无需读取父 loop。
+
+- 主分支提交 `05754b2ed90244bca7610968c2c40498e00ae417` 删除的是 `aireact/prompts.go` 中零引用的 `LoopPromptData`、`YaklangCodeActionLoopPromptData` 结构体，包括其中的 `OSArch` 字段；这不是删除有效提示词中的环境信息。
+- `reactloops/reactloop.go:GetBaseFrameContext` 和 `aireact/prompt_loop_materials.go` 仍生成并渲染 `OSArch`。
+- 三阶段重构 `eef9575072d13ec534ab7af2823d07aebded74ee` 保留了扩写模板的 `{{.OSArch}}`，但调用时 `parentLoop` 恒为 nil，遗漏了模板数据，渲染为 `OS/Arch: <no value>`。遗漏早于后台派发改造。
+- 修复补齐环境值，并删除扩写函数无效的 `parentLoop` 参数和分支。真实运行体的受控测试分别捕获 fork、task_only 的扩写请求，检查其包含实际系统/架构，同时继续验证父会话的隔离规则。
+
 ## 完整调用例子
 
 用户：“继续根据刚才的故障分析检查支付模块，同时独立复核库存代码，你整理部署配置。”

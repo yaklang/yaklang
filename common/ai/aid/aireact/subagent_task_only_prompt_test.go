@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"context"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -117,6 +118,7 @@ func TestSubAgentContextMode_RealRuntimeAndGoalElaboration(t *testing.T) {
 			elaborationCount, runtimeCount := len(elaborationPrompts), len(runtimePrompts)
 			mu.Unlock()
 			require.Equal(t, 1, elaborationCount)
+			require.Contains(t, elaboration, "OS/Arch: "+goruntime.GOOS+"/"+goruntime.GOARCH)
 			require.Equal(t, 1, runtimeCount)
 			for _, prompt := range []string{elaboration, runtime} {
 				require.Contains(t, prompt, "EXPLICIT_CHILD_GOAL")

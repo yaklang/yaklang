@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -543,7 +544,7 @@ func (defaultGoalElaborator) Elaborate(ctx context.Context, prepared *PreparedSu
 		return "", "", utils.Error("prepared sub-agent is not ready for elaboration")
 	}
 	// Use the child's frozen context, never the concurrently advancing parent loop.
-	return elaborateGoal(ctx, prepared.Invoker, nil, prepared.Task.GetId(), prepared.Job)
+	return elaborateGoal(ctx, prepared.Invoker, prepared.Task.GetId(), prepared.Job)
 }
 
 const (
@@ -601,25 +602,21 @@ Write the elaborated goal so it stands alone (the sub agent does not see this pr
 func elaborateGoal(
 	ctx context.Context,
 	childInvoker aicommon.AITaskInvokeRuntime,
-	parentLoop *ReActLoop,
 	subTaskId string,
 	job SubAgentJob,
 ) (goal, resultContract string, err error) {
 	if childInvoker == nil {
 		return "", "", utils.Error("child invoker is nil")
 	}
-	templateData := map[string]any{}
+	templateData := map[string]any{
+		"CurrentTime": time.Now().Format(time.RFC3339),
+		"OSArch":      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+	}
 	// The child owns the frozen branch; never consult a concurrently advancing parent.
 	if cfg, ok := childInvoker.GetConfig().(*aicommon.Config); ok {
 		templateData["WorkingDir"] = cfg.Workdir
-		templateData["CurrentTime"] = time.Now().Format(time.RFC3339)
 		if timeline := cfg.GetTimeline(); timeline != nil {
 			templateData["Timeline"] = timeline.Dump()
-		}
-	}
-	if parentLoop != nil && job.ContextMode != SubAgentContextTaskOnly {
-		for k, v := range parentLoop.GetBaseFrameContext() {
-			templateData[k] = v
 		}
 	}
 	templateData["SubTaskName"] = strings.TrimSpace(job.TaskName)

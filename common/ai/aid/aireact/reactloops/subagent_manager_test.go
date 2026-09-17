@@ -324,11 +324,13 @@ func TestBackgroundSubAgents_CancelAdmissionBeforeContextSignal(t *testing.T) {
 	m.jobs["queued"] = entry
 	m.order = []string{"queued"}
 	m.wg.Add(1)
-	m.run(entry, ctx, &PreparedSubAgent{}, SubAgentOptions{}, nil, nil, NewProgressRegistry())
+	released := false
+	m.run(entry, ctx, &PreparedSubAgent{Release: func() { released = true }}, SubAgentOptions{}, nil, nil, NewProgressRegistry())
 	snapshots, err := m.Inspect(nil)
 	require.NoError(t, err)
 	require.Equal(t, "cancelled", snapshots[0].State)
 	require.Nil(t, snapshots[0].StartedAt, "runtime must never be armed")
+	require.True(t, released, "cancellation before admission must still release prepared resources")
 }
 
 func TestBackgroundSubAgents_CleanTimelineStillInheritsSessionContext(t *testing.T) {
@@ -463,6 +465,37 @@ func TestBackgroundSubAgents_ExecutionTimeoutIsIndependentOfWait(t *testing.T) {
 	require.True(t, first.TimedOut)
 	items := awaitBackgroundTerminal(t, m, nil)
 	require.Equal(t, "timed_out", items[0].State)
+}
+
+func TestBackgroundSubAgents_TimeoutCleanupPreservesOutcome(t *testing.T) {
+	for _, outcome := range []string{"completed", "construction_error", "construction_panic"} {
+		t.Run(outcome, func(t *testing.T) {
+			loop, task := backgroundSubAgentFixture(t, 1)
+			if outcome != "completed" {
+				aicommon.AIRuntimeInvokerGetter = func(context.Context, ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+					if outcome == "construction_panic" {
+						panic("runtime construction failed")
+					}
+					return nil, fmt.Errorf("runtime construction failed")
+				}
+			}
+			release := make(chan struct{})
+			close(release)
+			_, err := loop.SubmitSubAgents(task, []SubAgentJob{{Identifier: outcome, Timeout: time.Hour}},
+				SubAgentOptions{TimelineMode: SubAgentTimelineClean, LoopBuilder: blockingSubAgentBuilder(make(chan string, 1), release, "done")}, outcome)
+			require.NoError(t, err)
+			m := loop.GetSubAgentManager()
+			items := awaitBackgroundTerminal(t, m, nil)
+			if outcome == "completed" {
+				require.Equal(t, "completed", items[0].State)
+			} else {
+				require.Equal(t, "failed", items[0].State)
+				require.Contains(t, items[0].Error, "runtime construction failed")
+			}
+			m.wg.Wait()
+			require.Empty(t, m.slots, "finalization must release the worker slot")
+		})
+	}
 }
 
 func TestBackgroundSubAgents_QueuedChildDoesNotRestoreOldToolPolicy(t *testing.T) {

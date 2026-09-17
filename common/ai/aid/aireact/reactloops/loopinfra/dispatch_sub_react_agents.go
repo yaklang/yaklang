@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -65,25 +64,6 @@ func handleDispatchSubReactAgents(
 		aicommon.WithStatusCode("subagent.dispatched"))
 	operator.Feedback(string(raw) + "\nAccepted, not completed. Continue independent work. If nothing useful remains, wait_sub_react_agents defaults to 30s; an observation timeout does not cancel workers. Results arrive in a later model input.")
 	operator.Continue()
-}
-
-// writeSubReactAgentTimelineRecord 把阶段 3 已构造好的 TimelineRecord 写进父
-// timeline。reference 落盘已在 DispatchSubAgents 的阶段 3 完成，这里只负责把
-// record JSON 写入父 timeline 条目。
-func writeSubReactAgentTimelineRecord(
-	invoker aicommon.AIInvokeRuntime,
-	record reactloops.TimelineRecord,
-) {
-	if invoker == nil {
-		return
-	}
-	raw, err := json.MarshalIndent(record, "", "  ")
-	if err != nil {
-		log.Warnf("dispatch_sub_react_agents: marshal timeline record failed: %v", err)
-		invoker.AddToTimeline(schema.AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT, utils.InterfaceToString(record))
-		return
-	}
-	invoker.AddToTimeline(schema.AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT, string(raw))
 }
 
 var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
