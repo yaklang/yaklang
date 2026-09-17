@@ -62,6 +62,14 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, kafkaResponse(1, append(append(kafkaBE16(0), kafkaBE32(0)...)))},
 			{0, kafkaRequest(3, 0, 2, "test", append(kafkaBE32(1), kafkaStr("foo")...))},
 		}},
+		{"tds-prelogin-login-batch", "tds", 11433, []sessionStep{
+			{0, tdsPrelogin(2)},
+			{1, tdsPreloginReply(2)},
+			{0, tdsLogin7()},
+			{1, tdsDone72()},
+			{0, tdsSQLBatch72("SELECT 1")},
+			{1, tdsQueryResult72()},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},
