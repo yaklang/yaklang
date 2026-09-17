@@ -64,6 +64,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.sip = "sip", &binSIP{pending: map[sipTxnKey]string{}, seen: map[sipTxnKey]int{}}
 	case "rtp":
 		f.protocol, f.rtp = "rtp", &binRTP{sources: map[uint32]*rtpSource{}}
+	case "quic":
+		f.protocol, f.quic = "quic", &binQUIC{streams: map[uint64]*quicStream{}}
 	}
 }
 
@@ -146,6 +148,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.sip.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "rtp":
 		e.Session, err = f.rtp.consume(e.Raw, f.directions[dir].ts, f.a.budget.MaxCollectionElements)
+	case "quic":
+		e.Session, err = f.quic.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -196,6 +200,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("SIP %v %v", e.Session["Packet Name"], e.Session["Call-ID"])
 		case "rtp":
 			e.Summary = fmt.Sprintf("RTP %v ssrc %v", e.Session["Packet Name"], e.Session["SSRC"])
+		case "quic":
+			e.Summary = fmt.Sprintf("QUIC %v", e.Session["Packet Name"])
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
@@ -219,7 +225,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }

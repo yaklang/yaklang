@@ -33,6 +33,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `doh-http-get-post.pcap` | RFC 8484 DoH HTTP/1.1 POST and GET application/dns-message with DNS ID pairing on non-443 port 18443 |
 | `sip-invite-ack-bye.pcap` | RFC 3261 INVITE/100/200/ACK/BYE on non-5060 TCP 15060 with SDP audio |
 | `rtp-seq-sr-rr.pcap` | RFC 3550 RTP PCMU sequence plus RTCP SR/RR on non-5004 TCP 15004 |
+| `quic-v1-crypto-stream.pcap` | RFC 9000 QUIC v1 Initial CRYPTO, Handshake CRYPTO, 0-RTT STREAM and CONNECTION_CLOSE on non-443 TCP 14443 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

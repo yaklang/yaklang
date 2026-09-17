@@ -97,6 +97,7 @@ var builtinBinSpecs = [][2]string{
 	{"sip", "SIP"},
 	{"rtp", "RTP"},
 	{"rtp", "RTCP"},
+	{"application-layer.quic", "QUIC"},
 }
 
 func (f *binFlow) spec(family, entry string) *binSpec {

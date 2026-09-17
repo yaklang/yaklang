@@ -148,6 +148,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "quic-v1-crypto-stream.pcap",
+      "protocol": "quic",
+      "sha256": "3612ee02ab8b832a189fceba1b63dda67512011c6da9234043a62e7a41059028",
+      "bytes": 882,
+      "decode_as_port": 14443,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "sip-invite-ack-bye.pcap",
       "protocol": "sip",
       "sha256": "06e06284db82ac3b5c6f0d7ec8e5b5c3391a9774c90c241a824bd268194f496c",
