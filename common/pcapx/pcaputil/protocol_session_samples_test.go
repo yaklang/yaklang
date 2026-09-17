@@ -59,7 +59,7 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 		}},
 		{"kafka-apiversions-metadata", "kafka", 19092, []sessionStep{
 			{0, kafkaRequest(18, 0, 1, "", nil)},
-			{1, kafkaResponse(1, append(append(kafkaBE16(0), kafkaBE32(0)...)))},
+			{1, kafkaResponse(1, append(kafkaBE16(0), kafkaBE32(0)...))},
 			{0, kafkaRequest(3, 0, 2, "test", append(kafkaBE32(1), kafkaStr("foo")...))},
 		}},
 		{"tds-prelogin-login-batch", "tds", 11433, []sessionStep{
