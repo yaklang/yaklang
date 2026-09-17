@@ -49,6 +49,11 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 			fopts = append(fopts, aiforge.WithLiteForge_FieldStreamEmitterCallback(item.FieldKeys, aiforge.FieldStreamEmitterCallback(item.Callback)))
 		}
 	}
+	// Consume extra AIRequestOption values from GeneralKVConfig (e.g.
+	// thinking-level degradation injected by the auxiliary task scheduler).
+	if extraReqOpts := gconfig.GetExtraRequestOpts(); len(extraReqOpts) > 0 {
+		fopts = append(fopts, aiforge.WithLiteForge_ExtraRequestOpts(extraReqOpts...))
+	}
 	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
 
 	if !utils.IsNil(cb) {
