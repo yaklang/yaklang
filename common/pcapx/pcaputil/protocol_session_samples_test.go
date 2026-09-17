@@ -217,6 +217,31 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, mqttPkt(0x32, append(append(append(mqttUTF("a/b"), 0, 1), 0), []byte("x")...))},
 			{1, mqttPkt(0x40, []byte{0, 1, 0, 0})},
 		}},
+		{"smtp-ehlo-mail", "smtp", 10025, []sessionStep{
+			{1, mailCR("220 smtp.example ESMTP ready")},
+			{0, mailCR("EHLO client.example")},
+			{1, []byte("250-PIPELINING\r\n250 HELP\r\n")},
+			{0, mailCR("MAIL FROM:<a@b>")},
+			{1, mailCR("250 OK")},
+		}},
+		{"imap-capability-login", "imap", 10143, []sessionStep{
+			{1, mailCR("* OK IMAP4rev1 ready")},
+			{0, mailCR("a1 CAPABILITY")},
+			{1, mailCR("* CAPABILITY IMAP4rev1 STARTTLS")},
+			{1, mailCR("a1 OK CAPABILITY completed")},
+		}},
+		{"pop3-capa-stat", "pop3", 10110, []sessionStep{
+			{1, mailCR("+OK POP3 ready")},
+			{0, mailCR("STAT")},
+			{1, mailCR("+OK 1 20")},
+		}},
+		{"ftp-user-pass-pasv", "ftp", 10021, []sessionStep{
+			{1, mailCR("220 ftp.example FTP server ready")},
+			{0, mailCR("USER anonymous")},
+			{1, mailCR("331 Password required")},
+			{0, mailCR("PASS x")},
+			{1, mailCR("230 Login successful")},
+		}},
 		{"grpc-unary-http2", "http2", 18081, []sessionStep{
 			{0, append([]byte(binH2Preface), h2TestFrame(4, 0, 0, nil)...)},
 			{1, h2TestFrame(4, 0, 0, nil)},

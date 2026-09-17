@@ -66,6 +66,14 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.rtp = "rtp", &binRTP{sources: map[uint32]*rtpSource{}}
 	case "quic":
 		f.protocol, f.quic = "quic", &binQUIC{streams: map[uint64]*quicStream{}, keys: f.a.quicKeys}
+	case "smtp":
+		f.protocol, f.smtp = "smtp", &binSMTP{}
+	case "imap":
+		f.protocol, f.imap = "imap", &binIMAP{pending: map[string]string{}}
+	case "pop3":
+		f.protocol, f.pop3 = "pop3", &binPOP3{}
+	case "ftp":
+		f.protocol, f.ftp = "ftp", &binFTP{}
 	}
 }
 
@@ -150,6 +158,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.rtp.consume(e.Raw, f.directions[dir].ts, f.a.budget.MaxCollectionElements)
 	case "quic":
 		e.Session, err = f.quic.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+	case "smtp":
+		e.Session, err = f.smtp.consume(dir, e.Raw)
+	case "imap":
+		e.Session, err = f.imap.consume(dir, e.Raw)
+	case "pop3":
+		e.Session, err = f.pop3.consume(e.Raw)
+	case "ftp":
+		e.Session, err = f.ftp.consume(e.Raw)
 	}
 	if e.Session != nil {
 		switch e.Protocol {
@@ -210,6 +226,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 				e.Protocol = "doq"
 				e.Summary = fmt.Sprintf("DoQ stream %v %v %v", e.Session["DoQ Stream ID"], e.Session["Packet Name"], e.Session["QNAME"])
 			}
+		case "smtp":
+			e.Summary = fmt.Sprintf("SMTP %v", e.Session["Packet Name"])
+		case "imap":
+			e.Summary = fmt.Sprintf("IMAP %v %v", e.Session["Packet Name"], e.Session["Tag"])
+		case "pop3":
+			e.Summary = fmt.Sprintf("POP3 %v", e.Session["Packet Name"])
+		case "ftp":
+			e.Summary = fmt.Sprintf("FTP %v", e.Session["Packet Name"])
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
@@ -233,7 +257,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -323,6 +347,18 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if p := f.sip; p != nil && len(p.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(p.pending)}, "SIP exchange ended with unmatched transactions")
+	}
+	if s := f.smtp; s != nil && s.pending != "" && !s.encrypted {
+		emit(0, map[string]any{"Outstanding": s.pending}, "SMTP exchange ended with unmatched command")
+	}
+	if im := f.imap; im != nil && len(im.pending) > 0 && !im.encrypted {
+		emit(0, map[string]any{"Outstanding": len(im.pending)}, "IMAP exchange ended with unmatched tags")
+	}
+	if p := f.pop3; p != nil && p.pending != "" && !p.encrypted {
+		emit(0, map[string]any{"Outstanding": p.pending}, "POP3 exchange ended with unmatched command")
+	}
+	if t := f.ftp; t != nil && t.pending != "" && !t.encrypted {
+		emit(0, map[string]any{"Outstanding": t.pending}, "FTP exchange ended with unmatched command")
 	}
 }
 

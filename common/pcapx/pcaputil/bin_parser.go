@@ -313,6 +313,10 @@ type binFlow struct {
 	sip              *binSIP
 	rtp              *binRTP
 	quic             *binQUIC
+	smtp             *binSMTP
+	imap             *binIMAP
+	pop3             *binPOP3
+	ftp              *binFTP
 	httpUpgrades     []bool
 	httpDoH          []bool
 	httpMethods      []string
@@ -518,7 +522,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		stateful := httpSession || f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp" || f.protocol == "smb2" || f.protocol == "dcerpc" || f.protocol == "ssh" || f.protocol == "nfs" || f.protocol == "snmp" || f.protocol == "rdp" || f.protocol == "dot" || f.protocol == "sip" || f.protocol == "rtp" || f.protocol == "quic")
+		stateful := httpSession || f.hasSession()
 		if !a.config.Deferred || stateful {
 			rawCopy := e.Raw
 			if f.protocol == "quic" {
@@ -530,6 +534,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+			} else if err != nil && stateful && f.mailLike() {
+				if cerr := f.consumeSession(dir, e, result); cerr == nil && e.Session != nil {
+					err = nil
+				} else if cerr != nil {
+					err = cerr
+				}
 			}
 			if err != nil {
 				e.Status, e.sessionError = classifySessionError(err)
