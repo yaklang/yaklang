@@ -148,6 +148,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "quic-v1-rfc9001-initial.pcap",
+      "protocol": "quic",
+      "sha256": "a04715a7f0ff155411d6eefd3379563807d63c7b2154224a00f95f5ee287ab99",
+      "bytes": 1955,
+      "decode_as_port": 14443,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "quic-v1-crypto-stream.pcap",
       "protocol": "quic",
       "sha256": "3612ee02ab8b832a189fceba1b63dda67512011c6da9234043a62e7a41059028",

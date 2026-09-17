@@ -65,7 +65,7 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "rtp":
 		f.protocol, f.rtp = "rtp", &binRTP{sources: map[uint32]*rtpSource{}}
 	case "quic":
-		f.protocol, f.quic = "quic", &binQUIC{streams: map[uint64]*quicStream{}}
+		f.protocol, f.quic = "quic", &binQUIC{streams: map[uint64]*quicStream{}, keys: f.a.quicKeys}
 	}
 }
 
@@ -149,7 +149,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "rtp":
 		e.Session, err = f.rtp.consume(e.Raw, f.directions[dir].ts, f.a.budget.MaxCollectionElements)
 	case "quic":
-		e.Session, err = f.quic.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		e.Session, err = f.quic.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
