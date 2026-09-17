@@ -18,11 +18,16 @@ func probeModbus(w []byte, limit int) ProbeResult {
 		}
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if w[0]&0x80 != 0 {
-		return ProbeResult{Verdict: ProbeReject}
-	}
 	if binary.BigEndian.Uint16(w[2:4]) != 0 {
 		return ProbeResult{Verdict: ProbeReject}
+	}
+	// RFC 9000 long headers put Version in bytes 1–4. Transaction ID 0x8001
+	// is 0x80 0x01 and is still a valid MBAP TID.
+	if len(w) >= 5 && w[0]&0xc0 == 0xc0 {
+		switch binary.BigEndian.Uint32(w[1:5]) {
+		case 0, 1:
+			return ProbeResult{Verdict: ProbeReject}
+		}
 	}
 	n := int(binary.BigEndian.Uint16(w[4:6]))
 	if n < 2 || n > 260 {

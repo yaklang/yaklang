@@ -320,6 +320,24 @@ func TestProtocolSessionModbusReadWriteException(t *testing.T) {
 	require.Equal(t, "Read Coils", r.Events[0].Session["In Reply To"])
 }
 
+func TestProtocolSessionModbusHighTransactionID(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	ts := time.Unix(1, 0)
+	req := mbap(0x8001, 1, 3, []byte{0, 0, 0, 2})
+	p := s.Probe(req)
+	require.Equal(t, ProbeAccept, p.Verdict)
+	require.Equal(t, "modbus", p.Protocol)
+	r := s.Feed(0, ts, req)
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Equal(t, "Read Holding Registers", r.Events[0].Session["Packet Name"])
+	require.Equal(t, 0x8001, r.Events[0].Session["Transaction ID"])
+	r = s.Feed(1, ts, mbap(0x8001, 1, 3, []byte{4, 0, 1, 0, 2}))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Equal(t, "response", r.Events[0].Session["Role"])
+	require.Equal(t, "Read Holding Registers", r.Events[0].Session["In Reply To"])
+}
+
 func TestProtocolSessionModbusFailClosed(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
