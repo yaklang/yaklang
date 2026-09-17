@@ -81,7 +81,7 @@ func (f *binFlow) frameNFS(w []byte) (int, *binSpec, error) {
 		}
 	}
 	_ = frags
-	return at, f.a.specs["onc_rpc/ONCRPCTCP"], nil
+	return at, f.a.specs["onc_rpc_tcp/ONCRPCTCP"], nil
 }
 
 func nfsAssemble(raw []byte) ([]byte, error) {

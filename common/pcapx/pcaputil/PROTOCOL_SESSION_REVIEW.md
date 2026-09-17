@@ -63,6 +63,10 @@ Integration with the concurrent Kafka addition also reproduced an early HTTP/2
 peer SETTINGS frame being claimed as Kafka. Admission now validates the fixed
 Kafka header and defers ambiguous SETTINGS prefixes; prefix tests cover several
 SETTINGS values and a Produce request that resolves the same ambiguity.
+The later NFS integration exposed a default-entry regression: adding the TCP
+record wrapper beside ONCRPC made unframed root parsing consume both entries.
+The wrapper now lives in `onc_rpc_tcp.yaml`, retaining the original unframed
+rule and its corpus/scorecard contracts while preserving NFS TCP framing.
 
 ## Boundaries
 
