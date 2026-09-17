@@ -311,8 +311,8 @@ func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 	// 由 go/defer 语句决定 emit 时机（异步调用 / defer 调用），因此不能直接走 buildExpression
 	// （后者会 EmitCall），而是从 expression 子树取出顶层 functionCall / instanceCode 再构造。
 	if funcCallExprStmt, ok := stmt.FunctionCallExpr().(*yak.FunctionCallExprContext); ok {
-		expr, ok := funcCallExprStmt.Expression().(*yak.ExpressionContext)
-		if !ok || expr == nil {
+		expr := unwrapCallExpression(funcCallExprStmt.Expression())
+		if expr == nil {
 			return nil
 		}
 		if fc, ok := expr.FunctionCall().(*yak.FunctionCallContext); ok && fc != nil {
@@ -339,6 +339,15 @@ func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 		c = b.buildInstanceCode(instanceCodeStmt)
 	}
 	return c
+}
+
+func unwrapCallExpression(raw yak.IExpressionContext) *yak.ExpressionContext {
+	expr, _ := raw.(*yak.ExpressionContext)
+	for expr != nil && expr.ParenExpression() != nil {
+		paren := expr.ParenExpression().(*yak.ParenExpressionContext)
+		expr, _ = paren.Expression().(*yak.ExpressionContext)
+	}
+	return expr
 }
 
 // defer stmt
@@ -375,8 +384,34 @@ func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
 	defer recoverRange()
 
 	var c *ssa.Call
-	if stmt, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
-		c = b.buildCallExpr(stmt)
+	if call, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
+		if raw, ok := call.FunctionCallExpr().(*yak.FunctionCallExprContext); ok {
+			expr := unwrapCallExpression(raw.Expression())
+			switch {
+			case expr != nil && (expr.FunctionCall() != nil || expr.InstanceCode() != nil):
+				c = b.buildCallExpr(call)
+			case expr != nil && expr.AnonymousFunctionDecl() != nil:
+				decl := expr.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext)
+				c = b.NewCall(b.buildAnonymousFunctionDecl(decl), nil)
+			default:
+				// General expressions run inside a zero-argument worker. A
+				// resulting function value is discarded, never invoked again.
+				if expression, ok := raw.Expression().(*yak.ExpressionContext); ok {
+					worker := b.NewFunc("")
+					func() {
+						b.FunctionBuilder = b.PushFunction(worker)
+						defer func() { b.FunctionBuilder = b.PopFunction() }()
+						b.AppendBlockRange()
+						b.buildExpression(expression)
+						b.EmitReturn(nil)
+						b.Finish()
+					}()
+					c = b.NewCall(worker, nil)
+				}
+			}
+		} else {
+			c = b.buildCallExpr(call)
+		}
 	}
 	if c == nil {
 		return nil

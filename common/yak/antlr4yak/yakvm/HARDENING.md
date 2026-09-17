@@ -92,7 +92,9 @@ w64devkit GCC. Baseline and candidate have independent worktrees.
 - `go` expression/function-definition cases cover original source, formatted source
   and serialized bytecode. Worker-only evaluation, lexical capture after the
   submitting function returns, short-circuit behavior, explicit calls and returned
-  closures are checked without changing existing language tests.
+  closures are checked without changing existing language tests. Yak SSA follows
+  the same rules, with regressions for worker placement and no extra closure call;
+  the existing incomplete-editor-input tests remain enabled.
 - The broader Lua/NASL runs encounter existing `Test4` (left-value assignment)
   and `TestCode` (Yak function assertion) failures. Both reproduce on the clean
   baseline with the same errors. Their tests are unchanged. No claim is made that
