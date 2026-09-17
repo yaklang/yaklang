@@ -25,7 +25,7 @@ func probeKafka(w []byte, limit int) ProbeResult {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	size := int(binary.BigEndian.Uint32(w[:4]))
-	if size < 8 || size > 1<<20 {
+	if size < 10 || size > 1<<20 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	api := binary.BigEndian.Uint16(w[4:6])
@@ -33,7 +33,23 @@ func probeKafka(w []byte, limit int) ProbeResult {
 	if !kafkaSupported(api, ver) {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	_ = limit
+	// API/version alone also match a server HTTP/2 SETTINGS frame. Inspect
+	// the complete fixed request header before committing the connection.
+	if len(w) < 14 {
+		return probeNeed("kafka", "request", len(w), 14)
+	}
+	clientLen := int(int16(binary.BigEndian.Uint16(w[12:14])))
+	if clientLen < -1 || clientLen > size-10 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	// A Produce v0 prefix can still be indistinguishable from initial peer
+	// SETTINGS. Leave that frame unclassified until the client preface or
+	// more request bytes resolve the ambiguity. Real Kafka requests with
+	// this prefix can be admitted once they extend beyond the short H2 frame.
+	h2Size := size >> 8
+	if w[3] == 4 && w[4] == 0 && binary.BigEndian.Uint32(w[5:9]) == 0 && h2Size%6 == 0 && len(w) <= 9+h2Size {
+		return probeNeed("kafka", "ambiguous-settings", len(w), min(limit, 10+h2Size))
+	}
 	return probeAccept("kafka", kafkaSessionAPIName(int16(api)), 88)
 }
 

@@ -50,6 +50,25 @@ func kafkaResponse(corr int32, body []byte) []byte {
 	return kafkaFrame(append(kafkaBE32(corr), body...))
 }
 
+func TestKafkaProbeDefersPeerHTTP2Settings(t *testing.T) {
+	for _, value := range []uint32{0, 8192, 65535} {
+		payload := append(kafkaBE16(1), kafkaBE32(int32(value))...)
+		settings := h2TestFrame(4, 0, 0, payload)
+		for n := 1; n <= len(settings); n++ {
+			require.NotEqual(t, ProbeAccept, probeKafka(settings[:n], 64).Verdict, "value=%d prefix=%d", value, n)
+		}
+	}
+	// This genuine request header has the same apparent six-byte SETTINGS
+	// length. Additional Kafka bytes must resolve it without excluding API 0.
+	req := kafkaRequest(0, 0, 1, "", make([]byte, 1530))
+	require.Equal(t, 1544, len(req))
+	require.Equal(t, ProbeNeedMore, probeKafka(req[:14], 64).Verdict)
+	require.Equal(t, ProbeAccept, probeKafka(req[:16], 64).Verdict)
+	bad := kafkaRequest(18, 0, 1, "", nil)
+	binary.BigEndian.PutUint16(bad[12:14], 1)
+	require.Equal(t, ProbeReject, probeKafka(bad, 64).Verdict)
+}
+
 func kafkaRecordBatch(count int32, compressed bool) []byte {
 	rest := kafkaBE32(-1) // leader epoch
 	rest = append(rest, 2)
@@ -223,5 +242,3 @@ func TestProtocolSessionKafkaFragmentation(t *testing.T) {
 		return names
 	})
 }
-
-

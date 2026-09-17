@@ -59,6 +59,10 @@ The 45-second fuzz run exercised 155,157 cases and checked no recovered flow
 panic, bounded peak buffered bytes, and zero retained buffer bytes after Close.
 Full regression caught the short-header MySQL collision and legacy budget
 status change; both were corrected without weakening the existing assertions.
+Integration with the concurrent Kafka addition also reproduced an early HTTP/2
+peer SETTINGS frame being claimed as Kafka. Admission now validates the fixed
+Kafka header and defers ambiguous SETTINGS prefixes; prefix tests cover several
+SETTINGS values and a Produce request that resolves the same ambiguity.
 
 ## Boundaries
 
