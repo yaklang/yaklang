@@ -1,0 +1,187 @@
+# Explicit, complete POP3 layouts with caller-selected response context.
+# RFC 1939/2449/5034; no command type inferred from numeric response text.
+# https://www.rfc-editor.org/rfc/rfc1939.html
+# https://www.rfc-editor.org/rfc/rfc2449.html
+# https://www.rfc-editor.org/rfc/rfc5034.html
+# AUTH without a mechanism is retained as a legacy probe, marked not validated.
+# Encoded continuation values remain raw; no mechanism/session outcome claim.
+# Message layout: seven-bit dot block, header unfolding and original body lines.
+# Historical pop3.yaml is unchanged. No TCP reassembly or session inference.
+# Complete messages additionally expose bounded MIME entities/transfer values
+# (RFC 2045/2046). Derived values map to original encoded ranges, never invented
+# decoded wire leaves. Unknown encodings stay opaque; invalid MIME keeps its
+# transport tree with an explicit diagnostic. No rendering or external fetches.
+# MIME limits: 64 parts, depth 8, 1 MiB total decoded, 1024 headers per entity.
+# Charset text conversion only covers valid US-ASCII/UTF-8; bytes remain available.
+# https://www.rfc-editor.org/rfc/rfc2045.html
+# https://www.rfc-editor.org/rfc/rfc2046.html
+# Local list cap 4096; message cap 1 MiB/8192 lines/1024 headers (1000 per line).
+# Base commands <=255 bytes; status/list lines <=512; continuation cap 64 KiB.
+endian: big
+unit: byte
+Package:
+  POP3CommandFields:
+    operator: |
+      err = parsePOP3Fields("command")
+      if err != nil { panic(err) }
+  POP3CommandFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 255 { panic("pop3-fields: exceeds 255-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3CommandExact", "POP3CommandFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3StatusFields:
+    operator: |
+      err = parsePOP3Fields("status")
+      if err != nil { panic(err) }
+  POP3StatusFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 512 { panic("pop3-fields: exceeds 512-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3StatusExact", "POP3StatusFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3StatFields:
+    operator: |
+      err = parsePOP3Fields("stat")
+      if err != nil { panic(err) }
+  POP3StatFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 512 { panic("pop3-fields: exceeds 512-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3StatExact", "POP3StatFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3ListFields:
+    operator: |
+      err = parsePOP3Fields("list")
+      if err != nil { panic(err) }
+  POP3ListFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("pop3-fields: exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3ListExact", "POP3ListFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3UIDLFields:
+    operator: |
+      err = parsePOP3Fields("uidl")
+      if err != nil { panic(err) }
+  POP3UIDLFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("pop3-fields: exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3UIDLExact", "POP3UIDLFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3CapabilitiesFields:
+    operator: |
+      err = parsePOP3Fields("capa")
+      if err != nil { panic(err) }
+  POP3CapabilitiesFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("pop3-fields: exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3CapabilitiesExact", "POP3CapabilitiesFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3MessageFields:
+    operator: |
+      err = parsePOP3Fields("message")
+      if err != nil { panic(err) }
+  POP3MessageFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("pop3-fields: exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3MessageExact", "POP3MessageFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3ChallengeFields:
+    operator: |
+      err = parsePOP3Fields("challenge")
+      if err != nil { panic(err) }
+  POP3ChallengeFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65536 { panic("pop3-fields: exceeds 65536-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3ChallengeExact", "POP3ChallengeFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3ClientContinuationFields:
+    operator: |
+      err = parsePOP3Fields("client-continuation")
+      if err != nil { panic(err) }
+  POP3ClientContinuationFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65536 { panic("pop3-fields: exceeds 65536-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3ClientContinuationExact", "POP3ClientContinuationFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3ListItemFields:
+    operator: |
+      err = parsePOP3Fields("list-one")
+      if err != nil { panic(err) }
+  POP3ListItemFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 512 { panic("pop3-fields: exceeds 512-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3ListItemExact", "POP3ListItemFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  POP3UIDLItemFields:
+    operator: |
+      err = parsePOP3Fields("uidl-one")
+      if err != nil { panic(err) }
+  POP3UIDLItemFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("pop3-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 512 { panic("pop3-fields: exceeds 512-byte resource limit") }
+      candidate, trial = this.TryProcessByType("POP3UIDLItemExact", "POP3UIDLItemFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed POP3 Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+POP3CommandExact: "import:application-layer/pop3_fields.yaml;node:POP3CommandFields"
+POP3StatusExact: "import:application-layer/pop3_fields.yaml;node:POP3StatusFields"
+POP3StatExact: "import:application-layer/pop3_fields.yaml;node:POP3StatFields"
+POP3ListExact: "import:application-layer/pop3_fields.yaml;node:POP3ListFields"
+POP3UIDLExact: "import:application-layer/pop3_fields.yaml;node:POP3UIDLFields"
+POP3CapabilitiesExact: "import:application-layer/pop3_fields.yaml;node:POP3CapabilitiesFields"
+POP3MessageExact: "import:application-layer/pop3_fields.yaml;node:POP3MessageFields"
+POP3ChallengeExact: "import:application-layer/pop3_fields.yaml;node:POP3ChallengeFields"
+POP3ClientContinuationExact: "import:application-layer/pop3_fields.yaml;node:POP3ClientContinuationFields"
+POP3ListItemExact: "import:application-layer/pop3_fields.yaml;node:POP3ListItemFields"
+POP3UIDLItemExact: "import:application-layer/pop3_fields.yaml;node:POP3UIDLItemFields"

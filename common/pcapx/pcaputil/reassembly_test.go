@@ -23,6 +23,9 @@ import (
 )
 
 type tcpStep struct {
+	ack                    uint32
+	window                 uint16
+	synack                 bool
 	seq                    uint32
 	data                   string
 	syn, fin, rst, reverse bool

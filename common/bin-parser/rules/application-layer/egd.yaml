@@ -1,0 +1,30 @@
+# Ethernet Global Data version-one data messages (not GE SRTP or EGD control).
+# Exchange data requires an external layout; it remains exact, bounded bytes.
+endian: little
+Package:
+  EGD:
+    operator: |
+      if !this.HasMaxLength() { panic("egd: datagram boundary is required") }
+      maximum = this.GetMaxLength()
+      if maximum < 32 || maximum > 1048576 { panic("egd: invalid datagram size") }
+      for name in ["PDU Type", "Version", "Request ID", "Producer ID", "Exchange ID", "Timestamp Seconds", "Timestamp Nanoseconds", "Status", "Configuration Signature", "Reserved"] {
+        this.ProcessSubNode(name)
+      }
+      if getNodeResult("PDU Type").Value != 13 || getNodeResult("Version").Value != 1 { panic("egd: unsupported data message type or version") }
+      size = maximum-32
+      if hasCtx("egdExchangeDataLength") && size != getCtx("egdExchangeDataLength") { panic("egd: exchange data size differs from configured layout") }
+      if size > 0 {
+        this.GetSubNode("Exchange Data").SetMaxLength(size)
+        this.ProcessSubNode("Exchange Data")
+      }
+    PDU Type: uint8
+    Version: uint8
+    Request ID: uint16
+    Producer ID: raw,4
+    Exchange ID: uint32
+    Timestamp Seconds: uint32
+    Timestamp Nanoseconds: uint32
+    Status: uint32
+    Configuration Signature: uint32
+    Reserved: uint32
+    Exchange Data: raw

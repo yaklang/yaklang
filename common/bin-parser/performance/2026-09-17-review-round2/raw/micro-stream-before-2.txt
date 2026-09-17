@@ -1,0 +1,10 @@
+COMMAND ["/tmp/yak-protocol-round2/before-stream.test", "-test.run=^$", "-test.bench=^BenchmarkHTTP2Review$", "-test.benchmem", "-test.benchtime=300ms", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser
+BenchmarkHTTP2Review/layout/headers-4         	  800718	       448.0 ns/op	  24.55 MB/s	    1648 B/op	       4 allocs/op
+BenchmarkHTTP2Review/layout/settings-4        	   71916	      5230 ns/op	  38.43 MB/s	   13169 B/op	      70 allocs/op
+BenchmarkHTTP2Review/layout/padded-priority-4 	  605916	       507.6 ns/op	  35.46 MB/s	    1656 B/op	       5 allocs/op
+BenchmarkHTTP2Review/hpack/headers=4-4        	  134484	      2670 ns/op	  64.42 MB/s	    1784 B/op	      27 allocs/op
+BenchmarkHTTP2Review/hpack/headers=128-4      	    4305	     84803 ns/op	  65.23 MB/s	   57468 B/op	     776 allocs/op
+PASS

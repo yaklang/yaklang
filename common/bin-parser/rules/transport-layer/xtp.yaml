@@ -1,0 +1,37 @@
+# XTP 4.0, explicit parse-only structural profile (wire VER=001).
+# Primary implementation author: V. Lo Faso, Implementing XTP in an IP
+# Environment (2001), sections 2.2/2.3, pp.5-9: header and checksum semantics.
+# https://users.encs.concordia.ca/~bill/theses/lofaso.pdf
+# Primary XTP developers: Atwood/Catrina/Fenton/Strayer, Reliable Multicasting
+# in the Xpress Transport Protocol (1996), JCNTL Packet Format (type 7).
+# https://digital.library.unt.edu/ark:/67531/metadc687256/m2/1/high_res_d/453648.pdf
+# Pinned upstream field layout (not copied erroneous CNTL display offsets or
+# fixed-size FIRST address advance):
+# https://github.com/wireshark/wireshark/blob/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-xtp.c
+# DLEN must exactly match body bytes. Internet checksum covers the header and,
+# unless NOCHECK is set, the payload. NOCHECK never disables header validation.
+# Bound is 32..65535 bytes (implementation limit), at any global bit offset.
+# DATA/BTAG, CNTL, FIRST (optional DATA/BTAG), TCNTL, JCNTL and DIAG supported;
+# address formats 0/1 and traffic formats 0/1 only. Exact control consumption.
+# Reserved/null bytes and Service are retained without inferred validity or
+# negotiated semantics. DATA and diagnostic message bytes remain uninterpreted.
+# ECNTL span layout/endianness, obsolete JOIN, other address/traffic formats,
+# context state, retransmission, multicast membership and generation unsupported.
+endian: big
+unit: byte
+Package:
+  XTP:
+    operator: |
+      err = parseXTPMessage()
+      if err != nil { panic(err) }
+  XTPCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 { panic("xtp: explicit nonempty carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("xtp: carrier requires a byte boundary") }
+      candidate, trial = this.TryProcessByType("XTPExactMessage", "XTP")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed XTP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+XTPExactMessage: "import:transport-layer/xtp.yaml;node:XTP"

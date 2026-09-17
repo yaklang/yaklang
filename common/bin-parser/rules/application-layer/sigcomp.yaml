@@ -1,0 +1,116 @@
+# RFC 3320 section 7 complete datagram header; RFC 4077 section 3 NACK v1.
+# https://www.rfc-editor.org/rfc/rfc3320.html#section-7
+# https://www.rfc-editor.org/rfc/rfc4077.html#section-3
+# Explicit message boundary after any transport record unquoting. This rule
+# does not execute uploaded UDVM programs, resolve saved state, decompress
+# application bytes or interpret a reported NACK as a locally verified error.
+endian: big
+Package:
+  SIGCOMP: SigCompMessage
+  SIGCOMPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("sigcomp: explicit message boundary required") }
+      if this.GetMaxLength("bit")%8 != 0 { panic("sigcomp: boundary must be byte-aligned") }
+      if this.GetMaxLength() == 0 { panic("sigcomp: empty carrier") }
+      candidate, trial = this.TryProcessByType("SigCompFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SIGCOMP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SigCompFrame: "import:application-layer/sigcomp.yaml;node:SIGCOMP"
+SigCompMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("sigcomp: explicit message boundary required") }
+    if this.GetMaxLength("bit")%8 != 0 { panic("sigcomp: boundary must be byte-aligned") }
+    total = this.GetMaxLength()
+    if total < 3 || total > 65527 { panic("sigcomp: datagram outside 3..65527 byte implementation boundary") }
+    header = this.ProcessSubNode("Header")
+    if int(header.Child("Signature").Value) != 31 { panic("sigcomp: expected five-bit signature") }
+    selector = int(header.Child("State ID Length Selector").Value)
+    remaining = total-1
+    if int(header.Child("Feedback Present").Value) != 0 {
+      feedback = this.ProcessSubNode("Feedback Header")
+      remaining--
+      if int(feedback.Child("Feedback Length Form").Value) != 0 {
+        size = int(feedback.Child("Feedback Value or Length").Value)
+        if size > remaining { panic("sigcomp: feedback exceeds message boundary") }
+        if size > 0 {
+          this.GetSubNode("Feedback Data").SetMaxLength(size)
+          this.ProcessSubNode("Feedback Data")
+        }
+        remaining -= size
+      }
+    }
+    nack = false
+    if selector != 0 {
+      size = 3+selector*3
+      if size > remaining { panic("sigcomp: incomplete partial state identifier") }
+      this.GetSubNode("Partial State Identifier").SetMaxLength(size)
+      this.ProcessSubNode("Partial State Identifier")
+      remaining -= size
+      this.AddInfo("Partial State Identifier Bytes", size)
+      this.AddInfo("Message Form", "state reference")
+    } else {
+      if remaining < 2 { panic("sigcomp: incomplete upload header") }
+      upload = this.ProcessSubNode("Upload Header")
+      remaining -= 2
+      size = int(upload.Child("Code Length").Value)
+      destination = int(upload.Child("Destination or NACK Version").Value)
+      if size == 0 {
+        nack = true
+        if destination != 1 { panic("sigcomp: unsupported NACK version") }
+        if remaining < 24 { panic("sigcomp: incomplete NACK fixed fields") }
+        this.ProcessSubNode("NACK Reason Code")
+        this.ProcessSubNode("Failed Opcode")
+        this.ProcessSubNode("Failed Program Counter")
+        this.ProcessSubNode("Failed Message SHA1")
+        remaining -= 24
+        if remaining > 0 {
+          this.GetSubNode("NACK Error Details").SetMaxLength(remaining)
+          this.ProcessSubNode("NACK Error Details")
+        }
+        remaining = 0
+        this.AddInfo("Message Form", "NACK v1")
+      } else {
+        if destination == 0 { panic("sigcomp: reserved bytecode destination") }
+        if size > remaining { panic("sigcomp: uploaded bytecode exceeds message boundary") }
+        this.GetSubNode("Uploaded UDVM Bytecode").SetMaxLength(size)
+        this.ProcessSubNode("Uploaded UDVM Bytecode")
+        remaining -= size
+        this.AddInfo("Bytecode Destination Address", (destination+1)*64)
+        this.AddInfo("Message Form", "uploaded bytecode")
+      }
+    }
+    if remaining > 0 {
+      this.GetSubNode("Compressed Data").SetMaxLength(remaining)
+      this.ProcessSubNode("Compressed Data")
+    }
+    if this.Length() != total { panic("sigcomp: incomplete message consumption") }
+    this.AddInfo("NACK Fields Decoded", nack)
+    this.AddInfo("State Resolved", false)
+    this.AddInfo("UDVM Executed", false)
+    this.AddInfo("Application Decompressed", false)
+    this.AddInfo("NACK Details Semantics Decoded", false)
+    this.AddInfo("Failed Message Hash Verified", false)
+    this.AddInfo("Stream Record Unquoting Performed", false)
+  Header:
+    Signature: uint8,5bit
+    Feedback Present: uint8,1bit
+    State ID Length Selector: uint8,2bit
+  Feedback Header:
+    Feedback Length Form: uint8,1bit
+    Feedback Value or Length: uint8,7bit
+  Feedback Data: raw
+  Partial State Identifier: raw
+  Upload Header:
+    Code Length: uint16,12bit
+    Destination or NACK Version: uint8,4bit
+  Uploaded UDVM Bytecode: raw
+  Compressed Data: raw
+  NACK Reason Code: uint8
+  Failed Opcode: uint8
+  Failed Program Counter: uint16
+  Failed Message SHA1: raw,20
+  NACK Error Details: raw

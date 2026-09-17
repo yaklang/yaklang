@@ -1,0 +1,47 @@
+# Ether-S-Bus protocol-0 datagrams. An optional original request must be
+# selected by the caller from the same peer exchange; no global sequence map
+# is used. Request/response bytes are described, never executed or transmitted.
+endian: big
+Package:
+  EtherSBus:
+    operator: |
+      if !this.HasMaxLength() { panic("ether-s-bus: datagram boundary is required") }
+      size = this.GetMaxLength()
+      limit = getCtx("etherSBusDatagramLimit")
+      if !hasCtx("etherSBusDatagramLimit") { limit = 65507 }
+      if size < 12 || size > 65507 || limit <= 0 || size > limit { panic("ether-s-bus: invalid datagram size") }
+      start = getCurrentPosition()
+      length = this.ProcessSubNode("Length").Value
+      if length != size { panic("ether-s-bus: declared length differs from datagram boundary") }
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Protocol")
+      this.ProcessSubNode("Sequence")
+      attribute = this.ProcessSubNode("Attribute").Value
+      if attribute == 0 {
+        if size < 13 { panic("ether-s-bus: truncated request header") }
+        this.ProcessSubNode("Destination")
+        this.ProcessSubNode("Command")
+      }
+      bodyLength = size-this.Length()-2
+      if bodyLength > 0 {
+        this.GetSubNode("Body").SetMaxLength(bodyLength)
+        this.ProcessSubNode("Body")
+      }
+      this.ProcessSubNode("Checksum")
+      request = []byte{}
+      if hasCtx("etherSBusRequest") { request = getCtx("etherSBusRequest") }
+      message, err = decodeEtherSBusDatagram(getCtx("buffer").Bytes()[start:start+size], request)
+      if err != nil { panic(err) }
+      this.AddInfo("Ether-S-Bus Message", message)
+      this.AddInfo("CRC Valid", true)
+      this.AddInfo("Body Decoded", message.BodyDecoded)
+      this.AddInfo("Request Context Required", message.RequestContextRequired)
+    Length: uint32
+    Version: uint8
+    Protocol: uint8
+    Sequence: uint16
+    Attribute: uint8
+    Destination: uint8
+    Command: uint8
+    Body: raw
+    Checksum: uint16

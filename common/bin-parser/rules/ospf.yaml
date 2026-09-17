@@ -1,0 +1,217 @@
+endian: big
+Package:
+  OSPF:
+    operator: |
+      probe, op = this.TryProcessSubNode("Version")
+      if !op.OK { op.Recovery(); panic(op.Message) }
+      version = probe.Value
+      op.Recovery()
+      if version == 3 { this.ProcessByType("OSPFv3"); return }
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v != 2 {
+        panic("ospf: version must be two or three")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 5 {
+        panic("ospf: unknown packet type")
+      }
+      this.ProcessSubNode("Packet Length")
+      l = getNodeResult("Packet Length").Value
+      if l < 24 {
+        panic("ospf: header too short")
+      }
+      if l >= 1048576 {
+        panic("ospf: packet too large")
+      }
+      this.SetMaxLength(l)
+      this.ProcessSubNode("Router ID")
+      this.ProcessSubNode("Area ID")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("AuType")
+      this.ProcessSubNode("Authentication")
+      if typ == 1 {
+        this.ProcessByType("OSPFHello")
+        return
+      }
+      if typ == 2 {
+        this.ProcessByType("OSPFDBDesc")
+        return
+      }
+      if typ == 3 {
+        this.ProcessByType("OSPFLSRequest")
+        return
+      }
+      if typ == 4 {
+        this.ProcessByType("OSPFLSUpdate")
+        return
+      }
+      if typ == 5 {
+        this.ProcessByType("OSPFLSAck")
+        return
+      }
+    Version: uint8
+    Type: uint8
+    Packet Length: uint16
+    Router ID: raw,4
+    Area ID: raw,4
+    Checksum: uint16
+    AuType: uint16
+    Authentication: raw,8
+OSPFv3: "import:ospfv3.yaml;node:OSPFv3"
+OSPFHello:
+  operator: |
+    this.ProcessSubNode("Network Mask")
+    this.ProcessSubNode("Hello Interval")
+    this.ProcessSubNode("Options")
+    this.ProcessSubNode("Priority")
+    this.ProcessSubNode("Dead Interval")
+    this.ProcessSubNode("Designated Router")
+    this.ProcessSubNode("Backup Designated Router")
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+      if rest >= 4 && rest < 1048576 {
+        this.GetSubNode("Neighbors").SetMaxLength(rest)
+        this.ProcessSubNode("Neighbors")
+      }
+    }
+  Network Mask: raw,4
+  Hello Interval: uint16
+  Options: uint8
+  Priority: uint8
+  Dead Interval: uint32
+  Designated Router: raw,4
+  Backup Designated Router: raw,4
+  Neighbors:
+    list: true
+    Neighbor: raw,4
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 4 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+OSPFDBDesc:
+  operator: |
+    this.ProcessSubNode("Interface MTU")
+    this.ProcessSubNode("Options")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("DD Sequence")
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+      if rest >= 20 && rest < 1048576 {
+        this.GetSubNode("LSA Headers").SetMaxLength(rest)
+        this.ProcessSubNode("LSA Headers")
+      }
+    }
+  Interface MTU: uint16
+  Options: uint8
+  Flags: uint8
+  DD Sequence: uint32
+  LSA Headers:
+    list: true
+    Header: OSPFLSAHdr
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 20 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+OSPFLSAHdr:
+  LS Age: uint16
+  Options: uint8
+  LS Type: uint8
+  Link State ID: raw,4
+  Advertising Router: raw,4
+  Sequence: uint32
+  Checksum: uint16
+  Length: uint16
+OSPFLSRequest:
+  Requests:
+    list: true
+    Request:
+      LS Type: uint32
+      Link State ID: raw,4
+      Advertising Router: raw,4
+    operator: |
+      for {
+        if this.GetRemainingSpace() == 0 {
+          break
+        }
+        if this.GetRemainingSpace() < 12 {
+          panic("ospf: truncated link-state request")
+        }
+        ele = this.NewElement()
+        ele.Process()
+      }
+OSPFLSUpdate:
+  operator: |
+    this.ProcessSubNode("LSA Count")
+    count = getNodeResult("LSA Count").Value
+    if count > 0 {
+      this.ProcessSubNode("LSAs")
+    }
+  LSA Count: uint32
+  LSAs:
+    list: true
+    list-length-from-field: "../LSA Count"
+    LSA: OSPFLSA
+OSPFLSA:
+  operator: |
+    this.ProcessSubNode("LS Age")
+    this.ProcessSubNode("Options")
+    this.ProcessSubNode("LS Type")
+    this.ProcessSubNode("Link State ID")
+    this.ProcessSubNode("Advertising Router")
+    this.ProcessSubNode("Sequence")
+    this.ProcessSubNode("Checksum")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length < 20 || length >= 1048576 {
+      panic("ospf: invalid LSA length")
+    }
+    body = length - 20
+    if body > this.GetRemainingSpace() {
+      panic("ospf: LSA length exceeds packet")
+    }
+    if body > 0 {
+      this.GetSubNode("Body").SetMaxLength(body)
+      this.ProcessSubNode("Body")
+    }
+  LS Age: uint16
+  Options: uint8
+  LS Type: uint8
+  Link State ID: raw,4
+  Advertising Router: raw,4
+  Sequence: uint32
+  Checksum: uint16
+  Length: uint16
+  Body: raw
+OSPFLSAck:
+  LSA Headers:
+    list: true
+    Header: OSPFLSAHdr
+    operator: |
+      for {
+        if this.GetRemainingSpace() == 0 {
+          break
+        }
+        if this.GetRemainingSpace() < 20 {
+          panic("ospf: truncated LSA header")
+        }
+        ele = this.NewElement()
+        ele.Process()
+      }

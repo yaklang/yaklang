@@ -1,0 +1,136 @@
+endian: big
+Package:
+  Telnet:
+    operator: |
+      res, probe = this.TryProcessByType("PeekByte")
+      probe.Recovery()
+      if !probe.OK {
+        panic("telnet: empty input")
+      }
+      if res.Value == 0xff {
+        this.ProcessSubNode("IAC")
+      } else {
+        this.ProcessSubNode("Data")
+      }
+      res, remaining = this.TryProcessByType("PeekByte")
+      remaining.Recovery()
+      if remaining.OK {
+        this.ProcessSubNode("Items")
+      }
+    IAC: TelnetIAC
+    Data: TelnetData
+    Items:
+      list: true
+      Item: TelnetItem
+      operator: |
+        for {
+          res, probe = this.TryProcessByType("PeekByte")
+          probe.Recovery()
+          if !probe.OK {
+            setCtx("inList", false)
+            break
+          }
+          prev = this.Length()
+          this.NewElement().Process()
+          if this.Length() <= prev {
+            panic("telnet: item did not consume input")
+          }
+        }
+
+TelnetItem:
+  operator: |
+    res, probe = this.TryProcessByType("PeekByte")
+    probe.Recovery()
+    if !probe.OK {
+      panic("telnet: truncated item")
+    }
+    if res.Value == 0xff {
+      this.ProcessByType("TelnetIAC")
+      return
+    }
+    this.ProcessByType("TelnetData")
+
+TelnetIAC:
+  operator: |
+    this.ProcessSubNode("IACByte")
+    if getNodeResult("IACByte").Value != 0xff {
+      panic("telnet: expected IAC")
+    }
+    this.ProcessSubNode("Command")
+    cmd = getNodeResult("Command").Value
+    if cmd < 240 {
+      panic("telnet: unknown IAC command")
+    }
+    if cmd == 251 || cmd == 252 || cmd == 253 || cmd == 254 {
+      this.ProcessSubNode("Option")
+      return
+    }
+    if cmd == 250 {
+      this.ProcessSubNode("SB Option")
+      opt = getNodeResult("SB Option").Value
+      if opt == 24 {
+        this.ProcessSubNode("SB Command")
+        this.ProcessSubNode("Terminal Type")
+        this.ProcessSubNode("SB IAC")
+        if getNodeResult("SB IAC").Value != 0xff {
+          panic("telnet: expected IAC before SE")
+        }
+        this.ProcessSubNode("SE")
+        if getNodeResult("SE").Value != 240 {
+          panic("telnet: expected SE")
+        }
+        return
+      }
+      if opt == 31 {
+        this.ProcessSubNode("Width")
+        this.ProcessSubNode("Height")
+        this.ProcessSubNode("SB IAC")
+        if getNodeResult("SB IAC").Value != 0xff {
+          panic("telnet: expected IAC before SE")
+        }
+        this.ProcessSubNode("SE")
+        if getNodeResult("SE").Value != 240 {
+          panic("telnet: expected SE")
+        }
+        return
+      }
+      panic("telnet: unknown SB option")
+    }
+  IACByte: uint8
+  Command: uint8
+  Option: uint8
+  SB Option: uint8
+  SB Command: uint8
+  Terminal Type:
+    list: true
+    Char: uint8
+    operator: |
+      for {
+        res, probe = this.TryProcessByType("PeekByte")
+        probe.Recovery()
+        if !probe.OK || res.Value == 0xff {
+          setCtx("inList", false)
+          break
+        }
+        this.NewElement().Process()
+      }
+  Width: uint16
+  Height: uint16
+  SB IAC: uint8
+  SE: uint8
+
+TelnetData:
+  list: true
+  Char: uint8
+  operator: |
+    for {
+      res, probe = this.TryProcessByType("PeekByte")
+      probe.Recovery()
+      if !probe.OK || res.Value == 0xff {
+        setCtx("inList", false)
+        break
+      }
+      this.NewElement().Process()
+    }
+
+PeekByte: uint8

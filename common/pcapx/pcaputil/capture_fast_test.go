@@ -141,7 +141,9 @@ func TestCaptureOptionsAndErrors(t *testing.T) {
 
 func TestOfflineDecoderCallbackPanic(t *testing.T) {
 	name := makeTestCapture(t, "ipv4")
-	require.NoError(t, OpenPcapFile(name, WithOnTrafficFlowOnDataFrameArrived(func(*TrafficFlow, *TrafficConnection, *TrafficFrame) { panic("test callback") })))
+	var stats TCPReassemblyStats
+	require.ErrorContains(t, OpenPcapFile(name, WithOnTrafficFlowOnDataFrameArrived(func(*TrafficFlow, *TrafficConnection, *TrafficFrame) { panic("test callback") }), WithTCPReassemblyStats(func(s TCPReassemblyStats) { stats = s })), "callback panic")
+	require.NotZero(t, stats.CallbackPanics)
 }
 
 func TestLargePcapFileStream(t *testing.T) {

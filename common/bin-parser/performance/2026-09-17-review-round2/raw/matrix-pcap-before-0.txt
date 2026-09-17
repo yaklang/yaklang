@@ -1,0 +1,17 @@
+COMMAND ["/tmp/yak-protocol-round2/before-pcap.test", "-test.run=^$", "-test.bench=^BenchmarkPcapBinParser$/mixed=true/full$", "-test.benchmem", "-test.benchtime=200ms", "-test.cpu=1,2,4,8", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/pcapx/pcaputil
+BenchmarkPcapBinParser/mixed=true/full/workers=1           	      19	  11357044 ns/op	 145.45 MB/s	        11.17 cpu-ms/batch	      3628 cpu-ns/message	         1.000 gomaxprocs	      3080 messages/batch	      3687 ns/message	19491948 B/op	   94977 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=1-2         	      25	   9363022 ns/op	 176.42 MB/s	        12.28 cpu-ms/batch	      3989 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      3040 ns/message	19493234 B/op	   94983 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=1-4         	      26	   8902343 ns/op	 185.55 MB/s	        12.80 cpu-ms/batch	      4157 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2890 ns/message	19495560 B/op	   94991 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=1-8         	      26	   8836014 ns/op	 186.94 MB/s	        13.84 cpu-ms/batch	      4493 cpu-ns/message	         8.000 gomaxprocs	      3080 messages/batch	      2869 ns/message	19498745 B/op	   94994 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=2           	      32	  11858029 ns/op	 139.30 MB/s	        11.66 cpu-ms/batch	      3787 cpu-ns/message	         1.000 gomaxprocs	      3080 messages/batch	      3850 ns/message	21983598 B/op	   95046 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=2-2         	      32	   7709776 ns/op	 214.25 MB/s	        14.15 cpu-ms/batch	      4595 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      2503 ns/message	21984004 B/op	   95046 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=2-4         	      38	   6399109 ns/op	 258.14 MB/s	        15.31 cpu-ms/batch	      4971 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2078 ns/message	21986351 B/op	   95054 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=2-8         	      39	   6098502 ns/op	 270.86 MB/s	        16.39 cpu-ms/batch	      5323 cpu-ns/message	         8.000 gomaxprocs	      3080 messages/batch	      1980 ns/message	21991277 B/op	   95073 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=4           	      46	  11803865 ns/op	 139.94 MB/s	        11.64 cpu-ms/batch	      3778 cpu-ns/message	         1.000 gomaxprocs	      3080 messages/batch	      3832 ns/message	24481016 B/op	   95101 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=4-2         	      27	   7868077 ns/op	 209.94 MB/s	        14.24 cpu-ms/batch	      4622 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      2555 ns/message	24481558 B/op	   95102 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=4-4         	      43	   5407484 ns/op	 305.47 MB/s	        17.12 cpu-ms/batch	      5558 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      1756 ns/message	24483630 B/op	   95109 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=4-8         	      44	   5295943 ns/op	 311.91 MB/s	        19.48 cpu-ms/batch	      6325 cpu-ns/message	         8.000 gomaxprocs	      3080 messages/batch	      1719 ns/message	24487990 B/op	   95123 allocs/op
+PASS

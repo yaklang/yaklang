@@ -1,0 +1,78 @@
+# Explicit caller-bounded network headers and payloads. References: RFC 3173 /
+# 2394 (IPComp), RFC 7637 (NVGRE), RFC 3032 / 4448 (Ethernet pseudowires).
+endian: big
+Package:
+  IPComp:
+    operator: |
+      if !this.HasMaxLength() { panic("ipcomp: message boundary is required") }
+      if this.GetMaxLength() < 5 || this.GetMaxLength() > 1048580 { panic("ipcomp: message size is outside bounds") }
+      this.ProcessSubNode("Next Header")
+      // Reserved flags are retained and ignored by receivers (RFC 3173).
+      this.ProcessSubNode("Flags")
+      cpi = this.ProcessSubNode("Compression Parameter Index").Value
+      compressed = this.ProcessSubNode("Compressed Payload").Value
+      payload, err = decodeIPCompPayload(cpi, compressed)
+      if err != nil { panic(err) }
+      this.AddInfo("Payload Decoded", payload.Decoded)
+      this.AddInfo("Payload", payload.Bytes)
+    Next Header: uint8
+    Flags: uint8
+    Compression Parameter Index: uint16
+    Compressed Payload: raw
+
+  NVGRE:
+    operator: |
+      if !this.HasMaxLength() { panic("nvgre: message boundary is required") }
+      if this.GetMaxLength() < 22 { panic("nvgre: truncated keyed GRE or Ethernet header") }
+      flags = this.ProcessSubNode("Flags And Version").Value
+      // RFC 2784 bits 6-12 are ignored by receivers; C/S, legacy flags and
+      // version remain constrained by RFC 7637 / 2890.
+      if (flags & 0xfc07) != 8192 { panic("nvgre: mandatory key flag and version zero required") }
+      if this.ProcessSubNode("Protocol Type").Value != 25944 { panic("nvgre: protocol type must be transparent Ethernet") }
+      this.ProcessSubNode("Virtual Subnet ID")
+      this.ProcessSubNode("Flow ID")
+      this.ProcessSubNode("Inner Frame")
+      innerType = getNodeResult("Inner Frame/Type").Value
+      if innerType == 33024 || innerType == 34984 { panic("nvgre: inner IEEE 802.1Q tag is not allowed") }
+    Flags And Version: uint16
+    Protocol Type: uint16
+    Virtual Subnet ID: uint32,24bit
+    Flow ID: uint8
+    Inner Frame: "import:ethernet.yaml;node:Ethernet"
+
+  MPLSEthernetPW:
+    operator: |
+      if !this.HasMaxLength() { panic("mpls-pw: message boundary is required") }
+      this.ProcessSubNode("Label Stack")
+      this.ProcessSubNode("Control Word")
+      if this.GetMaxLength() - this.Length() < 14 { panic("mpls-pw: truncated Ethernet header") }
+      this.ProcessSubNode("Inner Frame")
+    Label Stack:
+      list: true
+      Label: NSPWLabel
+      operator: |
+        for index = 0; index < 32; index++ {
+          label = this.NewElement()
+          label.Process()
+          if label.GetSubNode("Bottom of Stack").Result().Value == 1 {
+            if label.GetSubNode("Label").Result().Value < 16 { panic("mpls-pw: reserved label cannot identify an Ethernet pseudowire") }
+            return
+          }
+        }
+        panic("mpls-pw: label stack exceeds limit or has no bottom label")
+    Control Word:
+      operator: |
+        if this.ProcessSubNode("Prefix").Value != 0 { panic("mpls-pw: invalid Ethernet control word prefix") }
+        // RFC 4448 leaves all 12 bits reserved; they are not a length field.
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("Sequence Number")
+      Prefix: uint8,4bit
+      Reserved: uint16,12bit
+      Sequence Number: uint16
+    Inner Frame: "import:ethernet.yaml;node:Ethernet"
+
+NSPWLabel:
+  Label: uint32,20bit
+  Traffic Class: uint8,3bit
+  Bottom of Stack: uint8,1bit
+  TTL: uint8
