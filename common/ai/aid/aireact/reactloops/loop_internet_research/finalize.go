@@ -138,6 +138,19 @@ type smartEvaluation struct {
 	Overall    string
 }
 
+var smartEvaluationOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("specific", aitool.WithParam_Description("Specific: how specific are results"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("measurable", aitool.WithParam_Description("Measurable: verifiable data points"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("achievable", aitool.WithParam_Description("Achievable: did research achieve its goal"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("relevant", aitool.WithParam_Description("Relevant: relevance to user needs"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("time_bound", aitool.WithParam_Description("Time-bound: information timeliness"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("overall", aitool.WithParam_Description("Overall assessment in 1 sentence"), aitool.WithParam_Required(true)),
+}
+
+var insufficientReasonOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("analysis", aitool.WithParam_Description("Analysis of why results are insufficient"), aitool.WithParam_Required(true)),
+}
+
 // smartEvaluationStaticInstruction 是 SMART 评估的系统侧静态指令
 // 通过 aicommon.WithLiteForgeStaticInstruction 进入 LiteForge 的 high-static 段，跨调用稳定哈希
 // 关键词: aicache, PROMPT_SECTION, StaticInstruction, smart-evaluation, B 档
@@ -187,14 +200,7 @@ func evaluateSMART(ctx context.Context, invoker aicommon.AIInvokeRuntime, userQu
 		ctx,
 		"smart-evaluation",
 		materials,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("specific", aitool.WithParam_Description("Specific: how specific are results"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("measurable", aitool.WithParam_Description("Measurable: verifiable data points"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("achievable", aitool.WithParam_Description("Achievable: did research achieve its goal"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("relevant", aitool.WithParam_Description("Relevant: relevance to user needs"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("time_bound", aitool.WithParam_Description("Time-bound: information timeliness"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("overall", aitool.WithParam_Description("Overall assessment in 1 sentence"), aitool.WithParam_Required(true)),
-		},
+		smartEvaluationOutputs,
 		aicommon.WithLiteForgeStaticInstruction(smartEvaluationStaticInstruction),
 	)
 	if err != nil {
@@ -260,9 +266,7 @@ func evaluateInsufficientReason(ctx context.Context, invoker aicommon.AIInvokeRu
 		ctx,
 		"insufficient-reason-analysis",
 		materials,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("analysis", aitool.WithParam_Description("Analysis of why results are insufficient"), aitool.WithParam_Required(true)),
-		},
+		insufficientReasonOutputs,
 		aicommon.WithLiteForgeStaticInstruction(insufficientReasonStaticInstruction),
 	)
 	if err != nil || forgeResult == nil {
@@ -350,18 +354,63 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 		report.WriteString(mergedContent)
 		report.WriteString("\n\n")
 
-		smart := evaluateSMART(ctx, invoker, userQuery, searchResultsSummary, searchHistory)
 		report.WriteString("## S.M.A.R.T Evaluation\n\n")
-		if smart != nil {
-			report.WriteString("| Dimension | Evaluation |\n")
-			report.WriteString("|-----------|------------|\n")
-			report.WriteString(fmt.Sprintf("| **S**pecific | %s |\n", smart.Specific))
-			report.WriteString(fmt.Sprintf("| **M**easurable | %s |\n", smart.Measurable))
-			report.WriteString(fmt.Sprintf("| **A**chievable | %s |\n", smart.Achievable))
-			report.WriteString(fmt.Sprintf("| **R**elevant | %s |\n", smart.Relevant))
-			report.WriteString(fmt.Sprintf("| **T**ime-bound | %s |\n", smart.TimeBound))
-			report.WriteString(fmt.Sprintf("\n**Overall**: %s\n\n", smart.Overall))
-		} else {
+		smartEvalWritten := false
+		invoker.ScheduleAuxiliaryTask(ctx,
+			aicommon.CallerLabelSmartEvaluation,
+			func() string {
+				resultPreview := searchResultsSummary
+				if len(resultPreview) > 4096 {
+					resultPreview = resultPreview[:4096] + "\n...(truncated)"
+				}
+				promptTemplate := `<user_query>
+{{ .userQuery }}
+</user_query>
+
+<search_history>
+{{ .searchHistory }}
+</search_history>
+
+<search_results>
+{{ .searchResults }}
+</search_results>
+`
+				materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
+					"userQuery":     userQuery,
+					"searchHistory": searchHistory,
+					"searchResults": resultPreview,
+				})
+				if err != nil {
+					log.Warnf("SMART evaluation template render failed: %v", err)
+					return ""
+				}
+				return materials
+			},
+			func(action *aicommon.Action) {
+				smartEvalWritten = true
+				smart := &smartEvaluation{
+					Specific:   strings.TrimSpace(action.GetString("specific")),
+					Measurable: strings.TrimSpace(action.GetString("measurable")),
+					Achievable: strings.TrimSpace(action.GetString("achievable")),
+					Relevant:   strings.TrimSpace(action.GetString("relevant")),
+					TimeBound:  strings.TrimSpace(action.GetString("time_bound")),
+					Overall:    strings.TrimSpace(action.GetString("overall")),
+				}
+				report.WriteString("| Dimension | Evaluation |\n")
+				report.WriteString("|-----------|------------|\n")
+				report.WriteString(fmt.Sprintf("| **S**pecific | %s |\n", smart.Specific))
+				report.WriteString(fmt.Sprintf("| **M**easurable | %s |\n", smart.Measurable))
+				report.WriteString(fmt.Sprintf("| **A**chievable | %s |\n", smart.Achievable))
+				report.WriteString(fmt.Sprintf("| **R**elevant | %s |\n", smart.Relevant))
+				report.WriteString(fmt.Sprintf("| **T**ime-bound | %s |\n", smart.TimeBound))
+				report.WriteString(fmt.Sprintf("\n**Overall**: %s\n\n", smart.Overall))
+			},
+			aicommon.WithAuxiliaryOutputs(smartEvaluationOutputs...),
+			aicommon.WithAuxiliaryOpts(
+				aicommon.WithLiteForgeStaticInstruction(smartEvaluationStaticInstruction),
+			),
+		)
+		if !smartEvalWritten {
 			report.WriteString("S.M.A.R.T evaluation could not be generated.\n\n")
 		}
 
@@ -410,10 +459,49 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 		}
 
 		report.WriteString("## Analysis: Why Results Are Insufficient\n\n")
-		insufficientReason := evaluateInsufficientReason(ctx, invoker, userQuery, searchResultsSummary, searchHistory)
-		if insufficientReason != "" {
-			report.WriteString(insufficientReason)
-		} else {
+		insufficientReasonWritten := false
+		invoker.ScheduleAuxiliaryTask(ctx,
+			aicommon.CallerLabelInsufficientReasonAnalysis,
+			func() string {
+				resultPreview := searchResultsSummary
+				if len(resultPreview) > 2048 {
+					resultPreview = resultPreview[:2048] + "\n...(truncated)"
+				}
+				promptTemplate := `<user_query>
+{{ .userQuery }}
+</user_query>
+
+<search_history>
+{{ .searchHistory }}
+</search_history>
+
+<partial_results>
+{{ .searchResults }}
+</partial_results>
+`
+				materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
+					"userQuery":     userQuery,
+					"searchHistory": searchHistory,
+					"searchResults": resultPreview,
+				})
+				if err != nil {
+					return ""
+				}
+				return materials
+			},
+			func(action *aicommon.Action) {
+				analysis := strings.TrimSpace(action.GetString("analysis"))
+				if analysis != "" {
+					insufficientReasonWritten = true
+					report.WriteString(analysis)
+				}
+			},
+			aicommon.WithAuxiliaryOutputs(insufficientReasonOutputs...),
+			aicommon.WithAuxiliaryOpts(
+				aicommon.WithLiteForgeStaticInstruction(insufficientReasonStaticInstruction),
+			),
+		)
+		if !insufficientReasonWritten {
 			report.WriteString("The search results did not contain sufficient information directly relevant to the user's question. ")
 			report.WriteString("This may be due to the topic being too niche, the information not being publicly available, ")
 			report.WriteString("or the search keywords not matching the available content.\n")

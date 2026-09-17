@@ -32,6 +32,13 @@ var outputExample string
 const LoopHTTPFuzztestName = "http_fuzztest"
 const loopHTTPFuzztestHTTPSource = "reactloop_http_fuzztest"
 
+var extractHTTPRequestOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("raw_http_request", aitool.WithParam_Description("完整原始 HTTP 请求报文，无法提取则为空")),
+	aitool.WithStringParam("url", aitool.WithParam_Description("提取到的 URL，无法提取则为空")),
+	aitool.WithStringParam("method", aitool.WithParam_Description("提取到的 HTTP 方法，默认 GET")),
+	aitool.WithStringParam("reason", aitool.WithParam_Description("说明提取依据和置信度")),
+}
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		LoopHTTPFuzztestName,
@@ -146,7 +153,75 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		haveReq := loop.Get("fuzz_request") // Just to ensure the key exists in the loop state
 		if haveReq == "" {
 			// TBD: 如果没有，就尝试从用户输入中引导提取 HTTP 请求信息来初始化 fuzz_request
-			bootstrapResult := tryBootstrapFuzzRequestFromUserInput(r, loop, task)
+			bootstrapResult := ""
+			r.ScheduleAuxiliaryTask(task.GetContext(),
+				aicommon.CallerLabelExtractHTTPRequestFromInput,
+				func() string {
+					userInput := strings.TrimSpace(task.GetUserInput())
+					if userInput == "" {
+						return ""
+					}
+					prompt := `
+请从用户输入中提取可用于 HTTP 安全测试的请求信息。
+
+输出规则：
+1) 如果用户提供了原始 HTTP 请求报文（请求行 + Host 头），将完整报文放到 raw_http_request。
+2) 如果没有原始报文但有 URL，提取到 url，并给出 method（无明确时使用 GET）。
+3) 若无法提取，返回空字符串。
+
+<|USER_INPUT_{{ .nonce }}|>
+{{ .userInput }}
+<|USER_INPUT_END_{{ .nonce }}|>
+`
+					return utils.MustRenderTemplate(prompt, map[string]any{
+						"nonce":     utils.RandStringBytes(4),
+						"userInput": userInput,
+					})
+				},
+				func(action *aicommon.Action) {
+					rawPacket := strings.TrimSpace(action.GetString("raw_http_request"))
+					urlStr := strings.TrimSpace(action.GetString("url"))
+					method := strings.TrimSpace(action.GetString("method"))
+					reason := strings.TrimSpace(action.GetString("reason"))
+
+					if method == "" {
+						method = "GET"
+					}
+					method = strings.ToUpper(method)
+
+					if rawPacket != "" {
+						rawIsHTTPS := strings.HasPrefix(strings.ToLower(urlStr), "https://")
+						if initFuzzRequestFromRaw(loop, r, rawPacket, rawIsHTTPS) {
+							r.AddToTimeline("http_request_bootstrap", fmt.Sprintf("Initialized from extracted raw packet (%s)", reason))
+							bootstrapResult = "raw"
+							return
+						}
+					}
+
+					userInput := strings.TrimSpace(task.GetUserInput())
+					if urlStr == "" {
+						urlStr = extractURLFromUserInput(userInput)
+					}
+					if urlStr != "" {
+						if initFuzzRequestFromURL(loop, r, urlStr, method) {
+							r.AddToTimeline("http_request_bootstrap", fmt.Sprintf("Initialized from extracted URL: %s (%s)", urlStr, reason))
+							bootstrapResult = "url"
+							return
+						}
+					}
+
+					if reason != "" {
+						r.AddToTimeline("http_request_bootstrap", fmt.Sprintf("Initialization skipped: %s", reason))
+					}
+					bootstrapResult = "none"
+				},
+				aicommon.WithAuxiliaryOutputs(extractHTTPRequestOutputs...),
+				aicommon.WithAuxiliaryOpts(
+					aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "raw_http_request"),
+					aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "url"),
+					aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "reason"),
+				),
+			)
 			switch bootstrapResult {
 			case "raw":
 				loop.Set("bootstrap_source", "user_input_raw")
@@ -223,12 +298,7 @@ func tryBootstrapFuzzRequestFromUserInput(r aicommon.AIInvokeRuntime, loop *reac
 		task.GetContext(),
 		"extract-http-request-from-user-input",
 		renderedPrompt,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("raw_http_request", aitool.WithParam_Description("完整原始 HTTP 请求报文，无法提取则为空")),
-			aitool.WithStringParam("url", aitool.WithParam_Description("提取到的 URL，无法提取则为空")),
-			aitool.WithStringParam("method", aitool.WithParam_Description("提取到的 HTTP 方法，默认 GET")),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("说明提取依据和置信度")),
-		},
+		extractHTTPRequestOutputs,
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "raw_http_request"),
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "url"),
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "reason"),
