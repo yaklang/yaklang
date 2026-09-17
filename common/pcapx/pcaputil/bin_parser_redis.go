@@ -14,6 +14,10 @@ func probeRedis(w []byte, limit int) ProbeResult {
 	if len(w) < 1 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	// POP3 greetings are "+OK " with a banner. IMAP untagged lines are "* ".
+	if bytes.HasPrefix(w, []byte("+OK ")) || len(w) >= 2 && w[0] == '*' && w[1] == ' ' {
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	if !redisPrefix(w[0]) {
 		return ProbeResult{Verdict: ProbeReject}
 	}

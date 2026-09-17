@@ -220,6 +220,42 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "smtp-ehlo-mail.pcap",
+      "protocol": "smtp",
+      "sha256": "58f65214ac1d818b074e368c42266a030cbd885c12bb50be968fa99c8aa7d4fe",
+      "bytes": 932,
+      "decode_as_port": 10025,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "imap-capability-login.pcap",
+      "protocol": "imap",
+      "sha256": "2702ea27b9d06ddabf6e98f0404c6154db487f7d41d3c8f4e6e463b3829b2452",
+      "bytes": 858,
+      "decode_as_port": 10143,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "pop3-capa-stat.pcap",
+      "protocol": "pop3",
+      "sha256": "26d02751d7835278df63424607c5126ba9810a908480da95a4865caf2be66b29",
+      "bytes": 722,
+      "decode_as_port": 10110,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "ftp-user-pass-pasv.pcap",
+      "protocol": "ftp",
+      "sha256": "cc7d7a8a8bcc37a8c1220d16bb8a07d3caebe7dd30ae3ca3bbca363068fdcfbc",
+      "bytes": 933,
+      "decode_as_port": 10021,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "grpc-unary-http2.pcap",
       "protocol": "http2",
       "sha256": "8b05a8b1293dce8c0f0ba1e4084e2fbb9e6390bff13d4a89e82ae382b6ee09a1",
