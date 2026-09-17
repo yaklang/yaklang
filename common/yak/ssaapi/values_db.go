@@ -2,6 +2,8 @@ package ssaapi
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -290,6 +292,135 @@ type auditDatabase struct {
 	editorSave *dbcache.Save[*ssadb.IrSource]
 }
 
+// auditWriteBatchSize is the number of rows per multi-row INSERT issued by the
+// audit writers. The previous implementation issued one INSERT per audit node
+// and per edge; on a Hadoop-scale scan that is tens of millions of statements
+// against a single-writer SQLite, and the 10s busy_timeout turned the contention
+// into multi-minute stalls.
+func auditWriteBatchSize() int {
+	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_AUDIT_WRITE_BATCH")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			if v > 2000 {
+				return 2000
+			}
+			return v
+		}
+	}
+	return 400
+}
+
+// auditSQLiteVariableLimit keeps a multi-row INSERT under SQLite's default
+// SQLITE_MAX_VARIABLE_NUMBER (999) so the statement is accepted everywhere.
+const auditSQLiteVariableLimit = 900
+
+func batchSaveAuditNodes(db *gorm.DB, items []*ssadb.AuditNode) error {
+	if db == nil || len(items) == 0 {
+		return nil
+	}
+	table := db.NewScope(&ssadb.AuditNode{}).TableName()
+	cols := []string{
+		"created_at", "updated_at",
+		"task_id", "result_id", "result_variable", "result_index", "risk_hash",
+		"rule_name", "rule_title", "program_name",
+		"is_entry_node", "ir_code_id", "node_id",
+		"tmp_value", "tmp_value_file_hash", "tmp_start_offset", "tmp_end_offset",
+		"verbose_name",
+	}
+	const perRow = 18
+	batchSize := auditWriteBatchSize()
+	if maxBatch := auditSQLiteVariableLimit / perRow; batchSize > maxBatch {
+		batchSize = maxBatch
+	}
+	now := time.Now()
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for i := 0; i < len(items); i += batchSize {
+			j := i + batchSize
+			if j > len(items) {
+				j = len(items)
+			}
+			batch := items[i:j]
+			var sb strings.Builder
+			sb.Grow(256 + len(batch)*24)
+			sb.WriteString("INSERT INTO ")
+			sb.WriteString(table)
+			sb.WriteString(" (")
+			sb.WriteString(strings.Join(cols, ","))
+			sb.WriteString(") VALUES ")
+			args := make([]any, 0, len(batch)*perRow)
+			for idx, n := range batch {
+				if idx > 0 {
+					sb.WriteByte(',')
+				}
+				sb.WriteString("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+				args = append(args,
+					now, now,
+					n.TaskId, n.ResultId, n.ResultVariable, n.ResultIndex, n.RiskHash,
+					n.RuleName, n.RuleTitle, n.ProgramName,
+					n.IsEntryNode, n.IRCodeID, n.NodeID,
+					n.TmpValue, n.TmpValueFileHash, n.TmpStartOffset, n.TmpEndOffset,
+					n.VerboseName,
+				)
+			}
+			if err := tx.Exec(sb.String(), args...).Error; err != nil {
+				return utils.Errorf("save AuditNode failed: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+func batchSaveAuditEdges(db *gorm.DB, items []*ssadb.AuditEdge) error {
+	if db == nil || len(items) == 0 {
+		return nil
+	}
+	table := db.NewScope(&ssadb.AuditEdge{}).TableName()
+	cols := []string{
+		"created_at", "updated_at",
+		"task_id", "result_id",
+		"from_node", "to_node", "program_name",
+		"edge_type", "analysis_step", "analysis_label",
+	}
+	const perRow = 10
+	batchSize := auditWriteBatchSize()
+	if maxBatch := auditSQLiteVariableLimit / perRow; batchSize > maxBatch {
+		batchSize = maxBatch
+	}
+	now := time.Now()
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for i := 0; i < len(items); i += batchSize {
+			j := i + batchSize
+			if j > len(items) {
+				j = len(items)
+			}
+			batch := items[i:j]
+			var sb strings.Builder
+			sb.Grow(256 + len(batch)*16)
+			sb.WriteString("INSERT INTO ")
+			sb.WriteString(table)
+			sb.WriteString(" (")
+			sb.WriteString(strings.Join(cols, ","))
+			sb.WriteString(") VALUES ")
+			args := make([]any, 0, len(batch)*perRow)
+			for idx, e := range batch {
+				if idx > 0 {
+					sb.WriteByte(',')
+				}
+				sb.WriteString("(?,?,?,?,?,?,?,?,?,?)")
+				args = append(args,
+					now, now,
+					e.TaskId, e.ResultId,
+					e.FromNode, e.ToNode, e.ProgramName,
+					string(e.EdgeType), e.AnalysisStep, e.AnalysisLabel,
+				)
+			}
+			if err := tx.Exec(sb.String(), args...).Error; err != nil {
+				return utils.Errorf("save AuditEdge failed: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
 func (a *auditDatabase) SaveNode(node *ssadb.AuditNode) {
 	if node == nil {
 		return
@@ -340,28 +471,14 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 		if len(ae) == 0 {
 			return nil
 		}
-		return utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, e := range ae {
-				if err := tx.Save(e).Error; err != nil {
-					return utils.Errorf("save AuditNode failed: %w", err)
-				}
-			}
-			return nil
-		})
+		return batchSaveAuditNodes(db, ae)
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditNode"))
 
 	ret.edgeSave = dbcache.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) error {
 		if len(ae) == 0 {
 			return nil
 		}
-		return utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, e := range ae {
-				if err := tx.Save(e).Error; err != nil {
-					return utils.Errorf("save AuditEdge failed: %w", err)
-				}
-			}
-			return nil
-		})
+		return batchSaveAuditEdges(db, ae)
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditEdge"))
 
 	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) error {
