@@ -21,6 +21,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `mqtt5-connect-qos.pcap` | MQTT 5.0 CONNECT with Topic Alias Maximum, CONNACK, QoS 1 PUBLISH/PUBACK (port 18830) |
 | `mongodb-opmsg-compressed.pcap` | MongoDB OP_MSG ping/ok correlation on non-27017 port 27018 |
 | `kafka-apiversions-metadata.pcap` | Kafka ApiVersions + Metadata v0 on non-9092 port 19092 |
+| `tds-prelogin-login-batch.pcap` | MS-TDS 7.4 PRELOGIN, LOGIN7, SQLBatch and token-stream result on non-1433 port 11433 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

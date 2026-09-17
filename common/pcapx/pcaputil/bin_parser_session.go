@@ -42,6 +42,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
 	case "kafka":
 		f.protocol, f.kafka = "kafka", &binKafka{client: -1, pending: map[int32]int16{}}
+	case "tds":
+		f.protocol, f.tds = "tds", &binTDS{client: -1, encrypt: tdsEncryptUnknown}
 	}
 }
 
@@ -91,6 +93,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.mongo.consume(e.Raw, result)
 	case "kafka":
 		e.Session, err = f.kafka.consume(dir, e.Raw, result)
+	case "tds":
+		e.Session, err = f.tds.consume(dir, e.Raw, result, f.a.budget.MaxCollectionElements)
+		if err == nil && e.Session["Encrypted"] == true {
+			f.protocol, f.tds = "tls", nil
+		}
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -119,6 +126,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("MongoDB %v id %v", e.Session["Opcode Name"], e.Session["Request ID"])
 		case "kafka":
 			e.Summary = fmt.Sprintf("Kafka %v corr %v", e.Session["API Name"], e.Session["Correlation ID"])
+		case "tds":
+			e.Summary = fmt.Sprintf("TDS %v", e.Session["Packet Name"])
 		}
 	}
 	return err
@@ -138,7 +147,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka = nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -187,6 +196,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if k := f.kafka; k != nil && len(k.pending) > 0 {
 		emit(max(k.client, 0), map[string]any{"Outstanding": len(k.pending)}, "Kafka exchange ended with unmatched correlation IDs")
+	}
+	if d := f.tds; d != nil && len(d.pending) > 0 {
+		emit(max(d.client, 0), map[string]any{"Outstanding": len(d.pending)}, "TDS exchange ended with unmatched requests")
 	}
 }
 

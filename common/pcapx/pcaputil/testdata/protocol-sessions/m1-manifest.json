@@ -49,6 +49,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "tds-prelogin-login-batch.pcap",
+      "protocol": "tds",
+      "sha256": "cea2e5ba621f42df0123e8d67e82bf8371532cb8a0e6f051de0910876cbbf383",
+      "bytes": 1173,
+      "decode_as_port": 11433,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",
