@@ -1,0 +1,215 @@
+endian: little
+Package:
+  Dot11:
+    operator: |
+      this.ProcessSubNode("Frame Control")
+      fc = getNodeResult("Frame Control").Value
+      this.ProcessSubNode("Duration")
+      this.ProcessSubNode("Addr1")
+      typ = (fc >> 2) & 0x3
+      if typ > 2 {
+        panic("dot11: reserved type")
+      }
+      subtype = (fc >> 4) & 0xf
+      if typ == 1 {
+        if subtype == 12 {
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
+        if subtype == 13 {
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
+        this.ProcessSubNode("Addr2")
+        if subtype == 8 {
+          this.ProcessSubNode("BAR Control")
+          barc = getNodeResult("BAR Control").Value
+          mtid = (barc >> 1) & 1
+          if mtid == 1 {
+            this.ProcessSubNode("BAR TID Info")
+            res, op = this.TryProcessByType("PeekByte")
+            op.Recovery()
+            if op.OK {
+              this.ProcessByType("Next Protocol Data")
+            }
+            return
+          }
+          this.ProcessSubNode("Starting Sequence Control")
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
+        if subtype == 9 {
+          this.ProcessSubNode("BA Control")
+          bac = getNodeResult("BA Control").Value
+          mtid = (bac >> 1) & 1
+          compressed = (bac >> 2) & 1
+          if mtid == 1 {
+            if compressed == 1 {
+              this.ProcessSubNode("BA TID Info")
+            }
+            res, op = this.TryProcessByType("PeekByte")
+            op.Recovery()
+            if op.OK {
+              this.ProcessByType("Next Protocol Data")
+            }
+            return
+          }
+          this.ProcessSubNode("Starting Sequence Control")
+          if compressed == 1 {
+            this.ProcessSubNode("BA Bitmap")
+          }
+          if compressed == 0 {
+            this.ProcessSubNode("Block Ack Bitmap")
+          }
+          res, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if op.OK {
+            this.ProcessByType("Next Protocol Data")
+          }
+          return
+        }
+        res, op = this.TryProcessByType("PeekByte")
+        op.Recovery()
+        if op.OK {
+          this.ProcessByType("Next Protocol Data")
+        }
+        return
+      }
+      this.ProcessSubNode("Addr2")
+      this.ProcessSubNode("Addr3")
+      this.ProcessSubNode("Seq")
+      tods = (fc >> 8) & 1
+      fromds = (fc >> 9) & 1
+      if tods == 1 {
+        if fromds == 1 {
+          this.ProcessSubNode("Addr4")
+        }
+      }
+      if typ == 2 {
+        if subtype >= 8 {
+          this.ProcessSubNode("QoS Control")
+          order = (fc >> 15) & 1
+          if order == 1 {
+            this.ProcessSubNode("HT Control")
+          }
+        }
+      }
+      if typ < 1 {
+        order = (fc >> 15) & 1
+        if order == 1 {
+          this.ProcessSubNode("HT Control")
+        }
+      }
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if op.OK {
+        this.ProcessByType("Next Protocol Data")
+      }
+      return
+    Frame Control: uint16
+    Duration: uint16
+    Addr1: raw,6
+    Addr2: raw,6
+    Addr3: raw,6
+    Seq: uint16
+    Addr4: raw,6
+    QoS Control: uint16
+    HT Control: uint32
+    BAR Control: uint16
+    BA Control: uint16
+    Starting Sequence Control: uint16
+    BA Bitmap: raw,8
+    Block Ack Bitmap: raw,128
+    BAR TID Info:
+      list: true
+      Record: BARTIDRecord
+      operator: |
+        for {
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          ele.Process()
+        }
+    BA TID Info:
+      list: true
+      Record: BATIDRecord
+      operator: |
+        for {
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          ele.Process()
+        }
+  RSN:
+    operator: |
+      this.ProcessSubNode("Element ID")
+      if getNodeResult("Element ID").Value != 48 {
+        panic("rsn: element id must be 48")
+      }
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Group Cipher")
+      this.ProcessSubNode("Pairwise Count")
+      n = getNodeResult("Pairwise Count").Value
+      if n > 8 {
+        panic("rsn: too many pairwise ciphers")
+      }
+      this.ProcessSubNode("Pairwise List")
+      this.ProcessSubNode("AKM Count")
+      this.ProcessSubNode("AKM List")
+    Element ID: uint8
+    Length: uint8
+    Version: uint16
+    Group Cipher: raw,4
+    Pairwise Count: uint16
+    Pairwise List:
+      list: true
+      list-length-from-field: "../Pairwise Count"
+      Cipher: raw,4
+    AKM Count: uint16
+    AKM List:
+      list: true
+      list-length-from-field: "../AKM Count"
+      AKM: raw,4
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8
+BARTIDRecord:
+  Per TID Info: uint16
+  Starting Sequence Control: uint16
+BATIDRecord:
+  Per TID Info: uint16
+  Starting Sequence Control: uint16
+  BA Bitmap: raw,8

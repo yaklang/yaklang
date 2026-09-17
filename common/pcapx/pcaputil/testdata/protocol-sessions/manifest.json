@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "generator": "../../bin_parser_session_test.go:TestLiveProtocolPCAP",
+  "reproduce": "YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run ^TestLiveProtocolPCAP$ -count=1",
+  "samples": [
+    {
+      "file": "http2-multiplex.pcap",
+      "kind": "deterministic-generated-not-real-capture",
+      "sha256": "863b52523daa19711ba54f3e3d23a49e06624d5f78c54a926cae830ebf8b99c1",
+      "bytes": 3703,
+      "protocol": "http2",
+      "decode_as_port": 18080,
+      "tshark_version": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+      "tshark_protocol_records": 14,
+      "tshark_malformed_frames": []
+    },
+    {
+      "file": "mysql-classic.pcap",
+      "kind": "deterministic-generated-not-real-capture",
+      "sha256": "a2562f5cbc945cab45f6ae1aad4d47068dd9ccd0bfd82fed851ec0283544e6f7",
+      "bytes": 5780,
+      "protocol": "mysql",
+      "decode_as_port": 13306,
+      "tshark_version": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+      "tshark_protocol_records": 21,
+      "tshark_malformed_frames": []
+    },
+    {
+      "file": "mysql-deprecated-eof.pcap",
+      "kind": "deterministic-generated-not-real-capture",
+      "sha256": "51fade0228a76fc8954f36a746f4a0c4764f8cad4322dd151cbedbb9e37856a0",
+      "bytes": 5626,
+      "protocol": "mysql",
+      "decode_as_port": 13306,
+      "tshark_version": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+      "tshark_protocol_records": 19,
+      "tshark_malformed_frames": []
+    },
+    {
+      "file": "mysql-tracked-eof.pcap",
+      "kind": "deterministic-generated-not-real-capture",
+      "sha256": "853d8ba54fa115dcc2b7c8bec213f34c32f20fb2691d0302daf236cbb7dab87e",
+      "bytes": 5626,
+      "protocol": "mysql",
+      "decode_as_port": 13306,
+      "tshark_version": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+      "tshark_protocol_records": 19,
+      "tshark_malformed_frames": []
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+# April 2005 discovery messages carried in one explicitly bounded SOAP body.
+# Endpoint addresses and message kinds are descriptive metadata; no I/O occurs.
+Package:
+  WSDiscovery:
+    operator: |
+      if !this.HasMaxLength() { panic("ws-discovery: document requires an explicit boundary") }
+      limit = getCtx("wsDiscoveryMessageLimit")
+      if !hasCtx("wsDiscoveryMessageLimit") { limit = 1048576 }
+      if limit <= 0 || this.GetMaxLength() > limit || this.GetMaxLength() > 1048576 { panic("ws-discovery: document exceeds limit") }
+      depth = getCtx("wsDiscoveryDepthLimit")
+      if !hasCtx("wsDiscoveryDepthLimit") { depth = 64 }
+      text = this.ProcessSubNode("XML Text").Value
+      message, err = decodeWSDiscoveryText(text, depth)
+      if err != nil { panic(err) }
+      this.AddInfo("WS-Discovery Message", message)
+      this.AddInfo("Kind", message.Kind)
+      this.AddInfo("Action", message.Header.Action)
+      this.AddInfo("Message ID", message.Header.MessageID)
+      this.AddInfo("To", message.Header.To)
+      this.AddInfo("Endpoint Count", len(message.Endpoints))
+    XML Text: string

@@ -1,0 +1,134 @@
+# Explicit historical draft-ipsec-swipe-01 (1993-12-03) datagram profile.
+# Author's draft archived at https://diswww.mit.edu/MENELAUS.MIT.EDU/cpunks/6915
+# Header length counts 32-bit words, not bytes. Type zero has no sequence
+# field; types two/three encrypt the region after the first four bytes.
+# This is passive field parsing, with no policy, key or session inference.
+endian: big
+Package:
+  SwIPe: SwIPeDatagram
+  SwIPeCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("swipe: explicit datagram boundary required") }
+      if this.GetMaxLength("bit")%8 != 0 { panic("swipe: boundary must be byte-aligned") }
+      if this.GetMaxLength() == 0 { panic("swipe: empty carrier") }
+      candidate, trial = this.TryProcessByType("SwIPeFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed swIPe Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SwIPeFrame: "import:swipe.yaml;node:SwIPe"
+SwIPeDatagram:
+  operator: |
+    if !this.HasMaxLength() { panic("swipe: explicit datagram boundary required") }
+    if this.GetMaxLength("bit")%8 != 0 { panic("swipe: boundary must be byte-aligned") }
+    total = this.GetMaxLength()
+    if total < 4 || total > 65515 { panic("swipe: datagram outside 4..65515 byte implementation boundary") }
+    kind = int(this.ProcessSubNode("Packet Type").Value)
+    words = int(this.ProcessSubNode("Header Length Words").Value)
+    policy = int(this.ProcessSubNode("Policy Identifier").Value)
+    header = words*4
+    if words == 0 || header > total { panic("swipe: invalid header word length") }
+    if (kind >= 4 && kind < 16) || kind >= 64 { panic("swipe: unused or reserved packet type") }
+    clear = kind == 0 || kind == 1
+    if kind == 0 {
+      if words != 1 || policy != 1 { panic("swipe: plain profile requires one header word and policy one") }
+    } else if kind < 4 {
+      if header < 8 { panic("swipe: data profile requires at least two header words") }
+      if kind == 1 {
+        this.ProcessSubNode("Packet Sequence Number")
+        if header > 8 {
+          this.GetSubNode("Authenticator").SetMaxLength(header-8)
+          this.ProcessSubNode("Authenticator")
+        }
+      } else {
+        this.GetSubNode("Encrypted Header Fields").SetMaxLength(header-4)
+        this.ProcessSubNode("Encrypted Header Fields")
+      }
+    } else if header > 4 {
+      this.GetSubNode("Control Header Extension").SetMaxLength(header-4)
+      this.ProcessSubNode("Control Header Extension")
+    }
+    remaining = total-header
+    if clear {
+      if remaining < 20 { panic("swipe: truncated clear inner IPv4 header") }
+      inner = this.GetSubNode("Inner IPv4")
+      inner.SetMaxLength(remaining)
+      inner.Process()
+      padding = total-this.Length()
+      if padding > 0 {
+        this.GetSubNode("Unverified Padding").SetMaxLength(padding)
+        this.ProcessSubNode("Unverified Padding")
+      }
+    } else if remaining > 0 {
+      body = "Control Payload"
+      if kind < 4 { body = "Encrypted Packet and Padding" }
+      this.GetSubNode(body).SetMaxLength(remaining)
+      this.ProcessSubNode(body)
+    } else if kind < 4 { panic("swipe: missing encrypted packet") }
+    if this.Length() != total { panic("swipe: incomplete datagram consumption") }
+    this.AddInfo("Profile", "draft-ipsec-swipe-01 historical datagram")
+    this.AddInfo("Header Bytes", header)
+    this.AddInfo("Clear Inner IPv4 Fields Decoded", clear)
+    this.AddInfo("Policy Context Validated", false)
+    this.AddInfo("Data Decrypted", false)
+    this.AddInfo("Authenticator Verified", false)
+    this.AddInfo("Sequence State Validated", false)
+    this.AddInfo("Padding Validated", false)
+    this.AddInfo("Control Semantics Decoded", false)
+  Packet Type: uint8
+  Header Length Words: uint8
+  Policy Identifier: uint16
+  Packet Sequence Number: uint32
+  Authenticator: raw
+  Encrypted Header Fields: raw
+  Control Header Extension: raw
+  Inner IPv4: SwIPeInnerIPv4
+  Unverified Padding: raw
+  Encrypted Packet and Padding: raw
+  Control Payload: raw
+
+SwIPeInnerIPv4:
+  operator: |
+    available = this.GetMaxLength()
+    version = int(this.ProcessSubNode("Inner IP Version").Value)
+    words = int(this.ProcessSubNode("Inner Header Length Words").Value)
+    this.ProcessSubNode("Inner Type of Service")
+    size = int(this.ProcessSubNode("Inner Total Length").Value)
+    if version != 4 || words < 5 { panic("swipe: invalid clear inner IPv4 header") }
+    header = words*4
+    if size < header || size > available { panic("swipe: inner IPv4 length exceeds boundary or is below header") }
+    this.SetMaxLength(size)
+    this.ProcessSubNode("Inner Identification")
+    this.ProcessSubNode("Inner Flags and Fragment Offset")
+    this.ProcessSubNode("Inner Time To Live")
+    this.ProcessSubNode("Inner Protocol")
+    this.ProcessSubNode("Inner Header Checksum")
+    this.ProcessSubNode("Inner Source")
+    this.ProcessSubNode("Inner Destination")
+    if header > 20 {
+      this.GetSubNode("Inner Header Options").SetMaxLength(header-20)
+      this.ProcessSubNode("Inner Header Options")
+    }
+    if size > header {
+      this.GetSubNode("Inner Payload").SetMaxLength(size-header)
+      this.ProcessSubNode("Inner Payload")
+    }
+    this.AddInfo("Header Checksum Verified", false)
+    this.AddInfo("Options Semantics Decoded", false)
+    this.AddInfo("Payload Semantics Decoded", false)
+    this.AddInfo("Fragments Reassembled", false)
+  Inner IP Version: uint8,4bit
+  Inner Header Length Words: uint8,4bit
+  Inner Type of Service: uint8
+  Inner Total Length: uint16
+  Inner Identification: uint16
+  Inner Flags and Fragment Offset: uint16
+  Inner Time To Live: uint8
+  Inner Protocol: uint8
+  Inner Header Checksum: uint16
+  Inner Source: raw,4
+  Inner Destination: raw,4
+  Inner Header Options: raw
+  Inner Payload: raw

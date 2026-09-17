@@ -1,0 +1,127 @@
+endian: big
+Package:
+  VXLAN:
+    operator: |
+      this.ProcessSubNode("Reserved High")
+      this.ProcessSubNode("I")
+      this.ProcessSubNode("Reserved Low")
+      if getNodeResult("I").Value != 1 {
+        panic("vxlan: I-flag must be set")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("VNI")
+      this.ProcessSubNode("Reserved2")
+      this.ProcessSubNode("Inner")
+      return
+    Reserved High: uint8,4bit
+    I: uint8,1bit
+    Reserved Low: uint8,3bit
+    Reserved: raw,3
+    VNI: uint32,24bit
+    Reserved2: uint8
+    Inner:
+      operator: |
+        this.ProcessSubNode("Destination")
+        this.ProcessSubNode("Source")
+        this.ProcessSubNode("Type")
+        typ = getNodeResult("Type").Value
+        if typ == 0x0800 {
+          this.ProcessByType("IP")
+          return
+        }
+        if typ == 0x0806 {
+          this.ProcessByType("ARP")
+          return
+        }
+        return
+      Destination: raw,6
+      Source: raw,6
+      Type: uint16
+IP:
+  operator: |
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("IHL")
+    version = getNodeResult("Version").Value
+    ihl = getNodeResult("IHL").Value
+    if version != 4 || ihl < 5 {
+      panic("vxlan: invalid inner IPv4 header")
+    }
+    this.ProcessSubNode("TOS")
+    this.ProcessSubNode("Total Length")
+    total = getNodeResult("Total Length").Value
+    if total < ihl * 4 || total > this.GetMaxLength() {
+      panic("vxlan: invalid inner IPv4 length")
+    }
+    this.SetMaxLength(total)
+    this.ProcessSubNode("Identification")
+    this.ProcessSubNode("FlagsFrag")
+    this.ProcessSubNode("TTL")
+    this.ProcessSubNode("Protocol")
+    this.ProcessSubNode("Checksum")
+    this.ProcessSubNode("Source")
+    this.ProcessSubNode("Destination")
+    options = ihl * 4 - 20
+    if options > 0 {
+      this.GetSubNode("Options").SetMaxLength(options)
+      this.ProcessSubNode("Options")
+    }
+    proto = getNodeResult("Protocol").Value
+    if proto == 1 {
+      this.ProcessByType("ICMP")
+      return
+    }
+    if proto == 17 {
+      this.ProcessByType("VXLANUDP")
+      return
+    }
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Payload").SetMaxLength(rest)
+      this.ProcessSubNode("Payload")
+    }
+    return
+  Version: uint8,4bit
+  IHL: uint8,4bit
+  TOS: uint8
+  Total Length: uint16
+  Identification: uint16
+  FlagsFrag: uint16
+  TTL: uint8
+  Protocol: uint8
+  Checksum: uint16
+  Source: raw,4
+  Destination: raw,4
+  Options: raw
+  Payload: raw
+VXLANUDP:
+  operator: |
+    this.ProcessSubNode("Source Port")
+    this.ProcessSubNode("Destination Port")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length < 8 || length > this.GetMaxLength() {
+      panic("vxlan: invalid inner UDP length")
+    }
+    this.SetMaxLength(length)
+    this.ProcessSubNode("Checksum")
+    rest = this.GetMaxLength() - this.Length()
+    if rest == 0 {
+      return
+    }
+    source = getNodeResult("Source Port").Value
+    destination = getNodeResult("Destination Port").Value
+    if source == 53 || destination == 53 {
+      this.GetSubNode("DNS").SetMaxLength(rest)
+      this.ProcessSubNode("DNS")
+      return
+    }
+    this.GetSubNode("Payload").SetMaxLength(rest)
+    this.ProcessSubNode("Payload")
+  Source Port: uint16
+  Destination Port: uint16
+  Length: uint16
+  Checksum: uint16
+  DNS: "import:application-layer/dns.yaml;node:DNS"
+  Payload: raw
+ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+ICMP: "import:internet_control_message_protocol.yaml;node:ICMP"

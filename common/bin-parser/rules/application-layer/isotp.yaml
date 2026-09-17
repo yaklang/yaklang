@@ -1,0 +1,83 @@
+# RFC 1006 TPKT and class-0 ISO 8073 transport fields. Upper-layer data is
+# explicit bytes, not a claim that the application carried by COTP is decoded.
+endian: big
+Package:
+  TPKT:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Packet Length")
+      length = getNodeResult("Packet Length").Value
+      if getNodeResult("Version").Value != 3 || getNodeResult("Reserved").Value != 0 { panic("tpkt: invalid version or reserved byte") }
+      if length < 7 || length != this.GetMaxLength() { panic("tpkt: packet length mismatch") }
+      this.GetSubNode("Transport").SetMaxLength(length-4)
+      this.ProcessSubNode("Transport")
+    Version: uint8
+    Reserved: uint8
+    Packet Length: uint16
+    Transport: TransportCOTP
+  COTP: TransportCOTP
+
+TransportCOTP:
+  operator: |
+    this.ProcessSubNode("Length Indicator")
+    length = getNodeResult("Length Indicator").Value
+    if length < 2 || length == 255 || length > this.GetMaxLength()-1 { panic("cotp: invalid header length") }
+    this.GetSubNode("Header").SetMaxLength(length)
+    this.ProcessSubNode("Header")
+    remaining = this.GetMaxLength() - this.Length()
+    if remaining > 0 { this.GetSubNode("User Data").SetMaxLength(remaining); this.ProcessSubNode("User Data") }
+  Length Indicator: uint8
+  Header:
+    operator: |
+      this.ProcessSubNode("PDU Type")
+      kind = getNodeResult("PDU Type").Value
+      if kind == 0xf0 {
+        if this.GetMaxLength() != 2 { panic("cotp: class-0 data header length must be two") }
+        this.ProcessSubNode("End Of TSDU")
+        this.ProcessSubNode("TPDU Number")
+        return
+      }
+      if (kind & 0xf0) != 0xe0 && (kind & 0xf0) != 0xd0 { panic("cotp: unsupported PDU type") }
+      this.ProcessSubNode("Destination Reference")
+      this.ProcessSubNode("Source Reference")
+      this.ProcessSubNode("Class Option")
+      if (getNodeResult("Class Option").Value & 0xf0) != 0 { panic("cotp: only class zero is decoded") }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 { this.GetSubNode("Parameters").SetMaxLength(remaining); this.ProcessSubNode("Parameters") }
+    PDU Type: uint8
+    End Of TSDU: uint8,1bit
+    TPDU Number: uint8,7bit
+    Destination Reference: uint16
+    Source Reference: uint16
+    Class Option: uint8
+    Parameters:
+      list: true
+      Parameter: TransportParameter
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+  User Data: raw
+
+TransportParameter:
+  operator: |
+    this.ProcessSubNode("Code")
+    this.ProcessSubNode("Length")
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength()-this.Length() { panic("cotp: parameter length exceeds header") }
+    code = getNodeResult("Code").Value
+    if code == 0xc0 {
+      if length != 1 { panic("cotp: invalid TPDU size parameter") }
+      this.ProcessSubNode("TPDU Size Exponent")
+      return
+    }
+    if length > 0 {
+      if code == 0xc1 { this.GetSubNode("Source TSAP").SetMaxLength(length); this.ProcessSubNode("Source TSAP")
+      } else if code == 0xc2 { this.GetSubNode("Destination TSAP").SetMaxLength(length); this.ProcessSubNode("Destination TSAP")
+      } else { this.GetSubNode("Parameter Data").SetMaxLength(length); this.ProcessSubNode("Parameter Data") }
+    }
+  Code: uint8
+  Length: uint8
+  TPDU Size Exponent: uint8
+  Source TSAP: raw
+  Destination TSAP: raw
+  Parameter Data: raw

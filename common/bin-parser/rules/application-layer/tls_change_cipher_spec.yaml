@@ -1,0 +1,25 @@
+# Explicit plaintext ChangeCipherSpec record; RFC 5246 section 7.1 and
+# RFC 8446 section 5. Record version 0x0301..0x0303 is not negotiated version.
+# Earlier TLS versions protect this message under their current record state;
+# the caller must establish that this input is plaintext. TLS 1.3 uses it only
+# for compatibility. No phase validation, state transition or outcome inference.
+# Parse-only; no shared TLS dispatch or TCP reassembly. The strict record is
+# exactly six bytes; the raw fallback is locally bounded at 16389 bytes.
+endian: big
+unit: byte
+Package:
+  TLSChangeCipherSpecRecord:
+    operator: |
+      err = parseTLSChangeCipherSpecRecord()
+      if err != nil { panic(err) }
+  TLSChangeCipherSpecRecordCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls-ccs: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 16389 { panic("tls-ccs: carrier exceeds 16389-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLSChangeCipherSpecRecordExact", "TLSChangeCipherSpecRecord")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS ChangeCipherSpec Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TLSChangeCipherSpecRecordExact: "import:application-layer/tls_change_cipher_spec.yaml;node:TLSChangeCipherSpecRecord"

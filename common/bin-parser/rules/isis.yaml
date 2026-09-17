@@ -1,0 +1,337 @@
+# ISO 10589 fixed PDU headers and RFC 1195 TLV framing.  This rule validates
+# one explicitly bounded PDU.  It decodes a deliberately small set of common
+# TLVs; every other code is retained as an opaque, length-bounded value.
+endian: big
+Package:
+  ISIS:
+    operator: |
+      if !this.HasMaxLength() { panic("isis: PDU boundary is required") }
+      if this.GetMaxLength() < 8 { panic("isis: truncated common header") }
+      if this.GetMaxLength() > 65535 { panic("isis: PDU exceeds the 16-bit length field") }
+      if this.ProcessSubNode("Intradomain Routing Protocol Discriminator").Value != 0x83 { panic("isis: invalid intradomain routing protocol discriminator") }
+      headerLength = this.ProcessSubNode("Length Indicator").Value
+      if this.ProcessSubNode("Version Protocol ID Extension").Value != 1 { panic("isis: unsupported version/protocol ID extension") }
+      idLength = this.ProcessSubNode("ID Length").Value
+      // ISO 10589 encodes the usual six-octet System ID as either zero or
+      // six.  Other System ID sizes change every fixed header and are outside
+      // this rule's intentionally fixed-width profile.
+      if idLength != 0 && idLength != 6 { panic("isis: only six-octet system IDs are supported") }
+      this.ProcessSubNode("Reserved Type Bits")
+      pduType = this.ProcessSubNode("PDU Type").Value
+      if this.ProcessSubNode("Version").Value != 1 { panic("isis: unsupported PDU version") }
+      // Reserved/ECO, PDU-type reserved bits, and Maximum Area Addresses are
+      // exposed but ignored on receipt as required by the base specification.
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Maximum Area Addresses")
+      expectedHeaderLength = 0
+      switch pduType {
+        case 15: expectedHeaderLength = 27
+        case 16: expectedHeaderLength = 27
+        case 17: expectedHeaderLength = 20
+        case 18: expectedHeaderLength = 27
+        case 20: expectedHeaderLength = 27
+        case 24: expectedHeaderLength = 33
+        case 25: expectedHeaderLength = 33
+        case 26: expectedHeaderLength = 17
+        case 27: expectedHeaderLength = 17
+        default: panic("isis: unsupported PDU type")
+      }
+      if headerLength != expectedHeaderLength { panic("isis: length indicator does not match the PDU fixed header") }
+      if this.GetMaxLength() < expectedHeaderLength { panic("isis: PDU is shorter than its fixed header") }
+      switch pduType {
+        case 15: this.ProcessByType("ISISLANHello", "LAN Hello")
+        case 16: this.ProcessByType("ISISLANHello", "LAN Hello")
+        case 17: this.ProcessByType("ISISP2PHello", "Point-to-Point Hello")
+        case 18: this.ProcessByType("ISISLSP", "Link State PDU")
+        case 20: this.ProcessByType("ISISLSP", "Link State PDU")
+        case 24: this.ProcessByType("ISISCSNP", "Complete Sequence Number PDU")
+        case 25: this.ProcessByType("ISISCSNP", "Complete Sequence Number PDU")
+        case 26: this.ProcessByType("ISISPSNP", "Partial Sequence Number PDU")
+        case 27: this.ProcessByType("ISISPSNP", "Partial Sequence Number PDU")
+      }
+      if this.Length() != this.GetMaxLength() { panic("isis: PDU was not fully consumed") }
+    Intradomain Routing Protocol Discriminator: uint8
+    Length Indicator: uint8
+    Version Protocol ID Extension: uint8
+    ID Length: uint8
+    Reserved Type Bits: uint8,3bit
+    PDU Type: uint8,5bit
+    Version: uint8
+    Reserved: uint8
+    Maximum Area Addresses: uint8
+
+ISISLANHello:
+  operator: |
+    this.ProcessSubNode("Reserved Circuit Bits")
+    circuitType = this.ProcessSubNode("Circuit Type").Value
+    if circuitType == 0 { panic("isis: invalid zero circuit type") }
+    this.ProcessSubNode("Source System ID")
+    this.ProcessSubNode("Holding Timer")
+    pduLength = this.ProcessSubNode("PDU Length").Value
+    if pduLength != this.GetMaxLength()+8 { panic("isis: PDU length does not match input") }
+    this.ProcessSubNode("Reserved Priority Bit")
+    this.ProcessSubNode("Priority")
+    this.ProcessSubNode("LAN ID")
+    if this.Length() < this.GetMaxLength() { this.ProcessSubNode("TLVs") }
+    if this.Length() != this.GetMaxLength() { panic("isis: LAN Hello body was not fully consumed") }
+  Reserved Circuit Bits: uint8,6bit
+  Circuit Type: uint8,2bit
+  Source System ID: raw,6
+  Holding Timer: uint16
+  PDU Length: uint16
+  Reserved Priority Bit: uint8,1bit
+  Priority: uint8,7bit
+  LAN ID: raw,7
+  TLVs: ISISTLVs
+
+ISISP2PHello:
+  operator: |
+    this.ProcessSubNode("Reserved Circuit Bits")
+    circuitType = this.ProcessSubNode("Circuit Type").Value
+    if circuitType == 0 { panic("isis: invalid zero circuit type") }
+    this.ProcessSubNode("Source System ID")
+    this.ProcessSubNode("Holding Timer")
+    pduLength = this.ProcessSubNode("PDU Length").Value
+    if pduLength != this.GetMaxLength()+8 { panic("isis: PDU length does not match input") }
+    this.ProcessSubNode("Local Circuit ID")
+    if this.Length() < this.GetMaxLength() { this.ProcessSubNode("TLVs") }
+    if this.Length() != this.GetMaxLength() { panic("isis: point-to-point Hello body was not fully consumed") }
+  Reserved Circuit Bits: uint8,6bit
+  Circuit Type: uint8,2bit
+  Source System ID: raw,6
+  Holding Timer: uint16
+  PDU Length: uint16
+  Local Circuit ID: uint8
+  TLVs: ISISTLVs
+
+ISISLSP:
+  operator: |
+    pduLength = this.ProcessSubNode("PDU Length").Value
+    if pduLength != this.GetMaxLength()+8 { panic("isis: PDU length does not match input") }
+    this.ProcessSubNode("Remaining Lifetime")
+    this.ProcessSubNode("LSP ID")
+    this.ProcessSubNode("Sequence Number")
+    // The checksum is preserved.  Checksum calculation and database-state
+    // semantics are intentionally outside this structural parser.
+    this.ProcessSubNode("Checksum")
+    this.ProcessSubNode("Partition Repair")
+    this.ProcessSubNode("Attached Error")
+    this.ProcessSubNode("Attached Expense")
+    this.ProcessSubNode("Attached Delay")
+    this.ProcessSubNode("Attached Default")
+    this.ProcessSubNode("Overload")
+    this.ProcessSubNode("IS Type")
+    if this.Length() < this.GetMaxLength() { this.ProcessSubNode("TLVs") }
+    if this.Length() != this.GetMaxLength() { panic("isis: LSP body was not fully consumed") }
+  PDU Length: uint16
+  Remaining Lifetime: uint16
+  LSP ID: raw,8
+  Sequence Number: uint32
+  Checksum: uint16
+  Partition Repair: uint8,1bit
+  Attached Error: uint8,1bit
+  Attached Expense: uint8,1bit
+  Attached Delay: uint8,1bit
+  Attached Default: uint8,1bit
+  Overload: uint8,1bit
+  IS Type: uint8,2bit
+  TLVs: ISISTLVs
+
+ISISCSNP:
+  operator: |
+    pduLength = this.ProcessSubNode("PDU Length").Value
+    if pduLength != this.GetMaxLength()+8 { panic("isis: PDU length does not match input") }
+    this.ProcessSubNode("Source Node ID")
+    this.ProcessSubNode("Start LSP ID")
+    this.ProcessSubNode("End LSP ID")
+    if this.Length() < this.GetMaxLength() { this.ProcessSubNode("TLVs") }
+    if this.Length() != this.GetMaxLength() { panic("isis: CSNP body was not fully consumed") }
+  PDU Length: uint16
+  Source Node ID: raw,7
+  Start LSP ID: raw,8
+  End LSP ID: raw,8
+  TLVs: ISISTLVs
+
+ISISPSNP:
+  operator: |
+    pduLength = this.ProcessSubNode("PDU Length").Value
+    if pduLength != this.GetMaxLength()+8 { panic("isis: PDU length does not match input") }
+    this.ProcessSubNode("Source Node ID")
+    if this.Length() < this.GetMaxLength() { this.ProcessSubNode("TLVs") }
+    if this.Length() != this.GetMaxLength() { panic("isis: PSNP body was not fully consumed") }
+  PDU Length: uint16
+  Source Node ID: raw,7
+  TLVs: ISISTLVs
+
+ISISTLVs:
+  list: true
+  TLV: ISISTLV
+  operator: |
+    for this.Length() < this.GetMaxLength() {
+      if this.Length()+2 > this.GetMaxLength() { panic("isis: truncated TLV header") }
+      this.NewElement().Process()
+    }
+
+ISISTLV:
+  operator: |
+    tlvType = this.ProcessSubNode("TLV Type").Value
+    tlvLength = this.ProcessSubNode("TLV Length").Value
+    if this.Length()+tlvLength > this.GetMaxLength() { panic("isis: TLV length exceeds PDU boundary") }
+    switch tlvType {
+      case 1:
+        this.GetSubNode("Area Addresses").SetMaxLength(tlvLength)
+        this.ProcessSubNode("Area Addresses")
+      case 6:
+        this.GetSubNode("IS Neighbors").SetMaxLength(tlvLength)
+        this.ProcessSubNode("IS Neighbors")
+      case 8:
+        if tlvLength > 0 {
+          this.GetSubNode("Padding").SetMaxLength(tlvLength)
+          this.ProcessSubNode("Padding")
+        }
+      case 9:
+        this.GetSubNode("LSP Entries").SetMaxLength(tlvLength)
+        this.ProcessSubNode("LSP Entries")
+      case 10:
+        this.GetSubNode("Authentication").SetMaxLength(tlvLength)
+        this.ProcessSubNode("Authentication")
+      case 12:
+        this.GetSubNode("Optional Checksum").SetMaxLength(tlvLength)
+        this.ProcessSubNode("Optional Checksum")
+      case 14:
+        this.GetSubNode("LSP Buffer Size").SetMaxLength(tlvLength)
+        this.ProcessSubNode("LSP Buffer Size")
+      case 129:
+        this.GetSubNode("Protocols Supported").SetMaxLength(tlvLength)
+        this.ProcessSubNode("Protocols Supported")
+      case 132:
+        this.GetSubNode("IPv4 Interface Addresses").SetMaxLength(tlvLength)
+        this.ProcessSubNode("IPv4 Interface Addresses")
+      case 137:
+        this.GetSubNode("Dynamic Hostname").SetMaxLength(tlvLength)
+        this.ProcessSubNode("Dynamic Hostname")
+      case 232:
+        this.GetSubNode("IPv6 Interface Addresses").SetMaxLength(tlvLength)
+        this.ProcessSubNode("IPv6 Interface Addresses")
+      case 240:
+        this.GetSubNode("Point-to-Point Adjacency State").SetMaxLength(tlvLength)
+        this.ProcessSubNode("Point-to-Point Adjacency State")
+      default:
+        if tlvLength > 0 {
+          this.GetSubNode("Unknown Value").SetMaxLength(tlvLength)
+          this.ProcessSubNode("Unknown Value")
+        }
+    }
+  TLV Type: uint8
+  TLV Length: uint8
+  Area Addresses: ISISAreaAddresses
+  IS Neighbors: ISISSystemIDs
+  Padding: raw
+  LSP Entries: ISISLSPEntries
+  Authentication: ISISAuthentication
+  Optional Checksum: ISISOptionalChecksum
+  LSP Buffer Size: ISISLSPBufferSize
+  Protocols Supported: ISISProtocolsSupported
+  IPv4 Interface Addresses: ISISIPv4Addresses
+  Dynamic Hostname: ISISDynamicHostname
+  IPv6 Interface Addresses: ISISIPv6Addresses
+  Point-to-Point Adjacency State: ISISP2PAdjacencyState
+  Unknown Value: raw
+
+ISISAreaAddresses:
+  list: true
+  Area Address: ISISAreaAddress
+  operator: |
+    for this.Length() < this.GetMaxLength() {
+      if this.Length()+1 > this.GetMaxLength() { panic("isis: truncated area address") }
+      this.NewElement().Process()
+    }
+
+ISISAreaAddress:
+  operator: |
+    length = this.ProcessSubNode("Address Length").Value
+    if length == 0 { panic("isis: empty area address") }
+    if this.Length()+length > this.GetMaxLength() { panic("isis: area address exceeds TLV boundary") }
+    this.GetSubNode("Address").SetMaxLength(length)
+    this.ProcessSubNode("Address")
+  Address Length: uint8
+  Address: raw
+
+ISISSystemIDs:
+  list: true
+  System ID: raw,6
+  operator: |
+    if this.GetMaxLength() % 6 != 0 { panic("isis: IS Neighbors TLV length is not a multiple of six") }
+    for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+ISISLSPEntries:
+  list: true
+  LSP Entry: ISISLSPEntry
+  operator: |
+    if this.GetMaxLength() % 16 != 0 { panic("isis: LSP Entries TLV length is not a multiple of sixteen") }
+    for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+ISISLSPEntry:
+  Remaining Lifetime: uint16
+  LSP ID: raw,8
+  Sequence Number: uint32
+  Checksum: uint16
+
+ISISAuthentication:
+  operator: |
+    if this.GetMaxLength() < 1 { panic("isis: authentication TLV has no type") }
+    this.ProcessSubNode("Authentication Type")
+    if this.Length() < this.GetMaxLength() { this.ProcessSubNode("Authentication Value") }
+  Authentication Type: uint8
+  Authentication Value: raw
+
+ISISOptionalChecksum:
+  operator: |
+    if this.GetMaxLength() != 2 { panic("isis: optional checksum TLV length must be two") }
+    this.ProcessSubNode("Checksum Value")
+  Checksum Value: uint16
+
+ISISLSPBufferSize:
+  operator: |
+    if this.GetMaxLength() != 2 { panic("isis: LSP buffer size TLV length must be two") }
+    this.ProcessSubNode("Buffer Size")
+  Buffer Size: uint16
+
+ISISProtocolsSupported:
+  list: true
+  NLPID: uint8
+  operator: |
+    for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+ISISIPv4Addresses:
+  list: true
+  IPv4 Address: raw,4
+  operator: |
+    if this.GetMaxLength() % 4 != 0 { panic("isis: IPv4 interface address TLV length is not a multiple of four") }
+    for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+ISISDynamicHostname:
+  operator: |
+    if this.GetMaxLength() == 0 { panic("isis: dynamic hostname TLV is empty") }
+    this.ProcessSubNode("Hostname Bytes")
+  Hostname Bytes: raw
+
+ISISIPv6Addresses:
+  list: true
+  IPv6 Address: raw,16
+  operator: |
+    if this.GetMaxLength() % 16 != 0 { panic("isis: IPv6 interface address TLV length is not a multiple of sixteen") }
+    for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+ISISP2PAdjacencyState:
+  operator: |
+    length = this.GetMaxLength()
+    if length != 1 && length != 5 && length != 11 && length != 15 { panic("isis: invalid point-to-point adjacency state TLV length") }
+    this.ProcessSubNode("Adjacency State")
+    if length >= 5 { this.ProcessSubNode("Extended Local Circuit ID") }
+    if length >= 11 { this.ProcessSubNode("Neighbor System ID") }
+    if length == 15 { this.ProcessSubNode("Neighbor Extended Local Circuit ID") }
+  Adjacency State: uint8
+  Extended Local Circuit ID: uint32
+  Neighbor System ID: raw,6
+  Neighbor Extended Local Circuit ID: uint32

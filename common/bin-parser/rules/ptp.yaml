@@ -1,0 +1,70 @@
+endian: big
+Package:
+  PTP:
+    operator: |
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value & 0xf
+      if ver != 2 {
+        panic("ptp: version must be 2")
+      }
+      this.ProcessSubNode("Message Length")
+      this.ProcessSubNode("Domain Number")
+      this.ProcessSubNode("Minor Sdo Id")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Correction Field")
+      this.ProcessSubNode("Message Type Specific")
+      this.ProcessSubNode("Clock Identity")
+      this.ProcessSubNode("Source Port ID")
+      this.ProcessSubNode("Sequence ID")
+      this.ProcessSubNode("Control")
+      this.ProcessSubNode("Log Message Interval")
+      mt = getNodeResult("Message Type").Value & 0xf
+      if mt < 2 {
+        this.ProcessSubNode("Origin Timestamp")
+        return
+      }
+      if mt == 8 {
+        this.ProcessSubNode("Precise Origin Timestamp")
+        return
+      }
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if op.OK {
+        this.ProcessByType("Next Protocol Data")
+      }
+      return
+    Message Type: uint8
+    Version: uint8
+    Message Length: uint16
+    Domain Number: uint8
+    Minor Sdo Id: uint8
+    Flags: uint16
+    Correction Field: raw,8
+    Message Type Specific: uint32
+    Clock Identity: raw,8
+    Source Port ID: uint16
+    Sequence ID: uint16
+    Control: uint8
+    Log Message Interval: uint8
+    Origin Timestamp:
+      Seconds: raw,6
+      Nanoseconds: uint32
+    Precise Origin Timestamp:
+      Seconds: raw,6
+      Nanoseconds: uint32
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8

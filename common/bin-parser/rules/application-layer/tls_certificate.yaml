@@ -1,0 +1,26 @@
+# Explicit complete plaintext TLS 1.2 Certificate handshake layout only.
+# RFC 5246 7.4.2 and 7.4.6: https://datatracker.ietf.org/doc/html/rfc5246
+# Protocol version and sender role are caller preconditions, not wire findings.
+# Empty list is structurally legal (e.g. a client without a suitable certificate).
+# DER bytes are opaque: no ASN.1 fields, representation negotiation, identity,
+# chain, trust, role-specific conformance or handshake outcome is validated.
+# No TCP/record reassembly is performed. Local bounds: 1 MiB, 1024 certificates.
+# Existing application-layer/tls.yaml APIs are unchanged.
+endian: big
+unit: byte
+Package:
+  TLSHandshakeCertificate:
+    operator: |
+      err = parseTLSCertificateHandshake()
+      if err != nil { panic(err) }
+  TLSHandshakeCertificateCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls-certificate: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("tls-certificate: carrier exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLSHandshakeCertificateExact", "TLSHandshakeCertificate")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Certificate Handshake")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TLSHandshakeCertificateExact: "import:application-layer/tls_certificate.yaml;node:TLSHandshakeCertificate"

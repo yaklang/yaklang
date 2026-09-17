@@ -1,8 +1,29 @@
+endian: big
 Package:
   PPTP:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 12 {
+        panic("pptp: length smaller than 12")
+      }
+      this.ProcessSubNode("MessageType")
+      mt = getNodeResult("MessageType").Value
+      if mt != 1 {
+        panic("pptp: message type must be 1 (control)")
+      }
+      this.ProcessSubNode("MagicCookie")
+      if getNodeResult("MagicCookie").Value != 0x1a2b3c4d {
+        panic("pptp: magic cookie mismatch")
+      }
+      this.ProcessSubNode("ControlMessageType")
+      this.ProcessSubNode("Reserved")
+      rest = l - 12
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Message").SetMaxLength(rest)
+        this.ProcessSubNode("Message")
+      }
     Length: uint16
-    length-from-field: Length
-    length-from-field-multiply: 8
     MessageType: uint16
     MagicCookie: uint32
     ControlMessageType: uint16
@@ -11,18 +32,81 @@ Package:
       unpack: true
       operator: |
         type = getNodeResult("../ControlMessageType").Value
-        switch type{
-          case 1:
-            this.ProcessByType("Start Control Conn Req")
-          case 2:
-            this.ProcessByType("Start Control Conn Reply")
-          case 7:
-            this.ProcessByType("Outgoing Call Req")
-          case 8:
-            this.ProcessByType("Outgoing Call Reply")
-          case 15:
-            this.ProcessByType("Set Link Info")
+        if type == 1 {
+          this.ProcessSubNode("ProtocolVersion")
+          this.ProcessSubNode("Reserved2")
+          this.ProcessSubNode("FramingCapabilities")
+          this.ProcessSubNode("BearerCapabilities")
+          this.ProcessSubNode("MaxChannels")
+          this.ProcessSubNode("FirmwareRevision")
+          this.ProcessSubNode("Hostname")
+          this.ProcessSubNode("Vendor")
+          return
         }
+        if type == 2 {
+          this.ProcessByType("Start Control Conn Reply")
+          return
+        }
+        if type == 7 {
+          this.ProcessByType("Outgoing Call Req")
+          return
+        }
+        if type == 8 {
+          this.ProcessByType("Outgoing Call Reply")
+          return
+        }
+        if type == 5 {
+          this.ProcessByType("Echo Request")
+          return
+        }
+        if type == 6 {
+          this.ProcessByType("Echo Reply")
+          return
+        }
+        if type == 3 {
+          this.ProcessByType("Stop Control Conn Req")
+          return
+        }
+        if type == 4 {
+          this.ProcessByType("Stop Control Conn Reply")
+          return
+        }
+        if type == 9 {
+          this.ProcessByType("Incoming Call Req")
+          return
+        }
+        if type == 10 {
+          this.ProcessByType("Incoming Call Reply")
+          return
+        }
+        if type == 11 {
+          this.ProcessByType("Incoming Call Connected")
+          return
+        }
+        if type == 12 {
+          this.ProcessByType("Call Clear Req")
+          return
+        }
+        if type == 13 {
+          this.ProcessByType("Call Disconnect Notify")
+          return
+        }
+        if type == 14 {
+          this.ProcessByType("WAN Error Notify")
+          return
+        }
+        if type == 15 {
+          this.ProcessByType("Set Link Info")
+          return
+        }
+      ProtocolVersion: uint16
+      Reserved2: uint16
+      FramingCapabilities: uint32
+      BearerCapabilities: uint32
+      MaxChannels: uint16
+      FirmwareRevision: uint16
+      Hostname: string,64
+      Vendor: string,64
 
 Start Control Conn Req:
     ProtocolVersion: uint16
@@ -69,6 +153,76 @@ Outgoing Call Reply:
     RecvWindowSize: uint16
     ProcessingDelay: uint16
     PhysicalChannelId: uint32
+
+Echo Request:
+    Identifier: uint32
+
+Echo Reply:
+    Identifier: uint32
+    ResultCode: uint8
+    ErrorCode: uint8
+    Reserved1: uint16
+
+Stop Control Conn Req:
+    Reason: uint8
+    Reserved1: uint8
+    Reserved2: uint16
+
+Stop Control Conn Reply:
+    ResultCode: uint8
+    ErrorCode: uint8
+    Reserved1: uint16
+
+Incoming Call Req:
+    CallId: uint16
+    CallSerialNumber: uint16
+    BearerType: uint32
+    PhysicalChannelId: uint32
+    DialedNumberLength: uint16
+    DialingNumberLength: uint16
+    DialedNumber: string,64
+    DialingNumber: string,64
+    Subaddress: string,64
+
+Incoming Call Reply:
+    CallId: uint16
+    PeerCallId: uint16
+    ResultCode: uint8
+    ErrorCode: uint8
+    Reserved1: uint16
+    RecvWindowSize: uint16
+    ProcessingDelay: uint16
+    Reserved2: uint32
+
+Incoming Call Connected:
+    PeerCallId: uint16
+    Reserved1: uint16
+    ConnectSpeed: uint32
+    RecvWindowSize: uint16
+    ProcessingDelay: uint16
+    FramingType: uint32
+
+Call Clear Req:
+    CallId: uint16
+    Reserved1: uint16
+
+Call Disconnect Notify:
+    CallId: uint16
+    Reserved1: uint16
+    ResultCode: uint8
+    ErrorCode: uint8
+    CauseCode: uint16
+    Call Statistics: string,128
+
+WAN Error Notify:
+    PeerCallId: uint16
+    Reserved1: uint16
+    CRC Errors: uint32
+    Framing Errors: uint32
+    Hardware Overruns: uint32
+    Buffer Overruns: uint32
+    Timeout Errors: uint32
+    Alignment Errors: uint32
 
 Set Link Info:
     PeerCallId: uint16

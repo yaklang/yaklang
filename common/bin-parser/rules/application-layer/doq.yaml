@@ -1,0 +1,74 @@
+# Caller-provided CLEAR, COMPLETE, REASSEMBLED one-direction QUIC stream only.
+# This rule does not parse/decrypt QUIC or establish ALPN/identity/FIN/session
+# state. Caller must verify the version, client-initiated bidirectional stream,
+# byte offsets, final size and FIN. Never feed encrypted UDP bytes here.
+# https://www.rfc-editor.org/rfc/rfc9250.html sections 4.2, 4.2.1, 4.3.3
+# https://datatracker.ietf.org/doc/html/draft-ietf-dprive-dnsoquic-00 sections 4.1.1, 4.2, 5.4, 5.6.2
+# https://www.rfc-editor.org/rfc/rfc1035.html sections 3.4.1, 4.1, 4.2.2
+# https://www.rfc-editor.org/rfc/rfc6891.html section 6
+# RFC9250 uses two-octet message lengths; doq-i00 has one raw DNS message per
+# direction. Separate explicit entries prevent guessing from zero DNS IDs.
+# QUERY opcode DNS headers, questions, RR envelopes, compressed names, A and
+# EDNS(0) fields are decoded; other RData is opaque. No DNS lookup or other
+# network operation, response correlation or zone transfer validation occurs.
+# Limits: 1MiB stream, 256 response messages, 65535B DNS, 1024 records/message,
+# 256 EDNS options/OPT. A query stream contains exactly one message.
+endian: big
+unit: byte
+Package:
+  DoQQueryStream:
+    operator: |
+      err = parseDoQStream("rfc9250", false)
+      if err != nil { panic(err) }
+  DoQResponseStream:
+    operator: |
+      err = parseDoQStream("rfc9250", true)
+      if err != nil { panic(err) }
+  DoQDraft00QueryStream:
+    operator: |
+      err = parseDoQStream("draft-i00", false)
+      if err != nil { panic(err) }
+  DoQDraft00ResponseStream:
+    operator: |
+      err = parseDoQStream("draft-i00", true)
+      if err != nil { panic(err) }
+  DoQQueryCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("doq: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("DoQQueryExact", "DoQQueryStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed DoQ Clear Stream")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  DoQResponseCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("doq: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("DoQResponseExact", "DoQResponseStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed DoQ Clear Stream")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  DoQDraft00QueryCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("doq: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("DoQDraft00QueryExact", "DoQDraft00QueryStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed DoQ Clear Stream")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  DoQDraft00ResponseCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("doq: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("DoQDraft00ResponseExact", "DoQDraft00ResponseStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed DoQ Clear Stream")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+DoQQueryExact: "import:application-layer/doq.yaml;node:DoQQueryStream"
+DoQResponseExact: "import:application-layer/doq.yaml;node:DoQResponseStream"
+DoQDraft00QueryExact: "import:application-layer/doq.yaml;node:DoQDraft00QueryStream"
+DoQDraft00ResponseExact: "import:application-layer/doq.yaml;node:DoQDraft00ResponseStream"

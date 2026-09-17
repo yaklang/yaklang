@@ -1,0 +1,96 @@
+endian: big
+Package:
+  TNS:
+    operator: |
+      this.ProcessSubNode("Packet Length")
+      l = getNodeResult("Packet Length").Value
+      if l < 8 {
+        panic("tns: packet shorter than header")
+      }
+      this.ProcessSubNode("Packet Checksum")
+      this.ProcessSubNode("Packet Type")
+      typ = getNodeResult("Packet Type").Value
+      if typ < 1 || typ > 15 {
+        panic("tns: unknown packet type")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Header Checksum")
+      if typ == 1 {
+        if l < 34 {
+          panic("tns: CONNECT shorter than header")
+        }
+        this.GetSubNode("Connect").SetMaxLength(l - 8)
+        this.ProcessSubNode("Connect")
+        return
+      }
+      if typ == 6 {
+        if l < 10 {
+          panic("tns: DATA shorter than data flags")
+        }
+        this.ProcessSubNode("Data Flag")
+        rest = l - 10
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rest)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      }
+      if l > 8 {
+        this.GetSubNode("Octets").SetMaxLength(l - 8)
+        this.ProcessSubNode("Octets")
+      }
+    Packet Length: uint16
+    Packet Checksum: uint16
+    Packet Type: uint8
+    Reserved: uint8
+    Header Checksum: uint16
+    Data Flag: uint16
+    Octets: string
+    Connect:
+      operator: |
+        this.ProcessSubNode("Version")
+        this.ProcessSubNode("Compat")
+        this.ProcessSubNode("Service Options")
+        this.ProcessSubNode("SDU")
+        this.ProcessSubNode("TDU")
+        this.ProcessSubNode("NT Proto")
+        this.ProcessSubNode("Line Turnaround")
+        this.ProcessSubNode("One")
+        this.ProcessSubNode("Connect Data Length")
+        this.ProcessSubNode("Connect Data Offset")
+        this.ProcessSubNode("Max Connect Data")
+        this.ProcessSubNode("Flags0")
+        this.ProcessSubNode("Flags1")
+        cdl = getNodeResult("Connect Data Length").Value
+        off = getNodeResult("Connect Data Offset").Value
+        cur = this.Length()
+        if off > 8 {
+          skip = off - 8 - cur
+          if skip > 0 && skip < 1048576 {
+            this.GetSubNode("Offset Pad").SetMaxLength(skip)
+            this.ProcessSubNode("Offset Pad")
+          }
+        }
+        if cdl > 0 {
+          if cdl > 0x10000 {
+            panic("tns: connect data too large")
+          }
+          this.GetSubNode("Connect Data").SetMaxLength(cdl)
+          this.ProcessSubNode("Connect Data")
+        }
+        return
+      Version: uint16
+      Compat: uint16
+      Service Options: uint16
+      SDU: uint16
+      TDU: uint16
+      NT Proto: uint16
+      Line Turnaround: uint16
+      One: uint16
+      Connect Data Length: uint16
+      Connect Data Offset: uint16
+      Max Connect Data: uint32
+      Flags0: uint8
+      Flags1: uint8
+      Offset Pad: string
+      Connect Data: string

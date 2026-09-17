@@ -1,0 +1,232 @@
+# Slim Devices' SLIMP3 client protocol as implemented by SlimServer 5.0.1
+# and SLIMP3 firmware 2.2.  Every UDP message has an 18-byte header; LCD and
+# MPEG data, and I2C commands/responses, may continue to the UDP boundary.
+# https://preview.lyrion.org/reference/slimp3-protocol/
+#
+# The original SlimServer implementation independently fixes the discovery
+# request's device/revision offsets at bytes 2/3 (`unpack axCC...`), constructs
+# the server hello as `h` plus seventeen zero bytes, and receives at most 1500
+# bytes per UDP datagram.  Reserved fields are exposed but not required to be
+# zero: that would turn a sender construction convention into a receiver rule.
+# https://github.com/LMS-Community/slimserver/blob/5a1a86444ce511bee79f7c240ea8d72629b64fc8/Slim/Networking/UDP.pm
+# https://github.com/LMS-Community/slimserver/blob/5a1a86444ce511bee79f7c240ea8d72629b64fc8/Slim/Networking/SliMP3/Protocol.pm
+# https://github.com/LMS-Community/slimserver/blob/5a1a86444ce511bee79f7c240ea8d72629b64fc8/Slim/Player/SLIMP3.pm
+#
+# Wireshark supplies the two legacy opcodes `s` and `r` and the deployed port
+# set (1069 and 3483).  Its permissive decoder accepts truncated headers, so it
+# is a compatibility cross-check rather than the structural validity oracle.
+# https://gitlab.com/wireshark/wireshark/-/blob/411f78566bed622a2ca2e6480c659486175db129/epan/dissectors/packet-slimp3.c
+endian: big
+Package:
+  SliMP3: SliMP3Message
+
+  # UDP dispatch is transactional: a malformed, unsupported, or over-limit
+  # candidate is retained as one exact bounded value, with no partial fields.
+  SliMP3Carrier:
+    operator: |
+      if !this.HasMaxLength() { panic("slimp3: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("slimp3: empty carrier has no message") }
+      value, trial = this.TryProcessByType("SliMP3Frame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SliMP3 Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SliMP3Frame: "import:application-layer/slimp3.yaml;node:SliMP3"
+
+SliMP3Message:
+  operator: |
+    if !this.HasMaxLength() { panic("slimp3: explicit datagram boundary required") }
+    total = this.GetMaxLength()
+    if total < 18 { panic("slimp3: message is shorter than the 18-byte header") }
+    // SlimServer's receive path uses recv(..., 1500, ...).  The cap also keeps
+    // the repeated display-code tree finite; it is not a claim that UDP has a
+    // 1500-byte wire-format length field.
+    if total > 1500 { panic("slimp3: message exceeds the 1500-byte receiver limit") }
+
+    opcode = this.ProcessSubNode("Opcode").Value
+    kind = ""
+    direction = ""
+    directionContext = false
+    opaqueApplicationData = false
+
+    switch opcode {
+      case 68: // `D`: server discovery response.
+        kind = "Discovery Response"
+        direction = "Server to Client"
+        if total != 18 { panic("slimp3: discovery response must be exactly 18 bytes") }
+        this.ProcessSubNode("Discovery Reserved")
+        this.ProcessSubNode("Server Address")
+        this.ProcessSubNode("Server Port")
+        this.ProcessSubNode("Discovery Response Reserved")
+
+      case 100: // `d`: client discovery request.
+        kind = "Discovery Request"
+        direction = "Client to Server"
+        if total != 18 { panic("slimp3: discovery request must be exactly 18 bytes") }
+        this.ProcessSubNode("Discovery Reserved")
+        this.ProcessSubNode("Device ID")
+        this.ProcessSubNode("Firmware Revision")
+        this.ProcessSubNode("Discovery Request Reserved")
+        this.ProcessSubNode("Client MAC")
+
+      case 104: // `h`: the two directions intentionally use different bytes.
+        kind = "Hello"
+        direction = "Direction Context Required"
+        directionContext = true
+        if total != 18 { panic("slimp3: hello must be exactly 18 bytes") }
+        this.ProcessSubNode("Hello Byte 1")
+        this.ProcessSubNode("Hello Byte 2")
+        this.ProcessSubNode("Hello Reserved")
+        this.ProcessSubNode("Hello Endpoint Bytes")
+
+      case 105: // `i`: client IR report.
+        kind = "Infrared Code"
+        direction = "Client to Server"
+        if total != 18 { panic("slimp3: infrared report must be exactly 18 bytes") }
+        this.ProcessSubNode("IR Reserved")
+        this.ProcessSubNode("Uptime Ticks")
+        this.ProcessSubNode("Code Identifier")
+        this.ProcessSubNode("Code Bits")
+        this.ProcessSubNode("Infrared Code")
+        this.ProcessSubNode("Client MAC")
+
+      case 97: // `a`: client MPEG acknowledgement.
+        kind = "MPEG Acknowledgement"
+        direction = "Client to Server"
+        if total != 18 { panic("slimp3: MPEG acknowledgement must be exactly 18 bytes") }
+        this.ProcessSubNode("Acknowledgement Reserved")
+        writePointer = this.ProcessSubNode("Write Pointer").Value
+        readPointer = this.ProcessSubNode("Read Pointer").Value
+        this.ProcessSubNode("Sequence Number")
+        this.ProcessSubNode("Client MAC")
+        this.AddInfo("Write Pointer Bytes", writePointer*2)
+        this.AddInfo("Read Pointer Bytes", readPointer*2)
+
+      case 108: // `l`: server display codes, each exactly sixteen bits.
+        kind = "Display Data"
+        direction = "Server to Client"
+        this.ProcessSubNode("Display Reserved")
+        remaining = total-this.Length()
+        if remaining % 2 != 0 { panic("slimp3: display data is not 16-bit aligned") }
+        codeCount = remaining/2
+        if codeCount > 741 { panic("slimp3: display-code count exceeds receiver limit") }
+        for i = 0; i < codeCount; i++ {
+          this.NewSubNode("SliMP3DisplayCode", "Display Code").Process()
+        }
+        this.AddInfo("Display Code Count", codeCount)
+
+      case 109: // `m`: server MPEG data, including legal zero-data controls.
+        kind = "MPEG Data"
+        direction = "Server to Client"
+        opaqueApplicationData = true
+        control = this.ProcessSubNode("MPEG Control").Value
+        this.ProcessSubNode("MPEG Reserved 2-5")
+        writePointer = this.ProcessSubNode("Write Pointer").Value
+        this.ProcessSubNode("MPEG Reserved 8-9")
+        this.ProcessSubNode("Sequence Number")
+        this.ProcessSubNode("MPEG Reserved 12-17")
+        remaining = total-this.Length()
+        if remaining % 2 != 0 { panic("slimp3: MPEG data length must be even") }
+        if remaining > 0 {
+          this.GetSubNode("MPEG Data").SetMaxLength(remaining)
+          this.ProcessSubNode("MPEG Data")
+        }
+        this.AddInfo("MPEG Control Recognized", control == 0 || control == 1 || control == 3)
+        this.AddInfo("Write Pointer Bytes", writePointer*2)
+
+      case 50: // `2`: request and response bodies need transport direction.
+        kind = "I2C Data"
+        direction = "Direction Context Required"
+        directionContext = true
+        opaqueApplicationData = true
+        this.ProcessSubNode("I2C Header Bytes")
+        remaining = total-this.Length()
+        if remaining > 0 {
+          this.GetSubNode("I2C Application Data").SetMaxLength(remaining)
+          this.ProcessSubNode("I2C Application Data")
+        }
+
+      case 115: // `s`: legacy Wireshark stream-control form.
+        kind = "Legacy Stream Control"
+        direction = "Server to Client"
+        if total != 18 { panic("slimp3: legacy stream control must be exactly 18 bytes") }
+        control = this.ProcessSubNode("Legacy Stream Control").Value
+        this.ProcessSubNode("Legacy Control Reserved")
+        this.AddInfo("Legacy Control Recognized", control == 1 || control == 2 || control == 4)
+
+      case 114: // `r`: legacy client data request; offset is in 16-bit words.
+        kind = "Legacy Data Request"
+        direction = "Client to Server"
+        if total != 18 { panic("slimp3: legacy data request must be exactly 18 bytes") }
+        this.ProcessSubNode("Legacy Request Reserved")
+        requestOffset = this.ProcessSubNode("Requested Offset").Value
+        this.ProcessSubNode("Legacy Request Tail")
+        this.AddInfo("Requested Offset Bytes", requestOffset*2)
+
+      default:
+        panic("slimp3: unsupported opcode")
+    }
+
+    if this.Length() != total { panic("slimp3: message did not consume its datagram boundary") }
+    this.AddInfo("Message Kind", kind)
+    this.AddInfo("Direction", direction)
+    this.AddInfo("Direction Context Required", directionContext)
+    this.AddInfo("Conversation State Validated", false)
+    this.AddInfo("Application Data Opaque", opaqueApplicationData)
+
+  Opcode: uint8
+
+  Discovery Reserved: uint8
+  Device ID: uint8
+  Firmware Revision: uint8
+  Discovery Request Reserved: raw,8
+  Client MAC: raw,6
+
+  Server Address: raw,4
+  Server Port: uint16
+  Discovery Response Reserved: raw,10
+
+  Hello Byte 1: uint8
+  Hello Byte 2: uint8
+  Hello Reserved: raw,9
+  Hello Endpoint Bytes: raw,6
+
+  IR Reserved: uint8
+  Uptime Ticks: uint32
+  Code Identifier: uint8
+  Code Bits: uint8
+  Infrared Code: uint32
+
+  Acknowledgement Reserved: raw,5
+  Write Pointer: uint16
+  Read Pointer: uint16
+  Sequence Number: uint16
+
+  Display Reserved: raw,17
+
+  MPEG Control: uint8
+  MPEG Reserved 2-5: raw,4
+  MPEG Reserved 8-9: raw,2
+  MPEG Reserved 12-17: raw,6
+  MPEG Data: raw
+
+  I2C Header Bytes: raw,17
+  I2C Application Data: raw
+
+  Legacy Stream Control: uint8
+  Legacy Control Reserved: raw,16
+  Legacy Request Reserved: uint8
+  Requested Offset: uint16
+  Legacy Request Tail: raw,14
+
+SliMP3DisplayCode:
+  operator: |
+    kind = this.ProcessSubNode("Display Code Type").Value
+    this.ProcessSubNode("Display Code Value")
+    name = "Unknown"
+    if kind == 0 { name = "Delay" } else if kind == 2 { name = "Command" } else if kind == 3 { name = "Character" }
+    this.AddInfo("Code Class", name)
+  Display Code Type: uint8
+  Display Code Value: uint8

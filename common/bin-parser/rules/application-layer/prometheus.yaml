@@ -1,0 +1,18 @@
+# Prometheus text exposition bodies, extracted after HTTP framing/decompression.
+# The caller supplies the complete boundary; a line-aligned prefix by itself
+# cannot prove completeness. OpenMetrics/protobuf are separate formats.
+Package:
+  PrometheusExposition:
+    operator: |
+      if !this.HasMaxLength() { panic("prometheus: exposition requires an explicit boundary") }
+      limit = getCtx("prometheusMessageLimit")
+      if !hasCtx("prometheusMessageLimit") { limit = 1048576 }
+      if limit <= 0 || this.GetMaxLength() > limit { panic("prometheus: exposition exceeds limit") }
+      if hasCtx("prometheusMessageLength") && this.GetMaxLength() != getCtx("prometheusMessageLength") { panic("prometheus: length does not match external boundary") }
+      lineLimit = getCtx("prometheusLineLimit")
+      if !hasCtx("prometheusLineLimit") { lineLimit = 65536 }
+      text = this.ProcessSubNode("Exposition Text").Value
+      lines, err = decodePrometheusText(text, lineLimit)
+      if err != nil { panic(err) }
+      this.AddInfo("Lines", lines)
+    Exposition Text: string

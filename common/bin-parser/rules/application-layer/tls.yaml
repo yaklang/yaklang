@@ -3,27 +3,39 @@ Package:
   exception-plan: stopList # stopList, throw
   Transport Layer Security:
     Record Layer:
-      length-from-field: Length
       operator: |
         this.ProcessSubNode("ContentType")
-        version = this.ProcessSubNode("Version").Value
+        this.ProcessSubNode("Version")
         this.ProcessSubNode("Length")
-        switch version{
-          default:
-            this.ProcessByType("Payload")
+        ct = getNodeResult("ContentType").Value
+        l = getNodeResult("Length").Value
+        if ct == 22 {
+          res,op = this.TryProcessByType("TLSClientHello")
+          if op.OK {
+            err = op.Save()
+            if err != nil {
+              panic(err)
+            }
+            return
+          }
+          err = op.Recovery()
+          if err != nil {
+            panic(err)
+          }
+        }
+        if l > 0 {
+          this.GetSubNode("Payload").SetMaxLength(l)
+          this.ProcessSubNode("Payload")
         }
       ContentType: uint8
       Version: uint16
       Length: uint16
+      Payload: raw
 
-Payload: raw
+TLSClientHello: "import:application-layer/tls_hello.yaml;node:TLSClientHello"
 Handshake Protocol:
   Handshake Type: uint8
   Length: uint32,12bit
   Version: uint16
   Random: raw,32
   Session ID Length: uint8
-  Cipher Suites: raw
-  Compression Methods: raw
-  Extensions Length: uint16
-  Extensions: raw

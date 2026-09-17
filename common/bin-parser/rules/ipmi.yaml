@@ -1,0 +1,145 @@
+endian: big
+Package:
+  IPMI:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 0x06 {
+        panic("ipmi: rmcp version must be 6")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Class")
+      cls = getNodeResult("Class").Value
+      if (cls & 0x0f) != 0x06 && (cls & 0x0f) != 0x07 {
+        panic("ipmi: class must be IPMI or ASF")
+      }
+      if (cls & 0x0f) == 0x06 && this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 8 && rest < 1048576 {
+          this.ProcessSubNode("ASF")
+          return
+        }
+      }
+      if (cls & 0x0f) == 0x07 {
+        this.ProcessSubNode("Session")
+        return
+      }
+    Version: uint8
+    Reserved: uint8
+    Sequence: uint8
+    Class: uint8
+    ASF:
+      IANA: uint32
+      Msg Type: uint8
+      Msg Tag: uint8
+      ASF Reserved: uint8
+      Data Len: uint8
+    Session:
+      endian: little
+      operator: |
+        this.ProcessSubNode("Authentication Type")
+        auth = getNodeResult("Authentication Type").Value
+        if auth == 6 {
+          this.ProcessSubNode("Payload Type")
+          this.ProcessSubNode("RMCP+ Session ID")
+          this.ProcessSubNode("RMCP+ Session Sequence")
+          this.ProcessSubNode("Payload Length")
+          n = getNodeResult("Payload Length").Value
+          if n != this.GetMaxLength() - this.Length() { panic("ipmi: RMCP+ payload length does not match input") }
+          typ = getNodeResult("Payload Type").Value & 63
+          if typ == 16 {
+            if n != 32 { panic("ipmi: Open Session Request must be 32 bytes") }
+            this.GetSubNode("Open Session Request").SetMaxLength(n)
+            this.ProcessSubNode("Open Session Request")
+          } else if n > 0 {
+            this.GetSubNode("RMCP+ Payload").SetMaxLength(n)
+            this.ProcessSubNode("RMCP+ Payload")
+          }
+          return
+        }
+        this.ProcessSubNode("Session Sequence")
+        this.ProcessSubNode("Session ID")
+        if auth != 0 {
+          this.ProcessSubNode("Authentication Code")
+        }
+        this.ProcessSubNode("Message Length")
+        n = getNodeResult("Message Length").Value
+        if n < 7 || n >= 1048576 {
+          panic("ipmi: invalid message length")
+        }
+        remaining = this.GetMaxLength() - this.Length()
+        if n > remaining {
+          panic("ipmi: message length exceeds packet")
+        }
+        this.GetSubNode("Message").SetMaxLength(n)
+        this.ProcessSubNode("Message")
+      Authentication Type: uint8
+      Payload Type: uint8
+      RMCP+ Session ID: uint32
+      RMCP+ Session Sequence: uint32
+      Payload Length: uint16
+      Open Session Request:
+        operator: |
+          this.ProcessSubNode("Message Tag")
+          this.ProcessSubNode("Reserved")
+          this.ProcessSubNode("Maximum Privilege Level")
+          this.ProcessSubNode("Reserved 2")
+          this.ProcessSubNode("Console Session ID")
+          this.ProcessSubNode("Authentication Algorithm")
+          this.ProcessSubNode("Integrity Algorithm")
+          this.ProcessSubNode("Confidentiality Algorithm")
+        Message Tag: uint8
+        Reserved: uint8
+        Maximum Privilege Level: uint8
+        Reserved 2: uint8
+        Console Session ID: uint32
+        Authentication Algorithm: IPMIAlgorithmPayload
+        Integrity Algorithm: IPMIAlgorithmPayload
+        Confidentiality Algorithm: IPMIAlgorithmPayload
+      RMCP+ Payload: raw
+      Session Sequence: uint32
+      Session ID: uint32
+      Authentication Code: raw,16
+      Message Length: uint8
+      Message:
+        operator: |
+          this.ProcessSubNode("Target Address")
+          this.ProcessSubNode("Network Function")
+          this.ProcessSubNode("Target LUN")
+          this.ProcessSubNode("Header Checksum")
+          this.ProcessSubNode("Source Address")
+          this.ProcessSubNode("Source Sequence")
+          this.ProcessSubNode("Source LUN")
+          this.ProcessSubNode("Command")
+          rest = this.GetMaxLength() - this.Length()
+          if rest < 1 {
+            panic("ipmi: missing data checksum")
+          }
+          if rest > 1 {
+            this.GetSubNode("Data").SetMaxLength(rest - 1)
+            this.ProcessSubNode("Data")
+          }
+          this.ProcessSubNode("Data Checksum")
+        Target Address: uint8
+        Network Function: uint8,6bit
+        Target LUN: uint8,2bit
+        Header Checksum: uint8
+        Source Address: uint8
+        Source Sequence: uint8,6bit
+        Source LUN: uint8,2bit
+        Command: uint8
+        Data: raw
+        Data Checksum: uint8
+
+IPMIAlgorithmPayload:
+  endian: little
+  operator: |
+    this.ProcessSubNode("Payload Type")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Payload Length")
+    if getNodeResult("Payload Length").Value != 8 { panic("ipmi: algorithm payload length must be eight") }
+    this.ProcessSubNode("Algorithm")
+  Payload Type: uint8
+  Reserved: raw,2
+  Payload Length: uint8
+  Algorithm: uint32
