@@ -6,17 +6,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/syntaxflowdoc"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	_ "github.com/yaklang/yaklang/common/yak/ssaapi" // register NativeCallDocuments via init
 )
 
+// nativeCallsFromSSAAPI reads live docs from ssaapi.NativeCallDocuments
+// (populated by registerNativeCall in sf_native_call.go). Do not hardcode names here.
 func nativeCallsFromSSAAPI() []syntaxflowdoc.NativeCallInfo {
 	out := make([]syntaxflowdoc.NativeCallInfo, 0, len(ssaapi.NativeCallDocuments))
 	for name, doc := range ssaapi.NativeCallDocuments {
+		name = strings.TrimSpace(name)
 		if name == "" || doc == nil {
 			continue
 		}

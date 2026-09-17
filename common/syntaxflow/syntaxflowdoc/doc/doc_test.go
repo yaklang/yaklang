@@ -14,6 +14,7 @@ func TestEmbedDocumentAvailable(t *testing.T) {
 	require.NotEmpty(t, h.NativeCalls)
 	require.NotEmpty(t, h.BuiltinLibs)
 	require.NotNil(t, h.GetNativeCall("include"))
+	require.NotNil(t, h.GetNativeCall("npd"), "npd must be overlaid from live ssaapi.NativeCallDocuments")
 	require.NotNil(t, h.GetBuiltinLib("golang-gin-context"))
 
 	hits := SearchDocument("gin context include", 8, "")

@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/lifetime"
 
 	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 )
@@ -214,6 +215,13 @@ const (
 	// Usage: $regexVar<matchRegexpPath(target="$routeVar")>
 	// Returns the regex values that have a bypass risk against the target string paths.
 	NativeCall_MatchRegexpPath = "matchRegexpPath"
+
+	// NativeCall_NPD finds null-pointer dereference sites (independent of UAF).
+	// Usage:
+	//   - *<npd()> as $npd                      // all NPD sites
+	//   - $ptr<npd()> as $npd                   // NPD related to $ptr
+	//   - <npd(target=$ptr)> as $npd            // same, named target (receiver may be *)
+	NativeCall_NPD = "npd"
 )
 
 var nativeCallLength = sfvm.ValuesNativeCall(func(group sfvm.Values, slotSource sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
@@ -1539,6 +1547,20 @@ func init() {
 	registerNativeCall(NativeCall_NullCheck, nc_func(nativeCallNullCheck), nc_desc(`空指针检查条件：返回 if (p) / if (!p) / p==NULL / p!=NULL 等条件 SSA。用法：*<nullCheck()> / <nullCheck(target=$ptr)> / $ptr<nullCheck()>。`))
 	registerNativeCall(NativeCall_PointsTo, nc_func(nativeCallPointsTo), nc_desc(`may-points-to：返回指针可能指向的抽象对象（函数内 OUT 并集）。用法：$p<pointsTo()>。`))
 	registerNativeCall(NativeCall_Aliases, nc_func(nativeCallAliases), nc_desc(`may-alias：保留与 target 可能同对象的 receiver。用法：$a<aliases(target=$b)>。`))
+}
+
+func nativeCallNPD(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	return runLifetimeNativeCall(vs, frame, params, "npd",
+		func(prog *ssa.Program, seeds []ssa.Value, full bool) []*lifetime.Finding {
+			if full {
+				return lifetime.FindNPDUses(prog)
+			}
+			return lifetime.FindNPDUsesRelated(prog, seeds)
+		},
+		func(kind string) bool {
+			return kind == lifetime.KindNPD
+		},
+	)
 }
 
 func fetchProgram(v any) (*Program, error) {
