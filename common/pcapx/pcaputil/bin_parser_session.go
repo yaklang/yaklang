@@ -56,6 +56,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.nfs = "nfs", &binNFS{client: dir, pending: map[uint32]string{}}
 	case "snmp":
 		f.protocol, f.snmp = "snmp", &binSNMP{pending: map[int64]string{}}
+	case "rdp":
+		f.protocol, f.rdp = "rdp", &binRDP{client: dir}
 	}
 }
 
@@ -122,6 +124,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.nfs.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "snmp":
 		e.Session, err = f.snmp.consume(e.Raw, f.a.budget.MaxCollectionElements)
+	case "rdp":
+		e.Session, err = f.rdp.consume(e.Raw)
+		if err == nil && e.Session["TLS Expected"] == true {
+			f.protocol = "tls"
+		}
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -164,6 +171,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("NFS %v xid %v", e.Session["Packet Name"], e.Session["XID"])
 		case "snmp":
 			e.Summary = fmt.Sprintf("SNMPv3 %v id %v", e.Session["Packet Name"], e.Session["Request ID"])
+		case "rdp":
+			e.Summary = fmt.Sprintf("RDP %v", e.Session["Packet Name"])
 		}
 	}
 	return err
@@ -183,7 +192,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -261,6 +270,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if q := f.snmp; q != nil && len(q.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(q.pending)}, "SNMPv3 exchange ended with unmatched request-ids")
+	}
+	if r := f.rdp; r != nil && r.sawCR && !r.sawCC {
+		emit(max(r.client, 0), map[string]any{"Cookie": r.cookie}, "RDP exchange ended before X.224 Connection Confirm")
 	}
 }
 
