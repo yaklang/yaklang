@@ -11,51 +11,87 @@ const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 func (f *binFlow) detectDirection(dir int, w []byte) {
 	// Explicit user bindings retain precedence.
 	f.detect(w)
-	if f.binding != nil {
+	if f.binding != nil || f.protocol != "" {
 		return
 	}
-	if len(w) >= len(binH2Preface) && bytes.HasPrefix(w, []byte(binH2Preface)) {
+	p := probeWire(w, f.a.config.ProbeBytes)
+	if p.Verdict != ProbeAccept {
+		return
+	}
+	switch p.Protocol {
+	case "http2":
 		f.protocol, f.h2 = "http2", newBinHTTP2(dir)
-		return
-	}
-	// A v10 greeting with a printable, terminated version and sequence zero
-	// supplies the server role even on nonstandard ports.
-	if len(w) >= 6 && w[3] == 0 && w[4] == 10 {
-		end := bytes.IndexByte(w[5:], 0)
-		if end > 0 {
-			valid := true
-			for _, c := range w[5 : 5+end] {
-				if c < 32 || c > 126 {
-					valid = false
-				}
-			}
-			if valid {
-				f.protocol, f.mysql = "mysql", &binMySQL{server: dir, phase: "greeting"}
-			}
-		}
+	case "mysql":
+		f.protocol, f.mysql = "mysql", &binMySQL{server: dir, phase: "greeting"}
+	case "postgresql":
+		f.protocol, f.pg = "postgresql", &binPostgres{frontend: -1}
+	case "ldap":
+		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[uint64]string{}}
+	case "redis":
+		f.protocol, f.redis = "redis", &binRedis{}
+	case "websocket":
+		f.protocol, f.ws = "websocket", &binWebSocket{client: dir, phase: wsPhaseFromProbe(w)}
 	}
 }
 
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
-	if f.protocol == "http2" {
+	switch f.protocol {
+	case "http2":
 		e.Session, err = f.h2.consume(dir, e.Raw)
-	}
-	if f.protocol == "mysql" {
+		if err == nil {
+			f.consumeGRPC(dir, e)
+		}
+	case "mysql":
 		e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
 		if err == nil && f.mysql.phase == "tls" {
-			// SSLRequest establishes a framing boundary, not authenticated TLS.
 			f.protocol = "tls"
+		}
+	case "postgresql":
+		e.Session, err = f.pg.consume(dir, e.Raw, e.Entry)
+		if err == nil && e.Session["Encrypted"] == true {
+			f.protocol, f.pg = "tls", nil
+			e.Session["Protocol Transition"] = "postgresql->tls"
+		}
+	case "ldap":
+		e.Session, err = f.ldap.consume(e.Raw, e.Entry)
+		if err == nil && e.Session["StartTLS"] == true && e.Session["Message Name"] == "ExtendedResponse" {
+			f.protocol, f.ldap = "tls", nil
+			e.Session["Protocol Transition"] = "ldap->tls"
+		}
+	case "redis":
+		e.Session, err = f.redis.consume(e.Raw)
+	case "websocket":
+		if e.Entry == "WebSocket" {
+			e.Session, err = f.ws.consume(dir, e.Raw)
+		} else {
+			e.Session = map[string]any{
+				"Protocol Transition": "http->websocket",
+				"Reason":              "101 Switching Protocols",
+			}
 		}
 	}
 	if err == nil && e.Session != nil {
-		if e.Protocol == "http2" {
+		switch e.Protocol {
+		case "http2":
 			e.Summary = fmt.Sprintf("HTTP/2 stream %v frame %v", e.Session["Stream ID"], e.Session["Frame Type"])
 			if kind, ok := e.Session["Header Kind"].(string); ok {
 				e.Summary = fmt.Sprintf("HTTP/2 stream %v %s", e.Session["Stream ID"], kind)
 			}
-		} else {
+			if e.Session["GRPC"] == true {
+				e.Protocol = "grpc"
+				e.Summary = fmt.Sprintf("gRPC stream %v", e.Session["Stream ID"])
+			}
+		case "mysql":
 			e.Summary = fmt.Sprintf("MySQL transaction %v %v", e.Session["Transaction ID"], e.Session["Phase"])
+		case "postgresql":
+			e.Summary = fmt.Sprintf("PostgreSQL %v", e.Session["Message Name"])
+		case "ldap":
+			e.Summary = fmt.Sprintf("LDAP %v id %v", e.Session["Message Name"], e.Session["Message ID"])
+		case "redis":
+			e.Summary = fmt.Sprintf("Redis %v", e.Session["RESP Type"])
+		case "websocket":
+			e.Summary = fmt.Sprintf("WebSocket %v", e.Session["Opcode Name"])
 		}
 	}
 	return err
@@ -75,8 +111,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2 = nil
-	f.mysql = nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis = nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -100,6 +135,12 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if m := f.mysql; m != nil && f.protocol == "mysql" && m.phase != "command" && m.phase != "closed" {
 		emit(m.server, map[string]any{"Phase": m.phase, "Transaction ID": m.transaction}, "MySQL exchange ended before its expected response")
+	}
+	if p := f.pg; p != nil && p.pending > 0 {
+		emit(max(p.frontend, 0), map[string]any{"Outstanding": p.pending}, "PostgreSQL exchange ended with unmatched extended-query messages")
+	}
+	if l := f.ldap; l != nil && len(l.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(l.pending)}, "LDAP exchange ended with unmatched MessageIDs")
 	}
 }
 

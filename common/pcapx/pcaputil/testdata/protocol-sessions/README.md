@@ -13,11 +13,18 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `mysql-classic.pcap` | Greeting/login, authentication switch/continuation/fast-auth OK, query with two EOF-terminated results, query ERR, PING and QUIT |
 | `mysql-deprecated-eof.pcap` | Same exchange using negotiated DEPRECATE_EOF and OK result terminators |
 | `mysql-tracked-eof.pcap` | DEPRECATE_EOF plus SESSION_TRACK negotiation and the corresponding explicit result profile |
+| `postgres-extended-query.pcap` | Protocol 3.0 Startup, AuthenticationOk, ReadyForQuery, simple Query, CommandComplete (non-5432 port 15432) |
+| `ldap-bind-search.pcap` | LDAPv3 anonymous Bind, BindResponse, SearchRequest, SearchResultEntry, SearchResultDone (port 14389) |
+| `websocket-upgrade-text.pcap` | HTTP/1.1 Upgrade to RFC 6455 and an unmasked text frame (port 18090) |
+| `redis-resp2-resp3.pcap` | RESP2 PING/PONG and a RESP3 Map (port 16379) |
+| `grpc-unary-http2.pcap` | HTTP/2 preface/SETTINGS plus unary gRPC DATA prefix and trailers (port 18081) |
+
+M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 
 Regenerate intentionally from the repository root:
 
 ```sh
-YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run '^TestLiveProtocolPCAP$' -count=1
+YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run '^TestLiveProtocolPCAP$|^TestProtocolSessionM1PCAP$' -count=1
 ```
 
 The normal test reads the committed files and compares their bytes with the

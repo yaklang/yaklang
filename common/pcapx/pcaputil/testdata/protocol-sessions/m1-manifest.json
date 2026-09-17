@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "generator": "protocol_session_samples_test.go:TestProtocolSessionM1PCAP",
+  "reproduce": "YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run ^TestProtocolSessionM1PCAP$ -count=1",
+  "samples": [
+    {
+      "file": "postgres-extended-query.pcap",
+      "protocol": "postgresql",
+      "sha256": "939e39f10eb7667d77db6707d908e6140dc3be275bda368fb89ee5e09ec00ed0",
+      "bytes": 982,
+      "decode_as_port": 15432,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "ldap-bind-search.pcap",
+      "protocol": "ldap",
+      "sha256": "0ccfdd3626b19c30960bbe1968c6699013cc18cc9d29d8b578f5c6dc51f9cfd8",
+      "bytes": 917,
+      "decode_as_port": 14389,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "websocket-upgrade-text.pcap",
+      "protocol": "websocket",
+      "sha256": "ee383c291d18abcc85b5e0c3cf50c812dea1f1a4831dc86d1672d84df308943b",
+      "bytes": 921,
+      "decode_as_port": 18090,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "redis-resp2-resp3.pcap",
+      "protocol": "redis",
+      "sha256": "97b6427e0c5f4e1488bfdaa8341fc034645c85c7251a1d82373c781c442ee0e8",
+      "bytes": 727,
+      "decode_as_port": 16379,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "grpc-unary-http2.pcap",
+      "protocol": "http2",
+      "sha256": "8b05a8b1293dce8c0f0ba1e4084e2fbb9e6390bff13d4a89e82ae382b6ee09a1",
+      "bytes": 1206,
+      "decode_as_port": 18081,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    }
+  ]
+}

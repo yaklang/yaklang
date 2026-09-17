@@ -1,0 +1,131 @@
+package pcaputil
+
+import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/gopacket/gopacket/layers"
+	"github.com/stretchr/testify/require"
+)
+
+type m1Sample struct {
+	name     string
+	protocol string
+	port     layers.TCPPort
+	steps    []sessionStep
+}
+
+func m1SessionSamples(t testing.TB) []m1Sample {
+	t.Helper()
+	startup := pgSessionUntyped(196608, []byte("user\x00test\x00database\x00demo\x00\x00"))
+	bindBody := append([]byte{2, 1, 3}, ldapSessionTLV(4, nil)...)
+	bindBody = append(bindBody, 0x80, 0)
+	wsReq := []byte("GET /chat HTTP/1.1\r\nHost: example.test\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n")
+	wsResp := []byte("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
+	msg := make([]byte, 9)
+	binary.BigEndian.PutUint32(msg[1:5], 4)
+	copy(msg[5:], []byte{1, 2, 3, 4})
+	headers := h2TestHeaders(t, ":method", "POST", ":scheme", "http", ":path", "/svc.P/M", ":authority", "example.test", "content-type", "application/grpc")
+	resp := h2TestHeaders(t, ":status", "200", "content-type", "application/grpc")
+	trailers := h2TestHeaders(t, "grpc-status", "0")
+	return []m1Sample{
+		{"postgres-extended-query", "postgresql", 15432, []sessionStep{
+			{0, startup},
+			{1, pgSessionMsg('R', []byte{0, 0, 0, 0})},
+			{1, pgSessionMsg('Z', []byte{'I'})},
+			{0, pgSessionMsg('Q', append([]byte("SELECT 1"), 0))},
+			{1, pgSessionMsg('C', append([]byte("SELECT 1"), 0))},
+			{1, pgSessionMsg('Z', []byte{'I'})},
+		}},
+		{"ldap-bind-search", "ldap", 14389, []sessionStep{
+			{0, ldapSessionMsg(0x60, bindBody)},
+			{1, ldapSessionMsg(0x61, []byte{10, 1, 0, 4, 0, 4, 0})},
+			{0, mustHexSession(t, "301c020101631704000a01020a01000201000201000101008702636e3000")},
+			{1, ldapSessionMsg(0x64, append(ldapSessionTLV(4, []byte("cn=x")), 0x30, 0))},
+			{1, ldapSessionMsg(0x65, []byte{10, 1, 0, 4, 0, 4, 0})},
+		}},
+		{"websocket-upgrade-text", "websocket", 18090, []sessionStep{
+			{0, wsReq}, {1, wsResp}, {1, []byte{0x81, 0x05, 'H', 'e', 'l', 'l', 'o'}},
+		}},
+		{"redis-resp2-resp3", "redis", 16379, []sessionStep{
+			{0, []byte("*1\r\n$4\r\nPING\r\n")},
+			{1, []byte("+PONG\r\n")},
+			{1, []byte("%1\r\n+key\r\n+val\r\n")},
+		}},
+		{"grpc-unary-http2", "http2", 18081, []sessionStep{
+			{0, append([]byte(binH2Preface), h2TestFrame(4, 0, 0, nil)...)},
+			{1, h2TestFrame(4, 0, 0, nil)},
+			{0, h2TestFrame(4, 1, 0, nil)},
+			{1, h2TestFrame(4, 1, 0, nil)},
+			{0, h2TestFrame(1, 4, 1, headers)},
+			{0, h2TestFrame(0, 1, 1, msg)},
+			{1, h2TestFrame(1, 4, 1, resp)},
+			{1, h2TestFrame(1, 5, 1, trailers)},
+		}},
+	}
+}
+
+func TestProtocolSessionM1PCAP(t *testing.T) {
+	dir := filepath.Join("testdata", "protocol-sessions")
+	manifestPath := filepath.Join(dir, "m1-manifest.json")
+	type row struct {
+		File     string `json:"file"`
+		Protocol string `json:"protocol"`
+		SHA256   string `json:"sha256"`
+		Bytes    int    `json:"bytes"`
+		Port     int    `json:"decode_as_port"`
+		Kind     string `json:"kind"`
+		Source   string `json:"source"`
+	}
+	doc := struct {
+		Schema    int    `json:"schema_version"`
+		Generator string `json:"generator"`
+		Reproduce string `json:"reproduce"`
+		Samples   []row  `json:"samples"`
+	}{
+		Schema:    1,
+		Generator: "protocol_session_samples_test.go:TestProtocolSessionM1PCAP",
+		Reproduce: "YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run ^TestProtocolSessionM1PCAP$ -count=1",
+	}
+	for _, sample := range m1SessionSamples(t) {
+		golden := sessionTestPCAP(t, sample.steps, sample.port, 0, false, false)
+		sum := sha256.Sum256(golden)
+		path := filepath.Join(dir, sample.name+".pcap")
+		if os.Getenv("YAK_UPDATE_SESSION_PCAP") == "1" {
+			require.NoError(t, os.MkdirAll(dir, 0755))
+			require.NoError(t, os.WriteFile(path, golden, 0644))
+		}
+		stored, err := os.ReadFile(path)
+		require.NoError(t, err, sample.name)
+		require.Equal(t, hex.EncodeToString(golden), hex.EncodeToString(stored), sample.name)
+		events, stats, err := binReplay(t, stored, 1)
+		require.NoError(t, err, sample.name)
+		require.Zero(t, stats.Malformed, sample.name)
+		found := false
+		for _, e := range events {
+			if e.Protocol == sample.protocol || sample.protocol == "http2" && e.Protocol == "grpc" {
+				found = true
+			}
+		}
+		require.True(t, found, "%s: no %s events in %d", sample.name, sample.protocol, len(events))
+		doc.Samples = append(doc.Samples, row{
+			File: sample.name + ".pcap", Protocol: sample.protocol,
+			SHA256: hex.EncodeToString(sum[:]), Bytes: len(golden),
+			Port: int(sample.port), Kind: "deterministic-generated-not-real-capture",
+			Source: "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go",
+		})
+	}
+	if os.Getenv("YAK_UPDATE_SESSION_PCAP") == "1" {
+		raw, err := json.MarshalIndent(doc, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(manifestPath, append(raw, '\n'), 0644))
+	}
+	stored, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	require.Contains(t, string(stored), doc.Samples[0].SHA256)
+}

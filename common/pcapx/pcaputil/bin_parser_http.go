@@ -14,7 +14,7 @@ var errBinContext = errors.New("protocol context required")
 
 type binHTTPState struct {
 	header, total, cursor, next, search                 int
-	chunked, trailers, closeDelimited, response, tunnel bool
+	chunked, trailers, closeDelimited, response, tunnel, websocket bool
 	method, summary                                     string
 	status                                              int
 }
@@ -25,11 +25,19 @@ func (h *binHTTPState) config() map[string]any {
 
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
-		if f.protocol == "http2" {
+		switch f.protocol {
+		case "http2":
 			return f.frameHTTP2(dir, w)
-		}
-		if f.protocol == "mysql" {
+		case "mysql":
 			return f.frameMySQL(dir, w)
+		case "postgresql":
+			return f.framePostgres(dir, w)
+		case "ldap":
+			return f.frameLDAP(w)
+		case "redis":
+			return f.frameRedis(w)
+		case "websocket":
+			return f.frameWebSocket(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {
@@ -72,6 +80,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			}
 			h.status = response.StatusCode
 			length, transfer = response.ContentLength, response.TransferEncoding
+				h.websocket = h.status == 101 && bytes.Contains(lower, []byte("\r\nupgrade: websocket"))
 			h.tunnel = h.status == 101 || (h.method == "CONNECT" && h.status >= 200 && h.status < 300)
 			if h.method == "HEAD" || h.status < 200 || h.status == 204 || h.status == 304 || h.tunnel {
 				length, transfer = 0, nil
@@ -85,6 +94,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				return 0, nil, fmt.Errorf("unsupported HTTP version")
 			}
 			h.method = request.Method
+			h.websocket = bytes.Contains(lower, []byte("\r\nupgrade: websocket"))
 			length, transfer = request.ContentLength, request.TransferEncoding
 			if len(f.httpMethods) >= 128 {
 				return 0, nil, fmt.Errorf("%w: HTTP request pipeline exceeds 128 entries", errBinContext)
@@ -175,11 +185,21 @@ func (f *binFlow) finishHTTP(dir int) {
 	}
 	f.directions[dir].http = nil
 	f.directions[dir].headerScan = 0
+	if h.tunnel && h.status == 101 && (h.websocket || f.wsPending) {
+		client := 1 - dir
+		f.protocol, f.ws, f.wsPending = "websocket", &binWebSocket{client: client, phase: "frame"}, false
+		f.binding, f.level, f.httpMethods = nil, 0, nil
+		return
+	}
+	if h.websocket && !h.response {
+		f.wsPending = true
+	}
 	if h.tunnel {
 		// A confirmed CONNECT/101 response is an explicit protocol boundary.
 		// Re-probe the next ordered bytes once; keep the capture flow identity.
 		f.protocol, f.binding, f.level = "", nil, 0
 		f.httpMethods = nil
+		f.wsPending = false
 	}
 }
 
