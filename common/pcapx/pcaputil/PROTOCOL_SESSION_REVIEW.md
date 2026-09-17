@@ -82,6 +82,12 @@ before fragmented SIP targets arrived. Admission now defers ambiguous OPTIONS
 prefixes until the protocol version distinguishes them. Regression cases cover
 SIP/sips/uppercase URI schemes and `*`, whole-message and 1/2/7-byte feeds,
 plus ordinary HTTP OPTIONS targets and deferred decoding.
+RTP integration caused an observed Cassandra v5 handshake in the nDPI corpus
+to be claimed by the RTP version-bit probe. Cassandra handshake recognition
+now retains the v5 protocol identity while its unsupported profile remains
+context-required. The original corpus assertions stay unchanged at 108 decoded
+messages and 78,033 message bytes; a dedicated regression rejects RTP claims
+on that capture and checks the explicit unsupported-version context.
 
 ## Boundaries
 
