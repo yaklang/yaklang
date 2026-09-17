@@ -12,11 +12,36 @@ func quicTestDCID() []byte { return []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51} }
 func quicTestSCID() []byte { return []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5} }
 
 func TestQUICParseStreamAndAckFrames(t *testing.T) {
-	frames, err := quicParseFrames([]byte{0x0b, 0, 0, 3, 'G', 'E', 'T', 2, 0, 0, 0, 0}, 64)
-	require.NoError(t, err)
-	require.Len(t, frames, 2)
-	require.Equal(t, "STREAM", frames[0]["Frame Type"])
-	require.Equal(t, "ACK", frames[1]["Frame Type"])
+	// RFC 9000 section 19.8: Offset is present only when the OFF bit (0x04) is set.
+	for _, tc := range []struct {
+		name string
+		wire []byte
+	}{
+		{"implicit_offset", []byte{0x0b, 0, 3, 'G', 'E', 'T', 2, 0, 0, 0, 0}},
+		{"explicit_offset", []byte{0x0f, 0, 0, 3, 'G', 'E', 'T', 2, 0, 0, 0, 0}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			frames, err := quicParseFrames(tc.wire, 64)
+			require.NoError(t, err)
+			require.Len(t, frames, 2)
+			require.Equal(t, "STREAM", frames[0]["Frame Type"])
+			require.Equal(t, uint64(0), frames[0]["Stream ID"])
+			require.Equal(t, uint64(0), frames[0]["Offset"])
+			require.Equal(t, true, frames[0]["FIN"])
+			require.Equal(t, uint64(3), frames[0]["Length"])
+			require.Equal(t, []byte("GET"), frames[0]["Stream Data"])
+			require.Equal(t, "ACK", frames[1]["Frame Type"])
+		})
+	}
+
+	t.Run("unexpected_offset_byte", func(t *testing.T) {
+		_, err := quicParseFrames([]byte{0x0b, 0, 0, 3, 'G', 'E', 'T', 2, 0, 0, 0, 0}, 64)
+		require.Error(t, err)
+	})
+	t.Run("truncated_stream_data", func(t *testing.T) {
+		_, err := quicParseFrames([]byte{0x0b, 0, 3, 'G', 'E'}, 64)
+		require.Error(t, err)
+	})
 }
 
 func TestProtocolSessionQUICTransportAndLifecycle(t *testing.T) {
