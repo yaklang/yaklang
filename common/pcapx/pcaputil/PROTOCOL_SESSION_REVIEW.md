@@ -77,6 +77,11 @@ of `BenchmarkHTTP1OrdinaryDeferred` changed median time from 8,802 to 3,924 ns/o
 allocation bytes from 26,845 to 12,273 B/op, and allocations from 109 to 45.
 This is a microbenchmark of an ordinary HTTP request/response pair, not a
 general capture-throughput result.
+The later SIP integration shared HTTP's OPTIONS prefix and selected HTTP
+before fragmented SIP targets arrived. Admission now defers ambiguous OPTIONS
+prefixes until the protocol version distinguishes them. Regression cases cover
+SIP/sips/uppercase URI schemes and `*`, whole-message and 1/2/7-byte feeds,
+plus ordinary HTTP OPTIONS targets and deferred decoding.
 
 ## Boundaries
 

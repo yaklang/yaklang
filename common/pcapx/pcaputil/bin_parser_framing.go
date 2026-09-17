@@ -117,8 +117,23 @@ func (f *binFlow) detect(w []byte) {
 		if bytes.HasPrefix(w, []byte(prefix)) {
 			if prefix == "OPTIONS " {
 				rest := w[len("OPTIONS "):]
-				if bytes.HasPrefix(rest, []byte("sip:")) || bytes.HasPrefix(rest, []byte("sips:")) {
-					break
+				// OPTIONS is shared by HTTP and SIP. A fragmented method or
+				// ambiguous URI is not sufficient to select either protocol.
+				if len(rest) == 0 {
+					return
+				}
+				boundary := bytes.IndexByte(rest, ' ')
+				if boundary < 0 && (rest[0] == '*' || rest[0] == 's' || rest[0] == 'S') {
+					return
+				}
+				if boundary >= 0 {
+					version := rest[boundary+1:]
+					if bytes.HasPrefix(version, []byte("SIP/2.0")) {
+						break
+					}
+					if bytes.HasPrefix([]byte("SIP/2.0"), version) {
+						return
+					}
 				}
 			}
 			f.protocol = "http"
