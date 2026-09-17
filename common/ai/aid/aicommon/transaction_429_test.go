@@ -29,6 +29,8 @@ type transactionTestConfig struct {
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
 
+func (t *transactionTestConfig) IsSingleAIModelMode() bool { return false }
+
 func newTransactionTestConfig(ctx context.Context) *transactionTestConfig {
 	emitter := NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		return e, nil

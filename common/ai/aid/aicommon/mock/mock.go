@@ -48,6 +48,11 @@ func (m *MockedAIConfig) CallQualityPriorityAI(request *aicommon.AIRequest) (*ai
 
 var _ aicommon.AICallerConfigIf = (*MockedAIConfig)(nil)
 
+func (m *MockedAIConfig) IsSingleAIModelMode() bool {
+	return false
+}
+
+
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
 	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		return e, nil
@@ -622,4 +627,23 @@ func (m *MockInvoker) GetRuntimeTasks() []aicommon.AIStatefulTask {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return append([]aicommon.AIStatefulTask(nil), m.runtimeTask...)
+}
+
+func (m *MockInvoker) ScheduleAuxiliaryTask(ctx context.Context, spec aicommon.AuxiliaryTaskSpec) {
+	// Mock: build prompt lazily, delegate to InvokeSpeedPriorityLiteForge, call OnResult.
+	// No skip logic — mock always runs the task.
+	if spec.PromptBuilder == nil {
+		return
+	}
+	prompt := spec.PromptBuilder()
+	if prompt == "" {
+		return
+	}
+	action, err := m.InvokeSpeedPriorityLiteForge(ctx, spec.Name, prompt, spec.Outputs, spec.Opts...)
+	if err != nil || action == nil {
+		return
+	}
+	if spec.OnResult != nil {
+		spec.OnResult(action)
+	}
 }
