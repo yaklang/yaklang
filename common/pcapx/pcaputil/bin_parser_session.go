@@ -66,6 +66,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
 	switch f.protocol {
+	case "http":
+		e.Session, err = f.consumeDoHHTTP1(e.Raw)
 	case "http2":
 		var previous *binH2Stream
 		if len(e.Raw) >= 9 && !bytes.HasPrefix(e.Raw, []byte(binH2Preface)) {
@@ -74,6 +76,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.h2.consume(dir, e.Raw)
 		if err == nil {
 			err = f.consumeGRPC(dir, e, previous)
+		}
+		if err == nil {
+			err = f.consumeDoHH2(dir, e, previous)
 		}
 	case "mysql":
 		e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
@@ -180,6 +185,10 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "dot":
 			e.Summary = fmt.Sprintf("DoT %v id %v %v", e.Session["Packet Name"], e.Session["Transaction ID"], e.Session["QNAME"])
 		}
+		if e.Session["DoH"] == true {
+			e.Protocol = "doh"
+			e.Summary = dohSummary(e.Session)
+		}
 	}
 	return err
 }
@@ -198,7 +207,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -282,6 +291,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.dot; d != nil && len(d.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DoT exchange ended with unmatched DNS transaction IDs")
+	}
+	if h := f.doh; h != nil && len(h.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(h.pending)}, "DoH exchange ended with unmatched DNS transaction IDs")
 	}
 }
 

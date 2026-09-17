@@ -130,6 +130,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "doh-http-get-post.pcap",
+      "protocol": "doh",
+      "sha256": "6d4e1f15ec3f50fe9cc790d943272aeb56c1e0948804549516e52965e77702e9",
+      "bytes": 1267,
+      "decode_as_port": 18443,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",
