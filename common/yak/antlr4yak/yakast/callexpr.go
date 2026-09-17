@@ -32,6 +32,15 @@ func (y *YakCompiler) VisitFunctionCallExpr(raw yak.IFunctionCallExprContext) in
 	if i == nil {
 		return nil
 	}
+	expr, _ := i.Expression().(*yak.ExpressionContext)
+	for expr != nil && expr.LParen() != nil && expr.RParen() != nil && len(expr.AllExpression()) == 1 && expr.FunctionCall() == nil && expr.MemberCall() == nil && expr.SliceCall() == nil {
+		expr, _ = expr.Expression(0).(*yak.ExpressionContext)
+	}
+	if expr == nil || (expr.FunctionCall() == nil && expr.InstanceCode() == nil) {
+		err := y.newError("go/defer requires a function call")
+		y.pushError(err)
+		panic(err)
+	}
 
 	// functionCallExpr: expression
 	// 表达式本身即为调用（如 f() / a.b() / func(){}() / fn{...}），

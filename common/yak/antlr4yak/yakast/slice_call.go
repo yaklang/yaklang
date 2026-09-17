@@ -2,6 +2,7 @@ package yakast
 
 import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
@@ -18,7 +19,7 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 
 	//检查参数数量
 	exps := i.AllExpression()
-	if len(exps) == 0 {
+	if len(exps) == 0 && len(i.AllColon()) == 0 {
 		y.panicCompilerError(sliceCallNoParamError)
 	}
 	if len(exps) > 3 {
@@ -31,6 +32,7 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 	expect := true // 记录状态，如果期望是数字，得到的是:，则push一个默认数，不切换状态。
 	t := 0         // 记录参数个数
 	idEnd := false
+	omitted := 0
 	visitChildrens := childrens[1:]
 	lenOfVisitChildrens := len(visitChildrens)
 	for index, children := range visitChildrens {
@@ -45,17 +47,19 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 				y.VisitExpression(expression)
 				expect = !expect
 			} else {
+				omitted |= 1 << t
 				if t == 1 {
 					idEnd = true
-				}
-				if t == 2 {
-					y.panicCompilerError(sliceCallStepMustBeNumberError)
 				}
 
 				if index != lenOfVisitChildrens-1 {
 					y.writeString(":")
 				}
-				y.pushInteger(0, "0")
+				if t == 2 {
+					y.pushInteger(1, "1")
+				} else {
+					y.pushInteger(0, "0")
+				}
 			}
 
 			t += 1
@@ -68,5 +72,8 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 	}
 	y.pushBool(idEnd)
 	y.pushIterableCall(t)
+	// Keep the legacy end flag on the stack for cached bytecode compatibility;
+	// new code records each omitted bound separately on the instruction.
+	y.codes[len(y.codes)-1].Op1 = yakvm.NewAutoValue(omitted)
 	return nil
 }

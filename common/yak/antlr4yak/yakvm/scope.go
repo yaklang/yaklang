@@ -47,7 +47,21 @@ func (s *Scope) IsRoot() bool {
 }
 
 func (s *Scope) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return len(s.idToValue)
+}
+
+// snapshotBindings copies bindings, not the objects they refer to. Name
+// resolution happens after releasing mu; a scope chain is not an atomic snapshot.
+func (s *Scope) snapshotBindings() map[int]*Value {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make(map[int]*Value, len(s.idToValue))
+	for id, value := range s.idToValue {
+		result[id] = value
+	}
+	return result
 }
 
 func (s *Scope) GetValueByName(name string) (*Value, bool) {
@@ -126,7 +140,7 @@ func (s *Scope) GetAllIdInScopes() []int {
 
 func (s *Scope) GetAllNameAndValueInScopes() (results map[string]*Value) {
 	results = make(map[string]*Value)
-	for id, value := range s.idToValue {
+	for id, value := range s.snapshotBindings() {
 		name := s.GetNameById(id)
 		if name == "" || name == "_" {
 			continue
@@ -140,7 +154,7 @@ func (s *Scope) GetAllNameAndValueInAllScopes() (results map[string]*Value) {
 	results = make(map[string]*Value)
 	scope := s
 	for scope != nil {
-		for id, value := range scope.idToValue {
+		for id, value := range scope.snapshotBindings() {
 			name := scope.GetNameById(id)
 			if name == "" || name == "_" {
 				continue

@@ -18,6 +18,9 @@ func (v *Value) NativeCall(vm *Frame, wavy bool, vs ...*Value) interface{} {
 }
 
 func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interface{} {
+	if asyncCall && vm.vm.config.synchronousExecution {
+		panic("async calls are not supported in synchronous execution mode")
+	}
 	rets := reflect.ValueOf(v.Value)
 	funcType := rets.Type()
 	// 这儿很不完善，需要做大量兼容性处理
@@ -56,8 +59,8 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 			err := vm.AutoConvertReflectValueByType(&argVal, targetType)
 			if err != nil {
 				msg := fmt.Sprintf(
-					"native func `%s` calling failed: auto convert failed, cannot convert %v(passed) to %v(need)", v.GetLiteral(),
-					args[i].Type(), funcType.In(i),
+					"native func `%s` argument %d calling failed: auto convert failed, cannot convert %v(passed) to %v(need): %v", v.GetLiteral(), i+1,
+					reflectValueType(args[i]), targetType, err,
 				)
 				panic(msg)
 			}
@@ -74,8 +77,8 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 			err := vm.AutoConvertReflectValueByType(&argVal, funcType.In(i))
 			if err != nil {
 				msg := fmt.Sprintf(
-					"native func `%s` calling failed: auto convert failed, cannot convert %v(passed) to %v(need)", v.GetLiteral(),
-					args[i].Type(), funcType.In(i),
+					"native func `%s` argument %d calling failed: auto convert failed, cannot convert %v(passed) to %v(need): %v", v.GetLiteral(), i+1,
+					reflectValueType(args[i]), funcType.In(i), err,
 				)
 				panic(msg)
 			}
@@ -91,11 +94,10 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 	if asyncCall {
 		// Register only after argument validation has succeeded. A panic before a
 		// goroutine is created must not leave AsyncWait blocked forever.
-		vm.vm.AsyncStart()
-		go func() {
-			defer vm.vm.AsyncEnd()
+		vm.vm.startAsync(vm, !vm.vm.config.stopRecover, func() error {
 			rets.Call(args)
-		}()
+			return nil
+		})
 		return nil
 	}
 	returns := rets.Call(args)

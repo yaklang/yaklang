@@ -125,6 +125,9 @@ func GuessValuesTypeToBasicType(vals ...*Value) reflect.Type {
 
 	last := anyT
 	for index, i := range vals {
+		if i == nil || i.Value == nil || i.IsUndefined() {
+			return anyT
+		}
 		if index == 0 {
 			// 识别第一个类型
 			if i.IsByte() {
@@ -241,6 +244,9 @@ func (v *Frame) AutoConvertReflectValueByType(
 	reflectValue *reflect.Value,
 	targetType /*, targetReflectType*/ reflect.Type,
 ) error {
+	if reflectValue == nil || targetType == nil {
+		return fmt.Errorf("invalid reflection conversion target or value")
+	}
 	srcKind := reflectValue.Kind()
 
 	if srcKind == reflect.Invalid {
@@ -255,6 +261,12 @@ func (v *Frame) AutoConvertReflectValueByType(
 
 	targetKind := targetType.Kind()
 	if targetKind == reflect.Interface {
+		if !reflectValue.Type().AssignableTo(targetType) {
+			return fmt.Errorf("invalid argument type: require `%v`, but we got `%v`", targetType, reflectValue.Type())
+		}
+		if targetType.NumMethod() > 0 {
+			return nil
+		}
 		// 证明是别名，例如time.Duration 是 int64 类型别名，但是有自己实现的方法，所以不应该转换
 		pkgPath := reflectValue.Type().PkgPath()
 		if pkgPath != "" {
@@ -276,7 +288,8 @@ func (v *Frame) AutoConvertReflectValueByType(
 	}
 
 	srcType := reflectValue.Type()
-	if srcType == targetType {
+	// Non-identical container types historically convert through a copy.
+	if srcType.AssignableTo(targetType) && targetKind != reflect.Slice && targetKind != reflect.Array && targetKind != reflect.Map {
 		return nil
 	}
 
@@ -285,16 +298,33 @@ func (v *Frame) AutoConvertReflectValueByType(
 		if srcKind == reflect.Ptr {
 			elemSrcType := srcType.Elem()
 			if elemSrcType == targetType {
+				if reflectValue.IsNil() {
+					return fmt.Errorf("cannot dereference nil %v as %v", srcType, targetType)
+				}
 				*reflectValue = reflectValue.Elem()
 				return nil
 			}
 		}
 	case reflect.Func:
-		if srcType == literalReflectType_YakFunction && reflectValue.Interface() != nil {
+		if srcKind == reflect.Func && srcType.ConvertibleTo(targetType) {
+			*reflectValue = reflectValue.Convert(targetType)
+			return nil
+		}
+		if srcType == literalReflectType_YakFunction && !reflectValue.IsNil() {
 			if v == nil {
 				return utils.Errorf("cannot bind Yaklang.Function Calling for VirtualMachine!")
 			}
 			f := reflectValue.Interface().(*Function)
+			// Snapshot the lexical frame on its owner goroutine. A retained or
+			// asynchronous native callback must not read parent.scope while the
+			// parent is exiting a block or restoring its defer scope.
+			callbackParent := v
+			callbackOwner := v.ownerGoroutineID
+			synchronous := v.vm.config.synchronousExecution
+			if !synchronous {
+				callbackParent = NewSubFrame(v)
+				callbackParent.ownerGoroutineID = callbackOwner
+			}
 			*reflectValue = reflect.MakeFunc(targetType, func(args []reflect.Value) []reflect.Value {
 				var vmArgs []*Value
 				// fix: unpack variadic args
@@ -315,7 +345,12 @@ func (v *Frame) AutoConvertReflectValueByType(
 					}
 				}
 
-				result := v.nativeCallbackFrame().CallYakFunction(false, f, vmArgs)
+				parent := callbackParent
+				if synchronous || currentGoroutineID() == callbackOwner {
+					parent = v
+				}
+				callbackFrame := parent.nativeCallbackFrame()
+				result := callbackFrame.CallYakFunction(false, f, vmArgs)
 				outCount := targetType.NumOut()
 				if outCount <= 0 {
 					return nil
@@ -324,9 +359,9 @@ func (v *Frame) AutoConvertReflectValueByType(
 
 				if outCount == 1 {
 					expected := targetType.Out(0)
-					err := v.AutoConvertReflectValueByType(&reflectReturn, expected)
+					err := callbackFrame.AutoConvertReflectValueByType(&reflectReturn, expected)
 					if err != nil {
-						panic(fmt.Sprintf("runtime error: cannot convert `%v` to `%v`", reflectReturn.Type().String(), expected.String()))
+						panic(fmt.Sprintf("runtime error: cannot convert `%v` to `%v`: %v", reflectValueType(reflectReturn), expected, err))
 					}
 					return []reflect.Value{reflectReturn}
 				}
@@ -341,9 +376,9 @@ func (v *Frame) AutoConvertReflectValueByType(
 						val = val.Elem()
 					}
 					expectedType := targetType.Out(i)
-					err := v.AutoConvertReflectValueByType(&val, expectedType)
+					err := callbackFrame.AutoConvertReflectValueByType(&val, expectedType)
 					if err != nil {
-						panic(fmt.Sprintf("runtime error: cannot convert `%v` to `%v`", val.Type().String(), expectedType.String()))
+						panic(fmt.Sprintf("runtime error: cannot convert `%v` to `%v`: %v", reflectValueType(val), expectedType, err))
 					}
 					outputResults[i] = val
 				}
@@ -355,7 +390,15 @@ func (v *Frame) AutoConvertReflectValueByType(
 		}
 	case reflect.Slice, reflect.Array: // 数组类型转换
 		if srcKind == reflect.Slice || srcKind == reflect.Array {
-			resValRef := reflect.MakeSlice(targetType, reflectValue.Len(), reflectValue.Len())
+			var resValRef reflect.Value
+			if targetKind == reflect.Array {
+				if targetType.Len() != reflectValue.Len() {
+					return fmt.Errorf("cannot convert %v elements to %v", reflectValue.Len(), targetType)
+				}
+				resValRef = reflect.New(targetType).Elem()
+			} else {
+				resValRef = reflect.MakeSlice(targetType, reflectValue.Len(), reflectValue.Len())
+			}
 			reflectValueRef := reflect.ValueOf(reflectValue.Interface())
 			elemType := targetType.Elem()
 			for i := 0; i < reflectValueRef.Len(); i++ {
@@ -397,7 +440,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 			return nil
 		}
 	default:
-		if targetKind == srcKind || convertible(srcKind, targetKind) {
+		if (targetKind == srcKind || convertible(srcKind, targetKind)) && srcType.ConvertibleTo(targetType) {
 			*reflectValue = reflectValue.Convert(targetType)
 			return nil
 		}
@@ -407,17 +450,15 @@ func (v *Frame) AutoConvertReflectValueByType(
 	//    2. 如果要求为 string, 输入为 []byte / []uint8 也可以转
 	if srcKind == reflect.String &&
 		targetKind == reflect.Slice && targetType.Elem().Kind() == reflect.Uint8 {
-		strValue, ok := reflectValue.Interface().(string)
-		if ok {
-			*reflectValue = reflect.ValueOf([]byte(strValue))
+		if srcType.ConvertibleTo(targetType) {
+			*reflectValue = reflectValue.Convert(targetType)
 			return nil
 		}
 	}
 	if srcKind == reflect.Slice &&
 		targetKind == reflect.String && (reflectValue.Type().Elem().Kind() == reflect.Uint8) {
-		strValue, ok := reflectValue.Interface().([]byte)
-		if ok {
-			*reflectValue = reflect.ValueOf(string(strValue))
+		if srcType.ConvertibleTo(targetType) {
+			*reflectValue = reflectValue.Convert(targetType)
 			return nil
 		}
 	}
@@ -432,7 +473,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 	if srcType == literalReflectType_OrderedMap && targetKind == reflect.Map {
 		v, ok := reflectValue.Interface().(*orderedmap.OrderedMap)
 		targetMapKeyKind, targetMapValueKind := targetType.Key().Kind(), targetType.Elem().Kind()
-		if ok && targetMapValueKind == reflect.Interface {
+		if ok && v != nil && targetMapValueKind == reflect.Interface {
 			if targetMapKeyKind == reflect.String {
 				*reflectValue = reflect.ValueOf(v.ToStringMap())
 				return nil
@@ -458,4 +499,11 @@ func convertible(kind, tkind reflect.Kind) bool {
 		return kind >= reflect.Int && kind <= reflect.Float64
 	}
 	return false
+}
+
+func reflectValueType(value reflect.Value) interface{} {
+	if !value.IsValid() {
+		return "nil"
+	}
+	return value.Type()
 }
