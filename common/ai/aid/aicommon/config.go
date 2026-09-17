@@ -384,7 +384,7 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
-	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 auxiliary_scheduler.go
+	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*

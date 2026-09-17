@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -88,6 +89,7 @@ type liteforgeConfig struct {
 	forceImage        bool
 	speedPriority     bool
 	staticInstruction string
+	invokeRequest     *aicommon.LiteForgeInvokeRequest
 
 	aidOptions []aicommon.ConfigOption
 
@@ -295,6 +297,11 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		switch opt := optRaw.(type) {
 		case LiteForgeExecOption:
 			opt(cfg)
+		case *aicommon.LiteForgeInvokeRequest:
+			cfg.invokeRequest = opt
+			if opt != nil && opt.Context != nil {
+				cfg.ctx = opt.Context
+			}
 		case aicommon.ConfigOption:
 			cfg.aidOptions = append(cfg.aidOptions, opt)
 		case aispec.AIConfigOption:
@@ -317,6 +324,19 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 
 	if cfg.ctx == nil {
 		cfg.ctx = context.Background()
+	}
+
+	if req := cfg.invokeRequest; req != nil {
+		if req.ActionName == "" {
+			return nil, utils.Error("liteforge invoke request action name is required")
+		}
+		cfg.id = req.ActionName
+		cfg.action = req.ActionName
+		rawOutputs := make([]any, 0, len(req.Outputs))
+		for _, output := range req.Outputs {
+			rawOutputs = append(rawOutputs, output)
+		}
+		cfg.output = aitool.NewObjectSchemaWithActionName(req.ActionName, rawOutputs...)
 	}
 
 	// When cfg.output is set via LiteForgeExecOption, validate the schema here.
@@ -342,6 +362,34 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	if cfg.staticInstruction != "" {
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_StaticInstruction(cfg.staticInstruction))
 	}
+	if req := cfg.invokeRequest; req != nil {
+		gconfig := aicommon.NewGeneralKVConfig(req.Options...)
+		// Typed Config invocations put the task prompt in LiteForge's dynamic
+		// context segment, matching the ReAct invocation path without duplicating
+		// it again as an ExecParamItem.
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_Prompt(cfg.query))
+		if staticInstruction := gconfig.GetLiteForgeStaticInstruction(); staticInstruction != "" {
+			liteForgeOpts = append(liteForgeOpts, WithLiteForge_StaticInstruction(staticInstruction))
+		}
+		if gconfig.GetLiteForgeDisableTimeline() {
+			liteForgeOpts = append(liteForgeOpts, WithLiteForge_DisableTimeline())
+		}
+		for _, field := range gconfig.GetStreamableFields() {
+			liteForgeOpts = append(liteForgeOpts, WithLiteForge_StreamableFieldWithAINodeId(field.AINodeId(), field.FieldKey()))
+		}
+		for _, item := range gconfig.GetStreamableFieldCallbacks() {
+			if item != nil && item.Callback != nil {
+				liteForgeOpts = append(liteForgeOpts, WithLiteForge_FieldStreamEmitterCallback(
+					item.FieldKeys,
+					FieldStreamEmitterCallback(item.Callback),
+				))
+			}
+		}
+		if extraRequestOpts := gconfig.GetExtraRequestOpts(); len(extraRequestOpts) > 0 {
+			liteForgeOpts = append(liteForgeOpts, WithLiteForge_ExtraRequestOpts(extraRequestOpts...))
+		}
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_Emitter(req.Emitter))
+	}
 	liteforgeIns, err := NewLiteForge(cfg.id, liteForgeOpts...)
 	if err != nil {
 		return nil, utils.Errorf("new liteforge failed: %s", err)
@@ -351,9 +399,11 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		return nil, utils.Error("force image is true, but no image provided")
 	}
 
-	fr, err := liteforgeIns.ExecuteEx(cfg.ctx, []*ypb.ExecParamItem{
-		{Key: "query", Value: cfg.query},
-	}, cfg.images, cfg.aidOptions...)
+	execParams := []*ypb.ExecParamItem{{Key: "query", Value: cfg.query}}
+	if cfg.invokeRequest != nil {
+		execParams = []*ypb.ExecParamItem{}
+	}
+	fr, err := liteforgeIns.ExecuteEx(cfg.ctx, execParams, cfg.images, cfg.aidOptions...)
 	if err != nil {
 		return nil, utils.Errorf("execute liteforge failed: %s", err)
 	}

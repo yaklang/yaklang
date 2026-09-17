@@ -6,14 +6,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// AuxiliaryTaskSpec holds the essential fields for an auxiliary AI task:
-// a name (registry key), a lazy prompt builder, and a result callback.
-// Optional fields (output schema, LiteForge opts) are set via AuxiliaryTaskOption.
+// AuxiliaryTaskSpec holds the optional execution fields for an auxiliary AI
+// task. The required fields are positional arguments of ScheduleAuxiliaryTask.
 type AuxiliaryTaskSpec struct {
-	Name          string
-	PromptBuilder func() string
-	OnResult      func(*Action)
-
 	Outputs []aitool.ToolOption
 	Opts    []GeneralKVConfigOption
 }
@@ -36,8 +31,9 @@ func WithAuxiliaryOpts(opts ...GeneralKVConfigOption) AuxiliaryTaskOption {
 	}
 }
 
-// AuxiliaryScheduler is the interface for scheduling auxiliary AI tasks.
-// It decides whether to skip or run based on the single-model registry.
+// AuxiliaryScheduler is implemented by Config. Keeping scheduling on the
+// configuration makes the single-model policy available to ReAct and non-ReAct
+// callers alike, without coupling the policy to a particular runtime.
 type AuxiliaryScheduler interface {
 	ScheduleAuxiliaryTask(ctx context.Context, name string, promptBuilder func() string, onResult func(*Action), opts ...AuxiliaryTaskOption)
 }

@@ -31,6 +31,8 @@ type MockedAIConfig struct {
 	TodoState *aicommon.SessionPromptState
 
 	TimelineContentSizeLimit int64
+
+	ScheduleAuxiliaryTaskFunc func(context.Context, string, func() string, func(*aicommon.Action), ...aicommon.AuxiliaryTaskOption)
 }
 
 func (m *MockedAIConfig) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -52,6 +54,17 @@ func (m *MockedAIConfig) IsSingleAIModelMode() bool {
 	return false
 }
 
+func (m *MockedAIConfig) ScheduleAuxiliaryTask(
+	ctx context.Context,
+	name string,
+	promptBuilder func() string,
+	onResult func(*aicommon.Action),
+	opts ...aicommon.AuxiliaryTaskOption,
+) {
+	if m != nil && m.ScheduleAuxiliaryTaskFunc != nil {
+		m.ScheduleAuxiliaryTaskFunc(ctx, name, promptBuilder, onResult, opts...)
+	}
+}
 
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
 	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
@@ -257,10 +270,11 @@ type MockInvoker struct {
 }
 
 func NewMockInvoker(ctx context.Context) *MockInvoker {
-	return &MockInvoker{
-		ctx:    ctx,
-		config: NewMockedAIConfig(ctx),
-	}
+	m := &MockInvoker{ctx: ctx}
+	config := NewMockedAIConfig(ctx).(*MockedAIConfig)
+	config.ScheduleAuxiliaryTaskFunc = m.scheduleAuxiliaryTask
+	m.config = config
+	return m
 }
 
 func (m *MockInvoker) GetContext() context.Context {
@@ -629,7 +643,7 @@ func (m *MockInvoker) GetRuntimeTasks() []aicommon.AIStatefulTask {
 	return append([]aicommon.AIStatefulTask(nil), m.runtimeTask...)
 }
 
-func (m *MockInvoker) ScheduleAuxiliaryTask(
+func (m *MockInvoker) scheduleAuxiliaryTask(
 	ctx context.Context,
 	name string,
 	promptBuilder func() string,

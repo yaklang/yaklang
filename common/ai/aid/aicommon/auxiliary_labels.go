@@ -6,18 +6,14 @@ package aicommon
 // which are formatted as liteforge[<actionName>] at aiforge/liteforge.go
 // and written into AIRequest.CallerLabel.
 const (
-	// ── Skip (subsystem entry gates + function-block internal steps) ──
-	CallerLabelSessionInitGenerator        = "session-init-generator"
-	CallerLabelSessionTitleGenerator       = "session-title-generator"
-	CallerLabelIntentKeywordGen            = "intent-keyword-gen"
-	CallerLabelIntentCapabilityRecommend   = "intent-capability-recommend"
-	CallerLabelToolCallReason              = "tool-call-reason"
-	CallerLabelExtractExploreTargetPath    = "extract-explore-target-path"
-	CallerLabelExtractHTTPRequestFromInput = "extract-http-request-from-user-input"
-	CallerLabelAnalyzeReportIntent         = "analyze-report-intent"
-	CallerLabelSmartEvaluation             = "smart-evaluation"
-	CallerLabelInsufficientReasonAnalysis  = "insufficient-reason-analysis"
-	CallerLabelCapabilityCatalogMatch       = "capability-catalog-match"
+	// ── Skip (subsystem entry gates + non-critical auxiliary steps) ──
+	CallerLabelSessionInitGenerator       = "session-init-generator"
+	CallerLabelSessionTitleGenerator      = "session-title-generator"
+	CallerLabelIntentKeywordGen           = "intent-keyword-gen"
+	CallerLabelIntentCapabilityRecommend  = "intent-capability-recommend"
+	CallerLabelToolCallReason             = "tool-call-reason"
+	CallerLabelSmartEvaluation            = "smart-evaluation"
+	CallerLabelInsufficientReasonAnalysis = "insufficient-reason-analysis"
 	// Subsystem defensive fallback (should not be reached after entry gate)
 	CallerLabelMemoryTriage             = "memory-triage"
 	CallerLabelTextagSelection          = "tag-selection"
@@ -25,6 +21,10 @@ const (
 	CallerLabelPerception               = "perception"
 
 	// ── LiteCall ──
+	CallerLabelExtractExploreTargetPath     = "extract-explore-target-path"
+	CallerLabelExtractHTTPRequestFromInput  = "extract-http-request-from-user-input"
+	CallerLabelAnalyzeReportIntent          = "analyze-report-intent"
+	CallerLabelCapabilityCatalogMatch       = "capability-catalog-match"
 	CallerLabelKnowledgeCompress            = "knowledge-compress"
 	CallerLabelKnowledgeCompressBench       = "knowledge-compress-bench"
 	CallerLabelSelectKnowledgeBase          = "select_knowledge_base"
