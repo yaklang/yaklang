@@ -69,8 +69,8 @@ functionCall 取 `()`，二者共享前缀，SLL 无法在合并上下文中判�
 这类语句 bail 回退 LL。
 
 现在直接复用通用 `expression`（其顶层通常为 `expression functionCall` 或 instanceCode），
-判别完全交给 expression 自身的左递归消解，SLL 即可命中。是否为合法调用（顶层为 functionCall
-或 instanceCode）由 visitor 判定。
+判别完全交给 expression 自身的左递归消解，SLL 即可命中。defer 的调用约束由 visitor 判定；
+go 还允许普通表达式（整体异步求值）和直接函数定义（隐式调用一次）。
 */
 functionCallExpr: expression;
 

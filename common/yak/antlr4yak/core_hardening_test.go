@@ -100,7 +100,7 @@ func TestCoreBlockedChannelInstructionCancellation(t *testing.T) {
 
 func TestCoreAsyncScriptErrorsAndSynchronousBoundary(t *testing.T) {
 	for _, synchronous := range []bool{false, true} {
-		for _, source := range []string{"go host()", "f = () => { panic(\"yak boom\") }; go f()", "go hostCallback(() => { return 1 })"} {
+		for _, source := range []string{"go host()", "go host()+1", "f = () => { panic(\"yak boom\") }; go f()", "go hostCallback(() => { return 1 })", `go panic("expression boom")`, `go func(){ panic("literal boom") }`} {
 			e := New()
 			e.GetVM().GetConfig().SetSynchronousExecution(synchronous)
 			e.ImportLibs(map[string]any{
@@ -138,7 +138,7 @@ func TestCoreAsyncScriptErrorsAndSynchronousBoundary(t *testing.T) {
 
 func TestCoreInvalidCompileThenReuse(t *testing.T) {
 	e := New()
-	for _, source := range []string{"1 = 2", "f() = 2", "go 1+2", "defer x"} {
+	for _, source := range []string{"1 = 2", "f() = 2", "defer x"} {
 		codes, err := e.Compile(source)
 		if err == nil || len(codes) != 0 {
 			t.Fatalf("accepted partial compilation %q: %v", source, err)

@@ -33,6 +33,15 @@ The existing language regression suite remains authoritative outside these cases
 - Binary operands preserve left/right order. `OpAssign` and `OpFastAssign` keep
   their distinct stack order; multiple assignment, compound assignment, closures,
   defer, debug, Trace/Inline and template immutability remain regression-covered.
-- `go` and `defer` require call expressions (with existing instance-code syntax
-  preserved). Unknown compiler panics fail compilation and publish no code.
+- `go 1+1` evaluates the entire expression in an implicit asynchronous function.
+  A direct function definition, such as `go func(){...}` or `go ()=>...`, is
+  implicitly invoked once; parentheses do not change this classification.
+  `go factory()` invokes only factory, even if its result is a closure. Function
+  values obtained through variables, members, indexing or conditional expressions
+  are not implicitly invoked. `go f(args)` preserves call-site argument evaluation;
+  nested calls in general expressions execute inside the implicit worker body.
+  Existing instance-code syntax remains supported, and expression results are
+  discarded without leaving values on the submitting frame's operand stack.
+- `defer` retains its call-expression constraint (and existing panic/recover forms).
+  Unknown compiler panics fail compilation and publish no code.
   Failed compile attempts do not recycle previously reserved symbol IDs.

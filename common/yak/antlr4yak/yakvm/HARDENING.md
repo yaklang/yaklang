@@ -15,7 +15,7 @@ fixes. Existing tests are retained without changing their assertions or skips.
 | C04, first stage | Checked wire reads, host-integer checks, aggregate object/byte/depth budgets, unique table IDs, root/reachability/parent-child checks, opcode/count/control-target/operand validation, failure-state cleanup, and bounded decoder fuzzing. |
 | C05–C08 | Variadic tails use actually consumed positional arguments; missing fixed parameters retain the configured arity policy. Diagnostics use the actual variadic element type. Nil-first literals infer an interface element type. Index and slice normalization are separate; omitted bounds are represented explicitly. Arrays slice to copied slices and convert to arrays with checked lengths. |
 | C10 | Nonempty interfaces require assignability; nil pointers cannot be dereferenced into structs. Reflection conversions prove convertibility. Named string/byte/function conversions preserve the destination type. Nonidentical container conversions retain their copy behavior. |
-| C11, first stage | Unknown visitor panics become compiler errors; failed compilation publishes no codes. Reuse resets diagnostics and temporary control state. `go`/`defer` require a call expression. |
+| C11, first stage | Unknown visitor panics become compiler errors; failed compilation publishes no codes. Reuse resets diagnostics and temporary control state. `defer` requires a call expression. `go` supports asynchronous expressions and implicitly calls a direct function definition once. |
 | C12 | A FuzzTag partial-result-plus-error produces exactly one empty result. |
 | C13 | Map display keys are formatted once for sorting; deleted keys are skipped. Set iterators close on exhaustion, break, return, panic and cancellation. Closing is optional on the public iterator interface for compatibility. |
 | C14, first stage | `PeekN` returns nil outside `[0, Len)`. The generic linked stack and its full shadow restore behavior remain supported. |
@@ -43,7 +43,12 @@ arbitrary native code does not invoke callbacks from another goroutine.
 See [yak_semantics.md](yak_semantics.md). Intentional corrections include empty
 and end-position slices, explicit zero versus omitted negative-step bounds,
 well-typed array conversion, cancellable channel sends, and rejection of invalid
-`go`/`defer` expressions. Slice results remain copies; successful programs do not
+`defer` expressions. `go expr` evaluates a non-call expression in an implicit
+zero-argument worker function. A direct function definition (including arrow
+functions and parenthesized definitions) is called once; a returned closure or
+function-valued variable/container element is not implicitly called. Existing
+`go f(args)` keeps call-site argument evaluation. Slice results remain copies;
+successful programs do not
 gain Python-style out-of-bounds clipping or Go-style shared slice views.
 
 ### Limits of this batch
@@ -84,6 +89,10 @@ w64devkit GCC. Baseline and candidate have independent worktrees.
   depth budgets, marshaller reuse and valid execution round trips are regressions.
 - Async host panics and cold/saturated method-cache checks run in subprocesses.
   Set producer shutdown is checked by reacquiring the set's write lock after exit.
+- `go` expression/function-definition cases cover original source, formatted source
+  and serialized bytecode. Worker-only evaluation, lexical capture after the
+  submitting function returns, short-circuit behavior, explicit calls and returned
+  closures are checked without changing existing language tests.
 - The broader Lua/NASL runs encounter existing `Test4` (left-value assignment)
   and `TestCode` (Yak function assertion) failures. Both reproduce on the clean
   baseline with the same errors. Their tests are unchanged. No claim is made that
