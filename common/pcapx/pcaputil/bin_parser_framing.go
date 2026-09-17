@@ -95,6 +95,8 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.dns", "DNS"},
 	{"application-layer.tls", ""},
 	{"sip", "SIP"},
+	{"rtp", "RTP"},
+	{"rtp", "RTCP"},
 }
 
 func (f *binFlow) spec(family, entry string) *binSpec {
