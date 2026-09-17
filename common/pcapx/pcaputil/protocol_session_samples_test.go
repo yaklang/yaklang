@@ -160,6 +160,12 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, rtcpSR(0x12345678, 0x11121418, 320, 3, 48)},
 			{1, rtcpRR(0xabcdef01, 0x12345678, 0, 0)},
 		}},
+		{"quic-v1-crypto-stream", "quic", 14443, []sessionStep{
+			{0, quicLongPacket(0, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))},
+			{1, quicLongPacket(2, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 0, quicCryptoFrame(0, []byte("SHLO")))},
+			{0, quicLongPacket(1, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 0, quicStreamFrame(0, 0, true, []byte("GET")))},
+			{1, quicLongPacket(2, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 1, quicConnectionClose(0, "done"))},
+		}},
 		{"sip-invite-ack-bye", "sip", 15060, []sessionStep{
 			{0, sipInvite()},
 			{1, sipResp("100", "Trying", "z9hG4bK776asdhds", "314159 INVITE", "a84b4c76e66710@pc33.atlanta.example.com", "Alice <sip:alice@atlanta.example.com>;tag=1928301774", "Bob <sip:bob@biloxi.example.com>")},

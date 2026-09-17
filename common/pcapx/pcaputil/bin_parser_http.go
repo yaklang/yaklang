@@ -69,6 +69,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameSIP(w)
 		case "rtp":
 			return f.frameRTP(w)
+		case "quic":
+			return f.frameQUIC(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {
