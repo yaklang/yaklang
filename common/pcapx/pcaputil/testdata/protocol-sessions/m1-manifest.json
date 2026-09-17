@@ -40,6 +40,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "mongodb-opmsg-compressed.pcap",
+      "protocol": "mongodb",
+      "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",
+      "bytes": 690,
+      "decode_as_port": 27018,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mqtt5-connect-qos.pcap",
       "protocol": "mqtt",
       "sha256": "d8a7a21673a7572d3cafe289c0c64fcaa6acf625d3c7c8dec3363a2815b35215",

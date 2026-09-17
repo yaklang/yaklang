@@ -61,6 +61,12 @@ func redisFrameLengthBudget(w []byte, depth int, budget ParserBudget, used *int)
 		return 0, fmt.Errorf("redis: invalid RESP prefix")
 	}
 	if nl < 0 {
+		switch w[0] {
+		case '$', '!', '=', '*', '%', '~', '>', '(', ':':
+			if err := redisLengthDigits(w[1:]); err != nil {
+				return 0, err
+			}
+		}
 		return 0, nil
 	}
 	value := string(w[1:nl])
@@ -229,4 +235,26 @@ func redisTypeName(b byte) string {
 		return "Push"
 	}
 	return "Unknown"
+}
+
+func redisLengthDigits(w []byte) error {
+	if len(w) == 0 {
+		return nil
+	}
+	i := 0
+	if w[0] == '-' {
+		i = 1
+	}
+	if i >= len(w) {
+		return nil
+	}
+	for ; i < len(w); i++ {
+		if w[i] == '\r' {
+			return nil
+		}
+		if w[i] < '0' || w[i] > '9' {
+			return fmt.Errorf("redis: invalid length digits")
+		}
+	}
+	return nil
 }

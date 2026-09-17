@@ -38,6 +38,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: wsPhaseFromProbe(w)}
 	case "mqtt":
 		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: 5, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+	case "mongodb":
+		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
 
 	}
 }
@@ -84,6 +86,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "mqtt":
 		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
+	case "mongodb":
+		e.Session, err = f.mongo.consume(e.Raw, result)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -108,6 +112,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("WebSocket %v", e.Session["Opcode Name"])
 		case "mqtt":
 			e.Summary = fmt.Sprintf("MQTT %v", e.Session["Packet Name"])
+		case "mongodb":
+			e.Summary = fmt.Sprintf("MongoDB %v id %v", e.Session["Opcode Name"], e.Session["Request ID"])
 		}
 	}
 	return err
@@ -127,7 +133,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt = nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo = nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -170,6 +176,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		if n > 0 {
 			emit(q.client, map[string]any{"Outstanding": n}, "MQTT exchange ended with unmatched packet identifiers")
 		}
+	}
+	if g := f.mongo; g != nil && len(g.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(g.pending)}, "MongoDB exchange ended with unmatched request IDs")
 	}
 }
 

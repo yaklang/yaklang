@@ -57,6 +57,10 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, []byte("+PONG\r\n")},
 			{1, []byte("%1\r\n+key\r\n+val\r\n")},
 		}},
+		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
+			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
+			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},
+		}},
 		{"mqtt5-connect-qos", "mqtt", 18830, []sessionStep{
 			{0, mqtt5Connect("dev", []byte{3, 0x22, 0, 10})},
 			{1, mqtt5Connack(10)},

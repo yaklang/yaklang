@@ -68,6 +68,10 @@ func structuredNativeDecoder(source string) StructuredDecoder {
 			if arg == "" {
 				decode, endian = decodeSMB3TransformFields, "little"
 			}
+		case "parseMongoDBFields":
+			if arg == "" {
+				decode, endian = decodeMongoDBFields, "little"
+			}
 		case "parseTLSCertificateHandshake":
 			if arg == "" {
 				decode = decodeTLSCertificateHandshake

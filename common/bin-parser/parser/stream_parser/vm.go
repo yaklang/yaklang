@@ -451,6 +451,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseSMTPFields(invocation.node, invocation.operator, data)
 		},
+		"parseMongoDBFields": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("mongodb-fields: structured generation is not supported")
+			}
+			return parseMongoDBFields(invocation.node, invocation.operator)
+		},
 		"parseMQTTFields": func(level int) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("mqtt-fields: structured generation is not supported")
