@@ -384,6 +384,7 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
+	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 auxiliary_scheduler.go
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -695,6 +696,12 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 
 	ensureCapabilityManagers(config)
 
+	// Single-model simple mode: automatically enable existing subsystem
+	// disable switches so their internal AI calls are not triggered.
+	if config.IsSingleAIModelMode() {
+		config.applySingleModelModeDefaults()
+	}
+
 	return config
 }
 
@@ -781,7 +788,7 @@ func newConfig(ctx context.Context) *Config {
 		return e, nil
 	})
 
-	if config.GetSpeedPriorityAICallback() != nil {
+	if config.GetSpeedPriorityAICallback() != nil && !config.IsSingleAIModelMode() {
 		config.Emitter.SetStreamNodeIdI18nProvider(
 			config.buildStreamNodeIdI18nProvider(),
 		)
@@ -2761,6 +2768,32 @@ func WithDisablePerception(disable bool) ConfigOption {
 	}
 }
 
+// IsSingleAIModelMode returns whether single-model simple mode is enabled.
+// In this mode, auxiliary AI tasks are routed through ScheduleAuxiliaryTask
+// which decides whether to skip, use a lightweight call, or pass through.
+func (c *Config) IsSingleAIModelMode() bool {
+	if c == nil {
+		return false
+	}
+	return c.singleAIModelMode
+}
+
+// WithSingleAIModelMode enables or disables single-model simple mode.
+// When enabled, auxiliary AI calls (title generation, intent recognition,
+// knowledge compression, perception, etc.) are routed through a centralized
+// scheduler that can skip them, degrade parameters, or pass them through.
+func WithSingleAIModelMode(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.singleAIModelMode = enable
+		c.m.Unlock()
+		return nil
+	}
+}
+
 // WithEnableFunctionCallMode enables native functioncall (tool_calls) mode for
 // ReAct loops created from this config. When enabled, each ReAct loop iteration
 // uses a single "execute_action" tool whose arguments are a complete action
@@ -4520,6 +4553,13 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Propagate functioncall mode flag so sub-loops inherit the setting.
 	if i.EnableFunctionCallMode {
 		opts = append(opts, WithEnableFunctionCallMode(true))
+	}
+
+	// Propagate single-model simple mode flag so sub-loops inherit the setting.
+	// This ensures child agents (P&E task, plan, sub ReAct agents) also route
+	// auxiliary tasks through the scheduler and apply subsystem disable switches.
+	if i.singleAIModelMode {
+		opts = append(opts, WithSingleAIModelMode(true))
 	}
 
 	// once init config flag
