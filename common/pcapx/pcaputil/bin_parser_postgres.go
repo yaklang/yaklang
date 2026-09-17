@@ -14,28 +14,31 @@ type binPostgres struct {
 }
 
 func probePostgres(w []byte, limit int) ProbeResult {
-	if len(w) < 8 {
-		if len(w) > 0 && w[0] == 0 {
-			return probeNeed("postgresql", "3.0", len(w), 8)
-		}
-		if len(w) >= 1 && postgresTyped(w[0]) {
-			return probeNeed("postgresql", "3.0", len(w), 5)
-		}
+	if len(w) == 0 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if postgresTyped(w[0]) {
-		n := int(binary.BigEndian.Uint32(w[1:5]))
+		if len(w) < 5 {
+			return probeNeed("postgresql", "3.0", len(w), 5)
+		}
+		n := uint64(binary.BigEndian.Uint32(w[1:5]))
 		if n < 4 || n > 1<<20 {
 			return ProbeResult{Verdict: ProbeReject}
 		}
 		return probeAccept("postgresql", "3.0", 70)
+	}
+	if len(w) < 8 {
+		if w[0] == 0 {
+			return probeNeed("postgresql", "3.0", len(w), 8)
+		}
+		return ProbeResult{Verdict: ProbeReject}
 	}
 	n := int(binary.BigEndian.Uint32(w[:4]))
 	if n < 8 || n > 1<<20 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	code := binary.BigEndian.Uint32(w[4:8])
-	if code == 80877103 || code == 80877102 || code == 80877104 || code == 196608 {
+	if code == 80877103 || code == 80877102 || code == 196608 {
 		return probeAccept("postgresql", "3.0", 95)
 	}
 	_ = limit
@@ -59,7 +62,10 @@ func (f *binFlow) framePostgres(dir int, w []byte) (int, *binSpec, error) {
 	if err := f.reserveSession(256); err != nil {
 		return 0, nil, err
 	}
-	if p.ssl && p.frontend >= 0 && dir != p.frontend && len(w) >= 1 && (w[0] == 'S' || w[0] == 'N' || w[0] == 'G') {
+	if p.ssl && p.frontend >= 0 && dir != p.frontend && len(w) >= 1 {
+		if w[0] != 'S' && w[0] != 'N' {
+			return 0, nil, fmt.Errorf("postgresql: invalid SSL negotiation response")
+		}
 		return 1, f.spec("postgresql_fields", "PostgreSQLSSLResponseFields"), nil
 	}
 	if len(w) < 4 {
@@ -97,6 +103,9 @@ func (f *binFlow) framePostgres(dir int, w []byte) (int, *binSpec, error) {
 func (p *binPostgres) entry(dir int, w []byte, typed bool) (string, error) {
 	if !typed {
 		code := binary.BigEndian.Uint32(w[4:8])
+		if p.frontend >= 0 && p.frontend != dir {
+			return "", sessionContext("PostgreSQL Startup sent from observed backend")
+		}
 		p.frontend = dir
 		switch code {
 		case 80877103:
@@ -120,20 +129,12 @@ func (p *binPostgres) entry(dir int, w []byte, typed bool) (string, error) {
 	frontend := p.frontend == dir
 	if p.frontend < 0 {
 		switch typ {
-		case 'R', 'K', 'Z', 'T', 'S', '1', '2', '3', 'N', 'A':
+		case 'R', 'K', 'Z', 'T', '1', '2', '3', 'N', 'A':
 			p.frontend = 1 - dir
 			frontend = false
 		case 'Q', 'P', 'B', 'X', 'H', 'p':
 			p.frontend = dir
 			frontend = true
-		case 'E':
-			if postgresLooksLikeError(w[5:]) {
-				p.frontend = 1 - dir
-				frontend = false
-			} else {
-				p.frontend = dir
-				frontend = true
-			}
 		default:
 			return "", sessionContext("PostgreSQL ambiguous typed message before Startup")
 		}
@@ -144,24 +145,12 @@ func (p *binPostgres) entry(dir int, w []byte, typed bool) (string, error) {
 	return "PostgreSQLBackendFields", nil
 }
 
-func postgresLooksLikeError(body []byte) bool {
-	if len(body) == 0 {
-		return false
-	}
-	// Execute is portal cstring + int32. Error is (field type + cstring)+ + NUL.
-	if body[0] == 0 && len(body) == 5 {
-		return false
-	}
-	t := body[0]
-	return t >= 'A' && t <= 'Z'
-}
-
 func (p *binPostgres) consume(dir int, raw []byte, entry string) (map[string]any, error) {
 	info := map[string]any{
-		"Entry":                     entry,
-		"Frontend":                  p.frontend == dir,
-		"Session State Validated":   false,
-		"Context Level":             "observed",
+		"Entry":                   entry,
+		"Frontend":                p.frontend == dir,
+		"Session State Validated": false,
+		"Context Level":           "observed",
 	}
 	if entry == "PostgreSQLSSLResponseFields" && len(raw) == 1 {
 		info["Transport Response"] = string(raw)

@@ -33,6 +33,7 @@ type ProtocolEvent struct {
 	decodeSkip      int
 	decodeConfig    map[string]any
 	historySequence uint64
+	sessionError    *ProtocolError
 }
 
 // BinParserEvent is retained for source compatibility. Use ProtocolEvent.
@@ -182,6 +183,7 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	budget                                                                     ParserBudget
 	bindings                                                                   map[uint16][]*BinParserBinding
 	contextRequired                                                            atomic.Uint64
 	config                                                                     BinParserConfig
@@ -213,7 +215,9 @@ func (c *CaptureConfig) prepareBinParser() error {
 	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 16<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
 		return fmt.Errorf("invalid protocol parser buffer/probe limits")
 	}
-	a := &binParser{config: config, specs: make(map[string]*binSpec)}
+	a := &binParser{config: config, specs: make(map[string]*binSpec), budget: DefaultParserBudget()}
+	a.budget.MaxMessageBytes, a.budget.MaxFrameBytes = config.MaxMessageBytes, config.MaxMessageBytes
+	a.budget.MaxBufferedBytes, a.budget.ProbeBytes = config.MaxBufferedBytes, config.ProbeBytes
 	a.bindings = make(map[uint16][]*BinParserBinding)
 	for _, s := range builtinBinSpecs {
 		a.addSpec(s[0], s[1])
@@ -284,23 +288,24 @@ type binDirection struct {
 	stopped    bool
 }
 type binFlow struct {
-	sessionBytes int64
-	h2           *binHTTP2
-	mysql        *binMySQL
-	pg           *binPostgres
-	ws           *binWebSocket
-	ldap         *binLDAP
-	redis        *binRedis
-	wsPending    bool
-	httpMethods  []string
-	a            *binParser
-	id           uint64
-	endpoints    [2]string
-	ports        [2]uint16
-	protocol     string
-	level        byte
-	binding      *BinParserBinding
-	directions   [2]binDirection
+	lastSessionError *ProtocolError
+	sessionBytes     int64
+	h2               *binHTTP2
+	mysql            *binMySQL
+	pg               *binPostgres
+	ws               *binWebSocket
+	ldap             *binLDAP
+	redis            *binRedis
+	httpUpgrades     []bool
+	httpMethods      []string
+	a                *binParser
+	id               uint64
+	endpoints        [2]string
+	ports            [2]uint16
+	protocol         string
+	level            byte
+	binding          *BinParserBinding
+	directions       [2]binDirection
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
@@ -355,6 +360,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d := &f.directions[dir]
 	preview := wire[:min(len(wire), f.a.config.ProbeBytes)]
 	e := f.event(dir, preview, status, reason)
+	e.sessionError, f.lastSessionError = f.lastSessionError, nil
 	e.Length = len(wire)
 	if status == "unrecognized" {
 		f.a.unknown.Add(1)
@@ -453,10 +459,8 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		n, spec, err := f.frameDirection(dir, wire)
 		if err != nil {
-			status := "malformed"
-			if errors.Is(err, errBinContext) {
-				status = "context-required"
-			}
+			status, typed := classifySessionError(err)
+			f.lastSessionError = typed
 			f.stop(dir, wire, status, err.Error())
 			if f.hasSession() {
 				f.invalidateSession(1 - dir)
@@ -464,7 +468,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			return
 		}
-		if n < 0 || n > a.config.MaxMessageBytes {
+		if n < 0 || n > a.config.MaxMessageBytes || f.protocol != "http2" && n > a.budget.MaxFrameBytes {
 			f.stop(dir, wire, "limited", "declared message exceeds limit")
 			if f.hasSession() {
 				f.invalidateSession(1 - dir)
@@ -498,11 +502,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				err = f.consumeSession(dir, e, result)
 			}
 			if err != nil {
-				e.Status, e.Error = "malformed", err.Error()
-				if errors.Is(err, errBinContext) {
-					e.Status = "context-required"
+				e.Status, e.sessionError = classifySessionError(err)
+				e.Error = err.Error()
+				switch e.Status {
+				case "limited":
+					a.limited.Add(uint64(n))
+				case "context-required":
 					a.contextRequired.Add(1)
-				} else {
+				default:
 					a.malformed.Add(1)
 				}
 			} else if a.config.Deferred {

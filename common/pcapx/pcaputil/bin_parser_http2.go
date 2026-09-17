@@ -13,7 +13,8 @@ type binH2Stream struct {
 	headers, ended [2]bool
 	window         [2]int64
 	method         string
-	grpc           []byte
+	grpc           [2][]byte
+	grpcEnabled    [2]bool
 }
 
 type binH2Settings struct {
@@ -22,6 +23,7 @@ type binH2Settings struct {
 	push         bool
 }
 type binHTTP2 struct {
+	grpcBuffered        int64
 	scanEnd, scanFrames [2]int
 	client              int
 	initial             [2]bool
@@ -55,8 +57,7 @@ func (f *binFlow) frameHTTP2(dir int, w []byte) (int, *binSpec, error) {
 	}
 	// HPACK's RFC table size excludes the decoder's slices and lookup maps.
 	// Account for that Go storage too, including spare slice/map capacity.
-	tables := int64(h.settings[0].table) + int64(h.settings[1].table)
-	if err := f.reserveSession(12288 + int64(len(h.streams)+1)*512 + int64(len(h.pending[0])+len(h.pending[1])+1)*64 + 8*tables); err != nil {
+	if err := f.reserveSession(h.sessionStorageBytes()); err != nil {
 		return 0, nil, err
 	}
 	at := 0
@@ -75,6 +76,9 @@ func (f *binFlow) frameHTTP2(dir int, w []byte) (int, *binSpec, error) {
 		return 0, nil, nil
 	}
 	n := h2FrameLength(w[at:])
+	if n > f.a.budget.MaxFrameBytes {
+		return 0, nil, protocolError(ErrResourceExceeded, "HTTP/2 frame exceeds local frame budget")
+	}
 	if n-9 > int(h.effectiveSettings(1-dir).frame) {
 		return 0, nil, fmt.Errorf("http2: frame exceeds advertised receive limit")
 	}
@@ -113,6 +117,9 @@ func (f *binFlow) frameHTTP2(dir int, w []byte) (int, *binSpec, error) {
 			}
 			flags = w[end+4]
 			n = h2FrameLength(w[end:])
+			if n > f.a.budget.MaxFrameBytes {
+				return 0, nil, protocolError(ErrResourceExceeded, "HTTP/2 continuation exceeds local frame budget")
+			}
 			if n-9 > int(h.effectiveSettings(1-dir).frame) {
 				return 0, nil, fmt.Errorf("http2: continuation exceeds frame limit")
 			}
@@ -376,4 +383,9 @@ func (h *binHTTP2) applyLimits(receiver int, before binH2Settings) error {
 	}
 	h.decoder[1-receiver].SetAllowedTableSize(after.table)
 	return nil
+}
+
+func (h *binHTTP2) sessionStorageBytes() int64 {
+	tables := int64(h.settings[0].table) + int64(h.settings[1].table)
+	return 12288 + int64(len(h.streams)+1)*512 + int64(len(h.pending[0])+len(h.pending[1])+1)*64 + 8*tables + h.grpcBuffered
 }

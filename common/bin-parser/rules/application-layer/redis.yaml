@@ -43,13 +43,17 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Count").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
+      if n == -1 { return }
+      if n < 0 || n > 4096 { panic("redis: array count exceeds limit") }
+      rest = n
       if n >= 1 {
-        this.ProcessByType("RedisCommand")
+        prefix, trial = this.TryProcessByType("RedisPeekByte")
+        trial.Recovery()
+        if trial.OK && prefix.Value == 0x24 {
+          this.ProcessByType("RedisCommand")
+          rest = n - 1
+        }
       }
-      rest = n - 1
       if rest > 0 {
         this.GetSubNode("Arguments").SetCfg("list-length", rest)
         this.ProcessSubNode("Arguments")
@@ -63,14 +67,14 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Len").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
-      if n > 0 && n < 1048576 {
+      if n == -1 { return }
+      if n < 0 || n > 1048576 { panic("redis: invalid bulk length") }
+      if n > 0 {
         this.GetSubNode("Bulk").SetMaxLength(n)
         this.ProcessSubNode("Bulk")
       }
       this.ProcessSubNode("CRLF")
+      if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
     Len: "del:\r\n;type:string"
     Bulk: string
     CRLF: raw,2
@@ -92,9 +96,7 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Count").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
+      if n < 0 || n > 2048 { panic("redis: map count exceeds limit") }
       n = n * 2
       if n > 0 {
         this.GetSubNode("Entries").SetCfg("list-length", n)
@@ -108,9 +110,7 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Count").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
+      if n < 0 || n > 4096 { panic("redis: collection count exceeds limit") }
       if n > 0 {
         this.GetSubNode("Members").SetCfg("list-length", n)
         this.ProcessSubNode("Members")
@@ -123,9 +123,7 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Count").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
+      if n < 0 || n > 4096 { panic("redis: collection count exceeds limit") }
       if n > 0 {
         this.GetSubNode("Items").SetCfg("list-length", n)
         this.ProcessSubNode("Items")
@@ -138,14 +136,13 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Len").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
-      if n > 0 && n < 1048576 {
+      if n < 0 || n > 1048576 { panic("redis: invalid bulk length") }
+      if n > 0 {
         this.GetSubNode("Bulk").SetMaxLength(n)
         this.ProcessSubNode("Bulk")
       }
       this.ProcessSubNode("CRLF")
+      if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
     Len: "del:\r\n;type:string"
     Bulk: string
     CRLF: raw,2
@@ -153,14 +150,13 @@ RESP:
     operator: |
       nstr = this.ProcessSubNode("Len").Value
       n = int(nstr)
-      if n < 0 {
-        return
-      }
-      if n > 0 && n < 1048576 {
+      if n < 0 || n > 1048576 { panic("redis: invalid bulk length") }
+      if n > 0 {
         this.GetSubNode("Bulk").SetMaxLength(n)
         this.ProcessSubNode("Bulk")
       }
       this.ProcessSubNode("CRLF")
+      if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
     Len: "del:\r\n;type:string"
     Bulk: string
     CRLF: raw,2
@@ -172,16 +168,18 @@ RedisCommand:
     }
     nstr = this.ProcessSubNode("Len").Value
     n = int(nstr)
-    if n < 0 {
-      return
-    }
-    if n > 0 && n < 1048576 {
+    if n == -1 { return }
+    if n < 0 || n > 1048576 { panic("redis: invalid command length") }
+    if n > 0 {
       this.GetSubNode("Command").SetMaxLength(n)
       this.ProcessSubNode("Command")
     }
     this.ProcessSubNode("CRLF")
+    if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
     return
   Prefix: uint8
   Len: "del:\r\n;type:string"
   Command: string
   CRLF: raw,2
+
+RedisPeekByte: uint8
