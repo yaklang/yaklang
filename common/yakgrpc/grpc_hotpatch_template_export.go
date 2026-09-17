@@ -62,6 +62,7 @@ func (s *Server) ExportHotPatchTemplateStream(
 	var buf bytes.Buffer
 	zipWriter := zip.NewWriter(&buf)
 	var output = make([]map[string]interface{}, 0, 64)
+	var exported int64
 
 	for template := range yakit.YieldHotPatchTemplates(stream.Context(), db) {
 		select {
@@ -95,7 +96,8 @@ func (s *Server) ExportHotPatchTemplateStream(
 			"name":      template.Name,
 			"type":      template.Type,
 		})
-		client.YakitSetProgress(step + 0.1)
+		exported++
+		client.YakitSetProgress(0.1 + step*float64(exported))
 	}
 
 	if err := zipWriter.Flush(); err != nil {

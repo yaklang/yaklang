@@ -20,6 +20,7 @@ func YakitOutputToExecResult(i interface{}) *ypb.ExecResult {
 		return &ypb.ExecResult{
 			IsMessage: true,
 			Message:   raw,
+			Progress:  float32(ret.Progress),
 		}
 	case *YakitLog:
 		raw, _ := YakitMessageGenerator(ret)
