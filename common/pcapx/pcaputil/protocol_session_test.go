@@ -176,6 +176,7 @@ func TestProtocolSessionLDAPBindSearchAndWrite(t *testing.T) {
 	require.Nil(t, r.Err)
 	require.Equal(t, "SearchRequest", r.Events[0].Session["Message Name"])
 	mod := mustHexSession(t, "301d02010166180404636e3d783010300e0a010030090402636e3103040179")
+	mod[4] = 2 // Distinct MessageID while earlier requests remain outstanding.
 	r = s.Feed(0, ts, mod)
 	require.Nil(t, r.Err)
 	require.Equal(t, "ModifyRequest", r.Events[0].Session["Message Name"])
@@ -189,18 +190,22 @@ func TestProtocolSessionLDAPBindSearchAndWrite(t *testing.T) {
 	require.Nil(t, r.Err)
 	require.Equal(t, "SearchResultDone", r.Events[0].Session["Message Name"])
 	add := mustHexSession(t, "301802010168130404636e3d78300b30090402636e3103040178")
+	add[4] = 3 // Distinct MessageID while earlier requests remain outstanding.
 	r = s.Feed(0, ts, add)
 	require.Nil(t, r.Err)
 	require.Equal(t, "AddRequest", r.Events[0].Session["Message Name"])
 	del := mustHexSession(t, "30090201014a04636e3d78")
+	del[4] = 4 // Distinct MessageID while earlier requests remain outstanding.
 	r = s.Feed(0, ts, del)
 	require.Nil(t, r.Err)
 	require.Equal(t, "DelRequest", r.Events[0].Session["Message Name"])
 	moddn := mustHexSession(t, "30180201016c130406636e3d6f6c640406636e3d6e65770101ff")
+	moddn[4] = 5 // Distinct MessageID while earlier requests remain outstanding.
 	r = s.Feed(0, ts, moddn)
 	require.Nil(t, r.Err)
 	require.Equal(t, "ModifyDNRequest", r.Events[0].Session["Message Name"])
 	ext := mustHexSession(t, "3020020101771b8016312e332e362e312e342e312e313436362e32303033378101ff")
+	ext[4] = 6 // Distinct MessageID while earlier requests remain outstanding.
 	r = s.Feed(0, ts, ext)
 	require.Nil(t, r.Err)
 	require.Equal(t, "ExtendedRequest", r.Events[0].Session["Message Name"])

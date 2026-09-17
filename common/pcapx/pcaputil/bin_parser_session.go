@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"sort"
 )
@@ -26,11 +27,15 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "postgresql":
 		f.protocol, f.pg = "postgresql", &binPostgres{frontend: -1}
 	case "ldap":
-		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[uint64]string{}}
+		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[uint64]ldapRequest{}}
 	case "redis":
 		f.protocol, f.redis = "redis", &binRedis{}
 	case "websocket":
-		f.protocol, f.ws = "websocket", &binWebSocket{client: dir, phase: wsPhaseFromProbe(w)}
+		client := dir
+		if w[1]&128 == 0 {
+			client = 1 - dir
+		}
+		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: wsPhaseFromProbe(w)}
 	case "mqtt":
 		f.protocol, f.mqtt = "mqtt", &binMQTT{client: dir, level: 5, pending: [2]map[uint16]string{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
 	case "mongodb":
@@ -44,9 +49,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	var err error
 	switch f.protocol {
 	case "http2":
+		var previous *binH2Stream
+		if len(e.Raw) >= 9 && !bytes.HasPrefix(e.Raw, []byte(binH2Preface)) {
+			previous = f.h2.streams[binary.BigEndian.Uint32(e.Raw[5:9])&0x7fffffff]
+		}
 		e.Session, err = f.h2.consume(dir, e.Raw)
 		if err == nil {
-			f.consumeGRPC(dir, e)
+			err = f.consumeGRPC(dir, e, previous)
 		}
 	case "mysql":
 		e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
@@ -60,13 +69,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Session["Protocol Transition"] = "postgresql->tls"
 		}
 	case "ldap":
-		e.Session, err = f.ldap.consume(e.Raw, e.Entry)
+		e.Session, err = f.ldap.consume(dir, e.Raw, e.Entry, f.a.budget.MaxCollectionElements)
 		if err == nil && e.Session["StartTLS"] == true && e.Session["Message Name"] == "ExtendedResponse" {
 			f.protocol, f.ldap = "tls", nil
 			e.Session["Protocol Transition"] = "ldap->tls"
 		}
 	case "redis":
-		e.Session, err = f.redis.consume(e.Raw)
+		e.Session, err = f.redis.consume(dir, e.Raw)
 	case "websocket":
 		if e.Entry == "WebSocket" {
 			e.Session, err = f.ws.consume(dir, e.Raw)
@@ -154,6 +163,13 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if m := f.mysql; m != nil && f.protocol == "mysql" && m.phase != "command" && m.phase != "closed" {
 		emit(m.server, map[string]any{"Phase": m.phase, "Transaction ID": m.transaction}, "MySQL exchange ended before its expected response")
 	}
+	if ws := f.ws; ws != nil {
+		for dir, op := range ws.opcode {
+			if op != 0 {
+				emit(dir, map[string]any{"Opcode": uint64(op)}, "WebSocket message ended before its final continuation")
+			}
+		}
+	}
 	if p := f.pg; p != nil && p.pending > 0 {
 		emit(max(p.frontend, 0), map[string]any{"Outstanding": p.pending}, "PostgreSQL exchange ended with unmatched extended-query messages")
 	}
@@ -184,7 +200,7 @@ func (f *binFlow) reserveSession(target int64) error {
 	for {
 		current := f.a.buffered.Load()
 		if current+delta > int64(f.a.config.MaxBufferedBytes) {
-			return sessionContext("connection state exceeds capture memory budget")
+			return fmt.Errorf("%w: %w", errBinContext, protocolError(ErrResourceExceeded, "connection state exceeds capture memory budget"))
 		}
 		if f.a.buffered.CompareAndSwap(current, current+delta) {
 			f.sessionBytes = target

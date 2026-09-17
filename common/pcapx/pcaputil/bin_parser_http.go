@@ -13,10 +13,10 @@ import (
 var errBinContext = errors.New("protocol context required")
 
 type binHTTPState struct {
-	header, total, cursor, next, search                 int
+	header, total, cursor, next, search                            int
 	chunked, trailers, closeDelimited, response, tunnel, websocket bool
-	method, summary                                     string
-	status                                              int
+	method, summary                                                string
+	status                                                         int
 }
 
 func (h *binHTTPState) config() map[string]any {
@@ -37,7 +37,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		case "redis":
 			return f.frameRedis(w)
 		case "websocket":
-			return f.frameWebSocket(w)
+			return f.frameWebSocket(dir, w)
 		case "mqtt":
 			if f.mqtt != nil {
 				return f.frameMQTT(w)
@@ -88,7 +88,15 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			}
 			h.status = response.StatusCode
 			length, transfer = response.ContentLength, response.TransferEncoding
-				h.websocket = h.status == 101 && bytes.Contains(lower, []byte("\r\nupgrade: websocket"))
+			h.websocket = h.status == 101 && httpHeaderHasToken(response.Header, "Upgrade", "websocket") && httpHeaderHasToken(response.Header, "Connection", "upgrade")
+			if h.websocket {
+				if len(f.httpUpgrades) == 0 || !f.httpUpgrades[0] {
+					return 0, nil, sessionContext("WebSocket response lacks a matching upgrade request")
+				}
+				if response.Header.Get("Sec-WebSocket-Extensions") != "" {
+					return 0, nil, protocolError(ErrUnsupportedFeature, "WebSocket extensions are unsupported")
+				}
+			}
 			h.tunnel = h.status == 101 || (h.method == "CONNECT" && h.status >= 200 && h.status < 300)
 			if h.method == "HEAD" || h.status < 200 || h.status == 204 || h.status == 304 || h.tunnel {
 				length, transfer = 0, nil
@@ -102,7 +110,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				return 0, nil, fmt.Errorf("unsupported HTTP version")
 			}
 			h.method = request.Method
-			h.websocket = bytes.Contains(lower, []byte("\r\nupgrade: websocket"))
+			h.websocket = request.Method == "GET" && request.Header.Get("Sec-WebSocket-Version") == "13" && httpHeaderHasToken(request.Header, "Upgrade", "websocket") && httpHeaderHasToken(request.Header, "Connection", "upgrade")
 			length, transfer = request.ContentLength, request.TransferEncoding
 			if len(f.httpMethods) >= 128 {
 				return 0, nil, fmt.Errorf("%w: HTTP request pipeline exceeds 128 entries", errBinContext)
@@ -124,6 +132,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		// Associate the method as soon as its complete header is validated.
 		if !h.response {
 			f.httpMethods = append(f.httpMethods, h.method)
+			f.httpUpgrades = append(f.httpUpgrades, h.websocket)
 		}
 	}
 	if h.closeDelimited {
@@ -189,25 +198,26 @@ func (f *binFlow) finishHTTP(dir int) {
 		if h.status >= 200 || h.status == 101 {
 			f.httpMethods[0] = ""
 			f.httpMethods = f.httpMethods[1:]
+			if len(f.httpUpgrades) > 0 {
+				f.httpUpgrades = f.httpUpgrades[1:]
+			}
 		}
 	}
 	f.directions[dir].http = nil
 	f.directions[dir].headerScan = 0
-	if h.tunnel && h.status == 101 && (h.websocket || f.wsPending) {
+	if h.tunnel && h.status == 101 && h.websocket {
 		client := 1 - dir
-		f.protocol, f.ws, f.wsPending = "websocket", &binWebSocket{client: client, phase: "frame"}, false
+		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: "frame"}
+		f.httpUpgrades = nil
 		f.binding, f.level, f.httpMethods = nil, 0, nil
 		return
-	}
-	if h.websocket && !h.response {
-		f.wsPending = true
 	}
 	if h.tunnel {
 		// A confirmed CONNECT/101 response is an explicit protocol boundary.
 		// Re-probe the next ordered bytes once; keep the capture flow identity.
 		f.protocol, f.binding, f.level = "", nil, 0
 		f.httpMethods = nil
-		f.wsPending = false
+		f.httpUpgrades = nil
 	}
 }
 
@@ -227,4 +237,15 @@ func incrementalHTTPIndex(w []byte, start int, cursor *int, separator string) in
 		*cursor = start
 	}
 	return -1
+}
+
+func httpHeaderHasToken(header http.Header, name, token string) bool {
+	for _, value := range header.Values(name) {
+		for _, part := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(part), token) {
+				return true
+			}
+		}
+	}
+	return false
 }

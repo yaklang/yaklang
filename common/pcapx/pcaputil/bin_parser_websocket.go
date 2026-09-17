@@ -8,24 +8,18 @@ import (
 
 type binWebSocket struct {
 	client int
-	phase  string // "http" or "frame"
-	buf    []byte
-	opcode byte
+	phase  string
+	buf    [2][]byte
+	opcode [2]byte
+	closed [2]bool
 }
 
 func probeWebSocket(w []byte, limit int) ProbeResult {
 	if len(w) < 2 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	op := w[0] & 0x0f
-	rsv := (w[0] >> 4) & 0x07
-	fin := w[0]&0x80 != 0
-	// Continuation cannot open a session. HTTP/2 frames also start with a
-	// 24-bit length whose high byte is usually 0, which would look like opcode 0.
-	if rsv != 0 || op == 0 || op > 0x0a || op >= 3 && op <= 7 {
-		return ProbeResult{Verdict: ProbeReject}
-	}
-	if op >= 8 && !fin {
+	op := w[0] & 15
+	if w[0]&0x70 != 0 || op == 0 || op > 10 || op >= 3 && op <= 7 || op >= 8 && w[0]&128 == 0 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	n := websocketFrameLength(w)
@@ -33,26 +27,23 @@ func probeWebSocket(w []byte, limit int) ProbeResult {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if n == 0 {
-		return probeNeed("websocket", "13", len(w), 2)
+		need := 4
+		if w[1]&127 == 127 {
+			need = 10
+		}
+		return probeNeed("websocket", "13", len(w), min(limit, need))
 	}
-	_ = limit
 	return probeAccept("websocket", "13", 55)
 }
 
-func wsPhaseFromProbe(w []byte) string {
-	if len(w) >= 3 && (w[0] == 'G' || w[0] == 'H') {
-		return "http"
-	}
-	return "frame"
-}
+func wsPhaseFromProbe(w []byte) string { return "frame" }
 
 func websocketFrameLength(w []byte) int {
 	if len(w) < 2 {
 		return 0
 	}
-	n := int(w[1] & 0x7f)
-	extra := 2
-	if w[1]&0x80 != 0 {
+	n, extra := int(w[1]&127), 2
+	if w[1]&128 != 0 {
 		extra += 4
 	}
 	switch n {
@@ -62,12 +53,15 @@ func websocketFrameLength(w []byte) int {
 		}
 		n = int(binary.BigEndian.Uint16(w[2:4]))
 		extra += 2
+		if n < 126 {
+			return -1
+		}
 	case 127:
 		if len(w) < 10 {
 			return 0
 		}
 		v := binary.BigEndian.Uint64(w[2:10])
-		if v > 1<<20 {
+		if v < 65536 || v > 1<<20 {
 			return -1
 		}
 		n = int(v)
@@ -76,71 +70,91 @@ func websocketFrameLength(w []byte) int {
 	return extra + n
 }
 
-func (f *binFlow) frameWebSocket(w []byte) (int, *binSpec, error) {
-	if f.ws == nil {
+func (f *binFlow) frameWebSocket(dir int, w []byte) (int, *binSpec, error) {
+	ws := f.ws
+	if ws == nil {
 		return 0, nil, sessionContext("WebSocket upgrade was not observed")
-	}
-	if err := f.reserveSession(256 + int64(len(f.ws.buf))); err != nil {
-		return 0, nil, err
 	}
 	n := websocketFrameLength(w)
 	if n < 0 {
-		return 0, nil, fmt.Errorf("websocket: payload too large")
+		return 0, nil, fmt.Errorf("websocket: invalid or excessive payload length")
+	}
+	if n > f.a.budget.MaxFrameBytes {
+		return 0, nil, protocolError(ErrResourceExceeded, "WebSocket frame exceeds limit")
 	}
 	if n == 0 || n > len(w) {
 		return n, nil, nil
 	}
-	if n > f.a.config.MaxMessageBytes {
-		return f.a.config.MaxMessageBytes + 1, nil, nil
+	op := w[0] & 15
+	if w[0]&0x70 != 0 {
+		return 0, nil, protocolError(ErrUnsupportedFeature, "WebSocket RSV/extension is unsupported")
 	}
-	op := w[0] & 0x0f
-	if (w[0]>>4)&0x07 != 0 {
-		return 0, nil, fmt.Errorf("websocket: RSV must be 0")
-	}
-	if op > 0x0a || op >= 3 && op <= 7 {
+	if op > 10 || op >= 3 && op <= 7 {
 		return 0, nil, fmt.Errorf("websocket: reserved opcode")
 	}
-	if op >= 8 {
-		if w[0]&0x80 == 0 {
-			return 0, nil, fmt.Errorf("websocket: control frames must not be fragmented")
+	if op >= 8 && (w[0]&128 == 0 || w[1]&127 > 125) {
+		return 0, nil, fmt.Errorf("websocket: invalid control frame")
+	}
+	if (w[1]&128 != 0) != (dir == ws.client) {
+		return 0, nil, fmt.Errorf("websocket: mask does not match observed sender role")
+	}
+	if ws.closed[dir] {
+		return 0, nil, fmt.Errorf("websocket: frame after Close")
+	}
+	if op == 0 && ws.opcode[dir] == 0 {
+		return 0, nil, sessionContext("WebSocket continuation has no initial fragment")
+	}
+	if (op == 1 || op == 2) && ws.opcode[dir] != 0 {
+		return 0, nil, fmt.Errorf("websocket: new data frame interrupts fragmented message")
+	}
+	target := int64(256 + cap(ws.buf[0]) + cap(ws.buf[1]))
+	if op <= 2 && (op == 0 || w[0]&128 == 0) {
+		header := 2
+		if w[1]&127 == 126 {
+			header += 2
 		}
-		if int(w[1]&0x7f) > 125 && w[1]&0x7f != 0x7d {
-			plen := int(w[1] & 0x7f)
-			if plen == 126 || plen == 127 {
-				return 0, nil, fmt.Errorf("websocket: control payload too large")
-			}
+		if w[1]&127 == 127 {
+			header += 8
 		}
+		if w[1]&128 != 0 {
+			header += 4
+		}
+		size := len(ws.buf[dir]) + n - header
+		if size > f.a.config.MaxMessageBytes {
+			return 0, nil, protocolError(ErrResourceExceeded, "WebSocket fragmented message exceeds limit")
+		}
+		target += int64(max(0, size-cap(ws.buf[dir])))
+	}
+	if err := f.reserveSession(target); err != nil {
+		return 0, nil, err
 	}
 	return n, f.spec("websocket", "WebSocket"), nil
 }
 
 func (ws *binWebSocket) consume(dir int, raw []byte) (map[string]any, error) {
-	op := raw[0] & 0x0f
-	fin := raw[0]&0x80 != 0
-	masked := raw[1]&0x80 != 0
-	info := map[string]any{
-		"Opcode":      uint64(op),
-		"Opcode Name": websocketOpcodeName(op),
-		"FIN":         fin,
-		"Masked":      masked,
-		"Client":      dir == ws.client,
-	}
+	op, fin := raw[0]&15, raw[0]&128 != 0
+	info := map[string]any{"Opcode": uint64(op), "Opcode Name": websocketOpcodeName(op), "FIN": fin, "Masked": raw[1]&128 != 0, "Client": dir == ws.client}
 	payload := websocketPayload(raw)
 	if op == 0 || !fin && op <= 2 {
 		if op != 0 {
-			ws.opcode, ws.buf = op, append(ws.buf[:0], payload...)
-		} else {
-			ws.buf = append(ws.buf, payload...)
+			ws.opcode[dir] = op
 		}
+		size := len(ws.buf[dir]) + len(payload)
+		if cap(ws.buf[dir]) < size {
+			buf := make([]byte, len(ws.buf[dir]), size)
+			copy(buf, ws.buf[dir])
+			ws.buf[dir] = buf
+		}
+		ws.buf[dir] = append(ws.buf[dir], payload...)
 		info["Fragment"] = true
 		if fin {
-			info["Opcode"] = uint64(ws.opcode)
-			info["Opcode Name"] = websocketOpcodeName(ws.opcode)
-			info["Application"] = append([]byte(nil), ws.buf...)
-			if ws.opcode == 1 && !utf8.Valid(ws.buf) {
+			opcode := ws.opcode[dir]
+			if opcode == 1 && !utf8.Valid(ws.buf[dir]) {
 				return info, fmt.Errorf("websocket: text is not UTF-8")
 			}
-			ws.buf = ws.buf[:0]
+			info["Opcode"], info["Opcode Name"] = uint64(opcode), websocketOpcodeName(opcode)
+			info["Application"] = ws.buf[dir]
+			ws.buf[dir], ws.opcode[dir] = nil, 0
 		}
 		return info, nil
 	}
@@ -148,9 +162,12 @@ func (ws *binWebSocket) consume(dir int, raw []byte) (map[string]any, error) {
 		return info, fmt.Errorf("websocket: text is not UTF-8")
 	}
 	info["Application"] = payload
-	if op == 8 && len(payload) >= 2 {
-		info["Close Code"] = uint64(binary.BigEndian.Uint16(payload[:2]))
-		info["Reason"] = string(payload[2:])
+	if op == 8 {
+		ws.closed[dir] = true
+		if len(payload) >= 2 {
+			info["Close Code"] = uint64(binary.BigEndian.Uint16(payload[:2]))
+			info["Reason"] = string(payload[2:])
+		}
 	}
 	return info, nil
 }
@@ -174,8 +191,7 @@ func websocketOpcodeName(op byte) string {
 }
 
 func websocketPayload(raw []byte) []byte {
-	n := int(raw[1] & 0x7f)
-	at := 2
+	n, at := int(raw[1]&127), 2
 	if n == 126 {
 		n = int(binary.BigEndian.Uint16(raw[2:4]))
 		at = 4
@@ -184,12 +200,9 @@ func websocketPayload(raw []byte) []byte {
 		at = 10
 	}
 	var key []byte
-	if raw[1]&0x80 != 0 {
+	if raw[1]&128 != 0 {
 		key = raw[at : at+4]
 		at += 4
-	}
-	if at+n > len(raw) {
-		n = len(raw) - at
 	}
 	out := append([]byte(nil), raw[at:at+n]...)
 	if key != nil {

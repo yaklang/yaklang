@@ -3,13 +3,12 @@ package pcaputil
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 )
 
-type binRedis struct {
-	version string
-	pending int
-}
+type binRedis struct{ values [2]uint64 }
 
 func probeRedis(w []byte, limit int) ProbeResult {
 	if len(w) < 1 {
@@ -22,7 +21,7 @@ func probeRedis(w []byte, limit int) ProbeResult {
 	if err != nil {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if n == 0 {
+	if n == 0 && !bytes.Contains(w, []byte("\r\n")) {
 		return probeNeed("redis", redisVersion(w[0]), len(w), min(limit, len(w)+16))
 	}
 	return probeAccept("redis", redisVersion(w[0]), 80)
@@ -46,103 +45,120 @@ func redisVersion(b byte) string {
 }
 
 func redisFrameLength(w []byte, depth int) (int, error) {
-	if depth > 64 {
-		return 0, fmt.Errorf("redis: nesting exceeds limit")
+	used := 0
+	return redisFrameLengthBudget(w, depth, DefaultParserBudget(), &used)
+}
+
+func redisFrameLengthBudget(w []byte, depth int, budget ParserBudget, used *int) (int, error) {
+	if depth >= budget.MaxRecursionDepth {
+		return 0, protocolError(ErrResourceExceeded, "Redis nesting exceeds limit")
 	}
-	if len(w) < 1 {
+	if len(w) == 0 {
 		return 0, nil
 	}
 	nl := bytes.Index(w, []byte("\r\n"))
-	switch w[0] {
-	case '+', '-', ':', '_', '#', ',':
-		if nl < 0 {
-			return 0, nil
-		}
-		return nl + 2, nil
-	case '$', '!', '=', '*', '%', '~', '>', '(':
-		if nl < 0 {
+	if !redisPrefix(w[0]) {
+		return 0, fmt.Errorf("redis: invalid RESP prefix")
+	}
+	if nl < 0 {
+		switch w[0] {
+		case '$', '!', '=', '*', '%', '~', '>', '(', ':':
 			if err := redisLengthDigits(w[1:]); err != nil {
 				return 0, err
 			}
-			return 0, nil
 		}
-		if w[0] == '(' {
-			return nl + 2, nil
-		}
-	default:
-		return 0, fmt.Errorf("redis: invalid RESP prefix")
+		return 0, nil
+	}
+	value := string(w[1:nl])
+	if strings.ContainsAny(value, "\r\n") {
+		return 0, fmt.Errorf("redis: invalid line")
 	}
 	switch w[0] {
-	case '$', '!', '=':
-		n, err := strconv.Atoi(string(w[1:nl]))
-		if err != nil {
-			return 0, fmt.Errorf("redis: invalid bulk length")
+	case '+', '-':
+		return nl + 2, nil
+	case '_':
+		if value != "" {
+			return 0, fmt.Errorf("redis: invalid null")
 		}
-		if n < 0 {
-			return nl + 2, nil
+		return nl + 2, nil
+	case '#':
+		if value != "t" && value != "f" {
+			return 0, fmt.Errorf("redis: invalid boolean")
 		}
-		need := nl + 2 + n + 2
+		return nl + 2, nil
+	case ':', '(':
+		digits := value
+		if len(digits) > 0 && (digits[0] == '-' || digits[0] == '+') {
+			digits = digits[1:]
+		}
+		if digits == "" || strings.Trim(digits, "0123456789") != "" {
+			return 0, fmt.Errorf("redis: invalid integer")
+		}
+		if w[0] == ':' {
+			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+				return 0, fmt.Errorf("redis: integer overflow")
+			}
+		}
+		return nl + 2, nil
+	case ',':
+		if value != "inf" && value != "-inf" && value != "nan" {
+			n, err := strconv.ParseFloat(value, 64)
+			if err != nil || math.IsInf(n, 0) || math.IsNaN(n) {
+				return 0, fmt.Errorf("redis: invalid double")
+			}
+		}
+		return nl + 2, nil
+	}
+	if value == "-1" && (w[0] == '$' || w[0] == '*') {
+		return nl + 2, nil
+	}
+	if value == "" || strings.Trim(value, "0123456789") != "" {
+		return 0, fmt.Errorf("redis: invalid unsigned length")
+	}
+	count, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("redis: length overflow")
+	}
+	if w[0] == '$' || w[0] == '!' || w[0] == '=' {
+		if count > uint64(budget.MaxMessageBytes) || count+uint64(nl)+4 > uint64(budget.MaxMessageBytes) {
+			return 0, protocolError(ErrResourceExceeded, "Redis bulk exceeds message limit")
+		}
+		need := nl + 4 + int(count)
 		if need > len(w) {
 			return 0, nil
 		}
+		if !bytes.Equal(w[need-2:need], []byte("\r\n")) {
+			return 0, fmt.Errorf("redis: missing bulk terminator")
+		}
+		if w[0] == '=' && (count < 4 || w[nl+5] != ':') {
+			return 0, fmt.Errorf("redis: invalid verbatim format")
+		}
 		return need, nil
-	case '*', '%', '~', '>':
-		if nl < 0 {
+	}
+	multiplier := uint64(1)
+	if w[0] == '%' {
+		multiplier = 2
+	}
+	if count > uint64(budget.MaxCollectionElements)/multiplier {
+		return 0, protocolError(ErrResourceExceeded, "Redis aggregate exceeds limit")
+	}
+	count *= multiplier
+	if int(count) > budget.MaxCollectionElements-*used {
+		return 0, protocolError(ErrResourceExceeded, "Redis total elements exceed limit")
+	}
+	*used += int(count)
+	at := nl + 2
+	for i := uint64(0); i < count; i++ {
+		n, err := redisFrameLengthBudget(w[at:], depth+1, budget, used)
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 {
 			return 0, nil
 		}
-		count, err := strconv.Atoi(string(w[1:nl]))
-		if err != nil {
-			return 0, fmt.Errorf("redis: invalid aggregate count")
-		}
-		if count < 0 {
-			return nl + 2, nil
-		}
-		if w[0] == '%' {
-			count *= 2
-		}
-		if count > 4096 {
-			return 0, fmt.Errorf("redis: aggregate exceeds limit")
-		}
-		at := nl + 2
-		for i := 0; i < count; i++ {
-			if at >= len(w) {
-				return 0, nil
-			}
-			n, err := redisFrameLength(w[at:], depth+1)
-			if err != nil {
-				return 0, err
-			}
-			if n == 0 {
-				return 0, nil
-			}
-			at += n
-		}
-		return at, nil
-	default:
-		return 0, fmt.Errorf("redis: invalid RESP prefix")
+		at += n
 	}
-}
-
-func redisLengthDigits(w []byte) error {
-	if len(w) == 0 {
-		return nil
-	}
-	i := 0
-	if w[0] == '-' {
-		i = 1
-	}
-	if i >= len(w) {
-		return nil
-	}
-	for ; i < len(w); i++ {
-		if w[i] == '\r' {
-			return nil
-		}
-		if w[i] < '0' || w[i] > '9' {
-			return fmt.Errorf("redis: invalid length digits")
-		}
-	}
-	return nil
+	return at, nil
 }
 
 func (f *binFlow) frameRedis(w []byte) (int, *binSpec, error) {
@@ -152,7 +168,8 @@ func (f *binFlow) frameRedis(w []byte) (int, *binSpec, error) {
 	if err := f.reserveSession(256); err != nil {
 		return 0, nil, err
 	}
-	n, err := redisFrameLength(w, 0)
+	used := 0
+	n, err := redisFrameLengthBudget(w, 0, f.a.budget, &used)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -165,27 +182,21 @@ func (f *binFlow) frameRedis(w []byte) (int, *binSpec, error) {
 	return n, f.spec("redis", "Redis"), nil
 }
 
-func (r *binRedis) consume(raw []byte) (map[string]any, error) {
+func (r *binRedis) consume(dir int, raw []byte) (map[string]any, error) {
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("redis: empty value")
 	}
 	ver := redisVersion(raw[0])
-	if r.version == "" {
-		r.version = ver
-	}
 	info := map[string]any{
 		"RESP Type":     redisTypeName(raw[0]),
 		"Version":       ver,
 		"Context Level": "observed",
 	}
-	if raw[0] == '*' || raw[0] == '>' {
-		r.pending++
-		info["Pipeline"] = r.pending
-	} else if raw[0] == '+' || raw[0] == '-' || raw[0] == ':' || raw[0] == '$' {
-		if r.pending > 0 {
-			r.pending--
-		}
-	}
+	// An array may be either a command or a reply. Without an observed role,
+	// expose per-direction arrivals rather than inventing request correlation.
+	r.values[dir]++
+	info["Direction Value Index"] = r.values[dir]
+	info["Version Negotiated"] = false
 	if raw[0] == '>' {
 		info["Push"] = true
 	}
@@ -224,4 +235,26 @@ func redisTypeName(b byte) string {
 		return "Push"
 	}
 	return "Unknown"
+}
+
+func redisLengthDigits(w []byte) error {
+	if len(w) == 0 {
+		return nil
+	}
+	i := 0
+	if w[0] == '-' {
+		i = 1
+	}
+	if i >= len(w) {
+		return nil
+	}
+	for ; i < len(w); i++ {
+		if w[i] == '\r' {
+			return nil
+		}
+		if w[i] < '0' || w[i] > '9' {
+			return fmt.Errorf("redis: invalid length digits")
+		}
+	}
+	return nil
 }

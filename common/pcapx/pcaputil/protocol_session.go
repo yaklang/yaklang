@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -29,15 +30,15 @@ type ProbeResult struct {
 type ProtocolErrorKind string
 
 const (
-	ErrNeedMore            ProtocolErrorKind = "NeedMore"
-	ErrMalformedMessage    ProtocolErrorKind = "MalformedMessage"
-	ErrUnsupportedVersion  ProtocolErrorKind = "UnsupportedVersion"
-	ErrUnsupportedFeature  ProtocolErrorKind = "UnsupportedFeature"
-	ErrContextRequired     ProtocolErrorKind = "ContextRequired"
-	ErrEncrypted           ProtocolErrorKind = "Encrypted"
-	ErrResourceExceeded    ProtocolErrorKind = "ResourceExceeded"
-	ErrDesynchronized      ProtocolErrorKind = "Desynchronized"
-	ErrFatalSessionError   ProtocolErrorKind = "FatalSessionError"
+	ErrNeedMore           ProtocolErrorKind = "NeedMore"
+	ErrMalformedMessage   ProtocolErrorKind = "MalformedMessage"
+	ErrUnsupportedVersion ProtocolErrorKind = "UnsupportedVersion"
+	ErrUnsupportedFeature ProtocolErrorKind = "UnsupportedFeature"
+	ErrContextRequired    ProtocolErrorKind = "ContextRequired"
+	ErrEncrypted          ProtocolErrorKind = "Encrypted"
+	ErrResourceExceeded   ProtocolErrorKind = "ResourceExceeded"
+	ErrDesynchronized     ProtocolErrorKind = "Desynchronized"
+	ErrFatalSessionError  ProtocolErrorKind = "FatalSessionError"
 )
 
 // ProtocolError is a typed session failure. It is never a successful tree.
@@ -75,17 +76,18 @@ type ParserBudget struct {
 // DefaultParserBudget matches the live capture parser defaults.
 func DefaultParserBudget() ParserBudget {
 	return ParserBudget{
-		MaxFrameBytes:          1 << 20,
-		MaxMessageBytes:        1 << 20,
-		MaxBufferedBytes:       32 << 20,
-		MaxRecursionDepth:      64,
-		MaxCollectionElements:  4096,
-		ProbeBytes:             64,
+		MaxFrameBytes:         1 << 20,
+		MaxMessageBytes:       1 << 20,
+		MaxBufferedBytes:      32 << 20,
+		MaxRecursionDepth:     64,
+		MaxCollectionElements: 4096,
+		ProbeBytes:            64,
 	}
 }
 
 // ProtocolSession is the single Probe/Feed/Close path used by live replay
 // and by M1 protocol tests. Probe does not consume; Feed starts at byte 0.
+// Calls on a session must be serialized in TCP delivery order.
 type ProtocolSession interface {
 	Probe(data []byte) ProbeResult
 	Feed(direction int, ts time.Time, data []byte) FeedResult
@@ -96,14 +98,28 @@ type ProtocolSession interface {
 type captureSession struct {
 	f      *binFlow
 	events []*ProtocolEvent
-	seen   int
+	closed bool
 }
 
 // NewProtocolSession builds an isolated capture flow on the same binFlow
 // feed path as pcap replay. Ports are zero so admission cannot use 5432/389.
 func NewProtocolSession(budget ParserBudget) (ProtocolSession, error) {
-	if budget.MaxMessageBytes == 0 {
-		budget = DefaultParserBudget()
+	defaults := DefaultParserBudget()
+	for _, pair := range [][2]*int{
+		{&budget.MaxFrameBytes, &defaults.MaxFrameBytes}, {&budget.MaxMessageBytes, &defaults.MaxMessageBytes},
+		{&budget.MaxBufferedBytes, &defaults.MaxBufferedBytes}, {&budget.ProbeBytes, &defaults.ProbeBytes},
+		{&budget.MaxRecursionDepth, &defaults.MaxRecursionDepth}, {&budget.MaxCollectionElements, &defaults.MaxCollectionElements},
+	} {
+		if *pair[0] < 0 {
+			return nil, fmt.Errorf("negative parser budget")
+		}
+		if *pair[0] == 0 {
+			*pair[0] = *pair[1]
+		}
+	}
+	budget.MaxFrameBytes = min(budget.MaxFrameBytes, budget.MaxMessageBytes)
+	if budget.MaxRecursionDepth > 64 || budget.MaxCollectionElements > 4096 {
+		return nil, fmt.Errorf("parser structural budget exceeds supported maximum")
 	}
 	c := NewDefaultConfig()
 	s := &captureSession{}
@@ -121,6 +137,8 @@ func NewProtocolSession(budget ParserBudget) (ProtocolSession, error) {
 	if err = c.prepareBinParser(); err != nil {
 		return nil, err
 	}
+	c.binParser.budget = budget
+	c.binParser.flows.Add(1)
 	s.f = &binFlow{
 		a:         c.binParser,
 		id:        1,
@@ -138,18 +156,27 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if len(data) > limit {
 		data = data[:limit]
 	}
+	probe := *s.f
+	probe.protocol, probe.binding = "", nil
+	probe.detect(data)
+	if probe.protocol != "" {
+		return probeAccept(probe.protocol, "", 90)
+	}
 	return probeWire(data, limit)
 }
 
 func (s *captureSession) Feed(direction int, ts time.Time, data []byte) FeedResult {
+	if s.closed {
+		return FeedResult{State: "closed", Err: &ProtocolError{Kind: ErrFatalSessionError, Message: "session is closed"}}
+	}
 	if direction != 0 && direction != 1 {
 		return FeedResult{Err: &ProtocolError{Kind: ErrMalformedMessage, Message: "direction must be 0 or 1"}}
 	}
 	before := s.f.a.input.Load()
-	start := s.seen
+	s.events = nil
 	s.f.feed(direction, data, ts)
-	s.seen = len(s.events)
-	out := FeedResult{Consumed: int(s.f.a.input.Load() - before), Events: s.events[start:], State: s.f.protocol}
+	out := FeedResult{Consumed: int(s.f.a.input.Load() - before), Events: s.events, State: s.f.protocol}
+	s.events = nil
 	if out.State == "" {
 		out.State = "undetected"
 	}
@@ -171,10 +198,15 @@ func (s *captureSession) Feed(direction int, ts time.Time, data []byte) FeedResu
 }
 
 func (s *captureSession) Close(reason string) []*ProtocolEvent {
-	start := s.seen
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	s.events = nil
 	s.f.close(TrafficFlowCloseReason(reason))
-	s.seen = len(s.events)
-	return s.events[start:]
+	events := s.events
+	s.events = nil
+	return events
 }
 
 func (s *captureSession) Stats() ProtocolStats { return s.f.a.stats() }
@@ -184,6 +216,10 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 		e := events[i]
 		if e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") {
 			continue
+		}
+		if e.sessionError != nil {
+			copyError := *e.sessionError
+			return &copyError
 		}
 		kind := ErrMalformedMessage
 		switch e.Status {
@@ -260,6 +296,11 @@ func probeHTTP2(w []byte, limit int) ProbeResult {
 }
 
 func probeMySQL(w []byte, _ int) ProbeResult {
+	// The first five greeting bytes can resemble a short PostgreSQL header.
+	// Wait for the server-version prefix before allowing another candidate.
+	if len(w) == 5 && w[3] == 0 && w[4] == 10 {
+		return probeNeed("mysql", "10", len(w), 6)
+	}
 	if len(w) < 6 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
@@ -303,5 +344,29 @@ func indexByte(b []byte, c byte) int {
 }
 
 func protocolError(kind ProtocolErrorKind, format string, args ...any) error {
-	return fmt.Errorf("%w: %s", errBinContext, fmt.Sprintf(format, args...))
+	return &ProtocolError{Kind: kind, Message: fmt.Sprintf(format, args...)}
+}
+
+func classifySessionError(err error) (string, *ProtocolError) {
+	var typed *ProtocolError
+	if errors.As(err, &typed) {
+		// Preserve the established capture status for connection-state budgets.
+		if errors.Is(err, errBinContext) {
+			return "context-required", typed
+		}
+		switch typed.Kind {
+		case ErrResourceExceeded:
+			return "limited", typed
+		case ErrContextRequired, ErrEncrypted, ErrUnsupportedFeature, ErrUnsupportedVersion:
+			return "context-required", typed
+		case ErrNeedMore:
+			return "incomplete", typed
+		default:
+			return "malformed", typed
+		}
+	}
+	if errors.Is(err, errBinContext) {
+		return "context-required", nil
+	}
+	return "malformed", nil
 }
