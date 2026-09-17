@@ -153,6 +153,26 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, dohGET("dns.example.test", "ietf.org", 0x22)},
 			{1, dohHTTPResp(200, dnsWire(dnsAResponse(0x22, "ietf.org", [4]byte{4, 31, 198, 44})))},
 		}},
+		{"sip-invite-ack-bye", "sip", 15060, []sessionStep{
+			{0, sipInvite()},
+			{1, sipResp("100", "Trying", "z9hG4bK776asdhds", "314159 INVITE", "a84b4c76e66710@pc33.atlanta.example.com", "Alice <sip:alice@atlanta.example.com>;tag=1928301774", "Bob <sip:bob@biloxi.example.com>")},
+			{1, sipResp("200", "OK", "z9hG4bK776asdhds", "314159 INVITE", "a84b4c76e66710@pc33.atlanta.example.com", "Alice <sip:alice@atlanta.example.com>;tag=1928301774", "Bob <sip:bob@biloxi.example.com>;tag=a6c85cf")},
+			{0, sipMsg("ACK sip:bob@biloxi.example.com SIP/2.0", [][2]string{
+				{"Via", "SIP/2.0/UDP pc33.atlanta.example.com;branch=z9hG4bKack"},
+				{"From", "Alice <sip:alice@atlanta.example.com>;tag=1928301774"},
+				{"To", "Bob <sip:bob@biloxi.example.com>;tag=a6c85cf"},
+				{"Call-ID", "a84b4c76e66710@pc33.atlanta.example.com"},
+				{"CSeq", "314159 ACK"},
+			}, "")},
+			{0, sipMsg("BYE sip:bob@biloxi.example.com SIP/2.0", [][2]string{
+				{"Via", "SIP/2.0/UDP pc33.atlanta.example.com;branch=z9hG4bKbye"},
+				{"From", "Alice <sip:alice@atlanta.example.com>;tag=1928301774"},
+				{"To", "Bob <sip:bob@biloxi.example.com>;tag=a6c85cf"},
+				{"Call-ID", "a84b4c76e66710@pc33.atlanta.example.com"},
+				{"CSeq", "314160 BYE"},
+			}, "")},
+			{1, sipResp("200", "OK", "z9hG4bKbye", "314160 BYE", "a84b4c76e66710@pc33.atlanta.example.com", "Alice <sip:alice@atlanta.example.com>;tag=1928301774", "Bob <sip:bob@biloxi.example.com>;tag=a6c85cf")},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

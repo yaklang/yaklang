@@ -33,6 +33,9 @@ SIPBody:
   operator: |
     l = getCtx("body_length")
     ct = getCtx("content_type")
+    if l == nil || l == undefined {
+      l = 0
+    }
     if l > 0 && l < 1048576 {
       sdp = false
       if ct != nil {
@@ -64,8 +67,26 @@ SIPHeaders:
       if s.HasPrefix("Content-Length: ") {
         setCtx("body_length", int(s[len("Content-Length: "):]))
       }
+      if s.HasPrefix("content-length: ") {
+        setCtx("body_length", int(s[len("content-length: "):]))
+      }
+      if s.HasPrefix("l: ") {
+        setCtx("body_length", int(s[len("l: "):]))
+      }
+      if s.HasPrefix("L: ") {
+        setCtx("body_length", int(s[len("L: "):]))
+      }
       if s.HasPrefix("Content-Type: ") {
         setCtx("content_type", s[len("Content-Type: "):])
+      }
+      if s.HasPrefix("content-type: ") {
+        setCtx("content_type", s[len("content-type: "):])
+      }
+      if s.HasPrefix("c: ") {
+        setCtx("content_type", s[len("c: "):])
+      }
+      if s.HasPrefix("C: ") {
+        setCtx("content_type", s[len("C: "):])
       }
     }
   list: true

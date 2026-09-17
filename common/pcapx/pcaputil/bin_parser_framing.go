@@ -94,6 +94,7 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.kerberos_fields", "KerberosMessageFields"},
 	{"application-layer.dns", "DNS"},
 	{"application-layer.tls", ""},
+	{"sip", "SIP"},
 }
 
 func (f *binFlow) spec(family, entry string) *binSpec {
@@ -114,6 +115,12 @@ func (f *binFlow) detect(w []byte) {
 	}
 	for _, prefix := range []string{"GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ", "CONNECT ", "TRACE ", "HTTP/1."} {
 		if bytes.HasPrefix(w, []byte(prefix)) {
+			if prefix == "OPTIONS " {
+				rest := w[len("OPTIONS "):]
+				if bytes.HasPrefix(rest, []byte("sip:")) || bytes.HasPrefix(rest, []byte("sips:")) {
+					break
+				}
+			}
 			f.protocol = "http"
 			return
 		}

@@ -60,6 +60,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.rdp = "rdp", &binRDP{client: dir}
 	case "dot":
 		f.protocol, f.dot = "dot", &binDoT{pending: map[uint16]string{}}
+	case "sip":
+		f.protocol, f.sip = "sip", &binSIP{pending: map[sipTxnKey]string{}, seen: map[sipTxnKey]int{}}
 	}
 }
 
@@ -138,6 +140,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "dot":
 		e.Session, err = f.dot.consume(e.Raw, f.a.budget.MaxCollectionElements)
+	case "sip":
+		e.Session, err = f.sip.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -184,6 +188,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("RDP %v", e.Session["Packet Name"])
 		case "dot":
 			e.Summary = fmt.Sprintf("DoT %v id %v %v", e.Session["Packet Name"], e.Session["Transaction ID"], e.Session["QNAME"])
+		case "sip":
+			e.Summary = fmt.Sprintf("SIP %v %v", e.Session["Packet Name"], e.Session["Call-ID"])
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
@@ -207,7 +213,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -294,6 +300,9 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if h := f.doh; h != nil && len(h.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(h.pending)}, "DoH exchange ended with unmatched DNS transaction IDs")
+	}
+	if p := f.sip; p != nil && len(p.pending) > 0 {
+		emit(0, map[string]any{"Outstanding": len(p.pending)}, "SIP exchange ended with unmatched transactions")
 	}
 }
 

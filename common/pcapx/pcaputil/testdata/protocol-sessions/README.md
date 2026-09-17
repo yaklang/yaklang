@@ -31,6 +31,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `rdp-tpkt-negotiate-mcs.pcap` | RDP TPKT/X.224 Cookie+NEG_REQ/RSP and plaintext MCS/GCC channels on non-3389 port 13389 |
 | `dot-dns-tcp-length.pcap` | RFC 7858 DoT on TLS plaintext: 2-byte DNS length, Query/Response ID pairing on non-853 port 1853 |
 | `doh-http-get-post.pcap` | RFC 8484 DoH HTTP/1.1 POST and GET application/dns-message with DNS ID pairing on non-443 port 18443 |
+| `sip-invite-ack-bye.pcap` | RFC 3261 INVITE/100/200/ACK/BYE on non-5060 TCP 15060 with SDP audio |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 
