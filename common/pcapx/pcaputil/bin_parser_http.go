@@ -48,6 +48,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameKafka(dir, w)
 		case "tds":
 			return f.frameTDS(w)
+		case "amqp":
+			return f.frameAMQP(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

@@ -44,6 +44,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.kafka = "kafka", &binKafka{client: -1, pending: map[int32]int16{}}
 	case "tds":
 		f.protocol, f.tds = "tds", &binTDS{client: -1, encrypt: tdsEncryptUnknown}
+	case "amqp":
+		f.protocol, f.amqp = "amqp", &binAMQP{client: -1, pending: map[uint16][]string{}, delivers: map[uint64]uint16{}, chans: map[uint16]*amqpChan{}}
 	}
 }
 
@@ -98,6 +100,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil && e.Session["Encrypted"] == true {
 			f.protocol, f.tds = "tls", nil
 		}
+	case "amqp":
+		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -128,6 +132,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("Kafka %v corr %v", e.Session["API Name"], e.Session["Correlation ID"])
 		case "tds":
 			e.Summary = fmt.Sprintf("TDS %v", e.Session["Packet Name"])
+		case "amqp":
+			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
 		}
 	}
 	return err
@@ -147,7 +153,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -199,6 +205,15 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.tds; d != nil && len(d.pending) > 0 {
 		emit(max(d.client, 0), map[string]any{"Outstanding": len(d.pending)}, "TDS exchange ended with unmatched requests")
+	}
+	if q := f.amqp; q != nil {
+		n := len(q.delivers)
+		for _, list := range q.pending {
+			n += len(list)
+		}
+		if n > 0 {
+			emit(max(q.client, 0), map[string]any{"Outstanding": n}, "AMQP exchange ended with unmatched methods or deliveries")
+		}
 	}
 }
 
