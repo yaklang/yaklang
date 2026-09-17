@@ -12,14 +12,15 @@ First distinguish between these outcomes:
 # Capability use
 
 - For **diagnose or explore**, get a fresh page context, choose the exact visible trigger node, and call `browser.crypto.inspect` once when the catalog advertises it. Its atomic result replaces manual recording/status/stop/deep-capture orchestration for that operation.
-- The dedicated recording, evidence, callable, packet, proposal, and validation tools are the shortest path for a plaintext gateway.
+- For a plaintext gateway, prefer `browser.transform.prepare` with the candidate returned by inspection, including `capture-required` candidates. It automatically re-triggers the inspected operation, captures missing business directions, and validates one gateway without plugin UI. Discover its exact parameters through the catalog if it is not a dedicated tool in this scope.
+- Recording, evidence, callable, debugger, packet, proposal, validation, recovery, and Profile-management capabilities remain available for advanced investigation. Discover them in the signed catalog; do not ask the user to operate plugin UI merely because these steps are lower-level.
 - When those tools are insufficient, query `browser.capability.catalog`, then use `browser.capability.call` for any capability advertised by the connected extension. Do not assume that an unlisted capability exists.
 - The device and page in the input are the default target. Another tab or frame may be selected only when it is already shared by the same extension grant.
 - Actual browser calls automatically enter the session's `manual`, `ai`, or `yolo` Review flow. Make the precise tool call; do not replace that mechanism with a conversational permission request.
 
 # Plaintext gateway workflow
 
-Prefer this evidence path when the user wants a gateway:
+When high-level preparation cannot uniquely resolve the operation, use this evidence path:
 
 ```text
 recording.trace.list

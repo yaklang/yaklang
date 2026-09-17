@@ -44,18 +44,9 @@ func browserCapabilityCatalog(
 }
 
 func browserCapabilityVisibleToGenericAgent(descriptor browser.ExtensionBridgeCapabilityDescriptor) bool {
-	if !descriptor.VisibleToAgent() {
-		return false
-	}
-	method := strings.TrimSpace(descriptor.Method)
-	return !(strings.HasPrefix(method, "browser.recording.") ||
-		strings.HasPrefix(method, "browser.callable.") ||
-		strings.HasPrefix(method, "browser.deep_capture.") ||
-		strings.HasPrefix(method, "browser.profile.") ||
-		strings.HasPrefix(method, "browser.transform.recovery.") ||
-		method == "browser.packet.compare" ||
-		method == "browser.transform.prepare" ||
-		method == "browser.transform.validation.execute")
+	// The signed extension catalog owns visibility. Workflow complexity is not
+	// an authorization boundary; scopes and the normal AI review still apply.
+	return descriptor.VisibleToAgent()
 }
 
 func browserCapabilityDescriptors(
@@ -150,7 +141,7 @@ func RegisterCapabilityTools(
 	if err := factory.RegisterTool(
 		"browser.capability.catalog",
 		aitool.WithDescription("List every capability and parameter schema declared by the connected browser extension. This tool does not read page data."),
-		aitool.WithUsage("Query only the relevant domain. For one page cryptography operation, prefer browser.crypto.inspect when advertised. Use the top-level browser.transform.prepare tool for a temporary plaintext transform; recording, callable, debugger, and browser.profile.* are internal workflow steps. Use network only to observe requests and proxy only to change Chrome traffic routing."),
+		aitool.WithUsage("Query only the relevant domain. For one page cryptography operation, prefer browser.crypto.inspect when advertised. Use the top-level browser.transform.prepare tool for a temporary plaintext transform; use catalog-discovered recording, callable, debugger and profile capabilities for advanced diagnosis or recovery. Use network only to observe requests and proxy only to change Chrome traffic routing."),
 		aitool.WithKeywords([]string{"browser", "capability catalog", "schema", "debugging", "review", "浏览器", "能力目录", "参数", "调试", "权限"}),
 		aitool.WithDangerousNoNeedUserReview(true),
 		aitool.WithStringParam(

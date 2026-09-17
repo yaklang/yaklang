@@ -158,7 +158,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithDescription("Call a signed capability on an already-open browser connected through the Yakit browser extension. This tool never creates a Rod browser session."),
 		aitool.WithVerboseName("Browser Extension Capability"),
 		aitool.WithVerboseNameZh("浏览器插件能力"),
-		aitool.WithUsage("Call browser.capability.catalog for the relevant domain first. Pass browser_ref when several instances are online; omit it when only one is online. Use browser.tab.open or browser.tabs for navigation. For one page encryption, decryption, signature, or encoding operation, get a fresh browser.context and use browser.crypto.inspect. For encrypted HTTP, use browser.transform.prepare; recording, callable, debugger, and browser.profile.* are internal workflow steps. For QR/MFA/CAPTCHA call browser.handoff.request and wait. Never substitute use_browser/op=open or reopen a page because a dialog appeared."),
+		aitool.WithUsage("Call browser.capability.catalog for the relevant domain first. Pass browser_ref when several instances are online; omit it when only one is online. Use browser.tab.open or browser.tabs for navigation. For one page encryption, decryption, signature, or encoding operation, get a fresh browser.context and use browser.crypto.inspect. For encrypted HTTP, use browser.transform.prepare; use catalog-discovered recording, callable, debugger and profile capabilities for advanced diagnosis or recovery. For QR/MFA/CAPTCHA call browser.handoff.request and wait. Never substitute use_browser/op=open or reopen a page because a dialog appeared."),
 		aitool.WithKeywords([]string{"browser", "browser instance", "attached browser", "browser extension", "current website", "open tabs", "page interaction", "network", "debugging", "proxy", "浏览器", "浏览器实例", "已打开浏览器", "浏览器插件", "当前网站", "标签页", "页面操作", "网络", "调试"}),
 		aitool.WithStringParam(
 			"browser_ref",
@@ -208,7 +208,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithDescription("Inspect one real cryptographic page operation in the attached browser. It atomically records a visible-node click, page crypto/encoding calls, request bodies, and modal messages, then cleans up. It does not create a plaintext gateway."),
 		aitool.WithVerboseName("Inspect Browser Crypto Operation"),
 		aitool.WithVerboseNameZh("检查页面加解密操作"),
-		aitool.WithUsage("First call browser.capability.call with method=browser.context and includeDom=true. Select the exact visible node that triggers the operation, then call this tool once with that captureId and nodeId. Use the returned recording and network evidence to answer the user. Do not manually orchestrate recording/deep-capture/profile tools, and do not create a plaintext gateway unless the user explicitly asks for one."),
+		aitool.WithUsage("First call browser.capability.call with method=browser.context and includeDom=true. Select the exact visible node that triggers the operation, then call this tool once with that captureId and nodeId. Use the returned recording and network evidence to answer the user. Prefer high-level tools; use catalog-discovered recording/deep-capture/profile tools for advanced diagnosis or recovery, and do not create a plaintext gateway unless the user explicitly asks for one."),
 		aitool.WithKeywords([]string{"browser crypto", "page encryption", "decrypt", "AES", "RSA", "signature", "页面加密", "页面解密", "加密算法", "签名"}),
 		aitool.WithStringParam(
 			"browser_ref",
