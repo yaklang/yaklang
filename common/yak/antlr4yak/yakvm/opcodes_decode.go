@@ -13,6 +13,18 @@ import (
 // Zero fields select the defaults. Limits apply to one complete payload.
 type DecodeLimits struct{ MaxBytes, MaxObjects, MaxDepth int }
 
+// Indexed by the wire kind, including the marshaller's special []byte tag.
+// This table is read-only; constructing it per literal dominates decode cost.
+var decodedLiteralTypes = [...]reflect.Type{
+	reflect.Int: literalReflectType_Int, reflect.Int8: literalReflectType_Int8,
+	reflect.Int16: literalReflectType_Int16, reflect.Int32: literalReflectType_Int32, reflect.Int64: literalReflectType_Int64,
+	reflect.Uint: literalReflectType_Uint, reflect.Uint8: literalReflectType_Uint8,
+	reflect.Uint16: literalReflectType_Uint16, reflect.Uint32: literalReflectType_Uint32, reflect.Uint64: literalReflectType_Uint64,
+	reflect.Float32: literalReflectType_Float32, reflect.Float64: literalReflectType_Float64,
+	reflect.String: literalReflectType_String, reflect.Bool: literalReflectType_Bool,
+	reflect.Map: reflect.TypeOf(map[string]interface{}{}), 27: literalReflectType_Bytes,
+}
+
 type codeDecoder struct {
 	buf                        []byte
 	err                        error
@@ -228,27 +240,18 @@ func (d *codeDecoder) codes() []*Code {
 }
 
 func (d *codeDecoder) value() *Value {
-	v := &Value{TypeVerbose: string(d.bytes()), Literal: string(d.bytes())}
+	v := &Value{TypeVerbose: decodedTypeName(d.bytes()), Literal: string(d.bytes())}
 	switch tag := d.uint(); tag {
 	case 0:
 		kind := d.integer()
 		if kind == 0 {
 			return v
 		}
-		types := map[int]reflect.Type{
-			int(reflect.Int): literalReflectType_Int, int(reflect.Int8): literalReflectType_Int8,
-			int(reflect.Int16): literalReflectType_Int16, int(reflect.Int32): literalReflectType_Int32, int(reflect.Int64): literalReflectType_Int64,
-			int(reflect.Uint): literalReflectType_Uint, int(reflect.Uint8): literalReflectType_Uint8,
-			int(reflect.Uint16): literalReflectType_Uint16, int(reflect.Uint32): literalReflectType_Uint32, int(reflect.Uint64): literalReflectType_Uint64,
-			int(reflect.Float32): literalReflectType_Float32, int(reflect.Float64): literalReflectType_Float64,
-			int(reflect.String): literalReflectType_String, int(reflect.Bool): literalReflectType_Bool,
-			int(reflect.Map): reflect.TypeOf(map[string]interface{}{}), 27: literalReflectType_Bytes,
-		}
-		typ := types[kind]
-		if typ == nil {
+		if kind >= len(decodedLiteralTypes) || decodedLiteralTypes[kind] == nil {
 			d.fail("unsupported literal kind %d", kind)
 			return v
 		}
+		typ := decodedLiteralTypes[kind]
 		data := d.bytes()
 		if d.err != nil {
 			return v
@@ -259,6 +262,8 @@ func (d *codeDecoder) value() *Value {
 				d.fail("string: %v", err)
 			}
 			v.Value = s
+		} else if scalar, ok := decodeScalarLiteral(kind, data); ok {
+			v.Value = scalar
 		} else {
 			x := reflect.New(typ)
 			if err := json.Unmarshal(data, x.Interface()); err != nil {
@@ -293,10 +298,116 @@ func (d *codeDecoder) value() *Value {
 	return v
 }
 
+// Common literal types recur throughout a program. Reuse immutable names while
+// preserving arbitrary serialized names exactly, without retaining the input.
+func decodedTypeName(data []byte) string {
+	switch string(data) {
+	case "int":
+		return "int"
+	case "string":
+		return "string"
+	case "bool":
+		return "bool"
+	case "float64":
+		return "float64"
+	case "undefined":
+		return "undefined"
+	case "identifier":
+		return "identifier"
+	}
+	return string(data)
+}
+
+// Marshal emits JSON numbers and booleans. Decode those without
+// reflect.New and the general JSON decoder. Everything else (including null,
+// whitespace, overflow and malformed input) keeps JSON's original semantics.
+func decodeScalarLiteral(kind int, data []byte) (any, bool) {
+	if kind == int(reflect.Bool) {
+		switch string(data) {
+		case "true":
+			return true, true
+		case "false":
+			return false, true
+		}
+		return nil, false
+	}
+	if kind == int(reflect.Float32) || kind == int(reflect.Float64) {
+		n, err := strconv.ParseFloat(string(data), decodedLiteralTypes[kind].Bits())
+		// ParseFloat also accepts Go-only forms such as NaN, Inf and hex floats.
+		// JSON validity keeps those rejected while avoiding a second conversion.
+		if err != nil || !json.Valid(data) {
+			return nil, false
+		}
+		if kind == int(reflect.Float32) {
+			return float32(n), true
+		}
+		return n, true
+	}
+	if kind < int(reflect.Int) || kind > int(reflect.Uint64) || len(data) == 0 {
+		return nil, false
+	}
+	digits := data
+	if digits[0] == '-' {
+		digits = digits[1:]
+	}
+	if len(digits) == 0 || digits[0] < '0' || digits[0] > '9' || (len(digits) > 1 && digits[0] == '0') {
+		return nil, false
+	}
+	bits := decodedLiteralTypes[kind].Bits()
+	if kind <= int(reflect.Int64) {
+		n, err := strconv.ParseInt(string(data), 10, bits)
+		if err != nil {
+			return nil, false
+		}
+		switch reflect.Kind(kind) {
+		case reflect.Int:
+			return int(n), true
+		case reflect.Int8:
+			return int8(n), true
+		case reflect.Int16:
+			return int16(n), true
+		case reflect.Int32:
+			return int32(n), true
+		case reflect.Int64:
+			return n, true
+		}
+	}
+	n, err := strconv.ParseUint(string(data), 10, bits)
+	if err != nil {
+		return nil, false
+	}
+	switch reflect.Kind(kind) {
+	case reflect.Uint:
+		return uint(n), true
+	case reflect.Uint8:
+		return uint8(n), true
+	case reflect.Uint16:
+		return uint16(n), true
+	case reflect.Uint32:
+		return uint32(n), true
+	case reflect.Uint64:
+		return n, true
+	}
+	return nil, false
+}
+
 // validateCodes checks structural operands and control targets. Decoding is
 // not a sandbox: native capabilities and runtime execution budgets are separate.
 func (d *codeDecoder) validateCodes(codes []*Code) {
 	for i, c := range codes {
+		// Literal-heavy code mostly pushes and discards values. These known
+		// opcodes have no counts or control targets; perform their complete
+		// operand validation without the general opcode/jump dispatch below.
+		switch c.Opcode {
+		case OpPop:
+			continue
+		case OpPush, OpPushfuzz, OpPushId, OpType:
+			if c.Op1 == nil {
+				d.fail("missing operand at %d", i)
+				return
+			}
+			continue
+		}
 		if _, ok := OpcodeVerboseName[c.Opcode]; !ok {
 			d.fail("unknown opcode %d at %d", c.Opcode, i)
 			return
@@ -306,7 +417,7 @@ func (d *codeDecoder) validateCodes(codes []*Code) {
 			return
 		}
 		switch c.Opcode {
-		case OpPush, OpPushfuzz, OpPushId, OpType, OpDefer:
+		case OpDefer:
 			if c.Op1 == nil {
 				d.fail("missing operand at %d", i)
 				return

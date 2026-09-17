@@ -123,4 +123,127 @@ These are sample medians, not benchstat significance claims or universal speedup
 The last row measures a stack operation group, not a whole interpreter speedup.
 Normal mode is used throughout; private synchronous mode is not used to inflate
 the result. Raw samples are in `testdata/hardening-base-windows.txt` and
-`testdata/hardening-head-windows.txt`. No Linux/ARM64 performance claim is made.
+`testdata/hardening-head-windows.txt`. These original measurements make no
+Linux/ARM64 performance claim; the follow-up below measures macOS/ARM64 separately.
+
+## Follow-up: callback and decoder costs
+
+The four original execution benchmarks did not measure Go-to-Yak callbacks or
+bytecode loading. Follow-up measurements found substantial regressions in both:
+the callback adapter queried the goroutine ID before `nativeCallbackFrame`
+queried it again, and decoding constructed a reflection-type map for every
+literal. These costs were not an unavoidable consequence of the safety checks.
+
+The callback adapter now resolves ownership once through `nativeCallbackFrame`.
+An owner callback resumes the live caller; a foreign callback still uses the
+captured lexical context and gets independent panic/frame state. The snapshot
+and ordinary goroutine isolation remain enabled.
+
+Profiles also showed that a single `runtime.Stack` still spent substantial time
+decoding PC/line tables for the large opcode dispatcher on the native call stack.
+Ordinary non-debug Yak calls now take a small dispatch path after the same context
+check; the existing call implementation is shared with the full dispatcher.
+Debugger, Lua and NASL dispatch retain their original path. Variadic argument
+state, error-return unwrapping, defer and cancellation are regression-covered.
+
+Decoding uses a read-only type array. Numbers and booleans avoid the
+general JSON decoder; float syntax still requires JSON validity, and other
+forms, nulls, overflow and invalid input retain the
+JSON path. Differential tests and fuzzing compare exact types, values and
+acceptance against `encoding/json`. Common push/pop instructions perform their
+full validation directly; the other opcode, control-target, table-graph and
+resource-budget checks remain in place. Common immutable type names are reused
+without retaining the input buffer; arbitrary type names are copied unchanged.
+
+Channel sends now check assignability independently of FFI conversion. This
+preserves dynamic numeric types in `chan any` and the identity of assignable
+named containers. In particular, an imported large `uint64` must not become a
+negative `int` merely by passing through a channel. Nil is accepted only for
+nilable element types. Send cancellation and direction checks remain enabled.
+
+`BenchmarkCoreBoundaryExecution` adds fresh, reused and foreign-goroutine native
+callbacks, successful channel operations, async scheduling with a full wait, and
+map iteration. `BenchmarkCoreDecode` covers small/large integer payloads, strings,
+floats, booleans and maps. These benchmarks use ordinary execution mode and are
+intended to be copied unchanged into each comparison worktree. They supplement,
+rather than replace, the original execution benchmarks.
+
+### Follow-up measurements (2026-09-17)
+
+Apple M1 Max, Go 1.22.12 darwin/arm64, GOMAXPROCS=4, ordinary execution mode.
+Base is `855dd03e309d3463dee4d546c9d1c8455994248b`; original head is
+`f5afe6b9d153bdea7c89d5240e7aa7761320ccfa`; fixed is this follow-up working tree.
+Both benchmark files are byte-identical across the three independent worktrees.
+The binaries run sequentially for 12 rounds, using all six base/head/fixed
+orderings twice, with 300 ms per benchmark. Compilation is excluded. All three
+binaries use Go 1.22.12; the separately installed benchstat analyzer does not
+change the benchmark toolchain.
+
+Times below are sample medians in microseconds per operation. Each execution
+operation runs 1,000 loop iterations/callbacks/channel round trips, except
+asyncNative (100 tasks followed by AsyncWait) and map100 (10 traversals of 100
+keys). Each decode operation loads the named number of literals and their Pop
+instructions; marshalling is excluded. Retained callbacks run 1,000 calls per
+wrapper; callbackForeign runs them in one Go worker and waits for completion.
+
+| Benchmark | Base µs/op | Original head µs/op | Fixed µs/op | Fixed vs base | Base → fixed allocs/op |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Execution/arithmetic | 1739.578 | 1381.742 | 1387.707 | -20.23% | 43975 → 31968 |
+| Execution/functions | 2905.135 | 2492.526 | 2488.671 | -14.34% | 68739 → 50726 |
+| Execution/native | 2454.506 | 2063.523 | 2050.130 | -16.47% | 56722 → 41715 |
+| Execution/containers | 5081.429 | 3379.275 | 3459.784 | -31.91% | 123995 → 72995 |
+| Boundary/callback | 30011.697 | 60707.000 | 22631.818 | -24.59% | 87214 → 72207 |
+| Boundary/callbackReused | 26853.323 | 57430.851 | 19568.673 | -27.13% | 26530 → 23529 |
+| Boundary/callbackForeign | 4171.431 | 6411.127 | 4079.749 | -2.20% | 32533 → 28531 |
+| Boundary/channel | 3159.127 | 2528.700 | 2538.698 | -19.64% | 73746 → 54748 |
+| Boundary/asyncNative | 219.114 | 218.579 | 218.906 | ~ (p=0.887) | 3724 → 2826 |
+| Boundary/map100 | 3056.776 | 2159.501 | 2155.463 | -29.49% | 67705.5 → 39288 |
+| Decode/int10 | 3.470 | 8.627 | 2.392 | -31.08% | 77 → 38 |
+| Decode/int1000 | 323.426 | 826.515 | 219.803 | -32.04% | 7997 → 4742 |
+| Decode/string1000 | 270.693 | 769.672 | 273.488 | ~ (p=0.799) | 8007 → 6008 |
+| Decode/float1000 | 343.150 | 862.986 | 258.683 | -24.62% | 8007 → 5008 |
+| Decode/bool1000 | 300.613 | 827.111 | 197.698 | -34.23% | 8007 → 4008 |
+| Decode/map100 | 101.009 | 153.882 | 103.391 | ~ (p=0.160) | 1896 → 1897 |
+
+Benchstat reports p<0.001 for the time improvements except callbackForeign
+(p=0.006); `~` means no statistically significant difference in these samples,
+not proof of equality. The string/map decode median changes are +1.03%/+2.36%.
+No execution-time regression is significant against either base or original
+head. The four original execution cases retain their gains with no significant
+time difference against original head. Callback/callbackReused improve by
+62.72%/65.93% against original head. Integer-1000 decode drops from approximately
+1.326 MB to 269 KB/op, and from 9,021 to 4,742 allocations/op. Map decoding retains
+one additional allocation (about 48 bytes/op) for the hardened loader.
+
+These are per-case desktop microbenchmarks; they are not a production throughput
+claim, a guarantee of every workload improving, or results for Windows/Linux.
+In particular cold compilation, gzip/cache loading, debugger performance and real
+MITM/plugin latency distributions need separate measurements. No weighted overall
+speedup is inferred from the unrelated cases.
+
+Raw samples are `testdata/hardening-followup-{base,head,fixed}-darwin-arm64.txt`.
+Rebuild each worktree with the same `core_benchmark_test.go` and
+`core_boundary_benchmark_test.go`, then alternate independent binaries:
+
+```sh
+go test -c -o engine.test ./common/yak/antlr4yak
+GOMAXPROCS=4 ./engine.test -test.run '^$' -test.bench '^BenchmarkCore(Execution|BoundaryExecution|Decode)$' -test.benchmem -test.benchtime=300ms -test.count=1
+benchstat hardening-followup-base-darwin-arm64.txt hardening-followup-head-darwin-arm64.txt hardening-followup-fixed-darwin-arm64.txt
+```
+
+Final follow-up validation on Go 1.22.12 macOS/ARM64:
+
+- Complete `go test ./common/yak/antlr4yak/... -count=1 -timeout=15m` passes,
+  including DAP and LSP.
+- `go test -race ./common/yak/antlr4yak/yakvm/... ./common/yak/antlr4yak/yakast -count=1 -timeout=5m` passes.
+- Engine race run with `-run 'TestCore|Test.*(Callback|Concurrent|Closure|Frame)'` passes.
+- LL-only engine/compiler `-run '^TestCore'` passes with `YAK_ANTLR_SLL_FIRST=0`.
+- Two 30-second, two-worker fuzz runs pass: wire decoder 215,397 executions,
+  scalar JSON compatibility 140,340 executions.
+
+The channel type/value regressions are fixed. The broader hardening branch still
+has observable contracts beyond syntax (slice capacity, invalid-input rejection,
+async panic reporting, and decoder resource limits). This follow-up does not
+claim that all such changes are behaviorally invisible or turn the VM into a
+sandbox. These are local checks for the follow-up, not CI results for an uploaded
+commit; the earlier CI results apply to the original head only.

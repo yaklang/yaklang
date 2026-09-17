@@ -149,6 +149,43 @@ func TestCoreInvalidCompileThenReuse(t *testing.T) {
 	}
 }
 
+func TestCoreCallDispatchBoundaries(t *testing.T) {
+	e := New()
+	e.ImportLibs(map[string]any{
+		"sum": func(values ...int) (sum int) {
+			for _, value := range values {
+				sum += value
+			}
+			return
+		},
+		"good": func() (int, error) { return 7, nil },
+		"bad":  func() (int, error) { return 0, errors.New("host failure") },
+	})
+	if err := e.SafeEval(context.Background(), `
+args = [1,2,3]
+assert sum(args...) == 6
+assert sum(4) == 4
+seen = 0
+mark = () => { seen = 9 }
+f = () => { defer mark(); return good()~ }
+assert f() == 7
+assert seen == 9
+caught = false
+try { bad()~ } catch err { caught = true }
+assert caught
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	called := false
+	e.ImportLibs(map[string]any{"cancel": cancel, "called": func() { called = true }})
+	if err := e.SafeEval(ctx, "cancel(); called()"); !errors.Is(err, context.Canceled) || called {
+		t.Fatalf("call dispatch bypassed cancellation: called=%v, err=%v", called, err)
+	}
+}
+
 func TestCoreSetIterationExitClosesProducer(t *testing.T) {
 	for _, source := range []string{
 		"for v in values { break }",

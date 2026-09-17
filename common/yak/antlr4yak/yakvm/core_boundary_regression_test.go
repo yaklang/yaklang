@@ -269,6 +269,55 @@ func TestCoreChannelSendCancellation(t *testing.T) {
 	}
 }
 
+func TestCoreChannelSendPreservesAssignableValues(t *testing.T) {
+	f := NewFrame(New())
+	for _, input := range []any{int64(42), uint64(1<<63 + 9), float32(1.25), (*int)(nil), coreNamedString("named"), nil} {
+		ch := make(chan any, 1)
+		// Preserve the supplied Go value, as imported globals do. NewAutoValue
+		// has its own, separate numeric normalization contract.
+		f.sendChannel(NewAutoValue(ch), NewValue("any", input, ""))
+		if got := <-ch; !reflect.DeepEqual(got, input) {
+			t.Fatalf("send changed %T(%v) into %T(%v)", input, input, got, got)
+		}
+	}
+	// Assigning a named container to its underlying type must not copy it.
+	type namedSlice []int
+	slice := namedSlice{1}
+	slices := make(chan []int, 1)
+	f.sendChannel(NewAutoValue(slices), NewAutoValue(slice))
+	(<-slices)[0] = 2
+	if slice[0] != 2 {
+		t.Fatal("send copied assignable slice")
+	}
+	type namedMap map[string]int
+	m := namedMap{"key": 1}
+	maps := make(chan map[string]int, 1)
+	f.sendChannel(NewAutoValue(maps), NewAutoValue(m))
+	(<-maps)["key"] = 2
+	if m["key"] != 2 {
+		t.Fatal("send copied assignable map")
+	}
+	stringers := make(chan fmt.Stringer, 1)
+	f.sendChannel(NewAutoValue(stringers), NewAutoValue(coreStringer{}))
+	if (<-stringers).String() != "value" {
+		t.Fatal("send changed interface implementation")
+	}
+}
+
+func TestCoreChannelSendRejectsImplicitFFIConversions(t *testing.T) {
+	f := NewFrame(New())
+	for _, tc := range []struct{ channel, value any }{
+		{make(chan int, 1), nil},
+		{make(chan int, 1), int64(1)},
+		{make(chan []byte, 1), "text"},
+		{make(chan fmt.Stringer, 1), 1},
+	} {
+		if p := corePanic(func() { f.sendChannel(NewAutoValue(tc.channel), NewAutoValue(tc.value)) }); p == nil {
+			t.Fatalf("send accepted %T as %T", tc.value, tc.channel)
+		}
+	}
+}
+
 func TestCoreOperandStackOrderAndRelease(t *testing.T) {
 	f := NewFrame(New())
 	a, b := NewAutoValue(1), NewAutoValue(2)

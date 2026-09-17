@@ -12,7 +12,10 @@ The existing language regression suite remains authoritative outside these cases
   at the first element, and step zero fails. Extreme steps cannot overflow the
   loop index. Array slices produce `[]T`; slicing copies elements and allocates
   capacity proportional to the result. String indexing/slicing remains rune based.
-- Typed nil channel sends are valid. Nil/full/unbuffered sends observe context
+- Channel sends preserve Go assignability, dynamic interface types and container
+  identity; they do not apply FFI numeric normalization or container conversion.
+  Nil values may be sent to nilable element types, not to numeric elements.
+  Nil/full/unbuffered sends observe context
   cancellation. Cancellation already observed before select prevents a send;
   concurrent readiness permits either select outcome. Closed-channel sends and
   receive-only channels retain explicit errors. Top-level cancellation remains

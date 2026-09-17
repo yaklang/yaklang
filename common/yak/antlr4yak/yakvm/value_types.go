@@ -345,11 +345,13 @@ func (v *Frame) AutoConvertReflectValueByType(
 					}
 				}
 
-				parent := callbackParent
-				if synchronous || currentGoroutineID() == callbackOwner {
-					parent = v
+				// Resolve ownership once. The owner goroutine uses its live caller
+				// (for scopes/defer); a foreign goroutine gets an independent frame
+				// from the captured context without reading the mutable caller.
+				callbackFrame := callbackParent.nativeCallbackFrame()
+				if callbackFrame == callbackParent {
+					callbackFrame = v
 				}
-				callbackFrame := parent.nativeCallbackFrame()
 				result := callbackFrame.CallYakFunction(false, f, vmArgs)
 				outCount := targetType.NumOut()
 				if outCount <= 0 {

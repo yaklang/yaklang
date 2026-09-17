@@ -15,8 +15,19 @@ func (f *Frame) sendChannel(channel, value *Value) *Value {
 		panic("cannot send on receive-only channel")
 	}
 	item := reflect.ValueOf(value.Value)
-	if err := f.AutoConvertReflectValueByType(&item, ch.Type().Elem()); err != nil {
-		panic(err)
+	elem := ch.Type().Elem()
+	// Sending an assignable value preserves its dynamic type and identity. The
+	// FFI converter normalizes numbers in empty interfaces and copies containers
+	// of nonidentical types; neither operation belongs to channel assignment.
+	if !item.IsValid() {
+		switch elem.Kind() {
+		case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
+			item = reflect.Zero(elem)
+		default:
+			panic(fmt.Sprintf("cannot send nil to channel of %s", elem))
+		}
+	} else if !item.Type().AssignableTo(elem) {
+		panic(fmt.Sprintf("cannot send %s to channel of %s", item.Type(), elem))
 	}
 	ctx := f.ctx
 	if ctx == nil {

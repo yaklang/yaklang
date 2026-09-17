@@ -1,0 +1,240 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/native-4    	     174	   2058444 ns/op	 2048612 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3368615 ns/op	 3008651 B/op	   72995 allocs/op
+BenchmarkCoreExecution/arithmetic-4         	     258	   1381210 ns/op	 1434523 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     142	   2474332 ns/op	 2505308 B/op	   50726 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       6	  60283354 ns/op	 4036733 B/op	   73206 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  58036174 ns/op	 1271633 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      56	   6620264 ns/op	 1647765 B/op	   29532 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     135	   2598821 ns/op	 2768560 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1570	    223679 ns/op	  168808 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     165	   2161023 ns/op	 1940474 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   42099	      9481 ns/op	  22.36 MB/s	   13715 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     397	    887166 ns/op	  26.82 MB/s	 1325926 B/op	    9022 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     451	    824763 ns/op	  76.13 MB/s	 1229893 B/op	    8032 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     382	    946061 ns/op	  36.78 MB/s	 1333929 B/op	    9032 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     410	    909954 ns/op	  30.79 MB/s	 1313940 B/op	    9032 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2290	    162044 ns/op	  57.35 MB/s	  181165 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     241	   1453015 ns/op	 1434551 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     136	   2534719 ns/op	 2505342 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     182	   1961666 ns/op	 2048609 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3204915 ns/op	 3008638 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       6	  59551924 ns/op	 4036969 B/op	   73209 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57120757 ns/op	 1271449 B/op	   24528 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      57	   6355298 ns/op	 1647757 B/op	   29531 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     145	   2453744 ns/op	 2768537 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1773	    204534 ns/op	  168799 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     174	   2077952 ns/op	 1940467 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   43850	      8276 ns/op	  25.62 MB/s	   13713 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     465	    784511 ns/op	  30.33 MB/s	 1325859 B/op	    9022 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     471	    720922 ns/op	  87.10 MB/s	 1229847 B/op	    8032 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     450	    815635 ns/op	  42.66 MB/s	 1333878 B/op	    9032 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     464	    819572 ns/op	  34.18 MB/s	 1313872 B/op	    9032 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2298	    150935 ns/op	  61.57 MB/s	  181154 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     258	   1371505 ns/op	 1434554 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     145	   2491881 ns/op	 2505345 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     177	   2090599 ns/op	 2048603 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3407746 ns/op	 3008671 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  61902300 ns/op	 4036731 B/op	   73206 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  59862556 ns/op	 1271604 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      56	   6434681 ns/op	 1647746 B/op	   29531 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     141	   2489572 ns/op	 2768541 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1864	    203603 ns/op	  168809 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     169	   2080943 ns/op	 1940474 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   42210	      8273 ns/op	  25.62 MB/s	   13714 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     456	    797969 ns/op	  29.82 MB/s	 1325873 B/op	    9022 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     480	    716486 ns/op	  87.64 MB/s	 1229840 B/op	    8031 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     435	    818782 ns/op	  42.49 MB/s	 1333845 B/op	    9031 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     444	    794118 ns/op	  35.28 MB/s	 1313845 B/op	    9031 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2322	    146564 ns/op	  63.41 MB/s	  181156 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     273	   1316167 ns/op	 1434541 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     152	   2342512 ns/op	 2505346 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     183	   1953108 ns/op	 2048608 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3166524 ns/op	 3008659 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       6	  59784820 ns/op	 4036969 B/op	   73208 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  56532701 ns/op	 1271540 B/op	   24529 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      58	   6397851 ns/op	 1647749 B/op	   29531 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     144	   2410826 ns/op	 2768554 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1834	    207302 ns/op	  168807 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     168	   2234291 ns/op	 1940479 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   39441	      9068 ns/op	  23.38 MB/s	   13713 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     430	    845503 ns/op	  28.14 MB/s	 1325833 B/op	    9021 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     476	    737109 ns/op	  85.19 MB/s	 1229817 B/op	    8031 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     428	    851413 ns/op	  40.87 MB/s	 1333805 B/op	    9031 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     438	    857221 ns/op	  32.68 MB/s	 1313744 B/op	    9031 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2334	    156400 ns/op	  59.42 MB/s	  181145 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     261	   1315252 ns/op	 1434535 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     150	   2473169 ns/op	 2505359 B/op	   50727 allocs/op
+BenchmarkCoreExecution/native-4             	     178	   1973988 ns/op	 2048622 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3349440 ns/op	 3008656 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       6	  59662986 ns/op	 4036850 B/op	   73208 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  56761368 ns/op	 1271518 B/op	   24529 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      57	   6361286 ns/op	 1647772 B/op	   29532 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     151	   2440499 ns/op	 2768523 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1513	    221939 ns/op	  168811 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     168	   2164401 ns/op	 1940478 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   39799	      8647 ns/op	  24.52 MB/s	   13712 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     422	    825790 ns/op	  28.81 MB/s	 1325679 B/op	    9021 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     475	    747229 ns/op	  84.03 MB/s	 1229679 B/op	    8031 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     405	    974334 ns/op	  35.71 MB/s	 1333689 B/op	    9031 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     396	    920603 ns/op	  30.43 MB/s	 1313677 B/op	    9031 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2200	    169816 ns/op	  54.72 MB/s	  181129 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     261	   1332606 ns/op	 1434538 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     146	   2459907 ns/op	 2505345 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     178	   1958489 ns/op	 2048603 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3237232 ns/op	 3008664 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  60640450 ns/op	 4036891 B/op	   73208 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57319965 ns/op	 1271566 B/op	   24529 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      56	   6355440 ns/op	 1647738 B/op	   29531 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     100	   4581045 ns/op	 2768452 B/op	   54747 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1076	    308594 ns/op	  168803 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     146	   2381534 ns/op	 1940465 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   36168	      9811 ns/op	  21.61 MB/s	   13710 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     370	    949478 ns/op	  25.06 MB/s	 1325465 B/op	    9020 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     406	    902162 ns/op	  69.60 MB/s	 1229608 B/op	    8030 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     349	    998863 ns/op	  34.83 MB/s	 1333614 B/op	    9030 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     376	    936551 ns/op	  29.91 MB/s	 1313553 B/op	    9030 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2169	    168067 ns/op	  55.29 MB/s	  181127 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     242	   1529108 ns/op	 1434541 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     128	   2678917 ns/op	 2505370 B/op	   50727 allocs/op
+BenchmarkCoreExecution/native-4             	     166	   2192282 ns/op	 2048592 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	      99	   3579638 ns/op	 3008639 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  60999033 ns/op	 4036734 B/op	   73206 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57071840 ns/op	 1271561 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      56	   6360815 ns/op	 1647767 B/op	   29532 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     145	   2447969 ns/op	 2768526 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1666	    217664 ns/op	  168811 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     169	   2102866 ns/op	 1940479 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   42802	      8360 ns/op	  25.36 MB/s	   13711 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     440	    811780 ns/op	  29.31 MB/s	 1325620 B/op	    9020 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     484	    746630 ns/op	  84.10 MB/s	 1229602 B/op	    8030 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     435	    838327 ns/op	  41.50 MB/s	 1333595 B/op	    9030 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     444	    803018 ns/op	  34.88 MB/s	 1313599 B/op	    9030 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2462	    149827 ns/op	  62.02 MB/s	  181122 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/native-4    	     175	   2060935 ns/op	 2048630 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3389935 ns/op	 3008702 B/op	   72996 allocs/op
+BenchmarkCoreExecution/arithmetic-4         	     264	   1382273 ns/op	 1434525 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     146	   2466825 ns/op	 2505325 B/op	   50726 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  60268683 ns/op	 4037049 B/op	   73210 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57300354 ns/op	 1271606 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      57	   6382884 ns/op	 1647782 B/op	   29532 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     142	   2548398 ns/op	 2768569 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1562	    218470 ns/op	  168806 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     169	   2148170 ns/op	 1940472 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   42817	      8569 ns/op	  24.74 MB/s	   13713 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     434	    829707 ns/op	  28.68 MB/s	 1325740 B/op	    9021 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     469	    771504 ns/op	  81.39 MB/s	 1229811 B/op	    8031 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     408	    861744 ns/op	  40.38 MB/s	 1333862 B/op	    9032 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     434	    826731 ns/op	  33.88 MB/s	 1313730 B/op	    9031 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2382	    154961 ns/op	  59.97 MB/s	  181151 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     256	   1408697 ns/op	 1434539 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     144	   2933774 ns/op	 2505362 B/op	   50727 allocs/op
+BenchmarkCoreExecution/native-4             	     162	   2075602 ns/op	 2048604 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3348757 ns/op	 3008684 B/op	   72996 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  61348083 ns/op	 4036841 B/op	   73207 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57765861 ns/op	 1271588 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      56	   6424403 ns/op	 1647766 B/op	   29532 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     138	   2534596 ns/op	 2768556 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1564	    220921 ns/op	  168820 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     166	   2157980 ns/op	 1940461 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   39853	      8642 ns/op	  24.53 MB/s	   13713 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     439	    824997 ns/op	  28.84 MB/s	 1325898 B/op	    9022 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     459	    768925 ns/op	  81.66 MB/s	 1229833 B/op	    8031 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     422	    864228 ns/op	  40.26 MB/s	 1333904 B/op	    9032 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     441	    823366 ns/op	  34.02 MB/s	 1313871 B/op	    9032 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2377	    151889 ns/op	  61.18 MB/s	  181159 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/native-4    	     159	   2233019 ns/op	 2048619 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3709989 ns/op	 3008676 B/op	   72995 allocs/op
+BenchmarkCoreExecution/arithmetic-4         	     238	   1528317 ns/op	 1434542 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     132	   2702997 ns/op	 2505347 B/op	   50727 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  64174433 ns/op	 4036828 B/op	   73207 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  60919549 ns/op	 1271537 B/op	   24529 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      55	   6507786 ns/op	 1647778 B/op	   29532 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     141	   2551887 ns/op	 2768565 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1584	    218689 ns/op	  168810 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     165	   2161510 ns/op	 1940488 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   40520	      8613 ns/op	  24.61 MB/s	   13711 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     433	    827241 ns/op	  28.76 MB/s	 1325579 B/op	    9020 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     475	    770418 ns/op	  81.51 MB/s	 1229476 B/op	    8030 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     418	    864347 ns/op	  40.25 MB/s	 1333585 B/op	    9030 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     447	    817871 ns/op	  34.25 MB/s	 1313639 B/op	    9030 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2366	    151149 ns/op	  61.48 MB/s	  181127 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/arithmetic-4         	     247	   1368585 ns/op	 1434548 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     144	   2493170 ns/op	 2505346 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     172	   2066112 ns/op	 2048619 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3892732 ns/op	 3008673 B/op	   72995 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  61282458 ns/op	 4036766 B/op	   73207 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57541736 ns/op	 1271681 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      57	   6466526 ns/op	 1647728 B/op	   29531 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     140	   2522804 ns/op	 2768531 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1622	    216474 ns/op	  168803 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     169	   2138355 ns/op	 1940489 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   41331	      8543 ns/op	  24.82 MB/s	   13712 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     427	    817920 ns/op	  29.09 MB/s	 1325568 B/op	    9020 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     484	    772012 ns/op	  81.34 MB/s	 1229596 B/op	    8030 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     417	    859000 ns/op	  40.50 MB/s	 1333646 B/op	    9031 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     434	    827492 ns/op	  33.85 MB/s	 1313698 B/op	    9031 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2401	    152803 ns/op	  60.82 MB/s	  181138 B/op	    1999 allocs/op
+PASS
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+BenchmarkCoreExecution/functions-4 	     140	   2534674 ns/op	 2505354 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4    	     170	   2098138 ns/op	 2048620 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     100	   3434017 ns/op	 3008680 B/op	   72995 allocs/op
+BenchmarkCoreExecution/arithmetic-4         	     252	   1427385 ns/op	 1434524 B/op	   31968 allocs/op
+BenchmarkCoreBoundaryExecution/callback-4   	       5	  60773550 ns/op	 4036888 B/op	   73208 allocs/op
+BenchmarkCoreBoundaryExecution/callbackReused-4         	       6	  57934076 ns/op	 1271561 B/op	   24530 allocs/op
+BenchmarkCoreBoundaryExecution/callbackForeign-4        	      56	   6516139 ns/op	 1647750 B/op	   29531 allocs/op
+BenchmarkCoreBoundaryExecution/channel-4                	     136	   2663942 ns/op	 2768567 B/op	   54748 allocs/op
+BenchmarkCoreBoundaryExecution/asyncNative-4            	    1339	    258395 ns/op	  168814 B/op	    2826 allocs/op
+BenchmarkCoreBoundaryExecution/map100-4                 	     156	   2306552 ns/op	 1940475 B/op	   39288 allocs/op
+BenchmarkCoreDecode/int10-4                             	   39375	      9312 ns/op	  22.77 MB/s	   13714 B/op	      88 allocs/op
+BenchmarkCoreDecode/int1000-4                           	     409	    871581 ns/op	  27.30 MB/s	 1325839 B/op	    9022 allocs/op
+BenchmarkCoreDecode/string1000-4                        	     457	    871064 ns/op	  72.09 MB/s	 1229852 B/op	    8032 allocs/op
+BenchmarkCoreDecode/float1000-4                         	     243	   1484519 ns/op	  23.44 MB/s	 1333895 B/op	    9032 allocs/op
+BenchmarkCoreDecode/bool1000-4                          	     386	    934045 ns/op	  29.99 MB/s	 1313818 B/op	    9031 allocs/op
+BenchmarkCoreDecode/map100-4                            	    2076	    169289 ns/op	  54.89 MB/s	  181156 B/op	    1999 allocs/op
+PASS

@@ -331,8 +331,26 @@ func (v *Frame) execCode(c *Code, debug bool) {
 		v.codePointer = len(v.codes)
 		return
 	default:
+		// Native callbacks resolve their goroutine while this call is on the
+		// stack. Keep ordinary Yak calls out of the large opcode dispatcher:
+		// walking its PC/line tables dominates runtime.Stack in callback-heavy
+		// programs. Debugger and other language modes retain the full dispatch.
+		if c.Opcode == OpCall && v.vm.config.vmMode == YAK && !v.vm.debugMode {
+			v.execYakCall(c, v.consumeCallArgCount(c))
+			return
+		}
 		v._execCode(c, debug)
 	}
+}
+
+func (v *Frame) execYakCall(c *Code, argCount int) {
+	wavy := false
+	if c.Op1 != nil {
+		wavy = c.Op1.Bool()
+	}
+	args := v.popArgN(argCount)
+	callableValue := v.pop()
+	v.call(callableValue, wavy, args)
 }
 
 func (v *Frame) _execCode(c *Code, debug bool) {
@@ -1271,14 +1289,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		case YAK:
 			fallthrough
 		default:
-			// 函数调用，这个非常简单，从 unary 中取出 N 个参数，放入调用栈
-			wavy := false
-			if c.Op1 != nil {
-				wavy = c.Op1.Bool()
-			}
-			args := v.popArgN(argCount)
-			callableValue := v.pop()
-			v.call(callableValue, wavy, args)
+			v.execYakCall(c, argCount)
 		}
 	case OpPop:
 		// 弹个栈数据出来

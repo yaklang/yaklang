@@ -40,3 +40,5 @@ jobs:
         run: go test ./common/yak/antlr4yak ./common/yak/antlr4yak/yakast -run '^TestCore' -count=1 -timeout=3m
       - name: Bounded bytecode fuzz smoke test
         run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecode$' -fuzztime=30s -parallel=2
+      - name: Scalar decoder compatibility fuzz test
+        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecodeScalar$' -fuzztime=30s -parallel=2
