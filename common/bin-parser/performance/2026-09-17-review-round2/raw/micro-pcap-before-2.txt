@@ -1,0 +1,12 @@
+COMMAND ["/tmp/yak-protocol-round2/before-pcap.test", "-test.run=^$", "-test.bench=^(BenchmarkProtocolReview|BenchmarkLiveProtocolSessions|BenchmarkProtocolReviewRecording)$", "-test.benchmem", "-test.benchtime=300ms", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/pcapx/pcaputil
+BenchmarkLiveProtocolSessions/http2-4         	     889	    415512 ns/op	   3.79 MB/s	  572912 B/op	    2757 allocs/op
+BenchmarkLiveProtocolSessions/mysql-4         	    3165	    110733 ns/op	  16.54 MB/s	  392172 B/op	     999 allocs/op
+BenchmarkProtocolReview/history/budget=1048576-4         	   10000	     31630 ns/op	   23720 B/op	     134 allocs/op
+BenchmarkProtocolReview/history/budget=128-4             	   22669	     15854 ns/op	   23720 B/op	     134 allocs/op
+BenchmarkProtocolReview/http-fragmented/chunked=false-4  	     126	   2807790 ns/op	   5.72 MB/s	   68284 B/op	      22 allocs/op
+BenchmarkProtocolReview/http-fragmented/chunked=true-4   	     151	   2362677 ns/op	   6.81 MB/s	    5780 B/op	      21 allocs/op
+BenchmarkProtocolReviewRecording-4                       	      14	  22052545 ns/op	  74.90 MB/s	19494934 B/op	   94988 allocs/op
+PASS

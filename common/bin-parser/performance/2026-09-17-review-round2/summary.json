@@ -1,0 +1,2342 @@
+{
+  "matrix": {
+    "BenchmarkPcapBinParser/mixed=true/full/workers=1": {
+      "after": [
+        {
+          "ns/op": 11438300.0,
+          "MB/s": 144.41,
+          "cpu-ms/batch": 11.26,
+          "cpu-ns/message": 3657.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3714.0,
+          "B/op": 19509523.0,
+          "allocs/op": 94980.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 11357044.0,
+          "MB/s": 145.45,
+          "cpu-ms/batch": 11.17,
+          "cpu-ns/message": 3628.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3687.0,
+          "B/op": 19491948.0,
+          "allocs/op": 94977.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=1-2": {
+      "after": [
+        {
+          "ns/op": 9103045.0,
+          "MB/s": 181.46,
+          "cpu-ms/batch": 11.89,
+          "cpu-ns/message": 3861.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2956.0,
+          "B/op": 19510511.0,
+          "allocs/op": 94983.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 9363022.0,
+          "MB/s": 176.42,
+          "cpu-ms/batch": 12.28,
+          "cpu-ns/message": 3989.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3040.0,
+          "B/op": 19493234.0,
+          "allocs/op": 94983.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=1-4": {
+      "after": [
+        {
+          "ns/op": 10574775.0,
+          "MB/s": 156.21,
+          "cpu-ms/batch": 13.18,
+          "cpu-ns/message": 4278.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3433.0,
+          "B/op": 19512908.0,
+          "allocs/op": 94992.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 8902343.0,
+          "MB/s": 185.55,
+          "cpu-ms/batch": 12.8,
+          "cpu-ns/message": 4157.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2890.0,
+          "B/op": 19495560.0,
+          "allocs/op": 94991.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=1-8": {
+      "after": [
+        {
+          "ns/op": 8769357.0,
+          "MB/s": 188.36,
+          "cpu-ms/batch": 13.96,
+          "cpu-ns/message": 4532.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2847.0,
+          "B/op": 19516292.0,
+          "allocs/op": 94995.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 8836014.0,
+          "MB/s": 186.94,
+          "cpu-ms/batch": 13.84,
+          "cpu-ns/message": 4493.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2869.0,
+          "B/op": 19498745.0,
+          "allocs/op": 94994.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=2": {
+      "after": [
+        {
+          "ns/op": 11750914.0,
+          "MB/s": 140.57,
+          "cpu-ms/batch": 11.58,
+          "cpu-ns/message": 3758.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3815.0,
+          "B/op": 22001146.0,
+          "allocs/op": 95047.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 11858029.0,
+          "MB/s": 139.3,
+          "cpu-ms/batch": 11.66,
+          "cpu-ns/message": 3787.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3850.0,
+          "B/op": 21983598.0,
+          "allocs/op": 95046.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=2-2": {
+      "after": [
+        {
+          "ns/op": 7485323.0,
+          "MB/s": 220.68,
+          "cpu-ms/batch": 13.83,
+          "cpu-ns/message": 4490.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2430.0,
+          "B/op": 22001220.0,
+          "allocs/op": 95046.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 7709776.0,
+          "MB/s": 214.25,
+          "cpu-ms/batch": 14.15,
+          "cpu-ns/message": 4595.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2503.0,
+          "B/op": 21984004.0,
+          "allocs/op": 95046.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=2-4": {
+      "after": [
+        {
+          "ns/op": 6543915.0,
+          "MB/s": 252.42,
+          "cpu-ms/batch": 15.59,
+          "cpu-ns/message": 5062.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2125.0,
+          "B/op": 22003218.0,
+          "allocs/op": 95055.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 6399109.0,
+          "MB/s": 258.14,
+          "cpu-ms/batch": 15.31,
+          "cpu-ns/message": 4971.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2078.0,
+          "B/op": 21986351.0,
+          "allocs/op": 95054.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=2-8": {
+      "after": [
+        {
+          "ns/op": 6255627.0,
+          "MB/s": 264.06,
+          "cpu-ms/batch": 16.69,
+          "cpu-ns/message": 5419.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2031.0,
+          "B/op": 22007730.0,
+          "allocs/op": 95069.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 6098502.0,
+          "MB/s": 270.86,
+          "cpu-ms/batch": 16.39,
+          "cpu-ns/message": 5323.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1980.0,
+          "B/op": 21991277.0,
+          "allocs/op": 95073.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=4": {
+      "after": [
+        {
+          "ns/op": 11850688.0,
+          "MB/s": 139.39,
+          "cpu-ms/batch": 11.68,
+          "cpu-ns/message": 3793.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3848.0,
+          "B/op": 24498019.0,
+          "allocs/op": 95101.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 11803865.0,
+          "MB/s": 139.94,
+          "cpu-ms/batch": 11.64,
+          "cpu-ns/message": 3778.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3832.0,
+          "B/op": 24481016.0,
+          "allocs/op": 95101.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=4-2": {
+      "after": [
+        {
+          "ns/op": 7576300.0,
+          "MB/s": 218.03,
+          "cpu-ms/batch": 13.98,
+          "cpu-ns/message": 4539.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2460.0,
+          "B/op": 24498856.0,
+          "allocs/op": 95102.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 7868077.0,
+          "MB/s": 209.94,
+          "cpu-ms/batch": 14.24,
+          "cpu-ns/message": 4622.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2555.0,
+          "B/op": 24481558.0,
+          "allocs/op": 95102.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=4-4": {
+      "after": [
+        {
+          "ns/op": 5225649.0,
+          "MB/s": 316.1,
+          "cpu-ms/batch": 16.59,
+          "cpu-ns/message": 5387.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1697.0,
+          "B/op": 24500921.0,
+          "allocs/op": 95108.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 5407484.0,
+          "MB/s": 305.47,
+          "cpu-ms/batch": 17.12,
+          "cpu-ns/message": 5558.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1756.0,
+          "B/op": 24483630.0,
+          "allocs/op": 95109.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=4-8": {
+      "after": [
+        {
+          "ns/op": 5404206.0,
+          "MB/s": 305.66,
+          "cpu-ms/batch": 20.0,
+          "cpu-ns/message": 6494.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1755.0,
+          "B/op": 24505582.0,
+          "allocs/op": 95124.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 5295943.0,
+          "MB/s": 311.91,
+          "cpu-ms/batch": 19.48,
+          "cpu-ns/message": 6325.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1719.0,
+          "B/op": 24487990.0,
+          "allocs/op": 95123.0
+        }
+      ]
+    }
+  },
+  "micro": {
+    "BenchmarkLiveProtocolSessions/http2-4": {
+      "after": [
+        {
+          "ns/op": 492106.0,
+          "MB/s": 3.2,
+          "B/op": 551482.0,
+          "allocs/op": 2705.0
+        },
+        {
+          "ns/op": 396074.0,
+          "MB/s": 3.97,
+          "B/op": 551480.0,
+          "allocs/op": 2705.0
+        },
+        {
+          "ns/op": 396826.0,
+          "MB/s": 3.97,
+          "B/op": 551492.0,
+          "allocs/op": 2705.0
+        },
+        {
+          "ns/op": 391956.0,
+          "MB/s": 4.02,
+          "B/op": 551503.0,
+          "allocs/op": 2705.0
+        },
+        {
+          "ns/op": 401046.0,
+          "MB/s": 3.92,
+          "B/op": 551500.0,
+          "allocs/op": 2705.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 436500.0,
+          "MB/s": 3.61,
+          "B/op": 572882.0,
+          "allocs/op": 2757.0
+        },
+        {
+          "ns/op": 405161.0,
+          "MB/s": 3.88,
+          "B/op": 572878.0,
+          "allocs/op": 2757.0
+        },
+        {
+          "ns/op": 415512.0,
+          "MB/s": 3.79,
+          "B/op": 572912.0,
+          "allocs/op": 2757.0
+        },
+        {
+          "ns/op": 409283.0,
+          "MB/s": 3.85,
+          "B/op": 572887.0,
+          "allocs/op": 2757.0
+        },
+        {
+          "ns/op": 412526.0,
+          "MB/s": 3.82,
+          "B/op": 572912.0,
+          "allocs/op": 2757.0
+        }
+      ]
+    },
+    "BenchmarkLiveProtocolSessions/mysql-4": {
+      "after": [
+        {
+          "ns/op": 135657.0,
+          "MB/s": 13.5,
+          "B/op": 392204.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 113999.0,
+          "MB/s": 16.06,
+          "B/op": 392216.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 112355.0,
+          "MB/s": 16.3,
+          "B/op": 392201.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 116661.0,
+          "MB/s": 15.7,
+          "B/op": 392213.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 113728.0,
+          "MB/s": 16.1,
+          "B/op": 392219.0,
+          "allocs/op": 999.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 129733.0,
+          "MB/s": 14.11,
+          "B/op": 392169.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 111162.0,
+          "MB/s": 16.47,
+          "B/op": 392175.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 110733.0,
+          "MB/s": 16.54,
+          "B/op": 392172.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 113687.0,
+          "MB/s": 16.11,
+          "B/op": 392187.0,
+          "allocs/op": 999.0
+        },
+        {
+          "ns/op": 110006.0,
+          "MB/s": 16.64,
+          "B/op": 392167.0,
+          "allocs/op": 999.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReview/history/budget=1048576-4": {
+      "after": [
+        {
+          "ns/op": 17077.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15437.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15491.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15410.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15439.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 32599.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 31285.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 31630.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 31132.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 30964.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReview/history/budget=128-4": {
+      "after": [
+        {
+          "ns/op": 3687.0,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 3808.0,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 3537.0,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 3576.0,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 3529.0,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 16392.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15742.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15854.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15569.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        },
+        {
+          "ns/op": 15761.0,
+          "B/op": 23720.0,
+          "allocs/op": 134.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReview/http-fragmented/chunked=false-4": {
+      "after": [
+        {
+          "ns/op": 220403.0,
+          "MB/s": 72.9,
+          "B/op": 68299.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 214647.0,
+          "MB/s": 74.86,
+          "B/op": 68299.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 214731.0,
+          "MB/s": 74.83,
+          "B/op": 68299.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 215134.0,
+          "MB/s": 74.69,
+          "B/op": 68299.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 213559.0,
+          "MB/s": 75.24,
+          "B/op": 68299.0,
+          "allocs/op": 22.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 3600497.0,
+          "MB/s": 4.46,
+          "B/op": 68284.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 2817905.0,
+          "MB/s": 5.7,
+          "B/op": 68285.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 2807790.0,
+          "MB/s": 5.72,
+          "B/op": 68284.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 2841226.0,
+          "MB/s": 5.66,
+          "B/op": 68284.0,
+          "allocs/op": 22.0
+        },
+        {
+          "ns/op": 2840584.0,
+          "MB/s": 5.66,
+          "B/op": 68284.0,
+          "allocs/op": 22.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReview/http-fragmented/chunked=true-4": {
+      "after": [
+        {
+          "ns/op": 226925.0,
+          "MB/s": 70.87,
+          "B/op": 5792.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 229889.0,
+          "MB/s": 69.96,
+          "B/op": 5792.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 228988.0,
+          "MB/s": 70.23,
+          "B/op": 5792.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 228760.0,
+          "MB/s": 70.3,
+          "B/op": 5792.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 228034.0,
+          "MB/s": 70.52,
+          "B/op": 5792.0,
+          "allocs/op": 21.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 2429484.0,
+          "MB/s": 6.62,
+          "B/op": 5779.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 2344164.0,
+          "MB/s": 6.86,
+          "B/op": 5780.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 2362677.0,
+          "MB/s": 6.81,
+          "B/op": 5780.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 2365746.0,
+          "MB/s": 6.8,
+          "B/op": 5779.0,
+          "allocs/op": 21.0
+        },
+        {
+          "ns/op": 2344468.0,
+          "MB/s": 6.86,
+          "B/op": 5779.0,
+          "allocs/op": 21.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewRecording-4": {
+      "after": [
+        {
+          "ns/op": 10106773.0,
+          "MB/s": 163.44,
+          "B/op": 19774181.0,
+          "allocs/op": 94991.0
+        },
+        {
+          "ns/op": 10058562.0,
+          "MB/s": 164.22,
+          "B/op": 19774270.0,
+          "allocs/op": 94991.0
+        },
+        {
+          "ns/op": 9887487.0,
+          "MB/s": 167.06,
+          "B/op": 19774252.0,
+          "allocs/op": 94991.0
+        },
+        {
+          "ns/op": 10020631.0,
+          "MB/s": 164.84,
+          "B/op": 19774709.0,
+          "allocs/op": 94993.0
+        },
+        {
+          "ns/op": 10826566.0,
+          "MB/s": 152.57,
+          "B/op": 19775101.0,
+          "allocs/op": 94994.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 25288979.0,
+          "MB/s": 65.32,
+          "B/op": 19495997.0,
+          "allocs/op": 94992.0
+        },
+        {
+          "ns/op": 21755261.0,
+          "MB/s": 75.93,
+          "B/op": 19494883.0,
+          "allocs/op": 94989.0
+        },
+        {
+          "ns/op": 22052545.0,
+          "MB/s": 74.9,
+          "B/op": 19494934.0,
+          "allocs/op": 94988.0
+        },
+        {
+          "ns/op": 22674196.0,
+          "MB/s": 72.85,
+          "B/op": 19495338.0,
+          "allocs/op": 94990.0
+        },
+        {
+          "ns/op": 22114015.0,
+          "MB/s": 74.7,
+          "B/op": 19495073.0,
+          "allocs/op": 94988.0
+        }
+      ]
+    },
+    "BenchmarkHTTP2Review/layout/headers-4": {
+      "after": [
+        {
+          "ns/op": 42.56,
+          "MB/s": 258.47,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 41.22,
+          "MB/s": 266.86,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 41.55,
+          "MB/s": 264.73,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 41.28,
+          "MB/s": 266.47,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 41.49,
+          "MB/s": 265.15,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 515.9,
+          "MB/s": 21.32,
+          "B/op": 1648.0,
+          "allocs/op": 4.0
+        },
+        {
+          "ns/op": 451.1,
+          "MB/s": 24.38,
+          "B/op": 1648.0,
+          "allocs/op": 4.0
+        },
+        {
+          "ns/op": 448.0,
+          "MB/s": 24.55,
+          "B/op": 1648.0,
+          "allocs/op": 4.0
+        },
+        {
+          "ns/op": 464.4,
+          "MB/s": 23.69,
+          "B/op": 1648.0,
+          "allocs/op": 4.0
+        },
+        {
+          "ns/op": 468.0,
+          "MB/s": 23.5,
+          "B/op": 1648.0,
+          "allocs/op": 4.0
+        }
+      ]
+    },
+    "BenchmarkHTTP2Review/layout/settings-4": {
+      "after": [
+        {
+          "ns/op": 134.5,
+          "MB/s": 1494.08,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 125.4,
+          "MB/s": 1602.8,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 124.8,
+          "MB/s": 1611.04,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 124.5,
+          "MB/s": 1614.17,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 125.7,
+          "MB/s": 1599.63,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 5669.0,
+          "MB/s": 35.45,
+          "B/op": 13169.0,
+          "allocs/op": 70.0
+        },
+        {
+          "ns/op": 5072.0,
+          "MB/s": 39.63,
+          "B/op": 13169.0,
+          "allocs/op": 70.0
+        },
+        {
+          "ns/op": 5230.0,
+          "MB/s": 38.43,
+          "B/op": 13169.0,
+          "allocs/op": 70.0
+        },
+        {
+          "ns/op": 5221.0,
+          "MB/s": 38.5,
+          "B/op": 13169.0,
+          "allocs/op": 70.0
+        },
+        {
+          "ns/op": 5121.0,
+          "MB/s": 39.25,
+          "B/op": 13169.0,
+          "allocs/op": 70.0
+        }
+      ]
+    },
+    "BenchmarkHTTP2Review/layout/padded-priority-4": {
+      "after": [
+        {
+          "ns/op": 45.74,
+          "MB/s": 393.51,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 42.3,
+          "MB/s": 425.51,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 42.45,
+          "MB/s": 424.01,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 42.2,
+          "MB/s": 426.52,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        },
+        {
+          "ns/op": 42.57,
+          "MB/s": 422.84,
+          "B/op": 0.0,
+          "allocs/op": 0.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 584.2,
+          "MB/s": 30.81,
+          "B/op": 1656.0,
+          "allocs/op": 5.0
+        },
+        {
+          "ns/op": 505.4,
+          "MB/s": 35.62,
+          "B/op": 1656.0,
+          "allocs/op": 5.0
+        },
+        {
+          "ns/op": 507.6,
+          "MB/s": 35.46,
+          "B/op": 1656.0,
+          "allocs/op": 5.0
+        },
+        {
+          "ns/op": 508.4,
+          "MB/s": 35.41,
+          "B/op": 1656.0,
+          "allocs/op": 5.0
+        },
+        {
+          "ns/op": 500.8,
+          "MB/s": 35.94,
+          "B/op": 1656.0,
+          "allocs/op": 5.0
+        }
+      ]
+    },
+    "BenchmarkHTTP2Review/hpack/headers=4-4": {
+      "after": [
+        {
+          "ns/op": 2860.0,
+          "MB/s": 60.14,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2666.0,
+          "MB/s": 64.51,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2604.0,
+          "MB/s": 66.06,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2595.0,
+          "MB/s": 66.29,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2633.0,
+          "MB/s": 65.32,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 2844.0,
+          "MB/s": 60.48,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2705.0,
+          "MB/s": 63.58,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2670.0,
+          "MB/s": 64.42,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2687.0,
+          "MB/s": 64.02,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        },
+        {
+          "ns/op": 2730.0,
+          "MB/s": 63.0,
+          "B/op": 1784.0,
+          "allocs/op": 27.0
+        }
+      ]
+    },
+    "BenchmarkHTTP2Review/hpack/headers=128-4": {
+      "after": [
+        {
+          "ns/op": 90215.0,
+          "MB/s": 61.32,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 82220.0,
+          "MB/s": 67.28,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 82185.0,
+          "MB/s": 67.31,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 81323.0,
+          "MB/s": 68.03,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 82131.0,
+          "MB/s": 67.36,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 88102.0,
+          "MB/s": 62.79,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 83718.0,
+          "MB/s": 66.08,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 84803.0,
+          "MB/s": 65.23,
+          "B/op": 57468.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 83230.0,
+          "MB/s": 66.47,
+          "B/op": 57467.0,
+          "allocs/op": 776.0
+        },
+        {
+          "ns/op": 89396.0,
+          "MB/s": 61.88,
+          "B/op": 57467.0,
+          "allocs/op": 776.0
+        }
+      ]
+    }
+  },
+  "pipeline": {
+    "BenchmarkPcapBinParser/mixed=true/full/workers=1-4": {
+      "after": [
+        {
+          "ns/op": 8914965.0,
+          "MB/s": 185.29,
+          "cpu-ms/batch": 12.83,
+          "cpu-ns/message": 4166.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2894.0,
+          "B/op": 19512713.0,
+          "allocs/op": 94992.0
+        },
+        {
+          "ns/op": 8729782.0,
+          "MB/s": 189.22,
+          "cpu-ms/batch": 12.69,
+          "cpu-ns/message": 4119.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2834.0,
+          "B/op": 19512205.0,
+          "allocs/op": 94989.0
+        },
+        {
+          "ns/op": 8779572.0,
+          "MB/s": 188.15,
+          "cpu-ms/batch": 12.75,
+          "cpu-ns/message": 4139.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2851.0,
+          "B/op": 19512458.0,
+          "allocs/op": 94991.0
+        },
+        {
+          "ns/op": 8823848.0,
+          "MB/s": 187.2,
+          "cpu-ms/batch": 12.76,
+          "cpu-ns/message": 4144.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2865.0,
+          "B/op": 19512523.0,
+          "allocs/op": 94990.0
+        },
+        {
+          "ns/op": 8798080.0,
+          "MB/s": 187.75,
+          "cpu-ms/batch": 12.84,
+          "cpu-ns/message": 4168.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2857.0,
+          "B/op": 19512941.0,
+          "allocs/op": 94992.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 9375010.0,
+          "MB/s": 176.2,
+          "cpu-ms/batch": 13.51,
+          "cpu-ns/message": 4387.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3044.0,
+          "B/op": 19494861.0,
+          "allocs/op": 94989.0
+        },
+        {
+          "ns/op": 8618946.0,
+          "MB/s": 191.65,
+          "cpu-ms/batch": 12.39,
+          "cpu-ns/message": 4023.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2798.0,
+          "B/op": 19495359.0,
+          "allocs/op": 94990.0
+        },
+        {
+          "ns/op": 8614580.0,
+          "MB/s": 191.75,
+          "cpu-ms/batch": 12.42,
+          "cpu-ns/message": 4032.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2797.0,
+          "B/op": 19495338.0,
+          "allocs/op": 94990.0
+        },
+        {
+          "ns/op": 8523468.0,
+          "MB/s": 193.8,
+          "cpu-ms/batch": 12.29,
+          "cpu-ns/message": 3989.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2767.0,
+          "B/op": 19495125.0,
+          "allocs/op": 94989.0
+        },
+        {
+          "ns/op": 8784324.0,
+          "MB/s": 188.04,
+          "cpu-ms/batch": 12.65,
+          "cpu-ns/message": 4107.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2852.0,
+          "B/op": 19495357.0,
+          "allocs/op": 94990.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=2-4": {
+      "after": [
+        {
+          "ns/op": 6155974.0,
+          "MB/s": 268.33,
+          "cpu-ms/batch": 14.84,
+          "cpu-ns/message": 4818.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1999.0,
+          "B/op": 22003822.0,
+          "allocs/op": 95056.0
+        },
+        {
+          "ns/op": 6540078.0,
+          "MB/s": 252.57,
+          "cpu-ms/batch": 15.47,
+          "cpu-ns/message": 5023.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2123.0,
+          "B/op": 22004007.0,
+          "allocs/op": 95056.0
+        },
+        {
+          "ns/op": 6315341.0,
+          "MB/s": 261.56,
+          "cpu-ms/batch": 15.12,
+          "cpu-ns/message": 4910.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2050.0,
+          "B/op": 22003741.0,
+          "allocs/op": 95056.0
+        },
+        {
+          "ns/op": 6155894.0,
+          "MB/s": 268.33,
+          "cpu-ms/batch": 14.83,
+          "cpu-ns/message": 4814.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1999.0,
+          "B/op": 22003517.0,
+          "allocs/op": 95055.0
+        },
+        {
+          "ns/op": 6346763.0,
+          "MB/s": 260.26,
+          "cpu-ms/batch": 15.17,
+          "cpu-ns/message": 4925.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2061.0,
+          "B/op": 22003655.0,
+          "allocs/op": 95055.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 7267389.0,
+          "MB/s": 227.29,
+          "cpu-ms/batch": 16.8,
+          "cpu-ns/message": 5453.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2360.0,
+          "B/op": 21986173.0,
+          "allocs/op": 95053.0
+        },
+        {
+          "ns/op": 6479905.0,
+          "MB/s": 254.92,
+          "cpu-ms/batch": 15.36,
+          "cpu-ns/message": 4987.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2104.0,
+          "B/op": 21986648.0,
+          "allocs/op": 95055.0
+        },
+        {
+          "ns/op": 6451345.0,
+          "MB/s": 256.05,
+          "cpu-ms/batch": 15.35,
+          "cpu-ns/message": 4985.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2095.0,
+          "B/op": 21986104.0,
+          "allocs/op": 95052.0
+        },
+        {
+          "ns/op": 7248322.0,
+          "MB/s": 227.89,
+          "cpu-ms/batch": 15.31,
+          "cpu-ns/message": 4971.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2353.0,
+          "B/op": 21985941.0,
+          "allocs/op": 95052.0
+        },
+        {
+          "ns/op": 6416065.0,
+          "MB/s": 257.45,
+          "cpu-ms/batch": 15.24,
+          "cpu-ns/message": 4950.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2083.0,
+          "B/op": 21986434.0,
+          "allocs/op": 95055.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full/workers=4-4": {
+      "after": [
+        {
+          "ns/op": 5161561.0,
+          "MB/s": 320.03,
+          "cpu-ms/batch": 16.57,
+          "cpu-ns/message": 5379.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1676.0,
+          "B/op": 24500853.0,
+          "allocs/op": 95108.0
+        },
+        {
+          "ns/op": 5578395.0,
+          "MB/s": 296.11,
+          "cpu-ms/batch": 17.39,
+          "cpu-ns/message": 5646.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1811.0,
+          "B/op": 24500938.0,
+          "allocs/op": 95109.0
+        },
+        {
+          "ns/op": 5193804.0,
+          "MB/s": 318.04,
+          "cpu-ms/batch": 16.63,
+          "cpu-ns/message": 5399.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1686.0,
+          "B/op": 24500588.0,
+          "allocs/op": 95107.0
+        },
+        {
+          "ns/op": 5229327.0,
+          "MB/s": 315.88,
+          "cpu-ms/batch": 16.47,
+          "cpu-ns/message": 5346.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1698.0,
+          "B/op": 24500758.0,
+          "allocs/op": 95108.0
+        },
+        {
+          "ns/op": 5283186.0,
+          "MB/s": 312.66,
+          "cpu-ms/batch": 16.59,
+          "cpu-ns/message": 5388.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1715.0,
+          "B/op": 24501004.0,
+          "allocs/op": 95109.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 6191796.0,
+          "MB/s": 266.78,
+          "cpu-ms/batch": 18.71,
+          "cpu-ns/message": 6075.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2010.0,
+          "B/op": 24483490.0,
+          "allocs/op": 95108.0
+        },
+        {
+          "ns/op": 5469799.0,
+          "MB/s": 301.99,
+          "cpu-ms/batch": 17.21,
+          "cpu-ns/message": 5586.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1776.0,
+          "B/op": 24483954.0,
+          "allocs/op": 95110.0
+        },
+        {
+          "ns/op": 5307549.0,
+          "MB/s": 311.22,
+          "cpu-ms/batch": 16.81,
+          "cpu-ns/message": 5457.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1723.0,
+          "B/op": 24483864.0,
+          "allocs/op": 95109.0
+        },
+        {
+          "ns/op": 4997433.0,
+          "MB/s": 330.54,
+          "cpu-ms/batch": 16.01,
+          "cpu-ns/message": 5199.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1623.0,
+          "B/op": 24483243.0,
+          "allocs/op": 95107.0
+        },
+        {
+          "ns/op": 5187482.0,
+          "MB/s": 318.43,
+          "cpu-ms/batch": 16.59,
+          "cpu-ns/message": 5385.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1684.0,
+          "B/op": 24483692.0,
+          "allocs/op": 95109.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full-history/workers=1-4": {
+      "after": [
+        {
+          "ns/op": 9646479.0,
+          "MB/s": 171.24,
+          "cpu-ms/batch": 14.6,
+          "cpu-ns/message": 4739.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3132.0,
+          "B/op": 22351885.0,
+          "allocs/op": 101153.0
+        },
+        {
+          "ns/op": 9789961.0,
+          "MB/s": 168.73,
+          "cpu-ms/batch": 14.86,
+          "cpu-ns/message": 4823.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3179.0,
+          "B/op": 22351408.0,
+          "allocs/op": 101152.0
+        },
+        {
+          "ns/op": 9735458.0,
+          "MB/s": 169.67,
+          "cpu-ms/batch": 14.76,
+          "cpu-ns/message": 4793.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3161.0,
+          "B/op": 22352331.0,
+          "allocs/op": 101157.0
+        },
+        {
+          "ns/op": 9940262.0,
+          "MB/s": 166.18,
+          "cpu-ms/batch": 14.97,
+          "cpu-ns/message": 4859.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3227.0,
+          "B/op": 22351545.0,
+          "allocs/op": 101153.0
+        },
+        {
+          "ns/op": 10721083.0,
+          "MB/s": 154.07,
+          "cpu-ms/batch": 14.91,
+          "cpu-ns/message": 4839.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3481.0,
+          "B/op": 22351702.0,
+          "allocs/op": 101154.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 11978993.0,
+          "MB/s": 137.89,
+          "cpu-ms/batch": 16.02,
+          "cpu-ns/message": 5201.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3889.0,
+          "B/op": 22334485.0,
+          "allocs/op": 101153.0
+        },
+        {
+          "ns/op": 9789261.0,
+          "MB/s": 168.74,
+          "cpu-ms/batch": 14.77,
+          "cpu-ns/message": 4796.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3178.0,
+          "B/op": 22334333.0,
+          "allocs/op": 101152.0
+        },
+        {
+          "ns/op": 9722020.0,
+          "MB/s": 169.91,
+          "cpu-ms/batch": 14.69,
+          "cpu-ns/message": 4769.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3157.0,
+          "B/op": 22334221.0,
+          "allocs/op": 101152.0
+        },
+        {
+          "ns/op": 9542505.0,
+          "MB/s": 173.1,
+          "cpu-ms/batch": 14.38,
+          "cpu-ns/message": 4669.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3098.0,
+          "B/op": 22334546.0,
+          "allocs/op": 101153.0
+        },
+        {
+          "ns/op": 9620086.0,
+          "MB/s": 171.71,
+          "cpu-ms/batch": 14.56,
+          "cpu-ns/message": 4728.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 3123.0,
+          "B/op": 22334759.0,
+          "allocs/op": 101154.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full-history/workers=2-4": {
+      "after": [
+        {
+          "ns/op": 7202457.0,
+          "MB/s": 229.34,
+          "cpu-ms/batch": 17.23,
+          "cpu-ns/message": 5596.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2338.0,
+          "B/op": 24842413.0,
+          "allocs/op": 101216.0
+        },
+        {
+          "ns/op": 7301485.0,
+          "MB/s": 226.23,
+          "cpu-ms/batch": 17.56,
+          "cpu-ns/message": 5701.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2371.0,
+          "B/op": 24842927.0,
+          "allocs/op": 101218.0
+        },
+        {
+          "ns/op": 7243886.0,
+          "MB/s": 228.03,
+          "cpu-ms/batch": 17.5,
+          "cpu-ns/message": 5682.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2352.0,
+          "B/op": 24842727.0,
+          "allocs/op": 101217.0
+        },
+        {
+          "ns/op": 7468878.0,
+          "MB/s": 221.16,
+          "cpu-ms/batch": 17.93,
+          "cpu-ns/message": 5821.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2425.0,
+          "B/op": 24843112.0,
+          "allocs/op": 101218.0
+        },
+        {
+          "ns/op": 7309060.0,
+          "MB/s": 226.0,
+          "cpu-ms/batch": 17.6,
+          "cpu-ns/message": 5716.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2373.0,
+          "B/op": 24841950.0,
+          "allocs/op": 101214.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 8046869.0,
+          "MB/s": 205.28,
+          "cpu-ms/batch": 18.94,
+          "cpu-ns/message": 6148.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2613.0,
+          "B/op": 24825274.0,
+          "allocs/op": 101216.0
+        },
+        {
+          "ns/op": 7142318.0,
+          "MB/s": 231.28,
+          "cpu-ms/batch": 17.29,
+          "cpu-ns/message": 5613.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2319.0,
+          "B/op": 24825696.0,
+          "allocs/op": 101218.0
+        },
+        {
+          "ns/op": 7248211.0,
+          "MB/s": 227.9,
+          "cpu-ms/batch": 17.34,
+          "cpu-ns/message": 5629.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2353.0,
+          "B/op": 24825726.0,
+          "allocs/op": 101218.0
+        },
+        {
+          "ns/op": 7095158.0,
+          "MB/s": 232.81,
+          "cpu-ms/batch": 17.17,
+          "cpu-ns/message": 5575.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2304.0,
+          "B/op": 24825728.0,
+          "allocs/op": 101217.0
+        },
+        {
+          "ns/op": 7162528.0,
+          "MB/s": 230.62,
+          "cpu-ms/batch": 17.21,
+          "cpu-ns/message": 5588.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2325.0,
+          "B/op": 24825467.0,
+          "allocs/op": 101216.0
+        }
+      ]
+    },
+    "BenchmarkPcapBinParser/mixed=true/full-history/workers=4-4": {
+      "after": [
+        {
+          "ns/op": 6276101.0,
+          "MB/s": 263.2,
+          "cpu-ms/batch": 19.65,
+          "cpu-ns/message": 6381.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2038.0,
+          "B/op": 27339795.0,
+          "allocs/op": 101271.0
+        },
+        {
+          "ns/op": 6492574.0,
+          "MB/s": 254.42,
+          "cpu-ms/batch": 20.09,
+          "cpu-ns/message": 6521.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2108.0,
+          "B/op": 27339748.0,
+          "allocs/op": 101271.0
+        },
+        {
+          "ns/op": 6126639.0,
+          "MB/s": 269.62,
+          "cpu-ms/batch": 19.36,
+          "cpu-ns/message": 6287.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1989.0,
+          "B/op": 27340139.0,
+          "allocs/op": 101271.0
+        },
+        {
+          "ns/op": 5860572.0,
+          "MB/s": 281.86,
+          "cpu-ms/batch": 18.96,
+          "cpu-ns/message": 6155.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1903.0,
+          "B/op": 27339804.0,
+          "allocs/op": 101270.0
+        },
+        {
+          "ns/op": 6056561.0,
+          "MB/s": 272.74,
+          "cpu-ms/batch": 19.39,
+          "cpu-ns/message": 6296.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1966.0,
+          "B/op": 27339812.0,
+          "allocs/op": 101270.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 7310066.0,
+          "MB/s": 225.97,
+          "cpu-ms/batch": 21.65,
+          "cpu-ns/message": 7030.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2373.0,
+          "B/op": 27323021.0,
+          "allocs/op": 101272.0
+        },
+        {
+          "ns/op": 6948997.0,
+          "MB/s": 237.71,
+          "cpu-ms/batch": 18.96,
+          "cpu-ns/message": 6157.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2256.0,
+          "B/op": 27322647.0,
+          "allocs/op": 101271.0
+        },
+        {
+          "ns/op": 5956542.0,
+          "MB/s": 277.32,
+          "cpu-ms/batch": 18.95,
+          "cpu-ns/message": 6152.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1934.0,
+          "B/op": 27322983.0,
+          "allocs/op": 101271.0
+        },
+        {
+          "ns/op": 6428501.0,
+          "MB/s": 256.96,
+          "cpu-ms/batch": 19.95,
+          "cpu-ns/message": 6476.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 2087.0,
+          "B/op": 27322972.0,
+          "allocs/op": 101271.0
+        },
+        {
+          "ns/op": 5854173.0,
+          "MB/s": 282.16,
+          "cpu-ms/batch": 18.79,
+          "cpu-ns/message": 6101.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 3080.0,
+          "ns/message": 1901.0,
+          "B/op": 27322811.0,
+          "allocs/op": 101272.0
+        }
+      ]
+    }
+  },
+  "scheduler": {
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=1": {
+      "after": [
+        {
+          "ns/op": 536464.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 129.0,
+          "ns/message": 4159.0,
+          "B/op": 1067789.0,
+          "allocs/op": 3817.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 538896.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 129.0,
+          "ns/message": 4177.0,
+          "B/op": 1067719.0,
+          "allocs/op": 3817.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=1-2": {
+      "after": [
+        {
+          "ns/op": 439235.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 129.0,
+          "ns/message": 3405.0,
+          "B/op": 1067818.0,
+          "allocs/op": 3817.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 441506.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 129.0,
+          "ns/message": 3423.0,
+          "B/op": 1067809.0,
+          "allocs/op": 3817.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=1-4": {
+      "after": [
+        {
+          "ns/op": 398956.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 129.0,
+          "ns/message": 3093.0,
+          "B/op": 1067980.0,
+          "allocs/op": 3818.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 407958.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 129.0,
+          "ns/message": 3162.0,
+          "B/op": 1067951.0,
+          "allocs/op": 3818.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=1-8": {
+      "after": [
+        {
+          "ns/op": 405647.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 129.0,
+          "ns/message": 3145.0,
+          "B/op": 1068198.0,
+          "allocs/op": 3818.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 403679.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 129.0,
+          "ns/message": 3129.0,
+          "B/op": 1068195.0,
+          "allocs/op": 3818.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=2": {
+      "after": [
+        {
+          "ns/op": 1000851.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 129.0,
+          "ns/message": 7759.0,
+          "B/op": 3565880.0,
+          "allocs/op": 3882.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 972363.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 129.0,
+          "ns/message": 7538.0,
+          "B/op": 3565814.0,
+          "allocs/op": 3882.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=2-2": {
+      "after": [
+        {
+          "ns/op": 690951.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 129.0,
+          "ns/message": 5356.0,
+          "B/op": 3565965.0,
+          "allocs/op": 3882.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 688621.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 129.0,
+          "ns/message": 5338.0,
+          "B/op": 3565980.0,
+          "allocs/op": 3882.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=2-4": {
+      "after": [
+        {
+          "ns/op": 608748.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 129.0,
+          "ns/message": 4719.0,
+          "B/op": 3566421.0,
+          "allocs/op": 3884.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 622851.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 129.0,
+          "ns/message": 4828.0,
+          "B/op": 3566438.0,
+          "allocs/op": 3884.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=2-8": {
+      "after": [
+        {
+          "ns/op": 616567.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 129.0,
+          "ns/message": 4780.0,
+          "B/op": 3567271.0,
+          "allocs/op": 3886.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 603409.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 129.0,
+          "ns/message": 4678.0,
+          "B/op": 3567096.0,
+          "allocs/op": 3886.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=4": {
+      "after": [
+        {
+          "ns/op": 1218206.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 129.0,
+          "ns/message": 9443.0,
+          "B/op": 6063171.0,
+          "allocs/op": 3938.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 1204315.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 129.0,
+          "ns/message": 9336.0,
+          "B/op": 6063120.0,
+          "allocs/op": 3938.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=4-2": {
+      "after": [
+        {
+          "ns/op": 855002.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 129.0,
+          "ns/message": 6628.0,
+          "B/op": 6063299.0,
+          "allocs/op": 3938.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 837762.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 129.0,
+          "ns/message": 6494.0,
+          "B/op": 6063301.0,
+          "allocs/op": 3938.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=4-4": {
+      "after": [
+        {
+          "ns/op": 725623.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 129.0,
+          "ns/message": 5625.0,
+          "B/op": 6063758.0,
+          "allocs/op": 3940.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 773368.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 129.0,
+          "ns/message": 5995.0,
+          "B/op": 6063780.0,
+          "allocs/op": 3940.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/single-tcp/workers=4-8": {
+      "after": [
+        {
+          "ns/op": 768501.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 129.0,
+          "ns/message": 5957.0,
+          "B/op": 6065043.0,
+          "allocs/op": 3943.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 766908.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 129.0,
+          "ns/message": 5945.0,
+          "B/op": 6065053.0,
+          "allocs/op": 3943.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=1": {
+      "after": [
+        {
+          "ns/op": 67613.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 4.0,
+          "ns/message": 16903.0,
+          "B/op": 301273.0,
+          "allocs/op": 466.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 70592.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 4.0,
+          "ns/message": 17648.0,
+          "B/op": 301281.0,
+          "allocs/op": 466.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=1-2": {
+      "after": [
+        {
+          "ns/op": 49630.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 4.0,
+          "ns/message": 12407.0,
+          "B/op": 301285.0,
+          "allocs/op": 466.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 50147.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 4.0,
+          "ns/message": 12537.0,
+          "B/op": 301286.0,
+          "allocs/op": 466.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=1-4": {
+      "after": [
+        {
+          "ns/op": 48074.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 4.0,
+          "ns/message": 12019.0,
+          "B/op": 301301.0,
+          "allocs/op": 466.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 46077.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 4.0,
+          "ns/message": 11519.0,
+          "B/op": 301299.0,
+          "allocs/op": 466.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=1-8": {
+      "after": [
+        {
+          "ns/op": 48781.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 4.0,
+          "ns/message": 12195.0,
+          "B/op": 301334.0,
+          "allocs/op": 466.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 48417.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 4.0,
+          "ns/message": 12104.0,
+          "B/op": 301330.0,
+          "allocs/op": 466.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=2": {
+      "after": [
+        {
+          "ns/op": 441021.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 4.0,
+          "ns/message": 110255.0,
+          "B/op": 2802353.0,
+          "allocs/op": 550.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 441233.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 4.0,
+          "ns/message": 110308.0,
+          "B/op": 2802343.0,
+          "allocs/op": 550.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=2-2": {
+      "after": [
+        {
+          "ns/op": 251351.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 4.0,
+          "ns/message": 62838.0,
+          "B/op": 2802388.0,
+          "allocs/op": 550.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 245125.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 4.0,
+          "ns/message": 61281.0,
+          "B/op": 2802378.0,
+          "allocs/op": 550.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=2-4": {
+      "after": [
+        {
+          "ns/op": 260094.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 4.0,
+          "ns/message": 65023.0,
+          "B/op": 2802486.0,
+          "allocs/op": 551.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 196813.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 4.0,
+          "ns/message": 49203.0,
+          "B/op": 2802486.0,
+          "allocs/op": 551.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=2-8": {
+      "after": [
+        {
+          "ns/op": 199743.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 4.0,
+          "ns/message": 49936.0,
+          "B/op": 2802651.0,
+          "allocs/op": 551.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 198969.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 4.0,
+          "ns/message": 49742.0,
+          "B/op": 2802673.0,
+          "allocs/op": 551.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=4": {
+      "after": [
+        {
+          "ns/op": 881313.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 4.0,
+          "ns/message": 220328.0,
+          "B/op": 5299562.0,
+          "allocs/op": 605.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 856308.0,
+          "gomaxprocs": 1.0,
+          "messages/batch": 4.0,
+          "ns/message": 214077.0,
+          "B/op": 5299578.0,
+          "allocs/op": 605.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=4-2": {
+      "after": [
+        {
+          "ns/op": 432323.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 4.0,
+          "ns/message": 108081.0,
+          "B/op": 5299627.0,
+          "allocs/op": 606.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 425430.0,
+          "gomaxprocs": 2.0,
+          "messages/batch": 4.0,
+          "ns/message": 106358.0,
+          "B/op": 5299609.0,
+          "allocs/op": 605.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=4-4": {
+      "after": [
+        {
+          "ns/op": 316707.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 4.0,
+          "ns/message": 79177.0,
+          "B/op": 5299800.0,
+          "allocs/op": 606.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 319032.0,
+          "gomaxprocs": 4.0,
+          "messages/batch": 4.0,
+          "ns/message": 79758.0,
+          "B/op": 5299760.0,
+          "allocs/op": 606.0
+        }
+      ]
+    },
+    "BenchmarkProtocolReviewScheduler/dns-udp/workers=4-8": {
+      "after": [
+        {
+          "ns/op": 307270.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 4.0,
+          "ns/message": 76817.0,
+          "B/op": 5300059.0,
+          "allocs/op": 607.0
+        }
+      ],
+      "before": [
+        {
+          "ns/op": 309113.0,
+          "gomaxprocs": 8.0,
+          "messages/batch": 4.0,
+          "ns/message": 77278.0,
+          "B/op": 5300039.0,
+          "allocs/op": 607.0
+        }
+      ]
+    }
+  }
+}

@@ -60,3 +60,8 @@ go test ./common/bin-parser -list 'Benchmark.*Structured'
 先固定两版程序再交替运行，计时期间不编译或跑回归。报告及原始实验数据放在仓库外。
 Windows 原生抓包 pprof 可能混入等待，CPU 总量以进程 user+system 为准；解析热点
 使用不含原生等待的回放 profile 定位。
+
+
+## 2026-09-17 定向优化复测
+
+参见 [PR #5013 首轮优化 A/B 记录](performance/2026-09-17-review-round2/README.md)：包含 H2/HTTP/历史/库保存局部收益、完整解析回归、独立 worker × GOMAXPROCS 矩阵、原始日志及证据边界。

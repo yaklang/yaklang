@@ -1,0 +1,33 @@
+File: after-pcap.test
+Type: cpu
+Time: Sep 17, 2026 at 9:10am (CST)
+Duration: 4.32s, Total samples = 10.27s (237.79%)
+Showing nodes accounting for 8.55s, 83.25% of 10.27s total
+Dropped 247 nodes (cum <= 0.05s)
+Showing top 25 nodes out of 136
+      flat  flat%   sum%        cum   cum%
+     1.92s 18.70% 18.70%      1.92s 18.70%  runtime.usleep
+     1.33s 12.95% 31.65%      1.33s 12.95%  runtime.pthread_cond_signal
+     1.19s 11.59% 43.23%      1.19s 11.59%  runtime.pthread_cond_wait
+     1.05s 10.22% 53.46%      1.05s 10.22%  runtime.pthread_kill
+     0.70s  6.82% 60.27%      0.70s  6.82%  runtime.madvise
+     0.39s  3.80% 64.07%      0.39s  3.80%  runtime.kevent
+     0.33s  3.21% 67.28%      0.33s  3.21%  runtime.pthread_cond_timedwait_relative_np
+     0.24s  2.34% 69.62%      0.82s  7.98%  runtime.mallocgc
+     0.23s  2.24% 71.86%      0.72s  7.01%  runtime.scanobject
+     0.22s  2.14% 74.00%      0.24s  2.34%  runtime.scanblock
+     0.13s  1.27% 75.27%      0.17s  1.66%  runtime.findObject
+     0.13s  1.27% 76.53%      0.31s  3.02%  runtime.mapassign_faststr
+     0.12s  1.17% 77.70%      0.15s  1.46%  runtime.greyobject
+     0.12s  1.17% 78.87%      0.12s  1.17%  runtime.typePointers.nextFast (inline)
+     0.09s  0.88% 79.75%      0.14s  1.36%  runtime.(*mspan).writeHeapBitsSmall
+     0.07s  0.68% 80.43%      0.07s  0.68%  runtime.memclrNoHeapPointers
+     0.06s  0.58% 81.01%      1.65s 16.07%  runtime.gcDrain
+     0.06s  0.58% 81.60%      0.09s  0.88%  runtime.typePointers.next
+     0.04s  0.39% 81.99%      0.06s  0.58%  runtime.gcmarknewobject
+     0.03s  0.29% 82.28%      0.12s  1.17%  runtime.growslice
+     0.02s  0.19% 82.47%      0.06s  0.58%  fmt.(*pp).doPrintf
+     0.02s  0.19% 82.67%      0.07s  0.68%  gcWriteBarrier
+     0.02s  0.19% 82.86%      1.76s 17.14%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed
+     0.02s  0.19% 83.06%      0.71s  6.91%  runtime.runqgrab
+     0.02s  0.19% 83.25%      0.08s  0.78%  runtime.wbBufFlush1
