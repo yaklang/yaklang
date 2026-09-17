@@ -728,8 +728,11 @@ func GetBytesByNode(node *base.Node) []byte {
 	return res.([]byte)
 }
 func GetResultByNode(node *base.Node) any {
-	if node.Cfg.Has(CfgRawResult) {
-		return node.Cfg.GetItem(CfgRawResult)
+	if value, present := node.Cfg.LookupItem(CfgRawResult); present {
+		if raw, ok := value.([]byte); ok {
+			return bytes.Clone(raw)
+		}
+		return value
 	}
 	if NodeHasResult(node) {
 		return GetNodeResult(node)

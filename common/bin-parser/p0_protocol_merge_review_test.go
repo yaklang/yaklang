@@ -41,6 +41,13 @@ func TestProtocolMergeWebSocketProjection(t *testing.T) {
 	require.Equal(t, []byte{0xff, 0x80}, first)
 	first[0] = 0
 	require.Equal(t, []any{[]byte{0xff, 0x80}}, depthFieldValues(NodeToMap(n), "Binary"))
+	v, err := n.Result()
+	require.NoError(t, err)
+	v.Child("Binary").Value.([]byte)[0] = 0
+	again, err := n.Result()
+	require.NoError(t, err)
+	require.Equal(t, []byte{0xff, 0x80}, again.Child("Binary").Value)
+	require.Equal(t, []any{[]byte{0xff, 0x80}}, depthFieldValues(NodeToMap(n), "Binary"))
 	require.Equal(t, wire, NodeToBytes(n))
 }
 
