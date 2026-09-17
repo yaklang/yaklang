@@ -31,7 +31,7 @@ func (this *Stack) Peek() interface{} {
 
 // View the top n item on the stack
 func (this *Stack) PeekN(n int) interface{} {
-	if this.length == 0 {
+	if n < 0 || n >= this.length {
 		return nil
 	}
 

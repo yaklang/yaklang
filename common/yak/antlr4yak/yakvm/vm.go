@@ -29,7 +29,7 @@ type Frame struct {
 	//yak函数
 	// YakGlobalFunctions map[string]*Function
 	// 运行栈
-	stack *vmstack.Stack
+	stack operandStack
 	// 计数器栈，一般用于 for range 的计数
 	iteratorStack *vmstack.Stack
 	// 定义域栈
@@ -61,7 +61,8 @@ type Frame struct {
 	pendingCallArgCount         int
 	executionDepth              int // recursive Exec depth for this exact frame
 
-	coroutine *Coroutine
+	coroutine      *Coroutine
+	asyncExecution *asyncExecution
 
 	// ownerGoroutineID is resolved once for a top-level execution and reused by
 	// its synchronous subframes. It keeps goroutine-local frame isolation while
@@ -138,16 +139,16 @@ func NewSubFrame(parent *Frame) *Frame {
 		UnaryOperatorTable:  parent.UnaryOperatorTable,
 		GlobalVariables:     parent.GlobalVariables,
 		// YakGlobalFunctions:  parent.YakGlobalFunctions,
-		stack:         vmstack.New(),
-		iteratorStack: vmstack.New(),
-		tryStack:      vmstack.New(),
-		scope:         parent.scope,
-		debug:         parent.debug,
-		exitCode:      NoneExit,
-		ctx:           parent.ctx,
-		contextData:   parent.contextData,
-		coroutine:     parent.coroutine,
-		ThreadID:      parent.ThreadID,
+		iteratorStack:  vmstack.New(),
+		tryStack:       vmstack.New(),
+		scope:          parent.scope,
+		debug:          parent.debug,
+		exitCode:       NoneExit,
+		ctx:            parent.ctx,
+		contextData:    parent.contextData,
+		coroutine:      parent.coroutine,
+		asyncExecution: parent.asyncExecution,
+		ThreadID:       parent.ThreadID,
 	}
 	parent.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
@@ -165,14 +166,14 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		GlobalVariables:     limitedmap.NewSafeMap(map[string]any{}),
 		tryStack:            vmstack.New(),
 		// YakGlobalFunctions:  make(map[string]*Function),
-		stack:         vmstack.New(),
-		iteratorStack: vmstack.New(),
-		scope:         vm.rootScope,
-		debug:         false,
-		exitCode:      NoneExit,
-		contextData:   make(map[string]interface{}),
-		coroutine:     NewCoroutine(),
-		ownsThreadID:  true,
+		iteratorStack:  vmstack.New(),
+		scope:          vm.rootScope,
+		debug:          false,
+		exitCode:       NoneExit,
+		contextData:    make(map[string]interface{}),
+		coroutine:      NewCoroutine(),
+		asyncExecution: &asyncExecution{},
+		ownsThreadID:   true,
 	}
 	if v1, ok := buildinBinaryOperatorHandler[vm.config.vmMode]; ok {
 		for k, v := range v1 {

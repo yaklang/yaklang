@@ -212,7 +212,26 @@ func (y *YakCompiler) CompileSourceCodeWithPath(code string, fPath *string) bool
 	return y.Compiler(code)
 }
 
-func (y *YakCompiler) Compiler(code string) bool {
+func (y *YakCompiler) Compiler(code string) (success bool) {
+	// Errors and temporary control state belong to this attempt. Symbol IDs are
+	// monotonically reserved and must not be reused after an aborted compile.
+	y.lexerErrors, y.parserErrors, y.compilerErrors = nil, nil, nil
+	y.indeterminateUndefinedVar = nil
+	y.FreeValues = nil
+	y.forDepthStack, y.switchDepthStack, y.tryDepthStack = vmstack.New(), vmstack.New(), vmstack.New()
+	y.formatted = new(bytes.Buffer)
+	y.indent, y.currentLineLength = 0, 0
+	startScope := y.currentSymtbl
+	defer func() {
+		if p := recover(); p != nil {
+			y.pushError(y.newError("internal compiler error: %v", p))
+			success = false
+		}
+		y.currentSymtbl = startScope
+		if !success {
+			y.codes = nil
+		}
+	}()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(code))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(y.lexerErrorListener)
@@ -350,7 +369,18 @@ func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) inte
 		if err := recover(); err != nil {
 			msg := fmt.Sprintf("%vexit yak compiling by error: %v", prefix, err)
 			log.Error(msg)
-			// y.errors = append(y.errors, y.NewRangeSyntaxError(msg))
+			// Expected semantic errors are already registered by panicCompilerError.
+			known := false
+			for _, recorded := range y.compilerErrors {
+				if recorded == err {
+					known = true
+					break
+				}
+			}
+			if !known {
+				y.pushError(y.newError("internal compiler error: %v", err))
+			}
+			y.codes = nil
 		}
 		//if err := recover(); err != nil {
 		//	msg := fmt.Sprintf("%vexit yak compiling by error: %v", prefix, err)

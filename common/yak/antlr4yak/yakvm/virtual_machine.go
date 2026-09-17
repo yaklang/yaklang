@@ -49,6 +49,7 @@ type (
 
 		// asyncWaitGroup
 		asyncWaitGroup *sync.WaitGroup
+		asyncErrors    asyncErrors
 		// debug
 		debug         bool // 内部debug
 		debugMode     bool // 外部debugger
@@ -286,6 +287,7 @@ func (v *VirtualMachine) execYakFunctionWithParentFrame(ctx context.Context, par
 			// sandboxes race on lastPanic and can leak a panic across callers.
 			// Keep panic propagation within the current caller's chain instead.
 			frame.coroutine = defaultFrame.coroutine
+			frame.asyncExecution = defaultFrame.asyncExecution
 			frame.ownerGoroutineID = defaultFrame.ownerGoroutineID
 			if frame.vm == defaultFrame.vm {
 				// A same-VM sandbox call is still a synchronous nested call and
@@ -347,9 +349,19 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, parentFrame *
 	} else {
 		frame = NewSubFrame(parentFrame)
 	}
+	// The definition frame supplies capabilities, while the submitting execution
+	// owns workers and errors, including across VM sandbox boundaries.
+	if parentFrame != nil {
+		frame.asyncExecution = parentFrame.asyncExecution
+	} else {
+		frame.asyncExecution = &asyncExecution{}
+	}
 	executionVM := frame.vm
 	if executionVM == nil {
 		executionVM = v
+	}
+	if executionVM.config.synchronousExecution {
+		return utils.Error("async calls are not supported in synchronous execution mode")
 	}
 	// Allocate the VM thread ID before the goroutine starts. Loading the shared
 	// counter inside Frame.Exec lets delayed siblings observe the same final ID
@@ -374,24 +386,19 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, parentFrame *
 
 	// Register only once the async frame is fully constructed. Early context or
 	// validation failures must not leave an unmatched WaitGroup increment.
-	v.AsyncStart()
-	go func() {
+	// Yak workers have always had an outer panic boundary, including when
+	// stopRecover disables the interpreter's inner boundary for debugging.
+	v.startAsync(frame, true, func() error {
 		executionVM.pushCurrentFrame(frame)
-		defer func() {
-			executionVM.popCurrentFrame(frame)
-			v.AsyncEnd()
-			if err := frame.recover(); err != nil {
-				log.Errorf("yakvm async function panic: %v", err)
-			}
-			if err := recover(); err != nil {
-				log.Errorf("yakvm async function panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
+		defer executionVM.popCurrentFrame(frame)
 
 		frame.Exec(f.codes)
 		frame.ExitScope()
-	}()
+		if err := frame.recover(); err != nil {
+			return err
+		}
+		return ctx.Err()
+	})
 	return nil
 }
 

@@ -140,7 +140,11 @@ func (v *Frame) cacheRunes(val *Value) []rune {
 	}
 	s, ok := val.Value.(string)
 	if !ok {
-		return nil
+		rv := reflect.ValueOf(val.Value)
+		if !rv.IsValid() || rv.Kind() != reflect.String {
+			return nil
+		}
+		s = rv.String()
 	}
 	runes := []rune(s)
 	// Account for the retained string bytes and rune backing array. Very large

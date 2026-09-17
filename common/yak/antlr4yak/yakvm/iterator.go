@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/yaklang/yaklang/common/utils"
@@ -110,9 +111,19 @@ func newMapIterator(i interface{}) *MapIterator {
 	}
 
 	mapKeys := p.MapKeys()
-	sort.SliceStable(mapKeys, func(i, j int) bool {
-		return fmt.Sprint(mapKeys[i].Interface()) < fmt.Sprint(mapKeys[j].Interface())
-	})
+	type displayKey struct {
+		value reflect.Value
+		text  string
+	}
+	displayed := make([]displayKey, len(mapKeys))
+	for i, key := range mapKeys {
+		displayed[i] = displayKey{key, fmt.Sprint(key.Interface())}
+	}
+	// Equal display strings retain the existing unspecified MapKeys order.
+	sort.SliceStable(displayed, func(i, j int) bool { return displayed[i].text < displayed[j].text })
+	for i, key := range displayed {
+		mapKeys[i] = key.value
+	}
 
 	return &MapIterator{
 		BaseIterator: BaseIterator{
@@ -126,15 +137,16 @@ func newMapIterator(i interface{}) *MapIterator {
 }
 
 func (i *MapIterator) Next() (data []interface{}, hadEnd bool) {
-	var current int
-	current, hadEnd = i.nextStep()
-	if hadEnd {
-		data = []interface{}{nil, nil}
-	} else {
+	for !i.IsEnd() {
+		current, _ := i.nextStep()
 		key := i.mapKeys[current]
-		data = []interface{}{key.Interface(), i.p.MapIndex(key).Interface()}
+		value := i.p.MapIndex(key)
+		// A key deleted before its turn is skipped; new keys are not visited.
+		if value.IsValid() {
+			return []interface{}{key.Interface(), value.Interface()}, false
+		}
 	}
-	return
+	return []interface{}{nil, nil}, true
 }
 
 type OrderedMapIterator struct {
@@ -257,7 +269,17 @@ func (i *RepeatIterator) Next() (data []interface{}, hadEnd bool) {
 type SetIterator struct {
 	BaseIterator
 
-	iter *mapset.Iterator[any]
+	iter      *mapset.Iterator[any]
+	closeOnce sync.Once
+}
+
+func (i *SetIterator) Close() { i.closeOnce.Do(func() { i.iter.Stop() }) }
+
+// Optional closing keeps third-party IteratorInterface implementations valid.
+func closeIterator(iterator any) {
+	if closer, ok := iterator.(interface{ Close() }); ok {
+		closer.Close()
+	}
 }
 
 func newSetIterator(s mapset.Set[any]) *SetIterator {
@@ -284,6 +306,8 @@ func (i *SetIterator) Next() (data []interface{}, hadEnd bool) {
 	} else {
 		v, ok := <-i.iter.C
 		if !ok {
+			i.Current = i.N
+			hadEnd = true
 			data = []interface{}{nil, nil}
 		} else {
 			data = []interface{}{current, v}
@@ -350,7 +374,7 @@ func NewIterator(ctx context.Context, i interface{}) (IteratorInterface, error) 
 	kind := reflect.TypeOf(i).Kind()
 	switch kind {
 	case reflect.String:
-		runes := []rune(i.(string))
+		runes := []rune(reflect.ValueOf(i).String())
 		strArr := make([]string, len(runes))
 		for i, r := range runes {
 			strArr[i] = string(r)

@@ -1,0 +1,91 @@
+Go 1.22.12 windows/amd64, GOMAXPROCS=4; one engine op = 1000 iterations
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreExecution/containers-4         	     123	   3895938 ns/op	 3008653 B/op	   72995 allocs/op
+BenchmarkCoreExecution/arithmetic-4         	     297	   1573740 ns/op	 1434531 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     169	   2967944 ns/op	 2505312 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     196	   2513149 ns/op	 2048562 B/op	   41714 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreOperandStack-4   	381875548	         1.261 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreExecution/functions-4         	     162	   2795036 ns/op	 2505361 B/op	   50727 allocs/op
+BenchmarkCoreExecution/native-4            	     190	   2469635 ns/op	 2048605 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4        	     120	   3919358 ns/op	 3008648 B/op	   72995 allocs/op
+BenchmarkCoreExecution/arithmetic-4        	     304	   1680883 ns/op	 1434532 B/op	   31968 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreOperandStack-4   	390072967	         1.248 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreExecution/containers-4         	     130	   3716359 ns/op	 3008659 B/op	   72995 allocs/op
+BenchmarkCoreExecution/arithmetic-4         	     312	   1547156 ns/op	 1434545 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     165	   3259510 ns/op	 2505351 B/op	   50727 allocs/op
+BenchmarkCoreExecution/native-4             	     195	   2487497 ns/op	 2048587 B/op	   41715 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreOperandStack-4   	387584066	         1.237 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreExecution/arithmetic-4         	     312	   1498565 ns/op	 1434550 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     165	   3045690 ns/op	 2505321 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     198	   2263380 ns/op	 2048613 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     122	   3756966 ns/op	 3008676 B/op	   72996 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreOperandStack-4   	374234281	         1.250 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreExecution/arithmetic-4         	     288	   1538933 ns/op	 1434542 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     170	   2976845 ns/op	 2505378 B/op	   50727 allocs/op
+BenchmarkCoreExecution/native-4             	     207	   2389601 ns/op	 2048594 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     124	   4106525 ns/op	 3008637 B/op	   72995 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreOperandStack-4   	391046023	         1.244 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreExecution/arithmetic-4         	     297	   1572274 ns/op	 1434562 B/op	   31968 allocs/op
+BenchmarkCoreExecution/functions-4          	     162	   2985738 ns/op	 2505358 B/op	   50726 allocs/op
+BenchmarkCoreExecution/native-4             	     201	   2367227 ns/op	 2048613 B/op	   41715 allocs/op
+BenchmarkCoreExecution/containers-4         	     124	   3838676 ns/op	 3008646 B/op	   72995 allocs/op
+PASS
+goos: windows
+goarch: amd64
+pkg: github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm
+cpu: 13th Gen Intel(R) Core(TM) i5-13490F
+BenchmarkCoreOperandStack-4   	390072650	         1.272 ns/op	       0 B/op	       0 allocs/op
+PASS

@@ -74,7 +74,7 @@ func (v *Frame) CheckExit() error {
 	if v.stack.Len() > 0 {
 		err := utils.Errorf("Runtime Stack Unbalanced: %v ", v.stack.Len())
 		for v.stack.Len() > 0 {
-			value := v.stack.Pop().(*Value).Value
+			value := v.stack.Pop().Value
 			switch vv := value.(type) {
 			case []*Value:
 				for _, val := range vv {
@@ -102,6 +102,9 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 	isOutermostExecution := v.executionDepth == 1
 	defer func() {
 		v.executionDepth--
+		if isOutermostExecution && (v.coroutine.lastPanic != nil || (v.ctx != nil && v.ctx.Err() != nil)) {
+			v.stack.Clear()
+		}
 	}()
 
 	// These caches and pending decoder state belong to one execution segment.
@@ -109,6 +112,12 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 	// so retained Trace frames cannot keep values from earlier Inline runs.
 	defer v.clearRuneCache()
 	defer v.clearPendingCallArgCount()
+	iteratorDepth := v.iteratorStack.Len()
+	defer func() {
+		for v.iteratorStack.Len() > iteratorDepth {
+			closeIterator(v.iteratorStack.Pop())
+		}
+	}()
 	if !isContinue {
 		v.clearPendingCallArgCount()
 	}
@@ -322,8 +331,26 @@ func (v *Frame) execCode(c *Code, debug bool) {
 		v.codePointer = len(v.codes)
 		return
 	default:
+		// Native callbacks resolve their goroutine while this call is on the
+		// stack. Keep ordinary Yak calls out of the large opcode dispatcher:
+		// walking its PC/line tables dominates runtime.Stack in callback-heavy
+		// programs. Debugger and other language modes retain the full dispatch.
+		if c.Opcode == OpCall && v.vm.config.vmMode == YAK && !v.vm.debugMode {
+			v.execYakCall(c, v.consumeCallArgCount(c))
+			return
+		}
 		v._execCode(c, debug)
 	}
+}
+
+func (v *Frame) execYakCall(c *Code, argCount int) {
+	wavy := false
+	if c.Op1 != nil {
+		wavy = c.Op1.Bool()
+	}
+	args := v.popArgN(argCount)
+	callableValue := v.pop()
+	v.call(callableValue, wavy, args)
 }
 
 func (v *Frame) _execCode(c *Code, debug bool) {
@@ -439,9 +466,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(arg2)
 			return
 		case LUA:
-			assignArgs := v.popArgN(2)
-			leftValues := assignArgs[1]
-			rightValues := v.prepareAssignedFunction(leftValues, assignArgs[0])
+			right, leftValues := v.pop2()
+			rightValues := v.prepareAssignedFunction(leftValues, right)
 			if c.Unary == 0 {
 				v.luaGlobalAssign(leftValues, rightValues)
 			} else {
@@ -451,9 +477,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		case YAK:
 			fallthrough
 		default:
-			assignArgs := v.popArgN(2)
-			leftValues := assignArgs[1]
-			rightValues := v.prepareAssignedFunction(leftValues, assignArgs[0])
+			right, leftValues := v.pop2()
+			rightValues := v.prepareAssignedFunction(leftValues, right)
 			// if leftVal
 			v.assign(leftValues, rightValues)
 			return
@@ -461,8 +486,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 	case OpFastAssign:
 		switch v.vm.GetConfig().vmMode {
 		case LUA:
-			args := v.popArgN(2)
-			arg1, arg2 := args[0], args[1]
+			arg1, arg2 := v.pop2()
 			if c.Unary == 0 {
 				arg1.GlobalAssignBySymbol(v.CurrentScope(), arg2)
 			} else {
@@ -473,8 +497,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		case YAK:
 			fallthrough
 		default:
-			args := v.popArgN(2)
-			arg1, arg2 := args[0], args[1]
+			arg1, arg2 := v.pop2()
 			arg1.AssignBySymbol(v.CurrentScope(), arg2)
 			v.push(arg2)
 			return
@@ -612,7 +635,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		if !iterator.IsEnd() {
 			v.setCodeIndex(c.Unary)
 		} else {
-			v.iteratorStack.Pop()
+			closeIterator(v.iteratorStack.Pop())
 			v.nextCode()
 		}
 		return
@@ -627,14 +650,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				v.push(NewAutoValue([]byte(strValue)))
 			case 'x':
 				// 使用了f前缀生成的是 string slice
-				value, err := mutate.FuzzTagExec(strValue)
-				if err != nil {
-					v.push(NewStringSliceValue([]string{}))
-					log.Error(err)
-					// 解析fuzztag出错时不panic，防止fuzztag解析失败导致语言引擎异常
-					// panic(fmt.Sprintf("mutate.FuzzTagExec failed: %s", err))
-				}
-				v.push(NewStringSliceValue(value))
+				v.pushFuzzTagResult(mutate.FuzzTagExec(strValue))
 			default:
 				panic("unknown string prefix")
 			}
@@ -984,16 +1000,16 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			panic(fmt.Sprintf("cannot support chan op1[%v]", op.TypeVerbose))
 		}
 	case OpAnd, OpAndNot, OpOr, OpXor, OpShl, OpShr, OpAdd, OpSub, OpMul, OpDiv, OpMod,
-		OpLtEq, OpLt, OpGtEq, OpGt, OpNotEq, OpEq, OpSendChan, OpIn:
+		OpLtEq, OpLt, OpGtEq, OpGt, OpNotEq, OpEq, OpIn:
 		/* 一般的二元表达式：语言本身没有任何计算能力 */
-		args := v.popArgN(2)
-		op1, op2 := args[0], args[1]
+		op1, op2 := v.pop2()
 		op1, op2 = ChannelValueListToValue(op1), ChannelValueListToValue(op2)
-		if len(args) != 2 {
-			panic("binary op error")
-		}
 
 		v.push(v.execOp2(c.Opcode, op1, op2))
+		return
+	case OpSendChan:
+		op2, op1 := v.pop(), v.pop()
+		v.push(v.sendChannel(ChannelValueListToValue(op1), ChannelValueListToValue(op2)))
 		return
 	case OpPlusEq, OpMinusEq, OpMulEq, OpDivEq, OpModEq, OpAndEq, OpAndNotEq, OpOrEq, OpXorEq, OpShlEq, OpShrEq:
 		var (
@@ -1002,8 +1018,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			err   error
 		)
 
-		args := v.popArgN(2)
-		op1, op2 := args[1], args[0]
+		op2, op1 := v.pop2()
 		op1, op2 = ChannelValueListToValue(op1), ChannelValueListToValue(op2)
 		op1, err = op1.ConvertToLeftValue()
 		if err != nil {
@@ -1079,7 +1094,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		v.setCodeIndex(c.Unary)
 		switch c.Op2.Int() {
 		case 1:
-			v.iteratorStack.Pop()
+			closeIterator(v.iteratorStack.Pop())
 			v.pop()
 		}
 		v.ExitScopeWithCount(c.Op1.Int())
@@ -1274,14 +1289,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		case YAK:
 			fallthrough
 		default:
-			// 函数调用，这个非常简单，从 unary 中取出 N 个参数，放入调用栈
-			wavy := false
-			if c.Op1 != nil {
-				wavy = c.Op1.Bool()
-			}
-			args := v.popArgN(argCount)
-			callableValue := v.pop()
-			v.call(callableValue, wavy, args)
+			v.execYakCall(c, argCount)
 		}
 	case OpPop:
 		// 弹个栈数据出来
@@ -1391,54 +1399,35 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					panic("slice call args must be int")
 				}
 			}
-			var start, end int
+			var start, count int
 			step := 1
-
-			switch argsLength {
-			case 3:
-				step = args[2].Int()
-				if step == 0 {
-					panic("slice call step cannot be 0")
-				}
-				fallthrough
-			case 2:
-				end = args[1].Int()
-				if end < 0 {
-					end = iterableValueRF.Len() + end
-				}
-				if end < 0 || end > iterableValueRF.Len() {
-					panic("slice call error, end index out of range")
-				}
-				if end == 0 && isEnd.True() {
-					if step > 0 {
-						end = iterableValueRF.Len()
-					} else {
-						end = -1
-					}
-				}
-				fallthrough
-			case 1:
-				start = args[0].Int()
-				if start < 0 {
-					start = iterableValueRF.Len() + start
-				}
-				if start < 0 || start >= iterableValueRF.Len() {
-					switch v.vm.GetConfig().vmMode {
-					case NASL:
-						v.push(GetUndefined())
+			if argsLength == 1 {
+				var ok bool
+				start, ok = normalizeIndex(args[0].Int(), iterableValueRF.Len())
+				if !ok {
+					if v.vm.config.vmMode == NASL {
+						v.push(undefined)
 						return
-					default:
-						panic("slice call error, start index out of range")
+					}
+					panic("slice call error, start index out of range")
+				}
+			} else if argsLength == 2 || argsLength == 3 {
+				if argsLength == 3 {
+					step = args[2].Int()
+				}
+				omitted := 0
+				if c.Op1 != nil {
+					omitted = c.Op1.Int()
+				} else if isEnd.True() {
+					// Legacy cached bytecode used one shared omission flag.
+					omitted = 2
+					if args[0].Int() == 0 && step < 0 {
+						omitted |= 1
 					}
 				}
-				if start == 0 && isEnd.True() && step < 0 {
-					start = iterableValueRF.Len() - 1
-				}
-			default:
-				panic("slice call error, args got " + fmt.Sprint(argsLength) + ".")
-			}
-			if step == 0 {
-				panic("step cannot be zero")
+				start, count = normalizeSlice(iterableValueRF.Len(), args[0].Int(), args[1].Int(), step, omitted)
+			} else {
+				panic("slice call error, invalid argument count")
 			}
 			var sliceRes reflect.Value
 			if argsLength == 1 {
@@ -1459,15 +1448,15 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(value)
 				}
 			} else {
-				sliceRes = reflect.MakeSlice(iterableValueRF.Type(), 0, iterableValueRF.Len())
-
-				if step < 0 {
-					for i := start; i > end; i += step {
-						sliceRes = reflect.Append(sliceRes, iterableValueRF.Index(i))
-					}
-				} else {
-					for i := start; i < end; i += step {
-						sliceRes = reflect.Append(sliceRes, iterableValueRF.Index(i))
+				resultType := iterableValueRF.Type()
+				if resultType.Kind() == reflect.Array {
+					resultType = reflect.SliceOf(resultType.Elem())
+				}
+				sliceRes = reflect.MakeSlice(resultType, count, count)
+				for n, index := 0, start; n < count; n++ {
+					sliceRes.Index(n).Set(iterableValueRF.Index(index))
+					if n+1 < count {
+						index += step
 					}
 				}
 				if iterableValueType.Kind() == reflect.String {
@@ -1477,7 +1466,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						panic("cannot convert []byte to string")
 					}
 				} else {
-					v.push(NewValue(iterableValueType.String(), sliceRes.Interface(), ""))
+					v.push(NewValue(sliceRes.Type().String(), sliceRes.Interface(), ""))
 				}
 			}
 		case reflect.Map:
@@ -1756,17 +1745,17 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_OrderedMap))
 		case "slice":
 			if val := v.pop(); val.IsType() {
-				v.push(NewType("[]"+val.TypeVerbose, reflect.TypeOf(reflect.MakeSlice(reflect.SliceOf(val.Type()), 0, 0).Interface())))
+				v.push(NewType("[]"+val.TypeVerbose, reflect.SliceOf(val.Type())))
 			}
 		case "map":
 			if value := v.pop(); value.IsType() {
 				if key := v.pop(); key.IsType() {
-					v.push(NewType(fmt.Sprintf("map[%s]%s", key.TypeVerbose, value.TypeVerbose), reflect.TypeOf(reflect.MakeMap(reflect.MapOf(key.Type(), value.Type())).Interface())))
+					v.push(NewType(fmt.Sprintf("map[%s]%s", key.TypeVerbose, value.TypeVerbose), reflect.MapOf(key.Type(), value.Type())))
 				}
 			}
 		case "chan":
 			if val := v.pop(); val.IsType() {
-				v.push(NewType("chan "+val.TypeVerbose, reflect.TypeOf(reflect.MakeChan(reflect.ChanOf(reflect.BothDir, val.Type()), 0).Interface())))
+				v.push(NewType("chan "+val.TypeVerbose, reflect.ChanOf(reflect.BothDir, val.Type())))
 			}
 		default:
 			panic(fmt.Sprintf("invalid type: %s", strconv.Quote(c.Op1.TypeVerbose)))
@@ -1774,6 +1763,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 	case OpMake:
 		var newValue interface{}
 		var size, makeCap int = 0, 0
+		if c.Unary < 0 || c.Unary > 2 {
+			panic("make expects at most length and capacity")
+		}
 		vals := v.popArgN(c.Unary)
 		if len(vals) > 0 {
 			size = vals[0].Int()
@@ -1783,10 +1775,19 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 		if val := v.pop(); val.IsType() {
 			t := val.Type()
+			if size < 0 || makeCap < 0 {
+				panic("make length and capacity must be non-negative")
+			}
+			if t.Kind() != reflect.Slice && len(vals) > 1 {
+				panic(fmt.Sprintf("make %s expect 1 or 2 arguments, but got 3", val.TypeVerbose))
+			}
 			switch t.Kind() {
 			case reflect.Slice:
-				if makeCap <= 0 && size > makeCap {
+				if len(vals) < 2 {
 					makeCap = size
+				}
+				if size > makeCap {
+					panic("make length exceeds capacity")
 				}
 				newValue = reflect.MakeSlice(t, size, makeCap).Interface()
 			case reflect.Map:
@@ -1802,7 +1803,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			default:
 				panic(fmt.Sprintf("cannot make %s", val.TypeVerbose))
 			}
-			v.push(NewValue(val.TypeVerbose, newValue, fmt.Sprint(newValue)))
+			v.push(NewValue(val.TypeVerbose, newValue, ""))
 			return
 		}
 	case OpPanic:

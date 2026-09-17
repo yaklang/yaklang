@@ -121,6 +121,9 @@ func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[
 	funcName := f.GetActualName()
 
 	if f.IsVariableParameter() {
+		if len(f.paramSymbols) == 0 {
+			panic(fmt.Sprintf("function %s has no variadic parameter", funcName))
+		}
 		variableParamsId = f.paramSymbols[len(f.paramSymbols)-1]
 		stableArgumentsNumber = len(f.paramSymbols) - 1
 	} else {
@@ -140,7 +143,7 @@ func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[
 	}
 	otherVs := make([]*Value, 0)
 	for _, v := range vs {
-		if v.SymbolId != 0 {
+		if v != nil && v.SymbolId != 0 {
 			params[v.SymbolId] = v
 		} else {
 			otherVs = append(otherVs, v)
@@ -160,16 +163,21 @@ func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[
 		var valueIns *Value
 		if i < len(vs) {
 			valueIns = vs[i]
+			i++
 		} else {
+			if argumentCheck {
+				panic(fmt.Sprintf("runtime error: function %s missing parameter %d", funcName, t+1))
+			}
 			valueIns = undefined
 		}
 		params[symbolId] = valueIns
-		i++
 	}
 	if f.IsVariableParameter() {
-		variableParams := make([]interface{}, len(vs)-(stableArgumentsNumber))
+		variableParams := make([]interface{}, len(vs)-i)
 		for j := 0; i < len(vs); i++ {
-			variableParams[j] = vs[i].Value
+			if vs[i] != nil {
+				variableParams[j] = vs[i].Value
+			}
 			j++
 		}
 		variableParamsValue := NewValue("[]any", variableParams, "")
@@ -275,7 +283,14 @@ func (vm *Frame) CallYakFunction(asyncCall bool, f *Function, vs []*Value) inter
 	params := YakVMValuesToFunctionMap(f, vs, vm.vm.config.GetFunctionNumberCheck())
 
 	if asyncCall {
-		vm.vm.ExecAsyncYakFunction(vm.ctx, vm, f, params)
+		if err := vm.vm.ExecAsyncYakFunction(vm.ctx, vm, f, params); err != nil {
+			if vm.ctx.Err() != nil {
+				vm.asyncExecution.errors.add(err)
+				vm.vm.asyncErrors.add(err)
+				return nil
+			}
+			panic(err)
+		}
 		return nil
 	}
 	v, _ := vm.vm.execYakFunctionWithParentFrame(vm.ctx, vm, f, params, nil)

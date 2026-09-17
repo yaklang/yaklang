@@ -9,7 +9,7 @@ func (v *Frame) peek() *Value {
 	if value == nil {
 		return nil
 	}
-	return value.(*Value)
+	return value
 }
 
 func (v *Frame) peekN(n int) *Value {
@@ -17,7 +17,7 @@ func (v *Frame) peekN(n int) *Value {
 	if value == nil {
 		return nil
 	}
-	return value.(*Value)
+	return value
 }
 
 func (v *Frame) peekNextCode() *Code {
@@ -28,7 +28,7 @@ func (v *Frame) peekNextCode() *Code {
 }
 
 func (v *Frame) pop() *Value {
-	return v.stack.Pop().(*Value)
+	return v.stack.Pop()
 }
 
 func (v *Frame) popN(n int) []*Value {
