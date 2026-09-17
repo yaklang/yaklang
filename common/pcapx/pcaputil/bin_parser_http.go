@@ -42,6 +42,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			if f.mqtt != nil {
 				return f.frameMQTT(w)
 			}
+		case "mongodb":
+			return f.frameMongo(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

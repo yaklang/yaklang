@@ -15,6 +15,7 @@ var planNativeCalls = map[string]any{
 	"parsePostgreSQLFields": parsePostgreSQLFields, "parseMySQLFields": parseMySQLFields,
 	"parseIMAPFields": parseIMAPFields, "parsePOP3Fields": parsePOP3Fields,
 	"parseSMTPFields": parseSMTPFields, "parseMQTTFields": parseMQTTFields,
+	"parseMongoDBFields": parseMongoDBFields,
 	"parseKerberosFields": parseKerberosFields, "parseHTTP2Fields": parseHTTP2Fields,
 	"parseSSHPlaintextPacket":        parseSSHPlaintextPacket,
 	"parseTLSChangeCipherSpecRecord": parseTLSChangeCipherSpecRecord,

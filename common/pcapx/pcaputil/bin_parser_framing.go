@@ -63,6 +63,7 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.mqtt_fields", "MQTT31PacketFields"},
 	{"application-layer.mqtt_fields", "MQTT311PacketFields"},
 	{"application-layer.mqtt_fields", "MQTT5PacketFields"},
+	{"application-layer.mongodb_fields", "MongoDBFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
 	{"application-layer.memcached_fields", "MemcachedBinaryGetRequestFields"},

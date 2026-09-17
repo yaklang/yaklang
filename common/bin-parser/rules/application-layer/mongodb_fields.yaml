@@ -1,0 +1,11 @@
+# MongoDB wire protocol: OP_MSG (2013) and OP_COMPRESSED (2012).
+# Little-endian MsgHeader. OP_COMPRESSED snappy and zlib are fully decompressed
+# into the inner OP_MSG; other compressor IDs fail closed. Checksummed OP_MSG
+# is framed; CRC-32C is not treated as a successful decrypt. No port guess.
+endian: little
+unit: byte
+Package:
+  MongoDBFields:
+    operator: |
+      err = parseMongoDBFields()
+      if err != nil { panic(err) }
