@@ -183,7 +183,7 @@ func (f *binFlow) reserveSession(target int64) error {
 	for {
 		current := f.a.buffered.Load()
 		if current+delta > int64(f.a.config.MaxBufferedBytes) {
-			return protocolError(ErrResourceExceeded, "connection state exceeds capture memory budget")
+			return fmt.Errorf("%w: %w", errBinContext, protocolError(ErrResourceExceeded, "connection state exceeds capture memory budget"))
 		}
 		if f.a.buffered.CompareAndSwap(current, current+delta) {
 			f.sessionBytes = target

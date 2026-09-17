@@ -8,12 +8,7 @@ import (
 	"strings"
 )
 
-type binRedis struct {
-	version   string
-	pending   int
-	client    int
-	roleKnown bool
-}
+type binRedis struct{ values [2]uint64 }
 
 func probeRedis(w []byte, limit int) ProbeResult {
 	if len(w) < 1 {
@@ -186,27 +181,16 @@ func (r *binRedis) consume(dir int, raw []byte) (map[string]any, error) {
 		return nil, fmt.Errorf("redis: empty value")
 	}
 	ver := redisVersion(raw[0])
-	if r.version == "" {
-		r.version = ver
-	}
 	info := map[string]any{
 		"RESP Type":     redisTypeName(raw[0]),
 		"Version":       ver,
 		"Context Level": "observed",
 	}
-	// A push is out-of-band and an array reply is not itself a request.
-	if !r.roleKnown && raw[0] == '*' && bytes.Contains(raw, []byte("\r\n$")) {
-		r.client = dir
-		r.roleKnown = true
-	}
-	if r.roleKnown && raw[0] != '>' {
-		if dir == r.client && raw[0] == '*' {
-			r.pending++
-		} else if dir != r.client && r.pending > 0 {
-			r.pending--
-		}
-		info["Pipeline"] = r.pending
-	}
+	// An array may be either a command or a reply. Without an observed role,
+	// expose per-direction arrivals rather than inventing request correlation.
+	r.values[dir]++
+	info["Direction Value Index"] = r.values[dir]
+	info["Version Negotiated"] = false
 	if raw[0] == '>' {
 		info["Push"] = true
 	}

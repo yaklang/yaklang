@@ -87,6 +87,7 @@ func DefaultParserBudget() ParserBudget {
 
 // ProtocolSession is the single Probe/Feed/Close path used by live replay
 // and by M1 protocol tests. Probe does not consume; Feed starts at byte 0.
+// Calls on a session must be serialized in TCP delivery order.
 type ProtocolSession interface {
 	Probe(data []byte) ProbeResult
 	Feed(direction int, ts time.Time, data []byte) FeedResult
@@ -289,6 +290,11 @@ func probeHTTP2(w []byte, limit int) ProbeResult {
 }
 
 func probeMySQL(w []byte, _ int) ProbeResult {
+	// The first five greeting bytes can resemble a short PostgreSQL header.
+	// Wait for the server-version prefix before allowing another candidate.
+	if len(w) == 5 && w[3] == 0 && w[4] == 10 {
+		return probeNeed("mysql", "10", len(w), 6)
+	}
 	if len(w) < 6 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
@@ -338,6 +344,10 @@ func protocolError(kind ProtocolErrorKind, format string, args ...any) error {
 func classifySessionError(err error) (string, *ProtocolError) {
 	var typed *ProtocolError
 	if errors.As(err, &typed) {
+		// Preserve the established capture status for connection-state budgets.
+		if errors.Is(err, errBinContext) {
+			return "context-required", typed
+		}
 		switch typed.Kind {
 		case ErrResourceExceeded:
 			return "limited", typed
