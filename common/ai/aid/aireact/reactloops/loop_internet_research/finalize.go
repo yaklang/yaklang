@@ -307,7 +307,8 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 	allCompressedResults, artifactFiles := collectResearchData(loop)
 	hasResults := len(allCompressedResults) > 0 && searchResultsSummary != ""
 
-	ctx := loop.GetConfig().GetContext()
+	config := loop.GetConfig()
+	ctx := config.GetContext()
 
 	var report strings.Builder
 
@@ -356,7 +357,7 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 
 		report.WriteString("## S.M.A.R.T Evaluation\n\n")
 		smartEvalWritten := false
-		invoker.ScheduleAuxiliaryTask(ctx,
+		config.ScheduleAuxiliaryTask(ctx,
 			aicommon.CallerLabelSmartEvaluation,
 			func() string {
 				resultPreview := searchResultsSummary
@@ -460,7 +461,7 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 
 		report.WriteString("## Analysis: Why Results Are Insufficient\n\n")
 		insufficientReasonWritten := false
-		invoker.ScheduleAuxiliaryTask(ctx,
+		config.ScheduleAuxiliaryTask(ctx,
 			aicommon.CallerLabelInsufficientReasonAnalysis,
 			func() string {
 				resultPreview := searchResultsSummary

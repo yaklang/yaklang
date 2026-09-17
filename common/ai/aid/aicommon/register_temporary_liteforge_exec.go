@@ -1,8 +1,10 @@
 package aicommon
 
 import (
+	"context"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -15,6 +17,18 @@ type ForgeResult struct {
 }
 
 type LiteForgeExecuteCallback func(prompt string, opts ...any) (*ForgeResult, error)
+
+// LiteForgeInvokeRequest carries the typed invocation data needed by Config's
+// auxiliary-task scheduler through the aicommon -> aiforge registration bridge.
+// It lives in aicommon so Config can request a LiteForge execution without
+// importing aiforge (which already imports aicommon).
+type LiteForgeInvokeRequest struct {
+	Context    context.Context
+	ActionName string
+	Outputs    []aitool.ToolOption
+	Options    []GeneralKVConfigOption
+	Emitter    *Emitter
+}
 
 var liteforgeExecuteFunc LiteForgeExecuteCallback
 

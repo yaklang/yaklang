@@ -83,7 +83,8 @@ func ensureSingleModelRegistry() {
 // GetSingleModelAction returns the single-model-mode action for the given
 // CallerLabel. If the label is not in the registry, the default is PassThrough
 // (i.e. unregistered tasks are called normally, matching current behavior).
-// When single-model mode is disabled, this always returns PassThrough.
+// Config.ScheduleAuxiliaryTask consults this registry only when single-model
+// mode is enabled.
 func GetSingleModelAction(name string) SingleModelAction {
 	ensureSingleModelRegistry()
 	if action, ok := singleModelRegistry[name]; ok {

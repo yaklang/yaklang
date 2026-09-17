@@ -19,6 +19,7 @@ type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error
 type AICallerConfigIf interface {
 	AICaller
 	KeyValueConfigIf
+	AuxiliaryScheduler
 
 	// Interactivable
 	Interactivable
@@ -68,7 +69,6 @@ type AICallerConfigIf interface {
 	GetBrowserSessionTracker() BrowserSessionTracker
 
 	// IsSingleAIModelMode reports whether single-model simple mode is enabled.
-	// Used by the auxiliary task scheduler to decide skip/litecall/passthrough.
 	IsSingleAIModelMode() bool
 
 	// Reported risks: session-level "已报告漏洞清单" accumulator.

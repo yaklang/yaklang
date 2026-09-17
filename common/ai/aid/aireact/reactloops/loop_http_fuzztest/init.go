@@ -154,7 +154,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		if haveReq == "" {
 			// TBD: 如果没有，就尝试从用户输入中引导提取 HTTP 请求信息来初始化 fuzz_request
 			bootstrapResult := ""
-			r.ScheduleAuxiliaryTask(task.GetContext(),
+			config.ScheduleAuxiliaryTask(task.GetContext(),
 				aicommon.CallerLabelExtractHTTPRequestFromInput,
 				func() string {
 					userInput := strings.TrimSpace(task.GetUserInput())

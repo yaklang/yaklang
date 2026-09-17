@@ -319,7 +319,8 @@ func MatchIdentifiersFromCapabilityCatalog(r aicommon.AIInvokeRuntime, catalog s
 	if len(chunks) == 0 {
 		return nil
 	}
-	ctx := r.GetConfig().GetContext()
+	config := r.GetConfig()
+	ctx := config.GetContext()
 
 	var mu sync.Mutex
 	var allIdentifiers []string
@@ -328,7 +329,7 @@ func MatchIdentifiersFromCapabilityCatalog(r aicommon.AIInvokeRuntime, catalog s
 		wg.Add(1)
 		go func(chunkIndex int, chunkData string) {
 			defer wg.Done()
-			r.ScheduleAuxiliaryTask(ctx,
+			config.ScheduleAuxiliaryTask(ctx,
 				aicommon.CallerLabelCapabilityCatalogMatch,
 				func() string {
 					nonce := utils.RandStringBytes(6)

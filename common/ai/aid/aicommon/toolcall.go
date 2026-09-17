@@ -809,10 +809,10 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 	}() {
 		return
 	}
-	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
+	if t.config == nil || utils.IsNil(t.config) || tool == nil {
 		return
 	}
-	t.invokeRuntime.ScheduleAuxiliaryTask(t.ctx,
+	t.config.ScheduleAuxiliaryTask(t.ctx,
 		CallerLabelToolCallReason,
 		func() string {
 			return buildToolCallReasonPrompt(tool, params, t.task)

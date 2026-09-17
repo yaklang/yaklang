@@ -401,10 +401,6 @@ type AIInvokeRuntime interface {
 	EmitFileArtifactWithExt(name, ext string, data any) string
 	EmitResultAfterStream(any)
 	EmitResult(any)
-
-	// ScheduleAuxiliaryTask routes an auxiliary AI task through the single-model
-	// scheduler, which decides skip/run based on the registry.
-	ScheduleAuxiliaryTask(ctx context.Context, name string, promptBuilder func() string, onResult func(*Action), opts ...AuxiliaryTaskOption)
 }
 
 type AITaskInvokeRuntime interface {

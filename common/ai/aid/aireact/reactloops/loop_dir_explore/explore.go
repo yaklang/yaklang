@@ -160,7 +160,7 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 
 			// 如果没有预注入路径，则用 LiteForge 从用户输入中提取
 			if targetPath == "" {
-				r.ScheduleAuxiliaryTask(task.GetContext(),
+				r.GetConfig().ScheduleAuxiliaryTask(task.GetContext(),
 					aicommon.CallerLabelExtractExploreTargetPath,
 					func() string {
 						promptTpl := `分析用户的请求，提取需要探索的目标目录路径。
