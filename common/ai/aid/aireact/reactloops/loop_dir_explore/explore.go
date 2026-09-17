@@ -74,6 +74,15 @@ func (s *ExploreState) addNoteFile(path string) {
 	s.noteFiles = append(s.noteFiles, path)
 }
 
+var extractExploreTargetPathOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("target_path",
+		aitool.WithParam_Required(true),
+		aitool.WithParam_Description("需要探索的目标目录绝对路径，如果没有找到则返回空字符串")),
+	aitool.WithStringParam("reason",
+		aitool.WithParam_Required(false),
+		aitool.WithParam_Description("简要说明从用户输入中识别到的路径依据")),
+}
+
 func (s *ExploreState) getNoteFiles() []string {
 	result := make([]string, len(s.noteFiles))
 	copy(result, s.noteFiles)
@@ -110,14 +119,7 @@ func extractTargetPath(ctx context.Context, r aicommon.AIInvokeRuntime, userInpu
 		ctx,
 		"extract-explore-target-path",
 		rendered,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("target_path",
-				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("需要探索的目标目录绝对路径，如果没有找到则返回空字符串")),
-			aitool.WithStringParam("reason",
-				aitool.WithParam_Required(false),
-				aitool.WithParam_Description("简要说明从用户输入中识别到的路径依据")),
-		},
+		extractExploreTargetPathOutputs,
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "reason"),
 	)
 	if err != nil {
@@ -158,38 +160,88 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 
 			// 如果没有预注入路径，则用 LiteForge 从用户输入中提取
 			if targetPath == "" {
-				extracted, err := extractTargetPath(task.GetContext(), r, userInput)
-				if err != nil {
-					log.Warnf("[DirExplore] LiteForge extraction failed: %v, will require path from AI", err)
-				} else {
-					targetPath = extracted
+				r.ScheduleAuxiliaryTask(task.GetContext(),
+					aicommon.CallerLabelExtractExploreTargetPath,
+					func() string {
+						promptTpl := `分析用户的请求，提取需要探索的目标目录路径。
+
+## 用户输入
+<|USER_INPUT_{{ .Nonce }}|>
+{{ .UserInput }}
+<|USER_INPUT_END_{{ .Nonce }}|>
+
+## 提取规则
+1. 找到用户希望 AI 探索/分析的目录的绝对路径
+2. 路径通常是一个本地文件系统路径，例如 "/home/user/myproject" 或 "/Users/me/code/app"
+3. 如果用户提到多个路径，选择最主要/最明确的那个
+4. 如果没有找到任何目录路径，返回空字符串
+5. 输出路径必须是绝对路径（以 / 或 驱动器字母 开头）
+
+请返回目标路径。`
+						rendered, err := utils.RenderTemplate(promptTpl, map[string]any{
+							"Nonce":     utils.RandStringBytes(4),
+							"UserInput": userInput,
+						})
+						if err != nil {
+							log.Warnf("[DirExplore] render extract-path prompt failed: %v", err)
+							return ""
+						}
+						return rendered
+					},
+					func(action *aicommon.Action) {
+						extracted := strings.TrimSpace(action.GetString("target_path"))
+						reason := action.GetString("reason")
+						log.Infof("[DirExplore] extracted target path: %q (reason: %s)", extracted, reason)
+						if extracted == "" {
+							return
+						}
+
+						// 路径不存在 → fail
+						if _, err := os.Stat(extracted); err != nil {
+							op.Failed(utils.Errorf(
+								"[DirExplore] 目标目录不存在或无法访问: %s\n错误: %v\n请确认路径正确。",
+								extracted, err,
+							))
+							return
+						}
+
+						targetPath = extracted
+						state.TargetPath = targetPath
+						log.Infof("[DirExplore] Target path confirmed: %s", targetPath)
+						r.AddToTimeline("[EXPLORE_START]", fmt.Sprintf("开始目录探索，目标路径: %s", targetPath))
+						op.Continue()
+					},
+					aicommon.WithAuxiliaryOutputs(extractExploreTargetPathOutputs...),
+					aicommon.WithAuxiliaryOpts(
+						aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "reason"),
+					),
+				)
+
+				// 路径为空 → fail (OnResult 未被调用或未设置 targetPath)
+				if targetPath == "" {
+					op.Failed(utils.Error(
+						"[DirExplore] 无法从用户输入中提取目标目录路径。\n" +
+							"请在请求中明确指定需要探索的目录绝对路径，例如：\n" +
+							"  '请探索 /home/user/myproject 目录'\n" +
+							"  '帮我分析 /Users/me/code/webapp 项目的结构'\n",
+					))
+					return
 				}
-			}
+			} else {
+				// 路径不存在 → fail
+				if _, err := os.Stat(targetPath); err != nil {
+					op.Failed(utils.Errorf(
+						"[DirExplore] 目标目录不存在或无法访问: %s\n错误: %v\n请确认路径正确。",
+						targetPath, err,
+					))
+					return
+				}
 
-			// 路径为空 → fail
-			if targetPath == "" {
-				op.Failed(utils.Error(
-					"[DirExplore] 无法从用户输入中提取目标目录路径。\n" +
-						"请在请求中明确指定需要探索的目录绝对路径，例如：\n" +
-						"  '请探索 /home/user/myproject 目录'\n" +
-						"  '帮我分析 /Users/me/code/webapp 项目的结构'\n",
-				))
-				return
+				state.TargetPath = targetPath
+				log.Infof("[DirExplore] Target path confirmed: %s", targetPath)
+				r.AddToTimeline("[EXPLORE_START]", fmt.Sprintf("开始目录探索，目标路径: %s", targetPath))
+				op.Continue()
 			}
-
-			// 路径不存在 → fail
-			if _, err := os.Stat(targetPath); err != nil {
-				op.Failed(utils.Errorf(
-					"[DirExplore] 目标目录不存在或无法访问: %s\n错误: %v\n请确认路径正确。",
-					targetPath, err,
-				))
-				return
-			}
-
-			state.TargetPath = targetPath
-			log.Infof("[DirExplore] Target path confirmed: %s", targetPath)
-			r.AddToTimeline("[EXPLORE_START]", fmt.Sprintf("开始目录探索，目标路径: %s", targetPath))
-			op.Continue()
 		}),
 
 		// PersistentContextProvider：每轮注入探索指令，动态替换工作目录提示
