@@ -383,6 +383,13 @@ func WithToolCaller_InvokeRuntime(rt AIInvokeRuntime) ToolCallerOption {
 	}
 }
 
+var toolCallReasonOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("reason",
+		aitool.WithParam_Description("A terse phrase (under 15 words) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
+		aitool.WithParam_MaxLength(30),
+		aitool.WithParam_Required(true)),
+}
+
 // generateReasonByLiteForge uses the speed-priority lite forge to generate one
 // concise sentence describing WHY the given tool call is needed. It returns an
 // empty string (no-op) when no invokeRuntime is configured or generation fails,
@@ -397,12 +404,7 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 	prompt := buildToolCallReasonPrompt(tool, params, t.task)
 	action, err := t.invokeRuntime.InvokeSpeedPriorityLiteForge(
 		ctx, "tool-call-reason", prompt,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("A terse phrase (under 15 words) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
-				aitool.WithParam_MaxLength(30),
-				aitool.WithParam_Required(true)),
-		},
+		toolCallReasonOutputs,
 	)
 	if err != nil || utils.IsNil(action) {
 		log.Debugf("generate tool-call reason via liteforge failed: %v", err)
@@ -810,17 +812,26 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
 		return
 	}
-	reason := t.generateReasonByLiteForge(t.ctx, tool, params)
-	if strings.TrimSpace(reason) == "" {
-		return
-	}
-	t.m.Lock()
-	t.reason = reason
-	t.reasonFinalized = true // concrete reason now exists; thinking stream should not overwrite
-	t.m.Unlock()
-	if t.emitter != nil {
-		t.emitter.EmitToolCallReason(t.callToolId, reason)
-	}
+	t.invokeRuntime.ScheduleAuxiliaryTask(t.ctx,
+		CallerLabelToolCallReason,
+		func() string {
+			return buildToolCallReasonPrompt(tool, params, t.task)
+		},
+		func(action *Action) {
+			reason := strings.TrimSpace(action.GetString("reason"))
+			if reason == "" {
+				return
+			}
+			t.m.Lock()
+			t.reason = reason
+			t.reasonFinalized = true // concrete reason now exists; thinking stream should not overwrite
+			t.m.Unlock()
+			if t.emitter != nil {
+				t.emitter.EmitToolCallReason(t.callToolId, reason)
+			}
+		},
+		WithAuxiliaryOutputs(toolCallReasonOutputs...),
+	)
 }
 
 // DirectlyCallPrepareFunc is the loop-layer callback that prepares the final

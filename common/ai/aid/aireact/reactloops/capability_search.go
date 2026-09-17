@@ -304,6 +304,13 @@ func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
 	return sb.String()
 }
 
+var capabilityCatalogMatchOutputs = []aitool.ToolOption{
+	aitool.WithStringArrayParamEx("matched_identifiers", []aitool.PropertyOption{
+		aitool.WithParam_Description("List of matched capability identifiers from the catalog. Only include identifiers that actually exist in the catalog."),
+		aitool.WithParam_Required(true),
+	}),
+}
+
 func MatchIdentifiersFromCapabilityCatalog(r aicommon.AIInvokeRuntime, catalog string, query string) []string {
 	if catalog == "" || query == "" {
 		return nil
@@ -321,12 +328,39 @@ func MatchIdentifiersFromCapabilityCatalog(r aicommon.AIInvokeRuntime, catalog s
 		wg.Add(1)
 		go func(chunkIndex int, chunkData string) {
 			defer wg.Done()
-			ids := matchCapabilityCatalogChunk(ctx, r, chunkData, query, chunkIndex)
-			if len(ids) > 0 {
-				mu.Lock()
-				allIdentifiers = append(allIdentifiers, ids...)
-				mu.Unlock()
-			}
+			r.ScheduleAuxiliaryTask(ctx,
+				aicommon.CallerLabelCapabilityCatalogMatch,
+				func() string {
+					nonce := utils.RandStringBytes(6)
+					return fmt.Sprintf(`<|INSTRUCTION_%s|>
+You are a capability matcher. Given a user query and a catalog of available capabilities,
+select ALL capabilities that are relevant to the user's intent or scenario.
+
+CRITICAL RULES:
+- You MUST ONLY select identifiers that appear in the catalog below. Do NOT invent or fabricate any identifier.
+- If the user's input directly contains a capability identifier, that identifier MUST be included.
+- Consider both Chinese and English meanings when matching.
+- Return ONLY the identifier part (the text after the type prefix, e.g., "web_search" from "[tool:web_search]").
+<|INSTRUCTION_END_%s|>
+
+<|USER_QUERY_%s|>
+%s
+<|USER_QUERY_END_%s|>
+
+<|CAPABILITY_CATALOG_%s|>
+%s
+<|CAPABILITY_CATALOG_END_%s|>`, nonce, nonce, nonce, query, nonce, nonce, chunkData, nonce)
+				},
+				func(action *aicommon.Action) {
+					ids := action.GetStringSlice("matched_identifiers")
+					if len(ids) > 0 {
+						mu.Lock()
+						allIdentifiers = append(allIdentifiers, ids...)
+						mu.Unlock()
+					}
+				},
+				aicommon.WithAuxiliaryOutputs(capabilityCatalogMatchOutputs...),
+			)
 		}(index, chunk)
 	}
 	wg.Wait()
@@ -619,12 +653,7 @@ CRITICAL RULES:
 %s
 <|CAPABILITY_CATALOG_END_%s|>`, nonce, nonce, nonce, query, nonce, nonce, chunkData, nonce)
 
-	schema := []aitool.ToolOption{
-		aitool.WithStringArrayParamEx("matched_identifiers", []aitool.PropertyOption{
-			aitool.WithParam_Description("List of matched capability identifiers from the catalog. Only include identifiers that actually exist in the catalog."),
-			aitool.WithParam_Required(true),
-		}),
-	}
+	schema := capabilityCatalogMatchOutputs
 	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "capability-catalog-match", prompt, schema)
 	if err != nil {
 		log.Warnf("capability catalog match chunk %d failed: %v", chunkIdx, err)
