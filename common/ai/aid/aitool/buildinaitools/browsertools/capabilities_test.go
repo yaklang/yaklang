@@ -71,7 +71,7 @@ func toolByName(t *testing.T, tools []*aitool.Tool, name string) *aitool.Tool {
 	return nil
 }
 
-func TestGenericAgentCatalogHidesWorkflowInternals(t *testing.T) {
+func TestGenericAgentCatalogExposesAdvertisedWorkflows(t *testing.T) {
 	for _, method := range []string{
 		"browser.recording.start",
 		"browser.callable.create",
@@ -79,8 +79,9 @@ func TestGenericAgentCatalogHidesWorkflowInternals(t *testing.T) {
 		"browser.profile.validate",
 		"browser.transform.prepare",
 		"browser.transform.validation.execute",
+		"browser.transform.recovery.start",
 	} {
-		require.False(t, browserCapabilityVisibleToGenericAgent(browser.ExtensionBridgeCapabilityDescriptor{Method: method}), method)
+		require.True(t, browserCapabilityVisibleToGenericAgent(browser.ExtensionBridgeCapabilityDescriptor{Method: method}), method)
 	}
 	for _, method := range []string{"browser.crypto.inspect", "browser.context"} {
 		require.True(t, browserCapabilityVisibleToGenericAgent(browser.ExtensionBridgeCapabilityDescriptor{Method: method}), method)

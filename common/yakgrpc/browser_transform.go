@@ -493,16 +493,39 @@ func executeBrowserAgentHTTPRequest(
 	if profileID != "" {
 		runtime, err = prepareBrowserTransform(ctx, bridge, deviceID, profileID, timeout)
 	} else {
-		requestEnabled := true
+		callCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		raw, metadataErr := bridge.CallDevice(callCtx, deviceID, "browser.transform.validation.get", map[string]interface{}{"validationId": validationID})
+		if metadataErr != nil {
+			return nil, fmt.Errorf("read browser validation directions: %w", metadataErr)
+		}
+		var metadata struct {
+			ID         string `json:"id"`
+			Directions struct {
+				Request  bool `json:"request"`
+				Response bool `json:"response"`
+			} `json:"directions"`
+		}
+		if err := json.Unmarshal(raw, &metadata); err != nil || metadata.ID != validationID {
+			return nil, errors.New("browser validation metadata does not match requested draft")
+		}
+		requestEnabled := metadata.Directions.Request
+		responseEnabled := metadata.Directions.Response
 		if params.Has("transform_request") {
 			requestEnabled = params.GetBool("transform_request")
+		}
+		if params.Has("transform_response") {
+			responseEnabled = params.GetBool("transform_response")
+		}
+		if requestEnabled && !metadata.Directions.Request || responseEnabled && !metadata.Directions.Response {
+			return nil, errors.New("requested transform direction is not present in the validated gateway")
 		}
 		runtime, err = prepareBrowserValidationTransform(
 			bridge,
 			deviceID,
 			validationID,
 			requestEnabled,
-			params.GetBool("transform_response"),
+			responseEnabled,
 			timeout,
 		)
 	}
@@ -625,8 +648,8 @@ func buildBrowserHTTPTestTool(bridge browsertools.Bridge) (*aitool.Tool, error) 
 		aitool.WithStringParam("validation_id", aitool.WithParam_Description("Short-lived ID returned by browser.profile.validate; mutually exclusive with profile_id"), aitool.WithParam_MaxLength(512)),
 		aitool.WithStringParam("request", aitool.WithParam_Description("Complete plaintext HTTP/1.x request, including request line, Host, authentication headers, blank line, and body"), aitool.WithParam_Required(true)),
 		aitool.WithBoolParam("is_https", aitool.WithParam_Description("Whether the upstream request uses TLS; set this explicitly from the captured request URL"), aitool.WithParam_Required(true)),
-		aitool.WithBoolParam("transform_request", aitool.WithParam_Description("For a temporary validation draft, encrypt the request before sending"), aitool.WithParam_Default(true)),
-		aitool.WithBoolParam("transform_response", aitool.WithParam_Description("For a temporary validation draft, decrypt the response after receiving it; enable only when the validated draft has a response direction"), aitool.WithParam_Default(false)),
+		aitool.WithBoolParam("transform_request", aitool.WithParam_Description("Optional override for a temporary draft; omitted uses its validated request direction")),
+		aitool.WithBoolParam("transform_response", aitool.WithParam_Description("Optional override for a temporary draft; omitted uses its validated response direction, including automatic decryption for bidirectional gateways")),
 		aitool.WithIntegerParam("timeout_seconds", aitool.WithParam_Description("Overall request and page-transform timeout"), aitool.WithParam_Default(30), aitool.WithParam_Min(2), aitool.WithParam_Max(60)),
 		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, _ io.Writer, _ io.Writer) (interface{}, error) {
 			return executeBrowserAgentHTTPRequest(ctx, bridge, params, runtimeConfig)
@@ -637,16 +660,18 @@ func buildBrowserHTTPTestTool(bridge browsertools.Bridge) (*aitool.Tool, error) 
 func buildBrowserTransformPrepareTool(bridge browsertools.Bridge) (*aitool.Tool, error) {
 	return aitool.New(
 		"browser.transform.prepare",
-		aitool.WithDescription("Prepare a temporary plaintext HTTP transform from one browser.crypto.inspect capture. The extension creates the callable, compiles the Profile, and validates it atomically on the same page."),
+		aitool.WithDescription("Prepare a temporary plaintext HTTP transform from one browser.crypto.inspect capture. The extension automatically re-triggers the inspected operation when business capture is required, captures missing directions, and validates one bidirectional gateway without plugin UI."),
 		aitool.WithVerboseName("Prepare Browser Plaintext Transform"),
 		aitool.WithVerboseNameZh("准备浏览器明文转换"),
-		aitool.WithUsage("Call directly with gatewayPreparation.candidateId returned by browser.crypto.inspect and one complete plaintext HTTP request. Do not call recording, callable, debugger, browser.profile.*, or reopen the website. On success, pass validationDraft.id to browser.http.test."),
+		aitool.WithUsage("Call with gatewayPreparation.candidateId from browser.crypto.inspect, whether ready or capture-required, and a complete plaintext HTTP request. Missing business directions are captured automatically without plugin UI. If the trigger changed, pass fresh captureId/nodeId from browser.context. On success pass validationDraft.id to browser.http.test; its default directions follow the validated gateway. For advanced diagnosis or recovery, discover lower-level capabilities from browser.capability.catalog. Do not reopen the website or resend a request to recover from an unexplained error."),
 		aitool.WithKeywords([]string{"browser transform", "plaintext gateway", "page encryption", "明文网关", "加密发包", "页面加密"}),
 		aitool.WithStringParam("browser_ref", aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"), aitool.WithParam_MaxLength(512)),
 		aitool.WithStringParam("candidate_id", aitool.WithParam_Description("gatewayPreparation.candidateId returned by browser.crypto.inspect"), aitool.WithParam_MaxLength(160), aitool.WithParam_Required(true)),
 		aitool.WithStringParam("request", aitool.WithParam_Description("Complete plaintext HTTP/1.x request to validate against the captured operation"), aitool.WithParam_Required(true)),
 		aitool.WithBoolParam("is_https", aitool.WithParam_Description("Whether the captured upstream request uses TLS"), aitool.WithParam_Required(true)),
 		aitool.WithStringArrayParam("input_paths", aitool.WithParam_Description("Optional explicit packet value paths when automatic input mapping is ambiguous")),
+		aitool.WithStringParam("captureId", aitool.WithParam_Description("Optional fresh browser.context capture ID if the original trigger changed; supply together with nodeId")),
+		aitool.WithStringParam("nodeId", aitool.WithParam_Description("Optional visible operation trigger from captureId; otherwise the extension reuses the inspected operation")),
 		aitool.WithStringParam("name", aitool.WithParam_Description("Optional local draft name"), aitool.WithParam_MaxLength(120)),
 		aitool.WithIntegerParam("tabId", aitool.WithParam_Description("Target tab ID returned by browser.crypto.inspect"), aitool.WithParam_Min(1)),
 		aitool.WithIntegerParam("frameId", aitool.WithParam_Description("Target frame ID returned by browser.crypto.inspect"), aitool.WithParam_Min(0)),
@@ -675,6 +700,12 @@ func buildBrowserTransformPrepareTool(bridge browsertools.Bridge) (*aitool.Tool,
 			}
 			if params.Has("input_paths") {
 				callParams["inputPaths"] = params.GetStringSlice("input_paths")
+			}
+			if params.Has("captureId") || params.Has("nodeId") {
+				if params.GetString("captureId") == "" || params.GetString("nodeId") == "" {
+					return nil, errors.New("captureId and nodeId must be supplied together")
+				}
+				callParams["trigger"] = map[string]string{"captureId": params.GetString("captureId"), "nodeId": params.GetString("nodeId")}
 			}
 			catalog, connected := bridge.CapabilityCatalog(deviceID)
 			if !connected {
