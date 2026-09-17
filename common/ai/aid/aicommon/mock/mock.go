@@ -629,21 +629,31 @@ func (m *MockInvoker) GetRuntimeTasks() []aicommon.AIStatefulTask {
 	return append([]aicommon.AIStatefulTask(nil), m.runtimeTask...)
 }
 
-func (m *MockInvoker) ScheduleAuxiliaryTask(ctx context.Context, spec aicommon.AuxiliaryTaskSpec) {
-	// Mock: build prompt lazily, delegate to InvokeSpeedPriorityLiteForge, call OnResult.
+func (m *MockInvoker) ScheduleAuxiliaryTask(
+	ctx context.Context,
+	name string,
+	promptBuilder func() string,
+	onResult func(*aicommon.Action),
+	opts ...aicommon.AuxiliaryTaskOption,
+) {
+	// Mock: build prompt lazily, delegate to InvokeSpeedPriorityLiteForge, call onResult.
 	// No skip logic — mock always runs the task.
-	if spec.PromptBuilder == nil {
+	if promptBuilder == nil {
 		return
 	}
-	prompt := spec.PromptBuilder()
+	prompt := promptBuilder()
 	if prompt == "" {
 		return
 	}
-	action, err := m.InvokeSpeedPriorityLiteForge(ctx, spec.Name, prompt, spec.Outputs, spec.Opts...)
+	spec := &aicommon.AuxiliaryTaskSpec{}
+	for _, opt := range opts {
+		opt(spec)
+	}
+	action, err := m.InvokeSpeedPriorityLiteForge(ctx, name, prompt, spec.Outputs, spec.Opts...)
 	if err != nil || action == nil {
 		return
 	}
-	if spec.OnResult != nil {
-		spec.OnResult(action)
+	if onResult != nil {
+		onResult(action)
 	}
 }

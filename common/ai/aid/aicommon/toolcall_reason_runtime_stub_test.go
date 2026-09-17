@@ -144,22 +144,32 @@ func (r *reasonTestRuntime) EmitResultAfterStream(any) {}
 
 func (r *reasonTestRuntime) EmitResult(any) {}
 
-func (r *reasonTestRuntime) ScheduleAuxiliaryTask(ctx context.Context, spec AuxiliaryTaskSpec) {
-	// Build prompt lazily, delegate to InvokeSpeedPriorityLiteForge, call OnResult.
+func (r *reasonTestRuntime) ScheduleAuxiliaryTask(
+	ctx context.Context,
+	name string,
+	promptBuilder func() string,
+	onResult func(*Action),
+	opts ...AuxiliaryTaskOption,
+) {
+	// Build prompt lazily, delegate to InvokeSpeedPriorityLiteForge, call onResult.
 	// No skip logic — test runtime always runs the task.
-	if spec.PromptBuilder == nil {
+	if promptBuilder == nil {
 		return
 	}
-	prompt := spec.PromptBuilder()
+	prompt := promptBuilder()
 	if prompt == "" {
 		return
 	}
-	action, err := r.InvokeSpeedPriorityLiteForge(ctx, spec.Name, prompt, spec.Outputs, spec.Opts...)
+	spec := &AuxiliaryTaskSpec{}
+	for _, opt := range opts {
+		opt(spec)
+	}
+	action, err := r.InvokeSpeedPriorityLiteForge(ctx, name, prompt, spec.Outputs, spec.Opts...)
 	if err != nil || action == nil {
 		return
 	}
-	if spec.OnResult != nil {
-		spec.OnResult(action)
+	if onResult != nil {
+		onResult(action)
 	}
 }
 
