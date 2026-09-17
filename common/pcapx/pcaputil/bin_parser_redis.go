@@ -59,10 +59,21 @@ func redisFrameLength(w []byte, depth int) (int, error) {
 			return 0, nil
 		}
 		return nl + 2, nil
-	case '$', '!', '=':
+	case '$', '!', '=', '*', '%', '~', '>', '(':
 		if nl < 0 {
+			if err := redisLengthDigits(w[1:]); err != nil {
+				return 0, err
+			}
 			return 0, nil
 		}
+		if w[0] == '(' {
+			return nl + 2, nil
+		}
+	default:
+		return 0, fmt.Errorf("redis: invalid RESP prefix")
+	}
+	switch w[0] {
+	case '$', '!', '=':
 		n, err := strconv.Atoi(string(w[1:nl]))
 		if err != nil {
 			return 0, fmt.Errorf("redis: invalid bulk length")
@@ -107,14 +118,31 @@ func redisFrameLength(w []byte, depth int) (int, error) {
 			at += n
 		}
 		return at, nil
-	case '(':
-		if nl < 0 {
-			return 0, nil
-		}
-		return nl + 2, nil
 	default:
 		return 0, fmt.Errorf("redis: invalid RESP prefix")
 	}
+}
+
+func redisLengthDigits(w []byte) error {
+	if len(w) == 0 {
+		return nil
+	}
+	i := 0
+	if w[0] == '-' {
+		i = 1
+	}
+	if i >= len(w) {
+		return nil
+	}
+	for ; i < len(w); i++ {
+		if w[i] == '\r' {
+			return nil
+		}
+		if w[i] < '0' || w[i] > '9' {
+			return fmt.Errorf("redis: invalid length digits")
+		}
+	}
+	return nil
 }
 
 func (f *binFlow) frameRedis(w []byte) (int, *binSpec, error) {

@@ -292,6 +292,7 @@ type binFlow struct {
 	ldap         *binLDAP
 	redis        *binRedis
 	mqtt         *binMQTT
+	mongo        *binMongo
 	wsPending    bool
 	httpMethods  []string
 	a            *binParser
@@ -492,7 +493,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt")
+		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb")
 		if !a.config.Deferred || stateful {
 			result, err := e.Decode()
 			if err == nil && stateful {
