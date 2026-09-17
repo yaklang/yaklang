@@ -29,15 +29,12 @@ func initSingleModelRegistry() {
 		singleModelRegistry[name] = action
 	}
 
-	// ===== Skip =====
-	// Function-block internal steps migrated to the scheduler
+	// ===== Skip (non-critical auxiliary: skip with fallback) =====
+	// Pure display / evaluation — skipping only loses cosmetic output.
 	register(CallerLabelToolCallReason, SingleModelSkip)
-	register(CallerLabelExtractExploreTargetPath, SingleModelSkip)
-	register(CallerLabelExtractHTTPRequestFromInput, SingleModelSkip)
-	register(CallerLabelAnalyzeReportIntent, SingleModelSkip)
 	register(CallerLabelSmartEvaluation, SingleModelSkip)
 	register(CallerLabelInsufficientReasonAnalysis, SingleModelSkip)
-	register(CallerLabelCapabilityCatalogMatch, SingleModelSkip)
+
 	// Subsystem defensive fallback (should not be reached after entry gate)
 	register(CallerLabelSessionInitGenerator, SingleModelSkip)
 	register(CallerLabelSessionTitleGenerator, SingleModelSkip)
@@ -48,7 +45,11 @@ func initSingleModelRegistry() {
 	register(CallerLabelBatchMemoryDeduplication, SingleModelSkip)
 	register(CallerLabelPerception, SingleModelSkip)
 
-	// ===== LiteCall =====
+	// ===== LiteCall (critical path: still call, but degraded) =====
+	// InitTask key steps — skipping would break loop startup.
+	register(CallerLabelExtractExploreTargetPath, SingleModelLiteCall)
+	register(CallerLabelExtractHTTPRequestFromInput, SingleModelLiteCall)
+	register(CallerLabelAnalyzeReportIntent, SingleModelLiteCall)
 	register(CallerLabelKnowledgeCompress, SingleModelLiteCall)
 	register(CallerLabelKnowledgeCompressBench, SingleModelLiteCall)
 	register(CallerLabelSelectKnowledgeBase, SingleModelLiteCall)
@@ -56,6 +57,7 @@ func initSingleModelRegistry() {
 	register(CallerLabelEvaluateInternetResearchNext, SingleModelLiteCall)
 	register(CallerLabelPlanFactsHook, SingleModelLiteCall)
 	register(CallerLabelPlanDirect, SingleModelLiteCall)
+	register(CallerLabelCapabilityCatalogMatch, SingleModelLiteCall)
 	register(CallerLabelAnalyzeRequirementAndSearch, SingleModelLiteCall)
 	register(CallerLabelExtractRankedLines, SingleModelLiteCall)
 	register(CallerLabelHttpFuzztestInitBootstrap, SingleModelLiteCall)
