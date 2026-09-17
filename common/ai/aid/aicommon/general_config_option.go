@@ -98,3 +98,31 @@ func WithGeneralConfigStreamableFieldEmitterCallback(fieldKeys []string, callbac
 func WithLiteForgeOutputValidator(validate func(*Action) error) GeneralKVConfigOption {
 	return func(c *GeneralKVConfig) { c.config.Set("liteForgeOutputValidator", validate) }
 }
+
+// WithGeneralConfigExtraRequestOpts carries AIRequestOption values through
+// the GeneralKVConfig layer. These options are consumed by
+// invokeLiteForgeWithCallback and forwarded to LiteForge via
+// aiforge.WithLiteForge_ExtraRequestOpts, ultimately reaching
+// AIRequest.extraSpecOpts and the underlying AI call.
+//
+// Used by the auxiliary task scheduler to inject parameter degradation
+// (e.g. aispec.WithThinkingLevel("none")) for LiteCall decisions.
+func WithGeneralConfigExtraRequestOpts(opts ...AIRequestOption) GeneralKVConfigOption {
+	return func(c *GeneralKVConfig) {
+		existing := c.GetExtraRequestOpts()
+		c.config.Set("extraRequestOpts", append(existing, opts...))
+	}
+}
+
+// GetExtraRequestOpts returns the AIRequestOption list carried by this config.
+func (g *GeneralKVConfig) GetExtraRequestOpts() []AIRequestOption {
+	if g == nil {
+		return nil
+	}
+	result, ok := g.config.Get("extraRequestOpts")
+	if !ok {
+		return nil
+	}
+	opts, _ := result.([]AIRequestOption)
+	return opts
+}
