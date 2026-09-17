@@ -310,6 +310,7 @@ type binFlow struct {
 	dot              *binDoT
 	doh              *binDoH
 	httpUpgrades     []bool
+	httpDoH          []bool
 	httpMethods      []string
 	a                *binParser
 	id               uint64
@@ -504,14 +505,16 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if f.protocol == "smb2" {
 			e.decodeSkip = 4
 		}
+		httpSession := false
 		if f.protocol == "http" {
+			httpSession = d.http.doh
 			e.decodeConfig = d.http.config()
 			e.Summary = d.http.summary
 			f.finishHTTP(dir)
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		stateful := f.protocol == "http" || f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp" || f.protocol == "smb2" || f.protocol == "dcerpc" || f.protocol == "ssh" || f.protocol == "nfs" || f.protocol == "snmp" || f.protocol == "rdp" || f.protocol == "dot")
+		stateful := httpSession || f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp" || f.protocol == "smb2" || f.protocol == "dcerpc" || f.protocol == "ssh" || f.protocol == "nfs" || f.protocol == "snmp" || f.protocol == "rdp" || f.protocol == "dot")
 		if !a.config.Deferred || stateful {
 			result, err := e.Decode()
 			if err == nil && stateful {
