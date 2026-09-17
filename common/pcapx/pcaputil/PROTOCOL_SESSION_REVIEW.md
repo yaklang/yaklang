@@ -67,6 +67,16 @@ The later NFS integration exposed a default-entry regression: adding the TCP
 record wrapper beside ONCRPC made unframed root parsing consume both entries.
 The wrapper now lives in `onc_rpc_tcp.yaml`, retaining the original unframed
 rule and its corpus/scorecard contracts while preserving NFS TCP framing.
+The subsequent DoH integration eagerly decoded ordinary deferred HTTP and
+applied DoH response validation to later ordinary HTTP exchanges. DoH admission
+now reuses the existing parsed request header and follows the HTTP request
+queue; informational responses do not consume that association. A mixed
+DoH/ordinary/HEAD pipeline regression covers full and deferred parsing with
+whole-message, one-byte, and seven-byte feeds. On this host, three 300 ms runs
+of `BenchmarkHTTP1OrdinaryDeferred` changed median time from 8,802 to 3,924 ns/op,
+allocation bytes from 26,845 to 12,273 B/op, and allocations from 109 to 45.
+This is a microbenchmark of an ordinary HTTP request/response pair, not a
+general capture-throughput result.
 
 ## Boundaries
 
