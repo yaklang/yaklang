@@ -238,12 +238,12 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
-	return f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil
+	return f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil
 }
 
 func (f *binFlow) mailLike() bool {
 	switch f.protocol {
-	case "smtp", "imap", "pop3", "ftp":
+	case "smtp", "imap", "pop3", "ftp", "tns", "radius", "dhcp", "ntp", "coap", "modbus":
 		return true
 	}
 	return false
@@ -280,6 +280,18 @@ func probeWire(w []byte, limit int) ProbeResult {
 		return p
 	}
 	if p := probeFTP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeDHCP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeRADIUS(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeTNS(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeModbus(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeIMAP(w, limit); p.Verdict != ProbeReject {
@@ -328,6 +340,12 @@ func probeWire(w []byte, limit int) ProbeResult {
 		return p
 	}
 	if p := probeSIP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeNTP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeCoAP(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeRTP(w, limit); p.Verdict != ProbeReject {

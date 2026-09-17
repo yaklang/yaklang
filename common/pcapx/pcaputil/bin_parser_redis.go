@@ -18,6 +18,9 @@ func probeRedis(w []byte, limit int) ProbeResult {
 	if bytes.HasPrefix(w, []byte("+OK ")) || len(w) >= 2 && w[0] == '*' && w[1] == ' ' {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	if w[0] == '#' && len(w) >= 2 && w[1] != 't' && w[1] != 'f' {
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	if !redisPrefix(w[0]) {
 		return ProbeResult{Verdict: ProbeReject}
 	}

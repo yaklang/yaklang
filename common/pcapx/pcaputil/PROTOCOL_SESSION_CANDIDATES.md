@@ -6,8 +6,8 @@ DCE/RPC, TDS, SSH, AMQP 0-9-1, DoT, DoH, SIP, RTP/RTCP, NFSv3, SNMPv3, RDP,
 QUIC/HTTP3/QPACK/DoQ). Catalog / roadmap rows stay `partial` / `new` / `todo`.
 This file does not mark anything `done`.
 
-First-version work in this stack: SMTP, IMAP, POP3, and FTP on the shared
-Probe / Feed / Close path. The remaining six stay sequential follow-ups.
+First-version work in this stack: SMTP, IMAP, POP3, FTP, Oracle TNS, RADIUS,
+DHCP, NTP, CoAP, and Modbus TCP on the shared Probe / Feed / Close path.
 
 | Protocol | First-version profile | Spec | Must-have | Not complete |
 |---|---|---|---|---|

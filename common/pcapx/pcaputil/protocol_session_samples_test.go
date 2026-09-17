@@ -242,6 +242,33 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, mailCR("PASS x")},
 			{1, mailCR("230 Login successful")},
 		}},
+		{"tns-connect-accept", "tns", 11521, []sessionStep{
+			{0, tnsConnect("(DESCRIPTION=)")},
+			{1, tnsType(2, nil)},
+			{0, tnsType(6, []byte{0, 0, 'A', 'B'})},
+		}},
+		{"radius-access-accept", "radius", 11812, []sessionStep{
+			{0, radiusPkt(1, 7, radiusAttr(1, []byte("alice")))},
+			{1, radiusPkt(2, 7, nil)},
+		}},
+		{"dhcp-discover-ack", "dhcp", 10067, []sessionStep{
+			{0, dhcpMsg(1, 1, 0x12345678, []byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc})},
+			{1, dhcpMsg(2, 2, 0x12345678, []byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc})},
+			{0, dhcpMsg(1, 3, 0x12345678, []byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc})},
+			{1, dhcpMsg(2, 5, 0x12345678, []byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc})},
+		}},
+		{"ntp-client-server", "ntp", 10123, []sessionStep{
+			{0, ntpPkt(3, 0, make([]byte, 8), make([]byte, 8), []byte{1, 2, 3, 4, 5, 6, 7, 8})},
+			{1, ntpPkt(4, 2, []byte{1, 2, 3, 4, 5, 6, 7, 8}, make([]byte, 8), []byte{8, 8, 8, 8, 8, 8, 8, 8})},
+		}},
+		{"coap-get-content", "coap", 10568, []sessionStep{
+			{0, coapMsg(0, 1, 1, 7, []byte{0xab}, []byte{0xb1, 's'}, nil)},
+			{1, coapMsg(2, 1, 69, 7, []byte{0xab}, nil, []byte("ok"))},
+		}},
+		{"modbus-read-holding", "modbus", 10502, []sessionStep{
+			{0, mbap(1, 1, 3, []byte{0, 0, 0, 2})},
+			{1, mbap(1, 1, 3, []byte{4, 0, 1, 0, 2})},
+		}},
 		{"grpc-unary-http2", "http2", 18081, []sessionStep{
 			{0, append([]byte(binH2Preface), h2TestFrame(4, 0, 0, nil)...)},
 			{1, h2TestFrame(4, 0, 0, nil)},

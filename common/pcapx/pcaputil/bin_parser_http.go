@@ -79,6 +79,18 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.framePOP3(w)
 		case "ftp":
 			return f.frameFTP(w)
+		case "tns":
+			return f.frameTNS(w)
+		case "radius":
+			return f.frameRADIUS(w)
+		case "dhcp":
+			return f.frameDHCP(w)
+		case "ntp":
+			return f.frameNTP(w)
+		case "coap":
+			return f.frameCoAP(w)
+		case "modbus":
+			return f.frameModbus(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {
