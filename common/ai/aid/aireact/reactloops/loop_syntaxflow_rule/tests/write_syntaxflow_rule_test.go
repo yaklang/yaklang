@@ -3,8 +3,8 @@ package syntaxflowruletests
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -71,7 +70,7 @@ desc(
 func TestFocusMode_WriteSyntaxFlowRule(t *testing.T) {
 	_ = ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 256)
 
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -99,11 +98,13 @@ func TestFocusMode_WriteSyntaxFlowRule(t *testing.T) {
 	}
 	after := time.After(du * time.Second)
 
+	var gotRuleChange bool
 LOOP:
 	for {
 		select {
 		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
+			if e.Type == string(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE) {
+				gotRuleChange = true
 				break LOOP
 			}
 		case <-after:
@@ -116,10 +117,26 @@ LOOP:
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
+
+	if !gotRuleChange {
+		t.Fatal("expected syntaxflow_rule_change after write_rule (disk write is deferred)")
+	}
 }
 
 type mockStats_forWriteAndModify struct {
+	mu        sync.Mutex
 	writeDone bool
+}
+
+// claimFirstWrite returns true exactly once; later callers must use modify_rule.
+func (s *mockStats_forWriteAndModify) claimFirstWrite() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writeDone {
+		return false
+	}
+	s.writeDone = true
+	return true
 }
 
 func mockedSyntaxFlowWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
@@ -150,7 +167,7 @@ func mockedSyntaxFlowWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf,
 	if hasRulePrompt {
 		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
-		if !stat.writeDone {
+		if stat.claimFirstWrite() {
 			// 第一次写：故意返回有语法错误的规则（缺少 desc 的闭合括号），
 			// 触发 hasBlockingErrors，循环不退出，进入下一轮以便测试 modify_rule
 			ruleContent := `rule("test-rule")
@@ -166,9 +183,8 @@ desc(
 <|GEN_RULE_END_{{ .nonce }}|>`, map[string]any{
 				"nonce": nonceStr,
 			})))
-			stat.writeDone = true
 		} else {
-			// modify_rule: fix syntax error
+			// modify_rule: fix syntax error (also covers concurrent retries after first write)
 			modifiedContent := `rule("test-rule")
 desc(
 	title: "Test Rule Fixed"
@@ -194,7 +210,7 @@ desc(
 func TestFocusMode_WriteSyntaxFlowRuleAndThenModify(t *testing.T) {
 	_ = ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 256)
 
 	stat := &mockStats_forWriteAndModify{writeDone: false}
 	ins, err := aireact.NewTestReAct(
@@ -223,25 +239,28 @@ func TestFocusMode_WriteSyntaxFlowRuleAndThenModify(t *testing.T) {
 	}
 	after := time.After(du * time.Second)
 
-	var filenames []string
 	var writeRuleReceived, modifyRuleReceived bool
+	var lastContent string
 LOOP:
 	for {
 		select {
 		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
-				content := string(e.GetContent())
-				filename := utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
-				filenames = append(filenames, filename)
+			if e.Type != string(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE) {
+				continue
 			}
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				if e.GetNodeId() == "write_code" {
-					writeRuleReceived = true
-				}
-				if e.GetNodeId() == "modify_code" {
-					modifyRuleReceived = true
-					break LOOP
-				}
+			payload := parseSyntaxFlowRuleChangeResponse(t, e)
+			lastContent = payload.Code.Content
+			switch payload.SourceAction {
+			case "write_rule":
+				writeRuleReceived = true
+			case "modify_rule":
+				modifyRuleReceived = true
+				break LOOP
+			}
+			// Legacy editor node ids may still appear; prefer source_action from rule change.
+			if payload.Op == "replace" && writeRuleReceived {
+				modifyRuleReceived = true
+				break LOOP
 			}
 		case <-after:
 			break LOOP
@@ -250,40 +269,26 @@ LOOP:
 	close(in)
 
 	if !writeRuleReceived {
-		t.Fatal("write_rule event not received")
+		t.Fatal("write_rule syntaxflow_rule_change not received")
 	}
 	if !modifyRuleReceived {
-		t.Fatal("modify_rule event not received - first write had syntax error, loop should continue and AI should call modify_rule")
+		t.Fatal("modify_rule syntaxflow_rule_change not received - first write had syntax error, loop should continue and AI should call modify_rule")
 	}
 
-	var filename string
-	for _, name := range filenames {
-		if strings.Contains(name, "gen_code_") || strings.HasSuffix(name, ".sf") {
-			filename = name
-			break
-		}
-	}
-	if filename == "" {
-		t.Fatal("gen_code_/.sf filename not found")
-	}
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
+	fmt.Println(lastContent)
 
-	result, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatal(err)
+	if !strings.Contains(lastContent, "rule(") {
+		t.Fatal("rule content not delivered in syntaxflow_rule_change")
 	}
-	fmt.Println(string(result))
-	if !strings.Contains(string(result), "rule(") {
-		t.Fatal("rule content not written correctly")
-	}
-	if !strings.Contains(string(result), "desc(") {
-		t.Fatal("desc block not found in written rule")
+	if !strings.Contains(lastContent, "desc(") {
+		t.Fatal("desc block not found in delivered rule")
 	}
 	// modify_rule 应修复语法错误，最终内容包含 "Test Rule Fixed"
-	if !strings.Contains(string(result), "Test Rule Fixed") {
+	if !strings.Contains(lastContent, "Test Rule Fixed") {
 		t.Fatal("modify_rule did not apply; expected 'Test Rule Fixed' in final content")
 	}
 }

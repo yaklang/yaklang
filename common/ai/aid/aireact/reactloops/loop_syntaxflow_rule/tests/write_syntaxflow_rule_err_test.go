@@ -3,7 +3,6 @@ package syntaxflowruletests
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -45,13 +43,12 @@ func mockedSyntaxFlowWritingCauseError(t *testing.T, i aicommon.AICallerConfigIf
 	if hasRulePrompt {
 		nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
-		if !stat.writeDone {
-			invalidRule := "rule(\"test\")\ndesc(\n\ttitle: \"Test\"\n\ttype: audit\n"
+		if stat.claimFirstWrite() {
+			invalidRule := "rule(\"test\")\ndesc(\n\ttitle: \"Test\"\n\ttype: audit\n\tlevel: info\n"
 			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_rule"}
 <|GEN_RULE_{{ .nonce }}|>
 `+invalidRule+`
 <|GEN_RULE_END_{{ .nonce }}|>`, map[string]any{"nonce": nonceStr})))
-			stat.writeDone = true
 		} else {
 			fixedRule := "rule(\"test\")\ndesc(\n\ttitle: \"Test Fixed\"\n\ttype: audit\n\tlevel: info\n)"
 			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_rule", "modify_start_line": 1, "modify_end_line": 6}
@@ -68,13 +65,13 @@ func mockedSyntaxFlowWritingCauseError(t *testing.T, i aicommon.AICallerConfigIf
 func TestFocusMode_WriteSyntaxFlowRuleCauseErrorAndThenModify(t *testing.T) {
 	_ = ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 256)
 
 	var haveError bool
 	stat := &mockStats_forWriteAndModify{writeDone: false}
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if strings.Contains(r.GetPrompt(), "编译错误") {
+			if strings.Contains(r.GetPrompt(), "编译错误") || strings.Contains(r.GetPrompt(), "Syntax Error") {
 				haveError = true
 			}
 			return mockedSyntaxFlowWritingCauseError(t, i, r, stat)
@@ -101,16 +98,21 @@ func TestFocusMode_WriteSyntaxFlowRuleCauseErrorAndThenModify(t *testing.T) {
 	}
 	after := time.After(du * time.Second)
 
-	var filenames []string
+	var lastContent string
+	var gotModify bool
 LOOP:
 	for {
 		select {
 		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
-				content := string(e.GetContent())
-				filenames = append(filenames, utils.InterfaceToString(jsonpath.FindFirst(content, "$.path")))
+			if e.Type != string(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE) {
+				continue
 			}
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) && e.GetNodeId() == "modify_code" {
+			payload := parseSyntaxFlowRuleChangeResponse(t, e)
+			lastContent = payload.Code.Content
+			if payload.SourceAction == "modify_rule" ||
+				payload.Op == "replace" ||
+				strings.Contains(payload.Code.Content, "Test Fixed") {
+				gotModify = true
 				break LOOP
 			}
 		case <-after:
@@ -119,27 +121,19 @@ LOOP:
 	}
 	close(in)
 
-	var filename string
-	for _, name := range filenames {
-		if strings.Contains(name, "gen_code_") || strings.HasSuffix(name, ".sf") {
-			filename = name
-			break
-		}
-	}
-	if filename == "" {
-		t.Fatal("gen_code_/.sf filename not found")
-	}
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
 
-	result, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatal(err)
+	if !gotModify {
+		t.Fatal("expected modify_rule syntaxflow_rule_change after lint-failing write_rule")
 	}
-	if !strings.Contains(string(result), "rule(") {
-		t.Fatal("rule content not found in file")
+	if !strings.Contains(lastContent, "rule(") {
+		t.Fatal("rule content not found in syntaxflow_rule_change")
+	}
+	if !strings.Contains(lastContent, "Test Fixed") {
+		t.Fatal("expected repaired rule content 'Test Fixed'")
 	}
 	_ = haveError
 }
