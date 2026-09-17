@@ -33,6 +33,7 @@ type quicStream struct {
 	reset  bool
 	stop   bool
 	h3     *h3StreamState
+	doq    *doqStreamState
 }
 
 type quicRange struct {
@@ -280,6 +281,11 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 			if err := q.feedHTTP3(dir, sid, off, data, fin, max, fr, info); err != nil {
 				return err
 			}
+			if info["HTTP3"] != true {
+				if err := q.feedDoQ(dir, sid, off, data, fin, max, fr, info); err != nil {
+					return err
+				}
+			}
 		case "RESET_STREAM":
 			sid, _ := fr["Stream ID"].(uint64)
 			st := q.stream(sid, max)
@@ -290,6 +296,13 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 					info["HTTP3 Stream State"] = "reset"
 					info["HTTP3 Stream ID"] = sid
 					fr["HTTP3 Reset"] = true
+				}
+				if st.doq != nil && st.doq.haveQuery {
+					info["DoQ"] = true
+					info["Protocol Transition"] = "quic->doq"
+					info["DoQ Stream State"] = "reset"
+					info["DoQ Stream ID"] = sid
+					fr["DoQ Reset"] = true
 				}
 			}
 		case "STOP_SENDING":

@@ -151,7 +151,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "quic":
 		e.Session, err = f.quic.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	}
-	if err == nil && e.Session != nil {
+	if e.Session != nil {
 		switch e.Protocol {
 		case "http2":
 			e.Summary = fmt.Sprintf("HTTP/2 stream %v frame %v", e.Session["Stream ID"], e.Session["Frame Type"])
@@ -205,6 +205,10 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			if e.Session["HTTP3"] == true {
 				e.Protocol = "http3"
 				e.Summary = fmt.Sprintf("HTTP/3 stream %v %v", e.Session["HTTP3 Stream ID"], e.Session["HTTP3 Stream Kind"])
+			}
+			if e.Session["DoQ"] == true {
+				e.Protocol = "doq"
+				e.Summary = fmt.Sprintf("DoQ stream %v %v %v", e.Session["DoQ Stream ID"], e.Session["Packet Name"], e.Session["QNAME"])
 			}
 		}
 		if e.Session["DoH"] == true {

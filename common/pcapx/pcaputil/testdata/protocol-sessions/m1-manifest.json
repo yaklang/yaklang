@@ -148,6 +148,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "doq-query-response.pcap",
+      "protocol": "doq",
+      "sha256": "a63ebbff6555bdbdb38e6c72f0971cfe7e2b1b444fbcf83392a035c9898233f8",
+      "bytes": 851,
+      "decode_as_port": 14853,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "http3-qpack-encoder-headers.pcap",
       "protocol": "http3",
       "sha256": "ee33438be781182484b2e84bb6c906e91615e08faf7c8b1ce3308c6c80a8c3b8",

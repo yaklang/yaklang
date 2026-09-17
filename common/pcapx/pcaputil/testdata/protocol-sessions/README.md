@@ -37,6 +37,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `quic-v1-rfc9001-initial.pcap` | RFC 9001 A.2/A.3 Client/Server Initial with header protection removed and CRYPTO decrypted on non-443 TCP 14443 |
 | `http3-settings-headers-data.pcap` | RFC 9114 HTTP/3 control SETTINGS, request HEADERS+DATA and response HEADERS on QUIC streams, non-443 TCP 14443 |
 | `http3-qpack-encoder-headers.pcap` | RFC 9204 QPACK encoder inserts plus HEADERS decoded from the dynamic table on non-443 TCP 14443 |
+| `doq-query-response.pcap` | RFC 9250 DoQ length-prefixed Query/Response on a QUIC stream, non-853 TCP 14853 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 
