@@ -3,7 +3,9 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
@@ -57,6 +59,19 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	cfg.SetSyntaxFlowResultSaveMemory()
+	if cfg.SyntaxFlow != nil {
+		cfg.SyntaxFlow.Memory = true
+	}
+	// In-process ScanProject compile (process callbacks force ExtraInfo) skips
+	// the SSA compile plugin that stamps projectName(timestamp). Without a
+	// program name, buildSSARisk drops every hit and the scan reports 0 risks.
+	if strings.TrimSpace(cfg.GetProgramName()) == "" {
+		base := strings.TrimSpace(cfg.GetProjectName())
+		if base == "" {
+			base = "scan-project"
+		}
+		cfg.SetProgramName(fmt.Sprintf("%s(%s)", base, time.Now().Format("2006-01-02 15:04:05")))
+	}
 
 	recorder := newStageOutcomeRecorder()
 	report := func(stage ProductStage, err error) { recorder.record(stage, err) }
@@ -90,21 +105,18 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	// Stage risk counts come from the result stream, attributed by the rule's
 	// own mode. This keeps per-stage metrics authoritative without Legion
 	// re-deriving them from job chains.
-	if cfg.resultCallback != nil {
-		userResultCallback := cfg.resultCallback
-		cfg.resultCallback = func(result *ScanResult) {
-			if result != nil && result.Result != nil {
-				if count := int64(result.Result.RiskCount()); count > 0 {
-					switch resultModeStage(result) {
-					case StageInspect:
-						recorder.addRisk(StageInspect, count)
-					case StageReview:
-						recorder.addRisk(StageReview, count)
-					default:
-						recorder.addRisk(StageAnalyze, count)
-					}
-				}
+	userResultCallback := cfg.resultCallback
+	cfg.resultCallback = func(result *ScanResult) {
+		if result != nil && result.Result != nil {
+			stage := resultModeStage(result)
+			if rule := result.Result.GetRule(); rule != nil {
+				recorder.addRule(stage, rule.RuleName)
 			}
+			if count := int64(result.Result.RiskCount()); count > 0 {
+				recorder.addRisk(stage, count)
+			}
+		}
+		if userResultCallback != nil {
 			userResultCallback(result)
 		}
 	}
@@ -170,37 +182,65 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		} else if !sourceReady {
 			emit(StageCollect, 0.5, nil)
 		}
+		collectClosed := sourceReady
 		var compileOpts []ssaconfig.Option
 		if wantReview {
 			compileOpts = structCompileOptions(cfg)
 		}
 		compileOpts = append(compileOpts, ssaapi.WithProcess(func(msg string, process float64) {
+			scaleInfo := parseCompileScale(msg)
+			if scaleInfo != nil {
+				recorder.observeScale(scaleInfo)
+			}
+			info := scaleInfo
+			if !sourceReady && !collectClosed {
+				if scaleInfo != nil {
+					// Filesystem scan after clone/extract: the tree is here, so
+					// collect ends and the remaining compile belongs to review.
+					emit(StageCollect, 1, scaleInfo)
+					report(StageCollect, nil)
+					collectClosed = true
+					if wantReview {
+						emit(StageReview, 0, scaleInfo)
+					} else if compileOnly {
+						emit(StageCompile, process, scaleInfo)
+					}
+					return
+				}
+				emit(StageCollect, 0.5+process*0.5, info)
+				return
+			}
 			if compileOnly {
-				emit(StageCompile, process, nil)
-			} else if wantReview && sourceReady {
-				emit(StageReview, process, nil)
-			} else if !sourceReady {
-				emit(StageCollect, 0.5+process*0.5, nil)
+				emit(StageCompile, process, info)
+			} else if wantReview {
+				emit(StageReview, process, info)
 			}
 		}))
 		prog, err := compileProductProject(ctx, cfg.Config, compileOpts...)
 		if !sourceReady {
 			if isSourceCollectError(err) {
-				report(StageCollect, err)
+				if !collectClosed {
+					report(StageCollect, err)
+				}
 				return finishScanProject(cfg, recorder, programName, err)
 			}
-			report(StageCollect, nil)
-			emit(StageCollect, 1, nil)
+			if !collectClosed {
+				report(StageCollect, nil)
+				emit(StageCollect, 1, nil)
+				collectClosed = true
+			}
+		}
+		captureProgramEvidence(recorder, prog)
+		if wantReview && err == nil {
+			emitStructResults(cfg, prog)
+			recorder.observeStruct(prog)
+			emit(StageReview, 1, mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfo(prog)))
 		}
 		if compileStage != "" {
 			report(compileStage, err)
 		}
 		if err != nil {
 			return finishScanProject(cfg, recorder, programName, err)
-		}
-		if wantReview {
-			emitStructResults(cfg, prog)
-			emit(StageReview, 1, nil)
 		}
 		if prog != nil {
 			if name := strings.TrimSpace(prog.GetProgramName()); name != "" {
@@ -211,10 +251,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		// program; scanning the closed DBWrite program skips every SSA rule.
 		cfg.Programs = append(cfg.Programs, reloadCompiledProgram(prog))
 		if compileOnly {
-			emit(StageCompile, 1, nil)
-		}
-		if localDir == "" {
-			emit(StageCollect, 1, nil)
+			emit(StageCompile, 1, scaleInfoFromRecorder(recorder))
 		}
 		hasProgram = true
 	} else if wantReview && hasLoaded {
@@ -226,12 +263,13 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 				break
 			}
 			emitStructResults(cfg, prog)
+			recorder.observeStruct(prog)
 		}
 		report(StageReview, reviewErr)
 		if reviewErr != nil {
 			return finishScanProject(cfg, recorder, programName, reviewErr)
 		}
-		emit(StageReview, 1, nil)
+		emit(StageReview, 1, mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfoAll(cfg.Programs)))
 	}
 
 	// -p / reloaded -t: one StartScan. Source attaches via IrSource; SSA runs
@@ -286,6 +324,16 @@ func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName 
 		ProgramName: programName,
 		Succeeded:   recorder.Succeeded(),
 	}
+	if recorder != nil {
+		result.TotalFiles = recorder.scale.TotalFiles
+		result.HandlerFiles = recorder.scale.HandlerFiles
+		result.PrehandlerFiles = recorder.scale.PrehandlerFiles
+		result.TotalBytes = recorder.scale.TotalBytes
+		result.TotalLines = recorder.scale.TotalLines
+		result.SourceStatistics = recorder.sourceStatistics
+	}
+	result.SkippedStages = skippedRequestedStages(resolveProductModes(cfg), result.Stages)
+	result.IncompleteStages = len(result.SkippedStages) > 0
 	if err != nil {
 		result.Error = err.Error()
 	}
@@ -353,6 +401,35 @@ func resolveProductModes(cfg *Config) productModeSelection {
 		return productModeSelection{source: true, review: true, analyze: true}
 	}
 	return selection
+}
+
+// skippedRequestedStages lists detection stages the caller asked for that never
+// started. A failed or canceled stage ran, so it is not skipped.
+func skippedRequestedStages(mode productModeSelection, outcomes []StageOutcome) []string {
+	if mode.compileOnly {
+		return nil
+	}
+	present := map[ProductStage]struct{}{}
+	for _, outcome := range outcomes {
+		present[outcome.Stage] = struct{}{}
+	}
+	var skipped []string
+	if mode.source {
+		if _, ok := present[StageInspect]; !ok {
+			skipped = append(skipped, string(StageInspect))
+		}
+	}
+	if mode.review {
+		if _, ok := present[StageReview]; !ok {
+			skipped = append(skipped, string(StageReview))
+		}
+	}
+	if mode.analyze {
+		if _, ok := present[StageAnalyze]; !ok {
+			skipped = append(skipped, string(StageAnalyze))
+		}
+	}
+	return skipped
 }
 
 func compileRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
@@ -454,6 +531,147 @@ func isSourceCollectError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "SSA Git clone failed") ||
 		strings.Contains(msg, "git clone:")
+}
+
+const compileScalePrefix = "ssa-compile-scale:"
+
+func parseCompileScale(msg string) *RuleProcessInfoList {
+	msg = strings.TrimSpace(msg)
+	if !strings.HasPrefix(msg, compileScalePrefix) {
+		return nil
+	}
+	var scale struct {
+		TotalFiles      int64 `json:"total_files"`
+		HandlerFiles    int64 `json:"handler_files"`
+		PrehandlerFiles int64 `json:"prehandler_files"`
+		TotalBytes      int64 `json:"total_bytes"`
+	}
+	raw := strings.TrimPrefix(msg, compileScalePrefix)
+	if json.Unmarshal([]byte(raw), &scale) != nil {
+		return nil
+	}
+	if scale.TotalFiles <= 0 && scale.HandlerFiles <= 0 && scale.TotalBytes <= 0 {
+		return nil
+	}
+	return &RuleProcessInfoList{
+		TotalFiles:      scale.TotalFiles,
+		HandlerFiles:    scale.HandlerFiles,
+		PrehandlerFiles: scale.PrehandlerFiles,
+		TotalBytes:      scale.TotalBytes,
+	}
+}
+
+func mergeStageInfo(scale, rules *RuleProcessInfoList) *RuleProcessInfoList {
+	if scale == nil {
+		return rules
+	}
+	if rules == nil {
+		return scale
+	}
+	out := *scale
+	out.Rules = rules.Rules
+	if rules.TotalQuery > 0 {
+		out.TotalQuery = rules.TotalQuery
+		out.FinishedQuery = rules.FinishedQuery
+		out.FailedQuery = rules.FailedQuery
+		out.SuccessQuery = rules.SuccessQuery
+		out.SkippedQuery = rules.SkippedQuery
+	}
+	if rules.RiskCount > 0 {
+		out.RiskCount = rules.RiskCount
+	}
+	return &out
+}
+
+func structRuleProcessInfo(prog *ssaapi.Program) *RuleProcessInfoList {
+	if prog == nil {
+		return nil
+	}
+	stats := prog.StructScanRuleStats()
+	if len(stats) == 0 {
+		return nil
+	}
+	info := &RuleProcessInfoList{TotalQuery: int64(len(stats))}
+	for _, stat := range stats {
+		info.FinishedQuery++
+		if stat.Failed {
+			info.FailedQuery++
+		} else {
+			info.SuccessQuery++
+		}
+		if stat.RiskCount > 0 {
+			info.RiskCount += stat.RiskCount
+		}
+		item := &RuleProcessInfo{
+			RuleName:    stat.RuleName,
+			ProgramName: stat.ProgramName,
+			StartTime:   stat.StartTime,
+			EndTime:     stat.EndTime,
+			Progress:    1,
+			Finished:    true,
+			RiskCount:   stat.RiskCount,
+		}
+		if stat.Failed && stat.Error != "" {
+			item.Error = fmt.Errorf("%s", stat.Error)
+		}
+		info.Rules = append(info.Rules, item)
+	}
+	return info
+}
+
+func structRuleProcessInfoAll(progs []*ssaapi.Program) *RuleProcessInfoList {
+	var info *RuleProcessInfoList
+	for _, prog := range progs {
+		part := structRuleProcessInfo(prog)
+		if part == nil {
+			continue
+		}
+		if info == nil {
+			copied := *part
+			copied.Rules = append([]*RuleProcessInfo(nil), part.Rules...)
+			info = &copied
+			continue
+		}
+		info.Rules = append(info.Rules, part.Rules...)
+		info.TotalQuery += part.TotalQuery
+		info.FinishedQuery += part.FinishedQuery
+		info.FailedQuery += part.FailedQuery
+		info.SuccessQuery += part.SuccessQuery
+		info.SkippedQuery += part.SkippedQuery
+		info.RiskCount += part.RiskCount
+	}
+	return info
+}
+
+func scaleInfoFromRecorder(recorder *stageOutcomeRecorder) *RuleProcessInfoList {
+	if recorder == nil {
+		return nil
+	}
+	if recorder.scale.TotalFiles <= 0 && recorder.scale.TotalBytes <= 0 && recorder.scale.TotalLines <= 0 {
+		return nil
+	}
+	return &RuleProcessInfoList{
+		TotalFiles:      recorder.scale.TotalFiles,
+		HandlerFiles:    recorder.scale.HandlerFiles,
+		PrehandlerFiles: recorder.scale.PrehandlerFiles,
+		TotalBytes:      recorder.scale.TotalBytes,
+		TotalLines:      recorder.scale.TotalLines,
+	}
+}
+
+func captureProgramEvidence(recorder *stageOutcomeRecorder, prog *ssaapi.Program) {
+	if recorder == nil || prog == nil {
+		return
+	}
+	if stats, err := prog.GetSourceStatistics(); err == nil && stats != nil {
+		recorder.setSourceStatistics(stats)
+		if stats.AnalyzedLineCount > 0 {
+			recorder.scale.TotalLines = stats.AnalyzedLineCount
+		}
+		if stats.AnalyzedFileCount > 0 && recorder.scale.TotalFiles == 0 {
+			recorder.scale.TotalFiles = stats.AnalyzedFileCount
+		}
+	}
 }
 
 func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
@@ -654,6 +872,7 @@ func copySyntaxFlowRuleOptions(cfg *Config) []ssaconfig.Option {
 		"SyntaxFlowRule": cfg.SyntaxFlowRule,
 		"SyntaxFlow": map[string]any{
 			"result_save_kind": string(ssaconfig.SFResultSaveMemory),
+			"memory":           true,
 		},
 	})
 	if err != nil {

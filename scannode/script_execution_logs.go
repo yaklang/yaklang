@@ -242,7 +242,8 @@ func scanDetailStage(detailJSON string) string {
 	if err := json.Unmarshal([]byte(detailJSON), &detail); err == nil {
 		phase := strings.TrimSpace(detail.Phase)
 		switch phase {
-		case "compile", "load-program", "scan", "ingest", "source-scan":
+		case "compile", "load-program", "scan", "ingest", "source-scan",
+			"collect", "inspect", "review", "analyze":
 			return phase
 		}
 	}

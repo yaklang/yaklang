@@ -50,6 +50,14 @@ type RuleProcessInfoList struct {
 	FinishedQuery int64              `json:"finished_query"`
 	TotalQuery    int64              `json:"total_query"`
 	RiskCount     int64              `json:"risk_count"`
+	// Compile-scale / source-size fields. Collect and review stages carry
+	// these so the platform can show 代码行 / 文件 / 体积 without a chained
+	// compile job.
+	TotalFiles      int64 `json:"total_files,omitempty"`
+	HandlerFiles    int64 `json:"handler_files,omitempty"`
+	PrehandlerFiles int64 `json:"prehandler_files,omitempty"`
+	TotalBytes      int64 `json:"total_bytes,omitempty"`
+	TotalLines      int64 `json:"total_lines,omitempty"`
 }
 
 type RuleProcessInfo struct {

@@ -45,7 +45,11 @@ type SSAArtifactReadyEvent struct {
 	// ScanStages carries the product stage outcomes reported by the scan
 	// script (which stages ran, their status, duration, and counts). The
 	// platform renders them directly instead of inferring stage state.
-	ScanStages       json.RawMessage `json:"scan_stages,omitempty"`
+	ScanStages json.RawMessage `json:"scan_stages,omitempty"`
+	// CompileScale is the filesystem size signal (files / bytes / lines)
+	// reported by ScanProject so 收集代码 can show 代码行 / 文件 / 体积 after
+	// progress events expire.
+	CompileScale     json.RawMessage `json:"compile_scale,omitempty"`
 	ObjectKey        string          `json:"object_key"`
 	Codec            string          `json:"codec"` // "zstd" | "gzip" | "identity"
 	ArtifactFormat   string          `json:"artifact_format,omitempty"`

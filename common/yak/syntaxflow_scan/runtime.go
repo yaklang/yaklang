@@ -228,14 +228,16 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 					m.notifyResult(batch)
 				}
 			}),
-			ssaapi.QueryWithSave(m.kind),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
 		if workBudget != nil {
 			option = append(option, ssaapi.QueryWithWorkBudget(workBudget))
 		}
-		if m.Config.GetSyntaxFlowMemory() {
+		if m.Config != nil && (m.Config.GetSyntaxFlowMemory() ||
+			m.Config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory) {
 			option = append(option, ssaapi.QueryWithMemory())
+		} else {
+			option = append(option, ssaapi.QueryWithSave(m.kind))
 		}
 		if enableRulePerf {
 			ruleRecorder = diagnostics.NewRecorder()

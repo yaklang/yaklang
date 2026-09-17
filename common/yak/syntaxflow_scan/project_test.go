@@ -404,6 +404,36 @@ alert $cmd`,
 	require.Greater(t, alerts, 0, "SSA after -t must run on the reloaded DB program")
 }
 
+func TestScanProject_MemoryCompileKeepsSSAAlerts(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("def run(x):\n    return eval(x)\n"), 0o644))
+
+	var alerts int
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithCompileMemoryCompile(true),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SSAMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: python, title: "memory ssa")
+eval(* as $arg) as $call
+alert $call`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += r.Result.RiskCount()
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+	require.NotEmpty(t, result.ProgramName, "ScanProject must stamp a program name so SSA risks can be created")
+	require.Greater(t, alerts, 0, "memory compile must keep SSA alerts without saving results to DB")
+}
+
 func TestScanProject_ProgramPathRunsStructWithoutCompile(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("app.py", "def run(x):\n    return eval(x)\n")
