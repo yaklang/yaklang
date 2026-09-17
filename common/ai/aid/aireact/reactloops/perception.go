@@ -830,6 +830,10 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	if r.perception == nil {
 		return nil
 	}
+	// Single-model simple mode: skip perception AI calls.
+	if r.config != nil && r.config.IsSingleAIModelMode() {
+		return nil
+	}
 	totalStart := time.Now()
 	defer func() {
 		setWorkspaceDebugDuration(r, perceptionDebugTotalDurationKey, time.Since(totalStart))
