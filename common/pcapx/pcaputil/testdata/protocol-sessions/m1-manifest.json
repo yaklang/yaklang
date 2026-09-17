@@ -103,6 +103,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "snmpv3-get-response.pcap",
+      "protocol": "snmp",
+      "sha256": "618af80452a61bf2eda8996c6ced70e9fe5638cc9d6d695cb363ab91e34f42ee",
+      "bytes": 1936,
+      "decode_as_port": 1161,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",
