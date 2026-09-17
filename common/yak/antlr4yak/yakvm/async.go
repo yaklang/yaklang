@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const maxAsyncErrors = 64
@@ -72,6 +74,11 @@ func (v *VirtualMachine) startAsync(f *Frame, recoverPanic bool, run func() erro
 		record := func(err error) {
 			execution.errors.add(err)
 			v.asyncErrors.add(err)
+			// Legacy AsyncWait callers still receive an observable diagnostic;
+			// callers of the new APIs additionally get structured error results.
+			if err != nil {
+				log.Errorf("yakvm async call failed: %v", err)
+			}
 		}
 		if recoverPanic {
 			defer func() {
