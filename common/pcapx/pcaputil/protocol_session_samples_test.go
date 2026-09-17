@@ -124,6 +124,17 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, nfsWriteCall(4, 8, []byte("efgh"))},
 			{1, nfsWriteOK(4, 4)},
 		}},
+		{"snmpv3-get-response", "snmp", 1161, []sessionStep{
+			{0, snmpGet(1)},
+			{1, snmpGetResponse(1, "router")},
+			{0, snmpGetBulk(2, 0, 10)},
+			{1, snmpGetResponse(2, "bulk")},
+			{0, snmpSet(3, "name")},
+			{1, snmpGetResponse(3, "name")},
+			{1, snmpTrap()},
+			{0, snmpInform(4)},
+			{1, snmpGetResponse(4, "ack")},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

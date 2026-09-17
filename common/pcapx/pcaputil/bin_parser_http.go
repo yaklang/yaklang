@@ -58,6 +58,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameSSH(dir, w)
 		case "nfs":
 			return f.frameNFS(w)
+		case "snmp":
+			return f.frameSNMP(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

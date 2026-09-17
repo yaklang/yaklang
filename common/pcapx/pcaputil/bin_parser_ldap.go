@@ -38,8 +38,27 @@ func probeLDAP(w []byte, limit int) ProbeResult {
 	if len(w) < 1+hdr+2 {
 		return probeNeed("ldap", "3", len(w), 1+hdr+2)
 	}
-	// INTEGER messageID then an APPLICATION protocolOp.
-	if len(w) >= 1+hdr+2 && w[1+hdr] != 0x02 {
+	// INTEGER messageID then an APPLICATION protocolOp. SNMPv3 uses the
+	// same SEQUENCE+INTEGER prefix, but HeaderData is UNIVERSAL SEQUENCE.
+	at := 1 + hdr
+	if w[at] != 0x02 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	ml, mh, err := berLength(w[at+1:])
+	if err != nil {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if mh == 0 {
+		return probeNeed("ldap", "3", len(w), at+2+int(w[at+1]&127))
+	}
+	next := at + 1 + mh + ml
+	if next >= 1+hdr+n {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) < next+1 {
+		return probeNeed("ldap", "3", len(w), next+1)
+	}
+	if w[next]&0xc0 != 0x40 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	_ = n
