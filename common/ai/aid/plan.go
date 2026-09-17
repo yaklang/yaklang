@@ -378,6 +378,11 @@ func (c *Coordinator) generateSemanticIdentifier(name string) string {
 		return strings.TrimRight(truncated, "_")
 	}
 
+	// Single-model simple mode: skip AI call, use truncation fallback directly.
+	if c.GetAIConfig() != nil && c.GetAIConfig().IsSingleAIModelMode() {
+		return truncateFallback()
+	}
+
 	prompt := fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
 The identifier should capture the core meaning. Chinese or English are both acceptable.
 Reply with ONLY the JSON: {"@action":"object","identifier":"YOUR_IDENTIFIER"}

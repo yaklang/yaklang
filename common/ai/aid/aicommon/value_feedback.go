@@ -235,6 +235,10 @@ func SubmitValueFeedback(cfg *Config, record *ValueFeedbackRecord) {
 	if cfg == nil || record == nil {
 		return
 	}
+	// Single-model simple mode: skip value feedback AI calls.
+	if cfg.IsSingleAIModelMode() {
+		return
+	}
 	valueFeedbackSubmitterMu.RLock()
 	submitter := valueFeedbackSubmitter
 	valueFeedbackSubmitterMu.RUnlock()
