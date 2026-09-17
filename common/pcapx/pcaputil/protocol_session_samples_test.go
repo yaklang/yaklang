@@ -160,6 +160,12 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, rtcpSR(0x12345678, 0x11121418, 320, 3, 48)},
 			{1, rtcpRR(0xabcdef01, 0x12345678, 0, 0)},
 		}},
+		{"http3-qpack-encoder-headers", "http3", 14443, []sessionStep{
+			{0, quicLongPacket(0, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))},
+			{1, quicLongPacket(1, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 0, quicStreamFrame(3, 0, false, h3ControlSETTINGS(0x01, 220)))},
+			{0, quicLongPacket(1, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 0, quicStreamFrame(6, 0, false, h3EncoderStream(rfcHex("3fbd01c00f7777772e6578616d706c652e636f6dc10c2f73616d706c652f70617468"))))},
+			{0, quicLongPacket(1, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 1, quicStreamFrame(0, 0, true, h3Frame(0x01, rfcHex("03811011"))))},
+		}},
 		{"http3-settings-headers-data", "http3", 14443, []sessionStep{
 			{0, quicLongPacket(0, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))},
 			{0, quicLongPacket(1, 1, []byte{8, 3, 9, 4, 0xc8, 0xf0, 0x3e, 0x51}, []byte{0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}, nil, 0, quicStreamFrame(2, 0, false, h3ControlSETTINGS(0x01, 128)))},
