@@ -1,0 +1,90 @@
+# Extended DDP fields independently described from Apple's header and Linux's
+# checksum implementation (not a reproduction of either implementation):
+# https://github.com/apple-oss-distributions/xnu/blob/xnu-1228.15.4/bsd/netat/ddp.h
+# https://github.com/torvalds/linux/blob/v6.12/net/appletalk/ddp.c
+# This entry describes one extended datagram, not LocalTalk's short header,
+# routing state, or the application protocols selected by DDP Type.
+endian: big
+Package:
+  DDP: DDPMessage
+  DDPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("ddp: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("ddp: empty carrier has no datagram") }
+      candidate, operation = this.TryProcessByType("DDPCandidate")
+      if operation.OK {
+        operation.Save()
+        if this.Length() < this.GetMaxLength() {
+          tail = this.NewUnknownNode("DDP Link Trailer")
+          tail.SetMaxLength(this.GetMaxLength()-this.Length())
+          tail.Process()
+        }
+        return
+      }
+      operation.Recovery()
+      raw = this.NewUnknownNode("DDP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+DDPCandidate:
+  operator: |
+    prefix, operation = this.TryProcessByType("DDPLengthPrefix")
+    operation.Recovery()
+    if !operation.OK { panic("ddp: truncated length prefix") }
+    size = prefix.Value & 0x3ff
+    if size < 13 || size > 599 || size > this.GetMaxLength() { panic("ddp: datagram length outside carrier bounds") }
+    message = this.GetSubNode("Message")
+    message.SetMaxLength(size)
+    message.Process()
+  Message: DDPMessage
+
+DDPLengthPrefix: uint16
+DDPMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("ddp: explicit datagram boundary required") }
+    size = this.GetMaxLength()
+    if size < 13 || size > 599 { panic("ddp: extended datagram size must be 13 through 599 bytes") }
+    start = getCurrentPosition()
+    // The unused bits are preserved. Linux ignores them on receipt; do not
+    // infer address ownership or reject wire node/socket values from state.
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Hop Count")
+    if this.ProcessSubNode("Datagram Length").Value != size { panic("ddp: declared length does not match datagram boundary") }
+    checksum = this.ProcessSubNode("Checksum").Value
+    this.ProcessSubNode("Destination Network")
+    this.ProcessSubNode("Source Network")
+    this.ProcessSubNode("Destination Node")
+    this.ProcessSubNode("Source Node")
+    this.ProcessSubNode("Destination Socket")
+    this.ProcessSubNode("Source Socket")
+    this.ProcessSubNode("DDP Type")
+    if size > 13 {
+      this.GetSubNode("DDP Data").SetMaxLength(size-13)
+      this.ProcessSubNode("DDP Data")
+    }
+    this.AddInfo("Application Data Decoded", false)
+    this.AddInfo("Checksum Present", checksum != 0)
+    this.AddInfo("Checksum Validated", false)
+    if checksum != 0 {
+      bytes = getCtx("buffer").Bytes()[start+4:start+size]
+      sum = 0
+      for value in bytes {
+        sum = (sum + int(value)) & 0xffff
+        sum = ((sum << 1) | (sum >> 15)) & 0xffff
+      }
+      if sum == 0 { sum = 0xffff }
+      if checksum != sum { panic("ddp: checksum mismatch") }
+      this.AddInfo("Checksum Validated", true)
+    }
+  Reserved: uint8,2bit
+  Hop Count: uint8,4bit
+  Datagram Length: uint16,10bit
+  Checksum: uint16
+  Destination Network: uint16
+  Source Network: uint16
+  Destination Node: uint8
+  Source Node: uint8
+  Destination Socket: uint8
+  Source Socket: uint8
+  DDP Type: uint8
+  DDP Data: raw

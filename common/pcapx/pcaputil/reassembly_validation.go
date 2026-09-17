@@ -11,6 +11,8 @@ func (p *TrafficPool) invalidSegment(reason string) {
 		p.counters.invalid.Add(1)
 	} else if p.parallel != nil {
 		p.parallel.stats.invalid.Add(1)
+	} else {
+		p.singleDiagnostics.invalid.Add(1)
 	}
 	p.reassemblyFailure(reason)
 }
@@ -20,6 +22,8 @@ func (p *TrafficPool) malformedPacket(reason string) {
 		p.counters.decodeErrors.Add(1)
 	} else if p.parallel != nil {
 		p.parallel.stats.decodeErrors.Add(1)
+	} else {
+		p.singleDiagnostics.decodeErrors.Add(1)
 	}
 	p.reassemblyFailure(reason)
 }

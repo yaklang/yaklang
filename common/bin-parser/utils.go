@@ -66,34 +66,7 @@ func GetSubNode(node *base.Node, path string) *base.Node {
 	return getSubNode(node, splits)
 }
 func NodeToMap(node *base.Node) any {
-	if node.Cfg.Has(stream_parser.CfgNodeResult) {
-		return stream_parser.GetResultByNode(node)
-	}
-	if node.Cfg.GetBool(stream_parser.CfgIsList) {
-		res := []any{}
-		for _, sub := range node.Children {
-			d := NodeToMap(sub)
-			if d != nil {
-				res = append(res, d)
-			}
-		}
-		if len(res) == 0 {
-			return nil
-		}
-		return res
-	} else {
-		res := map[string]any{}
-		for _, sub := range node.Children {
-			d := NodeToMap(sub)
-			if d != nil {
-				res[sub.Name] = NodeToMap(sub)
-			}
-		}
-		if len(res) == 0 {
-			return nil
-		}
-		return res
-	}
+	return stream_parser.NodeToMap(node)
 }
 func NodeToBytes(node *base.Node) []byte {
 	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)

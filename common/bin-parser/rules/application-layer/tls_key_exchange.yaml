@@ -1,0 +1,84 @@
+# Explicit complete TLS 1.2 Server/ClientKeyExchange handshakes.
+# Caller selects the key exchange from known version/cipher context.
+# RFC 5246 4.7, 7.4.3, 7.4.7, A.7; RFC 8422 5.4/5.7.
+# Named-curve signed ECDHE, signed DHE, explicit client DH/EC, RSA vector.
+# No anonymous/implicit/explicit-curve profile, key validation, signature
+# verification, decryption, TCP reassembly, generation or automatic dispatch.
+endian: big
+unit: byte
+Package:
+  TLS12ECDHEServerKeyExchange:
+    operator: |
+      err = parseTLS12KeyExchange("ECDHEServer")
+      if err != nil { panic(err) }
+  TLS12ECDHEServerKeyExchangeCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-key-exchange: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 262154 { panic("tls12-key-exchange: carrier exceeds 262154-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12ECDHEServerKeyExchangeExact", "TLS12ECDHEServerKeyExchange")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Key Exchange")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLS12DHEServerKeyExchange:
+    operator: |
+      err = parseTLS12KeyExchange("DHEServer")
+      if err != nil { panic(err) }
+  TLS12DHEServerKeyExchangeCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-key-exchange: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 262154 { panic("tls12-key-exchange: carrier exceeds 262154-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12DHEServerKeyExchangeExact", "TLS12DHEServerKeyExchange")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Key Exchange")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLS12ECDHEClientKeyExchange:
+    operator: |
+      err = parseTLS12KeyExchange("ECDHEClient")
+      if err != nil { panic(err) }
+  TLS12ECDHEClientKeyExchangeCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-key-exchange: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 262154 { panic("tls12-key-exchange: carrier exceeds 262154-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12ECDHEClientKeyExchangeExact", "TLS12ECDHEClientKeyExchange")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Key Exchange")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLS12DHEClientKeyExchange:
+    operator: |
+      err = parseTLS12KeyExchange("DHEClient")
+      if err != nil { panic(err) }
+  TLS12DHEClientKeyExchangeCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-key-exchange: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 262154 { panic("tls12-key-exchange: carrier exceeds 262154-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12DHEClientKeyExchangeExact", "TLS12DHEClientKeyExchange")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Key Exchange")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLS12RSAClientKeyExchange:
+    operator: |
+      err = parseTLS12KeyExchange("RSAClient")
+      if err != nil { panic(err) }
+  TLS12RSAClientKeyExchangeCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-key-exchange: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 262154 { panic("tls12-key-exchange: carrier exceeds 262154-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12RSAClientKeyExchangeExact", "TLS12RSAClientKeyExchange")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Key Exchange")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TLS12ECDHEServerKeyExchangeExact: "import:application-layer/tls_key_exchange.yaml;node:TLS12ECDHEServerKeyExchange"
+TLS12DHEServerKeyExchangeExact: "import:application-layer/tls_key_exchange.yaml;node:TLS12DHEServerKeyExchange"
+TLS12ECDHEClientKeyExchangeExact: "import:application-layer/tls_key_exchange.yaml;node:TLS12ECDHEClientKeyExchange"
+TLS12DHEClientKeyExchangeExact: "import:application-layer/tls_key_exchange.yaml;node:TLS12DHEClientKeyExchange"
+TLS12RSAClientKeyExchangeExact: "import:application-layer/tls_key_exchange.yaml;node:TLS12RSAClientKeyExchange"

@@ -1,0 +1,164 @@
+# RFC 7011. Templates are local to a transport session and observation domain.
+# IPFIXMessages accepts concatenated complete messages from ONE exporter/session.
+# Repeated IPFIX calls may share a caller-owned map[int]any via the
+# ipfixTemplates context; never share that map between transport sessions.
+# Template withdrawal/expiry and structured-list information elements are not
+# implemented. Unknown elements retain their explicit identifiers and bytes.
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("IPFIX")
+  IPFIX: IPFIXMessage
+  IPFIXMessages:
+    list: true
+    Message: IPFIXMessage
+    operator: |
+      if !this.HasMaxLength() { panic("ipfix: message sequence requires a boundary") }
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+IPFIXMessage:
+  operator: |
+    this.ProcessSubNode("Header")
+    if getNodeResult("Header/Version").Value != 10 { panic("ipfix: version must be ten") }
+    length = getNodeResult("Header/Length").Value
+    if length < 16 || length > this.GetMaxLength() { panic("ipfix: invalid message length") }
+    this.SetMaxLength(length)
+    domains = getCtx("ipfixTemplates")
+    if !hasCtx("ipfixTemplates") { domains = map[int]any{}; setCtx("ipfixTemplates", domains) }
+    domain = getNodeResult("Header/Observation Domain ID").Value
+    previous = domains[domain]
+    working = map[int]any{}
+    if previous != nil { for id, value = range previous { working[id] = value } }
+    setCtx("ipfixWorkingTemplates", working)
+    if length > 16 { this.ProcessSubNode("Sets") }
+    if this.Length() != length { panic("ipfix: incomplete message") }
+    # Only publish template changes after the whole message succeeds.
+    domains[domain] = working
+  Header:
+    Version: uint16
+    Length: uint16
+    Export Time: uint32
+    Sequence Number: uint32
+    Observation Domain ID: uint32
+  Sets:
+    list: true
+    Set: IPFIXSet
+    operator: |
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+IPFIXSet:
+  operator: |
+    id = this.ProcessSubNode("Set ID").Value
+    length = this.ProcessSubNode("Set Length").Value
+    if length < 4 || length > this.GetMaxLength() { panic("ipfix: invalid set length") }
+    this.SetMaxLength(length)
+    setCtx("ipfixSetID", id)
+    if id == 2 || id == 3 {
+      minimum = id == 2 ? 4 : 6
+      for this.GetMaxLength()-this.Length() >= minimum { this.NewSubNode("Template").Process() }
+    } else if id >= 256 {
+      template = getCtx("ipfixWorkingTemplates")[id]
+      if template == nil { panic("ipfix: missing template for data set") }
+      minimum = template["minimum"]
+      for this.GetMaxLength()-this.Length() >= minimum {
+        record = this.NewSubNode("Record")
+        record.SetCfg("template", template)
+        before = this.Length()
+        record.Process()
+        if this.Length() <= before { panic("ipfix: record made no progress") }
+      }
+    } else { panic("ipfix: reserved set identifier") }
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Padding").SetMaxLength(remaining)
+      padding = this.ProcessSubNode("Padding").Value
+      for _, value = range padding { if value != 0 { panic("ipfix: padding must be zero") } }
+    }
+  Set ID: uint16
+  Set Length: uint16
+  Padding: raw
+Template:
+  operator: |
+    id = this.ProcessSubNode("Template ID").Value
+    count = this.ProcessSubNode("Field Count").Value
+    if id < 256 { panic("ipfix: reserved template identifier") }
+    if count == 0 { panic("ipfix: template withdrawal is not supported") }
+    scope = 0
+    if getCtx("ipfixSetID") == 3 {
+      scope = this.ProcessSubNode("Scope Field Count").Value
+      if scope == 0 || scope > count { panic("ipfix: invalid scope count") }
+    }
+    if count > (this.GetMaxLength()-this.Length())/4 { panic("ipfix: field count exceeds template") }
+    fields = map[int]any{}
+    minimum = 0
+    for i = range count {
+      node = this.NewSubNode("Field Specifier")
+      value = node.Process()
+      element = value.Child("Information Element ID").Value
+      size = value.Child("Field Length").Value
+      enterprise = value.Child("Enterprise Bit").Value
+      pen = 0
+      if enterprise != 0 { pen = value.Child("Enterprise Number").Value }
+      if size == 0 { panic("ipfix: zero-width template fields are unsupported") }
+      minimum += size == 65535 ? 1 : size
+      fields[i] = {"id":element, "size":size, "pen":pen, "enterprise":enterprise, "scope": i < scope}
+    }
+    getCtx("ipfixWorkingTemplates")[id] = {"fields":fields, "minimum":minimum, "scope":scope}
+  Template ID: uint16
+  Field Count: uint16
+  Scope Field Count: uint16
+Field Specifier:
+  operator: |
+    this.ProcessSubNode("Enterprise Bit")
+    this.ProcessSubNode("Information Element ID")
+    this.ProcessSubNode("Field Length")
+    if getNodeResult("Enterprise Bit").Value != 0 { this.ProcessSubNode("Enterprise Number") }
+  Enterprise Bit: uint8,1bit
+  Information Element ID: uint16,15bit
+  Field Length: uint16
+  Enterprise Number: uint32
+Record:
+  operator: |
+    template = this.GetCfg("template")
+    for i = range len(template["fields"]) {
+      spec = template["fields"][i]
+      field = this.NewSubNode("Field")
+      field.SetCfg("specifier", spec)
+      field.Process()
+    }
+Field:
+  operator: |
+    spec = this.GetCfg("specifier")
+    size = spec["size"]
+    id = spec["id"]
+    this.AddInfo("Information Element ID", id)
+    this.AddInfo("Enterprise Bit", spec["enterprise"])
+    this.AddInfo("Enterprise Number", spec["pen"])
+    this.AddInfo("Scope", spec["scope"])
+    if size == 65535 {
+      size = this.ProcessSubNode("Short Length").Value
+      if size == 255 { size = this.ProcessSubNode("Extended Length").Value }
+    }
+    if size > this.GetMaxLength()-this.Length() {
+      panic("ipfix: field exceeds record boundary: element=" + string(id) + " size=" + string(size) + " bound=" + string(this.GetMaxLength()) + " read=" + string(this.Length()))
+    }
+    this.AddInfo("Value Length", size)
+    if size == 0 { return }
+    kind = "Octets"
+    if spec["enterprise"] == 0 {
+      if id == 8 || id == 12 || id == 15 || id == 18 {
+        if size != 4 { panic("ipfix: IPv4 address must be four octets") }
+        kind = "Address"
+      } else if id == 27 || id == 28 || id == 62 || id == 63 {
+        if size != 16 { panic("ipfix: IPv6 address must be sixteen octets") }
+        kind = "Address"
+      } else if id in [1,2,4,5,6,7,9,10,11,13,14,16,17,21,22,32,36,37,60,152,153] {
+        if size > 8 { panic("ipfix: unsigned field exceeds eight octets") }
+        kind = "Unsigned"
+      }
+    }
+    this.GetSubNode(kind).SetMaxLength(size)
+    this.ProcessSubNode(kind)
+  Short Length: uint8
+  Extended Length: uint16
+  Address: raw
+  Unsigned: uint64
+  Octets: raw

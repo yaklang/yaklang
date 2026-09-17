@@ -1,0 +1,80 @@
+endian: big
+Package:
+  L2TP:
+    operator: |
+      this.ProcessSubNode("Flags")
+      flags = getNodeResult("Flags").Value
+      ver = flags & 0x0f
+      if ver != 2 {
+        panic("l2tp: version must be 2")
+      }
+      tbit = flags >> 15
+      lbit = (flags >> 14) & 1
+      sbit = (flags >> 11) & 1
+      obit = (flags >> 9) & 1
+      if lbit == 1 {
+        this.ProcessSubNode("Length")
+      }
+      this.ProcessSubNode("Tunnel ID")
+      this.ProcessSubNode("Session ID")
+      if sbit == 1 {
+        this.ProcessSubNode("Ns")
+        this.ProcessSubNode("Nr")
+      }
+      if obit == 1 {
+        this.ProcessSubNode("Offset Size")
+        off = getNodeResult("Offset Size").Value
+        if off > 0 && off < 1048576 {
+          this.GetSubNode("Offset Pad").SetMaxLength(off)
+          this.ProcessSubNode("Offset Pad")
+        }
+      }
+      if tbit == 1 && this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+        rest = this.GetMaxLength() - this.Length()
+        if rest >= 6 {
+          this.GetSubNode("AVPs").SetMaxLength(rest)
+          this.ProcessSubNode("AVPs")
+        }
+      }
+      if tbit == 0 {
+        this.ProcessByType("PPP")
+      }
+    Flags: uint16
+    Length: uint16
+    Tunnel ID: uint16
+    Session ID: uint16
+    Ns: uint16
+    Nr: uint16
+    Offset Size: uint16
+    Offset Pad: string
+    AVPs:
+      list: true
+      AVP: L2TPAVP
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 6 {
+            break
+          }
+          ele.Process()
+        }
+L2TPAVP:
+  operator: |
+    this.ProcessSubNode("FlagsLen")
+    fl = getNodeResult("FlagsLen").Value
+    alen = fl & 0x03ff
+    if alen < 6 {
+      panic("l2tp: AVP length smaller than 6")
+    }
+    this.ProcessSubNode("Vendor ID")
+    this.ProcessSubNode("Attribute Type")
+    vlen = alen - 6
+    if vlen > 0 && vlen < 1048576 {
+      this.GetSubNode("Attribute Value").SetMaxLength(vlen)
+      this.ProcessSubNode("Attribute Value")
+    }
+  FlagsLen: uint16
+  Vendor ID: uint16
+  Attribute Type: uint16
+  Attribute Value: string
+PPP: "import:ppp.yaml;node:PPP"

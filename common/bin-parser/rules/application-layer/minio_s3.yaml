@@ -1,0 +1,50 @@
+# Opt-in S3-compatible Signature V4 request structure, not endpoint identity.
+# AWS primary format, retrieved 2026-09-06:
+# https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sigv4-auth-using-authorization-header.html
+# https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sig-v4-header-based-auth.html
+# https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-troubleshooting.html
+# HTTP request line/header and Content-Length framing: RFC 9112 sections 3,5,6.
+# https://www.rfc-editor.org/rfc/rfc9112.html
+#
+# Explicit structural profile: HTTP/1.1 origin-form GET/PUT/POST/DELETE/HEAD/
+# OPTIONS, one request, AWS4-HMAC-SHA256 with Credential/SignedHeaders/Signature,
+# five-part scope (service s3), real scope date, lowercase sorted unique signed
+# header names, present Host and required x-amz-* / Content-MD5 associations.
+# x-amz-content-sha256 itself may be omitted from SignedHeaders. Request time
+# uses x-amz-date, or HTTP Date when absent; an overridden Date stays raw.
+# SHA256-shaped declaration or UNSIGNED-PAYLOAD only. No cryptographic check,
+# canonical request construction, timestamp freshness or outcome inference.
+# This does not identify MinIO, AWS, a bucket or an object from a host/path.
+# Object paths, repeated slashes, percent escapes and query order stay intact.
+# Other headers and payload remain raw factual values; payload digest, Range,
+# Content-MD5, content coding and extension semantics are not evaluated.
+#
+# No transfer coding, aws-chunked, presigned-query-only, SigV4A, browser POST
+# policy, HTTP/1.0, absolute-form, other services or streaming/trailer profile.
+# Singleton Authorization/Host/Content-Length/Date/x-amz-date/payload hash/MD5
+# duplicates are unsupported, including identical duplicates; other repeated
+# headers remain ordered and can correspond to one SignedHeaders item.
+# Resource limits are implementation bounds: 1MiB whole request, 256 headers,
+# 8192B each line including CRLF, 256B key/region scope components, and an
+# 8192B HTTP authority+target URL-helper profile. No region allow-list or key
+# authenticity is inferred. All punctuation/whitespace has an actual wire
+# leaf, and staged decode failure rolls back before whole raw carrier fallback.
+# Structured GenerateBinary is unsupported; parsed NodeToBytes is exact.
+Package:
+  S3SignatureV4Request:
+    operator: |
+      err = parseS3SignatureV4Request()
+      if err != nil { panic(err) }
+  S3SignatureV4Carrier:
+    operator: |
+      if !this.HasMaxLength() { panic("s3-sigv4: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("s3-sigv4: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("s3-sigv4: empty carrier has no request") }
+      candidate, trial = this.TryProcessByType("S3SignatureV4Frame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed S3 Signature V4 Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+S3SignatureV4Frame: "import:application-layer/minio_s3.yaml;node:S3SignatureV4Request"

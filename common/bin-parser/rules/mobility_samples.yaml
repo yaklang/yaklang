@@ -1,0 +1,224 @@
+# RFC 5944 / 4721 registration messages and RFC 6275 base Mobility Headers.
+# These entries validate wire structure, not a live registration association.
+endian: big
+Package:
+  MobileIP:
+    operator: |
+      if !this.HasMaxLength() { panic("mobile-ip: datagram boundary is required") }
+      if this.GetMaxLength() < 20 || this.GetMaxLength() > 65507 { panic("mobile-ip: datagram size is outside bounds") }
+      kind = this.ProcessSubNode("Message Type").Value
+      requiresExtension = kind == 1
+      if kind == 1 {
+        if this.GetMaxLength() < 24 { panic("mobile-ip: truncated registration request") }
+        // RFC 5944 r/x flag bits are retained and ignored on reception.
+        this.ProcessSubNode("Flags")
+      } else if kind == 3 {
+        code = this.ProcessSubNode("Code").Value
+        // Foreign-agent denials (including code 194) can lack a home-agent
+        // extension; RFC 5944 assigns home-agent denials to codes 128-136.
+        requiresExtension = code < 64 || (code >= 128 && code <= 136)
+      } else { panic("mobile-ip: unsupported registration message type") }
+      this.ProcessSubNode("Lifetime")
+      this.ProcessSubNode("Home Address")
+      this.ProcessSubNode("Home Agent")
+      if kind == 1 { this.ProcessSubNode("Care-of Address") }
+      this.ProcessSubNode("Identification")
+      found = false
+      if this.Length() < this.GetMaxLength() {
+        extensions = this.GetSubNode("Extensions")
+        extensions.SetMaxLength(this.GetMaxLength()-this.Length())
+        extensions.Process()
+        found = extensions.GetInfo("Registration Extension Present")
+      }
+      if requiresExtension && !found {
+        panic("mobile-ip: missing required registration extension")
+      }
+      this.AddInfo("Association Validated", false)
+    Message Type: uint8
+    Flags: uint8
+    Code: uint8
+    Lifetime: uint16
+    Home Address: raw,4
+    Home Agent: raw,4
+    Care-of Address: raw,4
+    Identification: uint64
+    Extensions:
+      list: true
+      Extension: MIPExtension
+      operator: |
+        found = false
+        count = 0
+        for this.Length() < this.GetMaxLength() {
+          if count >= 128 { panic("mobile-ip: too many extensions") }
+          ext = this.NewElement()
+          ext.Process()
+          kind = ext.GetSubNode("Extension Type").Result().Value
+          if kind == 32 && found { panic("mobile-ip: duplicate Mobile-Home extension") }
+          if kind == 36 && !found { panic("mobile-ip: generalized extension must follow Mobile-Home extension") }
+          if ext.GetInfo("Registration Extension") { found = true }
+          count++
+        }
+        this.AddInfo("Registration Extension Present", found)
+
+  MIPv6Packet:
+    operator: |
+      if !this.HasMaxLength() { panic("mipv6: IPv6 packet boundary is required") }
+      if this.GetMaxLength() < 48 || this.GetMaxLength() > 2088 { panic("mipv6: packet size is outside bounds") }
+      if this.ProcessSubNode("Version").Value != 6 { panic("mipv6: expected IPv6") }
+      this.ProcessSubNode("Traffic Class")
+      this.ProcessSubNode("Flow Label")
+      length = this.ProcessSubNode("Payload Length").Value
+      if length != this.GetMaxLength()-40 { panic("mipv6: IPv6 payload length differs from packet boundary") }
+      if this.ProcessSubNode("Next Header").Value != 135 { panic("mipv6: only directly carried Mobility Headers are supported") }
+      this.ProcessSubNode("Hop Limit")
+      source = this.ProcessSubNode("Source Address").Value
+      destination = this.ProcessSubNode("Destination Address").Value
+      start = getCurrentPosition()
+      this.GetSubNode("Mobility Header").SetMaxLength(length)
+      this.ProcessSubNode("Mobility Header")
+      // RFC 6275 pseudo-header uses protocol 135 and the complete MH length.
+      data = getCtx("buffer").Bytes()[start:start+length]
+      sum = 135 + length
+      for address in [source, destination] {
+        for i = 0; i < 16; i += 2 { sum += (int(address[i]) << 8) + int(address[i+1]) }
+      }
+      for i = 0; i < len(data); i += 2 { sum += (int(data[i]) << 8) + int(data[i+1]) }
+      for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+      if sum != 65535 { panic("mipv6: checksum mismatch") }
+      this.AddInfo("Checksum Valid", true)
+      this.AddInfo("Binding Context Validated", false)
+    Version: uint8,4bit
+    Traffic Class: uint8
+    Flow Label: uint32,20bit
+    Payload Length: uint16
+    Next Header: uint8
+    Hop Limit: uint8
+    Source Address: raw,16
+    Destination Address: raw,16
+    Mobility Header: MIPv6Header
+
+MIPExtension:
+  operator: |
+    kind = this.ProcessSubNode("Extension Type").Value
+    subtype = 0
+    length = 0
+    if kind == 36 {
+      subtype = this.ProcessSubNode("Subtype").Value
+      length = this.ProcessSubNode("Long Length").Value
+      if length < 20 { panic("mobile-ip: generalized extension length must be at least 20") }
+    } else {
+      if kind < 128 && kind != 32 && kind != 33 && kind != 34 { panic("mobile-ip: unsupported critical extension") }
+      length = this.ProcessSubNode("Length").Value
+    }
+    if length > this.GetMaxLength()-this.Length() { panic("mobile-ip: extension length exceeds datagram") }
+    if kind == 32 || kind == 33 || kind == 34 || kind == 36 {
+      if length < 5 { panic("mobile-ip: extension has no SPI or value") }
+      this.ProcessSubNode("SPI")
+      this.GetSubNode("Extension Value").SetMaxLength(length-4)
+      this.ProcessSubNode("Extension Value")
+    } else if length > 0 {
+      this.GetSubNode("Extension Value").SetMaxLength(length)
+      this.ProcessSubNode("Extension Value")
+    }
+    this.AddInfo("Registration Extension", kind == 32)
+  Extension Type: uint8
+  Subtype: uint8
+  Length: uint8
+  Long Length: uint16
+  SPI: uint32
+  Extension Value: raw
+
+MIPv6Header:
+  operator: |
+    if this.ProcessSubNode("Payload Protocol").Value != 59 { panic("mipv6: unsupported payload after Mobility Header") }
+    length = (this.ProcessSubNode("Header Length").Value+1)*8
+    if length != this.GetMaxLength() { panic("mipv6: Mobility Header length differs from payload boundary") }
+    kind = this.ProcessSubNode("MH Type").Value
+    if kind > 7 { panic("mipv6: unsupported Mobility Header type") }
+    minimum = [8,16,16,24,24,12,12,24][kind]
+    if length < minimum { panic("mipv6: truncated message fields") }
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Checksum")
+    if kind == 0 {
+      this.ProcessSubNode("Message Reserved")
+    } else if kind == 1 || kind == 2 {
+      this.ProcessSubNode("Message Reserved")
+      this.ProcessSubNode("Init Cookie")
+    } else if kind == 3 || kind == 4 {
+      this.ProcessSubNode("Nonce Index")
+      this.ProcessSubNode("Init Cookie")
+      this.ProcessSubNode("Keygen Token")
+    } else if kind == 5 {
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Lifetime")
+    } else if kind == 6 {
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Acknowledgement Flags")
+      this.ProcessSubNode("Sequence Number")
+      this.ProcessSubNode("Lifetime")
+    } else if kind == 7 {
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Error Reserved")
+      this.ProcessSubNode("Home Address")
+    }
+    if this.Length() < length {
+      this.GetSubNode("Options").SetMaxLength(length-this.Length())
+      this.ProcessSubNode("Options")
+    }
+  Payload Protocol: uint8
+  Header Length: uint8
+  MH Type: uint8
+  Reserved: uint8
+  Checksum: uint16
+  Message Reserved: uint16
+  Init Cookie: raw,8
+  Nonce Index: uint16
+  Keygen Token: raw,8
+  Sequence Number: uint16
+  Flags: uint16
+  Lifetime: uint16
+  Status: uint8
+  Acknowledgement Flags: uint8
+  Error Reserved: uint8
+  Home Address: raw,16
+  Options:
+    list: true
+    Option: MIPv6Option
+    operator: |
+      count = 0
+      for this.Length() < this.GetMaxLength() {
+        if count >= 256 { panic("mipv6: too many mobility options") }
+        option = this.NewElement()
+        option.Process()
+        if option.GetSubNode("Option Type").Result().Value == 5 && this.Length() != this.GetMaxLength() {
+          panic("mipv6: binding data must be the final option")
+        }
+        count++
+      }
+
+MIPv6Option:
+  operator: |
+    kind = this.ProcessSubNode("Option Type").Value
+    if kind == 0 { return }
+    length = this.ProcessSubNode("Option Length").Value
+    if length > this.GetMaxLength()-this.Length() { panic("mipv6: option length exceeds header") }
+    if (kind == 2 && length != 2) || (kind == 3 && length != 16) || (kind == 4 && length != 4) || (kind == 5 && length != 12) {
+      panic("mipv6: invalid known option length")
+    }
+    if kind == 2 { this.ProcessSubNode("Refresh Interval")
+    } else if kind == 3 { this.ProcessSubNode("Alternate Care-of Address")
+    } else if kind == 4 {
+      this.ProcessSubNode("Home Nonce Index")
+      this.ProcessSubNode("Care-of Nonce Index")
+    } else if length > 0 {
+      this.GetSubNode("Option Data").SetMaxLength(length)
+      this.ProcessSubNode("Option Data")
+    }
+  Option Type: uint8
+  Option Length: uint8
+  Refresh Interval: uint16
+  Alternate Care-of Address: raw,16
+  Home Nonce Index: uint16
+  Care-of Nonce Index: uint16
+  Option Data: raw

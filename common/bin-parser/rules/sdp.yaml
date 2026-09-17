@@ -1,0 +1,116 @@
+Package:
+  SDP:
+    operator: |
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Eq")
+      if getNodeResult("Eq").Value != 0x3d {
+        panic("sdp: expected =")
+      }
+      typ = getNodeResult("Type").Value
+      if typ != 0x76 {
+        panic("sdp: first line must be v=")
+      }
+      this.ProcessSubNode("Value")
+      this.ProcessSubNode("Origin Type")
+      this.ProcessSubNode("Origin Eq")
+      if getNodeResult("Origin Eq").Value != 0x3d {
+        panic("sdp: expected =")
+      }
+      otyp = getNodeResult("Origin Type").Value
+      if otyp != 0x6f {
+        panic("sdp: second line must be o=")
+      }
+      this.ProcessSubNode("Username")
+      this.ProcessSubNode("Sess ID")
+      this.ProcessSubNode("Sess Version")
+      this.ProcessSubNode("Net Type")
+      this.ProcessSubNode("Addr Type")
+      this.ProcessSubNode("Address")
+      res, op = this.TryProcessByType("SDPLine")
+      if op.OK {
+        op.Recovery()
+        this.ProcessSubNode("Lines")
+      } else {
+        op.Recovery()
+      }
+      return
+    Type: uint8
+    Eq: uint8
+    Value: "del:\r\n;type:string"
+    Origin Type: uint8
+    Origin Eq: uint8
+    Username: "del: ;type:string"
+    Sess ID: "del: ;type:string"
+    Sess Version: "del: ;type:string"
+    Net Type: "del: ;type:string"
+    Addr Type: "del: ;type:string"
+    Address: "del:\r\n;type:string"
+    Lines:
+      list: true
+      Line: SDPLine
+      operator: |
+        for {
+          prev = this.Length()
+          res, op = this.TryProcessByType("SDPLine")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Save()
+          if this.Length() <= prev {
+            break
+          }
+        }
+SDPLine:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Eq")
+    if getNodeResult("Eq").Value != 0x3d {
+      panic("sdp: expected =")
+    }
+    typ = getNodeResult("Type").Value
+    if typ == 0x73 {
+      this.ProcessSubNode("Session Name")
+      return
+    }
+    if typ == 0x74 {
+      this.ProcessSubNode("Start")
+      this.ProcessSubNode("Stop")
+      return
+    }
+    if typ == 0x63 {
+      this.ProcessSubNode("Net Type")
+      this.ProcessSubNode("Addr Type")
+      this.ProcessSubNode("Connection Address")
+      return
+    }
+    if typ == 0x6d {
+      this.ProcessSubNode("Media")
+      this.ProcessSubNode("Port")
+      this.ProcessSubNode("Proto")
+      this.ProcessSubNode("Format")
+      return
+    }
+    if typ == 0x61 {
+      this.ProcessSubNode("Attribute")
+      return
+    }
+    if typ == 0x69 || typ == 0x75 || typ == 0x65 || typ == 0x70 || typ == 0x62 || typ == 0x72 || typ == 0x7a || typ == 0x6b {
+      this.ProcessSubNode("Value")
+      return
+    }
+    panic("sdp: unknown line type")
+  Type: uint8
+  Eq: uint8
+  Session Name: "del:\r\n;type:string"
+  Start: "del: ;type:string"
+  Stop: "del:\r\n;type:string"
+  Net Type: "del: ;type:string"
+  Addr Type: "del: ;type:string"
+  Connection Address: "del:\r\n;type:string"
+  Media: "del: ;type:string"
+  Port: "del: ;type:string"
+  Proto: "del: ;type:string"
+  Format: "del:\r\n;type:string"
+  Attribute: "del:\r\n;type:string"
+  Value: "del:\r\n;type:string"

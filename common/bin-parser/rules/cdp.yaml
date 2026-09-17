@@ -1,0 +1,121 @@
+endian: big
+Package:
+  CDP:
+    operator: |
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v != 1 && v != 2 {
+        panic("cdp: version must be 1 or 2")
+      }
+      this.ProcessSubNode("TTL")
+      this.ProcessSubNode("Checksum")
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        return
+      }
+      op.Recovery()
+      this.ProcessSubNode("TLVs")
+      return
+    Version: uint8
+    TTL: uint8
+    Checksum: uint16
+    TLVs:
+      list: true
+      TLV: CDPTLV
+      operator: |
+        for {
+          if this.GetMaxLength() < 4 {
+            break
+          }
+          res, op = this.TryProcessByType("PeekByte")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          prev = this.Length()
+          ele.Process()
+          if this.Length() <= prev {
+            break
+          }
+        }
+CDPTLV:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    t = getNodeResult("Type").Value
+    l = getNodeResult("Length").Value
+    if l < 4 {
+      panic("cdp: tlv length smaller than 4")
+    }
+    dlen = l - 4
+    if t == 1 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Device ID").SetMaxLength(dlen)
+        this.ProcessSubNode("Device ID")
+      }
+      return
+    }
+    if t == 2 {
+      this.ProcessSubNode("Number of Addresses")
+      this.ProcessSubNode("Protocol Type")
+      this.ProcessSubNode("Protocol Length")
+      this.ProcessSubNode("Protocol")
+      this.ProcessSubNode("Address Length")
+      alen = getNodeResult("Address Length").Value
+      if alen > 0 && alen < 1048576 {
+        this.GetSubNode("Address").SetMaxLength(alen)
+        this.ProcessSubNode("Address")
+      }
+      return
+    }
+    if t == 3 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Port ID").SetMaxLength(dlen)
+        this.ProcessSubNode("Port ID")
+      }
+      return
+    }
+    if t == 4 {
+      this.ProcessSubNode("Capabilities")
+      return
+    }
+    if t == 5 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Software Version").SetMaxLength(dlen)
+        this.ProcessSubNode("Software Version")
+      }
+      return
+    }
+    if t == 6 {
+      if dlen > 0 && dlen < 1048576 {
+        this.GetSubNode("Platform").SetMaxLength(dlen)
+        this.ProcessSubNode("Platform")
+      }
+      return
+    }
+    if dlen > 0 && dlen < 1048576 {
+      this.GetSubNode("TLV Data").SetMaxLength(dlen)
+      this.ProcessSubNode("TLV Data")
+    }
+    return
+  Type: uint16
+  Length: uint16
+  Device ID: string
+  Number of Addresses: uint32
+  Protocol Type: uint8
+  Protocol Length: uint8
+  Protocol: uint8
+  Address Length: uint16
+  Address: string
+  Port ID: string
+  Capabilities: uint32
+  Software Version: string
+  Platform: string
+  TLV Data: string
+PeekByte: uint8

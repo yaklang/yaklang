@@ -1,0 +1,26 @@
+# Steam local discovery envelope, not arbitrary Steam service traffic.
+# Wire framing: Wireshark v4.4.9 packet-steam-ihs-discovery.c.
+# Message schema: SteamTracking/Protobufs (extracted client schema, not a
+# Valve-published standard), fcbb9a107a0ff5293385f24d6c774eeb5e3d4c84,
+# steam/steammessages_remoteclient_discovery.proto. Encoding: protobuf.dev.
+# Native bounded wire decoding preserves ordered fields and original spans.
+# Session state and encrypted bytes are not interpreted. Parse-only entry.
+endian: little
+Package:
+  SteamDiscovery:
+    operator: |
+      err = parseSteamDiscovery()
+      if err != nil { panic(err) }
+
+  SteamDiscoveryCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("steam discovery: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("steam discovery: empty carrier has no message") }
+      value, trial = this.TryProcessByType("SteamDiscoveryMessage")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Steam Discovery Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SteamDiscoveryMessage: "import:application-layer/steam_discovery.yaml;node:SteamDiscovery"

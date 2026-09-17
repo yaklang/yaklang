@@ -1,0 +1,64 @@
+# Ethernet/AppleTalk AARP wire fields, independently described from Linux v6.12:
+# https://github.com/torvalds/linux/blob/v6.12/include/linux/atalk.h
+# https://github.com/torvalds/linux/blob/v6.12/net/appletalk/aarp.c
+# This is address-resolution structure, not DDP or live address ownership.
+endian: big
+Package:
+  AARP: AARPMessage
+
+  AARPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("aarp: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("aarp: empty carrier has no message") }
+      // Only the fixed message is a candidate. Failed probes restore both
+      // fields and cursor; neither invalid bodies nor link trailers are AARP.
+      candidate, operation = this.TryProcessByType("AARPBounded")
+      if operation.OK {
+        operation.Save()
+        if this.Length() < this.GetMaxLength() {
+          tail = this.NewUnknownNode("AARP Link Trailer")
+          tail.SetMaxLength(this.GetMaxLength()-this.Length())
+          tail.Process()
+        }
+        return
+      }
+      operation.Recovery()
+      raw = this.NewUnknownNode("AARP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+AARPBounded:
+  length: 224 # Configuration lengths are bits: the candidate is exactly 28 bytes.
+  Message: AARPMessage
+
+AARPMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("aarp: explicit message boundary required") }
+    if this.GetMaxLength() != 28 { panic("aarp: Ethernet AppleTalk message length must be 28 bytes") }
+    if this.ProcessSubNode("Hardware Type").Value != 1 { panic("aarp: unsupported hardware type") }
+    if this.ProcessSubNode("Protocol Type").Value != 0x809b { panic("aarp: unsupported protocol type") }
+    if this.ProcessSubNode("Hardware Length").Value != 6 { panic("aarp: invalid hardware length") }
+    if this.ProcessSubNode("Protocol Length").Value != 4 { panic("aarp: invalid protocol length") }
+    kind = this.ProcessSubNode("Function").Value
+    if kind < 1 || kind > 3 { panic("aarp: unsupported function") }
+    this.ProcessSubNode("Source Hardware Address")
+    if this.ProcessSubNode("Source Protocol Reserved").Value != 0 { panic("aarp: source protocol reserved byte must be zero") }
+    this.ProcessSubNode("Source Network")
+    this.ProcessSubNode("Source Node")
+    this.ProcessSubNode("Destination Hardware Address")
+    if this.ProcessSubNode("Destination Protocol Reserved").Value != 0 { panic("aarp: destination protocol reserved byte must be zero") }
+    this.ProcessSubNode("Destination Network")
+    this.ProcessSubNode("Destination Node")
+  Hardware Type: uint16
+  Protocol Type: uint16
+  Hardware Length: uint8
+  Protocol Length: uint8
+  Function: uint16
+  Source Hardware Address: raw,6
+  Source Protocol Reserved: uint8
+  Source Network: uint16
+  Source Node: uint8
+  Destination Hardware Address: raw,6
+  Destination Protocol Reserved: uint8
+  Destination Network: uint16
+  Destination Node: uint8

@@ -1,0 +1,237 @@
+endian: big
+Package:
+  SNMPv3:
+    operator: |
+      ident = this.ProcessSubNode("Identifier").Value
+      if ident != 0x30 {
+        panic("snmpv3: expected SEQUENCE")
+      }
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Version Tag")
+      if getNodeResult("Version Tag").Value != 0x02 {
+        panic("snmpv3: expected INTEGER version")
+      }
+      this.ProcessSubNode("Version Length")
+      this.GetSubNode("Version").SetMaxLength(getNodeResult("Version Length").Value)
+      this.ProcessSubNode("Version")
+      vb = getNodeResult("Version").Value
+      ver = 0
+      if len(vb) > 0 {
+        ver = vb[0]
+      }
+      if ver != 3 {
+        panic("snmpv3: version must be 3")
+      }
+      res, op = this.TryProcessByType("SNMPHeaderData")
+      if op.OK {
+        op.Save()
+      } else {
+        op.Recovery()
+      }
+      return
+    Identifier: uint8
+    Length: uint8
+    Version Tag: uint8
+    Version Length: uint8
+    Version: string
+  SNMP:
+    operator: |
+      ident = this.ProcessSubNode("Identifier").Value
+      if ident != 0x30 {
+        panic("snmp: expected SEQUENCE")
+      }
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Version Tag")
+      if getNodeResult("Version Tag").Value != 0x02 {
+        panic("snmp: expected INTEGER version")
+      }
+      this.ProcessSubNode("Version Length")
+      this.GetSubNode("Version").SetMaxLength(getNodeResult("Version Length").Value)
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Community Tag")
+      if getNodeResult("Community Tag").Value != 0x04 {
+        panic("snmp: expected OCTET STRING community")
+      }
+      this.ProcessSubNode("Community Length")
+      this.GetSubNode("Community").SetMaxLength(getNodeResult("Community Length").Value)
+      this.ProcessSubNode("Community")
+      this.ProcessSubNode("PDU Tag")
+      pdu = getNodeResult("PDU Tag").Value
+      if pdu < 0xa0 || pdu > 0xa7 {
+        panic("snmp: unexpected PDU tag")
+      }
+      this.ProcessSubNode("PDU Length")
+      this.GetSubNode("PDU Body").SetMaxLength(getNodeResult("PDU Length").Value)
+      this.ProcessSubNode("PDU Body")
+      return
+    Identifier: uint8
+    Length: uint8
+    Version Tag: uint8
+    Version Length: uint8
+    Version: string
+    Community Tag: uint8
+    Community Length: uint8
+    Community: string
+    PDU Tag: uint8
+    PDU Length: uint8
+    PDU Body:
+      operator: |
+        this.ProcessSubNode("Request ID Tag")
+        this.ProcessSubNode("Request ID Length")
+        this.GetSubNode("Request ID").SetMaxLength(getNodeResult("Request ID Length").Value)
+        this.ProcessSubNode("Request ID")
+        this.ProcessSubNode("Error Status Tag")
+        this.ProcessSubNode("Error Status Length")
+        this.GetSubNode("Error Status").SetMaxLength(getNodeResult("Error Status Length").Value)
+        this.ProcessSubNode("Error Status")
+        this.ProcessSubNode("Error Index Tag")
+        this.ProcessSubNode("Error Index Length")
+        this.GetSubNode("Error Index").SetMaxLength(getNodeResult("Error Index Length").Value)
+        this.ProcessSubNode("Error Index")
+        this.ProcessSubNode("Variable Bindings")
+        return
+      Request ID Tag: uint8
+      Request ID Length: uint8
+      Request ID: string
+      Error Status Tag: uint8
+      Error Status Length: uint8
+      Error Status: string
+      Error Index Tag: uint8
+      Error Index Length: uint8
+      Error Index: string
+      Variable Bindings:
+        operator: |
+          this.ProcessSubNode("Sequence Tag")
+          if getNodeResult("Sequence Tag").Value != 0x30 {
+            panic("snmp: expected SEQUENCE variable-bindings")
+          }
+          this.ProcessSubNode("Sequence Length")
+          sl = getNodeResult("Sequence Length").Value
+          if sl > 0 {
+            this.GetSubNode("Bindings").SetMaxLength(sl)
+            this.ProcessSubNode("Bindings")
+          }
+          return
+        Sequence Tag: uint8
+        Sequence Length: uint8
+        Bindings:
+          operator: |
+            this.ProcessSubNode("Varbind Tag")
+            if getNodeResult("Varbind Tag").Value != 0x30 {
+              panic("snmp: expected SEQUENCE varbind")
+            }
+            this.ProcessSubNode("Varbind Length")
+            this.ProcessSubNode("OID Tag")
+            if getNodeResult("OID Tag").Value != 0x06 {
+              panic("snmp: expected OBJECT IDENTIFIER")
+            }
+            this.ProcessSubNode("OID Length")
+            ol = getNodeResult("OID Length").Value
+            if ol > 0 {
+              this.GetSubNode("OID").SetMaxLength(ol)
+              this.ProcessSubNode("OID")
+            }
+            this.ProcessSubNode("Value Tag")
+            this.ProcessSubNode("Value Length")
+            vl = getNodeResult("Value Length").Value
+            if vl > 0 && vl < 1048576 {
+              this.GetSubNode("Octets").SetMaxLength(vl)
+              this.ProcessSubNode("Octets")
+            }
+            return
+          Varbind Tag: uint8
+          Varbind Length: uint8
+          OID Tag: uint8
+          OID Length: uint8
+          OID: string
+          Value Tag: uint8
+          Value Length: uint8
+          Octets: string
+SNMPHeaderData:
+  operator: |
+    this.ProcessSubNode("Sequence Tag")
+    if getNodeResult("Sequence Tag").Value != 0x30 {
+      panic("snmpv3: expected HeaderData SEQUENCE")
+    }
+    this.ProcessSubNode("Sequence Length")
+    this.ProcessSubNode("MsgID Tag")
+    if getNodeResult("MsgID Tag").Value != 0x02 {
+      panic("snmpv3: expected INTEGER msgID")
+    }
+    this.ProcessSubNode("MsgID Length")
+    ml = getNodeResult("MsgID Length").Value
+    if ml <= 0 || ml > 8 {
+      panic("snmpv3: bad msgID length")
+    }
+    this.GetSubNode("MsgID").SetMaxLength(ml)
+    this.ProcessSubNode("MsgID")
+    this.ProcessSubNode("MsgMaxSize Tag")
+    if getNodeResult("MsgMaxSize Tag").Value != 0x02 {
+      panic("snmpv3: expected INTEGER msgMaxSize")
+    }
+    this.ProcessSubNode("MsgMaxSize Length")
+    msl = getNodeResult("MsgMaxSize Length").Value
+    if msl <= 0 || msl > 8 {
+      panic("snmpv3: bad msgMaxSize length")
+    }
+    this.GetSubNode("MsgMaxSize").SetMaxLength(msl)
+    this.ProcessSubNode("MsgMaxSize")
+    this.ProcessSubNode("MsgFlags Tag")
+    if getNodeResult("MsgFlags Tag").Value != 0x04 {
+      panic("snmpv3: expected OCTET STRING msgFlags")
+    }
+    this.ProcessSubNode("MsgFlags Length")
+    if getNodeResult("MsgFlags Length").Value != 1 {
+      panic("snmpv3: msgFlags size must be 1")
+    }
+    this.ProcessSubNode("MsgFlags")
+    this.ProcessSubNode("Security Model Tag")
+    if getNodeResult("Security Model Tag").Value != 0x02 {
+      panic("snmpv3: expected INTEGER msgSecurityModel")
+    }
+    this.ProcessSubNode("Security Model Length")
+    sml = getNodeResult("Security Model Length").Value
+    if sml <= 0 || sml > 8 {
+      panic("snmpv3: bad securityModel length")
+    }
+    this.GetSubNode("Security Model").SetMaxLength(sml)
+    this.ProcessSubNode("Security Model")
+    return
+  Sequence Tag: uint8
+  Sequence Length: uint8
+  MsgID Tag: uint8
+  MsgID Length: uint8
+  MsgID:
+    type: raw
+    out: |
+      b = data.Value
+      res = 0
+      for _, x = range b {
+        res = (res << 8) + x
+      }
+      return res
+  MsgMaxSize Tag: uint8
+  MsgMaxSize Length: uint8
+  MsgMaxSize:
+    type: raw
+    out: |
+      b = data.Value
+      res = 0
+      for _, x = range b {
+        res = (res << 8) + x
+      }
+      return res
+  MsgFlags Tag: uint8
+  MsgFlags Length: uint8
+  MsgFlags: uint8
+  Security Model Tag: uint8
+  Security Model Length: uint8
+  Security Model:
+    type: raw
+    out: |
+      b = data.Value
+      res = 0
+      for _, x = range b {
+        res = (res << 8) + x
+      }
+      return res

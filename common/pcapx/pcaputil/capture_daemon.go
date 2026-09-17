@@ -85,7 +85,10 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 	}
 
 	loop := false
-	if conf.reassemblyOptions.Workers > 1 {
+	if conf.captureBuffer > 0 {
+		defLiveOpts = append(defLiveOpts, func(o *OpenIfaceLiveOptions) { o.BufferSize = conf.captureBuffer })
+	}
+	if conf.requiresExclusiveHandle() {
 		defLiveOpts = append(defLiveOpts, WithTimeout(20*time.Millisecond))
 	}
 	if conf.mock == nil {
@@ -244,7 +247,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 	handler.device = dev
 	err = handler.SetBPFFilter(bpf)
 	if err != nil {
-		return "", handler, err
+		handler.close()
+		return "", nil, err
 	}
 	return "", handler, err
 }

@@ -1,0 +1,20 @@
+frame.number	_ws.col.Protocol	_ws.col.Info
+16	MySQL	Server Greeting  proto=10 version=8.0.36-fixture
+26	MySQL	Login Request user=fixture
+32	MySQL	Auth Switch Request
+38	MySQL	Auth Switch Response
+39	MySQL	Caching_sha2_password fast_auth_success
+41	MySQL	Response  OK
+45	MySQL	Request Query
+46	MySQL	Response TABULAR
+50	MySQL	Response
+51	MySQL	Response
+53	MySQL	Response  OK Response TABULAR
+57	MySQL	Response
+58	MySQL	Response
+60	MySQL	Response  OK
+62	MySQL	Request Query
+66	MySQL	Response  Error 1064
+67	MySQL	Request Ping
+69	MySQL	Response  OK
+70	MySQL	Request Quit

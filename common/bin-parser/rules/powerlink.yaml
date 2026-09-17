@@ -1,0 +1,97 @@
+# EPSG DS 301, 4.6.1.1; offsets cross-checked with the official
+# openPOWERLINK_V2 stack/include/oplk/frame.h. Multibyte POWERLINK fields
+# are little endian (the outer Ethernet EtherType remains big endian).
+# Covers the five core message headers and length-bearing process data.
+# PDO object mapping and ASnd service-specific bodies are not inferred.
+endian: big
+Package:
+  Powerlink:
+    operator: |
+      if !this.HasMaxLength() { panic("powerlink: explicit frame boundary required") }
+      if this.GetMaxLength() > 1504 { panic("powerlink: frame exceeds Ethernet payload bound") }
+      this.ProcessSubNode("Type Reserved")
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Destination Node")
+      this.ProcessSubNode("Source Node")
+      kind = getNodeResult("Message Type").Value
+      dst = getNodeResult("Destination Node").Value
+      src = getNodeResult("Source Node").Value
+      if src == 0 || src == 255 || dst == 0 { panic("powerlink: invalid node address") }
+      if (kind == 1 || kind == 5) && (dst != 255 || src != 240) { panic("powerlink: invalid managing-node broadcast") }
+      // DS 301 section 4.5 also permits isochronous diagnostic/router nodes.
+      if kind == 3 && (src != 240 || (dst > 239 && dst != 253 && dst != 254)) { panic("powerlink: invalid poll request address") }
+      if kind == 4 && dst != 255 { panic("powerlink: invalid poll response destination") }
+      switch kind {
+        case 1:
+          this.ProcessSubNode("SoC Reserved")
+          this.ProcessSubNode("Cycle Flags")
+          this.ProcessSubNode("SoC Reserved 2")
+          this.ProcessSubNode("Net Time Seconds")
+          this.ProcessSubNode("Net Time Nanoseconds")
+          this.ProcessSubNode("Relative Time")
+        case 3, 4:
+          if kind == 3 { this.ProcessSubNode("Poll Reserved") } else { this.ProcessSubNode("NMT Status") }
+          this.ProcessSubNode("Poll Flags")
+          this.ProcessSubNode("Async Request Flags")
+          this.ProcessSubNode("PDO Version")
+          this.ProcessSubNode("PDO Reserved")
+          this.ProcessSubNode("Payload Size")
+          size = getNodeResult("Payload Size").Value
+          if size > 1490 || size > this.GetMaxLength()-this.Length() { panic("powerlink: process data exceeds frame") }
+          if size > 0 { this.GetSubNode("Process Data").SetMaxLength(size); this.ProcessSubNode("Process Data") }
+        case 5:
+          this.ProcessSubNode("NMT Status")
+          this.ProcessSubNode("Async Flags")
+          this.ProcessSubNode("SoA Reserved")
+          this.ProcessSubNode("Requested Service ID")
+          this.ProcessSubNode("Requested Service Target")
+          this.ProcessSubNode("Profile Version")
+          this.ProcessSubNode("Redundancy Flags")
+          # PollResponse Chaining and other profile extensions are distinct
+          # schemas; retain their complete bounded bytes without claiming them.
+          remaining = this.GetMaxLength()-this.Length()
+          if remaining > 0 { this.GetSubNode("SoA Extension Data").SetMaxLength(remaining); this.ProcessSubNode("SoA Extension Data") }
+        case 6:
+          this.ProcessSubNode("Service ID")
+          remaining = this.GetMaxLength()-this.Length()
+          if remaining > 0 { this.GetSubNode("Service Data").SetMaxLength(remaining); this.ProcessSubNode("Service Data") }
+        default: panic("powerlink: unsupported message type")
+      }
+      remaining = this.GetMaxLength()-this.Length()
+      if remaining > 0 { this.GetSubNode("Frame Trailer").SetMaxLength(remaining); this.ProcessSubNode("Frame Trailer") }
+    Type Reserved: uint8,1bit
+    Message Type: uint8,7bit
+    Destination Node: uint8
+    Source Node: uint8
+    SoC Reserved: uint8
+    Cycle Flags: uint8
+    SoC Reserved 2: uint8
+    Net Time Seconds:
+      type: uint32
+      endian: little
+    Net Time Nanoseconds:
+      type: uint32
+      endian: little
+    Relative Time:
+      type: uint64
+      endian: little
+    Poll Reserved: uint8
+    NMT Status: uint8
+    Poll Flags: uint8
+    Async Request Flags: uint8
+    PDO Version: uint8
+    PDO Reserved: uint8
+    Payload Size:
+      type: uint16
+      endian: little
+    Process Data: raw
+    Async Flags: uint8
+    SoA Reserved: uint8
+    Requested Service ID: uint8
+    Requested Service Target: uint8
+    Profile Version: uint8
+    Redundancy Flags: uint8
+    SoA Extension Data: raw
+    Service ID: uint8
+    Service Data: raw
+    Frame Trailer: raw

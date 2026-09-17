@@ -1,0 +1,157 @@
+# Passive RFC 6325 base-header and C-tagged inner Ethernet decoding.
+# https://www.rfc-editor.org/rfc/rfc6325.html#section-3
+# https://www.rfc-editor.org/rfc/rfc7179.html#section-2.3
+# Reserved fields and exhausted hop counts are observable, not forwarding
+# decisions. Extended flags are decoded; later extension words are opaque.
+# Fine-grained labels, ESADI bodies and nested TRILL are not interpreted.
+# Inner imports are restricted to nonrecursive ICMP/ICMPv6 and Ethernet/IPv4
+# ARP. Other IP protocols, options, fragments and tunnels remain whole bytes.
+endian: big
+Package:
+  TRILL: TRILLMessage
+  TRILLCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("trill: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("trill: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("TRILLFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TRILL Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TRILLFrame: "import:trill.yaml;node:TRILL"
+TRILLMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("trill: explicit message boundary required") }
+    size = this.GetMaxLength()
+    if size < 24 { panic("trill: message is shorter than base and inner C-tagged headers") }
+    if size > 65535 { panic("trill: message exceeds supported 65535-byte boundary") }
+    if this.ProcessSubNode("TRILL Version").Value != 0 { panic("trill: unsupported version") }
+    this.ProcessSubNode("TRILL Reserved")
+    this.ProcessSubNode("Multi Destination")
+    words = this.ProcessSubNode("Option Length").Value
+    this.ProcessSubNode("TRILL Hop Count")
+    this.ProcessSubNode("Egress Nickname")
+    this.ProcessSubNode("Ingress Nickname")
+    if words*4 > size-24 { panic("trill: extension length exceeds the inner header boundary") }
+    if words != 0 {
+      this.GetSubNode("Extended Flags").SetMaxLength(4)
+      this.ProcessSubNode("Extended Flags")
+      if words > 1 {
+        this.GetSubNode("Additional Extensions").SetMaxLength((words-1)*4)
+        this.ProcessSubNode("Additional Extensions")
+      }
+    }
+    this.GetSubNode("Inner Ethernet").SetMaxLength(size-this.Length())
+    this.ProcessSubNode("Inner Ethernet")
+    this.AddInfo("Forwarding State Validated", false)
+    this.AddInfo("Additional Extensions Decoded", false)
+  TRILL Version: uint8,2bit
+  TRILL Reserved: uint8,2bit
+  Multi Destination: uint8,1bit
+  Option Length: uint8,5bit
+  TRILL Hop Count: uint8,6bit
+  Egress Nickname: uint16
+  Ingress Nickname: uint16
+  Extended Flags: TRILLExtendedFlags
+  Additional Extensions: raw
+  Inner Ethernet: TRILLInnerEthernet
+TRILLExtendedFlags:
+  CHbHS: uint8,1bit
+  CItES: uint8,1bit
+  CRSVS: uint8,1bit
+  Critical Hop by Hop Flags: uint8,5bit
+  Noncritical Hop by Hop Flags: uint8,6bit
+  Critical Reserved Flags: uint8,3bit
+  Noncritical Reserved Flags: uint8,4bit
+  Critical Ingress to Egress Flags: uint8,6bit
+  Noncritical Ingress to Egress Flags: uint8,5bit
+TRILLInnerEthernet:
+  operator: |
+    this.ProcessSubNode("Inner Destination")
+    this.ProcessSubNode("Inner Source")
+    if this.ProcessSubNode("Inner Tag Type").Value != 0x8100 { panic("trill: unsupported inner tag; C-tag required") }
+    this.ProcessSubNode("Inner Priority")
+    // RFC 6325 section 4.1.1: preserve C, which receivers ignore.
+    this.ProcessSubNode("Inner C")
+    this.ProcessSubNode("Inner VLAN ID")
+    this.ProcessSubNode("Inner EtherType")
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Inner Payload").SetMaxLength(remaining)
+      this.ProcessSubNode("Inner Payload")
+    }
+  Inner Destination: raw,6
+  Inner Source: raw,6
+  Inner Tag Type: uint16
+  Inner Priority: uint8,3bit
+  Inner C: uint8,1bit
+  Inner VLAN ID: uint16,12bit
+  Inner EtherType: uint16
+  Inner Payload:
+    operator: |
+      type = getNodeResult("../Inner EtherType").Value
+      target = ""
+      expected = 0
+      switch type {
+        case 0x0800:
+          prefix, probe = this.TryProcessByType("TRILLIPv4Prefix")
+          probe.Recovery()
+          if probe.OK {
+            bytes = prefix.Value
+            total = (int(bytes[2]) << 8) | int(bytes[3])
+            // The imported IPv4 path does not generally handle options or
+            // reassembly. Preserve such inner datagrams intact, not as an
+            // incorrectly shifted transport message.
+            if bytes[0] == 0x45 && bytes[9] == 1 && (int(bytes[6]) & 63) == 0 && bytes[7] == 0 && total >= 20 && total <= this.GetMaxLength() {
+              target = "TRILLInnerIPv4"
+              expected = total
+            }
+          }
+        case 0x86dd:
+          prefix, probe = this.TryProcessByType("TRILLIPv6Prefix")
+          probe.Recovery()
+          if probe.OK {
+            bytes = prefix.Value
+            payload = (int(bytes[4]) << 8) | int(bytes[5])
+            if int(bytes[0]) >> 4 == 6 && bytes[6] == 58 && payload != 0 && payload+40 <= this.GetMaxLength() {
+              target = "TRILLInnerIPv6"
+              expected = payload+40
+            }
+          }
+        case 0x0806:
+          prefix, probe = this.TryProcessByType("TRILLARPPrefix")
+          probe.Recovery()
+          if probe.OK {
+            bytes = prefix.Value
+            if bytes[0] == 0 && bytes[1] == 1 && bytes[2] == 8 && bytes[3] == 0 && bytes[4] == 6 && bytes[5] == 4 && this.GetMaxLength() >= 28 {
+              target = "TRILLInnerARP"
+              expected = 28
+            }
+          }
+      }
+      if target != "" {
+        start = getCurrentPosition()
+        candidate, trial = this.TryProcessByType(target)
+        // A partial inner decoder must not turn uninterpreted IP payload
+        // into supposed link padding. Save only the complete declared PDU.
+        if trial.OK && getCurrentPosition()-start == expected {
+          trial.Save()
+          if this.Length() < this.GetMaxLength() {
+            tail = this.NewUnknownNode("Inner Link Trailer")
+            tail.SetMaxLength(this.GetMaxLength()-this.Length())
+            tail.Process()
+          }
+          return
+        }
+        trial.Recovery()
+      }
+      raw = this.NewUnknownNode("Inner Opaque Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TRILLInnerIPv4: "import:internet_protocol.yaml;node:Internet Protocol"
+TRILLIPv4Prefix: raw,20
+TRILLIPv6Prefix: raw,40
+TRILLARPPrefix: raw,8
+TRILLInnerIPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+TRILLInnerARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"

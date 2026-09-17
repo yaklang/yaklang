@@ -1,0 +1,92 @@
+endian: big
+Package:
+  TACACS:
+    operator: |
+      // RFC 8907 sections 4.1 and 4.5. This is a single-record parser;
+      // an obfuscated body cannot be interpreted as cleartext fields.
+      limit = getCtx("tacacsRecordLimit")
+      if !hasCtx("tacacsRecordLimit") { limit = 1048576 }
+      if limit < 12 { panic("tacacs: invalid record limit") }
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      major = ver >> 4
+      if major != 12 {
+        panic("tacacs: major version must be 12")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ < 1 || typ > 3 {
+        panic("tacacs: type must be 1-3")
+      }
+      sequence = this.ProcessSubNode("Sequence").Value
+      flags = this.ProcessSubNode("Flags").Value
+      this.ProcessSubNode("Session ID")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > limit - 12 { panic("tacacs: record limit exceeded") }
+      if this.HasMaxLength() && this.GetMaxLength() != l + 12 { panic("tacacs: length does not match record boundary") }
+      this.SetMaxLength(l + 12)
+      cleartext = flags & 1 != 0
+      this.AddInfo("Body Obfuscated", !cleartext)
+      this.AddInfo("Client Packet", sequence & 1 != 0)
+      this.AddInfo("Single Connection", flags & 4 != 0)
+      this.AddInfo("Body Decoded", false)
+      if l == 0 { return }
+      if !cleartext {
+        this.GetSubNode("Obfuscated Body").SetMaxLength(l)
+        this.ProcessSubNode("Obfuscated Body")
+        return
+      }
+      if typ == 1 && sequence == 1 {
+        if l < 8 { panic("tacacs: incomplete START body") }
+        this.ProcessSubNode("AuthenStart")
+        ul = getNodeResult("User Len").Value
+        pl = getNodeResult("Port Len").Value
+        rl = getNodeResult("RemAddr Len").Value
+        dl = getNodeResult("Data Len").Value
+        if l != 8 + ul + pl + rl + dl { panic("tacacs: START field lengths do not match body") }
+        if ul > 0 && ul < 512 {
+          this.GetSubNode("User").SetMaxLength(ul)
+          this.ProcessSubNode("User")
+        }
+        if pl > 0 && pl < 512 {
+          this.GetSubNode("Port").SetMaxLength(pl)
+          this.ProcessSubNode("Port")
+        }
+        if rl > 0 && rl < 512 {
+          this.GetSubNode("RemAddr").SetMaxLength(rl)
+          this.ProcessSubNode("RemAddr")
+        }
+        if dl > 0 && dl < 512 {
+          this.GetSubNode("Token").SetMaxLength(dl)
+          this.ProcessSubNode("Token")
+        }
+        this.AddInfo("Body Decoded", true)
+        return
+      }
+      // Other cleartext message forms need their own schemas and session
+      // context. Preserve their complete body instead of labelling it START.
+      this.GetSubNode("Cleartext Body").SetMaxLength(l)
+      this.ProcessSubNode("Cleartext Body")
+    Version: uint8
+    Type: uint8
+    Sequence: uint8
+    Flags: uint8
+    Session ID: uint32
+    Length: uint32
+    Obfuscated Body: raw
+    Cleartext Body: raw
+    AuthenStart:
+      unpack: true
+      Action: uint8
+      Priv Lvl: uint8
+      Authen Type: uint8
+      Service: uint8
+      User Len: uint8
+      Port Len: uint8
+      RemAddr Len: uint8
+      Data Len: uint8
+    User: string
+    Port: string
+    RemAddr: string
+    Token: string

@@ -1,0 +1,31 @@
+# Caller-selected passive GET /api/v1/namespaces HTTP/1.1 request profile.
+# Pinned field and first-value conversion definitions, Kubernetes v1.35.0:
+# https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go
+# https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/zz_generated.conversion.go
+# https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/staging/src/k8s.io/apimachinery/pkg/runtime/conversion.go
+# https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/staging/src/k8s.io/client-go/gentype/type.go
+# https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/staging/src/k8s.io/client-go/kubernetes/typed/core/v1/namespace.go
+# Bodyless ListNamespace/WatchNamespace only, <=64 KiB, <=256 headers/query
+# occurrences. Every raw query occurrence survives; only the first known value
+# is converted. Unknown options, selector text and resource versions stay opaque.
+# URI, Host and Authorization are supplied text, not peer identity, successful
+# authentication or session evidence. Server-side validation, feature gates,
+# objects, responses, other resources/verbs, HTTP/2, TLS and coding are outside
+# this profile. No HTTP request or other operation is performed.
+endian: big
+unit: byte
+Package:
+  KubernetesAPIRequest:
+    operator: |
+      err = parseKubernetesAPIRequest()
+      if err != nil { panic(err) }
+  KubernetesAPICarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("kubernetes api: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("KubernetesAPIExact", "KubernetesAPIRequest")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Kubernetes API Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+KubernetesAPIExact: "import:application-layer/kubernetes_api.yaml;node:KubernetesAPIRequest"

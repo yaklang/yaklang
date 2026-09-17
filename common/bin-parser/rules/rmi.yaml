@@ -1,0 +1,60 @@
+# Passive JRMP transport v2 and bounded Java serialization v5 syntax.
+# https://docs.oracle.com/en/java/javase/17/docs/specs/rmi/protocol.html
+# https://docs.oracle.com/en/java/javase/17/docs/specs/serialization/protocol.html
+# Actual v2 constant (the prose RMI grammar still prints v1):
+# https://github.com/openjdk/jdk/blob/jdk-17%2B35/src/java.rmi/share/classes/sun/rmi/transport/TransportConstants.java
+# Caller-selected phases, not an inferred TCP session. RMI retains a legacy
+# unbounded seven-byte header read; RMIHeader is exact. Stream/Multiplex headers
+# end after byte seven; SingleOp must carry one complete message. No class
+# loading, object instantiation, invocation, HTTP tunnelling or reassembly.
+# Serialization lengths/handles/hierarchy are bounded before the existing Go
+# reader is called. Primitive arguments/custom blocks remain raw. TC_EXCEPTION
+# and unframed externalizable-v1 contents are outside this profile. Multiplex
+# virtual data stays raw without session-state/flow-control correctness claims.
+endian: big
+unit: byte
+Package:
+  RMI:
+    operator: |
+      err = parseRMIRecord("legacy-header")
+      if err != nil { panic(err) }
+  RMIHeader:
+    operator: |
+      err = parseRMIRecord("header")
+      if err != nil { panic(err) }
+  RMIServerHandshake:
+    operator: |
+      err = parseRMIRecord("server-handshake")
+      if err != nil { panic(err) }
+  RMIClientEndpoint:
+    operator: |
+      err = parseRMIRecord("client-endpoint")
+      if err != nil { panic(err) }
+  RMIMessage:
+    operator: |
+      err = parseRMIRecord("message")
+      if err != nil { panic(err) }
+  RMIMultiplex:
+    operator: |
+      err = parseRMIRecord("multiplex")
+      if err != nil { panic(err) }
+  RMICarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("rmi: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("RMIExactHeader", "RMIHeader")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed RMI Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  RMIMessageCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("rmi: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("RMIExactMessage", "RMIMessage")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed RMI Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+RMIExactHeader: "import:rmi.yaml;node:RMIHeader"
+RMIExactMessage: "import:rmi.yaml;node:RMIMessage"

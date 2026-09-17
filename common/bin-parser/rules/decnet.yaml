@@ -1,0 +1,684 @@
+# DECnet Phase IV Routing Layer fields and receive boundaries follow Digital's
+# Routing Layer Functional Specification V2.0, AA-X435A-TK, sections 10.1-10.12:
+# https://www.bitsavers.org/www.computer.museum.uq.edu.au/pdf/AA-X435A-TK%20DECnet%20Digital%20Network%20Architecture%20Phase%20IV%20Routing%20Layer%20Functional%20Specification.pdf
+#
+# The two-octet little-endian envelope count is also specified for the
+# Ethernet-compatible encapsulation in RFC 1376 section 4:
+# https://www.rfc-editor.org/rfc/rfc1376.html
+#
+# Short and long route headers are decoded completely.  A header-only message
+# is a valid Routing Layer structural boundary, while any remaining NSP bytes
+# are deliberately retained as opaque data; this rule does not claim to
+# implement the separate NSP state machine.  All seven Phase IV Routing Layer
+# control formats are bounded.  Routing updates are limited to the protocol's
+# 1024 node entries and their checksums are verified.
+endian: big
+Package:
+  DECnet: DECnetEnvelope
+
+  # Link-layer dispatch is transactional.  Invalid bytes remain one complete
+  # bounded payload and never leave a partially decoded DECnet tree.
+  DECnetCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("decnet: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("decnet: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("DECnetFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed DECnet Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+DECnetFrame: "import:decnet.yaml;node:DECnet"
+
+DECnetEnvelope:
+  operator: |
+    if !this.HasMaxLength() { panic("decnet: explicit envelope boundary required") }
+    total = this.GetMaxLength()
+    if total < 3 { panic("decnet: envelope is shorter than count and message") }
+    if total > 65537 { panic("decnet: envelope exceeds the supported 65537-byte boundary") }
+    count = int(this.ProcessSubNode("Octet Count").Value)
+    if count == 0 { panic("decnet: zero routing-message octet count") }
+    if count > total-this.Length() { panic("decnet: octet count exceeds carrier boundary") }
+    message = this.GetSubNode("Routing Message")
+    message.SetMaxLength(count)
+    message.Process()
+    remaining = total-this.Length()
+    if remaining > 0 {
+      this.GetSubNode("Link Padding").SetMaxLength(remaining)
+      this.ProcessSubNode("Link Padding")
+    }
+  Octet Count:
+    type: uint16
+    endian: little
+  Routing Message: DECnetRoutingMessage
+  Link Padding: raw
+
+DECnetRoutingMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("decnet: explicit routing-message boundary required") }
+    total = this.GetMaxLength()
+    if total == 0 { panic("decnet: empty routing message") }
+    prefix, probe = this.TryProcessByType("DECnetPeekByte")
+    probe.Recovery()
+    if !probe.OK { panic("decnet: truncated routing flags") }
+    padded = false
+    if prefix.Value & 128 != 0 {
+      paddingLength = int(prefix.Value & 127)
+      if paddingLength == 0 { panic("decnet: zero optional-padding length") }
+      if paddingLength >= total { panic("decnet: optional padding consumes the message") }
+      padding = this.GetSubNode("Optional Padding")
+      padding.SetMaxLength(paddingLength)
+      padding.Process()
+      padded = true
+      prefix, probe = this.TryProcessByType("DECnetPeekByte")
+      probe.Recovery()
+      if !probe.OK { panic("decnet: optional padding has no routing flags") }
+    }
+    flags = int(prefix.Value)
+    remaining = total-this.Length()
+    if flags & 1 == 0 {
+      format = flags & 7
+      if format == 2 {
+        this.GetSubNode("Short Data Packet").SetMaxLength(remaining)
+        this.ProcessSubNode("Short Data Packet")
+      } elif format == 6 {
+        this.GetSubNode("Long Data Packet").SetMaxLength(remaining)
+        this.ProcessSubNode("Long Data Packet")
+      } else {
+        panic("decnet: unsupported data-packet format")
+      }
+      return
+    }
+    controlType = (flags >> 1) & 7
+    if controlType == 0 {
+      if padded { panic("decnet: initialization message cannot be padded") }
+      this.GetSubNode("Initialization Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Initialization Message")
+    } elif controlType == 1 {
+      this.GetSubNode("Verification Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Verification Message")
+    } elif controlType == 2 {
+      this.GetSubNode("Hello and Test Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Hello and Test Message")
+    } elif controlType == 3 {
+      this.GetSubNode("Level 1 Routing Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Level 1 Routing Message")
+    } elif controlType == 4 {
+      this.GetSubNode("Level 2 Routing Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Level 2 Routing Message")
+    } elif controlType == 5 {
+      this.GetSubNode("Ethernet Router Hello Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Ethernet Router Hello Message")
+    } elif controlType == 6 {
+      this.GetSubNode("Ethernet Endnode Hello Message").SetMaxLength(remaining)
+      this.ProcessSubNode("Ethernet Endnode Hello Message")
+    } else {
+      panic("decnet: reserved control-message type")
+    }
+  Optional Padding: DECnetOptionalPadding
+  Short Data Packet: DECnetShortDataPacket
+  Long Data Packet: DECnetLongDataPacket
+  Initialization Message: DECnetInitializationMessage
+  Verification Message: DECnetVerificationMessage
+  Hello and Test Message: DECnetHelloTestMessage
+  Level 1 Routing Message: DECnetLevel1RoutingMessage
+  Level 2 Routing Message: DECnetLevel2RoutingMessage
+  Ethernet Router Hello Message: DECnetRouterHelloMessage
+  Ethernet Endnode Hello Message: DECnetEndnodeHelloMessage
+
+DECnetPeekByte: uint8
+
+DECnetOptionalPadding:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 1 { panic("decnet: invalid optional-padding boundary") }
+    if this.ProcessSubNode("Padding Present").Value != 1 { panic("decnet: optional-padding flag is clear") }
+    length = int(this.ProcessSubNode("Padding Length").Value)
+    if length == 0 || length != this.GetMaxLength() { panic("decnet: optional-padding length mismatch") }
+    if length > 1 {
+      this.GetSubNode("Padding Bytes").SetMaxLength(length-1)
+      this.ProcessSubNode("Padding Bytes")
+    }
+  Padding Present: uint8,1bit
+  Padding Length: uint8,7bit
+  Padding Bytes: raw
+
+DECnetShortDataPacket:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 6 { panic("decnet: short data header requires six bytes") }
+    this.ProcessSubNode("Flags")
+    destinationNode = this.GetSubNode("Destination Node")
+    destination = this.ProcessSubNode("Destination Node")
+    sourceNode = this.GetSubNode("Source Node")
+    source = this.ProcessSubNode("Source Node")
+    destinationNode.AddInfo("Area", int(destination.Value) >> 10)
+    destinationNode.AddInfo("Node", int(destination.Value) & 1023)
+    sourceNode.AddInfo("Area", int(source.Value) >> 10)
+    sourceNode.AddInfo("Node", int(source.Value) & 1023)
+    this.ProcessSubNode("Forwarding Information")
+    remaining = this.GetMaxLength()-this.Length()
+    this.AddInfo("NSP Present", remaining > 0)
+    this.AddInfo("NSP Decoded", false)
+    if remaining > 0 {
+      this.GetSubNode("NSP Payload").SetMaxLength(remaining)
+      this.ProcessSubNode("NSP Payload")
+    }
+  Flags: DECnetShortDataFlags
+  Destination Node:
+    type: uint16
+    endian: little
+  Source Node:
+    type: uint16
+    endian: little
+  Forwarding Information: DECnetForwardingInformation
+  NSP Payload: raw
+
+DECnetShortDataFlags:
+  operator: |
+    if this.ProcessSubNode("Padding Flag").Value != 0 { panic("decnet: nested short-data padding flag") }
+    if this.ProcessSubNode("Future Version").Value != 0 { panic("decnet: unsupported future data-packet version") }
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Return to Sender")
+    this.ProcessSubNode("Return Requested")
+    if this.ProcessSubNode("Format").Value != 2 { panic("decnet: invalid short-data format") }
+  Padding Flag: uint8,1bit
+  Future Version: uint8,1bit
+  Reserved: uint8,1bit
+  Return to Sender: uint8,1bit
+  Return Requested: uint8,1bit
+  Format: uint8,3bit
+
+DECnetForwardingInformation:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Visit Count")
+  Reserved: uint8,2bit
+  Visit Count: uint8,6bit
+
+DECnetLongDataPacket:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 21 { panic("decnet: long data header requires twenty-one bytes") }
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Destination Area")
+    this.ProcessSubNode("Destination Subarea")
+    destinationNode = this.GetSubNode("Destination ID")
+    destination = this.ProcessSubNode("Destination ID")
+    destinationHIORDValid = destination.Value[0] == 170 && destination.Value[1] == 0 && destination.Value[2] == 4 && destination.Value[3] == 0
+    destinationNode.AddInfo("HIORD Valid", destinationHIORDValid)
+    if !destinationHIORDValid { panic("decnet: long destination ID does not use HIORD") }
+    destinationAddress = int(destination.Value[4]) | (int(destination.Value[5]) << 8)
+    destinationNode.AddInfo("Area", destinationAddress >> 10)
+    destinationNode.AddInfo("Node", destinationAddress & 1023)
+    this.ProcessSubNode("Source Area")
+    this.ProcessSubNode("Source Subarea")
+    sourceNode = this.GetSubNode("Source ID")
+    source = this.ProcessSubNode("Source ID")
+    sourceHIORDValid = source.Value[0] == 170 && source.Value[1] == 0 && source.Value[2] == 4 && source.Value[3] == 0
+    sourceNode.AddInfo("HIORD Valid", sourceHIORDValid)
+    if !sourceHIORDValid { panic("decnet: long source ID does not use HIORD") }
+    sourceAddress = int(source.Value[4]) | (int(source.Value[5]) << 8)
+    sourceNode.AddInfo("Area", sourceAddress >> 10)
+    sourceNode.AddInfo("Node", sourceAddress & 1023)
+    this.ProcessSubNode("Next Level 2 Router")
+    this.ProcessSubNode("Visit Count")
+    this.ProcessSubNode("Service Class")
+    this.ProcessSubNode("Protocol Type")
+    remaining = this.GetMaxLength()-this.Length()
+    this.AddInfo("NSP Present", remaining > 0)
+    this.AddInfo("NSP Decoded", false)
+    if remaining > 0 {
+      this.GetSubNode("NSP Payload").SetMaxLength(remaining)
+      this.ProcessSubNode("NSP Payload")
+    }
+  Flags: DECnetLongDataFlags
+  Destination Area: uint8
+  Destination Subarea: uint8
+  Destination ID: raw,6
+  Source Area: uint8
+  Source Subarea: uint8
+  Source ID: raw,6
+  Next Level 2 Router: uint8
+  Visit Count: uint8
+  Service Class: uint8
+  Protocol Type: uint8
+  NSP Payload: raw
+
+DECnetLongDataFlags:
+  operator: |
+    if this.ProcessSubNode("Padding Flag").Value != 0 { panic("decnet: nested long-data padding flag") }
+    if this.ProcessSubNode("Future Version").Value != 0 { panic("decnet: unsupported future data-packet version") }
+    this.ProcessSubNode("Intra-Ethernet")
+    this.ProcessSubNode("Return to Sender")
+    this.ProcessSubNode("Return Requested")
+    if this.ProcessSubNode("Format").Value != 6 { panic("decnet: invalid long-data format") }
+  Padding Flag: uint8,1bit
+  Future Version: uint8,1bit
+  Intra-Ethernet: uint8,1bit
+  Return to Sender: uint8,1bit
+  Return Requested: uint8,1bit
+  Format: uint8,3bit
+
+DECnetControlFlags:
+  operator: |
+    if this.ProcessSubNode("Padding Flag").Value != 0 { panic("decnet: nested control padding flag") }
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Control Type")
+    if this.ProcessSubNode("Control Indicator").Value != 1 { panic("decnet: control indicator is clear") }
+  Padding Flag: uint8,1bit
+  Reserved: uint8,3bit
+  Control Type: uint8,3bit
+  Control Indicator: uint8,1bit
+
+DECnetTypeInformation:
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Blocking Requested")
+    this.ProcessSubNode("Verification Required")
+    nodeType = this.ProcessSubNode("Node Type").Value
+    if nodeType == 0 { panic("decnet: reserved initialization node type") }
+  Reserved: uint8,4bit
+  Blocking Requested: uint8,1bit
+  Verification Required: uint8,1bit
+  Node Type: uint8,2bit
+
+DECnetInitializationMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 12 { panic("decnet: truncated initialization message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 0 { panic("decnet: invalid initialization control type") }
+    this.ProcessSubNode("Source Node")
+    this.ProcessSubNode("Type Information")
+    this.ProcessSubNode("Block Size")
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("ECO")
+    this.ProcessSubNode("User ECO")
+    this.ProcessSubNode("Hello Timer")
+    length = int(this.ProcessSubNode("Reserved Length").Value)
+    if length > 64 { panic("decnet: initialization reserved image exceeds 64 bytes") }
+    if length != this.GetMaxLength()-this.Length() { panic("decnet: initialization reserved-image length mismatch") }
+    if length > 0 {
+      this.GetSubNode("Reserved Data").SetMaxLength(length)
+      this.ProcessSubNode("Reserved Data")
+    }
+  Control Flags: DECnetControlFlags
+  Source Node:
+    type: uint16
+    endian: little
+  Type Information: DECnetTypeInformation
+  Block Size:
+    type: uint16
+    endian: little
+  Version: uint8
+  ECO: uint8
+  User ECO: uint8
+  Hello Timer:
+    type: uint16
+    endian: little
+  Reserved Length: uint8
+  Reserved Data: raw
+
+DECnetVerificationMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 4 { panic("decnet: truncated verification message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 1 { panic("decnet: invalid verification control type") }
+    this.ProcessSubNode("Source Node")
+    length = int(this.ProcessSubNode("Function Value Length").Value)
+    if length > 64 { panic("decnet: function value exceeds 64 bytes") }
+    if length != this.GetMaxLength()-this.Length() { panic("decnet: function-value length mismatch") }
+    if length > 0 {
+      this.GetSubNode("Function Value").SetMaxLength(length)
+      this.ProcessSubNode("Function Value")
+    }
+  Control Flags: DECnetControlFlags
+  Source Node:
+    type: uint16
+    endian: little
+  Function Value Length: uint8
+  Function Value: raw
+
+DECnetHelloTestMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 4 { panic("decnet: truncated hello-and-test message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 2 { panic("decnet: invalid hello-and-test control type") }
+    this.ProcessSubNode("Source Node")
+    length = int(this.ProcessSubNode("Test Data Length").Value)
+    if length > 128 { panic("decnet: test data exceeds 128 bytes") }
+    if length != this.GetMaxLength()-this.Length() { panic("decnet: test-data length mismatch") }
+    if length > 0 {
+      this.GetSubNode("Test Data").SetMaxLength(length)
+      this.ProcessSubNode("Test Data")
+    }
+  Control Flags: DECnetControlFlags
+  Source Node:
+    type: uint16
+    endian: little
+  Test Data Length: uint8
+  Test Data: raw
+
+DECnetLevel1RoutingMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 12 { panic("decnet: truncated level-1 routing message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 3 { panic("decnet: invalid level-1 control type") }
+    this.ProcessSubNode("Source Node")
+    this.ProcessSubNode("Reserved")
+    remaining = this.GetMaxLength()-this.Length()
+    segments = this.GetSubNode("Segments")
+    segments.SetMaxLength(remaining-2)
+    segments.AddInfo("Routing Level", 1)
+    start = getCurrentPosition()
+    segments.Process()
+    checksum = this.ProcessSubNode("Checksum")
+    data = getCtx("buffer").Bytes()[start:start+remaining-2]
+    sum = 1
+    for i = 0; i < len(data); i += 2 {
+      sum += int(data[i]) | (int(data[i+1]) << 8)
+      sum = (sum & 65535) + (sum >> 16)
+    }
+    for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+    if sum != int(checksum.Value) { panic("decnet: routing-message checksum mismatch") }
+    this.AddInfo("Checksum Valid", true)
+  Control Flags: DECnetControlFlags
+  Source Node:
+    type: uint16
+    endian: little
+  Reserved: uint8
+  Segments: DECnetRoutingSegments
+  Checksum:
+    type: uint16
+    endian: little
+
+DECnetLevel2RoutingMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 12 { panic("decnet: truncated level-2 routing message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 4 { panic("decnet: invalid level-2 control type") }
+    this.ProcessSubNode("Source Node")
+    this.ProcessSubNode("Reserved")
+    remaining = this.GetMaxLength()-this.Length()
+    segments = this.GetSubNode("Segments")
+    segments.SetMaxLength(remaining-2)
+    segments.AddInfo("Routing Level", 2)
+    start = getCurrentPosition()
+    segments.Process()
+    checksum = this.ProcessSubNode("Checksum")
+    data = getCtx("buffer").Bytes()[start:start+remaining-2]
+    sum = 1
+    for i = 0; i < len(data); i += 2 {
+      sum += int(data[i]) | (int(data[i+1]) << 8)
+      sum = (sum & 65535) + (sum >> 16)
+    }
+    for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+    if sum != int(checksum.Value) { panic("decnet: routing-message checksum mismatch") }
+    this.AddInfo("Checksum Valid", true)
+  Control Flags: DECnetControlFlags
+  Source Node:
+    type: uint16
+    endian: little
+  Reserved: uint8
+  Segments: DECnetRoutingSegments
+  Checksum:
+    type: uint16
+    endian: little
+
+DECnetRoutingSegments:
+  list: true
+  Segment: DECnetRoutingSegment
+  operator: |
+    level = this.GetInfo("Routing Level")
+    segmentCount = 0
+    entryCount = 0
+    for this.Length() < this.GetMaxLength() {
+      if segmentCount >= 1024 { panic("decnet: too many routing segments") }
+      remaining = this.GetMaxLength()-this.Length()
+      if remaining < 6 { panic("decnet: truncated routing segment") }
+      prefix, trial = this.TryProcessByType("DECnetRoutingSegmentPrefix")
+      trial.Recovery()
+      if !trial.OK { panic("decnet: truncated routing-segment prefix") }
+      count = int(prefix.Child("Entry Count").Value)
+      start = int(prefix.Child("Start ID").Value)
+      if count == 0 { panic("decnet: routing segment has zero entries") }
+      if entryCount+count > 1024 { panic("decnet: too many routing entries") }
+      if level == 1 {
+        if start > 1023 || start+count > 1024 { panic("decnet: level-1 routing segment exceeds node range") }
+      } else {
+        if start > 63 || start+count > 64 { panic("decnet: level-2 routing segment exceeds area range") }
+      }
+      size = 4 + count*2
+      if size > remaining { panic("decnet: routing segment exceeds message boundary") }
+      segment = this.NewElement()
+      segment.SetMaxLength(size)
+      segment.AddInfo("Routing Level", level)
+      segment.Process()
+      segmentCount++
+      entryCount += count
+    }
+    if segmentCount == 0 { panic("decnet: routing message has no segments") }
+    this.AddInfo("Segment Count", segmentCount)
+    this.AddInfo("Entry Count", entryCount)
+
+DECnetRoutingSegmentPrefix:
+  Entry Count:
+    type: uint16
+    endian: little
+  Start ID:
+    type: uint16
+    endian: little
+
+DECnetRoutingSegment:
+  operator: |
+    count = int(this.ProcessSubNode("Entry Count").Value)
+    start = int(this.ProcessSubNode("Start ID").Value)
+    if count == 0 || 4+count*2 != this.GetMaxLength() { panic("decnet: routing-segment size mismatch") }
+    entries = this.GetSubNode("Routing Information")
+    entries.SetMaxLength(count*2)
+    entries.Process()
+    this.AddInfo("Entry Count", count)
+    this.AddInfo("Start ID", start)
+    this.AddInfo("Routing Level", this.GetInfo("Routing Level"))
+  Entry Count:
+    type: uint16
+    endian: little
+  Start ID:
+    type: uint16
+    endian: little
+  Routing Information: DECnetRoutingInformationList
+
+DECnetRoutingInformationList:
+  list: true
+  Entry: DECnetRoutingInformation
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength()%2 != 0 { panic("decnet: invalid routing-information boundary") }
+    count = this.GetMaxLength()/2
+    for i = 0; i < count; i++ { this.NewElement().Process() }
+
+DECnetRoutingInformation:
+  operator: |
+    low = int(this.ProcessSubNode("Cost Low").Value)
+    reserved = this.ProcessSubNode("Reserved").Value
+    hops = int(this.ProcessSubNode("Hops").Value)
+    high = int(this.ProcessSubNode("Cost High").Value)
+    this.AddInfo("Cost", low | (high << 8))
+    this.AddInfo("Hops", hops)
+    this.AddInfo("Reserved", reserved)
+  Cost Low: uint8
+  Reserved: uint8,1bit
+  Hops: uint8,5bit
+  Cost High: uint8,2bit
+
+DECnetInternetInformation:
+  operator: |
+    this.ProcessSubNode("Reserved High")
+    this.ProcessSubNode("Blocking Requested")
+    this.ProcessSubNode("No Multicast")
+    this.ProcessSubNode("Verification Failed")
+    this.ProcessSubNode("Reject")
+    this.ProcessSubNode("Verification Required")
+    nodeType = this.ProcessSubNode("Node Type").Value
+    if nodeType == 0 { panic("decnet: reserved Ethernet node type") }
+  Reserved High: uint8,1bit
+  Blocking Requested: uint8,1bit
+  No Multicast: uint8,1bit
+  Verification Failed: uint8,1bit
+  Reject: uint8,1bit
+  Verification Required: uint8,1bit
+  Node Type: uint8,2bit
+
+DECnetRouterHelloMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 19 { panic("decnet: truncated Ethernet router hello message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 5 { panic("decnet: invalid router-hello control type") }
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("ECO")
+    this.ProcessSubNode("User ECO")
+    idNode = this.GetSubNode("System ID")
+    id = this.ProcessSubNode("System ID")
+    idNode.AddInfo("HIORD Valid", id.Value[0] == 170 && id.Value[1] == 0 && id.Value[2] == 4 && id.Value[3] == 0)
+    information = this.ProcessSubNode("Internet Information")
+    nodeType = information.Child("Node Type").Value
+    if nodeType != 1 && nodeType != 2 { panic("decnet: router hello carries a non-router node type") }
+    this.ProcessSubNode("Block Size")
+    this.ProcessSubNode("Priority")
+    this.ProcessSubNode("Area")
+    this.ProcessSubNode("Hello Timer")
+    this.ProcessSubNode("MPD")
+    length = int(this.ProcessSubNode("E-List Length").Value)
+    if length > 244 { panic("decnet: invalid router E-list length") }
+    if length != this.GetMaxLength()-this.Length() { panic("decnet: router E-list length mismatch") }
+    if length > 0 {
+      list = this.GetSubNode("E-List")
+      list.SetMaxLength(length)
+      list.Process()
+    }
+  Control Flags: DECnetControlFlags
+  Version: uint8
+  ECO: uint8
+  User ECO: uint8
+  System ID: raw,6
+  Internet Information: DECnetInternetInformation
+  Block Size:
+    type: uint16
+    endian: little
+  Priority: uint8
+  Area: uint8
+  Hello Timer:
+    type: uint16
+    endian: little
+  MPD: uint8
+  E-List Length: uint8
+  E-List: DECnetRouterEList
+
+DECnetRouterEList:
+  list: true
+  Logical Ethernet: DECnetLogicalEthernet
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() == 0 || this.GetMaxLength() > 244 { panic("decnet: invalid router E-list boundary") }
+    count = 0
+    for this.Length() < this.GetMaxLength() {
+      if count >= 30 { panic("decnet: too many logical Ethernet entries") }
+      remaining = this.GetMaxLength()-this.Length()
+      if remaining < 8 { panic("decnet: truncated logical Ethernet entry") }
+      prefix, trial = this.TryProcessByType("DECnetLogicalEthernetPrefix")
+      trial.Recovery()
+      if !trial.OK { panic("decnet: truncated logical Ethernet prefix") }
+      length = int(prefix.Child("Router State List Length").Value)
+      if length > 236 || length%7 != 0 { panic("decnet: invalid router-state list length") }
+      if 8+length > remaining { panic("decnet: logical Ethernet entry exceeds E-list boundary") }
+      entry = this.NewElement()
+      entry.SetMaxLength(8+length)
+      entry.Process()
+      count++
+    }
+    this.AddInfo("Logical Ethernet Count", count)
+
+DECnetLogicalEthernetPrefix:
+  Logical Ethernet Name: raw,7
+  Router State List Length: uint8
+
+DECnetLogicalEthernet:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 8 { panic("decnet: invalid logical Ethernet boundary") }
+    this.ProcessSubNode("Logical Ethernet Name")
+    length = int(this.ProcessSubNode("Router State List Length").Value)
+    if length > 236 || length%7 != 0 { panic("decnet: invalid router-state list length") }
+    if length != this.GetMaxLength()-this.Length() { panic("decnet: router-state list length mismatch") }
+    if length > 0 {
+      states = this.GetSubNode("Router States")
+      states.SetMaxLength(length)
+      states.Process()
+    }
+    this.AddInfo("Router State Count", length/7)
+  Logical Ethernet Name: raw,7
+  Router State List Length: uint8
+  Router States: DECnetRouterStates
+
+DECnetRouterStates:
+  list: true
+  Router State: DECnetRouterState
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength()%7 != 0 || this.GetMaxLength() > 231 { panic("decnet: invalid router-state boundary") }
+    count = this.GetMaxLength()/7
+    for i = 0; i < count; i++ { this.NewElement().Process() }
+
+DECnetRouterState:
+  operator: |
+    idNode = this.GetSubNode("Router ID")
+    id = this.ProcessSubNode("Router ID")
+    idNode.AddInfo("HIORD Valid", id.Value[0] == 170 && id.Value[1] == 0 && id.Value[2] == 4 && id.Value[3] == 0)
+    this.ProcessSubNode("Known Two-Way")
+    this.ProcessSubNode("Priority")
+  Router ID: raw,6
+  Known Two-Way: uint8,1bit
+  Priority: uint8,7bit
+
+DECnetEndnodeHelloMessage:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() < 32 { panic("decnet: truncated Ethernet endnode hello message") }
+    flags = this.ProcessSubNode("Control Flags")
+    if flags.Child("Control Type").Value != 6 { panic("decnet: invalid endnode-hello control type") }
+    this.ProcessSubNode("Version")
+    this.ProcessSubNode("ECO")
+    this.ProcessSubNode("User ECO")
+    idNode = this.GetSubNode("System ID")
+    id = this.ProcessSubNode("System ID")
+    idNode.AddInfo("HIORD Valid", id.Value[0] == 170 && id.Value[1] == 0 && id.Value[2] == 4 && id.Value[3] == 0)
+    information = this.ProcessSubNode("Internet Information")
+    if information.Child("Node Type").Value != 3 { panic("decnet: endnode hello carries a non-endnode node type") }
+    this.ProcessSubNode("Block Size")
+    this.ProcessSubNode("Area")
+    this.ProcessSubNode("Verification Seed")
+    neighborNode = this.GetSubNode("Neighbor ID")
+    neighbor = this.ProcessSubNode("Neighbor ID")
+    zero = true
+    for i = 0; i < 6; i++ { if neighbor.Value[i] != 0 { zero = false } }
+    neighborNode.AddInfo("HIORD Valid", zero || (neighbor.Value[0] == 170 && neighbor.Value[1] == 0 && neighbor.Value[2] == 4 && neighbor.Value[3] == 0))
+    this.ProcessSubNode("Hello Timer")
+    this.ProcessSubNode("MPD")
+    length = int(this.ProcessSubNode("Test Data Length").Value)
+    if length > 128 { panic("decnet: endnode test data exceeds 128 bytes") }
+    if length != this.GetMaxLength()-this.Length() { panic("decnet: endnode test-data length mismatch") }
+    if length > 0 {
+      this.GetSubNode("Test Data").SetMaxLength(length)
+      this.ProcessSubNode("Test Data")
+    }
+  Control Flags: DECnetControlFlags
+  Version: uint8
+  ECO: uint8
+  User ECO: uint8
+  System ID: raw,6
+  Internet Information: DECnetInternetInformation
+  Block Size:
+    type: uint16
+    endian: little
+  Area: uint8
+  Verification Seed: raw,8
+  Neighbor ID: raw,6
+  Hello Timer:
+    type: uint16
+    endian: little
+  MPD: uint8
+  Test Data Length: uint8
+  Test Data: raw
