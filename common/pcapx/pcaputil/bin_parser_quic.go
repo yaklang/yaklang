@@ -17,6 +17,7 @@ type binQUIC struct {
 	state       string
 	closed      bool
 	keys        *quicKeyring
+	qpack       qpackConn
 }
 
 type quicPNSpace struct {

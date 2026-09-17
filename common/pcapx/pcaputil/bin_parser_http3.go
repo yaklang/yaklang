@@ -65,6 +65,45 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 		buf = h3.buf[dir][h3.parsed[dir]:]
 	}
+	if h3.kind == "encoder" {
+		n, inst, err := q.qpack.applyEncoder(dir, buf, max)
+		if err != nil {
+			return err
+		}
+		h3.parsed[dir] += n
+		info["HTTP3"] = true
+		info["Protocol Transition"] = "quic->http3"
+		info["HTTP3 Stream Kind"] = "encoder"
+		info["HTTP3 Stream ID"] = sid
+		fr["HTTP3"] = true
+		fr["HTTP3 Stream Kind"] = "encoder"
+		if len(inst) > 0 {
+			fr["QPACK Instructions"] = inst
+			info["QPACK Instructions"] = inst
+			info["QPACK Insert Count"] = q.qpack.table[dir].insertCount
+			info["QPACK Table Size"] = q.qpack.table[dir].size
+			info["QPACK Capacity"] = q.qpack.table[dir].capacity
+		}
+		return nil
+	}
+	if h3.kind == "decoder" {
+		n, inst, err := q.qpack.applyDecoder(buf, max)
+		if err != nil {
+			return err
+		}
+		h3.parsed[dir] += n
+		info["HTTP3"] = true
+		info["Protocol Transition"] = "quic->http3"
+		info["HTTP3 Stream Kind"] = "decoder"
+		info["HTTP3 Stream ID"] = sid
+		fr["HTTP3"] = true
+		fr["HTTP3 Stream Kind"] = "decoder"
+		if len(inst) > 0 {
+			fr["QPACK Instructions"] = inst
+			info["QPACK Instructions"] = inst
+		}
+		return nil
+	}
 	var frames []map[string]any
 	for len(buf) > 0 {
 		ft, n1, err := quicVarint(buf)
@@ -95,7 +134,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			break
 		}
 		payload := buf[n1+n2 : need]
-		hf, herr := h3DecodeFrame(ft, payload, h3, uni)
+		hf, herr := q.h3DecodeFrame(dir, ft, payload, h3, uni)
 		if herr != nil {
 			if h3.kind == "request" || h3.kind == "control" {
 				return herr
@@ -152,6 +191,9 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		if len(frames) > 0 {
 			fr["HTTP3 Frames"] = frames
 			info["HTTP3 Frames"] = frames
+			if hs, ok := frames[0]["Headers"].([]map[string]any); ok {
+				info["Headers"] = hs
+			}
 			names := make([]string, len(frames))
 			for i, hf := range frames {
 				n, _ := hf["Frame Type"].(string)
@@ -174,7 +216,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 	return nil
 }
 
-func h3DecodeFrame(ft uint64, payload []byte, h3 *h3StreamState, uni bool) (map[string]any, error) {
+func (q *binQUIC) h3DecodeFrame(dir int, ft uint64, payload []byte, h3 *h3StreamState, uni bool) (map[string]any, error) {
 	switch ft {
 	case 0x00:
 		if h3.kind == "control" {
@@ -188,11 +230,20 @@ func h3DecodeFrame(ft uint64, payload []byte, h3 *h3StreamState, uni bool) (map[
 		if h3.kind == "control" {
 			return nil, protocolError(ErrMalformedMessage, "http3: HEADERS is not permitted on the control stream")
 		}
-		return map[string]any{
+		out := map[string]any{
 			"Frame Type":  "HEADERS",
 			"Length":      uint64(len(payload)),
 			"QPACK Block": append([]byte(nil), payload...),
-		}, nil
+		}
+		headers, meta, err := q.qpack.decodeSection(dir, payload)
+		if err != nil {
+			return nil, err
+		}
+		out["Headers"] = headers
+		for k, v := range meta {
+			out[k] = v
+		}
+		return out, nil
 	case 0x04:
 		if h3.kind == "request" {
 			return nil, protocolError(ErrMalformedMessage, "http3: SETTINGS is not permitted on a request stream")
@@ -200,6 +251,17 @@ func h3DecodeFrame(ft uint64, payload []byte, h3 *h3StreamState, uni bool) (map[
 		settings, err := h3ParseSettings(payload)
 		if err != nil {
 			return nil, err
+		}
+		peer := 1 - dir
+		if dir != 0 && dir != 1 {
+			peer = 1
+		}
+		for _, s := range settings {
+			id, _ := s["ID"].(uint64)
+			val, _ := s["Value"].(uint64)
+			if id == 0x01 {
+				q.qpack.maxCap[peer] = val
+			}
 		}
 		return map[string]any{"Frame Type": "SETTINGS", "Settings": settings}, nil
 	case 0x07:
@@ -279,7 +341,7 @@ func h3RequestHeaders() []byte {
 }
 
 func h3ResponseHeaders() []byte {
-	return h3Frame(0x01, []byte{0, 0, 0x99})
+	return h3Frame(0x01, []byte{0, 0, 0xd9})
 }
 
 func h3Data(body []byte) []byte {

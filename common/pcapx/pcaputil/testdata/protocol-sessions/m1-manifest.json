@@ -148,9 +148,18 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "http3-qpack-encoder-headers.pcap",
+      "protocol": "http3",
+      "sha256": "ee33438be781182484b2e84bb6c906e91615e08faf7c8b1ce3308c6c80a8c3b8",
+      "bytes": 919,
+      "decode_as_port": 14443,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "http3-settings-headers-data.pcap",
       "protocol": "http3",
-      "sha256": "b1f701c6225754d9e6822166dbc595bd27fba13a16a49a9ab84dcf012950410a",
+      "sha256": "cb4c758077bc1b1b6c555215b86f9a4f9a8f2765d336572c75b44141651b28c0",
       "bytes": 910,
       "decode_as_port": 14443,
       "kind": "deterministic-generated-not-real-capture",
