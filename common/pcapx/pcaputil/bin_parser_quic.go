@@ -9,12 +9,14 @@ import (
 // is never consulted. Protected payloads without keys are Encrypted; frames
 // are parsed only from plaintext (constructed or caller-decrypted) input.
 type binQUIC struct {
-	dcid, scid []byte
-	spaces     [3]quicPNSpace
-	streams    map[uint64]*quicStream
-	crypto     [3][]quicRange
-	state      string
-	closed     bool
+	dcid, scid  []byte
+	initialDCID []byte
+	spaces      [3]quicPNSpace
+	streams     map[uint64]*quicStream
+	crypto      [3][]quicRange
+	state       string
+	closed      bool
+	keys        *quicKeyring
 }
 
 type quicPNSpace struct {
@@ -112,7 +114,7 @@ func (f *binFlow) frameQUIC(w []byte) (int, *binSpec, error) {
 	return h.size, f.a.specs["application-layer.quic/QUIC"], nil
 }
 
-func (q *binQUIC) consume(raw []byte, max int) (map[string]any, error) {
+func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) {
 	if max <= 0 {
 		max = 64
 	}
@@ -122,6 +124,9 @@ func (q *binQUIC) consume(raw []byte, max int) (map[string]any, error) {
 	}
 	if q.state == "" {
 		q.state = "initial"
+	}
+	if h.space == quicSpaceInitial && dir == 0 && len(q.initialDCID) == 0 && len(h.dcid) > 0 {
+		q.initialDCID = append([]byte(nil), h.dcid...)
 	}
 	if len(h.dcid) > 0 {
 		q.dcid = append([]byte(nil), h.dcid...)
@@ -155,40 +160,79 @@ func (q *binQUIC) consume(raw []byte, max int) (map[string]any, error) {
 	}
 	payload := raw[h.payloadOff:h.size]
 	if h.long && h.pnLen > 0 && h.pnLen <= len(payload) {
-		truncated := quicTruncatedPN(payload[:h.pnLen])
-		space := q.space(h.space)
-		pn := quicDecodePN(space.largest, truncated, h.pnLen)
-		info["Packet Number"] = pn
-		info["Packet Number Length"] = h.pnLen
-		if space.init {
-			if quicSeen(space, pn) {
-				info["Duplicate"] = true
-			} else if pn > space.largest+1 {
-				info["Gap"] = true
-				info["Missing Count"] = uint64(pn - space.largest - 1)
-			}
-		}
 		frames, ferr := quicParseFrames(payload[h.pnLen:], max)
-		if ferr != nil {
-			info["Encrypted"] = true
-			info["Protected Payload"] = true
-			return info, protocolError(ErrEncrypted, "QUIC payload is protected; keys were not provided")
+		if ferr == nil {
+			truncated := quicTruncatedPN(payload[:h.pnLen])
+			space := q.space(h.space)
+			pn := quicDecodePN(space.largest, truncated, h.pnLen)
+			info["Packet Number"] = pn
+			info["Packet Number Length"] = h.pnLen
+			info["Plaintext Input"] = true
+			q.observePN(space, pn, info)
+			return q.finishFrames(h.space, frames, info, max)
 		}
-		quicRemember(space, pn)
-		info["Frames"] = frames
-		if err := q.applyFrames(h.space, frames, info, max); err != nil {
-			return info, err
-		}
-		q.advanceState(h.space, frames)
-		info["Connection State"] = q.state
-		if q.closed {
-			info["Connection Closed"] = true
-		}
-		return info, nil
 	}
-	info["Encrypted"] = true
-	info["Protected Payload"] = true
-	return info, protocolError(ErrEncrypted, "QUIC payload is protected; keys were not provided")
+	tk, reason := q.keysFor(dir, h)
+	if tk == nil {
+		info["Encrypted"] = true
+		info["Protected Payload"] = true
+		info["Missing Keys"] = true
+		info["Key Reason"] = reason
+		return info, protocolError(ErrEncrypted, "QUIC payload is protected; keys were not provided")
+	}
+	var phaseKeys [2]*quicTrafficKeys
+	if q.keys != nil && !h.long {
+		phaseKeys = q.keys.app[dir]
+	}
+	plain, pn, pnLen, first, phase, uerr := quicUnprotect(raw, h, tk, phaseKeys, q.space(h.space).largest)
+	if uerr != nil {
+		info["Encrypted"] = true
+		info["Protected Payload"] = true
+		info["Header Protection"] = "failed"
+		return info, protocolError(ErrEncrypted, "QUIC payload is protected; keys were not provided")
+	}
+	info["Decrypted"] = true
+	info["Header Protection"] = "removed"
+	info["Packet Number"] = pn
+	info["Packet Number Length"] = pnLen
+	info["Cipher"] = tk.aead
+	if !h.long {
+		info["Key Phase"] = phase
+		_ = first
+	}
+	space := q.space(h.space)
+	q.observePN(space, pn, info)
+	frames, ferr := quicParseFrames(plain, max)
+	if ferr != nil {
+		info["Encrypted"] = true
+		return info, protocolError(ErrEncrypted, "QUIC decrypted payload is not a valid frame sequence")
+	}
+	return q.finishFrames(h.space, frames, info, max)
+}
+
+func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) {
+	if space.init {
+		if quicSeen(space, pn) {
+			info["Duplicate"] = true
+		} else if pn > space.largest+1 {
+			info["Gap"] = true
+			info["Missing Count"] = uint64(pn - space.largest - 1)
+		}
+	}
+	quicRemember(space, pn)
+}
+
+func (q *binQUIC) finishFrames(space int, frames []map[string]any, info map[string]any, max int) (map[string]any, error) {
+	info["Frames"] = frames
+	if err := q.applyFrames(space, frames, info, max); err != nil {
+		return info, err
+	}
+	q.advanceState(space, frames)
+	info["Connection State"] = q.state
+	if q.closed {
+		info["Connection Closed"] = true
+	}
+	return info, nil
 }
 
 func (q *binQUIC) space(id int) *quicPNSpace {
