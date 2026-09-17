@@ -42,6 +42,32 @@ func mqttTestConnect(level int, flags byte, id string, extra ...[]byte) []byte {
 	return mqttTestPacket(0x10, append(append(mqttTestVector([]byte(name)), byte(level), flags, 0, 60), mqttTestVector([]byte(id))...), bytes.Join(extra, nil))
 }
 
+func TestMQTT5FieldsConnectPublishSubscribe(t *testing.T) {
+	connect := mqttTestPacket(0x10, append(append(append(mqttTestVector([]byte("MQTT")), 5, 0x02, 0, 60, 3, 0x22, 0, 10), mqttTestVector([]byte("dev"))...)))
+	_, info, err := decodeMQTTFields(connect, 5)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), info["Packet Type"])
+	require.Equal(t, "CONNECT", info["Packet Name"])
+	require.Equal(t, uint64(10), info["Topic Alias Maximum"])
+	connack := mqttTestPacket(0x20, []byte{0, 0, 0})
+	_, info, err = decodeMQTTFields(connack, 5)
+	require.NoError(t, err)
+	require.Equal(t, "CONNACK", info["Packet Name"])
+	pub := mqttTestPacket(0x32, append(append(mqttTestVector([]byte("a/b")), 0, 1, 0), []byte("x")...))
+	_, info, err = decodeMQTTFields(pub, 5)
+	require.NoError(t, err)
+	require.Equal(t, "PUBLISH", info["Packet Name"])
+	require.Equal(t, uint64(1), info["Publish Flags"].(map[string]any)["QoS"])
+	sub := mqttTestPacket(0x82, append(append([]byte{0, 1, 2, 0x0B, 7}, mqttTestVector([]byte("a/#"))...), 1))
+	_, info, err = decodeMQTTFields(sub, 5)
+	require.NoError(t, err)
+	require.Equal(t, uint64(7), info["Subscription Identifier"])
+	_, _, err = decodeMQTTFields(mqttTestPacket(0x30, append(mqttTestVector(nil), 2, 0xff)), 5)
+	require.Error(t, err)
+	_, _, err = decodeMQTTFields([]byte{0x10, 0x01, 0x00}, 5)
+	require.Error(t, err)
+}
+
 func TestMQTTFieldsLayouts(t *testing.T) {
 	for _, level := range []int{3, 4} {
 		fixtures := map[byte][]byte{
@@ -205,6 +231,9 @@ func TestMQTTFieldsInvalidAndResourceBounds(t *testing.T) {
 			require.Error(t, err)
 		}
 	}
-	_, _, err := decodeMQTTFields([]byte{0xc0, 0}, 5)
+	_, info, err := decodeMQTTFields([]byte{0xc0, 0}, 5)
+	require.NoError(t, err)
+	require.Equal(t, "PINGREQ", info["Packet Name"])
+	_, _, err = decodeMQTTFields([]byte{0xf0, 0}, 5)
 	require.Error(t, err)
 }

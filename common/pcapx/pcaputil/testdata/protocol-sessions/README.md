@@ -18,6 +18,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `websocket-upgrade-text.pcap` | HTTP/1.1 Upgrade to RFC 6455 and an unmasked text frame (port 18090) |
 | `redis-resp2-resp3.pcap` | RESP2 PING/PONG and a RESP3 Map (port 16379) |
 | `grpc-unary-http2.pcap` | HTTP/2 preface/SETTINGS plus unary gRPC DATA prefix and trailers (port 18081) |
+| `mqtt5-connect-qos.pcap` | MQTT 5.0 CONNECT with Topic Alias Maximum, CONNACK, QoS 1 PUBLISH/PUBACK (port 18830) |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

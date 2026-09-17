@@ -22,6 +22,7 @@ type mqttFieldsReader struct {
 	err        error
 	missing    []string
 	flagFields []map[string]any
+	props      map[string]any
 }
 
 func (r *mqttFieldsReader) take(name, typ string, size int) []byte {
@@ -78,10 +79,111 @@ func (r *mqttFieldsReader) topic(name string, filter bool) {
 	}
 }
 
-func (r *mqttFieldsReader) packetID() {
-	if r.number("Packet Identifier", 2) == 0 && r.err == nil {
+func (r *mqttFieldsReader) packetID() uint64 {
+	id := r.number("Packet Identifier", 2)
+	if id == 0 && r.err == nil {
 		r.err = fmt.Errorf("mqtt-fields: packet identifier must be nonzero")
 	}
+	return id
+}
+
+func (r *mqttFieldsReader) vbi(name string) int {
+	n, m := 0, 1
+	for i := 0; i < 4; i++ {
+		b := r.take(name, "uint8", 1)
+		if r.err != nil {
+			return 0
+		}
+		n += int(b[0]&127) * m
+		if b[0]&128 == 0 {
+			if i > 0 && b[0] == 0 {
+				r.err = fmt.Errorf("mqtt-fields: non-canonical variable byte integer")
+			}
+			return n
+		}
+		m *= 128
+	}
+	r.err = fmt.Errorf("mqtt-fields: variable byte integer exceeds four bytes")
+	return 0
+}
+
+func (r *mqttFieldsReader) properties(label string, allowed map[byte]bool) map[string]any {
+	info := map[string]any{}
+	n := r.vbi(label + " Properties Length")
+	if r.err != nil {
+		return info
+	}
+	end := r.at + n
+	if end > len(r.wire) {
+		r.err = fmt.Errorf("mqtt-fields: truncated %s properties", label)
+		return info
+	}
+	seen := map[byte]int{}
+	for r.at < end && r.err == nil {
+		id := byte(r.number(label+" Property Identifier", 1))
+		if r.err != nil {
+			return info
+		}
+		if !allowed[id] {
+			r.err = fmt.Errorf("mqtt-fields: property 0x%02x is not valid in %s", id, label)
+			return info
+		}
+		seen[id]++
+		if id != 0x26 && !(id == 0x0B && label == "PUBLISH") && seen[id] > 1 {
+			r.err = fmt.Errorf("mqtt-fields: duplicate property 0x%02x in %s", id, label)
+			return info
+		}
+		switch id {
+		case 0x01, 0x17, 0x19, 0x24, 0x25, 0x28, 0x29, 0x2A:
+			r.number(mqtt5PropertyName[id], 1)
+		case 0x22, 0x13, 0x21, 0x23:
+			v := r.number(mqtt5PropertyName[id], 2)
+			if id == 0x23 && v == 0 && r.err == nil {
+				r.err = fmt.Errorf("mqtt-fields: Topic Alias must be nonzero")
+			}
+			if id == 0x22 {
+				info["Topic Alias Maximum"] = v
+			}
+			if id == 0x23 {
+				info["Topic Alias"] = v
+			}
+		case 0x02, 0x11, 0x18, 0x27:
+			r.number(mqtt5PropertyName[id], 4)
+		case 0x03, 0x08, 0x12, 0x15, 0x1A, 0x1C, 0x1F:
+			r.vector(mqtt5PropertyName[id], true, false)
+		case 0x09, 0x16:
+			r.vector(mqtt5PropertyName[id], false, true)
+		case 0x0B:
+			info["Subscription Identifier"] = uint64(r.vbi("Subscription Identifier"))
+		case 0x26:
+			r.vector("User Property Name", true, false)
+			r.vector("User Property Value", true, false)
+		default:
+			r.err = fmt.Errorf("mqtt-fields: unhandled property 0x%02x", id)
+		}
+	}
+	if r.err == nil && r.at != end {
+		r.err = fmt.Errorf("mqtt-fields: %s properties length mismatch", label)
+	}
+	if r.props == nil {
+		r.props = info
+	} else {
+		for k, v := range info {
+			r.props[k] = v
+		}
+	}
+	return info
+}
+
+func (r *mqttFieldsReader) reasonAndProperties(label string, remainingAfterID int, allowed map[byte]bool) uint64 {
+	if remainingAfterID == 0 {
+		return 0
+	}
+	code := r.number("Reason Code", 1)
+	if remainingAfterID > 1 {
+		r.properties(label, allowed)
+	}
+	return code
 }
 
 func (r *mqttFieldsReader) connect() {
@@ -104,18 +206,28 @@ func (r *mqttFieldsReader) connect() {
 		r.err = fmt.Errorf("mqtt-fields: invalid CONNECT flag combination")
 		return
 	}
+	sessionName := "Clean Session"
+	if r.level == 5 {
+		sessionName = "Clean Start"
+	}
 	r.flagFields = append(r.flagFields, map[string]any{
 		"Field": "Connect Flags", "Relative Byte Range": [2]int{flagAt, flagAt + 1},
 		"User Name Flag": flags&128 != 0, "Password Flag": flags&64 != 0,
 		"Will Retain": flags&32 != 0, "Will QoS": flags >> 3 & 3,
-		"Will Flag": flags&4 != 0, "Clean Session": flags&2 != 0, "Reserved": flags & 1,
+		"Will Flag": flags&4 != 0, sessionName: flags&2 != 0, "Reserved": flags & 1,
 	})
 	r.number("Keep Alive", 2)
+	if r.level == 5 {
+		r.properties("CONNECT", mqtt5ConnectProps)
+	}
 	id := r.vector("Client Identifier", true, false)
-	if r.err == nil && (r.level == 3 && (utf8.RuneCount(id) == 0 || utf8.RuneCount(id) > 23) || r.level == 4 && len(id) == 0 && flags&2 == 0) {
+	if r.err == nil && (r.level == 3 && (utf8.RuneCount(id) == 0 || utf8.RuneCount(id) > 23) || (r.level == 4 || r.level == 5) && len(id) == 0 && flags&2 == 0) {
 		r.err = fmt.Errorf("mqtt-fields: invalid client identifier for profile/clean-session flag")
 	}
 	if flags&4 != 0 {
+		if r.level == 5 {
+			r.properties("Will", mqtt5WillProps)
+		}
 		r.topic("Will Topic", false)
 		will := r.vector("Will Message", r.level == 3, true)
 		// The published legacy Will is specified as seven-bit ASCII.
@@ -147,12 +259,49 @@ func (r *mqttFieldsReader) connect() {
 	}
 }
 
+var mqtt5PropertyName = map[byte]string{
+	0x01: "Payload Format Indicator", 0x02: "Message Expiry Interval", 0x03: "Content Type",
+	0x08: "Response Topic", 0x09: "Correlation Data", 0x0B: "Subscription Identifier",
+	0x11: "Session Expiry Interval", 0x12: "Assigned Client Identifier", 0x13: "Server Keep Alive",
+	0x15: "Authentication Method", 0x16: "Authentication Data", 0x17: "Request Problem Information",
+	0x18: "Will Delay Interval", 0x19: "Request Response Information", 0x1A: "Response Information",
+	0x1C: "Server Reference", 0x1F: "Reason String", 0x21: "Receive Maximum",
+	0x22: "Topic Alias Maximum", 0x23: "Topic Alias", 0x24: "Maximum QoS",
+	0x25: "Retain Available", 0x26: "User Property", 0x27: "Maximum Packet Size",
+	0x28: "Wildcard Subscription Available", 0x29: "Subscription Identifier Available",
+	0x2A: "Shared Subscription Available",
+}
+
+var (
+	mqtt5ConnectProps     = mqtt5PropSet(0x11, 0x15, 0x16, 0x17, 0x19, 0x21, 0x22, 0x26, 0x27)
+	mqtt5WillProps        = mqtt5PropSet(0x01, 0x02, 0x03, 0x08, 0x09, 0x18, 0x26)
+	mqtt5ConnackProps     = mqtt5PropSet(0x11, 0x12, 0x13, 0x15, 0x16, 0x1A, 0x1C, 0x1F, 0x21, 0x22, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A)
+	mqtt5PublishProps     = mqtt5PropSet(0x01, 0x02, 0x03, 0x08, 0x09, 0x0B, 0x23, 0x26)
+	mqtt5AckProps         = mqtt5PropSet(0x1F, 0x26)
+	mqtt5SubscribeProps   = mqtt5PropSet(0x0B, 0x26)
+	mqtt5UnsubscribeProps = mqtt5PropSet(0x26)
+	mqtt5DisconnectProps  = mqtt5PropSet(0x11, 0x1C, 0x1F, 0x26)
+	mqtt5AuthProps        = mqtt5PropSet(0x15, 0x16, 0x1F, 0x26)
+)
+
+func mqtt5PropSet(ids ...byte) map[byte]bool {
+	m := make(map[byte]bool, len(ids))
+	for _, id := range ids {
+		m[id] = true
+	}
+	return m
+}
+
 func decodeMQTTFields(wire []byte, level int) ([]tlsCertificateField, map[string]any, error) {
-	if len(wire) < 2 || len(wire) > mqttFieldsMaxBytes || level != 3 && level != 4 {
-		return nil, nil, fmt.Errorf("mqtt-fields: explicit level 3/4 and 2..1048576 bytes required")
+	if len(wire) < 2 || len(wire) > mqttFieldsMaxBytes || level != 3 && level != 4 && level != 5 {
+		return nil, nil, fmt.Errorf("mqtt-fields: explicit level 3/4/5 and 2..1048576 bytes required")
 	}
 	typ, flags := wire[0]>>4, wire[0]&15
-	if typ == 0 || typ > 14 {
+	maxType := byte(14)
+	if level == 5 {
+		maxType = 15
+	}
+	if typ == 0 || typ > maxType {
 		return nil, nil, fmt.Errorf("mqtt-fields: unsupported packet type")
 	}
 	qos := flags >> 1 & 3
@@ -191,29 +340,91 @@ func decodeMQTTFields(wire []byte, level int) ([]tlsCertificateField, map[string
 	digits++
 	canonical := digits == 1 || remaining >= 1<<(7*(digits-1))
 	items := 0
+	var props map[string]any
 	switch typ {
 	case 1:
 		r.connect()
 	case 2:
 		flagAt := r.at
 		ack := r.number("Acknowledgment Flags", 1)
-		code := r.number("Return Code", 1)
-		if ack > 1 || level == 3 && ack != 0 || code > 5 || code != 0 && ack != 0 {
-			r.err = fmt.Errorf("mqtt-fields: invalid CONNACK flags/code")
+		if level == 5 {
+			code := r.number("Reason Code", 1)
+			if ack > 1 {
+				r.err = fmt.Errorf("mqtt-fields: invalid CONNACK flags/code")
+			}
+			props = r.properties("CONNACK", mqtt5ConnackProps)
+			_ = code
+		} else {
+			code := r.number("Return Code", 1)
+			if ack > 1 || level == 3 && ack != 0 || code > 5 || code != 0 && ack != 0 {
+				r.err = fmt.Errorf("mqtt-fields: invalid CONNACK flags/code")
+			}
 		}
-		if level == 4 {
+		if level >= 4 {
 			r.flagFields = append(r.flagFields, map[string]any{"Field": "Acknowledgment Flags", "Session Present": ack&1 != 0, "Reserved": ack >> 1, "Relative Byte Range": [2]int{flagAt, flagAt + 1}})
 		}
 	case 3:
-		r.topic("Topic Name", false)
+		topicAt := r.at
+		if level == 5 && r.at+2 <= len(wire) && int(wire[r.at])<<8|int(wire[r.at+1]) == 0 {
+			r.vector("Topic Name", true, false)
+		} else {
+			r.topic("Topic Name", false)
+		}
 		if qos > 0 {
 			r.packetID()
 		}
-		r.take("Application Message", "raw", len(wire)-r.at)
-	case 4, 5, 6, 7, 11:
+		if level == 5 {
+			props = r.properties("PUBLISH", mqtt5PublishProps)
+			if r.err == nil {
+				topicLen := 0
+				if topicAt+2 <= r.at {
+					topicLen = int(wire[topicAt])<<8 | int(wire[topicAt+1])
+				}
+				if topicLen == 0 && props["Topic Alias"] == nil {
+					r.err = fmt.Errorf("mqtt-fields: empty PUBLISH topic requires a Topic Alias")
+				}
+			}
+		}
+		if r.err == nil {
+			r.take("Application Message", "raw", len(wire)-r.at)
+		}
+	case 4, 5, 6, 7:
 		r.packetID()
+		if level == 5 {
+			r.reasonAndProperties(mqttPacketName(typ), remaining-2, mqtt5AckProps)
+		}
+	case 11:
+		r.packetID()
+		if level == 5 {
+			props = r.properties("UNSUBACK", mqtt5AckProps)
+			listStart := len(r.fields)
+			for r.at < len(wire) && r.err == nil {
+				if items >= mqttFieldsMaxItems {
+					r.err = fmt.Errorf("mqtt-fields: list exceeds 1024 items")
+					break
+				}
+				r.number("Reason Code", 1)
+				items++
+			}
+			if items == 0 && r.err == nil {
+				r.err = fmt.Errorf("mqtt-fields: required nonempty payload list")
+			}
+			if r.err == nil && items > 0 {
+				children := append([]tlsCertificateField(nil), r.fields[listStart:]...)
+				r.fields = append(r.fields[:listStart], tlsCertificateField{Name: "Payload Items", Start: children[0].Start, End: children[len(children)-1].End, Children: children, List: true})
+			}
+		}
 	case 8, 9, 10:
 		r.packetID()
+		if level == 5 {
+			allowed := mqtt5SubscribeProps
+			if typ == 9 {
+				allowed = mqtt5AckProps
+			} else if typ == 10 {
+				allowed = mqtt5UnsubscribeProps
+			}
+			props = r.properties(mqttPacketName(typ), allowed)
+		}
 		listStart := len(r.fields)
 		for r.at < len(wire) && r.err == nil {
 			if items >= mqttFieldsMaxItems {
@@ -223,13 +434,20 @@ func decodeMQTTFields(wire []byte, level int) ([]tlsCertificateField, map[string
 			start := len(r.fields)
 			if typ == 9 {
 				code := r.number("Granted QoS or Return Code", 1)
-				if code > 2 && !(level == 4 && code == 128) {
+				if level < 5 && code > 2 && !(level == 4 && code == 128) {
 					r.err = fmt.Errorf("mqtt-fields: invalid SUBACK value for profile")
 				}
 			} else {
 				r.topic("Topic Filter", true)
-				if typ == 8 && r.number("Requested QoS", 1) > 2 {
-					r.err = fmt.Errorf("mqtt-fields: invalid requested QoS")
+				if typ == 8 {
+					if level == 5 {
+						opt := r.number("Subscription Options", 1)
+						if r.err == nil && (opt&3 > 2 || opt&0xc0 != 0) {
+							r.err = fmt.Errorf("mqtt-fields: invalid requested QoS")
+						}
+					} else if r.number("Requested QoS", 1) > 2 {
+						r.err = fmt.Errorf("mqtt-fields: invalid requested QoS")
+					}
 				}
 			}
 			if r.err == nil {
@@ -245,8 +463,18 @@ func decodeMQTTFields(wire []byte, level int) ([]tlsCertificateField, map[string
 			children := append([]tlsCertificateField(nil), r.fields[listStart:]...)
 			r.fields = append(r.fields[:listStart], tlsCertificateField{Name: "Payload Items", Start: children[0].Start, End: children[len(children)-1].End, Children: children, List: true})
 		}
-	case 12, 13, 14:
-		// These levels have no variable header or body for these types.
+	case 12, 13:
+		// PINGREQ/PINGRESP have no variable header.
+	case 14:
+		if level == 5 && remaining > 0 {
+			r.reasonAndProperties("DISCONNECT", remaining, mqtt5DisconnectProps)
+		}
+	case 15:
+		if remaining == 0 {
+			r.err = fmt.Errorf("mqtt-fields: AUTH requires a reason code")
+		} else {
+			r.reasonAndProperties("AUTH", remaining, mqtt5AuthProps)
+		}
 	}
 	if r.err != nil {
 		return nil, nil, r.err
@@ -256,7 +484,7 @@ func decodeMQTTFields(wire []byte, level int) ([]tlsCertificateField, map[string
 	}
 	info := map[string]any{
 		"Profile": "MQTT exact packet fields", "Protocol Level Context": level,
-		"Packet Type": uint64(typ), "Fixed Flags": uint64(flags), "Remaining Length": remaining,
+		"Packet Type": uint64(typ), "Packet Name": mqttPacketName(typ), "Fixed Flags": uint64(flags), "Remaining Length": remaining,
 		"Remaining Length Canonical": canonical, "List Item Count": items,
 		"Legacy Omitted Fields": r.missing, "Version Field Present": typ == 1,
 		"Decoded Flag Fields":      r.flagFields,
@@ -267,7 +495,21 @@ func decodeMQTTFields(wire []byte, level int) ([]tlsCertificateField, map[string
 	if typ == 3 {
 		info["Publish Flags"] = map[string]any{"DUP": flags&8 != 0, "QoS": uint64(qos), "Retain": flags&1 != 0, "Relative Byte Range": [2]int{0, 1}}
 	}
+	for k, v := range props {
+		info[k] = v
+	}
+	for k, v := range r.props {
+		info[k] = v
+	}
 	return r.fields, info, nil
+}
+
+func mqttPacketName(typ byte) string {
+	names := [...]string{"", "CONNECT", "CONNACK", "PUBLISH", "PUBACK", "PUBREC", "PUBREL", "PUBCOMP", "SUBSCRIBE", "SUBACK", "UNSUBSCRIBE", "UNSUBACK", "PINGREQ", "PINGRESP", "DISCONNECT", "AUTH"}
+	if int(typ) < len(names) {
+		return names[typ]
+	}
+	return "UNKNOWN"
 }
 
 func parseMQTTFields(node *base.Node, process func(*base.Node) (func(bool), error), level int) error {
