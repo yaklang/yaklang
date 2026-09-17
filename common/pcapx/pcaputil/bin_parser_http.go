@@ -62,6 +62,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameSNMP(w)
 		case "rdp":
 			return f.frameRDP(w)
+		case "dot":
+			return f.frameDoT(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

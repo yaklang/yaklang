@@ -29,6 +29,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `nfsv3-lookup-read.pcap` | NFSv3 ONC RPC LOOKUP/GETATTR/READ/WRITE with XID pairing on non-2049 port 12049 |
 | `snmpv3-get-response.pcap` | SNMPv3 USM noAuthNoPriv Get/GetBulk/Set/Trap/Inform with request-id pairing on non-161 port 1161 |
 | `rdp-tpkt-negotiate-mcs.pcap` | RDP TPKT/X.224 Cookie+NEG_REQ/RSP and plaintext MCS/GCC channels on non-3389 port 13389 |
+| `dot-dns-tcp-length.pcap` | RFC 7858 DoT on TLS plaintext: 2-byte DNS length, Query/Response ID pairing on non-853 port 1853 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 
