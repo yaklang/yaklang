@@ -52,6 +52,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameAMQP(w)
 		case "smb2":
 			return f.frameSMB2(w)
+		case "dcerpc":
+			return f.frameDCERPC(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

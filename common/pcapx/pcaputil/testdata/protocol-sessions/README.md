@@ -24,6 +24,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `tds-prelogin-login-batch.pcap` | MS-TDS 7.4 PRELOGIN, LOGIN7, SQLBatch and token-stream result on non-1433 port 11433 |
 | `amqp-publish-deliver.pcap` | AMQP 0-9-1 protocol header, Connection.Start, channel open, Publish/Deliver/Ack on non-5672 port 15672 |
 | `smb2-negotiate-create.pcap` | SMB 3.1.1 Negotiate, SessionSetup, TreeConnect and Create on non-445 port 1445 |
+| `dcerpc-epm-srvsvc.pcap` | DCE/RPC v5 Bind/BindAck plus EPM ept_map and SRVSVC NetrShareEnum on non-135 port 13500 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 
