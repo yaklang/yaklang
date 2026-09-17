@@ -31,7 +31,6 @@ Package:
         } else {
           this.ProcessByType("Negotiate Request")
         }
-        return
       }
       if cmd == 1 {
         if isResp {
@@ -39,11 +38,9 @@ Package:
         } else {
           this.ProcessByType("Session Setup Request")
         }
-        return
       }
       if cmd == 2 {
         this.ProcessByType("Logoff")
-        return
       }
       if cmd == 3 {
         if isResp {
@@ -51,11 +48,9 @@ Package:
         } else {
           this.ProcessByType("Tree Connect Request")
         }
-        return
       }
       if cmd == 4 {
         this.ProcessByType("Tree Disconnect")
-        return
       }
       if cmd == 5 {
         if isResp {
@@ -63,11 +58,9 @@ Package:
         } else {
           this.ProcessByType("Create Request")
         }
-        return
       }
       if cmd == 6 {
         this.ProcessByType("Close")
-        return
       }
       if cmd == 8 {
         if isResp {
@@ -75,19 +68,27 @@ Package:
         } else {
           this.ProcessByType("Read Request")
         }
-        return
       }
       if cmd == 9 {
-        this.ProcessByType("Write Request")
-        return
+        if isResp {
+          this.ProcessByType("Write Response")
+        } else {
+          this.ProcessByType("Write Request")
+        }
       }
       if cmd == 11 {
         this.ProcessByType("IOCTL")
-        return
       }
       if cmd == 13 {
         this.ProcessByType("Echo")
-        return
+      }
+      next = getNodeResult("NextCommand").Value
+      if next != 0 && this.HasMaxLength() && this.GetMaxLength() > this.Length() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Compound Tail").SetMaxLength(rest)
+          this.ProcessSubNode("Compound Tail")
+        }
       }
     ProtocolId: uint32
     StructureSize: uint16
@@ -102,6 +103,7 @@ Package:
     TreeId: uint32
     SessionId: uint64
     Signature: raw,16
+    Compound Tail: raw
 Negotiate Request:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -453,6 +455,20 @@ Write Request:
   WriteChannelInfoLength: uint16
   Flags: uint32
   Octets: string
+Write Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Count")
+    this.ProcessSubNode("Remaining")
+    this.ProcessSubNode("WriteChannelInfoOffset")
+    this.ProcessSubNode("WriteChannelInfoLength")
+  StructureSize: uint16
+  Reserved: uint16
+  Count: uint32
+  Remaining: uint32
+  WriteChannelInfoOffset: uint16
+  WriteChannelInfoLength: uint16
 IOCTL:
   operator: |
     this.ProcessSubNode("StructureSize")

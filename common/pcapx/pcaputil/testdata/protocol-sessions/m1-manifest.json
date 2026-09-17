@@ -67,6 +67,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "smb2-negotiate-create.pcap",
+      "protocol": "smb2",
+      "sha256": "19f7638dcffee691c112273ae808fe6de1c8e1e23a615e1ab57ee7196eff164d",
+      "bytes": 1926,
+      "decode_as_port": 1445,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",

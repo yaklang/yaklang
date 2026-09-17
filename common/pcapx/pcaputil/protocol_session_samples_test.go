@@ -84,6 +84,16 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{1, amqpBody(1, []byte("x"))},
 			{0, amqpAck(1, 1)},
 		}},
+		{"smb2-negotiate-create", "smb2", 1445, []sessionStep{
+			{0, smb2NegotiateReq(0x0202, 0x0311)},
+			{1, smb2NegotiateResp(0x0311)},
+			{0, smb2SessionSetup(2, false)},
+			{1, smb2SessionSetup(2, true)},
+			{0, smb2TreeConnect(3, 0x11, `\\srv\share`)},
+			{1, smb2TreeConnectResp(3, 0x11, 1)},
+			{0, smb2Create(4, 0x11, 1, "file.txt")},
+			{1, smb2CreateResp(4, 0x11, 1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},

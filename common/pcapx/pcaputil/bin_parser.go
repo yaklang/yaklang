@@ -301,6 +301,7 @@ type binFlow struct {
 	kafka            *binKafka
 	tds              *binTDS
 	amqp             *binAMQP
+	smb2             *binSMB2
 	httpUpgrades     []bool
 	httpMethods      []string
 	a                *binParser
@@ -493,6 +494,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if f.protocol == "dns" {
 			e.decodeSkip = 2
 		}
+		if f.protocol == "smb2" {
+			e.decodeSkip = 4
+		}
 		if f.protocol == "http" {
 			e.decodeConfig = d.http.config()
 			e.Summary = d.http.summary
@@ -500,7 +504,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
-		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp")
+		stateful := f.hasSession() && (f.protocol == "http2" || f.protocol == "mysql" || f.protocol == "postgresql" || f.protocol == "ldap" || f.protocol == "redis" || f.protocol == "websocket" || f.protocol == "mqtt" || f.protocol == "mongodb" || f.protocol == "kafka" || f.protocol == "tds" || f.protocol == "amqp" || f.protocol == "smb2")
 		if !a.config.Deferred || stateful {
 			result, err := e.Decode()
 			if err == nil && stateful {
