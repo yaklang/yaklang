@@ -31,6 +31,7 @@ type quicStream struct {
 	fin    bool
 	reset  bool
 	stop   bool
+	h3     *h3StreamState
 }
 
 type quicRange struct {
@@ -169,7 +170,7 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 			info["Packet Number Length"] = h.pnLen
 			info["Plaintext Input"] = true
 			q.observePN(space, pn, info)
-			return q.finishFrames(h.space, frames, info, max)
+			return q.finishFrames(dir, h.space, frames, info, max)
 		}
 	}
 	tk, reason := q.keysFor(dir, h)
@@ -207,7 +208,7 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Encrypted"] = true
 		return info, protocolError(ErrEncrypted, "QUIC decrypted payload is not a valid frame sequence")
 	}
-	return q.finishFrames(h.space, frames, info, max)
+	return q.finishFrames(dir, h.space, frames, info, max)
 }
 
 func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) {
@@ -222,9 +223,9 @@ func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) 
 	quicRemember(space, pn)
 }
 
-func (q *binQUIC) finishFrames(space int, frames []map[string]any, info map[string]any, max int) (map[string]any, error) {
+func (q *binQUIC) finishFrames(dir, space int, frames []map[string]any, info map[string]any, max int) (map[string]any, error) {
 	info["Frames"] = frames
-	if err := q.applyFrames(space, frames, info, max); err != nil {
+	if err := q.applyFrames(dir, space, frames, info, max); err != nil {
 		return info, err
 	}
 	q.advanceState(space, frames)
@@ -242,7 +243,7 @@ func (q *binQUIC) space(id int) *quicPNSpace {
 	return &q.spaces[id]
 }
 
-func (q *binQUIC) applyFrames(space int, frames []map[string]any, info map[string]any, max int) error {
+func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[string]any, max int) error {
 	for _, fr := range frames {
 		name, _ := fr["Frame Type"].(string)
 		switch name {
@@ -275,11 +276,20 @@ func (q *binQUIC) applyFrames(space int, frames []map[string]any, info map[strin
 				st.fin = true
 				fr["Stream FIN"] = true
 			}
+			if err := q.feedHTTP3(dir, sid, off, data, fin, max, fr, info); err != nil {
+				return err
+			}
 		case "RESET_STREAM":
 			sid, _ := fr["Stream ID"].(uint64)
 			st := q.stream(sid, max)
 			if st != nil {
 				st.reset = true
+				if st.h3 != nil && st.h3.kind != "" {
+					info["HTTP3"] = true
+					info["HTTP3 Stream State"] = "reset"
+					info["HTTP3 Stream ID"] = sid
+					fr["HTTP3 Reset"] = true
+				}
 			}
 		case "STOP_SENDING":
 			sid, _ := fr["Stream ID"].(uint64)
