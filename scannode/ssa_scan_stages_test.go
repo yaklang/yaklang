@@ -48,6 +48,27 @@ func TestScanStagesReachArtifactMetrics(t *testing.T) {
 	require.Equal(t, "rule set aborted", last["error"])
 }
 
+func TestIncompleteStagesReachArtifactMetrics(t *testing.T) {
+	meta := parseSSAResultMeta(&ScriptExecutionResult{Data: map[string]any{
+		"succeeded":         true,
+		"incomplete_stages": true,
+		"skipped_stages":    []string{"analyze"},
+		"stages": []map[string]any{
+			{"stage": "collect", "status": "succeeded"},
+			{"stage": "inspect", "status": "succeeded"},
+			{"stage": "review", "status": "succeeded"},
+		},
+	}})
+	require.NotEmpty(t, meta.ScanStages)
+
+	var verdict map[string]any
+	require.NoError(t, json.Unmarshal(meta.ScanStages, &verdict))
+	require.Equal(t, true, verdict["incomplete_stages"])
+	skipped, ok := verdict["skipped_stages"].([]any)
+	require.True(t, ok)
+	require.Equal(t, []any{"analyze"}, skipped)
+}
+
 // A script that reports no stages (older engines, compile-only paths) must not
 // leak an empty scan_stages key into metrics.
 func TestScanStagesAbsentWhenNotReported(t *testing.T) {

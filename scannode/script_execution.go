@@ -1238,6 +1238,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	}
 	event.SourceStatistics = meta.SourceStatistics
 	event.ScanStages = meta.ScanStages
+	event.CompileScale = meta.CompileScale
 	if err := reporter.PublishSSAArtifactReady(event); err != nil {
 		return err
 	}
@@ -1389,6 +1390,7 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 type ssaResultMeta struct {
 	SourceStatistics json.RawMessage
 	ScanStages       json.RawMessage
+	CompileScale     json.RawMessage
 	ProgramName      string
 	TotalLines       int64
 	RiskCount        int64
@@ -1422,6 +1424,12 @@ func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
 		if errMsg := strings.TrimSpace(utils.InterfaceToString(dataMap["error"])); errMsg != "" {
 			wrapped["error"] = errMsg
 		}
+		if value, ok := dataMap["incomplete_stages"]; ok {
+			wrapped["incomplete_stages"] = value
+		}
+		if value, ok := dataMap["skipped_stages"]; ok {
+			wrapped["skipped_stages"] = value
+		}
 		meta.ScanStages, _ = json.Marshal(wrapped)
 	}
 	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
@@ -1433,6 +1441,25 @@ func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
 	meta.RiskCount = int64(utils.InterfaceToFloat64(
 		utils.MapGetFirstRaw(dataMap, "risk_count", "riskCount", "RiskCount"),
 	))
+	scale := map[string]int64{}
+	if files := int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(dataMap, "total_files", "totalFiles", "TotalFiles"))); files > 0 {
+		scale["total_files"] = files
+	}
+	if files := int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(dataMap, "handler_files", "handlerFiles", "HandlerFiles"))); files > 0 {
+		scale["handler_files"] = files
+	}
+	if files := int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(dataMap, "prehandler_files", "prehandlerFiles", "PrehandlerFiles"))); files > 0 {
+		scale["prehandler_files"] = files
+	}
+	if bytes := int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(dataMap, "total_bytes", "totalBytes", "TotalBytes"))); bytes > 0 {
+		scale["total_bytes"] = bytes
+	}
+	if meta.TotalLines > 0 {
+		scale["total_lines"] = meta.TotalLines
+	}
+	if len(scale) > 0 {
+		meta.CompileScale, _ = json.Marshal(scale)
+	}
 	return meta
 }
 
@@ -1451,6 +1478,12 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 	}
 	if len(event.ScanStages) > 0 && json.Valid(event.ScanStages) {
 		merged["scan_stages"] = event.ScanStages
+	}
+	if len(event.CompileScale) > 0 && json.Valid(event.CompileScale) {
+		var scale any
+		if json.Unmarshal(event.CompileScale, &scale) == nil && scale != nil {
+			merged["compile_scale"] = scale
+		}
 	}
 	merged["risk_count"] = event.RiskCount
 	merged["file_count"] = event.FileCount

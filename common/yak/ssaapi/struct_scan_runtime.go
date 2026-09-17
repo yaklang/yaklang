@@ -30,8 +30,32 @@ type structScanRuntime struct {
 	errs          []error
 	results       []*SyntaxFlowResult
 	ranHashes     []string
+	ruleStats     map[string]*structRuleStat
 	skipped       bool
 	skipReason    string
+}
+
+// structRuleStat aggregates one struct-mode rule across compile units so
+// 规则耗时 shows one row per rule instead of one row per package.
+type structRuleStat struct {
+	ruleName    string
+	programName string
+	startTime   int64
+	endTime     int64
+	riskCount   int64
+	failed      bool
+	err         string
+}
+
+// StructScanRuleStat is the per-rule timing ScanProject emits for 语义检测.
+type StructScanRuleStat struct {
+	RuleName    string
+	ProgramName string
+	StartTime   int64
+	EndTime     int64
+	RiskCount   int64
+	Failed      bool
+	Error       string
 }
 
 func (s *structScanRuntime) enabled() bool {
@@ -236,6 +260,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			budget = sfvm.NewRuleWorkBudget(s.workLimit, cancel)
 		}
 		target := NewStructQueryTarget(progAPI, unit, newStructBound(unit, progAPI.Program))
+		start := time.Now().Unix()
 		res, err := QuerySyntaxflow(
 			QueryWithValue(target),
 			QueryWithResultProgram(progAPI),
@@ -247,7 +272,13 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			QueryWithWorkBudget(budget),
 		)
 		cancel()
+		end := time.Now().Unix()
+		programName := ""
+		if progAPI != nil {
+			programName = strings.TrimSpace(progAPI.GetProgramName())
+		}
 		if err != nil {
+			s.noteRule(rule, programName, start, end, 0, err)
 			s.errs = append(s.errs, utils.Wrapf(err, "struct scan %s rule %s", unit.Key, rule.RuleName))
 			log.Warnf("[struct_scan] unit=%s rule=%s err=%v", unit.Key, rule.RuleName, err)
 			continue
@@ -255,6 +286,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		if res != nil {
 			s.results = append(s.results, res)
 			s.ranHashes = append(s.ranHashes, ruleContentHash(rule))
+			s.noteRule(rule, programName, start, end, int64(res.RiskCount()), nil)
 			if s.riskCB != nil {
 				risks := res.GetRisks()
 				if len(risks) == 0 {
@@ -329,6 +361,92 @@ func (p *Program) StructScanResults() []*SyntaxFlowResult {
 		return nil
 	}
 	return p.config.structScan.results
+}
+
+// StructScanCounts is the number of struct-mode rules this compile actually
+// loaded or ran, plus how many results they produced. ScanProject uses this
+// for the 语义检测 stage's rule_count when the syntaxflow process monitor
+// never saw those rules (they run inside compile, not StartScan).
+func (p *Program) StructScanCounts() (rules int, results int) {
+	if p == nil || p.config == nil || p.config.structScan == nil {
+		return 0, 0
+	}
+	s := p.config.structScan
+	rules = len(s.rules)
+	if rules == 0 {
+		rules = len(s.ranHashes)
+	}
+	return rules, len(s.results)
+}
+
+func (s *structScanRuntime) noteRule(rule *schema.SyntaxFlowRule, programName string, start, end int64, riskCount int64, err error) {
+	if s == nil || rule == nil {
+		return
+	}
+	if s.ruleStats == nil {
+		s.ruleStats = map[string]*structRuleStat{}
+	}
+	name := strings.TrimSpace(rule.RuleName)
+	if name == "" {
+		return
+	}
+	key := name + "@" + programName
+	stat := s.ruleStats[key]
+	if stat == nil {
+		stat = &structRuleStat{ruleName: name, programName: programName, startTime: start}
+		s.ruleStats[key] = stat
+	}
+	if start > 0 && (stat.startTime == 0 || start < stat.startTime) {
+		stat.startTime = start
+	}
+	elapsed := end - start
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	already := stat.endTime - stat.startTime
+	if already < 0 {
+		already = 0
+	}
+	stat.endTime = stat.startTime + already + elapsed
+	if riskCount > 0 {
+		stat.riskCount += riskCount
+	}
+	if err != nil {
+		stat.failed = true
+		stat.err = err.Error()
+	}
+}
+
+func (p *Program) StructScanRuleStats() []StructScanRuleStat {
+	if p == nil || p.config == nil || p.config.structScan == nil {
+		return nil
+	}
+	stats := p.config.structScan.ruleStats
+	if len(stats) == 0 {
+		return nil
+	}
+	out := make([]StructScanRuleStat, 0, len(stats))
+	for _, stat := range stats {
+		if stat == nil {
+			continue
+		}
+		out = append(out, StructScanRuleStat{
+			RuleName:    stat.ruleName,
+			ProgramName: stat.programName,
+			StartTime:   stat.startTime,
+			EndTime:     stat.endTime,
+			RiskCount:   stat.riskCount,
+			Failed:      stat.failed,
+			Error:       stat.err,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].RuleName == out[j].RuleName {
+			return out[i].ProgramName < out[j].ProgramName
+		}
+		return out[i].RuleName < out[j].RuleName
+	})
+	return out
 }
 
 func (p *Program) StructScanTaskID() string {

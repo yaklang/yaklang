@@ -24,3 +24,22 @@ func TestSourceStatisticsMetricsWithZeroRisks(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(metrics), "source_statistics")
 }
+
+func TestCompileScaleReachesArtifactMetrics(t *testing.T) {
+	meta := parseSSAResultMeta(&ScriptExecutionResult{Data: map[string]any{
+		"total_files":      12,
+		"handler_files":    8,
+		"prehandler_files": 12,
+		"total_bytes":      4096,
+		"total_lines":      80,
+	}})
+	require.NotEmpty(t, meta.CompileScale)
+	metrics, err := buildSSAArtifactMetricsPayload(&SSAArtifactReadyEvent{CompileScale: meta.CompileScale})
+	require.NoError(t, err)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(metrics, &payload))
+	scale := payload["compile_scale"].(map[string]any)
+	require.EqualValues(t, 12, scale["total_files"])
+	require.EqualValues(t, 4096, scale["total_bytes"])
+	require.EqualValues(t, 80, scale["total_lines"])
+}

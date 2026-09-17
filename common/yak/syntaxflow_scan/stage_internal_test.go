@@ -99,6 +99,23 @@ func TestStageOutcomeRecorder_CarriesStageMetrics(t *testing.T) {
 
 // Streamed risks are attributed to the stage that produced them, and counted
 // cumulatively when a stage streams several batches.
+func TestParseCompileScale(t *testing.T) {
+	info := parseCompileScale(`ssa-compile-scale:{"total_files":12,"handler_files":8,"prehandler_files":12,"total_bytes":4096}`)
+	require.NotNil(t, info)
+	require.EqualValues(t, 12, info.TotalFiles)
+	require.EqualValues(t, 8, info.HandlerFiles)
+	require.EqualValues(t, 4096, info.TotalBytes)
+	require.Nil(t, parseCompileScale("compiling php"))
+}
+
+func TestStageOutcomeRecorder_ObserveScale(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	recorder.observeScale(&RuleProcessInfoList{TotalFiles: 12, TotalBytes: 4096, TotalLines: 80})
+	require.EqualValues(t, 12, recorder.scale.TotalFiles)
+	require.EqualValues(t, 4096, recorder.scale.TotalBytes)
+	require.EqualValues(t, 80, recorder.scale.TotalLines)
+}
+
 func TestStageOutcomeRecorder_AccumulatesStreamedRisks(t *testing.T) {
 	recorder := newStageOutcomeRecorder()
 	recorder.enter(StageAnalyze)
@@ -109,4 +126,37 @@ func TestStageOutcomeRecorder_AccumulatesStreamedRisks(t *testing.T) {
 	outcome := recorder.Outcomes()[0]
 	require.True(t, outcome.Succeeded())
 	require.EqualValues(t, 7, outcome.RiskCount)
+}
+
+func TestSkippedRequestedStages_DetectsUnstartedDetection(t *testing.T) {
+	mode := productModeSelection{source: true, review: true, analyze: true}
+	skipped := skippedRequestedStages(mode, []StageOutcome{
+		{Stage: StageCollect, Status: StageStatusSucceeded},
+		{Stage: StageInspect, Status: StageStatusSucceeded},
+		{Stage: StageReview, Status: StageStatusSucceeded},
+	})
+	require.Equal(t, []string{string(StageAnalyze)}, skipped)
+
+	none := skippedRequestedStages(productModeSelection{source: true}, []StageOutcome{
+		{Stage: StageInspect, Status: StageStatusFailed, Error: "rule failed"},
+	})
+	require.Empty(t, none)
+}
+
+func TestMergeStageInfoKeepsCompileScaleAndStructRules(t *testing.T) {
+	scale := &RuleProcessInfoList{TotalFiles: 12, TotalBytes: 4096, TotalLines: 80}
+	rules := &RuleProcessInfoList{
+		TotalQuery:    2,
+		FinishedQuery: 2,
+		SuccessQuery:  2,
+		RiskCount:     3,
+		Rules:         []*RuleProcessInfo{{RuleName: "php-struct", Finished: true, RiskCount: 3}},
+	}
+	got := mergeStageInfo(scale, rules)
+	require.EqualValues(t, 12, got.TotalFiles)
+	require.EqualValues(t, 80, got.TotalLines)
+	require.EqualValues(t, 2, got.TotalQuery)
+	require.EqualValues(t, 3, got.RiskCount)
+	require.Len(t, got.Rules, 1)
+	require.Equal(t, "php-struct", got.Rules[0].RuleName)
 }

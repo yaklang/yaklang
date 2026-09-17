@@ -1,6 +1,7 @@
 package syntaxflow_scan
 
 import (
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -139,9 +140,12 @@ func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded
 // and decides the aggregate result: any successful detection stage makes the
 // whole run successful even when a sibling stage failed.
 type stageOutcomeRecorder struct {
-	outcomes []StageOutcome
-	started  map[ProductStage]time.Time
-	metrics  map[ProductStage]stageMetrics
+	outcomes         []StageOutcome
+	started          map[ProductStage]time.Time
+	metrics          map[ProductStage]stageMetrics
+	ruleNames        map[ProductStage]map[string]struct{}
+	scale            compileScale
+	sourceStatistics any
 }
 
 // stageMetrics accumulates what one stage actually did while it ran.
@@ -150,10 +154,20 @@ type stageMetrics struct {
 	riskCount int64
 }
 
+// compileScale is the filesystem size signal emitted after clone/extract.
+type compileScale struct {
+	TotalFiles      int64
+	HandlerFiles    int64
+	PrehandlerFiles int64
+	TotalBytes      int64
+	TotalLines      int64
+}
+
 func newStageOutcomeRecorder() *stageOutcomeRecorder {
 	return &stageOutcomeRecorder{
-		started: map[ProductStage]time.Time{},
-		metrics: map[ProductStage]stageMetrics{},
+		started:   map[ProductStage]time.Time{},
+		metrics:   map[ProductStage]stageMetrics{},
+		ruleNames: map[ProductStage]map[string]struct{}{},
 	}
 }
 
@@ -182,6 +196,7 @@ func (r *stageOutcomeRecorder) observe(stage ProductStage, info *RuleProcessInfo
 		metrics.riskCount = info.RiskCount
 	}
 	r.metrics[stage] = metrics
+	r.observeScale(info)
 }
 
 // addRisk counts risks a stage streamed through the result callback.
@@ -192,6 +207,72 @@ func (r *stageOutcomeRecorder) addRisk(stage ProductStage, count int64) {
 	metrics := r.metrics[stage]
 	metrics.riskCount += count
 	r.metrics[stage] = metrics
+}
+
+func (r *stageOutcomeRecorder) addRule(stage ProductStage, name string) {
+	name = strings.TrimSpace(name)
+	if r == nil || name == "" {
+		return
+	}
+	if r.ruleNames == nil {
+		r.ruleNames = map[ProductStage]map[string]struct{}{}
+	}
+	set := r.ruleNames[stage]
+	if set == nil {
+		set = map[string]struct{}{}
+		r.ruleNames[stage] = set
+	}
+	set[name] = struct{}{}
+	metrics := r.metrics[stage]
+	if n := int64(len(set)); n > metrics.ruleCount {
+		metrics.ruleCount = n
+		r.metrics[stage] = metrics
+	}
+}
+
+// observeScale keeps the last compile-scale / source-size snapshot so the
+// platform can render 收集代码 代码行 / 文件 / 体积 after the run.
+func (r *stageOutcomeRecorder) observeScale(info *RuleProcessInfoList) {
+	if r == nil || info == nil {
+		return
+	}
+	if info.TotalFiles > 0 {
+		r.scale.TotalFiles = info.TotalFiles
+	}
+	if info.HandlerFiles > 0 {
+		r.scale.HandlerFiles = info.HandlerFiles
+	}
+	if info.PrehandlerFiles > 0 {
+		r.scale.PrehandlerFiles = info.PrehandlerFiles
+	}
+	if info.TotalBytes > 0 {
+		r.scale.TotalBytes = info.TotalBytes
+	}
+	if info.TotalLines > 0 {
+		r.scale.TotalLines = info.TotalLines
+	}
+}
+
+func (r *stageOutcomeRecorder) observeStruct(prog interface{ StructScanCounts() (int, int) }) {
+	if r == nil || prog == nil {
+		return
+	}
+	rules, _ := prog.StructScanCounts()
+	if rules <= 0 {
+		return
+	}
+	metrics := r.metrics[StageReview]
+	if metrics.ruleCount < int64(rules) {
+		metrics.ruleCount = int64(rules)
+		r.metrics[StageReview] = metrics
+	}
+}
+
+func (r *stageOutcomeRecorder) setSourceStatistics(stats any) {
+	if r == nil || stats == nil {
+		return
+	}
+	r.sourceStatistics = stats
 }
 
 func (r *stageOutcomeRecorder) record(stage ProductStage, err error) {
@@ -256,6 +337,19 @@ type ProjectResult struct {
 	ProgramName string         `json:"program_name,omitempty"`
 	Succeeded   bool           `json:"succeeded"`
 	Error       string         `json:"error,omitempty"`
+	// IncompleteStages is true when the caller asked for detection stages
+	// that never started. The run can still Succeeded when an earlier
+	// detection stage completed.
+	IncompleteStages bool     `json:"incomplete_stages,omitempty"`
+	SkippedStages    []string `json:"skipped_stages,omitempty"`
+	// Source size for 收集代码. Platforms persist these with the artifact so
+	// diagnostics can show 代码行 / 文件 / 体积 after the process events expire.
+	TotalFiles       int64 `json:"total_files,omitempty"`
+	HandlerFiles     int64 `json:"handler_files,omitempty"`
+	PrehandlerFiles  int64 `json:"prehandler_files,omitempty"`
+	TotalBytes       int64 `json:"total_bytes,omitempty"`
+	TotalLines       int64 `json:"total_lines,omitempty"`
+	SourceStatistics any   `json:"source_statistics,omitempty"`
 }
 
 // ProjectResultCallback receives the terminal ProjectResult of one ScanProject
