@@ -83,6 +83,19 @@ func TestP0LDAPOperationEntries(t *testing.T) {
 		{"LDAPSearchEntryFields", "301502010164100400300c300a0402636e310404000400", "Attribute Description", "cn"},
 		{"LDAPSearchDoneFields", "300c02010165070a010004000400", "Result Code", uint64(0)},
 		{"LDAPSearchReferenceFields", "300f020101730a04086c6461703a2f2f78", "URI", "ldap://x"},
+		{"LDAPModifyRequestFields", "301d02010166180404636e3d783010300e0a010030090402636e3103040179", "Object Name", "cn=x"},
+		{"LDAPModifyResponseFields", "300c02010167070a010004000400", "Result Code", uint64(0)},
+		{"LDAPAddRequestFields", "301802010168130404636e3d78300b30090402636e3103040178", "Entry", "cn=x"},
+		{"LDAPAddResponseFields", "300c02010169070a010004000400", "Result Code", uint64(0)},
+		{"LDAPDelRequestFields", "30090201014a04636e3d78", "Entry", "cn=x"},
+		{"LDAPDelResponseFields", "300c0201016b070a010004000400", "Result Code", uint64(0)},
+		{"LDAPModifyDNRequestFields", "30180201016c130406636e3d6f6c640406636e3d6e65770101ff", "New RDN", "cn=new"},
+		{"LDAPModifyDNResponseFields", "300c0201016d070a010004000400", "Result Code", uint64(0)},
+		{"LDAPCompareRequestFields", "30140201016e0f0404636e3d7830070402636e040178", "Assertion Value", []byte("x")},
+		{"LDAPCompareResponseFields", "300c0201016f070a010504000400", "Result Code", uint64(5)},
+		{"LDAPAbandonRequestFields", "3006020101500102", "Abandoned Message ID", uint64(2)},
+		{"LDAPExtendedRequestFields", "3020020101771b8016312e332e362e312e342e312e313436362e32303033378101ff", "Request Name", "1.3.6.1.4.1.1466.20037"},
+		{"LDAPExtendedResponseFields", "3024020101781f0a0100040004008a16312e332e362e312e342e312e313436362e3230303337", "Response Name", "1.3.6.1.4.1.1466.20037"},
 	} {
 		t.Run(tc.entry, func(t *testing.T) {
 			wire := mustHex(t, tc.wire)

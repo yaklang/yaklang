@@ -31,7 +31,7 @@ Package:
         }
         this.ProcessSubNode("ProtocolOp Tag")
         tag = getNodeResult("ProtocolOp Tag").Value
-        if tag != 0x60 && tag != 0x61 && tag != 0x63 && tag != 0x64 && tag != 0x65 && tag != 0x42 && tag != 0x66 && tag != 0x67 && tag != 0x68 && tag != 0x69 && tag != 0x4a && tag != 0x6b && tag != 0x50 && tag != 0x6c && tag != 0x6d && tag != 0x6e && tag != 0x6f && tag != 0x73 && tag != 0x78 && tag != 0x79 {
+        if tag != 0x60 && tag != 0x61 && tag != 0x63 && tag != 0x64 && tag != 0x65 && tag != 0x42 && tag != 0x66 && tag != 0x67 && tag != 0x68 && tag != 0x69 && tag != 0x4a && tag != 0x6b && tag != 0x50 && tag != 0x6c && tag != 0x6d && tag != 0x6e && tag != 0x6f && tag != 0x73 && tag != 0x77 && tag != 0x78 && tag != 0x79 {
           panic("ldap: unexpected protocolOp tag")
         }
         this.ProcessSubNode("ProtocolOp Length")
@@ -50,6 +50,52 @@ Package:
           tag = getNodeResult("../ProtocolOp Tag").Value
           if tag == 0x60 {
             this.ProcessSubNode("BindRequest")
+            return
+          }
+          if tag == 0x66 {
+            this.ProcessSubNode("ModifyRequest")
+            return
+          }
+          if tag == 0x68 {
+            this.ProcessSubNode("AddRequest")
+            return
+          }
+          if tag == 0x4a {
+            rem = 0
+            if this.GetMaxLength() > this.Length() {
+              rem = this.GetMaxLength() - this.Length()
+            }
+            if rem > 0 {
+              this.GetSubNode("DelRequest").SetMaxLength(rem)
+            }
+            this.ProcessSubNode("DelRequest")
+            return
+          }
+          if tag == 0x6c {
+            this.ProcessSubNode("ModifyDNRequest")
+            return
+          }
+          if tag == 0x6e {
+            this.ProcessSubNode("CompareRequest")
+            return
+          }
+          if tag == 0x50 {
+            rem = 0
+            if this.GetMaxLength() > this.Length() {
+              rem = this.GetMaxLength() - this.Length()
+            }
+            if rem > 0 {
+              this.GetSubNode("AbandonRequest").SetMaxLength(rem)
+            }
+            this.ProcessSubNode("AbandonRequest")
+            return
+          }
+          if tag == 0x77 {
+            this.ProcessSubNode("ExtendedRequest")
+            return
+          }
+          if tag == 0x67 || tag == 0x69 || tag == 0x6b || tag == 0x6d || tag == 0x6f || tag == 0x61 || tag == 0x65 || tag == 0x78 {
+            this.ProcessSubNode("LDAPResult")
             return
           }
           return
@@ -86,79 +132,277 @@ Package:
           Auth Tag: uint8
           Auth Length: uint8
           Auth: string
+        ModifyRequest:
+          operator: |
+            this.ProcessSubNode("Object Tag")
+            this.ProcessSubNode("Object Length")
+            ol = getNodeResult("Object Length").Value
+            if ol > 0 {
+              this.GetSubNode("Object Name").SetMaxLength(ol)
+              this.ProcessSubNode("Object Name")
+            }
+            this.ProcessSubNode("Changes Tag")
+            this.ProcessSubNode("Changes Length")
+            cl = getNodeResult("Changes Length").Value
+            if cl > 0 {
+              this.GetSubNode("Changes").SetMaxLength(cl)
+              this.ProcessSubNode("Changes")
+            }
+          Object Tag: uint8
+          Object Length: uint8
+          Object Name: string
+          Changes Tag: uint8
+          Changes Length: uint8
+          Changes: string
+        AddRequest:
+          operator: |
+            this.ProcessSubNode("Entry Tag")
+            this.ProcessSubNode("Entry Length")
+            el = getNodeResult("Entry Length").Value
+            if el > 0 {
+              this.GetSubNode("Entry").SetMaxLength(el)
+              this.ProcessSubNode("Entry")
+            }
+            this.ProcessSubNode("Attributes Tag")
+            this.ProcessSubNode("Attributes Length")
+            al = getNodeResult("Attributes Length").Value
+            if al > 0 {
+              this.GetSubNode("Attributes").SetMaxLength(al)
+              this.ProcessSubNode("Attributes")
+            }
+          Entry Tag: uint8
+          Entry Length: uint8
+          Entry: string
+          Attributes Tag: uint8
+          Attributes Length: uint8
+          Attributes: string
+        DelRequest:
+          operator: |
+            rem = 0
+            if this.GetMaxLength() > this.Length() {
+              rem = this.GetMaxLength() - this.Length()
+            }
+            if rem > 0 {
+              this.GetSubNode("Entry").SetMaxLength(rem)
+              this.ProcessSubNode("Entry")
+            }
+          Entry: string
+        ModifyDNRequest:
+          operator: |
+            this.ProcessSubNode("Entry Tag")
+            this.ProcessSubNode("Entry Length")
+            el = getNodeResult("Entry Length").Value
+            if el > 0 {
+              this.GetSubNode("Entry").SetMaxLength(el)
+              this.ProcessSubNode("Entry")
+            }
+            this.ProcessSubNode("New RDN Tag")
+            this.ProcessSubNode("New RDN Length")
+            nl = getNodeResult("New RDN Length").Value
+            if nl > 0 {
+              this.GetSubNode("New RDN").SetMaxLength(nl)
+              this.ProcessSubNode("New RDN")
+            }
+            this.ProcessSubNode("Delete Old RDN Tag")
+            this.ProcessSubNode("Delete Old RDN Length")
+            dl = getNodeResult("Delete Old RDN Length").Value
+            if dl > 0 {
+              this.GetSubNode("Delete Old RDN").SetMaxLength(dl)
+              this.ProcessSubNode("Delete Old RDN")
+            }
+          Entry Tag: uint8
+          Entry Length: uint8
+          Entry: string
+          New RDN Tag: uint8
+          New RDN Length: uint8
+          New RDN: string
+          Delete Old RDN Tag: uint8
+          Delete Old RDN Length: uint8
+          Delete Old RDN: string
+        CompareRequest:
+          operator: |
+            this.ProcessSubNode("Entry Tag")
+            this.ProcessSubNode("Entry Length")
+            el = getNodeResult("Entry Length").Value
+            if el > 0 {
+              this.GetSubNode("Entry").SetMaxLength(el)
+              this.ProcessSubNode("Entry")
+            }
+            this.ProcessSubNode("AVA Tag")
+            this.ProcessSubNode("AVA Length")
+            al = getNodeResult("AVA Length").Value
+            if al > 0 {
+              this.GetSubNode("AVA").SetMaxLength(al)
+              this.ProcessSubNode("AVA")
+            }
+          Entry Tag: uint8
+          Entry Length: uint8
+          Entry: string
+          AVA Tag: uint8
+          AVA Length: uint8
+          AVA: LDAPAssertion
+        AbandonRequest:
+          operator: |
+            rem = 0
+            if this.GetMaxLength() > this.Length() {
+              rem = this.GetMaxLength() - this.Length()
+            }
+            if rem > 0 {
+              this.GetSubNode("Abandoned Message ID").SetMaxLength(rem)
+              this.ProcessSubNode("Abandoned Message ID")
+            }
+          Abandoned Message ID: string
+        ExtendedRequest:
+          operator: |
+            this.ProcessSubNode("Request Name Tag")
+            this.ProcessSubNode("Request Name Length")
+            nl = getNodeResult("Request Name Length").Value
+            if nl > 0 {
+              this.GetSubNode("Request Name").SetMaxLength(nl)
+              this.ProcessSubNode("Request Name")
+            }
+            if this.Length() < this.GetMaxLength() {
+              this.ProcessSubNode("Request Value Tag")
+              this.ProcessSubNode("Request Value Length")
+              vl = getNodeResult("Request Value Length").Value
+              if vl > 0 {
+                this.GetSubNode("Request Value").SetMaxLength(vl)
+                this.ProcessSubNode("Request Value")
+              }
+            }
+          Request Name Tag: uint8
+          Request Name Length: uint8
+          Request Name: string
+          Request Value Tag: uint8
+          Request Value Length: uint8
+          Request Value: string
+        LDAPResult:
+          operator: |
+            this.ProcessSubNode("Result Code Tag")
+            this.ProcessSubNode("Result Code Length")
+            rl = getNodeResult("Result Code Length").Value
+            if rl > 0 {
+              this.GetSubNode("Result Code").SetMaxLength(rl)
+              this.ProcessSubNode("Result Code")
+            }
+            this.ProcessSubNode("Matched DN Tag")
+            this.ProcessSubNode("Matched DN Length")
+            ml = getNodeResult("Matched DN Length").Value
+            if ml > 0 {
+              this.GetSubNode("Matched DN").SetMaxLength(ml)
+              this.ProcessSubNode("Matched DN")
+            }
+            this.ProcessSubNode("Diagnostic Tag")
+            this.ProcessSubNode("Diagnostic Length")
+            dl = getNodeResult("Diagnostic Length").Value
+            if dl > 0 {
+              this.GetSubNode("Diagnostic Message").SetMaxLength(dl)
+              this.ProcessSubNode("Diagnostic Message")
+            }
+          Result Code Tag: uint8
+          Result Code Length: uint8
+          Result Code: string
+          Matched DN Tag: uint8
+          Matched DN Length: uint8
+          Matched DN: string
+          Diagnostic Tag: uint8
+          Diagnostic Length: uint8
+          Diagnostic Message: string
   Message: BER
   LDAP:
-    parser: |
-      message = getNode("@Message")
-      data = getDataByNode(this)
-      this.SetValue(data)
-    generator: |
-      message = getNode("@Message")
-      data = getDataByNode(this)
-      message.SetValue(data)
-    MessageId: uint32
-    ProtocolOP:
-      BinRequest:
-        Version: uint32
-        Name: string
-        Auth: string
-      BinResponse:
-        BaseObject: string
-        Scope: uint32
-        DerefAliases: uint32
-        SizeLimit: uint32
-        TimeLimit: uint32
-        TypesOnly: bool
-        Filter: string
-        Attributes:
-          list: true
-          Attribute:
-            AttributeDescription: string
-            AttributeValue:
-              list: true
-              Value: string
-    Controls:
-      list: true
-      Control:
-        ControlType: uint32
-        Criticality: bool
-        ControlValue: string
-    out: |
-      check = (node,classId,tagId)=>{
-        assert node.Child("Class").Value == classId, "error class"
-        assert node.Child("Tag").Value == tagId, "error Tag"  
-      }
-      readString = (node) => {
-        if node == nil {
-          return ""
+      parser: |
+        message = getNode("@Message")
+        data = getDataByNode(this)
+        this.SetValue(data)
+      generator: |
+        message = getNode("@Message")
+        data = getDataByNode(this)
+        message.SetValue(data)
+      MessageId: uint32
+      ProtocolOP:
+        BinRequest:
+          Version: uint32
+          Name: string
+          Auth: string
+        BinResponse:
+          BaseObject: string
+          Scope: uint32
+          DerefAliases: uint32
+          SizeLimit: uint32
+          TimeLimit: uint32
+          TypesOnly: bool
+          Filter: string
+          Attributes:
+            list: true
+            Attribute:
+              AttributeDescription: string
+              AttributeValue:
+                list: true
+                Value: string
+      Controls:
+        list: true
+        Control:
+          ControlType: uint32
+          Criticality: bool
+          ControlValue: string
+      out: |
+        check = (node,classId,tagId)=>{
+          assert node.Child("Class").Value == classId, "error class"
+          assert node.Child("Tag").Value == tagId, "error Tag"
         }
-        v = ""
-        l = node.Child("Length").Value
-        if l != 0{
-          if node.Child("Value") == nil{ return "" }
-          v = string(node.Child("Value").Value)
+        readString = (node) => {
+          if node == nil {
+            return ""
+          }
+          v = ""
+          l = node.Child("Length").Value
+          if l != 0{
+            if node.Child("Value") == nil{ return "" }
+            v = string(node.Child("Value").Value)
+          }
+          return v
         }
-        return v
-      }
-      message = data.Child("Message")
-      check(message.Child("Type"),0,16)
-      sequence = message.Child("Children").Children()
-      messageIdNode = sequence[0]
-      messageId = messageIdNode.Child("Integer").Value
-      protocolOpNode = sequence[1]
-      var opname = ""
-      switch protocolOpNode.Child("Tag"){
-      case 0:
-        opname = "BindRequest"
-      case 1:
-        opname = "BindResponse"
-      }
-      protocolOpNodeChildren = protocolOpNode.Child("Children").Children()
-      versionNode = protocolOpNodeChildren[0]
-      version = versionNode.Child("Integer").Value
-      nameNode = protocolOpNodeChildren[1]
-      name = readString(nameNode)
-      auth = readString(protocolOpNodeChildren[2])
-      
-      return data
+        message = data.Child("Message")
+        check(message.Child("Type"),0,16)
+        sequence = message.Child("Children").Children()
+        messageIdNode = sequence[0]
+        messageId = messageIdNode.Child("Integer").Value
+        protocolOpNode = sequence[1]
+        var opname = ""
+        switch protocolOpNode.Child("Tag"){
+        case 0:
+          opname = "BindRequest"
+        case 1:
+          opname = "BindResponse"
+        }
+        protocolOpNodeChildren = protocolOpNode.Child("Children").Children()
+        versionNode = protocolOpNodeChildren[0]
+        version = versionNode.Child("Integer").Value
+        nameNode = protocolOpNodeChildren[1]
+        name = readString(nameNode)
+        auth = readString(protocolOpNodeChildren[2])
+
+        return data
+LDAPAssertion:
+  operator: |
+    this.ProcessSubNode("Attribute Description Tag")
+    this.ProcessSubNode("Attribute Description Length")
+    al = getNodeResult("Attribute Description Length").Value
+    if al > 0 {
+      this.GetSubNode("Attribute Description").SetMaxLength(al)
+      this.ProcessSubNode("Attribute Description")
+    }
+    this.ProcessSubNode("Assertion Value Tag")
+    this.ProcessSubNode("Assertion Value Length")
+    vl = getNodeResult("Assertion Value Length").Value
+    if vl > 0 {
+      this.GetSubNode("Assertion Value").SetMaxLength(vl)
+      this.ProcessSubNode("Assertion Value")
+    }
+  Attribute Description Tag: uint8
+  Attribute Description Length: uint8
+  Attribute Description: string
+  Assertion Value Tag: uint8
+  Assertion Value Length: uint8
+  Assertion Value: string
 BER: "import:application-layer/ber.yaml;node:BER Element"

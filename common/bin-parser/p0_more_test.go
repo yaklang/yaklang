@@ -158,20 +158,22 @@ func TestWebSocketFramesAndEdges(t *testing.T) {
 	p := parseRule(t, ping, "application-layer.websocket", "WebSocket")
 	require.Equal(t, uint64(9), uintVal(t, p.Child("Opcode")))
 
-	ext := make([]byte, 2+2+5)
+	ext := make([]byte, 2+2+126)
 	ext[0] = 0x82
 	ext[1] = 126
-	binary.BigEndian.PutUint16(ext[2:], 5)
+	binary.BigEndian.PutUint16(ext[2:], 126)
 	copy(ext[4:], []byte("world"))
 	e := parseRule(t, ext, "application-layer.websocket", "WebSocket")
 	require.Equal(t, uint64(2), uintVal(t, e.Child("Opcode")))
 	require.Equal(t, uint64(126), uintVal(t, e.Child("Payload Len")))
-	require.Equal(t, "world", strVal(t, e.Child("Octets")))
+	require.Equal(t, ext[4:], bytesVal(t, e.Child("Binary")))
+	parseMustFail(t, []byte{0x82, 126, 0, 5, 'w', 'o', 'r', 'l', 'd'}, "application-layer.websocket", "WebSocket")
 
 	masked := []byte{0x81, 0x85, 1, 2, 3, 4, 'h' ^ 1, 'e' ^ 2, 'l' ^ 3, 'l' ^ 4, 'o' ^ 1}
 	m := parseRule(t, masked, "application-layer.websocket", "WebSocket")
 	require.Equal(t, uint64(1), uintVal(t, m.Child("Mask")))
 	require.Equal(t, []byte{1, 2, 3, 4}, bytesVal(t, m.Child("Masking Key")))
+	require.Equal(t, "hello", strVal(t, m.Child("Text")))
 
 	parseMustFail(t, nil, "application-layer.websocket", "WebSocket")
 	parseMustFail(t, []byte{0x83, 0x00}, "application-layer.websocket", "WebSocket")

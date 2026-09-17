@@ -1,9 +1,12 @@
 package stream_parser
 
-import "fmt"
+import (
+	"fmt"
+	"unicode/utf8"
+)
 
-// RFC 4511 sections 4.1.9, 4.2.2, 4.3 and 4.5. These are explicit,
-// single-message profiles. No directory operation or matching rule is run.
+// RFC 4511 sections 4.1.9–4.14. These are explicit, single-message profiles.
+// No directory operation, matching rule or control semantics are run.
 func ldapOperationTag(profile string) byte {
 	switch profile {
 	case "bind-response":
@@ -18,6 +21,32 @@ func ldapOperationTag(profile string) byte {
 		return 0x65
 	case "search-reference":
 		return 0x73
+	case "modify-request":
+		return 0x66
+	case "modify-response":
+		return 0x67
+	case "add-request":
+		return 0x68
+	case "add-response":
+		return 0x69
+	case "del-request":
+		return 0x4a
+	case "del-response":
+		return 0x6b
+	case "modifydn-request":
+		return 0x6c
+	case "modifydn-response":
+		return 0x6d
+	case "compare-request":
+		return 0x6e
+	case "compare-response":
+		return 0x6f
+	case "abandon-request":
+		return 0x50
+	case "extended-request":
+		return 0x77
+	case "extended-response":
+		return 0x78
 	}
 	return 0
 }
@@ -220,24 +249,139 @@ func (r *ldapFieldsReader) searchEntry() {
 	r.within(e, func() {
 		r.list("Attributes", func() {
 			for r.err == nil && r.at < r.end && r.item() {
-				a := r.open(0x30)
-				r.within(a, func() {
-					r.octets(4, "Attribute Description", true)
-					v := r.open(0x31)
-					r.within(v, func() {
-						r.list("Values", func() {
-							for r.err == nil && r.at < r.end && r.item() {
-								r.octets(4, "Attribute Value", false)
-							}
-						})
-					})
-					r.close(v, "Values Encoding", false)
-				})
-				r.close(a, "Partial Attribute", false)
+				r.attribute("Partial Attribute")
 			}
 		})
 	})
 	r.close(e, "Attributes Encoding", false)
+}
+
+func (r *ldapFieldsReader) attribute(name string) {
+	a := r.open(0x30)
+	r.within(a, func() {
+		r.octets(4, "Attribute Description", true)
+		v := r.open(0x31)
+		r.within(v, func() {
+			r.list("Values", func() {
+				for r.err == nil && r.at < r.end && r.item() {
+					r.octets(4, "Attribute Value", false)
+				}
+			})
+		})
+		r.close(v, "Values Encoding", false)
+	})
+	r.close(a, name, false)
+}
+
+func (r *ldapFieldsReader) primitiveOctets(name string, text bool) {
+	typ := "raw"
+	if text {
+		typ = "string"
+	}
+	b := r.take(name, typ, r.end-r.at)
+	if text && !utf8.Valid(b) {
+		r.fail("invalid UTF-8 in " + name)
+	}
+}
+
+func (r *ldapFieldsReader) primitiveInteger(name string, maximum uint64) uint64 {
+	n := r.end - r.at
+	if n < 1 || n > 4 {
+		r.fail("invalid INTEGER width")
+		return 0
+	}
+	b := r.wire[r.at:r.end]
+	if b[0]&128 != 0 || n > 1 && b[0] == 0 && b[1]&128 == 0 {
+		r.fail("negative or nonminimal INTEGER")
+		return 0
+	}
+	v := r.uint(name, n)
+	if v > maximum {
+		r.fail("INTEGER range for " + name)
+	}
+	return v
+}
+
+func (r *ldapFieldsReader) modify() {
+	r.octets(4, "Object Name", true)
+	e := r.open(0x30)
+	r.within(e, func() {
+		r.list("Changes", func() {
+			for r.err == nil && r.at < r.end && r.item() {
+				c := r.open(0x30)
+				r.within(c, func() {
+					r.enumeration("Operation", 2147483647)
+					r.attribute("Modification")
+				})
+				r.close(c, "Change", false)
+			}
+		})
+	})
+	r.close(e, "Changes Encoding", false)
+}
+
+func (r *ldapFieldsReader) add() {
+	r.octets(4, "Entry", true)
+	e := r.open(0x30)
+	r.within(e, func() {
+		r.list("Attributes", func() {
+			for r.err == nil && r.at < r.end && r.item() {
+				r.attribute("Attribute")
+			}
+		})
+	})
+	r.close(e, "Attributes Encoding", false)
+}
+
+func (r *ldapFieldsReader) modifyDN() {
+	r.octets(4, "Entry", true)
+	r.octets(4, "New RDN", true)
+	r.boolean(1, "Delete Old RDN")
+	if r.err == nil && r.at < r.end {
+		if r.wire[r.at] != 0x80 {
+			r.fail("expected optional newSuperior")
+			return
+		}
+		r.octets(0x80, "New Superior", true)
+	}
+}
+
+func (r *ldapFieldsReader) compare() {
+	r.octets(4, "Entry", true)
+	a := r.open(0x30)
+	r.within(a, func() { r.assertion() })
+	r.close(a, "Attribute Value Assertion", false)
+}
+
+func (r *ldapFieldsReader) extendedRequest() {
+	oid := r.octets(0x80, "Request Name", true)
+	if r.err != nil {
+		return
+	}
+	if !ldapFieldsNumericOID(oid["Value"].([]byte)) {
+		r.fail("invalid numeric request OID")
+	}
+	if r.err == nil && r.at < r.end {
+		r.octets(0x81, "Request Value", false)
+	}
+}
+
+func (r *ldapFieldsReader) extendedResponse(info map[string]any) {
+	r.result(info)
+	name := false
+	if r.err == nil && r.at < r.end && r.wire[r.at] == 0x8a {
+		name = true
+		oid := r.octets(0x8a, "Response Name", true)
+		if r.err == nil && !ldapFieldsNumericOID(oid["Value"].([]byte)) {
+			r.fail("invalid numeric response OID")
+		}
+	}
+	if info["Message ID"] == uint64(0) && !name {
+		r.fail("unsolicited notification requires responseName")
+	}
+	if r.err == nil && r.at < r.end {
+		r.octets(0x8b, "Response Value", false)
+	}
 }
 
 func decodeLDAPOperationFields(wire []byte, profile string) ([]tlsCertificateField, map[string]any, error) {
@@ -249,19 +393,26 @@ func decodeLDAPOperationFields(wire []byte, profile string) ([]tlsCertificateFie
 		return nil, nil, fmt.Errorf("ldap-fields: 1..1048576 byte boundary required")
 	}
 	r := &ldapFieldsReader{wire: wire, end: len(wire)}
-	names := map[byte]string{0x61: "BindResponse", 0x42: "UnbindRequest", 0x63: "SearchRequest", 0x64: "SearchResultEntry", 0x65: "SearchResultDone", 0x73: "SearchResultReference"}
+	names := map[byte]string{
+		0x61: "BindResponse", 0x42: "UnbindRequest", 0x63: "SearchRequest",
+		0x64: "SearchResultEntry", 0x65: "SearchResultDone", 0x73: "SearchResultReference",
+		0x66: "ModifyRequest", 0x67: "ModifyResponse", 0x68: "AddRequest", 0x69: "AddResponse",
+		0x4a: "DelRequest", 0x6b: "DelResponse", 0x6c: "ModifyDNRequest", 0x6d: "ModifyDNResponse",
+		0x6e: "CompareRequest", 0x6f: "CompareResponse", 0x50: "AbandonRequest",
+		0x77: "ExtendedRequest", 0x78: "ExtendedResponse",
+	}
 	info := map[string]any{"Layout Context": profile, "Message Name": names[tag], "Session State Validated": false, "Directory Name Validated": false, "Transport Context Validated": false, "Control Semantics Applied": false, "Matching Rules Applied": false}
 	outer := r.open(0x30)
 	r.within(outer, func() {
 		id := r.number("Message ID", 2147483647)
-		if id == 0 {
+		if id == 0 && tag != 0x78 {
 			r.fail("operation requires nonzero message ID")
 		}
 		info["Message ID"] = id
 		op := r.open(tag)
 		r.within(op, func() {
 			switch tag {
-			case 0x61, 0x65:
+			case 0x61, 0x65, 0x67, 0x69, 0x6b, 0x6d, 0x6f:
 				r.result(info)
 				if tag == 0x61 && r.err == nil && r.at < r.end {
 					r.octets(0x87, "Server SASL Credentials", false)
@@ -273,6 +424,26 @@ func decodeLDAPOperationFields(wire []byte, profile string) ([]tlsCertificateFie
 				r.searchEntry()
 			case 0x73:
 				r.uriList("References")
+			case 0x66:
+				r.modify()
+			case 0x68:
+				r.add()
+			case 0x4a:
+				r.primitiveOctets("Entry", true)
+			case 0x6c:
+				r.modifyDN()
+			case 0x6e:
+				r.compare()
+			case 0x50:
+				abandoned := r.primitiveInteger("Abandoned Message ID", 2147483647)
+				if abandoned == 0 {
+					r.fail("abandon requires nonzero message ID")
+				}
+				info["Abandoned Message ID"] = abandoned
+			case 0x77:
+				r.extendedRequest()
+			case 0x78:
+				r.extendedResponse(info)
 			}
 		})
 		r.close(op, names[tag], false)

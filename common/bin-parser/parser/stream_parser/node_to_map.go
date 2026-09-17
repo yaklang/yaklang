@@ -1,6 +1,8 @@
 package stream_parser
 
 import (
+	"bytes"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -14,6 +16,12 @@ func NodeToMap(node *base.Node) any {
 
 func nodeToMapWithSource(node *base.Node, source *nodeResultSource) any {
 	settings := node.Cfg.ResultSettings()
+	if settings.RawPresent {
+		if value, ok := settings.RawResult.([]byte); ok {
+			return bytes.Clone(value)
+		}
+		return settings.RawResult
+	}
 	if settings.Present {
 		// Match Result's collection type for an observed zero-width list.
 		// Other result-bearing nodes keep their historical scalar behavior.

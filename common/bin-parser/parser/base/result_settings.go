@@ -7,6 +7,8 @@ package base
 type ResultSettings struct {
 	Position       any
 	Present        bool
+	RawResult      any
+	RawPresent     bool
 	Type, Endian   string
 	Terminal, List bool
 }
@@ -42,5 +44,12 @@ func (c *Config) ResultSettings() (r ResultSettings) {
 	r.Terminal, _ = v.(bool)
 	v, _ = get(7)
 	r.List, _ = v.(bool)
+	// Explicit application projections use a noncompact key. Ordinary wire
+	// fields keep the compact path without an additional map lookup or lock.
+	if s.configStoreLegacy != nil {
+		if i, ok := s.findLocked(CfgRawResult); ok {
+			r.RawResult, r.RawPresent = s.entries[i].value, true
+		}
+	}
 	return
 }

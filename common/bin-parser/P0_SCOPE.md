@@ -9,7 +9,7 @@ field coverage does not earn YAML schema or unmeasured branch points.
 
 | Protocol | Explicit completed message scope | Executable evidence |
 | --- | --- | --- |
-| LDAP | LDAPv3 BindRequest/BindResponse, UnbindRequest, SearchRequest, SearchResultEntry/Done/Reference; definite BER, all ten filter choices, ordered attribute/value lists and controls | `TestP0LDAPOperationEntries`, `TestLDAPOperation*`, original BindRequest and CLDAP rejection audits |
+| LDAP | LDAPv3 BindRequest/BindResponse, UnbindRequest, SearchRequest, SearchResultEntry/Done/Reference, Modify/Add/Del/ModifyDN/Compare/Abandon/Extended request and result layouts; definite BER, all ten filter choices, ordered attribute/value lists and controls | `TestP0LDAPOperationEntries`, `TestLDAPOperation*`, original BindRequest and CLDAP rejection audits |
 | MySQL | V10/41 greeting/response, SSLRequest, supported classic commands, OK/ERR/EOF and existing fresh-column text resultset profiles | Original 49-record audit, twelve-profile boundaries/fallback and wide-integer checks |
 | PostgreSQL | Existing sixteen bounded startup/SSL/GSS, authentication, frontend/backend and SCRAM message profiles | Original 88-record audit and direction/phase boundary/isolation checks |
 | SMB3 | Existing 3.0/3.0.2/3.1.1 NEGOTIATE profiles and full bounded Transform carrier | Original and seven-companion negotiate checks, receive-context checks, `TestP0SMB3TransformEntry`, `TestSMB3TransformFieldsBoundariesAndTransactions` |
@@ -63,3 +63,20 @@ exhaustive-branch credit. Recalculation with the existing rubric gives:
 `TestP0RoadmapCovered` additionally runs the four executable message-scope
 ledgers; a historical grade alone is insufficient for completion. Catalog
 `partial` status and the fourteen existing deferrals remain unchanged.
+
+## PR #5097 合入补充说明
+
+LDAP 新增的操作仍是显式单消息入口；ExtendedResponse 接受 RFC 4511 的 messageID=0
+通知，但必须带 responseName。历史 ldap.yaml 只支持短 BER 长度，完整有界校验使用
+ldap_fields.yaml，不将历史入口的字段命名视为完整 BER/会话语义验证。
+
+PostgreSQL 历史入口新增的多参数/多列字段使用真正的列表，二进制值保留字节。
+`C` 同时表示 frontend Close / backend CommandComplete，`D` 同时表示 Describe /
+DataRow，因此只有调用者通过 ParseBinaryWithConfig 指定 `postgresqlDirection: "backend"`
+时才在历史入口解析这两个 backend 消息。缺失方向时保留原始 Octets；严格解析优先使用
+已有 PostgreSQLFrontendFields / PostgreSQLBackendFields，不从端口选择消息含义。
+
+WebSocket 的 Result、NodeToMap 和结构化输出均交付解掩码后的字段，NodeToBytes 仍为
+原始捕获字节。二进制载荷保留字节，检查最短长度编码、控制帧边界、Close 状态和完整
+文本/Close reason 的 UTF-8；跨帧 UTF-8、Upgrade、消息重组和方向掩码仍需会话层。
+这三个协议尚未加入 pcapx 的自动实时会话分帧，不将字段覆盖等同于完整实时支持。

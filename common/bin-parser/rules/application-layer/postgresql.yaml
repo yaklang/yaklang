@@ -42,6 +42,26 @@ Package:
           this.ProcessSubNode("Ready")
           return
         }
+        if first == 0x50 {
+          this.ProcessByType("PostgreSQLParse")
+          return
+        }
+        if first == 0x42 {
+          this.ProcessByType("PostgreSQLBind")
+          return
+        }
+        if first == 0x54 {
+          this.ProcessByType("PostgreSQLRowDescription")
+          return
+        }
+        if first == 0x44 && getCtx("postgresqlDirection") == "backend" {
+          this.ProcessByType("PostgreSQLDataRow")
+          return
+        }
+        if first == 0x43 && getCtx("postgresqlDirection") == "backend" {
+          this.ProcessByType("PostgreSQLCommandComplete")
+          return
+        }
         rem = 0
         if this.GetMaxLength() > this.Length() {
           rem = this.GetMaxLength() - this.Length()
@@ -114,6 +134,167 @@ Package:
     SecretKey: uint32
 PostgreSQLQuery:
   SQL: "del:\0;type:string"
+PostgreSQLParse:
+  operator: |
+    this.ProcessSubNode("Statement")
+    this.ProcessSubNode("Query")
+    this.ProcessSubNode("Parameter Type Count")
+    n = getNodeResult("Parameter Type Count").Value
+    if n > 4096 {
+      panic("postgresql: too many parameter types")
+    }
+    if n > 0 { this.ProcessSubNode("Parameter Types") }
+  Statement: "del:\0;type:string"
+  Query: "del:\0;type:string"
+  Parameter Type Count: uint16
+  Parameter Types:
+    list: true
+    Item: PostgreSQLParamOID
+    operator: |
+      count = getNodeResult("../Parameter Type Count").Value
+      i = 0
+      for i < count {
+        this.NewElement().Process()
+        i = i + 1
+      }
+PostgreSQLBind:
+  operator: |
+    this.ProcessSubNode("Portal")
+    this.ProcessSubNode("Statement")
+    this.ProcessSubNode("Parameter Format Count")
+    fc = getNodeResult("Parameter Format Count").Value
+    if fc > 4096 {
+      panic("postgresql: too many parameter formats")
+    }
+    if fc > 0 { this.ProcessSubNode("Parameter Formats") }
+    this.ProcessSubNode("Parameter Count")
+    pc = getNodeResult("Parameter Count").Value
+    if fc > 1 && fc != pc { panic("postgresql: parameter format count mismatch") }
+    if pc > 4096 {
+      panic("postgresql: too many parameters")
+    }
+    if pc > 0 { this.ProcessSubNode("Parameters") }
+    this.ProcessSubNode("Result Format Count")
+    rc = getNodeResult("Result Format Count").Value
+    if rc > 4096 {
+      panic("postgresql: too many result formats")
+    }
+    if rc > 0 { this.ProcessSubNode("Result Formats") }
+  Portal: "del:\0;type:string"
+  Statement: "del:\0;type:string"
+  Parameter Format Count: uint16
+  Parameter Count: uint16
+  Result Format Count: uint16
+  Parameter Formats:
+    list: true
+    Item: PostgreSQLFormat
+    operator: |
+      count = getNodeResult("../Parameter Format Count").Value
+      i = 0
+      for i < count {
+        this.NewElement().Process()
+        i = i + 1
+      }
+  Parameters:
+    list: true
+    Item: PostgreSQLValue
+    operator: |
+      count = getNodeResult("../Parameter Count").Value
+      i = 0
+      for i < count {
+        this.NewElement().Process()
+        i = i + 1
+      }
+  Result Formats:
+    list: true
+    Item: PostgreSQLFormat
+    operator: |
+      count = getNodeResult("../Result Format Count").Value
+      i = 0
+      for i < count {
+        this.NewElement().Process()
+        i = i + 1
+      }
+PostgreSQLParamOID:
+  operator: |
+    this.ProcessSubNode("OID")
+  OID: uint32
+PostgreSQLFormat:
+  operator: |
+    this.ProcessSubNode("Format Code")
+    if getNodeResult("Format Code").Value > 1 { panic("postgresql: invalid format code") }
+  Format Code: uint16
+PostgreSQLValue:
+  operator: |
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    if n == 0xffffffff {
+      return
+    }
+    if n > 1048576 { panic("postgresql: invalid or oversized value length") }
+    if n > 0 {
+      this.GetSubNode("Value").SetMaxLength(n)
+      this.ProcessSubNode("Value")
+    }
+  Length: uint32
+  Value: raw
+PostgreSQLRowDescription:
+  operator: |
+    this.ProcessSubNode("Column Count")
+    n = getNodeResult("Column Count").Value
+    if n > 4096 {
+      panic("postgresql: too many columns")
+    }
+    if n > 0 { this.ProcessSubNode("Columns") }
+  Column Count: uint16
+  Columns:
+    list: true
+    Item: PostgreSQLColumn
+    operator: |
+      count = getNodeResult("../Column Count").Value
+      i = 0
+      for i < count {
+        this.NewElement().Process()
+        i = i + 1
+      }
+PostgreSQLColumn:
+  operator: |
+    this.ProcessSubNode("Column Name")
+    this.ProcessSubNode("Table OID")
+    this.ProcessSubNode("Attribute Number")
+    this.ProcessSubNode("Type OID")
+    this.ProcessSubNode("Type Size")
+    this.ProcessSubNode("Type Modifier")
+    this.ProcessSubNode("Format Code")
+    if getNodeResult("Format Code").Value > 1 { panic("postgresql: invalid column format code") }
+  Column Name: "del:\0;type:string"
+  Table OID: uint32
+  Attribute Number: int16
+  Type OID: uint32
+  Type Size: int16
+  Type Modifier: int32
+  Format Code: uint16
+PostgreSQLDataRow:
+  operator: |
+    this.ProcessSubNode("Column Count")
+    n = getNodeResult("Column Count").Value
+    if n > 4096 {
+      panic("postgresql: too many columns")
+    }
+    if n > 0 { this.ProcessSubNode("Columns") }
+  Column Count: uint16
+  Columns:
+    list: true
+    Item: PostgreSQLValue
+    operator: |
+      count = getNodeResult("../Column Count").Value
+      i = 0
+      for i < count {
+        this.NewElement().Process()
+        i = i + 1
+      }
+PostgreSQLCommandComplete:
+  Tag: "del:\0;type:string"
 PostgreSQLError:
   list: true
   Field: PGErrorField

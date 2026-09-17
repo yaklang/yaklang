@@ -27,6 +27,14 @@ func TestResultSettingsReadsCurrentPublicValues(t *testing.T) {
 		require.False(t, cfg.ResultSettings().Present)
 		cfg.SetItem(CfgNodeResult, nil)
 		require.True(t, cfg.ResultSettings().Present)
+		cfg.SetItem(CfgRawResult, []byte("derived"))
+		require.True(t, cfg.ResultSettings().RawPresent)
+		require.Equal(t, []byte("derived"), cfg.ResultSettings().RawResult)
+		cfg.SetItem(CfgRawResult, nil)
+		require.True(t, cfg.ResultSettings().RawPresent)
+		require.Nil(t, cfg.ResultSettings().RawResult)
+		cfg.DeleteItem(CfgRawResult)
+		require.False(t, cfg.ResultSettings().RawPresent)
 	}
 	var zero Config
 	require.Equal(t, ResultSettings{}, zero.ResultSettings())

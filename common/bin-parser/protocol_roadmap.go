@@ -242,7 +242,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "9P", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},
 
 	// --- 目录 / 认证 ---
-	{Name: "LDAP", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "P0 explicit LDAPv3 bind request/response, unbind, search request/entry/done/reference fields (P0_SCOPE.md)"},
+	{Name: "LDAP", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "P0 explicit LDAPv3 bind/unbind/search plus Modify/Add/Del/ModifyDN/Compare/Abandon/Extended fields (P0_SCOPE.md)"},
 	{Name: "LDAPS", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "CLDAP", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "Kerberos", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "APPLICATION tags AS/TGS/AP/ERROR + TCP record"},

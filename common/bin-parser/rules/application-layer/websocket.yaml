@@ -18,38 +18,89 @@ Package:
       if n == 126 {
         this.ProcessSubNode("Extended Length 16")
         n = getNodeResult("Extended Length 16").Value
+        if n < 126 { panic("websocket: nonminimal length") }
       } else {
         if n == 127 {
           this.ProcessSubNode("Extended Length 64")
           n = getNodeResult("Extended Length 64").Value
+          if n < 65536 { panic("websocket: nonminimal length") }
         }
       }
       if n > 0x100000 {
         panic("websocket: payload too large")
       }
-      if getNodeResult("Mask").Value == 1 {
+      if op >= 8 {
+        if getNodeResult("FIN").Value != 1 {
+          panic("websocket: control frames must not be fragmented")
+        }
+        if n > 125 {
+          panic("websocket: control payload too large")
+        }
+      }
+      masked = getNodeResult("Mask").Value == 1
+      if masked {
         this.ProcessSubNode("Masking Key")
       }
+      applyMask = (name, off) => {
+        if masked {
+          setCfg(name + ".raw result", unmaskWebSocket(getNodeResult("Masking Key").Value, getNodeResult(name).Value, off))
+        }
+      }
       if op == 1 {
-        if n > 0 && n < 1048576 {
+        if n > 0 && n <= 1048576 {
           this.GetSubNode("Text").SetMaxLength(n)
           this.ProcessSubNode("Text")
+          applyMask("Text", 0)
+          if getNodeResult("FIN").Value == 1 { validateWebSocketValue("text", getNodeResult("Text").Value) }
+        }
+        return
+      }
+      if op == 2 {
+        if n > 0 && n <= 1048576 {
+          this.GetSubNode("Binary").SetMaxLength(n)
+          this.ProcessSubNode("Binary")
+          applyMask("Binary", 0)
+        }
+        return
+      }
+      if op == 0 {
+        if n > 0 && n <= 1048576 {
+          this.GetSubNode("Continuation").SetMaxLength(n)
+          this.ProcessSubNode("Continuation")
+          applyMask("Continuation", 0)
         }
         return
       }
       if op == 8 {
+        if n == 1 { panic("websocket: one-byte close payload") }
         if n >= 2 {
           this.ProcessSubNode("Close Code")
+          applyMask("Close Code", 0)
+          validateWebSocketValue("code", getNodeResult("Close Code").Value)
           if n > 2 && n < 1048576 {
             this.GetSubNode("Reason").SetMaxLength(n-2)
             this.ProcessSubNode("Reason")
+            applyMask("Reason", 2)
+            validateWebSocketValue("text", getNodeResult("Reason").Value)
           }
         }
         return
       }
-      if n > 0 && n < 1048576 {
-        this.GetSubNode("Octets").SetMaxLength(n)
-        this.ProcessSubNode("Octets")
+      if op == 9 {
+        if n > 0 && n <= 1048576 {
+          this.GetSubNode("Ping").SetMaxLength(n)
+          this.ProcessSubNode("Ping")
+          applyMask("Ping", 0)
+        }
+        return
+      }
+      if op == 10 {
+        if n > 0 && n <= 1048576 {
+          this.GetSubNode("Pong").SetMaxLength(n)
+          this.ProcessSubNode("Pong")
+          applyMask("Pong", 0)
+        }
+        return
       }
     FIN: uint8,1bit
     RSV: uint8,3bit
@@ -60,6 +111,9 @@ Package:
     Extended Length 64: uint64
     Masking Key: raw,4
     Text: string
+    Binary: raw
+    Continuation: raw
+    Ping: raw
+    Pong: raw
     Close Code: uint16
     Reason: string
-    Octets: string
