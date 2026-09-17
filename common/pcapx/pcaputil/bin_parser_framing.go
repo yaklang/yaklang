@@ -77,6 +77,8 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.smb2", "SMB2"},
 	{"application-layer.smb3", "SMB3Transform"},
 	{"application-layer.dcerpc", "DCERPC"},
+	{"application-layer.ssh", "SSH"},
+	{"application-layer.ssh", "SSHPacket"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
 	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
 	{"application-layer.memcached_fields", "MemcachedBinaryGetRequestFields"},
