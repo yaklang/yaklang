@@ -85,6 +85,15 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "ssh-kex-newkeys.pcap",
+      "protocol": "ssh",
+      "sha256": "1d0e4bd4628c9e8bf66e3fcb97035d77a79529497b46a1b2a8626836768f4f59",
+      "bytes": 1571,
+      "decode_as_port": 10022,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",

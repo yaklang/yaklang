@@ -50,6 +50,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir, pending: map[uint64]string{}}
 	case "dcerpc":
 		f.protocol, f.dcerpc = "dcerpc", &binDCERPC{client: dir, ctx: map[uint16]string{}, uuid: map[uint16][]byte{}, pending: map[uint32]string{}, frags: map[uint32][]byte{}}
+	case "ssh":
+		f.protocol, f.ssh = "ssh", &binSSH{client: dir}
 	}
 }
 
@@ -110,6 +112,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.smb2.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "dcerpc":
 		e.Session, err = f.dcerpc.consume(e.Raw, f.a.budget.MaxCollectionElements)
+	case "ssh":
+		e.Session, err = f.ssh.consume(dir, e.Raw)
 	}
 	if err == nil && e.Session != nil {
 		switch e.Protocol {
@@ -146,6 +150,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])
 		case "dcerpc":
 			e.Summary = fmt.Sprintf("DCE/RPC %v call %v", e.Session["Packet Name"], e.Session["Call ID"])
+		case "ssh":
+			e.Summary = fmt.Sprintf("SSH %v", e.Session["Packet Name"])
 		}
 	}
 	return err
@@ -165,7 +171,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
-	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }
@@ -232,6 +238,11 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if d := f.dcerpc; d != nil && (len(d.pending) > 0 || len(d.frags) > 0) {
 		emit(max(d.client, 0), map[string]any{"Outstanding": len(d.pending) + len(d.frags)}, "DCE/RPC exchange ended with unmatched calls or fragments")
+	}
+	if sh := f.ssh; sh != nil && !sh.encrypted {
+		if !sh.banner[0] || !sh.banner[1] || !sh.haveKEX[0] || !sh.haveKEX[1] || !sh.newkeys[0] || !sh.newkeys[1] {
+			emit(max(sh.client, 0), map[string]any{"Identification": sh.ident}, "SSH handshake ended before NEWKEYS")
+		}
 	}
 }
 

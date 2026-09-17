@@ -104,6 +104,16 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, dcerpcRequest(4, 1, 15, []byte{0, 0, 0, 0})},
 			{1, dcerpcResponse(4, 1, nil)},
 		}},
+		{"ssh-kex-newkeys", "ssh", 10022, []sessionStep{
+			{0, sshIdent("SSH-2.0-OpenSSH_8.9")},
+			{1, sshIdent("SSH-2.0-sshd")},
+			{0, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
+			{1, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
+			{0, sshKexDHInit()},
+			{1, sshKexDHReply()},
+			{0, sshNewKeys()},
+			{1, sshNewKeys()},
+		}},
 		{"mongodb-opmsg-compressed", "mongodb", 27018, []sessionStep{
 			{0, mongoOpMsg(1, 0, 0, mongoKind0(mongoBSONInt32("ping", 1)))},
 			{1, mongoOpMsg(2, 1, 0, mongoKind0(mongoBSONInt32("ok", 1)))},
