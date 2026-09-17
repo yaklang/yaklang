@@ -23,4 +23,5 @@ func TestBuildDocumentHelper_WithLiveNativeCalls(t *testing.T) {
 	h := syntaxflowdoc.BuildDocumentHelper(syntaxflowdoc.BuildOptions{NativeCalls: items})
 	require.Greater(t, len(h.NativeCalls), 20)
 	require.NotNil(t, h.GetNativeCall("include"))
+	require.NotNil(t, h.GetNativeCall("npd"), "npd must come from sf_native_call.go registerNativeCall")
 }
