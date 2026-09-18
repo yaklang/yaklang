@@ -123,10 +123,10 @@ var (
 		return url, packet, nil, nil
 	}
 
-	// http://web.archive.org/cdx/search/cdx?url=*.%s/*&output=txt&fl=original&collapse=urlkey
+	// https://web.archive.org/cdx/search/cdx?url=*.%s/*&output=txt&fl=original&collapse=urlkey
 	ArchiveOrg SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
-		url := fmt.Sprintf("http://web.archive.org/cdx/search/cdx?url=*.%s/*&output=txt&fl=original&collapse=urlkey", target)
-		packet := lowhttp.UrlToRequestPacket("GET", url, nil, false)
+		url := fmt.Sprintf("https://web.archive.org/cdx/search/cdx?url=*.%s/*&output=txt&fl=original&collapse=urlkey", target)
+		packet := lowhttp.UrlToRequestPacket("GET", url, nil, true)
 		return url, packet, nil, nil
 	}
 
