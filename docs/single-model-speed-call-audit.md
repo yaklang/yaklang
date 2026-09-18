@@ -68,7 +68,7 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 
 ## 三、已迁移的 LiteForge Speed 任务
 
-生产代码中已没有活跃的直接 `InvokeSpeedPriorityLiteForge(...)` 业务调用；剩余匹配仅为接口、实现和 mock。
+下表所列调用已迁入调度器。当前代码中的 `reactloops/goal_mode.go` 仍有 `goal-acceptance-review` 直接 Speed 调用，待单独迁移；不能将下表理解为全部生产调用均已覆盖。
 
 ### 3.1 Skip 类
 
@@ -94,6 +94,9 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 
 | CallerLabel | 调用位置/用途 | 当前入口 |
 |---|---|---|
+| `prompt_optimize` | Mini AI Task 提示词优化 | `Config.ScheduleAuxiliaryTask` |
+| `timeline_summary` | Mini AI Task 时间线总结 | `Config.ScheduleAuxiliaryTask` |
+| `todo_draft` | Mini AI Task 待办草拟 | `Config.ScheduleAuxiliaryTask` |
 | `extract-explore-target-path` | Dir Explore InitTask | `Config.ScheduleAuxiliaryTask` |
 | `extract-http-request-from-user-input` | HTTP Fuzz InitTask | `Config.ScheduleAuxiliaryTask` |
 | `analyze-report-intent` | Report InitTask | `Config.ScheduleAuxiliaryTask` |
@@ -111,6 +114,8 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 | `llm-rerank` | Knowledge Bench 重排 | `Config.ScheduleAuxiliaryTask` |
 
 `analyze-requirement-and-search` 有两个生产调用位置，但共用一个 CallerLabel 和决策。
+
+三个内置 Mini AI Task 在单模型模式下使用 LiteCall，继续返回用户请求的结果，并注入现有的 `thinking=none` 降级参数；普通模式保持 Speed 调用。自定义 Mini Task 不自动归类。唯一模型的选择方案仍留待后续设计。
 
 ### 3.3 PassThrough 类
 
@@ -190,7 +195,7 @@ Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略
 
 在 AID Go 代码范围内：
 
-- 活跃 Speed LiteForge 调用已经完成迁移；
+- 已列出的 Speed LiteForge 调用（含三个内置 Mini AI Task）完成迁移；`goal-acceptance-review` 仍待迁移；
 - Timeline/Interval Review 已完成 LiteForge 调度迁移；AIVE 和 Speed Loop 仍仅接入决策；
 - Quality/Intelligence 调用没有修改；
 - 剩余边界集中在 Crawler、独立 RAG/产品能力和 Yak 脚本的配置传播问题。
@@ -202,6 +207,7 @@ Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略
 - 删除逐任务 caller 覆盖后，`aicommon` 整包测试再次通过（90.064s）。
 - LiteForge 及新增辅助任务流式测试通过：字段未结束时不提前交付结果、旧回调兼容、响应任务标识、错误/取消/Skip、Prompt 上限。
 - Interval Review 定向回归通过：并发工具事件归属、取消隔离、独立 checkpoint、调用期望、额外指令、上下文取消。
+- Mini AI Task 定向回归通过：普通模式不注入降级参数、单模型模式注入 `thinking=none` 且仍返回结果、只调用 Config 的 Speed callback、错误传播及 Sync 响应。
 - Timeline 状态测试通过：压缩后的序列化与恢复、Head 滚动与精简、失败规则回退、失败不删除原条目。
 - `common/ai/aid/...` 和 `common/aiforge` 全部通过只编译检查；未运行整个 AID 的全部行为测试。
 
