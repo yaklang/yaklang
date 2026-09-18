@@ -16,12 +16,16 @@ func TestMCPToolSetCatalogMatchesRegistration(t *testing.T) {
 	for _, entry := range mcpToolSetCatalog {
 		require.Contains(t, globalToolSets, entry.Name)
 		require.NotEmpty(t, entry.Summary)
-		require.NotEmpty(t, ToolNamesInSet(entry.Name), "tool set %q must expose tools", entry.Name)
+		if entry.Runtime {
+			require.Empty(t, ToolNamesInSet(entry.Name), "runtime callbacks must not enter the global registry")
+		} else {
+			require.NotEmpty(t, ToolNamesInSet(entry.Name), "tool set %q must expose tools", entry.Name)
+		}
 	}
 }
 
 func TestDefaultMCPToolSets_Classification(t *testing.T) {
-	require.Len(t, DefaultMCPToolSets, 12)
+	require.Len(t, DefaultMCPToolSets, 13)
 	require.Len(t, OptionalMCPToolSets, 12)
 	require.Len(t, InternalMCPToolSets, 1)
 
@@ -40,6 +44,7 @@ func TestDefaultMCPToolSets_Classification(t *testing.T) {
 	require.Contains(t, DefaultMCPToolSets, "risk")
 	require.Contains(t, DefaultMCPToolSets, "syntaxflow")
 	require.Contains(t, DefaultMCPToolSets, "mitm")
+	require.Contains(t, DefaultMCPToolSets, "browser_extension")
 
 	require.NotContains(t, DefaultMCPToolSets, "hybrid_scan")
 	require.NotContains(t, DefaultMCPToolSets, "payload")

@@ -38,12 +38,14 @@ type Server struct {
 	projectDatabase     *gorm.DB
 	projectReadDatabase *gorm.DB
 	// imEngine 是 IM 远程控制引擎（可选，StartIMControl 启动后非 nil）。
+	imEngine *imcontrol.Engine
+
 	reActServiceMu sync.Mutex
 	reActService   *reactservice.Service
-	imEngine       *imcontrol.Engine
-	browserBridge  *browser.ExtensionBridgeManager
-	browserTasks   chan struct{}
-	runtimeForges  *aiforge.RuntimeForgeRegistry
+
+	browserBridge *browser.ExtensionBridgeManager
+	browserTasks  chan struct{}
+	runtimeForges *aiforge.RuntimeForgeRegistry
 }
 
 type ServerOpts func(config *ServerConfig)

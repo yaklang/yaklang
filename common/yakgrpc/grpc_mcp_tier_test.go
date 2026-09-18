@@ -551,7 +551,7 @@ func TestGRPCMUSTPASS_GetMCPToolListIncludesBrowserExtensionTools(t *testing.T) 
 	}
 }
 
-func TestGRPCMUSTPASS_StartMcpServerExposesBrowserExtensionTools(t *testing.T) {
+func TestGRPCMUSTPASS_StartMcpServer_BrowserExtensionToolSet(t *testing.T) {
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 	manager, err := browser.NewExtensionBridgeManager(
@@ -561,12 +561,7 @@ func TestGRPCMUSTPASS_StartMcpServerExposesBrowserExtensionTools(t *testing.T) {
 	require.NoError(t, err)
 	server.browserBridge = manager
 
-	names := startMCPListToolNamesWithClient(t, client, &ypb.StartMcpServerRequest{
-		Host:        "127.0.0.1",
-		Port:        0,
-		DisableTool: append([]string{}, mcp.DefaultMCPToolSets...),
-	})
-	for _, name := range []string{
+	browserNames := []string{
 		"browser.instances.list",
 		"browser.capability.catalog",
 		"browser.capability.call",
@@ -574,7 +569,49 @@ func TestGRPCMUSTPASS_StartMcpServerExposesBrowserExtensionTools(t *testing.T) {
 		"browser.transform.prepare",
 		"browser.handoff.request",
 		"browser.http.test",
-	} {
-		require.Contains(t, names, name)
 	}
+	for _, tc := range []struct {
+		name    string
+		request *ypb.StartMcpServerRequest
+		exposed bool
+	}{
+		{"default", &ypb.StartMcpServerRequest{}, true},
+		{"all", &ypb.StartMcpServerRequest{EnableAll: true}, true},
+		{"browser only", &ypb.StartMcpServerRequest{Tool: []string{"browser_extension"}}, true},
+		{"other set only", &ypb.StartMcpServerRequest{Tool: []string{"codec"}}, false},
+		{"browser disabled", &ypb.StartMcpServerRequest{DisableTool: []string{"browser_extension"}}, false},
+		{"disable wins", &ypb.StartMcpServerRequest{Tool: []string{"browser_extension"}, DisableTool: []string{"browser_extension"}}, false},
+		{"raw only", &ypb.StartMcpServerRequest{DisableTool: append([]string{}, mcp.DefaultMCPToolSets...)}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			names := startMCPListToolNamesWithClient(t, client, tc.request)
+			for _, name := range browserNames {
+				require.Equal(t, tc.exposed, containsTool(names, name), name)
+			}
+			if tc.name == "browser only" {
+				require.ElementsMatch(t, browserNames, names)
+			}
+			if tc.name == "raw only" || tc.name == "disable wins" {
+				require.Empty(t, names)
+			}
+		})
+	}
+
+	// Per-tool switches must use this server's profile DB, not the global DB.
+	_, err = server.GetMCPToolList(context.Background(), &ypb.GetMCPToolListRequest{})
+	require.NoError(t, err)
+	response, err := server.SetMCPToolEnabled(context.Background(), &ypb.SetMCPToolEnabledRequest{
+		ToolName: "browser.http.test", Enable: false,
+	})
+	require.NoError(t, err)
+	require.True(t, response.GetOk())
+	names := startMCPListToolNamesWithClient(t, client, &ypb.StartMcpServerRequest{})
+	require.NotContains(t, names, "browser.http.test")
+	require.Contains(t, names, "browser.transform.prepare")
+
+	// Instance-bound callbacks must never leak into another MCP configuration.
+	require.Empty(t, mcp.ToolNamesInSet("browser_extension"))
+	server.browserBridge = nil
+	names = startMCPListToolNamesWithClient(t, client, &ypb.StartMcpServerRequest{Tool: []string{"browser_extension"}})
+	require.Empty(t, names)
 }

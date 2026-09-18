@@ -15,6 +15,7 @@ import (
 )
 
 type MCPServerConfig struct {
+	toolSets         map[string]*ToolSet
 	enableTools      map[string]*ToolWithHandler
 	disableTools     map[string]*ToolWithHandler
 	enableResources  map[string]*ResourceWithHandler
@@ -36,6 +37,7 @@ type MCPServerConfig struct {
 
 func NewMCPServerConfig() *MCPServerConfig {
 	return &MCPServerConfig{
+		toolSets:         maps.Clone(globalToolSets),
 		enableTools:      make(map[string]*ToolWithHandler),
 		disableTools:     make(map[string]*ToolWithHandler),
 		enableResources:  make(map[string]*ResourceWithHandler),
@@ -147,7 +149,7 @@ func WithEnableTool(name string) McpServerOption {
 
 func WithEnableToolSet(name string) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
-		toolSet, ok := globalToolSets[name]
+		toolSet, ok := cfg.toolSets[name]
 		if !ok {
 			return utils.Errorf("undefined tool set: %s", name)
 		}
@@ -193,7 +195,7 @@ func WithDisableTool(name string) McpServerOption {
 
 func WithDisableToolSet(name string) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
-		toolSet, ok := globalToolSets[name]
+		toolSet, ok := cfg.toolSets[name]
 		if !ok {
 			return utils.Errorf("undefined tool set: %s", name)
 		}

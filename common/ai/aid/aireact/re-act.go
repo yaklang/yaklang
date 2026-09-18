@@ -113,10 +113,10 @@ type ReAct struct {
 	browserSessionsMu sync.Mutex
 	browserSessionIDs map[string]struct{}
 
-	miniAITaskRegistry *MiniAITaskRegistry
-
 	attachedBrowsersMu sync.Mutex
 	attachedBrowsers   []*aicommon.AttachedResource
+
+	miniAITaskRegistry *MiniAITaskRegistry
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {

@@ -112,7 +112,24 @@ func convertAIToolToMCPHandler(aiTool *aitool.Tool) ToolHandlerWrapperFunc {
 // definition (name, description, inputSchema) and its Callback as the handler.
 // Tools that lack a Callback are skipped with a warning.
 func WithAITools(tools ...*aitool.Tool) McpServerOption {
+	return withAITools("", tools...)
+}
+
+// WithAIToolSet binds instance-owned tools to a named set without enabling it.
+// Apply it before WithEnableToolSet / WithDisableToolSet. Callbacks are never
+// stored in the global registry, so they cannot leak across server instances.
+func WithAIToolSet(name string, tools ...*aitool.Tool) McpServerOption {
+	return withAITools(name, tools...)
+}
+
+func withAITools(setName string, tools ...*aitool.Tool) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
+		target := cfg.extraAITools
+		if setName != "" {
+			set := &ToolSet{Tools: make(map[string]*ToolWithHandler)}
+			cfg.toolSets[setName] = set
+			target = set.Tools
+		}
 		for _, t := range tools {
 			if t == nil {
 				continue
@@ -121,7 +138,7 @@ func WithAITools(tools ...*aitool.Tool) McpServerOption {
 				log.Warnf("aitool %q has no callback, skipping MCP registration", t.Name)
 				continue
 			}
-			cfg.extraAITools[t.Name] = &ToolWithHandler{
+			target[t.Name] = &ToolWithHandler{
 				tool:    t.Tool, // *mcp.Tool embedded in aitool.Tool
 				handler: convertAIToolToMCPHandler(t),
 			}
