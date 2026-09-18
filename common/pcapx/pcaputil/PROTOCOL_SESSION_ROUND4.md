@@ -82,3 +82,16 @@ References: [IMAP RFC 3501](https://www.rfc-editor.org/rfc/rfc3501.html#section-
 [non-synchronizing literals RFC 7888](https://www.rfc-editor.org/rfc/rfc7888.html),
 [CoAP response matching RFC 7252](https://www.rfc-editor.org/rfc/rfc7252.html#section-5.3.2),
 [Modbus application protocol](https://www.modbus.org/file/secure/modbusprotocolspecification.pdf).
+
+## CI scanner input repair
+
+Diff-Code-Check run `35365603486` selected Yak `1.4.8-beta19` and failed before
+source compilation with `root path is not a directory: .` when given `fs.zip`.
+The downloaded artifact passes ZIP CRC checks and contains 1,580 files,
+including 621 Go files and the protocol fixes. The workflow now materializes
+that same snapshot in a fresh directory and scans the directory. Every extracted
+file was checked byte-for-byte against the archive; traversal/symlink entries
+are rejected. Scanner rules, exclusions, risk thresholds and error handling are
+unchanged. Actionlint adds no new diagnostics (six existing action-version and
+expression warnings remain). This fixes scanner input compatibility; it does not
+turn scanner errors into successful or skipped checks.
