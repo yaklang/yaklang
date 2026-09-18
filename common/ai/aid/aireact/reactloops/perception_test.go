@@ -22,13 +22,18 @@ type perceptionMidtermSchedulerTestInvoker struct {
 	scheduledKeywords []string
 }
 
-func (i *perceptionMidtermSchedulerTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	_ = ctx
-	_ = actionName
-	_ = prompt
-	_ = outputs
-	_ = opts
-	return aicommon.ExtractAction(`{
+// Mock the Config-owned entry point instead of the retired runtime helper.
+// Embedding the original config preserves tool/context providers used below.
+type perceptionSchedulerTestConfig struct {
+	aicommon.AICallerConfigIf
+	t *testing.T
+}
+
+func (c *perceptionSchedulerTestConfig) ScheduleAuxiliaryTask(ctx context.Context, name string, build func() string, onResult func(*aicommon.Action), opts ...aicommon.AuxiliaryTaskOption) {
+	c.t.Helper()
+	require.Equal(c.t, aicommon.CallerLabelPerception, name)
+	require.NotEmpty(c.t, build())
+	action, err := aicommon.ExtractAction(`{
 		"@action": "perception",
 		"summary": "focused summary from perception",
 		"topics": ["http fuzzing"],
@@ -36,6 +41,8 @@ func (i *perceptionMidtermSchedulerTestInvoker) InvokeSpeedPriorityLiteForge(ctx
 		"changed": true,
 		"confidence": 0.92
 	}`, "perception")
+	require.NoError(c.t, err)
+	onResult(action)
 }
 
 func (i *perceptionMidtermSchedulerTestInvoker) ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string) {
@@ -53,22 +60,6 @@ func (i *perceptionCapabilitySearchTestInvoker) GetConfig() aicommon.AICallerCon
 	return i.cfg
 }
 
-func (i *perceptionCapabilitySearchTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	_ = ctx
-	_ = actionName
-	_ = prompt
-	_ = outputs
-	_ = opts
-	return aicommon.ExtractAction(`{
-		"@action": "perception",
-		"summary": "focused summary from perception",
-		"topics": ["http fuzzing"],
-		"keywords": ["header", "malformed"],
-		"changed": true,
-		"confidence": 0.92
-	}`, "perception")
-}
-
 type perceptionKnowledgeSearchTestInvoker struct {
 	*mockcfg.MockInvoker
 	cfg                        aicommon.AICallerConfigIf
@@ -84,22 +75,6 @@ type perceptionKnowledgeSearchTestInvoker struct {
 
 func (i *perceptionKnowledgeSearchTestInvoker) GetConfig() aicommon.AICallerConfigIf {
 	return i.cfg
-}
-
-func (i *perceptionKnowledgeSearchTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	_ = ctx
-	_ = actionName
-	_ = prompt
-	_ = outputs
-	_ = opts
-	return aicommon.ExtractAction(`{
-		"@action": "perception",
-		"summary": "focused summary from perception",
-		"topics": ["http fuzzing"],
-		"keywords": ["header", "malformed"],
-		"changed": true,
-		"confidence": 0.92
-	}`, "perception")
 }
 
 func (i *perceptionKnowledgeSearchTestInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
@@ -129,6 +104,7 @@ func TestTriggerPerception_DoesNotScheduleLegacyMidtermRecall(t *testing.T) {
 	invoker := &perceptionMidtermSchedulerTestInvoker{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
+	invoker.SetConfig(&perceptionSchedulerTestConfig{AICallerConfigIf: invoker.GetConfig(), t: t})
 
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-midterm-test"
@@ -169,10 +145,10 @@ func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
 	}
 	invoker := &perceptionCapabilitySearchTestInvoker{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
-		cfg:         cfg,
+		cfg:         &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
 	}
 
-	loop := NewMinimalReActLoop(cfg, invoker)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-capability-search-test"
 	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.extraCapabilities = NewExtraCapabilitiesManager()
@@ -215,13 +191,13 @@ func TestTriggerPerception_AppliesKnowledgeSearchResultsToLoop(t *testing.T) {
 	}
 	invoker := &perceptionKnowledgeSearchTestInvoker{
 		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
-		cfg:                   cfg,
+		cfg:                   &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
 		selectedKnowledgeBase: []string{"security_kb"},
 		quickSearchResult:     "raw knowledge result",
 		compressedResult:      "compressed knowledge result",
 	}
 
-	loop := NewMinimalReActLoop(cfg, invoker)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-knowledge-search-test"
 	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.allowRAG = func() bool { return true }
@@ -266,13 +242,13 @@ func TestTriggerPerception_LimitsKnowledgeContextTo15K(t *testing.T) {
 	}
 	invoker := &perceptionKnowledgeSearchTestInvoker{
 		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
-		cfg:                   cfg,
+		cfg:                   &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
 		selectedKnowledgeBase: []string{"security_kb"},
 		quickSearchResult:     "raw knowledge result",
 		compressedResult:      oversizedKnowledge,
 	}
 
-	loop := NewMinimalReActLoop(cfg, invoker)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-knowledge-size-limit-test"
 	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.allowRAG = func() bool { return true }
