@@ -17,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-type editorSyncYaklangCodeChangeEvent = loopinfra.YaklangCodeChangeEvent
+type editorSyncYaklangCodeChangeEvent = loopinfra.CodeChangeEvent
 
 type editorSyncCapturedEvents struct {
 	mu     sync.Mutex
@@ -60,6 +60,7 @@ func TestYaklangEditorSync_LiveEmitsForEditDuringLoop(t *testing.T) {
 		loopinfra.WithLoopVarsPrefix("yak"),
 		loopinfra.WithActionSuffix("code"),
 		loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+		loopinfra.WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
 		loopinfra.WithFileExtension(".yak"),
 	)
 
@@ -96,12 +97,12 @@ func TestYaklangEditorSync_LiveEmitsForEditDuringLoop(t *testing.T) {
 
 	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpPatch, payload.Op)
+	assert.Equal(t, loopinfra.CodeEventOpPatch, payload.Op)
 	assert.Equal(t, "new", payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, "modify_code", payload.SourceAction)
 	require.NotNil(t, payload.Code.Patch)
-	assert.Equal(t, loopinfra.YaklangPatchKindLineRange, payload.Code.Patch.Kind)
+	assert.Equal(t, loopinfra.CodePatchKindLineRange, payload.Code.Patch.Kind)
 	assert.Equal(t, 2, payload.Code.Patch.StartLine)
 	assert.Equal(t, 2, payload.Code.Patch.EndLine)
 	assert.Equal(t, "old", payload.Code.Patch.OldSnippet)
@@ -148,7 +149,7 @@ func TestYaklangDeferredEditorSync_CreateModePersistsToCodeDir(t *testing.T) {
 
 	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, payload.Op)
+	assert.Equal(t, loopinfra.CodeEventOpCreate, payload.Op)
 	assert.Equal(t, "println(\"create\")", payload.Code.Content)
 	assert.Equal(t, genPath, payload.Code.Path)
 
@@ -191,7 +192,7 @@ func TestYaklangDeferredEditorSync_EditorFileWinsOverGenCodePath(t *testing.T) {
 
 	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, loopinfra.CodeEventOpReplace, payload.Op)
 	assert.Equal(t, filepath.Clean(editorFile), filepath.Clean(payload.Code.Path))
 
 	data, readErr := os.ReadFile(editorFile)
@@ -244,6 +245,7 @@ func TestYaklangDeferredEditorSync_FlushesAfterWriteCodeOnSeed(t *testing.T) {
 		loopinfra.WithLoopVarsPrefix("yak"),
 		loopinfra.WithActionSuffix("code"),
 		loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+		loopinfra.WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
 		loopinfra.WithFileExtension(".yak"),
 	)
 
@@ -280,10 +282,10 @@ func TestYaklangDeferredEditorSync_FlushesAfterWriteCodeOnSeed(t *testing.T) {
 
 	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpPatch, payload.Op)
+	assert.Equal(t, loopinfra.CodeEventOpPatch, payload.Op)
 	assert.Equal(t, "println(\"new task code\")", payload.Code.Content)
 	require.NotNil(t, payload.Code.Patch)
-	assert.Equal(t, loopinfra.YaklangPatchKindFull, payload.Code.Patch.Kind)
+	assert.Equal(t, loopinfra.CodePatchKindFull, payload.Code.Patch.Kind)
 
 	data, readErr := os.ReadFile(editorFile)
 	require.NoError(t, readErr)

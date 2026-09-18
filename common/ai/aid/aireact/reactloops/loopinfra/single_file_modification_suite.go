@@ -86,6 +86,11 @@ type SingleFileModificationSuiteFactory struct {
 	// Event type for emitting JSON events
 	eventType string
 
+	// Editor delivery (yaklang_code_change / syntaxflow_rule_change). Empty type disables emit.
+	editorDeliveryEventType schema.EventType
+	editorDeliveryEventNode string
+	editorDeliverySource    string
+
 	// Behavior flags
 	exitAfterWrite      bool // whether to call operator.Exit() after successful write (default: true)
 	exitWhenSyntaxClean bool // whether to call operator.Exit() after modify/insert/delete when syntax check passes
@@ -172,6 +177,16 @@ func WithPostSyntaxCleanHook(hook PostSyntaxCleanHook) SingleFileModificationOpt
 func WithCodePrettify(cb CodePrettifyCallback) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
 		f.codePrettifyCb = cb
+	}
+}
+
+// WithEditorDelivery configures the frontend editor-change event for this suite.
+// Callers in each language package pass their own EventType, node id, and change-id source.
+func WithEditorDelivery(eventType schema.EventType, node, defaultSource string) SingleFileModificationOption {
+	return func(f *SingleFileModificationSuiteFactory) {
+		f.editorDeliveryEventType = eventType
+		f.editorDeliveryEventNode = node
+		f.editorDeliverySource = defaultSource
 	}
 }
 
@@ -340,7 +355,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	op *reactloops.LoopActionHandlerOperator,
 	filename, fullCode, sourceAction, changeReason, editorPartial string,
 	successTimeline, failTimeline, successMsg string,
-	deliveryPatch *YaklangCodeDeliveryPatch,
+	deliveryPatch *CodeDeliveryPatch,
 ) error {
 	runtime := f.GetRuntime()
 	writeErr := f.replaceLoopFileContent(runtime, filename, fullCode, successTimeline, failTimeline, successMsg)
@@ -359,7 +374,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 		Path:          filename,
 		SourceAction:  sourceAction,
 		ChangeReason:  changeReason,
-		EventOp:       loopYaklangCodeEventOpReplace,
+		EventOp:       loopCodeEventOpReplace,
 		EmitEvent:     true,
 		DeliveryPatch: deliveryPatch,
 	})
@@ -448,7 +463,7 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	if err := f.CommitAfterCodeEdit(
 		loop, op, filename, newFull, actionName, reason, editorSummary,
 		"modify_success", "modify_write_failed", successMsg,
-		BuildYaklangPatchFull(newFull),
+		BuildCodePatchFull(newFull),
 	); err != nil {
 		op.Fail(fmt.Sprintf("failed to write patched content: %v", err))
 		return
@@ -587,7 +602,7 @@ old_snippet 预览：
 	if err := f.CommitAfterCodeEdit(
 		loop, op, filename, fullCode, actionName, reason, newCode,
 		"modify_success", "modify_write_failed", successMsg,
-		BuildYaklangPatchSnippet(newCode, oldSnippet, loop.GetInt(LoopVarCodeLineBase)),
+		BuildCodePatchSnippet(newCode, oldSnippet, loop.GetInt(LoopVarCodeLineBase)),
 	); err != nil {
 		op.Fail(fmt.Sprintf("failed to write modified content: %v", err))
 		return

@@ -241,6 +241,7 @@ func init() {
 				loopinfra.WithLoopVarsPrefix("yak"),
 				loopinfra.WithActionSuffix("code"),
 				loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+				loopinfra.WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
 				loopinfra.WithFileExtension(".yak"),
 				loopinfra.WithExitWhenSyntaxClean(true),
 				loopinfra.WithFileChanged(func(loop *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {

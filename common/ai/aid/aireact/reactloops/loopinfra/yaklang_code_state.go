@@ -12,20 +12,15 @@ const (
 	loopYaklangCodeStateKey           = "current_yaklang_code_state"
 	loopYaklangCodeVersionKey         = "yaklang_code_change_version"
 	loopYaklangCodeSourceActionKey    = "current_yaklang_code_source_action"
-	loopYaklangCodeChangeReasonKey    = "current_yaklang_code_change_reason"
-	loopYaklangCodeChangeEventNode    = "yaklang_code_change"
-	loopSyntaxflowRuleChangeEventNode = "syntaxflow_rule_change"
+	loopYaklangCodeChangeReasonKey = "current_yaklang_code_change_reason"
 
-	contentTypeYaklangCode    = "code/yaklang"
-	contentTypeSyntaxFlowRule = "text/syntaxflow"
+	CodeEventOpReplace  = "replace"
+	CodeEventOpSnapshot = "snapshot"
+	CodeEventOpCreate   = "create"
 
-	LoopYaklangCodeEventOpReplace  = "replace"
-	LoopYaklangCodeEventOpSnapshot = "snapshot"
-	LoopYaklangCodeEventOpCreate   = "create"
-
-	loopYaklangCodeEventOpReplace  = LoopYaklangCodeEventOpReplace
-	loopYaklangCodeEventOpSnapshot = LoopYaklangCodeEventOpSnapshot
-	loopYaklangCodeEventOpCreate   = LoopYaklangCodeEventOpCreate
+	loopCodeEventOpReplace  = CodeEventOpReplace
+	loopCodeEventOpSnapshot = CodeEventOpSnapshot
+	loopCodeEventOpCreate   = CodeEventOpCreate
 )
 
 type loopYaklangCodeState struct {
@@ -47,7 +42,7 @@ type loopYaklangCodeChange struct {
 	Version      int
 	EmitEvent    bool
 	// DeliveryPatch when set records a fragment delivery for editor_sync (live patch events).
-	DeliveryPatch *YaklangCodeDeliveryPatch
+	DeliveryPatch *CodeDeliveryPatch
 }
 
 type loopYaklangCodeChangeResult struct {
@@ -174,53 +169,40 @@ func resolveLoopYaklangCodeEventOp(explicitOp string, previousState *loopYaklang
 	switch strings.TrimSpace(explicitOp) {
 	case "":
 		if previousState == nil {
-			return loopYaklangCodeEventOpCreate, nil
+			return loopCodeEventOpCreate, nil
 		}
-		return loopYaklangCodeEventOpReplace, nil
-	case loopYaklangCodeEventOpReplace, loopYaklangCodeEventOpCreate, loopYaklangCodeEventOpSnapshot:
+		return loopCodeEventOpReplace, nil
+	case loopCodeEventOpReplace, loopCodeEventOpCreate, loopCodeEventOpSnapshot:
 		return strings.TrimSpace(explicitOp), nil
 	default:
-		return "", fmt.Errorf("unsupported yaklang code event op: %s", explicitOp)
+		return "", fmt.Errorf("unsupported code event op: %s", explicitOp)
 	}
-}
-
-func isSyntaxFlowRuleEditorContentType(contentType string) bool {
-	return contentType == contentTypeSyntaxFlowRule
 }
 
 func (f *SingleFileModificationSuiteFactory) editorChangeEventType() schema.EventType {
-	if f != nil && isSyntaxFlowRuleEditorContentType(f.contentType) {
-		return schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE
+	if f == nil {
+		return ""
 	}
-	return schema.EVENT_TYPE_YAKLANG_CODE_CHANGE
+	return f.editorDeliveryEventType
 }
 
 func (f *SingleFileModificationSuiteFactory) editorChangeEventNode() string {
-	if f != nil && isSyntaxFlowRuleEditorContentType(f.contentType) {
-		return loopSyntaxflowRuleChangeEventNode
+	if f == nil {
+		return ""
 	}
-	return loopYaklangCodeChangeEventNode
+	return f.editorDeliveryEventNode
 }
 
 func (f *SingleFileModificationSuiteFactory) editorChangeDefaultSource() string {
-	if f != nil && isSyntaxFlowRuleEditorContentType(f.contentType) {
-		return defaultSyntaxFlowRuleChangeSource
+	if f == nil {
+		return ""
 	}
-	return defaultYaklangCodeChangeSource
+	return f.editorDeliverySource
 }
 
-// supportsYaklangCodeChangeEvent reports whether this suite should emit editor delivery events
-// (yaklang_code_change or syntaxflow_rule_change).
+// supportsYaklangCodeChangeEvent reports whether this suite should emit editor delivery events.
 func (f *SingleFileModificationSuiteFactory) supportsYaklangCodeChangeEvent() bool {
-	if f == nil {
-		return false
-	}
-	switch f.contentType {
-	case contentTypeYaklangCode, contentTypeSyntaxFlowRule:
-		return true
-	default:
-		return false
-	}
+	return f != nil && f.editorDeliveryEventType != ""
 }
 
 // applyLoopYaklangCodeChange updates loop file state and optionally emits an editor delivery event
@@ -288,7 +270,7 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	clearLoopCodeSeededOnly(loop)
 
 	if input.DeliveryPatch != nil {
-		SetLoopYaklangDeliveryPatch(loop, input.DeliveryPatch)
+		SetLoopCodeDeliveryPatch(loop, input.DeliveryPatch)
 	}
 
 	if input.EmitEvent {
