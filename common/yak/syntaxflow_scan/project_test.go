@@ -453,7 +453,7 @@ func TestScanProject_ProgramPathRunsStructWithoutCompile(t *testing.T) {
 
 	var alerts int
 	var stages []string
-	_, err = syntaxflow_scan.ScanProject(context.Background(),
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithProgramNames(t.Name()),
 		// Explicit mode: an empty mode list is compile-only.
 		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode),
@@ -482,8 +482,23 @@ alert $call`,
 	require.NoError(t, err)
 	require.Greater(t, alerts, 0, "code-scan -p must struct-scan the loaded program")
 	require.Contains(t, stages, string(syntaxflow_scan.StageReview))
-	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
 	require.Contains(t, stages, string(syntaxflow_scan.StageAnalyze))
+	// Inspect still runs after review, but live callbacks stay in product
+	// order so the cursor does not jump backward.
+	var sawInspect, sawReview, sawAnalyze bool
+	for _, outcome := range result.Stages {
+		switch outcome.Stage {
+		case syntaxflow_scan.StageInspect:
+			sawInspect = true
+		case syntaxflow_scan.StageReview:
+			sawReview = true
+		case syntaxflow_scan.StageAnalyze:
+			sawAnalyze = true
+		}
+	}
+	require.True(t, sawInspect, "inspect must still run after a loaded-program review")
+	require.True(t, sawReview)
+	require.True(t, sawAnalyze)
 }
 
 func TestScanProject_NamedProgramFromDatabase(t *testing.T) {
