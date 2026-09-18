@@ -43,6 +43,9 @@ func buildValueFeedbackPostIteration() func(loop *ReActLoop, iteration int, task
 // submitValueFeedbackRecord 在 loop_end 始终提交, 在 iteration_end 仅当本轮执行了
 // 工具 (高价值客观信号) 时才提交, 减弱逐轮提交带来的低价值噪声与额外开销.
 func (r *ReActLoop) submitValueFeedbackRecord(iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+	if r.config != nil && r.config.IsSingleAIModelMode() {
+		return
+	}
 	if isDone {
 		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerLoopEnd, task, iteration)
 		return
@@ -86,7 +89,7 @@ func (r *ReActLoop) submitValueFeedbackSignal(trigger string) {
 // Value feedback 是高频轻模型调用，携带完整会话会使输入随会话长度线性增长。
 func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon.AIStatefulTask, iteration int) {
 	cfg, ok := r.config.(*aicommon.Config)
-	if !ok || cfg == nil {
+	if !ok || cfg == nil || cfg.IsSingleAIModelMode() {
 		return
 	}
 
@@ -172,7 +175,7 @@ func (r *ReActLoop) SubmitRiskFeedback(riskIDs []string, riskType, severity stri
 		return
 	}
 	cfg, ok := r.config.(*aicommon.Config)
-	if !ok || cfg == nil {
+	if !ok || cfg == nil || cfg.IsSingleAIModelMode() {
 		return
 	}
 
