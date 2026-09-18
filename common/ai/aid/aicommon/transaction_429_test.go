@@ -140,9 +140,14 @@ func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
 
 	cfg := newTransactionTestConfig(ctx)
 	cfg.retryMax = 3
+	var totalWait time.Duration
+	cfg.retryWait = func(_ context.Context, delay time.Duration) error {
+		totalWait += delay
+		return nil
+	}
 
 	var callCount int64
-	const num429Responses = 5
+	const num429Responses = 9
 
 	callAi := func(req *AIRequest) (*AIResponse, error) {
 		n := atomic.AddInt64(&callCount, 1)
@@ -150,7 +155,7 @@ func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
 			// Retryable 429: must have Retry-After header so the transaction
 			// layer classifies it as rate-limit (retryable) rather than
 			// quota-exceeded (not retryable).
-			rsp := make429Response("Retry-After: 1")
+			rsp := make429Response("Retry-After: 60")
 			return rsp, utils.Errorf("429 rate limited")
 		}
 		rsp := NewUnboundAIResponse()
@@ -164,6 +169,8 @@ func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
 
 	err := CallAITransaction(cfg, "test prompt", callAi, postHandler)
 	require.NoError(t, err, "transaction should succeed after 429 retries")
+	require.EqualValues(t, num429Responses+1, callCount)
+	require.Greater(t, totalWait, 2*time.Minute, "valid cooldowns must not exhaust a cumulative wait budget")
 
 	totalCalls := atomic.LoadInt64(&callCount)
 	assert.Greater(t, totalCalls, cfg.retryMax,
