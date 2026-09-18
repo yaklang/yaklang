@@ -93,49 +93,7 @@
 
 你 **必须** 将处理结果输出为一个严格遵守以下 Schema 的 JSON 对象。
 
-```schema
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["@action", "key_findings", "open_failures"],
-  "properties": {
-    "@action": {
-      "type": "string",
-      "const": "timeline-reducer"
-    },
-    "key_findings": {
-      "type": "array",
-      "items": { "type": "string" },
-      "minItems": 1,
-      "description": "关键发现与确认事实，每条一个独立事实。至少 1 条。"
-    },
-    "active_config": {
-      "type": "string",
-      "description": "仍在生效的配置、凭据、参数。无则留空字符串。"
-    },
-    "completed_work": {
-      "type": "string",
-      "description": "有客观成功或验收证据的已完成工作。调用结束或 protocol-completed 不是完成证据。无则留空字符串。"
-    },
-    "open_failures": {
-      "type": "string",
-      "description": "尚未解决的执行失败、阻塞、TODO、待验证项及其结构化失败证据。无则留空字符串。"
-    },
-    "failed_and_resolved": {
-      "type": "string",
-      "description": "已有更晚独立成功证据确认解决的失败→成功转折。无则留空字符串。"
-    },
-    "discarded": {
-      "type": "string",
-      "description": "被判定可安全丢弃的内容概述，限制为一到两句话。无则留空字符串。"
-    },
-    "user_directives": {
-      "type": "string",
-      "description": "用户给出的指令、修正、偏好。无则留空字符串。"
-    }
-  }
-}
-```
+{{ .OutputSchema }}
 
 # Good Cases
 

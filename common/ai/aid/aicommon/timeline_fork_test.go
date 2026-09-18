@@ -176,13 +176,18 @@ func TestTimelineFork_InheritedCompressedHeadNotMerged(t *testing.T) {
 }
 
 func TestTimelineFork_CompressDoesNotTouchProtectedPrefix(t *testing.T) {
+	registerTimelineTestLiteForge(t)
 	parent := NewTimeline(nil, nil)
 	parent.PushText(1, "base-1")
 	parent.PushText(2, "base-2")
 	baseHead := cloneTimelineCompressedHead(parent.compressedHead)
 
-	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
-	fork, err := parent.ForkForTask("1-1", "task-1", cfg, &mockedAI{})
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
+		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+			return (&mockedAI{}).CallSpeedPriorityAI(req)
+		}),
+	)
+	fork, err := parent.ForkForTask("1-1", "task-1", cfg, cfg)
 	require.NoError(t, err)
 	require.NotNil(t, fork)
 
