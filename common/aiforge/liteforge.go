@@ -66,6 +66,7 @@ type LiteForge struct {
 	OutputActionName    string
 	PreferSpeedPriority bool
 	DisableTimeline     bool
+	maxPromptTokens     int
 	ExtendAIDOptions    []aicommon.ConfigOption
 
 	streamFields         *omap.OrderedMap[string, *streamableField]
@@ -114,8 +115,18 @@ type FieldStreamEmitterCallback func(key string, r io.Reader, emitter *aicommon.
 
 // fieldStreamCallbackItem stores callback info for streaming fields
 type fieldStreamCallbackItem struct {
-	FieldKeys []string
-	Callback  FieldStreamEmitterCallback
+	FieldKeys        []string
+	Callback         FieldStreamEmitterCallback
+	ResponseCallback aicommon.StreamableFieldResponseCallback
+}
+
+func WithLiteForge_FieldStreamResponseCallback(fieldKeys []string, callback aicommon.StreamableFieldResponseCallback) LiteForgeOption {
+	return func(l *LiteForge) error {
+		l.fieldStreamCallbacks = append(l.fieldStreamCallbacks, &fieldStreamCallbackItem{
+			FieldKeys: fieldKeys, ResponseCallback: callback,
+		})
+		return nil
+	}
 }
 
 // WithLiteForge_FieldStreamCallback registers a callback to be invoked when specified fields stream data.
@@ -140,6 +151,10 @@ func WithLiteForge_FieldStreamEmitterCallback(fieldKeys []string, callback Field
 }
 
 type LiteForgeOption func(*LiteForge) error
+
+func WithLiteForge_MaxPromptTokens(limit int) LiteForgeOption {
+	return func(l *LiteForge) error { l.maxPromptTokens = limit; return nil }
+}
 
 // WithLiteForge_DisableTimeline is for callers whose dynamic prompt already
 // carries a deliberately bounded trace. It prevents LiteForge from appending
@@ -406,6 +421,11 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		return nil, err
 	}
 	var action *aicommon.Action
+	if l.maxPromptTokens > 0 {
+		if tokens := aicommon.MeasureTokens(rendered); tokens > l.maxPromptTokens {
+			return nil, utils.Errorf("liteforge prompt exceeds %d-token hard limit: %d", l.maxPromptTokens, tokens)
+		}
+	}
 	aiCallback := cod.CallAI
 	if l.PreferSpeedPriority {
 		aiCallback = cod.CallSpeedPriorityAI
@@ -462,6 +482,8 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler(item.FieldKeys, func(key string, r io.Reader) {
 					if item.Callback != nil {
 						item.Callback(key, r, boundEmitter)
+					} else if item.ResponseCallback != nil {
+						item.ResponseCallback(key, r, response, boundEmitter)
 					}
 				}))
 			}

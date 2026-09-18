@@ -4598,13 +4598,31 @@ func (c *Config) AICallbackAvailable() bool {
 }
 
 func (c *Config) InvokeLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
+	var callback AICallbackType
 	if cb := c.GetSpeedPriorityAICallback(); cb != nil {
-		opts = append(opts, WithFastAICallback(cb))
+		callback = cb
 	} else if cb := c.GetQualityPriorityAICallback(); cb != nil {
-		opts = append(opts, WithFastAICallback(cb))
+		callback = cb
 	} else {
-		opts = append(opts, WithFastAICallback(c.GetOriginalAICallback()))
+		callback = c.GetOriginalAICallback()
 	}
+	return c.invokeLiteForgeWithCallback(prompt, callback, opts...)
+}
+
+// invokeSpeedPriorityLiteForge preserves the auxiliary-task boundary: these
+// calls may use the configured Speed callback and fall back only to Original,
+// matching ReAct.InvokeSpeedPriorityLiteForge. It must never fall through to
+// the Quality/Intelligence callback.
+func (c *Config) invokeSpeedPriorityLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
+	callback := c.GetSpeedPriorityAICallback()
+	if callback == nil {
+		callback = c.GetOriginalAICallback()
+	}
+	return c.invokeLiteForgeWithCallback(prompt, callback, opts...)
+}
+
+func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackType, opts ...any) (*ForgeResult, error) {
+	opts = append(opts, WithFastAICallback(callback))
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
 	return InvokeLiteForge(prompt, opts...)
 }
