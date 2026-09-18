@@ -765,6 +765,11 @@ func loadNamedPrograms(cfg *Config) error {
 
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
+	// Read-only scans must not persist struct-stage results; the flag has to be
+	// set here because this stage writes its own audit rows and risks.
+	if cfg != nil && cfg.IsSyntaxFlowResultNoDB() {
+		opts = append(opts, ssaapi.WithStructRuleNoResultDB(true))
+	}
 	rules := cfg.customRules()
 	var structRaws []string
 	for _, rule := range rules {
