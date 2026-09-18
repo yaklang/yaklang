@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -249,21 +250,27 @@ func LLMRerankTopK(
 		topK = len(candidates)
 	}
 
-	dNonce := utils.RandStringBytes(4)
-	var candidateBlock strings.Builder
-	for i, c := range candidates {
-		summary := utils.ShrinkString(c.Summary, 200)
-		keywords := utils.ShrinkString(strings.Join(c.Keywords, ", "), 100)
-		candidateBlock.WriteString(fmt.Sprintf("[%d] id=%s title=%s\n", i+1, c.EntryID, c.Title))
-		if summary != "" {
-			candidateBlock.WriteString(fmt.Sprintf("    summary: %s\n", summary))
-		}
-		if keywords != "" {
-			candidateBlock.WriteString(fmt.Sprintf("    keywords: %s\n", keywords))
-		}
-	}
+	ranked := candidates[:topK]
+	var invokeErr error
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelLLMRerank,
+		func() string {
+			dNonce := utils.RandStringBytes(4)
+			var candidateBlock strings.Builder
+			for i, c := range candidates {
+				summary := utils.ShrinkString(c.Summary, 200)
+				keywords := utils.ShrinkString(strings.Join(c.Keywords, ", "), 100)
+				candidateBlock.WriteString(fmt.Sprintf("[%d] id=%s title=%s\n", i+1, c.EntryID, c.Title))
+				if summary != "" {
+					candidateBlock.WriteString(fmt.Sprintf("    summary: %s\n", summary))
+				}
+				if keywords != "" {
+					candidateBlock.WriteString(fmt.Sprintf("    keywords: %s\n", keywords))
+				}
+			}
 
-	promptTemplate := `<|USER_QUERY_%s|>
+			promptTemplate := `<|USER_QUERY_%s|>
 %s
 <|USER_QUERY_END_%s|>
 
@@ -279,17 +286,56 @@ Sort by score descending.
 <|INSTRUCT_END_%s|>
 `
 
-	prompt := fmt.Sprintf(promptTemplate,
-		dNonce, query, dNonce,
-		dNonce, candidateBlock.String(), dNonce,
-		dNonce, dNonce,
-	)
+			prompt := fmt.Sprintf(promptTemplate,
+				dNonce, query, dNonce,
+				dNonce, candidateBlock.String(), dNonce,
+				dNonce, dNonce,
+			)
 
-	result, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"llm-rerank",
-		prompt,
-		[]aitool.ToolOption{
+			return prompt
+		},
+		func(result *aicommon.Action) {
+			scoreItems := result.GetInvokeParamsArray("scores")
+
+			type scored struct {
+				idx   int
+				score float64
+			}
+			var scoredList []scored
+			for _, item := range scoreItems {
+				idx := int(item.GetInt("index")) - 1
+				// The JSON parser may represent whole numbers as integers.
+				score, err := strconv.ParseFloat(utils.InterfaceToString(item["score"]), 64)
+				if err == nil && idx >= 0 && idx < len(candidates) && score >= 0.10 {
+					scoredList = append(scoredList, scored{idx: idx, score: score})
+				}
+			}
+
+			sort.Slice(scoredList, func(i, j int) bool {
+				return scoredList[i].score > scoredList[j].score
+			})
+
+			var out []*RerankCandidate
+			for i, s := range scoredList {
+				if i >= topK {
+					break
+				}
+				c := candidates[s.idx]
+				c.RerankScore = s.score
+				out = append(out, c)
+			}
+
+			if len(out) == 0 && len(candidates) > 0 {
+				if topK > len(candidates) {
+					topK = len(candidates)
+				}
+				return
+			}
+
+			ranked = out
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) { invokeErr = utils.Wrap(err, "LLM rerank failed") }),
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"scores",
 				[]aitool.PropertyOption{
@@ -299,52 +345,13 @@ Sort by score descending.
 				aitool.WithNumberParam("index", aitool.WithParam_Description("1-based candidate index")),
 				aitool.WithNumberParam("score", aitool.WithParam_Description("relevance 0.00-1.00")),
 			),
-		},
+		),
 	)
-	if err != nil {
-		return nil, utils.Errorf("LLM rerank failed: %v", err)
-	}
-	if result == nil {
-		return candidates[:topK], nil
-	}
 
-	scoreItems := result.GetInvokeParamsArray("scores")
-
-	type scored struct {
-		idx   int
-		score float64
+	if invokeErr != nil {
+		return nil, invokeErr
 	}
-	var scoredList []scored
-	for _, item := range scoreItems {
-		idx := int(item.GetFloat("index")) - 1
-		score := item.GetFloat("score")
-		if idx >= 0 && idx < len(candidates) && score >= 0.10 {
-			scoredList = append(scoredList, scored{idx: idx, score: score})
-		}
-	}
-
-	sort.Slice(scoredList, func(i, j int) bool {
-		return scoredList[i].score > scoredList[j].score
-	})
-
-	var out []*RerankCandidate
-	for i, s := range scoredList {
-		if i >= topK {
-			break
-		}
-		c := candidates[s.idx]
-		c.RerankScore = s.score
-		out = append(out, c)
-	}
-
-	if len(out) == 0 && len(candidates) > 0 {
-		if topK > len(candidates) {
-			topK = len(candidates)
-		}
-		return candidates[:topK], nil
-	}
-
-	return out, nil
+	return ranked, nil
 }
 
 // RerankCandidate holds a knowledge entry summary for LLM reranking.

@@ -14,9 +14,9 @@ type MiniTaskDescriptor struct {
 }
 
 // MiniAITaskContext 是每个 mini AI handler 拿到的运行时上下文。
-// handler 通过它访问 ReAct 的完整能力，核心是 ReAct.InvokeSpeedPriorityLiteForge。
+// handler 通过 Config.ScheduleAuxiliaryTask 执行辅助 AI 调用。
 type MiniAITaskContext struct {
-	// ReAct 是完整的 ReAct 运行时实例，handler 通过它调用 InvokeSpeedPriorityLiteForge 等。
+	// ReAct 提供完整运行时能力；辅助 AI 调用统一由 Config 调度。
 	ReAct *ReAct
 	// Config 提供 GetTimeline / GetContext / GetEmitter 等基础能力。
 	Config *aicommon.Config

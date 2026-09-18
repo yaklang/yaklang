@@ -149,56 +149,22 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 	elapsed := time.Since(startTime)
 	log.Infof("toolcall interval review #%d triggered for tool [%s], elapsed: %v", reviewCount, tool.Name, elapsed)
 
-	// Generate a bounded speed-priority prompt from the newest Timeline facts.
-	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContextForTask(
-		task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
-	)
-	if err != nil {
-		log.Errorf("failed to generate interval review prompt: %v", err)
-		// The scheduler reports the failure and continues by default.
-		return true, fmt.Errorf("generate interval review prompt: %w", err)
-	}
-
-	var shouldContinue = true
-	var reviewReason string
-
-	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallSpeedPriorityAI,
-		func(rsp *aicommon.AIResponse) error {
-			boundEmitter := rsp.BindEmitter(emitter)
-			action, err := aicommon.ExtractActionFromStream(
-				ctx,
-				rsp.GetOutputStreamReader("interval-review", true, emitter),
-				"interval-toolcall-review",
-				aicommon.WithActionFieldStreamHandler([]string{
-					"reason", "progress_summary", "estimated_remaining_time",
-				}, func(key string, reader io.Reader) {
-					content, ok := normalizeIntervalReviewFieldContent(reader)
-					if !ok {
-						return
-					}
-					switch key {
-					case "estimated_remaining_time":
-						boundEmitter.EmitDefaultStreamEvent(
-							"interval-review",
-							strings.NewReader("预估时间："+content),
-							rsp.GetTaskIndex(),
-						)
-					default:
-						boundEmitter.EmitDefaultStreamEvent(
-							"interval-review",
-							strings.NewReader(content),
-							rsp.GetTaskIndex(),
-						)
-					}
-				}),
-			)
+	shouldContinue := true
+	var reviewErr error
+	r.config.ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelToolCallIntervalReview,
+		func() string {
+			materials, err := r.promptManager.buildIntervalReviewPromptForTask(
+				task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations, true)
 			if err != nil {
-				log.Errorf("failed to extract interval review action: %v", err)
-				return fmt.Errorf("extract interval review action: %w", err)
+				reviewErr = fmt.Errorf("generate interval review prompt: %w", err)
+				return ""
 			}
-
+			return materials
+		},
+		func(action *aicommon.Action) {
 			decision := action.GetString("decision")
-			reviewReason = action.GetString("reason")
+			reviewReason := action.GetString("reason")
 			progressSummary := action.GetString("progress_summary")
 
 			switch decision {
@@ -224,19 +190,38 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 				shouldContinue = true
 				log.Warnf("interval review: unknown decision '%s', continuing by default", decision)
 			}
-			return nil
 		},
-		aicommon.WithAIRequest_CallerLabel("toolcall-interval-review"),
-		aicommon.WithAIRequest_Context(ctx),
-		aicommon.WithAIRequest_DetachCheckpoint(),
+		aicommon.WithAuxiliaryOutputSchema("interval-toolcall-review", intervalReviewSchemaJSON),
+		aicommon.WithAuxiliaryEmitter(emitter),
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			reviewErr = fmt.Errorf("interval review transaction: %w", err)
+		}),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithLiteForgeDisableTimeline(),
+			aicommon.WithLiteForgeMaxPromptTokens(9000),
+			aicommon.WithLiteForgeStaticInstruction(intervalReviewInstructionText+"\n\n"+intervalReviewOutputExampleText),
+			aicommon.WithGeneralConfigExtraRequestOpts(
+				aicommon.WithAIRequest_CallerLabel(aicommon.CallerLabelToolCallIntervalReview),
+				aicommon.WithAIRequest_DetachCheckpoint(),
+			),
+			aicommon.WithGeneralConfigStreamableFieldResponseCallback(
+				[]string{"reason", "progress_summary", "estimated_remaining_time"},
+				func(key string, reader io.Reader, response *aicommon.AIResponse, boundEmitter *aicommon.Emitter) {
+					content, ok := normalizeIntervalReviewFieldContent(reader)
+					if !ok || boundEmitter == nil {
+						return
+					}
+					if key == "estimated_remaining_time" {
+						content = "预估时间：" + content
+					}
+					boundEmitter.EmitDefaultStreamEvent("interval-review", strings.NewReader(content), response.GetTaskIndex())
+				}),
+		),
 	)
-
-	if transErr != nil {
-		log.Errorf("interval review transaction failed: %v", transErr)
-		// The scheduler reports the failure and continues by default.
-		return true, fmt.Errorf("interval review transaction: %w", transErr)
+	if reviewErr != nil {
+		log.Errorf("interval review failed: %v", reviewErr)
+		return true, reviewErr
 	}
-
 	return shouldContinue, nil
 }
 

@@ -19,6 +19,7 @@ type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error
 type AICallerConfigIf interface {
 	AICaller
 	KeyValueConfigIf
+	AuxiliaryScheduler
 
 	// Interactivable
 	Interactivable
@@ -66,6 +67,9 @@ type AICallerConfigIf interface {
 	ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem
 
 	GetBrowserSessionTracker() BrowserSessionTracker
+
+	// IsSingleAIModelMode reports whether single-model simple mode is enabled.
+	IsSingleAIModelMode() bool
 
 	// Reported risks: session-level "已报告漏洞清单" accumulator.
 	// AppendReportedRisk is called from toolcall_invoke.go FeedBacker when a

@@ -29,6 +29,21 @@ type transactionTestConfig struct {
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
 
+func (t *transactionTestConfig) IsSingleAIModelMode() bool { return false }
+
+func (t *transactionTestConfig) ScheduleAuxiliaryTask(
+	context.Context,
+	string,
+	func() string,
+	func(*Action),
+	...AuxiliaryTaskOption,
+) {
+}
+
+func (t *transactionTestConfig) ResolveAuxiliaryTask(_ string) AuxiliaryTaskDecision {
+	return AuxiliaryTaskDecision{Action: SingleModelPassThrough}
+}
+
 func newTransactionTestConfig(ctx context.Context) *transactionTestConfig {
 	emitter := NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		return e, nil

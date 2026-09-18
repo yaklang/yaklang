@@ -141,43 +141,47 @@ func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntitiesByAI(ctx context.Context, 
 		return []int{}, nil
 	}
 
-	// 收集所有候选记忆的相似记忆作为上下文
-	allSimilarMemories, err := t.findSimilarMemoriesForBatch(entities, candidateIndices, 10) // 最多找10个相似记忆
-	if err != nil {
-		return nil, utils.Errorf("failed to find similar memories for batch: %v", err)
-	}
-
-	// 构建AI批量判别的prompt
-	prompt, err := t.buildBatchDeduplicationPrompt(entities, candidateIndices, allSimilarMemories)
-	if err != nil {
-		return nil, utils.Errorf("failed to build batch deduplication prompt: %v", err)
-	}
-
-	// 调用AI进行批量高级判别
-	action, err := t.invoker.InvokeSpeedPriorityLiteForge(ctx, "batch-memory-deduplication", prompt, []aitool.ToolOption{
-		aitool.WithStringArrayParam("non_duplicate_indices", aitool.WithParam_Description("不重复的记忆索引列表，例如: [\"1\", \"3\", \"5\"]。只返回确实不重复且值得保存的记忆索引")),
-		aitool.WithStringParam("analysis", aitool.WithParam_Description("详细分析每个记忆的重复情况和保留理由")),
-	})
-	if err != nil {
-		return nil, utils.Errorf("AI batch deduplication check failed: %v", err)
-	}
-
-	nonDuplicateIndicesStr := action.GetStringSlice("non_duplicate_indices")
-	analysis := action.GetString("analysis")
-
-	// 转换字符串索引为整数
 	var finalIndices []int
-	for _, idxStr := range nonDuplicateIndicesStr {
-		if idx := utils.InterfaceToInt(idxStr); idx >= 0 && idx < len(entities) {
-			finalIndices = append(finalIndices, idx)
-		}
-	}
+	taskErr := utils.Error("AI batch deduplication auxiliary task returned no action")
+	t.invoker.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelBatchMemoryDeduplication,
+		func() string {
+			allSimilarMemories, err := t.findSimilarMemoriesForBatch(entities, candidateIndices, 10)
+			if err != nil {
+				taskErr = utils.Errorf("failed to find similar memories for batch: %v", err)
+				return ""
+			}
+			prompt, err := t.buildBatchDeduplicationPrompt(entities, candidateIndices, allSimilarMemories)
+			if err != nil {
+				taskErr = utils.Errorf("failed to build batch deduplication prompt: %v", err)
+				return ""
+			}
+			return prompt
+		},
+		func(action *aicommon.Action) {
+			taskErr = nil
+			nonDuplicateIndicesStr := action.GetStringSlice("non_duplicate_indices")
+			analysis := action.GetString("analysis")
 
-	log.Infof("AI batch deduplication result: %d/%d memories selected as non-duplicate",
-		len(finalIndices), len(candidateIndices))
-	log.Infof("AI analysis: %s", analysis)
+			// 转换字符串索引为整数
+			for _, idxStr := range nonDuplicateIndicesStr {
+				if idx := utils.InterfaceToInt(idxStr); idx >= 0 && idx < len(entities) {
+					finalIndices = append(finalIndices, idx)
+				}
+			}
 
-	return finalIndices, nil
+			log.Infof("AI batch deduplication result: %d/%d memories selected as non-duplicate",
+				len(finalIndices), len(candidateIndices))
+			log.Infof("AI analysis: %s", analysis)
+
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) { taskErr = err }),
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringArrayParam("non_duplicate_indices", aitool.WithParam_Description("不重复的记忆索引列表，例如: [\"1\", \"3\", \"5\"]。只返回确实不重复且值得保存的记忆索引")),
+			aitool.WithStringParam("analysis", aitool.WithParam_Description("详细分析每个记忆的重复情况和保留理由")),
+		),
+	)
+	return finalIndices, taskErr
 }
 
 // checkTagRepetition 检查标签重复

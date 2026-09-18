@@ -830,6 +830,10 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	if r.perception == nil {
 		return nil
 	}
+	// Single-model simple mode: skip perception AI calls.
+	if r.config != nil && r.config.IsSingleAIModelMode() {
+		return nil
+	}
 	totalStart := time.Now()
 	defer func() {
 		setWorkspaceDebugDuration(r, perceptionDebugTotalDurationKey, time.Since(totalStart))
@@ -846,13 +850,6 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 		return r.perception.getCurrent()
 	}
 
-	input, extra := r.buildPerceptionInput(reason)
-	prompt, err := buildPerceptionPrompt(input, extra)
-	if err != nil {
-		log.Warnf("perception prompt build failed: %v", err)
-		return r.perception.getCurrent()
-	}
-
 	invoker := r.GetInvoker()
 	if utils.IsNil(invoker) {
 		log.Warn("perception: invoker is nil")
@@ -865,59 +862,70 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	}
 
 	aiStart := time.Now()
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx, "perception", prompt, perceptionOutputSchema,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "summary"),
+	r.config.ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelPerception,
+		func() string {
+			input, extra := r.buildPerceptionInput(reason)
+			prompt, err := buildPerceptionPrompt(input, extra)
+			if err != nil {
+				log.Warnf("perception prompt build failed: %v", err)
+				return ""
+			}
+
+			return prompt
+		},
+		func(action *aicommon.Action) {
+			setWorkspaceDebugDuration(r, perceptionDebugAIDurationKey, time.Since(aiStart))
+			params := action.GetParams()
+			parsed := &PerceptionState{
+				OneLinerSummary: params.GetString("summary"),
+				Topics:          params.GetStringSlice("topics"),
+				Keywords:        params.GetStringSlice("keywords"),
+				Changed:         params.GetBool("changed"),
+				ConfidenceLevel: params.GetFloat("confidence"),
+				// intent_shift 是新增的可选字段, AI 不返回时留空, IsIntentPivot 会回退到 Changed 语义.
+				// 这里做 lowercase + trim 归一化, 避免大小写/前后空格让枚举判定失效.
+				// 关键词: parsed.IntentShift 解析归一化, 大小写无关, intent_shift 可选解析
+				IntentShift: strings.ToLower(strings.TrimSpace(params.GetString("intent_shift"))),
+			}
+
+			parsed.LastTrigger = reason
+			currentState, updated := r.perception.applyResult(parsed)
+
+			// 下游昂贵刷新统一走 IntentShift 门控.
+			//
+			// shouldRefreshDownstreamForState 已经合并了三条规则:
+			//   1. updated 必须为 true, 否则没有新内容可以推
+			//   2. forced trigger 一律绕门 (用户/系统显式请求, 必须刷新)
+			//   3. 否则要求 IntentShift=pivot (向后兼容: IntentShift 空时回退到 Changed)
+			//
+			if currentState.shouldRefreshDownstreamForState(updated) {
+				r.refreshCapabilitiesFromPerception(currentState)
+				r.refreshKnowledgeFromPerception(currentState)
+			}
+
+			if cfg := r.config; cfg != nil && currentState != nil {
+				aicommon.NotifySessionSnapshotEmit(cfg)
+			}
+
+			invoker.AddToTimeline("perception",
+				fmt.Sprintf("Perception (epoch %d, trigger=%s): %s | topics=[%s]",
+					parsed.Epoch, reason, parsed.OneLinerSummary, strings.Join(parsed.Topics, ", ")))
+
+			log.Infof("perception updated (epoch=%d, trigger=%s, changed=%v, intent_shift=%q, confidence=%.2f): %s",
+				parsed.Epoch, reason, parsed.Changed, parsed.IntentShift, parsed.ConfidenceLevel, parsed.OneLinerSummary)
+
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			setWorkspaceDebugDuration(r, perceptionDebugAIDurationKey, time.Since(aiStart))
+			log.Warnf("perception liteforge call failed (trigger=%s): %v", reason, err)
+		}),
+		aicommon.WithAuxiliaryOutputs(perceptionOutputSchema...),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "summary"),
+		),
 	)
-	setWorkspaceDebugDuration(r, perceptionDebugAIDurationKey, time.Since(aiStart))
-	if err != nil {
-		log.Warnf("perception liteforge call failed (trigger=%s): %v", reason, err)
-		return r.perception.getCurrent()
-	}
-	if utils.IsNil(action) {
-		log.Warnf("perception: action is nil (trigger=%s)", reason)
-		return r.perception.getCurrent()
-	}
-
-	params := action.GetParams()
-	parsed := &PerceptionState{
-		OneLinerSummary: params.GetString("summary"),
-		Topics:          params.GetStringSlice("topics"),
-		Keywords:        params.GetStringSlice("keywords"),
-		Changed:         params.GetBool("changed"),
-		ConfidenceLevel: params.GetFloat("confidence"),
-		// intent_shift 是新增的可选字段, AI 不返回时留空, IsIntentPivot 会回退到 Changed 语义.
-		// 这里做 lowercase + trim 归一化, 避免大小写/前后空格让枚举判定失效.
-		// 关键词: parsed.IntentShift 解析归一化, 大小写无关, intent_shift 可选解析
-		IntentShift: strings.ToLower(strings.TrimSpace(params.GetString("intent_shift"))),
-	}
-
-	parsed.LastTrigger = reason
-	currentState, updated := r.perception.applyResult(parsed)
-
-	// 下游昂贵刷新统一走 IntentShift 门控.
-	//
-	// shouldRefreshDownstreamForState 已经合并了三条规则:
-	//   1. updated 必须为 true, 否则没有新内容可以推
-	//   2. forced trigger 一律绕门 (用户/系统显式请求, 必须刷新)
-	//   3. 否则要求 IntentShift=pivot (向后兼容: IntentShift 空时回退到 Changed)
-	//
-	if currentState.shouldRefreshDownstreamForState(updated) {
-		r.refreshCapabilitiesFromPerception(currentState)
-		r.refreshKnowledgeFromPerception(currentState)
-	}
-
-	if cfg := r.config; cfg != nil && currentState != nil {
-		aicommon.NotifySessionSnapshotEmit(cfg)
-	}
-
-	invoker.AddToTimeline("perception",
-		fmt.Sprintf("Perception (epoch %d, trigger=%s): %s | topics=[%s]",
-			parsed.Epoch, reason, parsed.OneLinerSummary, strings.Join(parsed.Topics, ", ")))
-
-	log.Infof("perception updated (epoch=%d, trigger=%s, changed=%v, intent_shift=%q, confidence=%.2f): %s",
-		parsed.Epoch, reason, parsed.Changed, parsed.IntentShift, parsed.ConfidenceLevel, parsed.OneLinerSummary)
-
 	return r.perception.getCurrent()
 }
 

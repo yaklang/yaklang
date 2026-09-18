@@ -40,14 +40,28 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if gconfig.GetLiteForgeDisableTimeline() {
 		fopts = append(fopts, aiforge.WithLiteForge_DisableTimeline())
 	}
+	if limit := gconfig.GetLiteForgeMaxPromptTokens(); limit > 0 {
+		fopts = append(fopts, aiforge.WithLiteForge_MaxPromptTokens(limit))
+	}
 	for _, i := range gconfig.GetStreamableFields() {
 		fopts = append(fopts, aiforge.WithLiteForge_StreamableFieldWithAINodeId(i.AINodeId(), i.FieldKey()))
 	}
 	// add user-defined field stream callbacks from GeneralKVConfig
 	for _, item := range gconfig.GetStreamableFieldCallbacks() {
+		if item == nil {
+			continue
+		}
 		if item.Callback != nil {
 			fopts = append(fopts, aiforge.WithLiteForge_FieldStreamEmitterCallback(item.FieldKeys, aiforge.FieldStreamEmitterCallback(item.Callback)))
 		}
+		if item.ResponseCallback != nil {
+			fopts = append(fopts, aiforge.WithLiteForge_FieldStreamResponseCallback(item.FieldKeys, item.ResponseCallback))
+		}
+	}
+	// Consume extra AIRequestOption values from GeneralKVConfig (e.g.
+	// thinking-level degradation injected by the auxiliary task scheduler).
+	if extraReqOpts := gconfig.GetExtraRequestOpts(); len(extraReqOpts) > 0 {
+		fopts = append(fopts, aiforge.WithLiteForge_ExtraRequestOpts(extraReqOpts...))
 	}
 	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
 
@@ -100,6 +114,8 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	return forgeResult.Action, nil
 }
 
+// InvokeSpeedPriorityLiteForge is retained for compatibility.
+// Deprecated: production Speed tasks should use r.config.ScheduleAuxiliaryTask.
 func (r *ReAct) InvokeSpeedPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,

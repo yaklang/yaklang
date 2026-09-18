@@ -221,22 +221,28 @@ func compressKnowledgeChunkWithScore(
 	invoker aicommon.AIInvokeRuntime,
 	alreadyExtracted string,
 ) []ScoredRange {
-	dNonce := utils.RandStringBytes(4)
-	minLines := 3
-	maxLines := 20
-	maxRanges := 8
+	var taskIndex string
+	var results []ScoredRange
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelKnowledgeCompress,
+		func() string {
+			dNonce := utils.RandStringBytes(4)
+			minLines := 3
+			maxLines := 20
+			maxRanges := 8
 
-	// Build already extracted section if available
-	alreadyExtractedSection := ""
-	if alreadyExtracted != "" {
-		alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
+			// Build already extracted section if available
+			alreadyExtractedSection := ""
+			if alreadyExtracted != "" {
+				alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
 %s
 <|ALREADY_EXTRACTED_END_%s|>
 
 `, dNonce, alreadyExtracted, dNonce)
-	}
+			}
 
-	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
+			promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
 {{ .userQuery }}
 <|USER_QUERY_END_{{ .nonce }}|>
 
@@ -275,26 +281,64 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
-	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
-		"nonce":                   dNonce,
-		"samples":                 chunkContentWithLineNum,
-		"userQuery":               userQuery,
-		"alreadyExtractedSection": alreadyExtractedSection,
-		"hasAlreadyExtracted":     alreadyExtracted != "",
-	})
+			materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
+				"nonce":                   dNonce,
+				"samples":                 chunkContentWithLineNum,
+				"userQuery":               userQuery,
+				"alreadyExtractedSection": alreadyExtractedSection,
+				"hasAlreadyExtracted":     alreadyExtracted != "",
+			})
 
-	if err != nil {
-		log.Errorf("compressKnowledgeChunkWithScore: template render failed: %v", err)
-		return nil
-	}
+			if err != nil {
+				log.Errorf("compressKnowledgeChunkWithScore: template render failed: %v", err)
+				return ""
+			}
 
-	// Get task index for emit
-	var taskIndex string
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"knowledge-compress",
-		materials,
-		[]aitool.ToolOption{
+			return materials
+		},
+		func(forgeResult *aicommon.Action) {
+			rangeItems := forgeResult.GetInvokeParamsArray("ranges")
+
+			for _, item := range rangeItems {
+				rangeStr := item.GetString("range")
+				score := item.GetFloat("score")
+
+				if rangeStr == "" {
+					continue
+				}
+
+				if !passesCompressionScore(score) {
+					continue
+				}
+
+				parts := strings.Split(rangeStr, "-")
+				if len(parts) != 2 {
+					continue
+				}
+
+				startLine, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+				endLine, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+
+				if err1 != nil || err2 != nil || startLine <= 0 || endLine < startLine {
+					continue
+				}
+				results = append(results, ScoredRange{
+					Range:     rangeStr,
+					StartLine: startLine,
+					EndLine:   endLine,
+					Score:     score,
+				})
+			}
+			spew.Dump(results)
+
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			log.Errorf("compressKnowledgeChunkWithScore: LiteForge failed: %v", err)
+			if emitter := invoker.GetConfig().GetEmitter(); emitter != nil {
+				emitter.EmitDefaultStreamEvent("error", bytes.NewBufferString("Compression failed: "+err.Error()), taskIndex)
+			}
+		}),
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -304,108 +348,47 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 				aitool.WithStringParam("range", aitool.WithParam_Description("原始行范围，格式: start-end")),
 				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
-			"ranges",
-		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
-			jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
-				score := 0.0
-				score = utils.MapGetFloat64(data, "score")
-				if !passesCompressionScore(score) {
-					return
-				}
-				rangeStr := utils.MapGetString(data, "range")
-				if rangeStr == "" {
-					return
-				}
-				parts := strings.Split(rangeStr, "-")
-				if len(parts) != 2 {
-					return
-				}
-				// utils.Int
-				startLine := utils.InterfaceToInt(strings.TrimSpace(parts[0]))
-				endLine := utils.InterfaceToInt(strings.TrimSpace(parts[1]))
-				if startLine <= 0 || endLine < startLine {
-					return
-				}
-				pr, pw := utils.NewPipe()
-				text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
-				pw.WriteString(fmt.Sprintf("[权重：%v] 片段范围: %v-%v(切片大小:%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
-				// Start streaming output with unified nodeId
-				if emitter != nil {
-					if event, _ := emitter.EmitDefaultStreamEvent(
-						"knowledge-compress",
-						pr,
-						taskIndex,
-					); event != nil {
-						streamId := event.GetStreamEventWriterId()
-						emitter.EmitTextReferenceMaterial(streamId, text)
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+				"ranges",
+			}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
+					score := utils.MapGetFloat64(data, "score")
+					if !passesCompressionScore(score) {
+						return
 					}
-				}
-				pw.Close()
-			}))
-		}),
+					rangeStr := utils.MapGetString(data, "range")
+					if rangeStr == "" {
+						return
+					}
+					parts := strings.Split(rangeStr, "-")
+					if len(parts) != 2 {
+						return
+					}
+					startLine := utils.InterfaceToInt(strings.TrimSpace(parts[0]))
+					endLine := utils.InterfaceToInt(strings.TrimSpace(parts[1]))
+					if startLine <= 0 || endLine < startLine {
+						return
+					}
+					pr, pw := utils.NewPipe()
+					text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
+					pw.WriteString(fmt.Sprintf("[权重：%v] 片段范围: %v-%v(切片大小:%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
+					if emitter != nil {
+						if event, _ := emitter.EmitDefaultStreamEvent(
+							"knowledge-compress",
+							pr,
+							taskIndex,
+						); event != nil {
+							streamId := event.GetStreamEventWriterId()
+							emitter.EmitTextReferenceMaterial(streamId, text)
+						}
+					}
+					pw.Close()
+				}))
+			}),
+		),
 	)
 
-	var invokerEmitter *aicommon.Emitter
-	if invoker != nil {
-		if config := invoker.GetConfig(); config != nil {
-			invokerEmitter = config.GetEmitter()
-		}
-	}
-
-	if err != nil {
-		invokerEmitter.EmitDefaultStreamEvent(
-			"error",
-			bytes.NewBufferString("Compression failed: "+err.Error()),
-			taskIndex,
-		)
-		log.Errorf("compressKnowledgeChunkWithScore: LiteForge failed: %v", err)
-		return nil
-	}
-
-	if forgeResult == nil {
-		invokerEmitter.EmitDefaultStreamEvent(
-			"error",
-			bytes.NewBufferString("Compression failed: "+`压缩结果为空`),
-			taskIndex,
-		)
-		return nil
-	}
-
-	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
-	var results []ScoredRange
-
-	for _, item := range rangeItems {
-		rangeStr := item.GetString("range")
-		score := item.GetFloat("score")
-
-		if rangeStr == "" {
-			continue
-		}
-
-		if !passesCompressionScore(score) {
-			continue
-		}
-
-		parts := strings.Split(rangeStr, "-")
-		if len(parts) != 2 {
-			continue
-		}
-
-		startLine, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
-		endLine, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
-
-		if err1 != nil || err2 != nil || startLine <= 0 || endLine < startLine {
-			continue
-		}
-		results = append(results, ScoredRange{
-			Range:     rangeStr,
-			StartLine: startLine,
-			EndLine:   endLine,
-			Score:     score,
-		})
-	}
-	spew.Dump(results)
 	return results
 }

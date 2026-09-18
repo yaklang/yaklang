@@ -135,8 +135,20 @@ func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AII
 		userQuery = strings.TrimSpace(task.GetUserInput())
 	}
 
-	nonce := utils.RandStringBytes(8)
-	summaryPrompt := utils.MustRenderTemplate(`
+	reactloops.EmitStatusI18n(loop, "生成分析报告", "Generating Report...")
+
+	taskID := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+
+	written := false
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		loop.GetConfig().GetContext(),
+		aicommon.CallerLabelHttpFlowAnalyzeFinalizeSummary,
+		func() string {
+			nonce := utils.RandStringBytes(8)
+			summaryPrompt := utils.MustRenderTemplate(`
 <|INSTRUCTION_{{ .Nonce }}|>
 You are an HTTP traffic analysis expert. Based on the analysis context below, generate a complete analysis report for the user.
 
@@ -156,71 +168,64 @@ User's original query: {{ .UserQuery }}
 {{ .ContextMaterials }}
 <|CONTEXT_END_{{ .Nonce }}|>
 `, map[string]any{
-		"Nonce":            nonce,
-		"UserQuery":        userQuery,
-		"ContextMaterials": contextMaterials,
-	})
+				"Nonce":            nonce,
+				"UserQuery":        userQuery,
+				"ContextMaterials": contextMaterials,
+			})
 
-	log.Infof("http_flow_analyze finalize: generating forced AI answer, prompt length: %d", len(summaryPrompt))
+			log.Infof("http_flow_analyze finalize: generating forced AI answer, prompt length: %d", len(summaryPrompt))
 
-	reactloops.EmitStatusI18n(loop, "生成分析报告", "Generating Report...")
+			return summaryPrompt
+		},
+		func(action *aicommon.Action) {
+			summary := strings.TrimSpace(action.GetString("summary"))
+			if summary == "" {
+				log.Warnf("http_flow_analyze finalize: AI generated empty summary, using raw context fallback")
+				return
+			}
 
-	taskID := ""
-	if task := loop.GetCurrentTask(); task != nil {
-		taskID = task.GetId()
-	}
-
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
-		loop.GetConfig().GetContext(),
-		"http_flow_analyze_finalize_summary",
-		summaryPrompt,
-		[]aitool.ToolOption{
+			invoker.EmitResultAfterStream(summary)
+			markFinalAnswerDelivered(loop)
+			recordMetaAction(loop, "finalize_summary",
+				"forced AI answer at loop exit",
+				utils.ShrinkTextBlock(summary, 240))
+			invoker.AddToTimeline("http_flow_analysis_finalized",
+				fmt.Sprintf("HTTP flow analysis finalized after %d iterations with AI generated summary",
+					loop.GetCurrentIterationIndex()))
+			written = true
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) { log.Errorf("http_flow_analyze finalize failed: %v", err) }),
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam("summary",
 				aitool.WithParam_Description("Complete HTTP traffic analysis report in Markdown format"),
 				aitool.WithParam_Required(true),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
-			"summary",
-		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
-			if emitter == nil {
-				io.Copy(io.Discard, r)
-				return
-			}
-			if event, _ := emitter.EmitStreamEventWithContentType(
-				"re-act-loop-answer-payload",
-				utils.JSONStringReader(r),
-				taskID,
-				aicommon.TypeTextMarkdown,
-				func() {},
-			); event != nil {
-				streamId := event.GetStreamEventWriterId()
-				emitter.EmitTextReferenceMaterial(streamId, contextMaterials)
-			}
-		}),
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+				"summary",
+			}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				if emitter == nil {
+					io.Copy(io.Discard, r)
+					return
+				}
+				if event, _ := emitter.EmitStreamEventWithContentType(
+					"re-act-loop-answer-payload",
+					utils.JSONStringReader(r),
+					taskID,
+					aicommon.TypeTextMarkdown,
+					func() {},
+				); event != nil {
+					streamId := event.GetStreamEventWriterId()
+					emitter.EmitTextReferenceMaterial(streamId, contextMaterials)
+				}
+			}),
+		),
 	)
 
-	if err != nil {
-		log.Errorf("http_flow_analyze finalize: AI summary generation failed: %v", err)
+	if !written {
 		deliverRawContextFallback(loop, invoker, contextMaterials)
-		return
 	}
-
-	summary := strings.TrimSpace(action.GetString("summary"))
-	if summary == "" {
-		log.Warnf("http_flow_analyze finalize: AI generated empty summary, using raw context fallback")
-		deliverRawContextFallback(loop, invoker, contextMaterials)
-		return
-	}
-
-	invoker.EmitResultAfterStream(summary)
-	markFinalAnswerDelivered(loop)
-	recordMetaAction(loop, "finalize_summary",
-		"forced AI answer at loop exit",
-		utils.ShrinkTextBlock(summary, 240))
-	invoker.AddToTimeline("http_flow_analysis_finalized",
-		fmt.Sprintf("HTTP flow analysis finalized after %d iterations with AI generated summary",
-			loop.GetCurrentIterationIndex()))
 }
 
 func deliverRawContextFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, contextMaterials string) {

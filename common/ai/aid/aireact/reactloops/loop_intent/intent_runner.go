@@ -39,6 +39,7 @@ type intentKeywordResult struct {
 // It performs at most 2 AI calls:
 //  1. Generate intent_summary + search_keywords (always).
 //  2. Recommend capabilities (only when matched results are too many).
+//
 // All local capability search (BM25, skills, focus modes) is done without AI.
 func runIntentRecognition(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop) *reactloops.DeepIntentResult {
 	totalStart := time.Now()
@@ -128,15 +129,8 @@ func runIntentRecognition(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 // generateIntentKeywords performs the single AI call to produce intent_summary
 // and search_keywords from user input.
 func generateIntentKeywords(r aicommon.AIInvokeRuntime, ctx context.Context, userQuery string) (*intentKeywordResult, error) {
-	nonce := utils.RandStringBytes(8)
-	prompt, err := utils.RenderTemplate(intentPromptTpl, map[string]any{
-		"Nonce":     nonce,
-		"UserQuery": userQuery,
-	})
-	if err != nil {
-		return nil, utils.Wrap(err, "render intent prompt failed")
-	}
-
+	var result *intentKeywordResult
+	var returnErr error
 	outputs := []aitool.ToolOption{
 		aitool.WithStringParam("intent_summary",
 			aitool.WithParam_Description("Concise intent label, around 20-24 Chinese chars or similar English, preserving complete meaning. Do not repeat the request, list tools, or explain the search process."),
@@ -159,49 +153,54 @@ func generateIntentKeywords(r aicommon.AIInvokeRuntime, ctx context.Context, use
 		),
 	}
 
-	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "intent-keyword-gen", prompt, outputs,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
+	r.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelIntentKeywordGen,
+		func() string {
+			nonce := utils.RandStringBytes(8)
+			prompt, err := utils.RenderTemplate(intentPromptTpl, map[string]any{
+				"Nonce":     nonce,
+				"UserQuery": userQuery,
+			})
+			if err != nil {
+				returnErr = utils.Wrap(err, "render intent prompt failed")
+				return ""
+			}
+
+			return prompt
+		},
+		func(forgeResult *aicommon.Action) {
+			result = &intentKeywordResult{
+				IntentSummary:  forgeResult.GetString("intent_summary"),
+				SearchKeywords: forgeResult.GetStringSlice("search_keywords"),
+				Tags:           forgeResult.GetStringSlice("tags"),
+				Questions:      forgeResult.GetStringSlice("questions"),
+			}
+
+			if len(result.SearchKeywords) == 0 {
+				result.SearchKeywords = []string{userQuery}
+			}
+
+		},
+		aicommon.WithAuxiliaryOnError(func(cause error) { returnErr = cause }),
+		aicommon.WithAuxiliaryOutputs(outputs...),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
+		),
 	)
-	if err != nil {
-		return nil, err
+	if returnErr != nil {
+		return nil, returnErr
 	}
-	if forgeResult == nil {
+	if result == nil {
 		return nil, utils.Error("intent keyword generation returned nil result")
 	}
-
-	result := &intentKeywordResult{
-		IntentSummary:  forgeResult.GetString("intent_summary"),
-		SearchKeywords: forgeResult.GetStringSlice("search_keywords"),
-		Tags:           forgeResult.GetStringSlice("tags"),
-		Questions:      forgeResult.GetStringSlice("questions"),
-	}
-
-	if len(result.SearchKeywords) == 0 {
-		result.SearchKeywords = []string{userQuery}
-	}
-
 	return result, nil
 }
 
 // recommendCapabilities performs the second (conditional) AI call to select the
 // most relevant capabilities from the matched search results.
 func recommendCapabilities(r aicommon.AIInvokeRuntime, ctx context.Context, userQuery, intentSummary string, searchResult *reactloops.CapabilitySearchResult) ([]string, error) {
-	matchedCapList := buildMatchedCapabilitiesText(searchResult)
-	if matchedCapList == "" {
-		return nil, nil
-	}
-
-	nonce := utils.RandStringBytes(8)
-	prompt, err := utils.RenderTemplate(recommendPromptTpl, map[string]any{
-		"Nonce":               nonce,
-		"UserQuery":           userQuery,
-		"IntentSummary":       intentSummary,
-		"MatchedCapabilities": matchedCapList,
-	})
-	if err != nil {
-		return nil, utils.Wrap(err, "render recommend prompt failed")
-	}
-
+	var result []string
+	var returnErr error
 	outputs := []aitool.ToolOption{
 		aitool.WithStringArrayParamEx("recommended_capabilities", []aitool.PropertyOption{
 			aitool.WithParam_Description("List of matched capability identifiers that are most relevant to the user's intent. Only include identifiers from the matched list."),
@@ -209,16 +208,39 @@ func recommendCapabilities(r aicommon.AIInvokeRuntime, ctx context.Context, user
 		}),
 	}
 
-	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "intent-capability-recommend", prompt, outputs)
-	if err != nil {
-		return nil, err
-	}
-	if forgeResult == nil {
-		return nil, nil
-	}
+	r.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelIntentCapabilityRecommend,
+		func() string {
+			matchedCapList := buildMatchedCapabilitiesText(searchResult)
+			if matchedCapList == "" {
+				return ""
+			}
 
-	caps := forgeResult.GetStringSlice("recommended_capabilities")
-	return reactloops.NormalizeCapabilityNames(strings.Join(caps, ",")), nil
+			nonce := utils.RandStringBytes(8)
+			prompt, err := utils.RenderTemplate(recommendPromptTpl, map[string]any{
+				"Nonce":               nonce,
+				"UserQuery":           userQuery,
+				"IntentSummary":       intentSummary,
+				"MatchedCapabilities": matchedCapList,
+			})
+			if err != nil {
+				returnErr = utils.Wrap(err, "render recommend prompt failed")
+				return ""
+			}
+
+			return prompt
+		},
+		func(forgeResult *aicommon.Action) {
+			caps := forgeResult.GetStringSlice("recommended_capabilities")
+			result = reactloops.NormalizeCapabilityNames(strings.Join(caps, ","))
+		},
+		aicommon.WithAuxiliaryOnError(func(cause error) { returnErr = cause }),
+		aicommon.WithAuxiliaryOutputs(outputs...),
+	)
+	if returnErr != nil {
+		return nil, returnErr
+	}
+	return result, nil
 }
 
 // buildMatchedCapabilitiesText formats the search result into a compact text list

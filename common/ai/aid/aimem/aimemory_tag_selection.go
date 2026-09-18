@@ -22,11 +22,36 @@ const tagSelectionStaticInstruction = `你是一个标签选择助手，负责�
 // SelectTags 从文本中生成标签以便搜索
 // B 档改造：去掉内层 INPUT/TAGS nonce；通过 StaticInstruction 把任务说明送入 high-static 段
 // 关键词: aicache, PROMPT_SECTION, SelectTags, B 档去 nonce
-func (r *AIMemoryTriage) SelectTags(ctx context.Context, i any) ([]string, error) {
+func (r *AIMemoryTriage) SelectTags(ctx context.Context, i any) (tags []string, err error) {
+	err = utils.Error("tag selection auxiliary task returned no action")
+	r.invoker.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelTextagSelection,
+		func() string {
+			var prompt string
+			prompt, err = r.buildTagSelectionPrompt(i)
+			return prompt
+		},
+		func(action *aicommon.Action) {
+			tags = action.GetStringSlice("tags")
+			if tags == nil {
+				tags = []string{}
+			}
+			err = nil
+		},
+		aicommon.WithAuxiliaryOnError(func(cause error) { err = cause }),
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringArrayParam("tags", aitool.WithParam_Description("从上面的输入中提取出相关的标签（领域），如果上面的标签已经足够了，就不需要再创建新的标签了")),
+		),
+		aicommon.WithAuxiliaryOpts(aicommon.WithLiteForgeStaticInstruction(tagSelectionStaticInstruction)),
+	)
+	return tags, err
+}
+
+func (r *AIMemoryTriage) buildTagSelectionPrompt(i any) (string, error) {
 	// summarize existing tags
 	existed, err := r.GetDynamicContextWithTags()
 	if err != nil {
-		return nil, utils.Errorf("GetDynamicContextWithTags failed: %v", err)
+		return "", utils.Errorf("GetDynamicContextWithTags failed: %v", err)
 	}
 
 	// 关键词: aicache, dynamic, tag-selection, 去内层 nonce
@@ -43,18 +68,8 @@ func (r *AIMemoryTriage) SelectTags(ctx context.Context, i any) ([]string, error
 		"Input":   utils.InterfaceToString(i),
 	})
 	if err != nil {
-		return nil, utils.Errorf("RenderTemplate failed: %v", err)
+		return "", utils.Errorf("RenderTemplate failed: %v", err)
 	}
 
-	action, err := r.invoker.InvokeSpeedPriorityLiteForge(ctx, "tag-selection", prompt, []aitool.ToolOption{
-		aitool.WithStringArrayParam("tags", aitool.WithParam_Description("从上面的输入中提取出相关的标签（领域），如果上面的标签已经足够了，就不需要再创建新的标签了")), // tags
-	}, aicommon.WithLiteForgeStaticInstruction(tagSelectionStaticInstruction))
-	if err != nil {
-		return nil, err
-	}
-	tags := action.GetStringSlice("tags")
-	if len(tags) > 0 {
-		return tags, nil
-	}
-	return []string{}, nil
+	return prompt, nil
 }

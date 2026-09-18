@@ -378,34 +378,39 @@ func (c *Coordinator) generateSemanticIdentifier(name string) string {
 		return strings.TrimRight(truncated, "_")
 	}
 
-	prompt := fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
+	// Single-model simple mode: skip AI call, use truncation fallback directly.
+	if c.GetAIConfig() != nil && c.GetAIConfig().IsSingleAIModelMode() {
+		return truncateFallback()
+	}
+
+	result := truncateFallback()
+	c.GetAIConfig().ScheduleAuxiliaryTask(c.GetContext(),
+		aicommon.CallerLabelTaskShortID,
+		func() string {
+			return fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
 The identifier should capture the core meaning. Chinese or English are both acceptable.
-Reply with ONLY the JSON: {"@action":"object","identifier":"YOUR_IDENTIFIER"}
+Reply with ONLY the JSON: {"@action":"%s","identifier":"YOUR_IDENTIFIER"}
 
-Task name: %s`, name)
-
-	forgeResult, err := c.InvokeLiteForge(prompt)
-	if err != nil {
-		log.Debugf("liteforge failed to generate semantic identifier for %q: %v, falling back to truncation", name, err)
-		return truncateFallback()
-	}
-	if forgeResult == nil || forgeResult.Action == nil {
-		log.Debugf("liteforge returned nil result for %q, falling back to truncation", name)
-		return truncateFallback()
-	}
-
-	result := strings.TrimSpace(forgeResult.Action.GetString("identifier"))
-	result = aicommon.SanitizeTaskName(result)
-	if result == "" {
-		return truncateFallback()
-	}
-
-	// Ensure the AI-generated identifier is within limits
-	resultRunes := []rune(result)
-	if len(resultRunes) > maxIdentifierRuneLen {
-		result = string(resultRunes[:maxIdentifierRuneLen])
-		result = strings.TrimRight(result, "_")
-	}
+Task name: %s`, aicommon.CallerLabelTaskShortID, name)
+		},
+		func(action *aicommon.Action) {
+			identifier := aicommon.SanitizeTaskName(strings.TrimSpace(action.GetString("identifier")))
+			if identifier == "" {
+				return
+			}
+			resultRunes := []rune(identifier)
+			if len(resultRunes) > maxIdentifierRuneLen {
+				identifier = strings.TrimRight(string(resultRunes[:maxIdentifierRuneLen]), "_")
+			}
+			result = identifier
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			log.Debugf("failed to generate semantic identifier for %q: %v, falling back to truncation", name, err)
+		}),
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringParam("identifier"),
+		),
+	)
 	return result
 }
 

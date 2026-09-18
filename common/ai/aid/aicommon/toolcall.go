@@ -383,32 +383,11 @@ func WithToolCaller_InvokeRuntime(rt AIInvokeRuntime) ToolCallerOption {
 	}
 }
 
-// generateReasonByLiteForge uses the speed-priority lite forge to generate one
-// concise sentence describing WHY the given tool call is needed. It returns an
-// empty string (no-op) when no invokeRuntime is configured or generation fails,
-// so callers without a runtime keep their original behavior.
-func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams) string {
-	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
-		return ""
-	}
-	if utils.IsNil(ctx) {
-		ctx = t.ctx
-	}
-	prompt := buildToolCallReasonPrompt(tool, params, t.task)
-	action, err := t.invokeRuntime.InvokeSpeedPriorityLiteForge(
-		ctx, "tool-call-reason", prompt,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("A terse phrase (under 15 words) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
-				aitool.WithParam_MaxLength(30),
-				aitool.WithParam_Required(true)),
-		},
-	)
-	if err != nil || utils.IsNil(action) {
-		log.Debugf("generate tool-call reason via liteforge failed: %v", err)
-		return ""
-	}
-	return strings.TrimSpace(action.GetString("reason"))
+var toolCallReasonOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("reason",
+		aitool.WithParam_Description("A terse phrase (under 15 words) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
+		aitool.WithParam_MaxLength(30),
+		aitool.WithParam_Required(true)),
 }
 
 // buildToolCallReasonPrompt builds the lite-forge prompt asking for a concise
@@ -788,7 +767,7 @@ func (t *ToolCaller) resetReasonForReview() {
 
 // generateReasonIfNeeded generates a reason via the speed-priority liteforge AT
 // MOST ONCE per tool call (guarded by t.reasonGen). It is a no-op when a reason
-// is already present (preset / action-stashed) or no invokeRuntime is configured.
+// is already present (preset / action-stashed) or no Config is configured.
 // reasonFinalized is NOT used as a guard here — its only job is to tell the
 // param-generation thinking stream (SetOnReasonChunk) not to overwrite an already
 // emitted concrete reason. Call this from the single reason-handling point in
@@ -807,20 +786,29 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 	}() {
 		return
 	}
-	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
+	if t.config == nil || utils.IsNil(t.config) || tool == nil {
 		return
 	}
-	reason := t.generateReasonByLiteForge(t.ctx, tool, params)
-	if strings.TrimSpace(reason) == "" {
-		return
-	}
-	t.m.Lock()
-	t.reason = reason
-	t.reasonFinalized = true // concrete reason now exists; thinking stream should not overwrite
-	t.m.Unlock()
-	if t.emitter != nil {
-		t.emitter.EmitToolCallReason(t.callToolId, reason)
-	}
+	t.config.ScheduleAuxiliaryTask(t.ctx,
+		CallerLabelToolCallReason,
+		func() string {
+			return buildToolCallReasonPrompt(tool, params, t.task)
+		},
+		func(action *Action) {
+			reason := strings.TrimSpace(action.GetString("reason"))
+			if reason == "" {
+				return
+			}
+			t.m.Lock()
+			t.reason = reason
+			t.reasonFinalized = true // concrete reason now exists; thinking stream should not overwrite
+			t.m.Unlock()
+			if t.emitter != nil {
+				t.emitter.EmitToolCallReason(t.callToolId, reason)
+			}
+		},
+		WithAuxiliaryOutputs(toolCallReasonOutputs...),
+	)
 }
 
 // DirectlyCallPrepareFunc is the loop-layer callback that prepares the final

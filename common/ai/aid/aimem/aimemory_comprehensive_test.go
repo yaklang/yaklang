@@ -31,7 +31,7 @@ type AdvancedMockInvoker struct {
 }
 
 func NewAdvancedMockInvoker(ctx context.Context) *AdvancedMockInvoker {
-	return &AdvancedMockInvoker{
+	invoker := &AdvancedMockInvoker{
 		MockInvoker:      aicommonmock.NewMockInvoker(ctx),
 		ctx:              ctx,
 		capturedPrompts:  []string{},
@@ -40,6 +40,36 @@ func NewAdvancedMockInvoker(ctx context.Context) *AdvancedMockInvoker {
 		shouldFail:       make(map[string]bool),
 		promptValidators: make(map[string]func(string) bool),
 	}
+	// The production path now schedules on Config. Keep the advanced prompt
+	// validators and responses attached to that entry point, not just the
+	// deprecated runtime method inherited by the base mock.
+	invoker.GetConfig().(*aicommonmock.MockedAIConfig).ScheduleAuxiliaryTaskFunc = func(
+		ctx context.Context, name string, build func() string, onResult func(*aicommon.Action),
+		opts ...aicommon.AuxiliaryTaskOption,
+	) {
+		if build == nil {
+			return
+		}
+		prompt := build()
+		if prompt == "" {
+			return
+		}
+		spec := &aicommon.AuxiliaryTaskSpec{}
+		for _, opt := range opts {
+			opt(spec)
+		}
+		action, err := invoker.InvokeSpeedPriorityLiteForge(ctx, name, prompt, spec.Outputs, spec.Opts...)
+		if err != nil {
+			if spec.OnError != nil {
+				spec.OnError(err)
+			}
+			return
+		}
+		if action != nil && onResult != nil {
+			onResult(action)
+		}
+	}
+	return invoker
 }
 
 // SetReturnValue 设置特定action的返回值

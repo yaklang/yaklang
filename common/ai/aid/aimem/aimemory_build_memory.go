@@ -7,7 +7,6 @@ package aimem
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/log"
 
 	"time"
 
@@ -36,39 +35,18 @@ func validateMemoryTriageAction(action *aicommon.Action) error {
 }
 
 // AddRawText 从原始文本生成记忆条目
-func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) {
-	nonce := utils.RandStringBytes(4)
-	i = aicommon.ShrinkTextBlockByTokens(i, memoryTriageInputTokenLimit)
-
-	var dynContext string
-	if r.contextProvider != nil {
-		var err error
-		dynContext, err = r.contextProvider()
-		if err != nil {
-			return nil, utils.Errorf("contextProvider failed: %v", err)
-		}
-	}
-
-	existedTag, err := r.GetDynamicContextWithTags()
-	if err != nil {
-		return nil, utils.Errorf("GetDynamicContextWithTags failed: %v", err)
-	}
-	dynContext += existedTag
-
-	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
-		"Nonce":              nonce,
-		"Query":              i,
-		"HaveDynamicContext": dynContext != "",
-		"DynamicContext":     dynContext,
-		"CorePactPrinciple":  corepactPrinciplesPrompt,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	log.Info("start to use speed priority lite forge to analyze memory")
-	ac, err := r.invoker.InvokeSpeedPriorityLiteForge(r.ctx, "memory-triage", promptResult, []aitool.ToolOption{
-		aitool.WithStructArrayParam(
+func (r *AIMemoryTriage) AddRawText(i string) (entities []*aicommon.MemoryEntity, err error) {
+	err = utils.Error("memory triage returned no action")
+	r.invoker.GetConfig().ScheduleAuxiliaryTask(r.ctx,
+		aicommon.CallerLabelMemoryTriage,
+		func() string {
+			var prompt string
+			prompt, err = r.buildRawTextPrompt(i)
+			return prompt
+		},
+		func(action *aicommon.Action) { entities, err = parseRawTextMemory(action) },
+		aicommon.WithAuxiliaryOnError(func(cause error) { err = cause }),
+		aicommon.WithAuxiliaryOutputs(aitool.WithStructArrayParam(
 			"memory_entities",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Description("根据用户的输入的内容，分析用户行为，生成一个或多个记忆条目"),
@@ -86,14 +64,46 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 			aitool.WithNumberParam("e", aitool.WithParam_Description("情感评分，用户在表达这个信息时的情绪如何？越低越消极，消极评分时一般伴随信息源不可信"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("r", aitool.WithParam_Description("相关性评分，这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("c", aitool.WithParam_Description("关联度评分，这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
-		),
-	}, aicommon.WithLiteForgeDisableTimeline(), aicommon.WithLiteForgeOutputValidator(validateMemoryTriageAction))
+		)),
+		aicommon.WithAuxiliaryOpts(aicommon.WithLiteForgeDisableTimeline(), aicommon.WithLiteForgeOutputValidator(validateMemoryTriageAction)),
+	)
+	return entities, err
+}
+
+func (r *AIMemoryTriage) buildRawTextPrompt(i string) (string, error) {
+	nonce := utils.RandStringBytes(4)
+	i = aicommon.ShrinkTextBlockByTokens(i, memoryTriageInputTokenLimit)
+
+	var dynContext string
+	if r.contextProvider != nil {
+		var err error
+		dynContext, err = r.contextProvider()
+		if err != nil {
+			return "", utils.Errorf("contextProvider failed: %v", err)
+		}
+	}
+
+	existedTag, err := r.GetDynamicContextWithTags()
 	if err != nil {
-		return nil, utils.Errorf("InvokeLiteForge failed: %w", err)
+		return "", utils.Errorf("GetDynamicContextWithTags failed: %v", err)
 	}
-	if ac == nil {
-		return nil, utils.Error("memory triage returned no action")
+	dynContext += existedTag
+
+	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
+		"Nonce":              nonce,
+		"Query":              i,
+		"HaveDynamicContext": dynContext != "",
+		"DynamicContext":     dynContext,
+		"CorePactPrinciple":  corepactPrinciplesPrompt,
+	})
+	if err != nil {
+		return "", err
 	}
+
+	return promptResult, nil
+}
+
+func parseRawTextMemory(ac *aicommon.Action) ([]*aicommon.MemoryEntity, error) {
 	result, present, err := ac.GetCanonicalObjectArray("memory_entities")
 	if err != nil {
 		return nil, err

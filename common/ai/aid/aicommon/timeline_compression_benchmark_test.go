@@ -26,8 +26,8 @@ func (*compressionArchiveRecorder) SearchArchivedBatches(context.Context, *Timel
 }
 
 func compressionBenchmarkFixture(cfg *Config) *Timeline {
-	timeline := NewTimeline(&mockedAI{}, nil)
-	timeline.SoftBindConfig(cfg, nil)
+	timeline := NewTimeline(cfg, nil)
+	timeline.SoftBindConfig(cfg, cfg)
 	timeline.totalDumpContentLimit = 50 * 1024
 	timeline.autoCompressDisabled = true
 	for id := int64(1); id <= 60; id++ {
@@ -37,8 +37,13 @@ func compressionBenchmarkFixture(cfg *Config) *Timeline {
 }
 
 func TestTimelineCompress_BatchPreservesSummaryWithoutArchive(t *testing.T) {
+	registerTimelineTestLiteForge(t)
 	store := &compressionArchiveRecorder{}
-	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true), WithTimelineArchiveStore(store))
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true), WithTimelineArchiveStore(store),
+		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+			return (&mockedAI{}).CallSpeedPriorityAI(req)
+		}),
+	)
 	timeline := compressionBenchmarkFixture(cfg)
 	items := timeline.idToTimelineItem.Values()
 	timeline.batchCompressOldestWithRecent(items[:50], items[50:])
@@ -61,10 +66,15 @@ func TestTimelineCompress_BatchPreservesSummaryWithoutArchive(t *testing.T) {
 // BenchmarkTimelineCompression measures compression and persistence with fixed
 // input and a deterministic reducer. Fixture construction is outside the timer.
 func BenchmarkTimelineCompression(b *testing.B) {
+	registerTimelineTestLiteForge(b)
 	for _, mode := range []string{"batch", "emergency"} {
 		b.Run(mode, func(b *testing.B) {
 			store := &compressionArchiveRecorder{}
-			cfg := NewConfig(context.Background(), WithDisableAutoSkills(true), WithTimelineArchiveStore(store))
+			cfg := NewConfig(context.Background(), WithDisableAutoSkills(true), WithTimelineArchiveStore(store),
+				WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+					return (&mockedAI{}).CallSpeedPriorityAI(req)
+				}),
+			)
 			fixture, err := MarshalTimeline(compressionBenchmarkFixture(cfg))
 			if err != nil {
 				b.Fatal(err)
@@ -77,7 +87,7 @@ func BenchmarkTimelineCompression(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				timeline.SoftBindConfig(cfg, &mockedAI{})
+				timeline.SoftBindConfig(cfg, cfg)
 				timeline.totalDumpContentLimit = 50 * 1024
 				items := timeline.idToTimelineItem.Values()
 				b.StartTimer()
