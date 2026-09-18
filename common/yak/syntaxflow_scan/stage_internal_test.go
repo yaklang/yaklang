@@ -1,6 +1,7 @@
 package syntaxflow_scan
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -39,6 +40,19 @@ func TestStageOutcomeRecorder_CollectAloneIsNotSuccess(t *testing.T) {
 }
 
 // Compile-only success still requires collect plus the compile stage.
+func TestProductStageRankDoesNotRegress(t *testing.T) {
+	require.Greater(t, ProductStageRank(StageReview), ProductStageRank(StageInspect))
+	require.Greater(t, ProductStageRank(StageAnalyze), ProductStageRank(StageReview))
+	require.Equal(t, ProductStageRank(StageReview), ProductStageRank(StageCompile))
+}
+
+func TestStageOutcomeJSONKeepsZeroDetectionCounts(t *testing.T) {
+	raw, err := json.Marshal(StageOutcome{Stage: StageInspect, Status: StageStatusSucceeded})
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"rule_count":0`)
+	require.Contains(t, string(raw), `"risk_count":0`)
+}
+
 func TestStageOutcomeRecorder_CompileOnlySuccess(t *testing.T) {
 	recorder := newStageOutcomeRecorder()
 	recorder.record(StageCollect, nil)
