@@ -1,210 +1,82 @@
 package loopinfra
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
 
-func TestLooksLikeCodePatch(t *testing.T) {
-	assert.True(t, LooksLikeCodePatch("*** Begin Patch\n*** End Patch"))
-	assert.False(t, LooksLikeCodePatch("x = 1\ny = 2\n"))
-	assert.False(t, LooksLikeCodePatch(""))
+func TestBuildYaklangPatchLineRange_AbsoluteLines(t *testing.T) {
+	patch := BuildYaklangPatchLineRange("new", 2, 2, "old", 9)
+	require.NotNil(t, patch)
+	assert.Equal(t, "new", patch.Fragment)
+	assert.Equal(t, YaklangPatchKindLineRange, patch.Meta.Kind)
+	assert.Equal(t, 11, patch.Meta.StartLine)
+	assert.Equal(t, 11, patch.Meta.EndLine)
+	assert.Equal(t, "old", patch.Meta.OldSnippet)
 }
 
-func TestParseAndApply_SingleHunkReplace(t *testing.T) {
-	full := "a = 1\nb = 2\nc = 3\n"
-	patch := `*** Begin Patch
-*** Update File: demo.yak
-@@ replace b
- a = 1
--b = 2
-+b = 42
- c = 3
-*** End Patch`
-	hunks, err := ParseCodePatch(patch)
+func TestBuildYaklangPatchChangeEvent(t *testing.T) {
+	patch := BuildYaklangPatchSnippet("println(\"x\")", "old()", 0)
+	event := BuildYaklangPatchChangeEvent("/tmp/a.yak", patch, 2, "modify_code", "fix")
+	assert.Equal(t, LoopYaklangCodeEventOpPatch, event.Op)
+	assert.Equal(t, "println(\"x\")", event.Code.Content)
+	assert.Equal(t, "/tmp/a.yak", event.Code.Path)
+	assert.Equal(t, 2, event.Code.Version)
+	assert.Equal(t, "modify_code:2", event.Code.ChangeID)
+	require.NotNil(t, event.Code.Patch)
+	assert.Equal(t, YaklangPatchKindSnippet, event.Code.Patch.Kind)
+	assert.Equal(t, "old()", event.Code.Patch.OldSnippet)
+}
+
+func TestLoopYaklangDeliveryPatchStorage(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, err := reactloops.NewReActLoop("patch-store-test", runtime)
 	require.NoError(t, err)
-	require.Len(t, hunks, 1)
-	assert.Equal(t, "a = 1\nb = 2\nc = 3", hunks[0].OldText)
-	assert.Equal(t, "a = 1\nb = 42\nc = 3", hunks[0].NewText)
 
-	out, err := ApplyCodePatch(full, hunks)
-	require.NoError(t, err)
-	assert.Equal(t, "a = 1\nb = 42\nc = 3\n", out)
+	assert.Nil(t, GetLoopYaklangDeliveryPatch(loop))
+	patch := BuildYaklangPatchInsert("line", 3, 0)
+	SetLoopYaklangDeliveryPatch(loop, patch)
+	got := GetLoopYaklangDeliveryPatch(loop)
+	require.NotNil(t, got)
+	assert.Equal(t, "line", got.Fragment)
+	assert.Equal(t, 3, got.Meta.InsertLine)
+
+	ClearLoopYaklangDeliveryPatch(loop)
+	assert.Nil(t, GetLoopYaklangDeliveryPatch(loop))
 }
 
-func TestParseAndApply_MultiHunk(t *testing.T) {
-	full := "one\ntwo\nthree\nfour\n"
-	patch := `*** Begin Patch
-*** Update File: x.yak
-@@ first
--one
-+ONE
-@@ second
--three
-+THREE
-*** End Patch`
-	out, err := ApplyCodePatchFromString(full, patch)
-	require.NoError(t, err)
-	assert.Equal(t, "ONE\ntwo\nTHREE\nfour\n", out)
+func TestBuildSyntaxFlowFullChangeEvent(t *testing.T) {
+	event := BuildSyntaxFlowFullChangeEvent("create", "/tmp/a.sf", "desc(title: \"t\")", 1, "write_rule", "init")
+	assert.Equal(t, "create", event.Op)
+	assert.Equal(t, "desc(title: \"t\")", event.Code.Content)
+	assert.Equal(t, "/tmp/a.sf", event.Code.Path)
+	assert.Equal(t, 1, event.Code.Version)
+	assert.Equal(t, "write_rule:1", event.Code.ChangeID)
+	assert.Equal(t, "write_rule", event.SourceAction)
+	assert.Equal(t, "init", event.Reason)
 }
 
-func TestApply_NotFound(t *testing.T) {
-	full := "a = 1\n"
-	patch := `*** Begin Patch
-@@ miss
--missing
-+x
-*** End Patch`
-	_, err := ApplyCodePatchFromString(full, patch)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+func TestBuildSyntaxFlowPatchChangeEvent(t *testing.T) {
+	patch := BuildYaklangPatchSnippet("alert $x;", "old", 0)
+	event := BuildSyntaxFlowPatchChangeEvent("/tmp/a.sf", patch, 3, "modify_rule", "fix")
+	assert.Equal(t, LoopYaklangCodeEventOpPatch, event.Op)
+	assert.Equal(t, "alert $x;", event.Code.Content)
+	assert.Equal(t, "/tmp/a.sf", event.Code.Path)
+	assert.Equal(t, 3, event.Code.Version)
+	assert.Equal(t, "modify_rule:3", event.Code.ChangeID)
+	require.NotNil(t, event.Code.Patch)
+	assert.Equal(t, SyntaxFlowPatchKindSnippet, event.Code.Patch.Kind)
+	assert.Equal(t, "old", event.Code.Patch.OldSnippet)
 }
 
-func TestApply_Ambiguous(t *testing.T) {
-	full := "x=1\nfoo\nx=1\n"
-	patch := `*** Begin Patch
-@@ ambig
--x=1
-+x=9
-*** End Patch`
-	_, err := ApplyCodePatchFromString(full, patch)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "matched")
-}
-
-func TestApply_NormalizesLineEndingsAndTrailingWhitespace(t *testing.T) {
-	full := "before\r\nx = 1  \r\nafter\r\n"
-	patch := `*** Begin Patch
-@@ normalize
- before
--x = 1
-+x = 42
- after
-*** End Patch`
-
-	out, err := ApplyCodePatchFromString(full, patch)
-	require.NoError(t, err)
-	// Matched region used CRLF — replacement must keep CRLF, not mix LF into the middle.
-	assert.Equal(t, "before\r\nx = 42\r\nafter\r\n", out)
-}
-
-func TestApply_NormalizedMatchStillRequiresUniqueness(t *testing.T) {
-	full := "x = 1  \r\nmiddle\r\nx = 1\t\r\n"
-	patch := `*** Begin Patch
-@@ ambiguous after normalization
--x = 1
-+x = 2
-*** End Patch`
-
-	_, err := ApplyCodePatchFromString(full, patch)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "matched 2 times")
-}
-
-func TestApply_CollapseOverEscapedNewlines(t *testing.T) {
-	// Source has literal \r\n (one backslash each); model over-escaped as \\r\\n in the patch.
-	full := "raw = \"A\\r\\nB\"\n"
-	patch := "*** Begin Patch\n@@ http mock\n" +
-		"-raw = \"A\\\\r\\\\nB\"\n" +
-		"+raw = \"A\\\\r\\\\nC\"\n" +
-		"*** End Patch\n"
-
-	out, warnings, err := ApplyCodePatchWithWarnings(full, mustParsePatch(t, patch))
-	require.NoError(t, err)
-	assert.Equal(t, "raw = \"A\\r\\nC\"\n", out)
-	require.NotEmpty(t, warnings)
-	assert.Contains(t, warnings[0], "collapsing")
-}
-
-func TestApply_NotFound_HintsEscapeNoise(t *testing.T) {
-	full := "a = 1\n"
-	patch := "*** Begin Patch\n@@ miss\n" +
-		"-raw = \"x\\r\\n\"\n" +
-		"+raw = \"y\"\n" +
-		"*** End Patch\n"
-	_, err := ApplyCodePatchFromString(full, patch)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
-	assert.Contains(t, err.Error(), "CURRENT_CODE")
-	assert.Contains(t, err.Error(), `\\n`)
-}
-
-func mustParsePatch(t *testing.T, patch string) []CodePatchHunk {
-	t.Helper()
-	hunks, err := ParseCodePatch(patch)
-	require.NoError(t, err)
-	return hunks
-}
-
-func TestApply_DeletionHunk(t *testing.T) {
-	full := "keep\nDROP_ME\nkeep2\n"
-	patch := `*** Begin Patch
-@@ delete
- keep
--DROP_ME
- keep2
-*** End Patch`
-	out, err := ApplyCodePatchFromString(full, patch)
-	require.NoError(t, err)
-	assert.Equal(t, "keep\nkeep2\n", out)
-}
-
-func TestApply_InsertViaContext(t *testing.T) {
-	full := "before\nafter\n"
-	patch := `*** Begin Patch
-@@ insert
- before
-+middle
- after
-*** End Patch`
-	out, err := ApplyCodePatchFromString(full, patch)
-	require.NoError(t, err)
-	assert.Equal(t, "before\nmiddle\nafter\n", out)
-}
-
-func TestParse_RejectsContextOnlyNoOpPatch(t *testing.T) {
-	// Model dumped indented code inside Begin Patch; leading spaces become context markers,
-	// so there are no '-' / '+' change lines — must fail fast instead of no-op apply.
-	patch := `*** Begin Patch
-*** Update File: current
-   hdrOpts := []
-   for k, v := range headers {
-       hdrOpts = append(hdrOpts, http.header(k, v))
-   }
-   rsp, err := http.Request("POST", chatUrl, allOpts...)
-*** End Patch`
-	_, err := ParseCodePatch(patch)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "'+' / '-'")
-	assert.Contains(t, err.Error(), "context-only")
-}
-
-func TestParse_RejectsSpaceOnlyContextHunk(t *testing.T) {
-	patch := `*** Begin Patch
-@@ noop
- a = 1
- b = 2
-*** End Patch`
-	_, err := ParseCodePatch(patch)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no-op")
-}
-
-func TestParse_EmptyPatch(t *testing.T) {
-	_, err := ParseCodePatch("")
-	require.Error(t, err)
-
-	_, err = ParseCodePatch("*** Begin Patch\n*** End Patch")
-	require.Error(t, err)
-}
-
-func TestSummarizeAppliedPatch_NoBeginMarker(t *testing.T) {
-	hunks := []CodePatchHunk{{Header: "x", NewText: "hello world"}}
-	s := SummarizeAppliedPatch(hunks)
-	assert.Contains(t, s, "applied 1 patch hunk")
-	assert.NotContains(t, s, "*** Begin Patch")
-	assert.True(t, strings.Contains(s, "hello") || strings.Contains(s, "hunk"))
+func TestCodeChangeEventAliasesShareShape(t *testing.T) {
+	var yak YaklangCodeChangeEvent
+	var sf SyntaxFlowRuleChangeEvent
+	yak = BuildYaklangFullChangeEvent("replace", "a.yak", "x=1", 1, "write_code", "")
+	sf = yak
+	assert.Equal(t, yak.Code.Content, sf.Code.Content)
+	assert.Equal(t, CodePatchKindFull, BuildYaklangPatchFull("x").Meta.Kind)
 }

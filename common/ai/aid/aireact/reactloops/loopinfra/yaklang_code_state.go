@@ -9,11 +9,15 @@ import (
 )
 
 const (
-	loopYaklangCodeStateKey        = "current_yaklang_code_state"
-	loopYaklangCodeVersionKey      = "yaklang_code_change_version"
-	loopYaklangCodeSourceActionKey = "current_yaklang_code_source_action"
-	loopYaklangCodeChangeReasonKey = "current_yaklang_code_change_reason"
-	loopYaklangCodeChangeEventNode = "yaklang_code_change"
+	loopYaklangCodeStateKey           = "current_yaklang_code_state"
+	loopYaklangCodeVersionKey         = "yaklang_code_change_version"
+	loopYaklangCodeSourceActionKey    = "current_yaklang_code_source_action"
+	loopYaklangCodeChangeReasonKey    = "current_yaklang_code_change_reason"
+	loopYaklangCodeChangeEventNode    = "yaklang_code_change"
+	loopSyntaxflowRuleChangeEventNode = "syntaxflow_rule_change"
+
+	contentTypeYaklangCode    = "code/yaklang"
+	contentTypeSyntaxFlowRule = "text/syntaxflow"
 
 	LoopYaklangCodeEventOpReplace  = "replace"
 	LoopYaklangCodeEventOpSnapshot = "snapshot"
@@ -35,13 +39,13 @@ type loopYaklangCodeState struct {
 
 // loopYaklangCodeChange mirrors loop_http_fuzztest.loopHTTPFuzzRequestChange.
 type loopYaklangCodeChange struct {
-	Content       string
-	Path          string
-	SourceAction  string
-	ChangeReason  string
-	EventOp       string
-	Version       int
-	EmitEvent     bool
+	Content      string
+	Path         string
+	SourceAction string
+	ChangeReason string
+	EventOp      string
+	Version      int
+	EmitEvent    bool
 	// DeliveryPatch when set records a fragment delivery for editor_sync (live patch events).
 	DeliveryPatch *YaklangCodeDeliveryPatch
 }
@@ -180,11 +184,39 @@ func resolveLoopYaklangCodeEventOp(explicitOp string, previousState *loopYaklang
 	}
 }
 
+func isSyntaxFlowRuleEditorContentType(contentType string) bool {
+	return contentType == contentTypeSyntaxFlowRule
+}
+
+func (f *SingleFileModificationSuiteFactory) editorChangeEventType() schema.EventType {
+	if f != nil && isSyntaxFlowRuleEditorContentType(f.contentType) {
+		return schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE
+	}
+	return schema.EVENT_TYPE_YAKLANG_CODE_CHANGE
+}
+
+func (f *SingleFileModificationSuiteFactory) editorChangeEventNode() string {
+	if f != nil && isSyntaxFlowRuleEditorContentType(f.contentType) {
+		return loopSyntaxflowRuleChangeEventNode
+	}
+	return loopYaklangCodeChangeEventNode
+}
+
+func (f *SingleFileModificationSuiteFactory) editorChangeDefaultSource() string {
+	if f != nil && isSyntaxFlowRuleEditorContentType(f.contentType) {
+		return defaultSyntaxFlowRuleChangeSource
+	}
+	return defaultYaklangCodeChangeSource
+}
+
 // supportsYaklangCodeChangeEvent reports whether this suite should emit editor delivery events
-// (yaklang_code_change or syntaxflow_rule_change; see emitLoopEditorChangeEvent).
+// (yaklang_code_change or syntaxflow_rule_change).
 func (f *SingleFileModificationSuiteFactory) supportsYaklangCodeChangeEvent() bool {
+	if f == nil {
+		return false
+	}
 	switch f.contentType {
-	case "code/yaklang", contentTypeSyntaxFlowRule:
+	case contentTypeYaklangCode, contentTypeSyntaxFlowRule:
 		return true
 	default:
 		return false
@@ -269,10 +301,12 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	}, nil
 }
 
-func emitLoopYaklangCodeChangeEvent(loop *reactloops.ReActLoop, state *loopYaklangCodeState, op string) {
-	if loop == nil || loop.GetEmitter() == nil || state == nil || strings.TrimSpace(state.Content) == "" {
+// emitLoopEditorChangeEvent emits yaklang_code_change or syntaxflow_rule_change
+// based on the suite content type (frontend routes on EventType).
+func (f *SingleFileModificationSuiteFactory) emitLoopEditorChangeEvent(loop *reactloops.ReActLoop, state *loopYaklangCodeState, op string) {
+	if f == nil || loop == nil || loop.GetEmitter() == nil || state == nil || strings.TrimSpace(state.Content) == "" {
 		return
 	}
-	payload := BuildYaklangFullChangeEvent(op, state.Path, state.Content, state.Version, state.SourceAction, state.ChangeReason)
-	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, loopYaklangCodeChangeEventNode, payload)
+	payload := BuildCodeFullChangeEvent(op, state.Path, state.Content, state.Version, state.SourceAction, state.ChangeReason, f.editorChangeDefaultSource())
+	_, _ = loop.GetEmitter().EmitJSON(f.editorChangeEventType(), f.editorChangeEventNode(), payload)
 }
