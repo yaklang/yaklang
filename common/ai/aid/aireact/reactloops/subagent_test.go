@@ -50,7 +50,7 @@ func TestBuildForkTaskID_StableSegment(t *testing.T) {
 func TestNormalizeForkConcurrency(t *testing.T) {
 	require.Equal(t, 5, normalizeSubAgentConcurrency(0, 8))
 	require.Equal(t, 2, normalizeSubAgentConcurrency(0, 2))
-	require.Equal(t, 10, normalizeSubAgentConcurrency(99, 20))
+	require.Equal(t, 20, normalizeSubAgentConcurrency(99, 20))
 }
 
 func TestForkSubTaskCompletionDoesNotCancelJobCtx(t *testing.T) {
@@ -309,5 +309,4 @@ func TestBuildSubAgentInvoker_ChildHasFreshHotPatchOptionChan(t *testing.T) {
 	assert.NotSame(t, parentCfg.HotPatchOptionChan, childCfg.HotPatchOptionChan,
 		"child must NOT share the parent's HotPatchOptionChan")
 }
-
 

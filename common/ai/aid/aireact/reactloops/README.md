@@ -80,6 +80,8 @@ flowchart TD
 
 ## 文档索引
 
+新增：[非阻塞子Agent：派发、观察和收尾](docs/20-background-subagents.md)。
+
 | 文档 | 内容 |
 |------|------|
 | [docs/01-architecture.md](docs/01-architecture.md) | `ReActLoop` 字段分组、主循环走读、状态机、`LoopActionHandlerOperator` 语义 |

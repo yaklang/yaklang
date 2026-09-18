@@ -62,22 +62,38 @@ func NewSessionPromptState() *SessionPromptState {
 }
 
 // ForkForSubAgent returns a deep copy of the session prompt state for a
-// forked sub ReAct agent. Every field is copied so the sub agent owns an
-// independent state that cannot race with (or mutate) the parent's, EXCEPT
-// the global verification TODO store (todoJSON): that list is the parent
+// forked sub ReAct agent. User history, evidence and render state are copied;
+// the reported-risk store is deliberately shared for session-wide deduplication.
+// The global verification TODO store (todoJSON) is omitted: that list is the parent
 // agent's verification bookkeeping and must neither leak into a sub agent's
 // prompt nor be polluted by a sub agent's todo_delta. The sub agent
 // therefore starts with an empty TODO list.
 //
 // 关键词: ForkForSubAgent, 子 agent 隔离, 复制非 todo 状态, todoJSON 丢弃
 func (s *SessionPromptState) ForkForSubAgent() *SessionPromptState {
+	return s.forkForSubAgent(true)
+}
+
+// ForkForTaskOnlySubAgent omits conversation state while retaining the shared
+// reporting ledger. It is a context policy, not a new authority boundary.
+func (s *SessionPromptState) ForkForTaskOnlySubAgent() *SessionPromptState {
+	return s.forkForSubAgent(false)
+}
+
+func (s *SessionPromptState) forkForSubAgent(inheritConversation bool) *SessionPromptState {
 	if s == nil {
 		return NewSessionPromptState()
 	}
-	s.m.RLock()
-	defer s.m.RUnlock()
+	s.m.Lock()
+	defer s.m.Unlock()
 
 	forked := &SessionPromptState{}
+	// Share the thread-safe reporting ledger even before the first report.
+	// A copied nil pointer would allow parent/children to create separate stores.
+	forked.reportedRiskStore = s.getOrCreateReportedRiskStore()
+	if !inheritConversation {
+		return forked
+	}
 
 	if len(s.UserInputHistory) > 0 {
 		forked.UserInputHistory = make([]schema.AIAgentUserInputRecord, len(s.UserInputHistory))
@@ -85,11 +101,6 @@ func (s *SessionPromptState) ForkForSubAgent() *SessionPromptState {
 	}
 
 	forked.evidenceJSON = s.evidenceJSON
-	// reportedRiskStore is shared (pointer-aliased) between parent and child:
-	// risks reported by a sub-agent are immediately visible to the parent and
-	// vice versa. The store is internally thread-safe (sync.Mutex), so
-	// concurrent access from parent and child agents is safe.
-	forked.reportedRiskStore = s.reportedRiskStore
 	// todoJSON intentionally left empty: sub agents do not inherit the
 	// parent's global TODO list.
 

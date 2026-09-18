@@ -15,10 +15,11 @@ type LoopActionHandlerOperator struct {
 
 	terminateOperateOnce *utils.Once
 
-	isContinued  bool
-	isTerminated bool
-	failedError  error
-	isSilence    bool
+	isContinued       bool
+	isTerminated      bool
+	failedError       error
+	isSilence         bool
+	userRequestedExit bool
 
 	// executedToolCallCount is not the number of tool calls declared by the
 	// model. It counts callbacks that actually settled with a ToolResult during
@@ -77,6 +78,15 @@ func (l *LoopActionHandlerOperator) Continue() {
 
 func (l *LoopActionHandlerOperator) Exit() {
 	l.terminateOperateOnce.Do(func() {
+		l.isTerminated = true
+	})
+}
+
+// ExitForUser bypasses ordinary model completion admission after an explicit
+// host-side user interruption. Owned background work is cancelled on exit.
+func (l *LoopActionHandlerOperator) ExitForUser() {
+	l.terminateOperateOnce.Do(func() {
+		l.userRequestedExit = true
 		l.isTerminated = true
 	})
 }

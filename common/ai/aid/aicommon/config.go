@@ -251,6 +251,7 @@ type Config struct {
 	// can isolate an explicitly injected MCP session. User options run once.
 	collectingToolManagerOptions bool
 	pendingToolManagerUpdates    []toolManagerConfigUpdate
+	inheritedToolManager         bool
 
 	// browserSessionTracker records browser ids opened by yak tools for session cleanup.
 	browserSessionTracker BrowserSessionTracker
@@ -662,7 +663,11 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 	config.pendingToolManagerUpdates = nil
-	if config.AiToolManager != nil {
+	// A queued child must not replay its old policy onto the parent's live
+	// capability manager. Explicitly supplied managers retain mutation semantics.
+	if config.inheritedToolManager && !isolateToolManager {
+		config.DisallowMCPServers = config.AiToolManager.DisallowMCPServers()
+	} else if config.AiToolManager != nil {
 		config.AiToolManager.SetDisallowMCPServers(config.DisallowMCPServers)
 	}
 
@@ -1803,7 +1808,21 @@ func WithAiToolManager(manager *buildinaitools.AiToolManager) ConfigOption {
 		}
 		c.m.Lock()
 		c.AiToolManager = manager
+		c.inheritedToolManager = false
 		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithInheritedAiToolManager shares the parent's live authority without replaying
+// a configuration snapshot's MCP policy when this child is constructed later.
+// Apply after the copied parent options, before any explicit child overrides.
+func WithInheritedAiToolManager(manager *buildinaitools.AiToolManager) ConfigOption {
+	return func(c *Config) error {
+		if err := WithAiToolManager(manager)(c); err != nil {
+			return err
+		}
+		c.inheritedToolManager = manager != nil
 		return nil
 	}
 }
@@ -1865,6 +1884,7 @@ func WithDisallowMCPServers(disallow bool) ConfigOption {
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.DisallowMCPServers = disallow
+		c.inheritedToolManager = false // An explicit override is a policy mutation.
 		deferred := c.queueToolManagerUpdateLocked(func(manager *buildinaitools.AiToolManager) error {
 			manager.SetDisallowMCPServers(disallow)
 			return nil

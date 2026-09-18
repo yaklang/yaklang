@@ -16,6 +16,7 @@ import (
 // 子 Agent 的 timeline 一旦 merge 回父，隔离语义彻底失效，父将看到子的全部
 // 中间条目——这是 sub agent 不变量所禁止的。
 type TimelineHandle struct {
+	taskID string // allocated once, shared by fork metadata, runtime and dispatch receipt
 	mode   SubAgentTimelineMode
 	fork   *aicommon.TimelineFork // Fork 模式非 nil，Clean 模式为 nil
 	branch *aicommon.Timeline     // 子实际使用的 timeline（Fork.Branch 或 Clean 新建）
@@ -62,7 +63,7 @@ func (h *TimelineHandle) Release() {
 // buildTimelineHandle 按模式构建子 Agent 的 timeline 容器。
 //
 //   - Fork：用父 timeline.ForkForTask 克隆快照，子在分支上运行。
-//   - Clean：用 aicommon.NewTimeline 新建空 timeline，子从零开始。
+//   - Clean：新建空 timeline；会话证据、用户历史和能力等仍按配置继承规则处理。
 func buildTimelineHandle(
 	parentCfg *aicommon.Config,
 	parentTimeline *aicommon.Timeline,
@@ -72,7 +73,7 @@ func buildTimelineHandle(
 	switch mode {
 	case SubAgentTimelineClean:
 		branch := aicommon.NewTimeline(parentCfg, nil)
-		return &TimelineHandle{mode: SubAgentTimelineClean, branch: branch}, nil
+		return &TimelineHandle{taskID: subTaskID, mode: SubAgentTimelineClean, branch: branch}, nil
 	default: // SubAgentTimelineFork
 		if parentTimeline == nil {
 			return nil, utils.Error("fork timeline mode requires parent timeline")
@@ -84,7 +85,7 @@ func buildTimelineHandle(
 		if fork == nil || fork.Branch == nil {
 			return nil, utils.Error("failed to create timeline fork for sub-agent")
 		}
-		return &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, nil
+		return &TimelineHandle{taskID: subTaskID, mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, nil
 	}
 }
 
@@ -110,7 +111,10 @@ func buildSubAgentRuntime(
 		return nil, nil, nil, utils.Error("timeline handle is nil")
 	}
 
-	subTaskID := BuildForkTaskID(parentTask, job)
+	subTaskID := handle.taskID
+	if subTaskID == "" {
+		subTaskID = BuildForkTaskID(parentTask, job)
+	}
 	subTaskName := strings.TrimSpace(job.TaskName)
 	if subTaskName == "" {
 		subTaskName = strings.TrimSpace(job.Identifier)
@@ -122,11 +126,15 @@ func buildSubAgentRuntime(
 		subTaskName = subTaskID
 	}
 
-	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
+	baseCtx := parentTask.GetContext()
+	if opts.runtimeContext != nil {
+		baseCtx = opts.runtimeContext
+	}
+	jobCtx, jobCancel := context.WithCancel(baseCtx)
 	if job.Timeout > 0 {
 		// 释放上一层的 cancel 句柄再覆盖，避免 cancel 泄漏（go vet lostcancel）。
 		jobCancel()
-		jobCtx, jobCancel = context.WithTimeout(parentTask.GetContext(), job.Timeout)
+		jobCtx, jobCancel = context.WithTimeout(baseCtx, job.Timeout)
 		log.Infof("[SubAgent] job %q wall-clock timeout=%s (armed on slot acquisition)", job.Identifier, job.Timeout)
 	}
 
@@ -156,15 +164,25 @@ func buildSubAgentRuntime(
 	}
 	subTask := aicommon.NewSubTaskBaseWithOptions(parentTask, subTaskID, userInput, subTaskOpts...)
 	var taskEmitter *aicommon.Emitter
+	parentEmitter := opts.parentEmitter
+	if parentEmitter == nil {
+		parentEmitter = parentCfg.GetEmitter()
+	}
 	if opts.InheritEmitter {
 		// 复用父任务的 emitter，事件保持父任务的 TaskId，前端不出现新卡片。
-		taskEmitter = parentCfg.GetEmitter()
+		taskEmitter = parentEmitter
 	} else {
-		taskEmitter = BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
+		taskEmitter = BuildForwardingEmitterForTask(parentEmitter, subTask)
+	}
+	if opts.observeEvent != nil {
+		taskEmitter = taskEmitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+			opts.observeEvent(event)
+			return event
+		})
 	}
 	subTask.SetEmitter(taskEmitter)
 
-	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter)
+	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter, opts.childConfigOptions)
 	if err != nil {
 		jobCancel()
 		return nil, nil, nil, utils.Wrap(err, "create sub react invoker failed")
@@ -179,6 +197,9 @@ func buildSubAgentRuntime(
 	// 不立即发送取消确认消息，而是在 finalizeSubAgents 中等子 Agent loop 退出
 	// 后统一触发 CallAsyncDeferCallback 发送，实现"取消完成再发返回消息"。
 	subTask.SetAsyncMode(true)
+	if opts.taskReady != nil {
+		opts.taskReady(subTask)
+	}
 
 	if handle.Mode() == SubAgentTimelineFork {
 		branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
@@ -200,16 +221,20 @@ func buildSubAgentInvoker(
 	handle *TimelineHandle,
 	taskCtx context.Context,
 	taskEmitter *aicommon.Emitter,
+	frozen ...[]aicommon.ConfigOption,
 ) (aicommon.AITaskInvokeRuntime, error) {
-	baseOpts := aicommon.ConvertConfigToOptions(parentCfg)
+	var baseOpts []aicommon.ConfigOption
+	if len(frozen) > 0 && frozen[0] != nil {
+		baseOpts = append(baseOpts, frozen[0]...)
+	} else {
+		baseOpts = snapshotSubAgentConfig(parentCfg)
+	}
 	baseOpts = append(baseOpts,
 		aicommon.WithTimeline(handle.Timeline()),
 		aicommon.WithContext(taskCtx),
-		aicommon.WithAICallbacks(parentCfg.GetRawAICallbacks()),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEmitter(taskEmitter),
 		aicommon.WithAgreeAuto(),
-		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
 	)
 	// 子 Agent 不得继承任何顶层执行策略。显式关闭 plan / goal mode / dispatch
 	// / increase iteration，使子 Agent 契约自文档化，且在 ConvertConfigToOptions
@@ -221,6 +246,34 @@ func buildSubAgentInvoker(
 		return nil, utils.Wrap(err, "create sub react invoker failed")
 	}
 	return childInvoker, nil
+}
+
+// Capture value options and a session-state fork at submission time. TODO state
+// is cleared; the reported-risk store, ordinary context providers and capability
+// managers deliberately retain their existing sharing/resource boundaries.
+func snapshotSubAgentConfig(parent *aicommon.Config, contextMode ...string) []aicommon.ConfigOption {
+	var state *aicommon.SessionPromptState
+	taskOnly := len(contextMode) > 0 && contextMode[0] == SubAgentContextTaskOnly
+	if taskOnly {
+		state = parent.SessionPromptState.ForkForTaskOnlySubAgent()
+	} else {
+		state = parent.SessionPromptState.ForkForSubAgent()
+	}
+	opts := append(aicommon.ConvertConfigToOptions(parent),
+		aicommon.WithInheritedAiToolManager(parent.AiToolManager),
+		aicommon.WithAICallbacks(parent.GetRawAICallbacks()),
+		aicommon.WithSessionPromptState(state),
+	)
+	if taskOnly {
+		opts = append(opts, aicommon.WithPlanPrompt(""),
+			aicommon.WithContextProvider(parent.ContextProviderManager.WithoutTaskContext()),
+			// Otherwise LiteForge can restore the parent's persisted history, and
+			// frozen plan partitions/automatic memory recall can refill the prompt.
+			aicommon.WithPersistentSessionId(""),
+			aicommon.WithFrozenBlockPartitionProducer(aicommon.NewFrozenBlockPartitionProducer()),
+			aicommon.WithDisableMemoryTriage(true), aicommon.WithNoOpMemoryTriage())
+	}
+	return opts
 }
 
 // buildSubAgentStrategyOptions 返回子 Agent 强制关闭的顶层策略选项。子 Agent

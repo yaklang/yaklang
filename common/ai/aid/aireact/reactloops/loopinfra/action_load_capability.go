@@ -94,6 +94,13 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 		fmt.Sprintf("加载能力: %s (%s) / Load capability: %s (%s)", identifier, resolvedType, identifier, resolvedType),
 		"正在加载能力", "Loading capability…")
 
+	if resolvedType == aicommon.ResolvedAs_Forge || resolvedType == aicommon.ResolvedAs_FocusedMode {
+		if reason := loop.SubAgentFinishBlockReason(); reason != "" {
+			op.Feedback(reason)
+			op.Continue()
+			return
+		}
+	}
 	switch resolvedType {
 	case aicommon.ResolvedAs_Tool:
 		handleLoadTool(loop, invoker, ctx, identifier, op)

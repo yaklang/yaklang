@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 
@@ -54,9 +55,10 @@ type AiToolManager struct {
 	disableTools          map[string]struct{} // 禁用的工具列表 优先级最高
 	searchTool            []*aitool.Tool
 	forgeSearchTool       []*aitool.Tool
-	noCacheTools          bool // 是否不缓存工具
-	enableAllTools        bool // 是否开启所有工具
-	disallowMCPServers    bool // when true, hide MCP tools from search/list/lookup paths
+	noCacheTools          bool        // 是否不缓存工具
+	enableAllTools        bool        // 是否开启所有工具
+	disallowMCPServers    atomic.Bool // when true, hide MCP tools from search/list/lookup paths
+	searchToolsMu         sync.Mutex
 	restrictToTools       bool // when true, disabled names must not fall back to profile DB/plugin lookup
 
 	recentToolsCache []*RecentToolEntry
@@ -171,8 +173,7 @@ func WithSearchToolEnabled(enabled bool) ToolManagerOption {
 // WithDisallowMCPServers hides MCP tools from search, prompt inventory, and name lookup.
 func WithDisallowMCPServers(disallow bool) ToolManagerOption {
 	return func(m *AiToolManager) {
-		m.disallowMCPServers = disallow
-		m.searchTool = nil
+		m.SetDisallowMCPServers(disallow)
 	}
 }
 
@@ -188,7 +189,7 @@ func WithOnlyTools(tools ...*aitool.Tool) ToolManagerOption {
 		}
 		m.enableSearchTool = false
 		m.enableForgeSearchTool = false
-		m.disallowMCPServers = true
+		m.disallowMCPServers.Store(true)
 	}
 }
 
@@ -234,10 +235,10 @@ func (m *AiToolManager) ForkForSession() *AiToolManager {
 		disableTools:          make(map[string]struct{}, len(m.disableTools)),
 		noCacheTools:          m.noCacheTools,
 		enableAllTools:        m.enableAllTools,
-		disallowMCPServers:    m.disallowMCPServers,
 		restrictToTools:       m.restrictToTools,
 		maxCacheTokens:        m.maxCacheTokens,
 	}
+	fork.disallowMCPServers.Store(m.disallowMCPServers.Load())
 	for name, enabled := range m.toolEnabled {
 		fork.toolEnabled[name] = enabled
 	}
@@ -260,7 +261,9 @@ func (m *AiToolManager) SetDisallowMCPServers(disallow bool) {
 	if m == nil {
 		return
 	}
-	m.disallowMCPServers = disallow
+	m.searchToolsMu.Lock()
+	defer m.searchToolsMu.Unlock()
+	m.disallowMCPServers.Store(disallow)
 	m.searchTool = nil
 }
 
@@ -269,7 +272,7 @@ func (m *AiToolManager) DisallowMCPServers() bool {
 	if m == nil {
 		return false
 	}
-	return m.disallowMCPServers
+	return m.disallowMCPServers.Load()
 }
 
 // NewToolManager 创建一个新的默认工具管理器实例
@@ -301,7 +304,7 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 		return []*aitool.Tool{}
 	}
 	allTools := m.toolsGetter()
-	if m.disallowMCPServers {
+	if m.disallowMCPServers.Load() {
 		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
 			return !IsMCPToolName(tool.Name)
 		})
@@ -350,6 +353,8 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 }
 
 func (m *AiToolManager) getForgeSearchTools() ([]*aitool.Tool, error) {
+	m.searchToolsMu.Lock()
+	defer m.searchToolsMu.Unlock()
 	if m.forgeSearchTool == nil {
 		// aiforge search tools
 		aiforgeSearchTools, err := searchtools.CreateAISearchTools(m.aiForgeSearcher, func() []*schema.AIForge {
@@ -368,6 +373,8 @@ func (m *AiToolManager) getForgeSearchTools() ([]*aitool.Tool, error) {
 }
 
 func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
+	m.searchToolsMu.Lock()
+	defer m.searchToolsMu.Unlock()
 	if m.searchTool == nil {
 		var err error
 		// ai tool search tools
@@ -375,7 +382,7 @@ func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
 			m.aiToolsSearcher,
 			m.safeToolsGetter,
 			searchtools.SearchToolName,
-			!m.disallowMCPServers,
+			!m.disallowMCPServers.Load(),
 		)
 		if err != nil {
 			log.Error(err)
@@ -436,7 +443,7 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 
 	// Look up cached MCP tool metadata using the compound name "mcp_{server}_{tool}".
 	// Skip when MCP servers are disabled for this runtime.
-	if !m.disallowMCPServers {
+	if !m.disallowMCPServers.Load() {
 		mcpCfg, mcpErr := yakit.GetMCPServerToolConfigByFullName(db, name)
 		if mcpErr == nil && mcpCfg.Enable && mcpCfg.Description != "" {
 			stub := buildStubToolFromMCPCache(name, mcpCfg)

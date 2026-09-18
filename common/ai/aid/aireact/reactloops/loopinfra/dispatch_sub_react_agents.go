@@ -3,12 +3,10 @@ package loopinfra
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -46,75 +44,34 @@ func handleDispatchSubReactAgents(
 		return
 	}
 
-	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(jobs))
-
-	loopInfraStatus(loop, "子 Agent 正在执行", "Sub-agents are running…")
-
-	// Pause the verification watchdog while sub-agents are running. This is a
-	// double-insurance alongside the sub-agent progress bypass in
-	// triggerVerificationWatchdog: even if the watchdog timer fires during
-	// the blocking DispatchSubAgents call, the suppression depth > 0
-	// prevents it from triggering a premature task.Finish.
-	// 关键词: dispatch watchdog suppression, begin/end pair
-	loop.BeginVerificationWatchdogToolSuppression()
-	defer loop.EndVerificationWatchdogToolSuppression()
-
-	results := reactloops.DispatchSubAgents(invoker, parentTask, jobs, reactloops.SubAgentOptions{
-		ParentLoop:         loop,
-		TimelineMode:       reactloops.SubAgentTimelineFork,
-		ElaborateGoals:     true,
-		ExecuteConcurrency: concurrency,
-	})
-
-	reactloops.SortJobResults(results)
-
-	var feedbackLines []string
-	successCount := 0
-	for _, result := range results {
-		if result == nil {
-			continue
-		}
-		if result.Record.Status == "completed" {
-			successCount++
-		}
-		writeSubReactAgentTimelineRecord(invoker, result.Record)
-		feedbackLines = append(feedbackLines, result.Feedback)
-	}
-
-	summary := fmt.Sprintf(
-		"Dispatched %d sub react agents: %d succeeded, %d failed.",
-		len(results), successCount, len(results)-successCount,
-	)
-	invoker.AddToTimeline("[DISPATCH_SUB_REACT_AGENTS_DONE]", summary)
-	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)
-
-	operator.Feedback(summary + "\n\n" + strings.Join(feedbackLines, "\n"))
-	operator.Continue()
-}
-
-// writeSubReactAgentTimelineRecord 把阶段 3 已构造好的 TimelineRecord 写进父
-// timeline。reference 落盘已在 DispatchSubAgents 的阶段 3 完成，这里只负责把
-// record JSON 写入父 timeline 条目。
-func writeSubReactAgentTimelineRecord(
-	invoker aicommon.AIInvokeRuntime,
-	record reactloops.TimelineRecord,
-) {
-	if invoker == nil {
-		return
-	}
-	raw, err := json.MarshalIndent(record, "", "  ")
+	receipt, err := loop.SubmitSubAgents(parentTask, jobs, reactloops.SubAgentOptions{
+		TimelineMode:   reactloops.SubAgentTimelineFork,
+		ElaborateGoals: true,
+	}, fmt.Sprintf("%s:%d", parentTask.GetUUID(), loop.GetCurrentIterationIndex()))
 	if err != nil {
-		log.Warnf("dispatch_sub_react_agents: marshal timeline record failed: %v", err)
-		invoker.AddToTimeline(schema.AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT, utils.InterfaceToString(record))
+		operator.Feedback("Sub-agent submission rejected: " + err.Error())
+		operator.Continue()
 		return
 	}
-	invoker.AddToTimeline(schema.AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT, string(raw))
+	raw, _ := json.Marshal(receipt)
+	invoker.AddToTimeline("sub_agent_dispatch_accepted", string(raw))
+	// The receipt is a model protocol. The user-facing stream must describe
+	// acceptance, not expose JSON or imply the child work already completed.
+	summary := fmt.Sprintf("已派发 %d 个子任务，正在后台执行；主任务将继续处理其他工作。", len(receipt.Jobs))
+	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)
+	reactloops.EmitStatusI18n(loop, summary,
+		fmt.Sprintf("Dispatched %d background tasks; continuing other work.", len(receipt.Jobs)),
+		aicommon.WithStatusCode("subagent.dispatched"))
+	operator.Feedback(string(raw) + "\nAccepted, not completed. Continue independent work. If nothing useful remains, wait_sub_react_agents defaults to 30s; an observation timeout does not cancel workers. Results arrive in a later model input.")
+	operator.Continue()
 }
 
 var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS,
-	Description: "Dispatch multiple INDEPENDENT sub ReAct agents in parallel. Each sub agent inherits the current timeline snapshot as context, " +
-		"runs in an isolated timeline fork, and returns one structured result record back to the parent agent. " +
+	Description: "Dispatch multiple INDEPENDENT sub ReAct agents in parallel. Choose context_mode per job: fork (default) inherits a submission-time history snapshot; task_only starts from the explicit task brief without parent conversation, evidence or input attachments. " +
+		"Use fork when prior investigation is needed; use task_only for self-contained searches or independent reviews, including required constraints, inputs and file paths in goal. Both modes keep host instructions, capabilities, shared risk deduplication and cancellation scope. " +
+		"This action returns accepted job IDs immediately; continue independent work while children run. " +
+		"Use inspect_sub_react_agents for progress, wait_sub_react_agents for a bounded wait (default 30 seconds), or cancel_sub_react_agents. New results enter the next model input automatically. " +
 		"Sub agents cannot dispatch more sub agents, open plans, or be subject to goal-mode limits.\n" +
 		"WHAT THIS IS FOR: parallelizing genuinely independent workstreams that can run at the same time without talking to each other (e.g. scan host A and scan host B).\n" +
 		"WHAT THIS IS NOT FOR: (1) offloading a single sequential task you should do yourself — if the whole task is one chain of steps, do NOT dispatch it; (2) dumping every imaginable subtask into one call to avoid thinking. Only dispatch subtasks you have actually confirmed are independent.\n" +
@@ -124,17 +81,21 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 		aitool.WithStructArrayParam("dispatches",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Sub agent jobs to dispatch in parallel. Each item runs in an isolated timeline fork and returns one structured result back to the parent. " +
+				aitool.WithParam_Description("Sub agent jobs to dispatch in parallel. Each item has its own context_mode and independent timeline, and returns one structured result back to the parent. " +
 					"All jobs in one dispatch MUST be mutually independent — none may depend on another job's input or result. Dependent sub agents must be split across separate loop iterations: dispatch the first batch, wait for completion, then dispatch the dependent batch in the next iteration."),
 			},
 			nil,
+			aitool.WithStringParam("context_mode",
+				aitool.WithParam_EnumString(reactloops.SubAgentContextFork, reactloops.SubAgentContextTaskOnly),
+				aitool.WithParam_Description("Default fork: inherit the history snapshot captured at dispatch, never later parent updates. task_only: no parent conversation/evidence/input attachments, plan partitions or automatic memory recall; provide all necessary task facts and constraints in goal. Resource permissions and host policy are unchanged.")),
 			aitool.WithStringParam("identifier",
 				aitool.WithParam_Description("Optional stable label for this sub agent. Auto-generated from array index when omitted."),
 			),
 			aitool.WithStringParam("goal",
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Short one-line intent for this sub agent — a noun phrase or single sentence, STRICTLY within 15 characters (English) / 15 字以内 (Chinese). Keep it brief; a complete, self-contained goal and result contract are elaborated automatically before the sub agent runs — do not write the full goal here."),
+				aitool.WithParam_Description("Self-contained goal, required inputs and constraints. Goal elaboration runs in the background and must preserve this scope."),
 			),
+			aitool.WithStringParam("result_contract", aitool.WithParam_Description("Required evidence, output format and acceptance criteria.")),
 			aitool.WithStringParam("task_name",
 				aitool.WithParam_Description("Short, human-readable name for this sub agent's task, shown as the task title in the UI and timeline. Falls back to identifier, then goal when omitted. Prefer a concise noun phrase here rather than reusing the full goal sentence."),
 			),

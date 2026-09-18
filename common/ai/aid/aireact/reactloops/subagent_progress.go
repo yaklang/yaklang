@@ -67,18 +67,27 @@ func (h *SubAgentHandle) LastActivityAt() time.Time {
 	if h == nil {
 		return time.Time{}
 	}
-	if h.SubLoop != nil {
+	h.mu.Lock()
+	loop := h.SubLoop
+	h.mu.Unlock()
+	if loop != nil {
 		// 子 Agent 正在跑工具时, iteration 不会前进, 但必须算作"还在动",
 		// 否则父 loop 的 stall 旁路会在 10 分钟后失效, 30 分钟 hard abort
 		// 误杀整个类别扫描 (Phase2 + fast_context + 全仓 grep).
-		if h.SubLoop.HasInflightToolActivity() {
+		if loop.HasInflightToolActivity() {
 			return time.Now()
 		}
-		if tick := h.SubLoop.lastObservedActivityNano(); tick > 0 {
+		if tick := loop.lastObservedActivityNano(); tick > 0 {
 			return time.Unix(0, tick)
 		}
 	}
 	return h.StartedAt
+}
+
+func (h *SubAgentHandle) SetSubLoop(loop *ReActLoop) {
+	h.mu.Lock()
+	h.SubLoop = loop
+	h.mu.Unlock()
 }
 
 // IsFinished 返回该子 Agent 是否已经结束 (成功或失败).

@@ -257,6 +257,8 @@ func (c *Config) GetExecutionPolicy() string {
 			"- 【MUST】Dispatch is strictly for parallelizing INDEPENDENT workstreams. You MUST NOT use it to offload a single sequential task you should do yourself, and you MUST NOT dump every imaginable subtask into one call to avoid thinking. Before batching, you MUST verify each subtask is mutually independent.",
 			"- 【MUST】If subtask B depends on subtask A's result, you MUST NOT batch them together. Do A first (dispatch it or do it yourself), wait for its result to land in the timeline, then dispatch B in a LATER iteration. Only zero-dependency subtasks may share one dispatch.",
 			"- When dispatching, write a crisp, self-contained goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
+			"- Choose context_mode per child: fork (default) for work needing prior investigation; task_only for self-contained searches or independent reviews. task_only omits parent history, evidence and input attachments, so include required facts, constraints and file paths in goal. Neither mode changes host authority or cancellation scope.",
+			"- Dispatch returns accepted job IDs immediately, not completed results. Continue useful independent work while children run. When no useful local work remains, use wait_sub_react_agents (default 30 seconds), inspect the returned progress, and decide again. A wait timeout never cancels child execution. Results arrive in a subsequent model input; finish requires all jobs settled and their results received. Use cancel_sub_react_agents to abandon unwanted work explicitly.",
 		)
 	}
 	if c.GetEnableGoalMode() {
