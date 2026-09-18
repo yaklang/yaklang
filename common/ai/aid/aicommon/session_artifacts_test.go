@@ -178,6 +178,7 @@ func TestSessionArtifactsAreNotRenderedByPromptTemplates(t *testing.T) {
 }
 
 func TestPromptTimelineAfterCompression_KeepsSixthAndSingleHead(t *testing.T) {
+	registerTimelineTestLiteForge(t)
 	const (
 		totalItems     = 40
 		oldMarker      = "old-marker-should-be-compressed"
@@ -280,6 +281,7 @@ func TestPromptTimelineAfterCompression_KeepsSixthAndSingleHead(t *testing.T) {
 }
 
 func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *testing.T) {
+	registerTimelineTestLiteForge(t)
 	const (
 		firstWaveItems  = 40
 		secondWaveItems = 40
