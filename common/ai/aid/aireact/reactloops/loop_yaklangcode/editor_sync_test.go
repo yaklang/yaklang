@@ -61,6 +61,7 @@ func TestYaklangEditorSync_LiveEmitsForEditDuringLoop(t *testing.T) {
 		loopinfra.WithActionSuffix("code"),
 		loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 		loopinfra.WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
+		loopinfra.WithEventType("yaklang_code_editor"),
 		loopinfra.WithFileExtension(".yak"),
 	)
 
@@ -246,6 +247,7 @@ func TestYaklangDeferredEditorSync_FlushesAfterWriteCodeOnSeed(t *testing.T) {
 		loopinfra.WithActionSuffix("code"),
 		loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 		loopinfra.WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
+		loopinfra.WithEventType("yaklang_code_editor"),
 		loopinfra.WithFileExtension(".yak"),
 	)
 

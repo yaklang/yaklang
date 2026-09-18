@@ -24,7 +24,7 @@ func TestNewSingleFileModificationSuiteFactory_DefaultValues(t *testing.T) {
 	assert.Equal(t, "content", f.aiTagVariable)
 	assert.Equal(t, "content", f.aiNodeId)
 	assert.Equal(t, "text/plain", f.contentType)
-	assert.Equal(t, "yaklang_code_editor", f.eventType)
+	assert.Equal(t, "", f.eventType)
 	assert.True(t, f.ShouldExitAfterWrite())
 	assert.NotNil(t, f.GetRuntime())
 }

@@ -9,21 +9,17 @@ import (
 )
 
 const (
-	loopYaklangCodeStateKey           = "current_yaklang_code_state"
-	loopYaklangCodeVersionKey         = "yaklang_code_change_version"
-	loopYaklangCodeSourceActionKey    = "current_yaklang_code_source_action"
-	loopYaklangCodeChangeReasonKey = "current_yaklang_code_change_reason"
+	LoopCodeStateKey        = "current_code_state"
+	LoopCodeVersionKey      = "code_change_version"
+	LoopCodeSourceActionKey = "current_code_source_action"
+	LoopCodeChangeReasonKey = "current_code_change_reason"
 
 	CodeEventOpReplace  = "replace"
 	CodeEventOpSnapshot = "snapshot"
 	CodeEventOpCreate   = "create"
-
-	loopCodeEventOpReplace  = CodeEventOpReplace
-	loopCodeEventOpSnapshot = CodeEventOpSnapshot
-	loopCodeEventOpCreate   = CodeEventOpCreate
 )
 
-type loopYaklangCodeState struct {
+type loopCodeState struct {
 	Content      string `json:"content"`
 	Path         string `json:"path,omitempty"`
 	Summary      string `json:"summary,omitempty"`
@@ -32,8 +28,8 @@ type loopYaklangCodeState struct {
 	ChangeReason string `json:"change_reason,omitempty"`
 }
 
-// loopYaklangCodeChange mirrors loop_http_fuzztest.loopHTTPFuzzRequestChange.
-type loopYaklangCodeChange struct {
+// loopCodeChange is the in-memory editor commit applied by a single-file suite.
+type loopCodeChange struct {
 	Content      string
 	Path         string
 	SourceAction string
@@ -45,12 +41,12 @@ type loopYaklangCodeChange struct {
 	DeliveryPatch *CodeDeliveryPatch
 }
 
-type loopYaklangCodeChangeResult struct {
-	PreviousState *loopYaklangCodeState
-	CurrentState  *loopYaklangCodeState
+type loopCodeChangeResult struct {
+	PreviousState *loopCodeState
+	CurrentState  *loopCodeState
 }
 
-func cloneLoopYaklangCodeState(state *loopYaklangCodeState) *loopYaklangCodeState {
+func cloneLoopCodeState(state *loopCodeState) *loopCodeState {
 	if state == nil {
 		return nil
 	}
@@ -58,33 +54,33 @@ func cloneLoopYaklangCodeState(state *loopYaklangCodeState) *loopYaklangCodeStat
 	return &cloned
 }
 
-func getLoopYaklangCodeState(loop *reactloops.ReActLoop, fullCodeVar, filenameVar string) *loopYaklangCodeState {
+func getLoopCodeState(loop *reactloops.ReActLoop, fullCodeVar, filenameVar string) *loopCodeState {
 	if loop == nil {
 		return nil
 	}
 
-	switch state := loop.GetVariable(loopYaklangCodeStateKey).(type) {
-	case *loopYaklangCodeState:
-		return cloneLoopYaklangCodeState(state)
-	case loopYaklangCodeState:
-		return cloneLoopYaklangCodeState(&state)
+	switch state := loop.GetVariable(LoopCodeStateKey).(type) {
+	case *loopCodeState:
+		return cloneLoopCodeState(state)
+	case loopCodeState:
+		return cloneLoopCodeState(&state)
 	}
 
 	content := strings.TrimSpace(loop.Get(fullCodeVar))
 	if content == "" {
 		return nil
 	}
-	return &loopYaklangCodeState{
+	return &loopCodeState{
 		Content:      content,
 		Path:         strings.TrimSpace(loop.Get(filenameVar)),
-		Summary:      buildLoopYaklangCodeSummary(content),
-		Version:      max(loop.GetInt(loopYaklangCodeVersionKey), 1),
-		SourceAction: firstNonEmptyYaklangString(loop.Get(loopYaklangCodeSourceActionKey)),
-		ChangeReason: firstNonEmptyYaklangString(loop.Get(loopYaklangCodeChangeReasonKey)),
+		Summary:      buildLoopCodeSummary(content),
+		Version:      max(loop.GetInt(LoopCodeVersionKey), 1),
+		SourceAction: firstNonEmptyTrimmedString(loop.Get(LoopCodeSourceActionKey)),
+		ChangeReason: firstNonEmptyTrimmedString(loop.Get(LoopCodeChangeReasonKey)),
 	}
 }
 
-func buildLoopYaklangCodeSummary(content string) string {
+func buildLoopCodeSummary(content string) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return ""
@@ -95,7 +91,7 @@ func buildLoopYaklangCodeSummary(content string) string {
 	return content
 }
 
-func firstNonEmptyYaklangString(values ...string) string {
+func firstNonEmptyTrimmedString(values ...string) string {
 	for _, value := range values {
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
 			return trimmed
@@ -105,7 +101,7 @@ func firstNonEmptyYaklangString(values ...string) string {
 }
 
 // IsLoopCodeSeededOnly reports whether full_code still equals the init seed and this loop
-// has not committed a yaklang code change via applyLoopYaklangCodeChange yet.
+// has not committed a code change via applyLoopCodeChange yet.
 func IsLoopCodeSeededOnly(loop *reactloops.ReActLoop) bool {
 	if loop == nil {
 		return false
@@ -124,18 +120,18 @@ func isLoopCodeSeededOnly(loop *reactloops.ReActLoop) bool {
 	return IsLoopCodeSeededOnly(loop)
 }
 
-// ResolvedYaklangCodeChangeVersion returns the committed yaklang code version (0 if none).
-func ResolvedYaklangCodeChangeVersion(loop *reactloops.ReActLoop, fullCodeVar string) int {
+// ResolvedCodeChangeVersion returns the committed editor-change version (0 if none).
+func ResolvedCodeChangeVersion(loop *reactloops.ReActLoop, fullCodeVar string) int {
 	if loop == nil {
 		return 0
 	}
 	_ = fullCodeVar
-	return loop.GetInt(loopYaklangCodeVersionKey)
+	return loop.GetInt(LoopCodeVersionKey)
 }
 
-// HasCommittedYaklangCodeChange reports whether this loop committed code via write/modify/replace.
-func HasCommittedYaklangCodeChange(loop *reactloops.ReActLoop, fullCodeVar string) bool {
-	return ResolvedYaklangCodeChangeVersion(loop, fullCodeVar) > 0
+// HasCommittedCodeChange reports whether this loop committed code via write/modify/replace.
+func HasCommittedCodeChange(loop *reactloops.ReActLoop, fullCodeVar string) bool {
+	return ResolvedCodeChangeVersion(loop, fullCodeVar) > 0
 }
 
 func clearLoopCodeSeededOnly(loop *reactloops.ReActLoop) {
@@ -151,7 +147,7 @@ func AllowWriteCodeDespiteExistingSeed(loop *reactloops.ReActLoop, fullCodeVar s
 	if loop == nil || !isLoopCodeSeededOnly(loop) {
 		return false
 	}
-	if loop.GetInt(loopYaklangCodeVersionKey) > 0 {
+	if loop.GetInt(LoopCodeVersionKey) > 0 {
 		return false
 	}
 	existing := strings.TrimSpace(loop.Get(fullCodeVar))
@@ -165,14 +161,14 @@ func AllowWriteCodeDespiteExistingSeed(loop *reactloops.ReActLoop, fullCodeVar s
 	return existing == seed
 }
 
-func resolveLoopYaklangCodeEventOp(explicitOp string, previousState *loopYaklangCodeState) (string, error) {
+func resolveLoopCodeEventOp(explicitOp string, previousState *loopCodeState) (string, error) {
 	switch strings.TrimSpace(explicitOp) {
 	case "":
 		if previousState == nil {
-			return loopCodeEventOpCreate, nil
+			return CodeEventOpCreate, nil
 		}
-		return loopCodeEventOpReplace, nil
-	case loopCodeEventOpReplace, loopCodeEventOpCreate, loopCodeEventOpSnapshot:
+		return CodeEventOpReplace, nil
+	case CodeEventOpReplace, CodeEventOpCreate, CodeEventOpSnapshot:
 		return strings.TrimSpace(explicitOp), nil
 	default:
 		return "", fmt.Errorf("unsupported code event op: %s", explicitOp)
@@ -200,25 +196,35 @@ func (f *SingleFileModificationSuiteFactory) editorChangeDefaultSource() string 
 	return f.editorDeliverySource
 }
 
-// supportsYaklangCodeChangeEvent reports whether this suite should emit editor delivery events.
-func (f *SingleFileModificationSuiteFactory) supportsYaklangCodeChangeEvent() bool {
+func (f *SingleFileModificationSuiteFactory) supportsEditorChangeEvent() bool {
 	return f != nil && f.editorDeliveryEventType != ""
 }
 
-// applyLoopYaklangCodeChange updates loop file state and optionally emits an editor delivery event
-// (yaklang_code_change or syntaxflow_rule_change).
-func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *reactloops.ReActLoop, input *loopYaklangCodeChange) (*loopYaklangCodeChangeResult, error) {
-	if !f.supportsYaklangCodeChangeEvent() {
+func (f *SingleFileModificationSuiteFactory) emitEditorStreamJSON(loop *reactloops.ReActLoop, nodeId string, payload any) {
+	if f == nil || loop == nil || loop.GetEmitter() == nil {
+		return
+	}
+	eventType := strings.TrimSpace(f.eventType)
+	if eventType == "" {
+		return
+	}
+	loop.GetEmitter().EmitJSON(schema.EventType(eventType), nodeId, payload)
+}
+
+// applyLoopCodeChange updates loop file state and optionally emits an editor delivery event
+// configured by WithEditorDelivery.
+func (f *SingleFileModificationSuiteFactory) applyLoopCodeChange(loop *reactloops.ReActLoop, input *loopCodeChange) (*loopCodeChangeResult, error) {
+	if !f.supportsEditorChangeEvent() {
 		return nil, nil
 	}
 	if loop == nil {
 		return nil, fmt.Errorf("loop is nil")
 	}
 	if input == nil {
-		return nil, fmt.Errorf("yaklang code change input is nil")
+		return nil, fmt.Errorf("code change input is nil")
 	}
 	if strings.TrimSpace(input.Content) == "" {
-		return nil, fmt.Errorf("yaklang code content cannot be empty")
+		return nil, fmt.Errorf("code content cannot be empty")
 	}
 	if strings.TrimSpace(input.SourceAction) == "" {
 		return nil, fmt.Errorf("source action cannot be empty")
@@ -227,8 +233,8 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	fullCodeVar := f.GetFullCodeVariableName()
 	filenameVar := f.GetFilenameVariableName()
 
-	previousState := getLoopYaklangCodeState(loop, fullCodeVar, filenameVar)
-	eventOp, err := resolveLoopYaklangCodeEventOp(input.EventOp, previousState)
+	previousState := getLoopCodeState(loop, fullCodeVar, filenameVar)
+	eventOp, err := resolveLoopCodeEventOp(input.EventOp, previousState)
 	if err != nil {
 		return nil, err
 	}
@@ -250,10 +256,10 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	}
 
 	content := input.Content
-	currentState := &loopYaklangCodeState{
+	currentState := &loopCodeState{
 		Content:      content,
 		Path:         path,
-		Summary:      buildLoopYaklangCodeSummary(content),
+		Summary:      buildLoopCodeSummary(content),
 		Version:      version,
 		SourceAction: strings.TrimSpace(input.SourceAction),
 		ChangeReason: strings.TrimSpace(input.ChangeReason),
@@ -263,10 +269,10 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	if path != "" {
 		loop.Set(filenameVar, path)
 	}
-	loop.Set(loopYaklangCodeStateKey, *currentState)
-	loop.Set(loopYaklangCodeVersionKey, currentState.Version)
-	loop.Set(loopYaklangCodeSourceActionKey, currentState.SourceAction)
-	loop.Set(loopYaklangCodeChangeReasonKey, currentState.ChangeReason)
+	loop.Set(LoopCodeStateKey, *currentState)
+	loop.Set(LoopCodeVersionKey, currentState.Version)
+	loop.Set(LoopCodeSourceActionKey, currentState.SourceAction)
+	loop.Set(LoopCodeChangeReasonKey, currentState.ChangeReason)
 	clearLoopCodeSeededOnly(loop)
 
 	if input.DeliveryPatch != nil {
@@ -277,15 +283,14 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 		f.emitLoopEditorChangeEvent(loop, currentState, eventOp)
 	}
 
-	return &loopYaklangCodeChangeResult{
+	return &loopCodeChangeResult{
 		PreviousState: previousState,
-		CurrentState:  cloneLoopYaklangCodeState(currentState),
+		CurrentState:  cloneLoopCodeState(currentState),
 	}, nil
 }
 
-// emitLoopEditorChangeEvent emits yaklang_code_change or syntaxflow_rule_change
-// based on the suite content type (frontend routes on EventType).
-func (f *SingleFileModificationSuiteFactory) emitLoopEditorChangeEvent(loop *reactloops.ReActLoop, state *loopYaklangCodeState, op string) {
+// emitLoopEditorChangeEvent emits the suite's configured editor-change event.
+func (f *SingleFileModificationSuiteFactory) emitLoopEditorChangeEvent(loop *reactloops.ReActLoop, state *loopCodeState, op string) {
 	if f == nil || loop == nil || loop.GetEmitter() == nil || state == nil || strings.TrimSpace(state.Content) == "" {
 		return
 	}

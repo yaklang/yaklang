@@ -22,7 +22,7 @@ func TestApplyLoopYaklangCodeChange_SyntaxFlowContentType_EmitsSyntaxFlowRuleCha
 
 	rule := `rule("test")
 desc(title: "t")`
-	result, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+	result, err := factory.applyLoopCodeChange(loop, &loopCodeChange{
 		Content:      rule,
 		Path:         "/tmp/demo.sf",
 		SourceAction: "write_rule",

@@ -122,6 +122,7 @@ func yaklangSingleFileOpts(extra ...SingleFileModificationOption) []SingleFileMo
 		WithFileExtension(".yak"),
 		WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 		WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
+		WithEventType("yaklang_code_editor"),
 	}
 	return append(opts, extra...)
 }
@@ -226,7 +227,7 @@ func TestWriteAction_AllowedWhenSeededOnly(t *testing.T) {
 
 	assert.Equal(t, "println(\"replacement\")", loop.Get(fullCodeVar))
 	assert.False(t, isLoopCodeSeededOnly(loop))
-	assert.Greater(t, loop.GetInt(loopYaklangCodeVersionKey), 0)
+	assert.Greater(t, loop.GetInt(LoopCodeVersionKey), 0)
 }
 
 func TestWriteAction_RejectedWhenExistingCodeNotSeedOnly(t *testing.T) {
@@ -534,7 +535,7 @@ func TestWriteAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopCodeEventOpCreate, payload.Op)
+	assert.Equal(t, CodeEventOpCreate, payload.Op)
 	assert.Equal(t, code, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, actionName, payload.SourceAction)
@@ -570,7 +571,7 @@ func TestModifyAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) 
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopCodeEventOpReplace, payload.Op)
+	assert.Equal(t, CodeEventOpReplace, payload.Op)
 	assert.Equal(t, expected, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, actionName, payload.SourceAction)
@@ -965,7 +966,7 @@ func TestModifyAction_Patch_Success_FullCodeHasNoPatchMarkers(t *testing.T) {
 	assert.Equal(t, "a = 1\nb = 42\nc = 3\n", string(disk))
 	assert.NotContains(t, string(disk), "*** Begin Patch")
 
-	state := getLoopYaklangCodeState(loop, factory.GetFullCodeVariableName(), factory.GetFilenameVariableName())
+	state := getLoopCodeState(loop, factory.GetFullCodeVariableName(), factory.GetFilenameVariableName())
 	require.NotNil(t, state)
 	assert.Equal(t, full, state.Content)
 	assert.NotContains(t, state.Content, "*** Begin Patch")

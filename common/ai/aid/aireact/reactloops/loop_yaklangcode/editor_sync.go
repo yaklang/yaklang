@@ -19,8 +19,8 @@ const (
 	yaklangEditorLastEmittedVersionKey = "yaklang_editor_last_emitted_version"
 	yaklangEditorDeliveryPathLoopKey   = "yaklang_editor_delivery_path"
 	yaklangEditorDeliveryOpLoopKey     = "yaklang_editor_delivery_op"
-	yaklangCodeSourceActionLoopKey     = "current_yaklang_code_source_action"
-	yaklangCodeChangeReasonLoopKey     = "current_yaklang_code_change_reason"
+	yaklangCodeSourceActionLoopKey     = loopinfra.LoopCodeSourceActionKey
+	yaklangCodeChangeReasonLoopKey     = loopinfra.LoopCodeChangeReasonKey
 	yaklangCodeChangeEventNode         = "yaklang_code_change"
 )
 
@@ -119,7 +119,7 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 		return
 	}
 
-	committed := loopinfra.HasCommittedYaklangCodeChange(loop, "full_code")
+	committed := loopinfra.HasCommittedCodeChange(loop, "full_code")
 	pending := isYaklangEditorSyncPending(loop)
 	if !committed && !pending {
 		return
@@ -168,7 +168,7 @@ func emitYaklangEditorPatchDelivery(loop *reactloops.ReActLoop, path, fullCode s
 	if loop == nil || patch == nil {
 		return
 	}
-	version := loopinfra.ResolvedYaklangCodeChangeVersion(loop, "full_code")
+	version := loopinfra.ResolvedCodeChangeVersion(loop, "full_code")
 	if version <= 0 {
 		version = 1
 	}
@@ -209,7 +209,7 @@ func emitYaklangEditorFullDelivery(loop *reactloops.ReActLoop, path, eventOp, co
 		return
 	}
 
-	version := loopinfra.ResolvedYaklangCodeChangeVersion(loop, "full_code")
+	version := loopinfra.ResolvedCodeChangeVersion(loop, "full_code")
 	if version <= 0 {
 		version = 1
 	}
