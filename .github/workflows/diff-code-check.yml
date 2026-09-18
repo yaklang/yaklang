@@ -356,21 +356,29 @@ jobs:
         if: steps.validate.outputs.should_skip != 'true'
         id: test_token
         run: |
-          # For PRs from forks, the GITHUB_TOKEN is read-only and cannot write
-          # comments, even when the workflow declares pull-requests: write.
-          # Detect this by checking if the PR head repo differs from the base repo.
+          # Decide which token to use for posting comments.
+          # For PRs from forks, GITHUB_TOKEN is read-only, so we need a
+          # dedicated COMMENT_TOKEN (PAT) to write comments. For same-repo
+          # PRs, GITHUB_TOKEN has write access per the job permissions.
           HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
           BASE_REPO="${{ github.repository }}"
           echo "Head repo: $HEAD_REPO"
           echo "Base repo: $BASE_REPO"
 
           if [ -n "$HEAD_REPO" ] && [ "$HEAD_REPO" != "$BASE_REPO" ]; then
-            echo "::notice::PR is from a fork ($HEAD_REPO). GITHUB_TOKEN is read-only for fork PRs, skipping security comments."
-            echo "has_permissions=false" >> $GITHUB_OUTPUT
+            # Fork PR — GITHUB_TOKEN is read-only
+            if [ -n "${{ secrets.COMMENT_TOKEN }}" ]; then
+              echo "::notice::PR is from a fork ($HEAD_REPO). Using COMMENT_TOKEN to post comments."
+              echo "has_permissions=true" >> $GITHUB_OUTPUT
+              echo "comment_token=${{ secrets.COMMENT_TOKEN }}" >> $GITHUB_OUTPUT
+            else
+              echo "::notice::PR is from a fork ($HEAD_REPO) and no COMMENT_TOKEN configured. GITHUB_TOKEN is read-only, falling back to CI annotations."
+              echo "has_permissions=false" >> $GITHUB_OUTPUT
+            fi
             exit 0
           fi
 
-          # For same-repo PRs, verify write access via a lightweight API call
+          # Same-repo PR — GITHUB_TOKEN has write access
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
@@ -382,11 +390,6 @@ jobs:
             echo "has_permissions=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Skip Security Comment (Insufficient Permissions)
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
-        run: |
-          echo "::warning::Insufficient token permissions, skipping security comments"
-      
       - name: Generate security report
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         id: generate_report
@@ -457,7 +460,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.test_token.outputs.comment_token || secrets.GITHUB_TOKEN }}
           script: |
             try {
               // 定义安全扫描评论的唯一标识符
@@ -531,10 +534,9 @@ jobs:
 
       - name: Comment PR with security findings
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && steps.generate_report.outputs.RISK_COUNT != '0'
-        continue-on-error: true
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.test_token.outputs.comment_token || secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             
