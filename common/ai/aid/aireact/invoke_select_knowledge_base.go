@@ -63,35 +63,45 @@ func (r *ReAct) SelectKnowledgeBase(ctx context.Context, originQuery string) (*a
 	pr, pw := io.Pipe()
 	defer pw.Close()
 	firstExec := utils.NewOnce()
-	// Use liteforge to select knowledge bases
-	action, err := r.InvokeSpeedPriorityLiteForge(ctx, "select_knowledge_base", prompt, []aitool.ToolOption{
-		aitool.WithStringArrayParam("knowledge_bases",
-			aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"),
-			aitool.WithParam_Required(true),
+	// Use the Config-owned auxiliary scheduler so single-model policy can govern
+	// this lightweight selection step without coupling it to ReAct.
+	var action *aicommon.Action
+	r.config.ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelSelectKnowledgeBase,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringArrayParam("knowledge_bases",
+				aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"),
+				aitool.WithParam_Required(true),
+			),
+			aitool.WithStringParam("reason",
+				aitool.WithParam_Description("选择这些知识库的理由"),
+				aitool.WithParam_Required(true),
+			),
 		),
-		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("选择这些知识库的理由"),
-			aitool.WithParam_Required(true),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+				"reason", "knowledge_bases",
+			}, func(key string, rd io.Reader, emitter *aicommon.Emitter) {
+				if emitter == nil {
+					io.Copy(io.Discard, rd)
+					return
+				}
+				firstExec.DoOr(func() {
+					emitter.EmitDefaultStreamEvent(
+						"search-relative-knowledge-base", pr,
+						r.GetCurrentTaskId(),
+					)
+				}, func() {
+					pw.Write([]byte("\n ... "))
+				})
+				io.Copy(pw, rd)
+			}),
 		),
-	}, aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
-		"reason", "knowledge_bases",
-	}, func(key string, rd io.Reader, emitter *aicommon.Emitter) {
-		if emitter == nil {
-			io.Copy(io.Discard, rd)
-			return
-		}
-		firstExec.DoOr(func() {
-			emitter.EmitDefaultStreamEvent(
-				"search-relative-knowledge-base", pr,
-				r.GetCurrentTaskId(),
-			)
-		}, func() {
-			pw.Write([]byte("\n ... "))
-		})
-		io.Copy(pw, rd)
-	}))
-	if err != nil {
-		return nil, utils.Errorf("failed to select knowledge bases via liteforge: %v", err)
+	)
+	if action == nil {
+		return nil, utils.Error("failed to select knowledge bases via auxiliary task")
 	}
 
 	knowledgeBases := action.GetStringSlice("knowledge_bases")

@@ -391,6 +391,10 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 	}
+	if r.useSpeedPriorityAI {
+		decision := r.config.ResolveAuxiliaryTask(fmt.Sprintf("react-loop:%s", r.loopName))
+		requestOpts = append(requestOpts, decision.RequestOpts...)
+	}
 
 	// In functioncall mode, inject native tools and tool_call callback.
 	// Tool call arguments are streamed through toolCallArgumentsWriter

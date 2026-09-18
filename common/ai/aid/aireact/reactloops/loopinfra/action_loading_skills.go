@@ -334,22 +334,27 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 				)
 
 				ctx := op.GetContext()
-				decision, liteForgeErr := invoker.InvokeSpeedPriorityLiteForge(ctx, "skill-conflict-resolver",
-					conflictPrompt, []aitool.ToolOption{
+				var decision *aicommon.Action
+				invoker.GetConfig().ScheduleAuxiliaryTask(ctx,
+					aicommon.CallerLabelSkillConflictResolver,
+					func() string { return conflictPrompt },
+					func(result *aicommon.Action) { decision = result },
+					aicommon.WithAuxiliaryOutputs(
 						aitool.WithStringParam("action",
 							aitool.WithParam_Description("One of: proceed_with_loaded, skip, use_alternative"),
 							aitool.WithParam_Required(true)),
 						aitool.WithStringParam("reason",
 							aitool.WithParam_Description("Brief reason for the decision")),
-					})
+					),
+				)
 
 				// Record decision to timeline
 				decisionAction := "proceed_with_loaded"
 				decisionReason := "LiteForge arbitration completed"
-				if liteForgeErr != nil {
-					log.Warnf("LiteForge skill-conflict-resolver failed: %v, defaulting to proceed_with_loaded", liteForgeErr)
-					decisionReason = fmt.Sprintf("LiteForge failed (%v), defaulting to proceed_with_loaded", liteForgeErr)
-				} else if decision != nil {
+				if decision == nil {
+					log.Warn("skill-conflict-resolver auxiliary task returned no result, defaulting to proceed_with_loaded")
+					decisionReason = "Auxiliary task returned no result; defaulting to proceed_with_loaded"
+				} else {
 					if a := decision.GetString("action"); a != "" {
 						decisionAction = a
 					}

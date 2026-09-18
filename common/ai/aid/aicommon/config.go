@@ -4639,13 +4639,18 @@ Requirements:
 - Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
 - English (en): A short, capitalized English phrase`, nodeId)
 
-		result, err := c.InvokeLiteForge(prompt,
-			WithLiteForgeOutputSchemaFromAIToolOptions(
+		var result *Action
+		c.ScheduleAuxiliaryTask(c.GetContext(),
+			CallerLabelI18nTranslation,
+			func() string { return prompt },
+			func(action *Action) { result = action },
+			WithAuxiliaryOutputs(
 				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
 				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
-			))
-		if err != nil {
-			log.Infof("stream nodeId i18n provider skipped for %q: %v", nodeId, err)
+			),
+		)
+		if result == nil {
+			log.Infof("stream nodeId i18n provider skipped for %q: auxiliary task returned no result", nodeId)
 			return nil
 		}
 		zh := result.GetString("zh")
