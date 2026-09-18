@@ -28,7 +28,7 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 		}
 	case probeCoAP(wire, len(wire)).Verdict == ProbeAccept:
 		e.Protocol, spec = "coap", a.specs["application-layer.extended_protocols/CoAP"]
-		session, err = (&binCoAP{}).consume(wire)
+		session, err = (&binCoAP{maxPending: a.budget.MaxCollectionElements}).consume(0, wire)
 	default:
 		return false
 	}

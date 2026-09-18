@@ -8,15 +8,17 @@ import (
 // binModbus is the M0 session state for Modbus TCP MBAP + FC 1–6/15/16.
 // Port 502 is never consulted. RTU/ASCII and TLS Modbus are out of scope.
 type binModbus struct {
-	pending   map[uint16]modbusRequest
-	client    int
-	hasClient bool
+	pending    map[uint16]modbusRequest
+	client     int
+	hasClient  bool
+	maxPending int
 }
 
 type modbusRequest struct {
 	direction      int
 	unit, function byte
 	name           string
+	addressValue   [4]byte
 }
 
 func probeModbus(w []byte, limit int) ProbeResult {
@@ -55,7 +57,7 @@ func (f *binFlow) frameModbus(w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("Modbus session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending))*8); err != nil {
+	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96); err != nil {
 		return 0, nil, err
 	}
 	if len(w) < 6 {
@@ -129,6 +131,9 @@ func (s *binModbus) consume(dir int, raw []byte) (map[string]any, error) {
 		s.pending = map[uint16]modbusRequest{}
 	}
 	req, matched := s.pending[tid]
+	if exc && s.hasClient && dir == s.client {
+		return nil, fmt.Errorf("modbus: exception received from request direction")
+	}
 	response := exc || s.hasClient && dir != s.client || matched && req.direction != dir
 	if response && matched && (req.unit != unit || req.function != base) {
 		return nil, fmt.Errorf("modbus: response unit/function differs from request")
@@ -136,7 +141,24 @@ func (s *binModbus) consume(dir int, raw []byte) (map[string]any, error) {
 	if err := validateModbusPDU(raw[7:], response); err != nil {
 		return nil, err
 	}
+	if response && matched && !exc {
+		if base <= 4 {
+			quantity := int(binary.BigEndian.Uint16(req.addressValue[2:]))
+			expected := (quantity + 7) / 8
+			if base >= 3 {
+				expected = quantity * 2
+			}
+			if int(raw[8]) != expected {
+				return nil, fmt.Errorf("modbus: response byte count differs from requested quantity")
+			}
+		} else if [4]byte(raw[8:12]) != req.addressValue {
+			return nil, fmt.Errorf("modbus: response address or quantity/value differs from request")
+		}
+	}
 	if exc {
+		if !s.hasClient {
+			s.client, s.hasClient = 1-dir, true
+		}
 		out["Exception"] = true
 		out["Packet Name"] = name + " Exception"
 		if len(raw) >= 9 {
@@ -161,7 +183,10 @@ func (s *binModbus) consume(dir int, raw []byte) (map[string]any, error) {
 		}
 	} else {
 		s.client, s.hasClient = dir, true
-		s.pending[tid] = modbusRequest{dir, unit, base, name}
+		if !matched && len(s.pending) >= sessionCollectionLimit(s.maxPending) {
+			return nil, protocolError(ErrResourceExceeded, "Modbus pending transaction budget exceeded")
+		}
+		s.pending[tid] = modbusRequest{direction: dir, unit: unit, function: base, name: name, addressValue: [4]byte(raw[8:12])}
 		out["Role"] = "request"
 	}
 	return out, nil

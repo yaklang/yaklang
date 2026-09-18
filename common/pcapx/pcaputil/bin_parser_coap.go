@@ -9,13 +9,31 @@ import (
 // binCoAP is the M0 session state for RFC 7252 CON/NON/ACK/RST on datagrams.
 // Port 5683 is never consulted. OSCORE, observe, and CoAP-over-TCP are out of scope.
 type binCoAP struct {
-	pending map[uint16]string
-	tokens  map[string]coapRequest
+	pending    map[coapMessageID]coapRequest
+	tokens     map[coapToken]uint16
+	maxPending int
+}
+
+type coapMessageID struct {
+	direction int
+	mid       uint16
+}
+
+type coapToken struct {
+	direction int
+	token     string
 }
 
 type coapRequest struct {
-	mid  uint16
-	name string
+	token string
+	name  string
+}
+
+func (s *binCoAP) removeRequest(key coapMessageID) {
+	if req, ok := s.pending[key]; ok {
+		delete(s.tokens, coapToken{key.direction, req.token})
+		delete(s.pending, key)
+	}
 }
 
 func probeCoAP(w []byte, limit int) ProbeResult {
@@ -51,7 +69,7 @@ func (f *binFlow) frameCoAP(w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("CoAP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending))*8); err != nil {
+	if err := f.reserveSession(256 + int64(len(s.pending)+1)*160); err != nil {
 		return 0, nil, err
 	}
 	n, err := coapMessageLength(w)
@@ -167,7 +185,7 @@ func coapCodeName(code byte) string {
 	return fmt.Sprintf("%d.%02d", class, detail)
 }
 
-func (s *binCoAP) consume(raw []byte) (map[string]any, error) {
+func (s *binCoAP) consume(dir int, raw []byte) (map[string]any, error) {
 	if len(raw) < 4 {
 		return nil, fmt.Errorf("coap: truncated header")
 	}
@@ -189,7 +207,7 @@ func (s *binCoAP) consume(raw []byte) (map[string]any, error) {
 	}
 	mid := binary.BigEndian.Uint16(raw[2:4])
 	token := append([]byte(nil), raw[4:4+tkl]...)
-	paths, payload, err := coapOptions(raw, 4+tkl)
+	paths, payload, err := coapOptions(raw, 4+tkl, sessionCollectionLimit(s.maxPending))
 	if err != nil {
 		return nil, err
 	}
@@ -204,49 +222,47 @@ func (s *binCoAP) consume(raw []byte) (map[string]any, error) {
 		out["Payload Bytes"] = len(payload)
 	}
 	if s.pending == nil {
-		s.pending = map[uint16]string{}
+		s.pending = map[coapMessageID]coapRequest{}
+		s.tokens = map[coapToken]uint16{}
 	}
-	if s.tokens == nil {
-		s.tokens = map[string]coapRequest{}
-	}
+	tokenKey := coapToken{dir, string(token)}
+	key := coapMessageID{dir, mid}
 	switch {
 	case code > 0 && code < 32:
-		// Reused message IDs and tokens replace their old association together,
-		// keeping both indexes bounded by the outstanding requests.
-		if req, ok := s.tokens[string(token)]; ok {
-			delete(s.pending, req.mid)
+		// A transaction belongs to its originating endpoint. Retransmission and
+		// replacement update both indexes in constant time, even at the budget limit.
+		oldMID, sameToken := s.tokens[tokenKey]
+		_, sameMID := s.pending[key]
+		if !sameToken && !sameMID && len(s.pending) >= sessionCollectionLimit(s.maxPending) {
+			return nil, protocolError(ErrResourceExceeded, "CoAP pending request budget exceeded")
 		}
-		if _, ok := s.pending[mid]; ok {
-			for key, req := range s.tokens {
-				if req.mid == mid {
-					delete(s.tokens, key)
-				}
-			}
+		if sameToken {
+			s.removeRequest(coapMessageID{dir, oldMID})
 		}
-		s.pending[mid] = coapCodeName(code)
-		s.tokens[string(token)] = coapRequest{mid, coapCodeName(code)}
+		s.removeRequest(key)
+		s.pending[key] = coapRequest{tokenKey.token, coapCodeName(code)}
+		s.tokens[tokenKey] = mid
 		out["Role"] = "request"
 	case code == 0:
 		out["Role"] = "acknowledgement"
-		if req, ok := s.pending[mid]; ok {
-			out["In Reply To"] = req
+		key.direction = 1 - dir
+		if typ == 0 {
+			out["Role"] = "ping"
+		} else if req, ok := s.pending[key]; ok {
+			out["In Reply To"] = req.name
 			if typ == 3 {
-				delete(s.pending, mid)
-				for key, req := range s.tokens {
-					if req.mid == mid {
-						delete(s.tokens, key)
-					}
-				}
+				s.removeRequest(key)
 			}
 		} else {
 			out["Association"] = "missing-request"
 		}
 	default:
 		out["Role"] = "response"
-		if req, ok := s.tokens[string(token)]; ok && (typ != 2 || req.mid == mid) {
-			out["In Reply To"] = req.name
-			delete(s.pending, req.mid)
-			delete(s.tokens, string(token))
+		tokenKey.direction = 1 - dir
+		if requestMID, ok := s.tokens[tokenKey]; ok && (typ != 2 || requestMID == mid) {
+			key = coapMessageID{1 - dir, requestMID}
+			out["In Reply To"] = s.pending[key].name
+			s.removeRequest(key)
 		} else {
 			out["Association"] = "missing-request"
 		}
@@ -254,15 +270,18 @@ func (s *binCoAP) consume(raw []byte) (map[string]any, error) {
 	return out, nil
 }
 
-func coapOptions(w []byte, at int) ([]string, []byte, error) {
+func coapOptions(w []byte, at, maxOptions int) ([]string, []byte, error) {
 	deltaBase := 0
 	var paths []string
-	for at < len(w) {
+	for count := 0; at < len(w); count++ {
 		if w[at] == 0xff {
 			if at+1 == len(w) {
 				return nil, nil, fmt.Errorf("coap: empty payload marker")
 			}
 			return paths, w[at+1:], nil
+		}
+		if count >= maxOptions {
+			return nil, nil, protocolError(ErrResourceExceeded, "CoAP option budget exceeded")
 		}
 		hdr := w[at]
 		at++
