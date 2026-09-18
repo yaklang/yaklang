@@ -442,7 +442,6 @@ func TestGetHTTPResponseBody_ReturnsCopy(t *testing.T) {
 	assert.Equal(t, "original", string(rsp.GetHTTPResponseBody()))
 }
 
-
 // --- is429Retryable ---
 
 func TestIs429Retryable_WithRetryAfter(t *testing.T) {
@@ -584,4 +583,11 @@ func TestWaitForHTTPBody_ContextCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("WaitForHTTPBody did not return after cancel")
 	}
+}
+
+func TestRetryAfterHTTPDate(t *testing.T) {
+	rsp := make429Response("Retry-After: " + time.Now().Add(90*time.Second).UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
+	seconds := parseRetryAfterSeconds(rsp, 0)
+	require.GreaterOrEqual(t, seconds, 89)
+	require.LessOrEqual(t, seconds, 90)
 }

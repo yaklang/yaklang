@@ -115,10 +115,6 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
 		requestCtx, stopRequestCtx := combineAIRequestAndConfigContext(c.Ctx, request.GetContext())
 		defer stopRequestCtx()
-		budget := request.rateLimitBudget
-		if budget == nil {
-			budget = newRateLimitBudget()
-		}
 		// check if callback is nil before calling
 		if i == nil {
 			return nil, utils.Error("AI callback is not set, please configure AI service first")
@@ -164,12 +160,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if request.IsDetachedCheckpoint() {
 			for _idx := 0; _idx < maxAttempts; {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if is429, shouldRetry, done := handle429RateLimitContext(requestCtx, c, rsp, budget); is429 {
+				if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 					if done {
 						return nil, requestCtx.Err()
 					}
 					if !shouldRetry {
-						return rsp, rateLimitError(budget, rsp)
+						_idx++
 					}
 					continue
 				}
@@ -240,12 +236,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		start := time.Now()
 		for _idx := 0; _idx < maxAttempts; {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, shouldRetry, done := handle429RateLimitContext(requestCtx, c, rsp, budget); is429 {
+			if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 				if done {
 					return nil, requestCtx.Err()
 				}
 				if !shouldRetry {
-					return rsp, rateLimitError(budget, rsp)
+					_idx++
 				}
 				continue
 			}
