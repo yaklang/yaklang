@@ -86,7 +86,7 @@ type SingleFileModificationSuiteFactory struct {
 	// Event type for emitting JSON events
 	eventType string
 
-	// Editor delivery (yaklang_code_change / syntaxflow_rule_change). Empty type disables emit.
+	// Editor delivery. Empty type disables emit; each language package sets its own EventType/node/source.
 	editorDeliveryEventType schema.EventType
 	editorDeliveryEventNode string
 	editorDeliverySource    string
@@ -110,7 +110,7 @@ func NewSingleFileModificationSuiteFactory(runtime aicommon.AIInvokeRuntime, opt
 		aiTagVariable:  "content",
 		aiNodeId:       "content",
 		contentType:    "text/plain",
-		eventType:      "yaklang_code_editor",
+		eventType:      "",
 		exitAfterWrite: true,
 		runtime:        runtime,
 		codePrettifyCb: func(code string) (int, int, string, bool) {
@@ -224,7 +224,7 @@ func (f *SingleFileModificationSuiteFactory) ShouldExitWhenSyntaxClean() bool {
 }
 
 // WithDeferDiskWrite skips os.WriteFile in write/modify/insert/delete actions.
-// Loop state and yaklang_code_change events still update; the frontend applies to disk after review.
+// Loop state and editor-change events still update; the frontend applies to disk after review.
 func WithDeferDiskWrite(deferWrite bool) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
 		f.deferDiskWrite = deferWrite
@@ -348,8 +348,7 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	return false
 }
 
-// CommitAfterCodeEdit persists code, runs lint, and records editor delivery state
-// (yaklang_code_change or syntaxflow_rule_change depending on content type).
+// CommitAfterCodeEdit persists code, runs lint, and records editor delivery state.
 func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
@@ -369,17 +368,17 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
 	loop.GetEmitter().EmitPinFilename(filename)
-	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+	_, _ = f.applyLoopCodeChange(loop, &loopCodeChange{
 		Content:       fullCode,
 		Path:          filename,
 		SourceAction:  sourceAction,
 		ChangeReason:  changeReason,
-		EventOp:       loopCodeEventOpReplace,
+		EventOp:       CodeEventOpReplace,
 		EmitEvent:     true,
 		DeliveryPatch: deliveryPatch,
 	})
 	if editorPartial != "" {
-		loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, sourceAction, editorPartial)
+		f.emitEditorStreamJSON(loop, sourceAction, editorPartial)
 	}
 	if errMsg != "" {
 		op.Feedback(errMsg)
@@ -388,7 +387,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 }
 
 // handleModifyByPatch applies an Apply Patch block from GEN_CODE onto full_code.
-// Frontend / yaklang_code_change always receive the merged full file — never raw patch text.
+// Frontend / editor-change events always receive the merged full file — never raw patch text.
 func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	loop *reactloops.ReActLoop,
 	action *aicommon.Action,

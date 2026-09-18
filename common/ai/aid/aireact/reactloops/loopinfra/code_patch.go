@@ -174,7 +174,7 @@ func BuildCodePatchChangeEvent(path string, patch *CodeDeliveryPatch, version in
 		Code: CodeChangeEventCode{
 			Content:  patch.Fragment,
 			Path:     strings.TrimSpace(path),
-			Summary:  buildLoopYaklangCodeSummary(patch.Fragment),
+			Summary:  buildLoopCodeSummary(patch.Fragment),
 			Version:  version,
 			ChangeID: BuildCodeChangeID(sourceAction, defaultSource, version),
 			Patch:    &meta,
@@ -198,7 +198,7 @@ func BuildCodeFullChangeEvent(op, path, content string, version int, sourceActio
 		Code: CodeChangeEventCode{
 			Content:  content,
 			Path:     strings.TrimSpace(path),
-			Summary:  buildLoopYaklangCodeSummary(content),
+			Summary:  buildLoopCodeSummary(content),
 			Version:  version,
 			ChangeID: BuildCodeChangeID(sourceAction, defaultSource, version),
 		},
