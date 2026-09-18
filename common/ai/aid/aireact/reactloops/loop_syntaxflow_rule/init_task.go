@@ -106,45 +106,53 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			)
 		}
 
-		renderedPrompt := utils.MustRenderTemplate(
-			promptTemplate,
-			map[string]any{
-				"nonce":           utils.RandStringBytes(4),
-				"data":            task.GetUserInput(),
-				"hasGrepSearcher": docSearcher != nil,
-				"hasRAGSearcher":  ragSearcher != nil,
-			})
-
 		forgeOptions := []aicommon.GeneralKVConfigOption{}
 		if hasSearcher {
 			forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-rule-sample", "reason"))
 		}
 
 		reactloops.EmitStatusI18n(loop, "开始分析用户需求...", "Analyzing user requirements...")
-		var step1Result *aicommon.Action
+		var createNewFile, hasCodeSample bool
+		var existed, reason, extractedSampleCode, sampleLanguage, sampleFilename string
+		var searchPatterns, semanticQuestions []string
+		analyzeErr := utils.Error("failed to analyze requirement: no result")
 		r.GetConfig().ScheduleAuxiliaryTask(
 			task.GetContext(),
 			aicommon.CallerLabelAnalyzeRequirementAndSearch,
-			func() string { return renderedPrompt },
-			func(result *aicommon.Action) { step1Result = result },
+			func() string {
+				renderedPrompt := utils.MustRenderTemplate(
+					promptTemplate,
+					map[string]any{
+						"nonce":           utils.RandStringBytes(4),
+						"data":            task.GetUserInput(),
+						"hasGrepSearcher": docSearcher != nil,
+						"hasRAGSearcher":  ragSearcher != nil,
+					})
+
+				return renderedPrompt
+			},
+			func(step1Result *aicommon.Action) {
+				analyzeErr = nil
+				createNewFile = step1Result.GetBool("create_new_file")
+				existed = step1Result.GetString("existed_filepath")
+				reason = step1Result.GetString("reason")
+				hasCodeSample = step1Result.GetBool("has_code_sample")
+				extractedSampleCode = step1Result.GetString("extracted_sample_code")
+				sampleLanguage = step1Result.GetString("sample_language")
+				sampleFilename = step1Result.GetString("sample_filename")
+				searchPatterns = step1Result.GetStringSlice("search_patterns")
+				semanticQuestions = step1Result.GetStringSlice("semantic_questions")
+
+			},
+			aicommon.WithAuxiliaryOnError(func(err error) { analyzeErr = err }),
 			aicommon.WithAuxiliaryOutputs(toolOptions...),
 			aicommon.WithAuxiliaryOpts(forgeOptions...),
 		)
-		if step1Result == nil {
-			log.Error("analyze-requirement-and-search auxiliary task returned no result")
-			operator.Failed(utils.Error("failed to analyze requirement"))
+		if analyzeErr != nil {
+			log.Errorf("failed to analyze requirement: %v", analyzeErr)
+			operator.Failed(analyzeErr)
 			return
 		}
-
-		createNewFile := step1Result.GetBool("create_new_file")
-		existed := step1Result.GetString("existed_filepath")
-		reason := step1Result.GetString("reason")
-		hasCodeSample := step1Result.GetBool("has_code_sample")
-		extractedSampleCode := step1Result.GetString("extracted_sample_code")
-		sampleLanguage := step1Result.GetString("sample_language")
-		sampleFilename := step1Result.GetString("sample_filename")
-		searchPatterns := step1Result.GetStringSlice("search_patterns")
-		semanticQuestions := step1Result.GetStringSlice("semantic_questions")
 
 		// 兜底：LLM 可能漏识别代码块，若用户输入明显含 Go 代码则强制 has_code_sample
 		userInput := task.GetUserInput()

@@ -156,18 +156,23 @@ func benchCompressChunk(
 	alreadyExtracted string,
 	scoreThreshold float64,
 ) []BenchScoredRange {
-	dNonce := utils.RandStringBytes(4)
+	var results []BenchScoredRange
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelKnowledgeCompressBench,
+		func() string {
+			dNonce := utils.RandStringBytes(4)
 
-	alreadyExtractedSection := ""
-	if alreadyExtracted != "" {
-		alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
+			alreadyExtractedSection := ""
+			if alreadyExtracted != "" {
+				alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
 %s
 <|ALREADY_EXTRACTED_END_%s|>
 
 `, dNonce, alreadyExtracted, dNonce)
-	}
+			}
 
-	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
+			promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
 {{ .userQuery }}
 <|USER_QUERY_END_{{ .nonce }}|>
 
@@ -185,23 +190,41 @@ Output the ranges array.
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
-	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, scoreThreshold), map[string]any{
-		"nonce":                   dNonce,
-		"samples":                 chunkContent,
-		"userQuery":               userQuery,
-		"alreadyExtractedSection": alreadyExtractedSection,
-	})
-	if err != nil {
-		log.Errorf("bench compress chunk template: %v", err)
-		return nil
-	}
+			materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, scoreThreshold), map[string]any{
+				"nonce":                   dNonce,
+				"samples":                 chunkContent,
+				"userQuery":               userQuery,
+				"alreadyExtractedSection": alreadyExtractedSection,
+			})
+			if err != nil {
+				log.Errorf("bench compress chunk template: %v", err)
+				return ""
+			}
 
-	var forgeResult *aicommon.Action
-	invoker.GetConfig().ScheduleAuxiliaryTask(
-		ctx,
-		aicommon.CallerLabelKnowledgeCompressBench,
-		func() string { return materials },
-		func(result *aicommon.Action) { forgeResult = result },
+			return materials
+		},
+		func(forgeResult *aicommon.Action) {
+			rangeItems := forgeResult.GetInvokeParamsArray("ranges")
+			for _, item := range rangeItems {
+				rangeStr := item.GetString("range")
+				score := item.GetFloat("score")
+				if rangeStr == "" || score < scoreThreshold {
+					continue
+				}
+				parts := strings.Split(rangeStr, "-")
+				if len(parts) != 2 {
+					continue
+				}
+				startLine, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+				endLine, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+				if err1 != nil || err2 != nil || startLine <= 0 || endLine < startLine {
+					continue
+				}
+				results = append(results, BenchScoredRange{StartLine: startLine, EndLine: endLine, Score: score})
+			}
+
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) { log.Errorf("bench compress LiteForge: %v", err) }),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
@@ -223,29 +246,7 @@ Output the ranges array.
 			}),
 		),
 	)
-	if forgeResult == nil {
-		return nil
-	}
 
-	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
-	var results []BenchScoredRange
-	for _, item := range rangeItems {
-		rangeStr := item.GetString("range")
-		score := item.GetFloat("score")
-		if rangeStr == "" || score < scoreThreshold {
-			continue
-		}
-		parts := strings.Split(rangeStr, "-")
-		if len(parts) != 2 {
-			continue
-		}
-		startLine, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
-		endLine, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
-		if err1 != nil || err2 != nil || startLine <= 0 || endLine < startLine {
-			continue
-		}
-		results = append(results, BenchScoredRange{StartLine: startLine, EndLine: endLine, Score: score})
-	}
 	return results
 }
 

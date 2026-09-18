@@ -246,7 +246,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		// Use the auxiliary scheduler for the speed-model fuzzing hints.
-		var action *aicommon.Action
 		config.ScheduleAuxiliaryTask(task.GetContext(),
 			aicommon.CallerLabelHttpFuzztestInitBootstrap,
 			func() string {
@@ -265,7 +264,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 `
 			},
-			func(result *aicommon.Action) { action = result },
+			func(action *aicommon.Action) {
+				invoker.AddToTimeline("http_fuzztest_init_booststrap", "Bootstrap insights: "+action.GetString("thought"))
+			},
+			aicommon.WithAuxiliaryOnError(func(err error) {
+				log.Warnf("http_fuzztest init bootstrap failed: %v", err)
+			}),
 			aicommon.WithAuxiliaryOutputs(
 				aitool.WithStringParam("thought", aitool.WithParam_Description("针对这个 HTTP 请求的模糊测试要点和灵感提示")),
 			),
@@ -273,11 +277,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "quick_plan"),
 			),
 		)
-		if action == nil {
-			log.Warn("http_fuzztest init bootstrap auxiliary task returned no result")
-			return
-		}
-		invoker.AddToTimeline("http_fuzztest_init_booststrap", "Bootstrap insights: "+action.GetString("thought"))
 	}
 }
 
