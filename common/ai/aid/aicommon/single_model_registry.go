@@ -75,6 +75,7 @@ func initSingleModelRegistry() {
 	register(CallerLabelCrawlerJSPathExtract, SingleModelLiteCall)
 
 	// ===== PassThrough (explicitly registered for audit) =====
+	register(CallerLabelGoalAcceptanceReview, SingleModelPassThrough)
 	register(CallerLabelHttpFlowAnalyzeFinalizeSummary, SingleModelPassThrough)
 	register(CallerLabelSkillConflictResolver, SingleModelPassThrough)
 }
