@@ -80,6 +80,14 @@ type LiteForge struct {
 	// reqOpts during Execute, allowing callers to inject parameters like
 	// aispec.WithThinkingLevel("none") through the LiteForge option chain.
 	extraRequestOpts []aicommon.AIRequestOption
+	responseHandler  aicommon.AuxiliaryResponseHandler
+}
+
+// WithLiteForge_ResponseHandler uses a complete caller-supplied prompt and
+// response protocol for one transaction, retaining LiteForge's model invocation,
+// retries and cancellation. The handler only parses/validates the response.
+func WithLiteForge_ResponseHandler(handler aicommon.AuxiliaryResponseHandler) LiteForgeOption {
+	return func(l *LiteForge) error { l.responseHandler = handler; return nil }
 }
 
 // WithLiteForge_OutputValidator adds caller-specific validation to the existing
@@ -377,48 +385,51 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		l.OutputActionName = cod.GetAIConfig().LiteForgeActionName
 	}
 
-	if l.OutputSchema == "" {
+	if l.OutputSchema == "" && l.responseHandler == nil {
 		return nil, utils.Error("liteforge output schema is required, you should set it via aiforge.WithLiteForge_OutputSchema or aicommon.WithLiteForgeOutputSchema config option")
 	}
 
-	nonce := strings.ToLower(utils.RandStringBytes(6))
-	var callBuffer bytes.Buffer
-	if len(params) == 1 {
-		callBuffer.WriteString(params[0].Value)
-	} else {
-		for _, i := range params {
-			if strings.Contains(i.Value, "\n") {
-				callBuffer.WriteString(i.Key + ": \n")
-				callBuffer.WriteString(utils.PrefixLines(i.Value, "  "))
-			} else {
-				callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
+	rendered := l.Prompt
+	if l.responseHandler == nil {
+		nonce := strings.ToLower(utils.RandStringBytes(6))
+		var callBuffer bytes.Buffer
+		if len(params) == 1 {
+			callBuffer.WriteString(params[0].Value)
+		} else {
+			for _, i := range params {
+				if strings.Contains(i.Value, "\n") {
+					callBuffer.WriteString(i.Key + ": \n")
+					callBuffer.WriteString(utils.PrefixLines(i.Value, "  "))
+				} else {
+					callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
+				}
 			}
 		}
-	}
-	call := callBuffer.String()
+		call := callBuffer.String()
 
-	// A LiteForge created with the parent persistent-session ID restores the
-	// parent's Timeline. Feeding its complete Frozen/Open projection here made
-	// every speed-priority helper call grow with the whole session, even though
-	// the ReAct lightweight loop itself was already bounded. Keep only a recent
-	// prompt projection and deliberately leave the frozen block empty: this is a
-	// one-shot helper context, not a second copy of the main loop's history.
-	var timelineOpen string
-	if !l.DisableTimeline {
-		timelineOpen = liteForgeRecentTimeline(cod.ContextProvider.GetTimelineInstance())
-	}
-	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
-		Nonce:               nonce,
-		Prompt:              string(l.Prompt),
-		StaticInstruction:   string(l.StaticInstruction),
-		Params:              call,
-		Schema:              string(l.OutputSchema),
-		PersistentMemory:    cod.ContextProvider.PersistentMemory(),
-		TimelineFrozenBlock: "",
-		TimelineOpen:        timelineOpen,
-	})
-	if err != nil {
-		return nil, err
+		// A LiteForge created with the parent persistent-session ID restores the
+		// parent's Timeline. Feeding its complete Frozen/Open projection here made
+		// every speed-priority helper call grow with the whole session, even though
+		// the ReAct lightweight loop itself was already bounded. Keep only a recent
+		// prompt projection and deliberately leave the frozen block empty: this is a
+		// one-shot helper context, not a second copy of the main loop's history.
+		var timelineOpen string
+		if !l.DisableTimeline {
+			timelineOpen = liteForgeRecentTimeline(cod.ContextProvider.GetTimelineInstance())
+		}
+		rendered, err = renderLiteForgePrompt(liteForgePromptParams{
+			Nonce:               nonce,
+			Prompt:              string(l.Prompt),
+			StaticInstruction:   string(l.StaticInstruction),
+			Params:              call,
+			Schema:              string(l.OutputSchema),
+			PersistentMemory:    cod.ContextProvider.PersistentMemory(),
+			TimelineFrozenBlock: "",
+			TimelineOpen:        timelineOpen,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 	var action *aicommon.Action
 	if l.maxPromptTokens > 0 {
@@ -448,6 +459,14 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	transactionErr := aicommon.CallAITransactionWithFailureExtra(cod, rendered, aiCallback,
 		func(response *aicommon.AIResponse) error {
+			if l.responseHandler != nil {
+				var parseErr error
+				action, parseErr = l.responseHandler(response)
+				if parseErr == nil && action == nil {
+					return utils.Error("liteforge response handler returned no action")
+				}
+				return parseErr
+			}
 			boundEmitter := response.BindEmitter(l.emitter)
 			if l.ForgeName == "" {
 				l.ForgeName = "LiteForge"
@@ -517,7 +536,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		reqOpts...,
 	)
 	if transactionErr != nil {
-		return nil, utils.Errorf("liteforge execute failed: %w", transactionErr)
+		return nil, utils.Wrap(transactionErr, "liteforge execute failed")
 	}
 	result := &ForgeResult{Action: action}
 	return result, nil

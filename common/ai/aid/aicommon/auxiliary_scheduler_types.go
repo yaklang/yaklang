@@ -15,6 +15,21 @@ type AuxiliaryTaskSpec struct {
 	OutputSchema     string
 	Emitter          *Emitter
 	OnError          func(error)
+	ResponseHandler  AuxiliaryResponseHandler
+}
+
+// AuxiliaryResponseHandler consumes and validates one provider response inside
+// the LiteForge transaction. Returning an error participates in normal retries;
+// only an accepted Action reaches onResult. It cannot choose or invoke a model.
+type AuxiliaryResponseHandler func(*AIResponse) (*Action, error)
+
+// WithAuxiliaryResponseHandler preserves a caller-owned response protocol (for
+// example a ReAct round with native tool calls and AITAG streams). promptBuilder
+// must provide the complete prompt: LiteForge does not wrap it with its fixed
+// JSON schema/template or add Timeline context. The handler owns stream parsing
+// and validation instead of the standard LiteForge field/schema parser.
+func WithAuxiliaryResponseHandler(handler AuxiliaryResponseHandler) AuxiliaryTaskOption {
+	return func(s *AuxiliaryTaskSpec) { s.ResponseHandler = handler }
 }
 
 // AuxiliaryTaskOption modifies an AuxiliaryTaskSpec.
