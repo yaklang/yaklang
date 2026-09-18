@@ -175,29 +175,8 @@ func resolveLoopCodeEventOp(explicitOp string, previousState *loopCodeState) (st
 	}
 }
 
-func (f *SingleFileModificationSuiteFactory) editorChangeEventType() schema.EventType {
-	if f == nil {
-		return ""
-	}
-	return f.editorDeliveryEventType
-}
-
-func (f *SingleFileModificationSuiteFactory) editorChangeEventNode() string {
-	if f == nil {
-		return ""
-	}
-	return f.editorDeliveryEventNode
-}
-
-func (f *SingleFileModificationSuiteFactory) editorChangeDefaultSource() string {
-	if f == nil {
-		return ""
-	}
-	return f.editorDeliverySource
-}
-
 func (f *SingleFileModificationSuiteFactory) supportsEditorChangeEvent() bool {
-	return f != nil && f.editorDeliveryEventType != ""
+	return f != nil && f.editorChange != ""
 }
 
 func (f *SingleFileModificationSuiteFactory) emitEditorStreamJSON(loop *reactloops.ReActLoop, nodeId string, payload any) {
@@ -211,8 +190,8 @@ func (f *SingleFileModificationSuiteFactory) emitEditorStreamJSON(loop *reactloo
 	loop.GetEmitter().EmitJSON(schema.EventType(eventType), nodeId, payload)
 }
 
-// applyLoopCodeChange updates loop file state and optionally emits an editor delivery event
-// configured by WithEditorDelivery.
+// applyLoopCodeChange updates loop file state and optionally emits an editor change event
+// configured by WithEditorChange.
 func (f *SingleFileModificationSuiteFactory) applyLoopCodeChange(loop *reactloops.ReActLoop, input *loopCodeChange) (*loopCodeChangeResult, error) {
 	if !f.supportsEditorChangeEvent() {
 		return nil, nil
@@ -294,6 +273,7 @@ func (f *SingleFileModificationSuiteFactory) emitLoopEditorChangeEvent(loop *rea
 	if f == nil || loop == nil || loop.GetEmitter() == nil || state == nil || strings.TrimSpace(state.Content) == "" {
 		return
 	}
-	payload := BuildCodeFullChangeEvent(op, state.Path, state.Content, state.Version, state.SourceAction, state.ChangeReason, f.editorChangeDefaultSource())
-	_, _ = loop.GetEmitter().EmitJSON(f.editorChangeEventType(), f.editorChangeEventNode(), payload)
+	eventType := f.editorChange
+	payload := BuildCodeFullChangeEvent(op, state.Path, state.Content, state.Version, state.SourceAction, state.ChangeReason, "")
+	_, _ = loop.GetEmitter().EmitJSON(eventType, string(eventType), payload)
 }

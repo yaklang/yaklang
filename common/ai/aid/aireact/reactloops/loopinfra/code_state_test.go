@@ -55,7 +55,7 @@ func newYaklangFactory(t *testing.T, runtime *testRuntimeForSingleFile) *SingleF
 		WithActionSuffix("code"),
 		WithFileExtension(".yak"),
 		WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
-		WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
+		WithEditorChange(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE),
 		WithEventType("yaklang_code_editor"),
 	)
 }
