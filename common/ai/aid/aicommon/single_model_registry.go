@@ -50,6 +50,10 @@ func initSingleModelRegistry() {
 	register(CallerLabelPerception, SingleModelSkip)
 
 	// ===== LiteCall (critical path: still call, but degraded) =====
+	// User-requested mini tasks must still produce a result.
+	register(CallerLabelMiniPromptOptimize, SingleModelLiteCall)
+	register(CallerLabelMiniTimelineSummary, SingleModelLiteCall)
+	register(CallerLabelMiniTodoDraft, SingleModelLiteCall)
 	// InitTask key steps — skipping would break loop startup.
 	register(CallerLabelExtractExploreTargetPath, SingleModelLiteCall)
 	register(CallerLabelExtractHTTPRequestFromInput, SingleModelLiteCall)

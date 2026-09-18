@@ -25,6 +25,9 @@ const (
 	CallerLabelPerception               = "perception"
 
 	// ── LiteCall ──
+	CallerLabelMiniPromptOptimize          = "prompt_optimize"
+	CallerLabelMiniTimelineSummary         = "timeline_summary"
+	CallerLabelMiniTodoDraft               = "todo_draft"
 	CallerLabelExtractExploreTargetPath    = "extract-explore-target-path"
 	CallerLabelExtractHTTPRequestFromInput = "extract-http-request-from-user-input"
 	CallerLabelAnalyzeReportIntent         = "analyze-report-intent"
