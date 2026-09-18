@@ -66,6 +66,10 @@ func (m *MockedAIConfig) ScheduleAuxiliaryTask(
 	}
 }
 
+func (m *MockedAIConfig) ResolveAuxiliaryTask(_ string) aicommon.AuxiliaryTaskDecision {
+	return aicommon.AuxiliaryTaskDecision{Action: aicommon.SingleModelPassThrough}
+}
+
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
 	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		return e, nil
@@ -665,6 +669,12 @@ func (m *MockInvoker) scheduleAuxiliaryTask(
 	}
 	action, err := m.InvokeSpeedPriorityLiteForge(ctx, name, prompt, spec.Outputs, spec.Opts...)
 	if err != nil || action == nil {
+		if err == nil {
+			err = utils.Errorf("auxiliary task %q returned no action", name)
+		}
+		if spec.OnError != nil {
+			spec.OnError(err)
+		}
 		return
 	}
 	if onResult != nil {

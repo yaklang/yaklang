@@ -387,6 +387,8 @@ type AIInvokeRuntime interface {
 	AsyncExecutePlan(ctx context.Context, input *ExecutePlanInput, onFinish func(error))
 	AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
+	// Deprecated: production Speed tasks must use GetConfig().ScheduleAuxiliaryTask
+	// so they participate in the auxiliary-task registry.
 	InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	// SelectKnowledgeBase selects appropriate knowledge bases based on the user query

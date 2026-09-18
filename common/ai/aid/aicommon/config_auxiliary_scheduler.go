@@ -22,30 +22,23 @@ func (c *Config) ScheduleAuxiliaryTask(
 		return
 	}
 
-	action := SingleModelPassThrough
-	if c.IsSingleAIModelMode() {
-		action = GetSingleModelAction(name)
-		if action == SingleModelSkip {
-			return
-		}
-	}
-
-	prompt := promptBuilder()
-	if prompt == "" {
+	decision := c.ResolveAuxiliaryTask(name)
+	if !decision.ShouldRun() {
 		return
 	}
-
-	spec := &AuxiliaryTaskSpec{}
+	spec := &AuxiliaryTaskSpec{Emitter: c.Emitter}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(spec)
 		}
 	}
-
-	if action == SingleModelLiteCall {
-		spec.Opts = append(spec.Opts, WithGeneralConfigExtraRequestOpts(
-			WithAIRequest_ExtraSpecOpts(aispec.WithThinkingLevel("none")),
-		))
+	prompt := promptBuilder()
+	if prompt == "" {
+		return
+	}
+	if len(decision.RequestOpts) > 0 {
+		spec.Opts = append([]GeneralKVConfigOption(nil), spec.Opts...)
+		spec.Opts = append(spec.Opts, WithGeneralConfigExtraRequestOpts(decision.RequestOpts...))
 	}
 
 	if utils.IsNil(ctx) {
@@ -57,13 +50,16 @@ func (c *Config) ScheduleAuxiliaryTask(
 
 	invokeOpts := []any{
 		&LiteForgeInvokeRequest{
-			Context:    ctx,
-			ActionName: name,
-			Outputs:    spec.Outputs,
-			Options:    spec.Opts,
-			Emitter:    c.Emitter,
+			Context:          ctx,
+			ActionName:       name,
+			OutputActionName: spec.OutputActionName,
+			OutputSchema:     spec.OutputSchema,
+			Outputs:          spec.Outputs,
+			Options:          spec.Opts,
+			Emitter:          spec.Emitter,
 		},
 		WithAgreeYOLO(),
+		WithAITransactionAutoRetry(c.GetAITransactionAutoRetryCount()),
 		WithPersistentSessionId(c.PersistentSessionId),
 	}
 	if retryWait := c.GetAIRetryWaitFunc(); retryWait != nil {
@@ -76,11 +72,37 @@ func (c *Config) ScheduleAuxiliaryTask(
 		invokeOpts = append(invokeOpts, WithEventHandler(c.EventHandler))
 	}
 
-	result, err := c.InvokeLiteForge(prompt, invokeOpts...)
+	result, err := c.invokeSpeedPriorityLiteForge(prompt, invokeOpts...)
 	if err != nil || result == nil || result.Action == nil {
+		if err == nil {
+			err = utils.Errorf("auxiliary task %q returned no action", name)
+		}
+		if spec.OnError != nil {
+			spec.OnError(err)
+		}
 		return
 	}
 	if onResult != nil {
 		onResult(result.Action)
 	}
+}
+
+// ResolveAuxiliaryTask exposes the Config-owned policy to non-LiteForge Speed
+// calls without changing their prompt or response protocol.
+func (c *Config) ResolveAuxiliaryTask(name string) AuxiliaryTaskDecision {
+	decision := AuxiliaryTaskDecision{Action: SingleModelPassThrough}
+	if c == nil {
+		return decision
+	}
+	action := SingleModelPassThrough
+	if c.IsSingleAIModelMode() {
+		action = GetSingleModelAction(name)
+	}
+	decision.Action = action
+	if action == SingleModelLiteCall {
+		decision.RequestOpts = []AIRequestOption{
+			WithAIRequest_ExtraSpecOpts(aispec.WithThinkingLevel("none")),
+		}
+	}
+	return decision
 }
