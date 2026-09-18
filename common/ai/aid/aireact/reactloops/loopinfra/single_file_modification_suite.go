@@ -86,6 +86,9 @@ type SingleFileModificationSuiteFactory struct {
 	// Event type for emitting JSON events
 	eventType string
 
+	// editorChange is the frontend *_change event. Empty disables emit.
+	editorChange schema.EventType
+
 	// Behavior flags
 	exitAfterWrite      bool // whether to call operator.Exit() after successful write (default: true)
 	exitWhenSyntaxClean bool // whether to call operator.Exit() after modify/insert/delete when syntax check passes
@@ -105,7 +108,7 @@ func NewSingleFileModificationSuiteFactory(runtime aicommon.AIInvokeRuntime, opt
 		aiTagVariable:  "content",
 		aiNodeId:       "content",
 		contentType:    "text/plain",
-		eventType:      "yaklang_code_editor",
+		eventType:      "",
 		exitAfterWrite: true,
 		runtime:        runtime,
 		codePrettifyCb: func(code string) (int, int, string, bool) {
@@ -175,6 +178,13 @@ func WithCodePrettify(cb CodePrettifyCallback) SingleFileModificationOption {
 	}
 }
 
+// WithEditorChange opts this suite into frontend *_change events (yaklang_code_change, syntaxflow_rule_change, ...).
+func WithEditorChange(eventType schema.EventType) SingleFileModificationOption {
+	return func(f *SingleFileModificationSuiteFactory) {
+		f.editorChange = eventType
+	}
+}
+
 // WithEventType sets the event type for emitting JSON events
 func WithEventType(eventType string) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
@@ -209,7 +219,7 @@ func (f *SingleFileModificationSuiteFactory) ShouldExitWhenSyntaxClean() bool {
 }
 
 // WithDeferDiskWrite skips os.WriteFile in write/modify/insert/delete actions.
-// Loop state and yaklang_code_change events still update; the frontend applies to disk after review.
+// Loop state and editor-change events still update; the frontend applies to disk after review.
 func WithDeferDiskWrite(deferWrite bool) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
 		f.deferDiskWrite = deferWrite
@@ -333,14 +343,13 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	return false
 }
 
-// CommitAfterCodeEdit persists code, runs lint, and records editor delivery state
-// (yaklang_code_change or syntaxflow_rule_change depending on content type).
+// CommitAfterCodeEdit persists code, runs lint, and records editor delivery state.
 func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
 	filename, fullCode, sourceAction, changeReason, editorPartial string,
 	successTimeline, failTimeline, successMsg string,
-	deliveryPatch *YaklangCodeDeliveryPatch,
+	deliveryPatch *CodeDeliveryPatch,
 ) error {
 	runtime := f.GetRuntime()
 	writeErr := f.replaceLoopFileContent(runtime, filename, fullCode, successTimeline, failTimeline, successMsg)
@@ -354,17 +363,17 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
 	loop.GetEmitter().EmitPinFilename(filename)
-	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+	_, _ = f.applyLoopCodeChange(loop, &loopCodeChange{
 		Content:       fullCode,
 		Path:          filename,
 		SourceAction:  sourceAction,
 		ChangeReason:  changeReason,
-		EventOp:       loopYaklangCodeEventOpReplace,
+		EventOp:       CodeEventOpReplace,
 		EmitEvent:     true,
 		DeliveryPatch: deliveryPatch,
 	})
 	if editorPartial != "" {
-		loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, sourceAction, editorPartial)
+		f.emitEditorStreamJSON(loop, sourceAction, editorPartial)
 	}
 	if errMsg != "" {
 		op.Feedback(errMsg)
@@ -373,7 +382,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 }
 
 // handleModifyByPatch applies an Apply Patch block from GEN_CODE onto full_code.
-// Frontend / yaklang_code_change always receive the merged full file — never raw patch text.
+// Frontend / editor-change events always receive the merged full file — never raw patch text.
 func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	loop *reactloops.ReActLoop,
 	action *aicommon.Action,
@@ -448,7 +457,7 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	if err := f.CommitAfterCodeEdit(
 		loop, op, filename, newFull, actionName, reason, editorSummary,
 		"modify_success", "modify_write_failed", successMsg,
-		BuildYaklangPatchFull(newFull),
+		BuildCodePatchFull(newFull),
 	); err != nil {
 		op.Fail(fmt.Sprintf("failed to write patched content: %v", err))
 		return
@@ -587,7 +596,7 @@ old_snippet 预览：
 	if err := f.CommitAfterCodeEdit(
 		loop, op, filename, fullCode, actionName, reason, newCode,
 		"modify_success", "modify_write_failed", successMsg,
-		BuildYaklangPatchSnippet(newCode, oldSnippet, loop.GetInt(LoopVarCodeLineBase)),
+		BuildCodePatchSnippet(newCode, oldSnippet, loop.GetInt(LoopVarCodeLineBase)),
 	); err != nil {
 		op.Fail(fmt.Sprintf("failed to write modified content: %v", err))
 		return

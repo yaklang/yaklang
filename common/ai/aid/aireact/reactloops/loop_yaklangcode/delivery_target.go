@@ -57,18 +57,18 @@ func resolveYaklangDeliveryTarget(loop *reactloops.ReActLoop) (path string, even
 
 	editorFile := strings.TrimSpace(loop.Get("editor_file_path"))
 	if aicommon.IsYaklangScriptDeliveryPath(editorFile) {
-		return filepath.Clean(editorFile), loopinfra.LoopYaklangCodeEventOpReplace, nil
+		return filepath.Clean(editorFile), loopinfra.CodeEventOpReplace, nil
 	}
 	// Non-.yak editor_file_path must not replace.
 
 	filename := strings.TrimSpace(loop.Get("filename"))
 	if filename != "" {
 		if isYaklangGenCodePath(filename) {
-			return filepath.Clean(filename), loopinfra.LoopYaklangCodeEventOpCreate, nil
+			return filepath.Clean(filename), loopinfra.CodeEventOpCreate, nil
 		}
 		// Never fall back to Type=file reference paths (.md, etc.).
 		if aicommon.IsYaklangScriptDeliveryPath(filename) && !isYaklangAspaceArtifactPath(filename) {
-			return filepath.Clean(filename), loopinfra.LoopYaklangCodeEventOpReplace, nil
+			return filepath.Clean(filename), loopinfra.CodeEventOpReplace, nil
 		}
 	}
 
@@ -76,5 +76,5 @@ func resolveYaklangDeliveryTarget(loop *reactloops.ReActLoop) (path string, even
 	if err != nil {
 		return "", "", err
 	}
-	return genPath, loopinfra.LoopYaklangCodeEventOpCreate, nil
+	return genPath, loopinfra.CodeEventOpCreate, nil
 }

@@ -15,13 +15,14 @@ func TestApplyLoopYaklangCodeChange_SyntaxFlowContentType_EmitsSyntaxFlowRuleCha
 		WithLoopVarsPrefix("sf"),
 		WithActionSuffix("rule"),
 		WithFileExtension(".sf"),
-		WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", contentTypeSyntaxFlowRule),
+		WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", "text/syntaxflow"),
+		WithEditorChange(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE),
 	)
 	loop, capture, _ := newLoopWithCapturedEvents(t, runtime, factory)
 
 	rule := `rule("test")
 desc(title: "t")`
-	result, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+	result, err := factory.applyLoopCodeChange(loop, &loopCodeChange{
 		Content:      rule,
 		Path:         "/tmp/demo.sf",
 		SourceAction: "write_rule",
@@ -33,11 +34,10 @@ desc(title: "t")`
 	assert.Empty(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE), "SF must not emit yaklang_code_change")
 	events := capture.byType(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE)
 	require.Len(t, events, 1)
-	require.Equal(t, loopSyntaxflowRuleChangeEventNode, events[0].NodeId)
-	require.Equal(t, schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE, factory.editorChangeEventType())
-	require.Equal(t, loopSyntaxflowRuleChangeEventNode, factory.editorChangeEventNode())
+	require.Equal(t, "syntaxflow_rule_change", events[0].NodeId)
+	require.Equal(t, schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE, factory.editorChange)
 
-	var payload SyntaxFlowRuleChangeEvent
+	var payload CodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
 	assert.Equal(t, "create", payload.Op)
 	assert.Equal(t, rule, payload.Code.Content)
