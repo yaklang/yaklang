@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
@@ -51,10 +52,33 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 	}
 	startParams := firstMsg.GetParams()
 	var sendMu sync.Mutex
+	started := make(chan struct{})
+	// debugStreamPrinter 在 DEBUG=1 时把流式 delta 合并到单行，避免每个
+	// token 单独换行造成的刷屏；非流事件来临时先 FlushIfActive 收尾，让
+	// 后续 log / 普通事件都从新行开始，消除"夹心"现象。
+	// 关键词: DEBUG=1 流式输出体验, AI stream delta debug print
+	debugStreamPrinter := aicommon.GetDefaultDebugStreamPrinter()
+	// 同步把 common/log 默认输出包装上一层 flush, 让任何日志写入前先把
+	// 流缓冲刷出, 彻底消灭日志被夹在流中间的视觉混乱。
+	// 关键词: EnsureLogFlushWrapperInstalled grpc_ai_react entry
+	aicommon.EnsureLogFlushWrapperInstalled()
+	close(started)
+	_ = started
+
 	feedback := func(e *schema.AiOutputEvent) error {
 		if e == nil {
 			return nil
 		}
+		if e.Timestamp <= 0 {
+			e.Timestamp = time.Now().Unix() // fallback
+		}
+		utils.Debug(func() {
+			if e.IsStream {
+				debugStreamPrinter.PrintStreamDelta(e)
+			} else {
+				debugStreamPrinter.FlushIfActive()
+			}
+		})
 		if stream.Context().Err() != nil {
 			return nil
 		}
@@ -68,6 +92,7 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 		return utils.Error("AI ReAct session runtime is not configured")
 	}
 	extraOptions := append([]aicommon.ConfigOption{}, additionalOptions...)
+	// 浏览器扩展桥接：AI Agent 会话注入受管实例的浏览器操作工具与运行时上下文。
 	if startParams.GetSource() == "ai" && s.browserBridge != nil {
 		bridge := serverBrowserExtensionBridge{server: s}
 		browserTools, toolErr := s.buildBrowserAgentTools()
@@ -84,6 +109,8 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 			)
 		}
 	}
+	// 运行时 Forge：会话创建前先把 Forge 的 ConfigOption（工具范围、系统提示等）
+	// 追加进来，sessionruntime 会把它们接到共享 ReAct 的 additionalOptions 尾部。
 	if forgeName := strings.TrimSpace(startParams.GetForgeName()); forgeName != "" {
 		preparation, handled, prepareErr := s.prepareRuntimeForgeReAct(
 			forgeName,

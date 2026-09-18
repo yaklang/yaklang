@@ -19,6 +19,8 @@ type MCPToolSetCatalogEntry struct {
 	Name    string
 	Tier    MCPToolSetTier
 	Summary string
+	// Runtime sets receive instance-bound tools when their owning service starts.
+	Runtime bool
 }
 
 // mcpToolSetCatalog is the authoritative inventory and default-startup classification.
@@ -37,6 +39,7 @@ var mcpToolSetCatalog = []MCPToolSetCatalogEntry{
 	{Name: "syntaxflow", Tier: ToolSetTierDefault, Summary: "SyntaxFlow rule management and code-audit scans"},
 	{Name: "mitm", Tier: ToolSetTierDefault, Summary: "MITM proxy filters, replacer rules, cert download, start_mitm_v2"},
 	{Name: "fingerprint", Tier: ToolSetTierDefault, Summary: "Service fingerprint query and CRUD"},
+	{Name: "browser_extension", Tier: ToolSetTierDefault, Runtime: true, Summary: "Browser extension capabilities and plaintext gateways; requires the browser bridge"},
 
 	// --- optional: specialized / heavy / UI-oriented ---
 	{Name: "screenshot", Tier: ToolSetTierOptional, Summary: "Capture the visible Yakit frontend with a local-time watermark"},
@@ -54,6 +57,14 @@ var mcpToolSetCatalog = []MCPToolSetCatalogEntry{
 
 	// --- internal ---
 	{Name: "dynamic", Tier: ToolSetTierInternal, Summary: "Runtime dynamic tool registration; meta hook"},
+}
+
+func init() {
+	for _, entry := range mcpToolSetCatalog {
+		if entry.Runtime {
+			AddGlobalToolSet(entry.Name)
+		}
+	}
 }
 
 // MCPToolSetCatalog returns a copy of the tool-set catalog entries.

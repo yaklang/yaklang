@@ -43,7 +43,7 @@ func TestGRPCMUSTPASS_EncodeHTTPPacketContent_TextAndPosition(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_EncodeHTTPPacketContent_HTTPFlowId(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 
 	flow := &schema.HTTPFlow{
@@ -52,7 +52,7 @@ func TestGRPCMUSTPASS_EncodeHTTPPacketContent_HTTPFlowId(t *testing.T) {
 		Url:     "http://example.com/",
 		Method:  "GET",
 	}
-	err = yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+	err = yakit.InsertHTTPFlow(server.GetProjectDatabase(), flow)
 	require.NoError(t, err)
 
 	rsp, err := client.EncodeHTTPPacketContent(context.Background(), &ypb.EncodeHTTPPacketContentRequest{

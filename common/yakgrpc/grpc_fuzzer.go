@@ -48,6 +48,17 @@ var (
 	fuzzerSessionPreFix  = "__FUZZER_SESSION__"
 )
 
+// Limit the displayed request without changing packets used by transport,
+// retry lookup, or browser-transform traces. The full slice expression forces
+// append to allocate instead of overwriting the original packet's body.
+func fuzzerRequestPreview(packet []byte) []byte {
+	const limit = 2 * 1024 * 1024
+	if len(packet) <= limit {
+		return packet
+	}
+	return append(packet[:limit:limit], "...(request > 2M) show chunked by yakit web fuzzer"...)
+}
+
 func ensureLowhttpHiddenIndex(r *lowhttp.LowhttpResponse) string {
 	if r == nil {
 		return uuid.NewString()
@@ -405,7 +416,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		Method:                method,
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
-		RequestRaw:            resultRequest,
+		RequestRaw:            fuzzerRequestPreview(resultRequest),
 		ExtractedResults:      extractResults,
 	}
 	rsp.UUID = uuid.New().String()
@@ -1402,7 +1413,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					StatusCode:  statusCode,
 					ContentType: utils.EscapeInvalidUTF8Byte([]byte(contentType)),
 					ResponseRaw: result.ResponseRaw,
-					RequestRaw:  result.RequestRaw,
+					RequestRaw:  fuzzerRequestPreview(result.RequestRaw),
 					UUID:        streamID,
 					Timestamp:   result.Timestamp,
 					TaskId:      int64(taskID),
@@ -1427,11 +1438,8 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				result.ResponseRaw,
 			)
 
-			// 2M
-			if len(result.RequestRaw) > 2*1024*1024 {
-				result.RequestRaw = result.RequestRaw[:2*1024*1024]
-				result.RequestRaw = append(result.RequestRaw, []byte("...(request > 2M) show chunked by yakit web fuzzer")...)
-			}
+			plainRequestRaw = fuzzerRequestPreview(plainRequestRaw)
+			wireRequestRaw = fuzzerRequestPreview(wireRequestRaw)
 
 			var payloads []string
 			task.HTTPFlowTotal++
@@ -1778,7 +1786,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
 						ResponseRaw:           redirectRes.RawPacket,
 						GuessResponseEncoding: Chardet(redirectRes.RawPacket),
-						RequestRaw:            redirectRes.RawRequest,
+						RequestRaw:            fuzzerRequestPreview(redirectRes.RawRequest),
 						Payloads:              payloads,
 						IsHTTPS:               redirectRes.Https,
 						RuntimeID:             runtimeID,
@@ -1850,7 +1858,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				}
 				// 如果重定向了,修正最后一个req
 				if len(redirectPacket) > 0 {
-					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
+					rsp.RequestRaw = fuzzerRequestPreview(redirectPacket[len(redirectPacket)-1].Request)
 				}
 			}
 			if browserTransform != nil {

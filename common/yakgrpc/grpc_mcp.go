@@ -7,10 +7,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -44,10 +44,10 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		if err != nil {
 			log.Warnf("StartMcpServer: build browser extension tools failed: %v", err)
 		} else {
-			baseOptions = append(baseOptions, mcp.WithAITools(browserTools...))
+			baseOptions = append(baseOptions, mcp.WithAIToolSet("browser_extension", browserTools...))
 		}
 	}
-	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, baseOptions...)
+	return s.launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, baseOptions...)
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
@@ -73,7 +73,7 @@ func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetTo
 }
 
 // launchMcpServer 启动 MCP 服务器的具体实现
-func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send func(*ypb.StartMcpServerResponse) error, explicitToolSets bool, baseOpts ...mcp.McpServerOption) (err error) {
+func (s *Server) launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send func(*ypb.StartMcpServerResponse) error, explicitToolSets bool, baseOpts ...mcp.McpServerOption) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("panic in launchMcpServer: %v", r)
@@ -133,7 +133,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	}
 
 	if req.GetEnableAIToolFramework() {
-		db := consts.GetGormProfileDatabase()
+		db := s.GetProfileDatabase()
 
 		// Built-in framework tools: fs, ssa, yakscript, etc.
 		builtinTools := buildinaitools.GetAllToolsDynamically(db)
@@ -144,7 +144,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	}
 
 	if req.GetEnableBridgeExternalMCP() {
-		db := consts.GetGormProfileDatabase()
+		db := s.GetProfileDatabase()
 		externalTools, mcpErr := aitool.LoadAllEnabledAIToolsFromMCPServers(db, ctx)
 		if mcpErr != nil {
 			log.Warnf("launchMcpServer: load external mcp tools via bridge failed: %v", mcpErr)
@@ -156,7 +156,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 
 	// Apply per-tool enable/disable from the profile DB.
 	// Tools that were explicitly disabled by the user are filtered out here.
-	disabledTools, dbErr := GetDisabledMCPToolNamesFromDB()
+	disabledTools, dbErr := yakit.GetDisabledMCPClientToolNames(s.GetProfileDatabase())
 	if dbErr != nil {
 		log.Warnf("launchMcpServer: failed to load disabled tool list: %v", dbErr)
 	}

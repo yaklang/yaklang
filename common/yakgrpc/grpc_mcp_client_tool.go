@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/schema"
@@ -174,17 +173,6 @@ func (s *Server) SetMCPToolEnabled(ctx context.Context, req *ypb.SetMCPToolEnabl
 		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
 	}
 	return &ypb.GeneralResponse{Ok: true}, nil
-}
-
-// GetDisabledMCPToolNamesFromDB is called by launchMcpServer to filter out
-// disabled tools before registering them. Returns an empty map on DB errors
-// so the server can still start in a degraded state.
-func GetDisabledMCPToolNamesFromDB() (map[string]struct{}, error) {
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
-		return map[string]struct{}{}, nil
-	}
-	return yakit.GetDisabledMCPClientToolNames(db)
 }
 
 // ---------------------------------------------------------------------------
