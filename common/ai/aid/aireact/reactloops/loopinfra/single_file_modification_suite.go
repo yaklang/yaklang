@@ -86,10 +86,8 @@ type SingleFileModificationSuiteFactory struct {
 	// Event type for emitting JSON events
 	eventType string
 
-	// Editor delivery. Empty type disables emit; each language package sets its own EventType/node/source.
-	editorDeliveryEventType schema.EventType
-	editorDeliveryEventNode string
-	editorDeliverySource    string
+	// editorChange is the frontend *_change event. Empty disables emit.
+	editorChange schema.EventType
 
 	// Behavior flags
 	exitAfterWrite      bool // whether to call operator.Exit() after successful write (default: true)
@@ -180,13 +178,10 @@ func WithCodePrettify(cb CodePrettifyCallback) SingleFileModificationOption {
 	}
 }
 
-// WithEditorDelivery configures the frontend editor-change event for this suite.
-// Callers in each language package pass their own EventType, node id, and change-id source.
-func WithEditorDelivery(eventType schema.EventType, node, defaultSource string) SingleFileModificationOption {
+// WithEditorChange opts this suite into frontend *_change events (yaklang_code_change, syntaxflow_rule_change, ...).
+func WithEditorChange(eventType schema.EventType) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
-		f.editorDeliveryEventType = eventType
-		f.editorDeliveryEventNode = node
-		f.editorDeliverySource = defaultSource
+		f.editorChange = eventType
 	}
 }
 

@@ -16,7 +16,7 @@ func TestApplyLoopYaklangCodeChange_SyntaxFlowContentType_EmitsSyntaxFlowRuleCha
 		WithActionSuffix("rule"),
 		WithFileExtension(".sf"),
 		WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", "text/syntaxflow"),
-		WithEditorDelivery(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE, "syntaxflow_rule_change", "syntaxflow_rule"),
+		WithEditorChange(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE),
 	)
 	loop, capture, _ := newLoopWithCapturedEvents(t, runtime, factory)
 
@@ -35,8 +35,7 @@ desc(title: "t")`
 	events := capture.byType(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE)
 	require.Len(t, events, 1)
 	require.Equal(t, "syntaxflow_rule_change", events[0].NodeId)
-	require.Equal(t, schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE, factory.editorChangeEventType())
-	require.Equal(t, "syntaxflow_rule_change", factory.editorChangeEventNode())
+	require.Equal(t, schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE, factory.editorChange)
 
 	var payload CodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
