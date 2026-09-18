@@ -221,22 +221,28 @@ func compressKnowledgeChunkWithScore(
 	invoker aicommon.AIInvokeRuntime,
 	alreadyExtracted string,
 ) []ScoredRange {
-	dNonce := utils.RandStringBytes(4)
-	minLines := 3
-	maxLines := 20
-	maxRanges := 8
+	var taskIndex string
+	var results []ScoredRange
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelKnowledgeCompress,
+		func() string {
+			dNonce := utils.RandStringBytes(4)
+			minLines := 3
+			maxLines := 20
+			maxRanges := 8
 
-	// Build already extracted section if available
-	alreadyExtractedSection := ""
-	if alreadyExtracted != "" {
-		alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
+			// Build already extracted section if available
+			alreadyExtractedSection := ""
+			if alreadyExtracted != "" {
+				alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
 %s
 <|ALREADY_EXTRACTED_END_%s|>
 
 `, dNonce, alreadyExtracted, dNonce)
-	}
+			}
 
-	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
+			promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
 {{ .userQuery }}
 <|USER_QUERY_END_{{ .nonce }}|>
 
@@ -275,27 +281,63 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
-	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
-		"nonce":                   dNonce,
-		"samples":                 chunkContentWithLineNum,
-		"userQuery":               userQuery,
-		"alreadyExtractedSection": alreadyExtractedSection,
-		"hasAlreadyExtracted":     alreadyExtracted != "",
-	})
+			materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
+				"nonce":                   dNonce,
+				"samples":                 chunkContentWithLineNum,
+				"userQuery":               userQuery,
+				"alreadyExtractedSection": alreadyExtractedSection,
+				"hasAlreadyExtracted":     alreadyExtracted != "",
+			})
 
-	if err != nil {
-		log.Errorf("compressKnowledgeChunkWithScore: template render failed: %v", err)
-		return nil
-	}
+			if err != nil {
+				log.Errorf("compressKnowledgeChunkWithScore: template render failed: %v", err)
+				return ""
+			}
 
-	// Get task index for emit
-	var taskIndex string
-	var forgeResult *aicommon.Action
-	invoker.GetConfig().ScheduleAuxiliaryTask(
-		ctx,
-		aicommon.CallerLabelKnowledgeCompress,
-		func() string { return materials },
-		func(result *aicommon.Action) { forgeResult = result },
+			return materials
+		},
+		func(forgeResult *aicommon.Action) {
+			rangeItems := forgeResult.GetInvokeParamsArray("ranges")
+
+			for _, item := range rangeItems {
+				rangeStr := item.GetString("range")
+				score := item.GetFloat("score")
+
+				if rangeStr == "" {
+					continue
+				}
+
+				if !passesCompressionScore(score) {
+					continue
+				}
+
+				parts := strings.Split(rangeStr, "-")
+				if len(parts) != 2 {
+					continue
+				}
+
+				startLine, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+				endLine, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+
+				if err1 != nil || err2 != nil || startLine <= 0 || endLine < startLine {
+					continue
+				}
+				results = append(results, ScoredRange{
+					Range:     rangeStr,
+					StartLine: startLine,
+					EndLine:   endLine,
+					Score:     score,
+				})
+			}
+			spew.Dump(results)
+
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			log.Errorf("compressKnowledgeChunkWithScore: LiteForge failed: %v", err)
+			if emitter := invoker.GetConfig().GetEmitter(); emitter != nil {
+				emitter.EmitDefaultStreamEvent("error", bytes.NewBufferString("Compression failed: "+err.Error()), taskIndex)
+			}
+		}),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
@@ -348,55 +390,5 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 		),
 	)
 
-	var invokerEmitter *aicommon.Emitter
-	if invoker != nil {
-		if config := invoker.GetConfig(); config != nil {
-			invokerEmitter = config.GetEmitter()
-		}
-	}
-
-	if forgeResult == nil {
-		invokerEmitter.EmitDefaultStreamEvent(
-			"error",
-			bytes.NewBufferString("Compression failed: "+`压缩结果为空`),
-			taskIndex,
-		)
-		return nil
-	}
-
-	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
-	var results []ScoredRange
-
-	for _, item := range rangeItems {
-		rangeStr := item.GetString("range")
-		score := item.GetFloat("score")
-
-		if rangeStr == "" {
-			continue
-		}
-
-		if !passesCompressionScore(score) {
-			continue
-		}
-
-		parts := strings.Split(rangeStr, "-")
-		if len(parts) != 2 {
-			continue
-		}
-
-		startLine, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
-		endLine, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
-
-		if err1 != nil || err2 != nil || startLine <= 0 || endLine < startLine {
-			continue
-		}
-		results = append(results, ScoredRange{
-			Range:     rangeStr,
-			StartLine: startLine,
-			EndLine:   endLine,
-			Score:     score,
-		})
-	}
-	spew.Dump(results)
 	return results
 }

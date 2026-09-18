@@ -383,38 +383,34 @@ func (c *Coordinator) generateSemanticIdentifier(name string) string {
 		return truncateFallback()
 	}
 
-	prompt := fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
-The identifier should capture the core meaning. Chinese or English are both acceptable.
-Reply with ONLY the JSON: {"@action":"object","identifier":"YOUR_IDENTIFIER"}
-
-Task name: %s`, name)
-
-	var action *aicommon.Action
+	result := truncateFallback()
 	c.GetAIConfig().ScheduleAuxiliaryTask(c.GetContext(),
 		aicommon.CallerLabelTaskShortID,
-		func() string { return prompt },
-		func(result *aicommon.Action) { action = result },
+		func() string {
+			return fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
+The identifier should capture the core meaning. Chinese or English are both acceptable.
+Reply with ONLY the JSON: {"@action":"%s","identifier":"YOUR_IDENTIFIER"}
+
+Task name: %s`, aicommon.CallerLabelTaskShortID, name)
+		},
+		func(action *aicommon.Action) {
+			identifier := aicommon.SanitizeTaskName(strings.TrimSpace(action.GetString("identifier")))
+			if identifier == "" {
+				return
+			}
+			resultRunes := []rune(identifier)
+			if len(resultRunes) > maxIdentifierRuneLen {
+				identifier = strings.TrimRight(string(resultRunes[:maxIdentifierRuneLen]), "_")
+			}
+			result = identifier
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			log.Debugf("failed to generate semantic identifier for %q: %v, falling back to truncation", name, err)
+		}),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam("identifier"),
 		),
 	)
-	if action == nil {
-		log.Debugf("liteforge returned nil result for %q, falling back to truncation", name)
-		return truncateFallback()
-	}
-
-	result := strings.TrimSpace(action.GetString("identifier"))
-	result = aicommon.SanitizeTaskName(result)
-	if result == "" {
-		return truncateFallback()
-	}
-
-	// Ensure the AI-generated identifier is within limits
-	resultRunes := []rune(result)
-	if len(resultRunes) > maxIdentifierRuneLen {
-		result = string(resultRunes[:maxIdentifierRuneLen])
-		result = strings.TrimRight(result, "_")
-	}
 	return result
 }
 

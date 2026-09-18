@@ -317,28 +317,43 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 					taskUserInput = task.GetUserInput()
 				}
 
-				conflictPrompt := fmt.Sprintf(
-					"Skill loading conflict detected.\n"+
-						"Failed skill: '%s' (attempted %d times, error: %v)\n"+
-						"Resolved as: %s (type: %s)\n"+
-						"Already loaded skills: %v\n"+
-						"Recent load attempts: %s\n"+
-						"User task context: %s\n\n"+
-						"You must decide what to do next. Options:\n"+
-						"- 'proceed_with_loaded': Continue using the already loaded skills\n"+
-						"- 'skip': Skip this skill entirely and proceed with the task\n"+
-						"- 'use_alternative': Try a different approach for this task\n",
-					skillName, failCount, err,
-					resolved.Suggestion, string(resolved.IdentityType),
-					loadedNames, loadHistory, taskUserInput,
-				)
-
 				ctx := op.GetContext()
-				var decision *aicommon.Action
+				decisionAction := "proceed_with_loaded"
+				decisionReason := "Auxiliary task returned no result; defaulting to proceed_with_loaded"
 				invoker.GetConfig().ScheduleAuxiliaryTask(ctx,
 					aicommon.CallerLabelSkillConflictResolver,
-					func() string { return conflictPrompt },
-					func(result *aicommon.Action) { decision = result },
+					func() string {
+						conflictPrompt := fmt.Sprintf(
+							"Skill loading conflict detected.\n"+
+								"Failed skill: '%s' (attempted %d times, error: %v)\n"+
+								"Resolved as: %s (type: %s)\n"+
+								"Already loaded skills: %v\n"+
+								"Recent load attempts: %s\n"+
+								"User task context: %s\n\n"+
+								"You must decide what to do next. Options:\n"+
+								"- 'proceed_with_loaded': Continue using the already loaded skills\n"+
+								"- 'skip': Skip this skill entirely and proceed with the task\n"+
+								"- 'use_alternative': Try a different approach for this task\n",
+							skillName, failCount, err,
+							resolved.Suggestion, string(resolved.IdentityType),
+							loadedNames, loadHistory, taskUserInput,
+						)
+
+						return conflictPrompt
+					},
+					func(decision *aicommon.Action) {
+						decisionReason = "LiteForge arbitration completed"
+						if action := decision.GetString("action"); action != "" {
+							decisionAction = action
+						}
+						if reason := decision.GetString("reason"); reason != "" {
+							decisionReason = reason
+						}
+					},
+					aicommon.WithAuxiliaryOnError(func(err error) {
+						log.Warnf("skill-conflict-resolver failed: %v", err)
+						decisionReason = fmt.Sprintf("LiteForge failed (%v), defaulting to proceed_with_loaded", err)
+					}),
 					aicommon.WithAuxiliaryOutputs(
 						aitool.WithStringParam("action",
 							aitool.WithParam_Description("One of: proceed_with_loaded, skip, use_alternative"),
@@ -347,21 +362,6 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 							aitool.WithParam_Description("Brief reason for the decision")),
 					),
 				)
-
-				// Record decision to timeline
-				decisionAction := "proceed_with_loaded"
-				decisionReason := "LiteForge arbitration completed"
-				if decision == nil {
-					log.Warn("skill-conflict-resolver auxiliary task returned no result, defaulting to proceed_with_loaded")
-					decisionReason = "Auxiliary task returned no result; defaulting to proceed_with_loaded"
-				} else {
-					if a := decision.GetString("action"); a != "" {
-						decisionAction = a
-					}
-					if r := decision.GetString("reason"); r != "" {
-						decisionReason = r
-					}
-				}
 
 				invoker.AddToTimeline("skill_conflict_resolved",
 					fmt.Sprintf("Skill conflict resolved by LiteForge. "+

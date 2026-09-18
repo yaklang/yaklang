@@ -463,22 +463,32 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 		ctx = task.GetContext()
 	}
 
-	userInput := ""
+	taskIndex := ""
 	if task != nil {
-		userInput = task.GetUserInput()
+		taskIndex = task.GetId()
 	}
 
-	lastActionText := ""
-	if lastAction != nil {
-		lastActionText = fmt.Sprintf("ActionType: %s\nActionName: %s\nActionParams: %s", lastAction.ActionType, lastAction.ActionName, utils.InterfaceToString(lastAction.ActionParams))
-	}
+	result := ""
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelPlanFactsHook,
+		func() string {
+			userInput := ""
+			if task != nil {
+				userInput = task.GetUserInput()
+			}
 
-	instruction := "基于最新执行结果，只输出本轮新增且可验证的事实，不能重复已有事实。"
-	if mode == "bootstrap" {
-		instruction = "当前还没有任何已记录 facts。请基于用户原始诉求、已有 plan 和已收集结果，整理出一份初始事实文档。只能写明确存在于上下文里的事实，禁止编造。"
-	}
+			lastActionText := ""
+			if lastAction != nil {
+				lastActionText = fmt.Sprintf("ActionType: %s\nActionName: %s\nActionParams: %s", lastAction.ActionType, lastAction.ActionName, utils.InterfaceToString(lastAction.ActionParams))
+			}
 
-	prompt := fmt.Sprintf(`你正在为任务规划循环生成 FACTS 文档。
+			instruction := "基于最新执行结果，只输出本轮新增且可验证的事实，不能重复已有事实。"
+			if mode == "bootstrap" {
+				instruction = "当前还没有任何已记录 facts。请基于用户原始诉求、已有 plan 和已收集结果，整理出一份初始事实文档。只能写明确存在于上下文里的事实，禁止编造。"
+			}
+
+			prompt := fmt.Sprintf(`你正在为任务规划循环生成 FACTS 文档。
 
 要求：
 - 输出 Markdown
@@ -522,17 +532,10 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 %s
 `, mode, instruction, userInput, lastActionText, getLoopTaskContext(loop))
 
-	taskIndex := ""
-	if task != nil {
-		taskIndex = task.GetId()
-	}
-
-	var action *aicommon.Action
-	invoker.GetConfig().ScheduleAuxiliaryTask(
-		ctx,
-		aicommon.CallerLabelPlanFactsHook,
-		func() string { return prompt },
-		func(result *aicommon.Action) { action = result },
+			return prompt
+		},
+		func(action *aicommon.Action) { result = normalizeFactsDocument(action.GetString(PlanFactsFieldName)) },
+		aicommon.WithAuxiliaryOnError(func(err error) { log.Warnf("plan loop: auto generate facts failed: %v", err) }),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam(PlanFactsFieldName, aitool.WithParam_Description("增量 facts markdown；没有新增事实时返回空字符串")),
 		),
@@ -550,10 +553,7 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 			),
 		),
 	)
-	if action == nil {
-		return ""
-	}
-	return normalizeFactsDocument(action.GetString(PlanFactsFieldName))
+	return result
 }
 
 func hasValidPlan(loop *reactloops.ReActLoop) bool {

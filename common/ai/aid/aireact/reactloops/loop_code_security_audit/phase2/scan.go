@@ -1001,16 +1001,6 @@ func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState,
 
 // planScanCategories 调用 AI 生成本次审计的扫描类别列表（LiteForge 在 fork 子 timeline 上运行，避免污染父 timeline）。
 func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState) []model.VulnCategory {
-	var defaultDesc strings.Builder
-	for _, c := range model.DefaultVulnCategories {
-		defaultDesc.WriteString(fmt.Sprintf("- %s（id: %s）\n", c.Name, c.ID))
-	}
-
-	userInput := task.GetUserInput()
-	if userInput == "" {
-		userInput = "（用户未提供额外说明）"
-	}
-
 	techStack := ""
 	if state != nil {
 		techStack = state.TechStack
@@ -1018,24 +1008,41 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 	if techStack == "" {
 		techStack = "（Phase1 未提供技术栈，按未识别画像处理）"
 	}
-	focusBlock := model.FormatFocusPlanForPrompt(techStack)
-	prompt := fmt.Sprintf(planPromptTemplate, len(model.DefaultVulnCategories), defaultDesc.String(), focusBlock, userInput)
 
 	fallback := func() []model.VulnCategory {
 		return model.OrderCategoriesByFocus(techStack, model.DefaultVulnCategories)
 	}
 
-	var action *aicommon.Action
+	result := fallback()
 	planErr := reactloops.RunForkInvokerCallback(r, task, reactloops.SubAgentJob{
 		Identifier: "scan-plan",
 		TaskName:   "Determine code audit vulnerability scan categories",
 		Goal:       "Determine code audit vulnerability scan categories",
 	}, func(childInvoker aicommon.AIInvokeRuntime, childTask aicommon.AIStatefulTask) error {
+		taskErr := utils.Error("scan plan auxiliary task returned no result")
 		childInvoker.GetConfig().ScheduleAuxiliaryTask(
 			childTask.GetContext(),
 			aicommon.CallerLabelScanPlan,
-			func() string { return prompt },
-			func(result *aicommon.Action) { action = result },
+			func() string {
+				var defaultDesc strings.Builder
+				for _, c := range model.DefaultVulnCategories {
+					defaultDesc.WriteString(fmt.Sprintf("- %s（id: %s）\n", c.Name, c.ID))
+				}
+
+				userInput := task.GetUserInput()
+				if userInput == "" {
+					userInput = "（用户未提供额外说明）"
+				}
+
+				focusBlock := model.FormatFocusPlanForPrompt(techStack)
+				prompt := fmt.Sprintf(planPromptTemplate, len(model.DefaultVulnCategories), defaultDesc.String(), focusBlock, userInput)
+				return prompt
+			},
+			func(action *aicommon.Action) {
+				taskErr = nil
+				result = parseScanPlanAction(r, action, techStack)
+			},
+			aicommon.WithAuxiliaryOnError(func(err error) { taskErr = err }),
 			aicommon.WithAuxiliaryOutputs(
 				aitool.WithStringArrayParam("selected_category_ids",
 					aitool.WithParam_Required(true),
@@ -1049,21 +1056,20 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 				),
 			),
 		)
-		if action == nil {
-			return utils.Error("scan plan auxiliary task returned no result")
-		}
-		return nil
+		return taskErr
 	})
 	if planErr != nil {
 		log.Warnf("[CodeAudit/Phase2] Plan AI call failed: %v, falling back to language-focused defaults", planErr)
 		return fallback()
 	}
 
-	if action == nil {
-		log.Warnf("[CodeAudit/Phase2] Plan returned nil action, using language-focused defaults")
-		return fallback()
-	}
+	return result
+}
 
+func parseScanPlanAction(r aicommon.AIInvokeRuntime, action *aicommon.Action, techStack string) []model.VulnCategory {
+	fallback := func() []model.VulnCategory {
+		return model.OrderCategoriesByFocus(techStack, model.DefaultVulnCategories)
+	}
 	selectedIDs := action.GetStringSlice("selected_category_ids")
 	if len(selectedIDs) == 0 {
 		log.Warnf("[CodeAudit/Phase2] Plan returned empty selected_category_ids, using language-focused defaults")

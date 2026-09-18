@@ -383,32 +383,45 @@ func evaluateNextSearch(
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
-	// 限制结果长度
-	resultPreview := currentResult
-	if len(resultPreview) > 2000 {
-		resultPreview = resultPreview[:2000] + "\n...(已截断)"
-	}
-
-	materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
-		"nonce":         dNonce,
-		"userQuery":     userQuery,
-		"searchHistory": searchHistory,
-		"currentQuery":  currentQuery,
-		"searchCount":   searchCount,
-		"currentResult": resultPreview,
-	})
-
-	if err != nil {
-		log.Errorf("evaluateNextSearch: template render failed: %v", err)
-		return EvaluateResult{Finished: true, Summary: "template render failed"}
-	}
-
-	var forgeResult *aicommon.Action
+	result := EvaluateResult{Finished: true, Summary: "auxiliary evaluation returned nil"}
 	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
 		aicommon.CallerLabelEvaluateNextSearch,
-		func() string { return materials },
-		func(result *aicommon.Action) { forgeResult = result },
+		func() string {
+			// 限制结果长度
+			resultPreview := currentResult
+			if len(resultPreview) > 2000 {
+				resultPreview = resultPreview[:2000] + "\n...(已截断)"
+			}
+
+			materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
+				"nonce":         dNonce,
+				"userQuery":     userQuery,
+				"searchHistory": searchHistory,
+				"currentQuery":  currentQuery,
+				"searchCount":   searchCount,
+				"currentResult": resultPreview,
+			})
+
+			if err != nil {
+				log.Errorf("evaluateNextSearch: template render failed: %v", err)
+				result.Summary = "template render failed"
+				return ""
+			}
+
+			return materials
+		},
+		func(action *aicommon.Action) {
+			result = EvaluateResult{
+				Finished:   action.GetBool("finished"),
+				NextSearch: strings.TrimSpace(action.GetString("next_search")),
+				Summary:    strings.TrimSpace(action.GetString("summary")),
+			}
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			log.Errorf("evaluateNextSearch: LiteForge failed: %v", err)
+			result.Summary = "LiteForge evaluation failed"
+		}),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithBoolParam("finished", aitool.WithParam_Description("是否已完成知识收集，true 表示信息已足够，false 表示需要继续搜索"), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("next_search", aitool.WithParam_Description("下一步搜索建议，如果 finished 为 true 则为空字符串")),
@@ -416,19 +429,7 @@ func evaluateNextSearch(
 		),
 	)
 
-	if forgeResult == nil {
-		return EvaluateResult{Finished: true, Summary: "auxiliary evaluation returned nil"}
-	}
-
-	finished := forgeResult.GetBool("finished")
-	nextSearch := strings.TrimSpace(forgeResult.GetString("next_search"))
-	summary := strings.TrimSpace(forgeResult.GetString("summary"))
-
-	return EvaluateResult{
-		NextSearch: nextSearch,
-		Finished:   finished,
-		Summary:    summary,
-	}
+	return result
 }
 
 // semantic and keyword action constructors

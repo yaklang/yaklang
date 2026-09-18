@@ -371,8 +371,8 @@ type Config struct {
 	MaxIterationCount        int64
 	EnableGoalMode           bool
 	GoalMinIterations        int64
-	GoalDurationSeconds      int64 // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
-	GoalAcceptanceCriteria   string // Goal mode acceptance criteria; non-empty enables LLM review gate
+	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
+	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables LLM review gate
 	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
 	DisableIncreaseIteration bool
 
@@ -4629,7 +4629,11 @@ func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackT
 
 func (c *Config) buildStreamNodeIdI18nProvider() func(nodeId string) *schema.I18n {
 	return func(nodeId string) *schema.I18n {
-		prompt := fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
+		var result *schema.I18n
+		c.ScheduleAuxiliaryTask(c.GetContext(),
+			CallerLabelI18nTranslation,
+			func() string {
+				return fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
 Translate the following technical stream/node identifier into concise, user-friendly display names.
 The identifier uses underscores or hyphens as word separators.
 
@@ -4638,26 +4642,21 @@ Identifier: %s
 Requirements:
 - Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
 - English (en): A short, capitalized English phrase`, nodeId)
-
-		var result *Action
-		c.ScheduleAuxiliaryTask(c.GetContext(),
-			CallerLabelI18nTranslation,
-			func() string { return prompt },
-			func(action *Action) { result = action },
+			},
+			func(action *Action) {
+				zh, en := action.GetString("zh"), action.GetString("en")
+				if zh != "" || en != "" {
+					result = &schema.I18n{Zh: zh, En: en}
+				}
+			},
+			WithAuxiliaryOnError(func(err error) {
+				log.Infof("stream nodeId i18n provider failed for %q: %v", nodeId, err)
+			}),
 			WithAuxiliaryOutputs(
 				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
 				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
 			),
 		)
-		if result == nil {
-			log.Infof("stream nodeId i18n provider skipped for %q: auxiliary task returned no result", nodeId)
-			return nil
-		}
-		zh := result.GetString("zh")
-		en := result.GetString("en")
-		if zh == "" && en == "" {
-			return nil
-		}
-		return &schema.I18n{Zh: zh, En: en}
+		return result
 	}
 }

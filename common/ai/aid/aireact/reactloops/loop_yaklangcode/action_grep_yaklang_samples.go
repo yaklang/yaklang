@@ -23,10 +23,19 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 		return resultStr
 	}
 
-	resultEditor := memedit.NewMemEditor(resultStr)
-	dNonce := utils.RandStringBytes(4)
+	var context = invoker.GetConfig().GetContext()
+	if op != nil {
+		context = op.GetTask().GetContext()
+	}
 
-	promptTemplate := `
+	result := resultStr
+	invoker.GetConfig().ScheduleAuxiliaryTask(
+		context,
+		aicommon.CallerLabelExtractRankedLines,
+		func() string {
+			dNonce := utils.RandStringBytes(4)
+
+			promptTemplate := `
 {{ if .userContext }}<|USER_CONTEXT_{{ .nonce }}|>
 {{ .userContext }}
 <|USER_CONTEXT_END_{{ .nonce }}|>
@@ -88,35 +97,28 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
-	if usePatterns {
-		promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|SEARCH_PATTERNS_{{ .nonce }}|>\n{{ .searchInfo }}\n<|SEARCH_PATTERNS_END_{{ .nonce }}|>\n\n<|SEARCH_RESULTS_{{ .nonce }}|>", 1)
-	} else {
-		promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|QUERY_{{ .nonce }}|>\n搜索模式: {{ .searchInfo }}\n<|QUERY_END_{{ .nonce }}|>\n\n<|GREP_RESULT_{{ .nonce }}|>", 1)
-	}
+			if usePatterns {
+				promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|SEARCH_PATTERNS_{{ .nonce }}|>\n{{ .searchInfo }}\n<|SEARCH_PATTERNS_END_{{ .nonce }}|>\n\n<|SEARCH_RESULTS_{{ .nonce }}|>", 1)
+			} else {
+				promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|QUERY_{{ .nonce }}|>\n搜索模式: {{ .searchInfo }}\n<|QUERY_END_{{ .nonce }}|>\n\n<|GREP_RESULT_{{ .nonce }}|>", 1)
+			}
 
-	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
-		"nonce":       dNonce,
-		"samples":     utils.PrefixLinesWithLineNumbers(resultStr),
-		"searchInfo":  searchInfo,
-		"userContext": userContext,
-	})
+			materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
+				"nonce":       dNonce,
+				"samples":     utils.PrefixLinesWithLineNumbers(resultStr),
+				"searchInfo":  searchInfo,
+				"userContext": userContext,
+			})
 
-	if err != nil {
-		log.Errorf("compressSearchResults: template render failed: %v", err)
-		return resultStr
-	}
+			if err != nil {
+				log.Errorf("compressSearchResults: template render failed: %v", err)
+				return ""
+			}
 
-	var context = invoker.GetConfig().GetContext()
-	if op != nil {
-		context = op.GetTask().GetContext()
-	}
-
-	var forgeResult *aicommon.Action
-	invoker.GetConfig().ScheduleAuxiliaryTask(
-		context,
-		aicommon.CallerLabelExtractRankedLines,
-		func() string { return materials },
-		func(result *aicommon.Action) { forgeResult = result },
+			return materials
+		},
+		func(action *aicommon.Action) { result = renderRankedSearchResults(action, resultStr, title) },
+		aicommon.WithAuxiliaryOnError(func(err error) { log.Errorf("compressSearchResults: forge failed: %v", err) }),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
@@ -134,11 +136,11 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 		),
 	)
 
-	if forgeResult == nil {
-		log.Warnf("compressSearchResults: forge result is nil")
-		return resultStr
-	}
+	return result
+}
 
+func renderRankedSearchResults(forgeResult *aicommon.Action, resultStr, title string) string {
+	resultEditor := memedit.NewMemEditor(resultStr)
 	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
 
 	if len(rangeItems) == 0 {

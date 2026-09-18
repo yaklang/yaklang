@@ -68,7 +68,7 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 
 ## 三、已迁移的 LiteForge Speed 任务
 
-下表所列调用已迁入调度器。当前代码中的 `reactloops/goal_mode.go` 仍有 `goal-acceptance-review` 直接 Speed 调用，待单独迁移；不能将下表理解为全部生产调用均已覆盖。
+下表所列调用已迁入调度器，包括 Mini AI Task 和 `goal-acceptance-review`。外围调用及特殊执行路径仍见后续章节。
 
 ### 3.1 Skip 类
 
@@ -123,8 +123,9 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 |---|---|---|
 | `http_flow_analyze_finalize_summary` | HTTP Flow 最终摘要 | `Config.ScheduleAuxiliaryTask` |
 | `skill-conflict-resolver` | Skill 加载冲突裁决 | `Config.ScheduleAuxiliaryTask` |
+| `goal-acceptance-review` | Goal Mode 完成前验收 | `Config.ScheduleAuxiliaryTask` |
 
-虽然这两个任务当前保持原 Speed 行为，它们仍通过统一入口，便于审计和后续调整。
+这些任务保持原 Speed 行为，通过统一入口执行。目标验收的失败放行策略保持不变：关闭目标模式、没有验收条件、子 Agent 或 AI 调用失败时不阻止结束；成功回调才更新 `Passed/Reason`。
 
 ## 四、原直接 Speed 调用的迁移状态
 
@@ -195,8 +196,9 @@ Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略
 
 在 AID Go 代码范围内：
 
-- 已列出的 Speed LiteForge 调用（含三个内置 Mini AI Task）完成迁移；`goal-acceptance-review` 仍待迁移；
-- Timeline/Interval Review 已完成 LiteForge 调度迁移；AIVE 和 Speed Loop 仍仅接入决策；
+- 已列出的 Speed LiteForge 调用（含三个内置 Mini AI Task、目标验收检查）完成迁移；
+- Timeline/Interval Review 已完成 LiteForge 调度迁移；Speed Loop 仍仅接入决策；
+- AIVE 在单模型模式直接停用，检查已前移到循环/审批/风险反馈的记录构建之前；普通模式保留现状，不为它增加 caller 覆盖；
 - Quality/Intelligence 调用没有修改；
 - 剩余边界集中在 Crawler、独立 RAG/产品能力和 Yak 脚本的配置传播问题。
 
@@ -212,3 +214,16 @@ Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略
 - `common/ai/aid/...` 和 `common/aiforge` 全部通过只编译检查；未运行整个 AID 的全部行为测试。
 
 Timeline 内部状态单测按用例注册 reducer 测试桥并在结束时恢复；真实 LiteForge 流式链路在 aiforge 集成测试中验证，避免全局注册改变其他单元测试的环境。
+
+## 十、调用方回调收尾
+
+已将原先“先生成 Prompt，再通过闭包返回变量”的调用改为在调度器执行 promptBuilder 时才准备材料。记忆任务的上下文/标签查询、相似记忆检索也移入延迟准备阶段。
+
+成功回调负责 Action 解析、业务结果转换及相应状态更新；需要继续执行的非 AI fallback 保留在调用外。带 error 返回值的记忆、知识库选择和重排调用保留原始调用错误；日志型调用补齐 OnError。
+
+- `task-short-id` 的 Prompt 与生成的 schema 统一使用同一个 action 名。
+- `goal-acceptance-review` 登记为 PassThrough，保留现有失败放行行为。
+- 重排回归发现整数序号用 GetFloat 读取会被当成 0，已在该调用内改用整数读取，并兼容整数/小数评分。
+- 测试 mock 的自定义记忆响应和 Prompt 校验已接到 Config 调度入口。
+
+本轮验证：aicommon 整包通过（102.203s）；记忆、Mini Task、目标验收、感知、Plan、Intent、知识搜索、HTTP Flow 及代码审计相关定向回归通过；短标识协议及规划解析兼容测试通过。新增用例覆盖跳过时不准备数据、原始错误传播、重排结果和 AIVE 提前停用。未运行全 AID 行为测试。
