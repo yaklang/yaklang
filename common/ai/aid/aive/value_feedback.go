@@ -214,6 +214,10 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 
 	prompt := buildValueFeedbackPrompt(record)
 	outputSchema := aitool.NewObjectSchemaWithActionName(valueFeedbackActionName, buildValueFeedbackOutputs()...)
+	decision := cfg.ResolveAuxiliaryTask(aicommon.CallerLabelAIValueFeedback)
+	if !decision.ShouldRun() {
+		return
+	}
 
 	// 硬编码 lightweight 回调 (memfit-light-free), 不暴露任何模型 option.
 	// 严格只用 lightweight tier: 拿不到就放弃, 绝不回退到 legacy ai.Chat (那会违反
@@ -230,6 +234,7 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 		aiforge.WithLiteForge_DisableTimeline(),
 		aiforge.WithLiteForge_OutputSchemaRaw(valueFeedbackActionName, outputSchema),
 		aiforge.WithLiteForge_SpeedPriority(),
+		aiforge.WithLiteForge_ExtraRequestOpts(decision.RequestOpts...),
 		aiforge.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)),
 	)
 	if err != nil {

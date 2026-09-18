@@ -111,11 +111,13 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 		context = op.GetTask().GetContext()
 	}
 
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
+	var forgeResult *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		context,
-		"extract-ranked-lines",
-		materials,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelExtractRankedLines,
+		func() string { return materials },
+		func(result *aicommon.Action) { forgeResult = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -126,14 +128,11 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 				aitool.WithIntegerParam("rank", aitool.WithParam_Description("重要性排序，1最重要，数字越大越不重要")),
 				aitool.WithStringParam("code_sample_title", aitool.WithParam_Description("简明扼要，选择此片段的理由，如果太简单可以省略，例如：找到xxx相关代码样本，或xx功能实现")),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("code_sample_title", "code_sample_title"),
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldWithNodeId("code_sample_title", "code_sample_title"),
+		),
 	)
-
-	if err != nil {
-		log.Errorf("compressSearchResults: forge failed: %v", err)
-		return resultStr
-	}
 
 	if forgeResult == nil {
 		log.Warnf("compressSearchResults: forge result is nil")

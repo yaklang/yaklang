@@ -559,9 +559,15 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 			if shouldTrySessionTitle {
 				toolOptions = append(toolOptions, aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title for display"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)))
 			}
-			action, err := r.InvokeSpeedPriorityLiteForge(liteForgeCtx, "session-init-generator", prompt, toolOptions)
-			if err != nil {
-				log.Warnf("generate semantic folder name failed: %v", err)
+			var action *aicommon.Action
+			cfg.ScheduleAuxiliaryTask(liteForgeCtx,
+				aicommon.CallerLabelSessionInitGenerator,
+				func() string { return prompt },
+				func(result *aicommon.Action) { action = result },
+				aicommon.WithAuxiliaryOutputs(toolOptions...),
+			)
+			if action == nil {
+				log.Warn("generate semantic folder name auxiliary task returned no result")
 				return
 			}
 
@@ -676,11 +682,17 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 		}
 
 		log.Info("start to handle session-title-generator,  using speed-priority LiteForge for session title generation")
-		action, err := r.InvokeSpeedPriorityLiteForge(cfg.GetContext(), "session-title-generator", prompt, []aitool.ToolOption{
-			aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
-		})
-		if err != nil {
-			log.Warnf("generate session title failed: %v", err)
+		var action *aicommon.Action
+		cfg.ScheduleAuxiliaryTask(cfg.GetContext(),
+			aicommon.CallerLabelSessionTitleGenerator,
+			func() string { return prompt },
+			func(result *aicommon.Action) { action = result },
+			aicommon.WithAuxiliaryOutputs(
+				aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
+			),
+		)
+		if action == nil {
+			log.Warn("generate session title auxiliary task returned no result")
 			return
 		}
 

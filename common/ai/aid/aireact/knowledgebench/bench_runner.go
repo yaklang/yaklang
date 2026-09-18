@@ -285,11 +285,13 @@ Sort by score descending.
 		dNonce, dNonce,
 	)
 
-	result, err := invoker.InvokeSpeedPriorityLiteForge(
+	var result *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
-		"llm-rerank",
-		prompt,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelLLMRerank,
+		func() string { return prompt },
+		func(action *aicommon.Action) { result = action },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"scores",
 				[]aitool.PropertyOption{
@@ -299,11 +301,8 @@ Sort by score descending.
 				aitool.WithNumberParam("index", aitool.WithParam_Description("1-based candidate index")),
 				aitool.WithNumberParam("score", aitool.WithParam_Description("relevance 0.00-1.00")),
 			),
-		},
+		),
 	)
-	if err != nil {
-		return nil, utils.Errorf("LLM rerank failed: %v", err)
-	}
 	if result == nil {
 		return candidates[:topK], nil
 	}

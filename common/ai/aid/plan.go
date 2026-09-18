@@ -389,17 +389,21 @@ Reply with ONLY the JSON: {"@action":"object","identifier":"YOUR_IDENTIFIER"}
 
 Task name: %s`, name)
 
-	forgeResult, err := c.InvokeLiteForge(prompt)
-	if err != nil {
-		log.Debugf("liteforge failed to generate semantic identifier for %q: %v, falling back to truncation", name, err)
-		return truncateFallback()
-	}
-	if forgeResult == nil || forgeResult.Action == nil {
+	var action *aicommon.Action
+	c.GetAIConfig().ScheduleAuxiliaryTask(c.GetContext(),
+		aicommon.CallerLabelTaskShortID,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringParam("identifier"),
+		),
+	)
+	if action == nil {
 		log.Debugf("liteforge returned nil result for %q, falling back to truncation", name)
 		return truncateFallback()
 	}
 
-	result := strings.TrimSpace(forgeResult.Action.GetString("identifier"))
+	result := strings.TrimSpace(action.GetString("identifier"))
 	result = aicommon.SanitizeTaskName(result)
 	if result == "" {
 		return truncateFallback()

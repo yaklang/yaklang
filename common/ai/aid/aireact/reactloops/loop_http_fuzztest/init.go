@@ -245,8 +245,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 
-		// TBD: 使用 liteforge 来处理一下
-		action, err := invoker.InvokeSpeedPriorityLiteForge(task.GetContext(), "http_fuzztest_init_booststrap", `
+		// Use the auxiliary scheduler for the speed-model fuzzing hints.
+		var action *aicommon.Action
+		config.ScheduleAuxiliaryTask(task.GetContext(),
+			aicommon.CallerLabelHttpFuzztestInitBootstrap,
+			func() string {
+				return `
 从安全模糊测试的角度来说，这个 HTTP 请求可能有哪些测试要点和灵感提示？请结合请求的结构、参数、头部等信息，给出一些模糊测试的思路和建议，帮助后续的 fuzzing 设计。
 
 案例如下：
@@ -259,93 +263,22 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 7. 如果当前数据包明显不合理，例如缺失 Host、User-Agent、Accept、Content-Type，或者 method/path/body 组合明显不匹配，先考虑修复数据包再测，尽量让请求更像真实客户端流量。
 8. 如果需要修复数据包，可以优先补齐 User-Agent、Accept、Accept-Language、Connection、Referer、Origin 等常见头部，并保持与当前接口语义一致，再继续做 fuzz。
 
-`, []aitool.ToolOption{
-			aitool.WithStringParam("thought", aitool.WithParam_Description("针对这个 HTTP 请求的模糊测试要点和灵感提示")),
-		}, aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "quick_plan"))
-		if err != nil {
-			log.Warnf("http_fuzztest init booststrap failed: %v", err)
+`
+			},
+			func(result *aicommon.Action) { action = result },
+			aicommon.WithAuxiliaryOutputs(
+				aitool.WithStringParam("thought", aitool.WithParam_Description("针对这个 HTTP 请求的模糊测试要点和灵感提示")),
+			),
+			aicommon.WithAuxiliaryOpts(
+				aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "quick_plan"),
+			),
+		)
+		if action == nil {
+			log.Warn("http_fuzztest init bootstrap auxiliary task returned no result")
 			return
 		}
 		invoker.AddToTimeline("http_fuzztest_init_booststrap", "Bootstrap insights: "+action.GetString("thought"))
 	}
-}
-
-func tryBootstrapFuzzRequestFromUserInput(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) string {
-	userInput := strings.TrimSpace(task.GetUserInput())
-	if userInput == "" {
-		return ""
-	}
-
-	prompt := `
-请从用户输入中提取可用于 HTTP 安全测试的请求信息。
-
-输出规则：
-1) 如果用户提供了原始 HTTP 请求报文（请求行 + Host 头），将完整报文放到 raw_http_request。
-2) 如果没有原始报文但有 URL，提取到 url，并给出 method（无明确时使用 GET）。
-3) 若无法提取，返回空字符串。
-
-<|USER_INPUT_{{ .nonce }}|>
-{{ .userInput }}
-<|USER_INPUT_END_{{ .nonce }}|>
-`
-
-	renderedPrompt := utils.MustRenderTemplate(prompt, map[string]any{
-		"nonce":     utils.RandStringBytes(4),
-		"userInput": userInput,
-	})
-
-	action, err := r.InvokeSpeedPriorityLiteForge(
-		task.GetContext(),
-		"extract-http-request-from-user-input",
-		renderedPrompt,
-		extractHTTPRequestOutputs,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "raw_http_request"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "url"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "reason"),
-	)
-	if err != nil {
-		log.Warnf("failed to extract HTTP request from user input: %v", err)
-		return ""
-	}
-
-	rawPacket := ""
-	urlStr := ""
-	method := "GET"
-	reason := ""
-	if action != nil {
-		rawPacket = strings.TrimSpace(action.GetString("raw_http_request"))
-		urlStr = strings.TrimSpace(action.GetString("url"))
-		method = strings.TrimSpace(action.GetString("method"))
-		reason = strings.TrimSpace(action.GetString("reason"))
-	}
-
-	if method == "" {
-		method = "GET"
-	}
-	method = strings.ToUpper(method)
-
-	if rawPacket != "" {
-		rawIsHTTPS := strings.HasPrefix(strings.ToLower(urlStr), "https://")
-		if initFuzzRequestFromRaw(loop, r, rawPacket, rawIsHTTPS) {
-			r.AddToTimeline("http_request_bootstrap", fmt.Sprintf("Initialized from extracted raw packet (%s)", reason))
-			return "raw"
-		}
-	}
-
-	if urlStr == "" {
-		urlStr = extractURLFromUserInput(userInput)
-	}
-	if urlStr != "" {
-		if initFuzzRequestFromURL(loop, r, urlStr, method) {
-			r.AddToTimeline("http_request_bootstrap", fmt.Sprintf("Initialized from extracted URL: %s (%s)", urlStr, reason))
-			return "url"
-		}
-	}
-
-	if reason != "" {
-		r.AddToTimeline("http_request_bootstrap", fmt.Sprintf("Initialization skipped: %s", reason))
-	}
-	return "none"
 }
 
 func initFuzzRequestFromRaw(loop *reactloops.ReActLoop, runtime aicommon.AIInvokeRuntime, rawPacket string, isHTTPS bool) bool {

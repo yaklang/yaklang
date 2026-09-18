@@ -154,12 +154,18 @@ func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntitiesByAI(ctx context.Context, 
 	}
 
 	// 调用AI进行批量高级判别
-	action, err := t.invoker.InvokeSpeedPriorityLiteForge(ctx, "batch-memory-deduplication", prompt, []aitool.ToolOption{
-		aitool.WithStringArrayParam("non_duplicate_indices", aitool.WithParam_Description("不重复的记忆索引列表，例如: [\"1\", \"3\", \"5\"]。只返回确实不重复且值得保存的记忆索引")),
-		aitool.WithStringParam("analysis", aitool.WithParam_Description("详细分析每个记忆的重复情况和保留理由")),
-	})
-	if err != nil {
-		return nil, utils.Errorf("AI batch deduplication check failed: %v", err)
+	var action *aicommon.Action
+	t.invoker.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelBatchMemoryDeduplication,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringArrayParam("non_duplicate_indices", aitool.WithParam_Description("不重复的记忆索引列表，例如: [\"1\", \"3\", \"5\"]。只返回确实不重复且值得保存的记忆索引")),
+			aitool.WithStringParam("analysis", aitool.WithParam_Description("详细分析每个记忆的重复情况和保留理由")),
+		),
+	)
+	if action == nil {
+		return nil, utils.Error("AI batch deduplication auxiliary task returned no action")
 	}
 
 	nonDuplicateIndicesStr := action.GetStringSlice("non_duplicate_indices")

@@ -253,11 +253,13 @@ func generateDirectPlanFromUserInput(loop *reactloops.ReActLoop, task aicommon.A
 		taskIndex = task.GetId()
 	}
 
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
+	var action *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
-		"plan_direct",
-		prompt,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelPlanDirect,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam("main_task", aitool.WithParam_Required(true)),
 			aitool.WithStringParam("main_task_identifier"),
 			aitool.WithStringParam("main_task_goal", aitool.WithParam_Required(true)),
@@ -279,25 +281,27 @@ func generateDirectPlanFromUserInput(loop *reactloops.ReActLoop, task aicommon.A
 					aitool.WithStringArrayParam("depends_on"),
 				),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
-			[]string{"tasks"},
-			func(key string, r io.Reader, emitter *aicommon.Emitter) {
-				if emitter == nil {
-					io.Copy(io.Discard, r)
-					return
-				}
-				pr, pw := io.Pipe()
-				go func() {
-					defer pw.Close()
-					planTasksStreamHandler(r, pw)
-				}()
-				emitter.EmitTextMarkdownStreamEvent(PlanTasksAINodeID, pr, taskIndex)
-			},
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
+				[]string{"tasks"},
+				func(key string, r io.Reader, emitter *aicommon.Emitter) {
+					if emitter == nil {
+						io.Copy(io.Discard, r)
+						return
+					}
+					pr, pw := io.Pipe()
+					go func() {
+						defer pw.Close()
+						planTasksStreamHandler(r, pw)
+					}()
+					emitter.EmitTextMarkdownStreamEvent(PlanTasksAINodeID, pr, taskIndex)
+				},
+			),
 		),
 	)
-	if err != nil {
-		log.Warnf("plan loop: generate direct plan failed: %v", err)
+	if action == nil {
+		log.Warn("plan loop: generate direct plan auxiliary task returned no result")
 		return ""
 	}
 	return buildPlanDataFromLiteForgeAction(action, "direct plan")

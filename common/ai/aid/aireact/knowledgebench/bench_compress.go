@@ -196,11 +196,13 @@ Output the ranges array.
 		return nil
 	}
 
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
+	var forgeResult *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
-		"knowledge-compress-bench",
-		materials,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelKnowledgeCompressBench,
+		func() string { return materials },
+		func(result *aicommon.Action) { forgeResult = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -210,19 +212,17 @@ Output the ranges array.
 				aitool.WithStringParam("range", aitool.WithParam_Description("line range start-end")),
 				aitool.WithNumberParam("score", aitool.WithParam_Description("relevance 0.0-1.0")),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
-			"ranges",
-		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
-			jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
-				// streaming callback — results are also collected below via forgeResult
-			}))
-		}),
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+				"ranges",
+			}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
+					// streaming callback — results are also collected below via forgeResult
+				}))
+			}),
+		),
 	)
-	if err != nil {
-		log.Errorf("bench compress LiteForge: %v", err)
-		return nil
-	}
 	if forgeResult == nil {
 		return nil
 	}

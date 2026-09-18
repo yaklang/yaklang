@@ -97,16 +97,18 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 			}
 
 			reactloops.EmitStatusI18n(loop, "开始分析用户需求...", "Analyzing user requirements...")
-			step1Result, err := r.InvokeSpeedPriorityLiteForge(
+			var step1Result *aicommon.Action
+			r.GetConfig().ScheduleAuxiliaryTask(
 				task.GetContext(),
-				"analyze-requirement-and-search",
-				renderedPrompt,
-				toolOptions,
-				forgeOptions...,
+				aicommon.CallerLabelAnalyzeRequirementAndSearch,
+				func() string { return renderedPrompt },
+				func(result *aicommon.Action) { step1Result = result },
+				aicommon.WithAuxiliaryOutputs(toolOptions...),
+				aicommon.WithAuxiliaryOpts(forgeOptions...),
 			)
-			if err != nil {
-				log.Errorf("failed to invoke liteforge step 1: %v", err)
-				operator.Failed(utils.Errorf("failed to analyze requirement: %v", err))
+			if step1Result == nil {
+				log.Error("analyze-requirement-and-search auxiliary task returned no result")
+				operator.Failed(utils.Error("failed to analyze requirement"))
 				return
 			}
 

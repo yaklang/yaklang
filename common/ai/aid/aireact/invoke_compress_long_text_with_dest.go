@@ -290,11 +290,13 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 
 	// Get task index for emit
 	var taskIndex string
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
+	var forgeResult *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
-		"knowledge-compress",
-		materials,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelKnowledgeCompress,
+		func() string { return materials },
+		func(result *aicommon.Action) { forgeResult = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -304,47 +306,46 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 				aitool.WithStringParam("range", aitool.WithParam_Description("原始行范围，格式: start-end")),
 				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
-			"ranges",
-		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
-			jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
-				score := 0.0
-				score = utils.MapGetFloat64(data, "score")
-				if !passesCompressionScore(score) {
-					return
-				}
-				rangeStr := utils.MapGetString(data, "range")
-				if rangeStr == "" {
-					return
-				}
-				parts := strings.Split(rangeStr, "-")
-				if len(parts) != 2 {
-					return
-				}
-				// utils.Int
-				startLine := utils.InterfaceToInt(strings.TrimSpace(parts[0]))
-				endLine := utils.InterfaceToInt(strings.TrimSpace(parts[1]))
-				if startLine <= 0 || endLine < startLine {
-					return
-				}
-				pr, pw := utils.NewPipe()
-				text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
-				pw.WriteString(fmt.Sprintf("[权重：%v] 片段范围: %v-%v(切片大小:%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
-				// Start streaming output with unified nodeId
-				if emitter != nil {
-					if event, _ := emitter.EmitDefaultStreamEvent(
-						"knowledge-compress",
-						pr,
-						taskIndex,
-					); event != nil {
-						streamId := event.GetStreamEventWriterId()
-						emitter.EmitTextReferenceMaterial(streamId, text)
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+				"ranges",
+			}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
+					score := utils.MapGetFloat64(data, "score")
+					if !passesCompressionScore(score) {
+						return
 					}
-				}
-				pw.Close()
-			}))
-		}),
+					rangeStr := utils.MapGetString(data, "range")
+					if rangeStr == "" {
+						return
+					}
+					parts := strings.Split(rangeStr, "-")
+					if len(parts) != 2 {
+						return
+					}
+					startLine := utils.InterfaceToInt(strings.TrimSpace(parts[0]))
+					endLine := utils.InterfaceToInt(strings.TrimSpace(parts[1]))
+					if startLine <= 0 || endLine < startLine {
+						return
+					}
+					pr, pw := utils.NewPipe()
+					text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
+					pw.WriteString(fmt.Sprintf("[权重：%v] 片段范围: %v-%v(切片大小:%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
+					if emitter != nil {
+						if event, _ := emitter.EmitDefaultStreamEvent(
+							"knowledge-compress",
+							pr,
+							taskIndex,
+						); event != nil {
+							streamId := event.GetStreamEventWriterId()
+							emitter.EmitTextReferenceMaterial(streamId, text)
+						}
+					}
+					pw.Close()
+				}))
+			}),
+		),
 	)
 
 	var invokerEmitter *aicommon.Emitter
@@ -352,16 +353,6 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 		if config := invoker.GetConfig(); config != nil {
 			invokerEmitter = config.GetEmitter()
 		}
-	}
-
-	if err != nil {
-		invokerEmitter.EmitDefaultStreamEvent(
-			"error",
-			bytes.NewBufferString("Compression failed: "+err.Error()),
-			taskIndex,
-		)
-		log.Errorf("compressKnowledgeChunkWithScore: LiteForge failed: %v", err)
-		return nil
 	}
 
 	if forgeResult == nil {

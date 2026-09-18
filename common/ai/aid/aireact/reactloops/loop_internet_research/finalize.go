@@ -1,7 +1,6 @@
 package loop_internet_research
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -164,63 +163,6 @@ For each S.M.A.R.T dimension, provide a brief evaluation (1-2 sentences) of the 
 - Time-bound: Is the information current and timely? Are the sources up-to-date?
 - Overall: A brief overall assessment of the research quality (1 sentence).`
 
-func evaluateSMART(ctx context.Context, invoker aicommon.AIInvokeRuntime, userQuery, searchResults, searchHistory string) *smartEvaluation {
-	resultPreview := searchResults
-	if len(resultPreview) > 4096 {
-		resultPreview = resultPreview[:4096] + "\n...(truncated)"
-	}
-
-	// 关键词: aicache, dynamic, smart-evaluation, B 档去 nonce
-	// 内层 user_query/search_history/search_results 不再带 nonce
-	// 外层 PROMPT_SECTION_dynamic_NONCE 已经屏蔽 prompt-injection
-	promptTemplate := `<user_query>
-{{ .userQuery }}
-</user_query>
-
-<search_history>
-{{ .searchHistory }}
-</search_history>
-
-<search_results>
-{{ .searchResults }}
-</search_results>
-`
-
-	materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
-		"userQuery":     userQuery,
-		"searchHistory": searchHistory,
-		"searchResults": resultPreview,
-	})
-	if err != nil {
-		log.Warnf("SMART evaluation template render failed: %v", err)
-		return nil
-	}
-
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"smart-evaluation",
-		materials,
-		smartEvaluationOutputs,
-		aicommon.WithLiteForgeStaticInstruction(smartEvaluationStaticInstruction),
-	)
-	if err != nil {
-		log.Warnf("SMART evaluation LiteForge failed: %v", err)
-		return nil
-	}
-	if forgeResult == nil {
-		return nil
-	}
-
-	return &smartEvaluation{
-		Specific:   strings.TrimSpace(forgeResult.GetString("specific")),
-		Measurable: strings.TrimSpace(forgeResult.GetString("measurable")),
-		Achievable: strings.TrimSpace(forgeResult.GetString("achievable")),
-		Relevant:   strings.TrimSpace(forgeResult.GetString("relevant")),
-		TimeBound:  strings.TrimSpace(forgeResult.GetString("time_bound")),
-		Overall:    strings.TrimSpace(forgeResult.GetString("overall")),
-	}
-}
-
 // insufficientReasonStaticInstruction 是 insufficient-reason 评估的系统侧静态指令
 // 通过 aicommon.WithLiteForgeStaticInstruction 进入 LiteForge 的 high-static 段，跨调用稳定哈希
 // 关键词: aicache, PROMPT_SECTION, StaticInstruction, insufficient-reason-analysis, B 档
@@ -232,49 +174,6 @@ Please analyze why the search results are insufficient. Consider:
 3. Possible reasons (topic too niche, information not publicly available, wrong search strategy, etc.)
 
 Provide a concise analysis (3-5 sentences) explaining why the collected information does not meet the user's needs.`
-
-func evaluateInsufficientReason(ctx context.Context, invoker aicommon.AIInvokeRuntime, userQuery, searchResults, searchHistory string) string {
-	resultPreview := searchResults
-	if len(resultPreview) > 2048 {
-		resultPreview = resultPreview[:2048] + "\n...(truncated)"
-	}
-
-	// 关键词: aicache, dynamic, insufficient-reason-analysis, B 档去 nonce
-	promptTemplate := `<user_query>
-{{ .userQuery }}
-</user_query>
-
-<search_history>
-{{ .searchHistory }}
-</search_history>
-
-<partial_results>
-{{ .searchResults }}
-</partial_results>
-`
-
-	materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
-		"userQuery":     userQuery,
-		"searchHistory": searchHistory,
-		"searchResults": resultPreview,
-	})
-	if err != nil {
-		return ""
-	}
-
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"insufficient-reason-analysis",
-		materials,
-		insufficientReasonOutputs,
-		aicommon.WithLiteForgeStaticInstruction(insufficientReasonStaticInstruction),
-	)
-	if err != nil || forgeResult == nil {
-		return ""
-	}
-
-	return strings.TrimSpace(forgeResult.GetString("analysis"))
-}
 
 func collectResearchData(loop *reactloops.ReActLoop) (allCompressedResults []string, artifactFiles []string) {
 	maxIterations := loop.GetCurrentIterationIndex()
