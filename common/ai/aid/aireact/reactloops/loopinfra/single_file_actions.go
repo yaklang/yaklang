@@ -129,9 +129,9 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				Content:       code,
 				Path:          filename,
 				SourceAction:  actionName,
-				EventOp:       loopYaklangCodeEventOpCreate,
+				EventOp:       loopCodeEventOpCreate,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchFull(code),
+				DeliveryPatch: BuildCodePatchFull(code),
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
 		},
@@ -390,9 +390,9 @@ GEN_CODE 解析行号：[%d-%d]
 				Path:          filename,
 				SourceAction:  actionName,
 				ChangeReason:  reason,
-				EventOp:       loopYaklangCodeEventOpReplace,
+				EventOp:       loopCodeEventOpReplace,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchLineRange(partialCode, modifyStartLine, modifyEndLine, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
+				DeliveryPatch: BuildCodePatchLineRange(partialCode, modifyStartLine, modifyEndLine, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 
@@ -551,9 +551,9 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 				Content:       fullCode,
 				Path:          filename,
 				SourceAction:  actionName,
-				EventOp:       loopYaklangCodeEventOpReplace,
+				EventOp:       loopCodeEventOpReplace,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchInsert(partialCode, insertLine, loop.GetInt(LoopVarCodeLineBase)),
+				DeliveryPatch: BuildCodePatchInsert(partialCode, insertLine, loop.GetInt(LoopVarCodeLineBase)),
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_lines", partialCode)
 
@@ -705,9 +705,9 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 				Content:       fullCode,
 				Path:          filename,
 				SourceAction:  actionName,
-				EventOp:       loopYaklangCodeEventOpReplace,
+				EventOp:       loopCodeEventOpReplace,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchDelete(deletedStart, deletedEnd, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
+				DeliveryPatch: BuildCodePatchDelete(deletedStart, deletedEnd, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
 			})
 
 			// Emit event with deletion info

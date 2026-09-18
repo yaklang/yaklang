@@ -121,6 +121,7 @@ func yaklangSingleFileOpts(extra ...SingleFileModificationOption) []SingleFileMo
 		WithActionSuffix("code"),
 		WithFileExtension(".yak"),
 		WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+		WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
 	}
 	return append(opts, extra...)
 }
@@ -533,7 +534,7 @@ func TestWriteAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
+	assert.Equal(t, loopCodeEventOpCreate, payload.Op)
 	assert.Equal(t, code, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, actionName, payload.SourceAction)
@@ -569,7 +570,7 @@ func TestModifyAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) 
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, loopCodeEventOpReplace, payload.Op)
 	assert.Equal(t, expected, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, actionName, payload.SourceAction)

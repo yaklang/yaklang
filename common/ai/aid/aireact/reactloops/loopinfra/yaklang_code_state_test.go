@@ -55,6 +55,7 @@ func newYaklangFactory(t *testing.T, runtime *testRuntimeForSingleFile) *SingleF
 		WithActionSuffix("code"),
 		WithFileExtension(".yak"),
 		WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+		WithEditorDelivery(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, "yaklang_code_change", "yaklang_code"),
 	)
 }
 
@@ -73,7 +74,7 @@ func newLoopWithCapturedEvents(t *testing.T, runtime *testRuntimeForSingleFile, 
 func parseYaklangCodeChangeEvent(t *testing.T, e *schema.AiOutputEvent) yaklangCodeChangeEventPayload {
 	t.Helper()
 	require.Equal(t, schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, e.Type)
-	require.Equal(t, loopYaklangCodeChangeEventNode, e.NodeId)
+	require.Equal(t, "yaklang_code_change", e.NodeId)
 	require.True(t, e.IsJson)
 
 	var payload yaklangCodeChangeEventPayload
@@ -110,7 +111,7 @@ func TestApplyLoopYaklangCodeChange_UpdatesLoopStateAndVersion(t *testing.T) {
 		Path:         filename,
 		SourceAction: "write_code",
 		ChangeReason: "initial write",
-		EventOp:      loopYaklangCodeEventOpCreate,
+		EventOp:      loopCodeEventOpCreate,
 		EmitEvent:    true,
 	})
 	require.NoError(t, err)
@@ -126,7 +127,7 @@ func TestApplyLoopYaklangCodeChange_UpdatesLoopStateAndVersion(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
+	assert.Equal(t, loopCodeEventOpCreate, payload.Op)
 	assert.Equal(t, content, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, 1, payload.Code.Version)
@@ -225,7 +226,7 @@ func TestApplyLoopYaklangCodeChange_AutoInferCreateWhenNoPreviousState(t *testin
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
+	assert.Equal(t, loopCodeEventOpCreate, payload.Op)
 }
 
 func TestApplyLoopYaklangCodeChange_ReplaceAfterPreviousState(t *testing.T) {
@@ -245,7 +246,7 @@ func TestApplyLoopYaklangCodeChange_ReplaceAfterPreviousState(t *testing.T) {
 		Content:      "v2",
 		Path:         "/tmp/v.yak",
 		SourceAction: "modify_code",
-		EventOp:      loopYaklangCodeEventOpReplace,
+		EventOp:      loopCodeEventOpReplace,
 		EmitEvent:    true,
 	})
 	require.NoError(t, err)
@@ -253,7 +254,7 @@ func TestApplyLoopYaklangCodeChange_ReplaceAfterPreviousState(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, loopCodeEventOpReplace, payload.Op)
 	assert.Equal(t, "v2", payload.Code.Content)
 }
 
@@ -266,7 +267,7 @@ func TestApplyLoopYaklangCodeChange_ExplicitCreateOp(t *testing.T) {
 		Content:      "println(\"create\")",
 		Path:         "/tmp/create.yak",
 		SourceAction: "write_code",
-		EventOp:      loopYaklangCodeEventOpCreate,
+		EventOp:      loopCodeEventOpCreate,
 		EmitEvent:    true,
 	})
 	require.NoError(t, err)
@@ -274,7 +275,7 @@ func TestApplyLoopYaklangCodeChange_ExplicitCreateOp(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
+	assert.Equal(t, loopCodeEventOpCreate, payload.Op)
 }
 
 func TestResolvedYaklangCodeChangeVersion_OnlyExplicitCommit(t *testing.T) {

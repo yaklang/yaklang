@@ -86,7 +86,7 @@ func liveSyncYaklangEditorOnChange(loop *reactloops.ReActLoop) {
 		return
 	}
 
-	if eventOp == loopinfra.LoopYaklangCodeEventOpCreate {
+	if eventOp == loopinfra.CodeEventOpCreate {
 		loop.Set(yaklangEditorSyncPendingLoopKey, true)
 		return
 	}
@@ -96,13 +96,13 @@ func liveSyncYaklangEditorOnChange(loop *reactloops.ReActLoop) {
 		return
 	}
 
-	deliveryPatch := loopinfra.GetLoopYaklangDeliveryPatch(loop)
+	deliveryPatch := loopinfra.GetLoopCodeDeliveryPatch(loop)
 	if deliveryPatch != nil {
 		emitYaklangEditorPatchDelivery(loop, path, fullCode, deliveryPatch)
 		return
 	}
 
-	emitYaklangEditorFullDelivery(loop, path, loopinfra.LoopYaklangCodeEventOpReplace, fullCode)
+	emitYaklangEditorFullDelivery(loop, path, loopinfra.CodeEventOpReplace, fullCode)
 }
 
 func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
@@ -147,7 +147,7 @@ func resolveCachedYaklangDeliveryTarget(loop *reactloops.ReActLoop) (string, str
 	if cachedPath := strings.TrimSpace(loop.Get(yaklangEditorDeliveryPathLoopKey)); cachedPath != "" {
 		cachedOp := strings.TrimSpace(loop.Get(yaklangEditorDeliveryOpLoopKey))
 		if cachedOp == "" {
-			cachedOp = loopinfra.LoopYaklangCodeEventOpReplace
+			cachedOp = loopinfra.CodeEventOpReplace
 		}
 		return cachedPath, cachedOp, nil
 	}
@@ -164,7 +164,7 @@ func resolveCachedYaklangDeliveryTarget(loop *reactloops.ReActLoop) (string, str
 	return path, eventOp, nil
 }
 
-func emitYaklangEditorPatchDelivery(loop *reactloops.ReActLoop, path, fullCode string, patch *loopinfra.YaklangCodeDeliveryPatch) {
+func emitYaklangEditorPatchDelivery(loop *reactloops.ReActLoop, path, fullCode string, patch *loopinfra.CodeDeliveryPatch) {
 	if loop == nil || patch == nil {
 		return
 	}
@@ -178,7 +178,7 @@ func emitYaklangEditorPatchDelivery(loop *reactloops.ReActLoop, path, fullCode s
 
 	sourceAction := strings.TrimSpace(loop.Get(yaklangCodeSourceActionLoopKey))
 	reason := strings.TrimSpace(loop.Get(yaklangCodeChangeReasonLoopKey))
-	payload := loopinfra.BuildYaklangPatchChangeEvent(path, patch, version, sourceAction, reason)
+	payload := BuildYaklangPatchChangeEvent(path, patch, version, sourceAction, reason)
 
 	emitYaklangCodeChangeEvent(loop, payload)
 	log.Infof(
@@ -188,7 +188,7 @@ func emitYaklangEditorPatchDelivery(loop *reactloops.ReActLoop, path, fullCode s
 	loop.Set(yaklangEditorLastEmittedVersionKey, version)
 	loop.Set(yaklangEditorLastEmittedContentKey, strings.TrimSpace(fullCode))
 	loop.Set(yaklangEditorSyncPendingLoopKey, false)
-	loopinfra.ClearLoopYaklangDeliveryPatch(loop)
+	loopinfra.ClearLoopCodeDeliveryPatch(loop)
 }
 
 func emitYaklangEditorFullDelivery(loop *reactloops.ReActLoop, path, eventOp, content string) {
@@ -214,19 +214,19 @@ func emitYaklangEditorFullDelivery(loop *reactloops.ReActLoop, path, eventOp, co
 		version = 1
 	}
 	if strings.TrimSpace(eventOp) == "" {
-		eventOp = loopinfra.LoopYaklangCodeEventOpReplace
+		eventOp = loopinfra.CodeEventOpReplace
 	}
 
 	sourceAction := strings.TrimSpace(loop.Get(yaklangCodeSourceActionLoopKey))
 	reason := strings.TrimSpace(loop.Get(yaklangCodeChangeReasonLoopKey))
-	payload := loopinfra.BuildYaklangFullChangeEvent(eventOp, path, content, version, sourceAction, reason)
+	payload := BuildYaklangFullChangeEvent(eventOp, path, content, version, sourceAction, reason)
 
 	emitYaklangCodeChangeEvent(loop, payload)
 	log.Infof("yaklang_code_change delivered: path=%s op=%s version=%d bytes=%d", path, eventOp, version, len(content))
 	loop.Set(yaklangEditorLastEmittedContentKey, content)
 	loop.Set(yaklangEditorLastEmittedVersionKey, version)
 	loop.Set(yaklangEditorSyncPendingLoopKey, false)
-	loopinfra.ClearLoopYaklangDeliveryPatch(loop)
+	loopinfra.ClearLoopCodeDeliveryPatch(loop)
 }
 
 func writeYaklangDeliveryFile(finalPath, content string) error {
@@ -244,7 +244,7 @@ func writeYaklangDeliveryFile(finalPath, content string) error {
 	return os.WriteFile(finalPath, []byte(content), 0o644)
 }
 
-func emitYaklangCodeChangeEvent(loop *reactloops.ReActLoop, payload loopinfra.YaklangCodeChangeEvent) {
+func emitYaklangCodeChangeEvent(loop *reactloops.ReActLoop, payload loopinfra.CodeChangeEvent) {
 	loop.Set(yaklangEditorSyncFlushingLoopKey, true)
 	defer loop.Set(yaklangEditorSyncFlushingLoopKey, false)
 	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, yaklangCodeChangeEventNode, payload)
