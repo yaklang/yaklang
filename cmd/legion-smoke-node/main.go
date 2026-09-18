@@ -34,6 +34,8 @@ func (p staticHostIdentityProvider) Snapshot() node.HostIdentity {
 }
 
 func main() {
+	// This marker starts after Go package initialization; use inittrace for earlier work.
+	log.Printf("component=legion-node event=startup stage=main status=entered")
 	if err := run(os.Args); err != nil {
 		log.Fatal(err)
 	}
@@ -203,6 +205,7 @@ func runNode(args []string) error {
 			SystemReservedMemoryBytes:   *runtimeSystemReservedMemory,
 		}))
 	}
+	finishNodeConstruction := startStartupStage(strings.TrimSpace(*kind) == "ai_session", "node_construct")
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
 		NodeType:             spec.NodeType_Scanner,
 		Kind:                 strings.TrimSpace(*kind),
@@ -221,6 +224,7 @@ func runNode(args []string) error {
 		HostIdentityProvider: hostIdentityProvider,
 		PostBootstrapHook:    postBootstrapHook,
 	}, scanNodeOptions...)
+	finishNodeConstruction(err)
 	if err != nil {
 		return err
 	}
@@ -228,6 +232,9 @@ func runNode(args []string) error {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		if strings.TrimSpace(*kind) == "ai_session" {
+			log.Printf("component=legion-node event=startup stage=node_run status=entered")
+		}
 		scanNode.Run()
 	}()
 
@@ -293,7 +300,10 @@ func initializeAISessionCapabilities(kind string, syncFn func() error) error {
 	if syncFn == nil {
 		return fmt.Errorf("initialize AI session capabilities: sync function is nil")
 	}
-	if err := syncFn(); err != nil {
+	finish := startStartupStage(true, "capabilities_sync")
+	err := syncFn()
+	finish(err)
+	if err != nil {
 		return fmt.Errorf("initialize AI session capabilities: %w", err)
 	}
 	return nil
@@ -303,22 +313,40 @@ func syncAISessionCapabilities() error {
 	// Capability search reads the profile database, while the tool manager also
 	// keeps an in-memory registry. Ephemeral session containers previously only
 	// populated the latter, so query_capabilities saw zero tools and blueprints.
+	finish := startStartupStage(true, "builtin_tools_sync")
 	yakscripttools.OverrideYakScriptAiTools()
+	finish(nil)
+	finish = startStartupStage(true, "builtin_tool_output_options")
 	yakscripttools.UpdateAIYakToolAIOutputOption()
+	finish(nil)
 
+	finish = startStartupStage(true, "profile_database_open")
 	db := consts.GetGormProfileDatabase()
+	finish(nil)
+
+	finish = startStartupStage(true, "builtin_tools_verify")
 	toolCount, err := yakit.CountAIYakTools(db, nil)
 	if err != nil {
+		finish(err)
 		return fmt.Errorf("verify built-in AI tools: %w", err)
 	}
 	if toolCount == 0 {
-		return fmt.Errorf("verify built-in AI tools: capability store is empty")
+		err := fmt.Errorf("verify built-in AI tools: capability store is empty")
+		finish(err)
+		return err
 	}
+	finish(nil)
 
-	if err := aiforge.ForceSyncBuildInForge(); err != nil {
+	finish = startStartupStage(true, "builtin_forges_sync")
+	err = aiforge.ForceSyncBuildInForge()
+	finish(err)
+	if err != nil {
 		return fmt.Errorf("sync built-in AI blueprints: %w", err)
 	}
-	if _, err := yakit.GetAIForgeByName(db, "hostscan"); err != nil {
+	finish = startStartupStage(true, "builtin_forges_verify")
+	_, err = yakit.GetAIForgeByName(db, "hostscan")
+	finish(err)
+	if err != nil {
 		return fmt.Errorf("verify built-in AI blueprint hostscan: %w", err)
 	}
 	return nil
@@ -337,25 +365,30 @@ func buildAISessionRegisterHook() func(node.SessionState) {
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	return func(session node.SessionState) {
+		finish := startStartupStage(true, "sessionmgr_register")
 		body, err := json.Marshal(map[string]string{
 			"node_id":         session.NodeID,
 			"node_session_id": session.SessionID,
 		})
 		if err != nil {
+			finish(err)
 			log.Printf("ai_session register marshal: %v", err)
 			return
 		}
 		url := strings.TrimRight(sessionmgrURL, "/") + "/v1/sessionmgr/sessions/" + sessionID + "/register"
 		resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 		if err != nil {
+			finish(err)
 			log.Printf("ai_session register callback to %s: %v", url, err)
 			return
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusAccepted {
+			finish(fmt.Errorf("unexpected register status"))
 			log.Printf("ai_session register callback %s returned status %d", url, resp.StatusCode)
 			return
 		}
+		finish(nil)
 		log.Printf("ai_session registered: node_id=%s session_id=%s", session.NodeID, session.SessionID)
 	}
 }
