@@ -48,6 +48,7 @@ const (
 	CallerLabelCrawlerJSPathExtract        = "crawler-js-path-extract"
 
 	// ── PassThrough (explicitly registered for audit) ──
+	CallerLabelGoalAcceptanceReview           = "goal-acceptance-review"
 	CallerLabelHttpFlowAnalyzeFinalizeSummary = "http_flow_analyze_finalize_summary"
 	CallerLabelSkillConflictResolver          = "skill-conflict-resolver"
 )
