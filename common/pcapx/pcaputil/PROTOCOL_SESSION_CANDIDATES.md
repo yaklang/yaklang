@@ -19,9 +19,9 @@ or ChannelData lifecycle coverage.
 | Rank | Protocol / reason | Reuse and first deliverable | Required evidence / missing samples | Relative effort |
 |---|---|---|---|---|
 | 1 | **STUN**: fills the NAT/connectivity side of SIP/RTP traffic | Reuse `stun.yaml`; UDP datagram admission, transaction ID + endpoint correlation, attributes/padding, XOR addresses, bounded expiry | Existing `ndpi-stun`; add IPv6, retransmissions, wrong-endpoint replies, malformed padding and TCP framing. Integrity is unverified without keys | Small–medium |
-| 2 | **TURN**: builds directly on STUN for relay traffic | Allocate/Refresh/CreatePermission/ChannelBind, channel-to-peer state, ChannelData; explicit allocation/permission/channel budgets | STUN samples do not prove complete TURN exchanges. Add real coturn allocation, refresh/expiry, errors, ChannelData and TCP padding captures | Medium |
+| 2 | **TURN**: builds directly on STUN for relay traffic | Allocate/Refresh/CreatePermission/ChannelBind, channel-to-peer state, ChannelData; explicit allocation/permission/channel budgets | Verified `ndpi-stun` includes Allocate, Refresh, CreatePermission, ChannelBind and ChannelData. Lock those exchanges to tests; add controlled coturn expiry, TCP padding and authentication-failure cases | Medium |
 | 3 | **TFTP**: compact transfer state machine and several existing corpora | Reuse `tftp.yaml`; RRQ/WRQ, server transfer-port binding, DATA/ACK block association, ERROR, bounded retransmission handling | Existing `ndpi-tftp`, `ws-tftp`, `tcpdump-tftp-packet-boundary`; add OACK/blocksize, duplicate/out-of-order blocks, rollover, final empty block, spoofed TID | Small–medium |
-| 4 | **RTSP**: joins control sessions to the existing RTP/RTCP parsers | Reuse `rtsp.yaml`; RTSP/1.0 CSeq/Session, DESCRIBE/SETUP/PLAY/TEARDOWN, Content-Length and interleaved `$` frames | Existing `ndpi-rtsp-http` is **HTTP-tunneled** evidence, not direct RTSP coverage. Add direct TCP, pipelining, interleaving and UDP transport negotiation; declare RTSP/2.0 separately | Medium |
+| 4 | **RTSP**: joins control sessions to the existing RTP/RTCP parsers | Reuse `rtsp.yaml`; RTSP/1.0 CSeq/Session, DESCRIBE/SETUP/PLAY/TEARDOWN, Content-Length and interleaved `$` frames | Despite its name, `ndpi-rtsp-http` contains only one direct RTSP/1.0 SETUP request. Add full request/reply sessions, HTTP tunneling, pipelining, interleaving and UDP transport negotiation; declare RTSP/2.0 separately | Medium |
 | 5 | **VNC / RFB**: adds remote desktop handshake visibility | Reuse `vnc.yaml`; 3.3/3.7/3.8 negotiation, security result, ClientInit/ServerInit, bounded framebuffer metadata | Existing `ndpi-vnc`; add version/security failures, variable pixel formats, rectangles and encoding changes. Unsupported compression must retain a clear boundary | Medium |
 | 6 | **IPP**: extends HTTP inspection into printer/job semantics | Existing HTTP framing; `application/ipp` admission, request ID, operation/status, attribute groups and value bounds; leave document bytes opaque | Existing `ndpi-ipp`; add Get-Printer-Attributes/Print-Job errors, repeated values, collection limits and chunked HTTP with mixed ordinary traffic | Medium |
 | 7 | **Diameter**: extends AAA coverage beyond RADIUS | Length framing, bounded/padded AVPs, Hop-by-Hop + direction matching, CER/CEA, DWR/DWA and DPR/DPA | Existing `ndpi-diameter`; add vendor/grouped AVPs, repeated requests, reconnect, error answers and oversized lengths. TCP first; SCTP needs separate transport work | Medium |
@@ -32,7 +32,13 @@ or ChannelData lifecycle coverage.
 Sample IDs above refer to the existing
 [corpus manifest](../../bin-parser/testdata/protocol-corpus/manifest.json), which
 retains source commits, licenses and SHA-256 hashes. Presence is a starting point,
-not evidence that every proposed session phase appears in a capture. No new
+not evidence that every proposed session phase appears in a capture. The twelve
+listed files were read with tshark and all twelve SHA-256 values match the
+manifest. In particular, `ndpi-rtsp-http` has just one direct SETUP packet;
+`ws-tftp` is one packet and the tcpdump TFTP sample is one malformed packet.
+`ndpi-stun` is mixed traffic including TURN, RTP, DTLS and an ICMP quotation;
+its 201 capture records are not 201 independent STUN transactions. Counts must
+exclude quoted/embedded messages when measuring session coverage. No new
 external captures were added in this maintenance round.
 
 ## Shared prerequisites and acceptance
