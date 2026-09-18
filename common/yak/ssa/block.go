@@ -167,24 +167,66 @@ func (b *BasicBlock) restoreScopeIfMissing() {
 	b.scopeRestored = true
 }
 
+// HaveSubBlock reports whether sub is b itself or one of its nested blocks by
+// walking the Parent chain upward from sub.
+//
+// Every hop resolves the parent block through the program instruction cache,
+// which on a DB-backed scan may not have the block resident. Three guards keep
+// the walk well behaved:
+//
+//   - a parent id equal to b is answered without resolving that block, so a
+//     direct child is recognized even when the parent block cannot be loaded,
+//   - a repeated block id means the parent chain is cyclic; stop walking
+//     instead of spinning forever on a malformed chain,
+//   - an unresolvable parent stops the walk with a distinct debug log instead
+//     of reusing the "sub is not a basic block" warning, which left callers
+//     unable to tell a bad argument apart from an unavailable parent block.
 func (b *BasicBlock) HaveSubBlock(sub Value) bool {
-	if b == nil || sub == nil {
+	if b == nil || utils.IsNil(sub) {
 		return false
 	}
 
-	for {
+	bID := b.GetId()
+	visited := make(map[int64]struct{})
+	for !utils.IsNil(sub) {
 		subBlock, ok := ToBasicBlock(sub)
-		if !ok || utils.IsNil(subBlock) {
+		if !ok || subBlock == nil {
+			// The caller passed something that is not a block at all.
 			log.Warnf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
 			return false
 		}
 
-		if b.GetId() == subBlock.GetId() {
+		id := subBlock.GetId()
+		if id == bID {
 			return true
 		}
+		if _, seen := visited[id]; seen {
+			// A cycle in the parent chain would otherwise loop forever.
+			log.Warnf("BasicBlock.HaveSubBlock: parent cycle at block %d, stop walk", id)
+			return false
+		}
+		visited[id] = struct{}{}
 
-		sub, _ = subBlock.GetBasicBlockByID(subBlock.Parent)
+		parent := subBlock.Parent
+		if parent <= 0 {
+			// Reached a root block: b is not an ancestor of sub.
+			return false
+		}
+		if parent == bID {
+			// Direct parent; no need to resolve the block from the cache.
+			return true
+		}
+		next, ok := subBlock.GetBasicBlockByID(parent)
+		if !ok || next == nil {
+			// The parent link exists but its block is not resolvable from the
+			// program cache. Report it distinctly so a cache miss is not
+			// mistaken for "this is not a sub block".
+			log.Debugf("BasicBlock.HaveSubBlock: parent %d of block %d is not resolvable, stop walk", parent, id)
+			return false
+		}
+		sub = next
 	}
+	return false
 }
 
 func (b *BasicBlock) Reachable() BasicBlockReachableKind {

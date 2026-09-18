@@ -1,7 +1,11 @@
 package sfreport
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
+	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 
@@ -16,13 +20,45 @@ import (
 type SarifReport struct {
 	report *sarif.Report
 	writer io.Writer
+
+	// Streaming state. Each result is converted to a SARIF run as soon as it
+	// is produced and streamed to the writer immediately, so a scan that emits
+	// risks over minutes no longer defers all conversion work to Save() (that
+	// deferral turned into a multi-minute silent tail after the scan finished).
+	//
+	// The writer is a shared io.Writer, so every emitted run is serialized as a
+	// whole JSON value; the surrounding object/array punctuation is written
+	// around it. A report with no result is still emitted as a valid, empty
+	// SARIF document.
+	streamMu    sync.Mutex
+	streamErr   error
+	streaming   bool
+	wroteHeader bool
+	wroteAnyRun bool
+	saved       bool
+	convertCost time.Duration
+	writeCost   time.Duration
+	resultCount int
 }
 
 func (r *SarifReport) SetWriter(writer io.Writer) error {
 	if writer == nil {
 		return utils.Errorf("writer is nil")
 	}
+	r.streamMu.Lock()
+	defer r.streamMu.Unlock()
 	r.writer = writer
+	// Results may have been collected before the writer was attached; flush
+	// them in order so the streamed document contains every run.
+	if len(r.report.Runs) > 0 {
+		pending := r.report.Runs
+		r.report.Runs = nil
+		for _, run := range pending {
+			if err := r.writeRunLocked(run); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -44,22 +80,105 @@ func NewSarifReport() (*SarifReport, error) {
 var _ IReport = (*SarifReport)(nil)
 
 func (r *SarifReport) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
+	start := time.Now()
 	run := ConvertSyntaxFlowResultToSarifRun(result)
-	if !funk.IsEmpty(run) {
-		r.report.AddRun(run)
+	convertCost := time.Since(start)
+	if funk.IsEmpty(run) {
+		return false
+	}
+
+	r.streamMu.Lock()
+	defer r.streamMu.Unlock()
+	r.convertCost += convertCost
+	r.resultCount++
+	if convertCost > 5*time.Second {
+		log.Infof("[sarif] convert result cost=%v (results=%d)", convertCost, r.resultCount)
+	}
+	// Stream the run out as it is produced. The writer may be nil (in-memory
+	// callers that only inspect the report), in which case runs accumulate and
+	// Save writes the whole document.
+	if r.writer != nil {
+		if r.saved {
+			// The document was already closed; a late result cannot be added
+			// without corrupting it, so drop it rather than write past the end.
+			log.Errorf("[sarif] dropping result for %s: report already saved", result.GetProgramName())
+			return false
+		}
+		if err := r.writeRunLocked(run); err != nil && r.streamErr == nil {
+			r.streamErr = err
+		}
 		return true
 	}
-	return false
+	r.report.AddRun(run)
+	return true
 }
 
 func (r *SarifReport) Save() error {
 	if r == nil {
 		return utils.Errorf("report is nil")
 	}
+	r.streamMu.Lock()
+	defer r.streamMu.Unlock()
+	if r.streamErr != nil {
+		return r.streamErr
+	}
 	if r.writer == nil {
 		return nil
 	}
-	return r.report.PrettyWrite(r.writer)
+	if r.streaming {
+		// Close the runs array and the document; every run was already written
+		// as it was produced.
+		if r.saved {
+			return nil
+		}
+		_, err := io.WriteString(r.writer, "]\n}\n")
+		if err != nil && r.streamErr == nil {
+			r.streamErr = err
+		}
+		r.saved = true
+		return err
+	}
+	start := time.Now()
+	err := r.report.PrettyWrite(r.writer)
+	log.Infof("[sarif] save report results=%d convert_total=%v marshal_write=%v",
+		r.resultCount, r.convertCost, time.Since(start))
+	return err
+}
+
+// writeRunLocked emits one run into the report document currently being
+// streamed. Callers must hold streamMu.
+func (r *SarifReport) writeRunLocked(run *sarif.Run) error {
+	start := time.Now()
+	defer func() { r.writeCost += time.Since(start) }()
+
+	if !r.wroteHeader {
+		header := fmt.Sprintf("{\n  \"version\": %q,\n  \"runs\": [", r.report.Version)
+		if _, err := io.WriteString(r.writer, header); err != nil {
+			return err
+		}
+		r.wroteHeader = true
+		r.streaming = true
+	}
+
+	// Matches what PrettyWrite did for the whole document before the runs were
+	// streamed out one at a time.
+	if err := run.DedupeArtifacts(); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(run)
+	if err != nil {
+		return err
+	}
+	if r.wroteAnyRun {
+		if _, err := io.WriteString(r.writer, ",\n"); err != nil {
+			return err
+		}
+	}
+	if _, err := r.writer.Write(raw); err != nil {
+		return err
+	}
+	r.wroteAnyRun = true
+	return nil
 }
 
 // ====================== sarif context ======================

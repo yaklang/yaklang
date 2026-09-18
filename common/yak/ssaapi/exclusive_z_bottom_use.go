@@ -28,12 +28,18 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
 	actx.direct = BottomUseAnalysis
+	if actx.widen != nil {
+		defer func() { lastWidenTrace.Store(actx.widen) }()
+	}
 	ret = v.getBottomUses(actx, opt...)
 	if actx.HasUntilNode() {
 		ret = actx.untilMatch
 	}
 	if ret.Count() > dataflowValueLimit {
 		log.Warnf("Value BottomUse too many: %d:\n\t%s", ret.Count(), v.StringWithRange())
+		if report := actx.widenReport(); report != "" {
+			log.Warnf("Value BottomUse widening: %s", report)
+		}
 		return nil
 	}
 	ret = MergeValues(ret)
@@ -51,6 +57,26 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if v.IsObject() {
+		// Keyed descent: the trace reached this object because some site read
+		// `v.key`. Resolve that key directly -- with the whole-table walk every
+		// sibling member is traced in turn and each of those traces can re-enter
+		// the object, which is what makes a wide type explode on a large project.
+		obj, key, member := actx.getCurrentObject()
+		if obj != nil && obj.GetId() == v.GetId() {
+			if matched := resolveKeyedMembers(v, key); len(matched) > 0 {
+				for _, m := range matched {
+					if utils.IsNil(m) || ValueCompare(m, member) {
+						continue
+					}
+					if err := actx.pushObject(v, m.GetKey(), m); err != nil {
+						continue
+					}
+					vals = append(vals, m.getBottomUses(actx, opt...)...)
+					actx.popObject()
+				}
+				goto users
+			}
+		}
 		exist := false
 		actx.foreachObjectStack(func(obj *Value, key *Value, val *Value) bool {
 			if obj.GetId() == v.GetId() {
@@ -60,13 +86,21 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			return true
 		})
 		if !exist {
-			v.GetAllMember().ForEach(func(value *Value) {
+			members := v.GetAllMember()
+			walked := 0
+			members.ForEach(func(value *Value) {
+				if callableMemberValue(value) {
+					return
+				}
+				walked++
 				_ = actx.pushObject(v, value.GetKey(), value)
 				vals = append(vals, value.getBottomUses(actx, opt...)...)
 				actx.popObject()
 			})
+			actx.traceObjectExpansion(walked)
 		}
 	}
+users:
 	if v.IsMember() {
 		currentObject := v.GetObject()
 		currentKey := v.GetKey()
@@ -85,6 +119,9 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		}
 	}
 	// log.Infof("current Value: %s", v)
+	if users := len(v.GetUsers()); users > 0 {
+		actx.traceUserFanout(users)
+	}
 	v.GetUsers().ForEach(func(value *Value) {
 		// log.Infof("value %s", value)
 		if ret := value.getBottomUses(actx, opt...); len(ret) > 0 {
@@ -109,6 +146,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	defer func() {
 		actx.depth--
 	}()
+	actx.traceNodeVisit()
 
 	// if not shadow value return i self
 	v = actx.CovertShadowValue(v)
@@ -148,6 +186,16 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			return v.visitUserFallback(actx, opt...)
 		}
 		actx.pushCall(inst)
+		// getRealMethod walks the call stack upwards (peekCall(1) is the call
+		// that invoked the current function) to bind a Parameter/ParameterMember
+		// callee to the function it actually receives at that site. That lookup
+		// is only meaningful while the stack holds the current nest of entered
+		// calls: without a matching pop, every sibling call left its frame
+		// behind, so a later call in the same body saw an unrelated earlier
+		// sibling as its "parent" and bound parameters to the wrong arguments.
+		// Pop on every exit from this call's subtree -- all of them return from
+		// this function -- so the stack mirrors the live nest.
+		defer actx.popCall()
 		//分析的当前值相同，说明进来就是当前值
 		if ValueCompare(v, actx.Self) {
 			log.Debugf("value analysis: (call instruction) caller is self")

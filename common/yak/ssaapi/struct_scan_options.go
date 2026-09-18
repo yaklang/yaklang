@@ -69,6 +69,15 @@ func WithStructRuleTimeout(d time.Duration) ssaconfig.Option {
 	})(d)
 }
 
+// WithStructRuleNoResultDB keeps struct-stage results out of the SSA database.
+// A read-only scan of an existing IR database needs this in addition to the
+// ssa-stage switch: this stage persists its own audit rows and risks.
+func WithStructRuleNoResultDB(noDB bool) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa_compile/struct_rule_no_result_db", func(c *Config, v bool) {
+		c.ensureStructScan().noResultDB = v
+	})(noDB)
+}
+
 func WithStructRuleWorkLimit(n int64) ssaconfig.Option {
 	return ssaconfig.SetOption("ssa_compile/struct_rule_work_limit", func(c *Config, v int64) {
 		c.ensureStructScan().workLimit = v
