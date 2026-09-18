@@ -527,29 +527,29 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 		taskIndex = task.GetId()
 	}
 
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
+	var action *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
-		"plan_facts_hook",
-		prompt,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelPlanFactsHook,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam(PlanFactsFieldName, aitool.WithParam_Description("增量 facts markdown；没有新增事实时返回空字符串")),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
-			[]string{PlanFactsFieldName},
-			func(key string, r io.Reader, emitter *aicommon.Emitter) {
-				r = utils.JSONStringReader(r)
-				if emitter == nil {
-					io.Copy(io.Discard, r)
-					return
-				}
-				emitter.EmitTextMarkdownStreamEvent(PlanFactsAINodeID, r, taskIndex)
-			},
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
+				[]string{PlanFactsFieldName},
+				func(key string, r io.Reader, emitter *aicommon.Emitter) {
+					r = utils.JSONStringReader(r)
+					if emitter == nil {
+						io.Copy(io.Discard, r)
+						return
+					}
+					emitter.EmitTextMarkdownStreamEvent(PlanFactsAINodeID, r, taskIndex)
+				},
+			),
 		),
 	)
-	if err != nil {
-		log.Warnf("plan loop: auto generate facts failed: %v", err)
-		return ""
-	}
 	if action == nil {
 		return ""
 	}

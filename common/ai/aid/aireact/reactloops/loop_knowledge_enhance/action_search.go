@@ -403,24 +403,21 @@ func evaluateNextSearch(
 		return EvaluateResult{Finished: true, Summary: "template render failed"}
 	}
 
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
+	var forgeResult *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
-		"evaluate-next-search",
-		materials,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelEvaluateNextSearch,
+		func() string { return materials },
+		func(result *aicommon.Action) { forgeResult = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithBoolParam("finished", aitool.WithParam_Description("是否已完成知识收集，true 表示信息已足够，false 表示需要继续搜索"), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("next_search", aitool.WithParam_Description("下一步搜索建议，如果 finished 为 true 则为空字符串")),
 			aitool.WithStringParam("summary", aitool.WithParam_Description("当 finished 为 true 时，简要总结已收集的知识")),
-		},
+		),
 	)
 
-	if err != nil {
-		log.Errorf("evaluateNextSearch: LiteForge failed: %v", err)
-		return EvaluateResult{Finished: true, Summary: "LiteForge evaluation failed"}
-	}
-
 	if forgeResult == nil {
-		return EvaluateResult{Finished: true, Summary: "LiteForge returned nil"}
+		return EvaluateResult{Finished: true, Summary: "auxiliary evaluation returned nil"}
 	}
 
 	finished := forgeResult.GetBool("finished")

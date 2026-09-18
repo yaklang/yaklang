@@ -46,11 +46,20 @@ func (r *AIMemoryTriage) SelectTags(ctx context.Context, i any) ([]string, error
 		return nil, utils.Errorf("RenderTemplate failed: %v", err)
 	}
 
-	action, err := r.invoker.InvokeSpeedPriorityLiteForge(ctx, "tag-selection", prompt, []aitool.ToolOption{
-		aitool.WithStringArrayParam("tags", aitool.WithParam_Description("从上面的输入中提取出相关的标签（领域），如果上面的标签已经足够了，就不需要再创建新的标签了")), // tags
-	}, aicommon.WithLiteForgeStaticInstruction(tagSelectionStaticInstruction))
-	if err != nil {
-		return nil, err
+	var action *aicommon.Action
+	r.invoker.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelTextagSelection,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
+			aitool.WithStringArrayParam("tags", aitool.WithParam_Description("从上面的输入中提取出相关的标签（领域），如果上面的标签已经足够了，就不需要再创建新的标签了")),
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithLiteForgeStaticInstruction(tagSelectionStaticInstruction),
+		),
+	)
+	if action == nil {
+		return nil, utils.Error("tag selection auxiliary task returned no action")
 	}
 	tags := action.GetStringSlice("tags")
 	if len(tags) > 0 {

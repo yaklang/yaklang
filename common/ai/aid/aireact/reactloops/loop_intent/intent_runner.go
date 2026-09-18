@@ -39,6 +39,7 @@ type intentKeywordResult struct {
 // It performs at most 2 AI calls:
 //  1. Generate intent_summary + search_keywords (always).
 //  2. Recommend capabilities (only when matched results are too many).
+//
 // All local capability search (BM25, skills, focus modes) is done without AI.
 func runIntentRecognition(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop) *reactloops.DeepIntentResult {
 	totalStart := time.Now()
@@ -159,12 +160,16 @@ func generateIntentKeywords(r aicommon.AIInvokeRuntime, ctx context.Context, use
 		),
 	}
 
-	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "intent-keyword-gen", prompt, outputs,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
+	var forgeResult *aicommon.Action
+	r.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelIntentKeywordGen,
+		func() string { return prompt },
+		func(result *aicommon.Action) { forgeResult = result },
+		aicommon.WithAuxiliaryOutputs(outputs...),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
+		),
 	)
-	if err != nil {
-		return nil, err
-	}
 	if forgeResult == nil {
 		return nil, utils.Error("intent keyword generation returned nil result")
 	}
@@ -209,10 +214,13 @@ func recommendCapabilities(r aicommon.AIInvokeRuntime, ctx context.Context, user
 		}),
 	}
 
-	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "intent-capability-recommend", prompt, outputs)
-	if err != nil {
-		return nil, err
-	}
+	var forgeResult *aicommon.Action
+	r.GetConfig().ScheduleAuxiliaryTask(ctx,
+		aicommon.CallerLabelIntentCapabilityRecommend,
+		func() string { return prompt },
+		func(result *aicommon.Action) { forgeResult = result },
+		aicommon.WithAuxiliaryOutputs(outputs...),
+	)
 	if forgeResult == nil {
 		return nil, nil
 	}

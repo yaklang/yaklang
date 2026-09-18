@@ -1,7 +1,6 @@
 package loop_report_generating
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,59 +17,6 @@ var analyzeReportIntentOutputs = []aitool.ToolOption{
 	aitool.WithBoolParam("is_modify", aitool.WithParam_Description("是否是修改现有文件（true）还是创建新文件（false）"), aitool.WithParam_Required(true)),
 	aitool.WithStringParam("target_file", aitool.WithParam_Description("如果用户指定了目标文件路径，返回该路径；否则返回空字符串")),
 	aitool.WithStringParam("analysis_reason", aitool.WithParam_Description("简要说明判断理由")),
-}
-
-// analyzeUserIntent 使用 LiteForge 分析用户意图（修改现有文件还是创建新文件）
-func analyzeUserIntent(ctx context.Context, r aicommon.AIInvokeRuntime, userInput string, attachedFiles []string) (isModify bool, targetFile string, err error) {
-	analysisPrompt := `分析用户的报告生成需求，判断是要修改现有文件还是创建新文件。
-
-## 用户输入
-<|USER_INPUT_{{ .nonce }}|>
-{{ .userInput }}
-<|USER_INPUT_END_{{ .nonce }}|>
-
-## 附加文件列表
-{{ if .attachedFiles }}
-{{ range .attachedFiles }}- {{ . }}
-{{ end }}
-{{ else }}
-（无附加文件）
-{{ end }}
-
-## 判断规则
-1. 如果用户明确提到要"修改"、"编辑"、"更新"某个现有文件 → is_modify=true
-2. 如果用户指定了输出文件路径（如"保存到 xxx.md"、"写入 xxx"）→ is_modify=true, target_file=指定路径
-3. 如果用户要求"生成"、"创建"、"撰写"新报告 → is_modify=false
-4. 如果用户提到现有报告需要"补充"、"完善" → is_modify=true
-
-请分析并返回结果。`
-
-	renderedPrompt := utils.MustRenderTemplate(analysisPrompt, map[string]any{
-		"nonce":         utils.RandStringBytes(4),
-		"userInput":     userInput,
-		"attachedFiles": attachedFiles,
-	})
-
-	result, err := r.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"analyze-report-intent",
-		renderedPrompt,
-		analyzeReportIntentOutputs,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "analysis_reason"),
-	)
-
-	if err != nil {
-		log.Warnf("failed to analyze user intent: %v, defaulting to create new file", err)
-		return false, "", nil
-	}
-
-	isModify = result.GetBool("is_modify")
-	targetFile = result.GetString("target_file")
-	reason := result.GetString("analysis_reason")
-
-	log.Infof("report_generating intent analysis: is_modify=%v, target_file=%s, reason=%s", isModify, targetFile, reason)
-
-	return isModify, targetFile, nil
 }
 
 // buildInitTask creates the initialization task handler for report generating loop

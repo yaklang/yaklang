@@ -132,41 +132,6 @@ func TestBuildRecentToolCallSummary_TruncatesLongError(t *testing.T) {
 	require.Less(t, len(summary), 200)
 }
 
-func TestGenerateReasonByLiteForge_NoRuntimeNoop(t *testing.T) {
-	tc, err := NewToolCaller(
-		context.Background(),
-		WithToolCaller_AICallerConfig(NewTestConfig(context.Background())),
-		WithToolCaller_AICaller(&ProxyAICaller{callFunc: func(request *AIRequest) (*AIResponse, error) {
-			return &AIResponse{}, nil
-		}}),
-		WithToolCaller_Task(NewStatefulTaskBase("task-1", "abc", context.Background(), nil, true)),
-	)
-	require.NoError(t, err)
-	require.Nil(t, tc.invokeRuntime)
-
-	tool := aitool.NewWithoutCallback("sleep")
-	require.Empty(t, tc.generateReasonByLiteForge(context.Background(), tool, nil))
-}
-
-func TestGenerateReasonByLiteForge_NilToolNoop(t *testing.T) {
-	tc := newToolCallerWithReasonRuntime(t, &reasonTestRuntime{})
-	require.Empty(t, tc.generateReasonByLiteForge(context.Background(), nil, nil))
-}
-
-func TestGenerateReasonByLiteForge_WithRuntimeReturnsReason(t *testing.T) {
-	tc := newToolCallerWithReasonRuntime(t, &reasonTestRuntime{})
-	tool := aitool.NewWithoutCallback("sleep", aitool.WithStringParam("seconds"))
-
-	reason := tc.generateReasonByLiteForge(context.Background(), tool, aitool.InvokeParams{"seconds": "0.1"})
-	require.Equal(t, "mocked tool-call reason", reason)
-}
-
-func TestGenerateReasonByLiteForge_WithRuntimeFailureReturnsEmpty(t *testing.T) {
-	tc := newToolCallerWithReasonRuntime(t, &reasonTestRuntime{failSpeedForge: true})
-	tool := aitool.NewWithoutCallback("sleep")
-	require.Empty(t, tc.generateReasonByLiteForge(context.Background(), tool, nil))
-}
-
 func TestWithToolCaller_InvokeRuntime_SetsRuntime(t *testing.T) {
 	rt := &reasonTestRuntime{}
 	tc := newToolCallerWithReasonRuntime(t, rt)

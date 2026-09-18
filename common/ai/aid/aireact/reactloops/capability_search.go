@@ -1,7 +1,6 @@
 package reactloops
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -631,39 +630,6 @@ func searchLoopMetadata(query string) []*LoopMetadata {
 		}
 	}
 	return matched
-}
-
-func matchCapabilityCatalogChunk(ctx context.Context, r aicommon.AIInvokeRuntime, chunkData string, query string, chunkIdx int) []string {
-	nonce := utils.RandStringBytes(6)
-	prompt := fmt.Sprintf(`<|INSTRUCTION_%s|>
-You are a capability matcher. Given a user query and a catalog of available capabilities,
-select ALL capabilities that are relevant to the user's intent or scenario.
-
-CRITICAL RULES:
-- You MUST ONLY select identifiers that appear in the catalog below. Do NOT invent or fabricate any identifier.
-- If the user's input directly contains a capability identifier, that identifier MUST be included.
-- Consider both Chinese and English meanings when matching.
-- Return ONLY the identifier part (the text after the type prefix, e.g., "web_search" from "[tool:web_search]").
-<|INSTRUCTION_END_%s|>
-
-<|USER_QUERY_%s|>
-%s
-<|USER_QUERY_END_%s|>
-
-<|CAPABILITY_CATALOG_%s|>
-%s
-<|CAPABILITY_CATALOG_END_%s|>`, nonce, nonce, nonce, query, nonce, nonce, chunkData, nonce)
-
-	schema := capabilityCatalogMatchOutputs
-	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "capability-catalog-match", prompt, schema)
-	if err != nil {
-		log.Warnf("capability catalog match chunk %d failed: %v", chunkIdx, err)
-		return nil
-	}
-	if forgeResult == nil {
-		return nil
-	}
-	return forgeResult.GetStringSlice("matched_identifiers")
 }
 
 func normalizeCapabilityStrings(values []string) []string {

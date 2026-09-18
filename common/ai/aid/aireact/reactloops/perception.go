@@ -869,15 +869,18 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	}
 
 	aiStart := time.Now()
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx, "perception", prompt, perceptionOutputSchema,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "summary"),
+	var action *aicommon.Action
+	r.config.ScheduleAuxiliaryTask(
+		ctx,
+		aicommon.CallerLabelPerception,
+		func() string { return prompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(perceptionOutputSchema...),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "summary"),
+		),
 	)
 	setWorkspaceDebugDuration(r, perceptionDebugAIDurationKey, time.Since(aiStart))
-	if err != nil {
-		log.Warnf("perception liteforge call failed (trigger=%s): %v", reason, err)
-		return r.perception.getCurrent()
-	}
 	if utils.IsNil(action) {
 		log.Warnf("perception: action is nil (trigger=%s)", reason)
 		return r.perception.getCurrent()

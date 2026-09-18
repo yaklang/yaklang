@@ -170,38 +170,42 @@ User's original query: {{ .UserQuery }}
 		taskID = task.GetId()
 	}
 
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
+	var action *aicommon.Action
+	invoker.GetConfig().ScheduleAuxiliaryTask(
 		loop.GetConfig().GetContext(),
-		"http_flow_analyze_finalize_summary",
-		summaryPrompt,
-		[]aitool.ToolOption{
+		aicommon.CallerLabelHttpFlowAnalyzeFinalizeSummary,
+		func() string { return summaryPrompt },
+		func(result *aicommon.Action) { action = result },
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam("summary",
 				aitool.WithParam_Description("Complete HTTP traffic analysis report in Markdown format"),
 				aitool.WithParam_Required(true),
 			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
-			"summary",
-		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
-			if emitter == nil {
-				io.Copy(io.Discard, r)
-				return
-			}
-			if event, _ := emitter.EmitStreamEventWithContentType(
-				"re-act-loop-answer-payload",
-				utils.JSONStringReader(r),
-				taskID,
-				aicommon.TypeTextMarkdown,
-				func() {},
-			); event != nil {
-				streamId := event.GetStreamEventWriterId()
-				emitter.EmitTextReferenceMaterial(streamId, contextMaterials)
-			}
-		}),
+		),
+		aicommon.WithAuxiliaryOpts(
+			aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+				"summary",
+			}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				if emitter == nil {
+					io.Copy(io.Discard, r)
+					return
+				}
+				if event, _ := emitter.EmitStreamEventWithContentType(
+					"re-act-loop-answer-payload",
+					utils.JSONStringReader(r),
+					taskID,
+					aicommon.TypeTextMarkdown,
+					func() {},
+				); event != nil {
+					streamId := event.GetStreamEventWriterId()
+					emitter.EmitTextReferenceMaterial(streamId, contextMaterials)
+				}
+			}),
+		),
 	)
 
-	if err != nil {
-		log.Errorf("http_flow_analyze finalize: AI summary generation failed: %v", err)
+	if action == nil {
+		log.Error("http_flow_analyze finalize: auxiliary summary generation returned no result")
 		deliverRawContextFallback(loop, invoker, contextMaterials)
 		return
 	}

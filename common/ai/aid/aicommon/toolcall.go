@@ -390,29 +390,6 @@ var toolCallReasonOutputs = []aitool.ToolOption{
 		aitool.WithParam_Required(true)),
 }
 
-// generateReasonByLiteForge uses the speed-priority lite forge to generate one
-// concise sentence describing WHY the given tool call is needed. It returns an
-// empty string (no-op) when no invokeRuntime is configured or generation fails,
-// so callers without a runtime keep their original behavior.
-func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams) string {
-	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
-		return ""
-	}
-	if utils.IsNil(ctx) {
-		ctx = t.ctx
-	}
-	prompt := buildToolCallReasonPrompt(tool, params, t.task)
-	action, err := t.invokeRuntime.InvokeSpeedPriorityLiteForge(
-		ctx, "tool-call-reason", prompt,
-		toolCallReasonOutputs,
-	)
-	if err != nil || utils.IsNil(action) {
-		log.Debugf("generate tool-call reason via liteforge failed: %v", err)
-		return ""
-	}
-	return strings.TrimSpace(action.GetString("reason"))
-}
-
 // buildToolCallReasonPrompt builds the lite-forge prompt asking for a concise
 // reason for a tool call, given the tool, its (possibly empty) params, and the
 // owning task's user input / name for intent context. It also includes a brief
@@ -790,7 +767,7 @@ func (t *ToolCaller) resetReasonForReview() {
 
 // generateReasonIfNeeded generates a reason via the speed-priority liteforge AT
 // MOST ONCE per tool call (guarded by t.reasonGen). It is a no-op when a reason
-// is already present (preset / action-stashed) or no invokeRuntime is configured.
+// is already present (preset / action-stashed) or no Config is configured.
 // reasonFinalized is NOT used as a guard here — its only job is to tell the
 // param-generation thinking stream (SetOnReasonChunk) not to overwrite an already
 // emitted concrete reason. Call this from the single reason-handling point in

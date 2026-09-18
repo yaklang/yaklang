@@ -2,7 +2,6 @@ package loop_dir_explore
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"fmt"
 	"os"
@@ -87,49 +86,6 @@ func (s *ExploreState) getNoteFiles() []string {
 	result := make([]string, len(s.noteFiles))
 	copy(result, s.noteFiles)
 	return result
-}
-
-// extractTargetPath 使用 LiteForge 从用户输入中提取目标目录路径。
-func extractTargetPath(ctx context.Context, r aicommon.AIInvokeRuntime, userInput string) (string, error) {
-	promptTpl := `分析用户的请求，提取需要探索的目标目录路径。
-
-## 用户输入
-<|USER_INPUT_{{ .Nonce }}|>
-{{ .UserInput }}
-<|USER_INPUT_END_{{ .Nonce }}|>
-
-## 提取规则
-1. 找到用户希望 AI 探索/分析的目录的绝对路径
-2. 路径通常是一个本地文件系统路径，例如 "/home/user/myproject" 或 "/Users/me/code/app"
-3. 如果用户提到多个路径，选择最主要/最明确的那个
-4. 如果没有找到任何目录路径，返回空字符串
-5. 输出路径必须是绝对路径（以 / 或 驱动器字母 开头）
-
-请返回目标路径。`
-
-	rendered, err := utils.RenderTemplate(promptTpl, map[string]any{
-		"Nonce":     utils.RandStringBytes(4),
-		"UserInput": userInput,
-	})
-	if err != nil {
-		return "", utils.Wrap(err, "render extract-path prompt")
-	}
-
-	result, err := r.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"extract-explore-target-path",
-		rendered,
-		extractExploreTargetPathOutputs,
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "reason"),
-	)
-	if err != nil {
-		return "", utils.Wrap(err, "LiteForge extract target path")
-	}
-
-	path := strings.TrimSpace(result.GetString("target_path"))
-	reason := result.GetString("reason")
-	log.Infof("[DirExplore] extracted target path: %q (reason: %s)", path, reason)
-	return path, nil
 }
 
 // BuildDirExploreLoop 构建目录探索 Loop。

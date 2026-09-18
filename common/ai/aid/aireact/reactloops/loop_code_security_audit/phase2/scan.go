@@ -1031,12 +1031,12 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 		TaskName:   "Determine code audit vulnerability scan categories",
 		Goal:       "Determine code audit vulnerability scan categories",
 	}, func(childInvoker aicommon.AIInvokeRuntime, childTask aicommon.AIStatefulTask) error {
-		var err error
-		action, err = childInvoker.InvokeSpeedPriorityLiteForge(
+		childInvoker.GetConfig().ScheduleAuxiliaryTask(
 			childTask.GetContext(),
-			"scan_plan",
-			prompt,
-			[]aitool.ToolOption{
+			aicommon.CallerLabelScanPlan,
+			func() string { return prompt },
+			func(result *aicommon.Action) { action = result },
+			aicommon.WithAuxiliaryOutputs(
 				aitool.WithStringArrayParam("selected_category_ids",
 					aitool.WithParam_Required(true),
 					aitool.WithParam_Description("按语言画像选择类别 ID：主攻类必须包含且建议靠前；次要保留；低优先无信号可省略"),
@@ -1047,9 +1047,12 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 [{"id":"custom_category","name":"类别名称","sink_patterns":"keyword1,keyword2","instruction":"扫描指南"}]
 如果没有额外要求，传入空字符串 ""`),
 				),
-			},
+			),
 		)
-		return err
+		if action == nil {
+			return utils.Error("scan plan auxiliary task returned no result")
+		}
+		return nil
 	})
 	if planErr != nil {
 		log.Warnf("[CodeAudit/Phase2] Plan AI call failed: %v, falling back to language-focused defaults", planErr)
