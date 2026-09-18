@@ -133,19 +133,23 @@ func (r *ReActLoop) CheckGoalAcceptanceCriteria(ctx context.Context) *GoalAccept
 		return result // acceptance criteria gate disabled
 	}
 
-	// Gather timeline context for the review
-	timelineDiff := r.GetTimelineDiffWithoutUpdate()
-	if strings.TrimSpace(timelineDiff) == "" {
-		timelineDiff = "(no timeline content available)"
+	if r.GetInvoker() == nil {
+		log.Warnf("goal acceptance check: invoker is nil, skipping")
+		return result
 	}
 
-	// Truncate to avoid excessive token usage
-	const maxTimelineChars = 8000
-	if len(timelineDiff) > maxTimelineChars {
-		timelineDiff = timelineDiff[:maxTimelineChars] + "\n... (truncated)"
-	}
-
-	prompt := fmt.Sprintf(`You are a strict acceptance reviewer. Determine whether the work done so far satisfies the acceptance criteria.
+	cfg.ScheduleAuxiliaryTask(ctx, aicommon.CallerLabelGoalAcceptanceReview,
+		func() string {
+			// Gather and bound the evidence only when the task is scheduled.
+			timelineDiff := r.GetTimelineDiffWithoutUpdate()
+			if strings.TrimSpace(timelineDiff) == "" {
+				timelineDiff = "(no timeline content available)"
+			}
+			const maxTimelineChars = 8000
+			if len(timelineDiff) > maxTimelineChars {
+				timelineDiff = timelineDiff[:maxTimelineChars] + "\n... (truncated)"
+			}
+			return fmt.Sprintf(`You are a strict acceptance reviewer. Determine whether the work done so far satisfies the acceptance criteria.
 
 ## Acceptance Criteria
 %s
@@ -157,36 +161,24 @@ func (r *ReActLoop) CheckGoalAcceptanceCriteria(ctx context.Context) *GoalAccept
 Review the timeline evidence against the acceptance criteria. If ALL criteria are satisfied, set "passed" to true. If any criterion is not met, set "passed" to false and explain exactly what is missing or incomplete in "reason".
 
 Be rigorous: only pass when there is concrete evidence in the timeline that each criterion is satisfied. Do not infer completion from absence of information.`, criteria, timelineDiff)
-
-	invoker := r.GetInvoker()
-	if invoker == nil {
-		log.Warnf("goal acceptance check: invoker is nil, skipping")
-		return result
-	}
-
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"goal-acceptance-review",
-		prompt,
-		[]aitool.ToolOption{
+		},
+		func(action *aicommon.Action) {
+			params := action.GetParams()
+			result.Passed = params.GetBool("passed")
+			result.Reason = strings.TrimSpace(params.GetString("reason"))
+		},
+		aicommon.WithAuxiliaryOnError(func(err error) {
+			log.Warnf("goal acceptance review failed: %v, allowing finish", err)
+		}),
+		aicommon.WithAuxiliaryOutputs(
 			aitool.WithBoolParam("passed",
 				aitool.WithParam_Description("true if all acceptance criteria are satisfied"),
 			),
 			aitool.WithStringParam("reason",
 				aitool.WithParam_Description("when passed=false, explain what is missing or incomplete; leave empty when passed=true"),
 			),
-		},
+		),
 	)
-	if err != nil {
-		log.Warnf("goal acceptance review failed: %v, allowing finish", err)
-		return result // on error, allow finish (fail-open)
-	}
-	if action == nil {
-		return result
-	}
-
-	params := action.GetParams()
-	result.Passed = params.GetBool("passed")
-	result.Reason = strings.TrimSpace(params.GetString("reason"))
+	// Errors and skipped calls leave the existing fail-open default intact.
 	return result
 }
