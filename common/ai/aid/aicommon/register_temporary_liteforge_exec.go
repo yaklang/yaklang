@@ -30,6 +30,7 @@ type LiteForgeInvokeRequest struct {
 	Outputs          []aitool.ToolOption
 	Options          []GeneralKVConfigOption
 	Emitter          *Emitter
+	ResponseHandler  AuxiliaryResponseHandler
 }
 
 var liteforgeExecuteFunc LiteForgeExecuteCallback

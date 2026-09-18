@@ -373,6 +373,10 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	}
 	if req := cfg.invokeRequest; req != nil {
 		gconfig := aicommon.NewGeneralKVConfig(req.Options...)
+		if validate := gconfig.GetLiteForgeOutputValidator(); validate != nil {
+			liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputValidator(validate))
+		}
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_ResponseHandler(req.ResponseHandler))
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_MaxPromptTokens(gconfig.GetLiteForgeMaxPromptTokens()))
 		// Typed Config invocations put the task prompt in LiteForge's dynamic
 		// context segment, matching the ReAct invocation path without duplicating
@@ -418,7 +422,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	}
 	fr, err := liteforgeIns.ExecuteEx(cfg.ctx, execParams, cfg.images, cfg.aidOptions...)
 	if err != nil {
-		return nil, utils.Errorf("execute liteforge failed: %s", err)
+		return nil, utils.Wrap(err, "execute liteforge failed")
 	}
 	if fr == nil {
 		return nil, utils.Errorf("execute liteforge result is nil")

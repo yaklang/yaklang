@@ -57,6 +57,7 @@ func (c *Config) ScheduleAuxiliaryTask(
 			Outputs:          spec.Outputs,
 			Options:          spec.Opts,
 			Emitter:          spec.Emitter,
+			ResponseHandler:  spec.ResponseHandler,
 		},
 		WithAgreeYOLO(),
 		WithAITransactionAutoRetry(c.GetAITransactionAutoRetryCount()),
