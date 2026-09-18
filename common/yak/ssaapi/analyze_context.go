@@ -94,6 +94,20 @@ type widenTrace struct {
 // bookkeeping is unnecessary on a hot path.
 var dataflowTraceEnabled = envFlagEnabled("YAK_SSA_DATAFLOW_TRACE")
 
+// setDataflowTraceEnabled forces the widening tracer on/off and reports the
+// previous value. Tests use it to measure fan-out for a specific shape without
+// depending on a process-level environment variable.
+func setDataflowTraceEnabled(enabled bool) (prev bool) {
+	prev = dataflowTraceEnabled
+	dataflowTraceEnabled = enabled
+	return prev
+}
+
+// lastWidenTrace holds the counters of the most recently finished descent.
+// Only populated while the tracer is enabled; tests read it right after a
+// GetTopDefs / GetBottomUses call to measure one descent's fan-out.
+var lastWidenTrace atomic.Pointer[widenTrace]
+
 // resolvedInstKey identifies a resolved instruction by program + inst-id. The
 // program pointer is stable for the lifetime of a Program; inst-id is unique
 // within a program.
