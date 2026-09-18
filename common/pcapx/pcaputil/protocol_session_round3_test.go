@@ -65,15 +65,15 @@ func TestRound3RadiusRejectPartialAttributes(t *testing.T) {
 
 func TestRound3CoAPSeparateResponse(t *testing.T) {
 	s := &binCoAP{}
-	_, err := s.consume(coapMsg(0, 1, 1, 7, []byte{0xab}, nil, nil))
+	_, err := s.consume(0, coapMsg(0, 1, 1, 7, []byte{0xab}, nil, nil))
 	require.NoError(t, err)
-	ack, err := s.consume(coapMsg(2, 0, 0, 7, nil, nil, nil))
+	ack, err := s.consume(1, coapMsg(2, 0, 0, 7, nil, nil, nil))
 	require.NoError(t, err)
 	require.Equal(t, "GET", ack["In Reply To"])
-	wrong, err := s.consume(coapMsg(0, 1, 69, 90, []byte{0xcd}, nil, []byte("wrong")))
+	wrong, err := s.consume(1, coapMsg(0, 1, 69, 90, []byte{0xcd}, nil, []byte("wrong")))
 	require.NoError(t, err)
 	require.Equal(t, "missing-request", wrong["Association"])
-	resp, err := s.consume(coapMsg(0, 1, 69, 91, []byte{0xab}, nil, []byte("ok")))
+	resp, err := s.consume(1, coapMsg(0, 1, 69, 91, []byte{0xab}, nil, []byte("ok")))
 	require.NoError(t, err)
 	require.Equal(t, "response", resp["Role"])
 	require.Equal(t, "GET", resp["In Reply To"])
@@ -81,11 +81,11 @@ func TestRound3CoAPSeparateResponse(t *testing.T) {
 	for _, bad := range [][]byte{
 		coapMsg(3, 0, 69, 1, nil, nil, nil), coapMsg(2, 1, 0, 1, []byte{1}, nil, nil), coapMsg(2, 0, 69, 1, nil, []byte{0xff}, nil), coapMsg(0, 0, 1, 1, nil, []byte{0xf0}, nil),
 	} {
-		_, err := (&binCoAP{}).consume(bad)
+		_, err := (&binCoAP{}).consume(0, bad)
 		require.Error(t, err)
 	}
 	// An extended option value of 15 is valid; only nibble 15 is reserved.
-	_, err = (&binCoAP{}).consume(coapMsg(0, 0, 1, 1, nil, append([]byte{0x0d, 2}, bytes.Repeat([]byte{'x'}, 15)...), nil))
+	_, err = (&binCoAP{}).consume(0, coapMsg(0, 0, 1, 1, nil, append([]byte{0x0d, 2}, bytes.Repeat([]byte{'x'}, 15)...), nil))
 	require.NoError(t, err)
 }
 

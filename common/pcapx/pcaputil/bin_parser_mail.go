@@ -15,19 +15,23 @@ const (
 )
 
 type binSMTP struct {
-	client    int
-	pending   []string
-	inData    bool
-	startTLS  bool
-	encrypted bool
+	client      int
+	pending     []string
+	pendingHead int
+	maxPending  int
+	inData      bool
+	startTLS    bool
+	encrypted   bool
 }
 
 type binIMAP struct {
-	pending     map[string]string
-	literal     [2]int
-	literalTail [2]bool
-	startTLS    string
-	encrypted   bool
+	pending      map[string]string
+	maxPending   int
+	pendingBytes int
+	literal      [2]int
+	literalTail  [2]bool
+	startTLS     string
+	encrypted    bool
 }
 
 type binPOP3 struct {
@@ -296,7 +300,7 @@ func (f *binFlow) frameSMTP(dir int, w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("SMTP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending))*16); err != nil {
+	if err := f.reserveSession(256 + int64(max(cap(s.pending), 2*(s.pendingCount()+1)))*32); err != nil {
 		return 0, nil, err
 	}
 	if s.encrypted {
@@ -335,6 +339,8 @@ func (f *binFlow) frameSMTP(dir int, w []byte) (int, *binSpec, error) {
 	return n, f.spec("smtp", "SMTPCommand"), nil
 }
 
+func (s *binSMTP) pendingCount() int { return len(s.pending) - s.pendingHead }
+
 func (s *binSMTP) consume(dir int, raw []byte) (map[string]any, error) {
 	if s.encrypted {
 		return nil, protocolError(ErrEncrypted, "SMTP transport is encrypted after STARTTLS")
@@ -342,8 +348,8 @@ func (s *binSMTP) consume(dir int, raw []byte) (map[string]any, error) {
 	if s.inData && dir == s.client {
 		s.inData = false
 		out := map[string]any{"Packet Name": "DATA Body", "Role": "command", "Bytes": len(raw)}
-		if len(s.pending) > 0 {
-			out["In Reply To"] = s.pending[0]
+		if s.pendingCount() > 0 {
+			out["In Reply To"] = s.pending[s.pendingHead]
 		}
 		return out, nil
 	}
@@ -352,18 +358,23 @@ func (s *binSMTP) consume(dir int, raw []byte) (map[string]any, error) {
 		out := map[string]any{
 			"Packet Name": "Reply", "Role": "reply", "Reply Code": code, "Multiline": bytes.Contains(raw, []byte("-")),
 		}
-		if len(s.pending) > 0 {
-			out["In Reply To"] = s.pending[0]
-			if s.pending[0] == "DATA" && code == 354 {
+		if s.pendingCount() > 0 {
+			out["In Reply To"] = s.pending[s.pendingHead]
+			if s.pending[s.pendingHead] == "DATA" && code == 354 {
 				s.inData = true
 			}
-			if s.pending[0] == "STARTTLS" && code == 220 {
+			if s.pending[s.pendingHead] == "STARTTLS" && code == 220 {
 				s.encrypted = true
 				out["Encrypted"] = true
 				out["Protocol Transition"] = "smtp->tls"
 			}
 			if code != 354 {
-				s.pending = s.pending[1:]
+				s.pending[s.pendingHead] = ""
+				s.pendingHead++
+				if s.pendingHead == len(s.pending) {
+					s.pending = s.pending[:0]
+					s.pendingHead = 0
+				}
 			}
 		}
 		if text := smtpReplyText(raw); text != "" {
@@ -378,6 +389,16 @@ func (s *binSMTP) consume(dir int, raw []byte) (map[string]any, error) {
 	}
 	if cmd == "BDAT" || cmd == "AUTH" {
 		return nil, protocolError(ErrUnsupportedFeature, "SMTP %s exchange requires an unsupported profile", cmd)
+	}
+	if s.pendingCount() >= sessionCollectionLimit(s.maxPending) {
+		return nil, protocolError(ErrResourceExceeded, "SMTP pending command budget exceeded")
+	}
+	// Reuse the FIFO storage after replies, clearing references as they retire.
+	if len(s.pending) == cap(s.pending) && s.pendingHead > 0 {
+		n := copy(s.pending, s.pending[s.pendingHead:])
+		clear(s.pending[n:])
+		s.pending = s.pending[:n]
+		s.pendingHead = 0
 	}
 	s.pending = append(s.pending, cmd)
 	out := map[string]any{"Packet Name": cmd, "Role": "command", "Line": line}
@@ -412,7 +433,7 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("IMAP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending))*16); err != nil {
+	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96 + int64(s.pendingBytes)); err != nil {
 		return 0, nil, err
 	}
 	if s.encrypted {
@@ -434,15 +455,13 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 	if n == 0 || n > len(w) {
 		return n, nil, nil
 	}
-	if size, plus, ok := imapLiteralSuffix(w[:n-2]); ok && plus {
-		need := n + size
-		if need > f.a.config.MaxMessageBytes {
-			return f.a.config.MaxMessageBytes + 1, nil, nil
-		}
-		if need > len(w) {
-			return need, nil, nil
-		}
-		return need, f.a.specs["imap/IMAP"], nil
+	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96 + int64(s.pendingBytes+n)); err != nil {
+		return 0, nil, err
+	}
+	// Both literal forms have a line header followed by exactly n opaque bytes.
+	// Reject oversized declarations before buffering their payload.
+	if size, _, ok := imapLiteralSuffix(w[:n-2]); ok && (size > f.a.config.MaxMessageBytes || size > f.a.budget.MaxFrameBytes) {
+		return 0, nil, protocolError(ErrResourceExceeded, "IMAP literal exceeds message/frame budget")
 	}
 	return n, f.a.specs["imap/IMAP"], nil
 }
@@ -460,6 +479,11 @@ func imapLiteralSuffix(line []byte) (int, bool, bool) {
 	}
 	if len(inner) == 0 {
 		return 0, false, false
+	}
+	for _, digit := range inner {
+		if digit < '0' || digit > '9' {
+			return 0, false, false
+		}
 	}
 	n, err := strconv.Atoi(string(inner))
 	if err != nil || n < 0 {
@@ -485,14 +509,19 @@ func (s *binIMAP) consume(dir int, raw []byte) (map[string]any, error) {
 		}
 	}
 	fields := strings.Fields(line)
+	if len(fields) > 0 && fields[0] == "+" {
+		return map[string]any{"Tag": "+", "Role": "continuation", "Packet Name": "Continuation", "Line": line}, nil
+	}
 	if len(fields) < 2 {
 		return nil, fmt.Errorf("imap: missing tag or command")
 	}
 	tag, cmd := fields[0], strings.ToUpper(fields[1])
 	out := map[string]any{"Tag": tag, "Command": cmd, "Line": line}
-	if size, plus, ok := imapLiteralSuffix(bytes.TrimRight(raw, "\r\n")); ok && !plus {
+	if size, plus, ok := imapLiteralSuffix(bytes.TrimSuffix(raw, []byte("\r\n"))); ok {
 		s.literal[dir] = size
+		s.literalTail[dir] = size == 0
 		out["Literal Size"] = size
+		out["Non-Synchronizing Literal"] = plus
 	}
 	if tag == "*" {
 		out["Role"] = "untagged"
@@ -515,6 +544,7 @@ func (s *binIMAP) consume(dir int, raw []byte) (map[string]any, error) {
 		if req, ok := s.pending[tag]; ok {
 			out["In Reply To"] = req
 			delete(s.pending, tag)
+			s.pendingBytes -= len(tag) + len(req)
 			if req == "STARTTLS" && cmd == "OK" {
 				s.encrypted = true
 				out["Encrypted"] = true
@@ -532,7 +562,16 @@ func (s *binIMAP) consume(dir int, raw []byte) (map[string]any, error) {
 		if s.pending == nil {
 			s.pending = map[string]string{}
 		}
-		s.pending[tag] = cmd
+		if _, exists := s.pending[tag]; exists {
+			return nil, protocolError(ErrDesynchronized, "IMAP command reused an outstanding tag")
+		}
+		if len(s.pending) >= sessionCollectionLimit(s.maxPending) {
+			return nil, protocolError(ErrResourceExceeded, "IMAP pending tag budget exceeded")
+		}
+		// Avoid retaining an entire command line (possibly credentials or a literal
+		// declaration) through a short tag substring.
+		s.pending[strings.Clone(tag)] = strings.Clone(cmd)
+		s.pendingBytes += len(tag) + len(cmd)
 		if cmd == "STARTTLS" {
 			s.startTLS = tag
 		}

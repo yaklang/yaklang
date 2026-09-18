@@ -80,9 +80,9 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		if smtpReplyPrefix(w) {
 			client = 1 - dir
 		}
-		f.protocol, f.smtp = "smtp", &binSMTP{client: client}
+		f.protocol, f.smtp = "smtp", &binSMTP{client: client, maxPending: f.a.budget.MaxCollectionElements}
 	case "imap":
-		f.protocol, f.imap = "imap", &binIMAP{pending: map[string]string{}}
+		f.protocol, f.imap = "imap", &binIMAP{pending: map[string]string{}, maxPending: f.a.budget.MaxCollectionElements}
 	case "pop3":
 		f.protocol, f.pop3 = "pop3", &binPOP3{}
 	case "ftp":
@@ -96,9 +96,9 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "ntp":
 		f.protocol, f.ntp = "ntp", &binNTP{}
 	case "coap":
-		f.protocol, f.coap = "coap", &binCoAP{pending: map[uint16]string{}}
+		f.protocol, f.coap = "coap", &binCoAP{maxPending: f.a.budget.MaxCollectionElements}
 	case "modbus":
-		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}}
+		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}, maxPending: f.a.budget.MaxCollectionElements}
 	}
 }
 
@@ -200,7 +200,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "ntp":
 		e.Session, err = f.ntp.consume(e.Raw)
 	case "coap":
-		e.Session, err = f.coap.consume(e.Raw)
+		e.Session, err = f.coap.consume(dir, e.Raw)
 	case "modbus":
 		e.Session, err = f.modbus.consume(dir, e.Raw)
 	}
@@ -397,8 +397,8 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	if p := f.sip; p != nil && len(p.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(p.pending)}, "SIP exchange ended with unmatched transactions")
 	}
-	if s := f.smtp; s != nil && len(s.pending) > 0 && !s.encrypted {
-		emit(0, map[string]any{"Outstanding": s.pending}, "SMTP exchange ended with unmatched command")
+	if s := f.smtp; s != nil && s.pendingCount() > 0 && !s.encrypted {
+		emit(0, map[string]any{"Outstanding": s.pending[s.pendingHead:]}, "SMTP exchange ended with unmatched command")
 	}
 	if im := f.imap; im != nil && len(im.pending) > 0 && !im.encrypted {
 		emit(0, map[string]any{"Outstanding": len(im.pending)}, "IMAP exchange ended with unmatched tags")
@@ -450,6 +450,13 @@ func (f *binFlow) reserveSession(target int64) error {
 	}
 }
 
+func sessionCollectionLimit(limit int) int {
+	if limit <= 0 {
+		return DefaultParserBudget().MaxCollectionElements
+	}
+	return limit
+}
+
 func sessionContext(why string) error { return fmt.Errorf("%w: %s", errBinContext, why) }
 
 // Context snapshots contain only these value types. No live decoder, pooled
@@ -468,6 +475,8 @@ func cloneSessionValue(v any) any {
 			out[i] = cloneSessionValue(v).(map[string]any)
 		}
 		return out
+	case []string:
+		return append([]string(nil), x...)
 	case []byte:
 		return bytes.Clone(x)
 	default:
@@ -501,6 +510,12 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 		n := 24 + len(x)*8
 		for _, v := range x {
 			n += sessionSnapshotSize(v, byteCapacity)
+		}
+		return n
+	case []string:
+		n := 24 + len(x)*16
+		for _, v := range x {
+			n += len(v)
 		}
 		return n
 	case string:
