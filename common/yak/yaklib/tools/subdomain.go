@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/subdomain"
@@ -163,10 +165,31 @@ func withRecursiveDict(i any) subdomain.ConfigOption {
 	return subdomain.WithSubDictionary(utils.StringAsFileParams(i))
 }
 
+// modes 是一个选项参数，设置子域名发现模式。可传入 search / brute / zone-transfer（或 axfr），
+// 可组合。仅 search 时不做字典爆破，适合被动子域聚合。
+func withModes(modes ...string) subdomain.ConfigOption {
+	var ints []int
+	for _, raw := range modes {
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "search":
+			ints = append(ints, subdomain.SEARCH)
+		case "brute":
+			ints = append(ints, subdomain.BRUTE)
+		case "zone-transfer", "axfr", "zone_transfer":
+			ints = append(ints, subdomain.ZONE_TRANSFER)
+		}
+	}
+	if len(ints) == 0 {
+		ints = []int{subdomain.SEARCH}
+	}
+	return subdomain.WithModes(ints...)
+}
+
 var SubDomainExports = map[string]interface{}{
 	"Scan": _subdomainScan,
 
 	// 选项
+	"modes":                  withModes,
 	"wildcardToStop":         subdomain.WithWildCardToStop,
 	"wildcardProbeCount":     subdomain.WithWildCardProbeCount,
 	"wildcardSinkholeVerify": subdomain.WithWildCardSinkholeVerify,
