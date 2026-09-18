@@ -56,8 +56,9 @@ func NewInstaller(defaultInstallDir, downloadDir string) Installer {
 
 // resolveInstallDir 根据 descriptor.InstallRoot 决定使用哪个安装根目录
 // 取值 "ai-skills" 落到 ~/yakit-projects/ai-skills/，便于 AutoSkillLoader 自动发现
+// 取值 "c-headers" 落到 ~/yakit-projects/c-headers/，供 c2ssa 外部头文件包懒加载
 // 取值 "libs" 或空字符串保持现有 yakit-projects/libs/ 默认行为
-// 关键词: install_root, ai-skills, libs, 安装根目录覆盖, resolveInstallDir
+// 关键词: install_root, ai-skills, c-headers, libs, 安装根目录覆盖, resolveInstallDir
 func (bi *BaseInstaller) resolveInstallDir(descriptor *BinaryDescriptor) string {
 	if descriptor == nil {
 		return bi.defaultInstallDir
@@ -65,6 +66,8 @@ func (bi *BaseInstaller) resolveInstallDir(descriptor *BinaryDescriptor) string 
 	switch descriptor.InstallRoot {
 	case "ai-skills":
 		return consts.GetDefaultAISkillsDir()
+	case "c-headers":
+		return consts.GetDefaultCHeadersDir()
 	case "libs", "":
 		return bi.defaultInstallDir
 	default:

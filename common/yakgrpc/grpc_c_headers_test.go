@@ -7,10 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
+	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -190,6 +194,10 @@ func TestCHeaders_ImportDirectory(t *testing.T) {
 }
 
 func TestCHeaders_DownloadOfficial(t *testing.T) {
+	// Init DB under ambient YAKIT_HOME first so t.TempDir cleanup is not blocked by sqlite.
+	require.NoError(t, yakit.CallPostInitDatabase())
+	require.NoError(t, thirdparty_bin.EnsureInitialized())
+
 	withTempCHeadersHome(t)
 	s := &Server{}
 	ctx := context.Background()
@@ -202,6 +210,11 @@ func TestCHeaders_DownloadOfficial(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/c-headers/latest/c-std-headers.zip", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		_, _ = w.Write(raw)
 	})
 	mux.HandleFunc("/c-headers/latest/version.txt", func(w http.ResponseWriter, r *http.Request) {
@@ -210,20 +223,41 @@ func TestCHeaders_DownloadOfficial(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	oldZip, oldVer := officialCHeadersZipURL, officialCHeadersVersionURL
-	officialCHeadersZipURL = srv.URL + "/c-headers/latest/c-std-headers.zip"
-	officialCHeadersVersionURL = srv.URL + "/c-headers/latest/version.txt"
-	t.Cleanup(func() {
-		officialCHeadersZipURL = oldZip
-		officialCHeadersVersionURL = oldVer
-	})
+	orig, err := thirdparty_bin.GetDescriptor(preprocess.OfficialCHeadersName)
+	require.NoError(t, err)
+	origCopy := *orig
+	if orig.DownloadInfoMap != nil {
+		origCopy.DownloadInfoMap = make(map[string]*thirdparty_bin.DownloadInfo, len(orig.DownloadInfoMap))
+		for k, v := range orig.DownloadInfoMap {
+			if v == nil {
+				continue
+			}
+			cp := *v
+			origCopy.DownloadInfoMap[k] = &cp
+		}
+	}
+	require.NoError(t, thirdparty_bin.Register(&thirdparty_bin.BinaryDescriptor{
+		Name:        preprocess.OfficialCHeadersName,
+		Description: orig.Description,
+		Tags:        append([]string(nil), orig.Tags...),
+		Version:     orig.Version,
+		InstallType: "bin",
+		InstallRoot: "c-headers",
+		DownloadInfoMap: map[string]*thirdparty_bin.DownloadInfo{
+			"*": {
+				URL:     srv.URL + "/c-headers/latest/c-std-headers.zip",
+				BinPath: preprocess.OfficialCHeadersZipName,
+			},
+		},
+	}))
+	t.Cleanup(func() { _ = thirdparty_bin.Register(&origCopy) })
 
 	first, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{})
 	require.NoError(t, err)
 	require.True(t, first.GetOk(), first.GetReason())
 	require.Equal(t, "1.0.0-test", first.GetVersion())
 	require.FileExists(t, first.GetPackPath())
-	require.Equal(t, "c-std-headers.zip", filepath.Base(first.GetPackPath()))
+	require.Equal(t, preprocess.OfficialCHeadersZipName, filepath.Base(first.GetPackPath()))
 
 	dup, err := s.DownloadOfficialCHeaders(ctx, &ypb.DownloadOfficialCHeadersRequest{})
 	require.NoError(t, err)
