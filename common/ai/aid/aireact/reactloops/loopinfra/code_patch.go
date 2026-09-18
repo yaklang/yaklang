@@ -2,463 +2,261 @@ package loopinfra
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
 
 const (
-	codePatchBeginMarker = "*** Begin Patch"
-	codePatchEndMarker   = "*** End Patch"
-	codePatchUpdateFile  = "*** Update File:"
-	codePatchAddFile     = "*** Add File:"
-	codePatchDeleteFile  = "*** Delete File:"
+	LoopYaklangCodeEventOpPatch = "patch"
 
-	codePatchEscapeHint = "HINT: preview 含 \\n/\\r\\n 字面量。请从 CURRENT_CODE 逐字符复制 context/- 行；禁止把 \\n 展开成真实换行，也禁止写成 \\\\n（多一层反斜杠）。"
+	CodePatchKindLineRange = "line_range"
+	CodePatchKindSnippet   = "snippet"
+	CodePatchKindInsert    = "insert"
+	CodePatchKindDelete    = "delete"
+	CodePatchKindFull      = "full"
+
+	YaklangPatchKindLineRange = CodePatchKindLineRange
+	YaklangPatchKindSnippet   = CodePatchKindSnippet
+	YaklangPatchKindInsert    = CodePatchKindInsert
+	YaklangPatchKindDelete    = CodePatchKindDelete
+	YaklangPatchKindFull      = CodePatchKindFull
+
+	SyntaxFlowPatchKindLineRange = CodePatchKindLineRange
+	SyntaxFlowPatchKindSnippet   = CodePatchKindSnippet
+	SyntaxFlowPatchKindInsert    = CodePatchKindInsert
+	SyntaxFlowPatchKindDelete    = CodePatchKindDelete
+	SyntaxFlowPatchKindFull      = CodePatchKindFull
+
+	codeLastDeliveryPatchLoopKey = "yaklang_last_delivery_patch"
+
+	defaultYaklangCodeChangeSource    = "yaklang_code"
+	defaultSyntaxFlowRuleChangeSource = "syntaxflow_rule"
 )
 
-// CodePatchHunk is one @@-delimited change block inside an Apply Patch body.
-type CodePatchHunk struct {
-	Header  string // @@ line without leading @@ (may be empty)
-	OldText string // context + deleted lines (exact match haystack)
-	NewText string // context + added lines (replacement)
+// CodePatchMeta describes how to apply code.content (fragment) on the frontend.
+// Shared by yaklang_code_change and syntaxflow_rule_change wire payloads.
+type CodePatchMeta struct {
+	Kind       string `json:"kind"`
+	StartLine  int    `json:"start_line,omitempty"`
+	EndLine    int    `json:"end_line,omitempty"`
+	InsertLine int    `json:"insert_line,omitempty"`
+	OldSnippet string `json:"old_snippet,omitempty"`
 }
 
-// LooksLikeCodePatch reports whether s contains an Apply Patch Begin Patch marker.
-func LooksLikeCodePatch(s string) bool {
-	return strings.Contains(s, codePatchBeginMarker)
+// CodeDeliveryPatch is stored on the loop when a single-file action commits.
+// Line numbers in Meta are already absolute (1-based file lines).
+type CodeDeliveryPatch struct {
+	Fragment string
+	Meta     CodePatchMeta
 }
 
-// ParseCodePatch parses an Apply Patch body into hunks.
-// "*** Update File:" paths are ignored; callers always apply against the loop's full_code.
-func ParseCodePatch(s string) ([]CodePatchHunk, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil, utils.Error("empty patch")
-	}
-	if !LooksLikeCodePatch(s) {
-		return nil, utils.Error("not a code patch: missing *** Begin Patch")
-	}
+// CodeChangeEventCode is the shared wire JSON shape for *.code on editor change events.
+type CodeChangeEventCode struct {
+	Content  string         `json:"content"`
+	Path     string         `json:"path,omitempty"`
+	Summary  string         `json:"summary,omitempty"`
+	Version  int            `json:"version"`
+	ChangeID string         `json:"change_id,omitempty"`
+	Patch    *CodePatchMeta `json:"patch,omitempty"`
+}
 
-	begin := strings.Index(s, codePatchBeginMarker)
-	body := s[begin+len(codePatchBeginMarker):]
-	if end := strings.Index(body, codePatchEndMarker); end >= 0 {
-		body = body[:end]
-	}
-	body = strings.TrimSpace(body)
-	if body == "" {
-		return nil, utils.Error("empty patch body")
-	}
+// CodeChangeEvent is the shared wire JSON payload for yaklang_code_change /
+// syntaxflow_rule_change (frontends can share normalize/review helpers).
+type CodeChangeEvent struct {
+	Op           string              `json:"op"`
+	Code         CodeChangeEventCode `json:"code"`
+	Reason       string              `json:"reason,omitempty"`
+	SourceAction string              `json:"source_action,omitempty"`
+}
 
-	lines := splitPatchLines(body)
-	var hunks []CodePatchHunk
-	var cur *CodePatchHunk
-	var oldLines, newLines []string
-	var hasChange bool // true if hunk saw at least one '-' or '+' line
+// Compatibility aliases — prefer Code* names for new code.
+type (
+	YaklangCodePatchMeta       = CodePatchMeta
+	YaklangCodeDeliveryPatch   = CodeDeliveryPatch
+	YaklangCodeChangeEventCode = CodeChangeEventCode
+	YaklangCodeChangeEvent     = CodeChangeEvent
 
-	flush := func() error {
-		if cur == nil {
-			return nil
-		}
-		cur.OldText = joinPatchLines(oldLines)
-		cur.NewText = joinPatchLines(newLines)
-		if cur.OldText == "" && cur.NewText == "" {
-			cur = nil
-			oldLines, newLines = nil, nil
-			hasChange = false
-			return nil
-		}
-		// Reject context-only dumps: model wrapped code in Begin Patch but omitted +/-.
-		// Leading spaces on indented Yak lines are parsed as context markers, producing
-		// OldText==NewText no-ops that look like "patches" without any real edit.
-		if !hasChange || cur.OldText == cur.NewText {
-			header := cur.Header
-			if header == "" {
-				header = "(no @@ header)"
-			}
-			err := utils.Errorf(
-				"hunk @@ %s: missing '+' / '-' change lines (context-only / no-op). "+
-					"Each hunk MUST use '-' for deleted lines and '+' for added lines; "+
-					"space-prefixed lines are context only. Example:\n"+
-					"@@ fix\n"+
-					" context\n"+
-					"-old\n"+
-					"+new",
-				header,
-			)
-			cur = nil
-			oldLines, newLines = nil, nil
-			hasChange = false
-			return err
-		}
-		hunks = append(hunks, *cur)
-		cur = nil
-		oldLines, newLines = nil, nil
-		hasChange = false
+	SyntaxFlowRulePatchMeta       = CodePatchMeta
+	SyntaxFlowRuleChangeEventCode = CodeChangeEventCode
+	SyntaxFlowRuleChangeEvent     = CodeChangeEvent
+)
+
+func YaklangAbsoluteLine(relativeLine, lineBase int) int {
+	if relativeLine <= 0 {
+		return relativeLine
+	}
+	if lineBase <= 0 {
+		return relativeLine
+	}
+	return relativeLine + lineBase
+}
+
+func BuildYaklangPatchLineRange(fragment string, startLine, endLine int, oldSnippet string, lineBase int) *CodeDeliveryPatch {
+	return &CodeDeliveryPatch{
+		Fragment: strings.TrimSpace(fragment),
+		Meta: CodePatchMeta{
+			Kind:       CodePatchKindLineRange,
+			StartLine:  YaklangAbsoluteLine(startLine, lineBase),
+			EndLine:    YaklangAbsoluteLine(endLine, lineBase),
+			OldSnippet: oldSnippet,
+		},
+	}
+}
+
+func BuildYaklangPatchSnippet(fragment, oldSnippet string, lineBase int) *CodeDeliveryPatch {
+	_ = lineBase // reserved for callers that pass seed offset; snippet match is text-based
+	return &CodeDeliveryPatch{
+		Fragment: strings.TrimSpace(fragment),
+		Meta: CodePatchMeta{
+			Kind:       CodePatchKindSnippet,
+			OldSnippet: oldSnippet,
+		},
+	}
+}
+
+func BuildYaklangPatchInsert(fragment string, insertLine, lineBase int) *CodeDeliveryPatch {
+	return &CodeDeliveryPatch{
+		Fragment: strings.TrimSpace(fragment),
+		Meta: CodePatchMeta{
+			Kind:       CodePatchKindInsert,
+			InsertLine: YaklangAbsoluteLine(insertLine, lineBase),
+		},
+	}
+}
+
+func BuildYaklangPatchDelete(startLine, endLine int, oldSnippet string, lineBase int) *CodeDeliveryPatch {
+	return &CodeDeliveryPatch{
+		Meta: CodePatchMeta{
+			Kind:       CodePatchKindDelete,
+			StartLine:  YaklangAbsoluteLine(startLine, lineBase),
+			EndLine:    YaklangAbsoluteLine(endLine, lineBase),
+			OldSnippet: oldSnippet,
+		},
+	}
+}
+
+func BuildYaklangPatchFull(fragment string) *CodeDeliveryPatch {
+	return &CodeDeliveryPatch{
+		Fragment: strings.TrimSpace(fragment),
+		Meta: CodePatchMeta{
+			Kind: CodePatchKindFull,
+		},
+	}
+}
+
+func SetLoopYaklangDeliveryPatch(loop *reactloops.ReActLoop, patch *CodeDeliveryPatch) {
+	if loop == nil || patch == nil {
+		return
+	}
+	loop.Set(codeLastDeliveryPatchLoopKey, patch)
+}
+
+func GetLoopYaklangDeliveryPatch(loop *reactloops.ReActLoop) *CodeDeliveryPatch {
+	if loop == nil {
 		return nil
 	}
-
-	startHunk := func(header string) error {
-		if err := flush(); err != nil {
-			return err
-		}
-		cur = &CodePatchHunk{Header: strings.TrimSpace(header)}
-		oldLines, newLines = nil, nil
-		hasChange = false
+	switch v := loop.GetVariable(codeLastDeliveryPatchLoopKey).(type) {
+	case *CodeDeliveryPatch:
+		return v
+	case CodeDeliveryPatch:
+		p := v
+		return &p
+	default:
 		return nil
 	}
-
-	for _, raw := range lines {
-		line := strings.TrimRight(raw, "\r")
-		trimmed := strings.TrimSpace(line)
-
-		switch {
-		case trimmed == "":
-			if cur != nil {
-				// Preserve blank lines inside an active hunk as context.
-				oldLines = append(oldLines, "")
-				newLines = append(newLines, "")
-			}
-		case strings.HasPrefix(trimmed, codePatchUpdateFile) ||
-			strings.HasPrefix(trimmed, codePatchAddFile) ||
-			strings.HasPrefix(trimmed, codePatchDeleteFile):
-			if err := flush(); err != nil {
-				return nil, err
-			}
-		case strings.HasPrefix(trimmed, "@@"):
-			header := strings.TrimSpace(strings.TrimPrefix(trimmed, "@@"))
-			if err := startHunk(header); err != nil {
-				return nil, err
-			}
-		case cur == nil && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, "+")):
-			// Hunk without @@ header — start an anonymous hunk.
-			if err := startHunk(""); err != nil {
-				return nil, err
-			}
-			fallthrough
-		case cur != nil:
-			if len(line) == 0 {
-				continue
-			}
-			prefix := line[0]
-			content := ""
-			if len(line) > 1 {
-				content = line[1:]
-				// Apply Patch lines are " "+content / "-"+content / "+"+content.
-				// If the model omitted the leading space after the marker, keep content as-is.
-			} else {
-				content = ""
-			}
-			switch prefix {
-			case ' ':
-				oldLines = append(oldLines, content)
-				newLines = append(newLines, content)
-			case '-':
-				oldLines = append(oldLines, content)
-				hasChange = true
-			case '+':
-				newLines = append(newLines, content)
-				hasChange = true
-			default:
-				// Treat unmarked lines inside a hunk as context (tolerant of model drift).
-				oldLines = append(oldLines, line)
-				newLines = append(newLines, line)
-			}
-		default:
-			// Ignore stray text before first hunk / file header.
-		}
-	}
-	if err := flush(); err != nil {
-		return nil, err
-	}
-
-	if len(hunks) == 0 {
-		return nil, utils.Error("patch contains no hunks")
-	}
-	return hunks, nil
 }
 
-// ApplyCodePatch applies hunks to fullCode. Every hunk's OldText must match
-// exactly once. Matching order:
-//  1. exact bytes
-//  2. CRLF/CR + trailing whitespace normalization
-//  3. one retry after collapsing over-escaped \\n / \\r\\n → \n / \r\n
-//
-// Replacement text adopts the matched region's line-ending style (LF vs CRLF)
-// so applied hunks do not mix endings inside the file.
-func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
-	result, _, err := ApplyCodePatchWithWarnings(fullCode, hunks)
-	return result, err
+func ClearLoopYaklangDeliveryPatch(loop *reactloops.ReActLoop) {
+	if loop == nil {
+		return
+	}
+	loop.Delete(codeLastDeliveryPatchLoopKey)
 }
 
-// ApplyCodePatchWithWarnings is like ApplyCodePatch but also returns soft warnings
-// (e.g. matched only after collapsing over-escaped newlines).
-func ApplyCodePatchWithWarnings(fullCode string, hunks []CodePatchHunk) (string, []string, error) {
-	if len(hunks) == 0 {
-		return "", nil, utils.Error("no hunks to apply")
+func BuildCodeChangeID(sourceAction, defaultSource string, version int) string {
+	sourceAction = strings.TrimSpace(sourceAction)
+	if sourceAction == "" {
+		sourceAction = strings.TrimSpace(defaultSource)
 	}
-
-	plans := make([]codePatchPlan, 0, len(hunks))
-	var warnings []string
-
-	for i, h := range hunks {
-		oldText := h.OldText
-		newText := h.NewText
-
-		// Pure insertion hunk: OldText empty means insert NewText.
-		// We require at least some OldText for location, except empty-file case.
-		if oldText == "" {
-			if fullCode == "" {
-				plans = append(plans, codePatchPlan{start: 0, end: 0, newText: newText, hunkIdx: i})
-				continue
-			}
-			return "", warnings, utils.Errorf("hunk %d (@@ %s): empty old text — add context/- lines to locate the insert", i+1, h.Header)
-		}
-
-		matches, usedCollapse := findCodeMatchRangesWithEscapeRetry(fullCode, oldText)
-		if usedCollapse {
-			newText = collapseOverEscapedNewlines(newText)
-			warnings = append(warnings, fmt.Sprintf(
-				"hunk %d (@@ %s): matched after collapsing \\\\n/\\\\r\\\\n → \\n/\\r\\n (model over-escaped); prefer copying CURRENT_CODE verbatim next time",
-				i+1, h.Header))
-		}
-		if len(matches) == 0 {
-			return "", warnings, formatOldTextNotFound(i+1, h.Header, oldText)
-		}
-		if len(matches) > 1 {
-			return "", warnings, utils.Errorf("hunk %d (@@ %s): old text matched %d times — enlarge @@ context for uniqueness",
-				i+1, h.Header, len(matches))
-		}
-		match := matches[0]
-		matchedOriginal := fullCode[match.start:match.end]
-		plans = append(plans, codePatchPlan{
-			start:   match.start,
-			end:     match.end,
-			newText: adaptNewTextLineEndings(matchedOriginal, newText),
-			hunkIdx: i,
-		})
+	if sourceAction == "" {
+		sourceAction = defaultYaklangCodeChangeSource
 	}
-
-	// Apply from end to start so earlier offsets stay valid.
-	sort.Slice(plans, func(i, j int) bool { return plans[i].start > plans[j].start })
-	result := fullCode
-	for _, p := range plans {
-		result = result[:p.start] + p.newText + result[p.end:]
+	if version <= 0 {
+		version = 1
 	}
-	return result, warnings, nil
+	return fmt.Sprintf("%s:%d", sourceAction, version)
 }
 
-// ApplyCodePatchFromString parses then applies a patch body onto fullCode.
-func ApplyCodePatchFromString(fullCode, patchBody string) (string, error) {
-	hunks, err := ParseCodePatch(patchBody)
-	if err != nil {
-		return "", err
-	}
-	return ApplyCodePatch(fullCode, hunks)
+func BuildYaklangCodeChangeID(sourceAction string, version int) string {
+	return BuildCodeChangeID(sourceAction, defaultYaklangCodeChangeSource, version)
 }
 
-// SummarizeAppliedPatch returns a short, non-patch summary of applied changes for editor emit.
-func SummarizeAppliedPatch(hunks []CodePatchHunk) string {
-	if len(hunks) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("applied %d patch hunk(s)\n", len(hunks)))
-	for i, h := range hunks {
-		header := h.Header
-		if header == "" {
-			header = "(no @@ header)"
-		}
-		b.WriteString(fmt.Sprintf("--- hunk %d: @@ %s\n", i+1, header))
-		if h.NewText != "" {
-			b.WriteString(utils.ShrinkTextBlock(h.NewText, 200))
-			b.WriteString("\n")
-		}
-	}
-	return strings.TrimRight(b.String(), "\n")
+func BuildSyntaxFlowRuleChangeID(sourceAction string, version int) string {
+	return BuildCodeChangeID(sourceAction, defaultSyntaxFlowRuleChangeSource, version)
 }
 
-func splitPatchLines(s string) []string {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "\n")
-	return strings.Split(s, "\n")
+func BuildCodePatchChangeEvent(path string, patch *CodeDeliveryPatch, version int, sourceAction, reason, defaultSource string) CodeChangeEvent {
+	if patch == nil {
+		return CodeChangeEvent{}
+	}
+	if version <= 0 {
+		version = 1
+	}
+	sourceAction = strings.TrimSpace(sourceAction)
+	meta := patch.Meta
+	return CodeChangeEvent{
+		Op: LoopYaklangCodeEventOpPatch,
+		Code: CodeChangeEventCode{
+			Content:  patch.Fragment,
+			Path:     strings.TrimSpace(path),
+			Summary:  buildLoopYaklangCodeSummary(patch.Fragment),
+			Version:  version,
+			ChangeID: BuildCodeChangeID(sourceAction, defaultSource, version),
+			Patch:    &meta,
+		},
+		Reason:       strings.TrimSpace(reason),
+		SourceAction: sourceAction,
+	}
 }
 
-func joinPatchLines(lines []string) string {
-	if len(lines) == 0 {
-		return ""
+func BuildCodeFullChangeEvent(op, path, content string, version int, sourceAction, reason, defaultSource string) CodeChangeEvent {
+	content = strings.TrimSpace(content)
+	if strings.TrimSpace(op) == "" {
+		op = LoopYaklangCodeEventOpReplace
 	}
-	return strings.Join(lines, "\n")
+	if version <= 0 {
+		version = 1
+	}
+	sourceAction = strings.TrimSpace(sourceAction)
+	return CodeChangeEvent{
+		Op: op,
+		Code: CodeChangeEventCode{
+			Content:  content,
+			Path:     strings.TrimSpace(path),
+			Summary:  buildLoopYaklangCodeSummary(content),
+			Version:  version,
+			ChangeID: BuildCodeChangeID(sourceAction, defaultSource, version),
+		},
+		Reason:       strings.TrimSpace(reason),
+		SourceAction: sourceAction,
+	}
 }
 
-func findAllSubstrings(haystack, needle string) []int {
-	if needle == "" {
-		return nil
-	}
-	var out []int
-	start := 0
-	for {
-		i := strings.Index(haystack[start:], needle)
-		if i < 0 {
-			break
-		}
-		abs := start + i
-		out = append(out, abs)
-		start = abs + 1
-		if start >= len(haystack) {
-			break
-		}
-	}
-	return out
+func BuildYaklangPatchChangeEvent(path string, patch *CodeDeliveryPatch, version int, sourceAction, reason string) CodeChangeEvent {
+	return BuildCodePatchChangeEvent(path, patch, version, sourceAction, reason, defaultYaklangCodeChangeSource)
 }
 
-type codeTextRange struct {
-	start int
-	end   int
+func BuildYaklangFullChangeEvent(op, path, content string, version int, sourceAction, reason string) CodeChangeEvent {
+	return BuildCodeFullChangeEvent(op, path, content, version, sourceAction, reason, defaultYaklangCodeChangeSource)
 }
 
-// findCodeMatchRangesWithEscapeRetry tries normal matching first, then one
-// collapse of over-escaped \\n/\\r\\n. Does NOT expand literal \n into real newlines.
-func findCodeMatchRangesWithEscapeRetry(fullCode, oldText string) (matches []codeTextRange, usedCollapse bool) {
-	matches = findCodeMatchRanges(fullCode, oldText)
-	if len(matches) > 0 {
-		return matches, false
-	}
-	collapsed := collapseOverEscapedNewlines(oldText)
-	if collapsed == oldText {
-		return nil, false
-	}
-	matches = findCodeMatchRanges(fullCode, collapsed)
-	if len(matches) == 0 {
-		return nil, false
-	}
-	return matches, true
+// BuildSyntaxFlowFullChangeEvent builds a full-content syntaxflow_rule_change payload.
+func BuildSyntaxFlowFullChangeEvent(op, path, content string, version int, sourceAction, reason string) CodeChangeEvent {
+	return BuildCodeFullChangeEvent(op, path, content, version, sourceAction, reason, defaultSyntaxFlowRuleChangeSource)
 }
 
-// findCodeMatchRanges first uses exact byte matching. Only when there are no
-// exact matches does it normalize CRLF/CR to LF and ignore trailing spaces/tabs.
-// The normalized offsets are mapped back to the original source so replacements
-// preserve all text outside the matched range.
-func findCodeMatchRanges(fullCode, oldText string) []codeTextRange {
-	exact := findAllSubstrings(fullCode, oldText)
-	if len(exact) > 0 {
-		ranges := make([]codeTextRange, 0, len(exact))
-		for _, start := range exact {
-			ranges = append(ranges, codeTextRange{start: start, end: start + len(oldText)})
-		}
-		return ranges
-	}
-
-	normalizedFull, offsets := normalizeCodeForMatchWithOffsets(fullCode)
-	normalizedOld := normalizeCodeForMatch(oldText)
-	if normalizedOld == "" {
-		return nil
-	}
-	normalizedMatches := findAllSubstrings(normalizedFull, normalizedOld)
-	ranges := make([]codeTextRange, 0, len(normalizedMatches))
-	for _, start := range normalizedMatches {
-		end := start + len(normalizedOld)
-		if start < 0 || end >= len(offsets) {
-			continue
-		}
-		ranges = append(ranges, codeTextRange{start: offsets[start], end: offsets[end]})
-	}
-	return ranges
-}
-
-func normalizeCodeForMatch(s string) string {
-	normalized, _ := normalizeCodeForMatchWithOffsets(s)
-	return normalized
-}
-
-// normalizeCodeForMatchWithOffsets returns normalized code and a boundary map:
-// offsets[i] is the exclusive original end after consuming normalized[:i].
-func normalizeCodeForMatchWithOffsets(s string) (string, []int) {
-	var b strings.Builder
-	// offsets[i] is the exclusive original end after consuming normalized[:i].
-	offsets := []int{0}
-
-	for i := 0; i < len(s); {
-		lineStart := i
-		for i < len(s) && s[i] != '\r' && s[i] != '\n' {
-			i++
-		}
-		lineEnd := i
-		trimmedEnd := lineEnd
-		for trimmedEnd > lineStart && (s[trimmedEnd-1] == ' ' || s[trimmedEnd-1] == '\t') {
-			trimmedEnd--
-		}
-		wroteContent := trimmedEnd > lineStart
-		for j := lineStart; j < trimmedEnd; j++ {
-			b.WriteByte(s[j])
-			offsets = append(offsets, j+1)
-		}
-		// Ending a match at this line's normalized EOL should consume trailing spaces.
-		if wroteContent {
-			offsets[len(offsets)-1] = lineEnd
-		}
-
-		if i >= len(s) {
-			break
-		}
-		if s[i] == '\r' && i+1 < len(s) && s[i+1] == '\n' {
-			i += 2
-		} else {
-			i++
-		}
-		b.WriteByte('\n')
-		offsets = append(offsets, i)
-	}
-
-	return b.String(), offsets
-}
-
-// collapseOverEscapedNewlines turns model over-escapes into source-literal form:
-// "\\r\\n" → "\r\n", "\\n" → "\n", "\\r" → "\r" (character sequences, not real newlines).
-func collapseOverEscapedNewlines(s string) string {
-	if !strings.Contains(s, `\\`) {
-		return s
-	}
-	s = strings.ReplaceAll(s, `\\r\\n`, `\r\n`)
-	s = strings.ReplaceAll(s, `\\n`, `\n`)
-	s = strings.ReplaceAll(s, `\\r`, `\r`)
-	return s
-}
-
-// adaptNewTextLineEndings rewrites structural newlines in newText to match the
-// matched original segment (CRLF vs LF). Literal backslash-n sequences are untouched
-// because they are not U+000A.
-func adaptNewTextLineEndings(matchedOriginal, newText string) string {
-	if newText == "" {
-		return newText
-	}
-	useCRLF := strings.Contains(matchedOriginal, "\r\n")
-	// Normalize any accidental CRLF in newText to LF first.
-	normalized := strings.ReplaceAll(newText, "\r\n", "\n")
-	normalized = strings.ReplaceAll(normalized, "\r", "\n")
-	if !useCRLF {
-		return normalized
-	}
-	return strings.ReplaceAll(normalized, "\n", "\r\n")
-}
-
-func formatOldTextNotFound(hunkIdx int, header, oldText string) error {
-	msg := fmt.Sprintf("hunk %d (@@ %s): old text not found.\nPreview:\n%s",
-		hunkIdx, header, utils.ShrinkTextBlock(oldText, 300))
-	if looksLikeEscapeNoise(oldText) {
-		msg += "\n\n" + codePatchEscapeHint
-	}
-	return utils.Error(msg)
-}
-
-func looksLikeEscapeNoise(s string) bool {
-	// Detect literal backslash-n / backslash-r sequences (common in HTTP mock strings).
-	return strings.Contains(s, `\n`) || strings.Contains(s, `\r`)
-}
-
-type codePatchPlan struct {
-	start, end int
-	newText    string
-	hunkIdx    int
+// BuildSyntaxFlowPatchChangeEvent builds an op=patch syntaxflow_rule_change payload from a delivery patch.
+func BuildSyntaxFlowPatchChangeEvent(path string, patch *CodeDeliveryPatch, version int, sourceAction, reason string) CodeChangeEvent {
+	return BuildCodePatchChangeEvent(path, patch, version, sourceAction, reason, defaultSyntaxFlowRuleChangeSource)
 }
