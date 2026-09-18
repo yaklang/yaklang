@@ -25,7 +25,8 @@ type PreprocessConfig struct {
 
 // DefaultConfig returns sensible defaults for project preprocessing.
 // External include roots come from $YAKIT_HOME/c-headers; when the library is
-// missing, EnsureExternalIncludeDirs may download the official pack from OSS.
+// missing, EnsureExternalIncludeDirs may lazily install "c-std-headers" via
+// thirdparty_bin (bin_cfg.yml).
 func DefaultConfig() PreprocessConfig {
 	return PreprocessConfig{
 		SkipSystemIncludes:  true,

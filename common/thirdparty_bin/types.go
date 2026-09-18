@@ -46,8 +46,9 @@ type BinaryDescriptor struct {
 	Dependencies []string `json:"dependencies,omitempty"`
 	// InstallRoot 覆盖默认安装根目录
 	// 取值 "ai-skills" 安装到 consts.GetDefaultAISkillsDir() (~/yakit-projects/ai-skills/)
+	// 取值 "c-headers" 安装到 consts.GetDefaultCHeadersDir() (~/yakit-projects/c-headers/)
 	// 取值 "libs" 或空字符串安装到默认 libs 目录 (~/yakit-projects/libs/)
-	// 关键词: install_root, ai-skills, libs, 安装根目录覆盖
+	// 关键词: install_root, ai-skills, c-headers, libs, 安装根目录覆盖
 	InstallRoot string `json:"install_root,omitempty"`
 }
 

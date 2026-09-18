@@ -216,3 +216,17 @@ binaries:
         pick: "*"
         bin_dir: "yak-skills"
         bin_path: "yak-skills/version.txt"
+  # c-std-headers: official C header pack for c2ssa preprocess (#include <stdio.h> etc.)
+  # Kept as zip under ~/yakit-projects/c-headers/ so ListCHeaders / OpenExternalRoot can use it as a pack.
+  # Lazy install: c2ssa EnsureExternalIncludeDirs → thirdparty_bin.Install when the dir is empty.
+  # 关键词: c-std-headers, c-headers, c2ssa, install_root, lazy download
+  - name: "c-std-headers"
+    description: "Official C standard / common system headers pack for c2ssa preprocess"
+    tags: "c,headers,c2ssa"
+    version: "latest"
+    install_type: "bin"
+    install_root: "c-headers"
+    download_info_map:
+      "*":
+        url: "/c-headers/latest/c-std-headers.zip"
+        bin_path: "c-std-headers.zip"

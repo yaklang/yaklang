@@ -39,6 +39,13 @@ func TestResolveInstallDir(t *testing.T) {
 		assert.NotEqual(t, defaultDir, got, "ai-skills must not be the libs default")
 	})
 
+	t.Run("install_root=c-headers routes to c-headers dir", func(t *testing.T) {
+		desc := &BinaryDescriptor{Name: "c-std-headers", InstallRoot: "c-headers"}
+		got := bi.resolveInstallDir(desc)
+		assert.Equal(t, consts.GetDefaultCHeadersDir(), got)
+		assert.NotEqual(t, defaultDir, got, "c-headers must not be the libs default")
+	})
+
 	t.Run("unknown install_root falls back with warning", func(t *testing.T) {
 		desc := &BinaryDescriptor{Name: "x", InstallRoot: "no-such-root"}
 		got := bi.resolveInstallDir(desc)

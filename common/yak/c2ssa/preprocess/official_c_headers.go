@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -12,33 +14,22 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const OfficialCHeadersZipName = "c-std-headers.zip"
+const (
+	// OfficialCHeadersName is the thirdparty_bin / bin_cfg.yml registry name.
+	OfficialCHeadersName = "c-std-headers"
+	// OfficialCHeadersZipName is the on-disk pack basename under $YAKIT_HOME/c-headers.
+	OfficialCHeadersZipName = "c-std-headers.zip"
+)
 
 var (
-	officialCHeadersZipURL     = "https://yaklang.oss-accelerate.aliyuncs.com/c-headers/latest/c-std-headers.zip"
-	officialCHeadersVersionURL = "https://yaklang.oss-accelerate.aliyuncs.com/c-headers/latest/version.txt"
-
 	autoDownloadOnce   sync.Once
 	autoDownloadErr    error
 	autoDownloadResult []string
 )
-
-// SetOfficialCHeadersURLs overrides OSS endpoints (tests). Returns a restore func.
-func SetOfficialCHeadersURLs(zipURL, versionURL string) func() {
-	oldZip, oldVer := officialCHeadersZipURL, officialCHeadersVersionURL
-	if strings.TrimSpace(zipURL) != "" {
-		officialCHeadersZipURL = zipURL
-	}
-	if strings.TrimSpace(versionURL) != "" {
-		officialCHeadersVersionURL = versionURL
-	}
-	return func() {
-		officialCHeadersZipURL, officialCHeadersVersionURL = oldZip, oldVer
-	}
-}
 
 // OfficialCHeadersAutoDownloadDisabled reports whether env disables auto fetch.
 func OfficialCHeadersAutoDownloadDisabled() bool {
@@ -46,8 +37,12 @@ func OfficialCHeadersAutoDownloadDisabled() bool {
 	return v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
 }
 
-// OfficialCHeadersPackPath returns $YAKIT_HOME/c-headers/c-std-headers.zip.
+// OfficialCHeadersPackPath returns the expected install path for the official zip.
+// Prefer thirdparty_bin.GetBinaryPath when the pack is already installed.
 func OfficialCHeadersPackPath() (string, error) {
+	if path, err := thirdparty_bin.GetBinaryPath(OfficialCHeadersName); err == nil && path != "" {
+		return path, nil
+	}
 	base := consts.GetDefaultCHeadersDir()
 	abs, err := filepath.Abs(base)
 	if err != nil {
@@ -68,117 +63,59 @@ func HasOfficialCHeadersLibrary() bool {
 	return len(collectCHeaderRoots(consts.GetDefaultCHeadersDir())) > 0
 }
 
-// EnsureOfficialCHeaders downloads the official zip from OSS when missing (or Force).
-// Returns the pack path on success / already present.
+// EnsureOfficialCHeaders lazily installs the official pack via thirdparty_bin
+// (bin_cfg.yml entry "c-std-headers") when missing, or Force-reinstalls.
 func EnsureOfficialCHeaders(ctx context.Context, force bool) (packPath string, version string, err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	dest, err := OfficialCHeadersPackPath()
-	if err != nil {
-		return "", "", err
+	if err := thirdparty_bin.EnsureInitialized(); err != nil {
+		return "", "", utils.Wrap(err, "thirdparty_bin not ready for c-std-headers")
 	}
+
 	if !force {
-		if _, statErr := os.Stat(dest); statErr == nil {
-			return dest, FetchOfficialCHeadersVersion(ctx), nil
+		if p, getErr := thirdparty_bin.GetBinaryPath(OfficialCHeadersName); getErr == nil && p != "" {
+			return p, FetchOfficialCHeadersVersion(ctx), nil
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dest), 0o777); err != nil {
-		return "", "", utils.Wrap(err, "mkdir c-headers")
+	if err := thirdparty_bin.Install(OfficialCHeadersName, &thirdparty_bin.InstallOptions{
+		Context: ctx,
+		Force:   force,
+	}); err != nil {
+		return "", "", utils.Wrap(err, "install official c-headers via thirdparty_bin")
 	}
 
-	tmp := dest + ".download"
-	_ = os.Remove(tmp)
-	if err := downloadOfficialCHeadersZip(ctx, tmp); err != nil {
-		_ = os.Remove(tmp)
-		return "", "", err
+	p, err := thirdparty_bin.GetBinaryPath(OfficialCHeadersName)
+	if err != nil {
+		return "", "", utils.Wrap(err, "resolve installed official c-headers path")
 	}
-	if err := os.RemoveAll(dest); err != nil {
-		_ = os.Remove(tmp)
-		return "", "", utils.Wrap(err, "replace official c-headers pack")
-	}
-	if err := os.Rename(tmp, dest); err != nil {
-		_ = os.Remove(tmp)
-		return "", "", utils.Wrap(err, "install official c-headers pack")
-	}
-	return dest, FetchOfficialCHeadersVersion(ctx), nil
+	return p, FetchOfficialCHeadersVersion(ctx), nil
 }
 
-func downloadOfficialCHeadersZip(ctx context.Context, localFile string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, officialCHeadersZipURL, nil)
-	if err != nil {
-		return utils.Wrapf(err, "build oss download request (%s)", officialCHeadersZipURL)
-	}
-	client := newOfficialCHeadersHTTPClient()
-	rsp, err := client.Do(req)
-	if err != nil {
-		return utils.Wrapf(err, "download official c-headers from oss (%s)", officialCHeadersZipURL)
-	}
-	if rsp == nil || rsp.Body == nil {
-		return utils.Errorf("download official c-headers from oss (%s): empty response", officialCHeadersZipURL)
-	}
-	defer rsp.Body.Close()
-	if rsp.StatusCode < 200 || rsp.StatusCode >= 300 {
-		snip, _ := io.ReadAll(io.LimitReader(rsp.Body, 256))
-		return utils.Errorf(
-			"download official c-headers from oss (%s): unexpected status %d: %s",
-			officialCHeadersZipURL, rsp.StatusCode, strings.TrimSpace(string(snip)),
-		)
-	}
-
-	fp, err := os.OpenFile(localFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o666)
-	if err != nil {
-		return utils.Wrap(err, "create c-headers download temp file")
-	}
-	defer fp.Close()
-
-	n, err := io.Copy(fp, rsp.Body)
-	if err != nil {
-		return utils.Wrapf(err, "download official c-headers from oss (%s)", officialCHeadersZipURL)
-	}
-	if n < 4 {
-		return utils.Errorf("download official c-headers from oss (%s): response too small (%d bytes)", officialCHeadersZipURL, n)
-	}
-	if err := fp.Sync(); err != nil {
-		return utils.Wrap(err, "sync c-headers download temp file")
-	}
-	if _, err := fp.Seek(0, io.SeekStart); err != nil {
-		return utils.Wrap(err, "rewind c-headers download temp file")
-	}
-	var magic [2]byte
-	if _, err := io.ReadFull(fp, magic[:]); err != nil {
-		return utils.Wrapf(err, "read downloaded c-headers magic (%s)", officialCHeadersZipURL)
-	}
-	if magic[0] != 'P' || magic[1] != 'K' {
-		return utils.Errorf("download official c-headers from oss (%s): content is not a zip archive", officialCHeadersZipURL)
-	}
-	return nil
-}
-
-// EnsureExternalIncludeDirs returns c-headers roots; if none exist, tries OSS download once.
-// On network/OSS failure it degrades to an empty include list (project-local headers only)
-// and emits an ERROR log so operators can see the fallback.
+// EnsureExternalIncludeDirs returns c-headers roots; if none exist, lazily downloads
+// once through thirdparty_bin. On failure it degrades to project-local includes only.
 func EnsureExternalIncludeDirs() []string {
 	dir := consts.GetDefaultCHeadersDir()
 	roots := collectCHeaderRoots(dir)
 	if len(roots) > 0 || OfficialCHeadersAutoDownloadDisabled() {
 		return roots
 	}
+	// Unit tests must not hit real OSS / thirdparty_bin install.
+	if utils.InTestcase() {
+		return roots
+	}
 
 	autoDownloadOnce.Do(func() {
-		log.Infof("c-headers library missing under %s; trying OSS download (%s)", dir, OfficialCHeadersZipName)
+		log.Infof("c-headers library missing under %s; lazy-install via thirdparty_bin (%s)", dir, OfficialCHeadersName)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		pack, ver, err := EnsureOfficialCHeaders(ctx, false)
 		if err != nil {
 			autoDownloadErr = err
 			log.Errorf(
-				"official c-headers OSS download failed, degrade to project-local includes only (no $YAKIT_HOME/c-headers): dir=%s url=%s err=%v",
-				dir, officialCHeadersZipURL, err,
+				"official c-headers lazy download failed, degrade to project-local includes only (no $YAKIT_HOME/c-headers): dir=%s name=%s err=%v",
+				dir, OfficialCHeadersName, err,
 			)
 			autoDownloadResult = nil
 			return
@@ -196,7 +133,6 @@ func EnsureExternalIncludeDirs() []string {
 	if len(autoDownloadResult) > 0 {
 		return append([]string(nil), autoDownloadResult...)
 	}
-	// Degraded path: keep whatever is on disk (usually empty) and continue preprocess.
 	return collectCHeaderRoots(dir)
 }
 
@@ -205,22 +141,24 @@ func LastOfficialCHeadersAutoDownloadError() error {
 	return autoDownloadErr
 }
 
-func newOfficialCHeadersHTTPClient() *http.Client {
-	client := utils.NewDefaultHTTPClient()
-	client.Timeout = 10 * time.Minute
-	return client
-}
-
-// FetchOfficialCHeadersVersion reads the remote version.txt (best-effort).
+// FetchOfficialCHeadersVersion reads remote version.txt next to the zip URL (best-effort).
 func FetchOfficialCHeadersVersion(ctx context.Context) string {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, officialCHeadersVersionURL, nil)
+	info, err := thirdparty_bin.GetDownloadInfo(OfficialCHeadersName)
+	if err != nil || info == nil || strings.TrimSpace(info.URL) == "" {
+		return ""
+	}
+	versionURL := siblingVersionURL(info.URL)
+	if versionURL == "" {
+		return ""
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, nil)
 	if err != nil {
 		return ""
 	}
-	client := newOfficialCHeadersHTTPClient()
+	client := utils.NewDefaultHTTPClient()
 	client.Timeout = 15 * time.Second
 	rsp, err := client.Do(req)
 	if err != nil || rsp == nil || rsp.Body == nil {
@@ -235,4 +173,15 @@ func FetchOfficialCHeadersVersion(ctx context.Context) string {
 		return ""
 	}
 	return strings.TrimSpace(string(raw))
+}
+
+func siblingVersionURL(zipURL string) string {
+	u, err := url.Parse(strings.TrimSpace(zipURL))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	u.Path = path.Join(path.Dir(u.Path), "version.txt")
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }
