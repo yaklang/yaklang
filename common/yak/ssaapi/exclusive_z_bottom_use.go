@@ -157,6 +157,16 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			return v.visitUserFallback(actx, opt...)
 		}
 		actx.pushCall(inst)
+		// getRealMethod walks the call stack upwards (peekCall(1) is the call
+		// that invoked the current function) to bind a Parameter/ParameterMember
+		// callee to the function it actually receives at that site. That lookup
+		// is only meaningful while the stack holds the current nest of entered
+		// calls: without a matching pop, every sibling call left its frame
+		// behind, so a later call in the same body saw an unrelated earlier
+		// sibling as its "parent" and bound parameters to the wrong arguments.
+		// Pop on every exit from this call's subtree -- all of them return from
+		// this function -- so the stack mirrors the live nest.
+		defer actx.popCall()
 		//分析的当前值相同，说明进来就是当前值
 		if ValueCompare(v, actx.Self) {
 			log.Debugf("value analysis: (call instruction) caller is self")
