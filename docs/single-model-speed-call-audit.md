@@ -134,8 +134,8 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 | `timeline-batch-compress` | `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge 字段流及成功回调 |
 | `timeline-head-refine` | `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge；失败规则截断 |
 | `toolcall-interval-review` | `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge；保留工具 Emitter、错误和独立 checkpoint |
-| `ai_value_feedback` | 强制 lightweight LiteForge | `ResolveAuxiliaryTask` + 原强制 callback |
-| Speed ReAct Loop | 条件选择 `CallSpeedPriorityAI` | 仅在 `useSpeedPriorityAI=true` 时读取辅助决策参数；普通 Intelligence Loop 不受影响 |
+| `ai_value_feedback` | 强制 lightweight LiteForge | 单模型模式在记录构建前停用；普通模式保留原执行路径 |
+| Speed ReAct Loop | 条件选择 `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge 响应解析/校验回调；普通 Intelligence Loop 不受影响 |
 
 ## 五、已清理的迁移遗留
 
@@ -197,7 +197,7 @@ Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略
 在 AID Go 代码范围内：
 
 - 已列出的 Speed LiteForge 调用（含三个内置 Mini AI Task、目标验收检查）完成迁移；
-- Timeline/Interval Review 已完成 LiteForge 调度迁移；Speed Loop 仍仅接入决策；
+- Timeline/Interval Review 和 Speed Loop 已完成 LiteForge 调度执行迁移；
 - AIVE 在单模型模式直接停用，检查已前移到循环/审批/风险反馈的记录构建之前；普通模式保留现状，不为它增加 caller 覆盖；
 - Quality/Intelligence 调用没有修改；
 - 剩余边界集中在 Crawler、独立 RAG/产品能力和 Yak 脚本的配置传播问题。
@@ -227,3 +227,19 @@ Timeline 内部状态单测按用例注册 reducer 测试桥并在结束时恢�
 - 测试 mock 的自定义记忆响应和 Prompt 校验已接到 Config 调度入口。
 
 本轮验证：aicommon 整包通过（102.203s）；记忆、Mini Task、目标验收、感知、Plan、Intent、知识搜索、HTTP Flow 及代码审计相关定向回归通过；短标识协议及规划解析兼容测试通过。新增用例覆盖跳过时不准备数据、原始错误传播、重排结果和 AIVE 提前停用。未运行全 AID 行为测试。
+
+## 十一、Speed ReAct Loop 执行迁移
+
+仅 `useSpeedPriorityAI=true` 的每轮请求进入 `Config.ScheduleAuxiliaryTask → LiteForgeExecuteCallback → LiteForge`。普通 Loop 仍使用原来的 `CallAITransaction(config, prompt, config.CallAI, postHandler, requestOpts...)`。
+
+新增 `WithAuxiliaryResponseHandler`，提供响应解析/校验回调，不提供模型 caller：
+
+- Loop 提供本轮已生成的完整 Prompt；LiteForge 不再套固定 JSON 模板、追加 Timeline 或替换 nonce。
+- LiteForge 负责模型调用和事务重试；Loop 回调消费原始响应，保留原生 tools/参数流、动作别名、AITAG、字段流、响应留存和 ActionVerifier。
+- 校验失败在事务内部重试，最终成功才触发结果回调；失败和取消通过 OnError 回传。桥接错误保留错误链，支持识别 `context.Canceled`。
+- Config 统一选择 Speed callback（保留 Original fallback），未恢复任何 per-task caller 覆盖。
+- 未新增 `react-loop:*` 的单模型策略，现有未知标签仍为 PassThrough；唯一模型选择和配置设计仍未实施。
+
+新增测试分两层：reactloops 验证调度入口与原有响应协议；aiforge 使用真实 Config/LiteForge 桥运行完整 Loop，覆盖普通、functioncall、单模型 PassThrough、校验重试及任务取消。另有响应回调的 Skip/LiteCall、空 Action 和错误路径测试。
+
+本轮验证：aicommon 整包通过（107.603s），reactloops 整包通过（30.453s），LiteForge/Mini Task/目标验收定向回归通过，`common/ai/aid/...` 和 `common/aiforge` 全部编译通过。整包回归暴露了 4 个仍模拟旧 runtime helper 的感知测试，已将测试桩移到 Config 调度入口，原生产逻辑和断言保持不变。未运行全 AID 行为测试。
