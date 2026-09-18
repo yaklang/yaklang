@@ -28,6 +28,9 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
 	actx.direct = BottomUseAnalysis
+	if actx.widen != nil {
+		defer func() { lastWidenTrace.Store(actx.widen) }()
+	}
 	ret = v.getBottomUses(actx, opt...)
 	if actx.HasUntilNode() {
 		ret = actx.untilMatch
@@ -54,6 +57,26 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if v.IsObject() {
+		// Keyed descent: the trace reached this object because some site read
+		// `v.key`. Resolve that key directly -- with the whole-table walk every
+		// sibling member is traced in turn and each of those traces can re-enter
+		// the object, which is what makes a wide type explode on a large project.
+		obj, key, member := actx.getCurrentObject()
+		if obj != nil && obj.GetId() == v.GetId() {
+			if matched := resolveKeyedMembers(v, key); len(matched) > 0 {
+				for _, m := range matched {
+					if utils.IsNil(m) || ValueCompare(m, member) {
+						continue
+					}
+					if err := actx.pushObject(v, m.GetKey(), m); err != nil {
+						continue
+					}
+					vals = append(vals, m.getBottomUses(actx, opt...)...)
+					actx.popObject()
+				}
+				goto users
+			}
+		}
 		exist := false
 		actx.foreachObjectStack(func(obj *Value, key *Value, val *Value) bool {
 			if obj.GetId() == v.GetId() {
@@ -64,14 +87,20 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		})
 		if !exist {
 			members := v.GetAllMember()
-			actx.traceObjectExpansion(len(members))
+			walked := 0
 			members.ForEach(func(value *Value) {
+				if callableMemberValue(value) {
+					return
+				}
+				walked++
 				_ = actx.pushObject(v, value.GetKey(), value)
 				vals = append(vals, value.getBottomUses(actx, opt...)...)
 				actx.popObject()
 			})
+			actx.traceObjectExpansion(walked)
 		}
 	}
+users:
 	if v.IsMember() {
 		currentObject := v.GetObject()
 		currentKey := v.GetKey()

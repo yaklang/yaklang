@@ -82,6 +82,30 @@ func isCollectionLikeValue(v *Value) bool {
 	return false
 }
 
+// callableMemberValue reports whether an object member is a callable symbol
+// (a method or a function-typed slot) rather than a data field.
+//
+// Such a member is reached as a callee: the call site that reads it passes the
+// owner object in as the receiver, so the value flow the caller is looking for
+// is already carried by the object's own uses. Walking it as if it were a data
+// field makes bottom-use descend every call site of that method, and on a
+// class blueprint that means every method of the class, each pulling in its
+// own caller set -- the dominant source of the observed fan-out.
+func callableMemberValue(v *Value) bool {
+	if utils.IsNil(v) {
+		return false
+	}
+	if v.IsFunction() || v.IsMethod() {
+		return true
+	}
+	typ := v.GetType()
+	if utils.IsNil(typ) {
+		return false
+	}
+	_, ok := ssa.ToFunctionType(GetBareType(typ))
+	return ok
+}
+
 // constKeyText returns the plain string content of a constant key. Member keys
 // are rendered with surrounding quotes by the generic key accessors, which
 // would defeat prefix comparison, so the constant content is read directly.
@@ -181,6 +205,9 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = i
 	actx.direct = TopDefAnalysis
+	if actx.widen != nil {
+		defer func() { lastWidenTrace.Store(actx.widen) }()
+	}
 	ret = i.getTopDefs(actx, opt...)
 	if actx.HasUntilNode() {
 		ret = actx.untilMatch
