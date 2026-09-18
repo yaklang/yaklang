@@ -232,33 +232,36 @@ func generateDirectPlanFromUserInput(loop *reactloops.ReActLoop, task aicommon.A
 		ctx = task.GetContext()
 	}
 
-	userInput := ""
-	if task != nil {
-		userInput = task.GetUserInput()
-	}
-
-	templateData := loop.GetBaseFrameContext()
-	templateData["UserInput"] = userInput
-	templateData["Facts"] = loop.Get(PLAN_FACTS_KEY)
-	templateData["Context"] = getLoopTaskContext(loop)
-
-	prompt, err := utils.RenderTemplate(planDirectPrompt, templateData)
-	if err != nil {
-		log.Warnf("plan loop: render plan_direct prompt failed: %v", err)
-		return ""
-	}
-
 	taskIndex := ""
 	if task != nil {
 		taskIndex = task.GetId()
 	}
 
-	var action *aicommon.Action
+	result := ""
 	invoker.GetConfig().ScheduleAuxiliaryTask(
 		ctx,
 		aicommon.CallerLabelPlanDirect,
-		func() string { return prompt },
-		func(result *aicommon.Action) { action = result },
+		func() string {
+			userInput := ""
+			if task != nil {
+				userInput = task.GetUserInput()
+			}
+
+			templateData := loop.GetBaseFrameContext()
+			templateData["UserInput"] = userInput
+			templateData["Facts"] = loop.Get(PLAN_FACTS_KEY)
+			templateData["Context"] = getLoopTaskContext(loop)
+
+			prompt, err := utils.RenderTemplate(planDirectPrompt, templateData)
+			if err != nil {
+				log.Warnf("plan loop: render plan_direct prompt failed: %v", err)
+				return ""
+			}
+
+			return prompt
+		},
+		func(action *aicommon.Action) { result = buildPlanDataFromLiteForgeAction(action, "direct plan") },
+		aicommon.WithAuxiliaryOnError(func(err error) { log.Warnf("plan loop: generate direct plan failed: %v", err) }),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithStringParam("main_task", aitool.WithParam_Required(true)),
 			aitool.WithStringParam("main_task_identifier"),
@@ -300,11 +303,7 @@ func generateDirectPlanFromUserInput(loop *reactloops.ReActLoop, task aicommon.A
 			),
 		),
 	)
-	if action == nil {
-		log.Warn("plan loop: generate direct plan auxiliary task returned no result")
-		return ""
-	}
-	return buildPlanDataFromLiteForgeAction(action, "direct plan")
+	return result
 }
 
 func serializeTaskParams(tasks []aitool.InvokeParams) []map[string]any {

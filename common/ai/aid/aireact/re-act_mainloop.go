@@ -547,38 +547,35 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 			liteForgeCtx, cancel := context.WithTimeout(cfg.GetContext(), 10*time.Second)
 			defer cancel()
 
-			prompt, err := r.promptManager.GenerateRequireConversationTitlePrompt(r.DumpTimeline(), trimmedInput)
-			if err != nil {
-				log.Warnf("generate semantic folder name prompt failed: %v", err)
-				return
-			}
-
 			toolOptions := []aitool.ToolOption{
 				aitool.WithStringParam("folder_name", aitool.WithParam_Description("Short filesystem-safe folder name in snake_case English, describing the task purpose, e.g. sql_injection_scan, http_flow_analysis"), aitool.WithParam_MaxLength(30), aitool.WithParam_Required(true)),
 			}
 			if shouldTrySessionTitle {
 				toolOptions = append(toolOptions, aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title for display"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)))
 			}
-			var action *aicommon.Action
 			cfg.ScheduleAuxiliaryTask(liteForgeCtx,
 				aicommon.CallerLabelSessionInitGenerator,
-				func() string { return prompt },
-				func(result *aicommon.Action) { action = result },
+				func() string {
+					prompt, err := r.promptManager.GenerateRequireConversationTitlePrompt(r.DumpTimeline(), trimmedInput)
+					if err != nil {
+						log.Warnf("generate semantic folder name prompt failed: %v", err)
+						return ""
+					}
+					return prompt
+				},
+				func(action *aicommon.Action) {
+					if fn := strings.TrimSpace(action.GetString("folder_name")); fn != "" {
+						folderName = sanitizeFolderName(fn, 30)
+					}
+					if shouldTrySessionTitle {
+						if st := strings.TrimSpace(action.GetString("session_title")); st != "" {
+							sessionTitle = st
+						}
+					}
+				},
+				aicommon.WithAuxiliaryOnError(func(err error) { log.Warnf("generate semantic folder name failed: %v", err) }),
 				aicommon.WithAuxiliaryOutputs(toolOptions...),
 			)
-			if action == nil {
-				log.Warn("generate semantic folder name auxiliary task returned no result")
-				return
-			}
-
-			if fn := strings.TrimSpace(action.GetString("folder_name")); fn != "" {
-				folderName = sanitizeFolderName(fn, 30)
-			}
-			if shouldTrySessionTitle {
-				if st := strings.TrimSpace(action.GetString("session_title")); st != "" {
-					sessionTitle = st
-				}
-			}
 		}()
 	}
 
@@ -675,45 +672,41 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 			}
 		}()
 
-		prompt, err := r.promptManager.GenerateRequireConversationTitlePrompt(r.DumpTimeline(), trimmedInput)
-		if err != nil {
-			log.Errorf("generate session title prompt failed: %v", err)
-			return
-		}
-
-		log.Info("start to handle session-title-generator,  using speed-priority LiteForge for session title generation")
-		var action *aicommon.Action
 		cfg.ScheduleAuxiliaryTask(cfg.GetContext(),
 			aicommon.CallerLabelSessionTitleGenerator,
-			func() string { return prompt },
-			func(result *aicommon.Action) { action = result },
+			func() string {
+				prompt, err := r.promptManager.GenerateRequireConversationTitlePrompt(r.DumpTimeline(), trimmedInput)
+				if err != nil {
+					log.Errorf("generate session title prompt failed: %v", err)
+					return ""
+				}
+				return prompt
+			},
+			func(action *aicommon.Action) {
+				sessionTitle := strings.TrimSpace(action.GetString("session_title"))
+				if sessionTitle == "" {
+					return
+				}
+
+				if r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
+					updated, err := yakit.InitAISessionTitleIfNeeded(cfg.GetDB(), r.config.PersistentSessionId, sessionTitle)
+					if err != nil {
+						log.Warnf("init ai session title failed: %v", err)
+						return
+					}
+					if !updated {
+						return
+					}
+				}
+				cfg.SetConfig("session_title", sessionTitle)
+				r.config.SetSessionTitle(sessionTitle)
+				r.Emitter.EmitSessionTitle(sessionTitle)
+			},
+			aicommon.WithAuxiliaryOnError(func(err error) { log.Warnf("generate session title failed: %v", err) }),
 			aicommon.WithAuxiliaryOutputs(
 				aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
 			),
 		)
-		if action == nil {
-			log.Warn("generate session title auxiliary task returned no result")
-			return
-		}
-
-		sessionTitle := strings.TrimSpace(action.GetString("session_title"))
-		if sessionTitle == "" {
-			return
-		}
-
-		if r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
-			updated, err := yakit.InitAISessionTitleIfNeeded(cfg.GetDB(), r.config.PersistentSessionId, sessionTitle)
-			if err != nil {
-				log.Warnf("init ai session title failed: %v", err)
-				return
-			}
-			if !updated {
-				return
-			}
-		}
-		cfg.SetConfig("session_title", sessionTitle)
-		r.config.SetSessionTitle(sessionTitle)
-		r.Emitter.EmitSessionTitle(sessionTitle)
 	}()
 }
 
