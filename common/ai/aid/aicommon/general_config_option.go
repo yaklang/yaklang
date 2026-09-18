@@ -48,6 +48,18 @@ func WithLiteForgeDisableTimeline() GeneralKVConfigOption {
 	}
 }
 
+// WithLiteForgeMaxPromptTokens bounds the fully rendered LiteForge prompt.
+// Zero preserves the existing unlimited behavior.
+func WithLiteForgeMaxPromptTokens(limit int) GeneralKVConfigOption {
+	return func(c *GeneralKVConfig) { c.config.Set("liteForgeMaxPromptTokens", limit) }
+}
+
+func (g *GeneralKVConfig) GetLiteForgeMaxPromptTokens() int {
+	value, _ := g.config.Get("liteForgeMaxPromptTokens")
+	limit, _ := value.(int)
+	return limit
+}
+
 // StreamableFieldCallback is a callback function that handles streaming field data during LiteForge execution.
 // key: the field key that matches one of the monitored fields
 // r: io.Reader containing the streaming data for that field
@@ -57,10 +69,25 @@ type StreamableFieldCallback func(key string, r io.Reader)
 // receives the emitter that has already been bound to the current AI response.
 type StreamableFieldEmitterCallback func(key string, r io.Reader, emitter *Emitter)
 
+// StreamableFieldResponseCallback receives the field's raw JSON stream and the
+// current response, including its task index. emitter is response-bound.
+// The callback must consume the reader or hand it to an asynchronous consumer.
+type StreamableFieldResponseCallback func(key string, r io.Reader, response *AIResponse, emitter *Emitter)
+
 // StreamableFieldCallbackItem stores the field keys and callback pair
 type StreamableFieldCallbackItem struct {
-	FieldKeys []string
-	Callback  StreamableFieldEmitterCallback
+	FieldKeys        []string
+	Callback         StreamableFieldEmitterCallback
+	ResponseCallback StreamableFieldResponseCallback
+}
+
+func WithGeneralConfigStreamableFieldResponseCallback(fieldKeys []string, callback StreamableFieldResponseCallback) GeneralKVConfigOption {
+	return func(c *GeneralKVConfig) {
+		callbacks := c.GetStreamableFieldCallbacks()
+		c.config.Set("streamFieldCallbacks", append(callbacks, &StreamableFieldCallbackItem{
+			FieldKeys: fieldKeys, ResponseCallback: callback,
+		}))
+	}
 }
 
 // WithGeneralConfigStreamableFieldCallback registers a callback for streaming field data during LiteForge execution.

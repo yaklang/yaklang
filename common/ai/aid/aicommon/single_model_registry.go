@@ -32,6 +32,10 @@ func initSingleModelRegistry() {
 	// ===== Skip (non-critical auxiliary: skip with fallback) =====
 	// Pure display / evaluation — skipping only loses cosmetic output.
 	register(CallerLabelToolCallReason, SingleModelSkip)
+	register(CallerLabelToolCallIntervalReview, SingleModelSkip)
+	register(CallerLabelAIValueFeedback, SingleModelSkip)
+	register(CallerLabelI18nTranslation, SingleModelSkip)
+	register(CallerLabelTaskShortID, SingleModelSkip)
 	register(CallerLabelSmartEvaluation, SingleModelSkip)
 	register(CallerLabelInsufficientReasonAnalysis, SingleModelSkip)
 
@@ -54,7 +58,6 @@ func initSingleModelRegistry() {
 	register(CallerLabelKnowledgeCompressBench, SingleModelLiteCall)
 	register(CallerLabelSelectKnowledgeBase, SingleModelLiteCall)
 	register(CallerLabelEvaluateNextSearch, SingleModelLiteCall)
-	register(CallerLabelEvaluateInternetResearchNext, SingleModelLiteCall)
 	register(CallerLabelPlanFactsHook, SingleModelLiteCall)
 	register(CallerLabelPlanDirect, SingleModelLiteCall)
 	register(CallerLabelCapabilityCatalogMatch, SingleModelLiteCall)
@@ -62,7 +65,6 @@ func initSingleModelRegistry() {
 	register(CallerLabelExtractRankedLines, SingleModelLiteCall)
 	register(CallerLabelHttpFuzztestInitBootstrap, SingleModelLiteCall)
 	register(CallerLabelScanPlan, SingleModelLiteCall)
-	register(CallerLabelSubReactAgentGoalElaboration, SingleModelLiteCall)
 	register(CallerLabelLLMRerank, SingleModelLiteCall)
 	register(CallerLabelTimelineBatchCompress, SingleModelLiteCall)
 	register(CallerLabelTimelineHeadRefine, SingleModelLiteCall)
@@ -70,8 +72,6 @@ func initSingleModelRegistry() {
 
 	// ===== PassThrough (explicitly registered for audit) =====
 	register(CallerLabelHttpFlowAnalyzeFinalizeSummary, SingleModelPassThrough)
-	register(CallerLabelPlanFromDocument, SingleModelPassThrough)
-	register(CallerLabelPlanGuidanceDocument, SingleModelPassThrough)
 	register(CallerLabelSkillConflictResolver, SingleModelPassThrough)
 }
 
@@ -83,8 +83,8 @@ func ensureSingleModelRegistry() {
 // GetSingleModelAction returns the single-model-mode action for the given
 // CallerLabel. If the label is not in the registry, the default is PassThrough
 // (i.e. unregistered tasks are called normally, matching current behavior).
-// Config.ScheduleAuxiliaryTask consults this registry only when single-model
-// mode is enabled.
+// Config.ResolveAuxiliaryTask consults this registry only when single-model
+// mode is enabled; both LiteForge and direct Speed calls share that decision.
 func GetSingleModelAction(name string) SingleModelAction {
 	ensureSingleModelRegistry()
 	if action, ok := singleModelRegistry[name]; ok {

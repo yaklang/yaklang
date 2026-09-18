@@ -23,11 +23,13 @@ type LiteForgeExecuteCallback func(prompt string, opts ...any) (*ForgeResult, er
 // It lives in aicommon so Config can request a LiteForge execution without
 // importing aiforge (which already imports aicommon).
 type LiteForgeInvokeRequest struct {
-	Context    context.Context
-	ActionName string
-	Outputs    []aitool.ToolOption
-	Options    []GeneralKVConfigOption
-	Emitter    *Emitter
+	Context          context.Context
+	ActionName       string
+	OutputActionName string
+	OutputSchema     string
+	Outputs          []aitool.ToolOption
+	Options          []GeneralKVConfigOption
+	Emitter          *Emitter
 }
 
 var liteforgeExecuteFunc LiteForgeExecuteCallback

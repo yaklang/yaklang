@@ -332,17 +332,26 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		}
 		cfg.id = req.ActionName
 		cfg.action = req.ActionName
+		if req.OutputActionName != "" {
+			cfg.action = req.OutputActionName
+		}
 		rawOutputs := make([]any, 0, len(req.Outputs))
 		for _, output := range req.Outputs {
 			rawOutputs = append(rawOutputs, output)
 		}
-		cfg.output = aitool.NewObjectSchemaWithActionName(req.ActionName, rawOutputs...)
+		cfg.output = aitool.NewObjectSchemaWithActionName(cfg.action, rawOutputs...)
+		if req.OutputSchema != "" {
+			cfg.output = req.OutputSchema
+		}
 	}
 
 	// When cfg.output is set via LiteForgeExecOption, validate the schema here.
 	// When schema is passed via aicommon.ConfigOption (in cfg.aidOptions), skip validation here
 	// and let ExecuteEx handle it - it will extract schema from coordinator's config.
-	if cfg.output != "" {
+	// Typed invocations supply their output action explicitly and may use enum
+	// rather than const (e.g. interval-toolcall-review). ExecuteEx passes that
+	// action name to the streaming parser for response validation.
+	if cfg.output != "" && cfg.invokeRequest == nil {
 		if ret := utils.InterfaceToString(jsonpath.FindFirst(cfg.output, "$..properties..const")); ret != cfg.action {
 			return nil, utils.Errorf("jsonschema output must have '@action' - const value '%s', lite: ..."+`.."@action": {"const": "`+cfg.action+`"}`+"..., found: %v, expect: %v", cfg.action, ret, cfg.action)
 		}
@@ -364,6 +373,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	}
 	if req := cfg.invokeRequest; req != nil {
 		gconfig := aicommon.NewGeneralKVConfig(req.Options...)
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_MaxPromptTokens(gconfig.GetLiteForgeMaxPromptTokens()))
 		// Typed Config invocations put the task prompt in LiteForge's dynamic
 		// context segment, matching the ReAct invocation path without duplicating
 		// it again as an ExecParamItem.
@@ -383,6 +393,9 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 					item.FieldKeys,
 					FieldStreamEmitterCallback(item.Callback),
 				))
+			}
+			if item != nil && item.ResponseCallback != nil {
+				liteForgeOpts = append(liteForgeOpts, WithLiteForge_FieldStreamResponseCallback(item.FieldKeys, item.ResponseCallback))
 			}
 		}
 		if extraRequestOpts := gconfig.GetExtraRequestOpts(); len(extraRequestOpts) > 0 {
