@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,23 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+func TestTomcatFalsePositiveRuleFixes(t *testing.T) {
+	files := []string{
+		filepath.Join("..", "general", "cwe-798-hardcoded-credentials", "general-hardcode-credentials.sf"),
+		filepath.Join("..", "java", "cwe-259-use-of-hard-coded-password", "java-weak-passwords-in-code.sf"),
+		filepath.Join("..", "java", "cwe-89-sql-injection", "java-execute-query-string-add-out-of-control.sf"),
+	}
+	for _, f := range files {
+		f := f
+		t.Run(filepath.Base(f), func(t *testing.T) {
+			raw, err := os.ReadFile(f)
+			require.NoError(t, err)
+			err = ssatest.EvaluateVerifyFilesystem(string(raw), t, true)
+			require.NoError(t, err)
+		})
+	}
+}
 
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
