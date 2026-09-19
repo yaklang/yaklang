@@ -12,6 +12,16 @@ import (
 )
 
 var builtinBinSpecs = [][2]string{
+	{"session_envelopes", "TPKT"},
+	{"session_envelopes", "UATCP"},
+	{"session_envelopes", "RFB"},
+	{"application-layer.extended_protocols", "Diameter"},
+	{"application-layer.extended_protocols", "IEC104"},
+	{"rtsp_session", "RTSP"},
+	{"rtsp_session", "Interleaved"},
+	{"stun_session", "STUN"},
+	{"tftp", "TFTP"},
+	{"stun_session", "ChannelData"},
 	{"application-layer.mysql_fields", "MySQLTextResultSetDeprecatedTrackFields"},
 	{"application-layer.mysql_fields", "MySQLGreetingFields"},
 	{"application-layer.mysql_fields", "MySQLHandshakeResponse41Fields"},
@@ -139,15 +149,15 @@ func (f *binFlow) detect(w []byte) {
 					return
 				}
 				boundary := bytes.IndexByte(rest, ' ')
-				if boundary < 0 && (rest[0] == '*' || rest[0] == 's' || rest[0] == 'S') {
+				if boundary < 0 && (rest[0] == '*' || rest[0] == 's' || rest[0] == 'S' || rest[0] == 'r' || rest[0] == 'R') {
 					return
 				}
 				if boundary >= 0 {
 					version := rest[boundary+1:]
-					if bytes.HasPrefix(version, []byte("SIP/2.0")) {
+					if bytes.HasPrefix(version, []byte("SIP/2.0")) || bytes.HasPrefix(version, []byte("RTSP/")) {
 						break
 					}
-					if bytes.HasPrefix([]byte("SIP/2.0"), version) {
+					if bytes.HasPrefix([]byte("SIP/2.0"), version) || bytes.HasPrefix([]byte("RTSP/1.0"), version) {
 						return
 					}
 				}

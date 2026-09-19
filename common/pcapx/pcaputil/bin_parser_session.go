@@ -29,6 +29,20 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		}
 	}
 	switch p.Protocol {
+	case "vnc":
+		f.protocol, f.rfb = "vnc", &binRFB{server: dir, phase: "server-version"}
+	case "diameter":
+		f.protocol, f.diameter = "diameter", &binDiameter{}
+	case "iec104":
+		f.protocol, f.iec104 = "iec104", &binIEC104{}
+	case "s7comm":
+		f.protocol, f.s7 = "s7comm", &binS7{}
+	case "opcua":
+		f.protocol, f.opcua = "opcua", &binOPCUA{}
+	case "rtsp":
+		f.protocol, f.rtsp = "rtsp", &binRTSP{}
+	case "stun":
+		f.protocol, f.stun = "stun", &binSTUN{}
 	case "http2":
 		f.protocol, f.h2 = "http2", newBinHTTP2(dir)
 	case "mysql":
@@ -105,8 +119,30 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
 	switch f.protocol {
+	case "vnc":
+		e.Session, err = f.rfb.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+	case "diameter":
+		e.Session, err = f.diameter.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+	case "iec104":
+		e.Session, err = f.iec104.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+	case "s7comm":
+		e.Session, err = f.s7.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+	case "opcua":
+		e.Session, err = f.opcua.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
+	case "rtsp":
+		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
+	case "stun":
+		e.Session, err = f.stun.consume(dir, e.Timestamp, e.Raw, f.a.budget.MaxCollectionElements, true)
+		if e.Session != nil && e.Session["TURN"] == true {
+			e.Protocol = "turn"
+		}
 	case "http":
-		e.Session, err = f.consumeDoHHTTP1(e.Raw)
+		if e.ipp {
+			e.Session, err = f.consumeIPPHTTP(dir, e.Raw)
+			e.Protocol = "ipp"
+		} else {
+			e.Session, err = f.consumeDoHHTTP1(e.Raw)
+		}
 	case "http2":
 		var previous *binH2Stream
 		if len(e.Raw) >= 9 && !bytes.HasPrefix(e.Raw, []byte(binH2Preface)) {
@@ -306,6 +342,9 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.stun, f.tftp, f.rtsp, f.ipp = nil, nil, nil, nil
+	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
+	f.rfb = nil
 	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp, f.tns, f.radius, f.dhcp, f.ntp, f.coap, f.modbus = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
@@ -475,6 +514,14 @@ func cloneSessionValue(v any) any {
 			out[i] = cloneSessionValue(v).(map[string]any)
 		}
 		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, v := range x {
+			out[i] = cloneSessionValue(v)
+		}
+		return out
+	case []int32:
+		return append([]int32(nil), x...)
 	case []string:
 		return append([]string(nil), x...)
 	case []byte:
@@ -512,6 +559,14 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 			n += sessionSnapshotSize(v, byteCapacity)
 		}
 		return n
+	case []any:
+		n := 24 + len(x)*16
+		for _, v := range x {
+			n += sessionSnapshotSize(v, byteCapacity)
+		}
+		return n
+	case []int32:
+		return 24 + len(x)*4
 	case []string:
 		n := 24 + len(x)*16
 		for _, v := range x {
