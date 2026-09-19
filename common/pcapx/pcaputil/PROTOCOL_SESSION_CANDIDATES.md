@@ -1,4 +1,9 @@
-# Next 10 live protocol session candidates — 2026-09-18
+# Protocol session candidate history — 2026-09-18
+
+**Update 2026-09-19:** All ten below now have bounded initial session profiles.
+See [round 5](PROTOCOL_SESSION_ROUND5.md) for actual capture replay, fields,
+security/compression boundaries and remaining gaps. The list below records the
+original proposal; it is no longer a list of unimplemented handlers.
 
 SMTP, IMAP, POP3, FTP, TNS, RADIUS, DHCP, NTP, CoAP and Modbus already have
 bounded session profiles. Their coverage and gaps are recorded in

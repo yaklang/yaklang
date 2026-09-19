@@ -207,7 +207,13 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			f.httpMethods = append(f.httpMethods, h.method)
 			f.httpUpgrades = append(f.httpUpgrades, h.websocket)
 			f.httpDoH = append(f.httpDoH, h.doh)
-			f.httpIPP = append(f.httpIPP, h.ipp)
+			// Allocate the sparse IPP marker queue only after an IPP request.
+			if h.ipp || len(f.httpIPP) > 0 {
+				for len(f.httpIPP) < len(f.httpMethods)-1 {
+					f.httpIPP = append(f.httpIPP, false)
+				}
+				f.httpIPP = append(f.httpIPP, h.ipp)
+			}
 		}
 	}
 	if h.closeDelimited {

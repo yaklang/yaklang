@@ -6,11 +6,17 @@ import (
 	"math"
 )
 
+type iecCommandKey struct {
+	dir    int
+	kind   byte
+	common uint16
+	ioa    uint32
+}
 type binIEC104 struct {
+	commands map[iecCommandKey]string
 	seen     [2]bool
 	next     [2]uint16
 	active   bool
-	uPending [2]map[byte]bool
 	uPending [2]map[byte]bool
 }
 
@@ -54,7 +60,7 @@ func iecControl(c []byte) bool {
 	return false
 }
 func (f *binFlow) frameIEC104(w []byte) (int, *binSpec, error) {
-	if err := f.reserveSession(128); err != nil {
+	if err := f.reserveSession(768 + int64(len(f.iec104.commands)+1)*96); err != nil {
 		return 0, nil, err
 	}
 	if len(w) < 2 {
@@ -121,7 +127,18 @@ func iecObjects(a []byte, max int) (map[string]any, error) {
 			o["Value"] = int16(binary.LittleEndian.Uint16(v))
 			o["Quality"] = v[2]
 		case 13, 36:
-			o["Value"] = math.Float32frombits(binary.LittleEndian.Uint32(v))
+			bits := binary.LittleEndian.Uint32(v)
+			value := math.Float32frombits(bits)
+			o["IEEE754 Bits"] = bits
+			if math.IsNaN(float64(value)) {
+				o["Value"] = "NaN"
+			} else if math.IsInf(float64(value), 1) {
+				o["Value"] = "+Inf"
+			} else if math.IsInf(float64(value), -1) {
+				o["Value"] = "-Inf"
+			} else {
+				o["Value"] = value
+			}
 			o["Quality"] = v[4]
 		case 45, 46, 47, 58, 59, 60:
 			o["Command"] = v[0] & 3
@@ -171,6 +188,31 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 		} else if w[8]&63 == 7 || w[8]&63 == 9 || w[8]&63 == 10 {
 			out["Role"] = "response"
 		}
+		// Transport N(R) acknowledges byte-stream delivery, not an ASDU command.
+		// Match activation confirmations by direction/type/common address/IOA.
+		if s.commands == nil {
+			s.commands = map[iecCommandKey]string{}
+		}
+		if w[6] >= 45 && len(w) >= 15 {
+			cot := w[8] & 63
+			key := iecCommandKey{dir, w[6], binary.LittleEndian.Uint16(w[10:]), uint32(w[12]) | uint32(w[13])<<8 | uint32(w[14])<<16}
+			if cot == 6 || cot == 8 {
+				if _, exists := s.commands[key]; !exists && len(s.commands) >= max {
+					return nil, protocolError(ErrResourceExceeded, "IEC104 outstanding commands")
+				}
+				s.commands[key] = iec104TypeName(w[6])
+			} else if cot == 7 || cot == 9 || cot == 10 {
+				key.dir = 1 - dir
+				name, ok := s.commands[key]
+				out["Matched"] = ok
+				if ok {
+					out["In Reply To"] = name
+					if cot == 9 || cot == 10 || w[8]&64 != 0 {
+						delete(s.commands, key)
+					}
+				}
+			}
+		}
 		if s.seen[dir] && seq != s.next[dir] {
 			out["Sequence Gap"] = true
 			out["Expected Sequence"] = s.next[dir]
@@ -197,6 +239,9 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 				s.uPending = [2]map[byte]bool{{}, {}}
 			}
 			if c[0] == 7 || c[0] == 19 || c[0] == 67 {
+				if !s.uPending[dir][c[0]] && len(s.uPending[0])+len(s.uPending[1]) >= max {
+					return nil, protocolError(ErrResourceExceeded, "IEC104 U requests")
+				}
 				s.uPending[dir][c[0]] = true
 				out["Role"] = "request"
 			} else {

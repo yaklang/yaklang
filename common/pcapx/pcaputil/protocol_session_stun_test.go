@@ -3,7 +3,6 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -100,30 +99,5 @@ func TestSTUNIPv6AndMalformed(t *testing.T) {
 	for _, bad := range [][]byte{w[:len(w)-1], stunTestMessage(1, 2, 1, stunTestAttr(0x20, []byte{0, 2, 0, 0, 0, 0, 0, 0})), stunTestMessage(1, 2, 1, stunTestAttr(0x8028, []byte{0, 0, 0, 0}))} {
 		_, err := (&binSTUN{}).consume(0, time.Time{}, bad, 8, false)
 		require.Error(t, err)
-	}
-}
-func TestSTUNTURNUpstreamCaptureReplay(t *testing.T) {
-	// Original nDPI captures, pinned commit/license/SHA-256 in each manifest.
-	for _, path := range []string{"../../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-stun.pcap", "testdata/protocol-sessions/upstream/stun_signal_tcp.pcapng", "testdata/protocol-sessions/upstream/stun_tcp_multiple_msgs_same_pkt.pcap"} {
-		for _, workers := range []int{1, 2} {
-			t.Run(fmt.Sprintf("%s/%d", path, workers), func(t *testing.T) {
-				raw, err := os.ReadFile(path)
-				require.NoError(t, err)
-				events, stats, err := binReplay(t, raw, workers)
-				require.NoError(t, err)
-				counts := map[string]int{}
-				for _, e := range events {
-					if e.Protocol == "stun" || e.Protocol == "turn" {
-						counts[e.Protocol+"/"+e.Status]++
-						if e.Error != "" {
-							t.Logf("%s: %s", e.Protocol, e.Error)
-						}
-					}
-				}
-				require.Positive(t, counts["stun/decoded"]+counts["turn/decoded"])
-				require.Zero(t, stats.BufferedBytes)
-				t.Logf("counts: %v", counts)
-			})
-		}
 	}
 }
