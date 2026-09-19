@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -52,14 +53,22 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 // metrics, aggregate success) or an error. A run whose useful stages succeeded
 // returns a result with Succeeded=true even when a sibling stage failed, so
 // callers render the outcome instead of re-deriving success from job state.
-func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, error) {
+func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectResult, err error) {
 	cfg := &Config{ScanTaskCallback: &ScanTaskCallback{}}
-	var err error
 	cfg.Config, err = ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
 		return ProjectResult{}, err
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
+	// The project owns one report across source, compile-time struct and SSA
+	// scans. A nested StartScan must not close it after its individual stage.
+	if cfg.Reporter != nil {
+		defer func() {
+			if saveErr := cfg.Reporter.Save(); saveErr != nil {
+				err = errors.Join(err, fmt.Errorf("save project report: %w", saveErr))
+			}
+		}()
+	}
 	cfg.SetSyntaxFlowResultSaveMemory()
 	if cfg.SyntaxFlow != nil {
 		cfg.SyntaxFlow.Memory = true
@@ -122,6 +131,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	userResultCallback := cfg.resultCallback
 	cfg.resultCallback = func(result *ScanResult) {
 		if result != nil && result.Result != nil {
+			if cfg.Reporter != nil {
+				cfg.Reporter.AddSyntaxFlowResult(result.Result)
+			}
 			stage := resultModeStage(result)
 			if rule := result.Result.GetRule(); rule != nil {
 				recorder.addRule(stage, rule.RuleName)
@@ -895,9 +907,6 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	}
 	if cfg.pauseCheck != nil {
 		opts = append(opts, WithPauseFunc(cfg.pauseCheck))
-	}
-	if cfg.Reporter != nil {
-		opts = append(opts, WithReporter(cfg.Reporter))
 	}
 	if cfg.GetScanIgnoreLanguage() {
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(true))
