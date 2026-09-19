@@ -122,6 +122,16 @@ func CompileRule(rule string) (*SFFrame, error) {
 	return frame, err
 }
 
+// LoadCompiled creates an independent execution frame from code compiled in
+// this process. Only code and rule metadata are shared; variables, callbacks,
+// context and evaluation stacks belong to the receiving VM.
+func (s *SyntaxFlowVirtualMachine) LoadCompiled(compiled *SFFrame) *SFFrame {
+	frame := newSfFrameEx(s.vars, compiled.Text, compiled.Codes, compiled.rule, s.config)
+	frame.vm = s
+	s.frames = append(s.frames, frame)
+	return frame
+}
+
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")

@@ -19,6 +19,13 @@ cleanup_ssa_test_home() {
 trap cleanup_ssa_test_home EXIT INT TERM
 
 echo "Use isolated YAKIT_HOME: ${YAKIT_HOME}"
+# Optional Go test arguments allow focused regression checks through the same
+# runner. With no arguments the complete SSA suite below remains the default.
+if [ "$#" -gt 0 ]; then
+  go test "$@"
+  exit $?
+fi
+
 go run ./common/yak/cmd sync-rule
 
 # Optional go test arguments allow focused regressions through the same setup.

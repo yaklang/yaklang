@@ -270,11 +270,13 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 }
 
 func NewTmpProgram(name string) *Program {
+	// Source hits create temporary programs even for individual constants.
+	// They do not need an audit-node cache: each TTL cache starts two workers
+	// which otherwise outlive the hit and accumulate throughout code-scan.
 	p := &Program{
 		Program:                 ssa.NewTmpProgram(name),
 		config:                  &Config{},
 		enableDatabase:          false,
-		nodeId2ValueCache:       utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
 		id:                      atomic.NewInt64(0),
 		interRuleStateThreshold: resetInterRuleStateCacheThreshold,
 	}
@@ -494,8 +496,10 @@ func (p *Program) NewValueFromAuditNode(db *gorm.DB, nodeID string) *Value {
 	}
 
 	// check cache
-	if val, ok := p.nodeId2ValueCache.Get(nodeID); ok {
-		return val
+	if p.nodeId2ValueCache != nil {
+		if val, ok := p.nodeId2ValueCache.Get(nodeID); ok {
+			return val
+		}
 	}
 
 	auditNode, err := ssadb.GetAuditNodeById(db, nodeID)
@@ -539,7 +543,9 @@ func (p *Program) NewValueFromAuditNode(db *gorm.DB, nodeID string) *Value {
 	val.auditNode = auditNode
 
 	// save cache
-	p.nodeId2ValueCache.Set(nodeID, val)
+	if p.nodeId2ValueCache != nil {
+		p.nodeId2ValueCache.Set(nodeID, val)
+	}
 
 	return val
 }
