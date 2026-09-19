@@ -915,6 +915,12 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.GetScanConcurrency() > 0 {
 		opts = append(opts, ssaconfig.WithScanConcurrency(cfg.GetScanConcurrency()))
 	}
+	// Nested stage scans rebuild their config. Preserve both budgets, including
+	// explicit zero (disabled), instead of silently reverting to unlimited work.
+	opts = append(opts,
+		ssaconfig.WithScanRuleTimeout(cfg.GetScanRuleTimeout()),
+		ssaconfig.WithScanRuleWorkLimit(cfg.GetScanRuleWorkLimit()),
+	)
 	// Propagate the risk-persistence setting to nested scan stages.
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
