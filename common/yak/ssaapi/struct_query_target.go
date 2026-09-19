@@ -19,6 +19,24 @@ type StructQueryTarget struct {
 	prog  *Program
 	unit  *ssa.CompileUnit
 	bound *structBound
+	// Only populated for the immutable compile-time scan of a completed unit.
+	opcodeIndex   map[ssa.Opcode][]ssa.Instruction
+	residentIndex *structResidentOpcodeIndex
+}
+
+// A completed batch is immutable during its scans. Build its opcode buckets
+// lazily once, then let each unit cache just its own matching instructions.
+// This index must never survive the batch's scan/persist stage.
+type structResidentOpcodeIndex struct {
+	prog  *ssa.Program
+	index map[ssa.Opcode][]ssa.Instruction
+}
+
+func (i *structResidentOpcodeIndex) get(opcode ssa.Opcode) []ssa.Instruction {
+	if i.index == nil {
+		i.index = ssa.IndexResidentInstructionsByOpcode(i.prog, nil)
+	}
+	return i.index[opcode]
 }
 
 var _ sfvm.ValueOperator = (*StructQueryTarget)(nil)
@@ -145,6 +163,26 @@ func (t *StructQueryTarget) matchOpcodes(opcodes ...ssa.Opcode) []ssa.Instructio
 	prog := t.prog.Program
 	if structScanUseDatabase(prog) {
 		return ssa.MatchInstructionByOpcodesWithFileFilter(t.queryCtx(), prog, t.includeFiles(), nil, opcodes...)
+	}
+	if t.opcodeIndex != nil {
+		var out []ssa.Instruction
+		seen := make(map[ssa.Opcode]bool, len(opcodes))
+		for _, opcode := range opcodes {
+			if !seen[opcode] {
+				if _, cached := t.opcodeIndex[opcode]; !cached && t.residentIndex != nil {
+					var matching []ssa.Instruction
+					for _, inst := range t.residentIndex.get(opcode) {
+						if t.bound == nil || t.bound.Allow(inst) {
+							matching = append(matching, inst)
+						}
+					}
+					t.opcodeIndex[opcode] = matching
+				}
+				out = append(out, t.opcodeIndex[opcode]...)
+				seen[opcode] = true
+			}
+		}
+		return out
 	}
 	return ssa.MatchInstructionByOpcodesResident(prog, opcodes...)
 }

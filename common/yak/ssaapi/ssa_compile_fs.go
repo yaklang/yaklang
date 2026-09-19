@@ -588,12 +588,13 @@ func (c *Config) parseProjectWithFSUnits(
 				if structProgAPI == nil {
 					structProgAPI = NewProgram(prog, c)
 				}
+				index := &structResidentOpcodeIndex{prog: prog}
 				for _, unit := range batch.units {
 					if unit == nil {
 						continue
 					}
 					processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
-					c.structScan.ScanStruct(structProgAPI, unit)
+					c.structScan.scanStructWithOpcodeIndex(structProgAPI, unit, index)
 					if c.isStop() {
 						return ErrContextCancel
 					}
