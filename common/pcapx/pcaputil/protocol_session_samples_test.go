@@ -275,8 +275,8 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, iec104I(0, 0, 100, 6, 0, []byte{20})},
 		}},
 		{"dnp3-read-response", "dnp3", 12000, []sessionStep{
-			{0, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})},
-			{1, dnp3Link(0x44, 2, 1, []byte{0xC0, 0x81, 0, 0})},
+			{0, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0xC0, 0x01})},
+			{1, dnp3Link(0x44, 2, 1, []byte{0xC0, 0xC0, 0x81, 0, 0})},
 		}},
 		{"c37118-cmd", "c37118", 14712, []sessionStep{
 			{0, c37frame(4, 1, 7, []byte{0, 2})},

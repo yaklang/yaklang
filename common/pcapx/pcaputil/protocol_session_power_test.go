@@ -92,18 +92,21 @@ func TestProtocolSessionDNP3ReadResponse(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)
-	req := dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})
+	req := dnp3Link(0xC4, 1, 2, []byte{0xC0, 0xC0, 0x01})
 	p := s.Probe(req)
 	require.Equal(t, ProbeAccept, p.Verdict)
 	require.Equal(t, "dnp3", p.Protocol)
 	r := s.Feed(0, ts, req)
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "READ", r.Events[0].Session["Packet Name"])
+	require.Equal(t, 0xC0, r.Events[0].Session["Transport Header"])
+	require.Equal(t, 0xC0, r.Events[0].Session["Application Control"])
 	require.Equal(t, 1, r.Events[0].Session["Destination"])
 	require.Equal(t, 2, r.Events[0].Session["Source"])
-	r = s.Feed(1, ts, dnp3Link(0x44, 2, 1, []byte{0xC0, 0x81, 0, 0}))
+	r = s.Feed(1, ts, dnp3Link(0x44, 2, 1, []byte{0xC0, 0xC0, 0x81, 0, 0}))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "RESPONSE", r.Events[0].Session["Packet Name"])
+	require.Equal(t, 0, r.Events[0].Session["IIN1"])
 	require.Equal(t, "READ", r.Events[0].Session["In Reply To"])
 }
 
@@ -113,18 +116,27 @@ func TestProtocolSessionDNP3FailClosed(t *testing.T) {
 	ts := time.Unix(1, 0)
 	require.NotEqual(t, "dnp3", s.Probe([]byte{0x05}).Protocol)
 	require.NotEqual(t, "dnp3", s.Probe([]byte{0x05, 0x63, 5, 0xC4, 1, 0, 2, 0, 0, 0}).Protocol)
-	require.Nil(t, s.Feed(0, ts, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})).Err)
-	bad := dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})
+	trunc := dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})
+	r := s.Feed(0, ts, trunc)
+	require.NotNil(t, r.Err)
+	require.NotEqual(t, ErrNeedMore, r.Err.Kind)
+	if len(r.Events) > 0 && r.Events[0].Session != nil {
+		require.NotEqual(t, "READ", r.Events[0].Session["Packet Name"])
+	}
+	s2, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	require.Nil(t, s2.Feed(0, ts, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0xC0, 0x01})).Err)
+	bad := dnp3Link(0xC4, 1, 2, []byte{0xC0, 0xC0, 0x01})
 	bad[8] ^= 0xff
-	r := s.Feed(0, ts, bad)
+	r = s2.Feed(0, ts, bad)
 	require.NotNil(t, r.Err)
 	require.NotEqual(t, ErrNeedMore, r.Err.Kind)
 }
 
 func TestProtocolSessionDNP3Fragmentation(t *testing.T) {
 	steps := []sessionStep{
-		{0, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})},
-		{1, dnp3Link(0x44, 2, 1, []byte{0xC0, 0x81, 0, 0})},
+		{0, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0xC0, 0x01})},
+		{1, dnp3Link(0x44, 2, 1, []byte{0xC0, 0xC0, 0x81, 0, 0})},
 	}
 	assertFragmentation(t, steps, func(chunk int) []string { return runMailNames(t, steps, chunk) })
 }
