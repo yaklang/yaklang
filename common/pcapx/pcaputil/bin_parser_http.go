@@ -17,7 +17,7 @@ type binHTTPState struct {
 	chunked, trailers, closeDelimited, response, tunnel, websocket bool
 	method, summary                                                string
 	status                                                         int
-	doh                                                            bool
+	doh, ipp                                                       bool
 }
 
 func (h *binHTTPState) config() map[string]any {
@@ -27,6 +27,20 @@ func (h *binHTTPState) config() map[string]any {
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
 		switch f.protocol {
+		case "vnc":
+			return f.frameRFB(dir, w)
+		case "diameter":
+			return f.frameDiameter(w)
+		case "iec104":
+			return f.frameIEC104(w)
+		case "s7comm":
+			return f.frameS7(w)
+		case "opcua":
+			return f.frameOPCUA(w)
+		case "rtsp":
+			return f.frameRTSP(w)
+		case "stun":
+			return f.frameSTUN(w)
 		case "http2":
 			return f.frameHTTP2(dir, w)
 		case "mysql":
@@ -134,6 +148,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.status = response.StatusCode
 			// Interim responses do not complete the queued request and carry
 			// no DNS message. Associate only this request's final response.
+			h.ipp = h.status >= 200 && len(f.httpIPP) > 0 && f.httpIPP[0]
 			h.doh = h.status >= 200 && len(f.httpDoH) > 0 && f.httpDoH[0]
 			length, transfer = response.ContentLength, response.TransferEncoding
 			h.websocket = h.status == 101 && httpHeaderHasToken(response.Header, "Upgrade", "websocket") && httpHeaderHasToken(response.Header, "Connection", "upgrade")
@@ -160,6 +175,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.method = request.Method
 			// Reuse the parsed header so ordinary deferred HTTP does not need
 			// a second net/http parse or eager structured field decoding.
+			h.ipp = ippMedia(request.Header.Get("Content-Type"))
 			h.doh = dohPathEvidence(request.URL.RequestURI()) || dohMedia(request.Header.Get("Content-Type")) || dohMedia(request.Header.Get("Accept"))
 			h.websocket = request.Method == "GET" && request.Header.Get("Sec-WebSocket-Version") == "13" && httpHeaderHasToken(request.Header, "Upgrade", "websocket") && httpHeaderHasToken(request.Header, "Connection", "upgrade")
 			length, transfer = request.ContentLength, request.TransferEncoding
@@ -185,6 +201,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			f.httpMethods = append(f.httpMethods, h.method)
 			f.httpUpgrades = append(f.httpUpgrades, h.websocket)
 			f.httpDoH = append(f.httpDoH, h.doh)
+			f.httpIPP = append(f.httpIPP, h.ipp)
 		}
 	}
 	if h.closeDelimited {
@@ -253,6 +270,9 @@ func (f *binFlow) finishHTTP(dir int) {
 			if len(f.httpUpgrades) > 0 {
 				f.httpUpgrades = f.httpUpgrades[1:]
 			}
+			if len(f.httpIPP) > 0 {
+				f.httpIPP = f.httpIPP[1:]
+			}
 			if len(f.httpDoH) > 0 {
 				f.httpDoH = f.httpDoH[1:]
 			}
@@ -264,7 +284,7 @@ func (f *binFlow) finishHTTP(dir int) {
 		client := 1 - dir
 		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: "frame"}
 		f.httpUpgrades = nil
-		f.httpDoH = nil
+		f.httpDoH, f.httpIPP = nil, nil
 		f.binding, f.level, f.httpMethods = nil, 0, nil
 		return
 	}
@@ -274,7 +294,7 @@ func (f *binFlow) finishHTTP(dir int) {
 		f.protocol, f.binding, f.level = "", nil, 0
 		f.httpMethods = nil
 		f.httpUpgrades = nil
-		f.httpDoH = nil
+		f.httpDoH, f.httpIPP = nil, nil
 	}
 }
 

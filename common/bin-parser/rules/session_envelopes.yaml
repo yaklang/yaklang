@@ -1,0 +1,32 @@
+Package:
+  TPKT:
+    endian: big
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Length")
+      if getNodeResult("Version").Value != 3 || getNodeResult("Reserved").Value != 0 || getNodeResult("Length").Value != this.GetMaxLength() { panic("invalid TPKT header") }
+      n = this.GetMaxLength() - this.Length()
+      if n > 0 { this.GetSubNode("COTP").SetMaxLength(n); this.ProcessSubNode("COTP") }
+    Version: uint8
+    Reserved: uint8
+    Length: uint16
+    COTP: raw
+  UATCP:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Chunk Type")
+      this.ProcessSubNode("Message Size")
+      if getNodeResult("Message Size").Value != this.GetMaxLength() { panic("invalid UA TCP size") }
+      n = this.GetMaxLength() - this.Length()
+      if n > 0 { this.GetSubNode("Body").SetMaxLength(n); this.ProcessSubNode("Body") }
+    Message Type: string,3
+    Chunk Type: string,1
+    Message Size: uint32
+    Body: raw
+  RFB:
+    operator: |
+      n = this.GetMaxLength()
+      if n > 0 { this.GetSubNode("Phase Data").SetMaxLength(n); this.ProcessSubNode("Phase Data") }
+    Phase Data: raw

@@ -13,6 +13,10 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 	var session map[string]any
 	var err error
 	switch {
+	case a.decodeSTUNDatagram(e, wire):
+		return true
+	case a.decodeTFTPDatagram(e, wire):
+		return true
 	case len(wire) >= 240 && (wire[0] == 1 || wire[0] == 2) && binary.BigEndian.Uint32(wire[236:240]) == dhcpCookie:
 		e.Protocol, spec = "dhcp", a.specs["application-layer.dhcp/DHCP"]
 		session, err = (&binDHCP{}).consume(wire)

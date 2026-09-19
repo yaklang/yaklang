@@ -33,6 +33,7 @@ type ProtocolEvent struct {
 	decodeSkip      int
 	decodeConfig    map[string]any
 	historySequence uint64
+	ipp             bool
 	sessionError    *ProtocolError
 }
 
@@ -183,6 +184,8 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	udpMu                                                                      sync.Mutex
+	udpSessions                                                                *binUDPStore
 	budget                                                                     ParserBudget
 	bindings                                                                   map[uint16][]*BinParserBinding
 	contextRequired                                                            atomic.Uint64
@@ -256,6 +259,7 @@ func (c *CaptureConfig) finishBinParser() error {
 		return nil
 	}
 	a := c.binParser
+	a.closeUDPSessions()
 	if a.config.OnStats != nil {
 		a.config.OnStats(a.stats())
 	}
@@ -324,8 +328,18 @@ type binFlow struct {
 	ntp              *binNTP
 	coap             *binCoAP
 	modbus           *binModbus
+	rfb              *binRFB
+	diameter         *binDiameter
+	iec104           *binIEC104
+	s7               *binS7
+	opcua            *binOPCUA
+	ipp              *binIPP
+	rtsp             *binRTSP
+	stun             *binSTUN
+	tftp             *binTFTP
 	httpUpgrades     []bool
 	httpDoH          []bool
+	httpIPP          []bool
 	httpMethods      []string
 	a                *binParser
 	id               uint64
@@ -522,7 +536,8 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		httpSession := false
 		if f.protocol == "http" {
-			httpSession = d.http.doh
+			httpSession = d.http.doh || d.http.ipp
+			e.ipp = d.http.ipp
 			e.decodeConfig = d.http.config()
 			e.Summary = d.http.summary
 			f.finishHTTP(dir)
