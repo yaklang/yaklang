@@ -321,8 +321,8 @@
     {
       "file": "dnp3-read-response.pcap",
       "protocol": "dnp3",
-      "sha256": "c69b685e583ca4c32669fefa0e0cab77f93168141b0567b2c52cfbd905b6d9ad",
-      "bytes": 650,
+      "sha256": "019da577dfa957b51e05d03d42e66b4f34628082179dd00979578e832629d22d",
+      "bytes": 652,
       "decode_as_port": 12000,
       "kind": "deterministic-generated-not-real-capture",
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
