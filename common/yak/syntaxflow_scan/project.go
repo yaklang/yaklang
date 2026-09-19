@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -493,7 +494,19 @@ func localSourceDir(cfg *Config) string {
 	if cfg.GetCodeSourceKind() != ssaconfig.CodeSourceLocal {
 		return ""
 	}
-	return strings.TrimSpace(cfg.GetCodeSourceLocalFile())
+	dir := strings.TrimSpace(cfg.GetCodeSourceLocalFile())
+	if dir == "" {
+		return ""
+	}
+	// Live source inspection walks the path as a directory. Archives and plain
+	// files must fall through to the compile pipeline, which knows how to open
+	// zip/jar code sources; walking them here fails with
+	// "root path is not a directory".
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	return dir
 }
 
 func emitStructResults(cfg *Config, prog *ssaapi.Program) {

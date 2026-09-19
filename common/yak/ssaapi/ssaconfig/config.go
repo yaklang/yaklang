@@ -75,6 +75,7 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 			return nil, err
 		}
 	}
+	cfg.NormalizeCodeSourceKind()
 	return cfg, nil
 }
 
@@ -121,6 +122,7 @@ func (c *Config) Update(options ...Option) error {
 			return err
 		}
 	}
+	c.NormalizeCodeSourceKind()
 	return nil
 }
 
