@@ -151,23 +151,37 @@ func (s *binDNP3) consume(raw []byte) (map[string]any, error) {
 	if s.pending == nil {
 		s.pending = map[uint32]string{}
 	}
-	if len(user) >= 2 {
-		fc := user[1]
-		out["Function"] = dnp3FuncName(fc)
-		out["Packet Name"] = dnp3FuncName(fc)
-		key := uint32(src)<<16 | uint32(dest)
-		rev := uint32(dest)<<16 | uint32(src)
-		if fc&0x80 == 0 {
-			s.pending[key] = dnp3FuncName(fc)
-			out["Role"] = "request"
+	if len(user) == 0 {
+		return out, nil
+	}
+	// IEEE 1815 Unconfirmed User Data: TH (1) + AC (1) + FC (1) [+ IIN on responses].
+	if len(user) < 3 {
+		return nil, fmt.Errorf("dnp3: truncated application layer")
+	}
+	th, ac, fc := user[0], user[1], user[2]
+	out["Transport Header"] = int(th)
+	out["Application Control"] = int(ac)
+	out["Function"] = dnp3FuncName(fc)
+	out["Packet Name"] = dnp3FuncName(fc)
+	key := uint32(src)<<16 | uint32(dest)
+	rev := uint32(dest)<<16 | uint32(src)
+	if fc == 0x81 || fc == 0x82 {
+		if len(user) < 5 {
+			return nil, fmt.Errorf("dnp3: truncated IIN")
+		}
+		out["IIN1"] = int(user[3])
+		out["IIN2"] = int(user[4])
+	}
+	if fc&0x80 == 0 {
+		s.pending[key] = dnp3FuncName(fc)
+		out["Role"] = "request"
+	} else {
+		out["Role"] = "response"
+		if req, ok := s.pending[rev]; ok {
+			out["In Reply To"] = req
+			delete(s.pending, rev)
 		} else {
-			out["Role"] = "response"
-			if req, ok := s.pending[rev]; ok {
-				out["In Reply To"] = req
-				delete(s.pending, rev)
-			} else {
-				out["Association"] = "missing-request"
-			}
+			out["Association"] = "missing-request"
 		}
 	}
 	return out, nil
