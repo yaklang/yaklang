@@ -74,7 +74,7 @@ func probeS7(w []byte, _ int) ProbeResult {
 }
 func (f *binFlow) frameS7(w []byte) (int, *binSpec, error) {
 	s := f.s7
-	reserve := 512 + int64(len(s.pending)+1)*64 + int64(len(s.fragments[0])+len(s.fragments[1])+len(w))
+	reserve := 512 + int64(len(s.pending)+1)*64 + 2*int64(cap(s.fragments[0])+cap(s.fragments[1])+len(w))
 	if err := f.reserveSession(reserve); err != nil {
 		return 0, nil, err
 	}

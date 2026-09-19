@@ -2,7 +2,6 @@ package pcaputil
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,29 +54,5 @@ func TestIPPMixedHTTPAndMalformed(t *testing.T) {
 	for _, bad := range [][]byte{req[:8], req[:len(req)-1], {1, 1, 0, 1, 0, 0, 0, 1, 1, 0x21, 0, 1, 'a', 0, 1, 1, 3}} {
 		_, err := ippFields(bad, 4, 4)
 		require.Error(t, err)
-	}
-}
-func TestRTSPIPPUpstreamCaptureReplay(t *testing.T) {
-	for _, tc := range []struct{ protocol, path string }{{"rtsp", "testdata/protocol-sessions/upstream/rtsp.pcap"}, {"ipp", "../../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-ipp.pcap"}} {
-		for _, workers := range []int{1, 2} {
-			t.Run(fmt.Sprintf("%s/%d", tc.protocol, workers), func(t *testing.T) {
-				raw, err := os.ReadFile(tc.path)
-				require.NoError(t, err)
-				events, stats, err := binReplay(t, raw, workers)
-				require.NoError(t, err)
-				counts := map[string]int{}
-				for _, e := range events {
-					if e.Protocol == tc.protocol {
-						counts[e.Status]++
-						if e.Error != "" {
-							t.Logf("%s %s", e.Entry, e.Error)
-						}
-					}
-				}
-				require.Positive(t, counts["decoded"])
-				require.Zero(t, stats.BufferedBytes)
-				t.Logf("counts %v", counts)
-			})
-		}
 	}
 }

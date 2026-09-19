@@ -17,7 +17,8 @@ type ippKey struct {
 type binIPP struct{ pending map[ippKey]uint16 }
 
 func ippMedia(s string) bool {
-	return strings.EqualFold(strings.TrimSpace(strings.SplitN(s, ";", 2)[0]), "application/ipp")
+	media, _, _ := strings.Cut(s, ";")
+	return strings.EqualFold(strings.TrimSpace(media), "application/ipp")
 }
 func ippFields(w []byte, max, depthLimit int) (map[string]any, error) {
 	if len(w) < 9 {

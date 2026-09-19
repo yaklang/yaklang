@@ -184,7 +184,7 @@ func TestRound5NewProfilesReleaseOnLimit(t *testing.T) {
 		wire []byte
 	}{{"diameter", diameterTestMessage(true, 1, nil)}, {"iec104", []byte{0x68, 4, 7, 0, 0, 0}}, {"opcua", uaTestEnvelope("ACK", make([]byte, 20))}, {"vnc", []byte("RFB 003.008\n")}, {"rtsp", []byte("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\n\r\n")}} {
 		t.Run(tc.name, func(t *testing.T) {
-			s, err := NewProtocolSession(ParserBudget{MaxBufferedBytes: 64})
+			s, err := NewProtocolSession(ParserBudget{MaxBufferedBytes: 64, MaxMessageBytes: 64, MaxFrameBytes: 64})
 			require.NoError(t, err)
 			r := s.Feed(0, time.Time{}, tc.wire)
 			require.NotNil(t, r.Err)
@@ -214,4 +214,23 @@ func FuzzRound5ProtocolBoundaries(f *testing.F) {
 			_, _ = (&binRTSP{}).consume(dir, w, time.Time{}, 32)
 		}
 	})
+}
+
+func TestIEC104ApplicationAssociationDoesNotUseTransportAck(t *testing.T) {
+	s := &binIEC104{}
+	_, err := s.consume(0, iec104I(5, 0, 100, 6, 0, []byte{20}), 4)
+	require.NoError(t, err)
+	// The confirmation's N(R) is unrelated to the request's send sequence.
+	out, err := s.consume(1, iec104I(16, 999, 100, 7, 0, []byte{20}), 4)
+	require.NoError(t, err)
+	require.Equal(t, true, out["Matched"])
+	require.Equal(t, "C_IC_NA_1", out["In Reply To"])
+	out, err = s.consume(0, iec104I(6, 1, 100, 10, 0, []byte{20}), 4)
+	require.NoError(t, err)
+	require.Equal(t, false, out["Matched"])
+	require.Len(t, s.commands, 1)
+	out, err = s.consume(1, iec104I(17, 999, 100, 10, 0, []byte{20}), 4)
+	require.NoError(t, err)
+	require.Equal(t, true, out["Matched"])
+	require.Empty(t, s.commands)
 }

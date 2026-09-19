@@ -171,6 +171,7 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 	if len(sid) > 256 {
 		return nil, protocolError(ErrResourceExceeded, "RTSP session identifier")
 	}
+	sid = strings.Clone(sid)
 	out := map[string]any{"CSeq": uint32(seq), "Session ID": sid, "Content Length": n, "Content Type": h.Get("Content-Type")}
 	key := rtspKey{dir, uint32(seq)}
 	if !response {

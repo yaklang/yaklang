@@ -49,9 +49,9 @@ func probeOPCUA(w []byte, _ int) ProbeResult {
 }
 func (f *binFlow) frameOPCUA(w []byte) (int, *binSpec, error) {
 	s := f.opcua
-	memory := int64(512 + (len(s.plain)+len(s.tokens)+len(s.pending))*96 + len(w))
+	memory := int64(512 + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
 	for _, c := range s.chunks {
-		memory += int64(len(c.data)) + 128
+		memory += 2*int64(cap(c.data)) + 128
 	}
 	if err := f.reserveSession(memory); err != nil {
 		return 0, nil, err

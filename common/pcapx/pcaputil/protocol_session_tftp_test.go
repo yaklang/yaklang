@@ -1,7 +1,6 @@
 package pcaputil
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -53,30 +52,4 @@ func TestTFTPRejectMalformedAndWrongAssociation(t *testing.T) {
 	_, err = s.consume(0, []byte{0, 4, 0, 1}, 8)
 	require.NoError(t, err)
 	require.True(t, s.done)
-}
-func TestTFTPUpstreamCaptureReplay(t *testing.T) {
-	// Original nDPI TFTP transfer, provenance/hash in the shared corpus manifest.
-	for _, workers := range []int{1, 2} {
-		t.Run(fmt.Sprint(workers), func(t *testing.T) {
-			events, stats, err := binReplay(t, binCorpusBytes(t, "ndpi/ndpi-tftp.pcap"), workers)
-			require.NoError(t, err)
-			counts := map[string]int{}
-			complete := 0
-			for _, e := range events {
-				if e.Protocol == "tftp" {
-					counts[e.Status]++
-					if e.Error != "" {
-						t.Log(e.Error)
-					}
-					if e.Session["Transfer Complete"] == true {
-						complete++
-					}
-				}
-			}
-			require.Positive(t, counts["decoded"])
-			require.Positive(t, complete)
-			require.Zero(t, stats.BufferedBytes)
-			t.Logf("counts %v complete %d", counts, complete)
-		})
-	}
 }

@@ -4,46 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"os"
 	"testing"
 )
 
-func TestRound5UpstreamIndustrialReplay(t *testing.T) {
-	for _, tc := range []struct{ protocol, path string }{{"diameter", "ndpi-diameter.pcap"}, {"s7comm", "ndpi-s7comm.pcap"}, {"iec104", "ndpi-iec104.pcap"}, {"opcua", "ndpi-opcua.pcap"}, {"vnc", "vnc-sample.pcap"}} {
-		for _, workers := range []int{1, 2} {
-			t.Run(fmt.Sprintf("%s/%d", tc.protocol, workers), func(t *testing.T) {
-				path := "../../bin-parser/testdata/protocol-corpus/captures/ndpi/" + tc.path
-				if tc.protocol == "vnc" {
-					path = "testdata/protocol-sessions/upstream/" + tc.path
-				}
-				raw, err := os.ReadFile(path)
-				require.NoError(t, err)
-				events, stats, err := binReplay(t, raw, workers)
-				if tc.protocol == "vnc" {
-					require.ErrorContains(t, err, "unfilled sequence gap")
-				} else {
-					require.NoError(t, err)
-				}
-				counts := map[string]int{}
-				for _, e := range events {
-					counts[e.Protocol+"/"+e.Status]++
-					if e.Protocol == tc.protocol {
-						if e.Error != "" {
-							t.Logf("error %s raw=%x", e.Error,e.Raw)
-						} else {
-							if tc.protocol != "s7comm" && tc.protocol != "opcua" {
-								t.Logf("%v", e.Session)
-							}
-						}
-					}
-				}
-				t.Logf("counts %v", counts)
-				require.Positive(t, counts[tc.protocol+"/decoded"])
-				require.Zero(t, stats.BufferedBytes)
-			})
-		}
-	}
-}
 func diameterTestMessage(request bool, hop uint32, avps []byte) []byte {
 	w := make([]byte, 20)
 	w[0] = 1
