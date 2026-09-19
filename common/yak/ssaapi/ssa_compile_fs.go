@@ -385,9 +385,30 @@ func (c *Config) parseProjectWithFSUnits(
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("unit compile start scc=%d batches=%d", len(plan.Order), len(batches))
 	var structProgAPI *Program
+	var batchPipeline compileBatchPipeline
+	defer batchPipeline.Wait()
 	for batchIndex, batch := range batches {
 		if c.isStop() {
 			return nil, ErrContextCancel
+		}
+		// Start bounded parsing while the previous batch scans and persists.
+		// Wait only before touching shared Program/type/instruction state.
+		var prefetchedUnit *CompileUnit
+		var prefetchedFiles <-chan *ssareducer.FileContent
+		for _, unit := range batch.units {
+			if unit != nil {
+				prefetchedUnit = unit
+				prefetchedFiles = c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
+				break
+			}
+		}
+		if err := batchPipeline.Wait(); err != nil {
+			if prefetchedFiles != nil {
+				for file := range prefetchedFiles {
+					file.Release()
+				}
+			}
+			return nil, err
 		}
 		if holdSCCIR && prog.Cache != nil {
 			prog.Cache.DisableInstructionSpill()
@@ -406,7 +427,10 @@ func (c *Config) parseProjectWithFSUnits(
 			}
 			prog.BeginCompileUnit(unit.Key)
 			unitCanceled := false
-			ch := c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
+			ch := prefetchedFiles
+			if unit != prefetchedUnit {
+				ch = c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
+			}
 			for fileContent := range ch {
 				if fileContent == nil {
 					continue
@@ -559,44 +583,47 @@ func (c *Config) parseProjectWithFSUnits(
 			return nil, ErrContextCancel
 		}
 		parseTime += time.Since(unitBuildStart)
-		if structScanOn {
-			if structProgAPI == nil {
-				structProgAPI = NewProgram(prog, c)
-			}
-			for _, unit := range batch.units {
-				if unit == nil {
-					continue
+		batchPipeline.Start(func() error {
+			if structScanOn {
+				if structProgAPI == nil {
+					structProgAPI = NewProgram(prog, c)
 				}
-				processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
-				c.structScan.ScanStruct(structProgAPI, unit)
-				if c.isStop() {
-					return nil, ErrContextCancel
+				for _, unit := range batch.units {
+					if unit == nil {
+						continue
+					}
+					processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
+					c.structScan.ScanStruct(structProgAPI, unit)
+					if c.isStop() {
+						return ErrContextCancel
+					}
+				}
+				c.structScan.WaitSaves()
+				if prog.Cache != nil {
+					prog.Cache.EnableInstructionSpill()
 				}
 			}
-			c.structScan.WaitSaves()
+			// Per-batch flush evicts ordinary instructions while retaining
+			// cross-unit boundaries. The program cache owns database selection.
 			if prog.Cache != nil {
-				prog.Cache.EnableInstructionSpill()
+				if !isIncremental {
+					prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
+				}
+				prog.Cache.FlushInstructionSaver()
+				prog.Cache.FlushAuxSavers()
+				prog.CheckMemoryPressure(batchIndex+1, len(batches))
 			}
-		}
-		// Per-batch flush: evict ordinary instructions to DB, keeping
-		// Function/Parameter/BasicBlock boundary instructions resident for
-		// cross-unit calls. Persistence goes through the program cache, which
-		// already uses ssadb.GetDB, so this loop does not pick a database or
-		// retune SQLite.
-		if prog.Cache != nil {
-			if !isIncremental {
-				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
+			if compileUnitLogEnabled() {
+				prog.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
 			}
-			prog.Cache.FlushInstructionSaver()
-			prog.Cache.FlushAuxSavers()
-			prog.CheckMemoryPressure(batchIndex+1, len(batches))
-		}
-		if compileUnitLogEnabled() {
-			prog.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
-		}
-		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
-		prog.SetPreHandler(true)
-		compilePhase = "f1_units"
+			logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
+			prog.SetPreHandler(true)
+			compilePhase = "f1_units"
+			return nil
+		})
+	}
+	if err := batchPipeline.Wait(); err != nil {
+		return nil, err
 	}
 	preHandlerTime = time.Since(unitStart) - parseTime
 	if astErr != nil && c.GetCompileStrictMode() {
