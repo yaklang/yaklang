@@ -2,7 +2,9 @@ package ssaapi
 
 import (
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -34,14 +36,10 @@ alert $call`)
 	vf.AddFile("a/A.java", `package a; class A { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
 	vf.AddFile("b/B.java", `package b; class B { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
 	progs, err := ParseProjectWithFS(vf, WithLanguage(ssaconfig.JAVA),
-		WithProgramName(uuid.NewString()), WithMemory(), WithStructRules(rule),
-		WithStructRuleCallback(func(*schema.SSARisk) {
-			// After the first unit, subsequent units must reuse in-process
-			// compiled code, including in dev builds that reject DB opcodes.
-			rule.Content = "this is not valid SyntaxFlow ((("
-		}))
+		WithProgramName(uuid.NewString()), WithMemory(), WithStructRules(rule))
 	require.NoError(t, err)
 	require.Len(t, progs, 1)
+	require.NotEmpty(t, rule.OpCodes)
 	require.Empty(t, progs[0].StructScanErrors())
 	require.Len(t, progs[0].StructScanResults(), 2)
 	for _, result := range progs[0].StructScanResults() {
@@ -74,6 +72,7 @@ func TestStructScanLanguageSelection(t *testing.T) {
 func TestStructScanReleasesPersistedBatchResults(t *testing.T) {
 	t.Setenv(compileUnitBatchMinFilesEnv, "1")
 	t.Setenv(compileUnitBatchMinBytesEnv, "1")
+	t.Setenv("YAK_SSA_COMPILE_UNIT_LOG", "1")
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("a/A.java", `package a; class A { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
 	vf.AddFile("b/B.java", `package b; class B { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
@@ -81,15 +80,27 @@ func TestStructScanReleasesPersistedBatchResults(t *testing.T) {
 	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), name) })
 	var state *structScanRuntime
 	callbacks := 0
+	completedBatches := 0
 	progs, err := ParseProjectWithFS(vf, WithLanguage(ssaconfig.JAVA), WithProgramName(name),
+		ssaconfig.WithCompileIrCacheTTL(time.Millisecond), ssaconfig.WithCompileIrCacheMax(1),
 		WithStructRuleRaw(`desc(mode: "struct", language: "java")
 Runtime.getRuntime().exec(* as $cmd) as $call
 alert $call`),
 		ssaconfig.SetOption("test/struct-state", func(c *Config, _ bool) {
 			state = c.ensureStructScan()
 		})(true),
+		WithProcess(func(msg string, _ float64) {
+			if strings.Contains(msg, "build finished units=") {
+				completedBatches++
+				require.NotEmpty(t, state.results)
+				require.Zero(t, state.results[0].program.Program.Cache.GetFlushAccounting().Pending,
+					"instruction persistence must settle before a batch is declared complete")
+			}
+		}),
 		WithStructRuleCallback(func(*schema.SSARisk) {
 			callbacks++
+			require.True(t, state.results[len(state.results)-1].program.Program.Cache.IsInstructionSpillDisabled(),
+				"completed batch IR must remain resident until its struct scan finishes")
 			if callbacks == 2 {
 				require.Equal(t, 1, state.persisted, "previous batch must persist before the next batch scans")
 				require.Nil(t, state.results[0].memResult, "previous VM frame must no longer retain its Value graph")
@@ -98,6 +109,7 @@ alert $call`),
 		}))
 	require.NoError(t, err)
 	require.Equal(t, 2, callbacks)
+	require.Equal(t, 2, completedBatches)
 	require.Empty(t, progs[0].StructScanErrors())
 	require.Equal(t, 2, state.persisted)
 	for _, result := range progs[0].StructScanResults() {
@@ -108,4 +120,37 @@ alert $call`),
 		require.Len(t, values, 1, "persisted alert must remain readable after compilation")
 		require.NotNil(t, values[0].GetRange())
 	}
+}
+
+func TestStructScanSplitsCyclicUnitsWithoutLosingDataflow(t *testing.T) {
+	t.Setenv(compileUnitBatchMaxFilesEnv, "1")
+	t.Setenv("YAK_SSA_COMPILE_UNIT_LOG", "1")
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("a/A.java", `package a; import b.B;
+class A { static String value() { return B.value(); } }`)
+	vf.AddFile("b/B.java", `package b; import a.A;
+class B {
+  static String value() { return "cyclic-batch-value"; }
+  static void run() { println(A.value()); }
+}`)
+	name := uuid.NewString()
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), name) })
+	batches := 0
+	progs, err := ParseProjectWithFS(vf, WithLanguage(ssaconfig.JAVA), WithProgramName(name),
+		WithStructRuleRaw(`desc(mode: "struct", language: "java")
+println(* as $arg)
+alert $arg`),
+		WithProcess(func(msg string, _ float64) {
+			if strings.Contains(msg, "build finished units=") {
+				batches++
+			}
+		}))
+	require.NoError(t, err)
+	require.Equal(t, 2, batches, "struct scans must preserve the batch size limit inside an SCC")
+	require.Empty(t, progs[0].StructScanErrors())
+	loaded, err := FromDatabase(name)
+	require.NoError(t, err)
+	result, err := loaded.SyntaxFlowWithError(`println(* #-> * as $source)`)
+	require.NoError(t, err)
+	require.Contains(t, result.GetValues("source").String(), "cyclic-batch-value")
 }
