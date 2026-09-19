@@ -2,6 +2,9 @@ package ssaconfig
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -17,6 +20,55 @@ const (
 	CodeSourceGit         CodeSourceKind = "git"         // Git仓库
 	CodeSourceSvn         CodeSourceKind = "svn"         // SVN仓库
 )
+
+// archiveCodeSourceExtensions maps the archive suffixes the SSA pipeline can
+// open to their code source kind. A local_file pointing at one of these must
+// never be walked as a directory.
+var archiveCodeSourceExtensions = map[string]CodeSourceKind{
+	".jar": CodeSourceJar,
+	".war": CodeSourceJar,
+	".zip": CodeSourceCompression,
+}
+
+// ClassifyLocalCodeSourceKind infers the code source kind from a local path:
+// java archives map to "jar", other archives map to "compression", and every
+// other path (directory or plain file) stays "local".
+func ClassifyLocalCodeSourceKind(localFile string) CodeSourceKind {
+	localFile = strings.TrimSpace(localFile)
+	if localFile == "" || strings.Contains(localFile, "://") {
+		// Remote inputs keep the caller-declared kind: a URL is downloaded,
+		// not opened as a local archive path.
+		return CodeSourceLocal
+	}
+	ext := strings.ToLower(filepath.Ext(localFile))
+	if kind, ok := archiveCodeSourceExtensions[ext]; ok {
+		return kind
+	}
+	return CodeSourceLocal
+}
+
+// NormalizeCodeSourceKind restores archive classification for configs that pin
+// kind=local (or leave it empty) while pointing local_file at a zip/jar. An
+// explicit git/svn/compression/jar kind stays authoritative.
+func (c *Config) NormalizeCodeSourceKind() {
+	if c == nil || c.CodeSource == nil {
+		return
+	}
+	if c.CodeSource.Kind != "" && c.CodeSource.Kind != CodeSourceLocal {
+		return
+	}
+	localFile := strings.TrimSpace(c.CodeSource.LocalFile)
+	if localFile == "" {
+		return
+	}
+	if info, err := os.Stat(localFile); err == nil && info.IsDir() {
+		// A real directory wins over the suffix: "project.zip/" is still a tree.
+		return
+	}
+	if kind := ClassifyLocalCodeSourceKind(localFile); kind != CodeSourceLocal {
+		c.CodeSource.Kind = kind
+	}
+}
 
 type AuthConfigInfo struct {
 	Kind       string `json:"kind"`                  // 认证方式: password/ssh_key/token

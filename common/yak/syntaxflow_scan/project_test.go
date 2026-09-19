@@ -1,6 +1,7 @@
 package syntaxflow_scan_test
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -16,9 +17,110 @@ import (
 	_ "github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// writeTestZip builds a tiny zip archive on disk, mirroring CI's `-t ./fs.zip`.
+func writeTestZip(t *testing.T, files map[string]string) string {
+	t.Helper()
+	zipPath := filepath.Join(t.TempDir(), "fs.zip")
+	f, err := os.Create(zipPath)
+	require.NoError(t, err)
+	w := zip.NewWriter(f)
+	for name, content := range files {
+		entry, err := w.Create(name)
+		require.NoError(t, err)
+		_, err = entry.Write([]byte(content))
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	require.NoError(t, f.Close())
+	return zipPath
+}
+
+// A local archive target must compile through the zip code source instead of
+// being walked as a directory: `-t ./fs.zip` used to fail with
+// "root path is not a directory: ." and abort the whole scan.
+func TestScanProject_LocalZipTargetCompilesInsteadOfWalkingDirectory(t *testing.T) {
+	zipPath := writeTestZip(t, map[string]string{
+		"main.go": "package main\n\nvar key = \"AKIAIOSFODNN7EXAMPLE\"\n",
+	})
+
+	var alerts int
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(zipPath),
+		ssaconfig.WithProjectRawLanguage("golang"),
+		ssaconfig.WithSetProgramName(fmt.Sprintf("%s-%s", t.Name(), uuid.NewString())),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: general, title: "zip source")
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			Language: string(ssaconfig.General),
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r != nil && r.Result != nil {
+				alerts += len(r.Result.GetAlertVariables())
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+	require.Greater(t, alerts, 0, "source rules must run against the zip snapshot")
+}
+
+// A local jar target must compile through the jar code source (java archive),
+// again without treating the file as a project directory.
+func TestScanProject_LocalJarTargetCompilesAsJar(t *testing.T) {
+	jarPath, err := ssatest.GetJarFile()
+	require.NoError(t, err)
+
+	programName := fmt.Sprintf("%s-%s", t.Name(), uuid.NewString())
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(jarPath),
+		ssaconfig.WithProjectRawLanguage("java"),
+		ssaconfig.WithSetProgramName(programName),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+	require.Equal(t, programName, result.ProgramName)
+}
+
+// Local directories must keep the live-source path: classification changes the
+// kind, not the pipeline.
+func TestScanProject_LocalDirectoryStaysLiveSource(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
+
+	var stages []string
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(fmt.Sprintf("%s-%s", t.Name(), uuid.NewString())),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: python, title: "dir source")
+${*.py}.pattern_regex(/eval\s*\(/) as $hit
+alert $hit`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Contains(t, stages, string(syntaxflow_scan.StageCollect))
+	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+}
 
 func TestScanProject_CompilesAndRunsSourceFromSnapshot(t *testing.T) {
 	dir := t.TempDir()
