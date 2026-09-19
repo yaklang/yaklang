@@ -30,6 +30,7 @@ type structScanRuntime struct {
 	workLimit     int64
 	errs          []error
 	results       []*SyntaxFlowResult
+	persisted     int
 	ranHashes     []string
 	ruleStats     map[string]*structRuleStat
 	skipped       bool
@@ -357,21 +358,32 @@ func ruleContentHash(rule *schema.SyntaxFlowRule) string {
 	return utils.CalcSha256(rule.RuleName, rule.Content)
 }
 
-func (s *structScanRuntime) persistAfterProgramMeta(progAPI *Program) {
+// persistResults checkpoints completed unit queries before the next batch.
+// Keeping their VM frames until project metadata is saved retains Value graphs
+// from every preceding batch, even after the instruction cache spills to disk.
+func (s *structScanRuntime) persistResults(progAPI *Program) {
 	if s == nil || progAPI == nil || progAPI.Program == nil {
 		return
 	}
 	if progAPI.Program.DatabaseKind == ssa.ProgramCacheMemory {
 		return
 	}
-	for _, res := range s.results {
+	for _, res := range s.results[s.persisted:] {
 		if res == nil {
+			s.persisted++
 			continue
 		}
 		if _, err := res.Save(schema.SFResultKindScan, s.taskID); err != nil {
 			log.Warnf("[struct_scan] persist result failed: %v", err)
 			s.errs = append(s.errs, err)
+			return
 		}
+		// Keep the same result handle (also held by the memory result cache),
+		// but serve subsequent alert value reads from persisted audit nodes.
+		res.memResult = nil
+		res.symbol = make(map[string]Values)
+		res.unName = nil
+		s.persisted++
 	}
 }
 
@@ -546,7 +558,7 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 		}
 		s.ScanStruct(p, unit)
 	}
-	s.persistAfterProgramMeta(p)
+	s.persistResults(p)
 	return nil
 }
 

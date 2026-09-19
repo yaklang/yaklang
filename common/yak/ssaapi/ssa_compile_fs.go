@@ -543,6 +543,7 @@ func (c *Config) parseProjectWithFSUnits(
 					return nil, ErrContextCancel
 				}
 			}
+			c.structScan.persistResults(structProgAPI)
 		}
 		// Per-batch flush: evict ordinary instructions to DB when resident
 		// count exceeds a threshold, keeping Function/Parameter/BasicBlock
@@ -622,7 +623,7 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, since)
 	}
 	if c.structScan != nil && c.structScan.enabled() {
-		c.structScan.persistAfterProgramMeta(structProgAPI)
+		c.structScan.persistResults(structProgAPI)
 	}
 	finishTime = time.Since(finishStart)
 

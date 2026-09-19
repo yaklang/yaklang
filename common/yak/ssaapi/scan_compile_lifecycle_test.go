@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -67,5 +68,44 @@ func TestStructScanLanguageSelection(t *testing.T) {
 			s.filterLanguage(tc.lang, tc.ignore)
 			require.Len(t, s.rules, tc.want)
 		})
+	}
+}
+
+func TestStructScanReleasesPersistedBatchResults(t *testing.T) {
+	t.Setenv(compileUnitBatchMinFilesEnv, "1")
+	t.Setenv(compileUnitBatchMinBytesEnv, "1")
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("a/A.java", `package a; class A { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
+	vf.AddFile("b/B.java", `package b; class B { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
+	name := uuid.NewString()
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), name) })
+	var state *structScanRuntime
+	callbacks := 0
+	progs, err := ParseProjectWithFS(vf, WithLanguage(ssaconfig.JAVA), WithProgramName(name),
+		WithStructRuleRaw(`desc(mode: "struct", language: "java")
+Runtime.getRuntime().exec(* as $cmd) as $call
+alert $call`),
+		ssaconfig.SetOption("test/struct-state", func(c *Config, _ bool) {
+			state = c.ensureStructScan()
+		})(true),
+		WithStructRuleCallback(func(*schema.SSARisk) {
+			callbacks++
+			if callbacks == 2 {
+				require.Equal(t, 1, state.persisted, "previous batch must persist before the next batch scans")
+				require.Nil(t, state.results[0].memResult, "previous VM frame must no longer retain its Value graph")
+				require.Empty(t, state.results[0].symbol)
+			}
+		}))
+	require.NoError(t, err)
+	require.Equal(t, 2, callbacks)
+	require.Empty(t, progs[0].StructScanErrors())
+	require.Equal(t, 2, state.persisted)
+	for _, result := range progs[0].StructScanResults() {
+		require.Nil(t, result.memResult)
+		require.NotNil(t, result.dbResult)
+		require.Equal(t, 1, result.RiskCount())
+		values := result.GetValues("call")
+		require.Len(t, values, 1, "persisted alert must remain readable after compilation")
+		require.NotNil(t, values[0].GetRange())
 	}
 }
