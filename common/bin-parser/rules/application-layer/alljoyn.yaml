@@ -1,0 +1,243 @@
+# AllJoyn legacy IP name service (AJNS), UDP 9956, message versions 0/1.
+# Pinned primary layout and codec (StringData, WhoHas, IsAt, _NSPacket):
+# https://github.com/alljoyn/core-alljoyn/blob/103b0833801f8e36e648a6d66313518356b0218d/alljoyn_core/router/ns/IpNsProtocol.cc
+# The receiver requires Deserialize's consumed length to equal the datagram:
+# https://github.com/alljoyn/core-alljoyn/blob/103b0833801f8e36e648a6d66313518356b0218d/alljoyn_core/router/ns/IpNameServiceImpl.cc#L7399-L7418
+# The 1454-byte maximum is this pinned implementation's NS_MESSAGE_MAX profile,
+# not a length field or a universal UDP limit. Names/GUIDs are byte-counted,
+# not NUL-terminated. Their text syntax/encoding is not validated by the codec.
+# Preserve the v1 WHO-HAS 0x04 compatibility flag despite older comments saying
+# all flags are reserved. In v0 IS-AT, IPv4 precedes IPv6 (some dissectors reverse
+# them). TransportMask remains the exact wire uint16; the daemon's later
+# single-bit policy is metadata, not a wire-layout rejection criterion.
+# This rule does not implement AllJoyn message-bus/ARDP or v2 mDNS semantics.
+# Structured public GenerateBinary is unsupported: it provides no explicit
+# input boundary. NodeToBytes of a parsed message still preserves every byte.
+# alljoynNSLegacyLengths=true retains the original repeated prefix-length
+# scans for same-build differential tests and controlled performance checks.
+endian: big
+Package:
+  AllJoynNS: AllJoynNSMessage
+  AllJoynNSCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("alljoyn-ns: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("alljoyn-ns: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("alljoyn-ns: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("AllJoynNSFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed AllJoyn NS Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+AllJoynNSFrame: "import:application-layer/alljoyn.yaml;node:AllJoynNS"
+
+AllJoynNSMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("alljoyn-ns: explicit message boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("alljoyn-ns: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 4 { panic("alljoyn-ns: truncated four-byte header") }
+    if total > 1454 { panic("alljoyn-ns: message exceeds the 1454-byte implementation profile") }
+    this.ProcessSubNode("Sender Version")
+    version = int(this.ProcessSubNode("Message Version").Value)
+    if version != 0 && version != 1 { panic("alljoyn-ns: unsupported message version") }
+    questions = int(this.ProcessSubNode("Question Count").Value)
+    answers = int(this.ProcessSubNode("Answer Count").Value)
+    this.ProcessSubNode("Timer")
+    if questions*2 + answers*4 > total-this.Length() { panic("alljoyn-ns: record counts exceed message boundary") }
+    if questions > 0 {
+      list = this.GetSubNode("Questions")
+      list.AddInfo("Message Version", version)
+      list.AddInfo("Count", questions)
+      list.SetMaxLength(total-this.Length())
+      list.Process()
+    }
+    if answers > 0 {
+      list = this.GetSubNode("Answers")
+      list.AddInfo("Message Version", version)
+      list.AddInfo("Count", answers)
+      list.SetMaxLength(total-this.Length())
+      list.Process()
+    }
+    if this.Length() != total { panic("alljoyn-ns: trailing bytes after declared records") }
+    this.AddInfo("Maximum Message Bytes", 1454)
+    this.AddInfo("Discovery Semantics Validated", false)
+    this.AddInfo("String Encoding Validated", false)
+  Sender Version: uint8,4bit
+  Message Version: uint8,4bit
+  Question Count: uint8
+  Answer Count: uint8
+  Timer: uint8
+  Questions: AllJoynNSQuestions
+  Answers: AllJoynNSAnswers
+
+AllJoynNSQuestions:
+  list: true
+  Question: AllJoynNSQuestion
+  operator: |
+    legacy = getCtx("alljoynNSLegacyLengths") == true
+    remaining = this.GetMaxLength()
+    for i = 0; i < this.GetInfo("Count"); i++ {
+      element = this.NewElement()
+      element.AddInfo("Message Version", this.GetInfo("Message Version"))
+      if legacy { remaining = this.GetMaxLength()-this.Length() }
+      element.SetMaxLength(remaining)
+      element.Process()
+      if !legacy { remaining -= element.Length() }
+    }
+
+AllJoynNSQuestion:
+  operator: |
+    if this.GetMaxLength() < 2 { panic("alljoyn-ns: truncated WHO-HAS header") }
+    if this.ProcessSubNode("Question Type").Value != 2 { panic("alljoyn-ns: invalid WHO-HAS type") }
+    if this.GetInfo("Message Version") == 0 {
+      this.ProcessSubNode("Question Reserved")
+      this.ProcessSubNode("T Flag")
+      this.ProcessSubNode("U Flag")
+      this.ProcessSubNode("S Flag")
+      this.ProcessSubNode("F Flag")
+    } else {
+      this.ProcessSubNode("Question Reserved High")
+      this.ProcessSubNode("Question Reserved Bit 3")
+      this.ProcessSubNode("U Compatibility Flag")
+      this.ProcessSubNode("Question Reserved Low")
+    }
+    count = int(this.ProcessSubNode("Name Count").Value)
+    if count > this.GetMaxLength()-this.Length() { panic("alljoyn-ns: name count exceeds record boundary") }
+    if count > 0 {
+      names = this.GetSubNode("Names")
+      names.AddInfo("Count", count)
+      names.SetMaxLength(this.GetMaxLength()-this.Length())
+      names.Process()
+    }
+    this.AddInfo("Legacy Flags Active", this.GetInfo("Message Version") == 0)
+    this.AddInfo("U Compatibility Flag Active", this.GetInfo("Message Version") == 1)
+  Question Type: uint8,2bit
+  Question Reserved: uint8,2bit
+  T Flag: uint8,1bit
+  U Flag: uint8,1bit
+  S Flag: uint8,1bit
+  F Flag: uint8,1bit
+  Question Reserved High: uint8,2bit
+  Question Reserved Bit 3: uint8,1bit
+  U Compatibility Flag: uint8,1bit
+  Question Reserved Low: uint8,2bit
+  Name Count: uint8
+  Names: AllJoynNSNames
+
+AllJoynNSAnswers:
+  list: true
+  Answer: AllJoynNSAnswer
+  operator: |
+    legacy = getCtx("alljoynNSLegacyLengths") == true
+    remaining = this.GetMaxLength()
+    for i = 0; i < this.GetInfo("Count"); i++ {
+      element = this.NewElement()
+      element.AddInfo("Message Version", this.GetInfo("Message Version"))
+      if legacy { remaining = this.GetMaxLength()-this.Length() }
+      element.SetMaxLength(remaining)
+      element.Process()
+      if !legacy { remaining -= element.Length() }
+    }
+
+AllJoynNSAnswer:
+  operator: |
+    if this.GetMaxLength() < 4 { panic("alljoyn-ns: truncated IS-AT header") }
+    version = this.GetInfo("Message Version")
+    if this.ProcessSubNode("Answer Type").Value != 1 { panic("alljoyn-ns: invalid IS-AT type") }
+    guid = int(this.ProcessSubNode("GUID Present").Value)
+    this.ProcessSubNode("Complete Flag")
+    count = 0
+    if version == 0 {
+      this.ProcessSubNode("TCP Flag")
+      this.ProcessSubNode("UDP Flag")
+      ipv6 = int(this.ProcessSubNode("IPv6 Present").Value)
+      ipv4 = int(this.ProcessSubNode("IPv4 Present").Value)
+      count = int(this.ProcessSubNode("Name Count").Value)
+      this.ProcessSubNode("Port")
+      if ipv4 != 0 { this.ProcessSubNode("IPv4 Address") }
+      if ipv6 != 0 { this.ProcessSubNode("IPv6 Address") }
+    } else {
+      r4 = int(this.ProcessSubNode("Reliable IPv4 Present").Value)
+      u4 = int(this.ProcessSubNode("Unreliable IPv4 Present").Value)
+      r6 = int(this.ProcessSubNode("Reliable IPv6 Present").Value)
+      u6 = int(this.ProcessSubNode("Unreliable IPv6 Present").Value)
+      count = int(this.ProcessSubNode("Name Count").Value)
+      mask = int(this.ProcessSubNode("Transport Mask").Value)
+      this.AddInfo("Transport Mask Has Single Bit", mask != 0 && (mask & (mask-1)) == 0)
+      if r4 != 0 { this.ProcessSubNode("Reliable IPv4") }
+      if u4 != 0 { this.ProcessSubNode("Unreliable IPv4") }
+      if r6 != 0 { this.ProcessSubNode("Reliable IPv6") }
+      if u6 != 0 { this.ProcessSubNode("Unreliable IPv6") }
+    }
+    if guid != 0 {
+      field = this.GetSubNode("GUID")
+      field.SetMaxLength(this.GetMaxLength()-this.Length())
+      field.Process()
+    }
+    if count > this.GetMaxLength()-this.Length() { panic("alljoyn-ns: name count exceeds record boundary") }
+    if count > 0 {
+      names = this.GetSubNode("Names")
+      names.AddInfo("Count", count)
+      names.SetMaxLength(this.GetMaxLength()-this.Length())
+      names.Process()
+    }
+  Answer Type: uint8,2bit
+  GUID Present: uint8,1bit
+  Complete Flag: uint8,1bit
+  TCP Flag: uint8,1bit
+  UDP Flag: uint8,1bit
+  IPv6 Present: uint8,1bit
+  IPv4 Present: uint8,1bit
+  Reliable IPv4 Present: uint8,1bit
+  Unreliable IPv4 Present: uint8,1bit
+  Reliable IPv6 Present: uint8,1bit
+  Unreliable IPv6 Present: uint8,1bit
+  Name Count: uint8
+  Port: uint16
+  Transport Mask: uint16
+  IPv4 Address: raw,4
+  IPv6 Address: raw,16
+  Reliable IPv4: AllJoynNSIPv4Endpoint
+  Unreliable IPv4: AllJoynNSIPv4Endpoint
+  Reliable IPv6: AllJoynNSIPv6Endpoint
+  Unreliable IPv6: AllJoynNSIPv6Endpoint
+  GUID: AllJoynNSString
+  Names: AllJoynNSNames
+
+AllJoynNSIPv4Endpoint:
+  Address: raw,4
+  Port: uint16
+
+AllJoynNSIPv6Endpoint:
+  Address: raw,16
+  Port: uint16
+
+AllJoynNSNames:
+  list: true
+  Name: AllJoynNSString
+  operator: |
+    legacy = getCtx("alljoynNSLegacyLengths") == true
+    remaining = this.GetMaxLength()
+    for i = 0; i < this.GetInfo("Count"); i++ {
+      name = this.NewElement()
+      if legacy { remaining = this.GetMaxLength()-this.Length() }
+      name.SetMaxLength(remaining)
+      name.Process()
+      if !legacy { remaining -= name.Length() }
+    }
+
+AllJoynNSString:
+  operator: |
+    length = int(this.ProcessSubNode("Byte Length").Value)
+    if length > this.GetMaxLength()-this.Length() { panic("alljoyn-ns: string length exceeds record boundary") }
+    if length > 0 {
+      this.GetSubNode("Text").SetMaxLength(length)
+      this.ProcessSubNode("Text")
+    }
+  Byte Length: uint8
+  Text: string
+  out: |
+    if data.Value[0].Value == 0 { return "" }
+    return data.Value[1].Value

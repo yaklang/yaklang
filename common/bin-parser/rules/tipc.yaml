@@ -1,0 +1,158 @@
+# TIPC v2 payload-message headers, independently described from Linux v6.12:
+# https://raw.githubusercontent.com/torvalds/linux/v6.12/net/tipc/msg.h
+# https://raw.githubusercontent.com/torvalds/linux/v6.12/net/tipc/msg.c
+# https://raw.githubusercontent.com/torvalds/linux/v6.12/net/tipc/socket.c
+# https://raw.githubusercontent.com/torvalds/linux/v6.12/net/tipc/group.c
+# https://raw.githubusercontent.com/torvalds/linux/v6.12/include/uapi/linux/tipc.h
+# Internal users (including bundling/fragmentation) and locally constructed
+# group member events are unsupported. Application bytes and extra header
+# words remain explicit bytes; no connection or group state is inferred.
+endian: big
+Package:
+  TIPC: TIPCPayloadMessage
+  TIPCCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("tipc: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("tipc: empty carrier has no message") }
+      value, trial = this.TryProcessByType("TIPCCandidate")
+      if trial.OK {
+        trial.Save()
+        if this.Length() < this.GetMaxLength() {
+          trailer = this.NewUnknownNode("TIPC Link Trailer")
+          trailer.SetMaxLength(this.GetMaxLength()-this.Length())
+          trailer.Process()
+        }
+        return
+      }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TIPC Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+TIPCCandidate:
+  operator: |
+    prefix, trial = this.TryProcessByType("TIPCLengthPrefix")
+    trial.Recovery()
+    if !trial.OK { panic("tipc: truncated size prefix") }
+    size = int(prefix.Value & 0x1ffff)
+    if size < 24 || size > this.GetMaxLength() { panic("tipc: message size outside carrier boundary") }
+    this.GetSubNode("Message").SetMaxLength(size)
+    this.ProcessSubNode("Message")
+  Message: "import:tipc.yaml;node:TIPC"
+TIPCLengthPrefix: uint32
+TIPCTypePrefix: raw,8
+
+TIPCPayloadMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("tipc: explicit message boundary required") }
+    total = this.GetMaxLength()
+    if total < 24 { panic("tipc: truncated minimum header") }
+    if total > 66060 { panic("tipc: message exceeds supported 66060-byte boundary") }
+    // Word-zero bit 18 has different meanings for payload-message types.
+    // Inspect the type transactionally before producing its named bit field.
+    prefix, trial = this.TryProcessByType("TIPCTypePrefix")
+    trial.Recovery()
+    if !trial.OK { panic("tipc: truncated type prefix") }
+    type = int(prefix.Value[4]) >> 5
+    if this.ProcessSubNode("Version").Value != 2 { panic("tipc: unsupported version") }
+    if this.ProcessSubNode("User").Value > 3 { panic("tipc: internal message user is unsupported") }
+    hsize = int(this.ProcessSubNode("Header Size Words").Value)*4
+    if hsize < 24 || hsize > 60 || hsize > total { panic("tipc: header size outside message boundary") }
+    this.ProcessSubNode("Non Sequential")
+    this.ProcessSubNode("Destination Droppable")
+    if type == 0 { this.ProcessSubNode("ACK Required") } else if type == 1 || type == 5 || type == 6 {
+      this.ProcessSubNode("Replicast")
+    } else if type == 2 || type == 3 {
+      this.ProcessSubNode("Source Droppable")
+    } else { this.ProcessSubNode("Control Flag") }
+    this.ProcessSubNode("SYN")
+    size = int(this.ProcessSubNode("Message Size").Value)
+    if size != total || size < hsize { panic("tipc: declared size does not match message boundary") }
+    if size-hsize > 66000 { panic("tipc: user data exceeds 66000-byte limit") }
+    this.ProcessSubNode("Message Type")
+    // Type four carries an event built for local delivery by group.c; its
+    // host-native event body is not a supported network payload format here.
+    if type == 4 { panic("tipc: local group member event is unsupported") }
+    minimum = 32
+    if type == 0 || type == 3 {
+      if hsize == 24 { minimum = 24 }
+    } else if type == 2 { minimum = 40 } else { minimum = 44 }
+    if hsize < minimum { panic("tipc: header too short for payload message type") }
+    this.ProcessSubNode("Error Code")
+    this.ProcessSubNode("Reroute Count")
+    this.ProcessSubNode("Lookup Scope")
+    this.ProcessSubNode("Word One Reserved")
+    this.ProcessSubNode("Broadcast ACK")
+    this.ProcessSubNode("Link ACK")
+    this.ProcessSubNode("Link Sequence")
+    previous = this.ProcessSubNode("Previous Node").Value
+    this.ProcessSubNode("Origin Port")
+    this.ProcessSubNode("Destination Port")
+    this.AddInfo("Destination Context Required", hsize == 24)
+    if hsize == 24 {
+      this.AddInfo("Origin Node", previous)
+    } else {
+      origin = this.ProcessSubNode("Origin Node").Value
+      this.AddInfo("Origin Node", origin)
+      this.ProcessSubNode("Destination Node")
+    }
+    if type == 1 || type == 2 || type >= 5 {
+      this.ProcessSubNode("Name Type")
+      if type == 1 {
+        this.ProcessSubNode("Name Lower")
+        this.ProcessSubNode("Name Upper")
+      } else if type == 2 || type == 6 { this.ProcessSubNode("Name Instance") } else { this.ProcessSubNode("Group Word Nine") }
+    }
+    if type >= 5 {
+      this.ProcessSubNode("Group Broadcast Sequence")
+      if type == 5 || type == 6 {
+        this.ProcessSubNode("Group Reserved")
+        this.ProcessSubNode("Group Broadcast ACK Required")
+      } else { this.ProcessSubNode("Group Unicast Reserved") }
+    }
+    if this.Length() < hsize {
+      this.GetSubNode("Header Extensions").SetMaxLength(hsize-this.Length())
+      this.ProcessSubNode("Header Extensions")
+    }
+    if size > hsize {
+      this.GetSubNode("Application Data").SetMaxLength(size-hsize)
+      this.ProcessSubNode("Application Data")
+    }
+    this.AddInfo("Header Bytes", hsize)
+    this.AddInfo("Application Decoded", false)
+    this.AddInfo("Connection State Validated", false)
+  Version: uint8,3bit
+  User: uint8,4bit
+  Header Size Words: uint8,4bit
+  Non Sequential: uint8,1bit
+  Destination Droppable: uint8,1bit
+  ACK Required: uint8,1bit
+  Source Droppable: uint8,1bit
+  Replicast: uint8,1bit
+  Control Flag: uint8,1bit
+  SYN: uint8,1bit
+  Message Size: uint32,17bit
+  Message Type: uint8,3bit
+  Error Code: uint8,4bit
+  Reroute Count: uint8,4bit
+  Lookup Scope: uint8,2bit
+  Word One Reserved: uint8,3bit
+  Broadcast ACK: uint16
+  Link ACK: uint16
+  Link Sequence: uint16
+  Previous Node: uint32
+  Origin Port: uint32
+  Destination Port: uint32
+  Origin Node: uint32
+  Destination Node: uint32
+  Name Type: uint32
+  Name Instance: uint32
+  Name Lower: uint32
+  Name Upper: uint32
+  Group Word Nine: uint32
+  Group Broadcast Sequence: uint16
+  Group Reserved: uint16,15bit
+  Group Broadcast ACK Required: uint8,1bit
+  Group Unicast Reserved: uint16
+  Header Extensions: raw
+  Application Data: raw

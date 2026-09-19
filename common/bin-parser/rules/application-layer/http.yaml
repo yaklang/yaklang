@@ -1,70 +1,194 @@
+# HTTP/1.x messages. Close-delimited responses require an explicit bounded
+# input and httpCloseDelimited=true. HEAD responses require response context.
+# The body limit defaults to 16 MiB; callers may set httpBodyLimit.
 Package:
-  HTTP:
+  operator: |
+    this.ProcessSubNode("HTTP")
+  HTTP: HTTPMessage
+  HTTPExact:
     operator: |
-      res,op = this.TryProcessByType("FirstWorld")
-      op.Recovery()
-      if string(res.Value).HasPrefix("HTTP/") {
-        this.ProcessSubNode("HTTP Response")
-      }else{
-        this.ProcessSubNode("HTTP Request")
+      if !this.HasMaxLength() { panic("http: exact message boundary is required") }
+      this.ProcessSubNode("Message")
+      if this.Length() != this.GetMaxLength() { panic("http: unconsumed bytes after HTTP message") }
+    Message: HTTPMessage
+  HTTPMessages:
+    list: true
+    Message: HTTPMessage
+    operator: |
+      if !this.HasMaxLength() { panic("http: message sequence requires a boundary") }
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+HTTPMessage:
+  operator: |
+    res,op = this.TryProcessByType("FirstWorld")
+    op.Recovery()
+    if !op.OK { panic("http: incomplete first word: remaining=" + string(this.GetMaxLength())) }
+    if string(res.Value).HasPrefix("HTTP/") {
+      this.ProcessSubNode("HTTP Response")
+    } else {
+      this.ProcessSubNode("HTTP Request")
+    }
+  HTTP Request:
+    operator: |
+      this.ProcessSubNode("FirstLine")
+      version = string(getNodeResult("Version").Value)
+      if version != "HTTP/1.0" && version != "HTTP/1.1" { panic("http: unsupported request version") }
+      method = string(getNodeResult("Method").Value)
+      target = string(getNodeResult("Path").Value)
+      if len(method) == 0 || len(target) == 0 { panic("http: empty request method or target") }
+      for _, octet = range []byte(method) {
+        if (octet < 65 || octet > 90) && (octet < 97 || octet > 122) && (octet < 48 || octet > 57) && octet not in []byte("!#$%&'*+-.^_`|~") { panic("http: invalid method token") }
       }
-    HTTP Request:
-      FirstLine:
-        unpack: true
-        Method: "del: ;type:string"
-        Path: "del: ;type:string"
-        Version: "del:\r\n;type:string"
-      Headers: Headers
-      Body: Body
-    HTTP Response:
-      FirstLine:
-        unpack: true
-        Version: "del: ;type:string"
-        Status: "del: ;type:string"
-        Message: "del:\r\n;type:string"
-      Headers: Headers
-      Body: Body
+      for _, octet = range []byte(target) { if octet <= 32 || octet == 127 { panic("http: invalid request target") } }
+      this.ProcessSubNode("Headers")
+      setCtx("httpNoBody", false)
+      setCtx("httpIsResponse", false)
+      if getCtx("isChunked") || getCtx("body_length") > 0 { this.ProcessSubNode("Body") }
+    FirstLine:
+      unpack: true
+      Method: "del: ;type:string"
+      Path: "del: ;type:string"
+      Version: "del:\r\n;type:string"
+    Headers: Headers
+    Body: Body
+  HTTP Response:
+    operator: |
+      this.ProcessSubNode("FirstLine")
+      version = string(getNodeResult("Version").Value)
+      if version != "HTTP/1.0" && version != "HTTP/1.1" { panic("http: unsupported response version") }
+      code = string(getNodeResult("Status").Value)
+      if len(code) != 3 { panic("http: invalid status code") }
+      for _, octet = range []byte(code) { if octet < 48 || octet > 57 { panic("http: invalid status code") } }
+      status = int(code)
+      if status < 100 { panic("http: invalid status code") }
+      for _, octet = range []byte(string(getNodeResult("Message").Value)) { if (octet < 32 && octet != 9) || octet == 127 { panic("http: invalid reason phrase") } }
+      this.ProcessSubNode("Headers")
+      noBody = status < 200 || status == 204 || status == 304 || getCtx("httpResponseToMethod") == "HEAD"
+      if getCtx("httpResponseToMethod") == "CONNECT" && status >= 200 && status < 300 { noBody = true }
+      setCtx("httpNoBody", noBody)
+      setCtx("httpIsResponse", true)
+      closeBody = getCtx("httpCloseDelimited") && !getCtx("httpHasLength") && this.GetSubNode("Body").GetMaxLength() > 0
+      if !noBody && (getCtx("isChunked") || getCtx("body_length") > 0 || closeBody) { this.ProcessSubNode("Body") }
+    FirstLine:
+      unpack: true
+      Version: "del: ;type:string"
+      Status: "del: ;type:string"
+      Message: "del:\r\n;type:string"
+    Headers: Headers
+    Body: Body
 FirstWorld: "del: ;type:string"
 Body:
   operator: |
+    if getCtx("httpNoBody") { return }
     if getCtx("isChunked") {
+      setCtx("httpChunkBytes", 0)
       this.ProcessSubNode("DataChunks")
-    }else{
-      this.GetSubNode("Data").SetMaxLength(getCtx("body_length"))
-      this.ProcessSubNode("Data")
+      return
     }
-  Data: raw
+    length = getCtx("body_length")
+    if !getCtx("httpHasLength") && getCtx("httpIsResponse") && getCtx("httpCloseDelimited") {
+      if !this.HasMaxLength() { panic("http: close-delimited response requires a boundary") }
+      length = this.GetMaxLength()
+    }
+    if length > getCtx("httpEffectiveBodyLimit") { panic("http: body exceeds configured limit") }
+    if length > 0 {
+      this.GetSubNode("Octets").SetMaxLength(length)
+      this.ProcessSubNode("Octets")
+    }
+  Octets: string
   DataChunks:
     list: true
+    operator: |
+      setCtx("httpChunksComplete", false)
+      for !getCtx("httpChunksComplete") { this.NewElement().Process() }
     DataChunk:
       operator: |
-        res = this.GetSubNode("DataChunkLength").Process().Value
-        length = int(res)
+        line = string(this.ProcessSubNode("Size").Value)
+        parts = line.SplitN(";", 2)
+        size = parts[0].Trim(" \t")
+        if len(size) == 0 { panic("http: invalid chunk size") }
+        length = 0
+        limit = getCtx("httpEffectiveBodyLimit")
+        for _, octet = range []byte(size) {
+          digit = -1
+          if octet >= 48 && octet <= 57 { digit = octet-48 }
+          if octet >= 65 && octet <= 70 { digit = octet-55 }
+          if octet >= 97 && octet <= 102 { digit = octet-87 }
+          if digit < 0 { panic("http: invalid chunk size") }
+          if length > (limit-digit)/16 { panic("http: chunk exceeds configured limit") }
+          length = length*16+digit
+        }
         if length == 0 {
-          setCtx("inList",false)
+          this.ProcessSubNode("Trailers")
+          setCtx("httpChunksComplete", true)
           return
         }
-        this.GetSubNode("DataChunk").SetCfg("length", length*8)
-        this.GetSubNode("DataChunk").Process()
-        this.GetSubNode("DataChunkEnd").Process()
-      DataChunkLength: "type:string;del:\r\n"
-      DataChunk: raw
-      DataChunkEnd: "del:\r\n;type:string"
+        total = getCtx("httpChunkBytes")+length
+        if total > limit { panic("http: body exceeds configured limit") }
+        setCtx("httpChunkBytes", total)
+        this.GetSubNode("Octets").SetMaxLength(length)
+        this.ProcessSubNode("Octets")
+        ending = this.ProcessSubNode("End").Value
+        if len(ending) != 0 { panic("http: chunk data must end with CRLF") }
+      Size: "type:string;del:\r\n"
+      Octets: string
+      End: "del:\r\n;type:string"
+      Trailers:
+        list: true
+        Item: "del:\r\n;type:string"
+        operator: |
+          for {
+            line = string(this.NewElement().Process().Value)
+            if len(line) == 0 { break }
+            parts = line.SplitN(":", 2)
+            if len(parts) != 2 || len(parts[0]) == 0 { panic("http: invalid trailer field") }
+            name = parts[0].Lower()
+            for _, octet = range []byte(name) {
+              if (octet < 97 || octet > 122) && (octet < 48 || octet > 57) && octet not in []byte("!#$%&'*+-.^_`|~") { panic("http: invalid trailer name") }
+            }
+            for _, octet = range []byte(parts[1]) { if (octet < 32 && octet != 9) || octet == 127 { panic("http: invalid trailer value") } }
+            if name == "content-length" || name == "transfer-encoding" { panic("http: framing field in trailers") }
+          }
 Headers:
   operator: |
+    # Framing state belongs to ONE message, even when callers reuse a context.
+    setCtx("body_length", 0)
+    setCtx("httpHasLength", false)
+    setCtx("isChunked", false)
+    limit = getCtx("httpBodyLimit")
+    if !hasCtx("httpBodyLimit") { limit = 16777216 }
+    if limit <= 0 { panic("http: invalid body limit") }
+    setCtx("httpEffectiveBodyLimit", limit)
+    seenTransfer = false
     for {
-      data := this.NewElement().Process().Value
-      if data == nil || len(data) == 0 {
-        // this.SetChildren(this.GetChildren()[:-1])
-        return
+      line = string(this.NewElement().Process().Value)
+      if len(line) == 0 { break }
+      parts = line.SplitN(":", 2)
+      if len(parts) != 2 || len(parts[0]) == 0 { panic("http: invalid header field") }
+      name = parts[0].Lower()
+      for _, octet = range []byte(name) {
+        if (octet < 97 || octet > 122) && (octet < 48 || octet > 57) && octet not in []byte("!#$%&'*+-.^_`|~") { panic("http: invalid header name") }
       }
-      if string(data).HasPrefix("Content-Length: ") {
-        l = int(string(data)[len("Content-Length: "):])
-        setCtx("body_length", l)
+      for _, octet = range []byte(parts[1]) { if (octet < 32 && octet != 9) || octet == 127 { panic("http: invalid header value") } }
+      value = parts[1].Trim(" \t")
+      if name == "content-length" {
+        if len(value) == 0 { panic("http: invalid content length") }
+        length = 0
+        for _, octet = range []byte(value) {
+          if octet < 48 || octet > 57 { panic("http: invalid content length") }
+          digit = octet-48
+          if length > (limit-digit)/10 { panic("http: body exceeds configured limit") }
+          length = length*10+digit
+        }
+        if getCtx("httpHasLength") && getCtx("body_length") != length { panic("http: conflicting content lengths") }
+        setCtx("body_length", length)
+        setCtx("httpHasLength", true)
       }
-      if string(data).HasPrefix("Transfer-Encoding: chunked") {
+      if name == "transfer-encoding" {
+        if seenTransfer || value.Lower() != "chunked" { panic("http: unsupported transfer coding") }
+        seenTransfer = true
         setCtx("isChunked", true)
       }
     }
+    if seenTransfer && getCtx("httpHasLength") { panic("http: ambiguous transfer framing") }
   list: true
   Item: "del:\r\n;type:string"

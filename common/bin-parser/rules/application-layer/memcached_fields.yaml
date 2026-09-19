@@ -1,0 +1,49 @@
+# Passive, explicitly bounded sampled layouts; no TCP reassembly or command execution.
+endian: big
+unit: byte
+Package:
+  MemcachedStatsRequestFields:
+    operator: |
+      err = parseMemcachedFields("stats-request")
+      if err != nil { panic(err) }
+  MemcachedStatsRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("memcached-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("memcached-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MemcachedStatsRequestFieldsExact", "MemcachedStatsRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Memcached Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MemcachedStatsResponseFields:
+    operator: |
+      err = parseMemcachedFields("stats-response")
+      if err != nil { panic(err) }
+  MemcachedStatsResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("memcached-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("memcached-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MemcachedStatsResponseFieldsExact", "MemcachedStatsResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Memcached Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  MemcachedBinaryGetRequestFields:
+    operator: |
+      err = parseMemcachedFields("binary-get-request")
+      if err != nil { panic(err) }
+  MemcachedBinaryGetRequestFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("memcached-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("memcached-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("MemcachedBinaryGetRequestFieldsExact", "MemcachedBinaryGetRequestFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Memcached Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+MemcachedStatsRequestFieldsExact: "import:application-layer/memcached_fields.yaml;node:MemcachedStatsRequestFields"
+MemcachedStatsResponseFieldsExact: "import:application-layer/memcached_fields.yaml;node:MemcachedStatsResponseFields"
+MemcachedBinaryGetRequestFieldsExact: "import:application-layer/memcached_fields.yaml;node:MemcachedBinaryGetRequestFields"

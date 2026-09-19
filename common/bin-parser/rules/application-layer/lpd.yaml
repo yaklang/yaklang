@@ -1,0 +1,15 @@
+# Passive decoding of the two queue-only daemon commands in RFC 1179.
+# Job-file subcommands, acknowledgements and queue listings have distinct
+# framing and are not interpreted as these initial connection commands.
+Package:
+  LPD:
+    operator: |
+      code = this.ProcessSubNode("Command").Value
+      if code != 1 && code != 2 { panic("lpd: unsupported daemon command") }
+      queue = string(this.ProcessSubNode("Queue").Value)
+      if len(queue) == 0 { panic("lpd: empty queue name") }
+      for _, octet = range []byte(queue) {
+        if octet <= 32 || octet >= 127 { panic("lpd: queue must be one printable ASCII name") }
+      }
+    Command: uint8
+    Queue: "type:string;del:\n"

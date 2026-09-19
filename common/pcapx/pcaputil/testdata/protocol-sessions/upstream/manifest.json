@@ -1,0 +1,51 @@
+{
+  "captures": [
+    {
+      "file": "rtsp.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/rtsp.pcap",
+      "repository": "ntop/nDPI",
+      "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+      "license": "LGPL-3.0",
+      "license_file": "../../../../../bin-parser/testdata/protocol-corpus/licenses/ndpi-COPYING.txt",
+      "sha256": "4675f9c4e6233fdfc8da88b7dd959367018b0ca1b34e6fc322d96c1495e58cf4",
+      "size_bytes": 119892,
+      "capture_records": 568,
+      "origin": "upstream-capture"
+    },
+    {
+      "file": "stun_signal_tcp.pcapng",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/stun_signal_tcp.pcapng",
+      "repository": "ntop/nDPI",
+      "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+      "license": "LGPL-3.0",
+      "license_file": "../../../../../bin-parser/testdata/protocol-corpus/licenses/ndpi-COPYING.txt",
+      "sha256": "a8e6127a047c369e64f75ca3d82f0249a45e8ccd52f95e3152fea387d4496a34",
+      "size_bytes": 131384,
+      "capture_records": 500,
+      "origin": "upstream-capture"
+    },
+    {
+      "file": "stun_tcp_multiple_msgs_same_pkt.pcap",
+      "source_url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/stun_tcp_multiple_msgs_same_pkt.pcap",
+      "repository": "ntop/nDPI",
+      "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+      "license": "LGPL-3.0",
+      "license_file": "../../../../../bin-parser/testdata/protocol-corpus/licenses/ndpi-COPYING.txt",
+      "sha256": "c07bb45c81ca5511b5697bc4c9823f7db2e67e0173ecc8b48ac56f4d31792b11",
+      "size_bytes": 788,
+      "capture_records": 5,
+      "origin": "upstream-capture"
+    },
+    {
+      "file": "vnc-sample.pcap",
+      "source_url": "https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/vnc-sample.pcap",
+      "source_page": "https://wiki.wireshark.org/SampleCaptures",
+      "license": "not stated for this attachment; public Wireshark sample contribution",
+      "sha256": "f1c5d9e2f2c963bbdef6c1fd3a5f6fe9d9e8b486e06e477a90476b09781c502f",
+      "size_bytes": 9516,
+      "capture_records": 81,
+      "origin": "upstream-capture",
+      "limitations": "RFB 3.8 VNC authentication and ZRLE; original capture has TCP sequence gaps; not a lossless desktop rendering fixture"
+    }
+  ]
+}

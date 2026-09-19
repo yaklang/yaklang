@@ -1,0 +1,36 @@
+endian: big
+Package:
+  NetRemoting:
+    operator: |
+      this.ProcessSubNode("Preamble")
+      p = string(getNodeResult("Preamble").Value)
+      if p != ".NET" {
+        panic("net-remoting: preamble must be .NET")
+      }
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
+      this.ProcessSubNode("Operation Type")
+      this.ProcessSubNode("Content Length")
+      l = getNodeResult("Content Length").Value
+      if l >= 17 && l < 1048576 {
+        this.GetSubNode("Serialized").SetMaxLength(l)
+        this.ProcessSubNode("Serialized")
+      }
+    Preamble: raw,4
+    Major: uint16
+    Minor: uint16
+    Operation Type: uint16
+    Content Length: uint32
+    Serialized:
+      endian: little
+      operator: |
+        this.ProcessSubNode("Record Type")
+        this.ProcessSubNode("Root Id")
+        this.ProcessSubNode("Header Id")
+        this.ProcessSubNode("Format Major")
+        this.ProcessSubNode("Format Minor")
+      Record Type: uint8
+      Root Id: int32
+      Header Id: int32
+      Format Major: int32
+      Format Minor: int32

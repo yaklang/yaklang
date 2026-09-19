@@ -1,0 +1,29 @@
+COMMAND ["/tmp/yak-protocol-round2/before-pcap.test", "-test.run=^$", "-test.bench=^BenchmarkProtocolReviewScheduler$", "-test.benchmem", "-test.benchtime=200ms", "-test.cpu=1,2,4,8", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/pcapx/pcaputil
+BenchmarkProtocolReviewScheduler/single-tcp/workers=1           	     426	    538896 ns/op	         1.000 gomaxprocs	       129.0 messages/batch	      4177 ns/message	 1067719 B/op	    3817 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=1-2         	     536	    441506 ns/op	         2.000 gomaxprocs	       129.0 messages/batch	      3423 ns/message	 1067809 B/op	    3817 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=1-4         	     588	    407958 ns/op	         4.000 gomaxprocs	       129.0 messages/batch	      3162 ns/message	 1067951 B/op	    3818 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=1-8         	     591	    403679 ns/op	         8.000 gomaxprocs	       129.0 messages/batch	      3129 ns/message	 1068195 B/op	    3818 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=2           	     247	    972363 ns/op	         1.000 gomaxprocs	       129.0 messages/batch	      7538 ns/message	 3565814 B/op	    3882 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=2-2         	     344	    688621 ns/op	         2.000 gomaxprocs	       129.0 messages/batch	      5338 ns/message	 3565980 B/op	    3882 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=2-4         	     388	    622851 ns/op	         4.000 gomaxprocs	       129.0 messages/batch	      4828 ns/message	 3566438 B/op	    3884 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=2-8         	     386	    603409 ns/op	         8.000 gomaxprocs	       129.0 messages/batch	      4678 ns/message	 3567096 B/op	    3886 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=4           	     195	   1204315 ns/op	         1.000 gomaxprocs	       129.0 messages/batch	      9336 ns/message	 6063120 B/op	    3938 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=4-2         	     290	    837762 ns/op	         2.000 gomaxprocs	       129.0 messages/batch	      6494 ns/message	 6063301 B/op	    3938 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=4-4         	     321	    773368 ns/op	         4.000 gomaxprocs	       129.0 messages/batch	      5995 ns/message	 6063780 B/op	    3940 allocs/op
+BenchmarkProtocolReviewScheduler/single-tcp/workers=4-8         	     316	    766908 ns/op	         8.000 gomaxprocs	       129.0 messages/batch	      5945 ns/message	 6065053 B/op	    3943 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=1              	    3451	     70592 ns/op	         1.000 gomaxprocs	         4.000 messages/batch	     17648 ns/message	  301281 B/op	     466 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=1-2            	    4996	     50147 ns/op	         2.000 gomaxprocs	         4.000 messages/batch	     12537 ns/message	  301286 B/op	     466 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=1-4            	    4998	     46077 ns/op	         4.000 gomaxprocs	         4.000 messages/batch	     11519 ns/message	  301299 B/op	     466 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=1-8            	    4792	     48417 ns/op	         8.000 gomaxprocs	         4.000 messages/batch	     12104 ns/message	  301330 B/op	     466 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=2              	     529	    441233 ns/op	         1.000 gomaxprocs	         4.000 messages/batch	    110308 ns/message	 2802343 B/op	     550 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=2-2            	     921	    245125 ns/op	         2.000 gomaxprocs	         4.000 messages/batch	     61281 ns/message	 2802378 B/op	     550 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=2-4            	    1132	    196813 ns/op	         4.000 gomaxprocs	         4.000 messages/batch	     49203 ns/message	 2802486 B/op	     551 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=2-8            	    1191	    198969 ns/op	         8.000 gomaxprocs	         4.000 messages/batch	     49742 ns/message	 2802673 B/op	     551 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=4              	     274	    856308 ns/op	         1.000 gomaxprocs	         4.000 messages/batch	    214077 ns/message	 5299578 B/op	     605 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=4-2            	     537	    425430 ns/op	         2.000 gomaxprocs	         4.000 messages/batch	    106358 ns/message	 5299609 B/op	     605 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=4-4            	     771	    319032 ns/op	         4.000 gomaxprocs	         4.000 messages/batch	     79758 ns/message	 5299760 B/op	     606 allocs/op
+BenchmarkProtocolReviewScheduler/dns-udp/workers=4-8            	     816	    309113 ns/op	         8.000 gomaxprocs	         4.000 messages/batch	     77278 ns/message	 5300039 B/op	     607 allocs/op
+PASS

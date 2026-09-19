@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 const (
@@ -28,8 +28,10 @@ const (
 	CfgParent              = "parent"
 	CfgDel                 = "del"
 	CfgDelimiter           = "delimiter"
+	CfgDelimiterOptional   = "delimiter-optional"
 	CfgImport              = "import"
 	CfgNodeResult          = "node result"
+	CfgConsumedBits        = "consumed bits"
 	CfgLastNode            = "last node"
 	CfgElementIndex        = "element index"
 	CfgExceptionPlan       = "exception-plan"
@@ -57,6 +59,7 @@ type DefParser struct {
 	mode  string
 	cfg   base.Config
 	bpPos []uint64
+	bpOut []base.BitWriterState
 }
 type Operator struct {
 	ParseStruct   func(node *base.Node) (bool, error)
@@ -106,6 +109,8 @@ func (d *DefParser) OnRoot(node *base.Node) error {
 	node.Ctx.SetItem("buffer", buffer)
 	node.Ctx.SetItem("writer", base.NewBitWriter(buffer))
 	d.ctx = node.Ctx
+	d.bpPos = nil
+	d.bpOut = nil
 	if d.ctx.Has("writer") {
 		d.write = func(bytes []byte, u uint64) ([2]uint64, error) {
 			writer := d.ctx.GetItem("writer").(*base.BitWriter)
@@ -126,13 +131,23 @@ func (d *DefParser) OnRoot(node *base.Node) error {
 	return nil
 }
 func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
+	return d.operate(operator, node)
+}
+
+func (d *DefParser) operate(operator nodeOperation, node *base.Node) error {
 	if node.Cfg.Has(CfgRefType) {
 		typeNode, err := ParseRefNode(node)
 		if err != nil {
 			return fmt.Errorf("new node by type error: %w", err)
 		}
 		*node = *typeNode
-		return d.Operate(operator, node)
+		// Rebind children to the destination instance, not the temporary copy
+		// returned by ParseRefNode. Relative field paths and length accounting
+		// must see the instance attached to the actual parse tree.
+		if err := InitNode(node); err != nil {
+			return err
+		}
+		return d.operate(operator, node)
 	}
 	if node.Name == "root" {
 		irootNodeMap := node.Ctx.GetItem(CfgRootMap)
@@ -147,7 +162,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 			return errors.New("package node not found")
 		} else {
 
-			return operator.NodeParse(v)
+			return operator.parseNode(v)
 		}
 	}
 	if node.Cfg.Has(CfgImport) {
@@ -176,6 +191,18 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		//}
 		//*rootNode.Ctx = *node.Ctx
 
+		// Imported rules need the caller's protocol limits/session settings, but
+		// must keep their own type map, paths and transient rule variables.
+		if inputConfig, ok := node.Ctx.GetItem(base.CtxInputConfig).(map[string]any); ok {
+			for key, value := range inputConfig {
+				switch key {
+				case CfgRootMap, "root", "path", "writer", "buffer", "def_writer", CfgInList, CtxGenReaders, base.CtxInputConfig:
+					continue
+				}
+				rootNode.Ctx.SetItem(key, value)
+			}
+			rootNode.Ctx.SetItem(base.CtxInputConfig, inputConfig)
+		}
 		rootNode.Ctx.SetItem("writer", node.Ctx.GetItem("writer"))
 		rootNode.Ctx.SetItem("buffer", node.Ctx.GetItem("buffer"))
 		// 补充runtime cfg
@@ -192,46 +219,52 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		node.Name = name
 		//InitNode(node)
 		//node.Cfg.SetItem("unpack", true)
-		return operator.NodeParse(node)
+		return operator.parseNode(node)
 	}
 	if v := node.Cfg.GetItem(CfgOperator); v != nil {
 		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) (func(bool), error) {
 			op := func(recovery bool) {
 				if recovery {
-					err := operator.Recovery()
+					err := operator.recovery()
 					if err != nil {
 						log.Errorf("recovery error: %v", err)
 					}
 				} else {
-					err := operator.PopBackup()
+					err := operator.popBackup()
 					if err != nil {
 						log.Errorf("pop backup error: %v", err)
 					}
 				}
 			}
-			err := operator.Backup()
+			err := operator.backup()
 			if err != nil {
 				return op, err
 			}
-			err = operator.NodeParse(node)
+			err = operator.parseNode(node)
 			if err != nil {
 				return op, err
 			}
 			return op, nil
-		})
+		}, operator.mode())
 		if err != nil {
 			return fmt.Errorf("eval operator error: %w", err)
 		}
 		return nil
 	}
 	if node.Cfg.GetBool(CfgIsList) {
-		if operator.ParseStruct != nil {
-			ok, err := operator.ParseStruct(node)
-			if ok {
-				return err
-			}
+		if ok, err := operator.parseStruct(node); ok {
+			return err
 		}
+		previousInList := node.Ctx.GetItem(CfgInList)
+		hadPreviousInList := node.Ctx.Has(CfgInList)
 		node.Ctx.SetItem(CfgInList, true)
+		defer func() {
+			if hadPreviousInList {
+				node.Ctx.SetItem(CfgInList, previousInList)
+			} else {
+				node.Ctx.DeleteItem(CfgInList)
+			}
+		}()
 		if len(node.Children) == 0 {
 			return errors.New("get node element type error")
 		}
@@ -262,12 +295,13 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				if hasLength && uint64(index) >= listLength {
 					break
 				}
-				err := operator.Backup()
+				err := operator.backup()
 				if err != nil {
 					return fmt.Errorf("backup error: %w", err)
 				}
 				element, err := ListNodeNewElement(node)
 				if err != nil {
+					_ = operator.recovery()
 					return fmt.Errorf("new list element error: %w", err)
 				}
 				element.Cfg.SetItem(CfgElementIndex, index)
@@ -276,29 +310,50 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				//node.Cfg.GetItem("exception-plan")
 				l, err := getNodeLength(element)
 				if err != nil {
+					_ = operator.recovery()
 					return fmt.Errorf("get remaining space error: %w", err)
 				}
 				if l == 0 {
 					node.Children = node.Children[:len(node.Children)-1]
+					if hasLength {
+						if err := operator.recovery(); err != nil {
+							return fmt.Errorf("recovery error before missing list element %d: %w", index, err)
+						}
+						return fmt.Errorf("list ended after %d of %d elements: %w", index, listLength, io.ErrUnexpectedEOF)
+					}
+					if err := operator.popBackup(); err != nil {
+						return fmt.Errorf("pop backup error: %w", err)
+					}
 					break
 				}
 				//cfgDeleteItem(element, CfgNodeResult)
 				if !node.Ctx.GetBool(CfgInList) {
+					node.Children = node.Children[:len(node.Children)-1]
+					if err := operator.popBackup(); err != nil {
+						return fmt.Errorf("pop backup error: %w", err)
+					}
 					break
 				}
-				err = operator.NodeParse(element)
+				err = operator.parseNode(element)
 				if err != nil {
 					switch node.Cfg.GetString(CfgExceptionPlan) {
 					case "stopList":
 						node.Children = node.Children[:len(node.Children)-1]
-						err := operator.Recovery()
+						err := operator.recovery()
 						if err != nil {
 							return fmt.Errorf("recovery error: %w", err)
 						}
 						return nil
 					default:
+						recoveryErr := operator.recovery()
+						if recoveryErr != nil {
+							return fmt.Errorf("recovery error after list element %d: %w", index, recoveryErr)
+						}
 						return fmt.Errorf("parse list node index %d error: %w", index, err)
 					}
+				}
+				if err := operator.popBackup(); err != nil {
+					return fmt.Errorf("pop backup error after list element %d: %w", index, err)
 				}
 				index++
 			}
@@ -307,45 +362,40 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		if err != nil {
 			return fmt.Errorf("parse list node error: %w", err)
 		}
-		operator.PopBackup()
-		node.Ctx.DeleteItem(CfgInList)
 		return nil
 	}
 	if node.Cfg.GetBool(CfgIsTerminal) {
-		err := operator.ParseTerminal(node)
+		err := operator.parseTerminal(node)
 		if err != nil {
 			return err
 		}
 		return nil
 	} else {
-		if operator.ParseStruct != nil {
-			ok, err := operator.ParseStruct(node)
-			if ok {
-				return err
-			}
+		if ok, err := operator.parseStruct(node); ok {
+			return err
 		}
-		err := operator.Backup()
+		err := operator.backup()
 		if err != nil {
 			return fmt.Errorf("backup error: %w", err)
 		}
 		for _, child := range node.Children {
-			err := operator.NodeParse(child)
+			err := operator.parseNode(child)
 			if err != nil {
 				//if node.Cfg.GetString(CfgExceptionPlan) == "skip" {
-				//	err = operator.Recovery()
+				//	err = operator.recovery()
 				//	if err != nil {
 				//		return fmt.Errorf("pop backup error: %w", err)
 				//	}
 				//	return nil
 				//}
-				e := operator.Recovery()
+				e := operator.recovery()
 				if e != nil {
 					return fmt.Errorf("recovery backup error: %w", e)
 				}
 				return fmt.Errorf("parse child node error: %w", err)
 			}
 		}
-		err = operator.PopBackup()
+		err = operator.popBackup()
 		if err != nil {
 			return fmt.Errorf("pop backup error: %w", err)
 		}
@@ -446,13 +496,18 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 				case []byte:
 					raw = ret
 				}
-				raw = append(raw, node.Cfg.GetString(CfgDelimiter)...)
+				delimiter := node.Cfg.GetString(CfgDelimiter)
+				if delimiter == "" {
+					delimiter = node.Cfg.GetString(CfgDel)
+				}
+				raw = append(raw, delimiter...)
 				rawRes, err := d.write(raw, uint64(len(raw)*8))
-				rawRes[1] = rawRes[1] - uint64(len(node.Cfg.GetString(CfgDelimiter))*8)
+				rawRes[1] = rawRes[1] - uint64(len(delimiter)*8)
 				if err != nil {
 					return fmt.Errorf("write error: %w", err)
 				}
 				node.Cfg.SetItem(CfgNodeResult, rawRes)
+				node.Cfg.SetItem(CfgConsumedBits, uint64(len(raw)*8))
 				return nil
 			}
 		},
@@ -469,115 +524,7 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 	return d.Operate(operator, node)
 }
 func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
-	var operator *Operator
-	operator = &Operator{
-		Mode: "parser",
-		NodeParse: func(n *base.Node) error {
-			return n.Parse(data)
-		},
-		ParseTerminal: func(node *base.Node) error {
-			//if node.Cfg.Has("parser") {
-			//	secondValue, err := ExecParser(node)
-			//	if err != nil {
-			//		return fmt.Errorf("exec parser error: %w", err)
-			//	}
-			//	node.Cfg.SetItem("secondValue", secondValue)
-			//	return nil
-			//}
-			if !NodeIsTerminal(node) {
-				return fmt.Errorf("node %s is not terminal", node.Name)
-			}
-			if !NodeIsDelimiter(node) {
-				itypeName := node.Cfg.GetItem(CfgType)
-				if itypeName == nil {
-					return errors.New("not set type")
-				}
-				typeName := utils.InterfaceToString(itypeName)
-				if utils.StringArrayContains(baseType, typeName) {
-					length, err := getNodeLength(node)
-					if err != nil {
-						return fmt.Errorf("get node length error: %w", err)
-					}
-					if length == 0 {
-						return nil
-					}
-					switch typeName {
-					case "string":
-						typeName = "bytes"
-					case "bytes":
-						typeName = "raw"
-					}
-					buf, err := data.ReadBits(length)
-					if err != nil {
-						return fmt.Errorf("read bits error: %w", err)
-					}
-					rawRes, err := d.write(buf, length)
-					if err != nil {
-						return fmt.Errorf("write error: %w", err)
-					}
-					node.Cfg.SetItem(CfgNodeResult, rawRes)
-					log.Debugf("node %s result: %v", node.Name, codec.EncodeToHex(buf))
-					return nil
-				} else {
-					return errors.New("not support type")
-				}
-			} else {
-				delimiter := utils.InterfaceToString(node.Cfg.GetItem(CfgDelimiter))
-				if len(delimiter) == 0 {
-					delimiter = utils.InterfaceToString(node.Cfg.GetItem(CfgDel))
-					if len(delimiter) == 0 {
-						return errors.New("delimiter length must be greater than 0")
-					}
-				}
-				delimitern := 0
-				byts := []byte{}
-				// 循环读取数据，直到遇到delimiter结束
-				for {
-					b, err := data.ReadBits(8)
-					if err != nil {
-						return err
-					}
-					if delimiter[delimitern] == b[0] {
-						delimitern++
-					} else {
-						delimitern = 0
-					}
-					if delimitern == len(delimiter) {
-						byts = byts[:len(byts)+1-delimitern]
-						break
-					}
-					byts = append(byts, b...)
-				}
-				res, err := d.write(byts, uint64(len(byts)*8))
-				if err != nil {
-					return err
-				}
-				node.Cfg.SetItem(CfgNodeResult, res)
-				res, err = d.write([]byte(delimiter), uint64(len(delimiter)*8))
-				if err != nil {
-					return err
-				}
-				log.Debugf("node %s result: %v", node.Name, codec.EncodeToHex(byts))
-				return nil
-			}
-		},
-		Backup: func() error {
-			d.bpPos = append(d.bpPos, d.ctx.GetUint64("pointer"))
-			return data.Backup()
-		},
-		Recovery: func() error {
-			d.ctx.SetItem("pointer", d.bpPos[len(d.bpPos)-1])
-			buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
-			buffer.Truncate(int(d.bpPos[len(d.bpPos)-1]) / 8)
-			d.bpPos = d.bpPos[:len(d.bpPos)-1]
-			return data.Recovery()
-		},
-		PopBackup: func() error {
-			d.bpPos = d.bpPos[:len(d.bpPos)-1]
-			return data.PopBackup()
-		},
-	}
-	return d.Operate(operator, node)
+	return d.operate(&parseExecution{parser: d, reader: data, origin: node}, node)
 }
 
 var noResultError = errors.New("no result")

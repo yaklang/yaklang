@@ -1,0 +1,149 @@
+endian: big
+Package:
+  GitPacketLines:
+    list: true
+    Packet: GitPacketLine
+    operator: |
+      for this.Length() < this.GetMaxLength() {
+        this.NewElement().Process()
+      }
+
+  EtherNetIPEncapsulation:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Session Handle")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Sender Context")
+      this.ProcessSubNode("Options")
+      length = getNodeResult("Length").Value
+      if length != this.GetMaxLength() - 24 {
+        panic("enip: encapsulation length does not match input")
+      }
+      command = getNodeResult("Command").Value
+      if command == 0x65 {
+        if length != 4 { panic("enip: register session length must be 4") }
+        this.ProcessSubNode("Protocol Version")
+        this.ProcessSubNode("Option Flags")
+        return
+      }
+      if command == 0x6f || command == 0x70 {
+        this.ProcessSubNode("Interface Handle")
+        this.ProcessSubNode("Timeout")
+        this.ProcessSubNode("Item Count")
+        this.ProcessSubNode("Items")
+        if this.Length() != this.GetMaxLength() { panic("enip: trailing CPF bytes") }
+        return
+      }
+      if length > 0 {
+        this.GetSubNode("Command Data").SetMaxLength(length)
+        this.ProcessSubNode("Command Data")
+      }
+    Command: uint16
+    Length: uint16
+    Session Handle: uint32
+    Status: uint32
+    Sender Context: raw,8
+    Options: uint32
+    Protocol Version: uint16
+    Option Flags: uint16
+    Interface Handle: uint32
+    Timeout: uint16
+    Item Count: uint16
+    Items:
+      list: true
+      list-length-from-field: "../Item Count"
+      Item: ENIPItem
+    Command Data: raw
+
+  RSVP:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("Send TTL")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Length")
+      if getNodeResult("Version").Value != 1 { panic("rsvp: version must be 1") }
+      if getNodeResult("Length").Value != this.GetMaxLength() { panic("rsvp: message length mismatch") }
+      if this.Length() < this.GetMaxLength() { this.ProcessSubNode("Objects") }
+    Version: uint8,4bit
+    Flags: uint8,4bit
+    Message Type: uint8
+    Checksum: uint16
+    Send TTL: uint8
+    Reserved: uint8
+    Length: uint16
+    Objects:
+      list: true
+      Object: RSVPObject
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+
+GitPacketLine:
+  operator: |
+    this.ProcessSubNode("Packet Length")
+    length = getNodeResult("Packet Length").Value
+    if length <= 2 { return }
+    if length < 4 || length > 65520 { panic("git: invalid packet length") }
+    if length > this.GetMaxLength() { panic("git: packet length exceeds input") }
+    if length > 4 {
+      this.GetSubNode("Line").SetMaxLength(length - 4)
+      this.ProcessSubNode("Line")
+    }
+  Packet Length:
+    list: true
+    Digit: uint8
+    operator: |
+      for i = range 4 { this.NewElement().Process() }
+    out: |
+      result = 0
+      for _, digit = range data.Value {
+        code = digit.Value
+        value = 0
+        if code >= 48 && code <= 57 { value = code - 48 } else if code >= 97 && code <= 102 { value = code - 87 } else { panic("git: packet length is not lowercase hex") }
+        result = result * 16 + value
+      }
+      return result
+  Line: string
+
+ENIPItem:
+  endian: little
+  operator: |
+    this.ProcessSubNode("Type ID")
+    this.ProcessSubNode("Item Length")
+    length = getNodeResult("Item Length").Value
+    if length > this.GetMaxLength() - 4 { panic("enip: CPF item length exceeds input") }
+    if length > 0 {
+      this.GetSubNode("Item Data").SetMaxLength(length)
+      this.ProcessSubNode("Item Data")
+    }
+  Type ID: uint16
+  Item Length: uint16
+  Item Data: raw
+
+RSVPObject:
+  operator: |
+    this.ProcessSubNode("Object Length")
+    this.ProcessSubNode("Class")
+    this.ProcessSubNode("C Type")
+    length = getNodeResult("Object Length").Value
+    if length < 4 || length % 4 != 0 || length > this.GetMaxLength() { panic("rsvp: invalid object length") }
+    if getNodeResult("Class").Value == 3 && getNodeResult("C Type").Value == 1 {
+      if length != 12 { panic("rsvp: IPv4 HOP length must be 12") }
+      this.ProcessSubNode("Neighbor Address")
+      this.ProcessSubNode("Logical Interface Handle")
+      return
+    }
+    if length > 4 {
+      this.GetSubNode("Object Data").SetMaxLength(length - 4)
+      this.ProcessSubNode("Object Data")
+    }
+  Object Length: uint16
+  Class: uint8
+  C Type: uint8
+  Neighbor Address: raw,4
+  Logical Interface Handle: uint32
+  Object Data: raw
