@@ -17,6 +17,9 @@ func probeTNS(w []byte, limit int) ProbeResult {
 	if len(w) < 5 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	if w[0] == 0x05 && w[1] == 0x64 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	typ := w[4]
 	if typ != 1 && typ != 2 && typ != 4 && typ != 6 {
 		return ProbeResult{Verdict: ProbeReject}

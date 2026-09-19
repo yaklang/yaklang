@@ -337,6 +337,9 @@ type binFlow struct {
 	rtsp             *binRTSP
 	stun             *binSTUN
 	tftp             *binTFTP
+	dnp3             *binDNP3
+	c37118           *binC37118
+	goose            *binGOOSE
 	httpUpgrades     []bool
 	httpDoH          []bool
 	httpIPP          []bool

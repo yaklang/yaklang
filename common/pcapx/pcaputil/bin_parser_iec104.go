@@ -7,13 +7,15 @@ import (
 )
 
 type binIEC104 struct {
-	seen   [2]bool
-	next   [2]uint16
-	active bool
+	seen     [2]bool
+	next     [2]uint16
+	active   bool
+	uPending [2]map[byte]bool
+	uPending [2]map[byte]bool
 }
 
 func probeIEC104(w []byte, _ int) ProbeResult {
-	if len(w) == 0 || w[0] != 0x68 {
+	if len(w) < 2 || w[0] != 0x68 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if len(w) < 6 {
@@ -155,6 +157,20 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 		out["Send Sequence"] = seq
 		out["Receive Sequence"] = binary.LittleEndian.Uint16(c[2:]) >> 1
 		out["ASDU"] = asdu
+		out["Format"] = "I"
+		out["TypeID"] = int(w[6])
+		out["COT"] = int(w[8] & 63)
+		out["Packet Name"] = iec104TypeName(w[6])
+		out["Recv Sequence"] = int(binary.LittleEndian.Uint16(c[2:]) >> 1)
+		out["Role"] = "indication"
+		if objects, ok := asdu["Objects"].([]map[string]any); ok && len(objects) > 0 {
+			out["IOA"] = int(objects[0]["Address"].(uint32))
+		}
+		if w[8]&63 == 6 || w[8]&63 == 8 {
+			out["Role"] = "request"
+		} else if w[8]&63 == 7 || w[8]&63 == 9 || w[8]&63 == 10 {
+			out["Role"] = "response"
+		}
 		if s.seen[dir] && seq != s.next[dir] {
 			out["Sequence Gap"] = true
 			out["Expected Sequence"] = s.next[dir]
@@ -169,9 +185,28 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 		}
 		if c[0] == 1 {
 			out["Frame Type"] = "S"
+			out["Format"] = "S"
+			out["Packet Name"] = "S-format"
+			out["Recv Sequence"] = int(binary.LittleEndian.Uint16(c[2:]) >> 1)
 			out["Receive Sequence"] = binary.LittleEndian.Uint16(c[2:]) >> 1
 		} else {
 			out["Frame Type"] = "U"
+			out["Format"] = "U"
+			out["Packet Name"] = iec104UName(c[0])
+			if s.uPending[0] == nil {
+				s.uPending = [2]map[byte]bool{{}, {}}
+			}
+			if c[0] == 7 || c[0] == 19 || c[0] == 67 {
+				s.uPending[dir][c[0]] = true
+				out["Role"] = "request"
+			} else {
+				out["Role"] = "response"
+				act := map[byte]byte{11: 7, 35: 19, 131: 67}[c[0]]
+				if s.uPending[1-dir][act] {
+					out["In Reply To"] = iec104UName(act)
+					delete(s.uPending[1-dir], act)
+				}
+			}
 			out["Function"] = map[byte]string{7: "STARTDT act", 11: "STARTDT con", 19: "STOPDT act", 35: "STOPDT con", 67: "TESTFR act", 131: "TESTFR con"}[c[0]]
 			if c[0] == 11 {
 				s.active = true
@@ -183,4 +218,14 @@ func (s *binIEC104) consume(dir int, w []byte, max int) (map[string]any, error) 
 	}
 	out["Observed STARTDT Confirmation"] = s.active
 	return out, nil
+}
+
+func iec104UName(c byte) string {
+	return map[byte]string{7: "STARTDT ACT", 11: "STARTDT CON", 19: "STOPDT ACT", 35: "STOPDT CON", 67: "TESTFR ACT", 131: "TESTFR CON"}[c]
+}
+func iec104TypeName(c byte) string {
+	if n, ok := map[byte]string{1: "M_SP_NA_1", 3: "M_DP_NA_1", 9: "M_ME_NA_1", 11: "M_ME_NB_1", 13: "M_ME_NC_1", 30: "M_SP_TB_1", 31: "M_DP_TB_1", 34: "M_ME_TD_1", 35: "M_ME_TE_1", 36: "M_ME_TF_1", 45: "C_SC_NA_1", 100: "C_IC_NA_1", 103: "C_CS_NA_1"}[c]; ok {
+		return n
+	}
+	return fmt.Sprintf("TypeID %d", c)
 }
