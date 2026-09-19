@@ -269,6 +269,21 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, mbap(1, 1, 3, []byte{0, 0, 0, 2})},
 			{1, mbap(1, 1, 3, []byte{4, 0, 1, 0, 2})},
 		}},
+		{"iec104-startdt-interrogation", "iec104", 12404, []sessionStep{
+			{0, iec104U(0x07)},
+			{1, iec104U(0x0b)},
+			{0, iec104I(0, 0, 100, 6, 0, []byte{20})},
+		}},
+		{"dnp3-read-response", "dnp3", 12000, []sessionStep{
+			{0, dnp3Link(0xC4, 1, 2, []byte{0xC0, 0x01})},
+			{1, dnp3Link(0x44, 2, 1, []byte{0xC0, 0x81, 0, 0})},
+		}},
+		{"c37118-cmd", "c37118", 14712, []sessionStep{
+			{0, c37frame(4, 1, 7, []byte{0, 2})},
+		}},
+		{"goose-dataset", "goose", 18888, []sessionStep{
+			{0, goosePDU()},
+		}},
 		{"grpc-unary-http2", "http2", 18081, []sessionStep{
 			{0, append([]byte(binH2Preface), h2TestFrame(4, 0, 0, nil)...)},
 			{1, h2TestFrame(4, 0, 0, nil)},

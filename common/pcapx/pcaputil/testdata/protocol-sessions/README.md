@@ -48,6 +48,10 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `ntp-client-server.pcap` | RFC 5905 NTPv4 mode 3/4 timestamps on non-123 port 10123 |
 | `coap-get-content.pcap` | RFC 7252 CON GET Uri-Path then ACK 2.05 on non-5683 port 10568 |
 | `modbus-read-holding.pcap` | Modbus TCP FC 3 read holding registers on non-502 port 10502 |
+| `iec104-startdt-interrogation.pcap` | IEC 60870-5-104 STARTDT and C_IC_NA_1 on non-2404 port 12404 |
+| `dnp3-read-response.pcap` | DNP3 READ/RESPONSE dest/src pairing on non-20000 port 12000 |
+| `c37118-cmd.pcap` | IEEE C37.118 command frame on non-4712 port 14712 |
+| `goose-dataset.pcap` | IEC 61850 GOOSE APPID 0x1234 stNum/sqNum/dataset on TCP 18888 |
 
 M1 samples are also listed in `m1-manifest.json` with SHA-256 and generator identity.
 

@@ -310,6 +310,42 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "file": "iec104-startdt-interrogation.pcap",
+      "protocol": "iec104",
+      "sha256": "0e348ba16c0b9ce0da1d85cceb6c9054aca1cb9494e97fda184b5ff989d2ef38",
+      "bytes": 718,
+      "decode_as_port": 12404,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "dnp3-read-response.pcap",
+      "protocol": "dnp3",
+      "sha256": "c69b685e583ca4c32669fefa0e0cab77f93168141b0567b2c52cfbd905b6d9ad",
+      "bytes": 650,
+      "decode_as_port": 12000,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "c37118-cmd.pcap",
+      "protocol": "c37118",
+      "sha256": "663f819f598b37d2c6bcb112f6eb1e07b0be7a9d66a3020f4a945d55f5b5d901",
+      "bytes": 568,
+      "decode_as_port": 14712,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
+      "file": "goose-dataset.pcap",
+      "protocol": "goose",
+      "sha256": "1f1d80ebeb1837a69653c90a0894d55011c7df91f4385b2dd27b172334fb8711",
+      "bytes": 621,
+      "decode_as_port": 18888,
+      "kind": "deterministic-generated-not-real-capture",
+      "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
+    },
+    {
       "file": "grpc-unary-http2.pcap",
       "protocol": "http2",
       "sha256": "8b05a8b1293dce8c0f0ba1e4084e2fbb9e6390bff13d4a89e82ae382b6ee09a1",

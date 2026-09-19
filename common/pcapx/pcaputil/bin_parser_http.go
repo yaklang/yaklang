@@ -105,6 +105,12 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameCoAP(w)
 		case "modbus":
 			return f.frameModbus(w)
+		case "dnp3":
+			return f.frameDNP3(w)
+		case "c37118":
+			return f.frameC37118(w)
+		case "goose":
+			return f.frameGOOSE(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

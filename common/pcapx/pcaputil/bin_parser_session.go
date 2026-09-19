@@ -113,6 +113,12 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.coap = "coap", &binCoAP{maxPending: f.a.budget.MaxCollectionElements}
 	case "modbus":
 		f.protocol, f.modbus = "modbus", &binModbus{pending: map[uint16]modbusRequest{}, maxPending: f.a.budget.MaxCollectionElements}
+	case "dnp3":
+		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[uint32]string{}}
+	case "c37118":
+		f.protocol, f.c37118 = "c37118", &binC37118{}
+	case "goose":
+		f.protocol, f.goose = "goose", &binGOOSE{}
 	}
 }
 
@@ -239,6 +245,12 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.coap.consume(dir, e.Raw)
 	case "modbus":
 		e.Session, err = f.modbus.consume(dir, e.Raw)
+	case "dnp3":
+		e.Session, err = f.dnp3.consume(e.Raw)
+	case "c37118":
+		e.Session, err = f.c37118.consume(e.Raw)
+	case "goose":
+		e.Session, err = f.goose.consume(e.Raw)
 	}
 	if e.Session != nil {
 		switch e.Protocol {
@@ -319,6 +331,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("CoAP %v %v mid %v", e.Session["Packet Name"], e.Session["Code"], e.Session["Message ID"])
 		case "modbus":
 			e.Summary = fmt.Sprintf("Modbus %v tid %v", e.Session["Packet Name"], e.Session["Transaction ID"])
+		case "iec104":
+			e.Summary = fmt.Sprintf("IEC104 %v", e.Session["Packet Name"])
+		case "dnp3":
+			e.Summary = fmt.Sprintf("DNP3 %v %v->%v", e.Session["Packet Name"], e.Session["Source"], e.Session["Destination"])
+		case "c37118":
+			e.Summary = fmt.Sprintf("C37.118 %v id %v", e.Session["Packet Name"], e.Session["ID Code"])
+		case "goose":
+			e.Summary = fmt.Sprintf("GOOSE st %v sq %v", e.Session["State Number"], e.Session["Sequence Number"])
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
@@ -345,6 +365,7 @@ func (f *binFlow) closeSession() {
 	f.stun, f.tftp, f.rtsp, f.ipp = nil, nil, nil, nil
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
+	f.dnp3, f.c37118, f.goose = nil, nil, nil
 	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp, f.tns, f.radius, f.dhcp, f.ntp, f.coap, f.modbus = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
