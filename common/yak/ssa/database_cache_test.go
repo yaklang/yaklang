@@ -240,10 +240,16 @@ func TestTypeFlushUpsertsExistingTypeRows(t *testing.T) {
 	typ := CreateStringType()
 	typ.AddFullTypeName("string")
 	prog.Cache.rememberType(typ)
-	prog.Cache.types.flush()
+	require.NoError(t, prog.Cache.types.flush())
+	var first ssadb.IrType
+	require.NoError(t, ssadb.GetDB().Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&first).Error)
+	require.NoError(t, prog.Cache.types.flush())
+	var unchanged ssadb.IrType
+	require.NoError(t, ssadb.GetDB().Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&unchanged).Error)
+	require.Equal(t, first.ID, unchanged.ID, "an unchanged type must not be deleted and reinserted at each batch")
 
 	typ.AddFullTypeName("java.lang.String")
-	prog.Cache.types.flush()
+	require.NoError(t, prog.Cache.types.flush())
 
 	var count int
 	err = ssadb.GetDB().

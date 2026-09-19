@@ -2,7 +2,9 @@ package ssa
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -30,6 +32,8 @@ type typeStore struct {
 	saveSize    int
 	nextID      *atomic.Int64
 	resident    *utils.SafeMapWithKey[int64, Type]
+	flushMu     sync.Mutex
+	persisted   map[int64][sha256.Size]byte
 }
 
 func newTypeStore(
@@ -108,6 +112,11 @@ func (s *typeStore) flush() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return nil
 	}
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
+	if s.persisted == nil {
+		s.persisted = make(map[int64][sha256.Size]byte)
+	}
 
 	types := make([]Type, 0, s.resident.Count())
 	s.resident.ForEach(func(_ int64, typ Type) bool {
@@ -122,6 +131,7 @@ func (s *typeStore) flush() error {
 
 	saveBatch := saveIrType(s.program, s.db)
 	batch := make([]*ssadb.IrType, 0, s.saveSize)
+	fingerprints := make(map[int64][sha256.Size]byte)
 	var firstErr error
 	flush := func() {
 		if len(batch) == 0 {
@@ -132,8 +142,14 @@ func (s *typeStore) flush() error {
 			if firstErr == nil {
 				firstErr = err
 			}
+		} else {
+			for _, typ := range batch {
+				id := int64(typ.TypeId)
+				s.persisted[id] = fingerprints[id]
+			}
 		}
 		batch = make([]*ssadb.IrType, 0, s.saveSize)
+		clear(fingerprints)
 	}
 
 	for _, typ := range types {
@@ -148,6 +164,15 @@ func (s *typeStore) flush() error {
 		if utils.IsNil(irType) {
 			continue
 		}
+		// Types remain mutable across units (e.g. imports enrich full names),
+		// so ID-only deduplication would lose updates. Compare the serialized
+		// content and advance the checkpoint only after a successful write.
+		fingerprint := sha256.Sum256([]byte(strconv.Itoa(irType.Kind) + "\x00" + irType.String + "\x00" + irType.ExtraInformation))
+		id := int64(irType.TypeId)
+		if previous, ok := s.persisted[id]; ok && previous == fingerprint {
+			continue
+		}
+		fingerprints[id] = fingerprint
 		batch = append(batch, irType)
 		if len(batch) >= s.saveSize {
 			flush()

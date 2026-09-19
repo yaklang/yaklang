@@ -23,6 +23,7 @@ type structScanRuntime struct {
 	extraDirs     []string
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
+	frames        map[*schema.SyntaxFlowRule]*sfvm.SFFrame
 	riskCB        func(*schema.SSARisk)
 	taskID        string
 	timeout       time.Duration
@@ -119,10 +120,26 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 	if err := s.resolveRules(); err != nil {
 		return err
 	}
+	s.filterLanguage(c.GetLanguage(), c.GetScanIgnoreLanguage())
 	if len(s.rules) == 0 {
 		log.Warnf("[struct_scan] no struct rules loaded")
 	}
 	return nil
+}
+
+// Match the normal scan manager's language selection. Unknown/mixed-language
+// programs retain all rules; source-mode filtering is handled separately.
+func (s *structScanRuntime) filterLanguage(language ssaconfig.Language, ignore bool) {
+	if ignore || language == "" || language == ssaconfig.General {
+		return
+	}
+	rules := make([]*schema.SyntaxFlowRule, 0, len(s.rules))
+	for _, rule := range s.rules {
+		if rule != nil && (rule.Language == ssaconfig.General || rule.Language == language) {
+			rules = append(rules, rule)
+		}
+	}
+	s.rules = rules
 }
 
 func (c *Config) ensureStructScan() *structScanRuntime {
@@ -251,6 +268,11 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		if rule == nil {
 			continue
 		}
+		frame, err := s.frameForRule(rule)
+		if err != nil {
+			s.errs = append(s.errs, err)
+			continue
+		}
 		ruleCtx, cancel := context.WithCancel(compileCtx)
 		if s.timeout > 0 {
 			ruleCtx, cancel = context.WithTimeout(compileCtx, s.timeout)
@@ -266,7 +288,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			QueryWithResultProgram(progAPI),
 			QueryWithSSAConfig(progAPI.config.Config),
 			QueryWithStruct(unit),
-			QueryWithRuleContent(rule.Content),
+			QueryWithFrame(frame),
 			QueryWithMemory(),
 			QueryWithTaskID(s.taskID),
 			QueryWithContext(ruleCtx),
@@ -307,6 +329,22 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		}
 		progAPI.ResetInterRuleState()
 	}
+}
+
+func (s *structScanRuntime) frameForRule(rule *schema.SyntaxFlowRule) (*sfvm.SFFrame, error) {
+	if s.frames == nil {
+		s.frames = make(map[*schema.SyntaxFlowRule]*sfvm.SFFrame)
+	}
+	compiled := s.frames[rule]
+	if compiled == nil {
+		var err error
+		compiled, _, err = sfvm.NewSyntaxFlowVirtualMachine().Load(rule)
+		if err != nil {
+			return nil, err
+		}
+		s.frames[rule] = compiled
+	}
+	return sfvm.NewSyntaxFlowVirtualMachine().LoadCompiled(compiled), nil
 }
 
 func ruleContentHash(rule *schema.SyntaxFlowRule) string {
@@ -492,6 +530,7 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 	if err := s.resolveRules(); err != nil {
 		return err
 	}
+	s.filterLanguage(p.GetLanguage(), cfg.GetScanIgnoreLanguage())
 	if len(s.rules) == 0 {
 		log.Warnf("[struct_scan] no struct rules loaded for program %s", p.GetProgramName())
 		return nil

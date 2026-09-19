@@ -255,9 +255,8 @@ func (c *Config) parseProjectWithFSUnits(
 	if err := c.prepareStructScan(plan); err != nil {
 		return nil, err
 	}
-	if c.structScan != nil && c.structScan.enabled() {
-		batches = sccExecutionBatches(plan.Order)
-	}
+	// Struct queries carry their own unit boundary. Keep the bounded compile
+	// batches instead of forcing one parser/flush cycle for every tiny SCC.
 	// Step mode (compile-unit batching) is the DEFAULT for any project size.
 	// YAK_SSA_COMPILE_UNIT_LEGACY opts back into the monolithic legacy/compat
 	// compile path (no batching).
@@ -364,6 +363,7 @@ func (c *Config) parseProjectWithFSUnits(
 	unitStart := time.Now()
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("unit compile start scc=%d batches=%d", len(plan.Order), len(batches))
+	var structProgAPI *Program
 	for batchIndex, batch := range batches {
 		if c.isStop() {
 			return nil, ErrContextCancel
@@ -530,13 +530,15 @@ func (c *Config) parseProjectWithFSUnits(
 			return nil, ErrContextCancel
 		}
 		if structScanOn {
-			progAPI := NewProgram(prog, c)
+			if structProgAPI == nil {
+				structProgAPI = NewProgram(prog, c)
+			}
 			for _, unit := range batch.units {
 				if unit == nil {
 					continue
 				}
 				processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
-				c.structScan.ScanStruct(progAPI, unit)
+				c.structScan.ScanStruct(structProgAPI, unit)
 				if c.isStop() {
 					return nil, ErrContextCancel
 				}
@@ -620,7 +622,7 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, since)
 	}
 	if c.structScan != nil && c.structScan.enabled() {
-		c.structScan.persistAfterProgramMeta(NewProgram(prog, c))
+		c.structScan.persistAfterProgramMeta(structProgAPI)
 	}
 	finishTime = time.Since(finishStart)
 
@@ -668,7 +670,10 @@ func (c *Config) parseProjectWithFSUnits(
 	compilePhase = "f6_wait"
 	wg.Wait()
 
-	p := NewProgram(prog, c)
+	p := structProgAPI
+	if p == nil {
+		p = NewProgram(prog, c)
+	}
 	SaveConfig(c, p)
 	SetProgramCache(p)
 	return p, nil
