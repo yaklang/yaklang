@@ -23,6 +23,7 @@ func TestStructOpcodeIndexPreservesUnitBoundary(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, progs, 1)
 	prog := progs[0]
+	index := &structResidentOpcodeIndex{prog: prog.Program}
 	checked := 0
 	seen := map[int64]string{}
 	for _, unit := range prog.Program.CompileUnits {
@@ -42,6 +43,22 @@ func TestStructOpcodeIndexPreservesUnitBoundary(t *testing.T) {
 				require.Equal(t, previous, unit.Key, "a call must not leak into another compile unit")
 			}
 			seen[id] = unit.Key
+		}
+		var want []int64
+		for _, inst := range target.matchOpcodes(ssa.SSAOpcodeCall) {
+			if target.bound.Allow(inst) {
+				want = append(want, inst.GetId())
+			}
+		}
+		require.NotEmpty(t, want)
+		target.opcodeIndex = make(map[ssa.Opcode][]ssa.Instruction)
+		target.residentIndex = index
+		for i := 0; i < 3; i++ {
+			var got []int64
+			for _, inst := range target.matchOpcodes(ssa.SSAOpcodeCall, ssa.SSAOpcodeCall) {
+				got = append(got, inst.GetId())
+			}
+			require.ElementsMatch(t, want, got, "reused index must preserve unit filtering and duplicate-opcode semantics")
 		}
 		checked++
 	}

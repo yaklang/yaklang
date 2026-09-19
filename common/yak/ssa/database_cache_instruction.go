@@ -452,6 +452,31 @@ func (s *instructionStore) GetAllResident() map[int64]Instruction {
 	}
 }
 
+// snapshotResident copies references without allocating a second hash table.
+// Inspect instructions after releasing the cache lock: resolving an instruction
+// can itself access the cache.
+func (s *instructionStore) snapshotResident() []Instruction {
+	if s == nil {
+		return nil
+	}
+	var out []Instruction
+	appendInst := func(_ int64, inst Instruction) bool {
+		out = append(out, inst)
+		return true
+	}
+	switch {
+	case s.writer != nil:
+		s.writer.ForEach(appendInst)
+	case s.reader != nil:
+		s.reader.ForEach(appendInst)
+	default:
+		for _, inst := range s.GetAllResident() {
+			out = append(out, inst)
+		}
+	}
+	return out
+}
+
 func (s *instructionStore) DisableSpill() {
 	if s == nil || s.writer == nil {
 		return
