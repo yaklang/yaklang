@@ -324,6 +324,10 @@ type binFlow struct {
 	ntp              *binNTP
 	coap             *binCoAP
 	modbus           *binModbus
+	iec104           *binIEC104
+	dnp3             *binDNP3
+	c37118           *binC37118
+	goose            *binGOOSE
 	httpUpgrades     []bool
 	httpDoH          []bool
 	httpMethods      []string
