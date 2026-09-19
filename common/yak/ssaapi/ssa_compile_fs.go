@@ -330,7 +330,10 @@ func (c *Config) parseProjectWithFSUnits(
 
 	prog.CompileUnits = flattenCompileUnits(plan)
 	prog.ProcessInfof("compile unit graph built units=%d edges=%d scc=%d", len(plan.Units), len(plan.Edges), len(plan.Order))
-	holdSCCIR := envFlagEnabled(compileUnitHoldSCCIREnv)
+	structScanOn := c.structScan != nil && c.structScan.enabled()
+	// Struct opcode queries enumerate live instructions. TTL/capacity eviction
+	// must not remove the completed batch before its semantic scan sees it.
+	holdSCCIR := envFlagEnabled(compileUnitHoldSCCIREnv) || structScanOn
 	spillMode := "auto"
 	if holdSCCIR {
 		spillMode = "held"
@@ -480,7 +483,7 @@ func (c *Config) parseProjectWithFSUnits(
 			language.Clearup()
 		}
 		prog.SetPreHandler(false)
-		if holdSCCIR && prog.Cache != nil {
+		if holdSCCIR && !structScanOn && prog.Cache != nil {
 			prog.Cache.EnableInstructionSpill()
 		}
 		compilePhase = "f3_unit_build"
@@ -494,7 +497,6 @@ func (c *Config) parseProjectWithFSUnits(
 		flushThreshold := flushCompileUnitThreshold()
 		isIncremental := c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != ""
 		flushedUnits := make(map[string]bool)
-		structScanOn := c.structScan != nil && c.structScan.enabled()
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
 				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.

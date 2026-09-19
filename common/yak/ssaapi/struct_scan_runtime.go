@@ -23,7 +23,6 @@ type structScanRuntime struct {
 	extraDirs     []string
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
-	frames        map[*schema.SyntaxFlowRule]*sfvm.SFFrame
 	riskCB        func(*schema.SSARisk)
 	taskID        string
 	timeout       time.Duration
@@ -265,6 +264,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 	if progAPI.config != nil && progAPI.config.ctx != nil {
 		compileCtx = progAPI.config.ctx
 	}
+	target := NewStructQueryTarget(progAPI, unit, nil)
 	for _, rule := range s.rules {
 		if rule == nil {
 			continue
@@ -282,7 +282,6 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		if s.workLimit > 0 {
 			budget = sfvm.NewRuleWorkBudget(s.workLimit, cancel)
 		}
-		target := NewStructQueryTarget(progAPI, unit, newStructBound(unit, progAPI.Program))
 		start := time.Now().Unix()
 		res, err := QuerySyntaxflow(
 			QueryWithValue(target),
@@ -332,20 +331,15 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 	}
 }
 
+// frameForRule builds an execution frame from the rule. Sync stores compiled
+// opcodes on the rule; Load uses those and does not parse. A rule that arrives
+// without opcodes is compiled once and the opcodes are written back onto it.
 func (s *structScanRuntime) frameForRule(rule *schema.SyntaxFlowRule) (*sfvm.SFFrame, error) {
-	if s.frames == nil {
-		s.frames = make(map[*schema.SyntaxFlowRule]*sfvm.SFFrame)
+	if rule == nil {
+		return nil, utils.Error("nil struct rule")
 	}
-	compiled := s.frames[rule]
-	if compiled == nil {
-		var err error
-		compiled, _, err = sfvm.NewSyntaxFlowVirtualMachine().Load(rule)
-		if err != nil {
-			return nil, err
-		}
-		s.frames[rule] = compiled
-	}
-	return sfvm.NewSyntaxFlowVirtualMachine().LoadCompiled(compiled), nil
+	frame, _, err := sfvm.NewSyntaxFlowVirtualMachine().Load(rule)
+	return frame, err
 }
 
 func ruleContentHash(rule *schema.SyntaxFlowRule) string {
