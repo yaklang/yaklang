@@ -342,6 +342,10 @@ jobs:
             exit 1
           fi
           
+          # Preserve raw scanner output; beta19 can append cumulative JSON snapshots.
+          cp risk.json risk.raw.json
+          python3 scripts/ssa-risk-tools/normalize-report.py risk.raw.json risk.json
+
           if ! NUM=$(cat risk.json | jq -r '.RiskNums // empty' 2>&1); then
             echo "::error::Failed to parse risk.json"
             echo "::error::jq error output: $NUM"
@@ -507,7 +511,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: risk.json
-          path: risk.json
+          path: |
+            risk.json
+            risk.raw.json
           if-no-files-found: ignore
 
       - name: Upload risk results
