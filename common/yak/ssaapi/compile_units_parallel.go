@@ -85,6 +85,10 @@ func compileUnitBuildWaves(plan *UnitPlan, batch compileUnitExecutionBatch) [][]
 // same library. Directory-based frontends can share an application builder
 // even when the dependency graph says their file units are independent.
 func buildCompileUnitWave(ctx context.Context, prog *ssa.Program, wave [][]string, concurrency int) (int, error) {
+	return buildCompileUnitWaveWithOwners(ctx, prog, wave, concurrency, make(map[*ssa.Program]bool))
+}
+
+func buildCompileUnitWaveWithOwners(ctx context.Context, prog *ssa.Program, wave [][]string, concurrency int, built map[*ssa.Program]bool) (int, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -95,7 +99,7 @@ func buildCompileUnitWave(ctx context.Context, prog *ssa.Program, wave [][]strin
 	var active, peak atomic.Int32
 	slots := make(chan struct{}, concurrency)
 	owners := make(map[*ssa.Program]bool)
-	build := func(keys []string) {
+	build := func(libraries []*ssa.Program) {
 		current := active.Add(1)
 		defer active.Add(-1)
 		for old := peak.Load(); current > old; old = peak.Load() {
@@ -103,7 +107,9 @@ func buildCompileUnitWave(ctx context.Context, prog *ssa.Program, wave [][]strin
 				break
 			}
 		}
-		prog.LazyBuildForUnits(keys)
+		for _, library := range libraries {
+			library.LazyBuildCurrentProgram()
+		}
 	}
 	for _, keys := range wave {
 		if err := ctx.Err(); err != nil {
@@ -114,17 +120,24 @@ func buildCompileUnitWave(ctx context.Context, prog *ssa.Program, wave [][]strin
 		var libraries []*ssa.Program
 		for _, key := range keys {
 			lib := prog.ProgramForCompileUnit(key)
-			if lib == nil || lib == prog.GetApplication() || owners[lib] {
+			if lib == nil || built[lib] {
+				continue
+			}
+			built[lib] = true
+			if lib == prog.GetApplication() || owners[lib] {
 				exclusive = true
 			}
 			libraries = append(libraries, lib)
+		}
+		if len(libraries) == 0 {
+			continue
 		}
 		if exclusive {
 			wg.Wait()
 			if err := ctx.Err(); err != nil {
 				return int(peak.Load()), err
 			}
-			build(keys)
+			build(libraries)
 			clear(owners)
 			continue
 		}
@@ -138,13 +151,13 @@ func buildCompileUnitWave(ctx context.Context, prog *ssa.Program, wave [][]strin
 			return int(peak.Load()), ctx.Err()
 		}
 		wg.Add(1)
-		go func(keys []string) {
+		go func(libraries []*ssa.Program) {
 			defer wg.Done()
 			defer func() { <-slots }()
 			if ctx.Err() == nil {
-				build(keys)
+				build(libraries)
 			}
-		}(keys)
+		}(libraries)
 	}
 	wg.Wait()
 	return int(peak.Load()), ctx.Err()
