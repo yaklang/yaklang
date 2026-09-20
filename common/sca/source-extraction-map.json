@@ -2427,31 +2427,63 @@
     },
     {
       "local_file": "common/sca/analyzer/utils_dependence.go",
-      "sha256": "235486d6678b6d3d0adb20275a16b14e03efdc82be390320b96b10f6faa08551",
+      "sha256": "457a9e555ca71cb546eeb2b7e8504ab9c174dd2183c4d238f9c81d58685fa3df",
       "symbols": [
         {
           "name": "parseVersion",
-          "line": 15
+          "line": 16
         },
         {
           "name": "handlerSemverVersionRange",
-          "line": 31
+          "line": 32
         },
         {
           "name": "MergePackages",
-          "line": 69
+          "line": 70
         },
         {
           "name": "mergePackagesOrKeep",
-          "line": 73
+          "line": 74
         },
         {
           "name": "mergePackagesBudget",
-          "line": 81
+          "line": 82
+        },
+        {
+          "name": "chargeAppend",
+          "line": 86
+        },
+        {
+          "name": "cloneStrings",
+          "line": 107
+        },
+        {
+          "name": "appendClonedStrings",
+          "line": 120
+        },
+        {
+          "name": "chargeDetailsCopy",
+          "line": 131
+        },
+        {
+          "name": "snapshotDetails",
+          "line": 147
+        },
+        {
+          "name": "mergeOwnedDetails",
+          "line": 161
+        },
+        {
+          "name": "mergeSlot",
+          "line": 170
+        },
+        {
+          "name": "absorbPackage",
+          "line": 176
         },
         {
           "name": "MergePackagesBudget",
-          "line": 90
+          "line": 218
         }
       ],
       "decision": "REWRITE",
@@ -2577,51 +2609,55 @@
     },
     {
       "local_file": "common/sca/core/budget/estimate.go",
-      "sha256": "c8f3d67aa0ca6ecfc594feb558aa4bb9e6292b34e52d17527e922bdcfd29019c",
+      "sha256": "e334f1cb95bceae564bf122ebcfff7579dba35d5929fa7d4bd011d1d015f2538",
       "symbols": [
         {
           "name": "SizeOfString",
-          "line": 13
+          "line": 15
         },
         {
           "name": "SizeOfStrings",
-          "line": 17
+          "line": 19
         },
         {
           "name": "SizeOfBytes",
-          "line": 28
+          "line": 30
         },
         {
           "name": "SizeOfNode",
-          "line": 35
-        },
-        {
-          "name": "SizeOfPackage",
           "line": 37
         },
         {
+          "name": "SizeOfPackage",
+          "line": 39
+        },
+        {
           "name": "SizeOfComponent",
-          "line": 41
+          "line": 43
         },
         {
           "name": "SizeOfObservation",
-          "line": 45
-        },
-        {
-          "name": "SizeOfEdge",
           "line": 47
         },
         {
-          "name": "SizeOfJob",
+          "name": "SizeOfEdge",
           "line": 49
         },
         {
-          "name": "SizeOfRecord",
+          "name": "SizeOfJob",
           "line": 51
         },
         {
+          "name": "SizeOfRecord",
+          "line": 53
+        },
+        {
           "name": "SizeOfSortIndex",
-          "line": 60
+          "line": 62
+        },
+        {
+          "name": "SizeMul",
+          "line": 75
         }
       ],
       "decision": "REWRITE",

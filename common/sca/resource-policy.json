@@ -60,7 +60,7 @@
       "RPM live page make([]byte,n) is gated by MaxReadBytes/MaxPageVisits; Parse also charges SizeOfBytes(min(MaxRecordBytes,16MiB)) as a conservative peak page/header working set",
       "pipeline materials.Open 32KiB read scratch is Once-charged as snapshot-read-scratch",
       "fillReport sort indexes charge SizePtr per package/location/requirement before sort.SliceStable; comparator temporary clones in locationKey/requirementKey are still sort runtime",
-      "MergePackages keeps the old no-error signature and uses budget.From(background) default MaxResultBytes; exhaustion returns the original slice unchanged (not nil). MergePackagesBudget charges pointer-set/index maps, extra License/FromFile/FromAnalyzer/MergeDetails copies, collected edges, rebuilt graphs, and the output index before any input mutation; same pointers are visited once"
+      "MergePackages keeps the old no-error signature and uses budget.From(background) default MaxResultBytes; exhaustion returns the original slice unchanged (not nil). MergePackagesBudget copies evidence onto independent backing before writing the representative, so shared PackageDetails/slice headers are not reread after mutation. Containers grow from empty after charging; len(pkgs) is not a make hint. SizeMul rejects overflow"
     ],
     "unbounded_runtime": [
       "Go decoder reflection into caller structs after SizeDecoderScratch",

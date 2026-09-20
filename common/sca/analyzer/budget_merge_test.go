@@ -284,6 +284,106 @@ func TestMergePackagesBudgetSameIdentityMetadata(t *testing.T) {
 	}
 }
 
+func TestMergePackagesSharedDetailsAndBacking(t *testing.T) {
+	shared := &dxtypes.PackageDetails{
+		Locations:    []dxtypes.SourceRange{{StartLine: 1, EndLine: 1}},
+		Requirements: []model.Requirement{{Target: "dep", Constraint: "1"}},
+		Diagnostics:  []model.Diagnostic{{Code: "malformed_input", Reason: "r"}},
+	}
+	ps := make([]*dxtypes.Package, 0, 3)
+	for i := 0; i < 3; i++ {
+		ps = append(ps, &dxtypes.Package{Name: "a", Version: "1", License: []string{"MIT"}, FromFile: []string{"lock"}, PackageDetails: shared})
+	}
+	if len(shared.Locations) != 1 {
+		t.Fatal("precondition")
+	}
+	got := MergePackages(ps)
+	if len(got) != 1 {
+		t.Fatalf("identities: %d", len(got))
+	}
+	if len(got[0].Locations) != 3 {
+		t.Fatalf("shared details: got locations=%d expected=3", len(got[0].Locations))
+	}
+	if len(got[0].Requirements) != 3 || len(got[0].Diagnostics) != 3 || len(got[0].License) != 3 || len(got[0].FromFile) != 3 {
+		t.Fatalf("shared details extra fields: loc=%d req=%d diag=%d lic=%d file=%d", len(got[0].Locations), len(got[0].Requirements), len(got[0].Diagnostics), len(got[0].License), len(got[0].FromFile))
+	}
+	if len(shared.Locations) != 1 || len(shared.Requirements) != 1 || len(shared.Diagnostics) != 1 {
+		t.Fatalf("shared PackageDetails mutated: %+v", shared)
+	}
+	if ps[1].PackageDetails != shared || ps[2].PackageDetails != shared {
+		t.Fatal("non-representative details pointer replaced")
+	}
+	if got[0].PackageDetails == shared {
+		t.Fatal("representative still aliases the shared details object")
+	}
+	failLimit, err := (budget.Limits{MaxResultBytes: 200}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	again := []*dxtypes.Package{
+		{Name: "z", Version: "1", PackageDetails: shared},
+		{Name: "z", Version: "1", PackageDetails: shared},
+		{Name: "z", Version: "1", PackageDetails: shared},
+	}
+	out, err := MergePackagesBudget(budget.From(budget.Bind(context.Background(), failLimit)), again)
+	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) || out != nil {
+		t.Fatalf("expected resource_limit before writing shared details: out=%v err=%v", out, err)
+	}
+	if len(shared.Locations) != 1 || again[0].PackageDetails != shared {
+		t.Fatal("failed merge mutated shared details")
+	}
+
+	lic := []string{"MIT"}
+	loc := []dxtypes.SourceRange{{StartLine: 9, EndLine: 9}}
+	a := &dxtypes.Package{Name: "b", Version: "1", License: lic, FromFile: []string{"a"}, PackageDetails: &dxtypes.PackageDetails{Locations: loc, Requirements: []model.Requirement{{Target: "x"}}, Diagnostics: []model.Diagnostic{{Reason: "a"}}}}
+	c := &dxtypes.Package{Name: "b", Version: "1", License: lic, FromFile: []string{"c"}, PackageDetails: &dxtypes.PackageDetails{Locations: loc, Requirements: []model.Requirement{{Target: "y"}}, Diagnostics: []model.Diagnostic{{Reason: "c"}}}}
+	out = MergePackages([]*dxtypes.Package{a, c, a, c, a})
+	if len(out) != 1 || len(out[0].License) != 2 || out[0].License[0] != "MIT" || out[0].License[1] != "MIT" {
+		t.Fatalf("shared license backing: %#v", out[0].License)
+	}
+	if len(out[0].Locations) != 2 || out[0].Locations[0].StartLine != 9 || out[0].Locations[1].StartLine != 9 {
+		t.Fatalf("shared location backing: %#v", out[0].Locations)
+	}
+	if len(out[0].Requirements) != 2 || out[0].Requirements[0].Target != "x" || out[0].Requirements[1].Target != "y" {
+		t.Fatalf("requirements: %#v", out[0].Requirements)
+	}
+	if len(out[0].Diagnostics) != 2 || out[0].Diagnostics[0].Reason != "a" || out[0].Diagnostics[1].Reason != "c" {
+		t.Fatalf("diagnostics: %#v", out[0].Diagnostics)
+	}
+	if len(lic) != 1 || lic[0] != "MIT" || len(loc) != 1 || loc[0].StartLine != 9 {
+		t.Fatalf("source backing mutated: lic=%v loc=%v", lic, loc)
+	}
+	if len(c.License) != 1 || len(c.Locations) != 1 {
+		t.Fatalf("unconsumed source mutated: lic=%v loc=%v", c.License, c.Locations)
+	}
+}
+
+func TestMergePackagesBudgetNilEntriesDoNotReserveInputLength(t *testing.T) {
+	l, err := (budget.Limits{MaxResultBytes: 500000}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := budget.From(budget.Bind(context.Background(), l))
+	pkgs := make([]*dxtypes.Package, 50000)
+	out, err := MergePackagesBudget(st, pkgs)
+	if err != nil || len(out) != 0 {
+		t.Fatalf("nil entries: len=%d err=%v", len(out), err)
+	}
+	if st.ResultBytes() > 4096 {
+		t.Fatalf("nil entries reserved unused input-length capacity: %d", st.ResultBytes())
+	}
+
+	tight, err := (budget.Limits{MaxResultBytes: 64}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st = budget.From(budget.Bind(context.Background(), tight))
+	out, err = MergePackagesBudget(st, pkgs)
+	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) || out != nil {
+		t.Fatalf("map headers must still be charged: out=%v err=%v", out, err)
+	}
+}
+
 func TestHandlerParsedResultBudget(t *testing.T) {
 	l, err := (budget.Limits{MaxResultBytes: 256}).Normalize()
 	if err != nil {

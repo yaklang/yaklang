@@ -1,5 +1,7 @@
 package budget
 
+import "github.com/yaklang/yaklang/common/sca/core/scanerr"
+
 // Logical size units for result-memory accounting. These are conservative
 // working-set estimates, not Go heap, GC, or RSS measurements.
 const (
@@ -61,5 +63,25 @@ func SizeOfSortIndex(n int) int64 {
 	if n < 0 {
 		return 0
 	}
-	return int64(n) * SizePtr
+	v, err := SizeMul(n, SizePtr)
+	if err != nil {
+		return -1
+	}
+	return v
+}
+
+// SizeMul is a saturating-safe product for capacity charges. Overflow is a
+// resource_limit, not a wrapped integer.
+func SizeMul(n int, unit int64) (int64, error) {
+	if n < 0 || unit < 0 {
+		return 0, scanerr.New(scanerr.ResourceLimit, "negative size multiply")
+	}
+	if n == 0 || unit == 0 {
+		return 0, nil
+	}
+	max := int64(^uint64(0) >> 1)
+	if unit != 0 && int64(n) > max/unit {
+		return 0, scanerr.New(scanerr.ResourceLimit, "size multiply overflow")
+	}
+	return int64(n) * unit, nil
 }

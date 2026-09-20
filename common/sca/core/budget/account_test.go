@@ -25,6 +25,26 @@ func TestZeroDefaultAndNegativeCharge(t *testing.T) {
 	}
 }
 
+func TestSizeMulOverflow(t *testing.T) {
+	if _, err := SizeMul(-1, 8); err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatal("negative n")
+	}
+	if _, err := SizeMul(2, -1); err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatal("negative unit")
+	}
+	n, err := SizeMul(0, 8)
+	if err != nil || n != 0 {
+		t.Fatalf("zero: %d %v", n, err)
+	}
+	n, err = SizeMul(3, 8)
+	if err != nil || n != 24 {
+		t.Fatalf("3*8: %d %v", n, err)
+	}
+	if _, err = SizeMul(4, 1<<62); err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("overflow: %v", err)
+	}
+}
+
 func TestOnceChargesSharedMaterialOnce(t *testing.T) {
 	l, err := (Limits{MaxResultBytes: 4096}).Normalize()
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
@@ -82,11 +83,138 @@ func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 	return MergePackagesBudget(st, pkgs)
 }
 
+func chargeAppend[T any](st *budget.State, s []T, v T, elem int64) ([]T, error) {
+	if len(s) < cap(s) {
+		return append(s, v), nil
+	}
+	next := cap(s) * 2
+	if next == 0 {
+		next = 1
+	}
+	if cap(s) > 0 && next/2 != cap(s) {
+		return s, scanerr.New(scanerr.ResourceLimit, "slice grow overflow")
+	}
+	n, err := budget.SizeMul(next, elem)
+	if err != nil {
+		return s, err
+	}
+	if err := st.Result(budget.SizeSlice + n); err != nil {
+		return s, err
+	}
+	return append(s, v), nil
+}
+
+func cloneStrings(st *budget.State, s []string) ([]string, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if err := st.Result(budget.SizeOfStrings(s)); err != nil {
+		return nil, err
+	}
+	if len(s) == 0 {
+		return []string{}, nil
+	}
+	return append([]string(nil), s...), nil
+}
+
+func appendClonedStrings(st *budget.State, dst, extra []string) ([]string, error) {
+	for _, v := range extra {
+		var err error
+		dst, err = chargeAppend(st, dst, v, budget.SizeOfString(v))
+		if err != nil {
+			return dst, err
+		}
+	}
+	return dst, nil
+}
+
+func chargeDetailsCopy(st *budget.State, d dxtypes.PackageDetails) error {
+	nloc, err := budget.SizeMul(len(d.Locations), budget.SizeObject)
+	if err != nil {
+		return err
+	}
+	nreq, err := budget.SizeMul(len(d.Requirements), budget.SizeOfRecord())
+	if err != nil {
+		return err
+	}
+	ndiag, err := budget.SizeMul(len(d.Diagnostics), budget.SizeOfObservation())
+	if err != nil {
+		return err
+	}
+	return st.Result(budget.SizeObject + budget.SizeMap + nloc + nreq + ndiag + budget.SizeOfStrings(d.RawLicenses) + budget.SizeOfStrings(d.UnresolvedDependencies) + budget.SizeOfStrings(d.Provides))
+}
+
+func snapshotDetails(st *budget.State, src dxtypes.PackageDetails) (*dxtypes.PackageDetails, error) {
+	if err := chargeDetailsCopy(st, src); err != nil {
+		return nil, err
+	}
+	nd := src
+	nd.Locations = append([]dxtypes.SourceRange(nil), src.Locations...)
+	nd.Requirements = append(nd.Requirements[:0:0], src.Requirements...)
+	nd.Diagnostics = append(nd.Diagnostics[:0:0], src.Diagnostics...)
+	nd.RawLicenses = append([]string(nil), src.RawLicenses...)
+	nd.UnresolvedDependencies = append([]string(nil), src.UnresolvedDependencies...)
+	nd.Provides = append([]string(nil), src.Provides...)
+	return &nd, nil
+}
+
+func mergeOwnedDetails(st *budget.State, dst *dxtypes.PackageDetails, src dxtypes.PackageDetails) error {
+	if err := chargeDetailsCopy(st, src); err != nil {
+		return err
+	}
+	holder := &dxtypes.Package{PackageDetails: dst}
+	holder.MergeDetails(src)
+	return nil
+}
+
+type mergeSlot struct {
+	dst                       *dxtypes.Package
+	license, fromFile, fromAn []string
+	details                   *dxtypes.PackageDetails
+}
+
+func absorbPackage(st *budget.State, s *mergeSlot, p *dxtypes.Package, first bool) error {
+	lic, err := cloneStrings(st, p.License)
+	if err != nil {
+		return err
+	}
+	files, err := cloneStrings(st, p.FromFile)
+	if err != nil {
+		return err
+	}
+	ans, err := cloneStrings(st, p.FromAnalyzer)
+	if err != nil {
+		return err
+	}
+	if first {
+		s.license, s.fromFile, s.fromAn = lic, files, ans
+	} else {
+		if s.license, err = appendClonedStrings(st, s.license, lic); err != nil {
+			return err
+		}
+		if s.fromFile, err = appendClonedStrings(st, s.fromFile, files); err != nil {
+			return err
+		}
+		if s.fromAn, err = appendClonedStrings(st, s.fromAn, ans); err != nil {
+			return err
+		}
+	}
+	if p.PackageDetails == nil {
+		return nil
+	}
+	src := p.Details()
+	if s.details == nil {
+		s.details, err = snapshotDetails(st, src)
+		return err
+	}
+	return mergeOwnedDetails(st, s.details, src)
+}
+
 // MergePackagesBudget merges exact identities under st. Controllable merge
-// working-set (maps, extra evidence copies, edges, output index) is charged
-// before any input mutation. Same pointers are visited once so already-merged
-// fields cannot be read back and appended again. On error, pkgs and graphs
-// are left unchanged.
+// working-set is charged before allocation. Evidence is copied onto independent
+// backing so shared *PackageDetails or slice headers cannot be read after this
+// round and appended again. Same *Package is visited once; each distinct
+// instance contributes its original evidence once. On error, pkgs is unchanged.
 func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.Package, error) {
 	if st == nil {
 		st = budget.From(context.Background())
@@ -99,17 +227,15 @@ func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 	keyOf := func(p *dxtypes.Package) identity {
 		return identity{p.IdentityDigest(), p.Potential, p.HasVersionRange(), p.Details().Evidence}
 	}
-	// Precheck containers: pointer set, identity index, edge/order slices,
-	// input-length sort scratch. Charge before allocating them.
-	if err := st.Result(budget.SizeMap*2 + budget.SizeSlice*2 + budget.SizeOfSortIndex(len(pkgs))); err != nil {
+	// Empty map headers only. Do not reserve len(pkgs) — nil/empty inputs must
+	// not allocate per-index capacity.
+	if err := st.Result(budget.SizeMap * 2); err != nil {
 		return nil, err
 	}
-	seenPtr := make(map[*dxtypes.Package]struct{}, len(pkgs))
-	index := make(map[identity]*dxtypes.Package, len(pkgs))
-	order := make([]*dxtypes.Package, 0, len(pkgs))
+	seenPtr := map[*dxtypes.Package]struct{}{}
+	index := map[identity]*mergeSlot{}
 	type edge struct{ from, to *dxtypes.Package }
-	edges := make([]edge, 0, len(pkgs))
-	nUnique := 0
+	var edges []edge
 	for _, p := range pkgs {
 		if p == nil {
 			continue
@@ -121,53 +247,48 @@ func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 			return nil, err
 		}
 		seenPtr[p] = struct{}{}
-		if err := st.Result(budget.SizePtr); err != nil {
-			return nil, err
-		}
-		order = append(order, p)
 		key := keyOf(p)
-		dst := index[key]
-		if dst == nil {
+		s := index[key]
+		if s == nil {
 			if err := st.Result(budget.SizeOfPackage(p.Name, p.Version, p.Verification) + budget.SizeObject + budget.SizePtr); err != nil {
 				return nil, err
 			}
-			index[key] = p
-			nUnique++
-		} else if dst != p {
-			extra := budget.SizeOfStrings(p.License) + budget.SizeOfStrings(p.FromFile) + budget.SizeOfStrings(p.FromAnalyzer)
-			if p.PackageDetails != nil {
-				d := p.Details()
-				extra += budget.SizeMap + int64(len(d.Locations))*budget.SizeObject + int64(len(d.Requirements))*budget.SizeOfRecord() + int64(len(d.Diagnostics))*budget.SizeOfObservation()
-				extra += budget.SizeOfStrings(d.RawLicenses) + budget.SizeOfStrings(d.UnresolvedDependencies) + budget.SizeOfStrings(d.Provides)
-			}
-			if err := st.Result(extra); err != nil {
+			s = &mergeSlot{dst: p}
+			index[key] = s
+			if err := absorbPackage(st, s, p, true); err != nil {
 				return nil, err
 			}
+		} else if err := absorbPackage(st, s, p, false); err != nil {
+			return nil, err
 		}
 		for _, up := range p.UpStreamPackages {
 			if up == nil {
 				continue
 			}
-			if err := st.Result(budget.SizeOfEdge()); err != nil {
+			var err error
+			edges, err = chargeAppend(st, edges, edge{p, up}, budget.SizeOfEdge())
+			if err != nil {
 				return nil, err
 			}
-			edges = append(edges, edge{p, up})
 		}
 	}
-	if err := st.Result(budget.SizeMap*int64(nUnique) + budget.SizeOfSortIndex(nUnique) + budget.SizeSlice + int64(nUnique)*budget.SizePtr); err != nil {
+	nUnique := len(index)
+	outBytes, err := budget.SizeMul(nUnique, budget.SizeObject+budget.SizePtr)
+	if err != nil {
 		return nil, err
 	}
-	for _, p := range order {
-		key := keyOf(p)
-		dst := index[key]
-		if dst != p {
-			if p.PackageDetails != nil {
-				dst.MergeDetails(p.Details())
-			}
-			dst.License = append(dst.License, p.License...)
-			dst.FromFile = append(dst.FromFile, p.FromFile...)
-			dst.FromAnalyzer = append(dst.FromAnalyzer, p.FromAnalyzer...)
-		}
+	graphBytes, err := budget.SizeMul(nUnique, budget.SizeMap)
+	if err != nil {
+		return nil, err
+	}
+	if err := st.Result(budget.SizeSlice*2 + outBytes + graphBytes); err != nil {
+		return nil, err
+	}
+	for _, s := range index {
+		s.dst.License = s.license
+		s.dst.FromFile = s.fromFile
+		s.dst.FromAnalyzer = s.fromAn
+		s.dst.PackageDetails = s.details
 	}
 	for _, p := range pkgs {
 		if p == nil {
@@ -181,12 +302,13 @@ func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 		if from == nil {
 			continue
 		}
-		if to == nil {
-			to = e.to
+		dstTo := e.to
+		if to != nil {
+			dstTo = to.dst
 		}
-		from.LinkDepend(to)
+		from.dst.LinkDepend(dstTo)
 	}
-	names := make([]identity, 0, len(index))
+	names := make([]identity, 0, nUnique)
 	for id := range index {
 		names = append(names, id)
 	}
@@ -203,9 +325,9 @@ func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 		}
 		return !a.Range && b.Range
 	})
-	out := make([]*dxtypes.Package, 0, len(index))
+	out := make([]*dxtypes.Package, 0, nUnique)
 	for _, id := range names {
-		out = append(out, index[id])
+		out = append(out, index[id].dst)
 	}
 	return out, nil
 }
