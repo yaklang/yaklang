@@ -129,8 +129,9 @@ func (p *Parser) parseV2(packages map[string]Package) ([]types.Library, []types.
 		lib := types.Library{
 			ID: id, Name: name, Version: record.Version, Source: record.Resolved,
 			Dev: record.Dev, Indirect: key != "" && !direct[key],
-			Verification: declared.Canonical,
-			Locations:    []types.Location{{StartLine: record.StartLine, EndLine: record.EndLine}},
+			Verification:      declared.Canonical,
+			DeclaredIntegrity: declared.Original,
+			Locations:         []types.Location{{StartLine: record.StartLine, EndLine: record.EndLine}},
 		}
 		if key == "" {
 			lib.Evidence = "declared"

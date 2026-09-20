@@ -15,46 +15,64 @@ var algorithms = map[string]int{
 	"blake2b-256": 32, "blake2b-384": 48, "blake2b-512": 64, "blake3": 32,
 }
 
+type Token struct {
+	Raw, Algorithm, Canonical, Issue string
+}
+
 type Result struct {
+	Original  string
 	Canonical string
+	Tokens    []Token
 	Issues    []string
 }
 
 // ParseDeclared normalizes SRI (`sha512-<base64>`) and `alg:hex` tokens.
 // Same digest with different encodings becomes one canonical `alg:hex` token.
+// Original text is always retained; invalid tokens never become Canonical.
 func ParseDeclared(raw string) Result {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	original := strings.TrimSpace(raw)
+	if original == "" {
 		return Result{}
 	}
-	var tokens []string
+	var canonical []string
 	var issues []string
 	seen := map[string]bool{}
-	for _, token := range strings.Fields(raw) {
+	out := Result{Original: original}
+	for _, token := range strings.Fields(original) {
+		item := Token{Raw: token}
 		alg, payload, ok := split(token)
 		if !ok {
-			issues = append(issues, "malformed digest token")
+			item.Issue = "malformed digest token"
+			issues = append(issues, item.Issue+": "+token)
+			out.Tokens = append(out.Tokens, item)
 			continue
 		}
+		item.Algorithm = alg
 		size, known := algorithms[alg]
 		if !known {
-			issues = append(issues, "unknown digest algorithm "+alg)
+			item.Issue = "unknown digest algorithm " + alg
+			issues = append(issues, item.Issue+": "+token)
+			out.Tokens = append(out.Tokens, item)
 			continue
 		}
 		sum, ok := decode(payload, size)
 		if !ok {
-			issues = append(issues, "illegal digest encoding")
+			item.Issue = "illegal digest encoding"
+			issues = append(issues, item.Issue+": "+token)
+			out.Tokens = append(out.Tokens, item)
 			continue
 		}
-		item := alg + ":" + hex.EncodeToString(sum)
-		if seen[item] {
-			continue
+		item.Canonical = alg + ":" + hex.EncodeToString(sum)
+		if !seen[item.Canonical] {
+			seen[item.Canonical] = true
+			canonical = append(canonical, item.Canonical)
 		}
-		seen[item] = true
-		tokens = append(tokens, item)
+		out.Tokens = append(out.Tokens, item)
 	}
-	sort.Strings(tokens)
-	return Result{Canonical: strings.Join(tokens, " "), Issues: issues}
+	sort.Strings(canonical)
+	out.Canonical = strings.Join(canonical, " ")
+	out.Issues = issues
+	return out
 }
 
 func split(token string) (string, string, bool) {

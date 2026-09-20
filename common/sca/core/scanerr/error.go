@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"strings"
 )
 
@@ -28,11 +27,47 @@ const (
 // not parse Reason strings.
 type Error struct {
 	Code string
+	File string
 	Err  error
 }
 
 func New(code, format string, args ...any) error {
 	return &Error{Code: code, Err: fmt.Errorf(format, args...)}
+}
+
+func WithFile(err error, file string) error {
+	if err == nil {
+		return nil
+	}
+	var e *Error
+	if errors.As(err, &e) {
+		if e.File == file {
+			return err
+		}
+		cp := *e
+		cp.File = file
+		return &cp
+	}
+	return &Error{Code: CodeOf(err), File: file, Err: err}
+}
+
+// Wrap keeps an existing classified error. Otherwise it attaches code while
+// preserving unwrap targets such as context.Canceled.
+func Wrap(code string, err error) error {
+	if err == nil {
+		if code == "" {
+			return nil
+		}
+		return &Error{Code: code}
+	}
+	var e *Error
+	if errors.As(err, &e) && e.Code != "" {
+		return err
+	}
+	if code == "" {
+		return err
+	}
+	return &Error{Code: code, Err: err}
 }
 
 func (e *Error) Error() string {
@@ -43,16 +78,23 @@ func (e *Error) Error() string {
 	if e.Err != nil {
 		msg = e.Err.Error()
 	}
-	if e.Code == "" {
-		return msg
+	if e.Code != "" && (msg == e.Code || strings.HasPrefix(msg, e.Code+": ")) {
+		msg = strings.TrimPrefix(strings.TrimPrefix(msg, e.Code+": "), e.Code)
 	}
-	if msg == "" {
+	switch {
+	case e.Code != "" && e.File != "" && msg != "":
+		return e.Code + ": " + e.File + ": " + msg
+	case e.Code != "" && e.File != "":
+		return e.Code + ": " + e.File
+	case e.Code != "" && msg != "":
+		return e.Code + ": " + msg
+	case e.Code != "":
 		return e.Code
-	}
-	if strings.HasPrefix(msg, e.Code) {
+	case e.File != "" && msg != "":
+		return e.File + ": " + msg
+	default:
 		return msg
 	}
-	return e.Code + ": " + msg
 }
 
 func (e *Error) Unwrap() error {
@@ -75,6 +117,8 @@ var (
 )
 
 // CodeOf returns the stable diagnostic code for err across scan stages.
+// String matching is only a prefix compatibility path for historical
+// fmt.Errorf("%s: ...") producers, never a substring search of paths or reasons.
 func CodeOf(err error) string {
 	if err == nil {
 		return ""
@@ -86,17 +130,11 @@ func CodeOf(err error) string {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return Cancelled
 	}
-	if errors.Is(err, fs.ErrPermission) {
-		return InvalidPath
-	}
 	msg := err.Error()
 	for _, code := range []string{ResourceLimit, InputChanged, InvalidPath, InternalError, UnsupportedSyntax, EvidenceInsufficient, MalformedInput, InvalidInput, InvalidConfig, UnsupportedInput, InputError, Cancelled} {
-		if strings.Contains(msg, code) {
+		if msg == code || strings.HasPrefix(msg, code+":") {
 			return code
 		}
-	}
-	if strings.Contains(msg, "resource limit") {
-		return ResourceLimit
 	}
 	return MalformedInput
 }

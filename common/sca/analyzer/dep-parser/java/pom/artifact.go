@@ -24,6 +24,8 @@ type artifact struct {
 	Root   bool
 	Direct bool
 
+	Type, Classifier, DeclaredConstraint string
+
 	Locations types.Locations
 }
 
@@ -73,7 +75,21 @@ func (a artifact) Inherit(parent artifact) artifact {
 }
 
 func (a artifact) Name() string {
-	return fmt.Sprintf("%s:%s", a.GroupID, a.ArtifactID)
+	return mavenCoordinate(a.GroupID, a.ArtifactID, a.Type, a.Classifier)
+}
+
+func mavenCoordinate(group, artifact, typ, classifier string) string {
+	name := fmt.Sprintf("%s:%s", group, artifact)
+	if classifier != "" {
+		if typ == "" {
+			typ = "jar"
+		}
+		return name + ":" + typ + ":" + classifier
+	}
+	if typ != "" && typ != "jar" {
+		return name + ":" + typ
+	}
+	return name
 }
 
 func (a artifact) String() string {

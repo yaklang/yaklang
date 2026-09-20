@@ -22,6 +22,7 @@ type Library struct {
 	Condition, Scope                        string
 	IsVersionRange                          bool
 	DeclaredCondition, Extras, Verification string
+	DeclaredIntegrity                       string
 	Diagnostics                             []model.Diagnostic
 
 	Source, Variant, Evidence, DeclaredName, DeclaredVersion string

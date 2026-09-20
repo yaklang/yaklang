@@ -24,8 +24,8 @@ type PackageDetails struct {
 
 	UnresolvedDependencies []string
 
-	Evidence, DeclaredName, DeclaredVersion, ReplacementVersion string
-	Indirect                                                    bool
+	Evidence, DeclaredName, DeclaredVersion, ReplacementVersion, DeclaredIntegrity string
+	Indirect                                                                       bool
 
 	// Qualifiers are optional on legacy producers and required by migrated ones.
 	Ecosystem, Source, Architecture, Variant, Snapshot, ProjectRoot, Instance string

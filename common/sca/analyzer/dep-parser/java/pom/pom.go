@@ -147,6 +147,8 @@ type pomDependency struct {
 	GroupID    string        `xml:"groupId"`
 	ArtifactID string        `xml:"artifactId"`
 	Version    string        `xml:"version"`
+	Type       string        `xml:"type"`
+	Classifier string        `xml:"classifier"`
 	Scope      string        `xml:"scope"`
 	Optional   bool          `xml:"optional"`
 	Exclusions pomExclusions `xml:"exclusions"`
@@ -166,7 +168,7 @@ type pomExclusion struct {
 }
 
 func (d pomDependency) Name() string {
-	return fmt.Sprintf("%s:%s", d.GroupID, d.ArtifactID)
+	return mavenCoordinate(d.GroupID, d.ArtifactID, d.Type, d.Classifier)
 }
 
 // Resolve evaluates variables in the dependency and inherit some fields from dependencyManagement to the dependency.
@@ -177,6 +179,8 @@ func (d pomDependency) Resolve(props map[string]string, depManagement, rootDepMa
 		GroupID:    evaluateVariable(d.GroupID, props, nil),
 		ArtifactID: evaluateVariable(d.ArtifactID, props, nil),
 		Version:    evaluateVariable(d.Version, props, nil),
+		Type:       evaluateVariable(d.Type, props, nil),
+		Classifier: evaluateVariable(d.Classifier, props, nil),
 		Scope:      evaluateVariable(d.Scope, props, nil),
 		Optional:   d.Optional,
 		Exclusions: d.Exclusions,
@@ -246,11 +250,14 @@ func (d pomDependency) ToArtifact(opts analysisOptions) artifact {
 	}
 
 	return artifact{
-		GroupID:    d.GroupID,
-		ArtifactID: d.ArtifactID,
-		Version:    newVersion(d.Version),
-		Exclusions: exclusions,
-		Locations:  locations,
+		GroupID:            d.GroupID,
+		ArtifactID:         d.ArtifactID,
+		Version:            newVersion(d.Version),
+		Type:               d.Type,
+		Classifier:         d.Classifier,
+		DeclaredConstraint: d.Version,
+		Exclusions:         exclusions,
+		Locations:          locations,
 	}
 }
 

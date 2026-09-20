@@ -31,17 +31,18 @@ type Component struct {
 	Licenses []string     `json:"licenses,omitempty"`
 }
 type Observation struct {
-	Provides  []string `json:"provides,omitempty"`
-	Condition string   `json:"condition,omitempty"`
-	Scope     string   `json:"scope,omitempty"`
-	Component string   `json:"component"`
-	Snapshot  string   `json:"snapshot"`
-	Project   string   `json:"project"`
-	File      string   `json:"file"`
-	StartLine int      `json:"startLine,omitempty"`
-	EndLine   int      `json:"endLine,omitempty"`
-	NativeID  string   `json:"nativeId,omitempty"`
-	Kind      string   `json:"kind"`
+	Provides          []string `json:"provides,omitempty"`
+	Condition         string   `json:"condition,omitempty"`
+	Scope             string   `json:"scope,omitempty"`
+	Component         string   `json:"component"`
+	Snapshot          string   `json:"snapshot"`
+	Project           string   `json:"project"`
+	File              string   `json:"file"`
+	StartLine         int      `json:"startLine,omitempty"`
+	EndLine           int      `json:"endLine,omitempty"`
+	NativeID          string   `json:"nativeId,omitempty"`
+	Kind              string   `json:"kind"`
+	DeclaredIntegrity string   `json:"declaredIntegrity,omitempty"`
 }
 
 func (o Observation) ID() string {

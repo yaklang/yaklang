@@ -110,7 +110,7 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		deps              []types.Dependency
 		rootDepManagement []pomDependency
 		uniqArtifacts     = map[string]artifact{}
-		uniqDeps          = map[string][]string{}
+		uniqDeps          = map[string][]pomEdge{}
 	)
 
 	// Iterate direct and transitive dependencies
@@ -186,19 +186,18 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		if !art.IsEmpty() {
 			// Override the version
 			uniqArtifacts[art.Name()] = artifact{
-				Version:   art.Version,
-				Licenses:  result.artifact.Licenses,
-				Direct:    art.Direct,
-				Root:      art.Root,
-				Locations: art.Locations,
+				Version:    art.Version,
+				Licenses:   result.artifact.Licenses,
+				Direct:     art.Direct,
+				Root:       art.Root,
+				Locations:  art.Locations,
+				Type:       art.Type,
+				Classifier: art.Classifier,
 			}
 
-			// save only dependency names
-			// version will be determined later
-			dependsOn := lo.Map(result.dependencies, func(a artifact, _ int) string {
-				return a.Name()
+			uniqDeps[packageID(art.Name(), art.Version.String())] = lo.Map(result.dependencies, func(a artifact, _ int) pomEdge {
+				return pomEdge{Name: a.Name(), Constraint: a.DeclaredConstraint, Version: a.Version.String()}
 			})
-			uniqDeps[packageID(art.Name(), art.Version.String())] = dependsOn
 		}
 	}
 
@@ -215,14 +214,16 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		}
 		libs = append(libs, lib)
 
-		// Keep declared edges even when the target version is still unknown.
 		var dependsOn []string
 		var reqs []types.Requirement
-		for _, dependOnName := range uniqDeps[lib.ID] {
-			ver := depVersion(dependOnName, uniqArtifacts)
-			id := packageID(dependOnName, ver)
-			dependsOn = append(dependsOn, id)
-			reqs = append(reqs, types.Requirement{Target: dependOnName, Constraint: ver, Scope: "runtime", Resolved: id})
+		for _, edge := range uniqDeps[lib.ID] {
+			req := types.Requirement{Target: edge.Name, Constraint: edge.Constraint, Scope: "runtime"}
+			if pomVersionKnown(edge.Version) {
+				id := packageID(edge.Name, edge.Version)
+				dependsOn = append(dependsOn, id)
+				req.Resolved = id
+			}
+			reqs = append(reqs, req)
 		}
 
 		sort.Strings(dependsOn)
@@ -248,6 +249,14 @@ func depVersion(depName string, uniqArtifacts map[string]artifact) string {
 		return art.Version.String()
 	}
 	return ""
+}
+
+type pomEdge struct {
+	Name, Constraint, Version string
+}
+
+func pomVersionKnown(v string) bool {
+	return v != "" && !strings.ContainsAny(v, "[](),${}")
 }
 
 func (p *parser) parseModule(currentPath, relativePath string) (artifact, error) {
@@ -415,12 +424,14 @@ func (p *parser) parseDependencies(deps []pomDependency, props map[string]string
 	rootDepManagement := opts.depManagement
 	var dependencies []artifact
 	for _, d := range deps {
-		// Resolve dependencies
+		declared := d.Version
 		d = d.Resolve(props, depManagement, rootDepManagement)
 		if strings.Contains(d.Version, "${") {
 			p.missing["unresolved property: "+d.Version] = true
 		}
-		dependencies = append(dependencies, d.ToArtifact(opts))
+		art := d.ToArtifact(opts)
+		art.DeclaredConstraint = declared
+		dependencies = append(dependencies, art)
 	}
 	return dependencies, nil
 }

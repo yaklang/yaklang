@@ -124,10 +124,11 @@ func (p *Parser) parse(lockVer int, lockFile LockFile) ([]types.Library, []types
 		lib := types.Library{
 			ID:      pkgID,
 			Variant: depPath, Source: info.Resolution.Tarball,
-			Name:         name,
-			Version:      version,
-			Indirect:     isIndirectLib(name, lockFile.Dependencies),
-			Verification: declared.Canonical,
+			Name:              name,
+			Version:           version,
+			Indirect:          isIndirectLib(name, lockFile.Dependencies),
+			Verification:      declared.Canonical,
+			DeclaredIntegrity: declared.Original,
 		}
 		for _, issue := range declared.Issues {
 			lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "pnpm", Reason: issue, Incomplete: true})

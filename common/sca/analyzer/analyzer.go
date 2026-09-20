@@ -119,6 +119,7 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 
 				DeclaredCondition: lib.DeclaredCondition,
 				Diagnostics:       lib.Diagnostics,
+				DeclaredIntegrity: lib.DeclaredIntegrity,
 
 				Instance: lib.ID, Source: lib.Source, Variant: lib.Variant, Evidence: lib.Evidence, DeclaredName: lib.DeclaredName, DeclaredVersion: lib.DeclaredVersion, Indirect: lib.Indirect},
 		}
@@ -153,6 +154,11 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 			prior.Locations = append(prior.Locations, p.Locations...)
 			prior.RawLicenses = append(prior.RawLicenses, p.RawLicenses...)
 			prior.Diagnostics = append(prior.Diagnostics, p.Diagnostics...)
+			if prior.DeclaredIntegrity == "" {
+				prior.DeclaredIntegrity = p.DeclaredIntegrity
+			} else if p.DeclaredIntegrity != "" && p.DeclaredIntegrity != prior.DeclaredIntegrity {
+				prior.DeclaredIntegrity = prior.DeclaredIntegrity + " " + p.DeclaredIntegrity
+			}
 			continue
 		}
 		pkgIDMap[id] = &p

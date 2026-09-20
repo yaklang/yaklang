@@ -40,6 +40,21 @@ func CreateCycloneDXSBOMFromReport(report *model.Report) *BOM {
 	occurrences := map[string]string{}
 	for _, o := range report.Observations {
 		occurrences[o.ID()] = o.Component
+		if o.DeclaredIntegrity == "" {
+			continue
+		}
+		c := components[o.Component]
+		prop := BOMProperty{"sca:declared-integrity", o.DeclaredIntegrity}
+		found := false
+		for _, old := range c.Properties {
+			if old == prop {
+				found = true
+			}
+		}
+		if !found {
+			c.Properties = append(c.Properties, prop)
+			components[o.Component] = c
+		}
 	}
 	edges := map[string]map[string]bool{}
 	for _, q := range report.Requirements {

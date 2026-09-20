@@ -1,16 +1,77 @@
 package sca
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/model"
 	"sort"
 	"strings"
 )
 
-func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
+func locationKey(p *dxtypes.Package) string {
+	p.EnsureDetails()
+	locs := append([]dxtypes.SourceRange{{StartLine: p.StartLine, EndLine: p.EndLine}}, p.Locations...)
+	sort.Slice(locs, func(i, j int) bool {
+		if locs[i].StartLine != locs[j].StartLine {
+			return locs[i].StartLine < locs[j].StartLine
+		}
+		return locs[i].EndLine < locs[j].EndLine
+	})
+	var b strings.Builder
+	for _, loc := range locs {
+		fmt.Fprintf(&b, "%d:%d,", loc.StartLine, loc.EndLine)
+	}
+	return b.String()
+}
+
+func requirementKey(p *dxtypes.Package) string {
+	p.EnsureDetails()
+	reqs := append([]model.Requirement(nil), p.Requirements...)
+	sort.Slice(reqs, func(i, j int) bool {
+		if reqs[i].Target != reqs[j].Target {
+			return reqs[i].Target < reqs[j].Target
+		}
+		if reqs[i].Constraint != reqs[j].Constraint {
+			return reqs[i].Constraint < reqs[j].Constraint
+		}
+		return reqs[i].Scope < reqs[j].Scope
+	})
+	raw, _ := json.Marshal(reqs)
+	return string(raw)
+}
+
+func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []error {
+	for _, p := range pkgs {
+		p.EnsureDetails()
+		sort.SliceStable(p.Locations, func(i, j int) bool {
+			if p.Locations[i].StartLine != p.Locations[j].StartLine {
+				return p.Locations[i].StartLine < p.Locations[j].StartLine
+			}
+			return p.Locations[i].EndLine < p.Locations[j].EndLine
+		})
+		if len(p.Locations) > 0 {
+			p.StartLine, p.EndLine = p.Locations[0].StartLine, p.Locations[0].EndLine
+		}
+		sort.SliceStable(p.Requirements, func(i, j int) bool {
+			if p.Requirements[i].Target != p.Requirements[j].Target {
+				return p.Requirements[i].Target < p.Requirements[j].Target
+			}
+			if p.Requirements[i].Constraint != p.Requirements[j].Constraint {
+				return p.Requirements[i].Constraint < p.Requirements[j].Constraint
+			}
+			return p.Requirements[i].Scope < p.Requirements[j].Scope
+		})
+	}
 	sort.SliceStable(pkgs, func(i, j int) bool {
-		return pkgs[i].Identifier() < pkgs[j].Identifier()
+		if a, b := pkgs[i].Identifier(), pkgs[j].Identifier(); a != b {
+			return a < b
+		}
+		if a, b := locationKey(pkgs[i]), locationKey(pkgs[j]); a != b {
+			return a < b
+		}
+		return requirementKey(pkgs[i]) < requirementKey(pkgs[j])
 	})
 	observations := map[*dxtypes.Package]string{}
 	actual := map[*dxtypes.Package]bool{}
@@ -18,9 +79,11 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
 	componentIDs := map[model.ComponentKey]bool{}
 	providers := map[[4]string][]string{}
 	providerCount := 0
+	var errs []error
 	limit := func(what string) {
 		r.Complete = false
 		r.Diagnostics = append(r.Diagnostics, model.Diagnostic{Code: "resource_limit", Stage: "normalize", Reason: what, Incomplete: true})
+		errs = append(errs, scanerr.New(scanerr.ResourceLimit, "%s", what))
 	}
 	for _, p := range pkgs {
 		p.EnsureDetails()
@@ -29,8 +92,14 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
 				d.File = p.FromFile[0]
 			}
 			r.Diagnostics = append(r.Diagnostics, d)
+			if d.Incomplete {
+				errs = append(errs, scanerr.Wrap(d.Code, fmt.Errorf("%s", d.Reason)))
+			}
 		}
 		if p.Potential {
+			continue
+		}
+		if strings.TrimSpace(p.Name) == "" {
 			continue
 		}
 		if len(r.Observations) >= l.MaxObservations {
@@ -62,7 +131,7 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
 		}
 		provides := append([]string(nil), p.Provides...)
 		sort.Strings(provides)
-		o := model.Observation{Provides: provides, Condition: p.Condition, Scope: p.Scope, Component: key.ID(), Snapshot: p.Snapshot, Project: p.ProjectRoot, File: file, NativeID: p.Instance, Kind: kind, StartLine: p.StartLine, EndLine: p.EndLine}
+		o := model.Observation{Provides: provides, Condition: p.Condition, Scope: p.Scope, Component: key.ID(), Snapshot: p.Snapshot, Project: p.ProjectRoot, File: file, NativeID: p.Instance, Kind: kind, StartLine: p.StartLine, EndLine: p.EndLine, DeclaredIntegrity: p.DeclaredIntegrity}
 		r.Observations = append(r.Observations, o)
 		observations[p] = o.ID()
 		nativeKey := [3]string{p.Snapshot, p.ProjectRoot, p.Instance}
@@ -122,7 +191,7 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
 	}
 	for _, p := range pkgs {
 		from := observations[p]
-		if !p.Potential && from == "" {
+		if !p.Potential && from == "" && strings.TrimSpace(p.Name) != "" {
 			continue
 		}
 		if p.Potential {
@@ -225,6 +294,7 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
 			p.LinkDepend(up)
 		}
 	}
+	return errs
 }
 func manifestEvidence(file string) bool {
 	return strings.HasSuffix(file, "/package.json") || file == "package.json" || strings.HasSuffix(file, "/composer.json") || file == "composer.json" || strings.HasSuffix(file, "requirements.txt")

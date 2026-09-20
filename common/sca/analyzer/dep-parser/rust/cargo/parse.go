@@ -67,6 +67,7 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		if pkg.Checksum != "" {
 			declared := digest.ParseDeclared("sha256:" + pkg.Checksum)
 			lib.Verification = declared.Canonical
+			lib.DeclaredIntegrity = pkg.Checksum
 			for _, issue := range declared.Issues {
 				lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "cargo", Reason: issue, Incomplete: true})
 			}

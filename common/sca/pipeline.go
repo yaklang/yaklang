@@ -195,24 +195,38 @@ func ScanReport(ctx context.Context, input fs.FS, opts ...ScanOption) (*model.Re
 }
 func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.Package, *model.Report, error) {
 	report := &model.Report{Complete: true}
+	var classified []error
 	fail := func(code, file string, e error) {
+		e = scanerr.Wrap(code, e)
+		if file != "" {
+			e = scanerr.WithFile(e, file)
+		}
+		if code == "" || scanerr.CodeOf(e) != "" && scanerr.CodeOf(e) != code {
+			code = scanerr.CodeOf(e)
+		}
+		if code == "" {
+			code = scanerr.MalformedInput
+		}
 		report.Complete = false
-		report.Diagnostics = append(report.Diagnostics, model.Diagnostic{Code: code, Stage: "scan", File: file, Reason: e.Error(), Incomplete: true})
+		reason := ""
+		if e != nil {
+			reason = e.Error()
+			classified = append(classified, e)
+		}
+		report.Diagnostics = append(report.Diagnostics, model.Diagnostic{Code: code, Stage: "scan", File: file, Reason: reason, Incomplete: true})
 	}
 	if ctx == nil || input == nil {
-		e := fmt.Errorf("nil scan context or filesystem")
-		fail("invalid_input", "", e)
-		return nil, report, e
+		fail(scanerr.InvalidInput, "", fmt.Errorf("nil scan context or filesystem"))
+		return nil, report, errors.Join(classified...)
 	}
 	if c.numWorkers < 1 || c.numWorkers > 64 {
-		e := fmt.Errorf("worker count must be between 1 and 64")
-		fail("invalid_config", "", e)
-		return nil, report, e
+		fail(scanerr.InvalidConfig, "", fmt.Errorf("worker count must be between 1 and 64"))
+		return nil, report, errors.Join(classified...)
 	}
 	limits, err := c.limits.Normalize()
 	if err != nil {
-		fail("invalid_config", "", err)
-		return nil, report, err
+		fail(scanerr.InvalidConfig, "", err)
+		return nil, report, errors.Join(classified...)
 	}
 	ctx = budget.Bind(ctx, limits)
 	m := &materials{source: input, ctx: ctx, files: map[string]*material{}, dirs: map[string]fs.FileInfo{}, limits: limits}
@@ -249,7 +263,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 	if err != nil {
 		fail(scanerr.CodeOf(err), "", err)
 		report.Normalize()
-		return nil, report, err
+		return nil, report, errors.Join(classified...)
 	}
 	selected := analyzer.FilterAnalyzer(c.scanMode, c.usedAnalyzers)
 	selected = append(selected, c.customAnalyzers...)
@@ -277,7 +291,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		}
 		actual, e := f.Stat()
 		if e == nil && !sameMaterial(v.info, actual) {
-			e = fmt.Errorf("input_changed: %s", name)
+			e = scanerr.New(scanerr.InputChanged, "%s", name)
 		}
 		if e == nil {
 			header = make([]byte, 4)
@@ -297,7 +311,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 			continue
 		}
 		if m.total > limits.MaxTotalReadBytes {
-			fail("resource_limit", name, fmt.Errorf("snapshot header read budget"))
+			fail(scanerr.ResourceLimit, name, scanerr.New(scanerr.ResourceLimit, "snapshot header read budget"))
 			break
 		}
 		for _, a := range selected {
@@ -413,20 +427,14 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		fail("resource_limit", "", fmt.Errorf("observations"))
 		pkgs = nil
 	}
-	fillReport(report, pkgs, limits)
+	classified = append(classified, fillReport(report, pkgs, limits)...)
 	report.Normalize()
 	if err = ctx.Err(); err != nil {
 		fail("cancelled", "", err)
 		report.Normalize()
 	}
 	sort.Slice(pkgs, func(i, j int) bool { return pkgs[i].Identifier() < pkgs[j].Identifier() })
-	var errs []error
-	for _, d := range report.Diagnostics {
-		if d.Incomplete {
-			errs = append(errs, fmt.Errorf("%s: %s: %s", d.Code, d.File, strings.TrimPrefix(d.Reason, d.Code+": ")))
-		}
-	}
-	return pkgs, report, errors.Join(errs...)
+	return pkgs, report, errors.Join(classified...)
 }
 func safeMatch(a analyzer.Analyzer, info analyzer.MatchInfo, source *fsio.Snapshot) (status int, err error) {
 	defer func() {

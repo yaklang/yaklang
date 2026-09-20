@@ -142,6 +142,18 @@ func CreateCycloneDXSBOMByDXPackages(pkgs []*Package) *BOM {
 				c.Properties = append(c.Properties, prop)
 			}
 		}
+		if details := p.Details(); details.DeclaredIntegrity != "" {
+			prop := BOMProperty{"sca:declared-integrity", details.DeclaredIntegrity}
+			found := false
+			for _, old := range c.Properties {
+				if old == prop {
+					found = true
+				}
+			}
+			if !found {
+				c.Properties = append(c.Properties, prop)
+			}
+		}
 		for _, cpe := range p.AmendedCPE {
 			if c.CPE == "" || cpe < c.CPE {
 				c.CPE = cpe
