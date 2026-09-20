@@ -24,6 +24,8 @@ const (
 	OutOfOrder ASTSequenceType = iota
 	Order
 	ReverseOrder
+	// BoundedOrder parses concurrently and delivers in input order within a fixed window.
+	BoundedOrder
 )
 
 // --- 基础信息配置 Get/Set 方法 ---

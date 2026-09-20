@@ -407,7 +407,11 @@ func (c *Config) parseProjectWithFSUnits(
 		// the available workers too, without multiplying the AST window by
 		// the number of units. Declaration registration remains ordered by
 		// the parser's configured delivery policy and owns its unit context.
-		prefetchedFiles := c.GetFileHandler(filesystem, batchFiles, preHandlerFileSet)
+		order := c.GetCompileASTSequence()
+		if order == ssareducer.OutOfOrder || order == ssareducer.Order {
+			order = ssareducer.BoundedOrder
+		}
+		prefetchedFiles := c.getFileHandlerWithOrder(filesystem, batchFiles, preHandlerFileSet, order)
 		if err := batchPipeline.Wait(); err != nil {
 			if prefetchedFiles != nil {
 				for file := range prefetchedFiles {
