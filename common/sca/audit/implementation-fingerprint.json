@@ -1,9 +1,9 @@
 {
-  "sha256": "cc96751c9c7c526980d08ecd3b11dab858abfdbd62f74de09f018bb56effee92",
+  "sha256": "5188537e4b17fa9d0a8e7463448e3770299f8ef08bd6cfb86c2a5a0dcae83079",
   "files": [
     {
       "path": ".github/workflows/sca-minimal.yml",
-      "sha256": "bb8da8bf9a172b9a52ccfcfbb978fc5059cee2fb17862652a4db3ca8c7a8f01a"
+      "sha256": "95b508272ae8de2d48c24519458f431824685d3309251c5c801760d1c37d8c7c"
     },
     {
       "path": "common/sca/analyzer.go",
@@ -59,7 +59,7 @@
     },
     {
       "path": "common/sca/analyzer/dep-parser/java/pom/parse.go",
-      "sha256": "3f8aaa81a4ca8ebb3a63bd75ee5dd52b9d93036d62719f9f40f1883824231d76"
+      "sha256": "149a51bbdb80bb8b65600388bb7cd5a543941431702f65c402351367eb4328a0"
     },
     {
       "path": "common/sca/analyzer/dep-parser/java/pom/pom.go",
@@ -595,7 +595,7 @@
     },
     {
       "path": "scripts/sca/dependency_audit.py",
-      "sha256": "005781e0b3990c9a217e1370fba658c26fffc3aef18351b78c4aee75fd146283"
+      "sha256": "44365d27d0e360a6b8bb40bbf9f91254fa175fda3424f2c7bd0408d9ac0c31eb"
     },
     {
       "path": "scripts/sca/isolated-test-exec.sh",

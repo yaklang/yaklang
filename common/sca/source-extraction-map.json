@@ -454,99 +454,99 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/java/pom/parse.go",
-      "sha256": "3f8aaa81a4ca8ebb3a63bd75ee5dd52b9d93036d62719f9f40f1883824231d76",
+      "sha256": "149a51bbdb80bb8b65600388bb7cd5a543941431702f65c402351367eb4328a0",
       "symbols": [
         {
           "name": "parser",
-          "line": 28
+          "line": 27
         },
         {
           "name": "NewParser",
-          "line": 40
+          "line": 39
         },
         {
           "name": "parser.Parse",
-          "line": 44
+          "line": 43
         },
         {
           "name": "parser.parseRoot",
-          "line": 79
+          "line": 78
         },
         {
           "name": "depVersion",
-          "line": 230
+          "line": 229
         },
         {
           "name": "parser.parseModule",
-          "line": 237
+          "line": 236
         },
         {
           "name": "parser.resolve",
-          "line": 257
+          "line": 256
         },
         {
           "name": "analysisResult",
-          "line": 280
+          "line": 279
         },
         {
           "name": "analysisOptions",
-          "line": 289
+          "line": 288
         },
         {
           "name": "parser.analyze",
-          "line": 295
+          "line": 294
         },
         {
           "name": "parser.mergeDependencyManagements",
-          "line": 349
+          "line": 348
         },
         {
           "name": "parser.parseDependencies",
-          "line": 365
+          "line": 364
         },
         {
           "name": "parser.resolveDepManagement",
-          "line": 389
+          "line": 388
         },
         {
           "name": "parser.mergeDependencies",
-          "line": 423
+          "line": 422
         },
         {
           "name": "excludeDep",
-          "line": 441
+          "line": 440
         },
         {
           "name": "parser.parseParent",
-          "line": 457
+          "line": 456
         },
         {
           "name": "parser.retrieveParent",
-          "line": 492
+          "line": 491
         },
         {
           "name": "parser.tryRelativePath",
-          "line": 521
+          "line": 520
         },
         {
           "name": "parser.openRelativePom",
-          "line": 550
+          "line": 549
         },
         {
           "name": "parser.openPom",
-          "line": 572
+          "line": 571
         },
         {
           "name": "parser.tryRepository",
-          "line": 594
+          "line": 593
         },
         {
           "name": "parser.isDirectory",
-          "line": 604
+          "line": 603
         },
         {
           "name": "parsePom",
-          "line": 615
+          "line": 614
         }
       ],
       "decision": "TRIM_AND_REWRITE",

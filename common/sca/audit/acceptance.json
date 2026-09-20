@@ -2,7 +2,7 @@
   "schema_version": 1,
   "branch": "codex/sca-minimal-dependency-core",
   "baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
-  "implementation_fingerprint": "cc96751c9c7c526980d08ecd3b11dab858abfdbd62f74de09f018bb56effee92",
+  "implementation_fingerprint": "5188537e4b17fa9d0a8e7463448e3770299f8ef08bd6cfb86c2a5a0dcae83079",
   "core_dependency_target": "PASS",
   "taskbook_final_acceptance": "NOT_FULLY_ACCEPTED",
   "tests": {

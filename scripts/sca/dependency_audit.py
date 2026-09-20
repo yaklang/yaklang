@@ -37,7 +37,9 @@ def main():
         cmd.append("-test")
     cmd.extend(args.roots)
     env = dict(os.environ, GOWORK="off", GOTOOLCHAIN="local", CGO_ENABLED="0")
-    result = subprocess.run(cmd, env=env, text=True, capture_output=True)
+    # Go emits UTF-8 JSON (including package documentation), independently of
+    # Windows' active ANSI code page.
+    result = subprocess.run(cmd, env=env, text=True, encoding="utf-8", capture_output=True)
     if result.returncode:
         sys.stderr.write(result.stderr)
         return 2

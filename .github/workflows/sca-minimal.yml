@@ -10,6 +10,7 @@ on:
       - 'go.sum'
       - '.github/workflows/sca-minimal.yml'
   push:
+    branches: [main]
     paths:
       - 'common/sca/**'
       - 'scripts/sca/**'

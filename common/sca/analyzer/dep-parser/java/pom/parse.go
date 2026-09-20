@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -549,17 +548,17 @@ func (p *parser) tryRelativePath(parentArtifact artifact, currentPath, relativeP
 
 func (p *parser) openRelativePom(currentPath, relativePath string) (*pom, error) {
 	// e.g. child/pom.xml => child/
-	dir := filepath.Dir(currentPath)
+	dir := path.Dir(currentPath)
 
 	// e.g. child + ../parent => parent/
-	filePath := filepath.Join(dir, relativePath)
+	filePath := path.Join(dir, relativePath)
 
 	isDir, err := p.isDirectory(filePath)
 	if err != nil {
 		return nil, err
 	} else if isDir {
 		// e.g. parent/ => parent/pom.xml
-		filePath = filepath.Join(filePath, "pom.xml")
+		filePath = path.Join(filePath, "pom.xml")
 	}
 
 	pom, err := p.openPom(filePath)
