@@ -301,24 +301,26 @@ func appendResidentIndex(index *utils.SafeMapWithKey[string, []int64], key strin
 	if index == nil || id <= 0 {
 		return
 	}
-	data, ok := index.Get(key)
-	if !ok {
-		data = make([]int64, 0, 1)
-	}
-	data = append(data, id)
-	index.Set(key, data)
+	index.Update(key, func(data []int64, _ bool) ([]int64, bool) {
+		return append(data, id), true
+	})
 }
 
 func removeResidentIndex(index *utils.SafeMapWithKey[string, []int64], key string, id int64) {
-	if index == nil || id <= 0 {
+	if index == nil || id <= 0 || !index.Have(key) {
 		return
 	}
-	data, ok := index.Get(key)
-	if !ok {
-		return
-	}
-	data = utils.RemoveSliceItem(data, id)
-	index.Set(key, data)
+	index.Update(key, func(data []int64, _ bool) ([]int64, bool) {
+		// Readers can retain the previous slice after releasing the map lock.
+		// Removal must not shift elements in that shared backing array.
+		var result []int64
+		for _, item := range data {
+			if item != id {
+				result = append(result, item)
+			}
+		}
+		return result, true
+	})
 }
 
 func CreateVariableIndexByName(name string, inst Instruction) *ssadb.IrIndex {
