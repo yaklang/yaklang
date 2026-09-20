@@ -785,7 +785,7 @@ switchLabeledRule
 
 // Java17
 defaultLabeledRule
-    : DEFAULT (ARROW | COLON) switchRuleOutcome
+    : (CASE NULL_LITERAL ',')? DEFAULT (ARROW | COLON) switchRuleOutcome
     ;
 
 // Java17
