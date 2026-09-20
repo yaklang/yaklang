@@ -179,7 +179,13 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		setMemberVerboseName(member)
 	}
 	writeUndefined := func() *Undefined {
-		recoverScope := b.SetCurrent(object, true)
+		// Missing members of a dependency are synthesized by the consuming
+		// unit. Re-entering the declaration block would mutate a completed
+		// dependency (and race with other consumers of that same object).
+		recoverScope := func() {}
+		if object.GetFunc() != nil && object.GetFunc().GetProgram() == b.GetProgram() {
+			recoverScope = b.SetCurrent(object, true)
+		}
 		displayName := name
 		if _, ok := ToConstInst(key); !ok {
 			if memberName := getMemberVerboseName(object, key); memberName != "" {
