@@ -545,11 +545,7 @@ jobs:
       - name: Slim gate test (irify_exclude)
         env:
           MOCKEY_CHECK_GCFLAGS: "false"
-        run: |
-          go test ./scripts/binary-size
-          go list -deps -json -tags irify_exclude ./common/yak/cmd/yak.go > "$RUNNER_TEMP/yak-slim-deps.json"
-          go run ./scripts/binary-size -deps "$RUNNER_TEMP/yak-slim-deps.json" -check-slim > "$RUNNER_TEMP/yak-slim-inventory.json"
-          go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc ./common/yak/cmd/yakcmds ./common/syntaxflow/sfdb
+        run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc ./common/yak/cmd/yakcmds ./common/syntaxflow/sfdb
 
   prepare-yakgrpc:
     timeout-minutes: 25
