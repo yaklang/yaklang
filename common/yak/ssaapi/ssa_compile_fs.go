@@ -591,7 +591,7 @@ func (c *Config) parseProjectWithFSUnits(
 		for waveIndex, wave := range waves {
 			waveStart := time.Now()
 			peak, err := buildCompileUnitWave(c.GetContext(), prog, wave, buildConcurrency)
-			prog.ProcessInfof("compile unit wave batch=%d wave=%d/%d groups=%d concurrency=%d peak_active=%d cost=%v",
+			log.Infof("compile unit wave batch=%d wave=%d/%d groups=%d concurrency=%d peak_active=%d cost=%v",
 				batchIndex+1, waveIndex+1, len(waves), len(wave), buildConcurrency, peak, time.Since(waveStart))
 			if err != nil {
 				return nil, err
