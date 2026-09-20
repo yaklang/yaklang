@@ -16,6 +16,7 @@ fi
 
 # ---------- 2. 生成 gzip_embed 所需的 .tar.gz 资源 ----------
 echo "[build] generating gzip embed resources..."
+bash scripts/generate-compressed-assets.sh
 gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
 gzip-embed -cache --source ./common/ai/aid/aireact/skills --gz ./common/ai/aid/aireact/skills.tar.gz --root-path --no-embed
 gzip-embed -cache --source ./common/coreplugin/base-yak-plugin --gz ./common/coreplugin/base-yak-plugin.tar.gz --root-path --no-embed

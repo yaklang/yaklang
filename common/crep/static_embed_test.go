@@ -17,7 +17,7 @@ func TestCompressedMITMStaticAssets(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || strings.HasSuffix(name, ".embed.gz") {
+		if entry.IsDir() {
 			return nil
 		}
 		name = filepath.ToSlash(name)
@@ -30,7 +30,7 @@ func TestCompressedMITMStaticAssets(t *testing.T) {
 			return err
 		}
 		if !bytes.Equal(want, got) {
-			t.Errorf("static resource differs: %s; run go generate ./common/crep", name)
+			t.Errorf("static resource differs: %s; regenerate release assets", name)
 		}
 		rsp := &http.Response{Request: &http.Request{URL: &url.URL{Path: "/" + name}}, Header: make(http.Header)}
 		if err := handleBuildInMITMDefaultPageResponse(rsp); err != nil {

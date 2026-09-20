@@ -6,8 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:generate go run ../common/utils/embedfs/generate -package embed -var FS -output resources_embed.go data dataex
-
 func Asset(name string) ([]byte, error) {
 	buf, err := FS.ReadFile(name)
 	if err != nil {

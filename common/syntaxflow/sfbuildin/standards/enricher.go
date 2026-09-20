@@ -10,7 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:generate go run ../../../utils/embedfs/generate -package standards -var mappingsFS -output resources_embed.go mappings.yaml
 
 // StandardMappings 标准映射配置
 type StandardMappings struct {

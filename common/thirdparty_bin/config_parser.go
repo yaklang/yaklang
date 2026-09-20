@@ -9,7 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:generate go run ../utils/embedfs/generate -package thirdparty_bin -var configFS -output resources_embed.go bin_cfg.yml
 
 // ConfigFile 配置文件结构
 type ConfigFile struct {
