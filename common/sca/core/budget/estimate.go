@@ -12,6 +12,19 @@ const (
 
 func SizeOfString(s string) int64 { return SizeString + int64(len(s)) }
 
+// SizeOfStrings is a conservative slice+header charge for copying extra
+// string evidence during merge. An empty input is free.
+func SizeOfStrings(ss []string) int64 {
+	if len(ss) == 0 {
+		return 0
+	}
+	n := SizeSlice
+	for _, s := range ss {
+		n += SizeOfString(s)
+	}
+	return n
+}
+
 func SizeOfBytes(n int) int64 {
 	if n < 0 {
 		return SizeSlice

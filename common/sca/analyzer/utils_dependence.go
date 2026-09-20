@@ -82,9 +82,11 @@ func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 	return MergePackagesBudget(st, pkgs)
 }
 
-// MergePackagesBudget merges exact identities under st. All unique-identity
-// and index charges run before any metadata mutation. On error, pkgs is left
-// unchanged (no license/edge/from-file appends, no cleared graphs).
+// MergePackagesBudget merges exact identities under st. Controllable merge
+// working-set (maps, extra evidence copies, edges, output index) is charged
+// before any input mutation. Same pointers are visited once so already-merged
+// fields cannot be read back and appended again. On error, pkgs and graphs
+// are left unchanged.
 func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.Package, error) {
 	if st == nil {
 		st = budget.From(context.Background())
@@ -97,47 +99,74 @@ func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 	keyOf := func(p *dxtypes.Package) identity {
 		return identity{p.IdentityDigest(), p.Potential, p.HasVersionRange(), p.Details().Evidence}
 	}
-	if err := st.Result(budget.SizeMap + budget.SizeOfSortIndex(len(pkgs))); err != nil {
+	// Precheck containers: pointer set, identity index, edge/order slices,
+	// input-length sort scratch. Charge before allocating them.
+	if err := st.Result(budget.SizeMap*2 + budget.SizeSlice*2 + budget.SizeOfSortIndex(len(pkgs))); err != nil {
 		return nil, err
 	}
-	seen := map[identity]struct{}{}
+	seenPtr := make(map[*dxtypes.Package]struct{}, len(pkgs))
+	index := make(map[identity]*dxtypes.Package, len(pkgs))
+	order := make([]*dxtypes.Package, 0, len(pkgs))
+	type edge struct{ from, to *dxtypes.Package }
+	edges := make([]edge, 0, len(pkgs))
+	nUnique := 0
 	for _, p := range pkgs {
 		if p == nil {
 			continue
 		}
-		key := keyOf(p)
-		if _, ok := seen[key]; ok {
+		if _, ok := seenPtr[p]; ok {
 			continue
 		}
-		if err := st.Result(budget.SizeOfPackage(p.Name, p.Version, p.Verification) + budget.SizePtr); err != nil {
+		if err := st.Result(budget.SizePtr); err != nil {
 			return nil, err
 		}
-		seen[key] = struct{}{}
-	}
-	index := make(map[identity]*dxtypes.Package, len(seen))
-	type edge struct{ from, to *dxtypes.Package }
-	var edges []edge
-	for _, p := range pkgs {
-		if p == nil {
-			continue
+		seenPtr[p] = struct{}{}
+		if err := st.Result(budget.SizePtr); err != nil {
+			return nil, err
 		}
+		order = append(order, p)
 		key := keyOf(p)
 		dst := index[key]
 		if dst == nil {
-			dst = p
-			index[key] = dst
-		} else {
+			if err := st.Result(budget.SizeOfPackage(p.Name, p.Version, p.Verification) + budget.SizeObject + budget.SizePtr); err != nil {
+				return nil, err
+			}
+			index[key] = p
+			nUnique++
+		} else if dst != p {
+			extra := budget.SizeOfStrings(p.License) + budget.SizeOfStrings(p.FromFile) + budget.SizeOfStrings(p.FromAnalyzer)
+			if p.PackageDetails != nil {
+				d := p.Details()
+				extra += budget.SizeMap + int64(len(d.Locations))*budget.SizeObject + int64(len(d.Requirements))*budget.SizeOfRecord() + int64(len(d.Diagnostics))*budget.SizeOfObservation()
+				extra += budget.SizeOfStrings(d.RawLicenses) + budget.SizeOfStrings(d.UnresolvedDependencies) + budget.SizeOfStrings(d.Provides)
+			}
+			if err := st.Result(extra); err != nil {
+				return nil, err
+			}
+		}
+		for _, up := range p.UpStreamPackages {
+			if up == nil {
+				continue
+			}
+			if err := st.Result(budget.SizeOfEdge()); err != nil {
+				return nil, err
+			}
+			edges = append(edges, edge{p, up})
+		}
+	}
+	if err := st.Result(budget.SizeMap*int64(nUnique) + budget.SizeOfSortIndex(nUnique) + budget.SizeSlice + int64(nUnique)*budget.SizePtr); err != nil {
+		return nil, err
+	}
+	for _, p := range order {
+		key := keyOf(p)
+		dst := index[key]
+		if dst != p {
 			if p.PackageDetails != nil {
 				dst.MergeDetails(p.Details())
 			}
 			dst.License = append(dst.License, p.License...)
 			dst.FromFile = append(dst.FromFile, p.FromFile...)
 			dst.FromAnalyzer = append(dst.FromAnalyzer, p.FromAnalyzer...)
-		}
-		for _, up := range p.UpStreamPackages {
-			if up != nil {
-				edges = append(edges, edge{p, up})
-			}
 		}
 	}
 	for _, p := range pkgs {

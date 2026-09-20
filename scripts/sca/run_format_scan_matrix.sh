@@ -20,16 +20,27 @@ COUNT="${COUNT:-3}"
 export GOWORK=off
 export GOFLAGS="${GOFLAGS:-}"
 
-TEMPS=""
+# Newline-separated exclusive temp paths. Spaces in TMPDIR must not split.
+TEMP_RECORD=""
 add_temp() {
-	TEMPS="${TEMPS} $1"
+	if [ -z "$1" ]; then
+		return 0
+	fi
+	if [ -z "$TEMP_RECORD" ]; then
+		TEMP_RECORD="$(mktemp "${TMPDIR:-/tmp}/sca-temps.XXXXXX")"
+	fi
+	printf '%s\n' "$1" >>"$TEMP_RECORD"
 }
 cleanup_temps() {
-	for d in $TEMPS; do
-		if [ -n "$d" ] && [ -d "$d" ]; then
-			rm -rf "$d"
-		fi
-	done
+	if [ -n "$TEMP_RECORD" ] && [ -f "$TEMP_RECORD" ]; then
+		while IFS= read -r d || [ -n "$d" ]; do
+			if [ -n "$d" ] && [ -d "$d" ]; then
+				rm -rf "$d"
+			fi
+		done <"$TEMP_RECORD"
+		rm -f "$TEMP_RECORD"
+		TEMP_RECORD=""
+	fi
 }
 trap cleanup_temps EXIT
 
@@ -503,6 +514,32 @@ selftest() {
 		die "pre-existing OUT/old-scan was deleted"
 	fi
 	echo "sentinel/stale-binary selftest ok"
+
+	base="${TMPDIR:-/tmp}"
+	root="$(mktemp -d "$base/sca matrix trap.XXXXXX")"
+	echo sentinel >"$root/SENTINEL"
+	set +e
+	TMPDIR="$root" MATRIX_TRAP_CHILD=1 "$0"
+	st=$?
+	set -e
+	if [ "$st" -ne 0 ]; then
+		rm -rf "$root"
+		die "trap child failed"
+	fi
+	if [ ! -f "$root/SENTINEL" ]; then
+		rm -rf "$root"
+		die "space-root sentinel removed by trap"
+	fi
+	child=""
+	if [ -f "$root/trap-child-temp" ]; then
+		child="$(cat "$root/trap-child-temp")"
+	fi
+	if [ -z "$child" ] || [ -d "$child" ]; then
+		rm -rf "$root"
+		die "exclusive temp with spaces survived trap: $child"
+	fi
+	rm -rf "$root"
+	echo "trap/space-tmpdir selftest ok"
 }
 
 write_cases() {
@@ -533,6 +570,14 @@ gobinary	app	common/sca/testdata/go_binary/go-binary
 conan	conan.lock	common/sca/testdata/conan/conan
 EOF
 }
+
+if [ "${MATRIX_TRAP_CHILD:-}" = "1" ]; then
+	t="$(mktemp -d "${TMPDIR:-/tmp}/sca-trap-child.XXXXXX")"
+	add_temp "$t"
+	echo inside >"$t/marker"
+	printf '%s\n' "$t" >"${TMPDIR}/trap-child-temp"
+	exit 0
+fi
 
 if [ "${MATRIX_SELFTEST:-}" = "1" ]; then
 	if [ -z "$GO" ]; then

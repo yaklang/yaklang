@@ -2427,7 +2427,7 @@
     },
     {
       "local_file": "common/sca/analyzer/utils_dependence.go",
-      "sha256": "910ca9d8f6531b4ccd802db85f6a53270ab1ccbebd34e5f50057fe8a47a54f1a",
+      "sha256": "235486d6678b6d3d0adb20275a16b14e03efdc82be390320b96b10f6faa08551",
       "symbols": [
         {
           "name": "parseVersion",
@@ -2451,7 +2451,7 @@
         },
         {
           "name": "MergePackagesBudget",
-          "line": 88
+          "line": 90
         }
       ],
       "decision": "REWRITE",
@@ -2577,47 +2577,51 @@
     },
     {
       "local_file": "common/sca/core/budget/estimate.go",
-      "sha256": "7c556c9fcaf4feacec3f9c7047d585a09d81d5d640e8c4d027d239457f396fe5",
+      "sha256": "c8f3d67aa0ca6ecfc594feb558aa4bb9e6292b34e52d17527e922bdcfd29019c",
       "symbols": [
-        {
-          "name": "SizeObject",
-          "line": 6
-        },
         {
           "name": "SizeOfString",
           "line": 13
         },
         {
+          "name": "SizeOfStrings",
+          "line": 17
+        },
+        {
           "name": "SizeOfBytes",
-          "line": 15
-        },
-        {
-          "name": "SizeOfNode",
-          "line": 22
-        },
-        {
-          "name": "SizeOfPackage",
-          "line": 24
-        },
-        {
-          "name": "SizeOfComponent",
           "line": 28
         },
         {
+          "name": "SizeOfNode",
+          "line": 35
+        },
+        {
+          "name": "SizeOfPackage",
+          "line": 37
+        },
+        {
+          "name": "SizeOfComponent",
+          "line": 41
+        },
+        {
           "name": "SizeOfObservation",
-          "line": 32
+          "line": 45
         },
         {
           "name": "SizeOfEdge",
-          "line": 34
+          "line": 47
         },
         {
           "name": "SizeOfJob",
-          "line": 36
+          "line": 49
         },
         {
           "name": "SizeOfRecord",
-          "line": 38
+          "line": 51
+        },
+        {
+          "name": "SizeOfSortIndex",
+          "line": 60
         }
       ],
       "decision": "REWRITE",
