@@ -5,12 +5,16 @@ desc(
 	level: mid
 	risk: "weak-hash"
 	desc: <<<DESC
-该规则检测 MD5/SHA1 的哈希调用。MD5 与 SHA1 已不适用于安全场景（密码、签名、完整性校验等），
-可能遭受碰撞攻击。
+该规则检测 crypto/md5、crypto/sha1 上的 New/Sum 调用。MD5 与 SHA1 已不适用于口令、签名、
+安全完整性等场景，可能遭受碰撞攻击。
+
+仅匹配真实调用，不匹配 import。实现既有网络/数据库协议、必须按对端算法协商时，应人工确认为
+协议兼容，而不是直接改成 SHA-256。
 DESC
 	rule_id: "68f97b0f-4da0-4133-bd95-5a7c05dd0cbc"
 	solution: <<<SOLUTION
-优先使用 SHA-256/512 或更现代方案（如 HMAC-SHA256、Argon2、bcrypt）替代 MD5/SHA1。
+自有数据的安全场景优先使用 SHA-256/512，或 HMAC-SHA256、Argon2、bcrypt。
+协议兼容实现保留对端要求的算法，不要为消告警而破坏互通。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
@@ -34,10 +38,11 @@ alert $mid for {
 	message: "检测到 MD5/SHA1 调用，弱哈希在安全场景下可能被碰撞攻击利用。",
 	risk: "weak-hash",
 	desc: <<<DESC
-MD5/SHA1 已被广泛认为不安全，不应在安全敏感场景中使用。
+MD5/SHA1 已被广泛认为不安全，不应在安全敏感场景中使用。协议强制算法需人工确认。
 DESC
 	solution: <<<SOLUTION
-将 MD5/SHA1 替换为 SHA-256/512；密码场景改用 bcrypt/Argon2，签名场景使用更强摘要算法。
+将自有数据路径上的 MD5/SHA1 替换为 SHA-256/512；密码场景改用 bcrypt/Argon2。
+若调用是为了实现既有协议（按对端选择摘要），保留原算法并记录例外。
 SOLUTION
 }
 
@@ -65,5 +70,15 @@ import "crypto/sha256"
 func main() {
 	_ = sha256.Sum256([]byte("secret"))
 }
+SAFE
+	'safefile://import-only.go': <<<SAFE
+package main
+
+import (
+	_ "crypto/md5"
+	_ "crypto/sha1"
+)
+
+func main() {}
 SAFE
 )

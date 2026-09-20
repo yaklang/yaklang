@@ -9,20 +9,20 @@ desc(
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
 ### 规则说明
-检测到 crypto/des。DES 密钥过短。
+检测到 des.NewCipher / des.NewTripleDESCipher 调用。仅匹配实际 DES API，不匹配 import "crypto/des"。
 
 ### 风险类型
 weak-cryptographic-algorithm
 
 ### 影响
-该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+DES 密钥过短，不应用于新的机密性保护。实现既有协议、必须使用服务端指定算法时，应人工确认为协议兼容而非本项目可替换的漏洞。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配 des.NewCipher( 或 des.NewTripleDESCipher( 调用。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用 AES-GCM。
+自有数据加密改用 AES-GCM。协议兼容实现不要强行替换，以免无法互通。
 SOLUTION
 	alert_min: 1
 	"file://c.go": <<<POS
@@ -36,9 +36,15 @@ package main
 func n() {}
 
 NEG
+	"safefile://import-only.go": <<<NEG
+package main
+import _ "crypto/des"
+func n() {}
+
+NEG
 )
 
-${*.go}.pattern_regex(/crypto\/des|des\.NewCipher\s*\(/) as $hit
+${*.go}.pattern_regex(/\bdes\.New(TripleDES)?Cipher\s*\(/) as $hit
 alert $hit for {
 	level: "high",
 	title: "检测 Go crypto/des",
