@@ -311,9 +311,18 @@ func TestProbeCompleteHandshakeMock(t *testing.T) {
 			if fault == "wrong_password" {
 				password += "wrong"
 			}
-			err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: username, Password: password, Timeout: 2 * time.Second})
+			details, err := ProbeDetailed(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: username, Password: password, Timeout: 2 * time.Second})
 			if (err == nil) != (fault == "success" || fault == "username_lowercase" || fault == "fragmented" || fault == "short_nonce_success") {
 				t.Fatalf("unexpected probe result: %v", err)
+			}
+			if err == nil {
+				wantVerifier := 18453
+				if fault == "short_nonce_success" {
+					wantVerifier = 6949
+				}
+				if details.Stage != "complete" || details.Transport != "tcp" || details.Verifier != wantVerifier || details.Encryption != "none" || details.Integrity != "none" {
+					t.Fatalf("incomplete success evidence: %+v", details)
+				}
 			}
 			if fault == "username_nul" || fault == "password_case" || fault == "password_space" || fault == "wrong_password" || fault == "error_after_properties" || fault == "short_nonce_rejected" {
 				var ora *Error

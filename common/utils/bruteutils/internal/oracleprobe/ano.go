@@ -127,7 +127,7 @@ func (s *session) negotiateAdvanced() error {
 			}
 		case 1:
 			if n != 2 || f[1].kind != 6 || len(f[1].data) != 2 || binary.BigEndian.Uint16(f[1].data) != 0xfbff {
-				return errors.New("oracle: server requires non-password authentication")
+				return ErrUnsupportedAuthentication
 			}
 		case 2:
 			if n != 2 || f[1].kind != 2 || len(f[1].data) != 1 {
@@ -150,7 +150,7 @@ func (s *session) negotiateAdvanced() error {
 		return errors.New("oracle: ANO length mismatch")
 	}
 	if (s.encryption == EncryptionRequired && encID == 0) || (s.encryption == EncryptionRejected && encID != 0) {
-		return errors.New("oracle: server did not honor native encryption policy")
+		return ErrEncryptionPolicy
 	}
 	if encID == 0 && hashID == 0 && dh == nil {
 		return nil
@@ -236,6 +236,10 @@ func (s *session) negotiateAdvanced() error {
 		}
 	default:
 		return fmt.Errorf("oracle: unsupported integrity algorithm %d", hashID)
+	}
+	if e == nil {
+		s.encryptionName = map[int]string{0: "none", 1: "RC4_40", 6: "RC4_256", 8: "RC4_56", 10: "RC4_128", 15: "AES128", 16: "AES192", 17: "AES256"}[encID]
+		s.integrityName = map[int]string{0: "none", 1: "MD5", 3: "SHA1", 4: "SHA512", 5: "SHA256", 6: "SHA384"}[hashID]
 	}
 	return e
 }

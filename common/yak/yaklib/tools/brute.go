@@ -29,6 +29,12 @@ var BruterExports = map[string]interface{}{
 	"bruteHandler":       yakBruteOpt_coreHandler,
 	"okToStop":           yakBruteOpt_OkToStop,
 	"finishingThreshold": yakBruteOpt_FinishingThreshold,
+	"oracleService":      yakBruteOpt_OracleService,
+	"oracleSID":          yakBruteOpt_OracleSID,
+	"oracleSysDBA":       yakBruteOpt_OracleSysDBA,
+	"oracleEncryption":   yakBruteOpt_OracleEncryption,
+	"oracleTLS":          yakBruteOpt_OracleTLS,
+	"oracleTimeout":      yakBruteOpt_OracleTimeout,
 }
 
 // GetAvailableBruteTypes 返回当前支持的所有内置爆破类型(协议/服务)名称列表
@@ -83,9 +89,10 @@ func GetPasswordListFromBruteType(t string) []string {
 }
 
 type yakBruter struct {
-	Ctx       context.Context
-	RuntimeId string
-	debug     bool `json:"debug"`
+	oracleConfig *bruteutils.OracleConfig
+	Ctx          context.Context
+	RuntimeId    string
+	debug        bool `json:"debug"`
 
 	// 设置用户与密码爆破字典
 	userList []string
@@ -359,6 +366,7 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 		bruteutils.WithTargetTasksConcurrent(y.concurrent),
 		bruteutils.WithOkToStop(y.okToStop),
 		bruteutils.WithFinishingThreshold(y.finishingThreshold),
+		bruteutils.WithOracleConfig(y.oracleConfig),
 		action,
 	)
 	if err != nil {
@@ -482,6 +490,14 @@ func _yakitBruterNew(typeStr string, opts ...BruteOpt) (*yakBruter, error) {
 	}
 	for _, p := range opts {
 		p(bruter)
+	}
+	if bruter.oracleConfig != nil {
+		if typeStr != "oracle" {
+			return nil, utils.Error("Oracle options require brute.New(\"oracle\")")
+		}
+		if err := bruter.oracleConfig.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	if bruter.Ctx == nil {
 		bruter.Ctx = context.Background()

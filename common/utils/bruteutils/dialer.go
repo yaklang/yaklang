@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *NetXDialer) Dial(network, address string) (net.Conn, error) {
 func (d *NetXDialer) DialTCPContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	conn, err := netx.DialContext(ctx, addr)
 	if err != nil {
-		return nil, utils.Wrap(dialError, err.Error())
+		return nil, fmt.Errorf("%w: %w", dialError, err)
 	}
 	return conn, nil
 }

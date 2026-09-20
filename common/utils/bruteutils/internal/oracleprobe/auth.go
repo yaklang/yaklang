@@ -169,7 +169,7 @@ func (obj *AuthObject) deriveResponse() error {
 		hash.Write(buffer)
 		key = hash.Sum(nil)[:32]
 	} else {
-		return errors.New("unsupported verifier type")
+		return ErrUnsupportedVerifier
 	}
 	obj.ServerSessKey, err = decryptSessionKey(padding, key, obj.EServerSessKey)
 	if err != nil {
@@ -437,7 +437,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 			keyBuffer = fmt.Sprintf("%X", buffer)
 			retKeyLen = 32
 		default:
-			return nil, errors.New("unsupported verifier type")
+			return nil, ErrUnsupportedVerifier
 		}
 		df2key, err := hex.DecodeString(obj.pbkdf2ChkSalt)
 		if err != nil {
@@ -483,7 +483,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 			ret = append(ret, hash.Sum(nil)...)
 			return ret[:24], nil
 		default:
-			return nil, errors.New("unsupported verifier type")
+			return nil, ErrUnsupportedVerifier
 		}
 	}
 }

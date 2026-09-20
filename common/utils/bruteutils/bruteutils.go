@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/brute/core"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -20,11 +21,12 @@ import (
 )
 
 type BruteItem struct {
-	Type     string
-	Target   string
-	Username string
-	Password string
-	Context  context.Context
+	Type         string
+	Target       string
+	Username     string
+	Password     string
+	Context      context.Context
+	OracleConfig *OracleConfig
 }
 
 func (b *BruteItem) Result() *BruteItemResult {
@@ -62,6 +64,7 @@ func (t *targetProcessing) Finish() {
 }
 
 type BruteUtil struct {
+	oracleConfig         *OracleConfig
 	processes            sync.Map
 	TargetTaskConcurrent int
 	// targetsConcurrent 记录 WithTargetsConcurrent / NewMultiTargetBruteUtil
@@ -102,6 +105,9 @@ func (b *BruteUtil) SetResultCallback(cb BruteItemResultCallback) {
 }
 
 type BruteItemResult struct {
+	// ProbeResult optionally preserves a protocol's structured outcome. It must
+	// contain no credentials or raw server messages. Legacy flags remain valid.
+	ProbeResult *core.Result
 	// 爆破类型
 	Type string
 
@@ -216,6 +222,10 @@ func (b *BruteUtil) RunWithContext(ctx context.Context) error {
 }
 
 func (b *BruteUtil) run(ctx context.Context) error {
+	if err := b.oracleConfig.Validate(); err != nil {
+		return err
+	}
+	ctx = withOracleServiceCache(ctx)
 	defer b.targetsSwg.Wait()
 
 	for {
@@ -300,6 +310,9 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 	for _, i := range process.Items {
 		// 将上下文传递给子任务
 		i.Context = currCtx
+		if i.OracleConfig == nil {
+			i.OracleConfig = b.oracleConfig
+		}
 		if err := currCtx.Err(); err != nil {
 			return errors.New("context canceled")
 		}

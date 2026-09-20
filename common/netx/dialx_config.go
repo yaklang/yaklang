@@ -1,6 +1,7 @@
 package netx
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"sync"
@@ -64,6 +65,7 @@ func (d *DialXTraceInfo) AddTLSRetryTip(tip string) {
 }
 
 type dialXConfig struct {
+	Context           context.Context
 	Timeout           time.Duration
 	ForceDisableProxy bool
 	// when empty proxy and EnableSystemProxyFromEnv(true),
@@ -120,6 +122,12 @@ type dialXConfig struct {
 	// be bound to a specific network interface
 	StrongHostMode    bool
 	StrongLocalAddrIP string // The local IP address to bind to (must be an IP, not hostname)
+}
+
+// DialX_WithContext bounds DNS, direct TCP dialing and its retries by the
+// caller's lifetime. Custom dialers must additionally honor their own context.
+func DialX_WithContext(ctx context.Context) DialXOption {
+	return func(c *dialXConfig) { c.Context = ctx }
 }
 
 type DialXOption func(c *dialXConfig)
