@@ -83,7 +83,7 @@ func TestCompileUnitBuildWaveOverlapsLibraries(t *testing.T) {
 
 func TestCompileUnitParallelJavaMemory(t *testing.T) {
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("base/Base.java", "package base;\npublic class Base { public static String shared = \"shared\"; public String field; public static String value(String s) { return s; } }")
+	vf.AddFile("base/Base.java", "package base;\n@Example public class Base { public static String shared = \"shared\"; public String field; public static String value(String s) { return s; } }")
 	for i := 0; i < 12; i++ {
 		vf.AddFile(fmt.Sprintf("p%d/C.java", i), fmt.Sprintf(`package p%d;
 import base.Base;
@@ -91,6 +91,7 @@ public class C {
   String f(String input) { String value = Base.value(input); System.out.println(value); return value; }
   int n(int a) { int r = 0; for (int i = 0; i < a; i++) { r += i; } return r; }
   String fields(Base b) { Base.shared = "changed"; b.field = Base.shared; return b.field; }
+  Base instance() { return new Base(); }
 }`, i))
 	}
 	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.JAVA), WithMemory(), ssaconfig.WithCompileConcurrency(4))
