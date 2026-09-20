@@ -270,16 +270,17 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.HasDefs = hasValuesForIrCode(value, anValue)
 
 	// user
-	ir.Users = anValue.userList
+	ir.Users = anValue.snapshotUserIDs()
 	// occulatation
 	ir.Occulatation = anValue.occultation
 
 	// object
-	ir.IsObject = anValue.IsObject()
+	memberPairs := anValue.snapshotMemberPairs()
+	ir.IsObject = len(memberPairs) > 0
 	if ir.IsObject {
-		if len(anValue.memberPairs) > 0 {
-			ir.ObjectMemberPairs = make(ssadb.Int64Map, 0, len(anValue.memberPairs))
-			for _, pair := range anValue.memberPairs {
+		if len(memberPairs) > 0 {
+			ir.ObjectMemberPairs = make(ssadb.Int64Map, 0, len(memberPairs))
+			for _, pair := range memberPairs {
 				if pair.key <= 0 || pair.member <= 0 {
 					continue
 				}
@@ -289,11 +290,12 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	// member
-	ir.IsObjectMember = anValue.IsMember()
+	ownerPairs := anValue.snapshotOwnerPairs()
+	ir.IsObjectMember = len(ownerPairs) > 0
 	if ir.IsObjectMember {
-		if len(anValue.ownerPairs) > 0 {
-			ir.ObjectOwnerPairs = make(ssadb.Int64Map, 0, len(anValue.ownerPairs))
-			for _, pair := range anValue.ownerPairs {
+		if len(ownerPairs) > 0 {
+			ir.ObjectOwnerPairs = make(ssadb.Int64Map, 0, len(ownerPairs))
+			for _, pair := range ownerPairs {
 				if pair.object <= 0 || pair.key <= 0 {
 					continue
 				}
@@ -336,7 +338,7 @@ func hasValuesForIrCode(value Value, anValue *anValue) bool {
 		return false
 	}
 	if _, ok := ToExternLib(value); ok {
-		return anValue != nil && len(anValue.memberPairs) > 0
+		return anValue != nil && anValue.IsObject()
 	}
 	return value.HasValues()
 }

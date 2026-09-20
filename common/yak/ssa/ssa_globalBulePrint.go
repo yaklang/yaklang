@@ -143,8 +143,8 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 		// handful of member call results.
 		if av, ok := ToValue(member); ok && av != nil {
 			rawAv := av.getAnValue()
-			if rawAv != nil && len(rawAv.memberPairs) <= 5000 {
-				for _, pair := range rawAv.memberPairs {
+			if pairs := rawAv.snapshotMemberPairs(); len(pairs) <= 5000 {
+				for _, pair := range pairs {
 					keyVal, ok1 := rawAv.resolveLinkedValue(pair.key)
 					memberVal, ok2 := rawAv.resolveLinkedValue(pair.member)
 					if !ok1 || !ok2 {
