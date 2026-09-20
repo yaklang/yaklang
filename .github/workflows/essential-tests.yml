@@ -20,6 +20,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "common/**"
+      - "embed/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
       # The suite/runner scripts below drive this workflow, so a change to them
@@ -541,6 +542,12 @@ jobs:
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
+
+      - name: Check compressed resource freshness
+        run: bash scripts/ci/check-embedded-resources.sh
+
+      - name: Test compressed resource compatibility
+        run: go test -race -run 'TestCompressed|TestFilesystemContract|TestIndependentReadersAndChecksum|TestHTTPFilesystem|TestGenerateReproducibilityAndFreshness' -timeout 3m ./common/utils/embedfs/... ./embed ./common/crep ./common/syntaxflow/sfdb
 
       - name: Slim gate test (irify_exclude)
         env:
