@@ -1,3 +1,5 @@
+//go:build !irify_exclude
+
 package scannode
 
 // ScanProject compiles through ssa_compile. That package cannot be imported by
