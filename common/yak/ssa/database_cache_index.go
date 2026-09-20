@@ -188,12 +188,22 @@ func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(strin
 		return nil
 	}
 	var ins []Instruction
+	// A value may be indexed under several matching variable/member/class
+	// names. Resolve it once, before potentially reloading spilled IR from DB.
+	seen := make(map[int64]struct{})
+	resolveOnce := func(id int64) Instruction {
+		if id <= 0 {
+			return nil
+		}
+		if _, exists := seen[id]; exists {
+			return nil
+		}
+		seen[id] = struct{}{}
+		return resolve(id)
+	}
 	appendResolved := func(ids []int64) {
 		for _, id := range ids {
-			if id <= 0 {
-				continue
-			}
-			inst := resolve(id)
+			inst := resolveOnce(id)
 			if inst == nil {
 				continue
 			}
@@ -203,10 +213,7 @@ func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(strin
 	if mod&ssadb.ConstType != 0 {
 		s.consts.ForEach(func(_ string, ids []int64) bool {
 			for _, id := range ids {
-				if id <= 0 {
-					continue
-				}
-				inst := resolve(id)
+				inst := resolveOnce(id)
 				if inst == nil {
 					continue
 				}
