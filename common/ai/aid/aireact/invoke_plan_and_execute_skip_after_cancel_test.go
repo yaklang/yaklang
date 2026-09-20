@@ -41,7 +41,8 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 	testNonce := utils.RandStringBytes(16)
 
 	testForgeName := "test_forge_skip_after_cancel_" + testNonce
-	planFlag := "plan_flag_skip_cancel_" + testNonce
+	// Keep the unique fixture task name short; this test exercises cancellation.
+	planFlag := "skip_" + testNonce[:12]
 	forge := &schema.AIForge{
 		ForgeName:    testForgeName,
 		ForgeType:    "yak",

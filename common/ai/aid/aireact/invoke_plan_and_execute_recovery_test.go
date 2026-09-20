@@ -43,12 +43,15 @@ func newRecoveryTaskForReAct(name, goal string) *aid.AiTask {
 		true,
 	)
 	base.SetName(name)
-	return &aid.AiTask{
+	task := &aid.AiTask{
 		AIStatefulTaskBase: base,
 		TaskId:             taskID,
 		Name:               name,
 		Goal:               goal,
 	}
+	// Include the directory identifier stored with a persisted task.
+	task.SetSemanticIdentifier(aicommon.SanitizeTaskName(taskID[:20]))
+	return task
 }
 
 func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
@@ -60,9 +63,10 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 	todoMarker := uuid.NewString()
 
 	root := newRecoveryTaskForReAct("root", "root-goal")
-	doneTask := newRecoveryTaskForReAct("doneTask-"+doneMarker, "goal-"+doneMarker)
-	abortedTask := newRecoveryTaskForReAct("abortedTask-"+abortedMarker, "goal-"+abortedMarker)
-	todoTask := newRecoveryTaskForReAct("todoTask-"+todoMarker, "goal-"+todoMarker)
+	// Keep unique evidence in the goals; naming is covered by identifier tests.
+	doneTask := newRecoveryTaskForReAct("doneTask", "goal-"+doneMarker)
+	abortedTask := newRecoveryTaskForReAct("abortedTask", "goal-"+abortedMarker)
+	todoTask := newRecoveryTaskForReAct("todoTask", "goal-"+todoMarker)
 
 	doneTask.ParentTask = root
 	abortedTask.ParentTask = root
@@ -257,9 +261,9 @@ func TestReAct_RecoveryPlanAndExec_StartFromSpecifiedTask(t *testing.T) {
 	lastMarker := uuid.NewString()
 
 	root := newRecoveryTaskForReAct("root", "root-goal")
-	firstTask := newRecoveryTaskForReAct("firstTask-"+firstMarker, "goal-"+firstMarker)
-	startTask := newRecoveryTaskForReAct("startTask-"+startMarker, "goal-"+startMarker)
-	lastTask := newRecoveryTaskForReAct("lastTask-"+lastMarker, "goal-"+lastMarker)
+	firstTask := newRecoveryTaskForReAct("firstTask", "goal-"+firstMarker)
+	startTask := newRecoveryTaskForReAct("startTask", "goal-"+startMarker)
+	lastTask := newRecoveryTaskForReAct("lastTask", "goal-"+lastMarker)
 
 	firstTask.ParentTask = root
 	startTask.ParentTask = root
