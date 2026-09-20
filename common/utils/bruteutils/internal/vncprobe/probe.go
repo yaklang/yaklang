@@ -6,6 +6,7 @@
 package vncprobe
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -179,14 +180,37 @@ func (s *session) ioErr(op string, err error) error {
 	return fmt.Errorf("%w: %s: %v", kind, op, err)
 }
 
+func looksLikeRFBPrefix(b []byte) bool {
+	const p = "RFB "
+	if len(b) == 0 {
+		return false
+	}
+	if len(b) >= len(p) {
+		return bytes.HasPrefix(b, []byte(p))
+	}
+	return bytes.Equal(b, []byte(p[:len(b)]))
+}
+
+func isEOF(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+}
+
 func (s *session) handshakeVersion() error {
 	var buf [versionLen]byte
-	if _, err := io.ReadFull(s.conn, buf[:]); err != nil {
+	n, err := io.ReadFull(s.conn, buf[:])
+	if err != nil {
+		got := buf[:n]
+		// Timeout/cancel after an RFB-looking prefix is transient: more
+		// passwords may still work. A peer that closes after a short
+		// write (truncated banner) stays protocol-mismatch.
+		if looksLikeRFBPrefix(got) && !isEOF(err) {
+			return fmt.Errorf("%w: version: %v", ErrTransient, err)
+		}
 		return fmt.Errorf("%w: version: %v", ErrProtocolMismatch, err)
 	}
 	var major, minor uint
-	n, err := fmt.Sscanf(string(buf[:]), "RFB %d.%d\n", &major, &minor)
-	if n != 2 || err != nil || major < 3 {
+	parsed, err := fmt.Sscanf(string(buf[:]), "RFB %d.%d\n", &major, &minor)
+	if parsed != 2 || err != nil || major < 3 {
 		return fmt.Errorf("%w: %q", ErrUnsupportedServer, buf)
 	}
 	if minor < 3 {
@@ -437,10 +461,9 @@ func lockoutReason(reason string) bool {
 	if s == "" {
 		return false
 	}
+	// Generic "Authentication failed" / "Security failure" is ordinary
+	// VNC-Auth reject, not a lockout. Only too-many / locked phrasing.
 	return strings.Contains(s, "too many") ||
-		strings.Contains(s, "too many authentication") ||
-		strings.Contains(s, "authentication failures") ||
-		strings.Contains(s, "security failure") ||
 		strings.Contains(s, "temporarily locked") ||
 		strings.Contains(s, "account locked") ||
 		strings.Contains(s, "locked out")
