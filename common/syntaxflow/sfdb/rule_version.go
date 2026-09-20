@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -19,6 +20,7 @@ type RuleInfo struct {
 }
 
 var ruleVersionMap map[string]*RuleInfo
+var ruleVersionOnce sync.Once
 
 func GetVersionFromEmbed(ruleId string) (string, error) {
 	if ruleId == "" {
@@ -45,16 +47,19 @@ func GetRuleInfo(ruleId string) (*RuleInfo, error) {
 }
 
 func getVersionMap() map[string]*RuleInfo {
-	if ruleVersionMap != nil {
-		return ruleVersionMap
-	}
-	ruleVersionMap = make(map[string]*RuleInfo)
-	var rules []RuleInfo
-	if err := json.Unmarshal(ruleVersions, &rules); err == nil {
-		for _, rule := range rules {
-			ruleVersionMap[rule.RuleID] = &rule
+	ruleVersionOnce.Do(func() {
+		ruleVersionMap = make(map[string]*RuleInfo)
+		data, err := readRuleVersions()
+		if err != nil {
+			return
 		}
-	}
+		var rules []RuleInfo
+		if err := json.Unmarshal(data, &rules); err == nil {
+			for _, rule := range rules {
+				ruleVersionMap[rule.RuleID] = &rule
+			}
+		}
+	})
 	return ruleVersionMap
 }
 

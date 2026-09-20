@@ -2,7 +2,8 @@
 
 package sfdb
 
-import _ "embed"
+//go:generate go run ../../utils/embedfs/generate -package sfdb -var ruleVersionFS -output rule_version_resources_embed.go -build-tag !irify_exclude rule_versions.json
 
-//go:embed rule_versions.json
-var ruleVersions []byte
+func readRuleVersions() ([]byte, error) {
+	return ruleVersionFS.ReadFile("rule_versions.json")
+}
