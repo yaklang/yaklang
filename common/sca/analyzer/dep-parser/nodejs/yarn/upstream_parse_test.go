@@ -86,24 +86,30 @@ func TestParsePattern(t *testing.T) {
 	}
 
 	for _, v := range vectors {
-		gotName, gotProtocol, gotVersion, err := parsePattern(v.target)
-
-		if v.occurErr != (err != nil) {
-			t.Errorf("expect error %t but err is %s", v.occurErr, err)
-			continue
+		name := v.name
+		if name == "" {
+			name = v.target
 		}
+		t.Run(name, func(t *testing.T) {
+			gotName, gotProtocol, gotVersion, err := parsePattern(v.target)
 
-		if gotName != v.expectName {
-			t.Errorf("name mismatch: got %s, want %s, target :%s", gotName, v.expectName, v.target)
-		}
+			if v.occurErr != (err != nil) {
+				t.Errorf("expect error %t but err is %s", v.occurErr, err)
+				return
+			}
 
-		if gotProtocol != v.expectProtocol {
-			t.Errorf("protocol mismatch: got %s, want %s, target :%s", gotProtocol, v.expectProtocol, v.target)
-		}
+			if gotName != v.expectName {
+				t.Errorf("name mismatch: got %s, want %s, target :%s", gotName, v.expectName, v.target)
+			}
 
-		if gotVersion != v.expactVersion {
-			t.Errorf("version mismatch: got %s, want %s, target :%s", gotVersion, v.expactVersion, v.target)
-		}
+			if gotProtocol != v.expectProtocol {
+				t.Errorf("protocol mismatch: got %s, want %s, target :%s", gotProtocol, v.expectProtocol, v.target)
+			}
+
+			if gotVersion != v.expactVersion {
+				t.Errorf("version mismatch: got %s, want %s, target :%s", gotVersion, v.expactVersion, v.target)
+			}
+		})
 	}
 }
 
@@ -167,25 +173,31 @@ func TestParsePackagePatterns(t *testing.T) {
 	}
 
 	for _, v := range vectors {
-		gotName, gotProtocol, gotPatterns, err := parsePackagePatterns(v.target)
-
-		if v.occurErr != (err != nil) {
-			t.Errorf("expect error %t but err is %s", v.occurErr, err)
-			continue
+		name := v.name
+		if name == "" {
+			name = v.target
 		}
+		t.Run(name, func(t *testing.T) {
+			gotName, gotProtocol, gotPatterns, err := parsePackagePatterns(v.target)
 
-		if gotName != v.expectName {
-			t.Errorf("name mismatch: got %s, want %s, target: %s", gotName, v.expectName, v.target)
-		}
+			if v.occurErr != (err != nil) {
+				t.Errorf("expect error %t but err is %s", v.occurErr, err)
+				return
+			}
 
-		if gotProtocol != v.expectProtocol {
-			t.Errorf("protocol mismatch: got %s, want %s, target: %s", gotProtocol, v.expectProtocol, v.target)
-		}
+			if gotName != v.expectName {
+				t.Errorf("name mismatch: got %s, want %s, target: %s", gotName, v.expectName, v.target)
+			}
 
-		sort.Strings(gotPatterns)
-		sort.Strings(v.expactPatterns)
+			if gotProtocol != v.expectProtocol {
+				t.Errorf("protocol mismatch: got %s, want %s, target: %s", gotProtocol, v.expectProtocol, v.target)
+			}
 
-		assert.Equal(t, v.expactPatterns, gotPatterns)
+			sort.Strings(gotPatterns)
+			sort.Strings(v.expactPatterns)
+
+			assert.Equal(t, v.expactPatterns, gotPatterns)
+		})
 	}
 }
 
@@ -230,20 +242,26 @@ func TestGetDependency(t *testing.T) {
 	}
 
 	for _, v := range vectors {
-		gotName, gotVersion, err := getDependency(v.target)
-
-		if v.occurErr != (err != nil) {
-			t.Errorf("expect error %t but err is %s", v.occurErr, err)
-			continue
+		name := v.name
+		if name == "" {
+			name = v.target
 		}
+		t.Run(name, func(t *testing.T) {
+			gotName, gotVersion, err := getDependency(v.target)
 
-		if gotName != v.expectName {
-			t.Errorf("name mismatch: got %s, want %s, target: %s", gotName, v.expectName, v.target)
-		}
+			if v.occurErr != (err != nil) {
+				t.Errorf("expect error %t but err is %s", v.occurErr, err)
+				return
+			}
 
-		if gotVersion != v.expactVersion {
-			t.Errorf("version mismatch: got %s, want %s, target: %s", gotVersion, v.expactVersion, v.target)
-		}
+			if gotName != v.expectName {
+				t.Errorf("name mismatch: got %s, want %s, target: %s", gotName, v.expectName, v.target)
+			}
+
+			if gotVersion != v.expactVersion {
+				t.Errorf("version mismatch: got %s, want %s, target: %s", gotVersion, v.expactVersion, v.target)
+			}
+		})
 	}
 }
 

@@ -1235,8 +1235,7 @@
       "case": "TestParsePattern",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1247,8 +1246,7 @@
       "case": "normal",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/normal"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1259,8 +1257,7 @@
       "case": "normal with protocol",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/normal with protocol"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1271,8 +1268,7 @@
       "case": "scope",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/scope"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1283,8 +1279,7 @@
       "case": "scope with protocol",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/scope with protocol"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1295,8 +1290,7 @@
       "case": "scope with protocol and quotes",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/scope with protocol and quotes"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1307,8 +1301,7 @@
       "case": "unusual version",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/unusual version"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1319,8 +1312,7 @@
       "case": "conditional version",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePattern/conditional version"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1331,8 +1323,7 @@
       "case": "TestParsePackagePatterns",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePackagePatterns"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1343,8 +1334,7 @@
       "case": "normal",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePackagePatterns/normal"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1355,8 +1345,7 @@
       "case": "normal with quotes",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePackagePatterns/normal with quotes"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1367,8 +1356,7 @@
       "case": "normal with protocol",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePackagePatterns/normal with protocol"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1379,8 +1367,7 @@
       "case": "multiple patterns",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePackagePatterns/multiple patterns"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1391,8 +1378,7 @@
       "case": "multiple patterns v2",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParsePackagePatterns/multiple patterns v2"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1403,8 +1389,7 @@
       "case": "TestGetDependency",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestGetDependency"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1415,8 +1400,7 @@
       "case": "normal",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestGetDependency/normal"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1427,8 +1411,7 @@
       "case": "range",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestGetDependency/range"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1439,8 +1422,7 @@
       "case": "normal v2",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestGetDependency/normal v2"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1451,8 +1433,7 @@
       "case": "range version v2",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestGetDependency/range version v2"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1463,8 +1444,7 @@
       "case": "name with scope",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestGetDependency/name with scope"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -1475,8 +1455,7 @@
       "case": "TestParse",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
-        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go:TestParse"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
