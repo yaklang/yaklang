@@ -74,10 +74,19 @@ func _exec(server string, domain string, config *ReliableDNSConfig) error {
 	}()
 
 	for i := 0; i < config.RetryTimes; i++ {
+		if err := config.GetBaseContext().Err(); err != nil {
+			return err
+		}
 		err := _execWithoutRetry(server, domain, config)
 		if err != nil {
 			log.Warnf("exec dns request failed: %s", err)
-			time.Sleep(500 * time.Millisecond)
+			timer := time.NewTimer(500 * time.Millisecond)
+			select {
+			case <-config.GetBaseContext().Done():
+				timer.Stop()
+				return config.GetBaseContext().Err()
+			case <-timer.C:
+			}
 			continue
 		}
 		return nil
@@ -109,6 +118,10 @@ func _execWithoutRetry(server string, domain string, config *ReliableDNSConfig) 
 			log.Errorf("fallback to dial tcp[%v] failed: %s", server, err)
 		}
 		if conn != nil {
+			owned := conn
+			defer owned.Close()
+			stop := context.AfterFunc(tcpCtx, func() { owned.Close() })
+			defer stop()
 			log.Debugf("execute dns request via tcp[%v], conn cost: %v", server, time.Now().Sub(connStart))
 			start := time.Now()
 			conn.Write(utils.NetworkByteOrderUint16ToBytes(uint16(len(req))))
@@ -158,6 +171,10 @@ func _execWithoutRetry(server string, domain string, config *ReliableDNSConfig) 
 	if err != nil {
 		log.Errorf("dial[%v] udp dns server failed: %s", time.Now().Sub(connStart), err)
 	} else if conn != nil {
+		owned := conn
+		defer owned.Close()
+		stop := context.AfterFunc(udpCtx, func() { owned.Close() })
+		defer stop()
 		start := time.Now()
 		conn.Write(req)
 		var buf = make([]byte, 512)
