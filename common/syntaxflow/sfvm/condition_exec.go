@@ -208,6 +208,41 @@ func (s *SFFrame) popCondition() ConditionEntry {
 	return s.conditionStack.Pop()
 }
 
+// Successive call-argument filters narrow the current values while their
+// anchor scope still describes the original calls. Project the source mask
+// onto that subset by anchor identity, never by the subset's new positions.
+func (s *SFFrame) applyConditionToCurrentValues(entry ConditionEntry, values Values) (Values, error) {
+	mask, ok := entry.(maskConditionEntry)
+	if !ok || len(mask.mask) == len(values) || values.IsEmpty() {
+		return entry.Apply(values)
+	}
+	scope, ok := s.activeAnchorScope()
+	if !ok || scope.mode != ConditionModeMask || scope.anchorWidth != len(mask.mask) {
+		return entry.Apply(values) // retain the invariant error for unrelated masks
+	}
+	aligned := make([]bool, len(values))
+	for i, value := range values {
+		if utils.IsNil(value) || value.IsEmpty() {
+			continue
+		}
+		bits := value.GetAnchorBitVector()
+		if bits == nil {
+			return nil, utils.Wrap(CriticalError, "condition subset has no source anchors")
+		}
+		found := false
+		for j, matched := range mask.mask {
+			if bits.Has(scope.anchorBase + j) {
+				found = true
+				aligned[i] = aligned[i] || matched
+			}
+		}
+		if !found {
+			return nil, utils.Wrap(CriticalError, "condition subset is outside source anchor scope")
+		}
+	}
+	return newMaskCondition(aligned).Apply(values)
+}
+
 func invertMask(mask []bool) []bool {
 	out := make([]bool, len(mask))
 	for i := 0; i < len(mask); i++ {
