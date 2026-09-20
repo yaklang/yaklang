@@ -79,6 +79,7 @@ func TestParse(t *testing.T) {
 				got[i].Variant = ""
 				got[i].Source = ""
 				got[i].Verification = ""
+				got[i].DeclaredIntegrity = ""
 				got[i].Diagnostics = nil
 			}
 			for i := range deps {

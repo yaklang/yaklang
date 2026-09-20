@@ -4,7 +4,7 @@
   "entries": [
     {
       "local_file": "common/sca/analyzer/analyzer.go",
-      "sha256": "ef93d20afc1c14e7787084ee12030b1c373e4682d04d8bf049e47a3bdcf548bf",
+      "sha256": "fe7d3c1eb4151003dc50a50787e88fef997684083510236525767bdd9813a459",
       "symbols": [
         {
           "name": "TypAnalyzer",
@@ -336,7 +336,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/java/pom/artifact.go",
-      "sha256": "2e828ba7a9588ba7ad0c63867dada659f5477a263d9f13f1de7079c709c89d7e",
+      "sha256": "5d31f098bf0601a136742c711f88c2796453aa157f36482f5fa6f1e95e5c685c",
       "symbols": [
         {
           "name": "artifact",
@@ -454,7 +454,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/java/pom/parse.go",
-      "sha256": "63d497e13bc85a5ed01b0599c733b38c8b2c6c8b80201b073223a177a52125af",
+      "sha256": "2d1066f92294761efd107b0375d04d4725ce296c7a89aad57bf882134d2f104b",
       "symbols": [
         {
           "name": "parser",
@@ -567,7 +567,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/java/pom/pom.go",
-      "sha256": "93757d91115fb4896afe7890c95f52e51809cfa39640aeb23c0254e6b39e112c",
+      "sha256": "f9336988c58f8ff31e157cdfc494bb650c2e3fb410bb0bb7967f2656f3b8a1fb",
       "symbols": [
         {
           "name": "pom",
@@ -750,7 +750,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/npm/parse.go",
-      "sha256": "9656375cbe89df1075c729abb9db7610be205a5116162fd038063550978a624d",
+      "sha256": "8f2b9fea386247e1953d02d81be798007554baf284b7af1f14309f05558ec92e",
       "symbols": [
         {
           "name": "LockFile",
@@ -824,7 +824,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/pnpm/parse.go",
-      "sha256": "28325876fad88d417e3be06332480ca394dc5cab37107f082f541203f24eb230",
+      "sha256": "31bf8dbd2153b13cb8a475d550329ccb15941070a9f6bd399908133bb50a1a5f",
       "symbols": [
         {
           "name": "PackageResolution",
@@ -1289,7 +1289,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/rust/cargo/parse.go",
-      "sha256": "b053e50438d2028b2696fa120917472bbfc07718d131b33fd83d614710c01809",
+      "sha256": "16e74ce81823991dbd363374d82be1e8fbcdbe08464a11bcd69297a06cef4023",
       "symbols": [
         {
           "name": "cargoPkg",
@@ -1341,7 +1341,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/types/types.go",
-      "sha256": "773eef8f4b4e9ec20a0010e3d6b8ed97f419ce9fc9edc03b2390abef402153b6",
+      "sha256": "cb51c2479ccf00d8393141896d3a67d5a5202ef81c2c5c1472b4276888b569be",
       "symbols": [
         {
           "name": "ReadSeekerAt",
@@ -3946,7 +3946,7 @@
     },
     {
       "local_file": "common/sca/dxtypes/cyclonedx_sbom.go",
-      "sha256": "33239eb625b752f94184673545ca1ea10b2a7bdcd558e9fba44a352c87509fca",
+      "sha256": "913320c85cdaad5b225023656fb65a498a77a72b7cc8d42fd31466390993ce00",
       "symbols": [
         {
           "name": "BOM",
@@ -4011,7 +4011,7 @@
     },
     {
       "local_file": "common/sca/dxtypes/package.go",
-      "sha256": "430705e1563ae28ca5395cf5f1b4f1b5eb3dda4517dc35cbfa90d0ded1a9d21c",
+      "sha256": "92232d49ddf0f1c81247d99a238d34857ef2d5fbf00c5019c85c423883a1db09",
       "symbols": [
         {
           "name": "PackageDetails",
@@ -4099,7 +4099,7 @@
     },
     {
       "local_file": "common/sca/dxtypes/report_sbom.go",
-      "sha256": "2a8a1f168507914131f6a3814fb06046eb63ae147302584fdb1264cb62fe5f36",
+      "sha256": "3d0b59adc6f170a03d64640f0d31a4f2896d109f398de71dfbbab66d98bb0717",
       "symbols": [
         {
           "name": "CreateCycloneDXSBOMFromReport",
@@ -4498,7 +4498,7 @@
     },
     {
       "local_file": "common/sca/model/report.go",
-      "sha256": "1ff964768625c084a8ee74e6cd9b230605f8d38ddac76a640a25fbcccef6c139",
+      "sha256": "7fc42e2c11338465a3813188be1aa8ae6a926801865844884e0f63422293b740",
       "symbols": [
         {
           "name": "ComponentKey",
@@ -4554,7 +4554,7 @@
     },
     {
       "local_file": "common/sca/pipeline.go",
-      "sha256": "00e062b72f6fb616840066e1faa247b732bb0f9b175e30282f1f6dcfde49800c",
+      "sha256": "18a6310c1fec446d2005dd135eb113815a978fd5f36f6d7d8532e01d36c93859",
       "symbols": [
         {
           "name": "material",
@@ -4655,7 +4655,7 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "e0d1d85e7d37e2d56f25eb9f8ac976d1b171050f51d42a33c83dc28f6c1d4a38",
+      "sha256": "40bb777b7e375448f9cea73977b9f87db95e37150629e741cd9f719ac729f884",
       "symbols": [
         {
           "name": "fillReport",
@@ -4717,7 +4717,7 @@
     },
     {
       "local_file": "common/sca/core/scanerr/error.go",
-      "sha256": "a787f4ef479d103798966ab83ca562b618a73a729609323dda3e5d0cddd28c10",
+      "sha256": "479691eb3071431e888f091a36058af0108f19574545ef935e5b45b67ef68a9d",
       "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
@@ -4732,7 +4732,7 @@
     },
     {
       "local_file": "common/sca/internal/digest/digest.go",
-      "sha256": "6443f3aa0f5442c0ecb8ed7c508c39e4c943065cca81bdf0b5e17ecc6cc0d84a",
+      "sha256": "efc1dd2834427a233326e03bf5e16ceeab0db465139ad5f08a56014bae26816d",
       "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",

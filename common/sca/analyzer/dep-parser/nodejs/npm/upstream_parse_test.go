@@ -61,6 +61,7 @@ func TestParse(t *testing.T) {
 				v.ExternalReferences = []types.ExternalRef{{Type: types.RefOther, URL: v.Source}}
 				v.Source = ""
 				v.Verification = ""
+				v.DeclaredIntegrity = ""
 				v.Diagnostics = nil
 				v.Evidence = ""
 			}
