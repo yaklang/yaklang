@@ -263,6 +263,9 @@ func init() {
 	case len(os.Args) > 1 && os.Args[1] == "mcp" && log.IsMCPStdioCommand(os.Args) && !stdio.IsWorker():
 		// The stdio supervisor owns only the client transport. Its worker
 		// initializes databases; this branch must not print the grpc banner.
+	case len(os.Args) > 1 && (os.Args[1] == "shark" || os.Args[1] == "shark-worker"):
+		// Packet capture needs neither databases nor plugin synchronization. Keep
+		// startup quiet for the TUI and machine-readable --json output.
 	case len(os.Args) > 1 && slices.Contains(ignoreInitDatabase, os.Args[1]):
 		log.Debug("grpc should not initialize database in func:init")
 		fmt.Printf(`
@@ -1996,7 +1999,7 @@ func main() {
 	app.Commands = append(app.Commands, cliGroup("RAG Server", yakcmds.RAGServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("AI Viz Server", yakcmds.VizServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Hot Patch Validators", yakcmds.HotPatchValidatorCommands...)...)
-	app.Commands = append(app.Commands, *yakcmds.MemfitWorkerCommand)
+	app.Commands = append(app.Commands, *yakcmds.MemfitWorkerCommand, *yakcmds.SharkWorkerCommand)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
