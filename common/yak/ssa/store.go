@@ -19,6 +19,21 @@ func (s *StoredFunctionBuilder) CurrentBlock() *BasicBlock {
 	return s.currentBlock
 }
 
+// NewExecutionBuilder restores lexical builder state into a private view.
+// A lazy task must not rewrite the shared declaration builder just to enter
+// its captured scope. Function/Program ownership and the function's evolving
+// type remain on the original IR objects; restoring a scope does not reset them.
+func (s *StoredFunctionBuilder) NewExecutionBuilder() *FunctionBuilder {
+	if s == nil || s.Current == nil {
+		return nil
+	}
+	b := *s.Current
+	b._editor = s.editor
+	b.parentBuilder = s.parentBuilder
+	b.MarkedThisClassBlueprint = s.markedThisClassBlueprint
+	return &b
+}
+
 func (b *FunctionBuilder) LoadFunctionBuilder(s *StoredFunctionBuilder) {
 	if b == nil || s == nil {
 		return
