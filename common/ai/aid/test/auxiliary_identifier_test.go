@@ -15,17 +15,21 @@ import (
 )
 
 func TestSemanticIdentifierAuxiliaryProtocolAndFallback(t *testing.T) {
-	for _, mode := range []string{"success", "failure", "single-model"} {
+	for _, mode := range []string{"success", "failure", "single-model", "short-name"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			var calls atomic.Int32
+			var calls, qualityCalls atomic.Int32
 			cfg := aicommon.NewConfig(ctx,
 				aicommon.WithDisableAutoSkills(true),
 				aicommon.WithDisableCreateDBRuntime(true),
 				aicommon.WithAIAutoRetry(1),
 				aicommon.WithAITransactionAutoRetry(1),
 				aicommon.WithSingleAIModelMode(mode == "single-model"),
+				aicommon.WithQualityPriorityAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					qualityCalls.Add(1)
+					return nil, errors.New("unexpected Intelligence call")
+				}),
 				aicommon.WithSpeedPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					calls.Add(1)
 					require.Equal(t, "liteforge[task-short-id]", req.GetCallerLabel())
@@ -41,18 +45,22 @@ func TestSemanticIdentifierAuxiliaryProtocolAndFallback(t *testing.T) {
 				}),
 			)
 			coordinator := &aid.Coordinator{Config: cfg}
-			task, err := aid.ExtractTaskFromRawResponse(coordinator,
-				`{"@action":"plan","main_task":"Review code and produce a complete verified security report","main_task_goal":"report","tasks":[]}`)
+			plan := `{"@action":"plan","main_task":"Review code and produce a complete verified security report","main_task_goal":"report","tasks":[]}`
+			if mode == "short-name" {
+				plan = `{"@action":"plan","main_task":"review_code","main_task_goal":"report","tasks":[]}`
+			}
+			task, err := aid.ExtractTaskFromRawResponse(coordinator, plan)
 			require.NoError(t, err)
 			require.NotNil(t, task)
-			if mode == "success" {
+			require.Zero(t, qualityCalls.Load())
+			if mode == "success" || mode == "short-name" {
 				require.Equal(t, "review_code", task.GetSemanticIdentifier())
 			} else {
 				require.NotEmpty(t, task.GetSemanticIdentifier())
 				require.LessOrEqual(t, len([]rune(task.GetSemanticIdentifier())), 20)
 				require.NotEqual(t, "review_code", task.GetSemanticIdentifier())
 			}
-			if mode == "single-model" {
+			if mode == "single-model" || mode == "short-name" {
 				require.Zero(t, calls.Load())
 			} else {
 				require.EqualValues(t, 1, calls.Load())

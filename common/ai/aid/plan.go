@@ -378,11 +378,6 @@ func (c *Coordinator) generateSemanticIdentifier(name string) string {
 		return strings.TrimRight(truncated, "_")
 	}
 
-	// Single-model simple mode: skip AI call, use truncation fallback directly.
-	if c.GetAIConfig() != nil && c.GetAIConfig().IsSingleAIModelMode() {
-		return truncateFallback()
-	}
-
 	result := truncateFallback()
 	c.GetAIConfig().ScheduleAuxiliaryTask(c.GetContext(),
 		aicommon.CallerLabelTaskShortID,
