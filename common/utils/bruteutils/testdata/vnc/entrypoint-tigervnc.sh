@@ -18,8 +18,28 @@ fi
 printf '%s\n' "$PASS" | vncpasswd -f > /tmp/vncpasswd
 chmod 600 /tmp/vncpasswd
 
-# Default TigerVNC is TLSVnc,VncAuth — a common real-world mix.
-# TLSVnc-only is a negative fixture (probe has no TLS security type).
+# Go crypto/tls cannot speak anonymous TLS (TLSVnc/TLSNone). Map those
+# env values to X509Vnc/X509None with a throwaway cert (skip-verify).
+make_x509() {
+  openssl req -x509 -newkey rsa:2048 -keyout /tmp/vnc.key -out /tmp/vnc.crt \
+    -days 1 -nodes -subj "/CN=localhost" >/tmp/openssl.log 2>&1
+}
+
+if [ "$SEC" = "TLSVnc" ] || [ "$SEC" = "X509Vnc" ]; then
+  make_x509
+  exec Xvnc :1 -geometry 640x480 -depth 16 -rfbport "$PORT" \
+    -rfbauth /tmp/vncpasswd -SecurityTypes X509Vnc \
+    -X509Cert /tmp/vnc.crt -X509Key /tmp/vnc.key \
+    -localhost no -AlwaysShared -DisconnectClients=0
+fi
+
+if [ "$SEC" = "TLSNone" ] || [ "$SEC" = "X509None" ]; then
+  make_x509
+  exec Xvnc :1 -geometry 640x480 -depth 16 -rfbport "$PORT" \
+    -SecurityTypes X509None -X509Cert /tmp/vnc.crt -X509Key /tmp/vnc.key \
+    -localhost no -AlwaysShared -DisconnectClients=0
+fi
+
 sec_args="-SecurityTypes VncAuth"
 if [ "$SEC" = "Default" ]; then
   sec_args=""
