@@ -46,10 +46,44 @@ func fullTypeNameSet(target *[]string, names []string, owner Type) bool {
 	if target == nil {
 		return false
 	}
-	cleaned := clean(names)
-	// Cap the list size
-	if len(cleaned) > maxFullTypeNameEntries {
-		cleaned = cleaned[:maxFullTypeNameEntries]
+	if len(names) <= 8 && len(*target) == len(names) {
+		same := true
+		for i, name := range names {
+			if (*target)[i] != name {
+				same = false
+				break
+			}
+		}
+		// Existing lists may be edited through GetFullTypeNames, so exact
+		// equality alone is insufficient if duplicate names were introduced.
+		if same {
+			unique := true
+			for i, name := range names {
+				if lo.Contains(names[:i], name) {
+					unique = false
+					break
+				}
+			}
+			if unique {
+				return false
+			}
+		}
+	}
+	// Stop after the same first 200 distinct names as before. Cleaning the
+	// entire input first retains its oversized backing array after slicing.
+	// Stack storage also avoids allocations when the effective list is unchanged.
+	var scratch [maxFullTypeNameEntries]string
+	cleaned := scratch[:0]
+	seen := make(map[string]struct{}, min(len(names), maxFullTypeNameEntries))
+	for _, name := range names {
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		cleaned = append(cleaned, name)
+		if len(cleaned) == maxFullTypeNameEntries {
+			break
+		}
 	}
 	if len(*target) == len(cleaned) {
 		same := true
@@ -63,6 +97,7 @@ func fullTypeNameSet(target *[]string, names []string, owner Type) bool {
 			return false
 		}
 	}
-	*target = cleaned
+	// Do not share input storage: callers may mutate their slice afterwards.
+	*target = append([]string(nil), cleaned...)
 	return true
 }

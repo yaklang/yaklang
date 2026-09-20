@@ -23,7 +23,7 @@ type typeStore struct {
 	nextID      *atomic.Int64
 	resident    *utils.SafeMapWithKey[int64, Type]
 	flushMu     sync.Mutex
-	persisted   map[int64][sha256.Size]byte
+	persisted   typeFingerprints
 }
 
 func newTypeStore(
@@ -106,7 +106,7 @@ func (s *typeStore) flush() error {
 	s.flushMu.Lock()
 	defer s.flushMu.Unlock()
 	if s.persisted == nil {
-		s.persisted = make(map[int64][sha256.Size]byte)
+		s.persisted = make(typeFingerprints)
 	}
 
 	types := make([]Type, 0, s.resident.Count())
@@ -145,7 +145,7 @@ func (s *typeStore) flush() error {
 			}
 		} else {
 			for i, typ := range batch {
-				s.persisted[typ.id] = fingerprints[i]
+				s.persisted.set(typ.id, fingerprints[i])
 			}
 		}
 		clear(batch)
@@ -158,7 +158,7 @@ func (s *typeStore) flush() error {
 		fingerprint := snapshot.fingerprint()
 		// Check ALL persisted fields before JSON encoding. ID/pointer-only
 		// checks would lose cross-unit updates, including in-place slice edits.
-		if previous, ok := s.persisted[snapshot.id]; ok && previous == fingerprint {
+		if previous, ok := s.persisted.get(snapshot.id); ok && previous == fingerprint {
 			continue
 		}
 		changed++
