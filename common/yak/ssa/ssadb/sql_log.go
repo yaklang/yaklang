@@ -1,6 +1,8 @@
 package ssadb
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,8 +21,8 @@ var (
 )
 
 // StartSQLFileLog appends GORM SQL (and slow/failed native reads) to
-// {debugDir}/db.log. Info lines with prefix [ssadb] also go to the process
-// log so the node task-log filter can drive a live DB tab.
+// {debugDir}/db.log. SQL text is written once, to this diagnostic file;
+// without a file it is available only at DEBUG level in the process log.
 func StartSQLFileLog(debugDir string) (func(), error) {
 	debugDir = strings.TrimSpace(debugDir)
 	if debugDir == "" {
@@ -75,8 +77,15 @@ func (ssadbSQLLogger) Print(values ...interface{}) {
 	if line == "" {
 		return
 	}
-	writeSQLLogLine(line)
-	log.Infof("[ssadb] %s", line)
+	if !writeSQLLogLine(line) {
+		log.Debugf("[ssadb] %s", line)
+	}
+	// Do not leak SQL/arguments at INFO/WARN/ERROR. Keep a visible indication
+	// of failures even when SQL diagnostics are disabled.
+	level, _ := values[0].(string)
+	if level == "error" {
+		log.Errorf("[ssadb] GORM operation failed; details in SQL debug log")
+	}
 }
 
 func formatGormSQLLog(values ...interface{}) string {
@@ -99,34 +108,37 @@ func formatGormSQLLog(values ...interface{}) string {
 	}
 }
 
-func writeSQLLogLine(line string) {
+func writeSQLLogLine(line string) bool {
 	line = strings.TrimRight(line, "\n")
 	if line == "" {
-		return
+		return false
 	}
 	sqlLogMu.Lock()
+	defer sqlLogMu.Unlock()
 	f := sqlLogFile
-	sqlLogMu.Unlock()
 	if f == nil {
-		return
+		return false
 	}
 	_, _ = f.WriteString(line + "\n")
+	return true
 }
 
 // logNativeSQL records native IR reads. Fast successful reads are omitted so a
 // hadoop-scale scan does not fill db.log; slow or failed statements are kept.
 func logNativeSQL(query string, d time.Duration, err error) {
-	if !sqlLogEnabled() {
+	miss := errors.Is(err, sql.ErrNoRows)
+	if (err == nil || miss) && d < nativeSQLLogMin {
 		return
 	}
-	if err == nil && d < nativeSQLLogMin {
-		return
+	if err != nil && !miss {
+		log.Errorf("[ssadb] native query failed after %s (cancellation=%t); details in SQL debug log", d, nativeContextErr(err))
 	}
 	status := "ok"
 	if err != nil {
 		status = err.Error()
 	}
 	line := fmt.Sprintf("%s native [%s] %s status=%s", time.Now().Format("2006-01-02 15:04:05.000"), d, query, status)
-	writeSQLLogLine(line)
-	log.Infof("[ssadb] %s", line)
+	if !writeSQLLogLine(line) {
+		log.Debugf("[ssadb] %s", line)
+	}
 }
