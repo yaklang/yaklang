@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,8 +29,11 @@ type structScanRuntime struct {
 	timeout       time.Duration
 	workLimit     int64
 	errs          []error
+	mu            sync.Mutex
 	results       []*SyntaxFlowResult
-	persisted     int
+	saveReady     bool
+	saveToDB      bool
+	saves         sync.WaitGroup
 	ranHashes     []string
 	ruleStats     map[string]*structRuleStat
 	skipped       bool
@@ -256,7 +260,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		if r := recover(); r != nil {
 			err := utils.Errorf("struct scan panic on %s: %v", unit.Key, r)
 			log.Errorf("%v", err)
-			s.errs = append(s.errs, err)
+			s.addErr(err)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
@@ -265,13 +269,14 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		compileCtx = progAPI.config.ctx
 	}
 	target := NewStructQueryTarget(progAPI, unit, nil)
+	var found []*SyntaxFlowResult
 	for _, rule := range s.rules {
 		if rule == nil {
 			continue
 		}
 		frame, err := s.frameForRule(rule)
 		if err != nil {
-			s.errs = append(s.errs, err)
+			s.addErr(err)
 			continue
 		}
 		ruleCtx, cancel := context.WithCancel(compileCtx)
@@ -302,12 +307,12 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		}
 		if err != nil {
 			s.noteRule(rule, programName, start, end, 0, err)
-			s.errs = append(s.errs, utils.Wrapf(err, "struct scan %s rule %s", unit.Key, rule.RuleName))
+			s.addErr(utils.Wrapf(err, "struct scan %s rule %s", unit.Key, rule.RuleName))
 			log.Warnf("[struct_scan] unit=%s rule=%s err=%v", unit.Key, rule.RuleName, err)
 			continue
 		}
 		if res != nil {
-			s.results = append(s.results, res)
+			found = append(found, res)
 			s.ranHashes = append(s.ranHashes, ruleContentHash(rule))
 			s.noteRule(rule, programName, start, end, int64(res.RiskCount()), nil)
 			if s.riskCB != nil {
@@ -329,6 +334,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		}
 		progAPI.ResetInterRuleState()
 	}
+	s.keepResults(found)
 }
 
 // frameForRule builds an execution frame from the rule. Sync stores compiled
@@ -352,33 +358,65 @@ func ruleContentHash(rule *schema.SyntaxFlowRule) string {
 	return utils.CalcSha256(rule.RuleName, rule.Content)
 }
 
-// persistResults checkpoints completed unit queries before the next batch.
-// Keeping their VM frames until project metadata is saved retains Value graphs
-// from every preceding batch, even after the instruction cache spills to disk.
-func (s *structScanRuntime) persistResults(progAPI *Program) {
-	if s == nil || progAPI == nil || progAPI.Program == nil {
+// prepareSave records once whether this compile writes struct results.
+// Memory programs keep the result in memory. Database programs save it.
+func (s *structScanRuntime) prepareSave(prog *ssa.Program) {
+	if s == nil || s.saveReady {
 		return
 	}
-	if progAPI.Program.DatabaseKind == ssa.ProgramCacheMemory {
+	s.saveReady = true
+	s.saveToDB = prog != nil && prog.DatabaseKind != ssa.ProgramCacheMemory
+}
+
+// keepResults publishes one unit's results. Database compiles save them on
+// the side and drop the value graph; the handle stays so a later report can
+// read the persisted alerts.
+func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
+	if s == nil || len(found) == 0 {
 		return
 	}
-	for _, res := range s.results[s.persisted:] {
-		if res == nil {
-			s.persisted++
-			continue
-		}
-		if _, err := res.Save(schema.SFResultKindScan, s.taskID); err != nil {
-			log.Warnf("[struct_scan] persist result failed: %v", err)
-			s.errs = append(s.errs, err)
-			return
-		}
-		// Keep the same result handle (also held by the memory result cache),
-		// but serve subsequent alert value reads from persisted audit nodes.
-		res.memResult = nil
-		res.symbol = make(map[string]Values)
-		res.unName = nil
-		s.persisted++
+	if !s.saveToDB {
+		s.mu.Lock()
+		s.results = append(s.results, found...)
+		s.mu.Unlock()
+		return
 	}
+	s.saves.Add(1)
+	go func() {
+		defer s.saves.Done()
+		for _, res := range found {
+			if res == nil {
+				continue
+			}
+			if _, err := res.Save(schema.SFResultKindScan, s.taskID); err != nil {
+				log.Warnf("[struct_scan] persist result failed: %v", err)
+				s.addErr(err)
+				continue
+			}
+			res.memResult = nil
+			res.symbol = make(map[string]Values)
+			res.unName = nil
+		}
+		s.mu.Lock()
+		s.results = append(s.results, found...)
+		s.mu.Unlock()
+	}()
+}
+
+func (s *structScanRuntime) addErr(err error) {
+	if s == nil || err == nil {
+		return
+	}
+	s.mu.Lock()
+	s.errs = append(s.errs, err)
+	s.mu.Unlock()
+}
+
+func (s *structScanRuntime) WaitSaves() {
+	if s == nil {
+		return
+	}
+	s.saves.Wait()
 }
 
 func (p *Program) StructRulesAlreadyRan(rule *schema.SyntaxFlowRule) bool {
@@ -398,14 +436,20 @@ func (p *Program) StructScanErrors() []error {
 	if p == nil || p.config == nil || p.config.structScan == nil {
 		return nil
 	}
-	return p.config.structScan.errs
+	s := p.config.structScan
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]error(nil), s.errs...)
 }
 
 func (p *Program) StructScanResults() []*SyntaxFlowResult {
 	if p == nil || p.config == nil || p.config.structScan == nil {
 		return nil
 	}
-	return p.config.structScan.results
+	s := p.config.structScan
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]*SyntaxFlowResult(nil), s.results...)
 }
 
 // StructScanCounts is the number of struct-mode rules this compile actually
@@ -417,6 +461,8 @@ func (p *Program) StructScanCounts() (rules int, results int) {
 		return 0, 0
 	}
 	s := p.config.structScan
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	rules = len(s.rules)
 	if rules == 0 {
 		rules = len(s.ranHashes)
@@ -530,6 +576,7 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	s := cfg.ensureStructScan()
+	s.prepareSave(p.Program)
 	if !s.wantsScan() {
 		return nil
 	}
@@ -552,7 +599,7 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 		}
 		s.ScanStruct(p, unit)
 	}
-	s.persistResults(p)
+	s.WaitSaves()
 	return nil
 }
 

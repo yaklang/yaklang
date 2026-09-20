@@ -22,6 +22,17 @@ type ProjectConfig struct {
 	Filepath    string
 }
 
+type ProjectConfigError struct {
+	Kind string
+	Path string
+	Err  error
+}
+
+func (e *ProjectConfigError) Error() string {
+	return fmt.Sprintf("project YAML %s not indexed (%s): %v", e.Path, e.Kind, e.Err)
+}
+func (e *ProjectConfigError) Unwrap() error { return e.Err }
+
 func (p *Program) GetProjectConfig(key string) *ProjectConfig {
 	if p == nil {
 		return nil
@@ -105,7 +116,14 @@ func (p *Program) parseYamlProjectConfig(raw []byte, path string) error {
 
 	config, err := yaml.YamlToKVParis(raw)
 	if err != nil {
-		return utils.Errorf("parse yaml project config error: %v", err)
+		kind := "config"
+		// Helm templates are not rendered YAML. Keep their source available
+		// to source-mode rules, but do not invent configuration values.
+		if strings.Contains(strings.ReplaceAll(path, "\\", "/"), "/templates/") && strings.Contains(string(raw), "{{") && strings.Contains(string(raw), "}}") {
+			kind = "template"
+		}
+		p.RecordCompileDiagnostic(kind, path, err.Error())
+		return &ProjectConfigError{Kind: kind, Path: path, Err: err}
 	}
 	for k, v := range config {
 		p.SetProjectConfig(k, v, path)

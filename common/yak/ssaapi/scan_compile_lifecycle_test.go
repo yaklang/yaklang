@@ -99,19 +99,20 @@ alert $call`),
 		}),
 		WithStructRuleCallback(func(*schema.SSARisk) {
 			callbacks++
-			require.True(t, state.results[len(state.results)-1].program.Program.Cache.IsInstructionSpillDisabled(),
-				"completed batch IR must remain resident until its struct scan finishes")
-			if callbacks == 2 {
-				require.Equal(t, 1, state.persisted, "previous batch must persist before the next batch scans")
-				require.Nil(t, state.results[0].memResult, "previous VM frame must no longer retain its Value graph")
-				require.Empty(t, state.results[0].symbol)
+			if callbacks != 2 {
+				return
 			}
+			require.Len(t, state.results, 1, "previous batch must be saved before the next batch scans")
+			require.Nil(t, state.results[0].memResult, "previous VM frame must no longer retain its Value graph")
+			require.Empty(t, state.results[0].symbol)
+			require.True(t, state.results[0].program.Program.Cache.IsInstructionSpillDisabled(),
+				"completed batch IR must remain resident until its struct scan finishes")
 		}))
 	require.NoError(t, err)
 	require.Equal(t, 2, callbacks)
 	require.Equal(t, 2, completedBatches)
 	require.Empty(t, progs[0].StructScanErrors())
-	require.Equal(t, 2, state.persisted)
+	require.Len(t, state.results, 2)
 	for _, result := range progs[0].StructScanResults() {
 		require.Nil(t, result.memResult)
 		require.NotNil(t, result.dbResult)

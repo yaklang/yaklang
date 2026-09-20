@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -9,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -261,12 +261,8 @@ func (c *Config) parseProjectWithFSUnits(
 	// YAK_SSA_COMPILE_UNIT_LEGACY opts back into the monolithic legacy/compat
 	// compile path (no batching).
 	//
-	// Per-batch FlushCompileUnit is disabled (see the batch loop below): every
-	// flush path breaks a suite, and the function-body release it gates is a
-	// no-op. CompileUnitSplit (instruction spill) is left false for the same
-	// reason. Both are re-enable targets once the dbcache FeedBlock + cross-
-	// unit resolution bugs are fixed; shouldKeepCompileUnitBoundaryResident
-	// already keeps BasicBlocks resident for that future path.
+	// Explicit batch flushes preserve cross-unit boundary instructions. Keep
+	// automatic compile-unit spill disabled while a batch is still building.
 	writerCacheRequested := true
 	writerCacheEnabled := true
 	if envFlagEnabled(compileUnitLegacyEnv) {
@@ -331,6 +327,9 @@ func (c *Config) parseProjectWithFSUnits(
 	prog.CompileUnits = flattenCompileUnits(plan)
 	prog.ProcessInfof("compile unit graph built units=%d edges=%d scc=%d", len(plan.Units), len(plan.Edges), len(plan.Order))
 	structScanOn := c.structScan != nil && c.structScan.enabled()
+	if structScanOn {
+		c.structScan.prepareSave(prog)
+	}
 	// Struct opcode queries enumerate live instructions. TTL/capacity eviction
 	// must not remove the completed batch before its semantic scan sees it.
 	holdSCCIR := envFlagEnabled(compileUnitHoldSCCIREnv) || structScanOn
@@ -396,11 +395,13 @@ func (c *Config) parseProjectWithFSUnits(
 				func(fileContent *ssareducer.FileContent) {
 					defer fileContent.Release()
 					if fileContent.Status == ssareducer.FileStatusFsError {
+						prog.RecordCompileDiagnostic("file", fileContent.Path, fmt.Sprint(fileContent.Err))
 						log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 						prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 						return
 					}
 					if fileContent.Status == ssareducer.FileParseASTError {
+						prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
 						if astParseErrLogged < maxAstParseErrLogs {
 							log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
 							astParseErrLogged++
@@ -424,6 +425,7 @@ func (c *Config) parseProjectWithFSUnits(
 						func() {
 							defer func() {
 								if r := recover(); r != nil {
+									prog.RecordCompileDiagnostic("prehandler", fileContent.Path, fmt.Sprint(r))
 									log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
 									utils.PrintCurrentGoroutineRuntimeStack()
 								}
@@ -431,7 +433,13 @@ func (c *Config) parseProjectWithFSUnits(
 							language.InitHandler(builder)
 							err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
 							if err != nil {
-								log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+								var configError *ssa.ProjectConfigError
+								if errors.As(err, &configError) {
+									log.Warnf("%v", err)
+								} else {
+									prog.RecordCompileDiagnostic("prehandler", fileContent.Path, err.Error())
+									log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+								}
 							}
 						}()
 					}
@@ -531,6 +539,7 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		parseTime += time.Since(unitBuildStart)
 		if structScanOn {
 			if structProgAPI == nil {
 				structProgAPI = NewProgram(prog, c)
@@ -545,45 +554,27 @@ func (c *Config) parseProjectWithFSUnits(
 					return nil, ErrContextCancel
 				}
 			}
-			c.structScan.persistResults(structProgAPI)
+			c.structScan.WaitSaves()
+			if prog.Cache != nil {
+				prog.Cache.EnableInstructionSpill()
+			}
 		}
-		// Per-batch flush: evict ordinary instructions to DB when resident
-		// count exceeds a threshold, keeping Function/Parameter/BasicBlock
-		// boundary instructions resident for cross-unit calls. This bounds
-		// resident memory on large projects (e.g. Apache Hadoop: 5M
-		// instructions would otherwise all stay resident until final
-		// SaveToDatabase, causing 21GB heap peak).
-		//
-		// FlushCompileUnit uses the flushCompileUnitWriter path which keeps
-		// boundary instructions (Function, Parameter, FreeValue, BasicBlock,
-		// ParameterMember, SideEffect, ExternLib) resident for cross-unit
-		// resolution in later batches. Only ordinary instructions are evicted
-		// to DB, bounding memory without breaking cross-unit calls.
-		//
-		// The threshold avoids flushing on small projects where it provides no
-		// memory benefit and only adds DB write overhead.
+		// Per-batch flush: evict ordinary instructions to DB, keeping
+		// Function/Parameter/BasicBlock boundary instructions resident for
+		// cross-unit calls. Persistence goes through the program cache, which
+		// already uses ssadb.GetDB, so this loop does not pick a database or
+		// retune SQLite.
 		if prog.Cache != nil {
 			if !isIncremental {
 				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
 			}
+			prog.Cache.FlushInstructionSaver()
 			prog.Cache.FlushAuxSavers()
-			// Tune SQLite for large SSA databases: as the DB grows past
-			// 128MB/512MB/1GB/2GB thresholds, raise cache_size, mmap_size,
-			// wal_autocheckpoint, and journal_size_limit to improve
-			// insert/read performance. Idempotent: sync.Map prevents
-			// re-applying at the same tier. No-op for small DBs (<128MB)
-			// and non-SQLite dialects.
-			if db := consts.GetGormSSAProjectDataBase(); db != nil {
-				if _, dbPath := consts.GetSSADataBaseInfo(); dbPath != "" {
-					consts.TuneSQLiteByDatabaseFileSize(db, dbPath)
-				}
-			}
 			prog.CheckMemoryPressure(batchIndex+1, len(batches))
 		}
 		if compileUnitLogEnabled() {
 			prog.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
 		}
-		parseTime += time.Since(unitBuildStart)
 		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
 		prog.SetPreHandler(true)
 		compilePhase = "f1_units"
@@ -625,7 +616,7 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, since)
 	}
 	if c.structScan != nil && c.structScan.enabled() {
-		c.structScan.persistResults(structProgAPI)
+		c.structScan.WaitSaves()
 	}
 	finishTime = time.Since(finishStart)
 
