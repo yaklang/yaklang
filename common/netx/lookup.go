@@ -196,21 +196,32 @@ func LookupCallback(host string, h func(dnsType, domain, ip, fromServer string, 
 // println(ip)
 // ```
 func LookupFirst(host string, opt ...DNSOption) string {
+	return lookupFirstWithContext(context.Background(), host, opt...)
+}
+
+// Direct dialing must retain its parent's budget while waiting for DNS. Using
+// WithDNSContext alone is insufficient because LookupFirst owns this context.
+func lookupFirstWithContext(parent context.Context, host string, opt ...DNSOption) string {
 	start := time.Now()
 	defer func() {
 		log.Debugf("lookup first %s cost %s", host, time.Since(start))
 	}()
 
-	var firstResult string
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+	defer cancel()
+	if ctx.Err() != nil {
+		return ""
+	}
+	firstResult := make(chan string, 1)
 	opt = append(opt, WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
 		if ip == "" {
 			return
 		}
 
-		if firstResult == "" {
-			firstResult = ip
+		select {
+		case firstResult <- ip:
 			cancel()
+		default:
 		}
 	}), WithDNSContext(ctx))
 	go func() {
@@ -220,8 +231,11 @@ func LookupFirst(host string, opt ...DNSOption) string {
 			log.Errorf("reliable lookup host %s failed: %v", host, err)
 		}
 	}()
+	<-ctx.Done()
 	select {
-	case <-ctx.Done():
+	case ip := <-firstResult:
+		return ip
+	default:
+		return ""
 	}
-	return firstResult
 }

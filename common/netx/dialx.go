@@ -46,7 +46,6 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
 		defer cancel()
-		config.DNSOpts = append(append([]DNSOption(nil), config.DNSOpts...), WithDNSContext(ctx))
 	}
 	waitRetry := func(delay time.Duration) error {
 		timer := time.NewTimer(delay)
@@ -150,7 +149,7 @@ RETRY:
 		ip := host
 		if net.ParseIP(utils.FixForParseIP(host)) == nil {
 			// not valid ip
-			ip = LookupFirst(host, config.DNSOpts...)
+			ip = lookupFirstWithContext(ctx, host, config.DNSOpts...)
 		}
 		if err := ctx.Err(); err != nil {
 			return nil, err
