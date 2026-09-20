@@ -204,6 +204,28 @@ func (t *TaskManager) Count() int {
 	return len(t.byAttempt)
 }
 
+// HoldIdle reserves an idle node for a short maintenance operation. While the
+// returned release function is held, LoadOrStoreAttempt cannot admit a new
+// task. This closes the check-then-delete race for IR lifecycle cleanup.
+func (t *TaskManager) HoldIdle() (release func(), ok bool) {
+	if t == nil {
+		return nil, false
+	}
+	t.stateMu.Lock()
+	if t.shuttingDown {
+		t.stateMu.Unlock()
+		return nil, false
+	}
+	t.mu.RLock()
+	idle := len(t.byAttempt) == 0
+	t.mu.RUnlock()
+	if !idle {
+		t.stateMu.Unlock()
+		return nil, false
+	}
+	return t.stateMu.Unlock, true
+}
+
 func (t *TaskManager) Touch(taskID string) {
 	task, err := t.GetTaskById(taskID)
 	if err != nil {

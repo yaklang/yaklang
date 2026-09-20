@@ -17,6 +17,7 @@ const (
 	legionCommandSSARuleSyncExport                    = "ssa.rule_sync.export"
 	legionCommandSSADebugQuery                        = "ssa.debug.query"
 	legionCommandSSALogTail                           = "ssa.log.tail"
+	legionCommandSSAIRProgramDelete                   = "ssa.ir_program.delete"
 	legionCommandPluginStoreSync                      = "plugin.store.sync"
 	legionCommandPluginStoreSyncStatusQuery           = "plugin.store.sync.status"
 	legionCommandPluginStoreImport                    = "plugin.store.import"
@@ -250,6 +251,8 @@ const (
 
 	legionReportKindScan = "scan_report"
 )
+
+const legionCapabilitySSAIRProgramDelete = "ssa.ir_program.delete.v1"
 
 const legionRealtimeHIDSDesiredSpecDryRunResultPrefix = legionRealtimePrefix + ".hids.desired_spec_dry_run.result"
 
