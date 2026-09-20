@@ -52,8 +52,8 @@ func TestVNCDocker(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
 		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_SECURITY=None"})
 		waitVNCAuth(t, addr, "")
-		assertProbe(t, "none-empty", mockProbe(t, "vnc", addr, "", ""), true, false)
-		assertProbe(t, "none-any", mockProbe(t, "vnc", addr, "", "ignored"), true, false)
+		assertUnauth(t, "none-empty", mockProbe(t, "vnc", addr, "", ""))
+		assertUnauth(t, "none-any", mockProbe(t, "vnc", addr, "", "ignored"))
 	})
 	t.Run("tigervnc-default-tlsvnc-plus-vncauth", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
@@ -96,7 +96,7 @@ func TestVNCDocker(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.libvnc", "yak-vnc-libvnc:test")
 		addr := runVNCContainer(t, "yak-vnc-libvnc:test", []string{"VNC_SECURITY=None"})
 		waitVNCAuth(t, addr, "")
-		assertProbe(t, "libvnc-none", mockProbe(t, "vnc", addr, "", ""), true, false)
+		assertUnauth(t, "libvnc-none", mockProbe(t, "vnc", addr, "", "ignored"))
 	})
 	t.Run("tightvnc", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tightvnc", "yak-vnc-tightvnc:test")
