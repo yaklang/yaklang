@@ -23,6 +23,7 @@ const (
 	OutOfOrder                  = ssaconfig.OutOfOrder
 	Order                       = ssaconfig.Order
 	ReverseOrder                = ssaconfig.ReverseOrder
+	BoundedOrder                = ssaconfig.BoundedOrder
 	defaultPipeConcurrency      = 10
 	defaultOrderedASTBufferFile = 1024
 	maxSourceQueueSize          = 8192
@@ -209,6 +210,11 @@ func FilesHandler(
 		return fileContent
 	}
 
+	if orderType == BoundedOrder {
+		return boundedOrderedFiles(ctx, paths, concurrency, astBuildWindowSize(concurrency, astBuildWindowOverride), initWorker,
+			func(path string, store *utils.SafeMap[any]) *FileContent { return parseFile(readFile(path), store) })
+	}
+
 	readPipe := pipeline.NewBoundedPipe[string, *FileContent](
 		ctx,
 		bufSize,
@@ -287,7 +293,7 @@ func FilesHandler(
 }
 
 func effectiveASTSequence(orderType ASTSequenceType, pathCount int) ASTSequenceType {
-	if orderType == OutOfOrder {
+	if orderType == OutOfOrder || orderType == BoundedOrder {
 		return orderType
 	}
 	limit := orderedASTBufferFileLimit()
