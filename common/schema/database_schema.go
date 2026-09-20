@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"sync/atomic"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,7 +11,7 @@ import (
 var (
 	projectDataBase    *gorm.DB
 	profileDatabase    *gorm.DB
-	defaultSSADataBase *gorm.DB
+	defaultSSADataBase atomic.Pointer[gorm.DB]
 )
 
 func init() {
@@ -202,7 +204,7 @@ func SetGormProfileDatabase(d *gorm.DB) {
 }
 
 func SetDefaultSSADatabase(d *gorm.DB) {
-	defaultSSADataBase = d
+	defaultSSADataBase.Store(d)
 }
 
 func GetGormProfileDatabase() *gorm.DB {
@@ -214,5 +216,5 @@ func GetGormProjectDatabase() *gorm.DB {
 }
 
 func GetDefaultSSADatabase() *gorm.DB {
-	return defaultSSADataBase
+	return defaultSSADataBase.Load()
 }
