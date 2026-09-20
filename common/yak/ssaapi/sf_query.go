@@ -3,6 +3,8 @@ package ssaapi
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -138,6 +140,16 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	for _, o := range opt {
 		o(config)
 	}
+	parent := config.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	queryCtx, cancelQuery := context.WithCancelCause(parent)
+	defer cancelQuery(nil)
+	config.ctx = ssadb.WithQueryErrorHandler(queryCtx, func(err error) {
+		cancelQuery(utils.Wrap(err, "SSA database search failed"))
+	})
+	config.opts = append(config.opts, sfvm.WithContext(config.ctx))
 	process := func(f float64, msg string) {
 		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
 			callBack(f, msg)
@@ -226,6 +238,9 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
 	} else {
 		res, err = frame.Feed(value, config.opts...)
+	}
+	if cause := context.Cause(queryCtx); cause != nil {
+		return nil, utils.Wrap(cause, "SyntaxflowQuery: query interrupted")
 	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")

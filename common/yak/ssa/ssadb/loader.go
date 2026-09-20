@@ -147,29 +147,15 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 	}
 
 	if matchMod&ConstType != 0 {
-		// A3: use the native-SQL ConstType ID query (skips GORM Model+Where+
-		// Pluck+YieldIrCode — the 3.59M-call hot path on hadoop). On any native
-		// error, fall back to the original GORM path so a DB error is never
-		// mistaken for an empty result.
-		ids, err := nativeGetIrCodeIDsByConstType(GetDB(), progName, compareMode, value)
-		if err == nil {
-			return filterLoaded(yieldIrCodes(ctx, progName, ids))
+		// This query is already the complete ConstType search. Retrying with
+		// an unbounded GORM Pluck after timeout both repeats expensive work
+		// and loses rule cancellation. Surface failures to the scan instead.
+		ids, err := nativeGetIrCodeIDsByConstTypeContext(ctx, GetDB(), progName, compareMode, value)
+		if err != nil {
+			reportQueryError(ctx, err)
+			return emptyIrCodeChan()
 		}
-		query := GetDB().Model(&IrCode{}).
-			Where(TableIrCodes+".program_name = ?", progName).
-			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", 5, "normal")
-		if compareMode == ExactCompare {
-			query = query.Where(TableIrCodes+".string = ?", value)
-		} else {
-			dialect := GetDB().Dialect().GetName()
-			switch dialect {
-			case "postgres", "postgresql":
-				query = query.Where(TableIrCodes+".string ~ ?", value)
-			default:
-				query = query.Where(TableIrCodes+".string REGEXP ?", value)
-			}
-		}
-		return filterLoaded(YieldIrCode(query, ctx, progName))
+		return filterLoaded(yieldIrCodes(ctx, progName, ids))
 	}
 
 	query := db.Model(&IrIndex{})

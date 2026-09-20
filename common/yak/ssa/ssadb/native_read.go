@@ -325,6 +325,10 @@ func joinPlaceholders(ps []string) string {
 // (including soft-delete deleted_at IS NULL). It is the A3 fast path: the GORM
 // version built Model+Where+Pluck+YieldIrCode per call (3.59M calls on hadoop).
 func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, error) {
+	return nativeGetIrCodeIDsByConstTypeContext(context.Background(), db, progName, compareMode, value)
+}
+
+func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, error) {
 	if db == nil || progName == "" {
 		return nil, nil
 	}
@@ -336,12 +340,20 @@ func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode Com
 			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`)
 		args = []interface{}{progName, 5, "normal", value}
 	} else {
+		operator := "REGEXP"
+		switch db.Dialect().GetName() {
+		case "postgres", "postgresql", "cloudsqlpostgres":
+			operator = "~"
+		}
 		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
-			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" REGEXP ? AND deleted_at IS NULL`)
+			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" `+operator+` ? AND deleted_at IS NULL`)
 		args = []interface{}{progName, 5, "normal", value}
 	}
 	started := time.Now()
-	ctx, cancel := nativeQueryContext(context.Background())
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, nativeQueryTimeout())
 	defer cancel()
 	rows, err := nativeQueryContextDB(db, ctx, q, args...)
 	if err != nil {
