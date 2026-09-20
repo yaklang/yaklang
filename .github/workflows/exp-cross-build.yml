@@ -24,6 +24,11 @@ on:
   pull_request:
     paths:
       - '.github/workflows/exp-cross-build.yml'
+      - '.github/workflows/reuse-build.yml'
+      - '.github/scripts/build-linux-manylinux.sh'
+      - '.github/scripts/verify-glibc-baseline.sh'
+      - 'scripts/build-gzip-embed.sh'
+      - 'scripts/generate-compressed-assets.sh'
 
 jobs:
   check_commit_msg:
