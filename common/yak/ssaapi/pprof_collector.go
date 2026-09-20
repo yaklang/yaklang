@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	runtimepprof "runtime/pprof"
 	"sync"
 	"time"
 
@@ -29,8 +30,8 @@ import (
 // Collection strategy:
 //   - Every 5 minutes, collect CPU + heap + goroutine profiles
 //   - CPU profile duration: 1 minute when memory < 10GB, 5 minutes when memory >= 10GB
-//   - An initial snapshot is collected 30 seconds after start
-//   - A final snapshot is collected on shutdown
+//   - An initial snapshot is collected at start, including short scans
+//   - Shutdown finishes active CPU sampling and collects final non-CPU snapshots
 type pprofCollector struct {
 	dir             string
 	cpuDir          string
@@ -43,6 +44,7 @@ type pprofCollector struct {
 	lastDBStats     ssadb.DBOpStats
 	lastDBStatsAt   time.Time
 	dbStatsMu       sync.Mutex
+	cpuMu           sync.Mutex
 }
 
 const (
@@ -55,7 +57,6 @@ const (
 	pprofInterval          = 5*time.Minute + 2*time.Second
 	pprofCPUDurationNormal = 60 * time.Second
 	pprofCPUDurationHigh   = 5 * time.Minute
-	pprofInitialDelay      = 30 * time.Second
 	pprofHTTPTimeout       = 10 * time.Minute
 	pprofListenAttempts    = 8
 
@@ -70,7 +71,7 @@ const (
 // StartPprofCollector creates the output directories, starts the pprof HTTP server,
 // and launches a background goroutine that periodically collects pprof snapshots.
 // The returned cleanup function stops the collector, waits for in-progress
-// collections to finish, and collects a final snapshot.
+// collections to flush on cancellation, and collects a final non-CPU snapshot.
 func StartPprofCollector(debugDir string) (func(), error) {
 	cpuDir := filepath.Join(debugDir, "cpu-pprof")
 	memDir := filepath.Join(debugDir, "memory-pprof")
@@ -110,8 +111,8 @@ func StartPprofCollector(debugDir string) (func(), error) {
 	cleanup := func() {
 		cancel()
 		collector.wg.Wait()
-		// Final snapshot: collect synchronously so CPU profile completes before return.
-		// Use a short CPU duration (10s) so cleanup doesn't block too long.
+		// Active CPU samples have been flushed. Sampling an idle process here
+		// only adds latency and obscures the task CPU utilization.
 		collector.collectSnapshotFinal("final")
 		log.Infof("[pprof] collector stopped, snapshots saved in %s", debugDir)
 	}
@@ -171,13 +172,10 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 		}
 	}()
 
-	select {
-	case <-ctx.Done():
+	if ctx.Err() != nil {
 		return
-	case <-time.After(pprofInitialDelay):
 	}
-
-	c.collectSnapshot("initial", false)
+	c.collectSnapshot(ctx, "initial")
 
 	earlyTicker := time.NewTicker(pprofEarlyInterval)
 	defer earlyTicker.Stop()
@@ -197,18 +195,16 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 				continue
 			}
 			earlySamples++
-			c.collectSnapshot(fmt.Sprintf("early%02d", earlySamples), false)
+			c.collectSnapshot(ctx, fmt.Sprintf("early%02d", earlySamples))
 		case <-ticker.C:
-			c.collectSnapshot(time.Now().Format("150405"), false)
+			c.collectSnapshot(ctx, time.Now().Format("150405"))
 		}
 	}
 }
 
-// collectSnapshot collects CPU, memory, and goroutine profiles.
-// When syncCPU is true, the CPU profile fetch blocks until completion (used for
-// the final snapshot). When false, it runs in a tracked goroutine (used for
-// periodic snapshots so the ticker is not blocked).
-func (c *pprofCollector) collectSnapshot(tag string, syncCPU bool) {
+// collectSnapshot captures state and starts cancellable CPU sampling in a
+// tracked goroutine so the ticker continues to capture memory during sampling.
+func (c *pprofCollector) collectSnapshot(ctx context.Context, tag string) {
 	ts := time.Now().Format("20060102-150405")
 	label := fmt.Sprintf("%s-%s", ts, tag)
 
@@ -229,48 +225,23 @@ func (c *pprofCollector) collectSnapshot(tag string, syncCPU bool) {
 	c.fetchDBStats(label)
 	c.fetchRuntimeStats(label)
 
-	if syncCPU {
-		// For final snapshot: wait for CPU profile to complete
-		c.fetchCPU(label, cpuDuration)
-	} else {
-		// For periodic snapshots: run CPU profile in background
-		c.wg.Add(1)
-		go func() {
-			defer c.wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					log.Errorf("[pprof] periodic CPU snapshot panicked: %v", r)
-				}
-			}()
-			c.fetchCPU(label, cpuDuration)
-		}()
-	}
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.fetchCPU(ctx, label, cpuDuration)
+	}()
 }
 
-// collectSnapshotFinal collects a final snapshot with a short CPU profile
-// duration (10 seconds) so cleanup doesn't block too long. CPU profile is
-// collected synchronously.
+// collectSnapshotFinal captures final retained state. CPU sampling has already
+// stopped with the workload; do not sample the idle shutdown period.
 func (c *pprofCollector) collectSnapshotFinal(tag string) {
 	ts := time.Now().Format("20060102-150405")
 	label := fmt.Sprintf("%s-%s", ts, tag)
-
-	cpuDuration := 10 * time.Second // short final CPU profile
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	memGB := float64(m.Alloc) / (1024 * 1024 * 1024)
-	if m.Alloc >= memoryThresholdHigh {
-		cpuDuration = 30 * time.Second // still shorter than periodic 5min
-		log.Infof("[pprof] memory %.1fGB >= 10GB, final CPU profile: %v", memGB, cpuDuration)
-	} else {
-		log.Infof("[pprof] memory %.1fGB < 10GB, final CPU profile: %v", memGB, cpuDuration)
-	}
 
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
 	c.fetchDBStats(label)
 	c.fetchRuntimeStats(label)
-	c.fetchCPU(label, cpuDuration) // synchronous
 }
 
 func (c *pprofCollector) fetchDBStats(label string) {
@@ -410,14 +381,39 @@ func captureRuntimeStats() (*RuntimeStatsSnapshot, error) {
 	return snapshot, nil
 }
 
-func (c *pprofCollector) fetchCPU(label string, duration time.Duration) {
-	url := fmt.Sprintf("http://%s/debug/pprof/profile?seconds=%d", c.httpAddr, int(duration.Seconds()))
+func (c *pprofCollector) fetchCPU(ctx context.Context, label string, duration time.Duration) {
+	if !c.cpuMu.TryLock() {
+		return // The active sample already covers this interval.
+	}
+	defer c.cpuMu.Unlock()
 	target := filepath.Join(c.cpuDir, label+".cpu.prof")
-	if err := fetchPprof(url, target); err != nil {
+	started := time.Now()
+	if err := collectCPUProfile(ctx, target, duration); err != nil {
 		log.Errorf("[pprof] CPU profile failed: %v", err)
 		return
 	}
-	log.Infof("[pprof] CPU profile saved: %s (%v)", target, duration)
+	log.Infof("[pprof] CPU profile saved: %s (%v)", target, time.Since(started))
+}
+
+// Capture directly so cancellation stops sampling AND flushes the valid partial
+// profile. Cancelling an HTTP request would discard its response body instead.
+func collectCPUProfile(ctx context.Context, target string, duration time.Duration) error {
+	f, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if err := runtimepprof.StartCPUProfile(f); err != nil {
+		return err
+	}
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+	runtimepprof.StopCPUProfile()
+	return f.Close()
 }
 
 func (c *pprofCollector) fetchHeap(label string) {
