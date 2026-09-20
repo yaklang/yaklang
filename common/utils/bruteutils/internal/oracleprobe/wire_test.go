@@ -120,7 +120,7 @@ func TestConnectResendRedirectAndRefuse(t *testing.T) {
 		}
 		return second, nil
 	})
-	s, e := connect(context.Background(), d, Options{Address: "127.0.0.1:1521"}, "(DESCRIPTION=probe)")
+	s, e := connect(context.Background(), d, Options{Address: "127.0.0.1:1521"}, "(DESCRIPTION=probe)", nil)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -134,7 +134,7 @@ func TestConnectResendRedirectAndRefuse(t *testing.T) {
 	msg := []byte("(DESCRIPTION=(ERR=12514))")
 	b := binary.BigEndian.AppendUint16([]byte{0, 0}, uint16(len(msg)))
 	c := &memoryConn{Reader: bytes.NewReader(wirePacket(0, 4, append(b, msg...)))}
-	_, e = connect(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return c, nil }), Options{Address: "localhost:1521"}, "test")
+	_, e = connect(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return c, nil }), Options{Address: "localhost:1521"}, "test", nil)
 	var ora *Error
 	if !errors.As(e, &ora) || !ora.ServiceUnknown() || !c.closed {
 		t.Fatalf("REFUSE: %v, closed=%v", e, c.closed)

@@ -72,6 +72,7 @@ const (
 type Connection struct {
 	ctx               context.Context
 	connOption        *loginOptions
+	details           *Details
 	session           *session
 	tcpNego           *TCPNego
 	dataNego          *DataTypeNego
@@ -82,6 +83,22 @@ type Connection struct {
 // Probe returns nil only after the server completes password authentication.
 // It never issues a SQL query. Every connection is closed before returning.
 func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
+	_, err = ProbeDetailed(ctx, dialer, o)
+	return err
+}
+
+// ProbeDetailed preserves Probe's authentication contract and adds bounded,
+// non-secret evidence for callers that need to distinguish failure stages.
+func ProbeDetailed(ctx context.Context, dialer Dialer, o Options) (details Details, err error) {
+	details.Stage, details.Transport = "options", "unknown"
+	err = probe(ctx, dialer, o, &details)
+	if err != nil {
+		err = &Failure{Stage: details.Stage, Err: err}
+	}
+	return
+}
+
+func probe(ctx context.Context, dialer Dialer, o Options, details *Details) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -107,16 +124,16 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 	if e != nil || p < 1 || p > 65535 {
 		return errors.New("oracle: invalid port")
 	}
-	if o.Service == "" || o.Username == "" {
-		return errors.New("oracle: service and username are required")
+	if o.Service == "" {
+		return errors.New("oracle: service is required")
 	}
 	for _, s := range []string{host, o.Service} {
 		if len(s) > 1024 || strings.ContainsAny(s, "()\x00\r\n") {
 			return errors.New("oracle: invalid connect descriptor value")
 		}
 	}
-	if len(o.Username) > 1024 || len(o.Password) > 4096 {
-		return errors.New("oracle: credentials exceed probe limit")
+	if o.Username == "" || len(o.Username) > 1024 || len(o.Password) > 4096 {
+		return ErrInvalidCredentials
 	}
 	serviceKind := "SERVICE_NAME"
 	if o.SID {
@@ -124,7 +141,8 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 	}
 	conf := &loginOptions{UserID: o.Username, Password: o.Password, ClientInfo: clientInfo{HostName: "yak", ProgramName: "yak-oracle-probe", OSUserName: "yak", DriverName: "yak-oracle-probe"}}
 	conf.descriptor = fmt.Sprintf("(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=%s)(PORT=%d))(CONNECT_DATA=(%s=%s)(CID=(PROGRAM=yak-oracle-probe)(HOST=yak)(USER=yak))))", host, p, serviceKind, o.Service)
-	s, e := connect(ctx, dialer, o, conf.descriptor)
+	details.Stage = "connect"
+	s, e := connect(ctx, dialer, o, conf.descriptor, details)
 	if e != nil {
 		return e
 	}
@@ -137,21 +155,31 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 			err = ctx.Err()
 		}
 	}()
-	c := &Connection{ctx: ctx, connOption: conf, session: s, LogonMode: NoNewPass}
+	c := &Connection{ctx: ctx, connOption: conf, session: s, LogonMode: NoNewPass, details: details}
 	if o.SysDBA {
 		c.LogonMode |= 0x20
 	}
+	details.Stage = "network-negotiation"
 	if o.Encryption == EncryptionRequired && !s.advanced {
-		return errors.New("oracle: native encryption is required but unavailable")
+		return fmt.Errorf("%w: required but unavailable", ErrEncryptionPolicy)
 	}
 	if s.advanced {
 		if e = s.negotiateAdvanced(); e != nil {
 			return fmt.Errorf("oracle network negotiation: %w", e)
 		}
 	}
+	details.Encryption, details.Integrity = s.encryptionName, s.integrityName
+	if details.Encryption == "" {
+		details.Encryption = "none"
+	}
+	if details.Integrity == "" {
+		details.Integrity = "none"
+	}
+	details.Stage = "protocol-negotiation"
 	if e = c.protocolNegotiation(); e != nil {
 		return fmt.Errorf("oracle protocol negotiation: %w", e)
 	}
+	details.Stage = "datatype-negotiation"
 	if e = c.dataTypeNegotiation(); e != nil {
 		return fmt.Errorf("oracle datatype negotiation: %w", e)
 	}

@@ -8,6 +8,9 @@ import (
 )
 
 func (c *Connection) doAuth() error {
+	if c.details != nil {
+		c.details.Stage = "auth-challenge"
+	}
 	s := c.session
 	s.ResetBuffer()
 	s.PutTTCFunc(3, 0x76)
@@ -23,14 +26,28 @@ func (c *Connection) doAuth() error {
 		return e
 	}
 	auth := &AuthObject{conn: c, tcpNego: c.tcpNego}
-	if e := auth.read(); e != nil {
+	e := auth.read()
+	if c.details != nil {
+		c.details.Verifier = auth.VerifierType
+	}
+	if e != nil {
 		return e
+	}
+	if c.details != nil {
+		c.details.Stage = "auth-response"
 	}
 	s.ResetBuffer()
 	if e := auth.Write(); e != nil {
 		return e
 	}
-	return c.readAuthResult(auth)
+	if c.details != nil {
+		c.details.Stage = "auth-result"
+	}
+	e = c.readAuthResult(auth)
+	if e == nil && c.details != nil {
+		c.details.Stage = "complete"
+	}
+	return e
 }
 
 func (c *Connection) readAuthResult(auth *AuthObject) error {

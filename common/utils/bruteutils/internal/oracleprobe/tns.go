@@ -30,6 +30,7 @@ type session struct {
 	sdu                                 int
 	advanced                            bool
 	encryption                          EncryptionPolicy
+	encryptionName, integrityName       string
 	received, packets                   int
 	UseBigClrChunks                     bool
 	ClrChunkSize                        int
@@ -213,9 +214,12 @@ var redirectHost = regexp.MustCompile(`(?i)\(\s*HOST\s*=\s*([\w.:%-]+)\s*\)`)
 var redirectPort = regexp.MustCompile(`(?i)\(\s*PORT\s*=\s*([0-9]+)\s*\)`)
 var refuseCode = regexp.MustCompile(`(?i)\(\s*(?:ERR|CODE)\s*=\s*([0-9]+)\s*\)`)
 
-func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*session, error) {
+func connect(ctx context.Context, d Dialer, o Options, descriptor string, details *Details) (*session, error) {
 	address := o.Address
 	for redirects := 0; redirects <= 2; redirects++ {
+		if details != nil {
+			details.Transport = "unknown"
+		}
 		conn, e := d.DialContext(ctx, "tcp", address)
 		if e != nil {
 			return nil, e
@@ -235,6 +239,12 @@ func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*sess
 				}
 				if e := s.startTLS(); e != nil {
 					return "", e
+				}
+			}
+			if details != nil {
+				details.Transport = "tcp"
+				if o.TLS != nil {
+					details.Transport = "tcps"
 				}
 			}
 			// v3.0.1 CONNECT layout. Fast-auth/pipelining are intentionally not advertised.
@@ -335,7 +345,7 @@ func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*sess
 					text := string(data[:n])
 					text = strings.SplitN(text, "\x00", 2)[0]
 					if strings.Contains(strings.ToUpper(text), "TCPS") && o.TLS == nil {
-						return "", errors.New("oracle: redirect requires TLS")
+						return "", ErrTLSRequired
 					}
 					h, p := redirectHost.FindStringSubmatch(text), redirectPort.FindStringSubmatch(text)
 					if len(h) != 2 || len(p) != 2 {
