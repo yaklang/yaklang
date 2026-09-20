@@ -78,6 +78,8 @@ func TestParse(t *testing.T) {
 				got[i].ID = ids[got[i].ID]
 				got[i].Variant = ""
 				got[i].Source = ""
+				got[i].Verification = ""
+				got[i].Diagnostics = nil
 			}
 			for i := range deps {
 				deps[i].ID = ids[deps[i].ID]
@@ -124,112 +126,112 @@ func sortLibs(libs []types.Library) {
 func Test_parsePackage(t *testing.T) {
 	tests := []struct {
 		name        string
-		lockFileVer float64
+		lockFileVer int
 		pkg         string
 		wantName    string
 		wantVersion string
 	}{
 		{
 			name:        "v5 - relative path",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "/lodash/4.17.10",
 			wantName:    "lodash",
 			wantVersion: "4.17.10",
 		},
 		{
 			name:        "v5 - registry",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "registry.npmjs.org/lodash/4.17.10",
 			wantName:    "lodash",
 			wantVersion: "4.17.10",
 		},
 		{
 			name:        "v5 - relative path with slash",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "/@babel/generator/7.21.9",
 			wantName:    "@babel/generator",
 			wantVersion: "7.21.9",
 		},
 		{
 			name:        "v5 - registry path with slash",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "registry.npmjs.org/@babel/generator/7.21.9",
 			wantName:    "@babel/generator",
 			wantVersion: "7.21.9",
 		},
 		{
 			name:        "v5 - relative path with slash and peer deps",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "/@babel/helper-compilation-targets/7.21.5_@babel+core@7.21.8",
 			wantName:    "@babel/helper-compilation-targets",
 			wantVersion: "7.21.5",
 		},
 		{
 			name:        "v5 - relative path with underline and peer deps",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "/lodash._baseclone/4.5.7_@babel+core@7.21.8",
 			wantName:    "lodash._baseclone",
 			wantVersion: "4.5.7",
 		},
 		{
 			name:        "v5 - registry with slash and peer deps",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "registry.npmjs.org/@babel/helper-compilation-targets/7.21.5_@babel+core@7.21.8",
 			wantName:    "@babel/helper-compilation-targets",
 			wantVersion: "7.21.5",
 		},
 		{
 			name:        "v5 - relative path with wrong version",
-			lockFileVer: 5.0,
+			lockFileVer: 5,
 			pkg:         "/lodash/4-wrong",
 			wantName:    "",
 			wantVersion: "",
 		},
 		{
 			name:        "v6 - relative path",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "/update-browserslist-db@1.0.11",
 			wantName:    "update-browserslist-db",
 			wantVersion: "1.0.11",
 		},
 		{
 			name:        "v6 - registry",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "registry.npmjs.org/lodash@4.17.10",
 			wantName:    "lodash",
 			wantVersion: "4.17.10",
 		},
 		{
 			name:        "v6 - relative path with slash",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "/@babel/helper-annotate-as-pure@7.18.6",
 			wantName:    "@babel/helper-annotate-as-pure",
 			wantVersion: "7.18.6",
 		},
 		{
 			name:        "v6 - registry with slash",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "registry.npmjs.org/@babel/helper-annotate-as-pure@7.18.6",
 			wantName:    "@babel/helper-annotate-as-pure",
 			wantVersion: "7.18.6",
 		},
 		{
 			name:        "v6 - relative path with slash and peer deps",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "/@babel/helper-compilation-targets@7.21.5(@babel/core@7.20.7)",
 			wantName:    "@babel/helper-compilation-targets",
 			wantVersion: "7.21.5",
 		},
 		{
 			name:        "v6 - registry with slash and peer deps",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "registry.npmjs.org/@babel/helper-compilation-targets@7.21.5(@babel/core@7.20.7)",
 			wantName:    "@babel/helper-compilation-targets",
 			wantVersion: "7.21.5",
 		},
 		{
 			name:        "v6 - relative path with wrong version",
-			lockFileVer: 6.0,
+			lockFileVer: 6,
 			pkg:         "/lodash@4-wrong",
 			wantName:    "",
 			wantVersion: "",

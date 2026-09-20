@@ -4,7 +4,7 @@
   "entries": [
     {
       "local_file": "common/sca/analyzer/analyzer.go",
-      "sha256": "4dc573a2b1a84c26566ad27ed7f4818bf89fd175fb2b37f6d9022dcfd55433d0",
+      "sha256": "ef93d20afc1c14e7787084ee12030b1c373e4682d04d8bf049e47a3bdcf548bf",
       "symbols": [
         {
           "name": "TypAnalyzer",
@@ -454,7 +454,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/java/pom/parse.go",
-      "sha256": "149a51bbdb80bb8b65600388bb7cd5a543941431702f65c402351367eb4328a0",
+      "sha256": "63d497e13bc85a5ed01b0599c733b38c8b2c6c8b80201b073223a177a52125af",
       "symbols": [
         {
           "name": "parser",
@@ -750,7 +750,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/npm/parse.go",
-      "sha256": "99c7324d152e97bc3272e0222b14803454a5e66b491eb0f78c0af198f5375535",
+      "sha256": "9656375cbe89df1075c729abb9db7610be205a5116162fd038063550978a624d",
       "symbols": [
         {
           "name": "LockFile",
@@ -824,7 +824,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/pnpm/parse.go",
-      "sha256": "b455c2b6ae1d5ca02139db1c69fd25b9fa3b2be5375de4a18511b54bbf0dc121",
+      "sha256": "28325876fad88d417e3be06332480ca394dc5cab37107f082f541203f24eb230",
       "symbols": [
         {
           "name": "PackageResolution",
@@ -1289,7 +1289,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/rust/cargo/parse.go",
-      "sha256": "efa1e6ccf2d83672594f18ffbcdb873dbfdd653093b24c37e6721f2df037cd0b",
+      "sha256": "b053e50438d2028b2696fa120917472bbfc07718d131b33fd83d614710c01809",
       "symbols": [
         {
           "name": "cargoPkg",
@@ -3946,7 +3946,7 @@
     },
     {
       "local_file": "common/sca/dxtypes/cyclonedx_sbom.go",
-      "sha256": "af34e580597f106c1f3ee8d61f5e36fa2c4da4cb5731fc7e52ee4127488c6253",
+      "sha256": "33239eb625b752f94184673545ca1ea10b2a7bdcd558e9fba44a352c87509fca",
       "symbols": [
         {
           "name": "BOM",
@@ -4554,7 +4554,7 @@
     },
     {
       "local_file": "common/sca/pipeline.go",
-      "sha256": "f17d4b956b25dd266d9764d83d90f7c785796e4e091830ee37167e3c1443e83b",
+      "sha256": "00e062b72f6fb616840066e1faa247b732bb0f9b175e30282f1f6dcfde49800c",
       "symbols": [
         {
           "name": "material",
@@ -4655,7 +4655,7 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "237afc6c064c61106aa4c5ec117612d6bfa75466d1d6152c1788df2492050519",
+      "sha256": "e0d1d85e7d37e2d56f25eb9f8ac976d1b171050f51d42a33c83dc28f6c1d4a38",
       "symbols": [
         {
           "name": "fillReport",
@@ -4713,6 +4713,36 @@
         "analyzerdata_test.go",
         "format_fuzz_test.go",
         "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/scanerr/error.go",
+      "sha256": "a787f4ef479d103798966ab83ca562b618a73a729609323dda3e5d0cddd28c10",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "review_5149_regression_test.go",
+        "review_5149_extra_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/internal/digest/digest.go",
+      "sha256": "6443f3aa0f5442c0ecb8ed7c508c39e4c943065cca81bdf0b5e17ecc6cc0d84a",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "review_5149_regression_test.go",
+        "review_5149_extra_test.go"
       ]
     }
   ],

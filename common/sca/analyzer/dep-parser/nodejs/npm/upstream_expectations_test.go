@@ -62,6 +62,21 @@ var (
 		{ID: "type-is@1.6.18", DependsOn: []string{"media-typer@0.3.0", "mime-types@2.1.35"}},
 	}
 
+	npmV2Deps = []types.Dependency{
+		{ID: "node_v1@1.0.0", DependsOn: []string{"@babel/helper-string-parser@7.19.4", "body-parser@1.18.3", "debug@2.5.2", "finalhandler@1.1.1", "ms@1.0.0", "promise@8.3.0"}},
+		{ID: "body-parser@1.18.3", DependsOn: []string{"bytes@3.0.0", "content-type@1.0.5", "debug@2.6.9", "depd@1.1.2", "http-errors@1.6.3", "iconv-lite@0.4.23", "on-finished@2.3.0", "qs@6.5.2", "raw-body@2.3.3", "type-is@1.6.18"}},
+		{ID: "debug@2.5.2", DependsOn: []string{"ms@0.7.2"}},
+		{ID: "debug@2.6.9", DependsOn: []string{"ms@2.0.0"}},
+		{ID: "finalhandler@1.1.1", DependsOn: []string{"debug@2.6.9", "encodeurl@1.0.2", "escape-html@1.0.3", "on-finished@2.3.0", "parseurl@1.3.3", "statuses@1.4.0", "unpipe@1.0.0"}},
+		{ID: "http-errors@1.6.3", DependsOn: []string{"depd@1.1.2", "inherits@2.0.3", "setprototypeof@1.1.0", "statuses@1.4.0"}},
+		{ID: "iconv-lite@0.4.23", DependsOn: []string{"safer-buffer@2.1.2"}},
+		{ID: "mime-types@2.1.35", DependsOn: []string{"mime-db@1.52.0"}},
+		{ID: "on-finished@2.3.0", DependsOn: []string{"ee-first@1.1.1"}},
+		{ID: "promise@8.3.0", DependsOn: []string{"asap@2.0.6"}},
+		{ID: "raw-body@2.3.3", DependsOn: []string{"bytes@3.0.0", "http-errors@1.6.3", "iconv-lite@0.4.23", "unpipe@1.0.0"}},
+		{ID: "type-is@1.6.18", DependsOn: []string{"media-typer@0.3.0", "mime-types@2.1.35"}},
+	}
+
 	// ... and
 	// npm i --lockfile-version 2
 	// same as npmV1Libs but change `Indirect` field to false for `body-parser@1.18.3`, `finalhandler@1.1.1`, `@babel/helper-string-parser@7.19.4`, `promise@8.3.0` and `ms@1.0.0`  libraries.
@@ -70,6 +85,7 @@ var (
 	// npm i --lockfile-version 3
 	// same as npmV2Libs.
 	npmV2Libs = []types.Library{
+		{ID: "node_v1@1.0.0", Name: "node_v1", Version: "1.0.0", Dev: false, Indirect: false, ExternalReferences: []types.ExternalRef{{Type: types.RefOther, URL: ""}}, Locations: []types.Location{{StartLine: 7, EndLine: 23}}},
 		{ID: "@babel/helper-string-parser@7.19.4", Name: "@babel/helper-string-parser", Version: "7.19.4", Dev: false, Indirect: false, ExternalReferences: []types.ExternalRef{{Type: types.RefOther, URL: "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.19.4.tgz"}}, Locations: []types.Location{{StartLine: 24, EndLine: 31}}},
 		{ID: "asap@2.0.6", Name: "asap", Version: "2.0.6", Dev: false, Indirect: true, ExternalReferences: []types.ExternalRef{{Type: types.RefOther, URL: "https://registry.npmjs.org/asap/-/asap-2.0.6.tgz"}}, Locations: []types.Location{{StartLine: 32, EndLine: 37}}},
 		{ID: "body-parser@1.18.3", Name: "body-parser", Version: "1.18.3", Dev: false, Indirect: false, ExternalReferences: []types.ExternalRef{{Type: types.RefOther, URL: "https://registry.npmjs.org/body-parser/-/body-parser-1.18.3.tgz"}}, Locations: []types.Location{{StartLine: 38, EndLine: 57}}},

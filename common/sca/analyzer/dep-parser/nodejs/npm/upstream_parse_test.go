@@ -31,13 +31,13 @@ func TestParse(t *testing.T) {
 			name:     "lock version v2",
 			file:     "testdata/package-lock_v2.json",
 			want:     npmV2Libs,
-			wantDeps: npmDeps,
+			wantDeps: npmV2Deps,
 		},
 		{
 			name:     "lock version v3",
 			file:     "testdata/package-lock_v3.json",
 			want:     npmV2Libs,
-			wantDeps: npmDeps,
+			wantDeps: npmV2Deps,
 		},
 	}
 
@@ -60,6 +60,9 @@ func TestParse(t *testing.T) {
 				v.ID = ids[v.ID]
 				v.ExternalReferences = []types.ExternalRef{{Type: types.RefOther, URL: v.Source}}
 				v.Source = ""
+				v.Verification = ""
+				v.Diagnostics = nil
+				v.Evidence = ""
 			}
 			for i := range deps {
 				d := &deps[i]

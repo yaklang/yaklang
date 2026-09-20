@@ -65,7 +65,7 @@ def main():
         module = pkg.get("Module", {})
         if module.get("Path") != "github.com/yaklang/yaklang":
             external.setdefault(module.get("Path", "UNKNOWN:" + path), []).append(path)
-        elif not (path == OWN or path.startswith(OWN + "/") or path == LEAF):
+        elif not (path == OWN or path.startswith(OWN + "/") or path == OWN + "_test" or path == LEAF):
             forbidden.append(path)
         if pkg.get("CgoFiles"):
             cgo.append(path)

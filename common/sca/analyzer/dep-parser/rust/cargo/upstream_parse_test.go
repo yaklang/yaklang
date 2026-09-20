@@ -137,6 +137,8 @@ func TestParse(t *testing.T) {
 				ids[r.ID] = r.Name + "@" + r.Version
 				r.ID = ids[r.ID]
 				r.Source = ""
+				r.Verification = ""
+				r.Diagnostics = nil
 			}
 			for i := range gotDeps {
 				gotDeps[i].ID = ids[gotDeps[i].ID]

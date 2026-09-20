@@ -4,7 +4,7 @@ SCA 从调用方提供的只读文件系统快照提取组件、出现位置、�
 
 `ScanReport(ctx, fs.FS, opts...)` 返回结构化报告；`ScanFilesystem` 保留旧包列表接口。20 类分析器及固定语法边界见 [function-contracts.json](function-contracts.json)。Docker、镜像、Git 获取入口已移除，调用方须先提供快照；POM 只访问快照中的父级、模块和显式仓库材料，JAR 不查询远端坐标。
 
-组件按生态、名称、版本、来源等完整身份归并；文件路径及原生实例分别保留。范围、markers、extras、校验和与未解析引用作为证据保留，不推断为确定版本或已安装组件。`go.sum` 只提供精确模块校验和，不生成组件清单。缺失材料、语法错误、超限和取消返回诊断及不完整状态，调用方可以使用已确认的部分结果。SBOM 使用自有 CycloneDX 1.5 DTO，替代第三方 SDK 类型。
+组件按生态、名称、版本、来源等完整身份归并；文件路径及原生实例分别保留。范围、markers、extras、校验和与未解析引用作为证据保留，不推断为确定版本或已安装组件。`go.sum` 只提供精确模块校验和，不生成组件清单。npm 锁文件根记录的原始约束会进入关系；材料声明的 SRI/checksum 进入 `Verification` 和 SBOM hashes，冲突摘要不会无声合并。超限截取在稳定身份顺序下进行。POM 未知版本保留声明边；BOM import 按图访问展开，环、深度和步数超限返回结构化诊断。pnpm 只接受冻结的 v5/v6 标识，Cargo.lock 只接受缺省或 v1/v2/v3。缺失材料、语法错误、超限和取消返回诊断及不完整状态；`Diagnostic.Code` 在发现、读取、解析和输出阶段使用同一组可 `errors.Is/As` 识别的分类。调用方可以使用已确认的部分结果。SBOM 使用自有 CycloneDX 1.5 DTO，替代第三方 SDK 类型。
 
 格式限制包括 pnpm v5/v6、只读 Cargo/Poetry TOML、静态 gemspec 和 pip 声明；不执行脚本或安装器，不支持任意 YAML 对象、TOML 1.1、pip includes 或 SQLite WAL 恢复。POM 父级坐标必须匹配，不读取宿主缓存和环境补全未知属性。具体正例、负例和兼容断言随各解析器测试保留。
 
