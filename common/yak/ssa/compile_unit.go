@@ -43,6 +43,13 @@ type UnitPartitioner interface {
 	CompileUnitDependencies(fs filesys_interface.FileSystem, units []*CompileUnit) []UnitRef
 }
 
+// ConcurrentUnitBuilder opts a frontend into parallel library body builds.
+// The frontend must provide dependency edges and keep execution builders local
+// to a unit. Declaration registration and shared deferred helpers remain serial.
+type ConcurrentUnitBuilder interface {
+	SupportsConcurrentUnitBuild() bool
+}
+
 // --- shared compile-unit path helpers (used by language builders) ---
 
 // ReadUnitSource reads a file's content via fs, returning "" on error.
