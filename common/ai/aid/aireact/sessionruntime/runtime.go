@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	reActSessionAttachTimeout = time.Minute
-	reActSessionStopTimeout   = 10 * time.Second
+	reActSessionAttachTimeout     = time.Minute
+	reActSessionStopTimeout       = 10 * time.Second
+	reActGeneratedSessionIDPrefix = "ai-session-"
 )
 
 // ReActSessionRuntime is the process-local, transport-independent entry point
@@ -199,8 +201,24 @@ func New(projectDB func() *gorm.DB) ReActSessionRuntime {
 func normalizeReActSessionID(sessionID string) string {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return "default"
+		return ""
 	}
+	return sessionID
+}
+
+func newReActSessionID() string {
+	return reActGeneratedSessionIDPrefix + uuid.NewString()
+}
+
+func resolveReActSessionID(startParams *ypb.AIStartParams) string {
+	if startParams == nil {
+		return newReActSessionID()
+	}
+	if sessionID := normalizeReActSessionID(startParams.GetTimelineSessionID()); sessionID != "" {
+		return sessionID
+	}
+	sessionID := newReActSessionID()
+	startParams.TimelineSessionID = sessionID
 	return sessionID
 }
 
@@ -284,6 +302,9 @@ func (r *reActSessionRuntime) ReserveSession(ctx context.Context, sessionID, own
 		ctx = context.Background()
 	}
 	sessionID = normalizeReActSessionID(sessionID)
+	if sessionID == "" {
+		sessionID = newReActSessionID()
+	}
 	ownerID = strings.TrimSpace(ownerID)
 	if ownerID == "" {
 		return nil, utils.Error("session reservation owner id is required")
@@ -374,6 +395,16 @@ func (r *reActSessionRuntime) connectWithOptions(
 		startParams = &ypb.AIStartParams{}
 	}
 	sessionID := normalizeReActSessionID(startParams.GetTimelineSessionID())
+	if sessionID == "" && req.Reservation != nil {
+		if raw := req.Reservation.runtimeReservation(); raw != nil {
+			sessionID = normalizeReActSessionID(raw.SessionID())
+			startParams.TimelineSessionID = sessionID
+		}
+	}
+	if sessionID == "" && startParams.GetAttach() {
+		return nil, utils.Error("AI ReAct attach requires an explicit timeline session id")
+	}
+	sessionID = resolveReActSessionID(startParams)
 	var onEventError func(error)
 	if req.Options != nil {
 		onEventError = req.Options.OnEventError
