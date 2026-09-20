@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -150,8 +151,10 @@ type StageOutcome struct {
 	// RuleCount / RiskCount come from the stage's own process and result
 	// callbacks, so a reader gets one authoritative per-stage summary.
 	// Zero is still a real count for a detection stage that ran.
-	RuleCount int64 `json:"rule_count"`
-	RiskCount int64 `json:"risk_count"`
+	RuleCount          int64                   `json:"rule_count"`
+	RiskCount          int64                   `json:"risk_count"`
+	CompileDiagnostics *ssa.CompileDiagnostics `json:"compile_diagnostics,omitempty"`
+	FailedRules        int64                   `json:"failed_rules,omitempty"`
 }
 
 func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded }
@@ -167,18 +170,20 @@ func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded
 type stageOutcomeRecorder struct {
 	mu sync.Mutex
 
-	outcomes         []StageOutcome
-	started          map[ProductStage]time.Time
-	metrics          map[ProductStage]stageMetrics
-	ruleNames        map[ProductStage]map[string]struct{}
-	scale            compileScale
-	sourceStatistics any
+	outcomes           []StageOutcome
+	started            map[ProductStage]time.Time
+	metrics            map[ProductStage]stageMetrics
+	ruleNames          map[ProductStage]map[string]struct{}
+	scale              compileScale
+	sourceStatistics   any
+	compileDiagnostics map[ProductStage]ssa.CompileDiagnostics
 }
 
 // stageMetrics accumulates what one stage actually did while it ran.
 type stageMetrics struct {
-	ruleCount int64
-	riskCount int64
+	ruleCount   int64
+	riskCount   int64
+	failedRules int64
 }
 
 // compileScale is the filesystem size signal emitted after clone/extract.
@@ -220,6 +225,9 @@ func (r *stageOutcomeRecorder) observe(stage ProductStage, info *RuleProcessInfo
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	metrics := r.metrics[stage]
+	if info.FailedQuery > metrics.failedRules {
+		metrics.failedRules = info.FailedQuery
+	}
 	if info.TotalQuery > metrics.ruleCount {
 		metrics.ruleCount = info.TotalQuery
 	} else if info.FinishedQuery > metrics.ruleCount {
@@ -369,6 +377,10 @@ func (r *stageOutcomeRecorder) record(stage ProductStage, err error) {
 	if metrics, ok := r.metrics[stage]; ok {
 		outcome.RuleCount = metrics.ruleCount
 		outcome.RiskCount = metrics.riskCount
+		outcome.FailedRules = metrics.failedRules
+	}
+	if diagnostic, ok := r.compileDiagnostics[stage]; ok && diagnostic.Incomplete() {
+		outcome.CompileDiagnostics = &diagnostic
 	}
 	r.outcomes = append(r.outcomes, outcome)
 }

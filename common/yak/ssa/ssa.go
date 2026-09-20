@@ -236,6 +236,8 @@ type ReExportInfo struct {
 
 // both instruction and value
 type Program struct {
+	compileDiagnosticsMu sync.Mutex
+	compileDiagnostics   CompileDiagnostics
 	// project
 	ProjectID uint64
 	// package list

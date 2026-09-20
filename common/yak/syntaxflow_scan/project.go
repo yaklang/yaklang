@@ -260,6 +260,20 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 			}
 		}
 		captureProgramEvidence(recorder, prog)
+		if prog != nil {
+			diagnostic := prog.Program.CompileDiagnostics()
+			if diagnostic.Incomplete() {
+				recorder.mu.Lock()
+				if recorder.compileDiagnostics == nil {
+					recorder.compileDiagnostics = make(map[ProductStage]ssa.CompileDiagnostics)
+				}
+				recorder.compileDiagnostics[compileStage] = diagnostic
+				if wantAnalyze {
+					recorder.compileDiagnostics[StageAnalyze] = diagnostic
+				}
+				recorder.mu.Unlock()
+			}
+		}
 		if wantReview && err == nil {
 			emitStructResults(cfg, prog)
 			recorder.observeStruct(prog)
@@ -362,6 +376,11 @@ func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName 
 	}
 	result.SkippedStages = skippedRequestedStages(resolveProductModes(cfg), result.Stages)
 	result.IncompleteStages = len(result.SkippedStages) > 0
+	for _, stage := range result.Stages {
+		if stage.Status == StageStatusPartial || stage.Status == StageStatusFailed {
+			result.IncompleteStages = true
+		}
+	}
 	if err != nil {
 		result.Error = err.Error()
 	}
