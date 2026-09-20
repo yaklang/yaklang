@@ -192,6 +192,13 @@ func (prog *Program) LazyBuildForUnits(unitKeys []string) {
 	}
 }
 
+// LazyBuildCurrentProgram drains only this program's declarations. A scheduler
+// that already owns the dependency graph must not implicitly build all upstream
+// libraries when it schedules an application-owned unit.
+func (p *Program) LazyBuildCurrentProgram() {
+	drainProgramLazy(p)
+}
+
 func drainProgramLazy(p *Program) {
 	if p == nil {
 		return

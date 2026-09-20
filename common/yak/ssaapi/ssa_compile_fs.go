@@ -587,18 +587,22 @@ func (c *Config) parseProjectWithFSUnits(
 		// belong to these units. PreHandler already built the skeleton;
 		// without this drain, bodies wait for Application.Finish and the
 		// unit cannot scan or recycle AST/IR on its own.
-		waves := compileUnitBuildWaves(plan, batch)
-		buildConcurrency := 1
-		if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok && language.SupportsConcurrentUnitBuild() {
-			buildConcurrency = c.GetCompileConcurrency()
-		}
-		for waveIndex, wave := range waves {
-			waveStart := time.Now()
-			peak, err := buildCompileUnitWave(c.GetContext(), prog, wave, buildConcurrency)
-			log.Infof("compile unit wave batch=%d wave=%d/%d groups=%d concurrency=%d peak_active=%d cost=%v",
-				batchIndex+1, waveIndex+1, len(waves), len(wave), buildConcurrency, peak, time.Since(waveStart))
-			if err != nil {
-				return nil, err
+		language, concurrentUnits := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder)
+		if !concurrentUnits || !language.SupportsConcurrentUnitBuild() {
+			// Directory-based frontends may share one application scope. Keep
+			// their existing single drain, including upstream library discovery.
+			prog.LazyBuildForUnits(unitKeys)
+		} else {
+			waves := compileUnitBuildWaves(plan, batch)
+			builtOwners := make(map[*ssa.Program]bool)
+			for waveIndex, wave := range waves {
+				waveStart := time.Now()
+				peak, err := buildCompileUnitWaveWithOwners(c.GetContext(), prog, wave, c.GetCompileConcurrency(), builtOwners)
+				log.Infof("compile unit wave batch=%d wave=%d/%d groups=%d concurrency=%d peak_active=%d cost=%v",
+					batchIndex+1, waveIndex+1, len(waves), len(wave), c.GetCompileConcurrency(), peak, time.Since(waveStart))
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		if c.isStop() {
