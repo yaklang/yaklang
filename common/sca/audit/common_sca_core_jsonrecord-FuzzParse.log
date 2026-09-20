@@ -1,8 +1,0 @@
-fuzz: elapsed: 0s, gathering baseline coverage: 0/1 completed
-fuzz: elapsed: 0s, gathering baseline coverage: 1/1 completed, now fuzzing with 2 workers
-fuzz: elapsed: 3s, execs: 166036 (55334/sec), new interesting: 72 (total: 73)
-fuzz: elapsed: 6s, execs: 307982 (47314/sec), new interesting: 82 (total: 83)
-fuzz: elapsed: 9s, execs: 307982 (0/sec), new interesting: 82 (total: 83)
-fuzz: elapsed: 11s, execs: 307982 (0/sec), new interesting: 82 (total: 83)
-PASS
-ok  	github.com/yaklang/yaklang/common/sca/core/jsonrecord	11.413s

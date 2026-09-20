@@ -17,7 +17,7 @@ func newPackage(name, version, prefix string) *dxtypes.Package {
 }
 
 // These are the original seven graph inputs from d33a21b6. Expectations now
-// preserve every distinct version and every OR declaration (BEHAVIOR_DIFF B03).
+// preserve every distinct version and every OR declaration.
 func TestMergePackagesNormal(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)

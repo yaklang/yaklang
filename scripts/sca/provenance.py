@@ -41,11 +41,11 @@ for p in sorted(sca.rglob('*')):
  h=sha(p); rel=str(p.relative_to(sca));matches=source_hashes.get(h,[])
  source={'matched_pinned_files':matches} if matches else {'baseline_or_generated':baseline}
  if rel.startswith('core/rpm/testdata/'):
-  source={'pinned_source':'go-rpmdb@a8af76a6220fc762827743740291ab88943183be','transformation':'gzip -n database snapshot' if p.suffix=='.gz' else 'isolated old-reader full output; rpm-qa.json preserves independent upstream command expectations','evidence_log':'rpm-migration.log'}
- manifest.append(dict(path=rel,sha256=h,bytes=p.stat().st_size,source=source,expectation='Pinned upstream oracle plus independent contract assertions; see test-migration-map.json and BEHAVIOR_DIFF.md'))
+  source={'pinned_source':'go-rpmdb@a8af76a6220fc762827743740291ab88943183be','transformation':'gzip -n database snapshot' if p.suffix=='.gz' else 'isolated old-reader full output; rpm-qa.json preserves independent upstream command expectations'}
+ manifest.append(dict(path=rel,sha256=h,bytes=p.stat().st_size,source=source,expectation='Pinned upstream oracle plus independent contract assertions; see test-migration-map.json and README.md'))
 write('testdata/manifest.json',dict(schema_version=1,fixtures=manifest))
 # Current production symbols and file-level provenance. Symbols remain tied to exact hashes.
-inv=json.loads((sca/'audit/source-ast.json').read_text());entries=[]
+inv=json.loads(subprocess.check_output(['go','run','scripts/sca/source_audit.go'],text=True,encoding='utf-8'));entries=[]
 lock=json.loads((sca/'upstream-sources.lock.json').read_text())
 for f in inv['files']:
  if f['test'] or '/internal/testcheck/' in f['path']:continue
@@ -53,7 +53,7 @@ for f in inv['files']:
  if rel.startswith('analyzer/dep-parser/'):
   u=ref/'go-dep-parser'/'pkg'/rel.removeprefix('analyzer/dep-parser/');up=[u] if u.exists() else []
   if not up and '/java/gradle/' in rel:u=ref/'go-dep-parser/pkg/gradle/lockfile'/Path(rel).name;up=[u] if u.exists() else []
-  strategy='TRIM_AND_REWRITE';reason='Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.'
+  strategy='TRIM_AND_REWRITE';reason='Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.'
  elif rel=='analyzer/parser_java_jar.go':
   up=[ref/'go-dep-parser/pkg/java/jar/parse.go'];strategy='EXTRACT_AND_REWRITE';reason='Remove Sonatype client, filename inference, temporary files and optional offline mode. Bounded ZIP and explicit metadata only.'
  elif rel.startswith('core/gomod/'):
@@ -85,11 +85,11 @@ for p in sorted((ref/'go-dep-parser/pkg').rglob('*.go')):
  for line,name in labels:
   status='ADAPTED';reason='Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested.'
   if r.startswith('golang/sum/'):
-   status='SEMANTIC_REPLACEMENT';reason='go.sum is checksum evidence, never an inventory; core/gomod ParseSum validates exact path/version/mod key. See BEHAVIOR_DIFF.md.'
+   status='SEMANTIC_REPLACEMENT';reason='go.sum is checksum evidence, never an inventory; core/gomod ParseSum validates exact path/version/mod key. See README.md.'
   if r.startswith('java/jar/'):
    localtests=['analyzer/upstream_jar_test.go'];reason='Static jar material migrated; remote SHA1/artifact lookup removed, inferred Manifest fields independently checked.'
   if r.startswith('java/pom/'):
-   reason='HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md.'
+   reason='HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests.'
   candidates.append(dict(source='go-dep-parser/'+r,source_sha256=sha(p),line=line,case=name,disposition=status,local_tests=localtests,reason=reason))
 # Grammar fixture candidates are individually enumerable and executable.
 for f in manifest:
@@ -132,6 +132,6 @@ for name in subprocess.check_output(['git','ls-tree','-r','--name-only',baseline
   m=re.match(r'func (Test\w+)\(',line)
   if not m:continue
   symbol=m.group(1);removed=any(x in symbol.lower() for x in ['docker','image','container','gitrepo'])
-  candidates.append(dict(source='yak@'+baseline+':'+name,source_sha256=hashlib.sha256(raw).hexdigest(),line=lineno,case=symbol,disposition='REMOVED_SCOPE' if removed else 'ADAPTED',local_tests=['removed_scope_test.go'] if removed else ([str(local.relative_to(sca))] if local.exists() else ['scan_contract_test.go','model/report_test.go']),reason='Explicit acquisition removal' if removed else 'Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object.'))
+  candidates.append(dict(source='yak@'+baseline+':'+name,source_sha256=hashlib.sha256(raw).hexdigest(),line=lineno,case=symbol,disposition='REMOVED_SCOPE' if removed else 'ADAPTED',local_tests=['removed_scope_test.go'] if removed else ([str(local.relative_to(sca))] if local.exists() else ['scan_contract_test.go','model/report_test.go']),reason='Explicit acquisition removal' if removed else 'Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object.'))
 write('test-migration-map.json',dict(schema_version=1,baseline=baseline,candidates=candidates,coverage_claim='Candidate disposition inventory; execution and independent assertions are separate gates. Do not infer test coverage from the number of rows.',original_yak_archive={'sha256':sha(evidence/'baseline.tar'),'git_commit':baseline},excluded_producer_tools='Docker/package managers/rpm CLI only generated pinned materials upstream, never test/runtime dependencies'))
 print('contracts',len(contracts),'source files',len(entries),'fixtures',len(manifest),'test candidates',len(candidates))

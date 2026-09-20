@@ -1,8 +1,0 @@
-fuzz: elapsed: 0s, gathering baseline coverage: 0/5 completed
-fuzz: elapsed: 0s, gathering baseline coverage: 5/5 completed, now fuzzing with 2 workers
-fuzz: elapsed: 3s, execs: 54163 (18052/sec), new interesting: 58 (total: 63)
-fuzz: elapsed: 6s, execs: 188175 (44661/sec), new interesting: 65 (total: 70)
-fuzz: elapsed: 9s, execs: 188175 (0/sec), new interesting: 65 (total: 70)
-fuzz: elapsed: 11s, execs: 188175 (0/sec), new interesting: 65 (total: 70)
-PASS
-ok  	github.com/yaklang/yaklang/common/sca/core/xmlrecord	11.344s

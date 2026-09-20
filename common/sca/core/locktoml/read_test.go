@@ -18,6 +18,7 @@ func TestUpstreamSyntaxCorpus(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		path = filepath.ToSlash(path)
 		if d.IsDir() || !strings.HasSuffix(path, ".toml") || strings.Contains(path, "/valid-next/") || strings.Contains(path, "/invalid-next/") {
 			return nil
 		}

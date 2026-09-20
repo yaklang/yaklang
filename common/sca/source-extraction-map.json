@@ -252,7 +252,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "b6b11b0274b225aba15205c0edcc5750116e8091515fd77481c3d0e2c01c4068",
       "upstream": [
         {
@@ -288,7 +288,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "16c03174001d728a01122afcd0a2918849e353d39c139506635674be13959228",
       "upstream": [
         {
@@ -320,7 +320,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "aa529e11898f436d0deaf045ba198b5d818c335e478b9658c8b50e831a06f5bb",
       "upstream": [
         {
@@ -396,7 +396,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "3eacf59c2e3bac53652185b10ff4b368f78c9c4fca4b828e93d5554f8eb5296d",
       "upstream": [
         {
@@ -437,7 +437,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "4c983b64fe8ec11cfcd2bc06b45b9b03d8aadb4ce67d91faf033e2329512372c",
       "upstream": [
         {
@@ -550,7 +550,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "ce3ef16e5d045ae48c37865a8bf1b92a27c620c78744a87fe3dd516252253551",
       "upstream": [
         {
@@ -663,7 +663,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "6da1818728e2ebdb878d33466ca432774f6de7480e6da7691ac68098034c2675",
       "upstream": [
         {
@@ -704,7 +704,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "a0a26f42740a14852346c93a76f1fec2b1aaa77b07f0f369ecb00c180ce1256c",
       "upstream": [
         {
@@ -733,7 +733,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "3d07780d19b491d45d25f3a11282483f1300b57c5ee02eb40253b5a2e3dfaa3c",
       "upstream": [
         {
@@ -806,7 +806,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "f2d09c4e7168dbc83b15c3c8d736e59e440c5567c603954ebebcace112c94770",
       "upstream": [
         {
@@ -876,7 +876,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "a8fc0c5c2bc4149a26a75eda84ab5fa3b267057963360f2eac36694481fe7739",
       "upstream": [
         {
@@ -981,7 +981,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "f57096b6b320c3988cd22eb803766a24a7b34420f86782eab294e0a56e5aa309",
       "upstream": [
         {
@@ -1022,7 +1022,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "63de0f9c1e7418fbf12f67a02cfe523973191098d51ac8382adc441f7e8ccc25",
       "upstream": [
         {
@@ -1054,7 +1054,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "cac2843e0fb498e545827fd847e9aba31bb079ed49722e97c8d1eaf689cabf00",
       "upstream": [
         {
@@ -1094,7 +1094,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "360ef55246fced816e2e0fc731652599f98568e63654515d103338d66bd3ae49",
       "upstream": [
         {
@@ -1135,7 +1135,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "4d5033411edcff1202f009a2f71f17bae47bb603d2d27089f6f7e8fb1c109308",
       "upstream": [
         {
@@ -1188,7 +1188,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "8e996d18cb5ab8e2355e49bbd2c0ebac3fdba4b993dc9984110c5093f0563a28",
       "upstream": [
         {
@@ -1225,7 +1225,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "9aa862154322dbb61d5c7c55ff6860627c67c74812ac8639656551769e48cba2",
       "upstream": [
         {
@@ -1273,7 +1273,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "4cd0ad2aa991f6ba8c94cd4aca8a00b21036bb4154f6e408edc31a0c8c351990",
       "upstream": [
         {
@@ -1325,7 +1325,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "122f92d3f9d31462ae31bf7b851b98532884a2354f2a217b816f944b338d0b22",
       "upstream": [
         {
@@ -1433,7 +1433,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "85c59d693fc08cba234ad7a748ce97e5160f8b1e3b01d305a43c21906ecd29d0",
       "upstream": [
         {
@@ -1467,7 +1467,7 @@
         }
       ],
       "decision": "TRIM_AND_REWRITE",
-      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in README.md.",
       "yak_baseline_sha256": "74be1968e80a6d8d24dabbd0943a262a8416ef879b86e308291c67bed048a575",
       "upstream": [
         {

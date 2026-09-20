@@ -1,7 +1,7 @@
 // Test materials derived from aquasecurity/go-dep-parser fb7eb3159bd5b83c24e5dbf29e15b4b7ca4618e9.
 // Copyright (c) 2019 Teppei Fukuda. MIT license: testdata/LICENSE.
 // Interface adapted to declarations: local replacements and Go 1.16 indirect
-// declarations are retained (they are not installed components). See BEHAVIOR_DIFF.md.
+// declarations are retained (they are not installed components).
 package gomod
 
 import (

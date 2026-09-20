@@ -1525,7 +1525,7 @@ var GoModWantPkgs = []*dxtypes.Package{
 }
 
 // BUGFIX: go.sum records checksums, not the build list. The previous TOML
-// expectation is retained in the isolated baseline archive; see BEHAVIOR_DIFF.md.
+// expectation is retained in the isolated baseline archive.
 var GoModLess117Pkgs = []*dxtypes.Package{
 	{Name: "github.com/aquasecurity/go-dep-parser", Version: "0.0.0-20230219131432-590b1dfb6edd", Verification: "h1:H9IR14rR3+Z13ZH7ay9bs2hHBL7WAqdEJLLr8nhx/Rs="},
 }

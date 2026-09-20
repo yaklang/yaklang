@@ -545,7 +545,7 @@ func TestPom_Parse(t *testing.T) {
 
 			// All former local/HTTP test-server materials are now explicit
 			// filesystem inputs. No host environment or HTTP listener is used.
-			p := pom.NewParser(strings.TrimPrefix(tt.inputFile, "testdata/"))
+			p := pom.NewParser(strings.TrimPrefix(filepath.ToSlash(tt.inputFile), "testdata/"))
 			got, _, err := p.Parse(fsio.New(os.DirFS("testdata")), f)
 
 			if tt.wantErr != "" {

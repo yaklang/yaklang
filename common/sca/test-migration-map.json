@@ -274,7 +274,7 @@
       "case": "TestParse",
       "disposition": "SEMANTIC_REPLACEMENT",
       "local_tests": [],
-      "reason": "go.sum is checksum evidence, never an inventory; core/gomod ParseSum validates exact path/version/mod key. See BEHAVIOR_DIFF.md."
+      "reason": "go.sum is checksum evidence, never an inventory; core/gomod ParseSum validates exact path/version/mod key. See README.md."
     },
     {
       "source": "go-dep-parser/gradle/lockfile/parse_test.go",
@@ -418,7 +418,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -430,7 +430,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -442,7 +442,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -454,7 +454,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -466,7 +466,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -478,7 +478,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -490,7 +490,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/artifact_test.go",
@@ -502,7 +502,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -514,7 +514,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -526,7 +526,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -538,7 +538,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -550,7 +550,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -562,7 +562,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -574,7 +574,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -586,7 +586,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -598,7 +598,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -610,7 +610,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -622,7 +622,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -634,7 +634,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -646,7 +646,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -658,7 +658,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -670,7 +670,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -682,7 +682,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -694,7 +694,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -706,7 +706,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -718,7 +718,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -730,7 +730,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -742,7 +742,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -754,7 +754,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -766,7 +766,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -778,7 +778,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -790,7 +790,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -802,7 +802,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -814,7 +814,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -826,7 +826,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -838,7 +838,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -850,7 +850,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/java/pom/parse_test.go",
@@ -862,7 +862,7 @@
         "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
         "analyzer/dep-parser/java/pom/upstream_parse_test.go"
       ],
-      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment corrections enumerated in BEHAVIOR_DIFF.md."
+      "reason": "HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests."
     },
     {
       "source": "go-dep-parser/nodejs/npm/parse_test.go",
@@ -7781,7 +7781,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer/utils_dependence_test.go",
@@ -7792,7 +7792,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer/utils_dependence_test.go",
@@ -7803,7 +7803,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer/utils_dependence_test.go",
@@ -7814,7 +7814,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer/utils_dependence_test.go",
@@ -7825,7 +7825,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer/utils_dependence_test.go",
@@ -7836,7 +7836,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer/utils_dependence_test.go",
@@ -7847,7 +7847,7 @@
       "local_tests": [
         "analyzer/utils_dependence_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7858,7 +7858,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7869,7 +7869,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7880,7 +7880,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7891,7 +7891,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7902,7 +7902,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7913,7 +7913,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7924,7 +7924,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7935,7 +7935,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7946,7 +7946,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7957,7 +7957,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7968,7 +7968,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7979,7 +7979,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -7990,7 +7990,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8001,7 +8001,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8012,7 +8012,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8023,7 +8023,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8034,7 +8034,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8045,7 +8045,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8056,7 +8056,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8067,7 +8067,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8078,7 +8078,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzer_test.go",
@@ -8089,7 +8089,7 @@
       "local_tests": [
         "analyzer_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/analyzerdata_test.go",
@@ -8100,7 +8100,7 @@
       "local_tests": [
         "analyzerdata_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/docker_test.go",
@@ -8122,7 +8122,7 @@
       "local_tests": [
         "dxtypes/pacakge_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/dxtypes/pacakge_test.go",
@@ -8133,7 +8133,7 @@
       "local_tests": [
         "dxtypes/pacakge_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/dxtypes/pacakge_test.go",
@@ -8144,7 +8144,7 @@
       "local_tests": [
         "dxtypes/pacakge_test.go"
       ],
-      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes documented in BEHAVIOR_DIFF.md. Original expectation preserved at baseline git object."
+      "reason": "Frozen inventory and independent graph-evidence contract; intentional golden changes are asserted in the mapped tests. Original expectation preserved at baseline git object."
     },
     {
       "source": "yak@d33a21b6a30945df93a663a18f3cce087b0f3718:common/sca/git_test.go",

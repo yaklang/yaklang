@@ -1,8 +1,0 @@
-{
-  "passed": true,
-  "sources": 88,
-  "fixtures": 809,
-  "test_candidates": 802,
-  "errors": [],
-  "scope": "hashes and mapping targets only; not independent semantic acceptance"
-}

@@ -1,3 +1,0 @@
-/Users/v1ll4n/.codex/sca-upstream-reference/validate_report_schema.py:3: DeprecationWarning: jsonschema.RefResolver is deprecated as of v4.18.0, in favor of the https://github.com/python-jsonschema/referencing library, which provides more compliant referencing behavior as well as more flexible APIs for customization. A future release will remove RefResolver. Please file a feature request (on referencing) if you are missing an API for the kind of customization you need.
-  from jsonschema import Draft7Validator,RefResolver
-CycloneDX 1.5 schema PASS; all references resolved from pinned local schemas

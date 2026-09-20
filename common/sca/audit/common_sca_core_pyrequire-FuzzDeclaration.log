@@ -1,8 +1,0 @@
-fuzz: elapsed: 0s, gathering baseline coverage: 0/2 completed
-fuzz: elapsed: 0s, gathering baseline coverage: 2/2 completed, now fuzzing with 2 workers
-fuzz: elapsed: 3s, execs: 148607 (49535/sec), new interesting: 163 (total: 165)
-fuzz: elapsed: 6s, execs: 519516 (123623/sec), new interesting: 194 (total: 196)
-fuzz: elapsed: 9s, execs: 754686 (78372/sec), new interesting: 236 (total: 238)
-fuzz: elapsed: 10s, execs: 841293 (79250/sec), new interesting: 248 (total: 250)
-PASS
-ok  	github.com/yaklang/yaklang/common/sca/core/pyrequire	10.687s
