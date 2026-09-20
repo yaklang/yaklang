@@ -276,8 +276,15 @@ jobs:
           echo "::group::Running security scan"
           yak sync-rule
           
-          # 运行扫描并捕获输出
-          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify-full -o risk --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
+          # code-scan's source/struct stages require a directory. gitefs emits a
+          # ZIP snapshot; materialize that same diff instead of handing the ZIP
+          # to a scanner version that treats its virtual root as a regular file.
+          SCAN_SOURCE=$(mktemp -d "${GITHUB_WORKSPACE}/.diff-scan-source.XXXXXX")
+          trap 'rm -rf "$SCAN_SOURCE"' EXIT
+          python3 -m zipfile -e ./fs.zip "$SCAN_SOURCE"
+
+          # Scan from the snapshot root so report paths remain repository-relative.
+          SCAN_OUTPUT=$(cd "$SCAN_SOURCE" && yak code-scan -t . -l golang --rule-keyword golang --format irify-full -o "${GITHUB_WORKSPACE}/risk" --memory --file-perf-log --rule-perf-log --exclude-file '**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/**' 2>&1) || SCAN_EXIT_CODE=$?
           
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
             echo "$SCAN_OUTPUT"
@@ -318,6 +325,12 @@ jobs:
             exit 1
           fi
           
+          # beta19 can append cumulative snapshots; preserve every finding and
+          # the original output instead of interpreting several counts as one.
+          cp risk.json risk.raw.json
+          python3 -m unittest discover -s scripts/ssa-risk-tools -p 'test_normalize_report.py'
+          python3 scripts/ssa-risk-tools/normalize-report.py risk.raw.json risk.json
+
           if ! NUM=$(cat risk.json | jq -r '.RiskNums // empty' 2>&1); then
             echo "::error::Failed to parse risk.json"
             echo "::error::jq error output: $NUM"
@@ -483,7 +496,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: risk.json
-          path: risk.json
+          path: |
+            risk.json
+            risk.raw.json
           if-no-files-found: ignore
 
       - name: Upload risk results
