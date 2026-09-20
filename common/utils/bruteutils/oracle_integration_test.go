@@ -176,6 +176,38 @@ func TestOracleCacheBoundsAndExpiry(t *testing.T) {
 	}
 }
 
+func TestOracleServiceOrderingWithConcurrentDiscovery(t *testing.T) {
+	ctx, cancel := context.WithCancel(withOracleServiceCache(context.Background()))
+	cache := ctx.Value(oracleCacheKey{}).(*oracleServiceCache)
+	services := []string{"sales", "hr", "inventory"}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for ctx.Err() == nil {
+			for _, service := range services {
+				key := oracleServiceKey{target: "127.0.0.1", service: service}
+				cache.remember(key, false)
+				cache.mu.Lock()
+				delete(cache.entries, key)
+				cache.mu.Unlock()
+			}
+		}
+	}()
+	defer func() { cancel(); <-done }()
+	for n := 0; n < 300; n++ {
+		counts := make(map[string]int)
+		oracleBrutePass(&BruteItem{Context: ctx, Target: "127.0.0.1", Username: "u", OracleConfig: &OracleConfig{Services: services}}, func(_ context.Context, o oracleprobe.Options) error {
+			counts[o.Service]++
+			return &oracleprobe.Error{Code: 1017}
+		})
+		for _, service := range services {
+			if counts[service] != 1 {
+				t.Fatalf("discovery/expiry omitted or duplicated a service: %v", counts)
+			}
+		}
+	}
+}
+
 func TestOracleConfigReachesStream(t *testing.T) {
 	mode := false
 	config := &OracleConfig{Services: []string{"CUSTOM"}, SID: true, SysDBA: &mode, TLS: &tls.Config{ServerName: "db.example"}, Encryption: "required", Timeout: time.Second}

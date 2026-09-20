@@ -77,14 +77,19 @@ func oracleBrutePassDetailed(i *BruteItem, probe oracleDetailedProbe) *BruteItem
 	address := appendDefaultPort(i.Target, 1521)
 	// Prioritize known services without assuming the listener has only one.
 	ordered := make([]string, 0, len(services))
-	for _, known := range []bool{true, false} {
-		for _, service := range services {
-			v, ok := cache.observation(oracleServiceKey{i.Target, service, info.SID})
-			if (ok && !v.unknown) == known {
-				ordered = append(ordered, service)
-			}
+	remaining := make([]string, 0, len(services))
+	for _, service := range services {
+		// Read each observation once: another worker can discover a service or
+		// its TTL can expire while we build this ordering. Two independent passes
+		// could otherwise omit or duplicate a candidate between those changes.
+		v, ok := cache.observation(oracleServiceKey{i.Target, service, info.SID})
+		if ok && !v.unknown {
+			ordered = append(ordered, service)
+		} else {
+			remaining = append(remaining, service)
 		}
 	}
+	ordered = append(ordered, remaining...)
 	allFinal, allUserBlocked, sawUser := true, true, false
 	retryBudget := 1
 	info.Status = oracleprobe.ServiceUnknown
