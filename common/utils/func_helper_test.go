@@ -271,6 +271,29 @@ func TestNewDebounceExtended(t *testing.T) {
 	assertDebounceBurst(t, debounce, 10)
 }
 
+func TestNewDebounceResetsDeadline(t *testing.T) {
+	const interval = 200 * time.Millisecond
+	debounce := NewDebounce(interval.Seconds())
+	called := make(chan int, 2)
+	debounce(func() { called <- 0 })
+	// A real gap is necessary here: a tight burst alone cannot distinguish
+	// resetting the deadline from only replacing the pending callback.
+	time.Sleep(50 * time.Millisecond)
+	lastCall := time.Now()
+	debounce(func() { called <- 1 })
+	select {
+	case index := <-called:
+		if index != 1 {
+			t.Fatalf("callback %d fired instead of the replacement", index)
+		}
+		if elapsed := time.Since(lastCall); elapsed < interval*9/10 {
+			t.Fatalf("replacement fired before its debounce interval: %s", elapsed)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("replacement callback did not execute")
+	}
+}
+
 func TestNewThrottleExtended(t *testing.T) {
 	var count int
 	throttle := NewThrottle(0.2)
