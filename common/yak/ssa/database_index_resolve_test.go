@@ -37,3 +37,22 @@ func TestVariableIndexResolvesEachInstructionOnce(t *testing.T) {
 		require.Len(t, result, 2)
 	}
 }
+
+func TestVariableIndexFiltersBeforeResolvingOutsideLock(t *testing.T) {
+	s := &indexStore{
+		variable: utils.NewSafeMapWithKey[string, []int64](),
+		member:   utils.NewSafeMapWithKey[string, []int64](),
+		class:    utils.NewSafeMapWithKey[string, []int64](),
+	}
+	s.variable.Set("keep", []int64{1})
+	s.variable.Set("drop", []int64{2})
+	var calls []int64
+	got := s.FindByVariableEx(ssadb.NameMatch, func(k string) bool { return k == "keep" }, func(id int64) Instruction {
+		calls = append(calls, id)
+		// IR resolution may populate indexes. Holding the map lock here deadlocks.
+		s.variable.Set("loaded", []int64{3})
+		return NewConst(id)
+	})
+	require.Equal(t, []int64{1}, calls)
+	require.Len(t, got, 1)
+}
