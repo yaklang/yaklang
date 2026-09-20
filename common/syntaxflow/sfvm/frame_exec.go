@@ -533,7 +533,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if entry == nil {
 			return true, utils.Wrap(CriticalError, "condition failed: empty condition stack")
 		}
-		filtered, err := entry.Apply(vs)
+		filtered, err := s.applyConditionToCurrentValues(entry, vs)
 		if err != nil {
 			return true, err
 		}
