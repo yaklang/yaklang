@@ -1,0 +1,21 @@
+# TightVNC Xtightvnc. Password file is produced by TigerVNC vncpasswd (same 8-byte obfuscation).
+#   docker build -t yak-vnc-tightvnc -f Dockerfile.tightvnc .
+FROM alpine:3.20 AS passwd
+RUN apk add --no-cache tigervnc
+ARG VNC_PASSWORD=TightPass
+RUN printf '%s\n' "$VNC_PASSWORD" | vncpasswd -f > /vncpasswd
+
+FROM debian:bookworm-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+      apt-get update && apt-get install -y --no-install-recommends tightvncserver xfonts-base xauth \
+      && break; \
+      sleep 8; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=passwd /vncpasswd /root/.vnc/passwd
+COPY entrypoint-tightvnc.sh /entrypoint.sh
+RUN chmod 600 /root/.vnc/passwd && chmod +x /entrypoint.sh
+EXPOSE 5900
+ENTRYPOINT ["/entrypoint.sh"]

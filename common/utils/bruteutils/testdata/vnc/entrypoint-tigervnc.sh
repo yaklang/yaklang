@@ -17,6 +17,16 @@ fi
 
 printf '%s\n' "$PASS" | vncpasswd -f > /tmp/vncpasswd
 chmod 600 /tmp/vncpasswd
+
+# Default TigerVNC is TLSVnc,VncAuth — a common real-world mix.
+# TLSVnc-only is a negative fixture (probe has no TLS security type).
+sec_args="-SecurityTypes VncAuth"
+if [ "$SEC" = "Default" ]; then
+  sec_args=""
+elif [ -n "$SEC" ]; then
+  sec_args="-SecurityTypes $SEC"
+fi
+
 exec Xvnc :1 -geometry 640x480 -depth 16 -rfbport "$PORT" \
-  -rfbauth /tmp/vncpasswd -SecurityTypes VncAuth \
+  -rfbauth /tmp/vncpasswd $sec_args \
   -localhost no -AlwaysShared -DisconnectClients=0

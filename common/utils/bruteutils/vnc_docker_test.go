@@ -9,17 +9,17 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 // Real VNC servers via Docker (local daemon or DOCKER_HOST / Windows docker context).
 //
-//	YAK_VNC_DOCKER=1 go test ./common/utils/bruteutils/ -run TestVNCDocker -count=1 -timeout 15m -v
+//	YAK_VNC_DOCKER=1 go test ./common/utils/bruteutils/ -run TestVNCDocker -count=1 -timeout 20m -v
 //
-// Optional: YAK_VNC_TEST_ADDRESS / YAK_VNC_TEST_PASSWORD for a pre-started server
-// (still requires YAK_VNC_DOCKER=1 or YAK_BRUTE_REAL=1). Unset env → skip, so
-// Essential Tests' 2m bruteutils job does not need containers.
+// Covers TigerVNC (VncAuth, None, default TLSVnc+VncAuth, TLSVnc-only negative),
+// x11vnc (default + RFB 3.3), LibVNCServer, and TightVNC. Unset env → skip.
 func TestVNCDocker(t *testing.T) {
 	if os.Getenv("YAK_VNC_DOCKER") != "1" && os.Getenv("YAK_BRUTE_REAL") != "1" {
 		t.Skip("set YAK_VNC_DOCKER=1 (or YAK_BRUTE_REAL=1) to start VNC fixtures via docker")
@@ -55,10 +55,53 @@ func TestVNCDocker(t *testing.T) {
 		assertProbe(t, "none-empty", mockProbe(t, "vnc", addr, "", ""), true, false)
 		assertProbe(t, "none-any", mockProbe(t, "vnc", addr, "", "ignored"), true, false)
 	})
+	t.Run("tigervnc-default-tlsvnc-plus-vncauth", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=VncPass123!", "VNC_SECURITY=Default"})
+		assertVNCLogin(t, "tiger-default", addr, "VncPass123!")
+	})
+	t.Run("tigervnc-tlsvnc-only-unsupported", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=VncPass123!", "VNC_SECURITY=TLSVnc"})
+		waitVNCPort(t, addr)
+		res := mockProbe(t, "vnc", addr, "", "VncPass123!")
+		if res.Ok {
+			t.Fatal("TLSVnc-only must not look like VNC-Auth success")
+		}
+		if !res.Finished {
+			t.Fatal("unsupported security type should finish the target")
+		}
+	})
+	t.Run("tigervnc-eight-byte-pass", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=12345678", "VNC_SECURITY=VncAuth"})
+		assertVNCLogin(t, "eight", addr, "12345678")
+	})
 	t.Run("x11vnc-rfbauth", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.x11vnc", "yak-vnc-x11vnc:test")
 		addr := runVNCContainer(t, "yak-vnc-x11vnc:test", []string{"VNC_PASSWORD=X11VncPass!"})
 		assertVNCLogin(t, "x11vnc", addr, "X11VncPass!")
+	})
+	t.Run("x11vnc-rfb33", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.x11vnc", "yak-vnc-x11vnc:test")
+		addr := runVNCContainer(t, "yak-vnc-x11vnc:test", []string{"VNC_PASSWORD=X11VncPass!", "RFB_VERSION=3.3"})
+		assertVNCLogin(t, "x11vnc33", addr, "X11VncPass!")
+	})
+	t.Run("libvncserver", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.libvnc", "yak-vnc-libvnc:test")
+		addr := runVNCContainer(t, "yak-vnc-libvnc:test", []string{"VNC_PASSWORD=LibVncPass!"})
+		assertVNCLogin(t, "libvnc", addr, "LibVncPass!")
+	})
+	t.Run("libvncserver-none", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.libvnc", "yak-vnc-libvnc:test")
+		addr := runVNCContainer(t, "yak-vnc-libvnc:test", []string{"VNC_SECURITY=None"})
+		waitVNCAuth(t, addr, "")
+		assertProbe(t, "libvnc-none", mockProbe(t, "vnc", addr, "", ""), true, false)
+	})
+	t.Run("tightvnc", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tightvnc", "yak-vnc-tightvnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tightvnc:test", nil)
+		assertVNCLogin(t, "tightvnc", addr, "TightPass")
 	})
 }
 
@@ -68,6 +111,36 @@ func assertVNCLogin(t *testing.T, name, addr, pass string) {
 	assertProbe(t, name+"-correct", mockProbe(t, "vnc", addr, "", pass), true, false)
 	assertProbe(t, name+"-wrong", mockProbe(t, "vnc", addr, "", "WRONG-PASSWORD"), false, false)
 	assertProbe(t, name+"-empty", mockProbe(t, "vnc", addr, "", ""), false, false)
+	assertProbe(t, name+"-user-ignored", mockProbe(t, "vnc", addr, "administrator", pass), true, false)
+	if len(pass) > 8 {
+		assertProbe(t, name+"-first8", mockProbe(t, "vnc", addr, "", pass[:8]), true, false)
+	}
+	const n = 4
+	var wg sync.WaitGroup
+	errCh := make(chan string, n)
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			res := mockProbe(t, "vnc", addr, "", pass)
+			if !res.Ok {
+				errCh <- "concurrent correct failed"
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for msg := range errCh {
+		t.Error(msg)
+	}
+	wrong := mockProbe(t, "vnc", addr, "", "WRONG-PASSWORD")
+	if wrong.Ok {
+		t.Fatal("wrong password succeeded after concurrent hits")
+	}
+	again := mockProbe(t, "vnc", addr, "", pass)
+	if !again.Ok {
+		t.Fatal("correct password failed after concurrent + wrong")
+	}
 }
 
 func vncTestdataDir(t *testing.T) string {
@@ -126,7 +199,6 @@ func runVNCContainer(t *testing.T, image string, env []string) string {
 
 func parseDockerPublishedPort(out string) (string, error) {
 	line := strings.TrimSpace(strings.Split(out, "\n")[0])
-	// 0.0.0.0:32768  or  [::]:32768
 	if i := strings.LastIndex(line, ":"); i >= 0 {
 		return strings.TrimSpace(line[i+1:]), nil
 	}
@@ -146,4 +218,20 @@ func waitVNCAuth(t *testing.T, addr, pass string) {
 		time.Sleep(250 * time.Millisecond)
 	}
 	t.Fatalf("%s VNC login not ready (pass set=%v): last ok=%v finished=%v", addr, pass != "", lastOK, lastFinished)
+}
+
+func waitVNCPort(t *testing.T, addr string) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	var last error
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		if err == nil {
+			_ = conn.Close()
+			return
+		}
+		last = err
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("%s not listening: %v", addr, last)
 }
