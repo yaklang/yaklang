@@ -20,7 +20,7 @@ func TestCompressedRuleVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(want, got) {
-		t.Fatal("rule versions differ; run go generate ./common/syntaxflow/sfdb")
+		t.Fatal("rule versions differ; regenerate release assets")
 	}
 	var rules []RuleInfo
 	if err = json.Unmarshal(want, &rules); err != nil {

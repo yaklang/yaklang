@@ -366,7 +366,9 @@ jobs:
         run: go install ./common/utils/gzip_embed/gzip-embed
 
       - name: Generate tar.gz resources
+        shell: bash
         run: |
+          bash scripts/generate-compressed-assets.sh
           gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
           gzip-embed -cache --source ./common/ai/aid/aireact/skills --gz ./common/ai/aid/aireact/skills.tar.gz --root-path --no-embed
           gzip-embed -cache --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --xor-key yaklang-yso-v1 --no-embed --root-path

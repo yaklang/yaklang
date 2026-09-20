@@ -19,7 +19,7 @@ func TestCompressedAssetsMatchSources(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if entry.IsDir() || strings.HasSuffix(name, ".embed.gz") {
+			if entry.IsDir() {
 				return nil
 			}
 			name = filepath.ToSlash(name)
@@ -33,7 +33,7 @@ func TestCompressedAssetsMatchSources(t *testing.T) {
 				return err
 			}
 			if !bytes.Equal(want, got) {
-				t.Errorf("FS content differs from source: %s; run go generate ./embed", name)
+				t.Errorf("FS content differs from source: %s; regenerate release assets", name)
 			}
 			if strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".gzip") {
 				r, err := gzip.NewReader(bytes.NewReader(want))

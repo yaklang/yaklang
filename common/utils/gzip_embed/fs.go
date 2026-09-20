@@ -19,8 +19,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-// PreprocessingEmbed is a simple tools to read file from embed.FS and gzip compress file
-// only support ReadFile method, not support Open method
+// PreprocessingEmbed reads a tar.gz embedded by the release build. Uncached
+// readers decompress on demand; development builds can keep using embed.FS.
 type PreprocessingEmbed struct {
 	*embed.FS
 	EnableCache    bool
@@ -56,6 +56,9 @@ func NewPreprocessingEmbedWithDecode(fs *embed.FS, fileName string, cache bool, 
 	}
 	if cache {
 		err := cfs.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
+			if header.Typeflag == tar.TypeDir {
+				return nil, true
+			}
 			buf := &bytes.Buffer{}
 			if _, err := io.Copy(buf, reader); err != nil {
 				return err, true
@@ -99,15 +102,15 @@ func (c *PreprocessingEmbed) scanFile(h func(header *tar.Header, reader io.Reade
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
-			break
+			// Validate the gzip trailer after the tar end marker.
+			_, err = io.Copy(io.Discard, gzReader)
+			return err
 		}
 		if err != nil {
 			return err
 		}
 		switch header.Typeflag {
-		case tar.TypeDir:
-			continue
-		case tar.TypeReg:
+		case tar.TypeDir, tar.TypeReg:
 			err, ok := h(header, tarReader)
 			if err != nil {
 				return err
@@ -117,10 +120,12 @@ func (c *PreprocessingEmbed) scanFile(h func(header *tar.Header, reader io.Reade
 			}
 		}
 	}
-	return nil
 }
 
 func (c *PreprocessingEmbed) openSource() (io.ReadCloser, error) {
+	if c.FS == nil {
+		return nil, fs.ErrNotExist
+	}
 	fp, err := c.FS.Open(c.sourceFileName)
 	if err != nil {
 		return nil, err
@@ -142,6 +147,9 @@ func (c *PreprocessingEmbed) openSource() (io.ReadCloser, error) {
 
 // ReadFile override embed.FS.ReadFile, if file is compress file, return decompress data
 func (c *PreprocessingEmbed) ReadFile(name string) ([]byte, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "readfile", Path: name, Err: fs.ErrInvalid}
+	}
 	var successful bool
 	var content []byte
 	if c.EnableCache {
@@ -150,11 +158,11 @@ func (c *PreprocessingEmbed) ReadFile(name string) ([]byte, error) {
 		}
 		if data, ok := c.cacheFile[name]; ok {
 			successful = true
-			content = data
+			content = bytes.Clone(data)
 		}
 	} else {
 		err := c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
-			if header.Name == name {
+			if header.Typeflag == tar.TypeReg && header.Name == name {
 				buf := &bytes.Buffer{}
 				if _, err := io.Copy(buf, reader); err != nil {
 					return err, true
@@ -172,7 +180,7 @@ func (c *PreprocessingEmbed) ReadFile(name string) ([]byte, error) {
 	if successful {
 		return content, nil
 	}
-	return nil, errors.New("file does not exist")
+	return nil, &fs.PathError{Op: "readfile", Path: name, Err: fs.ErrNotExist}
 }
 
 // Verify PreprocessingEmbed implements fi.FileSystem interface
@@ -180,15 +188,28 @@ var _ fi.FileSystem = (*PreprocessingEmbed)(nil)
 
 // Open opens the named file
 func (c *PreprocessingEmbed) Open(name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
 	data, err := c.ReadFile(name)
+	if err == nil {
+		return &virtualFile{name: path.Base(name), data: data, reader: bytes.NewReader(data)}, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	info, err := c.Stat(name)
 	if err != nil {
 		return nil, err
 	}
-	return &virtualFile{
-		name:   name,
-		data:   data,
-		reader: bytes.NewReader(data),
-	}, nil
+	if !info.IsDir() {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	entries, err := c.ReadDir(name)
+	if err != nil {
+		return nil, err
+	}
+	return &virtualDir{info: info, entries: entries}, nil
 }
 
 // OpenFile opens the named file with specified flag (readonly for tar.gz)
@@ -201,6 +222,10 @@ func (c *PreprocessingEmbed) Stat(name string) (fs.FileInfo, error) {
 	// 规范化路径
 	name = strings.TrimPrefix(name, "./")
 	name = strings.TrimSuffix(name, "/")
+
+	if name != "" && !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrInvalid}
+	}
 
 	// 特殊处理根目录
 	if name == "" || name == "." {
@@ -221,7 +246,7 @@ func (c *PreprocessingEmbed) Stat(name string) (fs.FileInfo, error) {
 
 		// 精确匹配文件
 		if headerName == name {
-			info = header.FileInfo()
+			info = archiveFileInfo(header)
 			found = true
 			return nil, false
 		}
@@ -243,7 +268,7 @@ func (c *PreprocessingEmbed) Stat(name string) (fs.FileInfo, error) {
 	}
 
 	if !found {
-		return nil, errors.New("file or directory does not exist")
+		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
 	}
 
 	// 如果找到的是目录但没有直接的 header，创建虚拟目录信息
@@ -260,59 +285,54 @@ func (c *PreprocessingEmbed) Stat(name string) (fs.FileInfo, error) {
 
 // ReadDir reads the directory and returns directory entries
 func (c *PreprocessingEmbed) ReadDir(dirname string) ([]fs.DirEntry, error) {
-	dirname = strings.TrimSuffix(dirname, "/")
-	if dirname == "." || dirname == "" {
-		dirname = ""
-	} else {
-		dirname = dirname + "/"
+	info, err := c.Stat(dirname)
+	if err != nil {
+		return nil, err
 	}
-
-	entries := make(map[string]fs.DirEntry)
-	err := c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
-		name := header.Name
-		if !strings.HasPrefix(name, dirname) {
+	if !info.IsDir() {
+		return nil, &fs.PathError{Op: "readdir", Path: dirname, Err: fs.ErrInvalid}
+	}
+	dirname = strings.TrimSuffix(strings.TrimPrefix(dirname, "./"), "/")
+	if dirname == "." {
+		dirname = ""
+	}
+	prefix := dirname
+	if prefix != "" {
+		prefix += "/"
+	}
+	entries := map[string]fs.DirEntry{}
+	err = c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
+		name := strings.TrimSuffix(header.Name, "/")
+		if !strings.HasPrefix(name, prefix) {
 			return nil, true
 		}
-
-		rel := strings.TrimPrefix(name, dirname)
+		rel := strings.TrimPrefix(name, prefix)
 		if rel == "" {
 			return nil, true
 		}
-
-		// Get the first component after the dirname
-		parts := strings.SplitN(rel, "/", 2)
-		if len(parts) == 0 {
-			return nil, true
-		}
-
-		firstComponent := parts[0]
-		if _, exists := entries[firstComponent]; !exists {
-			if len(parts) == 1 {
-				// It's a file in this directory
-				entries[firstComponent] = &dirEntry{
-					name:  firstComponent,
-					isDir: false,
-					info:  header.FileInfo(),
-				}
-			} else {
-				// It's a subdirectory
-				entries[firstComponent] = &dirEntry{
-					name:  firstComponent,
-					isDir: true,
-				}
+		first, _, hasChild := strings.Cut(rel, "/")
+		if _, exists := entries[first]; !exists {
+			info := archiveFileInfo(header)
+			if hasChild {
+				info = &virtualFileInfo{name: first, isDir: true}
 			}
+			entries[first] = fs.FileInfoToDirEntry(info)
 		}
 		return nil, true
 	})
 	if err != nil {
 		return nil, err
 	}
-
 	result := make([]fs.DirEntry, 0, len(entries))
 	for _, entry := range entries {
 		result = append(result, entry)
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name() < result[j].Name() })
 	return result, nil
+}
+
+func archiveFileInfo(header *tar.Header) fs.FileInfo {
+	return &virtualFileInfo{name: path.Base(strings.TrimSuffix(header.Name, "/")), size: header.Size, isDir: header.Typeflag == tar.TypeDir}
 }
 
 // ExtraInfo returns extra information about the fs
@@ -370,6 +390,9 @@ type virtualFile struct {
 }
 
 func (f *virtualFile) Stat() (fs.FileInfo, error) {
+	if f.closed {
+		return nil, fs.ErrClosed
+	}
 	return &virtualFileInfo{
 		name: f.name,
 		size: int64(len(f.data)),
@@ -378,14 +401,66 @@ func (f *virtualFile) Stat() (fs.FileInfo, error) {
 
 func (f *virtualFile) Read(p []byte) (int, error) {
 	if f.closed {
-		return 0, errors.New("file already closed")
+		return 0, fs.ErrClosed
 	}
 	return f.reader.Read(p)
 }
 
 func (f *virtualFile) Close() error {
 	f.closed = true
+	f.data = nil
+	f.reader = nil
 	return nil
+}
+
+// Seek and ReadAt let http.FileServer serve byte ranges from an opened asset.
+func (f *virtualFile) Seek(offset int64, whence int) (int64, error) {
+	if f.closed {
+		return 0, fs.ErrClosed
+	}
+	return f.reader.Seek(offset, whence)
+}
+func (f *virtualFile) ReadAt(p []byte, offset int64) (int, error) {
+	if f.closed {
+		return 0, fs.ErrClosed
+	}
+	return f.reader.ReadAt(p, offset)
+}
+
+type virtualDir struct {
+	info    fs.FileInfo
+	entries []fs.DirEntry
+	offset  int
+	closed  bool
+}
+
+func (d *virtualDir) Stat() (fs.FileInfo, error) {
+	if d.closed {
+		return nil, fs.ErrClosed
+	}
+	return d.info, nil
+}
+func (d *virtualDir) Read([]byte) (int, error) {
+	if d.closed {
+		return 0, fs.ErrClosed
+	}
+	return 0, fs.ErrInvalid
+}
+func (d *virtualDir) Close() error { d.closed = true; d.entries = nil; return nil }
+func (d *virtualDir) ReadDir(n int) ([]fs.DirEntry, error) {
+	if d.closed {
+		return nil, fs.ErrClosed
+	}
+	if n > 0 && d.offset >= len(d.entries) {
+		return nil, io.EOF
+	}
+	end := len(d.entries)
+	if n > 0 && n < end-d.offset {
+		end = d.offset + n
+	}
+	entries := d.entries[d.offset:end]
+	d.offset = end
+	return entries, nil
 }
 
 // virtualFileInfo implements fs.FileInfo interface
@@ -406,28 +481,6 @@ func (i *virtualFileInfo) Mode() fs.FileMode {
 func (i *virtualFileInfo) ModTime() time.Time { return time.Time{} }
 func (i *virtualFileInfo) IsDir() bool        { return i.isDir }
 func (i *virtualFileInfo) Sys() any           { return nil }
-
-// dirEntry implements fs.DirEntry interface
-type dirEntry struct {
-	name  string
-	isDir bool
-	info  fs.FileInfo
-}
-
-func (d *dirEntry) Name() string { return d.name }
-func (d *dirEntry) IsDir() bool  { return d.isDir }
-func (d *dirEntry) Type() fs.FileMode {
-	if d.isDir {
-		return fs.ModeDir
-	}
-	return 0
-}
-func (d *dirEntry) Info() (fs.FileInfo, error) {
-	if d.info != nil {
-		return d.info, nil
-	}
-	return &virtualFileInfo{name: d.name, size: 0}, nil
-}
 
 // GetHash 计算所有文件内容的哈希值，用于检测文件是否有变动
 // 返回一个 SHA256 哈希字符串

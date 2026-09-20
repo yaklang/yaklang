@@ -26,6 +26,7 @@ on:
       # The suite/runner scripts below drive this workflow, so a change to them
       # must exercise it; otherwise a broken edit merges without ever running.
       - "scripts/ci/**"
+      - "scripts/generate-compressed-assets.sh"
       - "go.mod"
 
 concurrency:
@@ -543,11 +544,17 @@ jobs:
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
 
-      - name: Check compressed resource freshness
-        run: bash scripts/ci/check-embedded-resources.sh
+      - name: Test development resource loading
+        run: go test -race -run 'TestCompressed|TestArchive' -timeout 3m ./embed ./common/crep ./common/syntaxflow/sfdb ./common/utils/gzip_embed/...
 
-      - name: Test compressed resource compatibility
-        run: go test -race -run 'TestCompressed|TestFilesystemContract|TestIndependentReadersAndChecksum|TestHTTPFilesystem|TestGenerateReproducibilityAndFreshness' -timeout 3m ./common/utils/embedfs/... ./embed ./common/crep ./common/syntaxflow/sfdb
+      - name: Generate release assets with existing gzip-embed tool
+        shell: bash
+        run: |
+          go install ./common/utils/gzip_embed/gzip-embed
+          bash scripts/generate-compressed-assets.sh
+
+      - name: Test release resource loading
+        run: go test -race -tags gzip_embed -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/syntaxflow/sfdb
 
       - name: Slim gate test (irify_exclude)
         env:
