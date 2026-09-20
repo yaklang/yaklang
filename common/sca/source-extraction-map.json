@@ -2427,7 +2427,7 @@
     },
     {
       "local_file": "common/sca/analyzer/utils_dependence.go",
-      "sha256": "91792fa8892cd726bf1f392b90a6bdd83420d4cff4946f9aececdabb4d9bb0fe",
+      "sha256": "09677fac3a68ba0da5572096c83770e1618d18165f34896f84a301472a058af0",
       "symbols": [
         {
           "name": "parseVersion",
@@ -2565,7 +2565,7 @@
     },
     {
       "local_file": "common/sca/core/budget/estimate.go",
-      "sha256": "2d7f717d63ea91d9620bee785a72951421f58eb09c4117fa1c742abe4a212bd9",
+      "sha256": "7c556c9fcaf4feacec3f9c7047d585a09d81d5d640e8c4d027d239457f396fe5",
       "symbols": [
         {
           "name": "SizeObject",
@@ -2964,7 +2964,7 @@
     },
     {
       "local_file": "common/sca/core/jsonrecord/read.go",
-      "sha256": "2fef2a0e2c4ef9e9f03ed3be08c1529402f72d64e32d81845c1f91ea3bc69e1e",
+      "sha256": "b7827a5bc92435983b80cf7c6189e06f2bdc33bc50c873c9bcb61c1b65e153b4",
       "symbols": [
         {
           "name": "Node",
@@ -3825,7 +3825,7 @@
     },
     {
       "local_file": "common/sca/core/rpm/read.go",
-      "sha256": "24194974942e8699ebbbf4466ee037769273c1be512c9f534e1f3bae2a1d9f35",
+      "sha256": "c43a618cb8dc60be6686139d1b68e2e02d2c28ae37af23a6bc93de72a9a95db4",
       "symbols": [
         {
           "name": "PackageInfo",
@@ -3987,7 +3987,7 @@
     },
     {
       "local_file": "common/sca/core/xmlrecord/read.go",
-      "sha256": "d6a62556bc053e9c29d93efd416d80aa00b8951ccaaa8ddf0d7db4a3a4186dac",
+      "sha256": "edaa0d4da3bb389e593f82061c288dbf451af2f5909f761dcc1b41f4a08bdfe7",
       "symbols": [
         {
           "name": "tokens",
@@ -4637,7 +4637,7 @@
     },
     {
       "local_file": "common/sca/pipeline.go",
-      "sha256": "97e6653b89a064ef9250d387b93cb51c1c6d61a8129e2731ad44f249d24053b0",
+      "sha256": "e7be09246622b222ef7d27701226fc2ece2e4f944e0c7920614850d1c8ca49d2",
       "symbols": [
         {
           "name": "material",
@@ -4738,7 +4738,7 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "030faa611213053e46afba014b9e6bf4450776d84851493ec41b877b875a8e74",
+      "sha256": "7733d906226ec4b3990193eef35f4596ca1a7292332856ef268178adf5ee559f",
       "symbols": [
         {
           "name": "fillReport",
