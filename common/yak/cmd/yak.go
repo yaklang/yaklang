@@ -785,17 +785,7 @@ var startGRPCServerCommand = cli.Command{
 		streamInterceptors := []grpc.StreamServerInterceptor{grpc_recovery.StreamServerInterceptor()}
 		unaryInterceptors := []grpc.UnaryServerInterceptor{grpc_recovery.UnaryServerInterceptor()}
 		if secret != "" {
-			auth := func(ctx context.Context) (context.Context, error) {
-				userSecret, err := grpc_auth.AuthFromMD(ctx, "bearer")
-				if err != nil {
-					log.Errorf("secret schema[%v] missed", "bearer")
-					return nil, err
-				}
-				if userSecret != secret {
-					return nil, utils.Errorf("secret verify failed...")
-				}
-				return ctx, nil
-			}
+			auth := newGRPCSecretAuth(secret)
 			streamInterceptors = append(streamInterceptors, grpc_auth.StreamServerInterceptor(auth))
 			unaryInterceptors = append(unaryInterceptors, grpc_auth.UnaryServerInterceptor(auth))
 		}
@@ -1514,17 +1504,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		log.Info("generated random secret for testing: ***")
 
 		// 创建 GRPC 服务器
-		auth := func(authCtx context.Context) (context.Context, error) {
-			userSecret, err := grpc_auth.AuthFromMD(authCtx, "bearer")
-			if err != nil {
-				log.Errorf("secret schema[%v] missed", "bearer")
-				return nil, err
-			}
-			if userSecret != secret {
-				return nil, utils.Errorf("secret verify failed...")
-			}
-			return authCtx, nil
-		}
+		auth := newGRPCSecretAuth(secret)
 
 		streamInterceptors := []grpc.StreamServerInterceptor{
 			grpc_recovery.StreamServerInterceptor(),

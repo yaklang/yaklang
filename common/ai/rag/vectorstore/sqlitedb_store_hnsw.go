@@ -51,7 +51,17 @@ func initSQLiteVectorStoreHNSW() *SQLiteVectorStoreHNSW { // 初始化 SQLiteVec
 }
 
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
+	started := time.Now()
+	var metadataCost, embeddingCost, graphCost, countCost, dimensionCost time.Duration
+	defer func() {
+		if total := time.Since(started); total > time.Second {
+			log.Warnf("RAG collection %q load took %s (metadata=%s embedding=%s graph=%s count=%s dimensions=%s)",
+				collectionName, total, metadataCost, embeddingCost, graphCost, countCost, dimensionCost)
+		}
+	}()
+	stage := time.Now()
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
+	metadataCost = time.Since(stage)
 	if err != nil {
 		return nil, utils.Wrap(err, fmt.Sprintf("query rag collection [%#v]", collectionName))
 	}
@@ -62,7 +72,10 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 
 	collectionConfig := LoadConfigFromCollectionInfo(collection, opts...)
 
-	if err := collectionConfig.FixEmbeddingClient(); err != nil {
+	stage = time.Now()
+	err = collectionConfig.FixEmbeddingClient()
+	embeddingCost = time.Since(stage)
+	if err != nil {
 		return nil, utils.Errorf("fix embedding client err: %v", err)
 	}
 	vectorStore := initSQLiteVectorStoreHNSW()
@@ -70,19 +83,25 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 	vectorStore.config = collectionConfig
 	vectorStore.embedder = collectionConfig.EmbeddingClient
 	vectorStore.collection = collection
+	stage = time.Now()
 	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, collectionConfig)
+	graphCost = time.Since(stage)
 	if err != nil {
 		log.Errorf("get graph wrapper err: %v", err)
 		return nil, utils.Wrap(err, "get graph wrapper")
 	}
 	vectorStore.hnsw = graphWrapper
 
+	stage = time.Now()
 	docCount, err := vectorStore.Count()
+	countCost = time.Since(stage)
 	if err != nil {
 		return nil, utils.Wrap(err, "count documents")
 	}
 	if docCount > 0 {
+		stage = time.Now()
 		dims := graphWrapper.graph.Dims()
+		dimensionCost = time.Since(stage)
 		if dims != collectionConfig.Dimension {
 			return nil, utils.Errorf("dimension mismatch: %d != %d, collection name: %s", dims, collectionConfig.Dimension, collectionName)
 		}
