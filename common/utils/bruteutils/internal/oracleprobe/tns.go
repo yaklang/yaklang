@@ -21,11 +21,15 @@ type session struct {
 	conn net.Conn
 	// Close the underlying socket directly; TLS close_notify must not extend a probe.
 	transport                           net.Conn
+	ctx                                 context.Context
+	tlsConfig                           *tls.Config
+	tlsRestarts                         int
 	in, out                             bytes.Buffer
 	err                                 error
 	version                             uint16
 	sdu                                 int
 	advanced                            bool
+	encryption                          EncryptionPolicy
 	received, packets                   int
 	UseBigClrChunks                     bool
 	ClrChunkSize                        int
@@ -35,6 +39,22 @@ type session struct {
 	crypt                               OracleNetworkEncryption
 	integrity                           OracleNetworkDataIntegrity
 	Summary                             *SummaryObject
+}
+
+// Oracle's TLS handoff starts a new TLS connection on the raw socket, not
+// inside the old TLS stream. Every handshake retains the probe's deadline and
+// certificate policy; the old wrapper must not send close_notify on this socket.
+func (s *session) startTLS() error {
+	if s.tlsRestarts >= 4 {
+		return errors.New("oracle: TLS restart limit exceeded")
+	}
+	s.tlsRestarts++
+	secured := tls.Client(s.transport, s.tlsConfig)
+	if err := secured.HandshakeContext(s.ctx); err != nil {
+		return err
+	}
+	s.conn = secured
+	return nil
 }
 
 func (s *session) HasError() bool {
@@ -134,6 +154,11 @@ func (s *session) data() ([]byte, error) {
 			if binary.BigEndian.Uint16(p[8:])&0x40 != 0 {
 				return nil, io.EOF
 			}
+			if s.tlsConfig != nil && (p[5]&0x80 != 0 || binary.BigEndian.Uint16(p[8:])&0x8000 != 0) {
+				if e := s.startTLS(); e != nil {
+					return nil, e
+				}
+			}
 			b := p[10:]
 			if s.crypt != nil || s.integrity != nil {
 				if len(b) < 2 {
@@ -195,7 +220,7 @@ func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*sess
 		if e != nil {
 			return nil, e
 		}
-		s := &session{conn: conn, transport: conn, sdu: 8192, ClrChunkSize: 64}
+		s := &session{conn: conn, transport: conn, ctx: ctx, encryption: o.Encryption, sdu: 8192, ClrChunkSize: 64}
 		stop := context.AfterFunc(ctx, func() { conn.Close() })
 		next, e := func() (string, error) {
 			if deadline, ok := ctx.Deadline(); ok {
@@ -204,15 +229,13 @@ func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*sess
 				}
 			}
 			if o.TLS != nil {
-				cfg := o.TLS.Clone()
-				if cfg.ServerName == "" {
-					cfg.ServerName, _, _ = net.SplitHostPort(address)
+				s.tlsConfig = o.TLS.Clone()
+				if s.tlsConfig.ServerName == "" {
+					s.tlsConfig.ServerName, _, _ = net.SplitHostPort(address)
 				}
-				tlsConn := tls.Client(conn, cfg)
-				if e := tlsConn.HandshakeContext(ctx); e != nil {
+				if e := s.startTLS(); e != nil {
 					return "", e
 				}
-				s.conn = tlsConn
 			}
 			// v3.0.1 CONNECT layout. Fast-auth/pipelining are intentionally not advertised.
 			b := make([]byte, 66)
@@ -246,6 +269,13 @@ func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*sess
 				}
 				switch p[4] {
 				case 11:
+					// Native Oracle TCPS may hand off to a dedicated server and
+					// request a fresh TLS session over the same TCP socket.
+					if p[5]&8 != 0 && s.tlsConfig != nil {
+						if e := s.startTLS(); e != nil {
+							return "", e
+						}
+					}
 					continue
 				case 2:
 					if len(p) < 32 {

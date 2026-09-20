@@ -178,8 +178,11 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	if request.err != nil {
 		return request.err
 	}
-	if string(username) != "PROBE" || mode&int(UserAndPass) == 0 {
+	if mode&int(UserAndPass) == 0 {
 		return errors.New("missing password login mode")
+	}
+	if !strings.EqualFold(string(username), "PROBE") {
+		return s.writeData(mockSummary(1017))
 	}
 	if _, ok := props["AUTH_ALTER_SESSION"]; ok {
 		return errors.New("probe must not issue ALTER SESSION")
@@ -234,7 +237,7 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	if err = s.writeData(response); err != nil {
 		return err
 	}
-	if fault == "success" || fault == "fragmented" {
+	if fault == "success" || fault == "username_lowercase" || fault == "fragmented" {
 		// The probe must close here, without SQL, version, NLS or ping requests.
 		var one [1]byte
 		_, err = conn.Read(one[:])
@@ -289,20 +292,30 @@ func mockDecrypt(key []byte, text string, padding bool) ([]byte, error) {
 }
 
 func TestProbeCompleteHandshakeMock(t *testing.T) {
-	for _, fault := range []string{"success", "fragmented", "short_nonce_success", "short_nonce_rejected", "wrong_password", "missing_proof", "invalid_proof", "invalid_proof_padding", "missing_identity", "bare_success", "error_after_properties", "error_after_completion", "truncated_proof", "unexpected_message", "premature_success", "disconnect_connect", "disconnect_protocol", "disconnect_datatype", "disconnect_challenge", "disconnect_result"} {
+	for _, fault := range []string{"success", "username_lowercase", "username_nul", "password_case", "password_space", "fragmented", "short_nonce_success", "short_nonce_rejected", "wrong_password", "missing_proof", "invalid_proof", "invalid_proof_padding", "missing_identity", "bare_success", "error_after_properties", "error_after_completion", "truncated_proof", "unexpected_message", "premature_success", "disconnect_connect", "disconnect_protocol", "disconnect_datatype", "disconnect_challenge", "disconnect_result"} {
 		t.Run(fault, func(t *testing.T) {
 			client, server := net.Pipe()
 			serverResult := make(chan error, 1)
 			go func() { serverResult <- mockLoginServer(server, fault) }()
-			password := "Mock_密码!123"
+			username, password := "PROBE", "Mock_密码!123"
+			switch fault {
+			case "username_lowercase":
+				username = "probe"
+			case "username_nul":
+				username += "\x00suffix"
+			case "password_case":
+				password = strings.ToLower(password)
+			case "password_space":
+				password += " "
+			}
 			if fault == "wrong_password" {
 				password += "wrong"
 			}
-			err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: "PROBE", Password: password, Timeout: 2 * time.Second})
-			if (err == nil) != (fault == "success" || fault == "fragmented" || fault == "short_nonce_success") {
+			err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: username, Password: password, Timeout: 2 * time.Second})
+			if (err == nil) != (fault == "success" || fault == "username_lowercase" || fault == "fragmented" || fault == "short_nonce_success") {
 				t.Fatalf("unexpected probe result: %v", err)
 			}
-			if fault == "wrong_password" || fault == "error_after_properties" || fault == "short_nonce_rejected" {
+			if fault == "username_nul" || fault == "password_case" || fault == "password_space" || fault == "wrong_password" || fault == "error_after_properties" || fault == "short_nonce_rejected" {
 				var ora *Error
 				if !errors.As(err, &ora) {
 					t.Fatalf("missing server error: %v", err)
@@ -332,17 +345,66 @@ func TestProbeTLSVerification(t *testing.T) {
 	roots := x509.NewCertPool()
 	roots.AddCert(cert)
 	serverConfig := &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}, MinVersion: tls.VersionTLS12}
-	for _, trusted := range []bool{true, false} {
-		t.Run(fmt.Sprintf("trusted=%v", trusted), func(t *testing.T) {
-			client, server := net.Pipe()
+	for _, scenario := range []string{"trusted", "untrusted", "handoff", "handoff_untrusted", "handoff_stall", "resend_limit"} {
+		t.Run(scenario, func(t *testing.T) {
+			trusted := scenario != "untrusted"
+			wantSuccess := scenario == "trusted" || scenario == "handoff"
+			client, server := tlsTCPPair(t)
 			done := make(chan error, 1)
 			go func() {
 				_ = server.SetDeadline(time.Now().Add(3 * time.Second))
+				defer server.Close()
 				secured := tls.Server(server, serverConfig)
 				if e := secured.Handshake(); e != nil {
 					server.Close()
 					done <- e
 					return
+				}
+				if strings.HasPrefix(scenario, "handoff") || scenario == "resend_limit" {
+					for n := 0; ; n++ {
+						wire := &session{conn: secured}
+						p, e := wire.packet()
+						if e != nil {
+							done <- e
+							return
+						}
+						if p[4] != 1 {
+							done <- errors.New("expected CONNECT before TLS handoff")
+							return
+						}
+						resend := wirePacket(0, 11, nil)
+						resend[5] = 8
+						if _, e = secured.Write(resend); e != nil {
+							done <- e
+							return
+						}
+						if scenario == "handoff_stall" {
+							_, e = io.Copy(io.Discard, server)
+							done <- e
+							return
+						}
+						cfg := serverConfig.Clone()
+						if scenario == "handoff_untrusted" {
+							// Initial handshake is trusted; only the replacement certificate is invalid.
+							other := *template
+							other.DNSNames = []string{"wrong.test"}
+							other.SerialNumber = big.NewInt(2)
+							der, e := x509.CreateCertificate(rand.Reader, &other, &other, pub, key)
+							if e != nil {
+								done <- e
+								return
+							}
+							cfg.Certificates = []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}
+						}
+						secured = tls.Server(server, cfg)
+						if e = secured.Handshake(); e != nil {
+							done <- e
+							return
+						}
+						if scenario != "resend_limit" || n >= 3 {
+							break
+						}
+					}
 				}
 				done <- mockLoginServer(secured, "success")
 			}()
@@ -350,13 +412,107 @@ func TestProbeTLSVerification(t *testing.T) {
 			if trusted {
 				config.RootCAs = roots
 			}
-			err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: "PROBE", Password: "Mock_密码!123", TLS: config, Timeout: 2 * time.Second})
-			if (err == nil) != trusted {
+			err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: "PROBE", Password: "Mock_密码!123", TLS: config, Timeout: 500 * time.Millisecond})
+			if (err == nil) != wantSuccess {
 				t.Fatalf("unexpected TLS result: %v", err)
 			}
-			if e := <-done; trusted && e != nil {
+			if scenario == "handoff_untrusted" {
+				var verification *tls.CertificateVerificationError
+				if !errors.As(err, &verification) {
+					t.Fatalf("replacement certificate accepted: %v", err)
+				}
+			}
+			if scenario == "handoff_stall" {
+				var timeout net.Error
+				if !errors.Is(err, context.DeadlineExceeded) && !(errors.As(err, &timeout) && timeout.Timeout()) {
+					t.Fatalf("lost handshake deadline: %v", err)
+				}
+			}
+			if scenario == "resend_limit" && (err == nil || !strings.Contains(err.Error(), "resend limit")) {
+				t.Fatalf("lost resend bound: %v", err)
+			}
+			if e := <-done; wantSuccess && e != nil {
 				t.Fatal(e)
 			}
 		})
 	}
+	for _, flag := range []string{"data", "header", "restart_limit"} {
+		t.Run(flag, func(t *testing.T) {
+			client, server := tlsTCPPair(t)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			_ = client.SetDeadline(time.Now().Add(time.Second))
+			_ = server.SetDeadline(time.Now().Add(time.Second))
+			done := make(chan error, 1)
+			go func() {
+				defer server.Close()
+				secured := tls.Server(server, serverConfig)
+				if e := secured.Handshake(); e != nil {
+					done <- e
+					return
+				}
+				for n := 0; ; n++ {
+					packet := wirePacket(0, 6, []byte{0, 0})
+					if flag == "header" {
+						packet[5] = 0x80
+					} else {
+						packet[8] = 0x80
+					}
+					if _, e := secured.Write(packet); e != nil {
+						done <- e
+						return
+					}
+					secured = tls.Server(server, serverConfig)
+					if e := secured.Handshake(); e != nil {
+						done <- e
+						return
+					}
+					if flag != "restart_limit" || n >= 4 {
+						break
+					}
+				}
+				_, e := secured.Write(wirePacket(0, 6, []byte{0, 0, 42}))
+				done <- e
+			}()
+			s := &session{conn: client, transport: client, ctx: ctx, tlsConfig: &tls.Config{ServerName: "oracle.test", RootCAs: roots, MinVersion: tls.VersionTLS12}}
+			if e := s.startTLS(); e != nil {
+				t.Fatal(e)
+			}
+			data, e := s.data()
+			if flag == "restart_limit" {
+				if e == nil || !strings.Contains(e.Error(), "TLS restart limit") {
+					t.Fatalf("unbounded TLS handoff: %v", e)
+				}
+			} else if e != nil || !bytes.Equal(data, []byte{42}) {
+				t.Fatalf("lost data after TLS handoff: %x %v", data, e)
+			}
+			client.Close()
+			if e := <-done; flag != "restart_limit" && e != nil {
+				t.Fatal(e)
+			}
+		})
+	}
+
+}
+
+// Real TCP buffering lets TLS peers exchange an alert while the other peer is
+// finishing its certificate flight. An unbuffered net.Pipe can deadlock there.
+func tlsTCPPair(t *testing.T) (net.Conn, net.Conn) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	client, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+	server, err := listener.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { server.Close() })
+	return client, server
 }

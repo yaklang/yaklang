@@ -2,10 +2,13 @@ package oracleprobe
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -13,15 +16,24 @@ import (
 // A separate fixture lets callers check locked/expired accounts without
 // treating those accounts as successful authentication.
 func TestProbeLiveRejection(t *testing.T) {
-	code, err := strconv.Atoi(os.Getenv("YAK_ORACLE_TEST_ERROR_CODE"))
-	if err != nil {
+	raw := os.Getenv("YAK_ORACLE_TEST_ERROR_CODE")
+	if raw == "" {
 		t.Skip("set YAK_ORACLE_TEST_ERROR_CODE and fixture credentials")
 	}
-	err = Probe(context.Background(), nil, Options{Address: os.Getenv("YAK_ORACLE_TEST_ADDRESS"), Service: os.Getenv("YAK_ORACLE_TEST_SERVICE"), Username: os.Getenv("YAK_ORACLE_TEST_USER"), Password: os.Getenv("YAK_ORACLE_TEST_PASSWORD")})
-	var ora *Error
-	if !errors.As(err, &ora) || ora.Code != code {
-		t.Fatalf("want ORA-%05d, got %v", code, err)
+	codes := map[int]bool{}
+	for _, value := range strings.Split(raw, ",") {
+		code, err := strconv.Atoi(value)
+		if err != nil || code <= 0 {
+			t.Fatal("invalid expected Oracle error code")
+		}
+		codes[code] = true
 	}
+	err := Probe(context.Background(), nil, liveOptions(t))
+	var ora *Error
+	if !errors.As(err, &ora) || !codes[ora.Code] {
+		t.Fatalf("want Oracle error %s, got %v", raw, err)
+	}
+	t.Logf("server rejection: ORA-%05d", ora.Code)
 }
 
 // Explicit opt-in: this test contacts only a caller-provided test database.
@@ -30,7 +42,7 @@ func TestProbeLive(t *testing.T) {
 	if addr == "" {
 		t.Skip("set YAK_ORACLE_TEST_ADDRESS, SERVICE, USER and PASSWORD for an isolated Oracle fixture")
 	}
-	o := Options{Address: addr, Service: os.Getenv("YAK_ORACLE_TEST_SERVICE"), Username: os.Getenv("YAK_ORACLE_TEST_USER"), Password: os.Getenv("YAK_ORACLE_TEST_PASSWORD"), Timeout: 15 * time.Second, SID: os.Getenv("YAK_ORACLE_TEST_SID") == "1", SysDBA: os.Getenv("YAK_ORACLE_TEST_SYSDBA") == "1"}
+	o := liveOptions(t)
 	// All scenarios share one budget, so a stalled fixture cannot multiply the timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), MaxTimeout)
 	defer cancel()
@@ -69,6 +81,88 @@ func TestProbeLive(t *testing.T) {
 			var ora *Error
 			if !errors.As(e, &ora) || !ora.CredentialsRejected() {
 				t.Fatalf("want ORA-01017, got %v", e)
+			}
+		})
+	}
+}
+
+func liveOptions(t *testing.T) Options {
+	t.Helper()
+	o := Options{Address: os.Getenv("YAK_ORACLE_TEST_ADDRESS"), Service: os.Getenv("YAK_ORACLE_TEST_SERVICE"), Username: os.Getenv("YAK_ORACLE_TEST_USER"), Password: os.Getenv("YAK_ORACLE_TEST_PASSWORD"), Timeout: 15 * time.Second, SID: os.Getenv("YAK_ORACLE_TEST_SID") == "1", SysDBA: os.Getenv("YAK_ORACLE_TEST_SYSDBA") == "1"}
+	switch strings.ToUpper(os.Getenv("YAK_ORACLE_TEST_ENCRYPTION")) {
+	case "", "ACCEPTED":
+	case "REJECTED":
+		o.Encryption = EncryptionRejected
+	case "REQUESTED":
+		o.Encryption = EncryptionRequested
+	case "REQUIRED":
+		o.Encryption = EncryptionRequired
+	default:
+		t.Fatal("unknown fixture encryption policy")
+	}
+	if os.Getenv("YAK_ORACLE_TEST_TLS") == "1" {
+		// Bypassing verification is an explicit fixture-only choice, never a default.
+		o.TLS = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: os.Getenv("YAK_ORACLE_TEST_TLS_INSECURE") == "1", ServerName: os.Getenv("YAK_ORACLE_TEST_TLS_SERVER_NAME")}
+	}
+	return o
+}
+
+func TestProbeLiveUntrustedTLS(t *testing.T) {
+	if os.Getenv("YAK_ORACLE_TEST_ADDRESS") == "" || os.Getenv("YAK_ORACLE_TEST_TLS") != "1" {
+		t.Skip("requires an isolated TCPS fixture")
+	}
+	o := liveOptions(t)
+	o.TLS.InsecureSkipVerify = false
+	o.TLS.RootCAs = x509.NewCertPool()
+	err := Probe(context.Background(), nil, o)
+	var verification *tls.CertificateVerificationError
+	if !errors.As(err, &verification) {
+		t.Fatalf("expected certificate verification failure, got %v", err)
+	}
+}
+
+func TestProbeLiveBoundaries(t *testing.T) {
+	if os.Getenv("YAK_ORACLE_TEST_ADDRESS") == "" || os.Getenv("YAK_ORACLE_TEST_BOUNDARIES") != "1" {
+		t.Skip("explicit boundary fixture opt-in")
+	}
+	o := liveOptions(t)
+	ctx, cancel := context.WithTimeout(context.Background(), MaxTimeout)
+	defer cancel()
+	for _, name := range []string{"uppercase_username", "password_case", "password_space", "username_nul"} {
+		t.Run(name, func(t *testing.T) {
+			// A successful control also prevents failed-attempt counters accumulating.
+			if err := Probe(ctx, nil, o); err != nil {
+				t.Fatalf("control login: %v", err)
+			}
+			candidate := o
+			switch name {
+			case "uppercase_username":
+				candidate.Username = strings.ToUpper(o.Username)
+			case "password_case":
+				candidate.Password = strings.ToLower(o.Password)
+				if candidate.Password == o.Password {
+					t.Skip("fixture password has no uppercase characters")
+				}
+			case "password_space":
+				candidate.Password += " "
+			case "username_nul":
+				candidate.Username += "\x00suffix"
+			}
+			err := Probe(ctx, nil, candidate)
+			if name == "uppercase_username" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("invalid credential was reported as authenticated")
+			}
+			if name != "username_nul" {
+				var ora *Error
+				if !errors.As(err, &ora) || !ora.CredentialsRejected() {
+					t.Fatalf("expected ORA-01017, got %v", err)
+				}
 			}
 		})
 	}
