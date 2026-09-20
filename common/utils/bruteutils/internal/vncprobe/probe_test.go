@@ -21,7 +21,7 @@ func TestProbeTimeoutBudget(t *testing.T) {
 	for _, timeout := range []time.Duration{0, -time.Second, time.Hour, 40 * time.Millisecond} {
 		t.Run(timeout.String(), func(t *testing.T) {
 			sentinel := errors.New("dial inspected")
-			err := Probe(context.Background(), dialFunc(func(ctx context.Context, _, _ string) (net.Conn, error) {
+			r := Probe(context.Background(), dialFunc(func(ctx context.Context, _, _ string) (net.Conn, error) {
 				deadline, ok := ctx.Deadline()
 				if !ok || time.Until(deadline) > MaxTimeout {
 					t.Fatalf("unbounded deadline: %v", deadline)
@@ -31,8 +31,8 @@ func TestProbeTimeoutBudget(t *testing.T) {
 				}
 				return nil, sentinel
 			}), Options{Address: "127.0.0.1:5900", Timeout: timeout})
-			if !errors.Is(err, sentinel) {
-				t.Fatal(err)
+			if !errors.Is(r.Err, sentinel) {
+				t.Fatal(r.Err)
 			}
 		})
 	}
@@ -46,10 +46,10 @@ func TestProbeStalledHandshake(t *testing.T) {
 		_, _ = io.Copy(io.Discard, server)
 	}()
 	start := time.Now()
-	err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) {
+	r := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) {
 		return client, nil
 	}), Options{Address: "127.0.0.1:5900", Password: "x", Timeout: 80 * time.Millisecond})
-	if err == nil {
+	if r.OK() {
 		t.Fatal("expected timeout")
 	}
 	if time.Since(start) > time.Second {
@@ -58,12 +58,12 @@ func TestProbeStalledHandshake(t *testing.T) {
 }
 
 func TestProbeEmptyAddress(t *testing.T) {
-	err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) {
+	r := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) {
 		t.Fatal("must not dial")
 		return nil, nil
 	}), Options{})
-	if !errors.Is(err, ErrProtocolMismatch) {
-		t.Fatalf("got %v", err)
+	if !errors.Is(r.Err, ErrProtocolMismatch) {
+		t.Fatalf("got %v", r.Err)
 	}
 }
 
@@ -85,7 +85,7 @@ func TestProbeCancelClosesConn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- Probe(ctx, nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: 5 * time.Second})
+		errCh <- Probe(ctx, nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: 5 * time.Second}).Err
 	}()
 	var srv net.Conn
 	select {
@@ -144,9 +144,9 @@ func TestProbeDoesNotSendClientInit(t *testing.T) {
 		n, _ := io.ReadFull(c, buf[:1])
 		sawExtra <- n > 0
 	}()
-	err = Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Timeout: 2 * time.Second})
-	if err != nil {
-		t.Fatal(err)
+	r := Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Timeout: 2 * time.Second})
+	if !r.OK() {
+		t.Fatal(r.Err)
 	}
 	select {
 	case extra := <-sawExtra:
@@ -178,8 +178,8 @@ func TestProbeOversizedListsDoNotAllocate(t *testing.T) {
 		_, _ = c.Write(bytes.Repeat([]byte{19}, 32))
 	}()
 	start := time.Now()
-	err = Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: 500 * time.Millisecond})
-	if err == nil {
+	r := Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: 500 * time.Millisecond})
+	if r.OK() {
 		t.Fatal("oversized type list must not authenticate")
 	}
 	if time.Since(start) > time.Second {
@@ -223,9 +223,9 @@ func TestProbeHugeFailureReason(t *testing.T) {
 		_, _ = c.Write(n[:])
 	}()
 	start := time.Now()
-	err = Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: time.Second})
-	if !errors.Is(err, ErrAuthFailed) {
-		t.Fatalf("want auth failed, got %v", err)
+	r := Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: time.Second})
+	if !errors.Is(r.Err, ErrAuthFailed) {
+		t.Fatalf("want auth failed, got %v", r.Err)
 	}
 	if time.Since(start) > time.Second {
 		t.Fatal("huge reason length must not block until the full timeout")
@@ -255,7 +255,162 @@ func TestProbeRFB33NoneSkipsSecurityResult(t *testing.T) {
 		_, _ = c.Write(st[:])
 		time.Sleep(200 * time.Millisecond)
 	}()
-	if err := Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Timeout: 2 * time.Second}); err != nil {
+	r := Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Timeout: 2 * time.Second})
+	if !r.OK() || !r.AuthNone || r.SecurityType != 1 {
+		t.Fatalf("want none success, got %+v", r)
+	}
+}
+
+func TestProbeTightCapabilities(t *testing.T) {
+	handshake := func(c net.Conn) {
+		_, _ = c.Write([]byte("RFB 003.008\n"))
+		ver := make([]byte, 12)
+		_, _ = io.ReadFull(c, ver)
+		_, _ = c.Write([]byte{1, 16})
+		sel := make([]byte, 1)
+		_, _ = io.ReadFull(c, sel)
+	}
+	writeCap := func(c net.Conn, code int32, vendor, sig string) {
+		var cap [16]byte
+		binary.BigEndian.PutUint32(cap[0:4], uint32(code))
+		copy(cap[4:8], vendor)
+		copy(cap[8:16], sig)
+		_, _ = c.Write(cap[:])
+	}
+	u32 := func(c net.Conn, v uint32) {
+		var b [4]byte
+		binary.BigEndian.PutUint32(b[:], v)
+		_, _ = c.Write(b[:])
+	}
+
+	t.Run("notunnel-and-vncauth", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			handshake(c)
+			u32(c, 1)
+			writeCap(c, 0, "TGHT", "NOTUNNEL")
+			sel := make([]byte, 4)
+			if _, err := io.ReadFull(c, sel); err != nil {
+				return
+			}
+			_ = binary.BigEndian.Uint32(sel)
+			u32(c, 1)
+			writeCap(c, 2, "STDV", "VNCAUTH_")
+			auth := make([]byte, 4)
+			if _, err := io.ReadFull(c, auth); err != nil {
+				return
+			}
+			_, _ = c.Write(bytes.Repeat([]byte{0x44}, 16))
+			resp := make([]byte, 16)
+			_, _ = io.ReadFull(c, resp)
+			u32(c, 0)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !r.OK() || r.AuthNone || r.SecurityType != 2 {
+			t.Fatalf("want vnc-auth success, got %+v", r)
+		}
+	})
+	t.Run("zero-tunnels-sends-none", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			handshake(c)
+			u32(c, 0)
+			u32(c, 1)
+			writeCap(c, 2, "STDV", "VNCAUTH_")
+			auth := make([]byte, 4)
+			if _, err := io.ReadFull(c, auth); err != nil {
+				return
+			}
+			_ = binary.BigEndian.Uint32(auth)
+			_, _ = c.Write(bytes.Repeat([]byte{0x44}, 16))
+			resp := make([]byte, 16)
+			_, _ = io.ReadFull(c, resp)
+			u32(c, 0)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !r.OK() {
+			t.Fatal(r.Err)
+		}
+	})
+	t.Run("missing-notunnel", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			handshake(c)
+			u32(c, 1)
+			writeCap(c, 1, "TGHT", "ENCRYPTT")
+			time.Sleep(50 * time.Millisecond)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !errors.Is(r.Err, ErrNoCompatibleAuth) {
+			t.Fatalf("want no compatible auth, got %v", r.Err)
+		}
+	})
+	t.Run("auth-code-without-signature", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			handshake(c)
+			u32(c, 0)
+			u32(c, 1)
+			writeCap(c, 2, "XXXX", "VNCAUTH_")
+			time.Sleep(50 * time.Millisecond)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !errors.Is(r.Err, ErrNoCompatibleAuth) {
+			t.Fatalf("want no compatible auth, got %v", r.Err)
+		}
+	})
+	t.Run("security-result-2-locked", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			ver := make([]byte, 12)
+			_, _ = io.ReadFull(c, ver)
+			_, _ = c.Write([]byte{1, 2})
+			sel := make([]byte, 1)
+			_, _ = io.ReadFull(c, sel)
+			_, _ = c.Write(bytes.Repeat([]byte{0x33}, 16))
+			resp := make([]byte, 16)
+			_, _ = io.ReadFull(c, resp)
+			u32(c, 2)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !errors.Is(r.Err, ErrLocked) || !r.Locked {
+			t.Fatalf("want locked, got %+v", r)
+		}
+	})
+	t.Run("too-many-reason-locked", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			ver := make([]byte, 12)
+			_, _ = io.ReadFull(c, ver)
+			_, _ = c.Write([]byte{1, 2})
+			sel := make([]byte, 1)
+			_, _ = io.ReadFull(c, sel)
+			_, _ = c.Write(bytes.Repeat([]byte{0x33}, 16))
+			resp := make([]byte, 16)
+			_, _ = io.ReadFull(c, resp)
+			u32(c, 1)
+			reason := []byte("Too many authentication failures")
+			u32(c, uint32(len(reason)))
+			_, _ = c.Write(reason)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !errors.Is(r.Err, ErrLocked) {
+			t.Fatalf("want locked from reason, got %v", r.Err)
+		}
+	})
+}
+
+func serveOnce(t *testing.T, fn func(net.Conn)) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		_ = c.SetDeadline(time.Now().Add(3 * time.Second))
+		fn(c)
+	}()
+	return ln.Addr().String()
 }

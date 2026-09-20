@@ -9,19 +9,30 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/bruteutils"
 )
 
 // Flexible in-process RFB mock used by the shipped VNC brute handler tests.
+type mockCap struct {
+	code        int32
+	vendor, sig string
+}
+
 type mockRFBConfig struct {
-	version   string // 12-byte ProtocolVersion; default RFB 3.8
-	secTypes  []byte // 3.7/3.8 list; ignored for 3.3
-	sec33     uint32 // 3.3 server-picked type
-	password  string
-	tightAuth []uint32 // Tight nested auth codes (default VNC-Auth)
-	nTunnels  int
-	hangAfter string // version|types|challenge
-	dropAfter string
-	banner    []byte // raw banner override (non-RFB / truncated)
+	version       string // 12-byte ProtocolVersion; default RFB 3.8
+	secTypes      []byte // 3.7/3.8 list; ignored for 3.3
+	sec33         uint32 // 3.3 server-picked type
+	password      string
+	tightAuth     []uint32 // Tight nested auth codes (default VNC-Auth)
+	tightTunnels  []mockCap
+	tightAuthCaps []mockCap
+	nTunnels      int
+	secResult     uint32 // forced SecurityResult; 0 means compute from password
+	failReason    string
+	hangAfter     string // version|types|challenge
+	dropAfter     string
+	banner        []byte // raw banner override (non-RFB / truncated)
 }
 
 func startMockRFB(t *testing.T, cfg mockRFBConfig) string {
@@ -124,14 +135,19 @@ func serveVNCAuth(c net.Conn, cfg mockRFBConfig) {
 		return
 	}
 	var result uint32 = 1
-	if bytes.Equal(resp, vncDESChallenge(cfg.password, challenge)) {
+	if cfg.secResult != 0 {
+		result = cfg.secResult
+	} else if bytes.Equal(resp, vncDESChallenge(cfg.password, challenge)) {
 		result = 0
 	}
 	var rb [4]byte
 	binary.BigEndian.PutUint32(rb[:], result)
 	_, _ = c.Write(rb[:])
 	if result != 0 && cfg.version != "RFB 003.003\n" && cfg.version != "RFB 003.007\n" {
-		reason := []byte("Authentication failed")
+		reason := []byte(cfg.failReason)
+		if len(reason) == 0 {
+			reason = []byte("Authentication failed")
+		}
 		var n [4]byte
 		binary.BigEndian.PutUint32(n[:], uint32(len(reason)))
 		_, _ = c.Write(n[:])
@@ -139,39 +155,50 @@ func serveVNCAuth(c net.Conn, cfg mockRFBConfig) {
 	}
 }
 
+func writeMockCap(c net.Conn, cap mockCap) {
+	var buf [16]byte
+	binary.BigEndian.PutUint32(buf[0:4], uint32(cap.code))
+	copy(buf[4:8], cap.vendor)
+	copy(buf[8:16], cap.sig)
+	_, _ = c.Write(buf[:])
+}
+
 func serveTight(c net.Conn, cfg mockRFBConfig) {
-	var n [4]byte
-	binary.BigEndian.PutUint32(n[:], uint32(cfg.nTunnels))
-	_, _ = c.Write(n[:])
-	for i := 0; i < cfg.nTunnels; i++ {
-		var cap [16]byte
-		copy(cap[4:8], "TGHT")
-		copy(cap[8:], "NOTUNNEL")
-		_, _ = c.Write(cap[:])
+	tunnels := cfg.tightTunnels
+	if tunnels == nil && cfg.nTunnels > 0 {
+		tunnels = []mockCap{{0, "TGHT", "NOTUNNEL"}}
 	}
-	if cfg.nTunnels > 0 {
+	var n [4]byte
+	binary.BigEndian.PutUint32(n[:], uint32(len(tunnels)))
+	_, _ = c.Write(n[:])
+	for _, cap := range tunnels {
+		writeMockCap(c, cap)
+	}
+	if len(tunnels) > 0 {
 		sel := make([]byte, 4)
 		if _, err := readFullN(c, sel); err != nil {
 			return
 		}
 	}
-	binary.BigEndian.PutUint32(n[:], uint32(len(cfg.tightAuth)))
+	authCaps := cfg.tightAuthCaps
+	if authCaps == nil {
+		for _, code := range cfg.tightAuth {
+			sig := "NOAUTH__"
+			if code == 2 {
+				sig = "VNCAUTH_"
+			}
+			authCaps = append(authCaps, mockCap{int32(code), "STDV", sig})
+		}
+	}
+	binary.BigEndian.PutUint32(n[:], uint32(len(authCaps)))
 	_, _ = c.Write(n[:])
-	if len(cfg.tightAuth) == 0 {
+	if len(authCaps) == 0 {
 		var ok [4]byte
 		_, _ = c.Write(ok[:])
 		return
 	}
-	for _, code := range cfg.tightAuth {
-		var cap [16]byte
-		binary.BigEndian.PutUint32(cap[0:4], code)
-		copy(cap[4:8], "STDV")
-		if code == 2 {
-			copy(cap[8:], "VNCAUTH_")
-		} else {
-			copy(cap[8:], "NOAUTH__")
-		}
-		_, _ = c.Write(cap[:])
+	for _, cap := range authCaps {
+		writeMockCap(c, cap)
 	}
 	chosen := make([]byte, 4)
 	if _, err := readFullN(c, chosen); err != nil {
@@ -190,16 +217,27 @@ func serveTight(c net.Conn, cfg mockRFBConfig) {
 func TestVNCLoginProbeHandler(t *testing.T) {
 	t.Run("rfb38-correct", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{password: "VncPass123!"})
-		assertProbe(t, "correct", mockProbe(t, "vnc", addr, "", "VncPass123!"), true, false)
+		res := mockProbe(t, "vnc", addr, "", "VncPass123!")
+		assertProbe(t, "correct", res, true, false)
+		if res.Password != "VncPass123!" {
+			t.Fatalf("password success must keep the input password, got %q", res.Password)
+		}
+		if res.AccountLocked {
+			t.Fatal("password success must not be locked")
+		}
 	})
 	t.Run("rfb38-wrong", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{password: "VncPass123!"})
-		assertProbe(t, "wrong", mockProbe(t, "vnc", addr, "ignored", "WRONG"), false, false)
+		res := mockProbe(t, "vnc", addr, "ignored", "WRONG")
+		assertProbe(t, "wrong", res, false, false)
+		if res.AccountLocked {
+			t.Fatal("wrong password is not a lockout")
+		}
 	})
 	t.Run("rfb38-none", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{1}})
-		assertProbe(t, "none-empty", mockProbe(t, "vnc", addr, "", ""), true, false)
-		assertProbe(t, "none-any", mockProbe(t, "vnc", addr, "", "whatever"), true, false)
+		assertUnauth(t, "none-empty", mockProbe(t, "vnc", addr, "", ""))
+		assertUnauth(t, "none-any", mockProbe(t, "vnc", addr, "u", "whatever"))
 	})
 	t.Run("rfb33-vnauth", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{version: "RFB 003.003\n", password: "p33"})
@@ -208,16 +246,23 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 	})
 	t.Run("rfb33-none", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{version: "RFB 003.003\n", sec33: 1})
-		assertProbe(t, "33-none", mockProbe(t, "vnc", addr, "", ""), true, false)
+		assertUnauth(t, "33-none", mockProbe(t, "vnc", addr, "u", "p"))
 	})
 	t.Run("rfb37-none", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{version: "RFB 003.007\n", secTypes: []byte{1}})
-		assertProbe(t, "37-none", mockProbe(t, "vnc", addr, "", "x"), true, false)
+		assertUnauth(t, "37-none", mockProbe(t, "vnc", addr, "", "x"))
 	})
-	t.Run("prefer-vnauth-over-none", func(t *testing.T) {
+	t.Run("none-and-vncauth-reports-unauth", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{1, 2}, password: "secret"})
-		assertProbe(t, "uses-type2", mockProbe(t, "vnc", addr, "", "secret"), true, false)
-		assertProbe(t, "wrong-not-none", mockProbe(t, "vnc", addr, "", "nope"), false, false)
+		res := mockProbe(t, "vnc", addr, "admin", "secret")
+		assertUnauth(t, "mixed-unauth", res)
+		wrong := mockProbe(t, "vnc", addr, "", "nope")
+		if wrong.Ok {
+			t.Fatal("wrong VNC-Auth password must not succeed via None fallback")
+		}
+		if wrong.Finished {
+			t.Fatal("wrong password must not finish the target")
+		}
 	})
 	t.Run("tight-vnauth", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16}, password: "TightPass", nTunnels: 1})
@@ -227,24 +272,21 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 	t.Run("truncated-banner", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{banner: []byte("RFB"), dropAfter: "banner"})
 		res := mockProbe(t, "vnc", addr, "", "x")
-		if res.Ok {
-			t.Fatal("truncated banner must not authenticate")
+		if res.Ok || !res.Finished {
+			t.Fatalf("truncated banner: ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("non-rfb", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{banner: []byte("HTTP/1.1 200 OK\r\n\r\n")})
 		res := mockProbe(t, "vnc", addr, "", "x")
-		if res.Ok {
-			t.Fatal("HTTP banner must not authenticate")
-		}
-		if !res.Finished {
-			t.Fatal("non-RFB should finish the target")
+		if res.Ok || !res.Finished {
+			t.Fatalf("HTTP banner: ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("unreachable", func(t *testing.T) {
 		res := mockProbe(t, "vnc", "127.0.0.1:1", "", "x")
-		if res.Ok {
-			t.Fatal("unreachable must not be ok")
+		if res.Ok || !res.Finished {
+			t.Fatalf("unreachable: ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("long-password-truncated", func(t *testing.T) {
@@ -263,8 +305,8 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 		defer cancel()
 		start := time.Now()
 		res := mockProbeContext(t, ctx, "vnc", addr, "", "x")
-		if res.Ok {
-			t.Fatal("cancelled probe must not be ok")
+		if res.Ok || res.Finished {
+			t.Fatalf("timeout after RFB banner must retry, ok=%v finished=%v", res.Ok, res.Finished)
 		}
 		if time.Since(start) > 2*time.Second {
 			t.Fatal("cancel did not bound the probe")
@@ -282,11 +324,11 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 	})
 	t.Run("tight-none", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16}, tightAuth: []uint32{}})
-		assertProbe(t, "tight-none", mockProbe(t, "vnc", addr, "", "ignored"), true, false)
+		assertUnauth(t, "tight-none", mockProbe(t, "vnc", addr, "", "ignored"))
 	})
 	t.Run("tight-nested-none-code", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16}, tightAuth: []uint32{1}})
-		assertProbe(t, "tight-auth1", mockProbe(t, "vnc", addr, "", "x"), true, false)
+		assertUnauth(t, "tight-auth1", mockProbe(t, "vnc", addr, "", "x"))
 	})
 	t.Run("prefer-vnauth-over-tight", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16, 2}, password: "secret"})
@@ -326,15 +368,52 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 	t.Run("drop-after-version", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{dropAfter: "version", password: "x"})
 		res := mockProbe(t, "vnc", addr, "", "x")
-		if res.Ok {
-			t.Fatal("truncated handshake must not authenticate")
+		if res.Ok || res.Finished {
+			t.Fatalf("EOF after RFB banner must retry, ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("drop-after-challenge", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{dropAfter: "challenge", password: "x"})
 		res := mockProbe(t, "vnc", addr, "", "x")
-		if res.Ok {
-			t.Fatal("missing security result must not authenticate")
+		if res.Ok || res.Finished {
+			t.Fatalf("EOF after challenge must retry, ok=%v finished=%v", res.Ok, res.Finished)
+		}
+	})
+	t.Run("lockout-result-2", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{password: "secret", secResult: 2})
+		res := mockProbe(t, "vnc", addr, "", "secret")
+		if res.Ok || res.Finished || !res.AccountLocked {
+			t.Fatalf("SecurityResult 2: ok=%v finished=%v locked=%v", res.Ok, res.Finished, res.AccountLocked)
+		}
+	})
+	t.Run("lockout-too-many-reason", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{password: "secret", failReason: "Too many authentication failures"})
+		res := mockProbe(t, "vnc", addr, "", "WRONG")
+		if res.Ok || !res.AccountLocked {
+			t.Fatalf("too-many reason: ok=%v locked=%v", res.Ok, res.AccountLocked)
+		}
+	})
+	t.Run("tight-missing-notunnel", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{
+			secTypes:     []byte{16},
+			nTunnels:     1,
+			tightTunnels: []mockCap{{1, "TGHT", "ENCRYPTT"}},
+			password:     "TightPass",
+		})
+		res := mockProbe(t, "vnc", addr, "", "TightPass")
+		if res.Ok || !res.Finished {
+			t.Fatalf("missing NOTUNNEL: ok=%v finished=%v", res.Ok, res.Finished)
+		}
+	})
+	t.Run("tight-auth-wrong-signature", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{
+			secTypes:      []byte{16},
+			tightAuthCaps: []mockCap{{2, "XXXX", "VNCAUTH_"}},
+			password:      "TightPass",
+		})
+		res := mockProbe(t, "vnc", addr, "", "TightPass")
+		if res.Ok || !res.Finished {
+			t.Fatalf("wrong Tight auth signature: ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("password-not-leaked", func(t *testing.T) {
@@ -463,6 +542,17 @@ func TestVNCLoginProbeConcurrent(t *testing.T) {
 		if msg := <-errCh; msg != "" {
 			t.Fatal(msg)
 		}
+	}
+}
+
+func assertUnauth(t *testing.T, name string, res *bruteutils.BruteItemResult) {
+	t.Helper()
+	assertProbe(t, name, res, true, false)
+	if res.Username != "" || res.Password != "" {
+		t.Errorf("[%s] unauth must clear creds, user=%q pass=%q", name, res.Username, res.Password)
+	}
+	if res.AccountLocked {
+		t.Errorf("[%s] unauth must not be locked", name)
 	}
 }
 
