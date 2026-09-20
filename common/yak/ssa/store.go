@@ -28,6 +28,8 @@ func (s *StoredFunctionBuilder) NewExecutionBuilder() *FunctionBuilder {
 		return nil
 	}
 	b := *s.Current
+	b.executionInitialBlock = b.CurrentBlock
+	b.executionInitialReturn = b.IsReturn
 	b._editor = s.editor
 	b.parentBuilder = s.parentBuilder
 	b.MarkedThisClassBlueprint = s.markedThisClassBlueprint
@@ -40,6 +42,11 @@ func (s *StoredFunctionBuilder) NewExecutionBuilder() *FunctionBuilder {
 // Callers must serialize tasks owned by the same declaration function.
 func (s *StoredFunctionBuilder) CommitExecutionBuilder(b *FunctionBuilder) {
 	if s == nil || s.Current == nil || b == nil || b.Function != s.Current.Function {
+		return
+	}
+	// An unchanged outer view must not undo progress committed by a nested
+	// lazy initializer while the outer task was building a child function.
+	if b.CurrentBlock == b.executionInitialBlock && b.IsReturn == b.executionInitialReturn {
 		return
 	}
 	s.Current.CurrentBlock = b.CurrentBlock
