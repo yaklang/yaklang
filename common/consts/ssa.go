@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 
@@ -35,7 +36,7 @@ const (
 var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
-	ssaDatabase            *gorm.DB
+	ssaDatabase            atomic.Pointer[gorm.DB]
 )
 
 const (
@@ -104,9 +105,7 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	if err != nil {
 		return err
 	}
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
-	schema.SetDefaultSSADatabase(db)
+	SetGormSSAProjectDatabase(db)
 	return nil
 }
 
@@ -149,14 +148,14 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 }
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
-	ssaDatabase = db
 	// 同步更新 schema 包中的默认 SSA 数据库
 	schema.SetDefaultSSADatabase(db)
+	ssaDatabase.Store(db)
 }
 
 func GetGormSSAProjectDataBase() *gorm.DB {
-	if ssaDatabase == nil {
+	if ssaDatabase.Load() == nil {
 		initYakitDatabase()
 	}
-	return ssaDatabase
+	return ssaDatabase.Load()
 }
