@@ -8,7 +8,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/core/locktoml"
-
+	"github.com/yaklang/yaklang/common/sca/internal/digest"
+	"github.com/yaklang/yaklang/common/sca/model"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -16,9 +17,11 @@ type cargoPkg struct {
 	Name         string   `json:"name"`
 	Version      string   `json:"version"`
 	Source       string   `json:"source,omitempty"`
+	Checksum     string   `json:"checksum,omitempty"`
 	Dependencies []string `json:"dependencies,omitempty"`
 }
 type Lockfile struct {
+	Version  int        `json:"version"`
 	Packages []cargoPkg `json:"package"`
 }
 
@@ -34,6 +37,9 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	if err != nil {
 		return nil, nil, fmt.Errorf("decode error: %w", err)
 	}
+	if lockfile.Version != 0 && lockfile.Version != 1 && lockfile.Version != 2 && lockfile.Version != 3 {
+		return nil, nil, fmt.Errorf("unsupported_syntax: cargo lock version %d", lockfile.Version)
+	}
 
 	// We need to get version for unique dependencies for lockfile v3 from lockfile.Packages
 	pkgs := cargoIndex{name: map[string][]cargoPkg{}, version: map[[2]string][]cargoPkg{}, full: map[[3]string][]cargoPkg{}}
@@ -48,12 +54,22 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	var libs []types.Library
 	var deps []types.Dependency
 	for index, pkg := range lockfile.Packages {
+		if strings.TrimSpace(pkg.Name) == "" {
+			return nil, nil, fmt.Errorf("malformed_input: cargo package identity")
+		}
 		pkgID := nativeID(pkg)
 		lib := types.Library{
 			ID:      pkgID,
 			Name:    pkg.Name,
 			Source:  pkg.Source,
 			Version: pkg.Version,
+		}
+		if pkg.Checksum != "" {
+			declared := digest.ParseDeclared("sha256:" + pkg.Checksum)
+			lib.Verification = declared.Canonical
+			for _, issue := range declared.Issues {
+				lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "cargo", Reason: issue, Incomplete: true})
+			}
 		}
 		if index < len(spans) {
 			lib.Locations = []types.Location{{StartLine: spans[index].StartLine, EndLine: spans[index].EndLine}}

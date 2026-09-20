@@ -1,24 +1,25 @@
 package pnpm
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
-	"encoding/json"
-	"github.com/yaklang/yaklang/common/sca/core/lockyaml"
-	"io"
-
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"log"
-
+	"github.com/yaklang/yaklang/common/sca/core/lockyaml"
+	"github.com/yaklang/yaklang/common/sca/internal/digest"
+	"github.com/yaklang/yaklang/common/sca/model"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type PackageResolution struct {
-	Tarball string `json:"tarball,omitempty"`
+	Tarball   string `json:"tarball,omitempty"`
+	Integrity string `json:"integrity,omitempty"`
 }
 
 type PackageInfo struct {
@@ -65,17 +66,20 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		return nil, nil, fmt.Errorf("decode error: %w", err)
 	}
 
-	lockVer := parseLockfileVersion(lockFile)
-	if lockVer < 5 || lockVer >= 7 {
-		return nil, nil, fmt.Errorf("unsupported_syntax: pnpm lock version %v", lockFile.LockfileVersion)
+	lockVer, err := parseLockfileVersion(lockFile)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	libs, deps := p.parse(lockVer, lockFile)
+	libs, deps, err := p.parse(lockVer, lockFile)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return libs, deps, nil
 }
 
-func (p *Parser) parse(lockVer float64, lockFile LockFile) ([]types.Library, []types.Dependency) {
+func (p *Parser) parse(lockVer int, lockFile LockFile) ([]types.Library, []types.Dependency, error) {
 	var libs []types.Library
 	var deps []types.Dependency
 
@@ -95,6 +99,9 @@ func (p *Parser) parse(lockVer float64, lockFile LockFile) ([]types.Library, []t
 		if name == "" {
 			name, version = parsePackage(depPath, lockVer)
 		}
+		if strings.TrimSpace(name) == "" {
+			return nil, nil, fmt.Errorf("malformed_input: pnpm package identity %q", depPath)
+		}
 		pkgID := depPath
 
 		dependencies := make([]string, 0, len(info.Dependencies))
@@ -113,13 +120,19 @@ func (p *Parser) parse(lockVer float64, lockFile LockFile) ([]types.Library, []t
 			dependencies = append(dependencies, ref)
 		}
 
-		libs = append(libs, types.Library{
+		declared := digest.ParseDeclared(info.Resolution.Integrity)
+		lib := types.Library{
 			ID:      pkgID,
 			Variant: depPath, Source: info.Resolution.Tarball,
-			Name:     name,
-			Version:  version,
-			Indirect: isIndirectLib(name, lockFile.Dependencies),
-		})
+			Name:         name,
+			Version:      version,
+			Indirect:     isIndirectLib(name, lockFile.Dependencies),
+			Verification: declared.Canonical,
+		}
+		for _, issue := range declared.Issues {
+			lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "pnpm", Reason: issue, Incomplete: true})
+		}
+		libs = append(libs, lib)
 
 		if len(dependencies) > 0 {
 			deps = append(deps, types.Dependency{
@@ -131,26 +144,43 @@ func (p *Parser) parse(lockVer float64, lockFile LockFile) ([]types.Library, []t
 
 	sort.Sort(types.Libraries(libs))
 	sort.Sort(types.Dependencies(deps))
-	return libs, deps
+	return libs, deps, nil
 }
 
-func parseLockfileVersion(lockFile LockFile) float64 {
+func parseLockfileVersion(lockFile LockFile) (int, error) {
+	var text string
 	switch v := lockFile.LockfileVersion.(type) {
-	// v5
-	case float64:
-		return v
-	// v6+
+	case nil:
+		return 0, fmt.Errorf("unsupported_syntax: missing pnpm lock version")
 	case string:
-		if lockVer, err := strconv.ParseFloat(v, 64); err != nil {
-			log.Printf("Unable to convert the lock file version to float: %s", err)
-			return -1
-		} else {
-			return lockVer
+		text = strings.TrimSpace(v)
+	case float64:
+		if v != v || v > 1e6 || v < 0 {
+			return 0, fmt.Errorf("unsupported_syntax: pnpm lock version %v", lockFile.LockfileVersion)
 		}
+		text = strconv.FormatFloat(v, 'f', -1, 64)
+	case int:
+		text = strconv.Itoa(v)
+	case int64:
+		text = strconv.FormatInt(v, 10)
+	case json.Number:
+		text = v.String()
 	default:
 		log.Printf("Unknown type for the lock file version: %s", lockFile.LockfileVersion)
-		return -1
+		return 0, fmt.Errorf("unsupported_syntax: pnpm lock version type %T", v)
 	}
+	if text == "" || strings.EqualFold(text, "nan") || strings.EqualFold(text, "inf") || strings.EqualFold(text, "+inf") || strings.EqualFold(text, "-inf") {
+		return 0, fmt.Errorf("unsupported_syntax: pnpm lock version %v", lockFile.LockfileVersion)
+	}
+	allowed := map[string]int{
+		"5": 5, "5.0": 5, "5.1": 5, "5.2": 5, "5.3": 5, "5.4": 5,
+		"6": 6, "6.0": 6,
+	}
+	major, ok := allowed[text]
+	if !ok {
+		return 0, fmt.Errorf("unsupported_syntax: pnpm lock version %v", lockFile.LockfileVersion)
+	}
+	return major, nil
 }
 
 func isIndirectLib(name string, directDeps map[string]interface{}) bool {
@@ -159,7 +189,7 @@ func isIndirectLib(name string, directDeps map[string]interface{}) bool {
 }
 
 // cf. https://github.com/pnpm/pnpm/blob/ce61f8d3c29eee46cee38d56ced45aea8a439a53/packages/dependency-path/src/index.ts#L112-L163
-func parsePackage(depPath string, lockFileVersion float64) (string, string) {
+func parsePackage(depPath string, lockFileVersion int) (string, string) {
 	// The version separator is different between v5 and v6+.
 	versionSep := "@"
 	if lockFileVersion < 6 {

@@ -3,17 +3,16 @@ package npm
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"path"
 	"sort"
 	"strings"
 
-	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
-
-	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
-	"io/fs"
-
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
+	"github.com/yaklang/yaklang/common/sca/internal/digest"
+	"github.com/yaklang/yaklang/common/sca/model"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -30,6 +29,7 @@ type Dependency struct {
 	Dependencies map[string]Dependency `json:"dependencies"`
 	Requires     map[string]string     `json:"requires"`
 	Resolved     string                `json:"resolved"`
+	Integrity    string                `json:"integrity"`
 	StartLine    int
 	EndLine      int
 }
@@ -40,7 +40,9 @@ type Package struct {
 	Dependencies         map[string]string `json:"dependencies"`
 	OptionalDependencies map[string]string `json:"optionalDependencies"`
 	DevDependencies      map[string]string `json:"devDependencies"`
+	PeerDependencies     map[string]string `json:"peerDependencies"`
 	Resolved             string            `json:"resolved"`
+	Integrity            string            `json:"integrity"`
 	Dev                  bool              `json:"dev"`
 	Link                 bool              `json:"link"`
 	Workspaces           []string          `json:"workspaces"`
@@ -94,13 +96,12 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 func (p *Parser) parseV2(packages map[string]Package) ([]types.Library, []types.Dependency) {
 	paths := make([]string, 0, len(packages))
 	for key := range packages {
-		if key != "" {
-			paths = append(paths, key)
-		}
+		paths = append(paths, key)
 	}
 	sort.Strings(paths)
 	direct := map[string]bool{}
-	for name := range lo.Assign(packages[""].Dependencies, packages[""].OptionalDependencies, packages[""].DevDependencies) {
+	root := packages[""]
+	for name := range lo.Assign(root.Dependencies, root.OptionalDependencies, root.DevDependencies, root.PeerDependencies) {
 		if target := findInstalled("", name, packages); target != "" {
 			direct[target] = true
 		}
@@ -112,24 +113,46 @@ func (p *Parser) parseV2(packages map[string]Package) ([]types.Library, []types.
 		if record.Link {
 			continue
 		} // the target record is the workspace component
+		id := key
+		if id == "" {
+			id = "."
+		}
 		name := record.Name
-		if name == "" {
+		if name == "" && key != "" {
 			name = pkgNameFromPath(key)
 		}
-		libs = append(libs, types.Library{ID: key, Name: name, Version: record.Version, Source: record.Resolved, Dev: record.Dev, Indirect: !direct[key], Locations: []types.Location{{StartLine: record.StartLine, EndLine: record.EndLine}}})
-		d := types.Dependency{ID: key}
+		hasDecl := len(record.Dependencies)+len(record.OptionalDependencies)+len(record.DevDependencies)+len(record.PeerDependencies) > 0
+		if key == "" && name == "" && !hasDecl {
+			continue
+		}
+		declared := digest.ParseDeclared(record.Integrity)
+		lib := types.Library{
+			ID: id, Name: name, Version: record.Version, Source: record.Resolved,
+			Dev: record.Dev, Indirect: key != "" && !direct[key],
+			Verification: declared.Canonical,
+			Locations:    []types.Location{{StartLine: record.StartLine, EndLine: record.EndLine}},
+		}
+		if key == "" {
+			lib.Evidence = "declared"
+			lib.Indirect = false
+		}
+		for _, issue := range declared.Issues {
+			lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "npm", Reason: issue, Incomplete: true})
+		}
+		libs = append(libs, lib)
+		d := types.Dependency{ID: id}
 		for _, scope := range []struct {
 			name   string
 			values map[string]string
-		}{{"runtime", record.Dependencies}, {"optional", record.OptionalDependencies}} {
+		}{{"runtime", record.Dependencies}, {"optional", record.OptionalDependencies}, {"dev", record.DevDependencies}, {"peer", record.PeerDependencies}} {
 			names := make([]string, 0, len(scope.values))
-			for name := range scope.values {
-				names = append(names, name)
+			for n := range scope.values {
+				names = append(names, n)
 			}
 			sort.Strings(names)
-			for _, name := range names {
-				target := findInstalled(key, name, packages)
-				d.Requirements = append(d.Requirements, types.Requirement{Target: name, Constraint: scope.values[name], Scope: scope.name, Resolved: target})
+			for _, n := range names {
+				target := findInstalled(key, n, packages)
+				d.Requirements = append(d.Requirements, types.Requirement{Target: n, Constraint: scope.values[n], Scope: scope.name, Resolved: target})
 			}
 		}
 		deps = append(deps, d)
@@ -188,7 +211,7 @@ func pkgNameFromPath(name string) string {
 func flattenV1(all map[string]Package, base string, dependencies map[string]Dependency) {
 	for name, d := range dependencies {
 		key := path.Join(base, "node_modules", name)
-		all[key] = Package{Name: name, Version: d.Version, Dependencies: d.Requires, Dev: d.Dev, Resolved: d.Resolved, StartLine: d.StartLine, EndLine: d.EndLine}
+		all[key] = Package{Name: name, Version: d.Version, Dependencies: d.Requires, Dev: d.Dev, Resolved: d.Resolved, Integrity: d.Integrity, StartLine: d.StartLine, EndLine: d.EndLine}
 		flattenV1(all, key, d.Dependencies)
 	}
 }

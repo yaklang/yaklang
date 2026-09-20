@@ -113,18 +113,20 @@ func CreateCycloneDXSBOMByDXPackages(pkgs []*Package) *BOM {
 				c.Licenses = append(c.Licenses, choice)
 			}
 		}
-		if alg, value, ok := strings.Cut(p.Verification, ":"); ok {
-			if a, ok := normalCyloneDXHashType(alg); ok && validHash(a, value) {
-				h := BOMHash{a, value}
-				exists := false
-				for _, old := range c.Hashes {
-					if old == h {
-						exists = true
-						break
+		for _, part := range strings.Fields(p.Verification) {
+			if alg, value, ok := strings.Cut(part, ":"); ok {
+				if a, ok := normalCyloneDXHashType(alg); ok && validHash(a, value) {
+					h := BOMHash{a, value}
+					exists := false
+					for _, old := range c.Hashes {
+						if old == h {
+							exists = true
+							break
+						}
 					}
-				}
-				if !exists {
-					c.Hashes = append(c.Hashes, h)
+					if !exists {
+						c.Hashes = append(c.Hashes, h)
+					}
 				}
 			}
 		}
