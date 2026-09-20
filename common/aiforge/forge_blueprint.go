@@ -310,6 +310,55 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
 	return f.GenerateFirstPromptWithMemoryOption(params)
 }
 
+func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
+	query string,
+	params []*ypb.ExecParamItem,
+) (string, []aicommon.ConfigOption, error) {
+	initPrompt, err := f.renderInitPromptWithValidatedParams(query, params)
+	if err != nil {
+		return "", nil, utils.Errorf("render init prompt failed: %v", err)
+	}
+	persistentPrompt, err := f.renderPersistentPrompt(query)
+	if err != nil {
+		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
+	}
+
+	var opts []aicommon.ConfigOption
+	if persistentPrompt != "" {
+		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
+	}
+	if len(f.Tools) > 0 {
+		opts = append(opts, aicommon.WithTools(f.Tools...))
+	}
+	if f.PlanMocker != nil {
+		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
+	}
+	opts = append(opts, f.AIOptions...)
+	if f.ResultPrompt != "" && f.ResultHandler != nil {
+		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
+			prompt, renderErr := f.renderResultPrompt(cod.ContextProvider)
+			if renderErr != nil {
+				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", renderErr))
+				return
+			}
+			config := cod.Config
+			rsp, callErr := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
+			if callErr != nil {
+				f.ResultHandler("", utils.Errorf("render result failed: %v", callErr))
+				return
+			}
+			rspReader := rsp.GetOutputStreamReader("forge", true, config.GetEmitter())
+			raw, readErr := io.ReadAll(rspReader)
+			if readErr == io.EOF {
+				f.ResultHandler(string(raw), nil)
+			} else {
+				f.ResultHandler(string(raw), readErr)
+			}
+		}))
+	}
+	return initPrompt, opts, nil
+}
+
 func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 	ret := make([]*ypb.YakScriptParam, 0, len(params))
 

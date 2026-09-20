@@ -32,6 +32,13 @@ type File struct {
 	SHA256       string `json:"sha256"`
 }
 
+type MaterialReference struct {
+	ResourceID   string   `json:"resource_id"`
+	RelativePath string   `json:"relative_path"`
+	SHA256       string   `json:"sha256"`
+	Operations   []string `json:"operations"`
+}
+
 func (w *Workspace) Files() []File {
 	files := make([]File, 0, len(w.manifest.Resources))
 	for _, resource := range w.manifest.Resources {
@@ -94,6 +101,7 @@ func (w *Workspace) List(ctx context.Context, selection string) (map[string]any,
 		if selected(resource.RelativePath, selection) {
 			files = append(files, map[string]any{"path": resource.RelativePath, "relative_path": resource.RelativePath,
 				"resource_id": resource.ResourceId, "size": resource.SizeBytes, "size_bytes": resource.SizeBytes, "sha256": resource.Sha256})
+			w.event("input.file.access", Event{ResourceID: resource.ResourceId, Path: resource.RelativePath, Operation: "metadata"})
 		}
 	}
 	return map[string]any{"path": selection, "files": files, "count": len(files), "truncated": false}, nil

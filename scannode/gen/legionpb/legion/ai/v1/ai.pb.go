@@ -508,6 +508,7 @@ type ContextPackage struct {
 	ProviderPolicySnapshotJson []byte                 `protobuf:"bytes,7,opt,name=provider_policy_snapshot_json,json=providerPolicySnapshotJson,proto3" json:"provider_policy_snapshot_json,omitempty"` // model provider config (API key, base URL, headers)
 	RuntimeOptionSnapshotJson  []byte                 `protobuf:"bytes,8,opt,name=runtime_option_snapshot_json,json=runtimeOptionSnapshotJson,proto3" json:"runtime_option_snapshot_json,omitempty"`    // temperature, max_tokens, etc.
 	FocusRelease               *ContextFocusRelease   `protobuf:"bytes,9,opt,name=focus_release,json=focusRelease,proto3" json:"focus_release,omitempty"`                                               // immutable server-published Yak Focus release selected for this Turn
+	ForgeRelease               *ContextForgeRelease   `protobuf:"bytes,10,opt,name=forge_release,json=forgeRelease,proto3" json:"forge_release,omitempty"`                                              // immutable server-published config Forge release selected for this Turn
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -601,6 +602,13 @@ func (x *ContextPackage) GetRuntimeOptionSnapshotJson() []byte {
 func (x *ContextPackage) GetFocusRelease() *ContextFocusRelease {
 	if x != nil {
 		return x.FocusRelease
+	}
+	return nil
+}
+
+func (x *ContextPackage) GetForgeRelease() *ContextForgeRelease {
+	if x != nil {
+		return x.ForgeRelease
 	}
 	return nil
 }
@@ -19293,6 +19301,242 @@ func (x *ContextFocusRelease) GetExecutionContractJson() string {
 	return ""
 }
 
+type ContextForgeParameter struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	ValueKind     string                 `protobuf:"bytes,3,opt,name=value_kind,json=valueKind,proto3" json:"value_kind,omitempty"` // string | text | resource
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContextForgeParameter) Reset() {
+	*x = ContextForgeParameter{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[238]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContextForgeParameter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContextForgeParameter) ProtoMessage() {}
+
+func (x *ContextForgeParameter) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[238]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContextForgeParameter.ProtoReflect.Descriptor instead.
+func (*ContextForgeParameter) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{238}
+}
+
+func (x *ContextForgeParameter) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *ContextForgeParameter) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *ContextForgeParameter) GetValueKind() string {
+	if x != nil {
+		return x.ValueKind
+	}
+	return ""
+}
+
+// ContextForgeRelease carries the exact immutable config Forge definition
+// selected by Legion. Scan Node verifies sha256 before execution and builds a
+// Blueprint directly from these fields. It must never resolve a same-name
+// Forge from the node-local database or execute parameter_rule_yaklang_code.
+type ContextForgeRelease struct {
+	state                    protoimpl.MessageState   `protogen:"open.v1"`
+	SchemaVersion            string                   `protobuf:"bytes,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"` // legion.ai-forge-release/v1
+	ReleaseId                string                   `protobuf:"bytes,2,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
+	ForgeId                  string                   `protobuf:"bytes,3,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	Version                  string                   `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
+	Name                     string                   `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	Sha256                   string                   `protobuf:"bytes,6,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	ExecutorKind             string                   `protobuf:"bytes,7,opt,name=executor_kind,json=executorKind,proto3" json:"executor_kind,omitempty"`                // config_forge_v1
+	CapabilityProfile        string                   `protobuf:"bytes,8,opt,name=capability_profile,json=capabilityProfile,proto3" json:"capability_profile,omitempty"` // advisory.v1 | report.v1 | http_assessment.v1
+	InitPrompt               string                   `protobuf:"bytes,9,opt,name=init_prompt,json=initPrompt,proto3" json:"init_prompt,omitempty"`
+	PersistentPrompt         string                   `protobuf:"bytes,10,opt,name=persistent_prompt,json=persistentPrompt,proto3" json:"persistent_prompt,omitempty"`
+	PlanPrompt               string                   `protobuf:"bytes,11,opt,name=plan_prompt,json=planPrompt,proto3" json:"plan_prompt,omitempty"`
+	ResultPrompt             string                   `protobuf:"bytes,12,opt,name=result_prompt,json=resultPrompt,proto3" json:"result_prompt,omitempty"`
+	ParameterRuleYaklangCode string                   `protobuf:"bytes,13,opt,name=parameter_rule_yaklang_code,json=parameterRuleYaklangCode,proto3" json:"parameter_rule_yaklang_code,omitempty"` // parse-only CLI declarations
+	Parameters               []*ContextForgeParameter `protobuf:"bytes,14,rep,name=parameters,proto3" json:"parameters,omitempty"`
+	DeclaredToolNames        []string                 `protobuf:"bytes,15,rep,name=declared_tool_names,json=declaredToolNames,proto3" json:"declared_tool_names,omitempty"`
+	InputSchemaJson          []byte                   `protobuf:"bytes,16,opt,name=input_schema_json,json=inputSchemaJson,proto3" json:"input_schema_json,omitempty"`
+	DefinitionSha256         string                   `protobuf:"bytes,17,opt,name=definition_sha256,json=definitionSha256,proto3" json:"definition_sha256,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *ContextForgeRelease) Reset() {
+	*x = ContextForgeRelease{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[239]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContextForgeRelease) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContextForgeRelease) ProtoMessage() {}
+
+func (x *ContextForgeRelease) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[239]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContextForgeRelease.ProtoReflect.Descriptor instead.
+func (*ContextForgeRelease) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{239}
+}
+
+func (x *ContextForgeRelease) GetSchemaVersion() string {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetReleaseId() string {
+	if x != nil {
+		return x.ReleaseId
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetForgeId() string {
+	if x != nil {
+		return x.ForgeId
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetExecutorKind() string {
+	if x != nil {
+		return x.ExecutorKind
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetCapabilityProfile() string {
+	if x != nil {
+		return x.CapabilityProfile
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetInitPrompt() string {
+	if x != nil {
+		return x.InitPrompt
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetPersistentPrompt() string {
+	if x != nil {
+		return x.PersistentPrompt
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetPlanPrompt() string {
+	if x != nil {
+		return x.PlanPrompt
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetResultPrompt() string {
+	if x != nil {
+		return x.ResultPrompt
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetParameterRuleYaklangCode() string {
+	if x != nil {
+		return x.ParameterRuleYaklangCode
+	}
+	return ""
+}
+
+func (x *ContextForgeRelease) GetParameters() []*ContextForgeParameter {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+func (x *ContextForgeRelease) GetDeclaredToolNames() []string {
+	if x != nil {
+		return x.DeclaredToolNames
+	}
+	return nil
+}
+
+func (x *ContextForgeRelease) GetInputSchemaJson() []byte {
+	if x != nil {
+		return x.InputSchemaJson
+	}
+	return nil
+}
+
+func (x *ContextForgeRelease) GetDefinitionSha256() string {
+	if x != nil {
+		return x.DefinitionSha256
+	}
+	return ""
+}
+
 // InputManifest pins authorized managed resources for one execution attempt.
 // It never carries download URLs, object-store locators or credentials.
 type InputManifest struct {
@@ -19317,7 +19561,7 @@ type InputManifest struct {
 
 func (x *InputManifest) Reset() {
 	*x = InputManifest{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[238]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[240]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19329,7 +19573,7 @@ func (x *InputManifest) String() string {
 func (*InputManifest) ProtoMessage() {}
 
 func (x *InputManifest) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[238]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[240]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19342,7 +19586,7 @@ func (x *InputManifest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InputManifest.ProtoReflect.Descriptor instead.
 func (*InputManifest) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{238}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{240}
 }
 
 func (x *InputManifest) GetSchemaVersion() string {
@@ -19441,7 +19685,7 @@ type InputResource struct {
 
 func (x *InputResource) Reset() {
 	*x = InputResource{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[239]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[241]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19453,7 +19697,7 @@ func (x *InputResource) String() string {
 func (*InputResource) ProtoMessage() {}
 
 func (x *InputResource) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[239]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[241]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19466,7 +19710,7 @@ func (x *InputResource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InputResource.ProtoReflect.Descriptor instead.
 func (*InputResource) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{239}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{241}
 }
 
 func (x *InputResource) GetResourceId() string {
@@ -19592,7 +19836,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x0fcontext_package\x18\x06 \x01(\v2\x1c.legion.ai.v1.ContextPackageR\x0econtextPackage\x12\x1b\n" +
 	"\treview_id\x18\a \x01(\tR\breviewId\x12\x17\n" +
 	"\aturn_id\x18\b \x01(\tR\x06turnId\x127\n" +
-	"\x18expected_node_session_id\x18\t \x01(\tR\x15expectedNodeSessionId\"\xee\x03\n" +
+	"\x18expected_node_session_id\x18\t \x01(\tR\x15expectedNodeSessionId\"\xb6\x04\n" +
 	"\x0eContextPackage\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
@@ -19604,7 +19848,9 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"user_input\x18\x06 \x01(\tR\tuserInput\x12A\n" +
 	"\x1dprovider_policy_snapshot_json\x18\a \x01(\fR\x1aproviderPolicySnapshotJson\x12?\n" +
 	"\x1cruntime_option_snapshot_json\x18\b \x01(\fR\x19runtimeOptionSnapshotJson\x12F\n" +
-	"\rfocus_release\x18\t \x01(\v2!.legion.ai.v1.ContextFocusReleaseR\ffocusRelease\"b\n" +
+	"\rfocus_release\x18\t \x01(\v2!.legion.ai.v1.ContextFocusReleaseR\ffocusRelease\x12F\n" +
+	"\rforge_release\x18\n" +
+	" \x01(\v2!.legion.ai.v1.ContextForgeReleaseR\fforgeRelease\"b\n" +
 	"\x0eContextMessage\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\"\n" +
@@ -21363,7 +21609,36 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"entry_code\x18\x06 \x01(\tR\tentryCode\x12@\n" +
 	"\tsidekicks\x18\a \x03(\v2\".legion.ai.v1.ContextFocusSidekickR\tsidekicks\x12\x16\n" +
 	"\x06sha256\x18\b \x01(\tR\x06sha256\x126\n" +
-	"\x17execution_contract_json\x18\t \x01(\tR\x15executionContractJson\"\x9e\x03\n" +
+	"\x17execution_contract_json\x18\t \x01(\tR\x15executionContractJson\"^\n" +
+	"\x15ContextForgeParameter\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x1d\n" +
+	"\n" +
+	"value_kind\x18\x03 \x01(\tR\tvalueKind\"\xb1\x05\n" +
+	"\x13ContextForgeRelease\x12%\n" +
+	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1d\n" +
+	"\n" +
+	"release_id\x18\x02 \x01(\tR\treleaseId\x12\x19\n" +
+	"\bforge_id\x18\x03 \x01(\tR\aforgeId\x12\x18\n" +
+	"\aversion\x18\x04 \x01(\tR\aversion\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12\x16\n" +
+	"\x06sha256\x18\x06 \x01(\tR\x06sha256\x12#\n" +
+	"\rexecutor_kind\x18\a \x01(\tR\fexecutorKind\x12-\n" +
+	"\x12capability_profile\x18\b \x01(\tR\x11capabilityProfile\x12\x1f\n" +
+	"\vinit_prompt\x18\t \x01(\tR\n" +
+	"initPrompt\x12+\n" +
+	"\x11persistent_prompt\x18\n" +
+	" \x01(\tR\x10persistentPrompt\x12\x1f\n" +
+	"\vplan_prompt\x18\v \x01(\tR\n" +
+	"planPrompt\x12#\n" +
+	"\rresult_prompt\x18\f \x01(\tR\fresultPrompt\x12=\n" +
+	"\x1bparameter_rule_yaklang_code\x18\r \x01(\tR\x18parameterRuleYaklangCode\x12C\n" +
+	"\n" +
+	"parameters\x18\x0e \x03(\v2#.legion.ai.v1.ContextForgeParameterR\n" +
+	"parameters\x12.\n" +
+	"\x13declared_tool_names\x18\x0f \x03(\tR\x11declaredToolNames\x12*\n" +
+	"\x11input_schema_json\x18\x10 \x01(\fR\x0finputSchemaJson\x12+\n" +
+	"\x11definition_sha256\x18\x11 \x01(\tR\x10definitionSha256\"\x9e\x03\n" +
 	"\rInputManifest\x12%\n" +
 	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1f\n" +
 	"\vmanifest_id\x18\x02 \x01(\tR\n" +
@@ -21411,7 +21686,7 @@ func file_legion_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_legion_ai_v1_ai_proto_rawDescData
 }
 
-var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 241)
+var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 243)
 var file_legion_ai_v1_ai_proto_goTypes = []any{
 	(*AISessionRef)(nil),                                // 0: legion.ai.v1.AISessionRef
 	(*AISessionAttachmentRef)(nil),                      // 1: legion.ai.v1.AISessionAttachmentRef
@@ -21651,346 +21926,350 @@ var file_legion_ai_v1_ai_proto_goTypes = []any{
 	(*AIFocusRiskJudgementScope)(nil),                   // 235: legion.ai.v1.AIFocusRiskJudgementScope
 	(*ContextFocusSidekick)(nil),                        // 236: legion.ai.v1.ContextFocusSidekick
 	(*ContextFocusRelease)(nil),                         // 237: legion.ai.v1.ContextFocusRelease
-	(*InputManifest)(nil),                               // 238: legion.ai.v1.InputManifest
-	(*InputResource)(nil),                               // 239: legion.ai.v1.InputResource
-	nil,                                                 // 240: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
-	(*v1.CommandMetadata)(nil),                          // 241: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),                            // 242: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil),                       // 243: google.protobuf.Timestamp
-	(*v11.JobRef)(nil),                                  // 244: legion.job.v1.JobRef
+	(*ContextForgeParameter)(nil),                       // 238: legion.ai.v1.ContextForgeParameter
+	(*ContextForgeRelease)(nil),                         // 239: legion.ai.v1.ContextForgeRelease
+	(*InputManifest)(nil),                               // 240: legion.ai.v1.InputManifest
+	(*InputResource)(nil),                               // 241: legion.ai.v1.InputResource
+	nil,                                                 // 242: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	(*v1.CommandMetadata)(nil),                          // 243: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),                            // 244: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),                       // 245: google.protobuf.Timestamp
+	(*v11.JobRef)(nil),                                  // 246: legion.job.v1.JobRef
 }
 var file_legion_ai_v1_ai_proto_depIdxs = []int32{
-	241, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	243, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,   // 1: legion.ai.v1.BindAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
 	1,   // 2: legion.ai.v1.BindAISessionCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
 	2,   // 3: legion.ai.v1.BindAISessionCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
 	234, // 4: legion.ai.v1.BindAISessionCommand.result_context:type_name -> legion.ai.v1.AIFocusResultContext
-	238, // 5: legion.ai.v1.BindAISessionCommand.input_manifest:type_name -> legion.ai.v1.InputManifest
-	241, // 6: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	240, // 5: legion.ai.v1.BindAISessionCommand.input_manifest:type_name -> legion.ai.v1.InputManifest
+	243, // 6: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,   // 7: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
 	5,   // 8: legion.ai.v1.PushAISessionInputCommand.context_package:type_name -> legion.ai.v1.ContextPackage
 	6,   // 9: legion.ai.v1.ContextPackage.messages:type_name -> legion.ai.v1.ContextMessage
 	7,   // 10: legion.ai.v1.ContextPackage.tools:type_name -> legion.ai.v1.ContextTool
 	8,   // 11: legion.ai.v1.ContextPackage.kb_fragments:type_name -> legion.ai.v1.ContextKbFragment
 	237, // 12: legion.ai.v1.ContextPackage.focus_release:type_name -> legion.ai.v1.ContextFocusRelease
-	241, // 13: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 14: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
-	1,   // 15: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
-	2,   // 16: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	241, // 17: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 18: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	241, // 19: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 20: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	241, // 21: legion.ai.v1.UpdateAISessionTitleCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 22: legion.ai.v1.UpdateAISessionTitleCommand.session:type_name -> legion.ai.v1.AISessionRef
-	242, // 23: legion.ai.v1.AISessionTitleUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 24: legion.ai.v1.AISessionTitleUpdated.session:type_name -> legion.ai.v1.AISessionRef
-	242, // 25: legion.ai.v1.AISessionTitleUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 26: legion.ai.v1.AISessionTitleUpdateFailed.session:type_name -> legion.ai.v1.AISessionRef
-	241, // 27: legion.ai.v1.DeleteAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 28: legion.ai.v1.DeleteAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	242, // 29: legion.ai.v1.AISessionDeleteCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 30: legion.ai.v1.AISessionDeleteCompleted.session:type_name -> legion.ai.v1.AISessionRef
-	242, // 31: legion.ai.v1.AISessionDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 32: legion.ai.v1.AISessionDeleteFailed.session:type_name -> legion.ai.v1.AISessionRef
-	240, // 33: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
-	241, // 34: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	18,  // 35: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	242, // 36: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	20,  // 37: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
-	242, // 38: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 39: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	18,  // 40: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	242, // 41: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	18,  // 42: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	242, // 43: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	26,  // 44: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 45: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	27,  // 46: legion.ai.v1.AIModelConfigSnapshot.provider:type_name -> legion.ai.v1.AIThirdPartyApplicationConfigSnapshot
-	26,  // 47: legion.ai.v1.AIModelConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
-	28,  // 48: legion.ai.v1.AIGlobalConfigSnapshot.intelligent_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
-	28,  // 49: legion.ai.v1.AIGlobalConfigSnapshot.lightweight_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
-	28,  // 50: legion.ai.v1.AIGlobalConfigSnapshot.vision_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
-	241, // 51: legion.ai.v1.GetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	241, // 52: legion.ai.v1.SetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	29,  // 53: legion.ai.v1.SetAIGlobalConfigCommand.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
-	242, // 54: legion.ai.v1.AIGlobalConfigFetched.metadata:type_name -> legion.node.v1.EventMetadata
-	29,  // 55: legion.ai.v1.AIGlobalConfigFetched.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
-	242, // 56: legion.ai.v1.AIGlobalConfigFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 57: legion.ai.v1.AIGlobalConfigUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	29,  // 58: legion.ai.v1.AIGlobalConfigUpdated.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
-	242, // 59: legion.ai.v1.AIGlobalConfigUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 60: legion.ai.v1.QueryAIFocusCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 61: legion.ai.v1.AIFocusQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	36,  // 62: legion.ai.v1.AIFocusQueried.items:type_name -> legion.ai.v1.AIFocus
-	242, // 63: legion.ai.v1.AIFocusQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 64: legion.ai.v1.GetRandomAIMaterialsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 65: legion.ai.v1.AIMaterialsRandomQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 66: legion.ai.v1.AIMaterialsRandomQueried.knowledge_base_entries:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	123, // 67: legion.ai.v1.AIMaterialsRandomQueried.ai_tools:type_name -> legion.ai.v1.AIToolRecord
-	99,  // 68: legion.ai.v1.AIMaterialsRandomQueried.ai_forges:type_name -> legion.ai.v1.AIForgeRecord
-	242, // 69: legion.ai.v1.AIMaterialsRandomQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	44,  // 70: legion.ai.v1.AIMCPServerTool.params:type_name -> legion.ai.v1.AIMCPServerToolParam
-	45,  // 71: legion.ai.v1.AIMCPServerRecord.tools:type_name -> legion.ai.v1.AIMCPServerTool
-	26,  // 72: legion.ai.v1.AIMCPServerRecord.envs:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 73: legion.ai.v1.AIMCPServerRecord.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	241, // 74: legion.ai.v1.ListAIMCPServersCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	43,  // 75: legion.ai.v1.ListAIMCPServersCommand.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
-	242, // 76: legion.ai.v1.AIMCPServersListed.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 77: legion.ai.v1.AIMCPServersListed.items:type_name -> legion.ai.v1.AIMCPServerRecord
-	43,  // 78: legion.ai.v1.AIMCPServersListed.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
-	242, // 79: legion.ai.v1.AIMCPServersListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 80: legion.ai.v1.CreateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	26,  // 81: legion.ai.v1.CreateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 82: legion.ai.v1.CreateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	242, // 83: legion.ai.v1.AIMCPServerCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 84: legion.ai.v1.AIMCPServerCreated.item:type_name -> legion.ai.v1.AIMCPServerRecord
-	242, // 85: legion.ai.v1.AIMCPServerCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 86: legion.ai.v1.UpdateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	26,  // 87: legion.ai.v1.UpdateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 88: legion.ai.v1.UpdateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	242, // 89: legion.ai.v1.AIMCPServerUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 90: legion.ai.v1.AIMCPServerUpdated.item:type_name -> legion.ai.v1.AIMCPServerRecord
-	242, // 91: legion.ai.v1.AIMCPServerUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 92: legion.ai.v1.DeleteAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 93: legion.ai.v1.AIMCPServerDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 94: legion.ai.v1.AIMCPServerDeleted.item:type_name -> legion.ai.v1.AIMCPServerRecord
-	242, // 95: legion.ai.v1.AIMCPServerDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	59,  // 96: legion.ai.v1.AILocalModelRecord.status:type_name -> legion.ai.v1.AILocalModelStatus
-	241, // 97: legion.ai.v1.ListAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 98: legion.ai.v1.AILocalModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 99: legion.ai.v1.AILocalModelsListed.items:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 100: legion.ai.v1.AILocalModelsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 101: legion.ai.v1.CheckAILlamaServerReadyCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 102: legion.ai.v1.AILlamaServerReadyChecked.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 103: legion.ai.v1.AILlamaServerReadyCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 104: legion.ai.v1.InstallAILlamaServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 105: legion.ai.v1.AILocalModelOperationAccepted.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 106: legion.ai.v1.AILocalModelOperationAccepted.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	242, // 107: legion.ai.v1.AILocalModelOperationProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 108: legion.ai.v1.AILocalModelOperationProgressed.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	242, // 109: legion.ai.v1.AILocalModelOperationCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 110: legion.ai.v1.AILocalModelOperationCompleted.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	60,  // 111: legion.ai.v1.AILocalModelOperationCompleted.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 112: legion.ai.v1.AILocalModelOperationCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 113: legion.ai.v1.AILocalModelOperationCancelled.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	242, // 114: legion.ai.v1.AILocalModelOperationFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 115: legion.ai.v1.AILocalModelOperationFailed.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	242, // 116: legion.ai.v1.AILlamaServerInstalled.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 117: legion.ai.v1.AILlamaServerInstallFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 118: legion.ai.v1.CreateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 119: legion.ai.v1.AILocalModelCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 120: legion.ai.v1.AILocalModelCreated.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 121: legion.ai.v1.AILocalModelCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 122: legion.ai.v1.UpdateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 123: legion.ai.v1.AILocalModelUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 124: legion.ai.v1.AILocalModelUpdated.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 125: legion.ai.v1.AILocalModelUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 126: legion.ai.v1.DeleteAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 127: legion.ai.v1.AILocalModelDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 128: legion.ai.v1.AILocalModelDeleted.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 129: legion.ai.v1.AILocalModelDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 130: legion.ai.v1.StartAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 131: legion.ai.v1.AILocalModelStarted.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 132: legion.ai.v1.AILocalModelStarted.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 133: legion.ai.v1.AILocalModelStartFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 134: legion.ai.v1.StopAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 135: legion.ai.v1.AILocalModelStopped.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 136: legion.ai.v1.AILocalModelStopped.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 137: legion.ai.v1.AILocalModelStopFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 138: legion.ai.v1.DownloadAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	241, // 139: legion.ai.v1.CancelAILocalModelOperationCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 140: legion.ai.v1.AILocalModelDownloaded.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 141: legion.ai.v1.AILocalModelDownloaded.item:type_name -> legion.ai.v1.AILocalModelRecord
-	242, // 142: legion.ai.v1.AILocalModelDownloadFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 143: legion.ai.v1.ClearAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 144: legion.ai.v1.AILocalModelsCleared.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 145: legion.ai.v1.AILocalModelsClearFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 146: legion.ai.v1.ListAIForgesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	98,  // 147: legion.ai.v1.ListAIForgesCommand.pagination:type_name -> legion.ai.v1.AIForgePagination
-	242, // 148: legion.ai.v1.AIForgesListed.metadata:type_name -> legion.node.v1.EventMetadata
-	99,  // 149: legion.ai.v1.AIForgesListed.items:type_name -> legion.ai.v1.AIForgeRecord
-	98,  // 150: legion.ai.v1.AIForgesListed.pagination:type_name -> legion.ai.v1.AIForgePagination
-	242, // 151: legion.ai.v1.AIForgesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 152: legion.ai.v1.CreateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 153: legion.ai.v1.AIForgeCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	99,  // 154: legion.ai.v1.AIForgeCreated.item:type_name -> legion.ai.v1.AIForgeRecord
-	242, // 155: legion.ai.v1.AIForgeCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 156: legion.ai.v1.UpdateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 157: legion.ai.v1.AIForgeUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	99,  // 158: legion.ai.v1.AIForgeUpdated.item:type_name -> legion.ai.v1.AIForgeRecord
-	242, // 159: legion.ai.v1.AIForgeUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 160: legion.ai.v1.DeleteAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 161: legion.ai.v1.AIForgeDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 162: legion.ai.v1.AIForgeDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 163: legion.ai.v1.ExportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 164: legion.ai.v1.AIForgeExportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 165: legion.ai.v1.AIForgeExported.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 166: legion.ai.v1.AIForgeExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 167: legion.ai.v1.ImportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	116, // 168: legion.ai.v1.ImportAIForgeCommand.attachment:type_name -> legion.ai.v1.AIForgeImportAttachment
-	242, // 169: legion.ai.v1.AIForgeImportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 170: legion.ai.v1.AIForgeImported.metadata:type_name -> legion.node.v1.EventMetadata
-	119, // 171: legion.ai.v1.AIForgeImported.items:type_name -> legion.ai.v1.AIForgeImportItem
-	242, // 172: legion.ai.v1.AIForgeImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 173: legion.ai.v1.ListAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	122, // 174: legion.ai.v1.ListAIToolsCommand.pagination:type_name -> legion.ai.v1.AIToolPagination
-	242, // 175: legion.ai.v1.AIToolsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	123, // 176: legion.ai.v1.AIToolsListed.items:type_name -> legion.ai.v1.AIToolRecord
-	122, // 177: legion.ai.v1.AIToolsListed.pagination:type_name -> legion.ai.v1.AIToolPagination
-	242, // 178: legion.ai.v1.AIToolsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 179: legion.ai.v1.CreateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 180: legion.ai.v1.AIToolCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	123, // 181: legion.ai.v1.AIToolCreated.item:type_name -> legion.ai.v1.AIToolRecord
-	242, // 182: legion.ai.v1.AIToolCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 183: legion.ai.v1.UpdateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 184: legion.ai.v1.AIToolUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	123, // 185: legion.ai.v1.AIToolUpdated.item:type_name -> legion.ai.v1.AIToolRecord
-	242, // 186: legion.ai.v1.AIToolUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 187: legion.ai.v1.GenerateAIToolMetadataCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 188: legion.ai.v1.AIToolMetadataGenerated.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 189: legion.ai.v1.AIToolMetadataGenerateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 190: legion.ai.v1.ToggleAIToolFavoriteCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 191: legion.ai.v1.AIToolFavoriteToggled.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 192: legion.ai.v1.AIToolFavoriteToggleFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 193: legion.ai.v1.DeleteAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 194: legion.ai.v1.AIToolsDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 195: legion.ai.v1.AIToolsDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 196: legion.ai.v1.ListAIKnowledgeBasesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	142, // 197: legion.ai.v1.ListAIKnowledgeBasesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	242, // 198: legion.ai.v1.AIKnowledgeBasesListed.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 199: legion.ai.v1.AIKnowledgeBasesListed.items:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	142, // 200: legion.ai.v1.AIKnowledgeBasesListed.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	242, // 201: legion.ai.v1.AIKnowledgeBasesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 202: legion.ai.v1.CreateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 203: legion.ai.v1.AIKnowledgeBaseCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 204: legion.ai.v1.AIKnowledgeBaseCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	242, // 205: legion.ai.v1.AIKnowledgeBaseCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 206: legion.ai.v1.ImportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	148, // 207: legion.ai.v1.ImportAIKnowledgeBaseCommand.attachment:type_name -> legion.ai.v1.AIKnowledgeBaseImportAttachment
-	242, // 208: legion.ai.v1.AIKnowledgeBaseImported.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 209: legion.ai.v1.AIKnowledgeBaseImported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	242, // 210: legion.ai.v1.AIKnowledgeBaseImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 211: legion.ai.v1.UpdateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 212: legion.ai.v1.AIKnowledgeBaseUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 213: legion.ai.v1.AIKnowledgeBaseUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	242, // 214: legion.ai.v1.AIKnowledgeBaseUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 215: legion.ai.v1.DeleteAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 216: legion.ai.v1.AIKnowledgeBaseDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 217: legion.ai.v1.AIKnowledgeBaseDeleted.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	242, // 218: legion.ai.v1.AIKnowledgeBaseDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 219: legion.ai.v1.ExportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 220: legion.ai.v1.AIKnowledgeBaseExported.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 221: legion.ai.v1.AIKnowledgeBaseExported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	242, // 222: legion.ai.v1.AIKnowledgeBaseExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 223: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	163, // 224: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.filter:type_name -> legion.ai.v1.AIKnowledgeBaseEntryFilter
-	142, // 225: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	242, // 226: legion.ai.v1.AIKnowledgeBaseEntriesSearched.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 227: legion.ai.v1.AIKnowledgeBaseEntriesSearched.items:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	142, // 228: legion.ai.v1.AIKnowledgeBaseEntriesSearched.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	242, // 229: legion.ai.v1.AIKnowledgeBaseEntriesSearchFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 230: legion.ai.v1.QueryAIKnowledgeBaseByAICommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	241, // 231: legion.ai.v1.CancelAIKnowledgeBaseByAIQueryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 232: legion.ai.v1.AIKnowledgeBaseQueryByAIChunk.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 233: legion.ai.v1.AIKnowledgeBaseQueryByAICompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 234: legion.ai.v1.AIKnowledgeBaseQueryByAIFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 235: legion.ai.v1.GenerateAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	241, // 236: legion.ai.v1.CancelAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 237: legion.ai.v1.AIKnowledgeBaseQuestionIndexProgress.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 238: legion.ai.v1.AIKnowledgeBaseQuestionIndexCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 239: legion.ai.v1.AIKnowledgeBaseQuestionIndexFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 240: legion.ai.v1.CreateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 241: legion.ai.v1.AIKnowledgeBaseEntryCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 242: legion.ai.v1.AIKnowledgeBaseEntryCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	242, // 243: legion.ai.v1.AIKnowledgeBaseEntryCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 244: legion.ai.v1.UpdateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 245: legion.ai.v1.AIKnowledgeBaseEntryUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 246: legion.ai.v1.AIKnowledgeBaseEntryUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	242, // 247: legion.ai.v1.AIKnowledgeBaseEntryUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 248: legion.ai.v1.DeleteAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 249: legion.ai.v1.AIKnowledgeBaseEntryDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 250: legion.ai.v1.AIKnowledgeBaseEntryDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 251: legion.ai.v1.BuildAIKnowledgeBaseVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 252: legion.ai.v1.AIKnowledgeBaseVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 253: legion.ai.v1.AIKnowledgeBaseVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 254: legion.ai.v1.BuildAIKnowledgeBaseEntryVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 255: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 256: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	193, // 257: legion.ai.v1.AIMemoryEntityFilter.c_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 258: legion.ai.v1.AIMemoryEntityFilter.o_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 259: legion.ai.v1.AIMemoryEntityFilter.r_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 260: legion.ai.v1.AIMemoryEntityFilter.e_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 261: legion.ai.v1.AIMemoryEntityFilter.p_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 262: legion.ai.v1.AIMemoryEntityFilter.a_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 263: legion.ai.v1.AIMemoryEntityFilter.t_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	194, // 264: legion.ai.v1.AIMemoryEntityFilter.created_at:type_name -> legion.ai.v1.AIMemoryInt64Range
-	194, // 265: legion.ai.v1.AIMemoryEntityFilter.updated_at:type_name -> legion.ai.v1.AIMemoryInt64Range
-	241, // 266: legion.ai.v1.CreateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 267: legion.ai.v1.AIMemoryEntityCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 268: legion.ai.v1.AIMemoryEntityCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 269: legion.ai.v1.GetAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 270: legion.ai.v1.AIMemoryEntityFetched.metadata:type_name -> legion.node.v1.EventMetadata
-	197, // 271: legion.ai.v1.AIMemoryEntityFetched.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	242, // 272: legion.ai.v1.AIMemoryEntityFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 273: legion.ai.v1.QueryAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	195, // 274: legion.ai.v1.QueryAIMemoryEntitiesCommand.pagination:type_name -> legion.ai.v1.AIMemoryPagination
-	198, // 275: legion.ai.v1.QueryAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
-	242, // 276: legion.ai.v1.AIMemoryEntitiesQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	195, // 277: legion.ai.v1.AIMemoryEntitiesQueried.pagination:type_name -> legion.ai.v1.AIMemoryPagination
-	197, // 278: legion.ai.v1.AIMemoryEntitiesQueried.items:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	242, // 279: legion.ai.v1.AIMemoryEntitiesQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 280: legion.ai.v1.UpdateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	197, // 281: legion.ai.v1.UpdateAIMemoryEntityCommand.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	242, // 282: legion.ai.v1.AIMemoryEntityUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	197, // 283: legion.ai.v1.AIMemoryEntityUpdated.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	242, // 284: legion.ai.v1.AIMemoryEntityUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 285: legion.ai.v1.DeleteAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	198, // 286: legion.ai.v1.DeleteAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
-	242, // 287: legion.ai.v1.AIMemoryEntitiesDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 288: legion.ai.v1.AIMemoryEntitiesDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 289: legion.ai.v1.CountAIMemoryEntityTagsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 290: legion.ai.v1.AIMemoryEntityTagsCounted.metadata:type_name -> legion.node.v1.EventMetadata
-	196, // 291: legion.ai.v1.AIMemoryEntityTagsCounted.tags_count:type_name -> legion.ai.v1.AIMemoryTagCount
-	242, // 292: legion.ai.v1.AIMemoryEntityTagsCountFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 293: legion.ai.v1.QueryAIHTTPFlowsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	217, // 294: legion.ai.v1.QueryAIHTTPFlowsCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	242, // 295: legion.ai.v1.AIHTTPFlowsQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	218, // 296: legion.ai.v1.AIHTTPFlowsQueried.items:type_name -> legion.ai.v1.AIHTTPFlowRecord
-	217, // 297: legion.ai.v1.AIHTTPFlowsQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	242, // 298: legion.ai.v1.AIHTTPFlowsQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 299: legion.ai.v1.QueryAIRisksCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	217, // 300: legion.ai.v1.QueryAIRisksCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	242, // 301: legion.ai.v1.AIRisksQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	222, // 302: legion.ai.v1.AIRisksQueried.items:type_name -> legion.ai.v1.AIRiskRecord
-	217, // 303: legion.ai.v1.AIRisksQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	242, // 304: legion.ai.v1.AIRisksQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	241, // 305: legion.ai.v1.ExportAILogsCheckpointsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	242, // 306: legion.ai.v1.AILogsCheckpointsExported.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 307: legion.ai.v1.AILogsCheckpointsExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	242, // 308: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 309: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
-	243, // 310: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
-	242, // 311: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 312: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
-	242, // 313: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 314: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
-	243, // 315: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
-	242, // 316: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 317: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
-	243, // 318: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
-	242, // 319: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 320: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
-	243, // 321: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	244, // 322: legion.ai.v1.AIFocusResultContext.job:type_name -> legion.job.v1.JobRef
-	235, // 323: legion.ai.v1.AIFocusResultContext.risk_judgement_scope:type_name -> legion.ai.v1.AIFocusRiskJudgementScope
-	236, // 324: legion.ai.v1.ContextFocusRelease.sidekicks:type_name -> legion.ai.v1.ContextFocusSidekick
-	239, // 325: legion.ai.v1.InputManifest.resources:type_name -> legion.ai.v1.InputResource
-	326, // [326:326] is the sub-list for method output_type
-	326, // [326:326] is the sub-list for method input_type
-	326, // [326:326] is the sub-list for extension type_name
-	326, // [326:326] is the sub-list for extension extendee
-	0,   // [0:326] is the sub-list for field type_name
+	239, // 13: legion.ai.v1.ContextPackage.forge_release:type_name -> legion.ai.v1.ContextForgeRelease
+	243, // 14: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 15: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
+	1,   // 16: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
+	2,   // 17: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
+	243, // 18: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 19: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	243, // 20: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 21: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	243, // 22: legion.ai.v1.UpdateAISessionTitleCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 23: legion.ai.v1.UpdateAISessionTitleCommand.session:type_name -> legion.ai.v1.AISessionRef
+	244, // 24: legion.ai.v1.AISessionTitleUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 25: legion.ai.v1.AISessionTitleUpdated.session:type_name -> legion.ai.v1.AISessionRef
+	244, // 26: legion.ai.v1.AISessionTitleUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 27: legion.ai.v1.AISessionTitleUpdateFailed.session:type_name -> legion.ai.v1.AISessionRef
+	243, // 28: legion.ai.v1.DeleteAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 29: legion.ai.v1.DeleteAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	244, // 30: legion.ai.v1.AISessionDeleteCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 31: legion.ai.v1.AISessionDeleteCompleted.session:type_name -> legion.ai.v1.AISessionRef
+	244, // 32: legion.ai.v1.AISessionDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 33: legion.ai.v1.AISessionDeleteFailed.session:type_name -> legion.ai.v1.AISessionRef
+	242, // 34: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	243, // 35: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	18,  // 36: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	244, // 37: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	20,  // 38: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
+	244, // 39: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 40: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	18,  // 41: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	244, // 42: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	18,  // 43: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	244, // 44: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	26,  // 45: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 46: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	27,  // 47: legion.ai.v1.AIModelConfigSnapshot.provider:type_name -> legion.ai.v1.AIThirdPartyApplicationConfigSnapshot
+	26,  // 48: legion.ai.v1.AIModelConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
+	28,  // 49: legion.ai.v1.AIGlobalConfigSnapshot.intelligent_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	28,  // 50: legion.ai.v1.AIGlobalConfigSnapshot.lightweight_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	28,  // 51: legion.ai.v1.AIGlobalConfigSnapshot.vision_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	243, // 52: legion.ai.v1.GetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	243, // 53: legion.ai.v1.SetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	29,  // 54: legion.ai.v1.SetAIGlobalConfigCommand.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	244, // 55: legion.ai.v1.AIGlobalConfigFetched.metadata:type_name -> legion.node.v1.EventMetadata
+	29,  // 56: legion.ai.v1.AIGlobalConfigFetched.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	244, // 57: legion.ai.v1.AIGlobalConfigFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 58: legion.ai.v1.AIGlobalConfigUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	29,  // 59: legion.ai.v1.AIGlobalConfigUpdated.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	244, // 60: legion.ai.v1.AIGlobalConfigUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 61: legion.ai.v1.QueryAIFocusCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 62: legion.ai.v1.AIFocusQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	36,  // 63: legion.ai.v1.AIFocusQueried.items:type_name -> legion.ai.v1.AIFocus
+	244, // 64: legion.ai.v1.AIFocusQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 65: legion.ai.v1.GetRandomAIMaterialsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 66: legion.ai.v1.AIMaterialsRandomQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 67: legion.ai.v1.AIMaterialsRandomQueried.knowledge_base_entries:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	123, // 68: legion.ai.v1.AIMaterialsRandomQueried.ai_tools:type_name -> legion.ai.v1.AIToolRecord
+	99,  // 69: legion.ai.v1.AIMaterialsRandomQueried.ai_forges:type_name -> legion.ai.v1.AIForgeRecord
+	244, // 70: legion.ai.v1.AIMaterialsRandomQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	44,  // 71: legion.ai.v1.AIMCPServerTool.params:type_name -> legion.ai.v1.AIMCPServerToolParam
+	45,  // 72: legion.ai.v1.AIMCPServerRecord.tools:type_name -> legion.ai.v1.AIMCPServerTool
+	26,  // 73: legion.ai.v1.AIMCPServerRecord.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 74: legion.ai.v1.AIMCPServerRecord.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	243, // 75: legion.ai.v1.ListAIMCPServersCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	43,  // 76: legion.ai.v1.ListAIMCPServersCommand.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
+	244, // 77: legion.ai.v1.AIMCPServersListed.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 78: legion.ai.v1.AIMCPServersListed.items:type_name -> legion.ai.v1.AIMCPServerRecord
+	43,  // 79: legion.ai.v1.AIMCPServersListed.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
+	244, // 80: legion.ai.v1.AIMCPServersListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 81: legion.ai.v1.CreateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	26,  // 82: legion.ai.v1.CreateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 83: legion.ai.v1.CreateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	244, // 84: legion.ai.v1.AIMCPServerCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 85: legion.ai.v1.AIMCPServerCreated.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	244, // 86: legion.ai.v1.AIMCPServerCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 87: legion.ai.v1.UpdateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	26,  // 88: legion.ai.v1.UpdateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 89: legion.ai.v1.UpdateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	244, // 90: legion.ai.v1.AIMCPServerUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 91: legion.ai.v1.AIMCPServerUpdated.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	244, // 92: legion.ai.v1.AIMCPServerUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 93: legion.ai.v1.DeleteAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 94: legion.ai.v1.AIMCPServerDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 95: legion.ai.v1.AIMCPServerDeleted.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	244, // 96: legion.ai.v1.AIMCPServerDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	59,  // 97: legion.ai.v1.AILocalModelRecord.status:type_name -> legion.ai.v1.AILocalModelStatus
+	243, // 98: legion.ai.v1.ListAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 99: legion.ai.v1.AILocalModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 100: legion.ai.v1.AILocalModelsListed.items:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 101: legion.ai.v1.AILocalModelsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 102: legion.ai.v1.CheckAILlamaServerReadyCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 103: legion.ai.v1.AILlamaServerReadyChecked.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 104: legion.ai.v1.AILlamaServerReadyCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 105: legion.ai.v1.InstallAILlamaServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 106: legion.ai.v1.AILocalModelOperationAccepted.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 107: legion.ai.v1.AILocalModelOperationAccepted.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	244, // 108: legion.ai.v1.AILocalModelOperationProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 109: legion.ai.v1.AILocalModelOperationProgressed.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	244, // 110: legion.ai.v1.AILocalModelOperationCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 111: legion.ai.v1.AILocalModelOperationCompleted.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	60,  // 112: legion.ai.v1.AILocalModelOperationCompleted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 113: legion.ai.v1.AILocalModelOperationCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 114: legion.ai.v1.AILocalModelOperationCancelled.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	244, // 115: legion.ai.v1.AILocalModelOperationFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 116: legion.ai.v1.AILocalModelOperationFailed.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	244, // 117: legion.ai.v1.AILlamaServerInstalled.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 118: legion.ai.v1.AILlamaServerInstallFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 119: legion.ai.v1.CreateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 120: legion.ai.v1.AILocalModelCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 121: legion.ai.v1.AILocalModelCreated.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 122: legion.ai.v1.AILocalModelCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 123: legion.ai.v1.UpdateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 124: legion.ai.v1.AILocalModelUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 125: legion.ai.v1.AILocalModelUpdated.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 126: legion.ai.v1.AILocalModelUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 127: legion.ai.v1.DeleteAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 128: legion.ai.v1.AILocalModelDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 129: legion.ai.v1.AILocalModelDeleted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 130: legion.ai.v1.AILocalModelDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 131: legion.ai.v1.StartAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 132: legion.ai.v1.AILocalModelStarted.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 133: legion.ai.v1.AILocalModelStarted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 134: legion.ai.v1.AILocalModelStartFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 135: legion.ai.v1.StopAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 136: legion.ai.v1.AILocalModelStopped.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 137: legion.ai.v1.AILocalModelStopped.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 138: legion.ai.v1.AILocalModelStopFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 139: legion.ai.v1.DownloadAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	243, // 140: legion.ai.v1.CancelAILocalModelOperationCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 141: legion.ai.v1.AILocalModelDownloaded.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 142: legion.ai.v1.AILocalModelDownloaded.item:type_name -> legion.ai.v1.AILocalModelRecord
+	244, // 143: legion.ai.v1.AILocalModelDownloadFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 144: legion.ai.v1.ClearAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 145: legion.ai.v1.AILocalModelsCleared.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 146: legion.ai.v1.AILocalModelsClearFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 147: legion.ai.v1.ListAIForgesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	98,  // 148: legion.ai.v1.ListAIForgesCommand.pagination:type_name -> legion.ai.v1.AIForgePagination
+	244, // 149: legion.ai.v1.AIForgesListed.metadata:type_name -> legion.node.v1.EventMetadata
+	99,  // 150: legion.ai.v1.AIForgesListed.items:type_name -> legion.ai.v1.AIForgeRecord
+	98,  // 151: legion.ai.v1.AIForgesListed.pagination:type_name -> legion.ai.v1.AIForgePagination
+	244, // 152: legion.ai.v1.AIForgesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 153: legion.ai.v1.CreateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 154: legion.ai.v1.AIForgeCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	99,  // 155: legion.ai.v1.AIForgeCreated.item:type_name -> legion.ai.v1.AIForgeRecord
+	244, // 156: legion.ai.v1.AIForgeCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 157: legion.ai.v1.UpdateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 158: legion.ai.v1.AIForgeUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	99,  // 159: legion.ai.v1.AIForgeUpdated.item:type_name -> legion.ai.v1.AIForgeRecord
+	244, // 160: legion.ai.v1.AIForgeUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 161: legion.ai.v1.DeleteAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 162: legion.ai.v1.AIForgeDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 163: legion.ai.v1.AIForgeDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 164: legion.ai.v1.ExportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 165: legion.ai.v1.AIForgeExportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 166: legion.ai.v1.AIForgeExported.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 167: legion.ai.v1.AIForgeExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 168: legion.ai.v1.ImportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	116, // 169: legion.ai.v1.ImportAIForgeCommand.attachment:type_name -> legion.ai.v1.AIForgeImportAttachment
+	244, // 170: legion.ai.v1.AIForgeImportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 171: legion.ai.v1.AIForgeImported.metadata:type_name -> legion.node.v1.EventMetadata
+	119, // 172: legion.ai.v1.AIForgeImported.items:type_name -> legion.ai.v1.AIForgeImportItem
+	244, // 173: legion.ai.v1.AIForgeImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 174: legion.ai.v1.ListAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	122, // 175: legion.ai.v1.ListAIToolsCommand.pagination:type_name -> legion.ai.v1.AIToolPagination
+	244, // 176: legion.ai.v1.AIToolsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	123, // 177: legion.ai.v1.AIToolsListed.items:type_name -> legion.ai.v1.AIToolRecord
+	122, // 178: legion.ai.v1.AIToolsListed.pagination:type_name -> legion.ai.v1.AIToolPagination
+	244, // 179: legion.ai.v1.AIToolsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 180: legion.ai.v1.CreateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 181: legion.ai.v1.AIToolCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	123, // 182: legion.ai.v1.AIToolCreated.item:type_name -> legion.ai.v1.AIToolRecord
+	244, // 183: legion.ai.v1.AIToolCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 184: legion.ai.v1.UpdateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 185: legion.ai.v1.AIToolUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	123, // 186: legion.ai.v1.AIToolUpdated.item:type_name -> legion.ai.v1.AIToolRecord
+	244, // 187: legion.ai.v1.AIToolUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 188: legion.ai.v1.GenerateAIToolMetadataCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 189: legion.ai.v1.AIToolMetadataGenerated.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 190: legion.ai.v1.AIToolMetadataGenerateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 191: legion.ai.v1.ToggleAIToolFavoriteCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 192: legion.ai.v1.AIToolFavoriteToggled.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 193: legion.ai.v1.AIToolFavoriteToggleFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 194: legion.ai.v1.DeleteAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 195: legion.ai.v1.AIToolsDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 196: legion.ai.v1.AIToolsDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 197: legion.ai.v1.ListAIKnowledgeBasesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	142, // 198: legion.ai.v1.ListAIKnowledgeBasesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	244, // 199: legion.ai.v1.AIKnowledgeBasesListed.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 200: legion.ai.v1.AIKnowledgeBasesListed.items:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	142, // 201: legion.ai.v1.AIKnowledgeBasesListed.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	244, // 202: legion.ai.v1.AIKnowledgeBasesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 203: legion.ai.v1.CreateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 204: legion.ai.v1.AIKnowledgeBaseCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 205: legion.ai.v1.AIKnowledgeBaseCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	244, // 206: legion.ai.v1.AIKnowledgeBaseCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 207: legion.ai.v1.ImportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	148, // 208: legion.ai.v1.ImportAIKnowledgeBaseCommand.attachment:type_name -> legion.ai.v1.AIKnowledgeBaseImportAttachment
+	244, // 209: legion.ai.v1.AIKnowledgeBaseImported.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 210: legion.ai.v1.AIKnowledgeBaseImported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	244, // 211: legion.ai.v1.AIKnowledgeBaseImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 212: legion.ai.v1.UpdateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 213: legion.ai.v1.AIKnowledgeBaseUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 214: legion.ai.v1.AIKnowledgeBaseUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	244, // 215: legion.ai.v1.AIKnowledgeBaseUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 216: legion.ai.v1.DeleteAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 217: legion.ai.v1.AIKnowledgeBaseDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 218: legion.ai.v1.AIKnowledgeBaseDeleted.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	244, // 219: legion.ai.v1.AIKnowledgeBaseDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 220: legion.ai.v1.ExportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 221: legion.ai.v1.AIKnowledgeBaseExported.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 222: legion.ai.v1.AIKnowledgeBaseExported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	244, // 223: legion.ai.v1.AIKnowledgeBaseExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 224: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	163, // 225: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.filter:type_name -> legion.ai.v1.AIKnowledgeBaseEntryFilter
+	142, // 226: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	244, // 227: legion.ai.v1.AIKnowledgeBaseEntriesSearched.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 228: legion.ai.v1.AIKnowledgeBaseEntriesSearched.items:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	142, // 229: legion.ai.v1.AIKnowledgeBaseEntriesSearched.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	244, // 230: legion.ai.v1.AIKnowledgeBaseEntriesSearchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 231: legion.ai.v1.QueryAIKnowledgeBaseByAICommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	243, // 232: legion.ai.v1.CancelAIKnowledgeBaseByAIQueryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 233: legion.ai.v1.AIKnowledgeBaseQueryByAIChunk.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 234: legion.ai.v1.AIKnowledgeBaseQueryByAICompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 235: legion.ai.v1.AIKnowledgeBaseQueryByAIFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 236: legion.ai.v1.GenerateAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	243, // 237: legion.ai.v1.CancelAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 238: legion.ai.v1.AIKnowledgeBaseQuestionIndexProgress.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 239: legion.ai.v1.AIKnowledgeBaseQuestionIndexCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 240: legion.ai.v1.AIKnowledgeBaseQuestionIndexFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 241: legion.ai.v1.CreateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 242: legion.ai.v1.AIKnowledgeBaseEntryCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 243: legion.ai.v1.AIKnowledgeBaseEntryCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	244, // 244: legion.ai.v1.AIKnowledgeBaseEntryCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 245: legion.ai.v1.UpdateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 246: legion.ai.v1.AIKnowledgeBaseEntryUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 247: legion.ai.v1.AIKnowledgeBaseEntryUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	244, // 248: legion.ai.v1.AIKnowledgeBaseEntryUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 249: legion.ai.v1.DeleteAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 250: legion.ai.v1.AIKnowledgeBaseEntryDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 251: legion.ai.v1.AIKnowledgeBaseEntryDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 252: legion.ai.v1.BuildAIKnowledgeBaseVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 253: legion.ai.v1.AIKnowledgeBaseVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 254: legion.ai.v1.AIKnowledgeBaseVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 255: legion.ai.v1.BuildAIKnowledgeBaseEntryVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 256: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 257: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	193, // 258: legion.ai.v1.AIMemoryEntityFilter.c_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 259: legion.ai.v1.AIMemoryEntityFilter.o_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 260: legion.ai.v1.AIMemoryEntityFilter.r_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 261: legion.ai.v1.AIMemoryEntityFilter.e_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 262: legion.ai.v1.AIMemoryEntityFilter.p_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 263: legion.ai.v1.AIMemoryEntityFilter.a_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 264: legion.ai.v1.AIMemoryEntityFilter.t_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	194, // 265: legion.ai.v1.AIMemoryEntityFilter.created_at:type_name -> legion.ai.v1.AIMemoryInt64Range
+	194, // 266: legion.ai.v1.AIMemoryEntityFilter.updated_at:type_name -> legion.ai.v1.AIMemoryInt64Range
+	243, // 267: legion.ai.v1.CreateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 268: legion.ai.v1.AIMemoryEntityCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 269: legion.ai.v1.AIMemoryEntityCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 270: legion.ai.v1.GetAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 271: legion.ai.v1.AIMemoryEntityFetched.metadata:type_name -> legion.node.v1.EventMetadata
+	197, // 272: legion.ai.v1.AIMemoryEntityFetched.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	244, // 273: legion.ai.v1.AIMemoryEntityFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 274: legion.ai.v1.QueryAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	195, // 275: legion.ai.v1.QueryAIMemoryEntitiesCommand.pagination:type_name -> legion.ai.v1.AIMemoryPagination
+	198, // 276: legion.ai.v1.QueryAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
+	244, // 277: legion.ai.v1.AIMemoryEntitiesQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	195, // 278: legion.ai.v1.AIMemoryEntitiesQueried.pagination:type_name -> legion.ai.v1.AIMemoryPagination
+	197, // 279: legion.ai.v1.AIMemoryEntitiesQueried.items:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	244, // 280: legion.ai.v1.AIMemoryEntitiesQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 281: legion.ai.v1.UpdateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	197, // 282: legion.ai.v1.UpdateAIMemoryEntityCommand.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	244, // 283: legion.ai.v1.AIMemoryEntityUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	197, // 284: legion.ai.v1.AIMemoryEntityUpdated.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	244, // 285: legion.ai.v1.AIMemoryEntityUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 286: legion.ai.v1.DeleteAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	198, // 287: legion.ai.v1.DeleteAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
+	244, // 288: legion.ai.v1.AIMemoryEntitiesDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 289: legion.ai.v1.AIMemoryEntitiesDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 290: legion.ai.v1.CountAIMemoryEntityTagsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 291: legion.ai.v1.AIMemoryEntityTagsCounted.metadata:type_name -> legion.node.v1.EventMetadata
+	196, // 292: legion.ai.v1.AIMemoryEntityTagsCounted.tags_count:type_name -> legion.ai.v1.AIMemoryTagCount
+	244, // 293: legion.ai.v1.AIMemoryEntityTagsCountFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 294: legion.ai.v1.QueryAIHTTPFlowsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	217, // 295: legion.ai.v1.QueryAIHTTPFlowsCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	244, // 296: legion.ai.v1.AIHTTPFlowsQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	218, // 297: legion.ai.v1.AIHTTPFlowsQueried.items:type_name -> legion.ai.v1.AIHTTPFlowRecord
+	217, // 298: legion.ai.v1.AIHTTPFlowsQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	244, // 299: legion.ai.v1.AIHTTPFlowsQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 300: legion.ai.v1.QueryAIRisksCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	217, // 301: legion.ai.v1.QueryAIRisksCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	244, // 302: legion.ai.v1.AIRisksQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	222, // 303: legion.ai.v1.AIRisksQueried.items:type_name -> legion.ai.v1.AIRiskRecord
+	217, // 304: legion.ai.v1.AIRisksQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	244, // 305: legion.ai.v1.AIRisksQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	243, // 306: legion.ai.v1.ExportAILogsCheckpointsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	244, // 307: legion.ai.v1.AILogsCheckpointsExported.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 308: legion.ai.v1.AILogsCheckpointsExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	244, // 309: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 310: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
+	245, // 311: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
+	244, // 312: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 313: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
+	244, // 314: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 315: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
+	245, // 316: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
+	244, // 317: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 318: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
+	245, // 319: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
+	244, // 320: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 321: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
+	245, // 322: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	246, // 323: legion.ai.v1.AIFocusResultContext.job:type_name -> legion.job.v1.JobRef
+	235, // 324: legion.ai.v1.AIFocusResultContext.risk_judgement_scope:type_name -> legion.ai.v1.AIFocusRiskJudgementScope
+	236, // 325: legion.ai.v1.ContextFocusRelease.sidekicks:type_name -> legion.ai.v1.ContextFocusSidekick
+	238, // 326: legion.ai.v1.ContextForgeRelease.parameters:type_name -> legion.ai.v1.ContextForgeParameter
+	241, // 327: legion.ai.v1.InputManifest.resources:type_name -> legion.ai.v1.InputResource
+	328, // [328:328] is the sub-list for method output_type
+	328, // [328:328] is the sub-list for method input_type
+	328, // [328:328] is the sub-list for extension type_name
+	328, // [328:328] is the sub-list for extension extendee
+	0,   // [0:328] is the sub-list for field type_name
 }
 
 func init() { file_legion_ai_v1_ai_proto_init() }
@@ -22004,7 +22283,7 @@ func file_legion_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_ai_v1_ai_proto_rawDesc), len(file_legion_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   241,
+			NumMessages:   243,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

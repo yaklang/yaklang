@@ -152,6 +152,37 @@ func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParam
 	return buf.String(), nil
 }
 
+// renderInitPromptWithValidatedParams renders a server-normalized parameter
+// set without parsing or executing the Forge's client-side CLI declarations.
+// The caller owns schema validation and authorization before this boundary.
+func (f *ForgeBlueprint) renderInitPromptWithValidatedParams(query string, params []*ypb.ExecParamItem) (string, error) {
+	tmpl, err := template.New("init").Parse(f.InitializePrompt)
+	if err != nil {
+		return "", err
+	}
+	rawParams := ExecParams2PromptString(params)
+	nonce := utils.RandStringBytes(8)
+	forgePromptParams := &ForgePromptParams{
+		UserParams:       fmt.Sprintf("<user_params_%s>\n%s\n</user_params_%s>", nonce, rawParams, nonce),
+		UserQuery:        query,
+		InitPrompt:       f.InitializePrompt,
+		PersistentPrompt: f.PersistentPrompt,
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]any{"Forge": forgePromptParams}); err != nil {
+		return "", err
+	}
+	if ret := f.ToolPrompt(); ret != "" {
+		buf.WriteString("\n")
+		buf.WriteString(ret)
+	}
+	if ret := f.KeywordPrompt(); ret != "" {
+		buf.WriteString("\n")
+		buf.WriteString(ret)
+	}
+	return buf.String(), nil
+}
+
 func (f *ForgeBlueprint) renderPersistentPrompt(query string) (string, error) {
 	tmpl, err := template.New("persistent").Parse(f.PersistentPrompt)
 	if err != nil {

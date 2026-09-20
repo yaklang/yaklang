@@ -16,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -965,6 +966,7 @@ func TestRunYakAIForgeDirectUsesExactForgeParamsAndEmitsResult(t *testing.T) {
 		chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
 		emitter,
 		"this query must not replace explicit ForgeParams",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("runYakAIForgeDirect() error = %v", err)
@@ -978,6 +980,51 @@ func TestRunYakAIForgeDirectUsesExactForgeParamsAndEmitsResult(t *testing.T) {
 	}
 	if emitter.eventType != aiSessionRuntimeEventReason || !strings.Contains(string(emitter.payload), "done") {
 		t.Fatalf("direct forge result was not emitted: type=%q payload=%s", emitter.eventType, emitter.payload)
+	}
+}
+
+func TestEmitAIApplicationResultPinsRunAttemptAndRelease(t *testing.T) {
+	release := testLegionContextForgeRelease(t)
+	emitter := &recordingAISessionRuntimeEmitter{}
+	if err := emitAIApplicationResult(emitter, yakRuntimeOptions{
+		AITaskRunID: " run-1 ", ApplicationAttemptID: " attempt-1 ",
+	}, release, aiSessionBinding{}, nil, &aiforge.ForgeResult{Formated: "  # Final\n\nBounded result.  "}); err != nil {
+		t.Fatal(err)
+	}
+	if emitter.eventType != "ai.application.result" {
+		t.Fatalf("event type = %q", emitter.eventType)
+	}
+	var payload struct {
+		SchemaVersion    string `json:"schema_version"`
+		RunID            string `json:"run_id"`
+		AttemptID        string `json:"attempt_id"`
+		ReleaseID        string `json:"release_id"`
+		ReleaseSHA256    string `json:"release_sha256"`
+		InvocationSHA256 string `json:"invocation_sha256"`
+		ResultID         string `json:"result_id"`
+		Outcome          string `json:"outcome"`
+		Markdown         string `json:"markdown"`
+	}
+	if err := json.Unmarshal(emitter.payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.SchemaVersion != "legion.ai-application-result/v1" || payload.RunID != "run-1" || payload.AttemptID != "attempt-1" ||
+		payload.ReleaseID != release.GetReleaseId() || payload.ReleaseSHA256 != release.GetDefinitionSha256() ||
+		payload.InvocationSHA256 != release.GetSha256() || !strings.HasPrefix(payload.ResultID, "aiar_") ||
+		payload.Outcome != "complete" || payload.Markdown != "# Final\n\nBounded result." {
+		t.Fatalf("unexpected application result: %#v", payload)
+	}
+}
+
+func TestEmitAIApplicationResultRejectsMissingIdentityAndOversize(t *testing.T) {
+	release := testLegionContextForgeRelease(t)
+	result := &aiforge.ForgeResult{Formated: "ok"}
+	if err := emitAIApplicationResult(&recordingAISessionRuntimeEmitter{}, yakRuntimeOptions{AITaskRunID: "run-1"}, release, aiSessionBinding{}, nil, result); err == nil || !strings.Contains(err.Error(), "identity") {
+		t.Fatalf("missing attempt identity error = %v", err)
+	}
+	result.Formated = strings.Repeat("x", maxAIApplicationResultMarkdownBytes+1)
+	if err := emitAIApplicationResult(&recordingAISessionRuntimeEmitter{}, yakRuntimeOptions{AITaskRunID: "run-1", ApplicationAttemptID: "attempt-1"}, release, aiSessionBinding{}, nil, result); err == nil || !strings.Contains(err.Error(), "limit") {
+		t.Fatalf("oversize result error = %v", err)
 	}
 }
 

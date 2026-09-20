@@ -10,6 +10,7 @@ func compiledScanNodeCapabilityKeys() []string {
 		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAIForgeReleaseV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyAIManagedInputV1,
 		capabilityKeyPluginBundleV1,
