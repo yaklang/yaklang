@@ -34,6 +34,18 @@ func (s *StoredFunctionBuilder) NewExecutionBuilder() *FunctionBuilder {
 	return &b
 }
 
+// CommitExecutionBuilder keeps control-flow progress made by a scoped task.
+// Lexical state stays private, but a field initializer can terminate the entry
+// block and create a successor: the next initializer must continue in that block.
+// Callers must serialize tasks owned by the same declaration function.
+func (s *StoredFunctionBuilder) CommitExecutionBuilder(b *FunctionBuilder) {
+	if s == nil || s.Current == nil || b == nil || b.Function != s.Current.Function {
+		return
+	}
+	s.Current.CurrentBlock = b.CurrentBlock
+	s.Current.IsReturn = b.IsReturn
+}
+
 func (b *FunctionBuilder) LoadFunctionBuilder(s *StoredFunctionBuilder) {
 	if b == nil || s == nil {
 		return
