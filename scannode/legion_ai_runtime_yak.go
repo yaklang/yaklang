@@ -19,12 +19,14 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
 
 const (
@@ -38,6 +40,7 @@ const (
 	aiSessionRuntimeEventToolResult         = "ai.session.tool_result"
 	maxAISessionAttachmentBytes             = 64 << 10
 	maxAISessionAttachmentTotalBytes        = 256 << 10
+	maxAIApplicationResultMarkdownBytes     = 1 << 20
 )
 
 type yakAIEngineRuntimeDriver struct{}
@@ -453,6 +456,7 @@ func (h *yakAIEngineRuntimeHandle) executeForgeDirectly(
 		h.forgeInput,
 		h.emitter,
 		content,
+		nil,
 	)
 	// Clear the active-Forge admission flag immediately when ExecuteForge
 	// returns, before any terminal publication or other work can admit a patch
@@ -471,8 +475,9 @@ func runYakAIForgeDirect(
 	forgeInputChannel *chanx.UnlimitedChan[*ypb.AIInputEvent],
 	emitter aiSessionRuntimeEmitter,
 	content string,
+	forgeRelease *aiv1.ContextForgeRelease,
 ) error {
-	commonOptions := make([]aicommon.ConfigOption, 0, len(config.ExtOptions)+5)
+	commonOptions := make([]aicommon.ConfigOption, 0, len(config.ExtOptions)+6)
 	if config.AICallback != nil {
 		commonOptions = append(commonOptions, aicommon.WithAICallback(config.AICallback))
 	}
@@ -482,7 +487,9 @@ func runYakAIForgeDirect(
 	if config.SpeedPriorityAICallback != nil {
 		commonOptions = append(commonOptions, aicommon.WithSpeedPriorityAICallback(config.SpeedPriorityAICallback))
 	}
-	commonOptions = append(commonOptions, config.ExtOptions...)
+	if forgeRelease == nil {
+		commonOptions = append(commonOptions, config.ExtOptions...)
+	}
 	commonOptions = append(commonOptions,
 		aicommon.WithID(binding.Ref.SessionID),
 		aicommon.WithEventInputChanx(forgeInputChannel),
@@ -500,33 +507,51 @@ func runYakAIForgeDirect(
 	case "yolo":
 		commonOptions = append(commonOptions, aicommon.WithAgreeYOLO())
 	}
-	if len(config.ExtraMCPServers) > 0 {
+	if forgeRelease == nil && len(config.ExtraMCPServers) > 0 {
 		commonOptions = append(commonOptions, aicommon.WithExtraMCPServers(config.ExtraMCPServers...))
 		if config.RestrictToSessionMCP {
 			commonOptions = append(commonOptions, aicommon.WithRestrictToolsToExtraMCPServers(true))
 		}
 	}
 
-	var forgeInput any = content
-	if runtime.ForgeParams != nil {
-		forgeInput = yakAIForgeExecParams(runtime.ForgeParams)
+	var result any
+	var err error
+	var httpRuntime *legionServerFocusRuntime
+	if forgeRelease != nil {
+		capabilityOptions, runtime, capabilityErr := legionForgeCapabilityOptions(ctx, forgeRelease, binding)
+		if capabilityErr != nil {
+			return capabilityErr
+		}
+		httpRuntime = runtime
+		commonOptions = append(commonOptions, capabilityOptions...)
+		result, err = executeContextForgeRelease(ctx, forgeRelease, content, commonOptions...)
+	} else {
+		var forgeInput any = content
+		if runtime.ForgeParams != nil {
+			forgeInput = yakAIForgeExecParams(runtime.ForgeParams)
+		}
+		result, err = executeYakAIForge(
+			strings.TrimSpace(runtime.ForgeName),
+			forgeInput,
+			yak.WithContext(ctx),
+			yak.WithCoordinatorId(binding.Ref.SessionID),
+			yak.WithExtendAICommonOptions(commonOptions...),
+			yak.WithAiAgentEventHandler(func(event *schema.AiOutputEvent) {
+				if event != nil {
+					emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
+				}
+			}),
+		)
 	}
-	result, err := executeYakAIForge(
-		strings.TrimSpace(runtime.ForgeName),
-		forgeInput,
-		yak.WithContext(ctx),
-		yak.WithCoordinatorId(binding.Ref.SessionID),
-		yak.WithExtendAICommonOptions(commonOptions...),
-		yak.WithAiAgentEventHandler(func(event *schema.AiOutputEvent) {
-			if event != nil {
-				emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
-			}
-		}),
-	)
 	if err != nil {
 		return err
 	}
 	if result != nil {
+		if forgeRelease != nil {
+			if err := emitAIApplicationResult(emitter, runtime, forgeRelease, binding, httpRuntime, result); err != nil {
+				return err
+			}
+		}
 		event := &schema.AiOutputEvent{
 			CoordinatorId: binding.Ref.SessionID,
 			Type:          schema.EVENT_TYPE_STREAM,
@@ -537,6 +562,109 @@ func runYakAIForgeDirect(
 		emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
 	}
 	return nil
+}
+
+func emitAIApplicationResult(
+	emitter aiSessionRuntimeEmitter,
+	runtime yakRuntimeOptions,
+	release *aiv1.ContextForgeRelease,
+	binding aiSessionBinding,
+	httpRuntime *legionServerFocusRuntime,
+	result any,
+) error {
+	forgeResult, ok := result.(*aiforge.ForgeResult)
+	if !ok || forgeResult == nil {
+		return fmt.Errorf("immutable Forge release returned no final Markdown result")
+	}
+	markdown, ok := forgeResult.Formated.(string)
+	markdown = strings.TrimSpace(markdown)
+	if !ok || markdown == "" {
+		return fmt.Errorf("immutable Forge release returned no final Markdown result")
+	}
+	if len(markdown) > maxAIApplicationResultMarkdownBytes {
+		return fmt.Errorf("immutable Forge release final Markdown exceeds the %d-byte limit", maxAIApplicationResultMarkdownBytes)
+	}
+	runID := strings.TrimSpace(runtime.AITaskRunID)
+	attemptID := strings.TrimSpace(runtime.ApplicationAttemptID)
+	if runID == "" || attemptID == "" {
+		return fmt.Errorf("immutable Forge release is missing application run identity")
+	}
+	resultIDSeed := strings.Join([]string{runID, attemptID, release.GetReleaseId(), release.GetDefinitionSha256()}, "\x00")
+	resultIDHash := sha256.Sum256([]byte(resultIDSeed))
+	materialRefs, err := aiApplicationMaterialReferences(release, binding, httpRuntime)
+	if err != nil {
+		return err
+	}
+	emitter.Emit("ai.application.result", mustJSON(map[string]any{
+		"schema_version":    "legion.ai-application-result/v1",
+		"run_id":            runID,
+		"attempt_id":        attemptID,
+		"release_id":        release.GetReleaseId(),
+		"release_sha256":    release.GetDefinitionSha256(),
+		"invocation_sha256": release.GetSha256(),
+		"result_id":         fmt.Sprintf("aiar_%x", resultIDHash[:16]),
+		"outcome":           "complete",
+		"markdown":          markdown,
+		"material_refs":     materialRefs,
+		"artifact_ids":      []string{},
+	}))
+	return nil
+}
+
+type aiApplicationMaterialReference struct {
+	Kind         string   `json:"kind"`
+	InputKey     string   `json:"input_key"`
+	ResourceID   string   `json:"resource_id,omitempty"`
+	RelativePath string   `json:"relative_path,omitempty"`
+	SHA256       string   `json:"sha256,omitempty"`
+	Operations   []string `json:"operations,omitempty"`
+}
+
+func aiApplicationMaterialReferences(
+	release *aiv1.ContextForgeRelease,
+	binding aiSessionBinding,
+	httpRuntime *legionServerFocusRuntime,
+) ([]aiApplicationMaterialReference, error) {
+	result := make([]aiApplicationMaterialReference, 0, len(release.GetParameters()))
+	pathKeys := make(map[string]string)
+	for _, parameter := range release.GetParameters() {
+		if parameter.GetValueKind() != "resource" {
+			if strings.TrimSpace(parameter.GetValue()) != "" {
+				result = append(result, aiApplicationMaterialReference{Kind: "declared_input", InputKey: parameter.GetKey()})
+			}
+			continue
+		}
+		paths := []string{strings.TrimSpace(parameter.GetValue())}
+		if strings.HasPrefix(paths[0], "[") {
+			if json.Unmarshal([]byte(paths[0]), &paths) != nil {
+				return nil, fmt.Errorf("immutable Forge release contains invalid resource provenance")
+			}
+		}
+		for _, path := range paths {
+			pathKeys[path] = parameter.GetKey()
+		}
+	}
+	if binding.InputWorkspace != nil {
+		for _, material := range binding.InputWorkspace.MaterialReferences() {
+			inputKey := pathKeys[material.RelativePath]
+			if inputKey == "" {
+				return nil, fmt.Errorf("managed input access is outside the immutable Forge parameters")
+			}
+			result = append(result, aiApplicationMaterialReference{
+				Kind: "managed_resource", InputKey: inputKey, ResourceID: material.ResourceID,
+				RelativePath: material.RelativePath, SHA256: material.SHA256, Operations: material.Operations,
+			})
+		}
+	}
+	requestRefs := httpRuntime.applicationHTTPMaterialReferences()
+	result = append(result, requestRefs...)
+	if release.GetCapabilityProfile() == legionForgeReportProfile && len(result) == 0 {
+		return nil, fmt.Errorf("report Forge release produced no authorized material provenance")
+	}
+	if release.GetCapabilityProfile() == legionForgeHTTPProfile && len(requestRefs) == 0 {
+		return nil, fmt.Errorf("HTTP Forge release produced no bounded request evidence")
+	}
+	return result, nil
 }
 
 var executeYakAIForge = yak.ExecuteForge
@@ -557,6 +685,7 @@ type yakRuntimeOptions struct {
 	AITaskKey                string `json:"ai_task_key,omitempty"`
 	AITaskVersion            string `json:"ai_task_version,omitempty"`
 	AITaskDefinitionChecksum string `json:"ai_task_definition_checksum,omitempty"`
+	ApplicationAttemptID     string `json:"ai_application_attempt_id,omitempty"`
 
 	ProviderPolicySchema           string                    `json:"schema"`
 	ProviderPolicyEnabled          *bool                     `json:"enabled"`
@@ -1453,6 +1582,9 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	}
 	if overlay.AITaskRunID != "" {
 		base.AITaskRunID = overlay.AITaskRunID
+	}
+	if overlay.ApplicationAttemptID != "" {
+		base.ApplicationAttemptID = overlay.ApplicationAttemptID
 	}
 	if overlay.AITaskSessionRole != "" {
 		base.AITaskSessionRole = overlay.AITaskSessionRole

@@ -90,6 +90,7 @@ type legionServerFocusRuntime struct {
 
 	mu           sync.Mutex
 	requestCount int
+	httpEvidence []legionForgeHTTPRequestEvidence
 }
 
 func newLegionServerFocusRuntime(
@@ -647,6 +648,10 @@ func parseFocusRiskJudgementEvidenceRefs(raw any) ([]aiFocusRiskJudgementEvidenc
 }
 
 func (r *legionServerFocusRuntime) executeHTTPRequest(params map[string]any) (map[string]any, error) {
+	return r.executeHTTPRequestContext(r.ctx, params)
+}
+
+func (r *legionServerFocusRuntime) executeHTTPRequestContext(ctx context.Context, params map[string]any) (map[string]any, error) {
 	target, err := r.resolveAuthorizedURL(focusRuntimeString(params, "url"))
 	if err != nil {
 		return nil, err
@@ -662,7 +667,10 @@ func (r *legionServerFocusRuntime) executeHTTPRequest(params map[string]any) (ma
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(r.ctx, method, target.String(), nil)
+	if ctx == nil {
+		ctx = r.ctx
+	}
+	req, err := http.NewRequestWithContext(ctx, method, target.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -673,7 +681,7 @@ func (r *legionServerFocusRuntime) executeHTTPRequest(params map[string]any) (ma
 		req.Header.Set("Accept", "text/html,application/json,application/javascript,text/javascript;q=0.9,*/*;q=0.1")
 	}
 	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", "IRify-Focus-Runtime/1.0")
+		req.Header.Set("User-Agent", "Legion-AI-Runtime/1.0")
 	}
 
 	response, err := r.client.Do(req)
@@ -693,6 +701,11 @@ func (r *legionServerFocusRuntime) executeHTTPRequest(params map[string]any) (ma
 	bodyHash := sha256.Sum256(body)
 	requestEvidence := renderServerFocusRequest(req)
 	responseEvidence := renderServerFocusResponse(response, bodyText)
+	r.mu.Lock()
+	r.httpEvidence = append(r.httpEvidence, legionForgeHTTPRequestEvidence{
+		Method: method, StatusCode: response.StatusCode, BodySHA256: hex.EncodeToString(bodyHash[:]),
+	})
+	r.mu.Unlock()
 	return map[string]any{
 		"url":               target.String(),
 		"method":            method,

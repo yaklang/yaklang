@@ -18,6 +18,7 @@ func TestNormalizeScanNodeCapabilityKeysDefaultsToNonHIDSBuildSurface(t *testing
 		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAIForgeReleaseV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 	}
@@ -54,6 +55,7 @@ func TestNormalizeScanNodeCapabilityKeysKeepsExplicitExtrasWithoutDuplicates(t *
 		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAIForgeReleaseV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 		"extra.capability",
@@ -79,11 +81,11 @@ func TestNormalizeScanNodeCapabilityKeysHidesCodeWorkspaceInStatefulRollbackMode
 	t.Parallel()
 
 	got := normalizeScanNodeCapabilityKeysForRuntime(
-		[]string{capabilityKeyAICodeWorkspaceV1, "extra.capability"},
+		[]string{capabilityKeyAICodeWorkspaceV1, capabilityKeyAIForgeReleaseV1, "extra.capability"},
 		aiSessionRuntimeModeStateful,
 	)
 	for _, key := range got {
-		if key == capabilityKeyAICodeWorkspaceV1 {
+		if key == capabilityKeyAICodeWorkspaceV1 || key == capabilityKeyAIForgeReleaseV1 {
 			t.Fatalf("stateful rollback mode advertised unsupported capability: %#v", got)
 		}
 	}

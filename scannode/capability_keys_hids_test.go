@@ -19,6 +19,7 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAIForgeReleaseV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 	}
@@ -56,6 +57,7 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAIForgeReleaseV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyPluginBundleV1,
 		"extra.capability",
