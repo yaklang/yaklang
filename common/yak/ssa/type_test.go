@@ -37,7 +37,7 @@ func Test_Type_CheckOrType(t *testing.T) {
 		num1 := ssa.CreateNumberType()
 		targetType := ssa.NewOrType(str1, num1)
 		require.Equal(t, ssa.OrTypeKind, targetType.GetTypeKind())
-		ssa.ExternMethodBuilder = &ssa_option.Builder{}
+		ssa.SetExternMethodBuilder(&ssa_option.Builder{})
 
 		method := ssa.GetMethod(str1, "Contains")
 		require.NotNil(t, method)
