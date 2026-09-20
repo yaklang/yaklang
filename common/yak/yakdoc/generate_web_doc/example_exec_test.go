@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -59,7 +58,7 @@ func setupLocalExecEnv(t *testing.T) {
 		filepath.Join(dir, "profile.db"),
 		filepath.Join(dir, "ssa.db"),
 	); err != nil {
-		t.Logf("init temp database failed (continue best-effort): %v", err)
+		t.Fatalf("init temp database failed: %v", err)
 	}
 	// 起一个本地 mock HTTP 服务，地址通过环境变量暴露，便于将来示例以 mock 方式自给自足地联调。
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nmock"))
@@ -77,7 +76,7 @@ func setupLocalExecEnv(t *testing.T) {
 func TestSafeLibsExampleExecution(t *testing.T) {
 	debug.SetGCPercent(-1)
 	setupLocalExecEnv(t)
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := testDocumentHelper(t)
 
 	names := make([]string, 0, len(safeExecLibs))
 	for name := range helper.Libs {
@@ -98,15 +97,19 @@ func TestSafeLibsExampleExecution(t *testing.T) {
 				annotated++
 				continue
 			}
-			engine := yaklang.New()
-			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-			err := engine.SafeEval(ctx, code)
-			cancel()
-			if err == nil {
-				continue
-			}
-			failed++
-			report.WriteString(fmt.Sprintf("=== %s example #%d ===\n%v\n--- code ---\n%s\n\n", name, i+1, err, code))
+			t.Run(fmt.Sprintf("%s/%d", name, i+1), func(t *testing.T) {
+				if strings.Contains(code, "risk.CheckServerReachable(") {
+					setupReachabilityExample(t)
+				}
+				engine := yaklang.New()
+				ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+				defer cancel()
+				if err := engine.SafeEval(ctx, code); err != nil {
+					failed++
+					report.WriteString(fmt.Sprintf("=== %s example #%d ===\n%v\n--- code ---\n%s\n\n", name, i+1, err, code))
+					t.Errorf("example execution failed: %v", err)
+				}
+			})
 		}
 	}
 	_ = os.WriteFile("/tmp/exec_fail.txt", []byte(report.String()), 0o644)
@@ -127,7 +130,7 @@ func TestSafeLibsExampleExecution(t *testing.T) {
 // 分类，把清单交给人工逐个 mock 或标注。关键词: 示例本地可验证性, 静态分类, 无法本地验证清单, 不出网
 func TestAllLibsExampleVerifiabilityReport(t *testing.T) {
 	debug.SetGCPercent(-1)
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := testDocumentHelper(t)
 
 	names := make([]string, 0, len(helper.Libs))
 	for name := range helper.Libs {

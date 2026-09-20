@@ -782,16 +782,12 @@ jobs:
                 {"package": "./scannode/...", "timeout": "30s"}
               ]
 
-          - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
-            # Stays serial. This suite gates the run, so parallelism was worth
-            # trying, but bruteutils defeats it: it decides RDP brute-force
-            # success from an internal wall-clock handshake deadline, and with
-            # two packages sharing the runner the v2 CredSSP case took 15.3s
-            # instead of 0.15s and reported a correct password as ok=false
-            # (run 35064637684). Widening the package timeout does not help,
-            # because the failing deadline lives in the test; serial runs hold
-            # that case at ~57s total. The suite's own timeout stays raised to
-            # 2m because 57s against the old 60s cap left only 4% headroom.
+          - name: "Test Utils Common / Yak Tooling USE gRPC"
+            # Keep packages serial: competing builds made the RDP mock's
+            # CredSSP handshake hit its internal deadline in run 35064637684.
+            # Widening go test's timeout does not fix that resource contention.
+            # Only the independent Telnet banner cases overlap within their
+            # parent test, so they finish before any other package test runs.
             test_configs: |
               [
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
@@ -814,12 +810,12 @@ jobs:
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
                 {"package": "./common/utils/zipx/...", "timeout": "30s"},
                 {"package": "./common/thirdparty_bin", "timeout": "1m", "skip": "^(TestFetchAllMD5|TestSingleURL|TestInstallMemoryUsage|TestMemoryUsageBaseline)$"},
-                {"package": "./common/utils/yakgit/..."},
+                {"package": "./common/utils/yakgit/...", "exclude_packages": ["./common/utils/yakgit/yakdiff/..."]},
                 {"package": "./common/utils/suspect"},
                 {"package": "./common/yak/antlr4nasl/tests/...", "timeout": "1m"},
                 {"package": "./common/utils/gzip_embed/test/...", "timeout": "30s"},
                 {"package": "./common/utils/resources_monitor/...", "timeout": "30s"},
-                {"package": "./common/yak/cmd/...", "timeout": "30s"},
+                {"package": "./common/yak/cmd/...", "timeout": "30s", "exclude_packages": ["./common/yak/cmd/yakcmds/..."]},
                 {"package": "./common/utils/pingutil", "timeout": "20s", "run": "TestPingAutoConfig"},
                 {"package": "./common/mutate_tests", "timeout": "20s"},
                 {"package": "./common/fuzztag", "timeout": "20s"},

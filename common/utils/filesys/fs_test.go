@@ -154,13 +154,16 @@ func TestYakFileMonitor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var currentEvent = make(chan *EventSet)
+	var currentEvent = make(chan *EventSet, 10)
 	_, err = WatchPath(ctx, tempDir, func(eventSet *EventSet) {
 		if len(eventSet.ChangeEvents) == 0 && len(eventSet.CreateEvents) == 0 && len(eventSet.DeleteEvents) == 0 {
 			return
 		}
-		currentEvent <- eventSet
-	})
+		select {
+		case currentEvent <- eventSet:
+		case <-ctx.Done():
+		}
+	}, WithPollInterval(20*time.Millisecond))
 	if err != nil {
 		t.Fatalf("watch path err: %v", err)
 	}

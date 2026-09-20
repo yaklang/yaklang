@@ -41,6 +41,10 @@ func collapseToSingleLine(s string) string {
 // CheckDocCodeBlockMatched 校验所有导出注释里的 ``` 围栏成对，不成对则 panic(早失败)。
 func CheckDocCodeBlockMatched() {
 	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	checkDocCodeBlockMatched(helper)
+}
+
+func checkDocCodeBlockMatched(helper *yakdoc.DocumentHelper) {
 	failCount := 0
 	checkFunc := func(f *yakdoc.FuncDecl) {
 		if len(f.Document) == 0 {

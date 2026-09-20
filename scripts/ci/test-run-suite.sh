@@ -102,6 +102,8 @@ if [[ "$grpc_ready" -ne 1 ]]; then
   exit 1
 fi
 
+echo "GRPC ready after ${waited}s"
+
 if [[ "$SUITE_SYNC_RULE" == "1" ]]; then
   "$YAK_BINARY_PATH" sync-rule 2>&1 | tee -a "$suite_log"
 fi

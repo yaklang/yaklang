@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -113,7 +112,7 @@ func TestOverviewYakExamples(t *testing.T) {
 // 关键词: overview 注入不变量, 最终产物校验
 func TestOverviewInjectedInvariants(t *testing.T) {
 	debug.SetGCPercent(-1)
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := testDocumentHelper(t)
 
 	dir := "overviews"
 	entries, err := os.ReadDir(dir)

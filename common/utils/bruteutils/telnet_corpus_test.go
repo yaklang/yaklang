@@ -10,18 +10,20 @@ package bruteutils_test
 
 import (
 	"bufio"
+	"context"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
 )
 
 // startBannerTelnet 连接后发送一条 banner 然后保持连接（不关闭），
 // 模拟真实设备的"无提示符 banner"行为。
-func startBannerTelnet(t *testing.T, banner string, hold time.Duration) string {
+func startBannerTelnet(t *testing.T, banner string) string {
 	t.Helper()
 	ln := mockListen(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -30,10 +32,9 @@ func startBannerTelnet(t *testing.T, banner string, hold time.Duration) string {
 			}
 			go func(c net.Conn) {
 				defer c.Close()
+				stop := context.AfterFunc(ctx, func() { c.Close() })
+				defer stop()
 				_, _ = c.Write([]byte(banner))
-				if hold > 0 {
-					time.Sleep(hold)
-				}
 				// 读取并丢弃客户端可能发送的数据（回车/凭证）
 				r := bufio.NewReader(c)
 				for {
@@ -72,8 +73,12 @@ func TestTelnetRealBannerCorpus(t *testing.T) {
 		{"password-only", "\r\nPassword: ", false, false, false},
 	}
 	for _, c := range cases {
+		c := c
 		t.Run(c.name, func(t *testing.T) {
-			addr := startBannerTelnet(t, c.banner, 800*time.Millisecond)
+			// Each case owns its listener. Overlap the protocol's idle-read
+			// windows without competing with the CPU-sensitive RDP tests.
+			t.Parallel()
+			addr := startBannerTelnet(t, c.banner)
 			res := mockProbe(t, "telnet", addr, "admin", "x")
 			if res.Ok != c.wantOK {
 				t.Errorf("ok=%v want %v", res.Ok, c.wantOK)
@@ -132,7 +137,7 @@ func TestTelnetRetriggerOnSilentBanner(t *testing.T) {
 // TestTelnetAccountLockedSignalFlow 验证锁定信号贯通到流式调度器
 // （core.OutcomeAccountLocked → LockoutBudget 短路）。
 func TestTelnetAccountLockedSignalFlow(t *testing.T) {
-	addr := startBannerTelnet(t, "\r\r\nProtection of brute force attack!! Lockout remaining: TELNET[ppp0] 163 seconds.\r\n", 800*time.Millisecond)
+	addr := startBannerTelnet(t, "\r\r\nProtection of brute force attack!! Lockout remaining: TELNET[ppp0] 163 seconds.\r\n")
 	_ = bruteutils.GetBuildinAvailableBruteType // 引用包避免未使用
 	res := mockProbe(t, "telnet", addr, "admin", "x")
 	if !res.AccountLocked {

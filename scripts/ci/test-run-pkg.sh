@@ -87,11 +87,37 @@ run_package() {
     echo "===== go test $pkg ${args[*]} (cwd: $pkg_dir) ====="
     # Run from the package directory like the compiled-binary runner did, so tests
     # that resolve testdata or fixtures through relative paths behave identically.
-    (cd "$pkg_dir" && go test . "${args[@]}") >"$log" 2>&1
+    # Bash time includes loading/build/link/vet as well as the test process.
+    # Go's package result reports only the test process; retain both so a slow
+    # build is not mistaken for a slow test (or a package timeout).
+    local TIMEFORMAT=$'real %3R\nuser %3U\nsys %3S'
+    (cd "$pkg_dir" && time go test . "${args[@]}") >"$log" 2>&1
     local code=$?
     # Keep the Actions log small: yak script suites print enormous traces, which is
     # why the compiled-binary runner wrapped its output in a grep filter.
     grep -aE '^(=== RUN|--- (PASS|FAIL|SKIP)|ok |FAIL( |$)|panic:|.*test timed out)' "$log" | tail -60
+    awk -v pkg="$pkg" '
+      /^real [0-9]/ { wall = $2 }
+      /^user [0-9]/ { user = $2 }
+      /^sys [0-9]/ { sys = $2 }
+      /^(ok|FAIL)[[:space:]]+github.com\/yaklang\/yaklang\// && $3 ~ /^[0-9.]+s$/ {
+        runtime = $3 + 0; measured = 1
+      }
+      END {
+        if (measured) {
+          other = wall - runtime; if (other < 0) other = 0
+          printf "TIMING %s: wall=%.3fs test_process=%.3fs build_and_other=%.3fs cpu_user=%.3fs cpu_sys=%.3fs\n", pkg, wall, runtime, other, user, sys
+        } else {
+          printf "TIMING %s: wall=%.3fs test_process=unavailable cpu_user=%.3fs cpu_sys=%.3fs\n", pkg, wall, user, sys
+        }
+      }' "$log"
+    # The last 60 lines can omit the slowest tests. Show their own durations,
+    # including subtests, rather than buffered Actions log timestamps.
+    echo "Slowest tests: $pkg"
+    awk '/^[[:space:]]*--- (PASS|FAIL): / {
+      duration = $NF; gsub(/[()s]/, "", duration)
+      if (duration + 0 >= 0.1) printf "%.2fs %s\n", duration, $3
+    }' "$log" | sort -nr | head -5
     if (( code == 0 )); then
       echo "PASS: $pkg"
       rc=0
