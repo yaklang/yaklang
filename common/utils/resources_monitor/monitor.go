@@ -99,7 +99,10 @@ func (g *gzipResourceMonitor) ensureInit() {
 		if g.notify != nil {
 			g.notify(0, "正在解压资源文件...")
 		}
-		fs, err := gzip_embed.NewPreprocessingEmbed(g.rawFS, g.fileName, true)
+		fs, err := gzip_embed.NewPreprocessingEmbed(g.rawFS, g.fileName)
+		if err == nil {
+			_, err = fs.Stat(".") // First use: finish loading before the completion notification.
+		}
 		if err != nil {
 			log.Errorf("init gzip embed[%s] failed: %v", g.fileName, err)
 			g.fs = gzip_embed.NewEmptyPreprocessingEmbed()

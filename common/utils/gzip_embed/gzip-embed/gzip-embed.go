@@ -4,15 +4,18 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 var template = `
@@ -29,7 +32,7 @@ var FS *gzip_embed.PreprocessingEmbed
 
 func init() {
 	var err error
-	FS, err = gzip_embed.NewPreprocessingEmbed(&resourceFS, "$gz", $cache)
+	FS, err = $constructor
 	if err != nil {
 		log.Errorf("init embed failed: %v", err)
 		FS = gzip_embed.NewEmptyPreprocessingEmbed()
@@ -37,14 +40,15 @@ func init() {
 }
 `
 
-func main() {
+func newApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = "gzip-embed"
 	app.Usage = `help you generate compress file and embed file reader`
 	app.Version = "v1.1"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name: "cache,c",
+		cli.BoolTFlag{
+			Name:  "cache,c",
+			Usage: "load once on first access and retain resources; use --cache=false for streaming",
 		},
 		cli.BoolFlag{
 			Name: "no-embed",
@@ -70,7 +74,8 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "xor-key",
-			Usage: "if set, XOR-encode the output tar.gz with this key",
+			Value: gzip_embed.DefaultXORKey,
+			Usage: "XOR resource key (shared default); an empty key disables encoding",
 		},
 	}
 	app.Action = func(c *cli.Context) error {
@@ -96,14 +101,20 @@ func main() {
 			}
 		}
 		if !c.Bool("no-embed") {
-			writeEmbedFile(c.IsSet("cache"), strings.Join(sources, " "), gzName)
+			if err := writeEmbedFile(c.Bool("cache"), strings.Join(sources, " "), gzName, xorKey); err != nil {
+				return err
+			}
 			log.Infof("generate embed file and compress file success, compress file name: %s", gzName)
 		} else {
 			log.Infof("generate compress file success (skip embed file), compress file name: %s", gzName)
 		}
 		return nil
 	}
-	err := app.Run(os.Args)
+	return app
+}
+
+func main() {
+	err := newApp().Run(os.Args)
 	if err != nil {
 		log.Error(err)
 		os.Exit(1)
@@ -115,24 +126,35 @@ func xorEncodeFile(path string, key []byte) error {
 	if err != nil {
 		return err
 	}
-	encoded := make([]byte, len(raw))
-	for i, b := range raw {
-		encoded[i] = b ^ key[i%len(key)]
+	if len(key) > 0 {
+		for i, j := 0, 0; i < len(raw); i++ {
+			raw[i] ^= key[j]
+			j++
+			if j == len(key) {
+				j = 0
+			}
+		}
 	}
-	return os.WriteFile(path, encoded, 0o644)
+	return os.WriteFile(path, raw, 0644)
 }
-func writeEmbedFile(cache bool, sourceDir string, gzName string) {
-	dir, _ := os.Getwd()
-	cacheStr := "false"
-	if cache {
-		cacheStr = "true"
+
+func writeEmbedFile(cache bool, sourceDir string, gzName string, xorKey string) error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	constructor := fmt.Sprintf("gzip_embed.NewPreprocessingEmbed(&resourceFS, %s, %t)", strconv.Quote(filepath.ToSlash(gzName)), cache)
+	if xorKey != "" && xorKey != gzip_embed.DefaultXORKey {
+		constructor = fmt.Sprintf("gzip_embed.NewPreprocessingEmbedWithXORKey(&resourceFS, %s, %t, []byte(%s))", strconv.Quote(filepath.ToSlash(gzName)), cache, strconv.Quote(xorKey))
 	}
 	code := fmt.Sprintf("package %s\n%s", filepath.Base(dir), utils.Format(template, map[string]string{
-		"source": sourceDir,
-		"gz":     gzName,
-		"cache":  cacheStr,
+		"source": sourceDir, "gz": strconv.Quote(filepath.ToSlash(gzName)), "constructor": constructor,
 	}))
-	os.WriteFile("embed.go", []byte(code), 0644)
+	formatted, err := format.Source([]byte(code))
+	if err != nil {
+		return err
+	}
+	return os.WriteFile("embed.go", formatted, 0644)
 }
 
 // targz 把若干个源目录合并打包成一个 tar.gz。

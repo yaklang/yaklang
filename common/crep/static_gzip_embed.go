@@ -11,12 +11,12 @@ import (
 //go:embed static.tar.gz
 var staticFSArchive embed.FS
 
-// Match development resource paths without retaining a global decompressed copy.
+// Decode and decompress on first access, then reuse resident contents.
 var staticFS *gzip_embed.PreprocessingEmbed
 
 func init() {
 	var err error
-	staticFS, err = gzip_embed.NewPreprocessingEmbed(&staticFSArchive, "static.tar.gz", false)
+	staticFS, err = gzip_embed.NewPreprocessingEmbed(&staticFSArchive, "static.tar.gz")
 	if err != nil {
 		panic(err)
 	}
