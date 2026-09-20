@@ -41,6 +41,14 @@ func WithFetchSize(size int) Option {
 	}
 }
 
+// WithInitialBufferSize controls the initial asynchronous queue capacity,
+// independently of database batch sizes. The queue still grows as needed.
+func WithInitialBufferSize(size int) Option {
+	return func(c *config) {
+		c.bufferSize = size
+	}
+}
+
 func WithEnableSave(enables ...bool) Option {
 	return func(c *config) {
 		if len(enables) > 0 {
@@ -93,11 +101,8 @@ func WithSkipEviction[T any](skip func(T) bool) Option {
 	}
 }
 
-const defaultBufferSize = 1000
-
 func NewConfig(opts ...Option) *config {
 	cfg := &config{
-		bufferSize:      defaultBufferSize, // Default buffer size
 		ctx:             context.Background(),
 		fetchSize:       defaultBatchSize,
 		saveSize:        defaultBatchSize,
@@ -107,6 +112,8 @@ func NewConfig(opts ...Option) *config {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	cfg.bufferSize = (max(cfg.fetchSize, cfg.saveSize)) * 4
+	if cfg.bufferSize <= 0 {
+		cfg.bufferSize = (max(cfg.fetchSize, cfg.saveSize)) * 4
+	}
 	return cfg
 }

@@ -521,7 +521,10 @@ func (b *baseType) RangeMethod(f func(string, *Function)) {
 }
 
 type BasicType struct {
-	*baseType
+	// Basic types are numerous and own their base state. Keep it in the same
+	// allocation, avoiding a separate GC object and pointer per type. BasicType
+	// must not be copied after use (baseType contains atomics and locks).
+	baseType
 	Kind    TypeKind
 	name    string
 	pkgPath string
@@ -531,12 +534,12 @@ type BasicType struct {
 
 func NewBasicType(kind TypeKind, name string) *BasicType {
 	typ := &BasicType{
-		baseType:     NewBaseType(),
 		Kind:         kind,
 		name:         name,
 		pkgPath:      name,
 		fullTypeName: make([]string, 0),
 	}
+	typ.id.Store(-1)
 	return typ
 }
 

@@ -9,6 +9,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var basicTypeAllocationSink *BasicType
+
+func TestBasicTypeOwnsBaseStateInOneAllocation(t *testing.T) {
+	a, b := CreateAnyType(), CreateAnyType()
+	require.EqualValues(t, -1, a.GetId())
+	a.SetId(42)
+	require.EqualValues(t, -1, b.GetId())
+	a.SetMethod(map[string]*Function{"method": nil})
+	require.Empty(t, b.GetMethod(), "independent basic types must not share mutable state")
+	require.LessOrEqual(t, testing.AllocsPerRun(100, func() {
+		basicTypeAllocationSink = NewBasicType(AnyTypeKind, "any")
+	}), float64(1), "base metadata should not allocate a second GC object")
+	basicTypeAllocationSink = nil
+}
+
+func BenchmarkBasicTypeAllocation(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		basicTypeAllocationSink = NewBasicType(AnyTypeKind, "any")
+	}
+	basicTypeAllocationSink = nil
+}
+
 func TestTypeFingerprintsPages(t *testing.T) {
 	p := make(typeFingerprints)
 	ids := []int64{1, 31, 32, 63, 64, math.MaxInt64}

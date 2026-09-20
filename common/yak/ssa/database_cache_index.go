@@ -183,6 +183,9 @@ func (s *indexStore) AddClassInstance(name string, inst Instruction) {
 	}
 }
 
+// checkValue is a pure exact/glob/regexp predicate. Key filtering can run under
+// an index read lock, but resolve (which may populate indexes) always runs after
+// the matching snapshot has released that lock.
 func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(string) bool, resolve func(id int64) Instruction) []Instruction {
 	if s == nil || resolve == nil {
 		return nil
@@ -211,7 +214,7 @@ func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(strin
 		}
 	}
 	if mod&ssadb.ConstType != 0 {
-		s.consts.ForEach(func(_ string, ids []int64) bool {
+		for _, ids := range s.consts.Values() {
 			for _, id := range ids {
 				inst := resolveOnce(id)
 				if inst == nil {
@@ -221,31 +224,21 @@ func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(strin
 					ins = append(ins, inst)
 				}
 			}
-			return true
-		})
+		}
 		return ins
 	}
 	if mod&ssadb.KeyMatch != 0 {
-		s.member.ForEach(func(key string, instructions []int64) bool {
-			if checkValue(key) {
-				appendResolved(instructions)
-			}
-			return true
-		})
+		for _, instructions := range s.member.ValuesMatching(checkValue) {
+			appendResolved(instructions)
+		}
 	}
 	if mod&ssadb.NameMatch != 0 {
-		s.variable.ForEach(func(key string, instructions []int64) bool {
-			if checkValue(key) {
-				appendResolved(instructions)
-			}
-			return true
-		})
-		s.class.ForEach(func(key string, instructions []int64) bool {
-			if checkValue(key) {
-				appendResolved(instructions)
-			}
-			return true
-		})
+		for _, instructions := range s.variable.ValuesMatching(checkValue) {
+			appendResolved(instructions)
+		}
+		for _, instructions := range s.class.ValuesMatching(checkValue) {
+			appendResolved(instructions)
+		}
 	}
 	return ins
 }

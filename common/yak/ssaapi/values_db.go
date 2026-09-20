@@ -364,20 +364,23 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 	ret := &auditDatabase{}
 
 	saveSize := size * 2
+	// Most result graphs are small. Avoid allocating three large queues for
+	// every result; large graphs can grow the queues without changing batches.
+	queueSize := dbcache.WithInitialBufferSize(64)
 
 	ret.nodeSave = dbcache.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) error {
 		if len(ae) == 0 {
 			return nil
 		}
 		return batchSaveAuditNodes(db, ae)
-	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditNode"))
+	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), queueSize, dbcache.WithName("AuditNode"))
 
 	ret.edgeSave = dbcache.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) error {
 		if len(ae) == 0 {
 			return nil
 		}
 		return batchSaveAuditEdges(db, ae)
-	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditEdge"))
+	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), queueSize, dbcache.WithName("AuditEdge"))
 
 	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) error {
 		if len(ae) == 0 {
@@ -391,7 +394,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			}
 			return nil
 		})
-	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(size), dbcache.WithName("SourceFile"))
+	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(size), queueSize, dbcache.WithName("SourceFile"))
 
 	return ret
 }
