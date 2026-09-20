@@ -104,3 +104,21 @@ func TestProbeRedirectSharesDeadline(t *testing.T) {
 		t.Fatalf("calls=%d err=%v", calls, err)
 	}
 }
+
+func TestProbeParentDeadlineIncludesDial(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	parentDeadline, _ := ctx.Deadline()
+	start := time.Now()
+	err := Probe(ctx, dialFunc(func(ctx context.Context, _, _ string) (net.Conn, error) {
+		deadline, _ := ctx.Deadline()
+		if !deadline.Equal(parentDeadline) {
+			t.Fatal("probe enlarged the caller's deadline")
+		}
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: "PROBE", Timeout: time.Hour})
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
+		t.Fatalf("dial deadline: %v", err)
+	}
+}
