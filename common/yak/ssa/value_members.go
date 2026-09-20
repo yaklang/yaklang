@@ -136,6 +136,12 @@ func (n *anValue) resolveLinkedValue(id int64) (Value, bool) {
 	if prog == nil {
 		return nil, false
 	}
+	// A missing memory-mode ID cannot be recovered from a database. Apart
+	// from unnecessary I/O, consulting the global DB can resolve an unrelated
+	// program's instruction and start database initialization in a body worker.
+	if prog.DatabaseKind == ProgramCacheMemory {
+		return nil, false
+	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
