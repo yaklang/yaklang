@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -301,15 +302,25 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 	})
 	t.Run("cancel", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{hangAfter: "version", password: "x"})
+		for i := 0; i < 20; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+			res := mockProbeContext(t, ctx, "vnc", addr, "", "x")
+			cancel()
+			if res.Ok || res.Finished {
+				t.Fatalf("timeout after RFB banner must retry (i=%d), ok=%v finished=%v", i, res.Ok, res.Finished)
+			}
+		}
+	})
+	t.Run("partial-rfb-prefix-timeout", func(t *testing.T) {
+		addr := startRawRFB(t, func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003."))
+			_, _ = io.Copy(io.Discard, c)
+		})
 		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 		defer cancel()
-		start := time.Now()
 		res := mockProbeContext(t, ctx, "vnc", addr, "", "x")
 		if res.Ok || res.Finished {
-			t.Fatalf("timeout after RFB banner must retry, ok=%v finished=%v", res.Ok, res.Finished)
-		}
-		if time.Since(start) > 2*time.Second {
-			t.Fatal("cancel did not bound the probe")
+			t.Fatalf("timeout after partial RFB prefix must retry, ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("rfb37-vnauth", func(t *testing.T) {
@@ -393,6 +404,13 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 			t.Fatalf("too-many reason: ok=%v locked=%v", res.Ok, res.AccountLocked)
 		}
 	})
+	t.Run("generic-security-failure-not-lockout", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{password: "secret", failReason: "Security failure"})
+		res := mockProbe(t, "vnc", addr, "", "WRONG")
+		if res.Ok || res.Finished || res.AccountLocked {
+			t.Fatalf("generic Security failure must be auth-fail, ok=%v finished=%v locked=%v", res.Ok, res.Finished, res.AccountLocked)
+		}
+	})
 	t.Run("tight-missing-notunnel", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{
 			secTypes:     []byte{16},
@@ -424,6 +442,43 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 			t.Fatal("password leaked in result")
 		}
 	})
+}
+
+func TestVNCStreamPasswordDedupe(t *testing.T) {
+	addr := startMockRFB(t, mockRFBConfig{password: "good-pass"})
+	handler, err := bruteutils.GetBruteFuncByType("vnc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attempts int32
+	seen := make(map[string]int)
+	util, err := bruteutils.NewMultiTargetBruteUtilEx(
+		bruteutils.WithOkToStop(false),
+		bruteutils.WithBruteCallback(func(item *bruteutils.BruteItem) *bruteutils.BruteItemResult {
+			atomic.AddInt32(&attempts, 1)
+			return handler(item)
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = util.StreamBruteContext(context.Background(), "vnc", []string{addr},
+		[]string{"alice", "bob"}, []string{"wrong-pass", "good-pass"},
+		func(res *bruteutils.BruteItemResult) {
+			seen[res.Username+"/"+res.Password]++
+			if res.Ok && res.Password != "good-pass" {
+				t.Errorf("unexpected hit user=%q pass=%q", res.Username, res.Password)
+			}
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := atomic.LoadInt32(&attempts); n != 2 {
+		t.Fatalf("password-only VNC must try each password once, attempts=%d want 2 (seen=%v)", n, seen)
+	}
+	if seen["alice/good-pass"]+seen["bob/good-pass"] == 0 {
+		t.Fatalf("correct password was not found: %v", seen)
+	}
 }
 
 func TestVNCLoginProbeCrashAndGarbage(t *testing.T) {

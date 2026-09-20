@@ -159,12 +159,14 @@ func coreResultFromLegacy(ctx context.Context, item *BruteItem, legacy *BruteIte
 		outcome = core.OutcomeCancelled
 	}
 	return core.Result{
-		Outcome:  outcome,
-		Protocol: item.Type,
-		TargetID: item.Target,
-		CredID:   core.Credential{Username: legacy.Username, Password: legacy.Password}.ID(),
-		Extra:    legacy.ExtraInfo,
-		Err:      core.ErrAuthRejected,
+		Outcome:          outcome,
+		Protocol:         item.Type,
+		TargetID:         item.Target,
+		CredID:           core.Credential{Username: legacy.Username, Password: legacy.Password}.ID(),
+		Extra:            legacy.ExtraInfo,
+		Err:              core.ErrAuthRejected,
+		UserEliminated:   legacy.UserEliminated,
+		OnlyNeedPassword: legacy.OnlyNeedPassword,
 		// RawCredentialIndex 由调度器回填；这里用 Attempts=1 标记未授权命中
 		// （handler 在未授权成功时清空 Username/Password）。
 		Attempts: unauthAttemptMark(legacy),

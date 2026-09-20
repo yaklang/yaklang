@@ -394,6 +394,45 @@ func TestProbeTightCapabilities(t *testing.T) {
 			t.Fatalf("want locked from reason, got %v", r.Err)
 		}
 	})
+	t.Run("generic-security-failure-not-locked", func(t *testing.T) {
+		addr := serveOnce(t, func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			ver := make([]byte, 12)
+			_, _ = io.ReadFull(c, ver)
+			_, _ = c.Write([]byte{1, 2})
+			sel := make([]byte, 1)
+			_, _ = io.ReadFull(c, sel)
+			_, _ = c.Write(bytes.Repeat([]byte{0x33}, 16))
+			resp := make([]byte, 16)
+			_, _ = io.ReadFull(c, resp)
+			u32(c, 1)
+			reason := []byte("Security failure")
+			u32(c, uint32(len(reason)))
+			_, _ = c.Write(reason)
+		})
+		r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 2 * time.Second})
+		if !errors.Is(r.Err, ErrAuthFailed) || r.Locked {
+			t.Fatalf("generic Security failure must be auth-fail, got %+v", r)
+		}
+	})
+}
+
+func TestProbePartialRFBPrefixTimeout(t *testing.T) {
+	addr := serveOnce(t, func(c net.Conn) {
+		_, _ = c.Write([]byte("RFB 003."))
+		_, _ = io.Copy(io.Discard, c)
+	})
+	start := time.Now()
+	r := Probe(context.Background(), nil, Options{Address: addr, Password: "x", Timeout: 80 * time.Millisecond})
+	if r.OK() {
+		t.Fatal("partial RFB prefix must not authenticate")
+	}
+	if !errors.Is(r.Err, ErrTransient) && !errors.Is(r.Err, context.DeadlineExceeded) {
+		t.Fatalf("timeout after RFB prefix must be transient, got %v", r.Err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("partial prefix timeout exceeded budget")
+	}
 }
 
 func serveOnce(t *testing.T, fn func(net.Conn)) string {
