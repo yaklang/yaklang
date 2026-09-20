@@ -34,6 +34,22 @@ slice prefixes are immutable: removals and replacements allocate a new slice,
 and readers resolve IDs after releasing the lock. Resident indexes use atomic
 read/append/write operations to avoid lost entries.
 
+Private builder scopes commit their resulting basic block back to the owning
+declaration after execution. This preserves control flow between consecutive
+field initializers while keeping editors and lexical state local. Tasks owned
+by that declaration remain serial. Shared type-name updates use per-type locks;
+default constructor lookup and registration use a short critical section, with
+constructor body execution outside it to permit recursive construction.
+
+Blueprint inheritance edges are registered as IR metadata without assignments
+in either declaration scope. Reverse edges must not start a dependency's lazy
+body. Missing dependency members are synthesized in the consuming library;
+the dependency retains the member relation but its block and scope remain
+unchanged. Type method maps publish immutable snapshots after lazy initialization.
+Type formatting uses a per-call recursion path instead of temporarily renaming
+shared types; completed root function strings retain an atomic cache. A missing
+memory-mode relation never falls back to a same-named persisted program.
+
 ## Validation
 
 Use `scripts/ssa-test.sh` for all tests. Focused coverage includes dependency
