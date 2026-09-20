@@ -18,7 +18,9 @@ import (
 const maxExchange = 1 << 20
 
 type session struct {
-	conn                                net.Conn
+	conn net.Conn
+	// Close the underlying socket directly; TLS close_notify must not extend a probe.
+	transport                           net.Conn
 	in, out                             bytes.Buffer
 	err                                 error
 	version                             uint16
@@ -193,7 +195,7 @@ func connect(ctx context.Context, d Dialer, o Options, descriptor string) (*sess
 		if e != nil {
 			return nil, e
 		}
-		s := &session{conn: conn, sdu: 8192, ClrChunkSize: 64}
+		s := &session{conn: conn, transport: conn, sdu: 8192, ClrChunkSize: 64}
 		stop := context.AfterFunc(ctx, func() { conn.Close() })
 		next, e := func() (string, error) {
 			if deadline, ok := ctx.Deadline(); ok {

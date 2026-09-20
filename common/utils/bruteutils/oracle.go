@@ -35,6 +35,10 @@ func oracleBrutePass(i *BruteItem, probe func(context.Context, oracleprobe.Optio
 	sawService := false
 	allLocked := true
 	for _, service := range oracleServiceNames {
+		if ctx.Err() != nil {
+			res.Finished = true
+			return res
+		}
 		err := probe(ctx, oracleprobe.Options{
 			Address: i.Target, Service: service, Username: i.Username,
 			Password: i.Password, SysDBA: strings.EqualFold(i.Username, "sys"),

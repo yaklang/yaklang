@@ -51,3 +51,17 @@ func TestOracleBruteResultClassification(t *testing.T) {
 		})
 	}
 }
+
+func TestOracleBruteCancellationStopsServices(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	r := oracleBrutePass(&BruteItem{Context: ctx, Target: "127.0.0.1", Username: "probe"}, func(context.Context, oracleprobe.Options) error {
+		calls++
+		cancel()
+		return &oracleprobe.Error{Code: 12514}
+	})
+	if calls != 1 || r.Ok || !r.Finished || r.UserEliminated {
+		t.Fatalf("cancellation: calls=%d result=%#v", calls, r)
+	}
+}
