@@ -2427,19 +2427,31 @@
     },
     {
       "local_file": "common/sca/analyzer/utils_dependence.go",
-      "sha256": "09677fac3a68ba0da5572096c83770e1618d18165f34896f84a301472a058af0",
+      "sha256": "910ca9d8f6531b4ccd802db85f6a53270ab1ccbebd34e5f50057fe8a47a54f1a",
       "symbols": [
         {
           "name": "parseVersion",
-          "line": 13
+          "line": 15
         },
         {
           "name": "handlerSemverVersionRange",
-          "line": 29
+          "line": 31
         },
         {
           "name": "MergePackages",
-          "line": 60
+          "line": 69
+        },
+        {
+          "name": "mergePackagesOrKeep",
+          "line": 73
+        },
+        {
+          "name": "mergePackagesBudget",
+          "line": 81
+        },
+        {
+          "name": "MergePackagesBudget",
+          "line": 88
         }
       ],
       "decision": "REWRITE",

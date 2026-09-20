@@ -57,16 +57,38 @@ func handlerSemverVersionRange(semverRange string) string {
 	return semverRange
 }
 
-// MergePackages is a compatibility exact-identity adapter. It never parses
+// MergePackages is the compatibility exact-identity adapter. It never parses
 // alternatives, compares versions, or searches a same-name candidate list.
-// The public signature is unchanged; a default bounded State is used when the
-// caller has no scan context.
+//
+// Compatibility: the public signature stays ([]*Package) with no error. A
+// default bounded State is used. Budget exhaustion must not look like an
+// empty inventory, so the original slice is returned unchanged (non-silent:
+// data is kept, not replaced with nil). License/from-file/graph fields are
+// not mutated on that path, so a later successful merge cannot double-append.
+// Callers that need the error should use MergePackagesBudget.
 func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
-	out, _ := mergePackagesBudget(budget.From(context.Background()), pkgs)
+	return mergePackagesOrKeep(budget.From(context.Background()), pkgs)
+}
+
+func mergePackagesOrKeep(st *budget.State, pkgs []*dxtypes.Package) []*dxtypes.Package {
+	out, err := MergePackagesBudget(st, pkgs)
+	if err != nil {
+		return pkgs
+	}
 	return out
 }
 
 func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.Package, error) {
+	return MergePackagesBudget(st, pkgs)
+}
+
+// MergePackagesBudget merges exact identities under st. All unique-identity
+// and index charges run before any metadata mutation. On error, pkgs is left
+// unchanged (no license/edge/from-file appends, no cleared graphs).
+func MergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.Package, error) {
+	if st == nil {
+		st = budget.From(context.Background())
+	}
 	type identity struct {
 		Digest           [32]byte
 		Potential, Range bool
@@ -78,7 +100,21 @@ func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 	if err := st.Result(budget.SizeMap + budget.SizeOfSortIndex(len(pkgs))); err != nil {
 		return nil, err
 	}
-	index := make(map[identity]*dxtypes.Package, len(pkgs))
+	seen := map[identity]struct{}{}
+	for _, p := range pkgs {
+		if p == nil {
+			continue
+		}
+		key := keyOf(p)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		if err := st.Result(budget.SizeOfPackage(p.Name, p.Version, p.Verification) + budget.SizePtr); err != nil {
+			return nil, err
+		}
+		seen[key] = struct{}{}
+	}
+	index := make(map[identity]*dxtypes.Package, len(seen))
 	type edge struct{ from, to *dxtypes.Package }
 	var edges []edge
 	for _, p := range pkgs {
@@ -88,13 +124,9 @@ func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 		key := keyOf(p)
 		dst := index[key]
 		if dst == nil {
-			if err := st.Result(budget.SizeOfPackage(p.Name, p.Version, p.Verification) + budget.SizePtr); err != nil {
-				return nil, err
-			}
 			dst = p
 			index[key] = dst
-		}
-		if dst != p {
+		} else {
 			if p.PackageDetails != nil {
 				dst.MergeDetails(p.Details())
 			}
@@ -117,6 +149,9 @@ func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.
 	}
 	for _, e := range edges {
 		from, to := index[keyOf(e.from)], index[keyOf(e.to)]
+		if from == nil {
+			continue
+		}
 		if to == nil {
 			to = e.to
 		}
