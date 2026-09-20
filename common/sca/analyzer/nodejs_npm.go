@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
 	"io"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm"
@@ -73,6 +74,7 @@ type packageJSON struct {
 	License              interface{}       `json:"license"`
 	Dependencies         map[string]string `json:"dependencies"`
 	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	DevDependencies      map[string]string `json:"devDependencies"`
 	Workspaces           []string          `json:"workspaces"`
 }
 
@@ -120,11 +122,26 @@ func (*parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]godeptypes.Libra
 		libs = append(libs, lib)
 	}
 	dep := godeptypes.Dependency{ID: id}
-	declarations := lo.Assign(pkgJSON.Dependencies, pkgJSON.OptionalDependencies)
-	for name, version := range declarations {
-		ref := "declaration:" + name
-		libs = append(libs, godeptypes.Library{ID: ref, Name: name, Version: version, IsVersionRange: !exactNPMVersion.MatchString(version), Evidence: "declared", DeclaredName: name, DeclaredVersion: version})
-		dep.DependsOn = append(dep.DependsOn, ref)
+	for _, scope := range []struct {
+		name     string
+		values   map[string]string
+		emitLib  bool
+		dev      bool
+	}{{"runtime", pkgJSON.Dependencies, true, false}, {"optional", pkgJSON.OptionalDependencies, true, false}, {"dev", pkgJSON.DevDependencies, false, true}} {
+		names := make([]string, 0, len(scope.values))
+		for n := range scope.values {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			version := scope.values[name]
+			if scope.emitLib {
+				ref := "declaration:" + name
+				libs = append(libs, godeptypes.Library{ID: ref, Name: name, Version: version, IsVersionRange: !exactNPMVersion.MatchString(version), Evidence: "declared", DeclaredName: name, DeclaredVersion: version, Dev: scope.dev, Scope: scope.name})
+				dep.DependsOn = append(dep.DependsOn, ref)
+			}
+			dep.Requirements = append(dep.Requirements, godeptypes.Requirement{Target: name, Constraint: version, Scope: scope.name})
+		}
 	}
 	return libs, []godeptypes.Dependency{dep}, nil
 }

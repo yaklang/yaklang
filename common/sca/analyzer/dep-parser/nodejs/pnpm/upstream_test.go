@@ -80,10 +80,12 @@ func TestParse(t *testing.T) {
 				got[i].Source = ""
 				got[i].Verification = ""
 				got[i].DeclaredIntegrity = ""
+				got[i].DeclaredVersion = ""
 				got[i].Diagnostics = nil
 			}
 			for i := range deps {
 				deps[i].ID = ids[deps[i].ID]
+				deps[i].Requirements = nil
 				for j, ref := range deps[i].DependsOn {
 					if id, ok := ids[ref]; ok {
 						deps[i].DependsOn[j] = id

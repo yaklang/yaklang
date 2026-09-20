@@ -55,6 +55,9 @@ func TestParser_Parse(t *testing.T) {
 			for i := range gotLibs {
 				gotLibs[i].Condition = ""
 				gotLibs[i].Scope = ""
+				gotLibs[i].Verification = ""
+				gotLibs[i].DeclaredIntegrity = ""
+				gotLibs[i].Diagnostics = nil
 			}
 			for i := range gotDeps {
 				gotDeps[i].Requirements = nil

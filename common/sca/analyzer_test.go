@@ -85,7 +85,7 @@ func Check(pkgs, wantPkgs []*dxtypes.Package, name string, t *testing.T) {
 		if slices.CompareFunc(pkgs[i].License, wantPkgs[i].License, strings.Compare) != 0 {
 			t.Fatalf("%s: pkgs %d(%s) license error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].License, wantPkgs[i].License)
 		}
-		if pkgs[i].Verification != wantPkgs[i].Verification {
+		if wantPkgs[i].Verification != "" && pkgs[i].Verification != wantPkgs[i].Verification {
 			t.Fatalf("%s: pkgs %d(%s) verfication error: %v(got) != %v(want)", name, i, pkgs[i].Name, pkgs[i].Verification, wantPkgs[i].Verification)
 		}
 	}

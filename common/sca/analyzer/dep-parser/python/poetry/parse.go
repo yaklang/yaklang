@@ -9,6 +9,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
+	"github.com/yaklang/yaklang/common/sca/internal/digest"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"log"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -24,7 +26,11 @@ type Lockfile struct {
 		PythonVersions string                 `json:"python-versions"`
 		Version        string                 `json:"version"`
 		Dependencies   map[string]interface{} `json:"dependencies"`
-		Metadata       interface{}
+		Files          []struct {
+			File string `json:"file"`
+			Hash string `json:"hash"`
+		} `json:"files"`
+		Metadata interface{}
 	} `json:"package"`
 }
 
@@ -51,12 +57,30 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		}
 
 		pkgID := utils.PackageID(pkg.Name, pkg.Version)
-		libs = append(libs, types.Library{
-			ID:        pkgID,
-			Name:      pkg.Name,
-			Condition: pkg.Marker, Scope: pkg.Category,
-			Version: pkg.Version,
-		})
+		scope := pkg.Category
+		if pkg.Optional {
+			scope = "optional"
+		}
+		var hashes []string
+		for _, f := range pkg.Files {
+			if f.Hash != "" {
+				hashes = append(hashes, f.Hash)
+			}
+		}
+		declared := digest.ParseDeclared(strings.Join(hashes, " "))
+		lib := types.Library{
+			ID:                pkgID,
+			Name:              pkg.Name,
+			Condition:         pkg.Marker,
+			Scope:             scope,
+			Version:           pkg.Version,
+			Verification:      declared.Canonical,
+			DeclaredIntegrity: declared.Original,
+		}
+		for _, issue := range declared.Issues {
+			lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "poetry", Reason: issue, Incomplete: true})
+		}
+		libs = append(libs, lib)
 
 		dependsOn := parseDependencies(pkg.Dependencies, libVersions)
 		reqs := []types.Requirement{}

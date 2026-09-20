@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/core/lockyaml"
 	"github.com/yaklang/yaklang/common/sca/internal/digest"
 	"github.com/yaklang/yaklang/common/sca/model"
@@ -33,6 +34,7 @@ type PackageInfo struct {
 
 type LockFile struct {
 	LockfileVersion any                    `json:"lockfileVersion"`
+	Specifiers      map[string]any         `json:"specifiers,omitempty"`
 	Dependencies    map[string]any         `json:"dependencies,omitempty"`
 	DevDependencies map[string]any         `json:"devDependencies,omitempty"`
 	Packages        map[string]PackageInfo `json:"packages,omitempty"`
@@ -60,6 +62,9 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	}
 	data, err = json.Marshal(tree)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := budget.From(types.ContextOf(r)).Working(int64(len(data))); err != nil {
 		return nil, nil, err
 	}
 	if err := json.Unmarshal(data, &lockFile); err != nil {
@@ -140,6 +145,20 @@ func (p *Parser) parse(lockVer int, lockFile LockFile) ([]types.Library, []types
 				ID:        pkgID,
 				DependsOn: dependencies,
 			})
+		}
+	}
+
+	specOf := map[string]string{}
+	for name, spec := range lockFile.Specifiers {
+		constraint := strings.TrimSpace(fmt.Sprint(spec))
+		if s, ok := spec.(string); ok {
+			constraint = s
+		}
+		specOf[name] = constraint
+	}
+	for i, lib := range libs {
+		if constraint, ok := specOf[lib.Name]; ok {
+			libs[i].DeclaredVersion = constraint
 		}
 	}
 

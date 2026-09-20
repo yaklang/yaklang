@@ -15,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
 	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
+	"github.com/yaklang/yaklang/common/sca/internal/digest"
+	"github.com/yaklang/yaklang/common/sca/model"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -29,11 +31,12 @@ type LockFile struct {
 }
 
 type Library struct {
-	Source   string
-	Patterns []string
-	Name     string
-	Version  string
-	Location types.Location
+	Source    string
+	Integrity string
+	Patterns  []string
+	Name      string
+	Version   string
+	Location  types.Location
 }
 type Dependency struct {
 	Pattern string
@@ -206,6 +209,9 @@ func parseBlock(block []byte, lineNum int) (lib Library, deps []string, newLine 
 		case strings.HasPrefix(line, "resolved "):
 			lib.Source = strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "resolved ")), `"`)
 			continue
+		case strings.HasPrefix(line, "integrity "):
+			lib.Integrity = strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "integrity ")), `"`)
+			continue
 		case strings.HasPrefix(line, "version"):
 			if lib.Version, err = getVersion(line); err != nil {
 				skipBlock = true
@@ -304,13 +310,20 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		sort.Strings(lib.Patterns)
 		rawID, _ := json.Marshal(lib.Patterns)
 		libID := string(rawID)
-		libs = append(libs, types.Library{
-			ID:        libID,
-			Name:      lib.Name,
-			Version:   lib.Version,
-			Source:    lib.Source,
-			Locations: []types.Location{lib.Location},
-		})
+		declared := digest.ParseDeclared(lib.Integrity)
+		item := types.Library{
+			ID:                libID,
+			Name:              lib.Name,
+			Version:           lib.Version,
+			Source:            lib.Source,
+			Verification:      declared.Canonical,
+			DeclaredIntegrity: declared.Original,
+			Locations:         []types.Location{lib.Location},
+		}
+		for _, issue := range declared.Issues {
+			item.Diagnostics = append(item.Diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "yarn", Reason: issue, Incomplete: true})
+		}
+		libs = append(libs, item)
 
 		for _, pattern := range lib.Patterns {
 			// e.g.

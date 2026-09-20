@@ -61,6 +61,11 @@ func TestParse(t *testing.T) {
 				return ret < 0
 			})
 
+			for i := range got {
+				got[i].Verification = ""
+				got[i].DeclaredIntegrity = ""
+				got[i].Diagnostics = nil
+			}
 			assert.Equal(t, v.want, got)
 		})
 	}

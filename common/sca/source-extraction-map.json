@@ -3,8 +3,69 @@
   "baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
   "entries": [
     {
+      "local_file": "common/sca/analyzer.go",
+      "sha256": "b7e450d762e04522127053c284d9101ff36c6706646d7f9d77b9cdd07561758c",
+      "symbols": [
+        {
+          "name": "ScanConfig",
+          "line": 15
+        },
+        {
+          "name": "ScanOption",
+          "line": 26
+        },
+        {
+          "name": "NewConfig",
+          "line": 28
+        },
+        {
+          "name": "_withCustomAnalyzer",
+          "line": 50
+        },
+        {
+          "name": "_withScanMode",
+          "line": 69
+        },
+        {
+          "name": "_withConcurrent",
+          "line": 88
+        },
+        {
+          "name": "_withAnalayzers",
+          "line": 107
+        },
+        {
+          "name": "scanFS",
+          "line": 113
+        },
+        {
+          "name": "ScanLocalFilesystem",
+          "line": 138
+        },
+        {
+          "name": "ScanFilesystem",
+          "line": 167
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "f4e37e5de4c3d403ef3b09f408b631f501a37b095ab7385790fa22e32fc786ce",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
       "local_file": "common/sca/analyzer/analyzer.go",
-      "sha256": "fe7d3c1eb4151003dc50a50787e88fef997684083510236525767bdd9813a459",
+      "sha256": "ccdc4fa72e7a9a26a826f74562df79a7da3c9f5cb9d67fb631b9aba45f3e434a",
       "symbols": [
         {
           "name": "TypAnalyzer",
@@ -76,7 +137,7 @@
     },
     {
       "local_file": "common/sca/analyzer/apk.go",
-      "sha256": "46a670fcc711279c2d4956e0d9dabec48a5c808967b789a22c76577ed10c4d84",
+      "sha256": "2cc1e1d8bcdb6259785879500c12772ba333adc5e6f4107d500b2f77dd2e5e73",
       "symbols": [
         {
           "name": "init",
@@ -454,7 +515,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/java/pom/parse.go",
-      "sha256": "2d1066f92294761efd107b0375d04d4725ce296c7a89aad57bf882134d2f104b",
+      "sha256": "ceadb529b0f4b90410e1d4a6f60433e62ca3e1ab1431aad54fc016c6413d59b2",
       "symbols": [
         {
           "name": "parser",
@@ -824,7 +885,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/pnpm/parse.go",
-      "sha256": "31bf8dbd2153b13cb8a475d550329ccb15941070a9f6bd399908133bb50a1a5f",
+      "sha256": "a5e2ae35f54f94544c65153b6bfea8d5bc37efba595b9656643c407399bdfe8c",
       "symbols": [
         {
           "name": "PackageResolution",
@@ -893,7 +954,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/yarn/parse.go",
-      "sha256": "82a9844f31f100996c187877650c4f78e8de185c5839feea2b0f8c00d14448c2",
+      "sha256": "c02b8d81c8cf61bd267b065d61c09a9c205c0eff4e94bf21e28abb3f48a4992d",
       "symbols": [
         {
           "name": "LockFile",
@@ -1038,7 +1099,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/python/packaging/parse.go",
-      "sha256": "e9eb414f036d0d7d9c360238779a696954aa77850128c217a1202f78373d91c4",
+      "sha256": "fc65bef3163c3b5da71d9b426dcb18715431cd9ba76f1d10828c68b815a28992",
       "symbols": [
         {
           "name": "Parser",
@@ -1070,7 +1131,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/python/pip/parse.go",
-      "sha256": "2f0cba718cb4ad5dd08f560b40478b712def8021df3f2cef6dceced4d59176a7",
+      "sha256": "ad43b973e498660001a5fea699119f0e45356ae1f6e36d06ef6f2d5d9659ac00",
       "symbols": [
         {
           "name": "Parser",
@@ -1111,7 +1172,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/python/pipenv/parse.go",
-      "sha256": "0a7be21323e0137cba9872cb842140119cf73bf9de0422d95fb767cff24604b3",
+      "sha256": "2f643a09fc781e177bb555b1fe263b2bfa809ca2ee6714bd6e7e73fca43587fc",
       "symbols": [
         {
           "name": "lockFile",
@@ -1152,7 +1213,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/python/poetry/parse.go",
-      "sha256": "dc062b0b482857ea92acb40bb2598043d6f64e4b84fb8ec903f73f218e6d88f0",
+      "sha256": "2daf64961a52680788aed67f88ba5a2f1578863ca59e0de5e8face764ab6d105",
       "symbols": [
         {
           "name": "Lockfile",
@@ -1481,7 +1542,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dpkg.go",
-      "sha256": "b06815d49ff811a113e6bde331ae165aa8b0e6586c4512ed85b3364977244d80",
+      "sha256": "36c3e731290f3435dc7fe4089f3e1a8610a85ad7788683ad58e2b5b810c56ad5",
       "symbols": [
         {
           "name": "init",
@@ -1765,7 +1826,7 @@
     },
     {
       "local_file": "common/sca/analyzer/nodejs_npm.go",
-      "sha256": "9c59551e9b8716dc39d44a78cdef7783fda07ca4fc28f1ccd4fcd5e75001242d",
+      "sha256": "a7404e17014961917fbbbec2253318423cfa38bb94a4589566ef36c0b35194f1",
       "symbols": [
         {
           "name": "init",
@@ -1905,7 +1966,7 @@
     },
     {
       "local_file": "common/sca/analyzer/parser_java_jar.go",
-      "sha256": "a9042db9092f8c35f0b594465d78e6c1c2bb50ddf1be2406f0a3414ab850c3c7",
+      "sha256": "65b2f4823fdb68de2b4183a63dfa8b1e58e11e100e67b90381a0a74d75432a79",
       "symbols": [
         {
           "name": "JarParser",
@@ -2042,7 +2103,7 @@
     },
     {
       "local_file": "common/sca/analyzer/python_packaging.go",
-      "sha256": "09d182f0a1ed5877fc0e505e2567f6743f198f3f5253b39652b07ebec5973433",
+      "sha256": "9406cd052440ea157c32934f6112037009577911103cf40eedb9580545137b1d",
       "symbols": [
         {
           "name": "init",
@@ -2398,7 +2459,7 @@
     },
     {
       "local_file": "common/sca/analyzer/utils_io.go",
-      "sha256": "a0a84ddbae7f19252490de33f2e799d3f454073eeea5ce302564293e8a3b47b8",
+      "sha256": "e7b26c807ee4e0456233331ec96e0f91126b76f528d2b89597eae2bb7bbcc9a7",
       "symbols": [
         {
           "name": "ReadBlock",
@@ -2422,67 +2483,6 @@
         "analyzer/format_contract_test.go",
         "analyzer/upstream_jar_test.go",
         "analyzer/text_boundary_test.go"
-      ]
-    },
-    {
-      "local_file": "common/sca/analyzer.go",
-      "sha256": "b7e450d762e04522127053c284d9101ff36c6706646d7f9d77b9cdd07561758c",
-      "symbols": [
-        {
-          "name": "ScanConfig",
-          "line": 15
-        },
-        {
-          "name": "ScanOption",
-          "line": 26
-        },
-        {
-          "name": "NewConfig",
-          "line": 28
-        },
-        {
-          "name": "_withCustomAnalyzer",
-          "line": 50
-        },
-        {
-          "name": "_withScanMode",
-          "line": 69
-        },
-        {
-          "name": "_withConcurrent",
-          "line": 88
-        },
-        {
-          "name": "_withAnalayzers",
-          "line": 107
-        },
-        {
-          "name": "scanFS",
-          "line": 113
-        },
-        {
-          "name": "ScanLocalFilesystem",
-          "line": 138
-        },
-        {
-          "name": "ScanFilesystem",
-          "line": 167
-        }
-      ],
-      "decision": "REWRITE",
-      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
-      "yak_baseline_sha256": "f4e37e5de4c3d403ef3b09f408b631f501a37b095ab7385790fa22e32fc786ce",
-      "upstream": [],
-      "maintenance_owner": "yaklang/yaklang SCA maintainers",
-      "review": "implementation self-review; pinned upstream changes require re-evaluation",
-      "tests": [
-        "scan_contract_test.go",
-        "discovery_benchmark_test.go",
-        "analyzer_test.go",
-        "report_contract_test.go",
-        "analyzerdata_test.go",
-        "format_fuzz_test.go",
-        "removed_scope_test.go"
       ]
     },
     {
@@ -2524,7 +2524,7 @@
     },
     {
       "local_file": "common/sca/core/budget/context.go",
-      "sha256": "3b6bc322a80464fb3c2a3493d4c7a6354ff153a158f9498dcb98ab1bdbbb4de8",
+      "sha256": "96e6e0d27fbe69c3f3bb6e263ff4452f33b8d41dd86352f2253f2a5467674605",
       "symbols": [
         {
           "name": "key",
@@ -2564,8 +2564,61 @@
       "tests": []
     },
     {
+      "local_file": "common/sca/core/budget/estimate.go",
+      "sha256": "2d7f717d63ea91d9620bee785a72951421f58eb09c4117fa1c742abe4a212bd9",
+      "symbols": [
+        {
+          "name": "SizeObject",
+          "line": 6
+        },
+        {
+          "name": "SizeOfString",
+          "line": 13
+        },
+        {
+          "name": "SizeOfBytes",
+          "line": 15
+        },
+        {
+          "name": "SizeOfNode",
+          "line": 22
+        },
+        {
+          "name": "SizeOfPackage",
+          "line": 24
+        },
+        {
+          "name": "SizeOfComponent",
+          "line": 28
+        },
+        {
+          "name": "SizeOfObservation",
+          "line": 32
+        },
+        {
+          "name": "SizeOfEdge",
+          "line": 34
+        },
+        {
+          "name": "SizeOfJob",
+          "line": 36
+        },
+        {
+          "name": "SizeOfRecord",
+          "line": 38
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
       "local_file": "common/sca/core/budget/limits.go",
-      "sha256": "da39fe16dc101a08da0ea8490603e66997ea6da9ade2ae980c9d660e8db95cdf",
+      "sha256": "9550ed8060b35405e027a9b2588f65a2f07f04e80bbeab2da58b573a166b3b64",
       "symbols": [
         {
           "name": "Limits",
@@ -2687,7 +2740,7 @@
     },
     {
       "local_file": "common/sca/core/gomod/parse.go",
-      "sha256": "ee5987ba7ba4554d6712b18acf4309782230f23c033d8c966cbdece4e1ee7973",
+      "sha256": "8b63c00ee5150a536ad88c99862a48dc3112a24b92a67871fbfabe1efbeab924",
       "symbols": [
         {
           "name": "Limits",
@@ -2911,7 +2964,7 @@
     },
     {
       "local_file": "common/sca/core/jsonrecord/read.go",
-      "sha256": "c9367ab53c8c19e7356c279272e97336e3ba1bb3f1834153a1b2bdc0cceab67f",
+      "sha256": "2fef2a0e2c4ef9e9f03ed3be08c1529402f72d64e32d81845c1f91ea3bc69e1e",
       "symbols": [
         {
           "name": "Node",
@@ -3398,7 +3451,7 @@
     },
     {
       "local_file": "common/sca/core/locktoml/parse.go",
-      "sha256": "3a0906d83e25a357614881e713f04a4e0cc8a2872766795d3814ec9e52b37d89",
+      "sha256": "11d3b59c3300019a7e19550d8c181b5b40a33a1a86e2f4ce78f95f5d4334298e",
       "symbols": [
         {
           "name": "tableOrigin",
@@ -3482,7 +3535,7 @@
     },
     {
       "local_file": "common/sca/core/locktoml/read.go",
-      "sha256": "c5f731ff5bb882a162e1cf472973af4508092f6cc1bf2ba36c82b0044603b744",
+      "sha256": "20e70cd9e42d9eb8c81b59607e02a687db6007b2fe7891d41b09a35dbd1d7b8c",
       "symbols": [
         {
           "name": "parseAbort",
@@ -3602,7 +3655,7 @@
     },
     {
       "local_file": "common/sca/core/lockyaml/read.go",
-      "sha256": "308af9bf702edc6cc0a5b5be2585c5037f4d6f24dc7150e69dcefb45a374e8c7",
+      "sha256": "17a96371836e4ff690294dfcbd55cfc0ea2e31dd17691e0bc71a62ddd3e860a5",
       "symbols": [
         {
           "name": "line",
@@ -3677,7 +3730,7 @@
     },
     {
       "local_file": "common/sca/core/pyrequire/read.go",
-      "sha256": "352786506c378db32bd1e83b3f29b7040a3205ca7c9c6c15e6a6f66ba9bf626d",
+      "sha256": "10d763a24be1f539e763019b5095f3d4c380192b100ee26e4970bbf49850aaf8",
       "symbols": [
         {
           "name": "Record",
@@ -3772,7 +3825,7 @@
     },
     {
       "local_file": "common/sca/core/rpm/read.go",
-      "sha256": "0b2f088cf67ff0e95615035ab823648e01f8dc7c7c6b50acdca00518ea47caf7",
+      "sha256": "24194974942e8699ebbbf4466ee037769273c1be512c9f534e1f3bae2a1d9f35",
       "symbols": [
         {
           "name": "PackageInfo",
@@ -3887,8 +3940,23 @@
       ]
     },
     {
+      "local_file": "common/sca/core/scanerr/error.go",
+      "sha256": "479691eb3071431e888f091a36058af0108f19574545ef935e5b45b67ef68a9d",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "review_5149_regression_test.go",
+        "review_5149_extra_test.go"
+      ]
+    },
+    {
       "local_file": "common/sca/core/textdecode/read.go",
-      "sha256": "6dfe7649335f10b1512c0d9ed4995c40af071574df78c03dd42925fd4c1a2915",
+      "sha256": "523be1a4725aa276aded6ac918dbc32480ccdf8983155876613baa6da11cee04",
       "symbols": [
         {
           "name": "Read",
@@ -3919,7 +3987,7 @@
     },
     {
       "local_file": "common/sca/core/xmlrecord/read.go",
-      "sha256": "dc7babd09486bb10731d5b8a24bb26fa0e9823ca6ee873db52f453f56ed76a41",
+      "sha256": "d6a62556bc053e9c29d93efd416d80aa00b8951ccaaa8ddf0d7db4a3a4186dac",
       "symbols": [
         {
           "name": "tokens",
@@ -4222,6 +4290,21 @@
       "maintenance_owner": "yaklang/yaklang SCA maintainers",
       "review": "implementation self-review; pinned upstream changes require re-evaluation",
       "tests": []
+    },
+    {
+      "local_file": "common/sca/internal/digest/digest.go",
+      "sha256": "efc1dd2834427a233326e03bf5e16ceeab0db465139ad5f08a56014bae26816d",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "review_5149_regression_test.go",
+        "review_5149_extra_test.go"
+      ]
     },
     {
       "local_file": "common/sca/internal/fsio/fs.go",
@@ -4554,7 +4637,7 @@
     },
     {
       "local_file": "common/sca/pipeline.go",
-      "sha256": "18a6310c1fec446d2005dd135eb113815a978fd5f36f6d7d8532e01d36c93859",
+      "sha256": "97e6653b89a064ef9250d387b93cb51c1c6d61a8129e2731ad44f249d24053b0",
       "symbols": [
         {
           "name": "material",
@@ -4655,7 +4738,7 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "40bb777b7e375448f9cea73977b9f87db95e37150629e741cd9f719ac729f884",
+      "sha256": "030faa611213053e46afba014b9e6bf4450776d84851493ec41b877b875a8e74",
       "symbols": [
         {
           "name": "fillReport",
@@ -4713,36 +4796,6 @@
         "analyzerdata_test.go",
         "format_fuzz_test.go",
         "removed_scope_test.go"
-      ]
-    },
-    {
-      "local_file": "common/sca/core/scanerr/error.go",
-      "sha256": "479691eb3071431e888f091a36058af0108f19574545ef935e5b45b67ef68a9d",
-      "symbols": [],
-      "decision": "REWRITE",
-      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
-      "yak_baseline_sha256": null,
-      "upstream": [],
-      "maintenance_owner": "yaklang/yaklang SCA maintainers",
-      "review": "implementation self-review; pinned upstream changes require re-evaluation",
-      "tests": [
-        "review_5149_regression_test.go",
-        "review_5149_extra_test.go"
-      ]
-    },
-    {
-      "local_file": "common/sca/internal/digest/digest.go",
-      "sha256": "efc1dd2834427a233326e03bf5e16ceeab0db465139ad5f08a56014bae26816d",
-      "symbols": [],
-      "decision": "REWRITE",
-      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
-      "yak_baseline_sha256": null,
-      "upstream": [],
-      "maintenance_owner": "yaklang/yaklang SCA maintainers",
-      "review": "implementation self-review; pinned upstream changes require re-evaluation",
-      "tests": [
-        "review_5149_regression_test.go",
-        "review_5149_extra_test.go"
       ]
     }
   ],
