@@ -242,8 +242,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "1b2debfef913a0690122871300cdca17fb8e175e5dcf520de6c8a0375e2f17fb",
-    "version": "20260914.0001"
+    "hash": "02c9ac52c8b8330e57f09e978ae7e15b94ae82268a7c23e1d1c5d0a719599960",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
@@ -368,14 +368,14 @@
   {
     "rule_id": "c0a39d53-a8ab-4c1f-be60-ab20e0f19f34",
     "rule_name": "检测Golang使用AES-CBC弱加密模式",
-    "hash": "e486d1018580f585757d9d10adb70ab9c9e71d45690835c6221ce7ba1b522204",
-    "version": "20260901.0002"
+    "hash": "314bbfdc2dc68d4bf7e0cba997ccd83f6d61c1fd53456cd3145aac9020d23e35",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "68f97b0f-4da0-4133-bd95-5a7c05dd0cbc",
     "rule_name": "检测Golang使用弱哈希算法（MD5/SHA1）",
-    "hash": "b38828a89d6a8bd6772f0c3a93ab16f2d1df8c95318c6507f372b15ab30d4f3d",
-    "version": "20260901.0002"
+    "hash": "27e3d9fe536e4483feae0d42e984379d2dab3867d8d68363209665d2f6417365",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "8bf92ed2-6abf-4f45-b3b2-14f06a88eb36",
@@ -1052,8 +1052,8 @@
   {
     "rule_id": "cf5bbdfd-fd95-4e50-8adc-119e7629fd38",
     "rule_name": "检测Java硬编码弱密码漏洞",
-    "hash": "2bde2e54151d63985d5f2fc15260ff5f8421ab0c588bb7690e5f381767866161",
-    "version": "20260901.0002"
+    "hash": "ea43d5fa9e38d66868245ae0fa8ed6212455b8d9ebcdb9782e1476ac8581f032",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "50d74e0f-2353-4367-a53c-18e8d48d22e1",
@@ -1430,8 +1430,8 @@
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
     "rule_name": "检测Java SQL注入漏洞",
-    "hash": "56eef1c9e1cdf505c81c8ff1cea3cff698075e60ce83aacf868422f41b2d9381",
-    "version": "20260901.0002"
+    "hash": "e5bddf00f2e4733b5ebf00a890f0483761c4c849c512af4bf74e1572b4b073fa",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "e53aa369-2d16-445a-a9e9-fb2155791246",
@@ -4892,8 +4892,8 @@
   {
     "rule_id": "source-go-des",
     "rule_name": "检测 Go crypto/des",
-    "hash": "88af19cd1679d973bcaa0b82ece0579a96ef531618f0d7e5ab5787d534184bd1",
-    "version": "20260914.0001"
+    "hash": "aa3b20674f2ccda5e13971c2c3013a9cf741955ea3f236bb51831341a3e2ff66",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "source-go-exec-command",
@@ -4934,8 +4934,8 @@
   {
     "rule_id": "source-go-md5-sum",
     "rule_name": "检测 Go crypto/md5",
-    "hash": "0e9a70c5b42a4a7f6722a5ba1321a8b56f59dee20d09a4b257012a7263f9dc5f",
-    "version": "20260914.0001"
+    "hash": "b8d01983486b2a262cd5c54cc8ff1a0f2bb74d5d7a711e3dd8da5969960751e0",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "source-go-pprof-import",
@@ -4946,14 +4946,14 @@
   {
     "rule_id": "source-go-rc4",
     "rule_name": "检测 Go crypto/rc4",
-    "hash": "7d5efd5299c2f00ee83a3eacccc79ef49e7f9fe640d693f957a034a8a1bde078",
-    "version": "20260914.0001"
+    "hash": "6d07c7a229be366279f3be29988aae9c06e17220e6b98813def80687618364f7",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "source-go-sha1",
     "rule_name": "检测 Go crypto/sha1",
-    "hash": "547d00241b74822651313af7b7619384ca473a59bfd366202f806624945c0f33",
-    "version": "20260914.0001"
+    "hash": "cd2ed2d9652529ba64b9e97804f87ebe1338e4f3cb133d32a59c3f4ba1516af3",
+    "version": "20260920.0001"
   },
   {
     "rule_id": "source-go-ssh-insecure-ignore",
