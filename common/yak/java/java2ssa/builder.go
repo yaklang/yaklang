@@ -201,16 +201,15 @@ func (b *singleFileBuilder) ReadClassConst(className, key string) (ssa.Value, bo
 }
 
 func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
-	t := b.StoreFunctionBuilder()
+	previous := b.FunctionBuilder
 	b.LoadBuilder(s)
 	return func() {
-		b.LoadBuilder(t)
+		b.FunctionBuilder = previous
 	}
 }
 
 func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
-	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s)
+	b.FunctionBuilder = s.NewExecutionBuilder()
 }
 
 func (b *singleFileBuilder) initImport() {
