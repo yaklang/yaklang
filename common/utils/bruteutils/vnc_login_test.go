@@ -363,7 +363,7 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 		}
 	})
 	t.Run("unsupported-vencrypt-subtype", func(t *testing.T) {
-		addr := startMockVeNCrypt(t, 259, "x", false)
+		addr := startMockVeNCrypt(t, []uint32{259}, "x", false)
 		res := mockProbe(t, "vnc", addr, "", "x")
 		if res.Ok || !res.Finished {
 			t.Fatalf("unsupported VeNCrypt subtype must finish, got ok=%v finished=%v", res.Ok, res.Finished)

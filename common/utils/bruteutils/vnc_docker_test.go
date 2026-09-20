@@ -63,13 +63,31 @@ func TestVNCDocker(t *testing.T) {
 	t.Run("tigervnc-tlsvnc", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
 		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=VncPass123!", "VNC_SECURITY=TLSVnc"})
-		assertVNCLogin(t, "tiger-tlsvnc", addr, "VncPass123!")
+		waitVNCPort(t, addr)
+		res := mockProbe(t, "vnc", addr, "", "VncPass123!")
+		if res.Ok {
+			t.Fatal("anonymous TLSVnc must not authenticate via stdlib TLS")
+		}
 	})
 	t.Run("tigervnc-tlsnone", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
 		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_SECURITY=TLSNone"})
+		waitVNCPort(t, addr)
+		res := mockProbe(t, "vnc", addr, "", "")
+		if res.Ok {
+			t.Fatal("anonymous TLSNone must not authenticate via stdlib TLS")
+		}
+	})
+	t.Run("tigervnc-x509vnc", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=VncPass123!", "VNC_SECURITY=X509Vnc"})
+		assertVNCLogin(t, "tiger-x509vnc", addr, "VncPass123!")
+	})
+	t.Run("tigervnc-x509none", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_SECURITY=X509None"})
 		waitVNCAuth(t, addr, "")
-		assertUnauth(t, "tiger-tlsnone", mockProbe(t, "vnc", addr, "u", "ignored"))
+		assertUnauth(t, "tiger-x509none", mockProbe(t, "vnc", addr, "u", "ignored"))
 	})
 	t.Run("tigervnc-eight-byte-pass", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
