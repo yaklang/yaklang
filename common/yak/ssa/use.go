@@ -215,11 +215,16 @@ func (e *ExternLib) GetValues() Values {
 	return ret
 }
 func (e *ExternLib) ReplaceValue(v Value, to Value) {
-	for index, pair := range e.memberPairs {
-		if pair.member == v.GetId() {
-			e.memberPairs[index].member = to.GetId()
+	fromID, toID := v.GetId(), to.GetId()
+	e.relationsMu.Lock()
+	defer e.relationsMu.Unlock()
+	pairs := append([]memberPairRecord(nil), e.memberPairs...)
+	for index, pair := range pairs {
+		if pair.member == fromID {
+			pairs[index].member = toID
 		}
 	}
+	e.memberPairs = pairs
 }
 
 // // ----------- param
