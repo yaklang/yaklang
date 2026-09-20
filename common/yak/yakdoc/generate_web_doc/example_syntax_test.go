@@ -5,10 +5,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 // TestAllLibsExampleSyntax 对【全部】导出库的真实生成产物，逐个抽取示例代码做 antlr
@@ -20,7 +18,7 @@ func TestAllLibsExampleSyntax(t *testing.T) {
 	// 规避 vendored ANTLR4 运行时在 GC 标记期偶发的堆损坏(与生成器 main 同因)。
 	debug.SetGCPercent(-1)
 
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := testDocumentHelper(t)
 	checker := func(code string) error {
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(code)
 		return err
@@ -51,7 +49,7 @@ func TestAllLibsExampleSyntax(t *testing.T) {
 // TestBenchmarkLibsHaveExamples 额外要求标杆库必须包含示例(内容丰满度的下限约束)。
 // 关键词: 标杆库示例存在性, yakit/db/servicescan/synscan
 func TestBenchmarkLibsHaveExamples(t *testing.T) {
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := testDocumentHelper(t)
 	for _, name := range []string{"yakit", "db", "servicescan", "synscan"} {
 		lib, ok := helper.Libs[name]
 		if !ok {

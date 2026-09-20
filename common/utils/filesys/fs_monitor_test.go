@@ -34,8 +34,8 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 		monitor.CancelFunc()
 	}()
 
-	// Wait a bit for the monitor to initialize
-	time.Sleep(2 * time.Second)
+	// WatchPath takes the initial snapshot before returning, so file changes
+	// can start immediately; event receipt below synchronizes each assertion.
 
 	// Create a new file
 	testFile := filepath.Join(tmpDir, "test.txt")

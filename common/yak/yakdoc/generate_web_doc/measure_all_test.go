@@ -9,11 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func funcHasExample(doc string) bool {
@@ -27,7 +25,7 @@ func funcHasExample(doc string) bool {
 // 关键词: 文档完善度度量, overview 覆盖, 示例覆盖, 语法失败
 func TestMeasureCoverage(t *testing.T) {
 	debug.SetGCPercent(-1)
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := testDocumentHelper(t)
 	checker := func(code string) error {
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(code)
 		return err
