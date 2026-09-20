@@ -286,11 +286,12 @@ type Program struct {
 
 	Cache *ProgramCache
 
-	finished           bool
-	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
-	deferredBuildTotal int
-	currentCompileUnit string
-	CompileUnits       []*CompileUnit
+	finished            bool
+	deferredBuilds      *omap.OrderedMap[string, *deferredBuildTask]
+	deferredBuildTotal  int
+	currentCompileUnit  string
+	concurrentUnitBuild bool
+	CompileUnits        []*CompileUnit
 
 	//consts
 	Consts map[string]Value

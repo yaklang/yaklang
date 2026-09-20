@@ -14,13 +14,19 @@ not permit its fragments to overlap across the batch lifecycle barrier.
 ## Ownership and lifecycle
 
 1. One bounded AST parser pool serves all files in a batch. Small single-file
-   packages can use multiple workers together. Prefetching for the next batch
-   can overlap the previous batch's semantic scan and persistence.
+   packages can use multiple workers together. A bounded input-order queue
+   preserves unit/declaration order even when later ASTs finish first. Admission
+   slots are released by the consumer; a slow head cannot retain the whole batch
+   or starve behind later files. Prefetching for the next batch can overlap the
+   previous batch's semantic scan and persistence.
 2. Declaration registration and deferred helpers remain serial: they use
    application-wide import, editor and declaration state.
 3. Frontends opt into library body parallelism through `ConcurrentUnitBuilder`.
    Java supplies package dependencies and private execution builder views.
-   Application-owned units and repeated library owners execute exclusively.
+   Application-owned units execute exclusively. Each actual Program owner is
+   drained once per batch, without recursively draining its upstream libraries;
+   the scheduler controls when those library bodies run. Frontends that have not
+   opted in retain the original single serial batch drain.
 4. All active body builders join before semantic scanning, persistence and
    release. Cancellation also joins active builders before returning and does
    not start queued work.
@@ -43,7 +49,8 @@ constructor body execution outside it to permit recursive construction.
 
 Blueprint inheritance edges are registered as IR metadata without assignments
 in either declaration scope. Reverse edges must not start a dependency's lazy
-body. Missing dependency members are synthesized in the consuming library;
+body. For frontends opted into concurrent units, missing dependency members
+are synthesized in the consuming library;
 the dependency retains the member relation but its block and scope remain
 unchanged. Type method maps publish immutable snapshots after lazy initialization.
 Type formatting uses a per-call recursion path instead of temporarily renaming
