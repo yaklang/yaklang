@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"github.com/yaklang/yaklang/common/sca/model"
 	"io"
 	"io/fs"
@@ -25,19 +26,21 @@ import (
 // POM parsing uses only the explicitly supplied snapshot. Repository retrieval,
 // settings.xml and environment configuration are deliberately absent.
 type parser struct {
-	modules  map[string]bool
-	ctx      context.Context
-	missing  map[string]bool
-	rootPath string
-	cache    pomCache
-	fs       fs.FS
-	visiting map[string]bool
-	steps    int
-	fatal    error
+	modules     map[string]bool
+	ctx         context.Context
+	missing     map[string]bool
+	rootPath    string
+	cache       pomCache
+	fs          fs.FS
+	visiting    map[string]bool
+	bomVisiting []string
+	bomResolved map[string][]pomDependency
+	steps       int
+	fatal       error
 }
 
 func NewParser(filePath string) types.Parser {
-	return &parser{rootPath: path.Clean(strings.TrimPrefix(filePath, "/")), cache: newPOMCache(), visiting: map[string]bool{}}
+	return &parser{rootPath: path.Clean(strings.TrimPrefix(filePath, "/")), cache: newPOMCache(), visiting: map[string]bool{}, bomResolved: map[string][]pomDependency{}}
 }
 
 func (p *parser) Parse(snapshot fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
@@ -45,6 +48,11 @@ func (p *parser) Parse(snapshot fi.FileSystem, r types.ReadSeekerAt) ([]types.Li
 	p.modules = map[string]bool{}
 	p.ctx = types.ContextOf(r)
 	p.missing = map[string]bool{}
+	p.visiting = map[string]bool{}
+	p.bomVisiting = nil
+	p.bomResolved = map[string][]pomDependency{}
+	p.steps = 0
+	p.fatal = nil
 	content, err := parsePom(r)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse POM: %w", err)
@@ -147,7 +155,10 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 
 		if art.Root {
 			// Managed dependencies in the root POM affect transitive dependencies
-			rootDepManagement = p.resolveDepManagement(result.properties, result.dependencyManagement)
+			rootDepManagement, err = p.resolveDepManagement(result.properties, result.dependencyManagement)
+			if err != nil {
+				return nil, nil, err
+			}
 
 			// mark root artifact and its dependencies as Direct
 			art.Direct = true
@@ -204,17 +215,23 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		}
 		libs = append(libs, lib)
 
-		// Convert dependency names into dependency IDs
-		dependsOn := lo.FilterMap(uniqDeps[lib.ID], func(dependOnName string, _ int) (string, bool) {
+		// Keep declared edges even when the target version is still unknown.
+		var dependsOn []string
+		var reqs []types.Requirement
+		for _, dependOnName := range uniqDeps[lib.ID] {
 			ver := depVersion(dependOnName, uniqArtifacts)
-			return packageID(dependOnName, ver), ver != ""
-		})
+			id := packageID(dependOnName, ver)
+			dependsOn = append(dependsOn, id)
+			reqs = append(reqs, types.Requirement{Target: dependOnName, Constraint: ver, Scope: "runtime", Resolved: id})
+		}
 
 		sort.Strings(dependsOn)
-		if len(dependsOn) > 0 {
+		sort.Slice(reqs, func(i, j int) bool { return reqs[i].Target < reqs[j].Target })
+		if len(dependsOn) > 0 || len(reqs) > 0 {
 			deps = append(deps, types.Dependency{
-				ID:        lib.ID,
-				DependsOn: dependsOn,
+				ID:           lib.ID,
+				DependsOn:    dependsOn,
+				Requirements: reqs,
 			})
 		}
 	}
@@ -253,8 +270,24 @@ func (p *parser) parseModule(currentPath, relativePath string) (artifact, error)
 	return moduleArtifact, nil
 }
 
+func (p *parser) charge() error {
+	if err := p.ctx.Err(); err != nil {
+		return err
+	}
+	p.steps++
+	if p.steps > budget.From(p.ctx).Limits.MaxResolveSteps {
+		err := scanerr.New(scanerr.ResourceLimit, "POM resolution budget exceeded")
+		p.fatal = err
+		return err
+	}
+	return nil
+}
+
 func (p *parser) resolve(art artifact, rootDepManagement []pomDependency) (analysisResult, error) {
-	// If the artifact is found in cache, it is returned.
+	if err := p.charge(); err != nil {
+		return analysisResult{}, err
+	}
+	// Cached analysis is not a safe expansion of imported BOM closures.
 	if result := p.cache.get(art); result != nil {
 		return *result, nil
 	}
@@ -332,7 +365,10 @@ func (p *parser) analyze(pom *pom, opts analysisOptions) (analysisResult, error)
 
 	// Merge dependencies. Child dependencies must be preferred than parent dependencies.
 	// Parents don't have to resolve dependencies.
-	deps := p.parseDependencies(pom.content.Dependencies.Dependency, props, depManagement, opts)
+	deps, err := p.parseDependencies(pom.content.Dependencies.Dependency, props, depManagement, opts)
+	if err != nil {
+		return analysisResult{}, err
+	}
 	deps = p.mergeDependencies(parent.dependencies, deps, opts.exclusions)
 
 	return analysisResult{
@@ -363,14 +399,18 @@ func (p *parser) mergeDependencyManagements(depManagements ...[]pomDependency) [
 
 func (p *parser) parseDependencies(deps []pomDependency, props map[string]string, depManagement []pomDependency,
 	opts analysisOptions,
-) []artifact {
+) ([]artifact, error) {
 	// Imported POMs often have no dependencies, so dependencyManagement resolution can be skipped.
 	if len(deps) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Resolve dependencyManagement
-	depManagement = p.resolveDepManagement(props, depManagement)
+	var err error
+	depManagement, err = p.resolveDepManagement(props, depManagement)
+	if err != nil {
+		return nil, err
+	}
 
 	rootDepManagement := opts.depManagement
 	var dependencies []artifact
@@ -382,10 +422,10 @@ func (p *parser) parseDependencies(deps []pomDependency, props map[string]string
 		}
 		dependencies = append(dependencies, d.ToArtifact(opts))
 	}
-	return dependencies
+	return dependencies, nil
 }
 
-func (p *parser) resolveDepManagement(props map[string]string, depManagement []pomDependency) []pomDependency {
+func (p *parser) resolveDepManagement(props map[string]string, depManagement []pomDependency) ([]pomDependency, error) {
 	var newDepManagement, imports []pomDependency
 	for _, dep := range depManagement {
 		// cf. https://howtodoinjava.com/maven/maven-dependency-scopes/#import
@@ -400,23 +440,47 @@ func (p *parser) resolveDepManagement(props map[string]string, depManagement []p
 	// Managed dependencies with a scope of "import" should be processed after other managed dependencies.
 	// cf. https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
 	for _, imp := range imports {
+		if err := p.charge(); err != nil {
+			return nil, err
+		}
 		art := newArtifact(imp.GroupID, imp.ArtifactID, imp.Version, nil, props)
-		result, err := p.resolve(art, nil)
-		if err != nil {
+		key := p.cache.key(art)
+		for i, seen := range p.bomVisiting {
+			if seen == key {
+				path := append(append([]string{}, p.bomVisiting[i:]...), key)
+				err := scanerr.New(scanerr.MalformedInput, "POM BOM import cycle: %s", strings.Join(path, " -> "))
+				p.fatal = err
+				return nil, err
+			}
+		}
+		if len(p.bomVisiting) >= budget.From(p.ctx).Limits.MaxReferenceDepth {
+			err := scanerr.New(scanerr.ResourceLimit, "POM BOM import depth")
+			p.fatal = err
+			return nil, err
+		}
+		if expanded, ok := p.bomResolved[key]; ok {
+			newDepManagement = p.mergeDependencyManagements(newDepManagement, expanded)
 			continue
 		}
-
-		// We need to recursively check all nested depManagements,
-		// so that we don't miss dependencies on nested depManagements with `Import` scope.
-		newProps := utils.MergeMaps(props, result.properties)
-		result.dependencyManagement = p.resolveDepManagement(newProps, result.dependencyManagement)
-		for k, dd := range result.dependencyManagement {
-			// Evaluate variables and overwrite dependencyManagement
-			result.dependencyManagement[k] = dd.Resolve(newProps, nil, nil)
+		p.bomVisiting = append(p.bomVisiting, key)
+		result, err := p.resolve(art, nil)
+		if err != nil {
+			p.bomVisiting = p.bomVisiting[:len(p.bomVisiting)-1]
+			return nil, err
 		}
-		newDepManagement = p.mergeDependencyManagements(newDepManagement, result.dependencyManagement)
+		newProps := utils.MergeMaps(props, result.properties)
+		expanded, err := p.resolveDepManagement(newProps, result.dependencyManagement)
+		p.bomVisiting = p.bomVisiting[:len(p.bomVisiting)-1]
+		if err != nil {
+			return nil, err
+		}
+		for k, dd := range expanded {
+			expanded[k] = dd.Resolve(newProps, nil, nil)
+		}
+		p.bomResolved[key] = expanded
+		newDepManagement = p.mergeDependencyManagements(newDepManagement, expanded)
 	}
-	return newDepManagement
+	return newDepManagement, nil
 }
 
 func (p *parser) mergeDependencies(parent, child []artifact, exclusions map[string]struct{}) []artifact {
