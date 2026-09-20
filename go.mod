@@ -90,7 +90,6 @@ require (
 	github.com/mdlayher/netlink v1.7.2
 	github.com/mfonda/simhash v0.0.0-20151007195837-79f94a1100d6
 	github.com/miekg/dns v1.1.50
-	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/nats-io/nats.go v1.39.1
 	github.com/oklog/ulid v1.3.1
