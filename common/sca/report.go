@@ -9,6 +9,9 @@ import (
 )
 
 func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) {
+	sort.SliceStable(pkgs, func(i, j int) bool {
+		return pkgs[i].Identifier() < pkgs[j].Identifier()
+	})
 	observations := map[*dxtypes.Package]string{}
 	actual := map[*dxtypes.Package]bool{}
 	native := map[[3]string]string{}

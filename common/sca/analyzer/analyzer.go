@@ -185,9 +185,24 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 		}
 	}
 
-	return lo.MapToSlice(pkgIDMap, func(_ string, pkg *dxtypes.Package) *dxtypes.Package {
-		return pkg
-	}), nil
+	pkgs := make([]*dxtypes.Package, 0, len(pkgIDMap))
+	for _, pkg := range pkgIDMap {
+		pkgs = append(pkgs, pkg)
+	}
+	sort.Slice(pkgs, func(i, j int) bool {
+		a, b := pkgs[i], pkgs[j]
+		if a.Instance != b.Instance {
+			return a.Instance < b.Instance
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		if a.Version != b.Version {
+			return a.Version < b.Version
+		}
+		return a.Verification < b.Verification
+	})
+	return pkgs, nil
 }
 
 func Name(a Analyzer) string {
