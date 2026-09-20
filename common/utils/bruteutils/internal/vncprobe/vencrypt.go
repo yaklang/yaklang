@@ -5,11 +5,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // veNCrypt is RFB security type 19, VeNCrypt 0.2:
 // version exchange, U32 subtype list, U8 accept, then TLS, then nested
-// None (TLSNone/X509None) or VNC-Auth (TLSVnc/X509Vnc).
+// None (X509None) or VNC-Auth (X509Vnc). Anonymous TLSNone/TLSVnc are
+// not implemented by crypto/tls.
 func (s *session) veNCrypt(password string, unauth bool) (uint8, error) {
 	var ver [2]byte
 	if _, err := io.ReadFull(s.conn, ver[:]); err != nil {
@@ -41,10 +43,11 @@ func (s *session) veNCrypt(password string, unauth bool) (uint8, error) {
 			return 0, s.ioErr("vencrypt types", err)
 		}
 	}
-	chosen := pickVeNCrypt(types, unauth)
-	if chosen == 0 {
-		return 0, fmt.Errorf("%w: vencrypt subtypes %v", ErrNoCompatibleAuth, types)
+	chosen, err := pickVeNCrypt(types, unauth)
+	if err != nil {
+		return 0, err
 	}
+	s.veSubtype = chosen
 	if err := s.writeU32(chosen); err != nil {
 		return 0, s.ioErr("vencrypt select", err)
 	}
@@ -59,9 +62,10 @@ func (s *session) veNCrypt(password string, unauth bool) (uint8, error) {
 		return 0, err
 	}
 	switch chosen {
-	case veTLSNone, veX509None:
+	case veX509None:
+		s.requireSecurityResult = true
 		return secNone, nil
-	case veTLSVnc, veX509Vnc:
+	case veX509Vnc:
 		if unauth {
 			return 0, ErrNoCompatibleAuth
 		}
@@ -71,7 +75,7 @@ func (s *session) veNCrypt(password string, unauth bool) (uint8, error) {
 	}
 }
 
-func pickVeNCrypt(types []uint32, unauth bool) uint32 {
+func pickVeNCrypt(types []uint32, unauth bool) (uint32, error) {
 	has := func(want uint32) bool {
 		for _, t := range types {
 			if t == want {
@@ -81,27 +85,21 @@ func pickVeNCrypt(types []uint32, unauth bool) uint32 {
 		return false
 	}
 	if unauth {
-		switch {
-		case has(veTLSNone):
-			return veTLSNone
-		case has(veX509None):
-			return veX509None
-		default:
-			return 0
+		if has(veX509None) {
+			return veX509None, nil
+		}
+	} else {
+		if has(veX509Vnc) {
+			return veX509Vnc, nil
+		}
+		if has(veX509None) {
+			return veX509None, nil
 		}
 	}
-	switch {
-	case has(veTLSVnc):
-		return veTLSVnc
-	case has(veX509Vnc):
-		return veX509Vnc
-	case has(veTLSNone):
-		return veTLSNone
-	case has(veX509None):
-		return veX509None
-	default:
-		return 0
+	if has(veTLSNone) || has(veTLSVnc) {
+		return 0, fmt.Errorf("%w: anonymous TLS (subtypes %v)", ErrUnsupportedTLS, types)
 	}
+	return 0, fmt.Errorf("%w: vencrypt subtypes %v", ErrNoCompatibleAuth, types)
 }
 
 func (s *session) wrapTLS() error {
@@ -111,8 +109,22 @@ func (s *session) wrapTLS() error {
 	}
 	c := tls.Client(s.conn, cfg)
 	if err := c.Handshake(); err != nil {
-		return fmt.Errorf("%w: tls: %v", ErrTransient, err)
+		return classifyTLS(err)
 	}
 	s.conn = c
+	s.tlsVerified = false
 	return nil
+}
+
+func classifyTLS(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "cipher suite") || strings.Contains(msg, "no certificates"):
+		return fmt.Errorf("%w: %w", ErrUnsupportedTLS, err)
+	default:
+		return fmt.Errorf("%w: %w", ErrTransient, err)
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -41,9 +42,19 @@ func vencryptTLSConfig(t *testing.T) *tls.Config {
 	}
 }
 
-func startMockVeNCrypt(t *testing.T, subtype uint32, password string, hangAfterTLS bool) string {
+func startMockVeNCrypt(t *testing.T, subtypes []uint32, password string, hangAfterTLS bool) string {
 	t.Helper()
-	tlsCfg := vencryptTLSConfig(t)
+	needCert := false
+	for _, st := range subtypes {
+		if st == 260 || st == 261 {
+			needCert = true
+			break
+		}
+	}
+	var tlsCfg *tls.Config
+	if needCert {
+		tlsCfg = vencryptTLSConfig(t)
+	}
 	return startRawRFB(t, func(c net.Conn) {
 		_, _ = c.Write([]byte("RFB 003.008\n"))
 		ver := make([]byte, 12)
@@ -60,16 +71,26 @@ func startMockVeNCrypt(t *testing.T, subtype uint32, password string, hangAfterT
 		if _, err := io.ReadFull(c, cver); err != nil {
 			return
 		}
-		_, _ = c.Write([]byte{0}) // version accepted
-		_, _ = c.Write([]byte{1})
-		var st [4]byte
-		binary.BigEndian.PutUint32(st[:], subtype)
-		_, _ = c.Write(st[:])
+		_, _ = c.Write([]byte{0})
+		_, _ = c.Write([]byte{byte(len(subtypes))})
+		for _, st := range subtypes {
+			var b [4]byte
+			binary.BigEndian.PutUint32(b[:], st)
+			_, _ = c.Write(b[:])
+		}
 		chosen := make([]byte, 4)
 		if _, err := io.ReadFull(c, chosen); err != nil {
 			return
 		}
+		st := binary.BigEndian.Uint32(chosen)
 		_, _ = c.Write([]byte{1})
+		if st == 257 || st == 258 {
+			_, _ = io.Copy(io.Discard, c)
+			return
+		}
+		if tlsCfg == nil {
+			return
+		}
 		sc := tls.Server(c, tlsCfg)
 		if err := sc.Handshake(); err != nil {
 			return
@@ -78,11 +99,11 @@ func startMockVeNCrypt(t *testing.T, subtype uint32, password string, hangAfterT
 			_, _ = io.Copy(io.Discard, sc)
 			return
 		}
-		switch subtype {
-		case 257, 260: // TLSNone, X509None
+		switch st {
+		case 260:
 			var ok [4]byte
 			_, _ = sc.Write(ok[:])
-		case 258, 261: // TLSVnc, X509Vnc
+		case 261:
 			challenge := bytes.Repeat([]byte{0x55}, 16)
 			_, _ = sc.Write(challenge)
 			resp := make([]byte, 16)
@@ -107,42 +128,109 @@ func startMockVeNCrypt(t *testing.T, subtype uint32, password string, hangAfterT
 }
 
 func TestVNCHandlerVeNCrypt(t *testing.T) {
-	t.Run("tlsvnc-correct", func(t *testing.T) {
-		addr := startMockVeNCrypt(t, 258, "TlsPass1!", false)
+	t.Run("x509vnc-correct", func(t *testing.T) {
+		addr := startMockVeNCrypt(t, []uint32{261}, "TlsPass1!", false)
 		res := mockProbe(t, "vnc", addr, "", "TlsPass1!")
-		assertProbe(t, "tlsvnc-ok", res, true, false)
+		assertProbe(t, "x509vnc-ok", res, true, false)
 		if res.Password != "TlsPass1!" {
-			t.Fatalf("TLSVnc success must keep password, got %q", res.Password)
+			t.Fatalf("X509Vnc success must keep password, got %q", res.Password)
 		}
-		if res.Username != "" {
-			t.Fatalf("VNC password-only username must stay empty, got %q", res.Username)
+		if !strings.Contains(string(res.ExtraInfo), "subtype=261") || !strings.Contains(string(res.ExtraInfo), "verified=false") {
+			t.Fatalf("path metadata missing: %q", res.ExtraInfo)
 		}
 	})
-	t.Run("tlsvnc-wrong", func(t *testing.T) {
-		addr := startMockVeNCrypt(t, 258, "TlsPass1!", false)
+	t.Run("x509vnc-wrong", func(t *testing.T) {
+		addr := startMockVeNCrypt(t, []uint32{261}, "TlsPass1!", false)
 		res := mockProbe(t, "vnc", addr, "", "WRONG")
 		if res.Ok || res.Finished {
-			t.Fatalf("TLSVnc wrong: ok=%v finished=%v", res.Ok, res.Finished)
+			t.Fatalf("X509Vnc wrong: ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
-	t.Run("tlsnone-unauth", func(t *testing.T) {
-		addr := startMockVeNCrypt(t, 257, "", false)
-		assertUnauth(t, "tlsnone", mockProbe(t, "vnc", addr, "u", "whatever"))
+	t.Run("mixed-x509-and-anonymous", func(t *testing.T) {
+		addr := startMockVeNCrypt(t, []uint32{261, 258}, "TlsPass1!", false)
+		res := mockProbe(t, "vnc", addr, "", "TlsPass1!")
+		assertProbe(t, "mixed-ok", res, true, false)
+		if !strings.Contains(string(res.ExtraInfo), "subtype=261") {
+			t.Fatalf("must select X509Vnc not TLSVnc: %q", res.ExtraInfo)
+		}
+	})
+	t.Run("x509none-unauth", func(t *testing.T) {
+		addr := startMockVeNCrypt(t, []uint32{260}, "", false)
+		assertUnauth(t, "x509none", mockProbe(t, "vnc", addr, "u", "whatever"))
 	})
 	t.Run("tlsplain-unsupported", func(t *testing.T) {
-		addr := startMockVeNCrypt(t, 259, "x", false)
+		addr := startMockVeNCrypt(t, []uint32{259}, "x", false)
 		res := mockProbe(t, "vnc", addr, "", "x")
 		if res.Ok || !res.Finished {
 			t.Fatalf("TLSPlain-only must finish, ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
+	t.Run("anonymous-tlsvnc-unsupported", func(t *testing.T) {
+		addr := startMockVeNCrypt(t, []uint32{258}, "x", false)
+		res := mockProbe(t, "vnc", addr, "", "x")
+		if res.Ok {
+			t.Fatal("anonymous TLSVnc must not authenticate")
+		}
+		if !res.Finished {
+			t.Fatal("anonymous-only should finish the target")
+		}
+	})
 	t.Run("cancel-after-tls", func(t *testing.T) {
-		addr := startMockVeNCrypt(t, 258, "x", true)
+		addr := startMockVeNCrypt(t, []uint32{261}, "x", true)
 		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer cancel()
 		res := mockProbeContext(t, ctx, "vnc", addr, "", "x")
 		if res.Ok || res.Finished {
 			t.Fatalf("cancel after TLS must retry, ok=%v finished=%v", res.Ok, res.Finished)
 		}
+	})
+	t.Run("tight-not-hidden-by-vencrypt", func(t *testing.T) {
+		addr := startRawRFB(t, func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			b := make([]byte, 16)
+			if _, err := io.ReadFull(c, b[:12]); err != nil {
+				return
+			}
+			_, _ = c.Write([]byte{2, 16, 19})
+			if _, err := io.ReadFull(c, b[:1]); err != nil {
+				return
+			}
+			if b[0] == 19 {
+				_, _ = c.Write([]byte{0, 2})
+				if _, err := io.ReadFull(c, b[:2]); err != nil {
+					return
+				}
+				_, _ = c.Write([]byte{0, 1})
+				var st [4]byte
+				binary.BigEndian.PutUint32(st[:], 259)
+				_, _ = c.Write(st[:])
+				_, _ = io.Copy(io.Discard, c)
+				return
+			}
+			var z [4]byte
+			_, _ = c.Write(z[:])
+			binary.BigEndian.PutUint32(z[:], 1)
+			_, _ = c.Write(z[:])
+			binary.BigEndian.PutUint32(z[:], 2)
+			_, _ = c.Write(z[:])
+			_, _ = c.Write([]byte("STDVVNCAUTH_"))
+			if _, err := io.ReadFull(c, b[:4]); err != nil {
+				return
+			}
+			challenge := bytes.Repeat([]byte{0x55}, 16)
+			_, _ = c.Write(challenge)
+			resp := make([]byte, 16)
+			if _, err := io.ReadFull(c, resp); err != nil {
+				return
+			}
+			result := uint32(1)
+			if bytes.Equal(resp, vncDESChallenge("secret", challenge)) {
+				result = 0
+			}
+			binary.BigEndian.PutUint32(z[:], result)
+			_, _ = c.Write(z[:])
+		})
+		res := mockProbe(t, "vnc", addr, "", "secret")
+		assertProbe(t, "tight-fallback", res, true, false)
 	})
 }

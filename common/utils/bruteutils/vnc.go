@@ -23,8 +23,8 @@ var vncAuth = &DefaultServiceAuthInfo{
 func vncUnauthVerify(item *BruteItem) *BruteItemResult {
 	r := vncProbe(item, "", true)
 	out := vncApply(item, r)
-	if errors.Is(r.Err, vncprobe.ErrNoCompatibleAuth) {
-		// None was not offered; password auth may still work.
+	if errors.Is(r.Err, vncprobe.ErrNoCompatibleAuth) || errors.Is(r.Err, vncprobe.ErrUnsupportedTLS) {
+		// None / anonymous TLS was not usable; password auth (X509Vnc, Tight) may still work.
 		out.Finished = false
 	}
 	return out
@@ -58,19 +58,21 @@ func vncProbe(item *BruteItem, password string, unauth bool) vncprobe.Result {
 func vncApply(item *BruteItem, r vncprobe.Result) *BruteItemResult {
 	out := item.Result()
 	out.OnlyNeedPassword = true
+	if r.Extra != "" {
+		out.ExtraInfo = []byte(r.Extra)
+	}
 	switch {
 	case r.Err == nil && r.AuthNone:
 		out.Ok = true
 		out.Username = ""
 		out.Password = ""
-		out.ExtraInfo = []byte("auth=none")
 	case r.Err == nil:
 		out.Ok = true
-		out.ExtraInfo = []byte("auth=vnc")
 	case r.Locked || errors.Is(r.Err, vncprobe.ErrLocked):
 		out.AccountLocked = true
 		out.UserEliminated = true
-		out.ExtraInfo = []byte("auth=locked")
+	case errors.Is(r.Err, vncprobe.ErrUnsupportedTLS):
+		out.Finished = true
 	case errors.Is(r.Err, vncprobe.ErrAuthFailed):
 		// Wrong password: keep other candidates.
 	case errors.Is(r.Err, vncprobe.ErrTransient),

@@ -453,3 +453,26 @@ func serveOnce(t *testing.T, fn func(net.Conn)) string {
 	}()
 	return ln.Addr().String()
 }
+
+func serveMany(t *testing.T, fn func(net.Conn)) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_ = c.SetDeadline(time.Now().Add(3 * time.Second))
+				fn(c)
+			}(c)
+		}
+	}()
+	return ln.Addr().String()
+}
