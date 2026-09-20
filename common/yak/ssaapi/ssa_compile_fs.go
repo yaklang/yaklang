@@ -393,15 +393,21 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		// Start bounded parsing while the previous batch scans and persists.
 		// Wait only before touching shared Program/type/instruction state.
-		var prefetchedUnit *CompileUnit
-		var prefetchedFiles <-chan *ssareducer.FileContent
+		var batchFiles []string
+		fileUnits := make(map[string]string, batch.files)
 		for _, unit := range batch.units {
 			if unit != nil {
-				prefetchedUnit = unit
-				prefetchedFiles = c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
-				break
+				batchFiles = append(batchFiles, unit.Files...)
+				for _, path := range unit.Files {
+					fileUnits[path] = unit.Key
+				}
 			}
 		}
+		// One bounded parser pool for the entire batch lets small packages use
+		// the available workers too, without multiplying the AST window by
+		// the number of units. Declaration registration remains ordered by
+		// the parser's configured delivery policy and owns its unit context.
+		prefetchedFiles := c.GetFileHandler(filesystem, batchFiles, preHandlerFileSet)
 		if err := batchPipeline.Wait(); err != nil {
 			if prefetchedFiles != nil {
 				for file := range prefetchedFiles {
@@ -421,110 +427,109 @@ func (c *Config) parseProjectWithFSUnits(
 			prog.ProcessInfof("compile unit batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d spill=%s",
 				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode)
 		}
-		for _, unit := range batch.units {
-			if unit == nil {
+		unitCanceled := false
+		for fileContent := range prefetchedFiles {
+			if fileContent != nil {
+				prog.BeginCompileUnit(fileUnits[fileContent.Path])
+			}
+			if fileContent == nil {
 				continue
 			}
-			prog.BeginCompileUnit(unit.Key)
-			unitCanceled := false
-			ch := prefetchedFiles
-			if unit != prefetchedUnit {
-				ch = c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
-			}
-			for fileContent := range ch {
-				if fileContent == nil {
-					continue
+			func(fileContent *ssareducer.FileContent) {
+				defer fileContent.Release()
+				if fileContent.Status == ssareducer.FileStatusFsError {
+					prog.RecordCompileDiagnostic("file", fileContent.Path, fmt.Sprint(fileContent.Err))
+					log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					return
 				}
-				func(fileContent *ssareducer.FileContent) {
-					defer fileContent.Release()
-					if fileContent.Status == ssareducer.FileStatusFsError {
-						prog.RecordCompileDiagnostic("file", fileContent.Path, fmt.Sprint(fileContent.Err))
-						log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-						prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-						return
+				if fileContent.Status == ssareducer.FileParseASTError {
+					prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
+					if astParseErrLogged < maxAstParseErrLogs {
+						log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+						astParseErrLogged++
+					} else if !astParseErrSuppressed {
+						astParseErrSuppressed = true
+						log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
 					}
-					if fileContent.Status == ssareducer.FileParseASTError {
-						prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
-						if astParseErrLogged < maxAstParseErrLogs {
-							log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-							astParseErrLogged++
-						} else if !astParseErrSuppressed {
-							astParseErrSuppressed = true
-							log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
-						}
-						astErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-					}
-					editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
-					fileContent.Editor = editor
-					fileContent.Content = nil
-					if fileContent.Err != nil {
-						prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
-						astErr = utils.JoinErrors(astErr,
-							utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-						)
-					}
-					preHandlerProcess()
-					if language := c.LanguageBuilder; language != nil {
-						func() {
-							defer func() {
-								if r := recover(); r != nil {
-									prog.RecordCompileDiagnostic("prehandler", fileContent.Path, fmt.Sprint(r))
-									log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
-									utils.PrintCurrentGoroutineRuntimeStack()
-								}
-							}()
-							language.InitHandler(builder)
-							err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
-							if err != nil {
-								var configError *ssa.ProjectConfigError
-								if errors.As(err, &configError) {
-									log.Warnf("%v", err)
-								} else {
-									prog.RecordCompileDiagnostic("prehandler", fileContent.Path, err.Error())
-									log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
-								}
+					astErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+				}
+				editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
+				fileContent.Editor = editor
+				fileContent.Content = nil
+				if fileContent.Err != nil {
+					prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
+					astErr = utils.JoinErrors(astErr,
+						utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+					)
+				}
+				preHandlerProcess()
+				if language := c.LanguageBuilder; language != nil {
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								prog.RecordCompileDiagnostic("prehandler", fileContent.Path, fmt.Sprint(r))
+								log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
+								utils.PrintCurrentGoroutineRuntimeStack()
 							}
 						}()
-					}
-					if preHandlerBuildsFiles {
-						ssa.ReleaseASTRoot(fileContent.AST)
-					}
-					if _, needBuild := preHandlerFileSet[fileContent.Path]; needBuild {
-						_, needsCompile := handlerFileSet[fileContent.Path]
-						switch {
-						case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
-							ast := fileContent.AST
-							path := fileContent.Path
-							prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
-								fileBuildStart := time.Now()
-								defer func() {
-									if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
-										log.Debugf("[file build] %s cost %v", path, d)
-									}
-								}()
-								if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
-									log.Errorf("file build [%s] failed: %v", path, err)
-								}
-							})
-						case !needsCompile && fileContent.Editor != nil:
-							rootEditor := fileContent.Editor
-							prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
-								prog.PushEditor(rootEditor)
-								prog.PopEditor(true)
-							})
+						language.InitHandler(builder)
+						err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+						if err != nil {
+							var configError *ssa.ProjectConfigError
+							if errors.As(err, &configError) {
+								log.Warnf("%v", err)
+							} else {
+								prog.RecordCompileDiagnostic("prehandler", fileContent.Path, err.Error())
+								log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+							}
 						}
-					}
-					fileContent.AST = nil
-				}(fileContent)
-				if c.isStop() {
-					unitCanceled = true
-					break
+					}()
 				}
+				if preHandlerBuildsFiles {
+					ssa.ReleaseASTRoot(fileContent.AST)
+				}
+				if _, needBuild := preHandlerFileSet[fileContent.Path]; needBuild {
+					_, needsCompile := handlerFileSet[fileContent.Path]
+					switch {
+					case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
+						ast := fileContent.AST
+						path := fileContent.Path
+						prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
+							fileBuildStart := time.Now()
+							defer func() {
+								if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
+									log.Debugf("[file build] %s cost %v", path, d)
+								}
+							}()
+							if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
+								log.Errorf("file build [%s] failed: %v", path, err)
+							}
+						})
+					case !needsCompile && fileContent.Editor != nil:
+						rootEditor := fileContent.Editor
+						prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
+							prog.PushEditor(rootEditor)
+							prog.PopEditor(true)
+						})
+					}
+				}
+				fileContent.AST = nil
+			}(fileContent)
+			if c.isStop() {
+				unitCanceled = true
+				break
 			}
 			prog.EndCompileUnit()
-			if unitCanceled {
-				return nil, ErrContextCancel
+		}
+		if unitCanceled {
+			// A bounded parser can be blocked delivering a file when its
+			// consumer stops. Drain and release the remaining AST permits.
+			for file := range prefetchedFiles {
+				file.Release()
 			}
+			prog.EndCompileUnit()
+			return nil, ErrContextCancel
 		}
 		if c.isStop() {
 			return nil, ErrContextCancel
@@ -578,7 +583,20 @@ func (c *Config) parseProjectWithFSUnits(
 		// belong to these units. PreHandler already built the skeleton;
 		// without this drain, bodies wait for Application.Finish and the
 		// unit cannot scan or recycle AST/IR on its own.
-		prog.LazyBuildForUnits(unitKeys)
+		waves := compileUnitBuildWaves(plan, batch)
+		buildConcurrency := 1
+		if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok && language.SupportsConcurrentUnitBuild() {
+			buildConcurrency = c.GetCompileConcurrency()
+		}
+		for waveIndex, wave := range waves {
+			waveStart := time.Now()
+			peak, err := buildCompileUnitWave(c.GetContext(), prog, wave, buildConcurrency)
+			prog.ProcessInfof("compile unit wave batch=%d wave=%d/%d groups=%d concurrency=%d peak_active=%d cost=%v",
+				batchIndex+1, waveIndex+1, len(waves), len(wave), buildConcurrency, peak, time.Since(waveStart))
+			if err != nil {
+				return nil, err
+			}
+		}
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
