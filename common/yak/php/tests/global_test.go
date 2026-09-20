@@ -3,10 +3,31 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
+
+func TestServerSuperglobalRegistered(t *testing.T) {
+	prog, err := ssaapi.Parse(`<?php
+println($_SERVER['REQUEST_METHOD']);
+function handle() { println($_SERVER['REMOTE_ADDR']); }
+handle();
+`, ssaapi.WithLanguage(ssaconfig.PHP))
+	require.NoError(t, err)
+	server, ok := prog.Program.GetGlobalVariable("_SERVER")
+	require.True(t, ok, "PHP initialization must register the server container in the global lookup index")
+	require.NotNil(t, server)
+	result, err := prog.SyntaxFlowWithError(`println(* as $input)`)
+	require.NoError(t, err)
+	inputs := result.GetValues("input")
+	require.Len(t, inputs, 2)
+	for _, input := range inputs {
+		require.NotNil(t, input)
+	}
+}
 
 func TestGlobal(t *testing.T) {
 	t.Run("not set global", func(t *testing.T) {
