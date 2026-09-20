@@ -14,14 +14,19 @@ import (
 	"time"
 )
 
+// Dialer must honor cancellation and deadlines supplied through its context.
 type Dialer interface {
 	DialContext(context.Context, string, string) (net.Conn, error)
 }
 
+// MaxTimeout bounds the entire login exchange, including redirects and TLS.
+const MaxTimeout = 20 * time.Second
+
 type Options struct {
 	Address, Service, Username, Password string
 	SID, SysDBA                          bool
-	Timeout                              time.Duration
+	// Timeout defaults to 10 seconds and is capped at MaxTimeout.
+	Timeout time.Duration
 	// TLS uses the caller's verification policy. Nil selects ordinary TNS/TCP.
 	TLS *tls.Config
 }
@@ -75,6 +80,9 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 	if o.Timeout <= 0 {
 		o.Timeout = 10 * time.Second
 	}
+	if o.Timeout > MaxTimeout {
+		o.Timeout = MaxTimeout
+	}
 	ctx, cancel := context.WithTimeout(ctx, o.Timeout)
 	defer cancel()
 	host, port, e := net.SplitHostPort(o.Address)
@@ -106,9 +114,9 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 	if e != nil {
 		return e
 	}
-	defer s.conn.Close()
+	defer s.transport.Close()
 	// A cancellation closes the owned connection, interrupting all reads/writes.
-	stop := context.AfterFunc(ctx, func() { s.conn.Close() })
+	stop := context.AfterFunc(ctx, func() { s.transport.Close() })
 	defer stop()
 	defer func() {
 		if ctx.Err() != nil {

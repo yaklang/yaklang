@@ -31,15 +31,18 @@ func TestProbeLive(t *testing.T) {
 		t.Skip("set YAK_ORACLE_TEST_ADDRESS, SERVICE, USER and PASSWORD for an isolated Oracle fixture")
 	}
 	o := Options{Address: addr, Service: os.Getenv("YAK_ORACLE_TEST_SERVICE"), Username: os.Getenv("YAK_ORACLE_TEST_USER"), Password: os.Getenv("YAK_ORACLE_TEST_PASSWORD"), Timeout: 15 * time.Second, SID: os.Getenv("YAK_ORACLE_TEST_SID") == "1", SysDBA: os.Getenv("YAK_ORACLE_TEST_SYSDBA") == "1"}
+	// All scenarios share one budget, so a stalled fixture cannot multiply the timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), MaxTimeout)
+	defer cancel()
 	t.Run("correct_password", func(t *testing.T) {
-		if e := Probe(context.Background(), &net.Dialer{}, o); e != nil {
+		if e := Probe(ctx, &net.Dialer{}, o); e != nil {
 			t.Fatal(e)
 		}
 	})
 	t.Run("wrong_password", func(t *testing.T) {
 		bad := o
 		bad.Password += "_incorrect"
-		e := Probe(context.Background(), &net.Dialer{}, bad)
+		e := Probe(ctx, &net.Dialer{}, bad)
 		var ora *Error
 		if !errors.As(e, &ora) || !ora.CredentialsRejected() {
 			t.Fatalf("want ORA-01017, got %v", e)
@@ -48,7 +51,7 @@ func TestProbeLive(t *testing.T) {
 	t.Run("unknown_service", func(t *testing.T) {
 		bad := o
 		bad.Service = "YAK_PROBE_SERVICE_DOES_NOT_EXIST"
-		e := Probe(context.Background(), &net.Dialer{}, bad)
+		e := Probe(ctx, &net.Dialer{}, bad)
 		var ora *Error
 		if !errors.As(e, &ora) || !ora.ServiceUnknown() {
 			t.Fatalf("want unknown service, got %v", e)
@@ -62,7 +65,7 @@ func TestProbeLive(t *testing.T) {
 			} else {
 				bad.Password = ""
 			}
-			e := Probe(context.Background(), &net.Dialer{}, bad)
+			e := Probe(ctx, &net.Dialer{}, bad)
 			var ora *Error
 			if !errors.As(e, &ora) || !ora.CredentialsRejected() {
 				t.Fatalf("want ORA-01017, got %v", e)

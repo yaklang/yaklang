@@ -42,6 +42,10 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	if p[4] != 1 || !bytes.Contains(p, []byte("SERVICE_NAME=MOCK")) {
 		return errors.New("expected CONNECT")
 	}
+	if fault == "stall_connect" {
+		_, err := io.Copy(io.Discard, conn)
+		return err
+	}
 	if fault == "disconnect_connect" {
 		return nil
 	}
@@ -55,6 +59,10 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	}
 	if len(p) < 3 || p[0] != 1 {
 		return errors.New("expected protocol request")
+	}
+	if fault == "stall_protocol" {
+		_, err := io.Copy(io.Discard, conn)
+		return err
 	}
 	if fault == "disconnect_protocol" {
 		return nil
@@ -76,6 +84,10 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	if len(p) < 1 || p[0] != 2 {
 		return errors.New("expected datatype request")
 	}
+	if fault == "stall_datatype" {
+		_, err := io.Copy(io.Discard, conn)
+		return err
+	}
 	if fault == "disconnect_datatype" {
 		return nil
 	}
@@ -88,6 +100,10 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	}
 	if len(p) < 3 || p[0] != 3 || p[1] != 0x76 {
 		return errors.New("expected password challenge request")
+	}
+	if fault == "stall_challenge" {
+		_, err := io.Copy(io.Discard, conn)
+		return err
 	}
 	if fault == "disconnect_challenge" {
 		return nil
@@ -124,6 +140,10 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	}
 	if len(p) < 3 || p[0] != 3 || p[1] != 0x73 {
 		return errors.New("expected password response")
+	}
+	if fault == "stall_result" {
+		_, err := io.Copy(io.Discard, conn)
+		return err
 	}
 	if fault == "disconnect_result" {
 		return nil
