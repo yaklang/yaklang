@@ -66,6 +66,26 @@ for f in inv['files']:
  previous=subprocess.run(['git','show',baseline+':'+f['path']],capture_output=True).stdout
  entries.append(dict(local_file=f['path'],sha256=f['sha256'],symbols=f['symbols'] or [],decision=strategy,reason=reason,yak_baseline_sha256=hashlib.sha256(previous).hexdigest() if previous else None,upstream=[dict(path=str(p.relative_to(ref)),sha256=sha(p)) for p in up if p.exists()],maintenance_owner='yaklang/yaklang SCA maintainers',review='implementation self-review; pinned upstream changes require re-evaluation',tests=[str(p.relative_to(sca)) for p in (sca/rel).parent.glob('*test.go')]))
 write('source-extraction-map.json',dict(schema_version=1,baseline=baseline,entries=entries,removed_capabilities=['x/mod editing and printing','TOML reflection decoder and encoder','general YAML runtime','go-rpmdb database/sql driver and host Open','CycloneDX SDK runtime','Docker and Git acquisition','all-pairs name-based graph merge','aggregate common/utils common/log common/filter runtime edges'],reference_only=['yaml scanner/decoder','SQLite driver module snapshot']))
+def gomod_mod_tests(case, line):
+ mapping={
+  'TestParse':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures'],
+  'without go version':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/no-go-version'],
+  'replace':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced'],
+  'no replace':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/no-replace'],
+  'replace with version':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-version'],
+  'replaced with version mismatch':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-version-mismatch'],
+  'replaced with local path':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-local-path'],
+  'replaced with local path and version':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-local-path-and-version'],
+  'replaced with local path and version, mismatch':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-local-path-and-version-mismatch'],
+  'go 1.16':['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/go116'],
+  'TestModuleID':['core/gomod/upstream_test.go:TestModuleID'],
+  'github.com/aquasecurity/trivy':['core/gomod/upstream_test.go:TestModuleID/github.com/aquasecurity/trivy'],
+  'pseudo version':['core/gomod/upstream_test.go:TestModuleID/pseudo-version'],
+  'github.com/aquasecurity/go-dep-parser':['core/gomod/upstream_test.go:TestModuleID/github.com/aquasecurity/go-dep-parser'],
+ }
+ if case=='normal':
+  return ['core/gomod/upstream_test.go:TestUpstreamGoModFixtures/normal'] if line<100 else ['core/gomod/upstream_test.go:TestModuleID/normal']
+ return mapping.get(case)
 # Every upstream table label is an individual candidate, along with named tests.
 # Disposal is per selected format, with exact original file/line/hash preserved.
 candidates=[]
@@ -84,13 +104,18 @@ for p in sorted((ref/'go-dep-parser/pkg').rglob('*.go')):
   if m:labels.append((lineno,m.group(1)))
  for line,name in labels:
   status='ADAPTED';reason='Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested.'
+  mapped=list(localtests)
+  if r.startswith('golang/mod/'):
+   mapped=gomod_mod_tests(name, line) or []
+   reason='Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files.'
   if r.startswith('golang/sum/'):
    status='SEMANTIC_REPLACEMENT';reason='go.sum is checksum evidence, never an inventory; core/gomod ParseSum validates exact path/version/mod key. See README.md.'
+   mapped=['core/gomod/parse_test.go:TestParseSumEvidence','core/gomod/parse_test.go:TestSumIdentityConflict','report_contract_test.go:TestUnknownManifestVersionAndSumEvidence']
   if r.startswith('java/jar/'):
-   localtests=['analyzer/upstream_jar_test.go'];reason='Static jar material migrated; remote SHA1/artifact lookup removed, inferred Manifest fields independently checked.'
+   mapped=['analyzer/upstream_jar_test.go'];reason='Static jar material migrated; remote SHA1/artifact lookup removed, inferred Manifest fields independently checked.'
   if r.startswith('java/pom/'):
    reason='HTTP/cache fixtures replaced by explicit readonly repository tree; coordinate mismatch/range/environment behavior is asserted in the mapped tests.'
-  candidates.append(dict(source='go-dep-parser/'+r,source_sha256=sha(p),line=line,case=name,disposition=status,local_tests=localtests,reason=reason))
+  candidates.append(dict(source='go-dep-parser/'+r,source_sha256=sha(p),line=line,case=name,disposition=status,local_tests=mapped,reason=reason))
 # Grammar fixture candidates are individually enumerable and executable.
 for f in manifest:
  if f['path'].startswith('core/locktoml/testdata/upstream/') and f['path'].endswith('.toml'):

@@ -116,3 +116,18 @@ func TestSumIdentityConflict(t *testing.T) {
 		t.Fatal("conflicting digest accepted")
 	}
 }
+
+func TestParseSumEvidence(t *testing.T) {
+	a := "h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	src := "github.com/aquasecurity/go-dep-parser v0.0.0-20211224170007-df43bca6b6ff " + a + "\n" +
+		"github.com/aquasecurity/go-dep-parser v0.0.0-20211224170007-df43bca6b6ff/go.mod " + a + "\n"
+	m, e := ParseSum(context.Background(), []byte(src))
+	if e != nil {
+		t.Fatal(e)
+	}
+	mod := SumKey{Path: "github.com/aquasecurity/go-dep-parser", Version: "v0.0.0-20211224170007-df43bca6b6ff", GoMod: false}
+	sum := SumKey{Path: "github.com/aquasecurity/go-dep-parser", Version: "v0.0.0-20211224170007-df43bca6b6ff", GoMod: true}
+	if m[mod] != a || m[sum] != a || len(m) != 2 {
+		t.Fatalf("sum evidence: %#v", m)
+	}
+}

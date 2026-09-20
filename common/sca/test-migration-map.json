@@ -129,8 +129,10 @@
       "line": 14,
       "case": "TestParse",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -138,8 +140,10 @@
       "line": 22,
       "case": "normal",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/normal"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -147,8 +151,10 @@
       "line": 28,
       "case": "without go version",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/no-go-version"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -156,8 +162,10 @@
       "line": 34,
       "case": "replace",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -165,8 +173,10 @@
       "line": 40,
       "case": "no replace",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/no-replace"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -174,8 +184,10 @@
       "line": 46,
       "case": "replace with version",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-version"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -183,8 +195,10 @@
       "line": 52,
       "case": "replaced with version mismatch",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-version-mismatch"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -192,8 +206,10 @@
       "line": 58,
       "case": "replaced with local path",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-local-path"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -201,8 +217,10 @@
       "line": 64,
       "case": "replaced with local path and version",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-local-path-and-version"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -210,8 +228,10 @@
       "line": 70,
       "case": "replaced with local path and version, mismatch",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/replaced-with-local-path-and-version-mismatch"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -219,8 +239,10 @@
       "line": 76,
       "case": "go 1.16",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestUpstreamGoModFixtures/go116"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -228,8 +250,10 @@
       "line": 103,
       "case": "TestModuleID",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestModuleID"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -237,8 +261,10 @@
       "line": 114,
       "case": "normal",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestModuleID/normal"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -246,8 +272,10 @@
       "line": 116,
       "case": "github.com/aquasecurity/trivy",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestModuleID/github.com/aquasecurity/trivy"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -255,8 +283,10 @@
       "line": 122,
       "case": "pseudo version",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestModuleID/pseudo-version"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/mod/parse_test.go",
@@ -264,8 +294,10 @@
       "line": 124,
       "case": "github.com/aquasecurity/go-dep-parser",
       "disposition": "ADAPTED",
-      "local_tests": [],
-      "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
+      "local_tests": [
+        "core/gomod/upstream_test.go:TestModuleID/github.com/aquasecurity/go-dep-parser"
+      ],
+      "reason": "Pinned go.mod fixture declarations (replace/local path/version mismatch/Go 1.16 indirect) asserted in core/gomod; not a dump of unrelated *_test.go files."
     },
     {
       "source": "go-dep-parser/golang/sum/parse_test.go",
@@ -273,7 +305,11 @@
       "line": 15,
       "case": "TestParse",
       "disposition": "SEMANTIC_REPLACEMENT",
-      "local_tests": [],
+      "local_tests": [
+        "core/gomod/parse_test.go:TestParseSumEvidence",
+        "core/gomod/parse_test.go:TestSumIdentityConflict",
+        "report_contract_test.go:TestUnknownManifestVersionAndSumEvidence"
+      ],
       "reason": "go.sum is checksum evidence, never an inventory; core/gomod ParseSum validates exact path/version/mod key. See README.md."
     },
     {

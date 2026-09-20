@@ -26,18 +26,23 @@ func TestUpstreamGoModFixtures(t *testing.T) {
 	full := []expected{{dep, old, "", false}, {x, xv, "", true}, {y, yv, "", true}}
 	local := []expected{{dep, old, "", false}, {x, "", "./xerrors", true}, {y, yv, "", true}}
 	for _, tc := range []struct {
-		name string
-		want []expected
+		name, file string
+		want       []expected
+		replaced   bool
 	}{
-		{"normal", full}, {"no-go-version", []expected{{dep, old, "", false}}},
-		{"replaced", []expected{{dep, replaced, dep, false}, {x, xv, "", true}}},
-		{"replaced-with-version", []expected{{dep, replaced, dep, false}, {x, xv, "", true}}},
-		{"replaced-with-version-mismatch", full},
-		{"replaced-with-local-path", local}, {"replaced-with-local-path-and-version", local}, {"replaced-with-local-path-and-version-mismatch", full},
-		{"go116", []expected{{dep, old, "", false}, {y, yv, "", true}}},
+		{"normal", "normal.mod", full, false},
+		{"no-replace", "normal.mod", full, false},
+		{"no-go-version", "no-go-version.mod", []expected{{dep, old, "", false}}, false},
+		{"replaced", "replaced.mod", []expected{{dep, replaced, dep, false}, {x, xv, "", true}}, true},
+		{"replaced-with-version", "replaced-with-version.mod", []expected{{dep, replaced, dep, false}, {x, xv, "", true}}, true},
+		{"replaced-with-version-mismatch", "replaced-with-version-mismatch.mod", full, false},
+		{"replaced-with-local-path", "replaced-with-local-path.mod", local, true},
+		{"replaced-with-local-path-and-version", "replaced-with-local-path-and-version.mod", local, true},
+		{"replaced-with-local-path-and-version-mismatch", "replaced-with-local-path-and-version-mismatch.mod", full, false},
+		{"go116", "go116.mod", []expected{{dep, old, "", false}, {y, yv, "", true}}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			data, e := os.ReadFile("testdata/" + tc.name + ".mod")
+			data, e := os.ReadFile("testdata/" + tc.file)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -56,8 +61,55 @@ func TestUpstreamGoModFixtures(t *testing.T) {
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("declarations\ngot %#v\nwant %#v", got, tc.want)
 			}
+			hasReplace := false
+			for _, d := range f.Declarations() {
+				if d.Replacement != nil {
+					hasReplace = true
+					break
+				}
+			}
+			if hasReplace != tc.replaced {
+				t.Fatalf("replacement applied=%v want %v", hasReplace, tc.replaced)
+			}
 		})
 	}
+}
+
+// TestModuleID keeps the go-dep-parser module-id cases as path@version
+// declarations. Inventory versions are still stored without a leading v.
+func TestModuleID(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, version, want string
+	}{
+		{"normal", "github.com/aquasecurity/trivy", "v0.22.0", "github.com/aquasecurity/trivy@v0.22.0"},
+		{"github.com/aquasecurity/trivy", "github.com/aquasecurity/trivy", "v0.22.0", "github.com/aquasecurity/trivy@v0.22.0"},
+		{"pseudo-version", "github.com/aquasecurity/go-dep-parser", "v0.0.0-20211224170007-df43bca6b6ff", "github.com/aquasecurity/go-dep-parser@v0.0.0-20211224170007-df43bca6b6ff"},
+		{"github.com/aquasecurity/go-dep-parser", "github.com/aquasecurity/go-dep-parser", "v0.0.0-20211224170007-df43bca6b6ff", "github.com/aquasecurity/go-dep-parser@v0.0.0-20211224170007-df43bca6b6ff"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := "module example.org/app\nrequire " + tc.path + " " + tc.version + "\n"
+			f, e := Parse(context.Background(), []byte(src), Limits{})
+			if e != nil {
+				t.Fatal(e)
+			}
+			if Canonical(tc.version) == "" {
+				t.Fatalf("canonical rejected %s", tc.version)
+			}
+			d := f.Declarations()
+			if len(d) != 1 {
+				t.Fatalf("declarations: %#v", d)
+			}
+			got := d[0].Effective.Path + "@" + d[0].Effective.Version
+			if got != tc.want {
+				t.Fatalf("got %s want %s", got, tc.want)
+			}
+		})
+	}
+	t.Run("invalid-pseudo", func(t *testing.T) {
+		if _, e := Parse(context.Background(), []byte("require github.com/aquasecurity/go-dep-parser v0.0.0-\n"), Limits{}); e == nil {
+			t.Fatal("accepted malformed pseudo-version")
+		}
+	})
 }
 
 // Punctuation cases ported from x/mod modfile/read_test.go TestParsePunctuation;

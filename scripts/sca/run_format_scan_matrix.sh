@@ -2,20 +2,512 @@
 # Compare frozen-fixture scans: current ScanReport vs archived baseline-eval
 # ScanLocalFilesystem. Machine output belongs under the supervision directory.
 # This is not a production SCA dependency.
+#
+# Usage:
+#   OLD=<baseline-eval> OUT=<supervision-dir> [COUNT=3] scripts/sca/run_format_scan_matrix.sh
+#   scripts/sca/run_format_scan_matrix.sh <OLD> <OUT>
+#   MATRIX_SELFTEST=1 scripts/sca/run_format_scan_matrix.sh
+#
+# GO is taken from PATH (command -v go). OLD and OUT must be set; there are
+# no personal-path defaults. Exclusive temps created this run are the only
+# paths removed on exit. Pre-existing OLD/OUT files are not deleted. A failed
+# old/new build does not execute a stale OUT binary.
 set -eu
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-GO="${GO:-/Users/v1ll4n/.goenv/versions/1.22.12/bin/go}"
-OLD="${OLD:-/Users/v1ll4n/.codex/sca-migration-evidence/d33a21b6/baseline-eval}"
-OUT="${OUT:-/Users/v1ll4n/.grok/task-supervision/sca-pr-5149/format-scan-matrix}"
-COUNT="${COUNT:-3}"
-export PATH="$(dirname "$GO"):$PATH"
-export GOWORK=off
-export CGO_ENABLED=0
-export GOFLAGS="${GOFLAGS:-}"
-mkdir -p "$OUT"
-cd "$ROOT"
 
-cat > "$OUT/cases.txt" << 'EOF'
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+GO="$(command -v go || true)"
+COUNT="${COUNT:-3}"
+export GOWORK=off
+export GOFLAGS="${GOFLAGS:-}"
+
+TEMPS=""
+add_temp() {
+	TEMPS="${TEMPS} $1"
+}
+cleanup_temps() {
+	for d in $TEMPS; do
+		if [ -n "$d" ] && [ -d "$d" ]; then
+			rm -rf "$d"
+		fi
+	done
+}
+trap cleanup_temps EXIT
+
+die() {
+	echo "$1" >&2
+	exit "${2:-2}"
+}
+
+run_logged() {
+	log="$1"
+	shift
+	if "$@" >"$log" 2>&1; then
+		cat "$log"
+		return 0
+	fi
+	cat "$log"
+	return 1
+}
+
+# Old driver source is written only into an exclusive temp module, never OLD.
+old_driver_src() {
+	cat << 'GO'
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/yaklang/yaklang/common/sca"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+)
+
+func rssBytes() int64 {
+	var ru syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
+		return -1
+	}
+	n := int64(ru.Maxrss)
+	if n < 0 {
+		return -1
+	}
+	switch runtime.GOOS {
+	case "darwin", "ios":
+		return n
+	default:
+		return n * 1024
+	}
+}
+
+func inputHash(dir string) (string, error) {
+	var files []string
+	err := filepath.Walk(dir, func(p string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if info.IsDir() {
+			return nil
+		}
+		files = append(files, p)
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	sort.Strings(files)
+	h := sha256.New()
+	for _, p := range files {
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return "", err
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(h, "%s %d\n", filepath.ToSlash(rel), len(b))
+		h.Write(b)
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func projection(keys []string) (uniqueHash, multiHash string, unique []string) {
+	counts := map[string]int{}
+	for _, k := range keys {
+		counts[k]++
+	}
+	unique = make([]string, 0, len(counts))
+	for k := range counts {
+		unique = append(unique, k)
+	}
+	sort.Strings(unique)
+	uh := sha256.Sum256([]byte(strings.Join(unique, "\n")))
+	multi := make([]string, 0, len(unique))
+	for _, k := range unique {
+		multi = append(multi, fmt.Sprintf("%s\t%d", k, counts[k]))
+	}
+	mh := sha256.Sum256([]byte(strings.Join(multi, "\n")))
+	return hex.EncodeToString(uh[:]), hex.EncodeToString(mh[:]), unique
+}
+
+func fail(payload map[string]any, err error, code int) {
+	payload["ok"] = false
+	payload["err"] = err.Error()
+	_ = json.NewEncoder(os.Stdout).Encode(payload)
+	os.Exit(code)
+}
+
+func main() {
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "usage: old-scan <case> <dir>")
+		os.Exit(2)
+	}
+	name, dir := os.Args[1], os.Args[2]
+	out := map[string]any{
+		"side": "old", "case": name, "dir": dir,
+		"rss_source": "getrusage(RUSAGE_SELF).ru_maxrss; darwin bytes, linux KiB converted to bytes; process peak including Go runtime",
+		"duration_source": "wall time of ScanFilesystem(NewRelLocalFs) only; OS analyzers Match relative snapshot paths such as var/lib/dpkg/status",
+	}
+	sum, err := inputHash(dir)
+	if err != nil {
+		fail(out, fmt.Errorf("input walk/read: %w", err), 1)
+	}
+	out["input_sha256"] = sum
+	start := time.Now()
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	alloc0, mallocs0 := ms.TotalAlloc, ms.Mallocs
+	pkgs, err := sca.ScanFilesystem(filesys.NewRelLocalFs(dir))
+	elapsed := time.Since(start)
+	runtime.ReadMemStats(&ms)
+	out["ns"] = elapsed.Nanoseconds()
+	out["alloc_bytes"] = ms.TotalAlloc - alloc0
+	out["mallocs"] = ms.Mallocs - mallocs0
+	out["rss_bytes"] = rssBytes()
+	keys := []string{}
+	for _, p := range pkgs {
+		if p == nil || strings.TrimSpace(p.Name) == "" {
+			continue
+		}
+		keys = append(keys, p.Name+"\t"+p.Version)
+	}
+	uh, mh, unique := projection(keys)
+	out["packages"] = len(pkgs)
+	out["projection"] = len(unique)
+	out["projection_sha256"] = uh
+	out["multiplicity_sha256"] = mh
+	out["identities"] = unique
+	out["ok"] = err == nil
+	if err != nil {
+		out["err"] = err.Error()
+	} else {
+		out["err"] = ""
+	}
+	_ = json.NewEncoder(os.Stdout).Encode(out)
+	if err != nil {
+		os.Exit(1)
+	}
+}
+GO
+}
+
+# Build old-scan in an exclusive module (copy go.mod/go.sum, symlink common).
+# Writes the binary to $1 only after a successful compile. Never writes into OLD.
+# Never overwrites dest on failure.
+install_old_scan() {
+	dest="$1"
+	old_root="$2"
+	log="$3"
+	mod="$(mktemp -d "${TMPDIR:-/tmp}/sca-old-mod.XXXXXX")"
+	scratch="$(mktemp -d "${TMPDIR:-/tmp}/sca-old-bin.XXXXXX")"
+	add_temp "$mod"
+	add_temp "$scratch"
+	if [ ! -f "$old_root/go.mod" ] || [ ! -d "$old_root/common" ]; then
+		echo "OLD is not a baseline-eval module" >"$log"
+		return 1
+	fi
+	cp "$old_root/go.mod" "$mod/go.mod"
+	if [ -f "$old_root/go.sum" ]; then
+		cp "$old_root/go.sum" "$mod/go.sum"
+	fi
+	ln -s "$old_root/common" "$mod/common"
+	mkdir -p "$mod/cmd/oldscan"
+	old_driver_src >"$mod/cmd/oldscan/main.go"
+	built="$scratch/old-scan"
+	if (
+		cd "$mod"
+		CGO_ENABLED=1 GOPROXY=off GOSUMDB=off "$GO" build -o "$built" ./cmd/oldscan
+	) >"$log" 2>&1; then
+		cp "$built" "$dest"
+		chmod +x "$dest"
+		return 0
+	fi
+	return 1
+}
+
+install_new_scan() {
+	dest="$1"
+	log="$2"
+	scratch="$(mktemp -d "${TMPDIR:-/tmp}/sca-new-bin.XXXXXX")"
+	add_temp "$scratch"
+	built="$scratch/new-scan"
+	if (
+		cd "$ROOT"
+		CGO_ENABLED=0 GOPROXY=off GOSUMDB=off "$GO" build -o "$built" ./scripts/sca/format_scan_matrix
+	) >"$log" 2>&1; then
+		cp "$built" "$dest"
+		chmod +x "$dest"
+		return 0
+	fi
+	return 1
+}
+
+compare_py() {
+	cat << 'PY'
+import json, os, sys, hashlib, shutil, tempfile, subprocess, time
+
+def parse_run(run):
+    if run.get("exit") != 0 or not run.get("stdout"):
+        return None
+    try:
+        return json.loads(run["stdout"].splitlines()[-1])
+    except Exception:
+        return None
+
+def side_status(runs, fixture_hash):
+    if not runs:
+        return False, "no runs", []
+    parsed = []
+    for i, run in enumerate(runs):
+        rec = parse_run(run)
+        if rec is None or rec.get("ok") is not True:
+            return False, "repeat %d failed" % i, parsed
+        parsed.append(rec)
+    inputs = {p.get("input_sha256") for p in parsed}
+    if inputs != {fixture_hash}:
+        return False, "canonical input hash differs from fixture or across repeats", parsed
+    proj = {p.get("projection_sha256") for p in parsed}
+    multi = {p.get("multiplicity_sha256") for p in parsed}
+    if len(proj) != 1 or len(multi) != 1:
+        return False, "nondeterministic projection across repeats", parsed
+    return True, "", parsed
+
+def decide(rec):
+    fixture = rec.get("input_sha256")
+    old_ok, old_reason, olds = side_status(rec.get("old_runs") or [], fixture)
+    new_ok, new_reason, news = side_status(rec.get("new_runs") or [], fixture)
+    rec["old_ok"] = old_ok
+    rec["new_ok"] = new_ok
+    rec["old"] = olds[-1] if olds else None
+    rec["new"] = news[-1] if news else None
+    rec["same_input"] = bool(olds and news and all(p.get("input_sha256") == fixture for p in olds + news))
+    rec["deterministic"] = old_ok and new_ok
+    rec["projection_equal"] = False
+    rec["comparable"] = False
+    rec["new_failed"] = False
+    if not new_ok:
+        rec["reason"] = new_reason or "new scan failed"
+        rec["new_failed"] = True
+        return rec
+    if news and news[0].get("complete") is False:
+        rec["reason"] = "new scan incomplete"
+        rec["new_failed"] = True
+        rec["new_ok"] = False
+        return rec
+    if not old_ok:
+        rec["reason"] = old_reason or "old scan failed"
+        return rec
+    if not rec["same_input"]:
+        rec["reason"] = "canonical input hash differs"
+        return rec
+    old_p, new_p = olds[0].get("projection_sha256"), news[0].get("projection_sha256")
+    old_m, new_m = olds[0].get("multiplicity_sha256"), news[0].get("multiplicity_sha256")
+    rec["old_identities"] = olds[0].get("identities")
+    rec["new_identities"] = news[0].get("identities")
+    if old_p != new_p or old_m != new_m:
+        rec["reason"] = "name@version projection differs; not a fabricated match"
+        return rec
+    rec["projection_equal"] = True
+    rec["comparable"] = True
+    rec["reason"] = ""
+    return rec
+
+def _run(identities, ok=True, complete=True, inp="abc", proj=None, multi=None, exit=0):
+    if proj is None:
+        proj = "p:" + ",".join(identities)
+    if multi is None:
+        multi = "m:" + ",".join(identities)
+    payload = {
+        "ok": ok, "complete": complete, "input_sha256": inp,
+        "projection_sha256": proj, "multiplicity_sha256": multi,
+        "identities": identities,
+    }
+    return {"exit": exit, "stdout": json.dumps(payload), "stderr": ""}
+
+def selftest_compare():
+    fixture = "abc"
+    good = decide({
+        "input_sha256": fixture,
+        "old_runs": [_run(["a\t1"]), _run(["a\t1"])],
+        "new_runs": [_run(["a\t1"]), _run(["a\t1"])],
+    })
+    if not good["comparable"] or not good["same_input"] or not good["projection_equal"]:
+        raise SystemExit("expected comparable equal projections")
+    unequal = decide({
+        "input_sha256": fixture,
+        "old_runs": [_run(["a\t1"]), _run(["a\t1"])],
+        "new_runs": [_run(["b\t1"]), _run(["b\t1"])],
+    })
+    if unequal["comparable"] or unequal["projection_equal"]:
+        raise SystemExit("unequal projections marked comparable")
+    failed = decide({
+        "input_sha256": fixture,
+        "old_runs": [_run(["a\t1"]), _run(["a\t1"], ok=False, exit=1)],
+        "new_runs": [_run(["a\t1"]), _run(["a\t1"])],
+    })
+    if failed["comparable"] or failed["old_ok"]:
+        raise SystemExit("failed repeat marked comparable")
+    newfail = decide({
+        "input_sha256": fixture,
+        "old_runs": [_run(["a\t1"]), _run(["a\t1"])],
+        "new_runs": [_run(["a\t1"], ok=False, complete=False, exit=1), _run(["a\t1"])],
+    })
+    if newfail["comparable"] or not newfail["new_failed"]:
+        raise SystemExit("new failure not retained")
+    mismatch = decide({
+        "input_sha256": fixture,
+        "old_runs": [_run(["a\t1"], inp="zzz"), _run(["a\t1"], inp="zzz")],
+        "new_runs": [_run(["a\t1"]), _run(["a\t1"])],
+    })
+    if mismatch["comparable"] or mismatch["same_input"]:
+        raise SystemExit("input hash mismatch marked comparable")
+    nondet = decide({
+        "input_sha256": fixture,
+        "old_runs": [_run(["a\t1"]), _run(["a\t2"])],
+        "new_runs": [_run(["a\t1"]), _run(["a\t1"])],
+    })
+    if nondet["comparable"] or nondet["deterministic"]:
+        raise SystemExit("nondeterministic projection marked comparable")
+    print("compare selftest ok")
+
+def fixture_hash(files):
+    h = hashlib.sha256()
+    for dest, data in sorted(files):
+        h.update(("%s %d\n" % (dest.replace("\\", "/"), len(data))).encode())
+        h.update(data)
+    return h.hexdigest()
+
+def run_matrix(root, out, count):
+    cases = {}
+    order = []
+    with open(os.path.join(out, "cases.txt")) as f:
+        for line in f:
+            name, dest, src = line.rstrip("\n").split("\t")
+            if name not in cases:
+                order.append(name)
+                cases[name] = []
+            cases[name].append((dest, os.path.join(root, src)))
+    old_bin = os.path.join(out, "old-scan")
+    new_bin = os.path.join(out, "new-scan")
+    rows = []
+    new_failed = False
+    for name in order:
+        files = cases[name]
+        missing = [src for _, src in files if not os.path.isfile(src)]
+        if missing:
+            rows.append({"case": name, "comparable": False, "new_failed": True,
+                         "reason": "missing fixture " + ",".join(missing)})
+            new_failed = True
+            continue
+        tdir = tempfile.mkdtemp(prefix="sca-fx-"+name+"-")
+        rec = {"case": name, "files": [d for d, _ in files], "old_runs": [], "new_runs": []}
+        try:
+            copied = []
+            for dest, src in files:
+                path = os.path.join(tdir, dest)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                data = open(src, "rb").read()
+                open(path, "wb").write(data)
+                copied.append((dest, data))
+            rec["input_sha256"] = fixture_hash(copied)
+            for side, binpath, key in (("old", old_bin, "old_runs"), ("new", new_bin, "new_runs")):
+                if not os.path.isfile(binpath):
+                    rec[side+"_missing_binary"] = True
+                    continue
+                for _ in range(count):
+                    t0 = time.perf_counter()
+                    p = subprocess.run([binpath, name, tdir], capture_output=True, text=True)
+                    rec[key].append({
+                        "exit": p.returncode,
+                        "stdout": p.stdout.strip(),
+                        "stderr": p.stderr.strip()[:2000],
+                        "wall_s": time.perf_counter() - t0,
+                    })
+            decide(rec)
+            if rec.get("new_failed"):
+                new_failed = True
+        finally:
+            shutil.rmtree(tdir, ignore_errors=True)
+        rows.append(rec)
+    summary = {
+        "cases": len(rows),
+        "comparable": sum(1 for r in rows if r.get("comparable")),
+        "incomparable": [{"case": r["case"], "reason": r.get("reason")} for r in rows if not r.get("comparable")],
+        "new_failed": new_failed,
+        "measurement": {
+            "duration": "wall time of ScanReport (new) / ScanFilesystem(RelLocalFs) (old) inside the scan subprocess",
+            "rss_bytes": "process peak RSS via getrusage ru_maxrss; Darwin bytes, Linux KiB converted to bytes; includes Go runtime",
+            "comparable_requires": [
+                "every repeat exit 0 and ok",
+                "new complete semantic contract",
+                "same canonical input hash as the fixture copy and across repeats",
+                "same unique name@version projection and multiplicity across repeats and between old and new",
+            ],
+        },
+        "claim": "not a completed old/new semantic matrix; incomparable rows are not fabricated matches",
+    }
+    open(os.path.join(out, "matrix.json"), "w").write(json.dumps({"summary": summary, "rows": rows}, indent=2) + "\n")
+    print(json.dumps(summary, indent=2))
+    if new_failed:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--selftest":
+        selftest_compare()
+    else:
+        run_matrix(sys.argv[1], sys.argv[2], int(sys.argv[3]))
+PY
+}
+
+selftest() {
+	echo "matrix driver selftest"
+	compare_py | python3 - --selftest
+
+	out="$(mktemp -d "${TMPDIR:-/tmp}/sca-matrix-out.XXXXXX")"
+	old="$(mktemp -d "${TMPDIR:-/tmp}/sca-matrix-old.XXXXXX")"
+	add_temp "$out"
+	add_temp "$old"
+	echo sentinel-out >"$out/SENTINEL"
+	echo sentinel-old >"$old/SENTINEL"
+	mkdir -p "$old/cmd/oldscan"
+	echo keep >"$old/cmd/oldscan/KEEP"
+	# Stale binary would succeed if executed; it must not run on build failure.
+	printf '#!/bin/sh\necho ran > "%s/RAN"\necho {"ok":true}\n' "$out" >"$out/old-scan"
+	chmod +x "$out/old-scan"
+	if [ -z "$GO" ]; then
+		die "go not on PATH"
+	fi
+	if install_old_scan "$out/old-scan.next" "$old" "$out/old-build.log"; then
+		die "old build should fail without go.mod"
+	fi
+	if [ ! -f "$out/SENTINEL" ] || [ ! -f "$old/SENTINEL" ] || [ ! -f "$old/cmd/oldscan/KEEP" ]; then
+		die "sentinel or pre-existing OLD file was removed"
+	fi
+	if [ -f "$out/RAN" ]; then
+		die "stale old-scan executed after build failure"
+	fi
+	if [ -f "$out/old-scan.next" ]; then
+		die "failed build installed a binary"
+	fi
+	# Pre-existing stale dest is left in place and must still not be used by install.
+	if [ ! -x "$out/old-scan" ]; then
+		die "pre-existing OUT/old-scan was deleted"
+	fi
+	echo "sentinel/stale-binary selftest ok"
+}
+
+write_cases() {
+	out="$1"
+	cat > "$out/cases.txt" << 'EOF'
 dpkg	var/lib/dpkg/status	common/sca/testdata/dpkg/dpkg
 rpm	var/lib/rpm/rpmdb.sqlite	common/sca/testdata/rpm/rpmdb.sqlite
 apk	lib/apk/db/installed	common/sca/testdata/apk/apk
@@ -40,192 +532,58 @@ gomod	go.sum	common/sca/testdata/go_mod/positive/sum
 gobinary	app	common/sca/testdata/go_binary/go-binary
 conan	conan.lock	common/sca/testdata/conan/conan
 EOF
-
-"$GO" version | tee "$OUT/toolchain.txt"
-uname -a | tee -a "$OUT/toolchain.txt"
-printf 'OLD=%s\nROOT=%s\nCOUNT=%s\n' "$OLD" "$ROOT" "$COUNT" | tee -a "$OUT/toolchain.txt"
-
-# Current-tree contract + timed ScanReport (same 20 cases).
-"$GO" test ./common/sca -count=1 -timeout 180s -run '^TestFormatScanContract$' | tee "$OUT/new-contract.log"
-"$GO" test ./common/sca -run '^$' -bench '^BenchmarkFormatScan$' -benchtime=1x -benchmem -count="$COUNT" | tee "$OUT/new-bench.log"
-
-WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/sca-old-matrix.XXXXXX")"
-trap 'rm -rf "$WORKDIR" "$OLD/cmd/oldscan"' EXIT
-mkdir -p "$OLD/cmd/oldscan"
-cat > "$OLD/cmd/oldscan/main.go" << 'GO'
-package main
-
-import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strings"
-	"syscall"
-	"time"
-
-	"github.com/yaklang/yaklang/common/sca"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-)
-
-func rssKB() int64 {
-	var ru syscall.Rusage
-	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
-		return -1
-	}
-	return ru.Maxrss
 }
 
-func main() {
-	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "usage: old-scan <case> <dir>")
-		os.Exit(2)
-	}
-	name, dir := os.Args[1], os.Args[2]
-	h := sha256.New()
-	filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
-		}
-		b, _ := os.ReadFile(p)
-		fmt.Fprintf(h, "%s %d\n", filepath.Base(p), len(b))
-		h.Write(b)
-		return nil
-	})
-	fs := filesys.NewRelLocalFs(dir)
-	start := time.Now()
-	var ms runtime.MemStats
-	runtime.ReadMemStats(&ms)
-	alloc0, mallocs0 := ms.TotalAlloc, ms.Mallocs
-	pkgs, err := sca.ScanFilesystem(fs)
-	elapsed := time.Since(start)
-	runtime.ReadMemStats(&ms)
-	proj := map[string]struct{}{}
-	for _, p := range pkgs {
-		if p == nil || strings.TrimSpace(p.Name) == "" {
-			continue
-		}
-		proj[p.Name+"\t"+p.Version] = struct{}{}
-	}
-	keys := make([]string, 0, len(proj))
-	for k := range proj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	ph := sha256.Sum256([]byte(strings.Join(keys, "\n")))
-	out := map[string]any{
-		"side": "old", "case": name, "dir": dir,
-		"input_sha256": hex.EncodeToString(h.Sum(nil)),
-		"ns": elapsed.Nanoseconds(),
-		"alloc_bytes": ms.TotalAlloc - alloc0,
-		"mallocs": ms.Mallocs - mallocs0,
-		"rss_kb": rssKB(),
-		"packages": len(pkgs),
-		"projection": len(keys),
-		"projection_sha256": hex.EncodeToString(ph[:]),
-		"err": fmt.Sprint(err),
-		"ok": err == nil,
-	}
-	enc := json.NewEncoder(os.Stdout)
-	_ = enc.Encode(out)
-	if err != nil && len(pkgs) == 0 {
-		os.Exit(1)
-	}
-}
-GO
+if [ "${MATRIX_SELFTEST:-}" = "1" ]; then
+	if [ -z "$GO" ]; then
+		die "go not on PATH"
+	fi
+	selftest
+	exit 0
+fi
 
-(
-	cd "$OLD"
-	CGO_ENABLED=1 GOPROXY=off GOSUMDB=off "$GO" build -o "$OUT/old-scan" ./cmd/oldscan
-) 2>"$OUT/old-build.log" || {
-	echo "old baseline-eval build failed; see $OUT/old-build.log" | tee "$OUT/old-status.txt"
-	cat "$OUT/old-build.log"
-}
-rm -rf "$OLD/cmd/oldscan"
+OLD="${1:-${OLD:-}}"
+OUT="${2:-${OUT:-}}"
+if [ -z "$GO" ]; then
+	die "go not on PATH; put Go 1.22.12 on PATH"
+fi
+if [ -z "$OLD" ] || [ -z "$OUT" ]; then
+	die "OLD and OUT must be set as arguments or environment variables"
+fi
+if [ ! -d "$OLD" ]; then
+	die "OLD is not a directory: $OLD"
+fi
+mkdir -p "$OUT"
+cd "$ROOT"
 
-CGO_ENABLED=0 "$GO" build -o "$OUT/new-scan" ./scripts/sca/format_scan_matrix 2>"$OUT/new-build.log"
-WORKDIR="$OUT"
+write_cases "$OUT"
+{
+	"$GO" version
+	uname -a
+	printf 'OLD=%s\nROOT=%s\nCOUNT=%s\nGO=%s\n' "$OLD" "$ROOT" "$COUNT" "$GO"
+} >"$OUT/toolchain.txt"
+cat "$OUT/toolchain.txt"
 
-python3 - "$ROOT" "$OUT" "$COUNT" "$WORKDIR" << 'PY'
-import hashlib, json, os, subprocess, sys, tempfile, time
-root, out, count, work = sys.argv[1:5]
-count = int(count)
-cases = {}
-order = []
-with open(os.path.join(out, "cases.txt")) as f:
-    for line in f:
-        name, dest, src = line.rstrip("\n").split("\t")
-        if name not in cases:
-            order.append(name)
-            cases[name] = []
-        cases[name].append((dest, os.path.join(root, src)))
-old_bin = os.path.join(out, "old-scan")
-new_bin = os.path.join(out, "new-scan")
-rows = []
+if ! run_logged "$OUT/new-contract.log" env CGO_ENABLED=0 "$GO" test ./common/sca -count=1 -timeout 180s -run '^TestFormatScanContract$'; then
+	die "TestFormatScanContract failed" 1
+fi
+if ! run_logged "$OUT/new-bench.log" env CGO_ENABLED=0 "$GO" test ./common/sca -run '^$' -bench '^BenchmarkFormatScan$' -benchtime=1x -benchmem -count="$COUNT"; then
+	die "BenchmarkFormatScan failed" 1
+fi
 
-def last_json(run):
-    if not run.get("stdout"):
-        return None
-    try:
-        return json.loads(run["stdout"].splitlines()[-1])
-    except Exception:
-        return None
+if ! install_old_scan "$OUT/old-scan" "$OLD" "$OUT/old-build.log"; then
+	cat "$OUT/old-build.log" >&2
+	echo "old baseline-eval build failed; refusing stale OUT/old-scan" | tee "$OUT/old-status.txt" >&2
+	exit 1
+fi
+echo "old baseline-eval build ok" | tee "$OUT/old-status.txt"
 
-for name in order:
-    files = cases[name]
-    missing = [src for _, src in files if not os.path.isfile(src)]
-    if missing:
-        rows.append({"case": name, "comparable": False, "reason": "missing fixture " + ",".join(missing)})
-        continue
-    tdir = tempfile.mkdtemp(prefix="sca-fx-"+name+"-")
-    h = hashlib.sha256()
-    for dest, src in files:
-        path = os.path.join(tdir, dest)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        data = open(src, "rb").read()
-        open(path, "wb").write(data)
-        h.update(dest.encode()); h.update(b"\n"); h.update(data)
-    rec = {"case": name, "input_sha256": h.hexdigest(), "files": [d for d,_ in files], "old_runs": [], "new_runs": []}
-    for side, binpath, key in (("old", old_bin, "old_runs"), ("new", new_bin, "new_runs")):
-        if not os.path.isfile(binpath):
-            rec[side+"_missing_binary"] = True
-            continue
-        for _ in range(count):
-            t0 = time.perf_counter()
-            p = subprocess.run([binpath, name, tdir], capture_output=True, text=True)
-            rec[key].append({
-                "exit": p.returncode,
-                "stdout": p.stdout.strip(),
-                "stderr": p.stderr.strip()[:2000],
-                "wall_s": time.perf_counter() - t0,
-            })
-        parsed = last_json(rec[key][-1]) if rec[key] else None
-        rec[side] = parsed
-        rec[side+"_ok"] = bool(parsed) and parsed.get("ok") is True
-    if rec.get("old") and rec.get("new"):
-        rec["same_input"] = rec["old"].get("input_sha256") == rec["new"].get("input_sha256") or True
-        rec["projection_equal"] = rec["old"].get("projection_sha256") == rec["new"].get("projection_sha256")
-        rec["comparable"] = rec["projection_equal"] is True
-        if not rec["comparable"]:
-            rec["reason"] = "name@version projection differs; not a fabricated match"
-    elif rec.get("new") and not rec.get("old"):
-        rec["comparable"] = False
-        rec["reason"] = rec.get("reason") or "old reader failed or did not emit JSON"
-    else:
-        rec["comparable"] = False
-        rec["reason"] = rec.get("reason") or "new or old scan missing"
-    rows.append(rec)
-summary = {
-    "cases": len(rows),
-    "comparable": sum(1 for r in rows if r.get("comparable")),
-    "incomparable": [ {"case": r["case"], "reason": r.get("reason")} for r in rows if not r.get("comparable") ],
-}
-open(os.path.join(out, "matrix.json"), "w").write(json.dumps({"summary": summary, "rows": rows}, indent=2) + "\n")
-print(json.dumps(summary, indent=2))
-PY
+if ! install_new_scan "$OUT/new-scan" "$OUT/new-build.log"; then
+	cat "$OUT/new-build.log" >&2
+	echo "new matrix driver build failed; refusing stale OUT/new-scan" >&2
+	exit 1
+fi
+
+compare_py | python3 - "$ROOT" "$OUT" "$COUNT"
 echo "matrix files in $OUT"
 ls -la "$OUT"
