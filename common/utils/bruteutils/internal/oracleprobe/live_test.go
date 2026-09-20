@@ -103,6 +103,39 @@ func liveOptions(t *testing.T) Options {
 	if os.Getenv("YAK_ORACLE_TEST_TLS") == "1" {
 		// Bypassing verification is an explicit fixture-only choice, never a default.
 		o.TLS = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: os.Getenv("YAK_ORACLE_TEST_TLS_INSECURE") == "1", ServerName: os.Getenv("YAK_ORACLE_TEST_TLS_SERVER_NAME")}
+		if path := os.Getenv("YAK_ORACLE_TEST_TLS_CA"); path != "" {
+			pem, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pool := x509.NewCertPool()
+			if !pool.AppendCertsFromPEM(pem) {
+				t.Fatal("invalid YAK_ORACLE_TEST_TLS_CA")
+			}
+			o.TLS.RootCAs = pool
+			// Oracle wallets in this lab are CN-only (no SAN). Go 1.22+ rejects CN.
+			// Verify the chain against the supplied CA and accept a matching CN.
+			cfg := o.TLS
+			cfg.InsecureSkipVerify = true
+			cfg.VerifyPeerCertificate = func(raw [][]byte, _ [][]*x509.Certificate) error {
+				if len(raw) == 0 {
+					return errors.New("tls: no server certificate")
+				}
+				cert, err := x509.ParseCertificate(raw[0])
+				if err != nil {
+					return err
+				}
+				if _, err := cert.Verify(x509.VerifyOptions{Roots: pool}); err != nil {
+					return err
+				}
+				if name := cfg.ServerName; name != "" && cert.Subject.CommonName != name {
+					if err := cert.VerifyHostname(name); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		}
 	}
 	return o
 }
