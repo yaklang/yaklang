@@ -2137,6 +2137,7 @@ message AIOutputEvent {
   string AIModelVerboseName = 23; // AI 模型展示名称（美化后的模型名）
 
   string TaskUUID = 21; // 任务的唯一ID
+  string SessionId = 26; // AI 会话的唯一ID
 }
 
 message I18n {
