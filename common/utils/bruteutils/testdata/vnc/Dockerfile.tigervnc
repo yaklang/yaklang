@@ -1,0 +1,10 @@
+# TigerVNC standalone (RFB 3.8, type-2 VNC-Auth or None).
+#   docker build -t yak-vnc-tigervnc -f Dockerfile.tigervnc .
+#   docker run -d --rm -p 5900:5900 -e VNC_PASSWORD=VncPass123! yak-vnc-tigervnc
+#   docker run -d --rm -p 5901:5900 -e VNC_SECURITY=None yak-vnc-tigervnc
+FROM alpine:3.20
+RUN apk add --no-cache tigervnc
+COPY entrypoint-tigervnc.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+EXPOSE 5900
+ENTRYPOINT ["/entrypoint.sh"]

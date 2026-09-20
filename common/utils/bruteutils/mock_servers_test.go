@@ -4,7 +4,7 @@ package bruteutils_test
 // 验证 BrutePass 判定链路（正确凭证→Ok，错误凭证→!Ok，不可达→Finished）。
 //
 // 覆盖：FTP / SMTP(AUTH LOGIN) / Redis(RESP) / Memcached(stats) /
-// Telnet(交互流) / LDAP(BER bindResponse) / VNC(RFB 3.8 VNC-Auth DES) /
+// Telnet(交互流) / LDAP(BER bindResponse) / VNC(RFB login probe) /
 // SNMPv2(UDP community)。
 //
 // 数据库协议（MySQL/PG/Mongo/MSSQL）的模拟器见 common/brute/probes/*，

@@ -1,0 +1,9 @@
+# x11vnc over Xvfb with classic -rfbauth VNC password (Alpine: fewer X/mesa deps).
+#   docker build -t yak-vnc-x11vnc -f Dockerfile.x11vnc .
+#   docker run -d --rm -p 5900:5900 -e VNC_PASSWORD=VncPass123! yak-vnc-x11vnc
+FROM alpine:3.20
+RUN apk add --no-cache x11vnc xvfb
+COPY entrypoint-x11vnc.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+EXPOSE 5900
+ENTRYPOINT ["/entrypoint.sh"]
