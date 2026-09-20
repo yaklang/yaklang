@@ -3,6 +3,7 @@ package sfvm
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
@@ -106,17 +107,28 @@ func (v *SyntaxFlowVisitor) VisitHereDoc(i any) string {
 	if item.LfHereDoc() != nil {
 		doc, ok := item.LfHereDoc().(*sf.LfHereDocContext)
 		if ok && doc.LfText() != nil {
-			return doc.LfText().GetText()
+			return hereDocText(doc.LfText())
 		}
 		return ""
 	}
 
 	if item.CrlfHereDoc() != nil {
 		doc, ok := item.CrlfHereDoc().(*sf.CrlfHereDocContext)
-		if ok {
-			return doc.CrlfText().GetText()
+		if ok && doc.CrlfText() != nil {
+			return hereDocText(doc.CrlfText())
 		}
 		return ""
 	}
 	return ""
+}
+
+// Here-doc text consists of terminal children. BaseParserRuleContext.GetText
+// repeatedly concatenates the growing prefix, allocating quadratically for
+// long rule descriptions. Preserve the same child text with a single builder.
+func hereDocText(ctx antlr.ParserRuleContext) string {
+	var text strings.Builder
+	for _, child := range ctx.GetChildren() {
+		text.WriteString(child.(antlr.ParseTree).GetText())
+	}
+	return text.String()
 }
