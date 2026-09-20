@@ -14,7 +14,6 @@ replace github.com/refraction-networking/utls => ./common/third_party/utls
 
 require (
 	github.com/BurntSushi/toml v1.3.2
-	github.com/CycloneDX/cyclonedx-go v0.7.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/PuerkitoBio/goquery v1.6.0
@@ -58,7 +57,6 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/golang/snappy v0.0.4
 	github.com/google/btree v1.0.0
-	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/google/uuid v1.6.0
@@ -79,8 +77,6 @@ require (
 	github.com/kataras/pio v0.0.2
 	github.com/kevinburke/ssh_config v1.2.0
 	github.com/klauspost/compress v1.17.9
-	github.com/knqyf263/go-rpmdb v0.1.0
-	github.com/liamg/jfather v0.0.7
 	github.com/lib/pq v1.12.3
 	github.com/lor00x/goldap v0.0.0-20180618054307-a546dffdd1a3
 	github.com/lunixbochs/struc v0.0.0-20200707160740-784aaebc1d40
@@ -137,14 +133,13 @@ require (
 	golang.org/x/crypto v0.33.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/image v0.18.0
-	golang.org/x/mod v0.19.0
+	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.35.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0
 	golang.org/x/term v0.29.0
 	golang.org/x/text v0.22.0
 	golang.org/x/time v0.5.0
-	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/grpc v1.69.4
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/fatih/set.v0 v0.2.1
@@ -158,6 +153,7 @@ require (
 require (
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	github.com/morikuni/aec v1.0.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
 )
 
@@ -168,8 +164,7 @@ require (
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
-	github.com/creack/pty v1.1.21 // indirect
+	github.com/creack/pty v1.1.21
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -196,8 +191,7 @@ require (
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.13
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
 	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
@@ -224,7 +218,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/u-root/u-root v0.11.0 // indirect
-	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/wenlng/go-captcha-assets v1.0.5 // indirect
 	github.com/wenlng/go-captcha/v2 v2.0.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect

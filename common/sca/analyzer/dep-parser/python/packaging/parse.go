@@ -2,14 +2,19 @@ package packaging
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/pyrequire"
+	"github.com/yaklang/yaklang/common/sca/core/textdecode"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"io"
 	"net/textproto"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -22,21 +27,30 @@ func NewParser() types.Parser {
 // Parse parses egg and wheel metadata.
 // e.g. .egg-info/PKG-INFO and dist-info/METADATA
 func (*Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
-	rd := textproto.NewReader(bufio.NewReader(r))
+	ctx := types.ContextOf(r)
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	raw, err := textdecode.Read(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	rd := textproto.NewReader(bufio.NewReader(bytes.NewReader(raw)))
+	var diagnostics []model.Diagnostic
 	h, err := rd.ReadMIMEHeader()
 	if e := textproto.ProtocolError(""); errors.As(err, &e) {
 		// A MIME header may contain bytes in the key or value outside the set allowed by RFC 7230.
 		// cf. https://cs.opensource.google/go/go/+/a6642e67e16b9d769a0c08e486ba08408064df19
 		// However, our required key/value could have been correctly parsed,
 		// so we continue with the subsequent process.
-		log.Debugf("MIME protocol error: %s", err)
+		diagnostics = append(diagnostics, model.Diagnostic{Code: "malformed_input", Stage: "parse", Reason: err.Error(), Incomplete: true})
 	} else if err != nil && err != io.EOF {
-		return nil, nil, utils.Errorf("read MIME error: %w", err)
+		return nil, nil, fmt.Errorf("read MIME error: %w", err)
 	}
 
 	name, version := h.Get("name"), h.Get("version")
 	if name == "" || version == "" {
-		return nil, nil, utils.Error("name or version is empty")
+		return nil, nil, errors.New("name or version is empty")
 	}
 
 	// "License-Expression" takes precedence as "License" is deprecated.
@@ -59,11 +73,25 @@ func (*Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, [
 		license = "file://" + h.Get("License-File")
 	}
 
-	return []types.Library{
-		{
-			Name:    name,
-			Version: version,
-			License: license,
-		},
-	}, nil, nil
+	for _, values := range h {
+		for _, v := range values {
+			if len(v) > budget.From(ctx).Limits.MaxFieldBytes {
+				return nil, nil, fmt.Errorf("resource_limit: metadata field")
+			}
+		}
+	}
+	id := "metadata:" + name + "@" + version
+	qs := []types.Requirement{}
+	for _, raw := range h.Values("Requires-Dist") {
+		q, e := pyrequire.Declaration(raw)
+		if e != nil {
+			return nil, nil, fmt.Errorf("malformed_input: Requires-Dist: %w", e)
+		}
+		qs = append(qs, types.Requirement{Target: q.Name, Constraint: q.Constraint, Condition: q.Marker})
+	}
+	var deps []types.Dependency
+	if len(qs) > 0 {
+		deps = append(deps, types.Dependency{ID: id, Requirements: qs})
+	}
+	return []types.Library{{ID: id, Name: name, Version: version, License: license, Diagnostics: diagnostics}}, deps, ctx.Err()
 }

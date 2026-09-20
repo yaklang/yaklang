@@ -2,11 +2,11 @@ package analyzer
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/binary"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -41,7 +41,7 @@ func (a goBinaryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, erro
 		if errors.Is(err, binary.ErrUnrecognizedExe) || errors.Is(err, binary.ErrNonGoBinary) {
 			return nil, nil
 		} else if err != nil {
-			err = utils.Errorf("go binary parse error: %s", err)
+			err = fmt.Errorf("go binary parse error: %s", err)
 		}
 		return pkgs, err
 	}

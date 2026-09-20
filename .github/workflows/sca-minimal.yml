@@ -1,0 +1,64 @@
+name: SCA minimal runtime
+on:
+  pull_request:
+    paths:
+      - 'common/sca/**'
+      - 'common/utils/filesys/filesys_interface/**'
+      - 'common/utils/filesys/virtual_fs.go'
+      - 'scripts/sca/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/sca-minimal.yml'
+  push:
+    paths:
+      - 'common/sca/**'
+      - 'scripts/sca/**'
+      - '.github/workflows/sca-minimal.yml'
+permissions:
+  contents: read
+jobs:
+  contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GOWORK: 'off'
+      CGO_ENABLED: '0'
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.12'
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Production and test closures
+        run: |
+          python scripts/sca/dependency_audit.py
+          python scripts/sca/dependency_audit.py --test
+      - name: Source capability audit
+        run: |
+          go run scripts/sca/source_audit.go
+          go run scripts/sca/source_audit.go common/utils/filesys/filesys_interface
+      - name: Source and fixture provenance
+        run: python scripts/sca/verify_artifacts.py
+      - name: Frozen contracts without module acquisition
+        env:
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+        run: go test ./common/sca/... -count=1
+      - name: Go vet
+        run: go vet ./common/sca/...
+      - name: Race
+        if: runner.os == 'Linux'
+        env:
+          CGO_ENABLED: '1'
+        run: go test -race ./common/sca/...
+      - name: Readonly network-isolated macOS runtime
+        if: runner.os == 'macOS'
+        shell: bash
+        run: go test ./common/sca/... -count=1 -exec "$PWD/scripts/sca/isolated-test-exec.sh"

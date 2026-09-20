@@ -1,88 +1,54 @@
 package pom
 
 import (
-	"encoding/xml"
+	"context"
+	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"io"
-	"net/http"
-	"net/url"
-	"os"
+	"io/fs"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/samber/lo"
-	outils "github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/html/charset"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/sca/core/xmlrecord"
+
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"log"
 )
 
-const (
-	centralURL = "https://repo.maven.apache.org/maven2/"
-)
-
-type options struct {
-	offline     bool
-	remoteRepos []string
-}
-
-type option func(*options)
-
-func WithOffline(offline bool) option {
-	return func(opts *options) {
-		opts.offline = offline
-	}
-}
-
-func WithRemoteRepos(repos []string) option {
-	return func(opts *options) {
-		opts.remoteRepos = repos
-	}
-}
-
+// POM parsing uses only the explicitly supplied snapshot. Repository retrieval,
+// settings.xml and environment configuration are deliberately absent.
 type parser struct {
-	rootPath           string
-	cache              pomCache
-	localRepository    string
-	remoteRepositories []string
-	offline            bool
+	modules  map[string]bool
+	ctx      context.Context
+	missing  map[string]bool
+	rootPath string
+	cache    pomCache
+	fs       fs.FS
+	visiting map[string]bool
+	steps    int
+	fatal    error
 }
 
-func NewParser(filePath string, opts ...option) types.Parser {
-	o := &options{
-		offline:     false,
-		remoteRepos: []string{centralURL},
-	}
-
-	for _, opt := range opts {
-		opt(o)
-	}
-
-	s := readSettings()
-	localRepository := s.LocalRepository
-	if localRepository == "" {
-		homeDir, _ := os.UserHomeDir()
-		localRepository = filepath.Join(homeDir, ".m2", "repository")
-	}
-
-	return &parser{
-		rootPath:           filepath.Clean(filePath),
-		cache:              newPOMCache(),
-		localRepository:    localRepository,
-		remoteRepositories: o.remoteRepos,
-		offline:            o.offline,
-	}
+func NewParser(filePath string) types.Parser {
+	return &parser{rootPath: path.Clean(strings.TrimPrefix(filePath, "/")), cache: newPOMCache(), visiting: map[string]bool{}}
 }
 
-func (p *parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *parser) Parse(snapshot fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	p.fs = snapshot
+	p.modules = map[string]bool{}
+	p.ctx = types.ContextOf(r)
+	p.missing = map[string]bool{}
 	content, err := parsePom(r)
 	if err != nil {
-		return nil, nil, outils.Errorf("failed to parse POM: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse POM: %w", err)
 	}
 
 	root := &pom{
@@ -93,16 +59,37 @@ func (p *parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	// Analyze root POM
 	result, err := p.analyze(root, analysisOptions{lineNumber: true})
 	if err != nil {
-		return nil, nil, outils.Errorf("analyze error (%s): %w", p.rootPath, err)
+		return nil, nil, fmt.Errorf("analyze error (%s): %w", p.rootPath, err)
 	}
 
 	// Cache root POM
 	p.cache.put(result.artifact, result)
 
-	return p.parseRoot(root.artifact())
+	libs, deps, err := p.parseRoot(root.artifact())
+	if len(libs) > 0 {
+		for name := range p.missing {
+			libs[0].Diagnostics = append(libs[0].Diagnostics, model.Diagnostic{Code: "evidence_insufficient", Stage: "pom", Reason: name, Incomplete: true})
+		}
+	} else if len(p.missing) > 0 {
+		err = errors.Join(err, fmt.Errorf("evidence_insufficient: POM references %d unavailable materials", len(p.missing)))
+	}
+	return libs, deps, errors.Join(err, p.fatal)
 }
 
 func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, error) {
+	key := root.String()
+	if p.modules[key] {
+		return nil, nil, fmt.Errorf("malformed_input: POM module cycle %s", key)
+	}
+	if len(p.modules) >= budget.From(p.ctx).Limits.MaxReferenceDepth {
+		return nil, nil, fmt.Errorf("resource_limit: POM module depth")
+	}
+	if err := p.ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	p.modules[key] = true
+	defer delete(p.modules, key)
+
 	// Prepare a queue for dependencies
 	queue := newArtifactQueue()
 
@@ -156,7 +143,7 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 
 		result, err := p.resolve(art, rootDepManagement)
 		if err != nil {
-			return nil, nil, outils.Errorf("resolve error (%s): %w", art, err)
+			return nil, nil, fmt.Errorf("resolve error (%s): %w", art, err)
 		}
 
 		if art.Root {
@@ -175,7 +162,7 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 		for _, relativePath := range result.modules {
 			moduleArtifact, err := p.parseModule(result.filePath, relativePath)
 			if err != nil {
-				log.Debugf("Unable to parse %q module: %s", result.filePath, err)
+				p.missing[fmt.Sprintf("module %s: %v", relativePath, err)] = true
 				continue
 			}
 
@@ -208,7 +195,8 @@ func (p *parser) parseRoot(root artifact) ([]types.Library, []types.Dependency, 
 	// Convert to []types.Library and []types.Dependency
 	for name, art := range uniqArtifacts {
 		lib := types.Library{
-			ID:        packageID(name, art.Version.String()),
+			ID:       packageID(name, art.Version.String()),
+			Evidence: "declared", DeclaredName: name, DeclaredVersion: art.Version.String(), IsVersionRange: strings.ContainsAny(art.Version.String(), "[](),${}"),
 			Name:      name,
 			Version:   art.Version.String(),
 			License:   art.JoinLicenses(),
@@ -250,12 +238,12 @@ func (p *parser) parseModule(currentPath, relativePath string) (artifact, error)
 	// modulePath: "root/" + "module/" => "root/module"
 	module, err := p.openRelativePom(currentPath, relativePath)
 	if err != nil {
-		return artifact{}, outils.Errorf("unable to open the relative path: %w", err)
+		return artifact{}, fmt.Errorf("unable to open the relative path: %w", err)
 	}
 
 	result, err := p.analyze(module, analysisOptions{})
 	if err != nil {
-		return artifact{}, outils.Errorf("analyze error: %w", err)
+		return artifact{}, fmt.Errorf("analyze error: %w", err)
 	}
 
 	moduleArtifact := module.artifact()
@@ -272,17 +260,17 @@ func (p *parser) resolve(art artifact, rootDepManagement []pomDependency) (analy
 		return *result, nil
 	}
 
-	log.Debugf("Resolving %s:%s:%s...", art.GroupID, art.ArtifactID, art.Version)
+	log.Printf("Resolving %s:%s:%s...", art.GroupID, art.ArtifactID, art.Version)
 	pomContent, err := p.tryRepository(art.GroupID, art.ArtifactID, art.Version.String())
 	if err != nil {
-		log.Debug(err)
+		log.Print(err)
 	}
 	result, err := p.analyze(pomContent, analysisOptions{
 		exclusions:    art.Exclusions,
 		depManagement: rootDepManagement,
 	})
 	if err != nil {
-		return analysisResult{}, outils.Errorf("analyze error: %w", err)
+		return analysisResult{}, fmt.Errorf("analyze error: %w", err)
 	}
 
 	p.cache.put(art, result)
@@ -309,13 +297,26 @@ func (p *parser) analyze(pom *pom, opts analysisOptions) (analysisResult, error)
 		return analysisResult{}, nil
 	}
 
-	// Update remoteRepositories
-	p.remoteRepositories = utils.UniqueStrings(append(p.remoteRepositories, pom.repositories()...))
+	p.steps++
+	l := budget.From(p.ctx).Limits
+	if err := p.ctx.Err(); err != nil {
+		return analysisResult{}, err
+	}
+	if p.steps > l.MaxResolveSteps || len(p.visiting) >= l.MaxReferenceDepth {
+		p.fatal = errors.New("resource_limit: POM resolution budget exceeded")
+		return analysisResult{}, p.fatal
+	}
+	if p.visiting[pom.filePath] {
+		p.fatal = fmt.Errorf("POM reference cycle: %s", pom.filePath)
+		return analysisResult{}, p.fatal
+	}
+	p.visiting[pom.filePath] = true
+	defer delete(p.visiting, pom.filePath)
 
 	// Parent
 	parent, err := p.parseParent(pom.filePath, pom.content.Parent)
 	if err != nil {
-		return analysisResult{}, outils.Errorf("parent error: %w", err)
+		return analysisResult{}, fmt.Errorf("parent error: %w", err)
 	}
 
 	// Inherit values/properties from parent
@@ -377,6 +378,9 @@ func (p *parser) parseDependencies(deps []pomDependency, props map[string]string
 	for _, d := range deps {
 		// Resolve dependencies
 		d = d.Resolve(props, depManagement, rootDepManagement)
+		if strings.Contains(d.Version, "${") {
+			p.missing["unresolved property: "+d.Version] = true
+		}
 		dependencies = append(dependencies, d.ToArtifact(opts))
 	}
 	return dependencies
@@ -457,9 +461,9 @@ func (p *parser) parseParent(currentPath string, parent pomParent) (analysisResu
 	if target.IsEmpty() && !isProperty(parent.Version) {
 		return analysisResult{}, nil
 	}
-	log.Debugf("Start parent: %s", target.String())
+	log.Printf("Start parent: %s", target.String())
 	defer func() {
-		log.Debugf("Exit parent: %s", target.String())
+		log.Printf("Exit parent: %s", target.String())
 	}()
 
 	// If the artifact is found in cache, it is returned.
@@ -469,12 +473,15 @@ func (p *parser) parseParent(currentPath string, parent pomParent) (analysisResu
 
 	parentPOM, err := p.retrieveParent(currentPath, parent.RelativePath, target)
 	if err != nil {
-		log.Debugf("parent POM not found: %s", err)
+		log.Printf("parent POM not found: %s", err)
 	}
 
+	if parentPOM == nil {
+		return analysisResult{artifact: target}, nil
+	}
 	result, err := p.analyze(parentPOM, analysisOptions{})
 	if err != nil {
-		return analysisResult{}, outils.Errorf("analyze error: %w", err)
+		return analysisResult{}, fmt.Errorf("analyze error: %w", err)
 	}
 
 	p.cache.put(target, result)
@@ -489,7 +496,7 @@ func (p *parser) retrieveParent(currentPath, relativePath string, target artifac
 	if relativePath != "" {
 		pom, err := p.tryRelativePath(target, currentPath, relativePath)
 		if err != nil {
-			errs = outils.JoinErrors(errs, err)
+			errs = errors.Join(errs, err)
 		} else {
 			return pom, nil
 		}
@@ -498,21 +505,17 @@ func (p *parser) retrieveParent(currentPath, relativePath string, target artifac
 	// If not found, search the parent director
 	pom, err := p.tryRelativePath(target, currentPath, "../pom.xml")
 	if err != nil {
-		errs = outils.JoinErrors(errs, err)
+		errs = errors.Join(errs, err)
 	} else {
 		return pom, nil
 	}
 
-	// If not found, search local/remote remoteRepositories
-	pom, err = p.tryRepository(target.GroupID, target.ArtifactID, target.Version.String())
-	if err != nil {
-		errs = outils.JoinErrors(errs, err)
-	} else {
-		return pom, nil
+	// Only the caller supplied repository tree may satisfy a coordinate.
+	doc, err := p.tryRepository(target.GroupID, target.ArtifactID, target.Version.String())
+	if err == nil {
+		return doc, nil
 	}
-
-	// Reaching here means the POM wasn't found
-	return nil, errs
+	return nil, errors.Join(errs, err)
 }
 
 func (p *parser) tryRelativePath(parentArtifact artifact, currentPath, relativePath string) (*pom, error) {
@@ -528,15 +531,17 @@ func (p *parser) tryRelativePath(parentArtifact artifact, currentPath, relativeP
 	// Version can contain a property (`p.analyze` function is required to get the GroupID).
 	// So we can only match ArtifactID's.
 	if pom.artifact().ArtifactID != parentArtifact.ArtifactID {
-		return nil, outils.Error("'parent.relativePath' points at wrong local POM")
+		return nil, errors.New("'parent.relativePath' points at wrong local POM")
 	}
 	result, err := p.analyze(pom, analysisOptions{})
 	if err != nil {
-		return nil, outils.Errorf("analyze error: %w", err)
+		return nil, fmt.Errorf("analyze error: %w", err)
 	}
 
-	if !parentArtifact.Equal(result.artifact) {
-		return nil, outils.Error("'parent.relativePath' points at wrong local POM")
+	expected := parentArtifact
+	expected.Version = newVersion(evaluateVariable(parentArtifact.Version.String(), result.properties, nil))
+	if !expected.Equal(result.artifact) {
+		return nil, errors.New("'parent.relativePath' points at wrong local POM")
 	}
 
 	return pom, nil
@@ -549,7 +554,7 @@ func (p *parser) openRelativePom(currentPath, relativePath string) (*pom, error)
 	// e.g. child + ../parent => parent/
 	filePath := filepath.Join(dir, relativePath)
 
-	isDir, err := isDirectory(filePath)
+	isDir, err := p.isDirectory(filePath)
 	if err != nil {
 		return nil, err
 	} else if isDir {
@@ -559,20 +564,24 @@ func (p *parser) openRelativePom(currentPath, relativePath string) (*pom, error)
 
 	pom, err := p.openPom(filePath)
 	if err != nil {
-		return nil, outils.Errorf("failed to open %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to open %s: %w", filePath, err)
 	}
 	return pom, nil
 }
 
 func (p *parser) openPom(filePath string) (*pom, error) {
-	f, err := os.Open(filePath)
+	if p.fs == nil || !fs.ValidPath(filePath) || strings.ContainsAny(filePath, `\:`) {
+		return nil, fmt.Errorf("POM reference outside snapshot: %s", filePath)
+	}
+	f, err := p.fs.Open(filePath)
 	if err != nil {
-		return nil, outils.Errorf("file open error (%s): %w", filePath, err)
+		return nil, fmt.Errorf("file open error (%s): %w", filePath, err)
 	}
 
+	defer f.Close()
 	content, err := parsePom(f)
 	if err != nil {
-		return nil, outils.Errorf("failed to parse the local POM: %w", err)
+		return nil, fmt.Errorf("failed to parse the local POM: %w", err)
 	}
 	return &pom{
 		filePath: filePath,
@@ -580,77 +589,33 @@ func (p *parser) openPom(filePath string) (*pom, error) {
 	}, nil
 }
 
+// The only repository layout is an explicitly supplied snapshot directory.
+// There is no repository configuration, network endpoint, or host cache fallback.
 func (p *parser) tryRepository(groupID, artifactID, version string) (*pom, error) {
-	// Generate a proper path to the pom.xml
-	// e.g. com.fasterxml.jackson.core, jackson-annotations, 2.10.0
-	//      => com/fasterxml/jackson/core/jackson-annotations/2.10.0/jackson-annotations-2.10.0.pom
-	paths := strings.Split(groupID, ".")
-	paths = append(paths, artifactID, version)
-	paths = append(paths, fmt.Sprintf("%s-%s.pom", artifactID, version))
-
-	// Search local remoteRepositories
-	loaded, err := p.loadPOMFromLocalRepository(paths)
-	if err == nil {
-		return loaded, nil
+	if groupID != "" && artifactID != "" && version != "" && !strings.ContainsAny(groupID+artifactID+version, `\/:$[](), `) {
+		name := path.Join("repository", strings.ReplaceAll(groupID, ".", "/"), artifactID, version, artifactID+"-"+version+".pom")
+		if doc, err := p.openPom(name); err == nil {
+			return doc, nil
+		}
 	}
-
-	// Search remote remoteRepositories
-	loaded, err = p.fetchPOMFromRemoteRepository(paths)
-	if err == nil {
-		return loaded, nil
-	}
-
-	return nil, outils.Errorf("%s:%s:%s was not found in local/remote repositories", groupID, artifactID, version)
+	p.missing[fmt.Sprintf("POM metadata absent from snapshot: %s:%s:%s", groupID, artifactID, version)] = true
+	return nil, fmt.Errorf("evidence_insufficient: POM %s:%s:%s is not in the supplied snapshot", groupID, artifactID, version)
 }
-
-func (p *parser) loadPOMFromLocalRepository(paths []string) (*pom, error) {
-	paths = append([]string{p.localRepository}, paths...)
-	localPath := filepath.Join(paths...)
-
-	return p.openPom(localPath)
-}
-
-func (p *parser) fetchPOMFromRemoteRepository(paths []string) (*pom, error) {
-	// Do not try fetching pom.xml from remote repositories in offline mode
-	if p.offline {
-		log.Debug("Fetching the remote pom.xml is skipped")
-		return nil, outils.Error("offline mode")
+func (p *parser) isDirectory(name string) (bool, error) {
+	if p.fs == nil || !fs.ValidPath(name) || strings.ContainsAny(name, `\:`) {
+		return false, fs.ErrPermission
 	}
-
-	// try all remoteRepositories
-	for _, repo := range p.remoteRepositories {
-		repoURL, err := url.Parse(repo)
-		if err != nil {
-			continue
-		}
-
-		paths = append([]string{repoURL.Path}, paths...)
-		repoURL.Path = path.Join(paths...)
-
-		resp, err := http.Get(repoURL.String())
-		if err != nil || resp.StatusCode != http.StatusOK {
-			continue
-		}
-
-		content, err := parsePom(resp.Body)
-		if err != nil {
-			return nil, outils.Errorf("failed to parse the remote POM: %w", err)
-		}
-
-		return &pom{
-			filePath: "", // from remote repositories
-			content:  content,
-		}, nil
+	info, err := fs.Stat(p.fs, name)
+	if err != nil {
+		return false, err
 	}
-	return nil, outils.Errorf("the POM was not found in remote remoteRepositories")
+	return info.IsDir(), nil
 }
 
 func parsePom(r io.Reader) (*pomXML, error) {
 	parsed := &pomXML{}
-	decoder := xml.NewDecoder(r)
-	decoder.CharsetReader = charset.NewReaderLabel
-	if err := decoder.Decode(parsed); err != nil {
-		return nil, outils.Errorf("xml decode error: %w", err)
+	if err := xmlrecord.Decode(types.ContextOf(r), r, parsed); err != nil {
+		return nil, fmt.Errorf("xml decode error: %w", err)
 	}
 	return parsed, nil
 }

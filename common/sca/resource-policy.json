@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "zero": "bounded default",
+  "negative": "configuration error",
+  "workers": {
+    "default": 5,
+    "min": 1,
+    "max": 64
+  },
+  "defaults": {
+    "MaxFiles": 200000,
+    "MaxCandidateFiles": 10000,
+    "MaxFileBytes": 67108864,
+    "MaxTotalReadBytes": 536870912,
+    "MaxComponents": 200000,
+    "MaxObservations": 400000,
+    "MaxEdges": 1000000,
+    "MaxArchiveEntries": 100000,
+    "MaxArchiveDepth": 8,
+    "MaxExpandedBytes": 536870912,
+    "MaxFieldBytes": 1048576,
+    "MaxSyntaxDepth": 64,
+    "MaxExpressionNodes": 100000,
+    "MaxResolveSteps": 1000000,
+    "MaxReferenceDepth": 64
+  },
+  "global_budgets": [
+    "MaxFiles",
+    "MaxCandidateFiles",
+    "MaxTotalReadBytes",
+    "MaxArchiveEntries",
+    "MaxExpandedBytes",
+    "MaxComponents",
+    "MaxObservations",
+    "MaxEdges"
+  ],
+  "per_parser": [
+    "MaxFieldBytes",
+    "MaxSyntaxDepth",
+    "MaxExpressionNodes",
+    "MaxResolveSteps",
+    "MaxReferenceDepth",
+    "MaxArchiveDepth"
+  ],
+  "additional_hard_caps": {
+    "structured_text_bytes": 16777216,
+    "gomod_directives": 200000,
+    "RPM_header_entries": 65536
+  },
+  "on_shared_budget_exhaustion": "discard concurrently produced graph; retain deterministic discovery diagnostics",
+  "policy_basis": "Versioned bounded defaults; not claimed as production sizing evidence",
+  "strict_preallocation_status": "File/archive/structured syntax readers are bounded before expansion. Component/edge output limits also apply during report insertion; some format DTO slices are constructed under syntax/file bounds before output-count validation."
+}

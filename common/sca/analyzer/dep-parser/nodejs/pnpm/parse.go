@@ -2,35 +2,39 @@ package pnpm
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/sca/core/lockyaml"
+	"io"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+	"log"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type PackageResolution struct {
-	Tarball string `yaml:"tarball,omitempty"`
+	Tarball string `json:"tarball,omitempty"`
 }
 
 type PackageInfo struct {
-	Resolution      PackageResolution `yaml:"resolution"`
-	Dependencies    map[string]string `yaml:"dependencies,omitempty"`
-	DevDependencies map[string]string `yaml:"devDependencies,omitempty"`
-	IsDev           bool              `yaml:"dev,omitempty"`
-	Name            string            `yaml:"name,omitempty"`
-	Version         string            `yaml:"version,omitempty"`
+	Resolution      PackageResolution `json:"resolution"`
+	Dependencies    map[string]string `json:"dependencies,omitempty"`
+	DevDependencies map[string]string `json:"devDependencies,omitempty"`
+	IsDev           bool              `json:"dev,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	Version         string            `json:"version,omitempty"`
 }
 
 type LockFile struct {
-	LockfileVersion any                    `yaml:"lockfileVersion"`
-	Dependencies    map[string]any         `yaml:"dependencies,omitempty"`
-	DevDependencies map[string]any         `yaml:"devDependencies,omitempty"`
-	Packages        map[string]PackageInfo `yaml:"packages,omitempty"`
+	LockfileVersion any                    `json:"lockfileVersion"`
+	Dependencies    map[string]any         `json:"dependencies,omitempty"`
+	DevDependencies map[string]any         `json:"devDependencies,omitempty"`
+	Packages        map[string]PackageInfo `json:"packages,omitempty"`
 }
 
 type Parser struct{}
@@ -45,13 +49,25 @@ func (p *Parser) ID(name, version string) string {
 
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockFile LockFile
-	if err := yaml.NewDecoder(r).Decode(&lockFile); err != nil {
-		return nil, nil, utils.Errorf("decode error: %w", err)
+	data, err := io.ReadAll(io.LimitReader(r, (16<<20)+1))
+	if err != nil {
+		return nil, nil, err
+	}
+	tree, err := lockyaml.Parse(types.ContextOf(r), data)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err = json.Marshal(tree)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := json.Unmarshal(data, &lockFile); err != nil {
+		return nil, nil, fmt.Errorf("decode error: %w", err)
 	}
 
 	lockVer := parseLockfileVersion(lockFile)
-	if lockVer < 0 {
-		return nil, nil, nil
+	if lockVer < 5 || lockVer >= 7 {
+		return nil, nil, fmt.Errorf("unsupported_syntax: pnpm lock version %v", lockFile.LockfileVersion)
 	}
 
 	libs, deps := p.parse(lockVer, lockFile)
@@ -79,15 +95,27 @@ func (p *Parser) parse(lockVer float64, lockFile LockFile) ([]types.Library, []t
 		if name == "" {
 			name, version = parsePackage(depPath, lockVer)
 		}
-		pkgID := p.ID(name, version)
+		pkgID := depPath
 
 		dependencies := make([]string, 0, len(info.Dependencies))
 		for depName, depVer := range info.Dependencies {
-			dependencies = append(dependencies, p.ID(depName, depVer))
+			ref := depVer
+			if _, ok := lockFile.Packages[ref]; !ok {
+				if lockVer < 6 {
+					ref = "/" + depName + "/" + depVer
+				} else {
+					ref = "/" + depName + "@" + depVer
+				}
+			}
+			if _, ok := lockFile.Packages[ref]; !ok {
+				ref = p.ID(depName, depVer)
+			}
+			dependencies = append(dependencies, ref)
 		}
 
 		libs = append(libs, types.Library{
-			ID:       pkgID,
+			ID:      pkgID,
+			Variant: depPath, Source: info.Resolution.Tarball,
 			Name:     name,
 			Version:  version,
 			Indirect: isIndirectLib(name, lockFile.Dependencies),
@@ -101,6 +129,8 @@ func (p *Parser) parse(lockVer float64, lockFile LockFile) ([]types.Library, []t
 		}
 	}
 
+	sort.Sort(types.Libraries(libs))
+	sort.Sort(types.Dependencies(deps))
 	return libs, deps
 }
 
@@ -112,13 +142,13 @@ func parseLockfileVersion(lockFile LockFile) float64 {
 	// v6+
 	case string:
 		if lockVer, err := strconv.ParseFloat(v, 64); err != nil {
-			log.Debugf("Unable to convert the lock file version to float: %s", err)
+			log.Printf("Unable to convert the lock file version to float: %s", err)
 			return -1
 		} else {
 			return lockVer
 		}
 	default:
-		log.Debugf("Unknown type for the lock file version: %s", lockFile.LockfileVersion)
+		log.Printf("Unknown type for the lock file version: %s", lockFile.LockfileVersion)
 		return -1
 	}
 }
@@ -137,6 +167,8 @@ func parsePackage(depPath string, lockFileVersion float64) (string, string) {
 	}
 	return parseDepPath(depPath, versionSep)
 }
+
+var lockedVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$`)
 
 func parseDepPath(depPath, versionSep string) (string, string) {
 	// Skip registry
@@ -170,6 +202,9 @@ func parseDepPath(depPath, versionSep string) (string, string) {
 	//    - v6+: "7.21.5(@babel/core@7.20.7)" => "7.21.5"
 	if idx := strings.IndexAny(version, "_("); idx != -1 {
 		version = version[:idx]
+	}
+	if !lockedVersion.MatchString(version) {
+		return "", ""
 	}
 	return name, version
 }

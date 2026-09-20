@@ -1,0 +1,25 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca
+BenchmarkSparseDiscovery/100000-10         	       1	 152341333 ns/op	    100002 opens/op	    400058 readbytes/op	63326496 B/op	  804578 allocs/op
+BenchmarkSparseDiscovery/100000-10         	       1	 154096541 ns/op	    100002 opens/op	    400058 readbytes/op	63296368 B/op	  804220 allocs/op
+BenchmarkSparseDiscovery/100000-10         	       1	 155246584 ns/op	    100002 opens/op	    400058 readbytes/op	63308848 B/op	  804280 allocs/op
+PASS
+        0.88 real         0.77 user         0.03 sys
+            62472192  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                3989  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                1217  signals received
+                 219  voluntary context switches
+                3907  involuntary context switches
+          6594586486  instructions retired
+          2431628862  cycles elapsed
+            57787328  peak memory footprint

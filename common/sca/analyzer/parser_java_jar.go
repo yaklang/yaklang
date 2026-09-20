@@ -4,25 +4,27 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	iofs "io/fs"
 	"net/textproto"
-	"os"
-	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-var jarFileRegEx = regexp.MustCompile(`^([a-zA-Z0-9\._-]*[^-*])-(\d\S*(?:-SNAPSHOT)?).jar$`)
-
 type JarParser struct {
+	ctx    context.Context
+	budget *budget.State
+	depth  int
+
 	rootFilePath string
 	offline      bool
 	size         int64
@@ -59,94 +61,130 @@ func NewJarParser(path string, size int64) types.Parser {
 }
 
 func (p *JarParser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	p.ctx = types.ContextOf(r)
+	p.budget = budget.From(p.ctx)
 	libs, deps, err := p.parseArtifact(fs, p.rootFilePath, p.size, r)
 	if err != nil {
-		return nil, nil, utils.Errorf("unable to parse %s: %v", p.rootFilePath, err)
+		return nil, nil, fmt.Errorf("unable to parse %s: %v", p.rootFilePath, err)
 	}
 	return removeLibraryDuplicates(libs), deps, nil
 }
 
 func (p *JarParser) parseArtifact(fs fi.FileSystem, filePath string, size int64, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	p.depth++
+	defer func() { p.depth-- }()
+	if p.depth > p.budget.Limits.MaxArchiveDepth {
+		return nil, nil, fmt.Errorf("resource_limit: archive depth")
+	}
+	if err := p.ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	zr, err := zip.NewReader(r, size)
 	if err != nil {
-		return nil, nil, utils.Errorf("zip error: %v", err)
+		return nil, nil, fmt.Errorf("zip error: %v", err)
 	}
-
-	// Try to extract artifactId and version from the file name
-	// e.g. spring-core-5.3.4-SNAPSHOT.jar => sprint-core, 5.3.4-SNAPSHOT
-	fileProps := parseFileName(fs, filePath)
 
 	var libs []types.Library
 	var m manifest
-	var foundPomProps bool
+	var manifestPath string
+	var explicitCoordinates bool
 
+	if err := p.budget.Archive(len(zr.File), 0); err != nil {
+		return nil, nil, err
+	}
 	for _, fileInJar := range zr.File {
+		if err := p.ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		entryName := strings.TrimSuffix(fileInJar.Name, "/")
+		if !iofs.ValidPath(entryName) || strings.ContainsAny(entryName, `\:`) {
+			return nil, nil, fmt.Errorf("invalid_path: archive entry %q", fileInJar.Name)
+		}
+		if fileInJar.Mode()&iofs.ModeSymlink != 0 {
+			return nil, nil, fmt.Errorf("unsupported_syntax: archive symlink")
+		}
+		if fileInJar.UncompressedSize64 > uint64(p.budget.Limits.MaxFileBytes) {
+			return nil, nil, fmt.Errorf("resource_limit: archive entry size")
+		}
+		if err := p.budget.Archive(0, int64(fileInJar.UncompressedSize64)); err != nil {
+			return nil, nil, err
+		}
 		filename := filepath.Base(fileInJar.Name)
 		switch {
 		case filename == "pom.properties":
+			if fileInJar.UncompressedSize64 > uint64(p.budget.Limits.MaxFieldBytes) {
+				return nil, nil, fmt.Errorf("resource_limit: pom.properties")
+			}
 			props, err := parsePomProperties(fileInJar, filePath)
 			if err != nil {
-				return nil, nil, utils.Errorf("failed to parse %s: %v", fileInJar.Name, err)
+				return nil, nil, fmt.Errorf("failed to parse %s: %v", fileInJar.Name, err)
+			}
+			if !props.Valid() {
+				return nil, nil, fmt.Errorf("malformed_input: incomplete pom.properties identity")
 			}
 			libs = append(libs, props.Library())
-
-			// Check if the pom.properties is for the original JAR/WAR/EAR
-			if fileProps.ArtifactID == props.ArtifactID && fileProps.Version == props.Version {
-				foundPomProps = true
-			}
+			explicitCoordinates = true
 		case filename == "MANIFEST.MF":
+			if fileInJar.UncompressedSize64 > uint64(p.budget.Limits.MaxFieldBytes) {
+				return nil, nil, fmt.Errorf("resource_limit: manifest")
+			}
+			manifestPath = filePath + "!/" + fileInJar.Name
 			m, err = parseManifest(fileInJar)
 			if err != nil {
-				return nil, nil, utils.Errorf("failed to parse MANIFEST.MF: %v", err)
+				return nil, nil, fmt.Errorf("failed to parse MANIFEST.MF: %v", err)
 			}
 		case isArtifact(fileInJar.Name):
 			innerLibs, _, err := p.parseInnerJar(fs, fileInJar, filePath) // TODO process inner deps
 			if err != nil {
-				continue
+				return nil, nil, err
 			}
 			libs = append(libs, innerLibs...)
 		}
 	}
 
-	// If pom.properties is found, it should be preferred than MANIFEST.MF.
-	if foundPomProps {
+	// Explicit Maven metadata takes precedence over vendor/title guesses. File
+	// names play no part in this decision, including shaded and renamed archives.
+	if explicitCoordinates {
 		return libs, nil, nil
 	}
-
-	manifestProps := m.properties(filePath)
+	manifestProps := m.properties(manifestPath)
 	if !manifestProps.Valid() {
 		return libs, nil, nil
 	}
-	return append(libs, manifestProps.Library()), nil, nil
+	candidate := manifestProps.Library()
+	for _, l := range libs {
+		if l.Name == candidate.Name && l.Version == candidate.Version {
+			return libs, nil, nil
+		}
+	}
+	// Manifest vendor/title fallbacks do not prove Maven coordinates.
+	candidate.Evidence = "inferred"
+	return append(libs, candidate), nil, nil
 }
 
 func (p *JarParser) parseInnerJar(fs fi.FileSystem, zf *zip.File, rootPath string) ([]types.Library, []types.Dependency, error) {
 	fr, err := zf.Open()
 	if err != nil {
-		return nil, nil, utils.Errorf("unable to open %s: %v", zf.Name, err)
+		return nil, nil, fmt.Errorf("unable to open %s: %v", zf.Name, err)
 	}
 
-	f, err := os.CreateTemp("", "inner")
+	defer fr.Close()
+	data, err := io.ReadAll(io.LimitReader(fr, p.budget.Limits.MaxFileBytes+1))
 	if err != nil {
-		return nil, nil, utils.Errorf("unable to create a temp file: %v", err)
+		return nil, nil, err
 	}
-	defer func() {
-		f.Close()
-		os.Remove(f.Name())
-	}()
-
-	// Copy the file content to the temp file
-	if _, err = io.Copy(f, fr); err != nil {
-		return nil, nil, utils.Errorf("file copy error: %v", err)
+	if int64(len(data)) > p.budget.Limits.MaxFileBytes {
+		return nil, nil, fmt.Errorf("resource_limit: expanded archive")
 	}
+	f := bytes.NewReader(data)
 
 	// build full path to inner jar
-	fullPath := path.Join(rootPath, zf.Name)
+	fullPath := rootPath + "!/" + zf.Name
 
 	// Parse jar/war/ear recursively
 	innerLibs, innerDeps, err := p.parseArtifact(fs, fullPath, int64(zf.UncompressedSize64), f)
 	if err != nil {
-		return nil, nil, utils.Errorf("failed to parse %s: %v", zf.Name, err)
+		return nil, nil, fmt.Errorf("failed to parse %s: %v", zf.Name, err)
 	}
 
 	return innerLibs, innerDeps, nil
@@ -160,30 +198,15 @@ func isArtifact(name string) bool {
 	return false
 }
 
-func parseFileName(fs fi.FileSystem, filePath string) JarProperties {
-	fileName := fs.Base(filePath)
-	// fileName := filepath.Base(filePath)
-	packageVersion := jarFileRegEx.FindStringSubmatch(fileName)
-	if len(packageVersion) != 3 {
-		return JarProperties{}
-	}
-
-	return JarProperties{
-		ArtifactID: packageVersion[1],
-		Version:    packageVersion[2],
-		FilePath:   filePath,
-	}
-}
-
 func parsePomProperties(f *zip.File, filePath string) (JarProperties, error) {
 	file, err := f.Open()
 	if err != nil {
-		return JarProperties{}, utils.Errorf("unable to open pom.properties: %v", err)
+		return JarProperties{}, fmt.Errorf("unable to open pom.properties: %v", err)
 	}
 	defer file.Close()
 
 	p := JarProperties{
-		FilePath: filePath,
+		FilePath: filePath + "!/" + f.Name,
 	}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -199,7 +222,7 @@ func parsePomProperties(f *zip.File, filePath string) (JarProperties, error) {
 	}
 
 	if err = scanner.Err(); err != nil {
-		return JarProperties{}, utils.Errorf("scan error: %v", err)
+		return JarProperties{}, fmt.Errorf("scan error: %v", err)
 	}
 	return p, nil
 }
@@ -220,7 +243,7 @@ type manifest struct {
 func parseManifest(f *zip.File) (manifest, error) {
 	file, err := f.Open()
 	if err != nil {
-		return manifest{}, utils.Errorf("unable to open MANIFEST.MF: %v", err)
+		return manifest{}, fmt.Errorf("unable to open MANIFEST.MF: %v", err)
 	}
 	defer file.Close()
 
@@ -238,7 +261,7 @@ func parseManifest(f *zip.File) (manifest, error) {
 		reader := textproto.NewReader(bufio.NewReader(bytes.NewReader(block)))
 		header, err := reader.ReadMIMEHeader()
 		if err != nil && err != io.EOF {
-			return manifest{}, utils.Errorf("parse MIME header error: %v ", err)
+			return manifest{}, fmt.Errorf("parse MIME header error: %v ", err)
 		}
 		m.implementationVersion = header.Get("Implementation-Version")
 		m.implementationTitle = header.Get("Implementation-Title")

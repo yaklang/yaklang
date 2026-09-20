@@ -1,0 +1,5 @@
+--- FAIL: TestUnknownManifestVersionAndSumEvidence (0.00s)
+    report_contract_test.go:101: lost exact checksum <nil>
+FAIL
+FAIL	github.com/yaklang/yaklang/common/sca	0.424s
+FAIL

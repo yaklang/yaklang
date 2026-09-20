@@ -1,13 +1,14 @@
 package analyzer
 
 import (
-	"path"
-
+	"errors"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/gomod"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
-
-	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/mod"
-	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/sum"
-	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
+	"io"
+	"io/fs"
+	"path"
+	"strings"
 )
 
 const (
@@ -45,55 +46,48 @@ func (a goModAnalyzer) Match(info MatchInfo) int {
 	return 0
 }
 
+// Analyze reads declarations only. A checksum in go.sum is not evidence of use.
 func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
-	fi := afi.Self
-	switch fi.MatchStatus {
-	case statusGoMod:
-		p := mod.NewParser(true)
-		parsedLibs, parsedDeps, err := p.Parse(fi.filesystem, fi.LazyFile)
-		if err != nil {
-			return nil, err
-		}
 
-		pkgs, err := handlerParsed(parsedLibs, parsedDeps)
-		if err != nil {
-			return nil, err
+	const maxBytes = 16 << 20
+	data, err := io.ReadAll(io.LimitReader(afi.Self.LazyFile, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if afi.Self.MatchStatus == statusGoSum {
+		_, err := gomod.ParseSum(afi.Self.LazyFile.Context(), data)
+		return nil, err
+	}
+	l := budget.From(afi.Self.LazyFile.Context()).Limits
+	f, err := gomod.Parse(afi.Self.LazyFile.Context(), data, gomod.Limits{MaxBytes: min(maxBytes, int(l.MaxFileBytes)), MaxTokenBytes: l.MaxFieldBytes, MaxStatements: l.MaxExpressionNodes})
+	if err != nil {
+		return nil, err
+	}
+	var sums map[gomod.SumKey]string
+	if afi.Self.filesystem != nil {
+		sumName := path.Join(path.Dir(afi.Self.Path), "go.sum")
+		raw, e := afi.Self.filesystem.ReadFile(sumName)
+		if e != nil && !errors.Is(e, fs.ErrNotExist) {
+			return nil, e
 		}
-		// if golang version < 1.17, need to parse go.sum
-		if lessThanGo117(parsedLibs) {
-			sumPath := path.Join(path.Dir(fi.Path), goSumFile)
-			if sfi, ok := afi.MatchedFileInfos[sumPath]; ok {
-				sp := sum.NewParser()
-				sumPkgs, err := ParseLanguageConfiguration(sfi, sp)
-				if err != nil {
-					return nil, err
-				}
-				originalPkg := make(map[string]*dxtypes.Package, len(pkgs))
-				for _, pkg := range pkgs {
-					originalPkg[pkg.Identifier()] = pkg
-				}
-				var subPkgs []*dxtypes.Package
-				for _, sPkg := range sumPkgs {
-					_, ok := originalPkg[sPkg.Identifier()]
-					if ok {
-						continue
-					}
-					subPkgs = append(subPkgs, sPkg)
-				}
-				pkgs = append(pkgs, subPkgs...)
+		if e == nil {
+			sums, e = gomod.ParseSum(afi.Self.LazyFile.Context(), raw)
+			if e != nil {
+				return nil, e
 			}
 		}
-		return pkgs, nil
 	}
-	return nil, nil
-}
-
-func lessThanGo117(pkgs []types.Library) bool {
-	for _, pkg := range pkgs {
-		// The indirect field is populated only in Go 1.17+
-		if pkg.Indirect {
-			return false
+	declarations := f.Declarations()
+	pkgs := make([]*dxtypes.Package, 0, len(declarations))
+	for _, d := range declarations {
+		p := &dxtypes.Package{Name: d.Effective.Path, Version: strings.TrimPrefix(d.Effective.Version, "v"), PackageDetails: &dxtypes.PackageDetails{Ecosystem: "golang", Evidence: "declared", DeclaredName: d.Requirement.Path, DeclaredVersion: d.Requirement.Version, Indirect: d.Requirement.Indirect}}
+		if d.Replacement != nil {
+			p.Source = d.Replacement.New.Path
+			p.ReplacementVersion = d.Replacement.New.Version
 		}
+		p.Verification = sums[gomod.SumKey{Path: d.Effective.Path, Version: d.Effective.Version}]
+		p.StartLine, p.EndLine = d.Requirement.Line, d.Requirement.Line
+		pkgs = append(pkgs, p)
 	}
-	return true
+	return pkgs, nil
 }

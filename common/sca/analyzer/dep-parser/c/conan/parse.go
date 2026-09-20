@@ -5,14 +5,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/liamg/jfather"
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
 
-	"golang.org/x/exp/slices"
-	"golang.org/x/xerrors"
+	"slices"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -41,10 +39,15 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	var lock LockFile
 	input, err := io.ReadAll(r)
 	if err != nil {
-		return nil, nil, utils.Errorf("failed to read canon lock file: %w", err)
+		return nil, nil, fmt.Errorf("failed to read canon lock file: %w", err)
 	}
-	if err := jfather.Unmarshal(input, &lock); err != nil {
-		return nil, nil, utils.Errorf("failed to decode canon lock file: %w", err)
+	nodes, err := jsonrecord.Decode(types.ContextOf(r), input, &lock)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode canon lock file: %w", err)
+	}
+	for k, v := range lock.GraphLock.Nodes {
+		v.StartLine, v.EndLine = nodes.Get("graph_lock", "nodes", k).Lines()
+		lock.GraphLock.Nodes[k] = v
 	}
 
 	// Get a list of direct dependencies
@@ -61,14 +64,15 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		}
 		lib, err := parseRef(node)
 		if err != nil {
-			log.Debug(err)
-			continue
+			return nil, nil, err
 		}
 
 		// Determine if the package is a direct dependency or not
 		direct := slices.Contains(directDeps, i)
 		lib.Indirect = !direct
 
+		lib.ID = i
+		lib.Source = node.Ref
 		parsed[i] = lib
 	}
 
@@ -85,6 +89,8 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		for _, req := range node.Requires {
 			if child, ok := parsed[req]; ok {
 				childDeps = append(childDeps, child.ID)
+			} else {
+				childDeps = append(childDeps, req)
 			}
 		}
 		if len(childDeps) != 0 {
@@ -108,7 +114,7 @@ func parseRef(node Node) (types.Library, error) {
 	// 'pkgd/0.1.0#7dcb50c43a5a50d984c2e8fa5898bf18'
 	ss := strings.Split(strings.Split(strings.Split(node.Ref, "@")[0], "#")[0], "/")
 	if len(ss) != 2 {
-		return types.Library{}, xerrors.Errorf("Unable to determine conan dependency: %q", node.Ref)
+		return types.Library{}, fmt.Errorf("Unable to determine conan dependency: %q", node.Ref)
 	}
 	return types.Library{
 		ID:      fmt.Sprintf("%s/%s", ss[0], ss[1]),
@@ -121,15 +127,4 @@ func parseRef(node Node) (types.Library, error) {
 			},
 		},
 	}, nil
-}
-
-// UnmarshalJSONWithMetadata needed to detect start and end lines of deps
-func (n *Node) UnmarshalJSONWithMetadata(node jfather.Node) error {
-	if err := node.Decode(&n); err != nil {
-		return err
-	}
-	// Decode func will overwrite line numbers if we save them first
-	n.StartLine = node.Range().Start.Line
-	n.EndLine = node.Range().End.Line
-	return nil
 }

@@ -1,0 +1,35 @@
+ok  	github.com/yaklang/yaklang/common/sca	2.708s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer	3.107s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/c/conan	1.297s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/binary	3.542s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/gradle	1.585s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/pom	3.277s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm	2.459s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/pnpm	2.740s
+?   	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types	[no test files]
+?   	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils	[no test files]
+?   	github.com/yaklang/yaklang/common/sca/core/budget	[no test files]
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/yarn	4.318s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/php/composer	4.081s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/packaging	2.950s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/pip	3.030s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/pipenv	2.436s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/poetry	2.567s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/ruby/bundler	2.717s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/ruby/gemspec	2.645s
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/rust/cargo	2.756s
+?   	github.com/yaklang/yaklang/common/sca/internal/collection	[no test files]
+?   	github.com/yaklang/yaklang/common/sca/internal/fsio	[no test files]
+?   	github.com/yaklang/yaklang/common/sca/internal/testcheck	[no test files]
+?   	github.com/yaklang/yaklang/common/sca/lazyfile	[no test files]
+?   	github.com/yaklang/yaklang/common/sca/license	[no test files]
+ok  	github.com/yaklang/yaklang/common/sca/core/gomod	2.765s
+ok  	github.com/yaklang/yaklang/common/sca/core/jsonrecord	2.607s
+ok  	github.com/yaklang/yaklang/common/sca/core/locktoml	2.718s
+ok  	github.com/yaklang/yaklang/common/sca/core/lockyaml	2.879s
+ok  	github.com/yaklang/yaklang/common/sca/core/pyrequire	2.820s
+ok  	github.com/yaklang/yaklang/common/sca/core/rpm	38.988s
+ok  	github.com/yaklang/yaklang/common/sca/core/textdecode	2.730s
+ok  	github.com/yaklang/yaklang/common/sca/core/xmlrecord	2.848s
+ok  	github.com/yaklang/yaklang/common/sca/dxtypes	2.847s
+ok  	github.com/yaklang/yaklang/common/sca/model	2.870s

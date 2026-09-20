@@ -2,16 +2,16 @@ package analyzer
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
-	"os"
+	"io/fs"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/packaging"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -43,9 +43,7 @@ func init() {
 	RegisterAnalyzer(TypPythonPackaging, NewPythonPackagingAnalyzer())
 }
 
-type pythonPackagingAnalyzer struct {
-	fileSystem fi.FileSystem
-}
+type pythonPackagingAnalyzer struct{}
 
 func NewPythonPackagingAnalyzer() *pythonPackagingAnalyzer {
 	return &pythonPackagingAnalyzer{}
@@ -70,10 +68,29 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Packag
 	case statusEgg:
 		realFileInfo, err := fi.LazyFile.Stat()
 		if err != nil {
-			return nil, utils.Errorf("failed to get file info: %s", err)
+			return nil, fmt.Errorf("failed to get file info: %s", err)
 		}
 		zr, err := zip.NewReader(fi.LazyFile, realFileInfo.Size())
+		if err != nil {
+			return nil, err
+		}
+		policy := budget.From(fi.LazyFile.Context())
+		if err = policy.Archive(len(zr.File), 0); err != nil {
+			return nil, err
+		}
 		for _, vf := range zr.File {
+			if err = fi.LazyFile.Context().Err(); err != nil {
+				return nil, err
+			}
+			if !fs.ValidPath(strings.TrimSuffix(vf.Name, "/")) || strings.ContainsAny(vf.Name, `\:`) || vf.Mode()&fs.ModeSymlink != 0 {
+				return nil, fmt.Errorf("invalid_path: egg entry")
+			}
+			if vf.UncompressedSize64 > uint64(policy.Limits.MaxFileBytes) {
+				return nil, fmt.Errorf("resource_limit: egg entry")
+			}
+			if err = policy.Archive(0, int64(vf.UncompressedSize64)); err != nil {
+				return nil, err
+			}
 			matched := a.Match(MatchInfo{
 				Path: vf.Name,
 			})
@@ -82,34 +99,21 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Packag
 				continue
 			}
 
-			// open zip file, write to tmp file
 			r, err := vf.Open()
 			if err != nil {
 				return nil, err
 			}
-			defer r.Close()
-
-			f, err := os.CreateTemp("", "python-egg-file-*")
+			data, err := io.ReadAll(io.LimitReader(r, policy.Limits.MaxFileBytes+1))
+			r.Close()
 			if err != nil {
-				return nil, utils.Errorf("failed to create analyzer temporary file for python packaging")
-			}
-			defer f.Close()
-
-			defer func() {
-				name := f.Name()
-				f.Close()
-				os.Remove(name)
-			}()
-
-			if _, err = io.Copy(f, r); err != nil {
 				return nil, err
 			}
-			// reset file offset to read
-			f.Seek(0, 0)
-
-			return ParseLanguageConfiguration(&FileInfo{
-				LazyFile: lazyfile.LazyOpenStreamByFile(a.fileSystem, f),
-			}, packaging.NewParser())
+			if int64(len(data)) > policy.Limits.MaxFileBytes {
+				return nil, fmt.Errorf("resource_limit: egg expansion")
+			}
+			nested := lazyfile.NewMemory(fi.Path+"!/"+vf.Name, data)
+			nested.SetContext(fi.LazyFile.Context())
+			return ParseLanguageConfiguration(&FileInfo{Path: fi.Path + "!/" + vf.Name, LazyFile: nested, filesystem: fi.filesystem}, packaging.NewParser())
 		}
 	case statusPythonPackaging:
 		return ParseLanguageConfiguration(fi, packaging.NewParser())

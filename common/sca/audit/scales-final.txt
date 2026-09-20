@@ -1,0 +1,20 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/model
+BenchmarkNormalize/100-10         	       1	    299708 ns/op	  246552 B/op	    1074 allocs/op
+BenchmarkNormalize/1000-10        	       1	   3309125 ns/op	 2645472 B/op	    9071 allocs/op
+BenchmarkNormalize/10000-10       	       1	  43967791 ns/op	24344368 B/op	   90629 allocs/op
+BenchmarkNormalize/50000-10       	       1	 291547792 ns/op	115525888 B/op	  454796 allocs/op
+BenchmarkNormalize/100000-10      	       1	 738266083 ns/op	231070256 B/op	  909782 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/model	1.473s
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm
+BenchmarkPathIndex/100-10         	       1	     92000 ns/op	  114720 B/op	     117 allocs/op
+BenchmarkPathIndex/1000-10        	       1	    332417 ns/op	 1302880 B/op	    1024 allocs/op
+BenchmarkPathIndex/10000-10       	       1	  14585667 ns/op	19797160 B/op	   10043 allocs/op
+BenchmarkPathIndex/50000-10       	       1	  44569459 ns/op	113108064 B/op	   50057 allocs/op
+BenchmarkPathIndex/100000-10      	       1	  87833709 ns/op	227436192 B/op	  100068 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm	0.606s

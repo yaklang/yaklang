@@ -1524,15 +1524,10 @@ var GoModWantPkgs = []*dxtypes.Package{
 	},
 }
 
+// BUGFIX: go.sum records checksums, not the build list. The previous TOML
+// expectation is retained in the isolated baseline archive; see BEHAVIOR_DIFF.md.
 var GoModLess117Pkgs = []*dxtypes.Package{
-	{
-		Name:    "github.com/aquasecurity/go-dep-parser",
-		Version: "0.0.0-20230219131432-590b1dfb6edd",
-	},
-	{
-		Name:    "github.com/BurntSushi/toml",
-		Version: "0.3.1",
-	},
+	{Name: "github.com/aquasecurity/go-dep-parser", Version: "0.0.0-20230219131432-590b1dfb6edd", Verification: "h1:H9IR14rR3+Z13ZH7ay9bs2hHBL7WAqdEJLLr8nhx/Rs="},
 }
 
 var PHPComposerPkgs = []*dxtypes.Package{
@@ -1616,6 +1611,9 @@ var PythonPackagingWheel = []*dxtypes.Package{
 }
 
 var PythonPIPPkgs = []*dxtypes.Package{
+	{Name: "Jinja2", Version: ""},
+	{Name: "MarkupSafe", Version: ""},
+	{Name: "Werkzeug", Version: ""},
 	{
 		Name:    "click",
 		Version: "8.0.0",
@@ -1754,7 +1752,7 @@ var JavaPomRequirementPkgs = []*dxtypes.Package{
 	},
 	{
 		Name:    "org.example:example-api",
-		Version: "",
+		Version: "(,1.0]",
 	},
 }
 

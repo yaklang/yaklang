@@ -1,0 +1,3 @@
+# Fixed offline acceptance evidence and the pinned Go PE buildinfo fixture.
+!/audit/*.log
+!/analyzer/dep-parser/golang/binary/testdata/test.exe

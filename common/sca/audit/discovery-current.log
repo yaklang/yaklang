@@ -1,0 +1,9 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca
+BenchmarkSparseDiscovery/100-10         	       1	    534208 ns/op	       102.0 opens/op	       458.0 readbytes/op	  119352 B/op	    1289 allocs/op
+BenchmarkSparseDiscovery/1000-10        	       1	   1023500 ns/op	      1002 opens/op	      4058 readbytes/op	  580952 B/op	    8206 allocs/op
+BenchmarkSparseDiscovery/10000-10       	       1	  12202666 ns/op	     10002 opens/op	     40058 readbytes/op	 5922432 B/op	   80485 allocs/op
+BenchmarkSparseDiscovery/100000-10      	       1	 143674583 ns/op	    100002 opens/op	    400058 readbytes/op	63302208 B/op	  804248 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca	0.776s

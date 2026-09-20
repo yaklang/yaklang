@@ -2,16 +2,17 @@ package binary
 
 import (
 	"debug/buildinfo"
+	"errors"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 var (
-	ErrUnrecognizedExe = utils.Error("unrecognized executable format")
-	ErrNonGoBinary     = utils.Error("non go binary")
+	ErrUnrecognizedExe = errors.New("unrecognized executable format")
+	ErrNonGoBinary     = errors.New("non go binary")
 )
 
 // convertError detects buildinfo.errUnrecognizedFormat and convert to

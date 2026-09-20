@@ -2,12 +2,14 @@ package gemspec
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -50,7 +52,11 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) (libs []types.Lib
 	var newVar, name, version, license string
 
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 4096), budget.From(types.ContextOf(r)).Limits.MaxFieldBytes)
 	for scanner.Scan() {
+		if err := types.ContextOf(r).Err(); err != nil {
+			return nil, nil, err
+		}
 		line := strings.TrimSpace(scanner.Text())
 		if strings.Contains(line, specNewStr) {
 			newVar = findSubString(newVarRegexp, line, "var")
@@ -64,12 +70,16 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) (libs []types.Lib
 		switch {
 		case strings.HasPrefix(line, fmt.Sprintf("%s.name", newVar)):
 			// https://guides.rubygems.org/specification-reference/#name
-			name = findSubString(nameRegexp, line, "name")
-			name = trim(name)
+			name, err = literalAssignment(line)
+			if err != nil {
+				return nil, nil, err
+			}
 		case strings.HasPrefix(line, fmt.Sprintf("%s.version", newVar)):
 			// https://guides.rubygems.org/specification-reference/#version
-			version = findSubString(versionRegexp, line, "version")
-			version = trim(version)
+			version, err = literalAssignment(line)
+			if err != nil {
+				return nil, nil, err
+			}
 		case strings.HasPrefix(line, fmt.Sprintf("%s.licenses", newVar)):
 			// https://guides.rubygems.org/specification-reference/#licenses=
 			license = findSubString(licensesRegexp, line, "licenses")
@@ -80,17 +90,13 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) (libs []types.Lib
 			license = trim(license)
 		}
 
-		// No need to iterate the loop anymore
-		if name != "" && version != "" && license != "" {
-			break
-		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, nil, utils.Errorf("failed to parse gemspec: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse gemspec: %w", err)
 	}
 
 	if name == "" || version == "" {
-		return nil, nil, utils.Error("failed to parse gemspec")
+		return nil, nil, errors.New("failed to parse gemspec")
 	}
 
 	return []types.Library{
@@ -100,6 +106,29 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) (libs []types.Lib
 			License: license,
 		},
 	}, nil, nil
+}
+
+// Evaluate no Ruby. Even a quoted prefix followed by an expression is not a
+// static value, and interpolation must not become a fictitious package version.
+func literalAssignment(line string) (string, error) {
+	_, s, ok := strings.Cut(line, "=")
+	s = strings.TrimSpace(s)
+	// A trailing comment outside the closed literal is not part of its value.
+	if len(s) > 1 && (s[0] == '\'' || s[0] == '"') {
+		if end := strings.IndexByte(s[1:], s[0]); end >= 0 {
+			end++
+			tail := strings.TrimSpace(s[end+1:])
+			tail = strings.TrimSpace(strings.TrimPrefix(tail, ".freeze"))
+			if strings.HasPrefix(tail, "#") {
+				s = s[:end+1]
+			}
+		}
+	}
+	s = strings.TrimSuffix(s, ".freeze")
+	if !ok || len(s) < 2 || (s[0] != '\'' && s[0] != '"') || s[len(s)-1] != s[0] || strings.ContainsAny(s[1:len(s)-1], "\\\"'`#") {
+		return "", fmt.Errorf("failed to parse gemspec: unsupported_syntax: dynamic Ruby assignment")
+	}
+	return s[1 : len(s)-1], nil
 }
 
 func findSubString(re *regexp.Regexp, line, name string) string {

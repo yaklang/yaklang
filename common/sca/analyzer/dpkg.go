@@ -3,13 +3,14 @@ package analyzer
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"net/textproto"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -30,12 +31,8 @@ func init() {
 type dpkgAnalyzer struct{}
 
 func (a dpkgAnalyzer) parseStatus(s string) bool {
-	for _, ss := range strings.Fields(s) {
-		if ss == "deinstall" || ss == "purge" {
-			return false
-		}
-	}
-	return true
+	fields := strings.Fields(s)
+	return len(fields) == 3 && fields[2] == "installed"
 }
 
 func (a dpkgAnalyzer) parseDepends(s string) dxtypes.PackageRelationShip {
@@ -96,12 +93,18 @@ func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *dxtypes.Package
 	}
 
 	pkg := &dxtypes.Package{
-		Name:      header.Get("Package"),
+		Name: header.Get("Package"),
+
 		Version:   header.Get("Version"),
-		DependsOn: a.parseDepends(header.Get("Depends")),
+		DependsOn: a.parseDepends(header.Get("Depends")), PackageDetails: &dxtypes.PackageDetails{Architecture: header.Get("Architecture"), Evidence: "installed"},
 	}
 	if pkg.Name == "" || pkg.Version == "" {
 		return nil
+	}
+	for _, raw := range strings.Split(header.Get("Provides"), ",") {
+		if v := strings.TrimSpace(raw); v != "" {
+			pkg.Provides = append(pkg.Provides, v)
+		}
 	}
 
 	return pkg
@@ -110,18 +113,31 @@ func (a dpkgAnalyzer) parseDpkgPkg(header textproto.MIMEHeader) *dxtypes.Package
 func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]*dxtypes.Package, error) {
 	pkgs := make([]*dxtypes.Package, 0)
 	br := bufio.NewReader(r)
+	ctx := types.ContextOf(r)
+	limits := budget.From(ctx).Limits
 	for {
-		block, err := ReadBlock(br)
+		block, err := readBlock(ctx, br)
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
-		if block == nil {
+		if len(block) == 0 {
 			break
 		}
 		reader := textproto.NewReader(bufio.NewReader(bytes.NewReader(block)))
 		header, err := reader.ReadMIMEHeader()
 		if err != nil && err != io.EOF {
-			return nil, utils.Errorf("parse MIME header error: %v ", err)
+			return nil, fmt.Errorf("parse MIME header error: %v ", err)
+		}
+		if header.Get("Status") == "" {
+			return pkgs, fmt.Errorf("evidence_insufficient: DPKG record without Status")
+		}
+		if a.parseStatus(header.Get("Status")) {
+			if header.Get("Package") == "" || header.Get("Version") == "" {
+				return pkgs, fmt.Errorf("malformed_input: installed DPKG record without identity")
+			}
+			if len(pkgs) >= limits.MaxComponents {
+				return pkgs, fmt.Errorf("resource_limit: DPKG records")
+			}
 		}
 		pkg := a.parseDpkgPkg(header)
 		if pkg != nil {
@@ -129,7 +145,7 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]*dxtypes.Package, error) {
 		}
 	}
 
-	return makePotentialPkgs(pkgs), nil
+	return pkgs, nil
 }
 
 func NewDpkgAnalyzer() *dpkgAnalyzer {

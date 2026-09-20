@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "branch": "codex/sca-minimal-dependency-core",
+  "baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
+  "implementation_fingerprint": "cc96751c9c7c526980d08ecd3b11dab858abfdbd62f74de09f018bb56effee92",
+  "core_dependency_target": "PASS",
+  "taskbook_final_acceptance": "NOT_FULLY_ACCEPTED",
+  "tests": {
+    "passed_events": 881,
+    "failed_events": 0,
+    "skipped_test_events": 0
+  },
+  "gates": [
+    {
+      "id": "production_dependency_closure",
+      "status": "PASS",
+      "evidence": [
+        "production-closure.json",
+        "leaf-source-ast.json"
+      ],
+      "detail": "134 packages, zero external modules, zero forbidden internal or CGO packages; approved leaf recursively audited"
+    },
+    {
+      "id": "test_dependency_closure",
+      "status": "PASS",
+      "evidence": [
+        "test-closure.json"
+      ],
+      "detail": "205 packages, zero external modules; no upstream runtime in test helpers"
+    },
+    {
+      "id": "frozen_automated_contracts",
+      "status": "PASS",
+      "evidence": [
+        "final-tests.jsonl"
+      ],
+      "detail": "881 passing test/subtest/seed events, 0 failures, 0 skipped test cases; this does not certify manual candidate disposition completeness"
+    },
+    {
+      "id": "offline_empty_module_cache",
+      "status": "PASS",
+      "evidence": [
+        "empty-cache-offline.log"
+      ],
+      "detail": "GOWORK=off CGO_ENABLED=0 GOPROXY=off GOSUMDB=off with a fresh GOMODCACHE"
+    },
+    {
+      "id": "race",
+      "status": "PASS",
+      "evidence": [
+        "race-final.log"
+      ],
+      "detail": "CGO_ENABLED=1 go test -race ./common/sca/... -count=1 on darwin/arm64"
+    },
+    {
+      "id": "vet",
+      "status": "PASS",
+      "evidence": [
+        "vet-final.log"
+      ],
+      "detail": "go vet ./common/sca/..."
+    },
+    {
+      "id": "cross_build",
+      "status": "PASS",
+      "evidence": [
+        "platform-builds.json"
+      ],
+      "detail": "darwin arm64/amd64, linux arm64/amd64, windows amd64; cross-builds are not native executions"
+    },
+    {
+      "id": "source_capability_audit",
+      "status": "PASS",
+      "evidence": [
+        "source-ast.json",
+        "leaf-source-ast.json"
+      ],
+      "detail": "AST import/selector/native-code inventory; no runtime network/process/SQL/CGO implementation"
+    },
+    {
+      "id": "runtime_deny_policy",
+      "status": "PASS",
+      "evidence": [
+        "isolated-runtime-final.log"
+      ],
+      "detail": "macOS sandbox denies network, file writes and subprocess execution; allows the initial test executable. No syscall attempt telemetry, so do not claim measured zero attempts"
+    },
+    {
+      "id": "rpm_backends",
+      "status": "PASS",
+      "evidence": [
+        "final-tests.jsonl"
+      ],
+      "detail": "16 BDB/NDB/SQLite snapshots compared with pinned isolated reader; independent rpm-qa subset assertions and bounded corruption/fuzz tests"
+    },
+    {
+      "id": "fuzz_smoke",
+      "status": "PASS",
+      "evidence": [
+        "fuzz-results.json",
+        "fuzz-final-root.log",
+        "fuzz-final-rpm-header.log",
+        "fuzz-final-toml.log",
+        "fuzz-final-npm.log"
+      ],
+      "detail": "11 fuzz targets at 10 seconds each, with later root/header/TOML refreshes. Bounded smoke fuzzing, not exhaustive or long-duration fuzzing"
+    },
+    {
+      "id": "mutation_sensitivity",
+      "status": "PASS",
+      "evidence": [
+        "mutations.json",
+        "mutation-component-source.log",
+        "mutation-checksum-kind.log",
+        "mutation-drop-exact-checksum.log"
+      ],
+      "detail": "Three isolated deliberate invariant breaks each fail the intended semantic test"
+    },
+    {
+      "id": "ssa_integration",
+      "status": "PASS",
+      "evidence": [
+        "ssa-java-final.log",
+        "ssa-php-final.log",
+        "ssa-typescript-final.log",
+        "ssa-fs-final.log"
+      ],
+      "detail": "Targeted Java TestNativeCallTypeNameWithSCAVersion, PHP TestComposerJson, TS TestSCAPackageJSONSnapshot, Yak virtual filesystem"
+    },
+    {
+      "id": "cyclonedx_1_5_schema",
+      "status": "PASS",
+      "evidence": [
+        "schema-validation.log",
+        "schema-report-validation.log"
+      ],
+      "detail": "Both compatibility DTO and Report exporter validated by independent jsonschema 4.23.0 using pinned offline schema"
+    },
+    {
+      "id": "source_and_fixture_integrity",
+      "status": "PASS",
+      "evidence": [
+        "artifact-verification.json"
+      ],
+      "detail": "88 production source hashes, 809 fixture hashes and all local mapping targets verified; 802 candidate rows are not a semantic coverage percentage"
+    },
+    {
+      "id": "exact_merge_performance",
+      "status": "PASS",
+      "evidence": [
+        "benchmark-summary.json",
+        "rss-baseline-extra.log",
+        "rss-current-extra.log",
+        "benchmarks-final.txt"
+      ],
+      "detail": "Same identity-only inventory benchmark; 1k/10k/50k and 100k time/RSS pass 1.10x threshold; allocated bytes remain higher for the merge kernel"
+    },
+    {
+      "id": "sparse_directory_performance",
+      "status": "PASS",
+      "evidence": [
+        "discovery-baseline.log",
+        "discovery-current.log",
+        "discovery-baseline-rss.log",
+        "discovery-current-rss.log"
+      ],
+      "detail": "100..100000 noncandidate files plus one go.mod; identical one-component result, actual opens/bytes counters; 100k repeat-three time/RSS pass 1.10x"
+    },
+    {
+      "id": "complete_candidate_semantics_review",
+      "status": "OPEN",
+      "evidence": [
+        "../test-migration-map.json",
+        "../source-extraction-map.json",
+        "../upstream-sources.lock.json"
+      ],
+      "detail": "All inventoried rows have dispositions, but generic parser/format scope mappings still require case-level independent review. Pinned source lock explicitly retains PENDING_INDEPENDENT_REVIEW; no 100-percent relevant-case certification"
+    },
+    {
+      "id": "strict_global_preallocation_and_result_memory",
+      "status": "OPEN",
+      "evidence": [
+        "../resource-policy.json"
+      ],
+      "detail": "File/read/archive/syntax limits bound parser work and report insertion checks output counts. Some format DTOs allocate under byte/syntax caps before output count checks; syntax/resolve budgets are per parser. No separate global result-memory estimate budget yet"
+    },
+    {
+      "id": "full_performance_and_runtime_attempt_matrix",
+      "status": "OPEN",
+      "evidence": [
+        "../SCA_BENCHMARKS.md"
+      ],
+      "detail": "Representative merge and sparse-discovery baselines are measured. Full format/edge-density/cycle/multisource matrix, per-format temporary-file counts, and runtime denied-attempt telemetry are not complete"
+    },
+    {
+      "id": "remote_ci",
+      "status": "NOT_RUN",
+      "evidence": [
+        "../../../.github/workflows/sca-minimal.yml"
+      ],
+      "detail": "Workflow added locally; no push, pull request or remote CI run was requested or performed"
+    }
+  ],
+  "delivery": "Local acceptance snapshot prepared before PR creation; current delivery/check status belongs to the PR.",
+  "evidence_scope": "Local execution on this workspace. Broader review and resource gates must not be silently counted as passed."
+}

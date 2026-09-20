@@ -1,18 +1,7 @@
 package analyzer
 
-import "github.com/h2non/filetype"
-
-var fastELFType = filetype.NewType("fast-elf", "application/x-executable")
-
-func fastELFTypeMatcher(buf []byte) bool {
-	return len(buf) > 3 && buf[0] == 0x7F && buf[1] == 0x45 &&
-		buf[2] == 0x4C && buf[3] == 0x46
-}
-
-func init() {
-	filetype.AddMatcher(fastELFType, fastELFTypeMatcher)
-}
-
+// IsExecutable recognizes only the executable containers accepted by this
+// analyzer. It does not install a process-wide matcher in a filetype registry.
 func IsExecutable(buf []byte) bool {
-	return filetype.Is(buf, "exe") || filetype.Is(buf, "fast-elf")
+	return len(buf) >= 4 && (string(buf[:4]) == "\x7fELF" || buf[0] == 'M' && buf[1] == 'Z')
 }

@@ -1,0 +1,26 @@
+[
+  {
+    "mutation": "component-source",
+    "file": "common/sca/model/report.go",
+    "test": "TestIdentityAndNormalize",
+    "caught_by_assertion": true,
+    "exit_code": 1,
+    "log": "mutation-component-source.log"
+  },
+  {
+    "mutation": "checksum-kind",
+    "file": "common/sca/core/gomod/sum.go",
+    "test": "TestSumIdentityConflict",
+    "caught_by_assertion": true,
+    "exit_code": 1,
+    "log": "mutation-checksum-kind.log"
+  },
+  {
+    "mutation": "drop-exact-checksum",
+    "file": "common/sca/analyzer/go_mod.go",
+    "test": "TestUnknownManifestVersionAndSumEvidence",
+    "caught_by_assertion": true,
+    "exit_code": 1,
+    "log": "mutation-drop-exact-checksum.log"
+  }
+]

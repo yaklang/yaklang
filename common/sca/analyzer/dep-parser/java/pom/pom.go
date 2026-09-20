@@ -4,12 +4,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
 
-	"github.com/samber/lo"
-	outils "github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
@@ -43,8 +40,7 @@ func (p pom) properties() properties {
 }
 
 func (p pom) projectProperties() map[string]string {
-	val := reflect.ValueOf(p.content).Elem()
-	props := p.listProperties(val)
+	props := map[string]string{"groupId": p.content.GroupId, "artifactId": p.content.ArtifactId, "version": p.content.Version, "parent.groupId": p.content.Parent.GroupId, "parent.artifactId": p.content.Parent.ArtifactId, "parent.version": p.content.Parent.Version}
 
 	// "version" and "groupId" elements could be inherited from parent.
 	// https://maven.apache.org/pom.html#inheritance
@@ -68,39 +64,6 @@ func (p pom) projectProperties() map[string]string {
 	}
 
 	return projectProperties
-}
-
-func (p pom) listProperties(val reflect.Value) map[string]string {
-	props := map[string]string{}
-	for i := 0; i < val.NumField(); i++ {
-		f := val.Type().Field(i)
-
-		tag, ok := f.Tag.Lookup("xml")
-		if !ok || strings.Contains(tag, ",") {
-			// e.g. ",chardata"
-			continue
-		}
-
-		switch f.Type.Kind() {
-		case reflect.Slice:
-			continue
-		case reflect.Map:
-			m := val.Field(i)
-			for _, e := range m.MapKeys() {
-				v := m.MapIndex(e)
-				props[e.String()] = v.String()
-			}
-		case reflect.Struct:
-			nestedProps := p.listProperties(val.Field(i))
-			for k, v := range nestedProps {
-				key := fmt.Sprintf("%s.%s", tag, k)
-				props[key] = v
-			}
-		default:
-			props[tag] = val.Field(i).String()
-		}
-	}
-	return props
 }
 
 func (p pom) artifact() artifact {
@@ -266,7 +229,7 @@ func (d pomDependency) ToArtifact(opts analysisOptions) artifact {
 	// See `exclusions in child` test for more information
 	exclusions := map[string]struct{}{}
 	if opts.exclusions != nil {
-		exclusions = maps.Clone(opts.exclusions)
+		exclusions = lo.Clone(opts.exclusions)
 	}
 	for _, e := range d.Exclusions.Exclusion {
 		exclusions[fmt.Sprintf("%s:%s", e.GroupID, e.ArtifactID)] = struct{}{}
@@ -306,7 +269,7 @@ func (props *properties) UnmarshalXML(d *xml.Decoder, _ xml.StartElement) error 
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return outils.Errorf("XML decode error: %w", err)
+			return fmt.Errorf("XML decode error: %w", err)
 		}
 
 		(*props)[p.XMLName.Local] = p.Value
@@ -320,7 +283,7 @@ func (deps *pomDependencies) UnmarshalXML(d *xml.Decoder, _ xml.StartElement) er
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return outils.Errorf("XML decode error: %w", err)
+			return fmt.Errorf("XML decode error: %w", err)
 		}
 
 		switch t := token.(type) {
@@ -332,7 +295,7 @@ func (deps *pomDependencies) UnmarshalXML(d *xml.Decoder, _ xml.StartElement) er
 				// Decode the <dependency> element
 				err = d.DecodeElement(&dep, &t)
 				if err != nil {
-					return outils.Errorf("Error decoding dependency: %w", err)
+					return fmt.Errorf("Error decoding dependency: %w", err)
 				}
 
 				dep.EndLine, _ = d.InputPos() // <dependency> tag ends

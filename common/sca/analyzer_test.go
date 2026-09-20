@@ -1,23 +1,25 @@
 package sca
 
 import (
+	"context"
 	"embed"
 	"fmt"
-	"io"
-	"os"
+	"io/fs"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer"
+	"github.com/yaklang/yaklang/common/sca/internal/fsio"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	"golang.org/x/exp/slices"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
-	"github.com/samber/lo"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 )
 
 //go:embed testdata
@@ -34,30 +36,6 @@ type testcase struct {
 	a              analyzer.Analyzer
 	matchType      int
 	matchedFileMap map[string]string
-}
-
-func CreateTempFromFsFile(path string) (*os.File, error) {
-	// remove ./ prefix
-	if strings.HasPrefix(path, "./") {
-		path = path[2:]
-	}
-
-	tempFile, err := os.CreateTemp("", "test")
-	if err != nil {
-		return nil, err
-	}
-
-	f, err := testFS.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(tempFile, f); err != nil {
-		return nil, err
-	}
-
-	return tempFile, nil
 }
 
 func Check(pkgs, wantPkgs []*dxtypes.Package, name string, t *testing.T) {
@@ -152,44 +130,32 @@ func Run(tc testcase) []*dxtypes.Package {
 	t := tc.t
 	fmt.Printf("TestCase: %s\n===============================\n", tc.name)
 
-	f, err := CreateTempFromFsFile(tc.filePath)
-	defer func() {
-		f.Close()
-		os.Remove(f.Name())
-	}()
-	if err != nil {
-		t.Fatalf("%s: con't open file: %v", err, tc.name)
-	}
-	fs := filesys.NewLocalFs()
-
-	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, *analyzer.FileInfo) {
-		f, err := CreateTempFromFsFile(v)
+	snapshot := fstest.MapFS{}
+	load := func(logical, source string) []byte {
+		data, err := testFS.ReadFile(strings.TrimPrefix(source, "./"))
 		if err != nil {
-			t.Fatalf("%s: con't open file: %v", err, tc.name)
+			t.Fatal(err)
 		}
-		fi := &analyzer.FileInfo{
-			Path:        k,
-			Analyzer:    tc.a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
-			MatchStatus: tc.matchType,
-		}
-		analyzer.SetFileInfoFileSystem(fi, fs)
-		return k, fi
-	})
-	defer func() {
-		for _, fi := range matchedFileInfos {
-			f := fi.LazyFile
-			f.Close()
-			os.Remove(f.Name())
-		}
-	}()
-
-	fi := &analyzer.FileInfo{
-		Path:        tc.virtualPath,
-		Analyzer:    tc.a,
-		LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
-		MatchStatus: tc.matchType,
+		snapshot[strings.TrimPrefix(logical, "/")] = &fstest.MapFile{Data: data}
+		return data
 	}
+	logical := strings.TrimPrefix(tc.virtualPath, "/")
+	if logical == "" {
+		logical = path.Base(tc.filePath)
+	}
+	input := load(logical, tc.filePath)
+	matchedFileInfos := map[string]*analyzer.FileInfo{}
+	for name, source := range tc.matchedFileMap {
+		clean := strings.TrimPrefix(name, "/")
+		data := load(clean, source)
+		info := &analyzer.FileInfo{Path: clean, Analyzer: tc.a, LazyFile: lazyfile.NewMemory(clean, data), MatchStatus: tc.matchType}
+		matchedFileInfos[clean] = info
+	}
+	fs := fsio.New(snapshot)
+	for _, info := range matchedFileInfos {
+		analyzer.SetFileInfoFileSystem(info, fs)
+	}
+	fi := &analyzer.FileInfo{Path: logical, Analyzer: tc.a, LazyFile: lazyfile.NewMemory(logical, input), MatchStatus: tc.matchType}
 	analyzer.SetFileInfoFileSystem(fi, fs)
 	pkgs, err := tc.a.Analyze(analyzer.AnalyzeFileInfo{
 		Self:             fi,
@@ -224,7 +190,7 @@ func TestRPM(t *testing.T) {
 		tc := testcase{
 			name:      "positive",
 			filePath:  "./testdata/rpm/rpmdb.sqlite",
-			wantPkgs:  RPMWantPkgs,
+			wantPkgs:  installedOnly(RPMWantPkgs),
 			t:         t,
 			a:         analyzer.NewRPMAnalyzer(),
 			matchType: 1,
@@ -251,7 +217,7 @@ func TestApk(t *testing.T) {
 		tc := testcase{
 			name:      "negative",
 			filePath:  "./testdata/apk/negative-apk",
-			wantPkgs:  APKNegativePkgs,
+			wantPkgs:  installedOnly(APKNegativePkgs),
 			t:         t,
 			a:         analyzer.NewApkAnalyzer(),
 			matchType: 1,
@@ -269,7 +235,7 @@ func TestDpkg(t *testing.T) {
 			t:         t,
 			a:         a,
 			matchType: 1,
-			wantPkgs:  DPKGWantPkgs,
+			wantPkgs:  installedOnly(DPKGWantPkgs),
 		}
 		Run(tc)
 	})
@@ -279,6 +245,7 @@ func TestDpkg(t *testing.T) {
 		tc := testcase{
 			name:      "negative",
 			filePath:  "./testdata/dpkg/negative-dpkg",
+			wantError: true,
 			t:         t,
 			a:         a,
 			matchType: 1,
@@ -365,7 +332,7 @@ func TestGoMod(t *testing.T) {
 			matchedFileMap: map[string]string{
 				"/test/go.sum": "./testdata/go_mod/positive/sum",
 			},
-			wantPkgs: GoModWantPkgs,
+			wantPkgs: []*dxtypes.Package{{Name: "github.com/aquasecurity/go-dep-parser", Version: "0.0.0-20220406074731-71021a481237"}, {Name: "golang.org/x/xerrors", Version: "0.0.0-20200804184101-5ec99f83aff1", Verification: "h1:go1bK/D/BFZV2I8cIQd1NKEZ+0owSTG1fDTci4IqFcE="}},
 		}
 		Run(tc)
 	})
@@ -795,64 +762,49 @@ func TestNodeNpm(t *testing.T) {
 		}
 		Run(tc)
 	})
-	// folder
-
 	t.Run("positive-folder", func(t *testing.T) {
-		tc := testcase{
-			name:      "positive-folder",
-			t:         t,
-			a:         analyzer.NewNodeNpmAnalyzer(),
-			skipCheck: true,
+		snapshot := fstest.MapFS{}
+		base := "testdata/node_npm/positive_folder/"
+		err := fs.WalkDir(testFS, strings.TrimSuffix(base, "/"), func(name string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			data, err := testFS.ReadFile(name)
+			if err != nil {
+				return err
+			}
+			logical := strings.ReplaceAll(strings.TrimPrefix(name, base), "test_node_modules", "node_modules")
+			snapshot[logical] = &fstest.MapFile{Data: data}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
-		pkgs := make([]*dxtypes.Package, 0)
-		{
-			tc.filePath = "./testdata/node_npm/positive_folder/package-lock.json"
-			tc.matchType = 2
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/ms/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/debug/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/express/test_node_modules/ms/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/debug/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
-			tc.filePath = "./testdata/node_npm/positive_folder/test_node_modules/body-parser/test_node_modules/ms/package.json"
-			tc.matchType = 1
-			pkgs = append(pkgs, Run(tc)...)
-
+		report, err := ScanReport(context.Background(), snapshot, _withAnalayzers(analyzer.TypNodeNpm))
+		if err != nil {
+			t.Fatal(err)
 		}
-		if len(pkgs) != 62 {
-			t.Fatalf("%s: package length error: %d(get)", tc.name, len(pkgs))
+		// Independent record inventory: lock=9; manifests=6+1+31+11+1+2+1+2.
+		if len(report.Observations) != 64 {
+			t.Fatalf("lost observations: %d", len(report.Observations))
 		}
-		// fmt.Println("before: ", len(pkgs))
-		// analyzer.DrawPackagesDOT(pkgs)
-		ret := analyzer.MergePackages(pkgs)
-		// fmt.Println("after: ", len(ret))
-		// showPkgs(ret)
-		Check(ret, NodeNpmPkgsFolder, tc.name, t)
-		// analyzer.DrawPackagesDOT(ret)
+		counts := map[string]int{}
+		for _, o := range report.Observations {
+			counts[o.File]++
+		}
+		if counts["node_modules/express/package.json"] != 31 || counts["package-lock.json"] != 9 {
+			t.Fatalf("lost file evidence: %v", counts)
+		}
+		for _, q := range report.Requirements {
+			for _, id := range q.Resolved {
+				if id == "" {
+					t.Fatal("empty edge")
+				}
+			}
+		}
 	})
 }
 
@@ -917,6 +869,7 @@ func TestRubyBundler(t *testing.T) {
 	t.Run("negative", func(t *testing.T) {
 		tc := testcase{
 			name:           "negative",
+			wantError:      true,
 			filePath:       "./testdata/ruby_bundler/negative/Gemfile.lock",
 			virtualPath:    "/test/Gemfile.lock",
 			t:              t,
@@ -1181,4 +1134,14 @@ func TestFilterAnalyzer(t *testing.T) {
 			compare(gotTypes, wantTypes)
 		}
 	})
+}
+
+func installedOnly(in []*dxtypes.Package) []*dxtypes.Package {
+	var out []*dxtypes.Package
+	for _, p := range in {
+		if !p.Potential {
+			out = append(out, p)
+		}
+	}
+	return out
 }

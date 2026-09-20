@@ -1,0 +1,8 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/3 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 3/3 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 256721 (85544/sec), new interesting: 12 (total: 15)
+fuzz: elapsed: 6s, execs: 527082 (90145/sec), new interesting: 15 (total: 18)
+fuzz: elapsed: 9s, execs: 790155 (87667/sec), new interesting: 19 (total: 22)
+fuzz: elapsed: 10s, execs: 877966 (80478/sec), new interesting: 19 (total: 22)
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/core/rpm	10.379s

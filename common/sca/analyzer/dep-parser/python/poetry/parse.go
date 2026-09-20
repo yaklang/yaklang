@@ -1,30 +1,31 @@
 package poetry
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/yaklang/yaklang/common/sca/core/locktoml"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
-	outils "github.com/yaklang/yaklang/common/utils"
+	"log"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type Lockfile struct {
 	Packages []struct {
-		Category       string                 `toml:"category"`
-		Description    string                 `toml:"description"`
-		Marker         string                 `toml:"marker,omitempty"`
-		Name           string                 `toml:"name"`
-		Optional       bool                   `toml:"optional"`
-		PythonVersions string                 `toml:"python-versions"`
-		Version        string                 `toml:"version"`
-		Dependencies   map[string]interface{} `toml:"dependencies"`
+		Category       string                 `json:"category"`
+		Description    string                 `json:"description"`
+		Marker         string                 `json:"marker,omitempty"`
+		Name           string                 `json:"name"`
+		Optional       bool                   `json:"optional"`
+		PythonVersions string                 `json:"python-versions"`
+		Version        string                 `json:"version"`
+		Dependencies   map[string]interface{} `json:"dependencies"`
 		Metadata       interface{}
-	} `toml:"package"`
+	} `json:"package"`
 }
 
 type Parser struct{}
@@ -35,8 +36,8 @@ func NewParser() types.Parser {
 
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockfile Lockfile
-	if _, err := toml.NewDecoder(r).Decode(&lockfile); err != nil {
-		return nil, nil, outils.Errorf("failed to decode poetry.lock: %w", err)
+	if err := locktoml.Decode(types.ContextOf(r), r, &lockfile); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode poetry.lock: %w", err)
 	}
 
 	// Keep all installed versions
@@ -51,16 +52,37 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 
 		pkgID := utils.PackageID(pkg.Name, pkg.Version)
 		libs = append(libs, types.Library{
-			ID:      pkgID,
-			Name:    pkg.Name,
+			ID:        pkgID,
+			Name:      pkg.Name,
+			Condition: pkg.Marker, Scope: pkg.Category,
 			Version: pkg.Version,
 		})
 
 		dependsOn := parseDependencies(pkg.Dependencies, libVersions)
-		if len(dependsOn) != 0 {
+		reqs := []types.Requirement{}
+		for name, raw := range pkg.Dependencies {
+			q := types.Requirement{Target: normalizePkgName(name)}
+			switch v := raw.(type) {
+			case string:
+				q.Constraint = v
+			case map[string]any:
+				if text, ok := v["version"].(string); ok {
+					q.Constraint = text
+				}
+				if text, ok := v["markers"].(string); ok {
+					q.Condition = text
+				}
+			default:
+				q.Constraint = fmt.Sprint(v)
+			}
+			reqs = append(reqs, q)
+		}
+		sort.Slice(reqs, func(i, j int) bool { return reqs[i].Target < reqs[j].Target })
+		if len(dependsOn) != 0 || len(reqs) != 0 {
 			deps = append(deps, types.Dependency{
-				ID:        pkgID,
-				DependsOn: dependsOn,
+				ID:           pkgID,
+				Requirements: reqs,
+				DependsOn:    dependsOn,
 			})
 		}
 	}
@@ -88,7 +110,7 @@ func parseDependencies(deps map[string]any, libVersions map[string][]string) []s
 	var dependsOn []string
 	for name, versRange := range deps {
 		if dep, err := parseDependency(name, versRange, libVersions); err != nil {
-			log.Debugf("failed to parse poetry dependency: %s", err)
+			log.Printf("failed to parse poetry dependency: %s", err)
 		} else if dep != "" {
 			dependsOn = append(dependsOn, dep)
 		}
@@ -103,13 +125,16 @@ func parseDependency(name string, versRange any, libVersions map[string][]string
 	name = normalizePkgName(name)
 	vers, ok := libVersions[name]
 	if !ok {
-		return "", outils.Errorf("no version found for %q", name)
+		return "", fmt.Errorf("no version found for %q", name)
 	}
 
+	if len(vers) > 1 {
+		return "", fmt.Errorf("ambiguous locked versions for %q", name)
+	}
 	for _, ver := range vers {
 		return utils.PackageID(name, ver), nil
 	}
-	return "", outils.Errorf("no matched version found for %q", name)
+	return "", fmt.Errorf("no matched version found for %q", name)
 }
 
 func normalizePkgName(name string) string {

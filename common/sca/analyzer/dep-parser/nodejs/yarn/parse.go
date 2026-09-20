@@ -3,16 +3,18 @@ package yarn
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"io"
 	"regexp"
+	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
-	outils "github.com/yaklang/yaklang/common/utils"
-
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -27,6 +29,7 @@ type LockFile struct {
 }
 
 type Library struct {
+	Source   string
 	Patterns []string
 	Name     string
 	Version  string
@@ -43,9 +46,9 @@ type LineScanner struct {
 }
 
 func NewLineScanner(r io.Reader) *LineScanner {
-	return &LineScanner{
-		Scanner: bufio.NewScanner(r),
-	}
+	s := bufio.NewScanner(r)
+	s.Buffer(make([]byte, 4096), 1<<20)
+	return &LineScanner{Scanner: s}
 }
 
 func (s *LineScanner) Scan() bool {
@@ -63,7 +66,7 @@ func (s *LineScanner) LineNum(prevNum int) int {
 func parsePattern(target string) (packagename, protocol, version string, err error) {
 	capture := yarnPatternRegexp.FindStringSubmatch(target)
 	if len(capture) < 3 {
-		return "", "", "", outils.Error("not package format")
+		return "", "", "", errors.New("not package format")
 	}
 	for i, group := range yarnPatternRegexp.SubexpNames() {
 		switch group {
@@ -84,17 +87,20 @@ func parsePackagePatterns(target string) (packagename, protocol string, patterns
 	if err != nil {
 		return "", "", nil, err
 	}
-	patterns = lo.Map(patternsSplit, func(pattern string, _ int) string {
-		_, _, version, _ := parsePattern(pattern)
-		return utils.PackageID(packagename, version)
-	})
+	for _, pattern := range patternsSplit {
+		name, proto, version, e := parsePattern(pattern)
+		if e != nil || proto != protocol {
+			return "", "", nil, fmt.Errorf("malformed_input: inconsistent Yarn descriptor")
+		}
+		patterns = append(patterns, utils.PackageID(name, version))
+	}
 	return
 }
 
 func getVersion(target string) (version string, err error) {
 	capture := yarnVersionRegexp.FindStringSubmatch(target)
 	if len(capture) < 2 {
-		return "", outils.Errorf("failed to parse version: '%s", target)
+		return "", fmt.Errorf("failed to parse version: '%s", target)
 	}
 	return capture[len(capture)-1], nil
 }
@@ -102,7 +108,7 @@ func getVersion(target string) (version string, err error) {
 func getDependency(target string) (name, version string, err error) {
 	capture := yarnDependencyRegexp.FindStringSubmatch(target)
 	if len(capture) < 3 {
-		return "", "", outils.Error("not dependency")
+		return "", "", errors.New("not dependency")
 	}
 	if !validProtocol(capture[2]) {
 		return "", "", nil
@@ -131,7 +137,10 @@ func parseResults(patternIDs map[string]string, dependsOn map[string][]string) (
 	// find dependencies by patterns
 	for libID, depPatterns := range dependsOn {
 		depIDs := lo.Map(depPatterns, func(pattern string, index int) string {
-			return patternIDs[pattern]
+			if id := patternIDs[pattern]; id != "" {
+				return id
+			}
+			return "unresolved-yarn:" + pattern
 		})
 		deps = append(deps, types.Dependency{
 			ID:        libID,
@@ -194,12 +203,15 @@ func parseBlock(block []byte, lineNum int) (lib Library, deps []string, newLine 
 		line = strings.TrimPrefix(strings.TrimSpace(line), "\"")
 
 		switch {
+		case strings.HasPrefix(line, "resolved "):
+			lib.Source = strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "resolved ")), `"`)
+			continue
 		case strings.HasPrefix(line, "version"):
 			if lib.Version, err = getVersion(line); err != nil {
 				skipBlock = true
 			}
 			continue
-		case strings.HasPrefix(line, "dependencies:"):
+		case strings.HasPrefix(line, "dependencies:"), strings.HasPrefix(line, "optionalDependencies:"):
 			// start dependencies block
 			deps = parseDependencies(scanner)
 			continue
@@ -212,7 +224,7 @@ func parseBlock(block []byte, lineNum int) (lib Library, deps []string, newLine 
 				if !ignoreProtocol(protocol) {
 					// we need to calculate the last line of the block in order to correctly determine the line numbers of the next blocks
 					// store the error. we will handle it later
-					err = outils.Errorf("unknown protocol: '%s', line: %s", protocol, line)
+					err = fmt.Errorf("unknown protocol: '%s', line: %s", protocol, line)
 					continue
 				}
 				continue
@@ -227,8 +239,7 @@ func parseBlock(block []byte, lineNum int) (lib Library, deps []string, newLine 
 	// in case an unsupported protocol is detected
 	// show warning and continue parsing
 	if err != nil {
-		log.Warnf("Yarn protocol error: %s", err)
-		return Library{}, nil, scanner.LineNum(lineNum), nil
+		return Library{}, nil, scanner.LineNum(lineNum), fmt.Errorf("unsupported_syntax: %w", err)
 	}
 
 	lib.Location = types.Location{
@@ -265,7 +276,7 @@ func parseDependency(line string) (string, error) {
 	}
 }
 
-func (p *Parser) Parse(fs fi.FileSystem,r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	lineNumber := 1
 	var libs []types.Library
 
@@ -274,9 +285,13 @@ func (p *Parser) Parse(fs fi.FileSystem,r types.ReadSeekerAt) ([]types.Library, 
 	patternIDs := map[string]string{}
 
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 4096), budget.From(types.ContextOf(r)).Limits.MaxFieldBytes)
 	scanner.Split(scanBlocks)
 	dependsOn := map[string][]string{}
 	for scanner.Scan() {
+		if err := types.ContextOf(r).Err(); err != nil {
+			return nil, nil, err
+		}
 		block := scanner.Bytes()
 		lib, deps, newLine, err := parseBlock(block, lineNumber)
 		lineNumber = newLine + 2
@@ -286,11 +301,14 @@ func (p *Parser) Parse(fs fi.FileSystem,r types.ReadSeekerAt) ([]types.Library, 
 			continue
 		}
 
-		libID := utils.PackageID(lib.Name, lib.Version)
+		sort.Strings(lib.Patterns)
+		rawID, _ := json.Marshal(lib.Patterns)
+		libID := string(rawID)
 		libs = append(libs, types.Library{
 			ID:        libID,
 			Name:      lib.Name,
 			Version:   lib.Version,
+			Source:    lib.Source,
 			Locations: []types.Location{lib.Location},
 		})
 
@@ -298,6 +316,9 @@ func (p *Parser) Parse(fs fi.FileSystem,r types.ReadSeekerAt) ([]types.Library, 
 			// e.g.
 			//   combined-stream@^1.0.6 => combined-stream@1.0.8
 			//   combined-stream@~1.0.6 => combined-stream@1.0.8
+			if prior, exists := patternIDs[pattern]; exists && prior != libID {
+				return nil, nil, fmt.Errorf("malformed_input: conflicting Yarn descriptor %s", pattern)
+			}
 			patternIDs[pattern] = libID
 			if len(deps) > 0 {
 				dependsOn[libID] = deps
@@ -306,7 +327,7 @@ func (p *Parser) Parse(fs fi.FileSystem,r types.ReadSeekerAt) ([]types.Library, 
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, nil, outils.Errorf("failed to scan yarn.lock, got scanner error: %s", err.Error())
+		return nil, nil, fmt.Errorf("failed to scan yarn.lock, got scanner error: %s", err.Error())
 	}
 
 	// Replace dependency patterns with library IDs

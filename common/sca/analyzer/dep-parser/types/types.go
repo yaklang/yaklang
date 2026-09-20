@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"io"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -17,6 +19,13 @@ type ReadSeekCloserAt interface {
 }
 
 type Library struct {
+	Condition, Scope                        string
+	IsVersionRange                          bool
+	DeclaredCondition, Extras, Verification string
+	Diagnostics                             []model.Diagnostic
+
+	Source, Variant, Evidence, DeclaredName, DeclaredVersion string
+
 	ID                 string `json:",omitempty"`
 	Name               string
 	Version            string
@@ -60,7 +69,14 @@ type ExternalRef struct {
 	URL  string
 }
 
+type Requirement struct {
+	Target, Constraint, Scope, Condition string
+	Resolved                             string
+}
+
 type Dependency struct {
+	Requirements []Requirement
+
 	ID        string
 	DependsOn []string
 }
@@ -87,3 +103,10 @@ const (
 	RefIssueTracker RefType = "issue-tracker"
 	RefOther        RefType = "other"
 )
+
+func ContextOf(r any) context.Context {
+	if c, ok := r.(interface{ Context() context.Context }); ok {
+		return c.Context()
+	}
+	return context.Background()
+}

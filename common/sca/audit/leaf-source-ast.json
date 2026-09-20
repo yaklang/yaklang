@@ -1,0 +1,41 @@
+{
+  "passed": true,
+  "files": [
+    {
+      "path": "common/utils/filesys/filesys_interface/interface.go",
+      "sha256": "14e4434cfaf7442f74df71f6e8fb446cc745a33f3c50e9c90a2e8b7bfe91b674",
+      "symbols": [
+        {
+          "name": "ReadOnlyFileSystem",
+          "line": 8
+        },
+        {
+          "name": "PathFileSystem",
+          "line": 20
+        },
+        {
+          "name": "WriteFileSystem",
+          "line": 32
+        },
+        {
+          "name": "TrashFileSystem",
+          "line": 41
+        },
+        {
+          "name": "SyncFileSystem",
+          "line": 47
+        },
+        {
+          "name": "FileSystem",
+          "line": 52
+        }
+      ],
+      "imports": [
+        "io/fs",
+        "os"
+      ],
+      "test": false
+    }
+  ],
+  "violations": null
+}

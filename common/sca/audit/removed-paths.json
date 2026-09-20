@@ -1,0 +1,16 @@
+{
+  "baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
+  "deleted_tracked_paths": [
+    "common/sca/analyzer/dep-parser/golang/mod/parse.go",
+    "common/sca/analyzer/dep-parser/golang/sum/sum.go",
+    "common/sca/analyzer/dep-parser/java/jar/parse.go",
+    "common/sca/analyzer/dep-parser/java/jar/types.go",
+    "common/sca/analyzer/dep-parser/java/pom/settings.go",
+    "common/sca/analyzer/dep-parser/rust/cargo/native_pkg_parser.go",
+    "common/sca/docker_test.go",
+    "common/sca/git_test.go",
+    "common/sca/sbom_test.go",
+    "common/sca/testdata/sca_dockertest.tar.gz",
+    "common/sca/testdata/sca_git_test.tar.gz"
+  ]
+}

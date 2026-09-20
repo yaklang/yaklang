@@ -1,15 +1,17 @@
 package analyzer
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
+	"io"
+	"regexp"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	godeptypes "github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -81,7 +83,8 @@ func parseLicense(val interface{}) string {
 		return v
 	case map[string]interface{}:
 		if license, ok := v["type"]; ok {
-			return license.(string)
+			text, _ := license.(string)
+			return text
 		}
 	}
 	return ""
@@ -96,8 +99,12 @@ func newNpmParse() *parser {
 func (*parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]godeptypes.Library, []godeptypes.Dependency, error) {
 	var pkgJSON packageJSON
 	// todo: use json field select
-	if err := json.NewDecoder(r).Decode(&pkgJSON); err != nil {
-		return nil, nil, nil
+	data, err := io.ReadAll(io.LimitReader(r, (16<<20)+1))
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := jsonrecord.Decode(types.ContextOf(r), data, &pkgJSON); err != nil {
+		return nil, nil, err
 	}
 
 	id := fmt.Sprintf("%s@%s", pkgJSON.Name, pkgJSON.Version)
@@ -108,13 +115,18 @@ func (*parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]godeptypes.Libra
 		License: parseLicense(pkgJSON.License),
 	}
 
-	dep := godeptypes.Dependency{
-		ID: id,
-		// depend id list
-		DependsOn: lo.MapToSlice(pkgJSON.Dependencies, func(name, version string) string {
-			return fmt.Sprintf("%s@%s", name, version)
-		}),
+	var libs []godeptypes.Library
+	if lib.Name != "" {
+		libs = append(libs, lib)
 	}
-
-	return []godeptypes.Library{lib}, []godeptypes.Dependency{dep}, nil
+	dep := godeptypes.Dependency{ID: id}
+	declarations := lo.Assign(pkgJSON.Dependencies, pkgJSON.OptionalDependencies)
+	for name, version := range declarations {
+		ref := "declaration:" + name
+		libs = append(libs, godeptypes.Library{ID: ref, Name: name, Version: version, IsVersionRange: !exactNPMVersion.MatchString(version), Evidence: "declared", DeclaredName: name, DeclaredVersion: version})
+		dep.DependsOn = append(dep.DependsOn, ref)
+	}
+	return libs, []godeptypes.Dependency{dep}, nil
 }
+
+var exactNPMVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$`)

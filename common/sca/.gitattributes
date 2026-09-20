@@ -1,0 +1,3 @@
+# Provenance hashes and binary/text fixtures describe exact producer bytes.
+# Preserve them on Windows checkouts as well as Unix checkouts.
+* -text

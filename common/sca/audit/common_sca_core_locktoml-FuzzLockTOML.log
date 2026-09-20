@@ -1,0 +1,8 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/1 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 1/1 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 40108 (13365/sec), new interesting: 78 (total: 79)
+fuzz: elapsed: 6s, execs: 40108 (0/sec), new interesting: 78 (total: 79)
+fuzz: elapsed: 9s, execs: 40108 (0/sec), new interesting: 78 (total: 79)
+fuzz: elapsed: 11s, execs: 40108 (0/sec), new interesting: 78 (total: 79)
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/core/locktoml	11.348s

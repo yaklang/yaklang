@@ -1,0 +1,444 @@
+{
+  "schema_version": 1,
+  "baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
+  "contracts": [
+    {
+      "id": "SCA-01",
+      "name": "DPKG",
+      "analyzer": "dpkg-pkg",
+      "status": "RETAIN",
+      "grammar": "Debian status paragraphs; Depends AND/OR",
+      "implementation": "analyzer/dpkg.go",
+      "fixtures_root": "testdata/dpkg",
+      "tests": [
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-02",
+      "name": "RPM",
+      "analyzer": "rpm-pkg",
+      "status": "RETAIN",
+      "grammar": "BDB hash, NDB, SQLite Packages snapshots; 16 real layouts",
+      "implementation": "core/rpm",
+      "fixtures_root": "testdata/rpm",
+      "tests": [
+        "core/rpm/read_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-03",
+      "name": "APK",
+      "analyzer": "apk-pkg",
+      "status": "RETAIN",
+      "grammar": "Alpine installed text records",
+      "implementation": "analyzer/apk.go",
+      "fixtures_root": "testdata/apk",
+      "tests": [
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-04",
+      "name": "Ruby Bundler",
+      "analyzer": "ruby-bundler-lang",
+      "status": "RETAIN",
+      "grammar": "GEM/GIT/PATH lock sections; platform variants",
+      "implementation": "analyzer/dep-parser/ruby/bundler",
+      "fixtures_root": "testdata/ruby_bundler",
+      "tests": [
+        "analyzer/dep-parser/ruby/bundler/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-05",
+      "name": "Rust Cargo",
+      "analyzer": "cargo-lang",
+      "status": "RETAIN",
+      "grammar": "Cargo.lock v1/v2/v3 package arrays; source-qualified refs",
+      "implementation": "analyzer/dep-parser/rust/cargo",
+      "fixtures_root": "testdata/rust_cargo",
+      "tests": [
+        "analyzer/dep-parser/rust/cargo/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-06",
+      "name": "Ruby GemSpec",
+      "analyzer": "ruby-gemspec-lang",
+      "status": "RETAIN",
+      "grammar": "Static quoted assignments with optional .freeze; no Ruby evaluation",
+      "implementation": "analyzer/dep-parser/ruby/gemspec",
+      "fixtures_root": "testdata/ruby_gemspec",
+      "tests": [
+        "analyzer/dep-parser/ruby/gemspec/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-07",
+      "name": "Python Poetry",
+      "analyzer": "python-poetry-lang",
+      "status": "RETAIN",
+      "grammar": "Poetry TOML package arrays, runtime scope, dependency declarations",
+      "implementation": "analyzer/dep-parser/python/poetry",
+      "fixtures_root": "testdata/python_poetry",
+      "tests": [
+        "analyzer/dep-parser/python/poetry/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/python/poetry/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-08",
+      "name": "Python Pipenv",
+      "analyzer": "python-pipenv-lang",
+      "status": "RETAIN",
+      "grammar": "Pipfile.lock JSON default group; index and markers",
+      "implementation": "analyzer/dep-parser/python/pipenv",
+      "fixtures_root": "testdata/python_pipenv",
+      "tests": [
+        "analyzer/dep-parser/python/pipenv/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/python/pipenv/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-09",
+      "name": "Python Pip",
+      "analyzer": "python-pip-lang",
+      "status": "RETAIN",
+      "grammar": "Named requirements, == pins, ranges, extras, markers, URLs, hashes; includes/options rejected",
+      "implementation": "core/pyrequire",
+      "fixtures_root": "testdata/python_pip",
+      "tests": [
+        "core/pyrequire/read_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-10",
+      "name": "Python Packaging",
+      "analyzer": "python-packaging-lang",
+      "status": "RETAIN",
+      "grammar": "egg/egg-info/dist-info PKG-INFO/METADATA, License-Expression, Requires-Dist",
+      "implementation": "analyzer/dep-parser/python/packaging",
+      "fixtures_root": "testdata/python_packaging",
+      "tests": [
+        "analyzer/dep-parser/python/packaging/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-11",
+      "name": "PHP Composer",
+      "analyzer": "composer-lang",
+      "status": "RETAIN",
+      "grammar": "composer.json declarations; composer.lock runtime packages and require",
+      "implementation": "analyzer/dep-parser/php/composer",
+      "fixtures_root": "testdata/php_composer",
+      "tests": [
+        "analyzer/dep-parser/php/composer/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-12",
+      "name": "Node Yarn",
+      "analyzer": "yarm-lang",
+      "status": "RETAIN",
+      "grammar": "Yarn v1/v2 npm descriptors; resolved, dependencies and optionalDependencies",
+      "implementation": "analyzer/dep-parser/nodejs/yarn",
+      "fixtures_root": "testdata/node_yarn",
+      "tests": [
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-13",
+      "name": "Node pnpm",
+      "analyzer": "npmp-lang",
+      "status": "RETAIN",
+      "grammar": "pnpm lock v5/v6 runtime package mappings including peer suffixes",
+      "implementation": "analyzer/dep-parser/nodejs/pnpm",
+      "fixtures_root": "testdata/node_pnpm",
+      "tests": [
+        "analyzer/dep-parser/nodejs/pnpm/upstream_test.go",
+        "analyzer/dep-parser/nodejs/pnpm/upstream_expectations_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-14",
+      "name": "Node npm",
+      "analyzer": "npm-lang",
+      "status": "RETAIN",
+      "grammar": "package.json declarations; package-lock v1/v2/v3; workspace links",
+      "implementation": "analyzer/dep-parser/nodejs/npm",
+      "fixtures_root": "testdata/node_npm",
+      "tests": [
+        "analyzer/dep-parser/nodejs/npm/instance_test.go",
+        "analyzer/dep-parser/nodejs/npm/upstream_parse_test.go",
+        "analyzer/dep-parser/nodejs/npm/upstream_expectations_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-15",
+      "name": "Java POM",
+      "analyzer": "pom-lang",
+      "status": "RETAIN",
+      "grammar": "POM XML; explicit relative parents/modules/BOM and repository material only",
+      "implementation": "analyzer/dep-parser/java/pom",
+      "fixtures_root": "testdata/java_pom",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-16",
+      "name": "Java Gradle",
+      "analyzer": "gradle-lang",
+      "status": "RETAIN",
+      "grammar": "Gradle dependency lock group:name:version=scopes lines",
+      "implementation": "analyzer/dep-parser/java/gradle",
+      "fixtures_root": "testdata/java_gradle",
+      "tests": [
+        "analyzer/dep-parser/java/gradle/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-17",
+      "name": "Java JAR",
+      "analyzer": "jar-lang",
+      "status": "RETAIN",
+      "grammar": "JAR/WAR/EAR metadata and bounded nested ZIPs",
+      "implementation": "analyzer/parser_java_jar.go",
+      "fixtures_root": "testdata/java_jar",
+      "tests": [
+        "analyzer/upstream_jar_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-18",
+      "name": "Go mod",
+      "analyzer": "go-mod-lang",
+      "status": "RETAIN",
+      "grammar": "module/go/toolchain/godebug/require/replace/exclude/retract and exact go.sum checksum evidence",
+      "implementation": "core/gomod",
+      "fixtures_root": "testdata/go_mod",
+      "tests": [
+        "core/gomod/upstream_test.go",
+        "core/gomod/parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-19",
+      "name": "Go binary",
+      "analyzer": "go-binary-lang",
+      "status": "RETAIN",
+      "grammar": "Go buildinfo in ELF/PE/Mach-O as supported by Go 1.22 debug/buildinfo",
+      "implementation": "analyzer/dep-parser/golang/binary",
+      "fixtures_root": "testdata/go_binary",
+      "tests": [
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    },
+    {
+      "id": "SCA-20",
+      "name": "C/C++ Conan",
+      "analyzer": "conan-lang",
+      "status": "RETAIN",
+      "grammar": "Conan graph_lock.nodes JSON; native graph IDs, full ref provenance",
+      "implementation": "analyzer/dep-parser/c/conan",
+      "fixtures_root": "testdata/conan",
+      "tests": [
+        "analyzer/dep-parser/c/conan/upstream_parse_test.go",
+        "scan_contract_test.go",
+        "report_contract_test.go",
+        "format_fuzz_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json"
+    }
+  ],
+  "removed": [
+    "Docker context image/container/file acquisition",
+    "Docker endpoint option",
+    "Git repository/history acquisition"
+  ],
+  "not_promised": [
+    "full ecosystem solving",
+    "arbitrary Ruby/Groovy/Python execution",
+    "arbitrary YAML/TOML 1.1",
+    "SQLite WAL recovery",
+    "host mutable filesystem race-proof sandbox"
+  ]
+}

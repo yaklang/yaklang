@@ -1,0 +1,1349 @@
+{
+  "baseline_packages": 704,
+  "baseline_external_modules": 91,
+  "current": {
+    "roots": [
+      "./common/sca/..."
+    ],
+    "test_closure": false,
+    "package_count": 134,
+    "third_party_module_count": 0,
+    "external_modules": {},
+    "forbidden_internal": [],
+    "cgo_packages": [],
+    "passed": true,
+    "classification": "PACKAGE_CLOSURE_ONLY_NOT_FULL_RELEASE_ACCEPTANCE"
+  },
+  "modules": [
+    {
+      "module": "dario.cat/mergo",
+      "baseline_version": "v1.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "dario.cat/mergo",
+        "Version": "v1.0.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "dario.cat/mergo"
+      ]
+    },
+    {
+      "module": "github.com/BurntSushi/toml",
+      "baseline_version": "v1.3.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/BurntSushi/toml",
+        "Version": "v1.3.2"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/urfavecli/altsrc",
+        "github.com/BurntSushi/toml"
+      ]
+    },
+    {
+      "module": "github.com/CycloneDX/cyclonedx-go",
+      "baseline_version": "v0.7.2",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": []
+    },
+    {
+      "module": "github.com/DataDog/mmh3",
+      "baseline_version": "v0.0.0-20210722141835-012dc69a9e49",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/DataDog/mmh3",
+        "Version": "v0.0.0-20210722141835-012dc69a9e49"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/cuckoo",
+        "github.com/DataDog/mmh3"
+      ]
+    },
+    {
+      "module": "github.com/ProtonMail/go-crypto",
+      "baseline_version": "v1.1.3",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/ProtonMail/go-crypto",
+        "Version": "v1.1.3",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "github.com/ProtonMail/go-crypto/openpgp"
+      ]
+    },
+    {
+      "module": "github.com/VillanCh/go-pcre2-lite",
+      "baseline_version": "v0.1.6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/VillanCh/go-pcre2-lite",
+        "Version": "v0.1.6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/crawler",
+        "github.com/VillanCh/go-pcre2-lite"
+      ]
+    },
+    {
+      "module": "github.com/andybalholm/brotli",
+      "baseline_version": "v1.0.6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/andybalholm/brotli",
+        "Version": "v1.0.6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/lowhttp",
+        "github.com/andybalholm/brotli"
+      ]
+    },
+    {
+      "module": "github.com/antchfx/xpath",
+      "baseline_version": "v1.3.6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/antchfx/xpath",
+        "Version": "v1.3.6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/htmlquery",
+        "github.com/antchfx/xpath"
+      ]
+    },
+    {
+      "module": "github.com/asaskevich/govalidator",
+      "baseline_version": "v0.0.0-20210307081110-f21760c49a8d",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/asaskevich/govalidator",
+        "Version": "v0.0.0-20210307081110-f21760c49a8d"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/fuzzx",
+        "github.com/asaskevich/govalidator"
+      ]
+    },
+    {
+      "module": "github.com/cloudflare/circl",
+      "baseline_version": "v1.5.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/cloudflare/circl",
+        "Version": "v1.5.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/netx",
+        "github.com/cloudflare/circl/kem/hybrid"
+      ]
+    },
+    {
+      "module": "github.com/containerd/stargz-snapshotter/estargz",
+      "baseline_version": "v0.14.3",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": []
+    },
+    {
+      "module": "github.com/cyphar/filepath-securejoin",
+      "baseline_version": "v0.2.5",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/cyphar/filepath-securejoin",
+        "Version": "v0.2.5",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-billy/v5/osfs",
+        "github.com/cyphar/filepath-securejoin"
+      ]
+    },
+    {
+      "module": "github.com/davecgh/go-spew",
+      "baseline_version": "v1.1.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/davecgh/go-spew",
+        "Version": "v1.1.1"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid/aireact",
+        "github.com/davecgh/go-spew/spew"
+      ]
+    },
+    {
+      "module": "github.com/denisbrodbeck/machineid",
+      "baseline_version": "v1.0.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/denisbrodbeck/machineid",
+        "Version": "v1.0.1"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/denisbrodbeck/machineid"
+      ]
+    },
+    {
+      "module": "github.com/dgryski/go-farm",
+      "baseline_version": "v0.0.0-20200201041132-a6ae2369ad13",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/dgryski/go-farm",
+        "Version": "v0.0.0-20200201041132-a6ae2369ad13"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/cuckoo",
+        "github.com/dgryski/go-farm"
+      ]
+    },
+    {
+      "module": "github.com/distribution/reference",
+      "baseline_version": "v0.5.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/distribution/reference",
+        "Version": "v0.5.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "github.com/distribution/reference"
+      ]
+    },
+    {
+      "module": "github.com/docker/docker",
+      "baseline_version": "v25.0.6+incompatible",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/docker/docker",
+        "Version": "v25.0.6+incompatible"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/api/types"
+      ]
+    },
+    {
+      "module": "github.com/docker/go-connections",
+      "baseline_version": "v0.4.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/docker/go-connections",
+        "Version": "v0.4.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/go-connections/nat"
+      ]
+    },
+    {
+      "module": "github.com/docker/go-units",
+      "baseline_version": "v0.5.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/docker/go-units",
+        "Version": "v0.5.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/api/types",
+        "github.com/docker/go-units"
+      ]
+    },
+    {
+      "module": "github.com/emirpasic/gods",
+      "baseline_version": "v1.18.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/emirpasic/gods",
+        "Version": "v1.18.1",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5/plumbing/object",
+        "github.com/emirpasic/gods/trees/binaryheap"
+      ]
+    },
+    {
+      "module": "github.com/felixge/httpsnoop",
+      "baseline_version": "v1.0.4",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/felixge/httpsnoop",
+        "Version": "v1.0.4",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "github.com/felixge/httpsnoop"
+      ]
+    },
+    {
+      "module": "github.com/go-git/gcfg",
+      "baseline_version": "v1.5.1-0.20230307220236-3a3c6141e376",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/go-git/gcfg",
+        "Version": "v1.5.1-0.20230307220236-3a3c6141e376",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "github.com/go-git/go-git/v5/plumbing/format/config",
+        "github.com/go-git/gcfg"
+      ]
+    },
+    {
+      "module": "github.com/go-git/go-billy/v5",
+      "baseline_version": "v5.6.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/go-git/go-billy/v5",
+        "Version": "v5.6.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit/yakdiff",
+        "github.com/go-git/go-billy/v5/memfs"
+      ]
+    },
+    {
+      "module": "github.com/go-git/go-git/v5",
+      "baseline_version": "v5.13.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/go-git/go-git/v5",
+        "Version": "v5.13.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5"
+      ]
+    },
+    {
+      "module": "github.com/go-logr/logr",
+      "baseline_version": "v1.4.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/go-logr/logr",
+        "Version": "v1.4.2",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "github.com/go-logr/logr"
+      ]
+    },
+    {
+      "module": "github.com/go-logr/stdr",
+      "baseline_version": "v1.2.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/go-logr/stdr",
+        "Version": "v1.2.2",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/internal/global",
+        "github.com/go-logr/stdr"
+      ]
+    },
+    {
+      "module": "github.com/gobwas/glob",
+      "baseline_version": "v0.2.3",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/gobwas/glob",
+        "Version": "v0.2.3"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/crawler",
+        "github.com/gobwas/glob"
+      ]
+    },
+    {
+      "module": "github.com/gogo/protobuf",
+      "baseline_version": "v1.3.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/gogo/protobuf",
+        "Version": "v1.3.2",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/api/types",
+        "github.com/docker/docker/api/types/swarm",
+        "github.com/docker/docker/api/types/swarm/runtime",
+        "github.com/gogo/protobuf/proto"
+      ]
+    },
+    {
+      "module": "github.com/golang/groupcache",
+      "baseline_version": "v0.0.0-20210331224755-41bb18bfe9da",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/golang/groupcache",
+        "Version": "v0.0.0-20210331224755-41bb18bfe9da"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/htmlquery",
+        "github.com/golang/groupcache/lru"
+      ]
+    },
+    {
+      "module": "github.com/google/go-containerregistry",
+      "baseline_version": "v0.15.2",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": []
+    },
+    {
+      "module": "github.com/google/uuid",
+      "baseline_version": "v1.6.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/google/uuid",
+        "Version": "v1.6.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid",
+        "github.com/google/uuid"
+      ]
+    },
+    {
+      "module": "github.com/gorilla/websocket",
+      "baseline_version": "v1.4.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/gorilla/websocket",
+        "Version": "v1.4.2"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/browser",
+        "github.com/gorilla/websocket"
+      ]
+    },
+    {
+      "module": "github.com/h2non/filetype",
+      "baseline_version": "v1.1.3",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/h2non/filetype",
+        "Version": "v1.1.3"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aispec",
+        "github.com/h2non/filetype"
+      ]
+    },
+    {
+      "module": "github.com/hpcloud/tail",
+      "baseline_version": "v1.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/hpcloud/tail",
+        "Version": "v1.0.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/hpcloud/tail"
+      ]
+    },
+    {
+      "module": "github.com/jbenet/go-context",
+      "baseline_version": "v0.0.0-20150711004518-d14ea06fba99",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/jbenet/go-context",
+        "Version": "v0.0.0-20150711004518-d14ea06fba99",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "github.com/go-git/go-git/v5/utils/ioutil",
+        "github.com/jbenet/go-context/io"
+      ]
+    },
+    {
+      "module": "github.com/jellydator/ttlcache/v3",
+      "baseline_version": "v3.3.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/jellydator/ttlcache/v3",
+        "Version": "v3.3.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/jellydator/ttlcache/v3"
+      ]
+    },
+    {
+      "module": "github.com/jinzhu/inflection",
+      "baseline_version": "v1.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/jinzhu/inflection",
+        "Version": "v1.0.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/cmd/yak-mitm-perf",
+        "github.com/yaklang/gorm",
+        "github.com/jinzhu/inflection"
+      ]
+    },
+    {
+      "module": "github.com/kataras/golog",
+      "baseline_version": "v0.0.10",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/kataras/golog",
+        "Version": "v0.0.10"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/log",
+        "github.com/kataras/golog"
+      ]
+    },
+    {
+      "module": "github.com/kataras/pio",
+      "baseline_version": "v0.0.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/kataras/pio",
+        "Version": "v0.0.2"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/schema",
+        "github.com/kataras/pio"
+      ]
+    },
+    {
+      "module": "github.com/kevinburke/ssh_config",
+      "baseline_version": "v1.2.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/kevinburke/ssh_config",
+        "Version": "v1.2.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/spec/hidsevent",
+        "github.com/kevinburke/ssh_config"
+      ]
+    },
+    {
+      "module": "github.com/klauspost/compress",
+      "baseline_version": "v1.17.9",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/klauspost/compress",
+        "Version": "v1.17.9"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/lowhttp",
+        "github.com/klauspost/compress/flate"
+      ]
+    },
+    {
+      "module": "github.com/knqyf263/go-rpmdb",
+      "baseline_version": "v0.1.0",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": []
+    },
+    {
+      "module": "github.com/kr/fs",
+      "baseline_version": "v0.1.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/kr/fs",
+        "Version": "v0.1.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/pkg/sftp",
+        "github.com/kr/fs"
+      ]
+    },
+    {
+      "module": "github.com/liamg/jfather",
+      "baseline_version": "v0.0.7",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": []
+    },
+    {
+      "module": "github.com/mattn/go-sqlite3",
+      "baseline_version": "v1.14.48",
+      "baseline_replace": {
+        "Path": "github.com/yaklang/go-sqlite3",
+        "Version": "v0.0.1",
+        "Time": "2026-01-28T09:08:57Z",
+        "Dir": "/Users/v1ll4n/go/1.22.12/pkg/mod/github.com/yaklang/go-sqlite3@v0.0.1",
+        "GoMod": "/Users/v1ll4n/go/1.22.12/pkg/mod/cache/download/github.com/yaklang/go-sqlite3/@v/v0.0.1.mod",
+        "GoVersion": "1.19"
+      },
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/mattn/go-sqlite3",
+        "Version": "v1.14.48"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader",
+        "github.com/mattn/go-sqlite3"
+      ]
+    },
+    {
+      "module": "github.com/mfonda/simhash",
+      "baseline_version": "v0.0.0-20151007195837-79f94a1100d6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/mfonda/simhash",
+        "Version": "v0.0.0-20151007195837-79f94a1100d6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/mfonda/simhash"
+      ]
+    },
+    {
+      "module": "github.com/miekg/dns",
+      "baseline_version": "v1.1.50",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/miekg/dns",
+        "Version": "v1.1.50"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/facades",
+        "github.com/miekg/dns"
+      ]
+    },
+    {
+      "module": "github.com/opencontainers/go-digest",
+      "baseline_version": "v1.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/opencontainers/go-digest",
+        "Version": "v1.0.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "github.com/opencontainers/go-digest"
+      ]
+    },
+    {
+      "module": "github.com/opencontainers/image-spec",
+      "baseline_version": "v1.1.0-rc3",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/opencontainers/image-spec",
+        "Version": "v1.1.0-rc3",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "github.com/opencontainers/image-spec/specs-go/v1"
+      ]
+    },
+    {
+      "module": "github.com/pjbgf/sha1cd",
+      "baseline_version": "v0.3.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/pjbgf/sha1cd",
+        "Version": "v0.3.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "github.com/go-git/go-git/v5/plumbing/hash",
+        "github.com/pjbgf/sha1cd"
+      ]
+    },
+    {
+      "module": "github.com/pkg/errors",
+      "baseline_version": "v0.9.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/pkg/errors",
+        "Version": "v0.9.1"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/crawler",
+        "github.com/pkg/errors"
+      ]
+    },
+    {
+      "module": "github.com/pkg/sftp",
+      "baseline_version": "v1.11.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/pkg/sftp",
+        "Version": "v1.11.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/pkg/sftp"
+      ]
+    },
+    {
+      "module": "github.com/refraction-networking/utls",
+      "baseline_version": "v1.6.7",
+      "baseline_replace": {
+        "Path": "./common/third_party/utls",
+        "Dir": "/Users/v1ll4n/.codex/worktrees/1f5f/yaklang/common/third_party/utls",
+        "GoMod": "/Users/v1ll4n/.codex/worktrees/1f5f/yaklang/common/third_party/utls/go.mod",
+        "GoVersion": "1.21"
+      },
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/refraction-networking/utls",
+        "Version": "v1.6.7"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ja3",
+        "github.com/refraction-networking/utls"
+      ]
+    },
+    {
+      "module": "github.com/saintfish/chardet",
+      "baseline_version": "v0.0.0-20120816061221-3af4cd4741ca",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/saintfish/chardet",
+        "Version": "v0.0.0-20120816061221-3af4cd4741ca"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset",
+        "github.com/saintfish/chardet"
+      ]
+    },
+    {
+      "module": "github.com/samber/lo",
+      "baseline_version": "v1.38.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/samber/lo",
+        "Version": "v1.38.1"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai",
+        "github.com/samber/lo"
+      ]
+    },
+    {
+      "module": "github.com/segmentio/ksuid",
+      "baseline_version": "v1.0.4",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/segmentio/ksuid",
+        "Version": "v1.0.4"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid/aicommon",
+        "github.com/segmentio/ksuid"
+      ]
+    },
+    {
+      "module": "github.com/sergi/go-diff",
+      "baseline_version": "v1.3.2-0.20230802210424-5b0b94c5c0d3",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/sergi/go-diff",
+        "Version": "v1.3.2-0.20230802210424-5b0b94c5c0d3",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "github.com/sergi/go-diff/diffmatchpatch"
+      ]
+    },
+    {
+      "module": "github.com/skeema/knownhosts",
+      "baseline_version": "v1.3.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/skeema/knownhosts",
+        "Version": "v1.3.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5/plumbing/transport/ssh",
+        "github.com/skeema/knownhosts"
+      ]
+    },
+    {
+      "module": "github.com/tevino/abool",
+      "baseline_version": "v0.0.0-20170917061928-9b9efcf221b5",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/tevino/abool",
+        "Version": "v0.0.0-20170917061928-9b9efcf221b5"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/mq",
+        "github.com/tevino/abool"
+      ]
+    },
+    {
+      "module": "github.com/tidwall/gjson",
+      "baseline_version": "v1.14.4",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/tidwall/gjson",
+        "Version": "v1.14.4"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid",
+        "github.com/tidwall/gjson"
+      ]
+    },
+    {
+      "module": "github.com/tidwall/match",
+      "baseline_version": "v1.1.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/tidwall/match",
+        "Version": "v1.1.1",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid",
+        "github.com/tidwall/gjson",
+        "github.com/tidwall/match"
+      ]
+    },
+    {
+      "module": "github.com/tidwall/pretty",
+      "baseline_version": "v1.2.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/tidwall/pretty",
+        "Version": "v1.2.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid",
+        "github.com/tidwall/gjson",
+        "github.com/tidwall/pretty"
+      ]
+    },
+    {
+      "module": "github.com/twmb/murmur3",
+      "baseline_version": "v1.1.6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/twmb/murmur3",
+        "Version": "v1.1.6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/twmb/murmur3"
+      ]
+    },
+    {
+      "module": "github.com/valyala/bytebufferpool",
+      "baseline_version": "v1.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/valyala/bytebufferpool",
+        "Version": "v1.0.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/crawlerx/tools",
+        "github.com/valyala/bytebufferpool"
+      ]
+    },
+    {
+      "module": "github.com/vbatts/tar-split",
+      "baseline_version": "v0.11.3",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": []
+    },
+    {
+      "module": "github.com/xanzy/ssh-agent",
+      "baseline_version": "v0.3.3",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/xanzy/ssh-agent",
+        "Version": "v0.3.3",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5/plumbing/transport/ssh",
+        "github.com/xanzy/ssh-agent"
+      ]
+    },
+    {
+      "module": "github.com/xdg-go/pbkdf2",
+      "baseline_version": "v1.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/xdg-go/pbkdf2",
+        "Version": "v1.0.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/bizhelper",
+        "github.com/xdg-go/pbkdf2"
+      ]
+    },
+    {
+      "module": "github.com/yaklang/gorm",
+      "baseline_version": "v1.9.17-0.20260811094634-87ab480108b6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "github.com/yaklang/gorm",
+        "Version": "v1.9.17-0.20260811094634-87ab480108b6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/cmd/yak-mitm-perf",
+        "github.com/yaklang/gorm"
+      ]
+    },
+    {
+      "module": "go.opentelemetry.io/auto/sdk",
+      "baseline_version": "v1.1.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "go.opentelemetry.io/auto/sdk",
+        "Version": "v1.1.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/internal/global",
+        "go.opentelemetry.io/auto/sdk"
+      ]
+    },
+    {
+      "module": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+      "baseline_version": "v0.47.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "Version": "v0.47.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+      ]
+    },
+    {
+      "module": "go.opentelemetry.io/otel",
+      "baseline_version": "v1.34.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "go.opentelemetry.io/otel",
+        "Version": "v1.34.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel"
+      ]
+    },
+    {
+      "module": "go.opentelemetry.io/otel/metric",
+      "baseline_version": "v1.34.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "go.opentelemetry.io/otel/metric",
+        "Version": "v1.34.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel/metric"
+      ]
+    },
+    {
+      "module": "go.opentelemetry.io/otel/trace",
+      "baseline_version": "v1.34.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "go.opentelemetry.io/otel/trace",
+        "Version": "v1.34.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/thirdpartyservices",
+        "github.com/docker/docker/client",
+        "go.opentelemetry.io/otel/trace"
+      ]
+    },
+    {
+      "module": "golang.org/x/crypto",
+      "baseline_version": "v0.33.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/crypto",
+        "Version": "v0.33.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/gmsm/gmtls",
+        "golang.org/x/crypto/chacha20poly1305"
+      ]
+    },
+    {
+      "module": "golang.org/x/exp",
+      "baseline_version": "v0.0.0-20240719175910-8a7402abbf56",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/exp",
+        "Version": "v0.0.0-20240719175910-8a7402abbf56"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/fp/fingerprint/rule",
+        "golang.org/x/exp/maps"
+      ]
+    },
+    {
+      "module": "golang.org/x/mod",
+      "baseline_version": "v0.19.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/mod",
+        "Version": "v0.19.0",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/lowhttp",
+        "github.com/quic-go/quic-go",
+        "go.uber.org/mock/mockgen",
+        "golang.org/x/mod/modfile"
+      ]
+    },
+    {
+      "module": "golang.org/x/net",
+      "baseline_version": "v0.35.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/net",
+        "Version": "v0.35.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/gmsm/gmtls/gmcredentials",
+        "golang.org/x/net/context"
+      ]
+    },
+    {
+      "module": "golang.org/x/sync",
+      "baseline_version": "v0.11.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/sync",
+        "Version": "v0.11.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "golang.org/x/sync/singleflight"
+      ]
+    },
+    {
+      "module": "golang.org/x/sys",
+      "baseline_version": "v0.30.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/sys",
+        "Version": "v0.30.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/gmsm/gmtls",
+        "golang.org/x/sys/cpu"
+      ]
+    },
+    {
+      "module": "golang.org/x/text",
+      "baseline_version": "v0.22.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/text",
+        "Version": "v0.22.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/yak/yaklib/codec",
+        "golang.org/x/text/encoding"
+      ]
+    },
+    {
+      "module": "golang.org/x/time",
+      "baseline_version": "v0.5.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "golang.org/x/time",
+        "Version": "v0.5.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/log",
+        "golang.org/x/time/rate"
+      ]
+    },
+    {
+      "module": "golang.org/x/xerrors",
+      "baseline_version": "v0.0.0-20220907171357-04be3eba64a2",
+      "baseline_replace": null,
+      "still_required": false,
+      "current_requirement": null,
+      "go_mod_why": [
+        "(main module does not need module golang.org/x/xerrors)"
+      ]
+    },
+    {
+      "module": "google.golang.org/genproto/googleapis/rpc",
+      "baseline_version": "v0.0.0-20241015192408-796eee8c2d53",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "google.golang.org/genproto/googleapis/rpc",
+        "Version": "v0.0.0-20241015192408-796eee8c2d53",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/cybertunnel/tpb",
+        "google.golang.org/grpc/status",
+        "google.golang.org/genproto/googleapis/rpc/status"
+      ]
+    },
+    {
+      "module": "google.golang.org/grpc",
+      "baseline_version": "v1.69.4",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "google.golang.org/grpc",
+        "Version": "v1.69.4"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/cmd/yak-mitm-perf",
+        "google.golang.org/grpc"
+      ]
+    },
+    {
+      "module": "google.golang.org/protobuf",
+      "baseline_version": "v1.36.6",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "google.golang.org/protobuf",
+        "Version": "v1.36.6"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid/aischedule",
+        "google.golang.org/protobuf/encoding/protojson"
+      ]
+    },
+    {
+      "module": "gopkg.in/fatih/set.v0",
+      "baseline_version": "v0.2.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "gopkg.in/fatih/set.v0",
+        "Version": "v0.2.1"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "gopkg.in/fatih/set.v0"
+      ]
+    },
+    {
+      "module": "gopkg.in/fsnotify.v1",
+      "baseline_version": "v1.4.7",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "gopkg.in/fsnotify.v1",
+        "Version": "v1.4.7",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/hpcloud/tail",
+        "github.com/hpcloud/tail/watch",
+        "gopkg.in/fsnotify.v1"
+      ]
+    },
+    {
+      "module": "gopkg.in/natefinch/lumberjack.v2",
+      "baseline_version": "v2.0.0",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "gopkg.in/natefinch/lumberjack.v2",
+        "Version": "v2.0.0"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/log",
+        "gopkg.in/natefinch/lumberjack.v2"
+      ]
+    },
+    {
+      "module": "gopkg.in/tomb.v1",
+      "baseline_version": "v1.0.0-20141024135613-dd632973f1e7",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "gopkg.in/tomb.v1",
+        "Version": "v1.0.0-20141024135613-dd632973f1e7",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils",
+        "github.com/hpcloud/tail",
+        "gopkg.in/tomb.v1"
+      ]
+    },
+    {
+      "module": "gopkg.in/warnings.v0",
+      "baseline_version": "v0.1.2",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "gopkg.in/warnings.v0",
+        "Version": "v0.1.2",
+        "Indirect": true
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/utils/yakgit",
+        "github.com/go-git/go-git/v5",
+        "github.com/go-git/go-git/v5/plumbing/format/config",
+        "github.com/go-git/gcfg",
+        "gopkg.in/warnings.v0"
+      ]
+    },
+    {
+      "module": "gopkg.in/yaml.v3",
+      "baseline_version": "v3.0.1",
+      "baseline_replace": null,
+      "still_required": true,
+      "current_requirement": {
+        "Path": "gopkg.in/yaml.v3",
+        "Version": "v3.0.1"
+      },
+      "go_mod_why": [
+        "github.com/yaklang/yaklang/common/ai/aid/aicommon",
+        "gopkg.in/yaml.v3"
+      ]
+    }
+  ]
+}

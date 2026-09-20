@@ -1,0 +1,39 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/analyzer
+BenchmarkExactIdentity/100-10         	       1	    118333 ns/op	   43976 B/op	     212 allocs/op
+BenchmarkExactIdentity/1000-10        	       1	    650292 ns/op	  476904 B/op	    2756 allocs/op
+BenchmarkExactIdentity/10000-10       	       1	   7238125 ns/op	 4447176 B/op	   29760 allocs/op
+BenchmarkExactIdentity/50000-10       	       1	  41220291 ns/op	21807184 B/op	  150603 allocs/op
+BenchmarkExactIdentity/100000-10      	       1	  88339500 ns/op	43685976 B/op	  301442 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/analyzer	0.671s
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/model
+BenchmarkNormalize/100-10         	       1	    302250 ns/op	  248520 B/op	    1075 allocs/op
+BenchmarkNormalize/1000-10        	       1	   3250750 ns/op	 2644864 B/op	    9072 allocs/op
+BenchmarkNormalize/10000-10       	       1	  42587542 ns/op	24342464 B/op	   90608 allocs/op
+BenchmarkNormalize/50000-10       	       1	 265358792 ns/op	115607336 B/op	  454875 allocs/op
+BenchmarkNormalize/100000-10      	       1	 617354083 ns/op	231102704 B/op	  909729 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/model	1.343s
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm
+BenchmarkPathIndex/100-10         	       1	     70916 ns/op	  114720 B/op	     117 allocs/op
+BenchmarkPathIndex/1000-10        	       1	    306000 ns/op	 1302880 B/op	    1024 allocs/op
+BenchmarkPathIndex/10000-10       	       1	   6517833 ns/op	19796960 B/op	   10040 allocs/op
+BenchmarkPathIndex/50000-10       	       1	  42930000 ns/op	113108064 B/op	   50057 allocs/op
+BenchmarkPathIndex/100000-10      	       1	  82934750 ns/op	227429704 B/op	  100062 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm	0.729s
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/core/gomod
+BenchmarkParse/100-10         	       1	    108459 ns/op	   50184 B/op	     527 allocs/op
+BenchmarkParse/1000-10        	       1	    700083 ns/op	  499856 B/op	    5060 allocs/op
+BenchmarkParse/10000-10       	       1	   7670750 ns/op	 5911608 B/op	   50183 allocs/op
+BenchmarkParse/100000-10      	       1	  84157542 ns/op	62567288 B/op	  503946 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/core/gomod	0.512s

@@ -1,29 +1,25 @@
 package cargo
 
 import (
-	"io"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/BurntSushi/toml"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
+	"github.com/yaklang/yaklang/common/sca/core/locktoml"
 
-	"github.com/samber/lo"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-
-	"golang.org/x/xerrors"
 )
 
 type cargoPkg struct {
-	Name         string   `toml:"name"`
-	Version      string   `toml:"version"`
-	Source       string   `toml:"source,omitempty"`
-	Dependencies []string `toml:"dependencies,omitempty"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version"`
+	Source       string   `json:"source,omitempty"`
+	Dependencies []string `json:"dependencies,omitempty"`
 }
 type Lockfile struct {
-	Packages []cargoPkg `toml:"package"`
+	Packages []cargoPkg `json:"package"`
 }
 
 type Parser struct{}
@@ -34,35 +30,33 @@ func NewParser() types.Parser {
 
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockfile Lockfile
-	decoder := toml.NewDecoder(r)
-	if _, err := decoder.Decode(&lockfile); err != nil {
-		return nil, nil, xerrors.Errorf("decode error: %w", err)
+	spans, err := locktoml.DecodeRecords(types.ContextOf(r), r, &lockfile, "package")
+	if err != nil {
+		return nil, nil, fmt.Errorf("decode error: %w", err)
 	}
-
-	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		return nil, nil, xerrors.Errorf("seek error: %w", err)
-	}
-
-	// naive parser to get line numbers by package from lock file
-	pkgParser := naivePkgParser{r: r}
-	lineNumIdx := pkgParser.parse()
 
 	// We need to get version for unique dependencies for lockfile v3 from lockfile.Packages
-	pkgs := lo.SliceToMap(lockfile.Packages, func(pkg cargoPkg) (string, cargoPkg) {
-		return pkg.Name, pkg
-	})
+	pkgs := cargoIndex{name: map[string][]cargoPkg{}, version: map[[2]string][]cargoPkg{}, full: map[[3]string][]cargoPkg{}}
+	for _, pkg := range lockfile.Packages {
+		pkgs.name[pkg.Name] = append(pkgs.name[pkg.Name], pkg)
+		k := [2]string{pkg.Name, pkg.Version}
+		pkgs.version[k] = append(pkgs.version[k], pkg)
+		f := [3]string{pkg.Name, pkg.Version, pkg.Source}
+		pkgs.full[f] = append(pkgs.full[f], pkg)
+	}
 
 	var libs []types.Library
 	var deps []types.Dependency
-	for _, pkg := range lockfile.Packages {
-		pkgID := utils.PackageID(pkg.Name, pkg.Version)
+	for index, pkg := range lockfile.Packages {
+		pkgID := nativeID(pkg)
 		lib := types.Library{
 			ID:      pkgID,
 			Name:    pkg.Name,
+			Source:  pkg.Source,
 			Version: pkg.Version,
 		}
-		if pos, ok := lineNumIdx[pkgID]; ok {
-			lib.Locations = []types.Location{{StartLine: pos.start, EndLine: pos.end}}
+		if index < len(spans) {
+			lib.Locations = []types.Location{{StartLine: spans[index].StartLine, EndLine: spans[index].EndLine}}
 		}
 
 		libs = append(libs, lib)
@@ -76,45 +70,39 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	return libs, deps, nil
 }
 
-func parseDependencies(pkgId string, pkg cargoPkg, pkgs map[string]cargoPkg) *types.Dependency {
-	var dependOn []string
-
-	for _, pkgDep := range pkg.Dependencies {
-		/*
-			Dependency entries look like:
-			old Cargo.lock - https://github.com/rust-lang/cargo/blob/46bac2dc448ab12fe0f182bee8d35cc804d9a6af/tests/testsuite/lockfile_compat.rs#L48-L50
-				"unsafe-any 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)"
-			new Cargo.lock -https://github.com/rust-lang/cargo/blob/46bac2dc448ab12fe0f182bee8d35cc804d9a6af/tests/testsuite/lockfile_compat.rs#L39-L41
-				"unsafe-any" - if lock file contains only 1 version of dependency
-				"unsafe-any 0.4.2" if lock file contains more than 1 version of dependency
-		*/
-		fields := strings.Fields(pkgDep)
-		switch len(fields) {
-		// unique dependency in new lock file
+func nativeID(p cargoPkg) string {
+	b, _ := json.Marshal([]string{p.Name, p.Version, p.Source})
+	return string(b)
+}
+func parseDependencies(id string, pkg cargoPkg, index cargoIndex) *types.Dependency {
+	dep := &types.Dependency{ID: id}
+	for _, raw := range pkg.Dependencies {
+		f := strings.Fields(raw)
+		var matches []cargoPkg
+		switch len(f) {
 		case 1:
-			name := fields[0]
-			version, ok := pkgs[name]
-			if !ok {
-				log.Debugf("can't find version for %s", name)
-				continue
-			}
-			dependOn = append(dependOn, utils.PackageID(name, version.Version))
-		// 2: non-unique dependency in new lock file
-		// 3: old lock file
-		case 2, 3:
-			dependOn = append(dependOn, utils.PackageID(fields[0], fields[1]))
-		default:
-			log.Debugf("wrong dependency format for %s", pkgDep)
-			continue
+			matches = index.name[f[0]]
+		case 2:
+			matches = index.version[[2]string{f[0], f[1]}]
+		case 3:
+			matches = index.full[[3]string{f[0], f[1], strings.TrimSuffix(strings.TrimPrefix(f[2], "("), ")")}]
+		}
+
+		if len(matches) == 1 {
+			dep.DependsOn = append(dep.DependsOn, nativeID(matches[0]))
+		} else {
+			dep.DependsOn = append(dep.DependsOn, "unresolved-cargo:"+raw)
 		}
 	}
-	if len(dependOn) > 0 {
-		sort.Strings(dependOn)
-		return &types.Dependency{
-			ID:        pkgId,
-			DependsOn: dependOn,
-		}
-	} else {
+	if len(dep.DependsOn) == 0 {
 		return nil
 	}
+	sort.Strings(dep.DependsOn)
+	return dep
+}
+
+type cargoIndex struct {
+	name    map[string][]cargoPkg
+	version map[[2]string][]cargoPkg
+	full    map[[3]string][]cargoPkg
 }

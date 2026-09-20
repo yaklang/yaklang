@@ -1,0 +1,8 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/6 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 6/6 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 80757 (26910/sec), new interesting: 42 (total: 48)
+fuzz: elapsed: 6s, execs: 80757 (0/sec), new interesting: 42 (total: 48)
+fuzz: elapsed: 9s, execs: 80757 (0/sec), new interesting: 42 (total: 48)
+fuzz: elapsed: 11s, execs: 1161015 (539407/sec), new interesting: 43 (total: 49)
+PASS
+ok  	github.com/yaklang/yaklang/common/sca/core/textdecode	11.322s

@@ -1,115 +1,23 @@
 package analyzer
 
 import (
+	"encoding/json"
 	"fmt"
-	"sort"
-	"strings"
-	"testing"
-
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
-	"golang.org/x/exp/slices"
+	"reflect"
+	"testing"
 )
 
-var pkgMaps = make(map[string][]*dxtypes.Package)
+var pkgMaps = map[string][]*dxtypes.Package{}
 
 func newPackage(name, version, prefix string) *dxtypes.Package {
-	p := &dxtypes.Package{
-		Name:               name,
-		Version:            version,
-		IsVersionRange:     strings.ContainsAny(version, "<>="),
-		FromFile:           []string{fmt.Sprintf("/path/%s/file", prefix)},
-		FromAnalyzer:       []string{fmt.Sprintf("%s-analyzer", prefix)},
-		Verification:       "",
-		License:            nil,
-		UpStreamPackages:   make(map[string]*dxtypes.Package),
-		DownStreamPackages: make(map[string]*dxtypes.Package),
-	}
-	//pkgs = append(pkgs, p)
-	list, ok := pkgMaps[prefix]
-	if !ok {
-		list = make([]*dxtypes.Package, 0)
-	}
-	list = append(list, p)
-	pkgMaps[prefix] = list
+	p := &dxtypes.Package{Name: name, Version: version, FromFile: []string{"/path/" + prefix + "/file"}, FromAnalyzer: []string{prefix + "-analyzer"}}
+	pkgMaps[prefix] = append(pkgMaps[prefix], p)
 	return p
 }
 
-// func ShowDot(pkgs []*dxtypes.Package) {
-// 	sort.SliceStable(pkgs, func(i, j int) bool {
-// 		return pkgs[i].Name+pkgs[i].Version < pkgs[j].Name+pkgs[j].Version
-// 	})
-// 	for _, pkg := range pkgs {
-// 		upstream := lo.MapToSlice(pkg.UpStreamPackages, func(_ string, p *dxtypes.Package) string {
-// 			return p.Name + "-" + p.Version
-// 		})
-// 		sort.Strings(upstream)
-// 		downstream := lo.MapToSlice(pkg.DownStreamPackages, func(_ string, p *dxtypes.Package) string {
-// 			return p.Name + "-" + p.Version
-// 		})
-// 		sort.Strings(downstream)
-// 		fmt.Printf(`
-// 		{
-// 	 		ID: "%s-%s",
-// 	 		UpStream: %#v,
-// 	 		DownStream: %#v,
-// 	 	},
-// 		`, pkg.Name, pkg.Version, upstream, downstream,
-// 		)
-// 	}
-// }
-
-type testPackage struct {
-	ID         string
-	DownStream []string // name + version
-	UpStream   []string // name + version
-}
-
-func Check(t *testing.T, packages []*dxtypes.Package, want []*testPackage) {
-	pkgs := CoverPackageToPkg(packages)
-	if len(pkgs) != len(want) {
-		t.Fatalf("%s: pkgs length error: %d(got) != %d(want)", t.Name(), len(pkgs), len(want))
-	}
-	for i := 0; i < len(pkgs); i++ {
-
-		if pkgs[i].ID != want[i].ID {
-			t.Fatalf("%s: pkgs %d(%s) ID error: %s(got) != %s(want)", t.Name(), i, pkgs[i].ID, pkgs[i].ID, want[i].ID)
-		}
-
-		if slices.Compare(pkgs[i].DownStream, want[i].DownStream) != 0 {
-			t.Fatalf("%s: pkgs %d(%s) DownStream error: %#v(got) != %#v(want)", t.Name(), i, pkgs[i].ID, pkgs[i].DownStream, want[i].DownStream)
-		}
-		if slices.Compare(pkgs[i].UpStream, want[i].UpStream) != 0 {
-			t.Fatalf("%s: pkgs %d(%s) UpStream error: %#v(got) != %#v(want)", t.Name(), i, pkgs[i].ID, pkgs[i].UpStream, want[i].UpStream)
-		}
-	}
-
-}
-
-func CoverPackageToPkg(packages []*dxtypes.Package) []*testPackage {
-	pkgs := make([]*testPackage, 0)
-	sort.SliceStable(packages, func(i, j int) bool {
-		return packages[i].Name+packages[i].Version < packages[j].Name+packages[j].Version
-	})
-	for _, pkg := range packages {
-		upstream := lo.MapToSlice(pkg.UpStreamPackages, func(_ string, p *dxtypes.Package) string {
-			return p.Name + "-" + p.Version
-		})
-		sort.Strings(upstream)
-		downstream := lo.MapToSlice(pkg.DownStreamPackages, func(_ string, p *dxtypes.Package) string {
-			return p.Name + "-" + p.Version
-		})
-		sort.Strings(downstream)
-		p := &testPackage{
-			ID:         pkg.Name + "-" + pkg.Version,
-			DownStream: downstream,
-			UpStream:   upstream,
-		}
-		pkgs = append(pkgs, p)
-	}
-	return pkgs
-}
-
+// These are the original seven graph inputs from d33a21b6. Expectations now
+// preserve every distinct version and every OR declaration (BEHAVIOR_DIFF B03).
 func TestMergePackagesNormal(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)
@@ -136,58 +44,9 @@ func TestMergePackagesNormal(t *testing.T) {
 	// pb1 -> pb2(pa22) -> pb3
 	pb1.LinkDepend(pb2)
 	pb2.LinkDepend(pb3)
-	// DrawPackagesDOT(pkgs)
 
-	ret := MergePackages(pkgs)
-	wantPkg := []*testPackage{
-
-		{
-			ID:         "pa1-0.0.3",
-			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pa21-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa1-0.0.3"},
-		},
-
-		{
-			ID:         "pa22-0.0.3",
-			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
-			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
-		},
-
-		{
-			ID:         "pa3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb1-0.0.3",
-			UpStream:   []string{"pa22-0.0.3"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pb3-0.0.2",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-	}
-	// DrawPackagesDOT(ret)
-	// ShowDot(ret)
-	Check(t, ret, wantPkg)
+	assertExactGraph(t, pkgs, 7)
 }
-
 func TestMergePackagesVersionRange(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)
@@ -214,56 +73,8 @@ func TestMergePackagesVersionRange(t *testing.T) {
 	pe1.LinkDepend(pe2)
 	pe2.LinkDepend(pe3)
 
-	// DrawPackagesDOT(pkgs, "org.png")
-	ret := MergePackages(pkgs)
-	wantPkg := []*testPackage{
-
-		{
-			ID:         "pa1-0.0.3",
-			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pa21-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa1-0.0.3"},
-		},
-
-		{
-			ID:         "pa22-0.0.3",
-			UpStream:   []string{"pa3-0.0.3", "pa3->0.0.3", "pb3-0.0.2"},
-			DownStream: []string{"pa1-0.0.3", "pe1-0.0.3"},
-		},
-
-		{
-			ID:         "pa3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pa3->0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.2",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pe1-0.0.3",
-			UpStream:   []string{"pa22-0.0.3"},
-			DownStream: []string{},
-		},
-	}
-	// ShowDot(ret)
-	Check(t, ret, wantPkg)
+	assertExactGraph(t, pkgs, 8)
 }
-
 func TestMergePackagesOrPackage(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)
@@ -300,75 +111,8 @@ func TestMergePackagesOrPackage(t *testing.T) {
 	pc1.LinkDepend(pc2)
 	pc1.LinkDepend(pcor)
 	pc2.LinkDepend(pc3)
-	// DrawPackagesDOT(pkgs, "org.png")
-	ret := MergePackages(pkgs)
-	// _ = ret
-	// DrawPackagesDOT(ret, "ret.png")
-	wantPkg := []*testPackage{
-		{
-			ID:         "pa1-0.0.3",
-			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
-			DownStream: []string{"pc1-0.0.3"},
-		},
-
-		{
-			ID:         "pa21-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa1-0.0.3"},
-		},
-
-		{
-			ID:         "pa22-0.0.3",
-			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
-			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
-		},
-
-		{
-			ID:         "pa3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb1-0.0.3",
-			UpStream:   []string{"pa22-0.0.3"},
-			DownStream: []string{"pc1-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.2",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pc1-0.0.3",
-			UpStream:   []string{"pa1-0.0.3", "pb1-0.0.3", "pc2-0.0.3"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pc2-0.0.3",
-			UpStream:   []string{"pc3-0.0.3"},
-			DownStream: []string{"pc1-0.0.3"},
-		},
-
-		{
-			ID:         "pc3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pc2-0.0.3"},
-		},
-	}
-	// ShowDot(ret)
-	Check(t, ret, wantPkg)
+	assertExactGraph(t, pkgs, 11)
 }
-
 func TestMergePackagesOrPackageNotMatch(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)
@@ -406,80 +150,8 @@ func TestMergePackagesOrPackageNotMatch(t *testing.T) {
 	pd1.LinkDepend(pd2)
 	pd2.LinkDepend(pd3)
 	pd1.LinkDepend(pdor)
-	// DrawPackagesDOT(pkgs)
-	ret := MergePackages(pkgs)
-	// DrawPackagesDOT(ret)
-	// ShowDot(ret)
-	wantPkg := []*testPackage{
-		{
-			ID:         "pa1-0.0.3",
-			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pa21-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa1-0.0.3"},
-		},
-
-		{
-			ID:         "pa22-0.0.3",
-			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
-			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
-		},
-
-		{
-			ID:         "pa3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb1-0.0.3",
-			UpStream:   []string{"pa22-0.0.3"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pb3-0.0.2",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pd1-0.0.3",
-			UpStream:   []string{"pd2-0.0.5", "pe1|pf1|pg2-0.0.2|0.0.3|0.0.4"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pd2-0.0.5",
-			UpStream:   []string{"pd3-0.0.3"},
-			DownStream: []string{"pd1-0.0.3"},
-		},
-
-		{
-			ID:         "pd3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pd2-0.0.5"},
-		},
-		{
-			ID:         "pe1|pf1|pg2-0.0.2|0.0.3|0.0.4",
-			UpStream:   []string{},
-			DownStream: []string{"pd1-0.0.3"},
-		},
-	}
-	Check(t, ret, wantPkg)
-
+	assertExactGraph(t, pkgs, 11)
 }
-
 func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgMaps = make(map[string][]*dxtypes.Package)
@@ -516,92 +188,16 @@ func TestMergePackagesOrPackageVersionRange(t *testing.T) {
 	pd1.LinkDepend(pd2)
 	pd2.LinkDepend(pd3)
 	pd1.LinkDepend(pdor)
-	// DrawPackagesDOT(pkgs)
-	ret := MergePackages(pkgs)
-	// DrawPackagesDOT(ret)
-	// ShowDot(ret)
-	wantPkg := []*testPackage{
-		{
-			ID:         "pa1-0.0.3",
-			UpStream:   []string{"pa21-0.0.3", "pa22-0.0.3"},
-			DownStream: []string{"pd1-0.0.3"},
-		},
-
-		{
-			ID:         "pa21-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa1-0.0.3"},
-		},
-
-		{
-			ID:         "pa22-0.0.3",
-			UpStream:   []string{"pa3-0.0.3", "pb3-0.0.2", "pb3-0.0.3"},
-			DownStream: []string{"pa1-0.0.3", "pb1-0.0.3"},
-		},
-
-		{
-			ID:         "pa3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb1-0.0.3",
-			UpStream:   []string{"pa22-0.0.3"},
-			DownStream: []string{"pd1-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.2",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pb3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pa22-0.0.3"},
-		},
-
-		{
-			ID:         "pd1-0.0.3",
-			UpStream:   []string{"pa1-0.0.3", "pb1-0.0.3", "pd2-0.0.5"},
-			DownStream: []string{},
-		},
-
-		{
-			ID:         "pd2-0.0.5",
-			UpStream:   []string{"pd3-0.0.3"},
-			DownStream: []string{"pd1-0.0.3"},
-		},
-
-		{
-			ID:         "pd3-0.0.3",
-			UpStream:   []string{},
-			DownStream: []string{"pd2-0.0.5"},
-		},
-	}
-	Check(t, ret, wantPkg)
+	assertExactGraph(t, pkgs, 11)
 }
-
 func TestMregePackagesVersionRangeFirst(t *testing.T) {
 	pkgs := make([]*dxtypes.Package, 0)
 	pkgs = append(pkgs, newPackage("p1", "> 0.0.3", "p1"))
 	pkgs = append(pkgs, newPackage("p1", "0.0.4", "p1"))
 	pkgs = append(pkgs, newPackage("p3", "0.0.4", "p1"))
 
-	ret := MergePackages(pkgs)
-	wantPkg := []*testPackage{
-		{
-			ID: "p1-0.0.4",
-		},
-		{
-			ID: "p3-0.0.4",
-		},
-	}
-	Check(t, ret, wantPkg)
+	assertExactGraph(t, pkgs, 3)
 }
-
 func TestSemverRange(t *testing.T) {
 	check := func(semver, want string) {
 		got := handlerSemverVersionRange(semver)
@@ -611,9 +207,50 @@ func TestSemverRange(t *testing.T) {
 	}
 
 	check("~3.4.1", ">= 3.4.1 && < 3.5.0")
+	check("^0.2.3", ">= 0.2.3 && < 0.3.0")
+	check("^0.0.3", ">= 0.0.3 && < 0.0.4")
 	check("^3.4.1", ">= 3.4.1 && < 4.0.0")
 	check("3.4.1", "3.4.1")
 	check("~3.41", "~3.41")
 	check("^3.41", "^3.41")
 	check("~3.4.1a", "~3.4.1a")
+}
+
+func graphEvidence(pkgs []*dxtypes.Package) map[string]map[string]bool {
+	label := func(p *dxtypes.Package) string {
+		b, _ := json.Marshal([]string{p.Name, p.Version, p.Details().Ecosystem, p.Details().Source, p.Details().Architecture, p.Details().Variant, p.Details().Snapshot, p.Details().ProjectRoot, p.Details().Instance, p.Verification, fmt.Sprint(p.Potential)})
+		return string(b)
+	}
+	result := map[string]map[string]bool{}
+	for _, p := range pkgs {
+		key := label(p)
+		if result[key] == nil {
+			result[key] = map[string]bool{}
+		}
+		for _, up := range p.UpStreamPackages {
+			result[key][label(up)] = true
+		}
+	}
+	return result
+}
+func assertExactGraph(t *testing.T, pkgs []*dxtypes.Package, n int) {
+	t.Helper()
+	before := graphEvidence(pkgs)
+	got := MergePackages(pkgs)
+	if len(got) != n {
+		t.Fatalf("component count %d want %d", len(got), n)
+	}
+	if after := graphEvidence(got); !reflect.DeepEqual(before, after) {
+		t.Fatalf("lost or invented graph relation: before=%v after=%v", before, after)
+	}
+	again := MergePackages(got)
+	if len(again) != len(got) || !reflect.DeepEqual(before, graphEvidence(again)) {
+		t.Fatal("not idempotent")
+	}
+}
+func TestExactMergeSeparatesContexts(t *testing.T) {
+	a := &dxtypes.Package{Name: "a", Version: "1", PackageDetails: &dxtypes.PackageDetails{ProjectRoot: "one"}}
+	b := &dxtypes.Package{Name: "a", Version: "1", PackageDetails: &dxtypes.PackageDetails{ProjectRoot: "two"}}
+	c := &dxtypes.Package{Name: "a", Version: "1", Verification: "hash:other", PackageDetails: &dxtypes.PackageDetails{ProjectRoot: "one"}}
+	assertExactGraph(t, []*dxtypes.Package{a, b, c, a}, 3)
 }

@@ -1,0 +1,4733 @@
+{
+  "schema_version": 1,
+  "baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
+  "entries": [
+    {
+      "local_file": "common/sca/analyzer/analyzer.go",
+      "sha256": "4dc573a2b1a84c26566ad27ed7f4818bf89fd175fb2b37f6d9022dcfd55433d0",
+      "symbols": [
+        {
+          "name": "TypAnalyzer",
+          "line": 34
+        },
+        {
+          "name": "ScanMode",
+          "line": 35
+        },
+        {
+          "name": "Analyzer",
+          "line": 36
+        },
+        {
+          "name": "FileInfo",
+          "line": 42
+        },
+        {
+          "name": "SetFileInfoFileSystem",
+          "line": 50
+        },
+        {
+          "name": "AnalyzeFileInfo",
+          "line": 54
+        },
+        {
+          "name": "MatchInfo",
+          "line": 60
+        },
+        {
+          "name": "RegisterAnalyzer",
+          "line": 67
+        },
+        {
+          "name": "FilterAnalyzer",
+          "line": 77
+        },
+        {
+          "name": "ParseLanguageConfiguration",
+          "line": 100
+        },
+        {
+          "name": "handlerParsed",
+          "line": 108
+        },
+        {
+          "name": "Name",
+          "line": 193
+        },
+        {
+          "name": "MatchInSnapshot",
+          "line": 199
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "6df76813e3754987cc5a4dbf2ab623b0004aab18440721ea4fc52cac2d382f0c",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/apk.go",
+      "sha256": "46a670fcc711279c2d4956e0d9dabec48a5c808967b789a22c76577ed10c4d84",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 23
+        },
+        {
+          "name": "apkAnalyzer",
+          "line": 27
+        },
+        {
+          "name": "NewApkAnalyzer",
+          "line": 29
+        },
+        {
+          "name": "apkAnalyzer.parseLicense",
+          "line": 33
+        },
+        {
+          "name": "trimRequirement",
+          "line": 55
+        },
+        {
+          "name": "apkAnalyzer.parseDependencies",
+          "line": 69
+        },
+        {
+          "name": "apkAnalyzer.parseProvides",
+          "line": 81
+        },
+        {
+          "name": "apkAnalyzer.Analyze",
+          "line": 88
+        },
+        {
+          "name": "apkAnalyzer.Match",
+          "line": 149
+        },
+        {
+          "name": "decodeChecksumLine",
+          "line": 158
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "801fdc672a0fadba7c7f5976d2093365e4776e31d57c86a7cd93eb530d2ad43d",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/c_conan.go",
+      "sha256": "dd47bf969462de1b5f3d4efe1dc89ce2676234c74c2d39e345f61fb893e9a428",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 19
+        },
+        {
+          "name": "conanAnalyzer",
+          "line": 23
+        },
+        {
+          "name": "NewConanAnalyzer",
+          "line": 25
+        },
+        {
+          "name": "conanAnalyzer.Analyze",
+          "line": 29
+        },
+        {
+          "name": "conanAnalyzer.Match",
+          "line": 43
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "dd47bf969462de1b5f3d4efe1dc89ce2676234c74c2d39e345f61fb893e9a428",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/custom_analyzer.go",
+      "sha256": "e7da90791fab1c03d3d54da6fc5157fdf04d98792978d3cbb61c6c45e3d31d89",
+      "symbols": [
+        {
+          "name": "customAnalyzer",
+          "line": 8
+        },
+        {
+          "name": "NewCustomAnalyzer",
+          "line": 15
+        },
+        {
+          "name": "NewAnalyzerResult",
+          "line": 39
+        },
+        {
+          "name": "customAnalyzer.Match",
+          "line": 46
+        },
+        {
+          "name": "customAnalyzer.Analyze",
+          "line": 50
+        },
+        {
+          "name": "CustomPackage",
+          "line": 65
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "39e03641b417b22d8135a846f05562720de69dcd55eacb8ae48cea9083a2bb18",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/c/conan/parse.go",
+      "sha256": "414cbcd7a993e869f02aaa91b1e70e97df4e1b823252cbef8bf514f457fcb72d",
+      "symbols": [
+        {
+          "name": "LockFile",
+          "line": 17
+        },
+        {
+          "name": "GraphLock",
+          "line": 21
+        },
+        {
+          "name": "Node",
+          "line": 25
+        },
+        {
+          "name": "Parser",
+          "line": 32
+        },
+        {
+          "name": "NewParser",
+          "line": 34
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 38
+        },
+        {
+          "name": "parseRef",
+          "line": 108
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "b6b11b0274b225aba15205c0edcc5750116e8091515fd77481c3d0e2c01c4068",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/c/conan/parse.go",
+          "sha256": "506a0f650f95af29ee84e6d779122e097e9d75ca6035326348e1ebbccba61b62"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/c/conan/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/golang/binary/parse.go",
+      "sha256": "5696dff1538dd8ebba6e050dd00dc590a3973fdf2d38037665c2b986424e3051",
+      "symbols": [
+        {
+          "name": "convertError",
+          "line": 20
+        },
+        {
+          "name": "Parser",
+          "line": 32
+        },
+        {
+          "name": "NewParser",
+          "line": 34
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 39
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "16c03174001d728a01122afcd0a2918849e353d39c139506635674be13959228",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/golang/binary/parse.go",
+          "sha256": "b19f9cdb4121093f60fdd4e46d3e2cd17a405106d1419c3b83e93dcd72bf7a23"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/gradle/parse.go",
+      "sha256": "090825146d5d779bf671c03a1fcbbe8531ab890c63885af8cf45c245396ca4c1",
+      "symbols": [
+        {
+          "name": "Parser",
+          "line": 14
+        },
+        {
+          "name": "NewParser",
+          "line": 16
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 20
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "aa529e11898f436d0deaf045ba198b5d818c335e478b9658c8b50e831a06f5bb",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/gradle/lockfile/parse.go",
+          "sha256": "47ed4332c6e7ee6e29bb744c8386579d97a4684d4b275943aec151add346e95a"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/gradle/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/pom/artifact.go",
+      "sha256": "2e828ba7a9588ba7ad0c63867dada659f5477a263d9f13f1de7079c709c89d7e",
+      "symbols": [
+        {
+          "name": "artifact",
+          "line": 15
+        },
+        {
+          "name": "newArtifact",
+          "line": 30
+        },
+        {
+          "name": "artifact.IsEmpty",
+          "line": 39
+        },
+        {
+          "name": "artifact.Equal",
+          "line": 43
+        },
+        {
+          "name": "artifact.JoinLicenses",
+          "line": 47
+        },
+        {
+          "name": "artifact.ToPOMLicenses",
+          "line": 51
+        },
+        {
+          "name": "artifact.Inherit",
+          "line": 59
+        },
+        {
+          "name": "artifact.Name",
+          "line": 75
+        },
+        {
+          "name": "artifact.String",
+          "line": 79
+        },
+        {
+          "name": "version",
+          "line": 83
+        },
+        {
+          "name": "newVersion",
+          "line": 89
+        },
+        {
+          "name": "version.shouldOverride",
+          "line": 102
+        },
+        {
+          "name": "version.String",
+          "line": 109
+        },
+        {
+          "name": "evaluateVariable",
+          "line": 113
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "3eacf59c2e3bac53652185b10ff4b368f78c9c4fca4b828e93d5554f8eb5296d",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/pom/artifact.go",
+          "sha256": "8d636321786457f1859ea9e8668d2ecb1c7f053afa1fe55af64657dd045e8ef2"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/pom/cache.go",
+      "sha256": "4c983b64fe8ec11cfcd2bc06b45b9b03d8aadb4ce67d91faf033e2329512372c",
+      "symbols": [
+        {
+          "name": "pomCache",
+          "line": 5
+        },
+        {
+          "name": "newPOMCache",
+          "line": 7
+        },
+        {
+          "name": "pomCache.put",
+          "line": 11
+        },
+        {
+          "name": "pomCache.get",
+          "line": 15
+        },
+        {
+          "name": "pomCache.key",
+          "line": 19
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "4c983b64fe8ec11cfcd2bc06b45b9b03d8aadb4ce67d91faf033e2329512372c",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/pom/cache.go",
+          "sha256": "4c983b64fe8ec11cfcd2bc06b45b9b03d8aadb4ce67d91faf033e2329512372c"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/pom/parse.go",
+      "sha256": "3f8aaa81a4ca8ebb3a63bd75ee5dd52b9d93036d62719f9f40f1883824231d76",
+      "symbols": [
+        {
+          "name": "parser",
+          "line": 28
+        },
+        {
+          "name": "NewParser",
+          "line": 40
+        },
+        {
+          "name": "parser.Parse",
+          "line": 44
+        },
+        {
+          "name": "parser.parseRoot",
+          "line": 79
+        },
+        {
+          "name": "depVersion",
+          "line": 230
+        },
+        {
+          "name": "parser.parseModule",
+          "line": 237
+        },
+        {
+          "name": "parser.resolve",
+          "line": 257
+        },
+        {
+          "name": "analysisResult",
+          "line": 280
+        },
+        {
+          "name": "analysisOptions",
+          "line": 289
+        },
+        {
+          "name": "parser.analyze",
+          "line": 295
+        },
+        {
+          "name": "parser.mergeDependencyManagements",
+          "line": 349
+        },
+        {
+          "name": "parser.parseDependencies",
+          "line": 365
+        },
+        {
+          "name": "parser.resolveDepManagement",
+          "line": 389
+        },
+        {
+          "name": "parser.mergeDependencies",
+          "line": 423
+        },
+        {
+          "name": "excludeDep",
+          "line": 441
+        },
+        {
+          "name": "parser.parseParent",
+          "line": 457
+        },
+        {
+          "name": "parser.retrieveParent",
+          "line": 492
+        },
+        {
+          "name": "parser.tryRelativePath",
+          "line": 521
+        },
+        {
+          "name": "parser.openRelativePom",
+          "line": 550
+        },
+        {
+          "name": "parser.openPom",
+          "line": 572
+        },
+        {
+          "name": "parser.tryRepository",
+          "line": 594
+        },
+        {
+          "name": "parser.isDirectory",
+          "line": 604
+        },
+        {
+          "name": "parsePom",
+          "line": 615
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "ce3ef16e5d045ae48c37865a8bf1b92a27c620c78744a87fe3dd516252253551",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/pom/parse.go",
+          "sha256": "a13610e9a91e6bf8560e13e6f6eeb3c35183d265740c8d0c98cba7ab786f03e1"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/pom/pom.go",
+      "sha256": "93757d91115fb4896afe7890c95f52e51809cfa39640aeb23c0254e6b39e112c",
+      "symbols": [
+        {
+          "name": "pom",
+          "line": 15
+        },
+        {
+          "name": "pom.inherit",
+          "line": 20
+        },
+        {
+          "name": "pom.properties",
+          "line": 37
+        },
+        {
+          "name": "pom.projectProperties",
+          "line": 42
+        },
+        {
+          "name": "pom.artifact",
+          "line": 69
+        },
+        {
+          "name": "pom.licenses",
+          "line": 73
+        },
+        {
+          "name": "pom.repositories",
+          "line": 79
+        },
+        {
+          "name": "pomXML",
+          "line": 89
+        },
+        {
+          "name": "pomParent",
+          "line": 124
+        },
+        {
+          "name": "pomLicenses",
+          "line": 131
+        },
+        {
+          "name": "pomLicense",
+          "line": 136
+        },
+        {
+          "name": "pomDependencies",
+          "line": 140
+        },
+        {
+          "name": "pomDependency",
+          "line": 145
+        },
+        {
+          "name": "pomExclusions",
+          "line": 157
+        },
+        {
+          "name": "pomExclusion",
+          "line": 163
+        },
+        {
+          "name": "pomDependency.Name",
+          "line": 168
+        },
+        {
+          "name": "pomDependency.Resolve",
+          "line": 173
+        },
+        {
+          "name": "pomDependency.ToArtifact",
+          "line": 226
+        },
+        {
+          "name": "properties",
+          "line": 257
+        },
+        {
+          "name": "property",
+          "line": 259
+        },
+        {
+          "name": "properties.UnmarshalXML",
+          "line": 264
+        },
+        {
+          "name": "pomDependencies.UnmarshalXML",
+          "line": 280
+        },
+        {
+          "name": "findDep",
+          "line": 310
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "6da1818728e2ebdb878d33466ca432774f6de7480e6da7691ac68098034c2675",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/pom/pom.go",
+          "sha256": "759416f200e4b6af4cb3688aeb8ec081e05249d6569345928877a4f590d539fb"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/pom/queue.go",
+      "sha256": "a0a26f42740a14852346c93a76f1fec2b1aaa77b07f0f369ecb00c180ce1256c",
+      "symbols": [
+        {
+          "name": "artifactQueue",
+          "line": 6
+        },
+        {
+          "name": "newArtifactQueue",
+          "line": 11
+        },
+        {
+          "name": "artifactQueue.enqueue",
+          "line": 15
+        },
+        {
+          "name": "artifactQueue.dequeue",
+          "line": 21
+        },
+        {
+          "name": "artifactQueue.IsEmpty",
+          "line": 30
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "a0a26f42740a14852346c93a76f1fec2b1aaa77b07f0f369ecb00c180ce1256c",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/pom/queue.go",
+          "sha256": "a0a26f42740a14852346c93a76f1fec2b1aaa77b07f0f369ecb00c180ce1256c"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/java/pom/utils.go",
+      "sha256": "1963a4cac4c7496a5fc431e2f0fb7a1185c732d6cf000ff2e117766c80e8ab0c",
+      "symbols": [
+        {
+          "name": "isProperty",
+          "line": 8
+        },
+        {
+          "name": "packageID",
+          "line": 15
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "3d07780d19b491d45d25f3a11282483f1300b57c5ee02eb40253b5a2e3dfaa3c",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/pom/utils.go",
+          "sha256": "a1f2f27d1c7e148c130702ec0d3a5750f3603bfd440f54a3934c77ea9ca4c2be"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/java/pom/upstream_artifact_test.go",
+        "analyzer/dep-parser/java/pom/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/nodejs/npm/parse.go",
+      "sha256": "99c7324d152e97bc3272e0222b14803454a5e66b491eb0f78c0af198f5375535",
+      "symbols": [
+        {
+          "name": "LockFile",
+          "line": 22
+        },
+        {
+          "name": "Dependency",
+          "line": 27
+        },
+        {
+          "name": "Package",
+          "line": 37
+        },
+        {
+          "name": "Parser",
+          "line": 51
+        },
+        {
+          "name": "NewParser",
+          "line": 53
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 57
+        },
+        {
+          "name": "Parser.parseV2",
+          "line": 94
+        },
+        {
+          "name": "followLink",
+          "line": 139
+        },
+        {
+          "name": "findInstalled",
+          "line": 157
+        },
+        {
+          "name": "validPath",
+          "line": 178
+        },
+        {
+          "name": "pkgNameFromPath",
+          "line": 181
+        },
+        {
+          "name": "flattenV1",
+          "line": 188
+        },
+        {
+          "name": "setDependencyLocations",
+          "line": 196
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "f2d09c4e7168dbc83b15c3c8d736e59e440c5567c603954ebebcace112c94770",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/nodejs/npm/parse.go",
+          "sha256": "93fd67f4199118185b05110e82679d17f245546e2c6a7f5f6001ffaea3568189"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/nodejs/npm/instance_test.go",
+        "analyzer/dep-parser/nodejs/npm/upstream_parse_test.go",
+        "analyzer/dep-parser/nodejs/npm/upstream_expectations_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/nodejs/pnpm/parse.go",
+      "sha256": "b455c2b6ae1d5ca02139db1c69fd25b9fa3b2be5375de4a18511b54bbf0dc121",
+      "symbols": [
+        {
+          "name": "PackageResolution",
+          "line": 20
+        },
+        {
+          "name": "PackageInfo",
+          "line": 24
+        },
+        {
+          "name": "LockFile",
+          "line": 33
+        },
+        {
+          "name": "Parser",
+          "line": 40
+        },
+        {
+          "name": "NewParser",
+          "line": 42
+        },
+        {
+          "name": "Parser.ID",
+          "line": 46
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 50
+        },
+        {
+          "name": "Parser.parse",
+          "line": 78
+        },
+        {
+          "name": "parseLockfileVersion",
+          "line": 137
+        },
+        {
+          "name": "isIndirectLib",
+          "line": 156
+        },
+        {
+          "name": "parsePackage",
+          "line": 162
+        },
+        {
+          "name": "parseDepPath",
+          "line": 173
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "a8fc0c5c2bc4149a26a75eda84ab5fa3b267057963360f2eac36694481fe7739",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/nodejs/pnpm/parse.go",
+          "sha256": "36f0fdb21c9f5041c2c308d3b365d0963ef6c9c2f2df584993f1ec0842af0e54"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/nodejs/pnpm/upstream_test.go",
+        "analyzer/dep-parser/nodejs/pnpm/upstream_expectations_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/nodejs/yarn/parse.go",
+      "sha256": "82a9844f31f100996c187877650c4f78e8de185c5839feea2b0f8c00d14448c2",
+      "symbols": [
+        {
+          "name": "LockFile",
+          "line": 27
+        },
+        {
+          "name": "Library",
+          "line": 31
+        },
+        {
+          "name": "Dependency",
+          "line": 38
+        },
+        {
+          "name": "LineScanner",
+          "line": 43
+        },
+        {
+          "name": "NewLineScanner",
+          "line": 48
+        },
+        {
+          "name": "LineScanner.Scan",
+          "line": 54
+        },
+        {
+          "name": "LineScanner.LineNum",
+          "line": 62
+        },
+        {
+          "name": "parsePattern",
+          "line": 66
+        },
+        {
+          "name": "parsePackagePatterns",
+          "line": 84
+        },
+        {
+          "name": "getVersion",
+          "line": 100
+        },
+        {
+          "name": "getDependency",
+          "line": 108
+        },
+        {
+          "name": "validProtocol",
+          "line": 119
+        },
+        {
+          "name": "ignoreProtocol",
+          "line": 128
+        },
+        {
+          "name": "parseResults",
+          "line": 136
+        },
+        {
+          "name": "Parser",
+          "line": 153
+        },
+        {
+          "name": "NewParser",
+          "line": 155
+        },
+        {
+          "name": "scanBlocks",
+          "line": 159
+        },
+        {
+          "name": "parseBlock",
+          "line": 178
+        },
+        {
+          "name": "parseDependencies",
+          "line": 257
+        },
+        {
+          "name": "parseDependency",
+          "line": 271
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 279
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "f57096b6b320c3988cd22eb803766a24a7b34420f86782eab294e0a56e5aa309",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/nodejs/yarn/parse.go",
+          "sha256": "923a602b61f3f4bb59aedc6976565c990f6001e2ea85e99e97064f9f82a18262"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/nodejs/yarn/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/php/composer/parse.go",
+      "sha256": "05ca5722e73cc292228965b0d5c38796d42173f491ae763f407c395efa28396c",
+      "symbols": [
+        {
+          "name": "lockFile",
+          "line": 18
+        },
+        {
+          "name": "packageInfo",
+          "line": 21
+        },
+        {
+          "name": "Parser",
+          "line": 34
+        },
+        {
+          "name": "NewParser",
+          "line": 36
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 40
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "63de0f9c1e7418fbf12f67a02cfe523973191098d51ac8382adc441f7e8ccc25",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/php/composer/parse.go",
+          "sha256": "96f9ab85ee25ec4915822df96284675c3f520ab786dea0be5b797f14ed47869a"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/php/composer/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/python/packaging/parse.go",
+      "sha256": "e9eb414f036d0d7d9c360238779a696954aa77850128c217a1202f78373d91c4",
+      "symbols": [
+        {
+          "name": "Parser",
+          "line": 21
+        },
+        {
+          "name": "NewParser",
+          "line": 23
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 29
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "cac2843e0fb498e545827fd847e9aba31bb079ed49722e97c8d1eaf689cabf00",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/python/packaging/parse.go",
+          "sha256": "b7d88231b619f7f49f3132556a0f43bb0c968d0eba0bb76e7a4a4cd1943143d1"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/python/packaging/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/python/pip/parse.go",
+      "sha256": "2f0cba718cb4ad5dd08f560b40478b712def8021df3f2cef6dceced4d59176a7",
+      "symbols": [
+        {
+          "name": "Parser",
+          "line": 23
+        },
+        {
+          "name": "NewParser",
+          "line": 25
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 29
+        },
+        {
+          "name": "rStripByKey",
+          "line": 46
+        },
+        {
+          "name": "removeExtras",
+          "line": 53
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "360ef55246fced816e2e0fc731652599f98568e63654515d103338d66bd3ae49",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/python/pip/parse.go",
+          "sha256": "09a33de29dea5c1116501a89307b9071129d32276eb6cc89457fe0f014abd208"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/python/pip/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/python/pip/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/python/pipenv/parse.go",
+      "sha256": "0a7be21323e0137cba9872cb842140119cf73bf9de0422d95fb767cff24604b3",
+      "symbols": [
+        {
+          "name": "lockFile",
+          "line": 15
+        },
+        {
+          "name": "dependency",
+          "line": 18
+        },
+        {
+          "name": "Parser",
+          "line": 26
+        },
+        {
+          "name": "NewParser",
+          "line": 28
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 32
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "4d5033411edcff1202f009a2f71f17bae47bb603d2d27089f6f7e8fb1c109308",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/python/pipenv/parse.go",
+          "sha256": "d1cb7340c6aa654000e48191c58225a64032cc6894a1c01d869ae9eaddc0cfcd"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/python/pipenv/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/python/pipenv/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/python/poetry/parse.go",
+      "sha256": "dc062b0b482857ea92acb40bb2598043d6f64e4b84fb8ec903f73f218e6d88f0",
+      "symbols": [
+        {
+          "name": "Lockfile",
+          "line": 17
+        },
+        {
+          "name": "Parser",
+          "line": 31
+        },
+        {
+          "name": "NewParser",
+          "line": 33
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 37
+        },
+        {
+          "name": "parseVersions",
+          "line": 94
+        },
+        {
+          "name": "parseDependencies",
+          "line": 109
+        },
+        {
+          "name": "parseDependency",
+          "line": 124
+        },
+        {
+          "name": "normalizePkgName",
+          "line": 140
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "8e996d18cb5ab8e2355e49bbd2c0ebac3fdba4b993dc9984110c5093f0563a28",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/python/poetry/parse.go",
+          "sha256": "c086e69c78a9c07ce08b87246b5a95803a467b3bf962dadd8c9f221364f7e35a"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/python/poetry/upstream_parse_testcase_test.go",
+        "analyzer/dep-parser/python/poetry/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/ruby/bundler/parse.go",
+      "sha256": "77a124058b4734c61c054c2972c4b9fa810d78d25d77c9b15b26c11665148479",
+      "symbols": [
+        {
+          "name": "Parser",
+          "line": 14
+        },
+        {
+          "name": "NewParser",
+          "line": 16
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 17
+        },
+        {
+          "name": "splitSpec",
+          "line": 127
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "9aa862154322dbb61d5c7c55ff6860627c67c74812ac8639656551769e48cba2",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/ruby/bundler/parse.go",
+          "sha256": "8ea3124b60796bc0797e1ff00e722b1eafa29e2fb735f0c526d2faaa20f59397"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/ruby/bundler/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/ruby/gemspec/parse.go",
+      "sha256": "20e37fdb83f38ad7fc109630c080503f5d532ead6af08f3c6b8518b08d37cee7",
+      "symbols": [
+        {
+          "name": "Parser",
+          "line": 45
+        },
+        {
+          "name": "NewParser",
+          "line": 47
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 51
+        },
+        {
+          "name": "literalAssignment",
+          "line": 113
+        },
+        {
+          "name": "findSubString",
+          "line": 134
+        },
+        {
+          "name": "trim",
+          "line": 144
+        },
+        {
+          "name": "parseLicenses",
+          "line": 150
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "4cd0ad2aa991f6ba8c94cd4aca8a00b21036bb4154f6e408edc31a0c8c351990",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/ruby/gemspec/parse.go",
+          "sha256": "00af830ca6ed8516e1504bce7ab2070325cb3e9c77b9260d4fc0e22da29174ce"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/ruby/gemspec/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/rust/cargo/parse.go",
+      "sha256": "efa1e6ccf2d83672594f18ffbcdb873dbfdd653093b24c37e6721f2df037cd0b",
+      "symbols": [
+        {
+          "name": "cargoPkg",
+          "line": 15
+        },
+        {
+          "name": "Lockfile",
+          "line": 21
+        },
+        {
+          "name": "Parser",
+          "line": 25
+        },
+        {
+          "name": "NewParser",
+          "line": 27
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 31
+        },
+        {
+          "name": "nativeID",
+          "line": 73
+        },
+        {
+          "name": "parseDependencies",
+          "line": 77
+        },
+        {
+          "name": "cargoIndex",
+          "line": 104
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "122f92d3f9d31462ae31bf7b851b98532884a2354f2a217b816f944b338d0b22",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/rust/cargo/parse.go",
+          "sha256": "d45e848c1025a82d43c652a9729df74711bc0f1c79edcbf1dc37e2d84c6f94f4"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/dep-parser/rust/cargo/upstream_parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/types/types.go",
+      "sha256": "773eef8f4b4e9ec20a0010e3d6b8ed97f419ce9fc9edc03b2390abef402153b6",
+      "symbols": [
+        {
+          "name": "ReadSeekerAt",
+          "line": 11
+        },
+        {
+          "name": "ReadSeekCloserAt",
+          "line": 16
+        },
+        {
+          "name": "Library",
+          "line": 21
+        },
+        {
+          "name": "Libraries",
+          "line": 40
+        },
+        {
+          "name": "Libraries.Len",
+          "line": 42
+        },
+        {
+          "name": "Libraries.Less",
+          "line": 43
+        },
+        {
+          "name": "Libraries.Swap",
+          "line": 51
+        },
+        {
+          "name": "Location",
+          "line": 54
+        },
+        {
+          "name": "Locations",
+          "line": 59
+        },
+        {
+          "name": "Locations.Len",
+          "line": 61
+        },
+        {
+          "name": "Locations.Less",
+          "line": 62
+        },
+        {
+          "name": "Locations.Swap",
+          "line": 65
+        },
+        {
+          "name": "ExternalRef",
+          "line": 67
+        },
+        {
+          "name": "Requirement",
+          "line": 72
+        },
+        {
+          "name": "Dependency",
+          "line": 77
+        },
+        {
+          "name": "Dependencies",
+          "line": 84
+        },
+        {
+          "name": "Dependencies.Len",
+          "line": 86
+        },
+        {
+          "name": "Dependencies.Less",
+          "line": 87
+        },
+        {
+          "name": "Dependencies.Swap",
+          "line": 90
+        },
+        {
+          "name": "Parser",
+          "line": 92
+        },
+        {
+          "name": "RefType",
+          "line": 97
+        },
+        {
+          "name": "ContextOf",
+          "line": 107
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "85c59d693fc08cba234ad7a748ce97e5160f8b1e3b01d305a43c21906ecd29d0",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/types/types.go",
+          "sha256": "8a28e130c7022e2b6efde22be0473507357e6717a9c15e08f58017dfe3ab6045"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/utils/utils.go",
+      "sha256": "9442712324adddd833287185047abfb0e304ab707f53fd4a47cfd88349ed4795",
+      "symbols": [
+        {
+          "name": "UniqueStrings",
+          "line": 11
+        },
+        {
+          "name": "UniqueLibraries",
+          "line": 24
+        },
+        {
+          "name": "MergeMaps",
+          "line": 56
+        },
+        {
+          "name": "PackageID",
+          "line": 68
+        }
+      ],
+      "decision": "TRIM_AND_REWRITE",
+      "reason": "Retained required record helpers only; JSON/TOML/YAML/runtime/IO framework replaced. Source/reference identity and diagnostics changes recorded in BEHAVIOR_DIFF.md.",
+      "yak_baseline_sha256": "74be1968e80a6d8d24dabbd0943a262a8416ef879b86e308291c67bed048a575",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/utils/utils.go",
+          "sha256": "7cb7d4e65825f6a228aaf2349b8f7f391650bf643e93a2638f899fa3a2de69d7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/analyzer/dpkg.go",
+      "sha256": "b06815d49ff811a113e6bde331ae165aa8b0e6586c4512ed85b3364977244d80",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 27
+        },
+        {
+          "name": "dpkgAnalyzer",
+          "line": 31
+        },
+        {
+          "name": "dpkgAnalyzer.parseStatus",
+          "line": 33
+        },
+        {
+          "name": "dpkgAnalyzer.parseDepends",
+          "line": 38
+        },
+        {
+          "name": "dpkgAnalyzer.getPackageNameAndVersion",
+          "line": 69
+        },
+        {
+          "name": "dpkgAnalyzer.parseDpkgPkg",
+          "line": 86
+        },
+        {
+          "name": "dpkgAnalyzer.analyzeStatus",
+          "line": 113
+        },
+        {
+          "name": "NewDpkgAnalyzer",
+          "line": 151
+        },
+        {
+          "name": "dpkgAnalyzer.Match",
+          "line": 155
+        },
+        {
+          "name": "dpkgAnalyzer.Analyze",
+          "line": 163
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "82e4fc3cfb8392161b2a4192d34d6cbe7bb65d839745de2b4e91c5593192512f",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/filetype.go",
+      "sha256": "9bb1dd389ac4cc1fbab15eabb2bdf2245eddf4cc48a42ac74100eeeb07134856",
+      "symbols": [
+        {
+          "name": "IsExecutable",
+          "line": 5
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "95709c740bd9ffd2c8117d872d240fb17df08d43664d92a1d6a0da15788d6fc2",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/go_binary.go",
+      "sha256": "ff4f3e044dba787b2675618e7a487f42177cc3b67159ab6fdf155bf25d6675d8",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 18
+        },
+        {
+          "name": "goBinaryAnalyzer",
+          "line": 22
+        },
+        {
+          "name": "NewGoBinaryAnalyzer",
+          "line": 24
+        },
+        {
+          "name": "goBinaryAnalyzer.Match",
+          "line": 28
+        },
+        {
+          "name": "goBinaryAnalyzer.Analyze",
+          "line": 35
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "b111726f65468d399c1d0476bba9ae83fedbde5ffb1d9545262201c279d749ad",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/go_mod.go",
+      "sha256": "d363149e589739e0ef6012cdcf45b4458dd2106038a2dfbdd50d7b9d224b02d1",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 29
+        },
+        {
+          "name": "goModAnalyzer",
+          "line": 33
+        },
+        {
+          "name": "NewGoModAnalyzer",
+          "line": 35
+        },
+        {
+          "name": "goModAnalyzer.Match",
+          "line": 39
+        },
+        {
+          "name": "goModAnalyzer.Analyze",
+          "line": 50
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "7bb7cb7410602225a1015dd1bdc977fb389bf1dd72513e02cb2d9368452f08ab",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/java_gradle.go",
+      "sha256": "dde0582690978fa86caa12890523a2722b9c9ec1894318ffa86d495500e4d19e",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 19
+        },
+        {
+          "name": "gradleAnalyzer",
+          "line": 23
+        },
+        {
+          "name": "NewJavaGradleAnalyzer",
+          "line": 25
+        },
+        {
+          "name": "gradleAnalyzer.Analyze",
+          "line": 29
+        },
+        {
+          "name": "gradleAnalyzer.Match",
+          "line": 43
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "dde0582690978fa86caa12890523a2722b9c9ec1894318ffa86d495500e4d19e",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/java_jar.go",
+      "sha256": "b88d7fc1d9859d6c64cea302004e67b441bb9b4e7c26fa77836c01825908782d",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 22
+        },
+        {
+          "name": "jarAnalyzer",
+          "line": 26
+        },
+        {
+          "name": "NewJavaJarAnalyzer",
+          "line": 28
+        },
+        {
+          "name": "jarAnalyzer.Analyze",
+          "line": 32
+        },
+        {
+          "name": "jarAnalyzer.Match",
+          "line": 53
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "b88d7fc1d9859d6c64cea302004e67b441bb9b4e7c26fa77836c01825908782d",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/java_pom.go",
+      "sha256": "3a4d0ab484d9663bd99ca99a49be8c9949b57d618e4aea5edc9f49d14b5c2e0e",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 17
+        },
+        {
+          "name": "pomAnalyzer",
+          "line": 21
+        },
+        {
+          "name": "NewJavaPomAnalyzer",
+          "line": 23
+        },
+        {
+          "name": "pomAnalyzer.Analyze",
+          "line": 27
+        },
+        {
+          "name": "pomAnalyzer.Match",
+          "line": 41
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "158c25ef27c3f499c1889d5c1071cb10cf8ae51d08d2dccdbfa7711f2010dba3",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/nodejs_npm.go",
+      "sha256": "9c59551e9b8716dc39d44a78cdef7783fda07ca4fc28f1ccd4fcd5e75001242d",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 28
+        },
+        {
+          "name": "npmAnalyzer",
+          "line": 32
+        },
+        {
+          "name": "NewNodeNpmAnalyzer",
+          "line": 34
+        },
+        {
+          "name": "npmAnalyzer.Analyze",
+          "line": 38
+        },
+        {
+          "name": "npmAnalyzer.Match",
+          "line": 60
+        },
+        {
+          "name": "packageJSON",
+          "line": 70
+        },
+        {
+          "name": "parseLicense",
+          "line": 79
+        },
+        {
+          "name": "parser",
+          "line": 93
+        },
+        {
+          "name": "newNpmParse",
+          "line": 95
+        },
+        {
+          "name": "parser.Parse",
+          "line": 99
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "f1dcb252d467ca4d30c19f27478a4ba05cc982ee82d53e9e1d0822a37e94fb49",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/nodejs_pnpm.go",
+      "sha256": "04a9311c09fcb9c7af14cd9f5794bf14d6d7ddb6250015f127981332d18fddf5",
+      "symbols": [
+        {
+          "name": "pnpmAnalyzer",
+          "line": 16
+        },
+        {
+          "name": "init",
+          "line": 18
+        },
+        {
+          "name": "NewNodePnpmAnalyzer",
+          "line": 22
+        },
+        {
+          "name": "pnpmAnalyzer.Analyze",
+          "line": 26
+        },
+        {
+          "name": "pnpmAnalyzer.Match",
+          "line": 39
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "04a9311c09fcb9c7af14cd9f5794bf14d6d7ddb6250015f127981332d18fddf5",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/nodejs_yarn.go",
+      "sha256": "2876e1e342684c9445436c13de789ab916faf03ef4746e9883588969d25d3ad2",
+      "symbols": [
+        {
+          "name": "yarnAnalyzer",
+          "line": 15
+        },
+        {
+          "name": "init",
+          "line": 17
+        },
+        {
+          "name": "NewNodeYarnAnalyzer",
+          "line": 21
+        },
+        {
+          "name": "yarnAnalyzer.Analyze",
+          "line": 25
+        },
+        {
+          "name": "yarnAnalyzer.Match",
+          "line": 38
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "2876e1e342684c9445436c13de789ab916faf03ef4746e9883588969d25d3ad2",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/parser_java_jar.go",
+      "sha256": "a9042db9092f8c35f0b594465d78e6c1c2bb50ddf1be2406f0a3414ab850c3c7",
+      "symbols": [
+        {
+          "name": "JarParser",
+          "line": 23
+        },
+        {
+          "name": "JarProperties",
+          "line": 33
+        },
+        {
+          "name": "JarProperties.Library",
+          "line": 40
+        },
+        {
+          "name": "JarProperties.Valid",
+          "line": 48
+        },
+        {
+          "name": "JarProperties.String",
+          "line": 52
+        },
+        {
+          "name": "NewJarParser",
+          "line": 56
+        },
+        {
+          "name": "JarParser.Parse",
+          "line": 63
+        },
+        {
+          "name": "JarParser.parseArtifact",
+          "line": 73
+        },
+        {
+          "name": "JarParser.parseInnerJar",
+          "line": 165
+        },
+        {
+          "name": "isArtifact",
+          "line": 193
+        },
+        {
+          "name": "parsePomProperties",
+          "line": 201
+        },
+        {
+          "name": "manifest",
+          "line": 230
+        },
+        {
+          "name": "parseManifest",
+          "line": 243
+        },
+        {
+          "name": "manifest.properties",
+          "line": 283
+        },
+        {
+          "name": "manifest.determineGroupID",
+          "line": 307
+        },
+        {
+          "name": "manifest.determineArtifactID",
+          "line": 329
+        },
+        {
+          "name": "manifest.determineVersion",
+          "line": 344
+        },
+        {
+          "name": "removeLibraryDuplicates",
+          "line": 359
+        }
+      ],
+      "decision": "EXTRACT_AND_REWRITE",
+      "reason": "Remove Sonatype client, filename inference, temporary files and optional offline mode. Bounded ZIP and explicit metadata only.",
+      "yak_baseline_sha256": "964c535498c0ea3ab9c03774a2b92a31e734e7f024282a115f32403c62f8cbb9",
+      "upstream": [
+        {
+          "path": "go-dep-parser/pkg/java/jar/parse.go",
+          "sha256": "d89a618a22d32095d52682708548050831cbf65f6b44c8863fbe0f3c13958af7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/php_composer.go",
+      "sha256": "02fecde5c02b130f42b081d58a9dec64bb365e18dc94f625221436e645c11c96",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 24
+        },
+        {
+          "name": "composerAnalyzer",
+          "line": 28
+        },
+        {
+          "name": "NewPHPComposerAnalyzer",
+          "line": 30
+        },
+        {
+          "name": "composerAnalyzer.Analyze",
+          "line": 34
+        },
+        {
+          "name": "composerAnalyzer.Match",
+          "line": 70
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "8d952b2aa1bd5bbf27134bbef782d1a7994b2f941408407e16239b923b45e5aa",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/python_packaging.go",
+      "sha256": "09d182f0a1ed5877fc0e505e2567f6743f198f3f5253b39652b07ebec5973433",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 42
+        },
+        {
+          "name": "pythonPackagingAnalyzer",
+          "line": 46
+        },
+        {
+          "name": "NewPythonPackagingAnalyzer",
+          "line": 48
+        },
+        {
+          "name": "pythonPackagingAnalyzer.Match",
+          "line": 52
+        },
+        {
+          "name": "pythonPackagingAnalyzer.Analyze",
+          "line": 64
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "ad91f427d5127bb57b649d0d63de0a8ebde8ea2fd5ee28655936fdf6c37f479a",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/python_pip.go",
+      "sha256": "3684172a34af9fa00adb360ab66eee590025f51869c5fb4bb204298b26b125f4",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 19
+        },
+        {
+          "name": "pythonPIPAnalyzer",
+          "line": 23
+        },
+        {
+          "name": "NewPythonPIPAnalyzer",
+          "line": 25
+        },
+        {
+          "name": "pythonPIPAnalyzer.Match",
+          "line": 29
+        },
+        {
+          "name": "pythonPIPAnalyzer.Analyze",
+          "line": 36
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "3684172a34af9fa00adb360ab66eee590025f51869c5fb4bb204298b26b125f4",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/python_pipenv.go",
+      "sha256": "536359831fdd717bfc22c91fed8952f6938c3476fd3156522b783c080bcd06f3",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 19
+        },
+        {
+          "name": "pythonPIPEnvAnalyzer",
+          "line": 23
+        },
+        {
+          "name": "NewPythonPIPEnvAnalyzer",
+          "line": 25
+        },
+        {
+          "name": "pythonPIPEnvAnalyzer.Match",
+          "line": 29
+        },
+        {
+          "name": "pythonPIPEnvAnalyzer.Analyze",
+          "line": 36
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "536359831fdd717bfc22c91fed8952f6938c3476fd3156522b783c080bcd06f3",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/python_poerty.go",
+      "sha256": "ffcd0fe92c6231b3848f6e9da9bf83a4a81e61a70cd4a568ff8db8f91284796c",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 20
+        },
+        {
+          "name": "pythonPoetryAnalyzer",
+          "line": 24
+        },
+        {
+          "name": "NewPythonPoetryAnalyzer",
+          "line": 26
+        },
+        {
+          "name": "pythonPoetryAnalyzer.Match",
+          "line": 30
+        },
+        {
+          "name": "pythonPoetryAnalyzer.Analyze",
+          "line": 37
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "ffcd0fe92c6231b3848f6e9da9bf83a4a81e61a70cd4a568ff8db8f91284796c",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/rpm.go",
+      "sha256": "4b8a1c9f5125fa8e93ab88505cab51f60f00926be281ecf067c6447f39f84d6e",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 19
+        },
+        {
+          "name": "rpmAnalyzer",
+          "line": 38
+        },
+        {
+          "name": "NewRPMAnalyzer",
+          "line": 40
+        },
+        {
+          "name": "rpmAnalyzer.createPackage",
+          "line": 44
+        },
+        {
+          "name": "rpmAnalyzer.Analyze",
+          "line": 63
+        },
+        {
+          "name": "rpmAnalyzer.Match",
+          "line": 86
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "124addb098429cde972ca8ab1935fc78cf7c8a8c3258a69f972fbbf7d54d7654",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/ruby_bundler.go",
+      "sha256": "ec134392aef0a20f6feb9e59d779a2aca7236f8b181e68799f1f71576a1d97e2",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 14
+        },
+        {
+          "name": "rubyBunlderAnalyzer",
+          "line": 18
+        },
+        {
+          "name": "NewRubyBundlerAnalyzer",
+          "line": 20
+        },
+        {
+          "name": "rubyBunlderAnalyzer.Analyze",
+          "line": 24
+        },
+        {
+          "name": "rubyBunlderAnalyzer.Match",
+          "line": 37
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "ec134392aef0a20f6feb9e59d779a2aca7236f8b181e68799f1f71576a1d97e2",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/ruby_gemspec.go",
+      "sha256": "7573cd648d3bf1a8970c5b98d18fd652c8855baa64578706035f62ada037cad5",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 18
+        },
+        {
+          "name": "rubyGemSpecAnalyzer",
+          "line": 22
+        },
+        {
+          "name": "NewRubyGemSpecAnalyzer",
+          "line": 24
+        },
+        {
+          "name": "rubyGemSpecAnalyzer.Analyze",
+          "line": 28
+        },
+        {
+          "name": "rubyGemSpecAnalyzer.Match",
+          "line": 41
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "7573cd648d3bf1a8970c5b98d18fd652c8855baa64578706035f62ada037cad5",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/rust_cargo.go",
+      "sha256": "8058916378d909d160df620a15ac62511cb983e092a58dee4fb0736a7e930878",
+      "symbols": [
+        {
+          "name": "init",
+          "line": 18
+        },
+        {
+          "name": "cargoAnalyzer",
+          "line": 22
+        },
+        {
+          "name": "NewRustCargoAnalyzer",
+          "line": 24
+        },
+        {
+          "name": "cargoAnalyzer.Analyze",
+          "line": 28
+        },
+        {
+          "name": "cargoAnalyzer.Match",
+          "line": 42
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "8058916378d909d160df620a15ac62511cb983e092a58dee4fb0736a7e930878",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/utils_dependence.go",
+      "sha256": "91792fa8892cd726bf1f392b90a6bdd83420d4cff4946f9aececdabb4d9bb0fe",
+      "symbols": [
+        {
+          "name": "parseVersion",
+          "line": 13
+        },
+        {
+          "name": "handlerSemverVersionRange",
+          "line": 29
+        },
+        {
+          "name": "MergePackages",
+          "line": 60
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "98e37df421bea345118593dbf51e1ce89c155ff0327f9275f3504f7b10b67924",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/utils_io.go",
+      "sha256": "a0a84ddbae7f19252490de33f2e799d3f454073eeea5ce302564293e8a3b47b8",
+      "symbols": [
+        {
+          "name": "ReadBlock",
+          "line": 14
+        },
+        {
+          "name": "readBlock",
+          "line": 18
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "828d44c696a31e338d8606e19adb9734217de3988de3fe47e303af152c1dda52",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "analyzer/utils_dependence_test.go",
+        "analyzer/merge_benchmark_test.go",
+        "analyzer/parsed_contract_test.go",
+        "analyzer/format_contract_test.go",
+        "analyzer/upstream_jar_test.go",
+        "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer.go",
+      "sha256": "b7e450d762e04522127053c284d9101ff36c6706646d7f9d77b9cdd07561758c",
+      "symbols": [
+        {
+          "name": "ScanConfig",
+          "line": 15
+        },
+        {
+          "name": "ScanOption",
+          "line": 26
+        },
+        {
+          "name": "NewConfig",
+          "line": 28
+        },
+        {
+          "name": "_withCustomAnalyzer",
+          "line": 50
+        },
+        {
+          "name": "_withScanMode",
+          "line": 69
+        },
+        {
+          "name": "_withConcurrent",
+          "line": 88
+        },
+        {
+          "name": "_withAnalayzers",
+          "line": 107
+        },
+        {
+          "name": "scanFS",
+          "line": 113
+        },
+        {
+          "name": "ScanLocalFilesystem",
+          "line": 138
+        },
+        {
+          "name": "ScanFilesystem",
+          "line": 167
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "f4e37e5de4c3d403ef3b09f408b631f501a37b095ab7385790fa22e32fc786ce",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/config.go",
+      "sha256": "d862069934a5eea9bb4e77a331dfb9f39ee39adb3e54a0581bd7a375d42dd38b",
+      "symbols": [
+        {
+          "name": "SCAConfig",
+          "line": 4
+        },
+        {
+          "name": "SCAConfigOption",
+          "line": 8
+        },
+        {
+          "name": "WithFileSystemPath",
+          "line": 10
+        },
+        {
+          "name": "WithDisableLanguages",
+          "line": 13
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "813ca66aa6eeb39edee2aa7ead76971a9caa9336096bbc811cf809eba31896cf",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/budget/context.go",
+      "sha256": "3b6bc322a80464fb3c2a3493d4c7a6354ff153a158f9498dcb98ab1bdbbb4de8",
+      "symbols": [
+        {
+          "name": "key",
+          "line": 9
+        },
+        {
+          "name": "State",
+          "line": 10
+        },
+        {
+          "name": "Bind",
+          "line": 19
+        },
+        {
+          "name": "From",
+          "line": 22
+        },
+        {
+          "name": "State.Archive",
+          "line": 29
+        },
+        {
+          "name": "State.Read",
+          "line": 41
+        },
+        {
+          "name": "State.Exhausted",
+          "line": 54
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/core/budget/limits.go",
+      "sha256": "da39fe16dc101a08da0ea8490603e66997ea6da9ade2ae980c9d660e8db95cdf",
+      "symbols": [
+        {
+          "name": "Limits",
+          "line": 9
+        },
+        {
+          "name": "Limits.Normalize",
+          "line": 18
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/core/gomod/lexer.go",
+      "sha256": "a2a6d21b20e9d8b861f25e3067f1fdea37df15b42ada7e23b1b42d6f2399b7a7",
+      "symbols": [
+        {
+          "name": "Position",
+          "line": 16
+        },
+        {
+          "name": "input",
+          "line": 17
+        },
+        {
+          "name": "parseFailure",
+          "line": 24
+        },
+        {
+          "name": "input.Error",
+          "line": 26
+        },
+        {
+          "name": "input.eof",
+          "line": 29
+        },
+        {
+          "name": "input.peekRune",
+          "line": 34
+        },
+        {
+          "name": "input.peekPrefix",
+          "line": 43
+        },
+        {
+          "name": "input.readRune",
+          "line": 55
+        },
+        {
+          "name": "token",
+          "line": 79
+        },
+        {
+          "name": "tokenKind",
+          "line": 86
+        },
+        {
+          "name": "tokenKind.isComment",
+          "line": 98
+        },
+        {
+          "name": "tokenKind.isEOL",
+          "line": 103
+        },
+        {
+          "name": "input.startToken",
+          "line": 110
+        },
+        {
+          "name": "input.endToken",
+          "line": 119
+        },
+        {
+          "name": "input.peek",
+          "line": 134
+        },
+        {
+          "name": "input.lex",
+          "line": 139
+        },
+        {
+          "name": "input.readToken",
+          "line": 146
+        },
+        {
+          "name": "isIdent",
+          "line": 257
+        }
+      ],
+      "decision": "EXTRACT_AND_REWRITE",
+      "reason": "Retain lexer and module/version validation concepts; remove edit/print/work-file APIs, download resolution, and public x/mod types.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "x-mod/modfile/read.go",
+          "sha256": "94addf2b410f66a822d3048c1b8f78fa1fc53cfc3bb5c35757caab844f417eb5"
+        },
+        {
+          "path": "x-mod/modfile/rule.go",
+          "sha256": "21b4ef48e7f8fd9d7f7fe909a06d2f9aac2c6eb1060e753f9a42369be3ab8e47"
+        },
+        {
+          "path": "x-mod/semver/semver.go",
+          "sha256": "773c3065d16827d7633298bba180dee5cf91016167228046cfbbec2c93b80e28"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/gomod/upstream_test.go",
+        "core/gomod/parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/gomod/parse.go",
+      "sha256": "ee5987ba7ba4554d6712b18acf4309782230f23c033d8c966cbdece4e1ee7973",
+      "symbols": [
+        {
+          "name": "Limits",
+          "line": 17
+        },
+        {
+          "name": "Limits.defaults",
+          "line": 19
+        },
+        {
+          "name": "Module",
+          "line": 35
+        },
+        {
+          "name": "Requirement",
+          "line": 36
+        },
+        {
+          "name": "Replacement",
+          "line": 41
+        },
+        {
+          "name": "Interval",
+          "line": 45
+        },
+        {
+          "name": "File",
+          "line": 49
+        },
+        {
+          "name": "version",
+          "line": 60
+        },
+        {
+          "name": "modulePath",
+          "line": 61
+        },
+        {
+          "name": "Parse",
+          "line": 67
+        },
+        {
+          "name": "File.add",
+          "line": 178
+        }
+      ],
+      "decision": "EXTRACT_AND_REWRITE",
+      "reason": "Retain lexer and module/version validation concepts; remove edit/print/work-file APIs, download resolution, and public x/mod types.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "x-mod/modfile/read.go",
+          "sha256": "94addf2b410f66a822d3048c1b8f78fa1fc53cfc3bb5c35757caab844f417eb5"
+        },
+        {
+          "path": "x-mod/modfile/rule.go",
+          "sha256": "21b4ef48e7f8fd9d7f7fe909a06d2f9aac2c6eb1060e753f9a42369be3ab8e47"
+        },
+        {
+          "path": "x-mod/semver/semver.go",
+          "sha256": "773c3065d16827d7633298bba180dee5cf91016167228046cfbbec2c93b80e28"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/gomod/upstream_test.go",
+        "core/gomod/parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/gomod/resolve.go",
+      "sha256": "ce512b5c31aad640449a2e9a1ac546a565b92de6451bc761717d6496323fc521",
+      "symbols": [
+        {
+          "name": "Declaration",
+          "line": 6
+        },
+        {
+          "name": "File.Declarations",
+          "line": 12
+        }
+      ],
+      "decision": "EXTRACT_AND_REWRITE",
+      "reason": "Retain lexer and module/version validation concepts; remove edit/print/work-file APIs, download resolution, and public x/mod types.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "x-mod/modfile/read.go",
+          "sha256": "94addf2b410f66a822d3048c1b8f78fa1fc53cfc3bb5c35757caab844f417eb5"
+        },
+        {
+          "path": "x-mod/modfile/rule.go",
+          "sha256": "21b4ef48e7f8fd9d7f7fe909a06d2f9aac2c6eb1060e753f9a42369be3ab8e47"
+        },
+        {
+          "path": "x-mod/semver/semver.go",
+          "sha256": "773c3065d16827d7633298bba180dee5cf91016167228046cfbbec2c93b80e28"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/gomod/upstream_test.go",
+        "core/gomod/parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/gomod/sum.go",
+      "sha256": "caad5cbd90283e428f6179d39ae58310f482c658af4d951c31167277c8be8fbe",
+      "symbols": [
+        {
+          "name": "SumKey",
+          "line": 12
+        },
+        {
+          "name": "ParseSum",
+          "line": 19
+        }
+      ],
+      "decision": "EXTRACT_AND_REWRITE",
+      "reason": "Retain lexer and module/version validation concepts; remove edit/print/work-file APIs, download resolution, and public x/mod types.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "x-mod/modfile/read.go",
+          "sha256": "94addf2b410f66a822d3048c1b8f78fa1fc53cfc3bb5c35757caab844f417eb5"
+        },
+        {
+          "path": "x-mod/modfile/rule.go",
+          "sha256": "21b4ef48e7f8fd9d7f7fe909a06d2f9aac2c6eb1060e753f9a42369be3ab8e47"
+        },
+        {
+          "path": "x-mod/semver/semver.go",
+          "sha256": "773c3065d16827d7633298bba180dee5cf91016167228046cfbbec2c93b80e28"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/gomod/upstream_test.go",
+        "core/gomod/parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/gomod/version.go",
+      "sha256": "f23d373e37dfcc732dd137fc5450df5b7aba8d8d14acf90812595da2701f2a7a",
+      "symbols": [
+        {
+          "name": "parsed",
+          "line": 10
+        },
+        {
+          "name": "Canonical",
+          "line": 19
+        },
+        {
+          "name": "parse",
+          "line": 33
+        },
+        {
+          "name": "parseInt",
+          "line": 88
+        },
+        {
+          "name": "parsePrerelease",
+          "line": 105
+        },
+        {
+          "name": "parseBuild",
+          "line": 133
+        },
+        {
+          "name": "isIdentChar",
+          "line": 157
+        },
+        {
+          "name": "isBadNum",
+          "line": 161
+        },
+        {
+          "name": "SplitPathVersion",
+          "line": 169
+        },
+        {
+          "name": "splitGopkgIn",
+          "line": 193
+        },
+        {
+          "name": "canonicalVersion",
+          "line": 215
+        },
+        {
+          "name": "matchingMajor",
+          "line": 222
+        }
+      ],
+      "decision": "EXTRACT_AND_REWRITE",
+      "reason": "Retain lexer and module/version validation concepts; remove edit/print/work-file APIs, download resolution, and public x/mod types.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "x-mod/modfile/read.go",
+          "sha256": "94addf2b410f66a822d3048c1b8f78fa1fc53cfc3bb5c35757caab844f417eb5"
+        },
+        {
+          "path": "x-mod/modfile/rule.go",
+          "sha256": "21b4ef48e7f8fd9d7f7fe909a06d2f9aac2c6eb1060e753f9a42369be3ab8e47"
+        },
+        {
+          "path": "x-mod/semver/semver.go",
+          "sha256": "773c3065d16827d7633298bba180dee5cf91016167228046cfbbec2c93b80e28"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/gomod/upstream_test.go",
+        "core/gomod/parse_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/jsonrecord/read.go",
+      "sha256": "c9367ab53c8c19e7356c279272e97336e3ba1bb3f1834153a1b2bdc0cceab67f",
+      "symbols": [
+        {
+          "name": "Node",
+          "line": 17
+        },
+        {
+          "name": "Node.Get",
+          "line": 24
+        },
+        {
+          "name": "Node.Lines",
+          "line": 33
+        },
+        {
+          "name": "Node.Elements",
+          "line": 39
+        },
+        {
+          "name": "reader",
+          "line": 46
+        },
+        {
+          "name": "Parse",
+          "line": 59
+        },
+        {
+          "name": "reader.value",
+          "line": 89
+        },
+        {
+          "name": "Decode",
+          "line": 160
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/jsonrecord/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/locktoml/error.go",
+      "sha256": "fc422d57ef0b4dbfe61993c8ef614c7b56a4e236f95202cc1ce7b6a296f584c9",
+      "symbols": [
+        {
+          "name": "ParseError",
+          "line": 8
+        },
+        {
+          "name": "Position",
+          "line": 24
+        },
+        {
+          "name": "ParseError.Error",
+          "line": 30
+        },
+        {
+          "name": "errLexControl",
+          "line": 44
+        },
+        {
+          "name": "errLexEscape",
+          "line": 45
+        },
+        {
+          "name": "errLexUTF8",
+          "line": 46
+        },
+        {
+          "name": "errLexInvalidNum",
+          "line": 47
+        },
+        {
+          "name": "errLexInvalidDate",
+          "line": 48
+        },
+        {
+          "name": "errLexInlineTableNL",
+          "line": 49
+        },
+        {
+          "name": "errLexStringNL",
+          "line": 50
+        },
+        {
+          "name": "errParseRange",
+          "line": 51
+        },
+        {
+          "name": "errParseDuration",
+          "line": 55
+        },
+        {
+          "name": "errLexControl.Error",
+          "line": 58
+        },
+        {
+          "name": "errLexEscape.Error",
+          "line": 62
+        },
+        {
+          "name": "errLexUTF8.Error",
+          "line": 63
+        },
+        {
+          "name": "errLexInvalidNum.Error",
+          "line": 64
+        },
+        {
+          "name": "errLexInvalidDate.Error",
+          "line": 65
+        },
+        {
+          "name": "errLexInlineTableNL.Error",
+          "line": 66
+        },
+        {
+          "name": "errLexStringNL.Error",
+          "line": 67
+        },
+        {
+          "name": "errParseRange.Error",
+          "line": 68
+        }
+      ],
+      "decision": "EXTRACT_AND_TRIM",
+      "reason": "Finite lock lexer/scalars/table parser; remove encoder, reflection binding, environment options, dates, TOML 1.1.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "toml/lex.go",
+          "sha256": "e2cc420888ce329f315abf95b28f8e9e8f0fa013045af089575251f49554e3ef"
+        },
+        {
+          "path": "toml/parse.go",
+          "sha256": "0d02803922363df7b4dd5a09dda5f340d2e0050b19d2d4ae2532f158e99e1f1e"
+        },
+        {
+          "path": "toml/error.go",
+          "sha256": "5382d5ec0d9d8bda6522ae79aae701fa3cf867611b8dfbd42129179d7b4871f7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/locktoml/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/locktoml/lex.go",
+      "sha256": "822c5f121647a1a047d4272edd753b90e9d6bbeddd6a62f0bce20da6ba60182b",
+      "symbols": [
+        {
+          "name": "itemType",
+          "line": 12
+        },
+        {
+          "name": "stateFn",
+          "line": 42
+        },
+        {
+          "name": "Position.String",
+          "line": 44
+        },
+        {
+          "name": "lexer",
+          "line": 48
+        },
+        {
+          "name": "item",
+          "line": 74
+        },
+        {
+          "name": "lexer.nextItem",
+          "line": 81
+        },
+        {
+          "name": "lex",
+          "line": 93
+        },
+        {
+          "name": "lexer.push",
+          "line": 104
+        },
+        {
+          "name": "lexer.pop",
+          "line": 108
+        },
+        {
+          "name": "lexer.current",
+          "line": 117
+        },
+        {
+          "name": "lexer.getPos",
+          "line": 121
+        },
+        {
+          "name": "lexer.emit",
+          "line": 133
+        },
+        {
+          "name": "lexer.emitTrim",
+          "line": 143
+        },
+        {
+          "name": "lexer.next",
+          "line": 148
+        },
+        {
+          "name": "lexer.ignore",
+          "line": 195
+        },
+        {
+          "name": "lexer.backup",
+          "line": 200
+        },
+        {
+          "name": "lexer.accept",
+          "line": 221
+        },
+        {
+          "name": "lexer.peek",
+          "line": 230
+        },
+        {
+          "name": "lexer.skip",
+          "line": 237
+        },
+        {
+          "name": "lexer.error",
+          "line": 253
+        },
+        {
+          "name": "lexer.errorPrevLine",
+          "line": 265
+        },
+        {
+          "name": "lexer.errorPos",
+          "line": 275
+        },
+        {
+          "name": "lexer.errorf",
+          "line": 284
+        },
+        {
+          "name": "lexer.errorControlChar",
+          "line": 297
+        },
+        {
+          "name": "lexTop",
+          "line": 302
+        },
+        {
+          "name": "lexTopEnd",
+          "line": 331
+        },
+        {
+          "name": "lexTableStart",
+          "line": 357
+        },
+        {
+          "name": "lexTableEnd",
+          "line": 369
+        },
+        {
+          "name": "lexArrayTableEnd",
+          "line": 374
+        },
+        {
+          "name": "lexTableNameStart",
+          "line": 382
+        },
+        {
+          "name": "lexTableNameEnd",
+          "line": 401
+        },
+        {
+          "name": "lexBareName",
+          "line": 422
+        },
+        {
+          "name": "lexQuotedName",
+          "line": 438
+        },
+        {
+          "name": "lexKeyStart",
+          "line": 457
+        },
+        {
+          "name": "lexKeyNameStart",
+          "line": 473
+        },
+        {
+          "name": "lexKeyEnd",
+          "line": 492
+        },
+        {
+          "name": "lexValue",
+          "line": 513
+        },
+        {
+          "name": "lexArrayValue",
+          "line": 579
+        },
+        {
+          "name": "lexArrayValueEnd",
+          "line": 601
+        },
+        {
+          "name": "lexArrayEnd",
+          "line": 620
+        },
+        {
+          "name": "lexInlineTableValue",
+          "line": 628
+        },
+        {
+          "name": "lexInlineTableValueEnd",
+          "line": 652
+        },
+        {
+          "name": "runeOrEOF",
+          "line": 677
+        },
+        {
+          "name": "lexInlineTableEnd",
+          "line": 686
+        },
+        {
+          "name": "lexString",
+          "line": 694
+        },
+        {
+          "name": "lexMultilineString",
+          "line": 716
+        },
+        {
+          "name": "lexRawString",
+          "line": 771
+        },
+        {
+          "name": "lexMultilineRawString",
+          "line": 792
+        },
+        {
+          "name": "lexMultilineStringEscape",
+          "line": 835
+        },
+        {
+          "name": "lexStringEscape",
+          "line": 844
+        },
+        {
+          "name": "lexShortUnicodeEscape",
+          "line": 877
+        },
+        {
+          "name": "lexLongUnicodeEscape",
+          "line": 890
+        },
+        {
+          "name": "lexNumberOrDateStart",
+          "line": 907
+        },
+        {
+          "name": "lexNumberOrDate",
+          "line": 925
+        },
+        {
+          "name": "lexDatetime",
+          "line": 946
+        },
+        {
+          "name": "lexHexInteger",
+          "line": 962
+        },
+        {
+          "name": "lexOctalInteger",
+          "line": 978
+        },
+        {
+          "name": "lexBinaryInteger",
+          "line": 994
+        },
+        {
+          "name": "lexDecimalNumber",
+          "line": 1010
+        },
+        {
+          "name": "lexDecimalNumberStart",
+          "line": 1032
+        },
+        {
+          "name": "lexBaseNumberOrDate",
+          "line": 1069
+        },
+        {
+          "name": "lexFloat",
+          "line": 1112
+        },
+        {
+          "name": "lexBool",
+          "line": 1128
+        },
+        {
+          "name": "lexCommentStart",
+          "line": 1149
+        },
+        {
+          "name": "lexComment",
+          "line": 1158
+        },
+        {
+          "name": "lexSkip",
+          "line": 1170
+        },
+        {
+          "name": "itemType.String",
+          "line": 1175
+        },
+        {
+          "name": "item.String",
+          "line": 1217
+        },
+        {
+          "name": "isWhitespace",
+          "line": 1221
+        },
+        {
+          "name": "isNL",
+          "line": 1222
+        },
+        {
+          "name": "isControl",
+          "line": 1223
+        },
+        {
+          "name": "isDigit",
+          "line": 1231
+        },
+        {
+          "name": "isBinary",
+          "line": 1232
+        },
+        {
+          "name": "isOctal",
+          "line": 1233
+        },
+        {
+          "name": "isHexadecimal",
+          "line": 1234
+        },
+        {
+          "name": "isBareKeyChar",
+          "line": 1238
+        }
+      ],
+      "decision": "EXTRACT_AND_TRIM",
+      "reason": "Finite lock lexer/scalars/table parser; remove encoder, reflection binding, environment options, dates, TOML 1.1.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "toml/lex.go",
+          "sha256": "e2cc420888ce329f315abf95b28f8e9e8f0fa013045af089575251f49554e3ef"
+        },
+        {
+          "path": "toml/parse.go",
+          "sha256": "0d02803922363df7b4dd5a09dda5f340d2e0050b19d2d4ae2532f158e99e1f1e"
+        },
+        {
+          "path": "toml/error.go",
+          "sha256": "5382d5ec0d9d8bda6522ae79aae701fa3cf867611b8dfbd42129179d7b4871f7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/locktoml/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/locktoml/parse.go",
+      "sha256": "3a0906d83e25a357614881e713f04a4e0cc8a2872766795d3814ec9e52b37d89",
+      "symbols": [
+        {
+          "name": "tableOrigin",
+          "line": 11
+        },
+        {
+          "name": "node",
+          "line": 19
+        },
+        {
+          "name": "table",
+          "line": 28
+        },
+        {
+          "name": "parser",
+          "line": 30
+        },
+        {
+          "name": "parse",
+          "line": 39
+        },
+        {
+          "name": "parser.next",
+          "line": 79
+        },
+        {
+          "name": "parser.expect",
+          "line": 97
+        },
+        {
+          "name": "parser.panicItemf",
+          "line": 104
+        },
+        {
+          "name": "parser.bug",
+          "line": 107
+        },
+        {
+          "name": "parser.key",
+          "line": 110
+        },
+        {
+          "name": "parser.header",
+          "line": 138
+        },
+        {
+          "name": "parser.assign",
+          "line": 179
+        },
+        {
+          "name": "parser.value",
+          "line": 197
+        },
+        {
+          "name": "node.value",
+          "line": 275
+        }
+      ],
+      "decision": "EXTRACT_AND_TRIM",
+      "reason": "Finite lock lexer/scalars/table parser; remove encoder, reflection binding, environment options, dates, TOML 1.1.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "toml/lex.go",
+          "sha256": "e2cc420888ce329f315abf95b28f8e9e8f0fa013045af089575251f49554e3ef"
+        },
+        {
+          "path": "toml/parse.go",
+          "sha256": "0d02803922363df7b4dd5a09dda5f340d2e0050b19d2d4ae2532f158e99e1f1e"
+        },
+        {
+          "path": "toml/error.go",
+          "sha256": "5382d5ec0d9d8bda6522ae79aae701fa3cf867611b8dfbd42129179d7b4871f7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/locktoml/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/locktoml/read.go",
+      "sha256": "c5f731ff5bb882a162e1cf472973af4508092f6cc1bf2ba36c82b0044603b744",
+      "symbols": [
+        {
+          "name": "parseAbort",
+          "line": 16
+        },
+        {
+          "name": "Key",
+          "line": 17
+        },
+        {
+          "name": "Key.add",
+          "line": 19
+        },
+        {
+          "name": "Key.String",
+          "line": 20
+        },
+        {
+          "name": "Parse",
+          "line": 21
+        },
+        {
+          "name": "document",
+          "line": 28
+        },
+        {
+          "name": "Span",
+          "line": 48
+        },
+        {
+          "name": "DecodeRecords",
+          "line": 52
+        },
+        {
+          "name": "Decode",
+          "line": 78
+        }
+      ],
+      "decision": "EXTRACT_AND_TRIM",
+      "reason": "Finite lock lexer/scalars/table parser; remove encoder, reflection binding, environment options, dates, TOML 1.1.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "toml/lex.go",
+          "sha256": "e2cc420888ce329f315abf95b28f8e9e8f0fa013045af089575251f49554e3ef"
+        },
+        {
+          "path": "toml/parse.go",
+          "sha256": "0d02803922363df7b4dd5a09dda5f340d2e0050b19d2d4ae2532f158e99e1f1e"
+        },
+        {
+          "path": "toml/error.go",
+          "sha256": "5382d5ec0d9d8bda6522ae79aae701fa3cf867611b8dfbd42129179d7b4871f7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/locktoml/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/locktoml/scalars.go",
+      "sha256": "4edef94aee9ade2f9eba47095e25dd0fa17f28378a710d88acf9c92fc8d0fb71",
+      "symbols": [
+        {
+          "name": "numHasLeadingZero",
+          "line": 10
+        },
+        {
+          "name": "numUnderscoresOK",
+          "line": 22
+        },
+        {
+          "name": "numPeriodsOK",
+          "line": 43
+        },
+        {
+          "name": "stripFirstNewline",
+          "line": 54
+        },
+        {
+          "name": "parser.stripEscapedNewlines",
+          "line": 70
+        },
+        {
+          "name": "parser.replaceEscapes",
+          "line": 114
+        },
+        {
+          "name": "parser.asciiEscapeToUnicode",
+          "line": 179
+        }
+      ],
+      "decision": "EXTRACT_AND_TRIM",
+      "reason": "Finite lock lexer/scalars/table parser; remove encoder, reflection binding, environment options, dates, TOML 1.1.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "toml/lex.go",
+          "sha256": "e2cc420888ce329f315abf95b28f8e9e8f0fa013045af089575251f49554e3ef"
+        },
+        {
+          "path": "toml/parse.go",
+          "sha256": "0d02803922363df7b4dd5a09dda5f340d2e0050b19d2d4ae2532f158e99e1f1e"
+        },
+        {
+          "path": "toml/error.go",
+          "sha256": "5382d5ec0d9d8bda6522ae79aae701fa3cf867611b8dfbd42129179d7b4871f7"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/locktoml/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/lockyaml/read.go",
+      "sha256": "308af9bf702edc6cc0a5b5be2585c5037f4d6f24dc7150e69dcefb45a374e8c7",
+      "symbols": [
+        {
+          "name": "line",
+          "line": 16
+        },
+        {
+          "name": "reader",
+          "line": 20
+        },
+        {
+          "name": "Parse",
+          "line": 27
+        },
+        {
+          "name": "clean",
+          "line": 103
+        },
+        {
+          "name": "reader.check",
+          "line": 145
+        },
+        {
+          "name": "seq",
+          "line": 155
+        },
+        {
+          "name": "reader.block",
+          "line": 156
+        },
+        {
+          "name": "reader.mapping",
+          "line": 186
+        },
+        {
+          "name": "splitKey",
+          "line": 226
+        },
+        {
+          "name": "reader.value",
+          "line": 264
+        },
+        {
+          "name": "scalar",
+          "line": 288
+        },
+        {
+          "name": "double",
+          "line": 313
+        },
+        {
+          "name": "flow",
+          "line": 360
+        },
+        {
+          "name": "flow.space",
+          "line": 366
+        },
+        {
+          "name": "flow.value",
+          "line": 371
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/lockyaml/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/pyrequire/read.go",
+      "sha256": "352786506c378db32bd1e83b3f29b7040a3205ca7c9c6c15e6a6f66ba9bf626d",
+      "symbols": [
+        {
+          "name": "Record",
+          "line": 15
+        },
+        {
+          "name": "Parse",
+          "line": 24
+        },
+        {
+          "name": "Declaration",
+          "line": 75
+        },
+        {
+          "name": "marker",
+          "line": 162
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/pyrequire/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/rpm/bdb.go",
+      "sha256": "f2ea06ae7cb3f0b843978a8967983d7fc61d919c1abad75c73b11ad286b6d203",
+      "symbols": [
+        {
+          "name": "snapshot.bdb",
+          "line": 10
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Binary layout reference and owned bounded readers; no SQL driver or generic database API.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "go-rpmdb/pkg/entry.go",
+          "sha256": "c276932e4f8467d984b02c3d2367b936b98ba338e8c00a6df2a58f48e77ad70b"
+        },
+        {
+          "path": "go-rpmdb/pkg/bdb/bdb.go",
+          "sha256": "89136db2b600cfb89ee27fbf346e8b5e730882ce3afeee855dcd1a48df8d9d1d"
+        },
+        {
+          "path": "go-rpmdb/pkg/ndb/ndb.go",
+          "sha256": "1bb0aabcc508c4761fc64a6fad94d6515fb8d202cf2465915023c5316116263e"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/rpm/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/rpm/ndb.go",
+      "sha256": "a74acb7e1a8972f58880b472f2e05f2cc3c87ea90d54e1a8361832404118a7e0",
+      "symbols": [
+        {
+          "name": "snapshot.ndb",
+          "line": 10
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Binary layout reference and owned bounded readers; no SQL driver or generic database API.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "go-rpmdb/pkg/entry.go",
+          "sha256": "c276932e4f8467d984b02c3d2367b936b98ba338e8c00a6df2a58f48e77ad70b"
+        },
+        {
+          "path": "go-rpmdb/pkg/bdb/bdb.go",
+          "sha256": "89136db2b600cfb89ee27fbf346e8b5e730882ce3afeee855dcd1a48df8d9d1d"
+        },
+        {
+          "path": "go-rpmdb/pkg/ndb/ndb.go",
+          "sha256": "1bb0aabcc508c4761fc64a6fad94d6515fb8d202cf2465915023c5316116263e"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/rpm/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/rpm/read.go",
+      "sha256": "0b2f088cf67ff0e95615035ab823648e01f8dc7c7c6b50acdca00518ea47caf7",
+      "symbols": [
+        {
+          "name": "PackageInfo",
+          "line": 17
+        },
+        {
+          "name": "Limits",
+          "line": 22
+        },
+        {
+          "name": "snapshot",
+          "line": 26
+        },
+        {
+          "name": "Parse",
+          "line": 34
+        },
+        {
+          "name": "snapshot.at",
+          "line": 86
+        },
+        {
+          "name": "header",
+          "line": 111
+        },
+        {
+          "name": "headerWithContext",
+          "line": 115
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Binary layout reference and owned bounded readers; no SQL driver or generic database API.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "go-rpmdb/pkg/entry.go",
+          "sha256": "c276932e4f8467d984b02c3d2367b936b98ba338e8c00a6df2a58f48e77ad70b"
+        },
+        {
+          "path": "go-rpmdb/pkg/bdb/bdb.go",
+          "sha256": "89136db2b600cfb89ee27fbf346e8b5e730882ce3afeee855dcd1a48df8d9d1d"
+        },
+        {
+          "path": "go-rpmdb/pkg/ndb/ndb.go",
+          "sha256": "1bb0aabcc508c4761fc64a6fad94d6515fb8d202cf2465915023c5316116263e"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/rpm/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/rpm/sqlite.go",
+      "sha256": "3a2d50658a0ae36af2888da9add169c91d26c3da9863b9228ab7b642d7d630b3",
+      "symbols": [
+        {
+          "name": "sqliteSnapshot",
+          "line": 12
+        },
+        {
+          "name": "snapshot.sqlite",
+          "line": 20
+        },
+        {
+          "name": "sqliteSnapshot.page",
+          "line": 85
+        },
+        {
+          "name": "sqliteSnapshot.table",
+          "line": 92
+        },
+        {
+          "name": "sqliteVarint",
+          "line": 190
+        },
+        {
+          "name": "sqliteField",
+          "line": 207
+        },
+        {
+          "name": "sqliteField.integer",
+          "line": 212
+        },
+        {
+          "name": "sqliteRecord",
+          "line": 228
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Binary layout reference and owned bounded readers; no SQL driver or generic database API.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "go-rpmdb/pkg/entry.go",
+          "sha256": "c276932e4f8467d984b02c3d2367b936b98ba338e8c00a6df2a58f48e77ad70b"
+        },
+        {
+          "path": "go-rpmdb/pkg/bdb/bdb.go",
+          "sha256": "89136db2b600cfb89ee27fbf346e8b5e730882ce3afeee855dcd1a48df8d9d1d"
+        },
+        {
+          "path": "go-rpmdb/pkg/ndb/ndb.go",
+          "sha256": "1bb0aabcc508c4761fc64a6fad94d6515fb8d202cf2465915023c5316116263e"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/rpm/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/textdecode/read.go",
+      "sha256": "6dfe7649335f10b1512c0d9ed4995c40af071574df78c03dd42925fd4c1a2915",
+      "symbols": [
+        {
+          "name": "Read",
+          "line": 14
+        },
+        {
+          "name": "BOM",
+          "line": 24
+        },
+        {
+          "name": "decode16",
+          "line": 39
+        },
+        {
+          "name": "CharsetReader",
+          "line": 65
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/textdecode/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/core/xmlrecord/read.go",
+      "sha256": "dc7babd09486bb10731d5b8a24bb26fa0e9823ca6ee873db52f453f56ed76a41",
+      "symbols": [
+        {
+          "name": "tokens",
+          "line": 15
+        },
+        {
+          "name": "tokens.Token",
+          "line": 22
+        },
+        {
+          "name": "Decode",
+          "line": 59
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "core/xmlrecord/read_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/dxtypes/cyclonedx_sbom.go",
+      "sha256": "af34e580597f106c1f3ee8d61f5e36fa2c4da4cb5731fc7e52ee4127488c6253",
+      "symbols": [
+        {
+          "name": "BOM",
+          "line": 13
+        },
+        {
+          "name": "BOMComponent",
+          "line": 22
+        },
+        {
+          "name": "BOMProperty",
+          "line": 32
+        },
+        {
+          "name": "BOMHash",
+          "line": 36
+        },
+        {
+          "name": "BOMLicense",
+          "line": 40
+        },
+        {
+          "name": "BOMLicenseChoice",
+          "line": 43
+        },
+        {
+          "name": "BOMDependency",
+          "line": 47
+        },
+        {
+          "name": "normalCyloneDXHashType",
+          "line": 52
+        },
+        {
+          "name": "CreateCycloneDXSBOMByDXPackages",
+          "line": 75
+        },
+        {
+          "name": "MarshalCycloneDXBomToJSON",
+          "line": 202
+        },
+        {
+          "name": "validHash",
+          "line": 209
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Own fixed CycloneDX 1.5 DTO; reference schema shape, no SDK runtime.",
+      "yak_baseline_sha256": "7c4d14ffa9bfbbe58ad085b3c7465689208c4170f2eeb8f2d0757b979b643c20",
+      "upstream": [
+        {
+          "path": "cyclonedx-go/cyclonedx.go",
+          "sha256": "7c4b81d6b3c0829e6a33f1aefac62c8c340cae721e9cb0b1029c98be3976ba90"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "dxtypes/cyclonedx_sbom_test.go",
+        "dxtypes/pacakge_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/dxtypes/package.go",
+      "sha256": "430705e1563ae28ca5395cf5f1b4f1b5eb3dda4517dc35cbfa90d0ded1a9d21c",
+      "symbols": [
+        {
+          "name": "PackageDetails",
+          "line": 14
+        },
+        {
+          "name": "Package",
+          "line": 36
+        },
+        {
+          "name": "SourceRange",
+          "line": 70
+        },
+        {
+          "name": "PackageRelationShip",
+          "line": 72
+        },
+        {
+          "name": "Package.Identifier",
+          "line": 79
+        },
+        {
+          "name": "Package.IdentityDigest",
+          "line": 86
+        },
+        {
+          "name": "Package.HasVersionRange",
+          "line": 100
+        },
+        {
+          "name": "Package.String",
+          "line": 104
+        },
+        {
+          "name": "Package.SetFrom",
+          "line": 125
+        },
+        {
+          "name": "Package.From",
+          "line": 136
+        },
+        {
+          "name": "Package.LinkDepend",
+          "line": 139
+        },
+        {
+          "name": "Package.Merge",
+          "line": 151
+        },
+        {
+          "name": "CanMerge",
+          "line": 189
+        },
+        {
+          "name": "relationStrings",
+          "line": 196
+        },
+        {
+          "name": "uniqueStrings",
+          "line": 204
+        },
+        {
+          "name": "Package.Details",
+          "line": 218
+        },
+        {
+          "name": "Package.EnsureDetails",
+          "line": 224
+        },
+        {
+          "name": "Package.MergeDetails",
+          "line": 229
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "469847d1174bc07556e1d58bcee4104019370fa43a0e02ce7b3a4f712c9862b8",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "dxtypes/cyclonedx_sbom_test.go",
+        "dxtypes/pacakge_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/dxtypes/report_sbom.go",
+      "sha256": "2a8a1f168507914131f6a3814fb06046eb63ae147302584fdb1264cb62fe5f36",
+      "symbols": [
+        {
+          "name": "CreateCycloneDXSBOMFromReport",
+          "line": 13
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Own fixed CycloneDX 1.5 DTO; reference schema shape, no SDK runtime.",
+      "yak_baseline_sha256": null,
+      "upstream": [
+        {
+          "path": "cyclonedx-go/cyclonedx.go",
+          "sha256": "7c4b81d6b3c0829e6a33f1aefac62c8c340cae721e9cb0b1029c98be3976ba90"
+        }
+      ],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "dxtypes/cyclonedx_sbom_test.go",
+        "dxtypes/pacakge_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/dxtypes/service.go",
+      "sha256": "8cc79687a17b3e386d4f3077fb5845d31694c723ea01ce08fad596aa314a9e45",
+      "symbols": [
+        {
+          "name": "Service",
+          "line": 5
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "8cc79687a17b3e386d4f3077fb5845d31694c723ea01ce08fad596aa314a9e45",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "dxtypes/cyclonedx_sbom_test.go",
+        "dxtypes/pacakge_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/exports.go",
+      "sha256": "21f0a3ab845a9b5ba86bc8271cb7f5333fc348c6d71969d6b9e6eb9b686a77de",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "641123b2c0693698e8577ff3e3711efe79b2d12ab6bb59eceabba309812655c9",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/internal/collection/collection.go",
+      "sha256": "79df832e559d6960c2f7922759e5376b32f6ab2a07c45aae021edc54bc6d2351",
+      "symbols": [
+        {
+          "name": "Map",
+          "line": 5
+        },
+        {
+          "name": "FilterMap",
+          "line": 12
+        },
+        {
+          "name": "Find",
+          "line": 21
+        },
+        {
+          "name": "MapToSlice",
+          "line": 30
+        },
+        {
+          "name": "SliceToMap",
+          "line": 37
+        },
+        {
+          "name": "UniqBy",
+          "line": 45
+        },
+        {
+          "name": "Assign",
+          "line": 57
+        },
+        {
+          "name": "PickBy",
+          "line": 66
+        },
+        {
+          "name": "Values",
+          "line": 75
+        },
+        {
+          "name": "ForEach",
+          "line": 82
+        },
+        {
+          "name": "Clone",
+          "line": 87
+        },
+        {
+          "name": "MapEntries",
+          "line": 98
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/internal/fsio/fs.go",
+      "sha256": "e369d4c085bb146e9c788835dbe9d0d1c5d704cde4c7f85337569daca1fa1113",
+      "symbols": [
+        {
+          "name": "Snapshot",
+          "line": 14
+        },
+        {
+          "name": "New",
+          "line": 16
+        },
+        {
+          "name": "valid",
+          "line": 17
+        },
+        {
+          "name": "Snapshot.Open",
+          "line": 18
+        },
+        {
+          "name": "Snapshot.ReadDir",
+          "line": 24
+        },
+        {
+          "name": "Snapshot.ReadFile",
+          "line": 31
+        },
+        {
+          "name": "Snapshot.Stat",
+          "line": 43
+        },
+        {
+          "name": "Snapshot.OpenFile",
+          "line": 50
+        },
+        {
+          "name": "Snapshot.ExtraInfo",
+          "line": 56
+        },
+        {
+          "name": "Snapshot.GetSeparators",
+          "line": 57
+        },
+        {
+          "name": "Snapshot.Join",
+          "line": 58
+        },
+        {
+          "name": "Snapshot.Base",
+          "line": 59
+        },
+        {
+          "name": "Snapshot.PathSplit",
+          "line": 60
+        },
+        {
+          "name": "Snapshot.Ext",
+          "line": 61
+        },
+        {
+          "name": "Snapshot.IsAbs",
+          "line": 62
+        },
+        {
+          "name": "Snapshot.Getwd",
+          "line": 63
+        },
+        {
+          "name": "Snapshot.Exists",
+          "line": 64
+        },
+        {
+          "name": "Snapshot.Rel",
+          "line": 71
+        },
+        {
+          "name": "Snapshot.Rename",
+          "line": 84
+        },
+        {
+          "name": "Snapshot.WriteFile",
+          "line": 85
+        },
+        {
+          "name": "Snapshot.Delete",
+          "line": 86
+        },
+        {
+          "name": "Snapshot.MkdirAll",
+          "line": 87
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/lazyfile/fileinfo.go",
+      "sha256": "1779c5ed13f80a618bcd36bb7da896f1d06865981178bae9c34eff3619633fe2",
+      "symbols": [
+        {
+          "name": "FileInfo",
+          "line": 8
+        },
+        {
+          "name": "NewFileInfo",
+          "line": 14
+        },
+        {
+          "name": "FileInfo.Name",
+          "line": 22
+        },
+        {
+          "name": "FileInfo.Size",
+          "line": 26
+        },
+        {
+          "name": "FileInfo.Mode",
+          "line": 30
+        },
+        {
+          "name": "FileInfo.ModTime",
+          "line": 34
+        },
+        {
+          "name": "FileInfo.IsDir",
+          "line": 38
+        },
+        {
+          "name": "FileInfo.Sys",
+          "line": 42
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "ef3af7cd011e5ce2e3871b493ef36c68edf5f9ae2097315c3e41d3ab576f7d4c",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/lazyfile/lazyfile.go",
+      "sha256": "b6cf0c99806ecf934a6604c901bfeb044319cea0c127c5ad9ccf5ba082354868",
+      "symbols": [
+        {
+          "name": "LazyFile",
+          "line": 14
+        },
+        {
+          "name": "LazyOpenStreamByFilePath",
+          "line": 28
+        },
+        {
+          "name": "LazyOpenStreamByFile",
+          "line": 53
+        },
+        {
+          "name": "LazyFile.lazyOpen",
+          "line": 67
+        },
+        {
+          "name": "LazyFile.ReadAt",
+          "line": 77
+        },
+        {
+          "name": "LazyFile.Read",
+          "line": 95
+        },
+        {
+          "name": "LazyFile.Stat",
+          "line": 107
+        },
+        {
+          "name": "LazyFile.Close",
+          "line": 123
+        },
+        {
+          "name": "LazyFile.Name",
+          "line": 138
+        },
+        {
+          "name": "LazyFile.Seek",
+          "line": 142
+        },
+        {
+          "name": "localFS",
+          "line": 156
+        },
+        {
+          "name": "localFS.Open",
+          "line": 158
+        },
+        {
+          "name": "LazyFile.SetContext",
+          "line": 160
+        },
+        {
+          "name": "LazyFile.Context",
+          "line": 161
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "f284b26f17cbc2ac09e13dcfbed8ba005a11eb9dd79e085005444a488b9974a9",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/lazyfile/memory.go",
+      "sha256": "7c8b895fd0be90ce4d49eccf4493d4dd1f84cecda7b442607081d5d48787e8e1",
+      "symbols": [
+        {
+          "name": "memoryFile",
+          "line": 10
+        },
+        {
+          "name": "memoryFile.Stat",
+          "line": 16
+        },
+        {
+          "name": "memoryFile.Close",
+          "line": 19
+        },
+        {
+          "name": "NewMemory",
+          "line": 23
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/license/category.go",
+      "sha256": "9081210a6599135f9f26850b64fffb95a86fbd5d4f84e54d432be51e1612d1dc",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "9081210a6599135f9f26850b64fffb95a86fbd5d4f84e54d432be51e1612d1dc",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/license/normal.go",
+      "sha256": "4affa8d8ab3c33e4dd2f0eef8a1ecdd9ebfba49295910e541be10e3d713c38e1",
+      "symbols": [
+        {
+          "name": "Normalize",
+          "line": 83
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "4affa8d8ab3c33e4dd2f0eef8a1ecdd9ebfba49295910e541be10e3d713c38e1",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": []
+    },
+    {
+      "local_file": "common/sca/model/report.go",
+      "sha256": "1ff964768625c084a8ee74e6cd9b230605f8d38ddac76a640a25fbcccef6c139",
+      "symbols": [
+        {
+          "name": "ComponentKey",
+          "line": 13
+        },
+        {
+          "name": "ComponentKey.ID",
+          "line": 23
+        },
+        {
+          "name": "Component",
+          "line": 29
+        },
+        {
+          "name": "Observation",
+          "line": 33
+        },
+        {
+          "name": "Observation.ID",
+          "line": 47
+        },
+        {
+          "name": "Requirement",
+          "line": 53
+        },
+        {
+          "name": "Diagnostic",
+          "line": 64
+        },
+        {
+          "name": "Report",
+          "line": 72
+        },
+        {
+          "name": "Report.Normalize",
+          "line": 84
+        },
+        {
+          "name": "exact",
+          "line": 123
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "model/benchmark_test.go",
+        "model/report_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/pipeline.go",
+      "sha256": "f17d4b956b25dd266d9764d83d90f7c785796e4e091830ee37167e3c1443e83b",
+      "symbols": [
+        {
+          "name": "material",
+          "line": 24
+        },
+        {
+          "name": "materials",
+          "line": 30
+        },
+        {
+          "name": "materials.Open",
+          "line": 40
+        },
+        {
+          "name": "sameMaterial",
+          "line": 121
+        },
+        {
+          "name": "materials.Stat",
+          "line": 130
+        },
+        {
+          "name": "materials.ReadDir",
+          "line": 139
+        },
+        {
+          "name": "materials.identity",
+          "line": 157
+        },
+        {
+          "name": "scanJob",
+          "line": 173
+        },
+        {
+          "name": "jobResult",
+          "line": 177
+        },
+        {
+          "name": "ScanReport",
+          "line": 186
+        },
+        {
+          "name": "scanPipeline",
+          "line": 195
+        },
+        {
+          "name": "safeMatch",
+          "line": 430
+        },
+        {
+          "name": "safeAnalyze",
+          "line": 438
+        },
+        {
+          "name": "errorCode",
+          "line": 452
+        },
+        {
+          "name": "ecosystem",
+          "line": 466
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/ref.go",
+      "sha256": "868791e3f78b065f9fd29f61ede8bb44ad57840fe16dcdf55845a9dc670e58ee",
+      "symbols": [],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": "868791e3f78b065f9fd29f61ede8bb44ad57840fe16dcdf55845a9dc670e58ee",
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/report.go",
+      "sha256": "237afc6c064c61106aa4c5ec117612d6bfa75466d1d6152c1788df2492050519",
+      "symbols": [
+        {
+          "name": "fillReport",
+          "line": 11
+        },
+        {
+          "name": "manifestEvidence",
+          "line": 226
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/resource.go",
+      "sha256": "4c3dc39bc1ac1d4ead19dcade23935bc2b9efbef8b02ed6f47bf934e9d7f1ec5",
+      "symbols": [
+        {
+          "name": "ResourceLimits",
+          "line": 7
+        },
+        {
+          "name": "WithResourceLimits",
+          "line": 9
+        },
+        {
+          "name": "WithSnapshotID",
+          "line": 10
+        }
+      ],
+      "decision": "REWRITE",
+      "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review; pinned upstream changes require re-evaluation",
+      "tests": [
+        "scan_contract_test.go",
+        "discovery_benchmark_test.go",
+        "analyzer_test.go",
+        "report_contract_test.go",
+        "analyzerdata_test.go",
+        "format_fuzz_test.go",
+        "removed_scope_test.go"
+      ]
+    }
+  ],
+  "removed_capabilities": [
+    "x/mod editing and printing",
+    "TOML reflection decoder and encoder",
+    "general YAML runtime",
+    "go-rpmdb database/sql driver and host Open",
+    "CycloneDX SDK runtime",
+    "Docker and Git acquisition",
+    "all-pairs name-based graph merge",
+    "aggregate common/utils common/log common/filter runtime edges"
+  ],
+  "reference_only": [
+    "yaml scanner/decoder",
+    "SQLite driver module snapshot"
+  ]
+}

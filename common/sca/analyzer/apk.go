@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/hex"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -41,7 +42,9 @@ func (a apkAnalyzer) parseLicense(line string) []string {
 		if s == "AND" || s == "OR" {
 			continue
 		} else if i > 0 && (s == "1.0" || s == "2.0" || s == "3.0") {
-			license[i-1] = licenses.Normalize(license[i-1] + s)
+			if len(license) > 0 {
+				license[len(license)-1] = licenses.Normalize(license[len(license)-1] + s)
+			}
 		} else {
 			license = append(license, licenses.Normalize(s))
 		}
@@ -57,7 +60,7 @@ func trimRequirement(name string) (string, string) {
 
 	version := "*"
 	if strings.ContainsAny(name, "<>=") {
-		version = name[strings.IndexAny(name, "><=")+1:]
+		version = name[strings.IndexAny(name, "><="):]
 		name = name[:strings.IndexAny(name, "><=")]
 	}
 	return name, version
@@ -92,11 +95,14 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 			version string
 		)
 
-		provides := make(map[string]*dxtypes.Package)
-		pkg = new(dxtypes.Package)
+		pkg = &dxtypes.Package{PackageDetails: &dxtypes.PackageDetails{Evidence: "installed"}}
 
 		scanner := bufio.NewScanner(fi.LazyFile)
+		scanner.Buffer(make([]byte, 4096), budget.From(fi.LazyFile.Context()).Limits.MaxFieldBytes)
 		for scanner.Scan() {
+			if err := fi.LazyFile.Context().Err(); err != nil {
+				return nil, err
+			}
 			line := scanner.Text()
 
 			if len(line) < 2 {
@@ -105,22 +111,25 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 				}
 				// new
 				// pkg = &dxtypes.Package{}
-				pkg = new(dxtypes.Package)
+				pkg = &dxtypes.Package{PackageDetails: &dxtypes.PackageDetails{Evidence: "installed"}}
 				continue
 			}
 			// ref. https://wiki.alpinelinux.org/wiki/Apk_spec
 			switch line[:2] {
 			case "P:":
 				pkg.Name = line[2:]
+			case "A:":
+				pkg.Architecture = line[2:]
 			case "V:":
 				version = line[2:]
 				pkg.Version = version
 			case "L:":
 				pkg.License = a.parseLicense(line)
-			case "p:":
-				a.parseProvides(line, pkg, provides)
+				pkg.RawLicenses = []string{line[2:]}
 			case "D:": // dependencies (corresponds to depend in PKGINFO, concatenated by spaces into a single line)
 				pkg.DependsOn.And = a.parseDependencies(line)
+			case "p:":
+				pkg.Provides = append(pkg.Provides, strings.Fields(line[2:])...)
 			case "C:":
 				pkg.Verification = decodeChecksumLine(line)
 			}
@@ -129,9 +138,10 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 			pkgs = append(pkgs, pkg)
 		}
 
-		handleDependsOn(pkgs, provides)
-
-		return makePotentialPkgs(pkgs), nil
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
+		return pkgs, nil
 	}
 	return nil, nil
 }

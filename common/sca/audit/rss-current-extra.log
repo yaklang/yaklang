@@ -1,0 +1,28 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/sca/analyzer
+BenchmarkExactIdentity/100-10         	       1	    147000 ns/op	   45128 B/op	     214 allocs/op
+BenchmarkExactIdentity/100-10         	       1	    106292 ns/op	   44552 B/op	     213 allocs/op
+BenchmarkExactIdentity/100-10         	       1	    101042 ns/op	   45704 B/op	     215 allocs/op
+BenchmarkExactIdentity/100000-10      	       1	 142131625 ns/op	43687584 B/op	  301431 allocs/op
+BenchmarkExactIdentity/100000-10      	       1	 135343625 ns/op	43701296 B/op	  301465 allocs/op
+BenchmarkExactIdentity/100000-10      	       1	 161666208 ns/op	43694264 B/op	  301461 allocs/op
+PASS
+        1.32 real         0.34 user         0.01 sys
+            55296000  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                3526  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                 160  signals received
+                   4  voluntary context switches
+                1743  involuntary context switches
+          3268621264  instructions retired
+          1070713532  cycles elapsed
+            52724672  peak memory footprint

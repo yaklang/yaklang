@@ -1,0 +1,5 @@
+--- FAIL: TestIdentityAndNormalize (0.00s)
+    report_test.go:14: identity collision
+FAIL
+FAIL	github.com/yaklang/yaklang/common/sca/model	1.988s
+FAIL

@@ -1,0 +1,5 @@
+--- FAIL: TestSumIdentityConflict (0.00s)
+    parse_test.go:113: map[] malformed_input: conflicting go.sum evidence at 2
+FAIL
+FAIL	github.com/yaklang/yaklang/common/sca/core/gomod	1.908s
+FAIL
