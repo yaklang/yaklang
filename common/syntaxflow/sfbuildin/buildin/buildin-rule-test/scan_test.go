@@ -40,6 +40,26 @@ func TestTomcatFalsePositiveRuleFixes(t *testing.T) {
 	}
 }
 
+func TestGoWeakCryptoFalsePositiveRuleFixes(t *testing.T) {
+	files := []string{
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-md5-sum.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-sha1.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-des.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-rc4.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-encryption", "golang-weak-hash-md5-sha1.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-encryption", "golang-weak-encryption-cbc.sf"),
+	}
+	for _, f := range files {
+		f := f
+		t.Run(filepath.Base(f), func(t *testing.T) {
+			raw, err := os.ReadFile(f)
+			require.NoError(t, err)
+			err = ssatest.EvaluateVerifyFilesystem(string(raw), t, true)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()
