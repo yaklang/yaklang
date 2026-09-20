@@ -303,6 +303,16 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 }
 
 func TestJavaBasic_Variable_SwitchArrow(t *testing.T) {
+	t.Run("combined null default", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		String input = null;
+		String result = switch (input) {
+		case "date" -> "folder.mod_date";
+		case null, default -> "folder.name";
+		};
+		println(result);
+		`, []string{`"folder.name"`}, t)
+	})
 	t.Run("test switch arrow stmt", func(t *testing.T) {
 		CheckJavaPrintlnValue(`
 		var a=1;
