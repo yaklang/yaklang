@@ -2,8 +2,12 @@ package jsonrecord
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 )
 
 func TestLocationsAndEscapedKeys(t *testing.T) {
@@ -31,6 +35,28 @@ func TestRejectAmbiguousAndBounded(t *testing.T) {
 		t.Fatal("ignored cancellation")
 	}
 }
+func TestDecodeChargesBeforeUnmarshal(t *testing.T) {
+	raw := []byte(`{"name":"a","version":"1"}`)
+	l, err := (budget.Limits{MaxResultBytes: 5000}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := budget.Bind(context.Background(), l)
+	var rec struct{ Name, Version string }
+	_, err = Decode(ctx, raw, &rec)
+	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("second JSON mapping must be charged before Unmarshal: rec=%+v err=%v", rec, err)
+	}
+	if rec.Name != "" {
+		t.Fatal("Unmarshal ran after budget exhaustion")
+	}
+	ctx = budget.Bind(context.Background(), budget.Limits{})
+	n, err := Decode(ctx, raw, &rec)
+	if err != nil || n == nil || rec.Name != "a" {
+		t.Fatalf("positive decode: %+v %v", rec, err)
+	}
+}
+
 func FuzzParse(f *testing.F) {
 	f.Add([]byte(`{"name":"a","version":"1"}`))
 	f.Fuzz(func(t *testing.T, b []byte) {

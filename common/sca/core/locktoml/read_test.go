@@ -1,8 +1,10 @@
 package locktoml
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -11,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 )
 
 func TestUpstreamSyntaxCorpus(t *testing.T) {
@@ -143,6 +148,24 @@ func compareTyped(got, want any) error {
 	}
 	return fmt.Errorf("unmapped oracle value")
 }
+func TestDecodeChargesBeforeMarshal(t *testing.T) {
+	raw := []byte("[[package]]\nname='a'\nversion='1.2.3'\n")
+	l, err := (budget.Limits{MaxResultBytes: 5000}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := budget.Bind(context.Background(), l)
+	var rec struct {
+		Package []struct{ Name, Version string }
+	}
+	if err := Decode(ctx, bytes.NewReader(raw), &rec); err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("JSON conversion must be charged before Marshal: rec=%+v err=%v", rec, err)
+	}
+	if len(rec.Package) != 0 {
+		t.Fatal("Marshal/Unmarshal ran after budget exhaustion")
+	}
+}
+
 func TestBudgetsAndCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

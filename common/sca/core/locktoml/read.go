@@ -61,6 +61,12 @@ func DecodeRecords(ctx context.Context, r io.Reader, out any, name string) ([]Sp
 	if e != nil {
 		return nil, e
 	}
+	if e = budget.From(ctx).Result(budget.SizeDecoderScratch); e != nil {
+		return nil, e
+	}
+	if e = budget.From(ctx).Working(int64(len(b))); e != nil {
+		return nil, e
+	}
 	raw, e := json.Marshal(p.mapping)
 	if e != nil {
 		return nil, e
@@ -91,6 +97,12 @@ func Decode(ctx context.Context, r io.Reader, out any) error {
 	}
 	m, err := Parse(ctx, b)
 	if err != nil {
+		return err
+	}
+	if err = budget.From(ctx).Result(budget.SizeDecoderScratch); err != nil {
+		return err
+	}
+	if err = budget.From(ctx).Working(int64(len(b))); err != nil {
 		return err
 	}
 	b, err = json.Marshal(m)

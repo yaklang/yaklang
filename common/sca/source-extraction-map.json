@@ -3016,7 +3016,7 @@
     },
     {
       "local_file": "common/sca/core/jsonrecord/read.go",
-      "sha256": "b7827a5bc92435983b80cf7c6189e06f2bdc33bc50c873c9bcb61c1b65e153b4",
+      "sha256": "45d93bb1fe19d13d64d2e5a5d93404429a41142e9afa40d655f84e5ba00aeb6a",
       "symbols": [
         {
           "name": "Node",
@@ -3044,11 +3044,11 @@
         },
         {
           "name": "reader.value",
-          "line": 89
+          "line": 102
         },
         {
           "name": "Decode",
-          "line": 160
+          "line": 181
         }
       ],
       "decision": "REWRITE",
@@ -3587,7 +3587,7 @@
     },
     {
       "local_file": "common/sca/core/locktoml/read.go",
-      "sha256": "20e70cd9e42d9eb8c81b59607e02a687db6007b2fe7891d41b09a35dbd1d7b8c",
+      "sha256": "14e958bfd6d312876e05ee12635897ca4c9e5a5c1bc4fb17f0fb18e2288e9d1f",
       "symbols": [
         {
           "name": "parseAbort",
@@ -3615,15 +3615,15 @@
         },
         {
           "name": "Span",
-          "line": 48
+          "line": 51
         },
         {
           "name": "DecodeRecords",
-          "line": 52
+          "line": 55
         },
         {
           "name": "Decode",
-          "line": 78
+          "line": 93
         }
       ],
       "decision": "EXTRACT_AND_TRIM",

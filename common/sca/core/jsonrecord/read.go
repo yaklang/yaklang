@@ -183,6 +183,12 @@ func Decode(ctx context.Context, raw []byte, record any) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err = budget.From(ctx).Result(budget.SizeDecoderScratch); err != nil {
+		return n, err
+	}
+	if err = budget.From(ctx).Working(int64(len(raw))); err != nil {
+		return n, err
+	}
 	if err = json.Unmarshal(raw, record); err != nil {
 		return nil, fmt.Errorf("malformed_input: %w", err)
 	}
