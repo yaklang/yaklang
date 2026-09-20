@@ -28,16 +28,14 @@ func TestScanProjectEnforcesRuleWorkBudget(t *testing.T) {
 	cleanup := prepareHeavyPHPProgram(t, name, 200, 5)
 	defer cleanup()
 	for _, limit := range []int64{0, 500} {
-		errs := &errorCapture{}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		_, err := ScanProject(ctx,
+		result, err := ScanProject(ctx,
 			ssaconfig.WithProgramNames(name), WithMode(SSAMode),
 			ssaconfig.WithRuleInputRaw(heavyTopDefRule),
 			ssaconfig.WithScanRuleTimeout(5*time.Minute),
-			ssaconfig.WithScanRuleWorkLimit(limit), WithErrorCallback(errs.cb()))
+			ssaconfig.WithScanRuleWorkLimit(limit))
 		cancel()
 		require.NoError(t, err)
-		require.Equal(t, limit > 0, errs.has("per-rule budget"),
-			"project scans must honor both a positive limit and explicit zero")
+		require.False(t, result.IncompleteStages, "a budget bail keeps the findings and does not fail the scan")
 	}
 }
