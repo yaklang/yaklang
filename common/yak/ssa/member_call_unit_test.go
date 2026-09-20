@@ -9,6 +9,7 @@ import (
 
 func TestMissingDependencyMembersStayInConsumerUnit(t *testing.T) {
 	prog, dependency := newTestBuilder(t)
+	prog.SetConcurrentUnitBuild(true)
 	object := emitObject(dependency, "shared")
 	original := append([]int64(nil), dependency.CurrentBlock.Insts...)
 	const count = 16
@@ -37,4 +38,13 @@ func TestMissingDependencyMembersStayInConsumerUnit(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, member.GetId(), linked.GetId(), "cross-unit member relations must remain visible")
 	}
+}
+
+func TestSerialMissingDependencyMemberKeepsDeclarationScope(t *testing.T) {
+	prog, dependency := newTestBuilder(t)
+	object := emitObject(dependency, "shared")
+	consumer := prog.NewLibrary("consumer", nil).GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	member := consumer.ReadMemberCallMethod(object, consumer.EmitConstInstPlaceholder("missing"))
+	require.NotNil(t, member)
+	require.Same(t, dependency.Function, member.GetFunc(), "frontends without parallel-unit support retain their declaration-scope binding")
 }
