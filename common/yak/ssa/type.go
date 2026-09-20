@@ -254,10 +254,24 @@ type MethodBuilder interface {
 
 // ExternMethodBuilder is the default for standalone type queries and programs
 // without a configured method builder. Parse configurations belong to Program.
+// Deprecated: use SetExternMethodBuilder when programs can compile concurrently.
 var ExternMethodBuilder MethodBuilder
+var externMethodBuilderMu sync.RWMutex
+
+func SetExternMethodBuilder(builder MethodBuilder) {
+	externMethodBuilderMu.Lock()
+	ExternMethodBuilder = builder
+	externMethodBuilderMu.Unlock()
+}
+
+func getExternMethodBuilder() MethodBuilder {
+	externMethodBuilderMu.RLock()
+	defer externMethodBuilderMu.RUnlock()
+	return ExternMethodBuilder
+}
 
 func GetMethod(t Type, id string, peek ...bool) *Function {
-	return getMethodWithBuilder(t, id, ExternMethodBuilder, peek...)
+	return getMethodWithBuilder(t, id, getExternMethodBuilder(), peek...)
 }
 
 func (prog *Program) getMethod(t Type, id string, peek ...bool) *Function {
@@ -268,7 +282,7 @@ func (prog *Program) getExternMethodBuilder() MethodBuilder {
 	if prog != nil && prog.externMethodBuilder != nil {
 		return prog.externMethodBuilder
 	}
-	return ExternMethodBuilder
+	return getExternMethodBuilder()
 }
 
 func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool) *Function {
@@ -298,7 +312,7 @@ func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool
 }
 
 func GetMethodsName(t Type) []string {
-	return getMethodsNameWithBuilder(t, ExternMethodBuilder)
+	return getMethodsNameWithBuilder(t, getExternMethodBuilder())
 }
 
 func getMethodsNameWithBuilder(t Type, builder MethodBuilder) []string {
