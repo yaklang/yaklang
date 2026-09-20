@@ -28,7 +28,8 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 
 	// mock 一个 forge ，用于测试取消 pe 任务
 	testForgeName := "test_forge_cancel_" + testNonce
-	planFlag := "plan_flag_cancel_" + testNonce
+	// Keep the unique fixture task name short; this test exercises cancellation.
+	planFlag := "cancel_" + testNonce[:12]
 	forge := &schema.AIForge{
 		ForgeName:    testForgeName,
 		ForgeType:    "yak",
