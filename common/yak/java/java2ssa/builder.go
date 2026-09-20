@@ -203,7 +203,9 @@ func (b *singleFileBuilder) ReadClassConst(className, key string) (ssa.Value, bo
 func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	previous := b.FunctionBuilder
 	b.LoadBuilder(s)
+	execution := b.FunctionBuilder
 	return func() {
+		s.CommitExecutionBuilder(execution)
 		b.FunctionBuilder = previous
 	}
 }

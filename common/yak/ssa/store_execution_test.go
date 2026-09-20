@@ -29,3 +29,17 @@ func TestStoredBuilderExecutionDoesNotMutateDeclaration(t *testing.T) {
 	require.Nil(t, decl.MarkedThisClassBlueprint)
 	require.Same(t, prog, decl.GetProgram())
 }
+
+func TestStoredBuilderExecutionKeepsControlFlowProgress(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "builder-control-flow")
+	decl := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	stored := decl.StoreFunctionBuilder()
+	first := stored.NewExecutionBuilder()
+	next := first.NewBasicBlock("next-initializer")
+	first.EmitJump(next)
+	first.CurrentBlock = next
+	stored.CommitExecutionBuilder(first)
+	second := stored.NewExecutionBuilder()
+	require.Same(t, next, second.CurrentBlock)
+	require.False(t, second.IsBlockFinish())
+}
