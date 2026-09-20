@@ -73,6 +73,10 @@ func (m *materials) Open(name string) (fs.File, error) {
 			v.err = err
 			return
 		}
+		if err := budget.From(m.ctx).Once("snapshot-read-scratch", 0, budget.SizeReadScratch); err != nil {
+			v.err = err
+			return
+		}
 		var data []byte
 		if v.info.Size() > 0 {
 			data = make([]byte, 0, int(v.info.Size()))

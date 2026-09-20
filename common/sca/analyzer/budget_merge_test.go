@@ -9,7 +9,24 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/core/scanerr"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
+
+func TestMergePackagesResultBudget(t *testing.T) {
+	l, err := (budget.Limits{MaxResultBytes: 256}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := budget.From(budget.Bind(context.Background(), l))
+	pkgs := make([]*dxtypes.Package, 40)
+	for i := range pkgs {
+		pkgs[i] = &dxtypes.Package{Name: fmt.Sprintf("pkg-%d", i), Version: "1.0.0"}
+	}
+	out, err := mergePackagesBudget(st, pkgs)
+	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("adapter without context must still use a bounded default internally; small budget: out=%d err=%v", len(out), err)
+	}
+}
 
 func TestHandlerParsedResultBudget(t *testing.T) {
 	l, err := (budget.Limits{MaxResultBytes: 256}).Normalize()

@@ -55,17 +55,19 @@
     "unit": "logical working-set estimate, not Go heap or RSS",
     "charges_before": ["parser working copy", "syntax node", "map/slice insert", "package merge", "job enqueue", "report component/observation/edge"],
     "shared_once": "POM analysis cache keys and identical material ids",
+    "derived_caps": [
+      "encoding/json and encoding/xml decoder internals: SizeDecoderScratch (4KiB) charged per Parse/Decode in addition to Working of the document; not a measurement of decoder heap",
+      "RPM live page make([]byte,n) is gated by MaxReadBytes/MaxPageVisits; Parse also charges SizeOfBytes(min(MaxRecordBytes,16MiB)) as a conservative peak page/header working set",
+      "pipeline materials.Open 32KiB read scratch is Once-charged as snapshot-read-scratch",
+      "fillReport sort indexes charge SizePtr per package/location/requirement before sort.SliceStable; comparator temporary clones in locationKey/requirementKey are still sort runtime",
+      "MergePackages keeps the old signature and uses budget.From(background) default MaxResultBytes"
+    ],
     "unbounded_runtime": [
-      "encoding/json.Decoder internal buffers after Working() of the document",
-      "encoding/xml.Decoder token scratch and Decode reflection into caller structs after Working() of the document",
-      "locktoml node.value() map rebuild after per-token/table charges; json.Marshal record conversion is charged as Working of the JSON bytes",
-      "RPM page buffers in core/rpm.snapshot.at allocate against MaxReadBytes, not MaxResultBytes; package DTOs are charged in emit before append",
-      "32KiB snapshot read scratch in pipeline materials.Open after Once of the file size",
-      "apk bufio.Scanner.Text line copies; DPKG MIME header maps after readBlock charges",
-      "analyzer.MergePackages has no context and is a test/benchmark exact-identity adapter only; ScanReport merge is handlerParsedBudget",
-      "sort.Slice temporary indexes",
-      "Go map growth beyond conservative SizeMap/SizePtr charges"
+      "Go decoder reflection into caller structs after SizeDecoderScratch",
+      "locktoml node.value() map rebuild after per-token charges; json.Marshal conversion is charged as Working of the JSON bytes",
+      "sort.Slice comparator closures may allocate extra index copies beyond SizeOfSortIndex",
+      "Go map bucket growth beyond SizeMap/SizePtr; GC, stack, and RSS are not this estimate"
     ]
   },
-  "strict_preallocation_status": "Shared MaxResultBytes and MaxExpressionNodes are charged before working copies, syntax nodes, enqueue, merge inserts, and report appends. Cached snapshot bytes and POM analysis results are Once-charged. Remaining decoder internals, RPM page buffers, and sort temporaries are named in result_memory.unbounded_runtime."
+  "strict_preallocation_status": "Shared MaxResultBytes is a logical working-set estimate charged before documented working copies, nodes, enqueue, merge inserts, and report appends. Decoder scratch, RPM page peak, snapshot read scratch, and sort indexes now have conservative charges derived from existing byte/node limits. This is not a strict pre-allocation or RSS cap. Remaining runtime overhead is named in result_memory.unbounded_runtime."
 }

@@ -136,6 +136,23 @@ func TestResultBudgetWorkersDeterministic(t *testing.T) {
 	}
 }
 
+func TestDecoderScratchChargedBeforeAlloc(t *testing.T) {
+	raw := []byte(`{"k":1}`)
+	limits := mustLimits(t, ResourceLimits{MaxResultBytes: int64(len(raw) + 64), MaxFileBytes: 1 << 20, MaxExpressionNodes: 100000})
+	ctx := budget.Bind(context.Background(), limits)
+	if _, err := jsonrecord.Parse(ctx, raw); err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("JSON decoder scratch not charged beyond file bytes: %v", err)
+	}
+	xml := []byte("<project><n>a</n></project>")
+	ctx = budget.Bind(context.Background(), limits)
+	var pom struct {
+		XMLName struct{} `xml:"project"`
+	}
+	if err := xmlrecord.Decode(ctx, strings.NewReader(string(xml)), &pom); err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("XML decoder scratch not charged beyond file bytes: %v", err)
+	}
+}
+
 func TestResultBudgetNegativeRejected(t *testing.T) {
 	if _, err := (budget.Limits{MaxResultBytes: -1}).Normalize(); err == nil {
 		t.Fatal("negative MaxResultBytes accepted")

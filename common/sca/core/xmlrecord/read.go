@@ -67,6 +67,9 @@ func Decode(ctx context.Context, r io.Reader, out any) error {
 	if err := budget.From(ctx).Working(int64(len(b))); err != nil {
 		return err
 	}
+	if err := budget.From(ctx).Result(budget.SizeDecoderScratch); err != nil {
+		return err
+	}
 	transcoded := bytes.HasPrefix(b, []byte{0xff, 0xfe}) || bytes.HasPrefix(b, []byte{0xfe, 0xff})
 	if transcoded || bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {
 		b, err = textdecode.BOM(b)

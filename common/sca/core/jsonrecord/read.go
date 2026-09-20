@@ -73,6 +73,9 @@ func Parse(ctx context.Context, raw []byte) (*Node, error) {
 	if err := budget.From(ctx).Working(int64(len(raw))); err != nil {
 		return nil, err
 	}
+	if err := budget.From(ctx).Result(budget.SizeDecoderScratch); err != nil {
+		return nil, err
+	}
 	newlines := bytes.Count(raw, []byte{'\n'})
 	if err := budget.From(ctx).Result(budget.SizeSlice + int64(newlines)*8); err != nil {
 		return nil, err

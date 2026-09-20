@@ -36,3 +36,17 @@ func SizeOfEdge() int64 { return 128 }
 func SizeOfJob() int64 { return 96 }
 
 func SizeOfRecord() int64 { return 160 }
+
+// SizeDecoderScratch is a conservative allowance for encoding/json and
+// encoding/xml internal buffers. It is not a measurement of those decoders.
+const SizeDecoderScratch int64 = 4096
+
+// SizeReadScratch is the pipeline snapshot read buffer.
+const SizeReadScratch int64 = 32 << 10
+
+func SizeOfSortIndex(n int) int64 {
+	if n < 0 {
+		return 0
+	}
+	return int64(n) * SizePtr
+}

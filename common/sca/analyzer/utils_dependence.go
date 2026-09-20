@@ -1,12 +1,14 @@
 package analyzer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
@@ -57,7 +59,14 @@ func handlerSemverVersionRange(semverRange string) string {
 
 // MergePackages is a compatibility exact-identity adapter. It never parses
 // alternatives, compares versions, or searches a same-name candidate list.
+// The public signature is unchanged; a default bounded State is used when the
+// caller has no scan context.
 func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
+	out, _ := mergePackagesBudget(budget.From(context.Background()), pkgs)
+	return out
+}
+
+func mergePackagesBudget(st *budget.State, pkgs []*dxtypes.Package) ([]*dxtypes.Package, error) {
 	type identity struct {
 		Digest           [32]byte
 		Potential, Range bool
@@ -65,6 +74,9 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	}
 	keyOf := func(p *dxtypes.Package) identity {
 		return identity{p.IdentityDigest(), p.Potential, p.HasVersionRange(), p.Details().Evidence}
+	}
+	if err := st.Result(budget.SizeMap + budget.SizeOfSortIndex(len(pkgs))); err != nil {
+		return nil, err
 	}
 	index := make(map[identity]*dxtypes.Package, len(pkgs))
 	type edge struct{ from, to *dxtypes.Package }
@@ -76,6 +88,9 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 		key := keyOf(p)
 		dst := index[key]
 		if dst == nil {
+			if err := st.Result(budget.SizeOfPackage(p.Name, p.Version, p.Verification) + budget.SizePtr); err != nil {
+				return nil, err
+			}
 			dst = p
 			index[key] = dst
 		}
@@ -128,5 +143,5 @@ func MergePackages(pkgs []*dxtypes.Package) []*dxtypes.Package {
 	for _, id := range names {
 		out = append(out, index[id])
 	}
-	return out
+	return out, nil
 }

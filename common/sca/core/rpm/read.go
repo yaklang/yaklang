@@ -53,6 +53,13 @@ func Parse(ctx context.Context, r io.ReaderAt, size int64, lim Limits) ([]*Packa
 	lim.MaxReadBytes = min(lim.MaxReadBytes, scanLimits.MaxTotalReadBytes)
 	lim.MaxPageVisits = min(lim.MaxPageVisits, scanLimits.MaxResolveSteps)
 	s := &snapshot{ctx: ctx, r: r, size: size, limits: lim}
+	page := lim.MaxRecordBytes
+	if page <= 0 || page > 16<<20 {
+		page = 16 << 20
+	}
+	if err := budget.From(ctx).Result(budget.SizeOfBytes(page)); err != nil {
+		return nil, err
+	}
 	head, err := s.at(0, 100)
 	if err != nil {
 		return nil, err

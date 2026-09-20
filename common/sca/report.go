@@ -44,6 +44,20 @@ func requirementKey(p *dxtypes.Package) string {
 }
 
 func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shared ...*budget.State) []error {
+	st := &budget.State{Limits: l}
+	if len(shared) > 0 && shared[0] != nil {
+		st = shared[0]
+	}
+	index := len(pkgs)
+	for _, p := range pkgs {
+		p.EnsureDetails()
+		index += len(p.Locations) + len(p.Requirements)
+	}
+	if err := st.Result(budget.SizeOfSortIndex(index)); err != nil {
+		r.Complete = false
+		r.Diagnostics = append(r.Diagnostics, model.Diagnostic{Code: "resource_limit", Stage: "normalize", Reason: "result memory estimate", Incomplete: true})
+		return []error{scanerr.New(scanerr.ResourceLimit, "result memory estimate")}
+	}
 	for _, p := range pkgs {
 		p.EnsureDetails()
 		sort.SliceStable(p.Locations, func(i, j int) bool {
@@ -80,10 +94,6 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shar
 	componentIDs := map[model.ComponentKey]bool{}
 	providers := map[[4]string][]string{}
 	providerCount := 0
-	st := &budget.State{Limits: l}
-	if len(shared) > 0 && shared[0] != nil {
-		st = shared[0]
-	}
 	var errs []error
 	limit := func(what string) {
 		r.Complete = false
