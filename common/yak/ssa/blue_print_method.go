@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -9,6 +10,12 @@ import (
 )
 
 type BlueprintMagicMethodKind string
+
+// Missing constructors are materialized on first use, including writes through
+// the declaration's builder. Serialize this short lookup/registration section;
+// constructor bodies execute after releasing the lock and may resolve methods
+// recursively.
+var blueprintMagicMu sync.Mutex
 
 const (
 	Constructor BlueprintMagicMethodKind = "constructor"
@@ -21,6 +28,12 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 }
 
 func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
+	blueprintMagicMu.Lock()
+	defer blueprintMagicMu.Unlock()
+	c.registerMagicMethod(name, val)
+}
+
+func (c *Blueprint) registerMagicMethod(name BlueprintMagicMethodKind, val Value) {
 	if c == nil || utils.IsNil(val) {
 		return
 	}
@@ -61,6 +74,20 @@ func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value
 }
 
 func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBuilder) Value {
+	method := func() Value {
+		blueprintMagicMu.Lock()
+		defer blueprintMagicMu.Unlock()
+		return c.resolveMagicMethod(name, fb)
+	}()
+	if !utils.IsNil(method) {
+		if function, ok := ToFunction(method); ok {
+			function.Build()
+		}
+	}
+	return method
+}
+
+func (c *Blueprint) resolveMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBuilder) Value {
 	var _method Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		switch name {
@@ -110,7 +137,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
 			functionType.SetFullTypeNames(c.GetFullTypeNames())
 			_method.SetType(functionType)
-			c.RegisterMagicMethod(Constructor, _method)
+			c.registerMagicMethod(Constructor, _method)
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
 			destructor := fb.EmitUndefined(_name)
@@ -118,15 +145,9 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
 			functionType.SetFullTypeNames(c.GetFullTypeNames())
 			_method.SetType(functionType)
-			c.RegisterMagicMethod(Destructor, _method)
+			c.registerMagicMethod(Destructor, _method)
 		default:
 			return nil
-		}
-	}
-	if !utils.IsNil(_method) {
-		if function, b := ToFunction(_method); b {
-			_ = function
-			function.Build()
 		}
 	}
 	return _method
