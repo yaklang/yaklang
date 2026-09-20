@@ -28,3 +28,17 @@ func TestSyntaxFlowSurfacesDatabaseCancellation(t *testing.T) {
 	require.ErrorContains(t, err, "SSA database search failed")
 	require.Nil(t, result, "database failure must not be a successful empty scan")
 }
+
+func TestSyntaxFlowQueryRestoresSharedVMContext(t *testing.T) {
+	prog, err := Parse("a = 1")
+	require.NoError(t, err)
+	vm := sfvm.NewSyntaxFlowVirtualMachine()
+	parent := vm.GetConfig().GetContext()
+	for i := 0; i < 2; i++ {
+		result, err := prog.SyntaxFlowWithError(`a as $value`, QueryWithVM(vm))
+		require.NoError(t, err)
+		require.Len(t, result.GetValues("value"), 1)
+		require.Equal(t, parent, vm.GetConfig().GetContext())
+		require.NoError(t, parent.Err())
+	}
+}
