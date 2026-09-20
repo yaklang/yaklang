@@ -8,7 +8,7 @@ SCA 从调用方提供的只读文件系统快照提取组件、出现位置、�
 
 格式限制包括 pnpm v5/v6、只读 Cargo/Poetry TOML、静态 gemspec 和 pip 声明；不执行脚本或安装器，不支持任意 YAML 对象、TOML 1.1、pip includes 或 SQLite WAL 恢复。POM 父级坐标必须匹配，不读取宿主缓存和环境补全未知属性。具体正例、负例和兼容断言随各解析器测试保留。
 
-资源默认值见 [resource-policy.json](resource-policy.json)。读入、归档及语法展开有界，但部分格式 DTO 在输出计数检查前仍按字节/语法预算分配，尚不满足严格的全局分配前内存预算。逐候选语义迁移的完整独立复核、全格式旧新性能矩阵及系统调用尝试计数也尚未完成；零依赖不代表这些门槛已经通过。
+资源默认值见 [resource-policy.json](resource-policy.json)。共用预算含文件/候选/读写字节、归档展开、语法节点、组件/观察/边，以及 **MaxResultBytes 逻辑结果内存估算**（不是 Go 堆或 RSS；0 用默认 256MiB，负值拒绝）。JSON/TOML/YAML/XML/文本工作副本、语法节点、材料缓存、入队、RPM/JAR/APK/DPKG 发出、归并插入和报告 append 在分配或插入前记账；快照材料与 POM 分析结果按 id 只计一次。encoding/json 与 encoding/xml 解码器内部缓冲、RPM 页缓冲（计入 MaxReadBytes）、`sort.Slice` 临时索引和 `MergePackages` 兼容适配器仍可能超出该估算，见 resource-policy.json 的 `result_memory.unbounded_runtime`。`TestFormatFieldMatrix` 与 `BenchmarkFormatScan` 覆盖冻结夹具上的字段语义和格式扫描；它们不是 802 条候选的独立审查，也不是与旧实现逐格式对照的完整性能证明。系统调用尝试须用隔离执行或平台追踪取证，零依赖导入审计不能代替。
 
 ## 验证
 
@@ -23,7 +23,7 @@ python3 scripts/sca/dependency_audit.py --test
 go run scripts/sca/source_audit.go
 go run scripts/sca/source_audit.go common/utils/filesys/filesys_interface
 python3 scripts/sca/verify_artifacts.py
-go test ./common/sca ./common/sca/analyzer ./common/sca/model -run '^$' -bench 'Benchmark(SparseDiscovery|ExactIdentity|Normalize)$' -benchmem
+go test ./common/sca ./common/sca/analyzer ./common/sca/model -run '^$' -bench 'Benchmark(SparseDiscovery|ExactIdentity|Normalize|FormatScan)$' -benchmem
 ```
 
 macOS 可额外执行禁止网络、文件写入及子进程的隔离测试：

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"regexp"
 	"strconv"
 	"strings"
@@ -80,6 +81,9 @@ func Parse(ctx context.Context, data []byte, limits Limits) (result *File, err e
 	}
 	if !utf8.Valid(data) {
 		return nil, errors.New("invalid UTF-8 in go.mod")
+	}
+	if err := budget.From(ctx).Working(int64(len(data))); err != nil {
+		return nil, err
 	}
 	in := &input{complete: data, remaining: data, ctx: ctx, limits: limits, pos: Position{Line: 1, LineRune: 1}}
 	defer func() {
@@ -160,7 +164,7 @@ func Parse(ctx context.Context, data []byte, limits Limits) (result *File, err e
 							args[i] = v
 						}
 					}
-					if e := f.add(verb, args, line, comment, required, replaced); e != nil {
+					if e := f.add(ctx, verb, args, line, comment, required, replaced); e != nil {
 						return nil, e
 					}
 				}
@@ -175,7 +179,7 @@ func Parse(ctx context.Context, data []byte, limits Limits) (result *File, err e
 	}
 	return f, nil
 }
-func (f *File) add(verb string, a []string, line int, comment string, required map[string]bool, replaced map[Module]bool) error {
+func (f *File) add(ctx context.Context, verb string, a []string, line int, comment string, required map[string]bool, replaced map[Module]bool) error {
 	bad := func() error { return fmt.Errorf("go.mod:%d: invalid or duplicate %s directive", line, verb) }
 	pair := func(a []string) (Module, bool) {
 		if len(a) != 2 || !modulePath(a[0]) || !version(a[1]) {
@@ -207,6 +211,9 @@ func (f *File) add(verb string, a []string, line int, comment string, required m
 		if len(a) != 1 || strings.Count(a[0], "=") != 1 || strings.HasPrefix(a[0], "=") || strings.HasSuffix(a[0], "=") {
 			return bad()
 		}
+		if err := budget.From(ctx).Result(budget.SizeOfString(a[0])); err != nil {
+			return err
+		}
 		f.Godebug = append(f.Godebug, a[0])
 	case "require":
 		m, ok := pair(a)
@@ -216,11 +223,17 @@ func (f *File) add(verb string, a []string, line int, comment string, required m
 		required[m.Path] = true
 		c := strings.Fields(strings.TrimPrefix(comment, "//"))
 		indirect := len(c) > 0 && (c[0] == "indirect" || c[0] == "indirect;")
+		if err := budget.From(ctx).Result(budget.SizeOfRecord() + budget.SizeOfString(m.Path) + budget.SizeOfString(m.Version)); err != nil {
+			return err
+		}
 		f.Require = append(f.Require, Requirement{m.Path, m.Version, indirect, line})
 	case "exclude":
 		m, ok := pair(a)
 		if !ok {
 			return bad()
+		}
+		if err := budget.From(ctx).Result(budget.SizeOfRecord() + budget.SizeOfString(m.Path) + budget.SizeOfString(m.Version)); err != nil {
+			return err
 		}
 		f.Exclude = append(f.Exclude, m)
 	case "replace":
@@ -259,11 +272,20 @@ func (f *File) add(verb string, a []string, line int, comment string, required m
 			return bad()
 		}
 		replaced[old] = true
+		if err := budget.From(ctx).Result(budget.SizeOfRecord() + budget.SizeOfString(old.Path) + budget.SizeOfString(next.Path)); err != nil {
+			return err
+		}
 		f.Replace = append(f.Replace, Replacement{old, next, line})
 	case "retract":
 		if len(a) == 1 && version(a[0]) {
+			if err := budget.From(ctx).Result(budget.SizeOfRecord() + budget.SizeOfString(a[0])); err != nil {
+				return err
+			}
 			f.Retract = append(f.Retract, Interval{a[0], a[0], line})
 		} else if len(a) == 5 && a[0] == "[" && a[2] == "," && a[4] == "]" && version(a[1]) && version(a[3]) {
+			if err := budget.From(ctx).Result(budget.SizeOfRecord() + budget.SizeOfString(a[1]) + budget.SizeOfString(a[3])); err != nil {
+				return err
+			}
 			f.Retract = append(f.Retract, Interval{a[1], a[3], line})
 		} else {
 			return bad()

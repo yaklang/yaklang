@@ -60,12 +60,22 @@ func Parse(ctx context.Context, raw []byte) (*Node, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("nil JSON context")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	l := budget.From(ctx).Limits
 	if int64(len(raw)) > min(int64(MaxBytes), l.MaxFileBytes) {
 		return nil, fmt.Errorf("resource_limit: JSON bytes exceed %d", MaxBytes)
 	}
 	if !utf8.Valid(raw) {
 		return nil, fmt.Errorf("malformed_input: JSON is not UTF-8")
+	}
+	if err := budget.From(ctx).Working(int64(len(raw))); err != nil {
+		return nil, err
+	}
+	newlines := bytes.Count(raw, []byte{'\n'})
+	if err := budget.From(ctx).Result(budget.SizeSlice + int64(newlines)*8); err != nil {
+		return nil, err
 	}
 	p := &reader{limits: l, ctx: ctx, raw: raw, dec: json.NewDecoder(bytes.NewReader(raw))}
 	p.dec.UseNumber()
@@ -90,9 +100,11 @@ func (p *reader) value(depth int) (*Node, error) {
 	if err := p.ctx.Err(); err != nil {
 		return nil, err
 	}
-	p.nodes++
-	if depth > p.limits.MaxSyntaxDepth || p.nodes > p.limits.MaxExpressionNodes {
+	if depth > p.limits.MaxSyntaxDepth {
 		return nil, fmt.Errorf("resource_limit: JSON depth or nodes")
+	}
+	if err := budget.From(p.ctx).Add(1, budget.SizeOfNode(0)); err != nil {
+		return nil, err
 	}
 	start := int(p.dec.InputOffset())
 	for start < len(p.raw) && (p.raw[start] == ' ' || p.raw[start] == '\n' || p.raw[start] == '\r' || p.raw[start] == '\t' || p.raw[start] == ':' || p.raw[start] == ',') {
@@ -123,6 +135,9 @@ func (p *reader) value(depth int) (*Node, error) {
 				if err != nil {
 					return nil, err
 				}
+				if err := budget.From(p.ctx).Insert(k); err != nil {
+					return nil, err
+				}
 				n.Object[k] = v
 			}
 			end, err := p.dec.Token()
@@ -133,6 +148,9 @@ func (p *reader) value(depth int) (*Node, error) {
 			for p.dec.More() {
 				v, err := p.value(depth + 1)
 				if err != nil {
+					return nil, err
+				}
+				if err := budget.From(p.ctx).Result(budget.SizePtr); err != nil {
 					return nil, err
 				}
 				n.Array = append(n.Array, v)

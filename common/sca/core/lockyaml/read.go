@@ -28,12 +28,18 @@ func Parse(ctx context.Context, data []byte) (map[string]any, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("nil context")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	l := budget.From(ctx).Limits
 	if int64(len(data)) > min(l.MaxFileBytes, 16<<20) {
 		return nil, fmt.Errorf("resource_limit: YAML bytes")
 	}
 	if !utf8.Valid(data) {
 		return nil, fmt.Errorf("malformed_input: YAML UTF-8")
+	}
+	if err := budget.From(ctx).Working(int64(len(data))); err != nil {
+		return nil, err
 	}
 	p := &reader{ctx: ctx, limits: l}
 	var pending string
@@ -72,6 +78,9 @@ func Parse(ctx context.Context, data []byte) (map[string]any, error) {
 		}
 		if text == "---" || text == "..." || strings.HasPrefix(text, "%") {
 			return nil, fmt.Errorf("unsupported_syntax: YAML document directive")
+		}
+		if err := budget.From(ctx).Result(budget.SizeObject + budget.SizeOfString(text)); err != nil {
+			return nil, err
 		}
 		p.lines = append(p.lines, line{pendingIndent, start, text})
 		if len(p.lines) > l.MaxExpressionNodes {
@@ -143,14 +152,13 @@ func clean(s string) (string, int, bool, error) {
 	return strings.TrimSpace(s), depth, quote != 0, nil
 }
 func (p *reader) check(depth int) error {
-	p.nodes++
 	if err := p.ctx.Err(); err != nil {
 		return err
 	}
-	if depth > p.limits.MaxSyntaxDepth || p.nodes > p.limits.MaxExpressionNodes {
+	if depth > p.limits.MaxSyntaxDepth {
 		return fmt.Errorf("resource_limit: YAML nodes or depth")
 	}
-	return nil
+	return budget.From(p.ctx).Add(1, budget.SizeObject)
 }
 func seq(s string) bool { return s == "-" || strings.HasPrefix(s, "- ") }
 func (p *reader) block(indent, depth int) (any, error) {
@@ -162,6 +170,9 @@ func (p *reader) block(indent, depth int) (any, error) {
 	}
 	if !seq(p.lines[p.pos].text) {
 		return p.mapping(indent, depth, nil)
+	}
+	if err := budget.From(p.ctx).Result(budget.SizeSlice); err != nil {
+		return nil, err
 	}
 	var list []any
 	for p.pos < len(p.lines) && p.lines[p.pos].indent == indent && seq(p.lines[p.pos].text) {
@@ -179,12 +190,18 @@ func (p *reader) block(indent, depth int) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := budget.From(p.ctx).Result(budget.SizePtr); err != nil {
+			return nil, err
+		}
 		list = append(list, v)
 	}
 	return list, nil
 }
 func (p *reader) mapping(indent, depth int, first *line) (map[string]any, error) {
 	if err := p.check(depth); err != nil {
+		return nil, err
+	}
+	if err := budget.From(p.ctx).Result(budget.SizeMap); err != nil {
 		return nil, err
 	}
 	m := map[string]any{}
@@ -214,6 +231,9 @@ func (p *reader) mapping(indent, depth int, first *line) (map[string]any, error)
 		}
 		v, err := p.value(strings.TrimSpace(l.text[cut+1:]), indent, depth+1)
 		if err != nil {
+			return nil, err
+		}
+		if err := budget.From(p.ctx).Insert(k); err != nil {
 			return nil, err
 		}
 		m[k] = v
@@ -379,6 +399,13 @@ func (f *flow) value(depth int) (any, error) {
 	c := f.s[f.i]
 	if c == '{' || c == '[' {
 		f.i++
+		if c == '{' {
+			if err := budget.From(f.p.ctx).Result(budget.SizeMap); err != nil {
+				return nil, err
+			}
+		} else if err := budget.From(f.p.ctx).Result(budget.SizeSlice); err != nil {
+			return nil, err
+		}
 		m := map[string]any{}
 		var a []any
 		end := byte(']')
@@ -445,8 +472,14 @@ func (f *flow) value(depth int) (any, error) {
 				return nil, err
 			}
 			if c == '{' {
+				if err := budget.From(f.p.ctx).Insert(key); err != nil {
+					return nil, err
+				}
 				m[key] = v
 			} else {
+				if err := budget.From(f.p.ctx).Result(budget.SizePtr); err != nil {
+					return nil, err
+				}
 				a = append(a, v)
 			}
 			f.space()

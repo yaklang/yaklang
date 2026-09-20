@@ -30,6 +30,9 @@ func readBlock(ctx context.Context, r *bufio.Reader) ([]byte, error) {
 		blank := lineBytes == 0 && (bytes.Equal(part, []byte("\n")) || bytes.Equal(part, []byte("\r\n")))
 		lineBytes += len(part)
 		if !blank {
+			if err := budget.From(ctx).Result(int64(len(part))); err != nil {
+				return nil, err
+			}
 			block.Write(part)
 		}
 		if err == bufio.ErrBufferFull {

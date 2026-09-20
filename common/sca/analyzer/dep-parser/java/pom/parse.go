@@ -69,8 +69,9 @@ func (p *parser) Parse(snapshot fi.FileSystem, r types.ReadSeekerAt) ([]types.Li
 		return nil, nil, fmt.Errorf("analyze error (%s): %w", p.rootPath, err)
 	}
 
-	// Cache root POM
-	p.cache.put(result.artifact, result)
+	if err := p.remember(result.artifact, result); err != nil {
+		return nil, nil, err
+	}
 
 	libs, deps, err := p.parseRoot(root.artifact())
 	if len(libs) > 0 {
@@ -274,7 +275,9 @@ func (p *parser) parseModule(currentPath, relativePath string) (artifact, error)
 	moduleArtifact := module.artifact()
 	moduleArtifact.Module = true
 
-	p.cache.put(moduleArtifact, result)
+	if err := p.remember(moduleArtifact, result); err != nil {
+		return artifact{}, err
+	}
 
 	return moduleArtifact, nil
 }
@@ -297,6 +300,7 @@ func (p *parser) resolve(art artifact, rootDepManagement []pomDependency) (analy
 		return analysisResult{}, err
 	}
 	// Cached analysis is not a safe expansion of imported BOM closures.
+	// Shared POM material was charged when first stored.
 	if result := p.cache.get(art); result != nil {
 		return *result, nil
 	}
@@ -314,8 +318,20 @@ func (p *parser) resolve(art artifact, rootDepManagement []pomDependency) (analy
 		return analysisResult{}, fmt.Errorf("analyze error: %w", err)
 	}
 
-	p.cache.put(art, result)
+	if err := p.remember(art, result); err != nil {
+		return analysisResult{}, err
+	}
 	return result, nil
+}
+
+func (p *parser) remember(art artifact, result analysisResult) error {
+	key := p.cache.key(art)
+	if err := budget.From(p.ctx).Once("pom:"+key, 1, budget.SizeObject*4+budget.SizeOfString(key)); err != nil {
+		p.fatal = err
+		return err
+	}
+	p.cache.put(art, result)
+	return nil
 }
 
 type analysisResult struct {
@@ -558,7 +574,9 @@ func (p *parser) parseParent(currentPath string, parent pomParent) (analysisResu
 		return analysisResult{}, fmt.Errorf("analyze error: %w", err)
 	}
 
-	p.cache.put(target, result)
+	if err := p.remember(target, result); err != nil {
+		return analysisResult{}, err
+	}
 
 	return result, nil
 }

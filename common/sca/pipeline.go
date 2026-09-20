@@ -69,8 +69,14 @@ func (m *materials) Open(name string) (fs.File, error) {
 			v.err = scanerr.New(scanerr.InputChanged, "%s", name)
 			return
 		}
-		// Charge actual bytes in chunks, including repeated material names only once.
+		if err := budget.From(m.ctx).Once("material:"+name, 1, budget.SizeOfBytes(int(v.info.Size()))); err != nil {
+			v.err = err
+			return
+		}
 		var data []byte
+		if v.info.Size() > 0 {
+			data = make([]byte, 0, int(v.info.Size()))
+		}
 		buf := make([]byte, 32<<10)
 		for {
 			if err = m.ctx.Err(); err != nil {
@@ -250,12 +256,18 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 			return err
 		}
 		if d.IsDir() {
+			if err := budget.From(ctx).Result(budget.SizeObject + budget.SizeOfString(name)); err != nil {
+				return err
+			}
 			m.dirs[name] = info
 			return nil
 		}
 		if !info.Mode().IsRegular() {
 			fail("unsupported_input", name, fmt.Errorf("non-regular material omitted"))
 			return nil
+		}
+		if err := budget.From(ctx).Result(budget.SizeObject + budget.SizeOfString(name)); err != nil {
+			return err
 		}
 		m.files[name] = &material{info: info}
 		return nil
@@ -351,6 +363,10 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 			if _, ok := matched[name]; !ok {
 				matched[name] = info
 			}
+			if err := budget.From(ctx).Result(budget.SizeOfJob()); err != nil {
+				fail(scanerr.CodeOf(err), name, err)
+				break
+			}
 			jobs = append(jobs, scanJob{info, analyzer.Name(a)})
 		}
 	}
@@ -427,7 +443,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		fail("resource_limit", "", fmt.Errorf("observations"))
 		pkgs = nil
 	}
-	classified = append(classified, fillReport(report, pkgs, limits)...)
+	classified = append(classified, fillReport(report, pkgs, limits, budget.From(ctx))...)
 	report.Normalize()
 	if err = ctx.Err(); err != nil {
 		fail("cancelled", "", err)

@@ -122,7 +122,11 @@ func (p *JarParser) parseArtifact(fs fi.FileSystem, filePath string, size int64,
 			if !props.Valid() {
 				return nil, nil, fmt.Errorf("malformed_input: incomplete pom.properties identity")
 			}
-			libs = append(libs, props.Library())
+			lib := props.Library()
+			if err := p.budget.Result(budget.SizeOfPackage(lib.Name, lib.Version, lib.FilePath)); err != nil {
+				return nil, nil, err
+			}
+			libs = append(libs, lib)
 			explicitCoordinates = true
 		case filename == "MANIFEST.MF":
 			if fileInJar.UncompressedSize64 > uint64(p.budget.Limits.MaxFieldBytes) {
@@ -159,6 +163,9 @@ func (p *JarParser) parseArtifact(fs fi.FileSystem, filePath string, size int64,
 	}
 	// Manifest vendor/title fallbacks do not prove Maven coordinates.
 	candidate.Evidence = "inferred"
+	if err := p.budget.Result(budget.SizeOfPackage(candidate.Name, candidate.Version, candidate.FilePath)); err != nil {
+		return nil, nil, err
+	}
 	return append(libs, candidate), nil, nil
 }
 
@@ -175,6 +182,9 @@ func (p *JarParser) parseInnerJar(fs fi.FileSystem, zf *zip.File, rootPath strin
 	}
 	if int64(len(data)) > p.budget.Limits.MaxFileBytes {
 		return nil, nil, fmt.Errorf("resource_limit: expanded archive")
+	}
+	if err := p.budget.Working(int64(len(data))); err != nil {
+		return nil, nil, err
 	}
 	f := bytes.NewReader(data)
 

@@ -111,6 +111,9 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Packag
 			if int64(len(data)) > policy.Limits.MaxFileBytes {
 				return nil, fmt.Errorf("resource_limit: egg expansion")
 			}
+			if err = policy.Working(int64(len(data))); err != nil {
+				return nil, err
+			}
 			nested := lazyfile.NewMemory(fi.Path+"!/"+vf.Name, data)
 			nested.SetContext(fi.LazyFile.Context())
 			return ParseLanguageConfiguration(&FileInfo{Path: fi.Path + "!/" + vf.Name, LazyFile: nested, filesystem: fi.filesystem}, packaging.NewParser())

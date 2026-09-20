@@ -1,7 +1,9 @@
 package analyzer
 
 import (
+	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/model"
 	"io/fs"
 	"sort"
@@ -102,13 +104,25 @@ func ParseLanguageConfiguration(fi *FileInfo, parser types.Parser) ([]*dxtypes.P
 	if err != nil {
 		return nil, err
 	}
-	return handlerParsed(parsedLibs, parsedDeps)
+	ctx := context.Background()
+	if fi != nil && fi.LazyFile != nil {
+		ctx = fi.LazyFile.Context()
+	}
+	return handlerParsedBudget(ctx, parsedLibs, parsedDeps)
 }
 
 func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([]*dxtypes.Package, error) {
+	return handlerParsedBudget(context.Background(), parsedLibs, parsedDeps)
+}
+
+func handlerParsedBudget(ctx context.Context, parsedLibs types.Libraries, parsedDeps types.Dependencies) ([]*dxtypes.Package, error) {
+	st := budget.From(ctx)
 	pkgIDMap := make(map[string]*dxtypes.Package, len(parsedLibs))
 
 	for _, lib := range parsedLibs {
+		if err := st.Result(budget.SizeOfPackage(lib.Name, lib.Version, lib.Verification)); err != nil {
+			return nil, err
+		}
 		p := dxtypes.Package{
 
 			IsVersionRange: lib.IsVersionRange,
@@ -131,6 +145,9 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 			p.Instance = p.ArtifactPath + "#" + p.Name + "@" + p.Version
 		}
 		for _, loc := range lib.Locations {
+			if err := st.Result(budget.SizeOfObservation()); err != nil {
+				return nil, err
+			}
 			p.Locations = append(p.Locations, dxtypes.SourceRange{StartLine: loc.StartLine, EndLine: loc.EndLine})
 		}
 		if len(lib.Locations) > 0 {
@@ -147,6 +164,9 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 		if id == "" {
 			id = p.Identifier()
 		}
+		if err := st.Result(budget.SizeMap + budget.SizePtr); err != nil {
+			return nil, err
+		}
 		if prior, exists := pkgIDMap[id]; exists {
 			if prior.Identifier() != p.Identifier() {
 				return nil, fmt.Errorf("malformed_input: conflicting native reference %q", id)
@@ -160,6 +180,13 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 				prior.DeclaredIntegrity = prior.DeclaredIntegrity + " " + p.DeclaredIntegrity
 			}
 			continue
+		}
+		if lib.DeclaredVersion != "" {
+			req := model.Requirement{Target: lib.Name, Constraint: lib.DeclaredVersion, Scope: p.Scope}
+			if err := st.Result(budget.SizeOfEdge() + budget.SizeOfString(req.Target) + budget.SizeOfString(req.Constraint)); err != nil {
+				return nil, err
+			}
+			p.Requirements = append(p.Requirements, req)
 		}
 		pkgIDMap[id] = &p
 	}
@@ -178,6 +205,9 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 			if up := pkgIDMap[q.Resolved]; q.Resolved != "" && up != nil {
 				pkg.LinkDepend(up)
 				req.Resolved = []string{up.Instance}
+			}
+			if err := st.Result(budget.SizeOfEdge() + budget.SizeOfString(q.Target) + budget.SizeOfString(q.Constraint)); err != nil {
+				return nil, err
 			}
 			pkg.Requirements = append(pkg.Requirements, req)
 		}

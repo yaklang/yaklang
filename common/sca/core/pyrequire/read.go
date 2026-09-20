@@ -26,6 +26,9 @@ func Parse(ctx context.Context, data []byte) ([]Record, error) {
 	if int64(len(data)) > min(l.MaxFileBytes, 16<<20) {
 		return nil, fmt.Errorf("resource_limit: Python requirements bytes")
 	}
+	if err := budget.From(ctx).Working(int64(len(data))); err != nil {
+		return nil, err
+	}
 	s := bufio.NewScanner(bytes.NewReader(data))
 	s.Buffer(make([]byte, 4096), l.MaxFieldBytes)
 	var out []Record
@@ -58,6 +61,9 @@ func Parse(ctx context.Context, data []byte) ([]Record, error) {
 		}
 		r.StartLine = start
 		r.EndLine = n
+		if err := budget.From(ctx).Result(budget.SizeOfRecord() + budget.SizeOfString(r.Name) + budget.SizeOfString(r.Constraint)); err != nil {
+			return nil, err
+		}
 		out = append(out, r)
 		line = ""
 		if len(out) > l.MaxExpressionNodes {

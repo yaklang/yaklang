@@ -25,8 +25,6 @@ type node struct {
 	sealed, aot        bool
 }
 
-func table(origin tableOrigin) *node { return &node{table: map[string]*node{}, origin: origin} }
-
 type parser struct {
 	lastLine      int
 	limits        budget.Limits
@@ -34,6 +32,13 @@ type parser struct {
 	tokens        int
 	mapping       map[string]any
 	root, current *node
+}
+
+func (p *parser) table(origin tableOrigin) *node {
+	if err := budget.From(p.lx.ctx).Add(1, budget.SizeMap+budget.SizeObject); err != nil {
+		panic(parseAbort{err})
+	}
+	return &node{table: map[string]*node{}, origin: origin}
 }
 
 func parse(ctx context.Context, data string) (p *parser, err error) {
@@ -46,8 +51,9 @@ func parse(ctx context.Context, data string) (p *parser, err error) {
 			}
 		}
 	}()
-	p = &parser{limits: budget.From(ctx).Limits, lx: lex(strings.TrimPrefix(data, "\ufeff")), root: table(explicit)}
+	p = &parser{limits: budget.From(ctx).Limits, lx: lex(strings.TrimPrefix(data, "\ufeff"))}
 	p.lx.ctx = ctx
+	p.root = p.table(explicit)
 	p.current = p.root
 	for {
 		it := p.next()
@@ -77,9 +83,8 @@ func parse(ctx context.Context, data string) (p *parser, err error) {
 	}
 }
 func (p *parser) next() item {
-	p.tokens++
-	if p.tokens > p.limits.MaxExpressionNodes {
-		panic(parseAbort{fmt.Errorf("resource_limit: TOML tokens")})
+	if err := budget.From(p.lx.ctx).Add(1, budget.SizeObject); err != nil {
+		panic(parseAbort{err})
 	}
 	it := p.lx.nextItem()
 	p.lastLine = it.pos.Line + strings.Count(it.val, "\n")
@@ -140,7 +145,10 @@ func (p *parser) header(key []string, array bool) *node {
 	for _, k := range key[:len(key)-1] {
 		v := n.table[k]
 		if v == nil {
-			v = table(implicit)
+			v = p.table(implicit)
+			if err := budget.From(p.lx.ctx).Insert(k); err != nil {
+				panic(parseAbort{err})
+			}
 			n.table[k] = v
 		}
 		if v.aot {
@@ -155,18 +163,30 @@ func (p *parser) header(key []string, array bool) *node {
 	v := n.table[k]
 	if array {
 		if v == nil {
+			if err := budget.From(p.lx.ctx).Add(1, budget.SizeSlice+budget.SizeObject); err != nil {
+				panic(parseAbort{err})
+			}
 			v = &node{aot: true}
+			if err := budget.From(p.lx.ctx).Insert(k); err != nil {
+				panic(parseAbort{err})
+			}
 			n.table[k] = v
 		}
 		if !v.aot {
 			p.bug("array table redefines key")
 		}
-		next := table(explicit)
+		next := p.table(explicit)
+		if err := budget.From(p.lx.ctx).Result(budget.SizePtr); err != nil {
+			panic(parseAbort{err})
+		}
 		v.array = append(v.array, next)
 		return next
 	}
 	if v == nil {
-		v = table(explicit)
+		v = p.table(explicit)
+		if err := budget.From(p.lx.ctx).Insert(k); err != nil {
+			panic(parseAbort{err})
+		}
 		n.table[k] = v
 		return v
 	}
@@ -180,7 +200,10 @@ func (p *parser) assign(n *node, key []string, v *node) {
 	for _, k := range key[:len(key)-1] {
 		next := n.table[k]
 		if next == nil {
-			next = table(dotted)
+			next = p.table(dotted)
+			if err := budget.From(p.lx.ctx).Insert(k); err != nil {
+				panic(parseAbort{err})
+			}
 			n.table[k] = next
 		}
 		if next.table == nil || next.sealed || next.origin == explicit {
@@ -191,6 +214,9 @@ func (p *parser) assign(n *node, key []string, v *node) {
 	k := key[len(key)-1]
 	if n.table[k] != nil {
 		p.bug("duplicate key %q", k)
+	}
+	if err := budget.From(p.lx.ctx).Insert(k); err != nil {
+		panic(parseAbort{err})
 	}
 	n.table[k] = v
 }
@@ -241,6 +267,9 @@ func (p *parser) value(it item, depth int) *node {
 	case itemDatetime:
 		panic(parseAbort{fmt.Errorf("unsupported_syntax: dates in SCA lock files")})
 	case itemArray:
+		if err := budget.From(p.lx.ctx).Result(budget.SizeSlice); err != nil {
+			panic(parseAbort{err})
+		}
 		n.array = []*node{}
 		for {
 			next := p.next()
@@ -251,10 +280,14 @@ func (p *parser) value(it item, depth int) *node {
 				p.expect(itemText)
 				continue
 			}
-			n.array = append(n.array, p.value(next, depth+1))
+			item := p.value(next, depth+1)
+			if err := budget.From(p.lx.ctx).Result(budget.SizePtr); err != nil {
+				panic(parseAbort{err})
+			}
+			n.array = append(n.array, item)
 		}
 	case itemInlineTableStart:
-		n = table(dotted)
+		n = p.table(dotted)
 		for {
 			next := p.next()
 			if next.typ == itemInlineTableEnd {

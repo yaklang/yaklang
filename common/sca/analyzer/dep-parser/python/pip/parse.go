@@ -2,6 +2,7 @@ package pip
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/core/pyrequire"
 	"strings"
 	"unicode"
@@ -27,17 +28,21 @@ func NewParser() types.Parser {
 }
 
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
-	data, err := textdecode.Read(r)
+	ctx := types.ContextOf(r)
+	data, err := textdecode.ReadContext(ctx, r)
 	if err != nil {
 		return nil, nil, err
 	}
-	records, err := pyrequire.Parse(types.ContextOf(r), data)
+	records, err := pyrequire.Parse(ctx, data)
 	if err != nil {
 		return nil, nil, err
 	}
 	var libs []types.Library
 	for _, d := range records {
 		verification := strings.Join(d.Hashes, ",")
+		if err := budget.From(ctx).Result(budget.SizeOfPackage(d.Name, d.Version, d.Constraint)); err != nil {
+			return nil, nil, err
+		}
 		libs = append(libs, types.Library{ID: fmt.Sprintf("requirement:%d", d.StartLine), Name: d.Name, Version: d.Version, Evidence: "declared", DeclaredName: d.Name, DeclaredVersion: d.Constraint, DeclaredCondition: d.Marker, Source: d.URL, Variant: d.Extras, Extras: d.Extras, Verification: verification, Locations: []types.Location{{StartLine: d.StartLine, EndLine: d.EndLine}}})
 	}
 	return libs, nil, nil

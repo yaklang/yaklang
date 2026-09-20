@@ -22,7 +22,8 @@
     "MaxSyntaxDepth": 64,
     "MaxExpressionNodes": 100000,
     "MaxResolveSteps": 1000000,
-    "MaxReferenceDepth": 64
+    "MaxReferenceDepth": 64,
+    "MaxResultBytes": 268435456
   },
   "global_budgets": [
     "MaxFiles",
@@ -32,7 +33,8 @@
     "MaxExpandedBytes",
     "MaxComponents",
     "MaxObservations",
-    "MaxEdges"
+    "MaxEdges",
+    "MaxResultBytes"
   ],
   "per_parser": [
     "MaxFieldBytes",
@@ -49,5 +51,21 @@
   },
   "on_shared_budget_exhaustion": "discard concurrently produced graph; retain deterministic discovery diagnostics",
   "policy_basis": "Versioned bounded defaults; not claimed as production sizing evidence",
-  "strict_preallocation_status": "File/archive/structured syntax readers are bounded before expansion. Component/edge output limits also apply during report insertion; some format DTO slices are constructed under syntax/file bounds before output-count validation."
+  "result_memory": {
+    "unit": "logical working-set estimate, not Go heap or RSS",
+    "charges_before": ["parser working copy", "syntax node", "map/slice insert", "package merge", "job enqueue", "report component/observation/edge"],
+    "shared_once": "POM analysis cache keys and identical material ids",
+    "unbounded_runtime": [
+      "encoding/json.Decoder internal buffers after Working() of the document",
+      "encoding/xml.Decoder token scratch and Decode reflection into caller structs after Working() of the document",
+      "locktoml node.value() map rebuild after per-token/table charges; json.Marshal record conversion is charged as Working of the JSON bytes",
+      "RPM page buffers in core/rpm.snapshot.at allocate against MaxReadBytes, not MaxResultBytes; package DTOs are charged in emit before append",
+      "32KiB snapshot read scratch in pipeline materials.Open after Once of the file size",
+      "apk bufio.Scanner.Text line copies; DPKG MIME header maps after readBlock charges",
+      "analyzer.MergePackages has no context and is a test/benchmark exact-identity adapter only; ScanReport merge is handlerParsedBudget",
+      "sort.Slice temporary indexes",
+      "Go map growth beyond conservative SizeMap/SizePtr charges"
+    ]
+  },
+  "strict_preallocation_status": "Shared MaxResultBytes and MaxExpressionNodes are charged before working copies, syntax nodes, enqueue, merge inserts, and report appends. Cached snapshot bytes and POM analysis results are Once-charged. Remaining decoder internals, RPM page buffers, and sort temporaries are named in result_memory.unbounded_runtime."
 }

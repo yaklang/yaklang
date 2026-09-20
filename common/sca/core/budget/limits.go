@@ -13,6 +13,7 @@ type Limits struct {
 	MaxFiles, MaxCandidateFiles              int
 	MaxFileBytes, MaxTotalReadBytes          int64
 	MaxComponents, MaxObservations, MaxEdges int
+	MaxResultBytes                           int64
 }
 
 func (l Limits) Normalize() (Limits, error) {
@@ -39,7 +40,10 @@ func (l Limits) Normalize() (Limits, error) {
 	big = append(big, struct {
 		p        *int64
 		def, max int64
-	}{&l.MaxExpandedBytes, 512 << 20, 2 << 30})
+	}{&l.MaxExpandedBytes, 512 << 20, 2 << 30}, struct {
+		p        *int64
+		def, max int64
+	}{&l.MaxResultBytes, 256 << 20, 2 << 30})
 	for _, x := range big {
 		if *x.p < 0 || *x.p > x.max {
 			return l, fmt.Errorf("invalid byte limit")

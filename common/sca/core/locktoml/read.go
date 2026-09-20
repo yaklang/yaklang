@@ -38,6 +38,9 @@ func document(ctx context.Context, b []byte) (*parser, error) {
 	if !utf8.Valid(b) {
 		return nil, fmt.Errorf("malformed_input: TOML requires UTF-8")
 	}
+	if err := budget.From(ctx).Working(int64(len(b))); err != nil {
+		return nil, err
+	}
 	p, err := parse(ctx, string(b))
 	if err != nil {
 		return nil, err
@@ -62,12 +65,18 @@ func DecodeRecords(ctx context.Context, r io.Reader, out any, name string) ([]Sp
 	if e != nil {
 		return nil, e
 	}
+	if e = budget.From(ctx).Working(int64(len(raw))); e != nil {
+		return nil, e
+	}
 	if e = json.Unmarshal(raw, out); e != nil {
 		return nil, e
 	}
 	var spans []Span
 	if n := p.root.table[name]; n != nil && n.aot {
 		for _, record := range n.array {
+			if e = budget.From(ctx).Result(budget.SizeObject); e != nil {
+				return nil, e
+			}
 			spans = append(spans, Span{record.startLine, record.endLine})
 		}
 	}
@@ -87,6 +96,9 @@ func Decode(ctx context.Context, r io.Reader, out any) error {
 	b, err = json.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("unsupported_syntax: TOML non-JSON scalar: %w", err)
+	}
+	if err = budget.From(ctx).Working(int64(len(b))); err != nil {
+		return err
 	}
 	dec := json.NewDecoder(strings.NewReader(string(b)))
 	return dec.Decode(out)

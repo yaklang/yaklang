@@ -3,23 +3,49 @@ package textdecode
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 )
 
 func Read(r io.Reader) ([]byte, error) {
-	b, err := io.ReadAll(io.LimitReader(r, (16<<20)+1))
+	return ReadContext(context.Background(), r)
+}
+
+func ReadContext(ctx context.Context, r io.Reader) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	capn := min(budget.From(ctx).Limits.MaxFileBytes, 16<<20)
+	b, err := io.ReadAll(io.LimitReader(r, capn+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(b) > 16<<20 {
+	if int64(len(b)) > capn {
 		return nil, fmt.Errorf("resource_limit: text bytes")
 	}
-	return BOM(b)
+	if err := budget.From(ctx).Working(int64(len(b))); err != nil {
+		return nil, err
+	}
+	out, err := BOM(b)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) != len(b) {
+		if err := budget.From(ctx).Working(int64(len(out))); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 func BOM(b []byte) ([]byte, error) {
 	if bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {

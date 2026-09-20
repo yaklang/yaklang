@@ -27,9 +27,8 @@ func (t *tokens) Token() (xml.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	t.count++
-	if t.count > t.l.MaxExpressionNodes {
-		return nil, fmt.Errorf("resource_limit: XML tokens")
+	if err := budget.From(t.ctx).Add(1, budget.SizeObject); err != nil {
+		return nil, err
 	}
 	switch v := token.(type) {
 	case xml.StartElement:
@@ -65,10 +64,16 @@ func Decode(ctx context.Context, r io.Reader, out any) error {
 	if int64(len(b)) > min(l.MaxFileBytes, 16<<20) {
 		return fmt.Errorf("resource_limit: XML bytes")
 	}
+	if err := budget.From(ctx).Working(int64(len(b))); err != nil {
+		return err
+	}
 	transcoded := bytes.HasPrefix(b, []byte{0xff, 0xfe}) || bytes.HasPrefix(b, []byte{0xfe, 0xff})
 	if transcoded || bytes.HasPrefix(b, []byte{0xef, 0xbb, 0xbf}) {
 		b, err = textdecode.BOM(b)
 		if err != nil {
+			return err
+		}
+		if err := budget.From(ctx).Working(int64(len(b))); err != nil {
 			return err
 		}
 	}

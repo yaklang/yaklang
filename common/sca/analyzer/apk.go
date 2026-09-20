@@ -107,6 +107,9 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 
 			if len(line) < 2 {
 				if pkg.Name != "" && pkg.Version != "" {
+					if err := budget.From(fi.LazyFile.Context()).Result(budget.SizeOfPackage(pkg.Name, pkg.Version, pkg.Architecture)); err != nil {
+						return nil, err
+					}
 					pkgs = append(pkgs, pkg)
 				}
 				// new
@@ -135,6 +138,9 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 			}
 		}
 		if pkg.Name != "" && pkg.Version != "" {
+			if err := budget.From(fi.LazyFile.Context()).Result(budget.SizeOfPackage(pkg.Name, pkg.Version, pkg.Architecture)); err != nil {
+				return nil, err
+			}
 			pkgs = append(pkgs, pkg)
 		}
 

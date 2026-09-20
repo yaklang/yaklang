@@ -141,6 +141,9 @@ func (a dpkgAnalyzer) analyzeStatus(r io.Reader) ([]*dxtypes.Package, error) {
 		}
 		pkg := a.parseDpkgPkg(header)
 		if pkg != nil {
+			if err := budget.From(ctx).Result(budget.SizeOfPackage(pkg.Name, pkg.Version, pkg.Architecture)); err != nil {
+				return nil, err
+			}
 			pkgs = append(pkgs, pkg)
 		}
 	}

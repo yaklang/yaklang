@@ -67,6 +67,9 @@ func Parse(ctx context.Context, r io.ReaderAt, size int64, lim Limits) ([]*Packa
 		if err != nil {
 			return err
 		}
+		if err := budget.From(ctx).Result(budget.SizeOfPackage(p.Name, p.Version, p.License)); err != nil {
+			return err
+		}
 		result = append(result, p)
 		return nil
 	}
@@ -160,6 +163,9 @@ func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*Pa
 					return nil, fmt.Errorf("resource_limit: RPM field")
 				}
 				if tag == 1000 || tag == 1001 || tag == 1002 || tag == 1014 || tag == 1022 || tag == 1047 || tag == 1049 {
+					if err := budget.From(ctx).Result(budget.SizeString + int64(k)); err != nil {
+						return nil, err
+					}
 					values = append(values, string(rest[:k]))
 				}
 				rest = rest[k+1:]

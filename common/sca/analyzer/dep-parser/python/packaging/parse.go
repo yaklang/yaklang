@@ -31,7 +31,7 @@ func (*Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, [
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
-	raw, err := textdecode.Read(r)
+	raw, err := textdecode.ReadContext(ctx, r)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -81,11 +81,17 @@ func (*Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, [
 		}
 	}
 	id := "metadata:" + name + "@" + version
+	if err := budget.From(ctx).Result(budget.SizeOfPackage(name, version, license)); err != nil {
+		return nil, nil, err
+	}
 	qs := []types.Requirement{}
 	for _, raw := range h.Values("Requires-Dist") {
 		q, e := pyrequire.Declaration(raw)
 		if e != nil {
 			return nil, nil, fmt.Errorf("malformed_input: Requires-Dist: %w", e)
+		}
+		if err := budget.From(ctx).Result(budget.SizeOfEdge() + budget.SizeOfString(q.Name) + budget.SizeOfString(q.Constraint)); err != nil {
+			return nil, nil, err
 		}
 		qs = append(qs, types.Requirement{Target: q.Name, Constraint: q.Constraint, Condition: q.Marker})
 	}

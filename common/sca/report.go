@@ -3,6 +3,7 @@ package sca
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/model"
@@ -42,7 +43,7 @@ func requirementKey(p *dxtypes.Package) string {
 	return string(raw)
 }
 
-func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []error {
+func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shared ...*budget.State) []error {
 	for _, p := range pkgs {
 		p.EnsureDetails()
 		sort.SliceStable(p.Locations, func(i, j int) bool {
@@ -79,6 +80,10 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []er
 	componentIDs := map[model.ComponentKey]bool{}
 	providers := map[[4]string][]string{}
 	providerCount := 0
+	st := &budget.State{Limits: l}
+	if len(shared) > 0 && shared[0] != nil {
+		st = shared[0]
+	}
 	var errs []error
 	limit := func(what string) {
 		r.Complete = false
@@ -91,10 +96,17 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []er
 			if d.File == "" && len(p.FromFile) > 0 {
 				d.File = p.FromFile[0]
 			}
+			if err := st.Result(budget.SizeObject + budget.SizeOfString(d.Reason)); err != nil {
+				limit("result memory estimate")
+				break
+			}
 			r.Diagnostics = append(r.Diagnostics, d)
 			if d.Incomplete {
 				errs = append(errs, scanerr.Wrap(d.Code, fmt.Errorf("%s", d.Reason)))
 			}
+		}
+		if st.Exhausted() {
+			break
 		}
 		if p.Potential {
 			continue
@@ -120,6 +132,10 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []er
 		if len(licenses) == 0 {
 			licenses = p.License
 		}
+		if err := st.Result(budget.SizeOfComponent(key.Name, key.Version)); err != nil {
+			limit("result memory estimate")
+			break
+		}
 		r.Components = append(r.Components, model.Component{Key: key, Licenses: append([]string(nil), licenses...)})
 		kind := p.Evidence
 		if kind == "" {
@@ -132,6 +148,10 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []er
 		provides := append([]string(nil), p.Provides...)
 		sort.Strings(provides)
 		o := model.Observation{Provides: provides, Condition: p.Condition, Scope: p.Scope, Component: key.ID(), Snapshot: p.Snapshot, Project: p.ProjectRoot, File: file, NativeID: p.Instance, Kind: kind, StartLine: p.StartLine, EndLine: p.EndLine, DeclaredIntegrity: p.DeclaredIntegrity}
+		if err := st.Result(budget.SizeOfObservation() + budget.SizeOfString(o.NativeID)); err != nil {
+			limit("result memory estimate")
+			break
+		}
 		r.Observations = append(r.Observations, o)
 		observations[p] = o.ID()
 		nativeKey := [3]string{p.Snapshot, p.ProjectRoot, p.Instance}
@@ -151,6 +171,10 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []er
 			}
 			extra := o
 			extra.StartLine, extra.EndLine = loc.StartLine, loc.EndLine
+			if err := st.Result(budget.SizeOfObservation()); err != nil {
+				limit("result memory estimate")
+				break
+			}
 			r.Observations = append(r.Observations, extra)
 		}
 		actual[p] = true
@@ -184,6 +208,13 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits) []er
 			if !edgeLimitReported {
 				edgeLimitReported = true
 				limit("requirement count")
+			}
+			return
+		}
+		if err := st.Result(budget.SizeOfEdge() + budget.SizeOfString(q.Target) + budget.SizeOfString(q.Constraint)); err != nil {
+			if !edgeLimitReported {
+				edgeLimitReported = true
+				limit("result memory estimate")
 			}
 			return
 		}
