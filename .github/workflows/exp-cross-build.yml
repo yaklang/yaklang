@@ -30,6 +30,12 @@ on:
       - 'scripts/build-gzip-embed.sh'
       - 'scripts/generate-compressed-assets.sh'
 
+# Superseded PR revisions should not keep building and uploading every platform.
+# Tag releases and manually dispatched builds retain independent runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check_commit_msg:
     runs-on: ubuntu-22.04
