@@ -63,11 +63,32 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	// start pprof
 	_ "net/http/pprof"
 )
+
+// Keep command helpers in this file: release/CI builds also compile yak.go directly.
+func newGRPCSecretAuth(secret string) grpc_auth.AuthFunc {
+	return func(ctx context.Context) (context.Context, error) {
+		method, _ := grpc.Method(ctx)
+		userSecret, err := grpc_auth.AuthFromMD(ctx, "bearer")
+		if err != nil {
+			// A rejected request is not a server startup failure. Include the RPC
+			// so callers can identify premature/unauthenticated connection probes.
+			log.Warnf("gRPC authentication rejected: method=%s reason=missing or malformed Bearer authorization", method)
+			return nil, err
+		}
+		if userSecret != secret {
+			log.Warnf("gRPC authentication rejected: method=%s reason=invalid credentials", method)
+			return nil, status.Error(codes.Unauthenticated, "secret verify failed")
+		}
+		return ctx, nil
+	}
+}
 
 var (
 	yakVersion string

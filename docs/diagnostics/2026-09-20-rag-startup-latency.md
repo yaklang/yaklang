@@ -66,3 +66,11 @@ YAK_RAG_STARTUP_PROFILE_DB=/absolute/path/to/project.db \
 ```
 
 Logs retained under `/tmp/yak-rag-*.log`, including `startup-before`, `startup-after`, `bench-before`, `bench-after`, `all-mustpass`, `race`, and `cli-acceptance`. Earlier Schema-stream race failures are separate and have not been fixed by this branch's RAG changes.
+
+## CI compatibility follow-up
+
+The initial CI run exposed two execution-path differences from the local package build:
+
+- Essential Tests builds `common/yak/cmd/yak.go` directly. The shared authentication helper now stays in that file so both single-file release builds and package tests work.
+- The beta19 scanner used by Diff-Code-Check rejects the `gitefs` ZIP root before scanning. CI now extracts the same snapshot into a temporary directory and scans from its root, retaining repository-relative report paths and the original exclusions/rules. A local replay reproduces the ZIP failure and completes scanning after extraction.
+- beta19 emits concatenated cumulative JSON reports. Reuse the lossless normalizer: preserve the raw report, merge findings by immutable hash, retain all rule/file records and severities, and reject malformed or conflicting snapshots. Its tests run in the workflow; findings are not discarded to obtain a successful check.
