@@ -18,7 +18,7 @@ import (
 //
 //	YAK_VNC_DOCKER=1 go test ./common/utils/bruteutils/ -run TestVNCDocker -count=1 -timeout 20m -v
 //
-// Covers TigerVNC (VncAuth, None, default TLSVnc+VncAuth, TLSVnc-only negative),
+// Covers TigerVNC (VncAuth, None, default TLSVnc+VncAuth, X509Vnc, X509None),
 // x11vnc (default + RFB 3.3), LibVNCServer, and TightVNC. Unset env → skip.
 func TestVNCDocker(t *testing.T) {
 	if os.Getenv("YAK_VNC_DOCKER") != "1" && os.Getenv("YAK_BRUTE_REAL") != "1" {
@@ -60,17 +60,16 @@ func TestVNCDocker(t *testing.T) {
 		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=VncPass123!", "VNC_SECURITY=Default"})
 		assertVNCLogin(t, "tiger-default", addr, "VncPass123!")
 	})
-	t.Run("tigervnc-tlsvnc-only-unsupported", func(t *testing.T) {
+	t.Run("tigervnc-tlsvnc", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
 		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_PASSWORD=VncPass123!", "VNC_SECURITY=TLSVnc"})
-		waitVNCPort(t, addr)
-		res := mockProbe(t, "vnc", addr, "", "VncPass123!")
-		if res.Ok {
-			t.Fatal("TLSVnc-only must not look like VNC-Auth success")
-		}
-		if !res.Finished {
-			t.Fatal("unsupported security type should finish the target")
-		}
+		assertVNCLogin(t, "tiger-tlsvnc", addr, "VncPass123!")
+	})
+	t.Run("tigervnc-tlsnone", func(t *testing.T) {
+		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")
+		addr := runVNCContainer(t, "yak-vnc-tigervnc:test", []string{"VNC_SECURITY=TLSNone"})
+		waitVNCAuth(t, addr, "")
+		assertUnauth(t, "tiger-tlsnone", mockProbe(t, "vnc", addr, "u", "ignored"))
 	})
 	t.Run("tigervnc-eight-byte-pass", func(t *testing.T) {
 		buildVNCImage(t, dir, "Dockerfile.tigervnc", "yak-vnc-tigervnc:test")

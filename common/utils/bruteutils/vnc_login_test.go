@@ -362,11 +362,11 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 			t.Fatal("VNC must be password-only")
 		}
 	})
-	t.Run("unsupported-vencrypt", func(t *testing.T) {
-		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{19}})
+	t.Run("unsupported-vencrypt-subtype", func(t *testing.T) {
+		addr := startMockVeNCrypt(t, 259, "x", false)
 		res := mockProbe(t, "vnc", addr, "", "x")
 		if res.Ok || !res.Finished {
-			t.Fatalf("VeNCrypt-only must finish the target, got ok=%v finished=%v", res.Ok, res.Finished)
+			t.Fatalf("unsupported VeNCrypt subtype must finish, got ok=%v finished=%v", res.Ok, res.Finished)
 		}
 	})
 	t.Run("unsupported-ra2", func(t *testing.T) {

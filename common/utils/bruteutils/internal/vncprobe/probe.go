@@ -18,9 +18,15 @@ import (
 )
 
 const (
-	secNone    = 1
-	secVNCAuth = 2
-	secTight   = 16
+	secNone     = 1
+	secVNCAuth  = 2
+	secTight    = 16
+	secVeNCrypt = 19
+
+	veTLSNone  uint32 = 257
+	veTLSVnc   uint32 = 258
+	veX509None uint32 = 260
+	veX509Vnc  uint32 = 261
 
 	secResultOK      uint32 = 0
 	secResultFailed  uint32 = 1
@@ -247,7 +253,7 @@ func (s *session) negotiateSecurity(unauth bool) (uint8, error) {
 			return 0, ErrNoCompatibleAuth
 		}
 		chosen := uint8(raw)
-		if unauth && chosen != secNone && chosen != secTight {
+		if unauth && chosen != secNone && chosen != secTight && chosen != secVeNCrypt {
 			return 0, ErrNoCompatibleAuth
 		}
 		if !unauth && chosen == secNone {
@@ -294,6 +300,8 @@ func pickSecurity(types []byte, unauth bool) uint8 {
 		switch {
 		case has(secNone):
 			return secNone
+		case has(secVeNCrypt):
+			return secVeNCrypt
 		case has(secTight):
 			return secTight
 		default:
@@ -303,6 +311,8 @@ func pickSecurity(types []byte, unauth bool) uint8 {
 	switch {
 	case has(secVNCAuth):
 		return secVNCAuth
+	case has(secVeNCrypt):
+		return secVeNCrypt
 	case has(secTight):
 		return secTight
 	case has(secNone):
@@ -323,6 +333,8 @@ func (s *session) doSecurity(sec uint8, password string, unauth bool) (uint8, er
 		return secVNCAuth, s.vncAuth(password)
 	case secTight:
 		return s.tightAuth(password, unauth)
+	case secVeNCrypt:
+		return s.veNCrypt(password, unauth)
 	default:
 		return 0, ErrNoCompatibleAuth
 	}
