@@ -32,6 +32,8 @@ jobs:
         run: go test ./common/yak/antlr4yak/... -count=1 -timeout=15m
       - name: VM and compiler race coverage
         run: go test -race ./common/yak/antlr4yak/yakvm/... ./common/yak/antlr4yak/yakast -count=1 -timeout=5m
+      - name: Concurrent debugger and DAP event ordering regression
+        run: go test -race ./common/yak/antlr4yak/dap -run '^TestThreadsRequest$' -count=20 -timeout=3m
       - name: Incremental engine boundary race coverage
         run: go test -race ./common/yak/antlr4yak -run '^TestCore' -count=1 -timeout=3m
       - name: LL-only semantic and boundary coverage

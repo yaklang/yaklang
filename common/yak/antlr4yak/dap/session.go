@@ -434,7 +434,9 @@ func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDon
 		// 等待调试器初始化完成
 		ds.debugger.WaitInit()
 
-		ds.debugger.Continue()
+		// Release execution only after the configuration response is sent;
+		// otherwise a fast breakpoint can overtake it on the wire.
+		defer ds.debugger.Continue()
 	}
 	ds.logToConsole(fmt.Sprintf("Yak version: %s\nType 'dbg help' for help info.\n", consts.GetYakVersion()))
 
@@ -449,9 +451,8 @@ func (ds *DebugSession) onContinueRequest(request *dap.ContinueRequest) {
 
 	// ? 不支持单个线程继续运行,整个程序继续执行
 	// ? 不需要处理request.threadId
-	ds.debugger.Continue()
-
 	ds.send(&dap.ContinueResponse{Response: *newResponse(request.Request), Body: dap.ContinueResponseBody{AllThreadsContinued: true}})
+	ds.debugger.Continue()
 }
 
 func (ds *DebugSession) onNextRequest(request *dap.NextRequest) {
