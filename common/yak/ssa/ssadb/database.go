@@ -285,47 +285,60 @@ func SetDB(db *gorm.DB) {
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
-		deleteProgramCodeOnly(tx, program)
-		deleteProgramAuditResult(tx, program)
-		deleteProgramRiskAndScanTask(tx, program)
-		return nil
+	_ = DeleteProgramChecked(db, program)
+}
+
+// DeleteProgramChecked removes one exact program and reports transaction
+// failures. Node-driven lifecycle cleanup uses this variant so it never
+// acknowledges a partially failed deletion as success.
+func DeleteProgramChecked(db *gorm.DB, program string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if err := tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{}).Error; err != nil {
+			return err
+		}
+		if err := deleteProgramCodeOnly(tx, program); err != nil {
+			return err
+		}
+		if err := deleteProgramAuditResult(tx, program); err != nil {
+			return err
+		}
+		return deleteProgramRiskAndScanTask(tx, program)
 	})
 }
 
 func DeleteProgramIrCode(db *gorm.DB, program string) {
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		deleteProgramCodeOnly(tx, program)
-		deleteProgramAuditResult(tx, program) // because audit result depends on ir code
-		return nil
+		if err := deleteProgramCodeOnly(tx, program); err != nil {
+			return err
+		}
+		return deleteProgramAuditResult(tx, program) // because audit result depends on ir code
 	})
 }
 
-func deleteProgramCodeOnly(db *gorm.DB, program string) {
+func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 	deleteCache(program)
 	// Batch all DELETEs into a single Exec call to reduce round-trips.
 	// Each DELETE is still a separate statement but they're sent in one
 	// batch to SQLite, cutting 7 round-trips to 1.
-	db.Exec(`DELETE FROM `+TableIrCodes+` WHERE program_name = ?;
+	return db.Exec(`DELETE FROM `+TableIrCodes+` WHERE program_name = ?;
 DELETE FROM `+TableIrIndices+` WHERE program_name = ?;
 DELETE FROM `+TableIrNamePool+` WHERE program_name = ?;
 DELETE FROM `+TableIrSources+` WHERE program_name = ?;
 DELETE FROM `+TableIrSources+` WHERE folder_path = ? AND file_name = ?;
 DELETE FROM `+TableIrTypes+` WHERE program_name = ?;
 DELETE FROM `+TableIrOffsets+` WHERE program_name = ?;`,
-		program, program, program, program, "/", program, program, program)
+		program, program, program, program, "/", program, program, program).Error
 }
 
-func deleteProgramAuditResult(db *gorm.DB, program string) {
-	db.Exec(`DELETE FROM `+TableAuditResults+` WHERE program_name = ?;
+func deleteProgramAuditResult(db *gorm.DB, program string) error {
+	return db.Exec(`DELETE FROM `+TableAuditResults+` WHERE program_name = ?;
 DELETE FROM `+TableAuditNodes+` WHERE program_name = ?;
 DELETE FROM `+TableAuditEdges+` WHERE program_name = ?;`,
-		program, program, program)
+		program, program, program).Error
 }
 
-func deleteProgramRiskAndScanTask(db *gorm.DB, program string) {
-	db.Exec(`DELETE FROM `+schema.TableSSARisks+` WHERE program_name = ?;
+func deleteProgramRiskAndScanTask(db *gorm.DB, program string) error {
+	return db.Exec(`DELETE FROM `+schema.TableSSARisks+` WHERE program_name = ?;
 DELETE FROM `+schema.TableSyntaxFlowScanTask+` WHERE programs = ?;`,
-		program, program)
+		program, program).Error
 }

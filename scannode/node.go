@@ -95,7 +95,11 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		cfg.NodeType = spec.NodeType_Scanner
 	}
 	if strings.TrimSpace(cfg.Kind) != "ai_session" {
-		cfg.CapabilityKeys = append(cfg.CapabilityKeys, "node.resource_policy.v1")
+		cfg.CapabilityKeys = append(
+			cfg.CapabilityKeys,
+			"node.resource_policy.v1",
+			legionCapabilitySSAIRProgramDelete,
+		)
 	}
 	cfg.CapabilityKeys = normalizeScanNodeCapabilityKeys(cfg.CapabilityKeys)
 	if cfg.StatusProvider == nil {
