@@ -71,7 +71,7 @@ if grep -Eq '[[:space:]]\.(symtab|debug_info)[[:space:]]' <<< "$sections"; then
   echo "Unstripped binary: linker -s -w flags did not take effect" >&2
   exit 1
 fi
-file "./${OUTPUT_BINARY}"
 YAKIT_HOME="$(mktemp -d)" "./${OUTPUT_BINARY}" --help >/tmp/yak-build-help.txt
+echo "Verified stripped binary and startup inside manylinux2014"
 ls -lh "./${OUTPUT_BINARY}"
 EOS
