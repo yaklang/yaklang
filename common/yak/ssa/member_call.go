@@ -183,7 +183,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		// unit. Re-entering the declaration block would mutate a completed
 		// dependency (and race with other consumers of that same object).
 		recoverScope := func() {}
-		if object.GetFunc() != nil && object.GetFunc().GetProgram() == b.GetProgram() {
+		if !b.GetProgram().ConcurrentUnitBuildEnabled() || (object.GetFunc() != nil && object.GetFunc().GetProgram() == b.GetProgram()) {
 			recoverScope = b.SetCurrent(object, true)
 		}
 		displayName := name

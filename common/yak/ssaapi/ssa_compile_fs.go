@@ -313,6 +313,9 @@ func (c *Config) parseProjectWithFSUnits(
 	if err != nil {
 		return nil, err
 	}
+	if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok {
+		prog.SetConcurrentUnitBuild(language.SupportsConcurrentUnitBuild())
+	}
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := s
 		if len(v) > 0 {

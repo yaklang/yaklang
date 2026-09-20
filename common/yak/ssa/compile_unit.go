@@ -50,6 +50,19 @@ type ConcurrentUnitBuilder interface {
 	SupportsConcurrentUnitBuild() bool
 }
 
+// SetConcurrentUnitBuild fixes the ownership policy before unit work starts.
+// Frontends that have not opted in retain their existing shared-scope behavior.
+func (p *Program) SetConcurrentUnitBuild(enabled bool) {
+	if app := p.GetApplication(); app != nil {
+		app.concurrentUnitBuild = enabled
+	}
+}
+
+func (p *Program) ConcurrentUnitBuildEnabled() bool {
+	app := p.GetApplication()
+	return app != nil && app.concurrentUnitBuild
+}
+
 // --- shared compile-unit path helpers (used by language builders) ---
 
 // ReadUnitSource reads a file's content via fs, returning "" on error.
