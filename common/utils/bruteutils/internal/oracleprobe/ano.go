@@ -47,10 +47,19 @@ func (s *session) sendANO(services ...[]byte) error {
 func (s *session) negotiateAdvanced() error {
 	version := anoNumber(5, 0x17000000, 4)
 	arr := []byte{0xde, 0xad, 0xbe, 0xef, 0, 3, 0, 0, 0, 4, 0, 4, 0, 1, 0, 2, 0, 3}
+	algorithms := []byte{17, 16, 15, 6, 10, 8, 1}
+	switch s.encryption {
+	case EncryptionAccepted:
+		algorithms = append([]byte{0}, algorithms...)
+	case EncryptionRejected:
+		algorithms = []byte{0}
+	case EncryptionRequested:
+		algorithms = append(algorithms, 0)
+	}
 	e := s.sendANO(
 		anoService(4, version, anoField{1, []byte{0, 0, 16, 28, 102, 236, 40, 234}}, anoField{1, arr}),
 		anoService(1, version, anoNumber(3, 0xe0e1, 2), anoNumber(6, 0xfcff, 2)),
-		anoService(2, version, anoField{1, []byte{0, 1, 8, 10, 6, 15, 16, 17}}, anoNumber(2, 1, 1)),
+		anoService(2, version, anoField{1, algorithms}, anoNumber(2, 1, 1)),
 		anoService(3, version, anoField{1, []byte{0, 1, 3, 4, 5, 6}}),
 	)
 	if e != nil {
@@ -139,6 +148,9 @@ func (s *session) negotiateAdvanced() error {
 	}
 	if consumed != total {
 		return errors.New("oracle: ANO length mismatch")
+	}
+	if (s.encryption == EncryptionRequired && encID == 0) || (s.encryption == EncryptionRejected && encID != 0) {
+		return errors.New("oracle: server did not honor native encryption policy")
 	}
 	if encID == 0 && hashID == 0 && dh == nil {
 		return nil

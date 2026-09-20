@@ -22,13 +22,24 @@ type Dialer interface {
 // MaxTimeout bounds the entire login exchange, including redirects and TLS.
 const MaxTimeout = 20 * time.Second
 
+// EncryptionPolicy controls Oracle native encryption independently of TLS.
+type EncryptionPolicy byte
+
+const (
+	EncryptionAccepted EncryptionPolicy = iota
+	EncryptionRejected
+	EncryptionRequested
+	EncryptionRequired
+)
+
 type Options struct {
 	Address, Service, Username, Password string
 	SID, SysDBA                          bool
 	// Timeout defaults to 10 seconds and is capped at MaxTimeout.
 	Timeout time.Duration
 	// TLS uses the caller's verification policy. Nil selects ordinary TNS/TCP.
-	TLS *tls.Config
+	TLS        *tls.Config
+	Encryption EncryptionPolicy
 }
 
 type Error struct {
@@ -85,6 +96,9 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, o.Timeout)
 	defer cancel()
+	if o.Encryption > EncryptionRequired {
+		return errors.New("oracle: invalid encryption policy")
+	}
 	host, port, e := net.SplitHostPort(o.Address)
 	if e != nil {
 		return e
@@ -126,6 +140,9 @@ func Probe(ctx context.Context, dialer Dialer, o Options) (err error) {
 	c := &Connection{ctx: ctx, connOption: conf, session: s, LogonMode: NoNewPass}
 	if o.SysDBA {
 		c.LogonMode |= 0x20
+	}
+	if o.Encryption == EncryptionRequired && !s.advanced {
+		return errors.New("oracle: native encryption is required but unavailable")
 	}
 	if s.advanced {
 		if e = s.negotiateAdvanced(); e != nil {
