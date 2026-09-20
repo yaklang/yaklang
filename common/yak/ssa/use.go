@@ -223,43 +223,59 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 // ----------- Call
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
-	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
-	if method, ok := c.GetValueById(c.Method); ok {
-		ret = append(ret, method)
-	}
-	ret = append(ret, c.GetValuesByIDs(c.Args)...)
-	for _, v := range c.Binding {
-		if val, ok := c.GetValueById(v); ok {
-			ret = append(ret, val)
+	ret := make(Values, 0, len(c.Args)+len(c.Binding)+len(c.ArgMember)+1)
+	seen := make(map[int64]struct{}, len(c.Args)+len(c.Binding)+len(c.ArgMember)+1)
+	appendID := func(id int64) {
+		if id <= 0 {
+			return
 		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		val, ok := c.GetValueById(id)
+		if !ok || val == nil {
+			return
+		}
+		seen[id] = struct{}{}
+		ret = append(ret, val)
+	}
+	appendID(c.Method)
+	for _, id := range c.Args {
+		appendID(id)
+	}
+	for _, id := range c.ArgMember {
+		appendID(id)
+	}
+	for _, id := range c.Binding {
+		appendID(id)
 	}
 	return ret
 }
 
 func (c *Call) ReplaceValue(v Value, to Value) {
-	if c.Method == v.GetId() {
-		c.Method = to.GetId()
+	fromID := v.GetId()
+	toID := to.GetId()
+	if c.Method == fromID {
+		c.Method = toID
 		c.handlerObjectMethod()
 		c.handleCalleeFunction()
 		c.handlerReturnType()
 	}
-	lo.ForEach(c.Args, func(id int64, index int) {
-		if id == v.GetId() {
-			c.Args[index] = to.GetId()
+	for index, id := range c.Args {
+		if id == fromID {
+			c.Args[index] = toID
 		}
-		return
-	})
-
-	lo.ForEach(c.Args, func(id int64, index int) {
-		if id == v.GetId() {
-			c.Args[index] = to.GetId()
+	}
+	for index, id := range c.ArgMember {
+		if id == fromID {
+			c.ArgMember[index] = toID
 		}
-		return
-	})
-
-	lo.ForEach(c.ArgMember, func(id int64, index int) {
-		c.ArgMember[index] = to.GetId()
-	})
+	}
+	for name, id := range c.Binding {
+		if id == fromID {
+			c.Binding[name] = toID
+		}
+	}
 }
 
 // ------------ SideEffect
@@ -456,12 +472,14 @@ func (sw *Switch) GetValues() Values {
 	return ret
 }
 func (sw *Switch) ReplaceValue(v Value, to Value) {
-	if sw.Cond == v.GetId() {
-		sw.Cond = to.GetId()
+	fromID := v.GetId()
+	toID := to.GetId()
+	if sw.Cond == fromID {
+		sw.Cond = toID
 	}
-	for _, c := range sw.Label {
-		if c.Value == v.GetId() {
-			c.Value = to.GetId()
+	for i := range sw.Label {
+		if sw.Label[i].Value == fromID {
+			sw.Label[i].Value = toID
 		}
 	}
 }

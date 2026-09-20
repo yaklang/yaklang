@@ -595,15 +595,21 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 }
 
 func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
+	// Dedup only. A single remaining edge stays a Phi; generatePhi is what
+	// folds that trivial case back to the value itself.
+	unique, _ := normalizePhiIncoming(vs)
+	if len(unique) == 0 {
+		return nil
+	}
 	p := &Phi{
 		anValue: NewValue(),
-		Edge:    vs.GetIds(),
+		Edge:    unique.GetIds(),
 	}
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {
 		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p.GetId())
 	})
-	for _, v := range vs {
+	for _, v := range unique {
 		// if _, ok := ToFunction(v); ok {
 		// 	continue
 		// }
@@ -711,6 +717,9 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 				}
 				edge = append(edge, phi.GetValues()...)
 				phit := f.EmitPhi(name, edge)
+				if phit == nil {
+					return se
+				}
 
 				for i, e := range phit.GetValues() {
 					if p, ok := ToParameter(e); ok && p.IsFreeValue {
@@ -758,6 +767,9 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 			}
 		}
 		phi := f.EmitPhi(v.name, edgeValues)
+		if phi == nil {
+			break
+		}
 		phi.CFGEntryBasicBlock = v.CFGEntryBasicBlock
 		ret = phi
 	}

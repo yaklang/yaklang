@@ -149,6 +149,29 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 
 var _ ssautil.SpinHandle[Value] = SpinHandle
 
+// normalizePhiIncoming drops nils and duplicate ids, preserving first-seen order.
+// trivial is true when fewer than two distinct values remain: merge sites should
+// return that single value (or nil) instead of emitting a Phi.
+func normalizePhiIncoming(vs []Value) (Values, bool) {
+	if len(vs) == 0 {
+		return nil, true
+	}
+	out := make(Values, 0, len(vs))
+	seen := make(map[int64]struct{}, len(vs))
+	for _, v := range vs {
+		if v == nil || utils.IsNil(v) {
+			continue
+		}
+		id := v.GetId()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, v)
+	}
+	return out, len(out) <= 1
+}
+
 // build phi
 func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(name string, t []Value) Value {
 	return func(name string, vst []Value) Value {
@@ -171,16 +194,17 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 			}()
 		}
 
+		vs, trivial := normalizePhiIncoming(vst)
+		if trivial {
+			if len(vs) == 0 {
+				return nil
+			}
+			return vs[0]
+		}
+
 		var t Type
-		var vs []Value
 		typeMerge := make(map[Type]struct{})
 
-		for _, v := range vst {
-			vs = append(vs, v)
-		}
-		if len(vs) == 0 {
-			return nil
-		}
 		for _, v := range vs {
 			if v.GetType().GetTypeKind() == AnyTypeKind {
 				continue
@@ -205,10 +229,10 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 			t = NewOrType(lo.Keys(typeMerge)...)
 		}
 		phi := builder.EmitPhi(name, vs)
-		phi.SetType(t)
 		if utils.IsNil(phi) {
 			return nil
 		}
+		phi.SetType(t)
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())
