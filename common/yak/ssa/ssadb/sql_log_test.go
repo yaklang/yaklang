@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	yaklog "github.com/yaklang/yaklang/common/log"
 )
 
@@ -52,4 +54,10 @@ func TestSQLTextDoesNotReachInfoLog(t *testing.T) {
 	logNativeSQL("SELECT secret", time.Second, context.DeadlineExceeded)
 	require.NotContains(t, process.String(), "SELECT")
 	require.Contains(t, process.String(), "native query failed")
+	process.Reset()
+	ssadbSQLLogger{}.Print("log", "source", gorm.ErrRecordNotFound)
+	require.Empty(t, process.String())
+	ssadbSQLLogger{}.Print("log", "source", errors.New("database is locked"))
+	require.Contains(t, process.String(), "GORM operation failed: database is locked")
+	require.NotContains(t, process.String(), "SELECT")
 }
