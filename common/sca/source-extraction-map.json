@@ -2122,7 +2122,7 @@
     },
     {
       "local_file": "common/sca/analyzer/python_pipenv.go",
-      "sha256": "536359831fdd717bfc22c91fed8952f6938c3476fd3156522b783c080bcd06f3",
+      "sha256": "fdef17fc058d4b5ccd64e83e8747e3e7b394561a2e17b77d555986b465d580ee",
       "symbols": [
         {
           "name": "init",

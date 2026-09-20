@@ -43,6 +43,28 @@ func TestParseErrorsReachCaller(t *testing.T) {
 		t.Fatalf("missing parser error: %v", err)
 	}
 }
+
+func TestPipAndPipenvDefaultDiscovery(t *testing.T) {
+	input := fstest.MapFS{
+		"pip/requirements.txt":     {Data: []byte("flask==2.0.3\n")},
+		"pipenv/Pipfile.lock":      {Data: []byte(`{"default":{"requests":{"version":"==2.31.0"}}}`)},
+		"ignored/not-Pipfile.lock": {Data: []byte("not a lock file")},
+	}
+	pkgs, err := ScanFilesystem(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"flask": "2.0.3", "requests": "2.31.0"}
+	if len(pkgs) != len(want) {
+		t.Fatalf("expected both pip and Pipenv records, got %#v", pkgs)
+	}
+	for _, p := range pkgs {
+		if version, ok := want[p.Name]; !ok || version != p.Version {
+			t.Fatalf("unexpected package %s@%s", p.Name, p.Version)
+		}
+		delete(want, p.Name)
+	}
+}
 func TestCallbackPanicDoesNotAbandonQueue(t *testing.T) {
 	input := fstest.MapFS{}
 	for _, n := range []string{"a", "b", "c"} {
