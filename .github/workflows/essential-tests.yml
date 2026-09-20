@@ -853,6 +853,7 @@ jobs:
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
                 {"package": "./common/utils/bruteutils/.", "timeout": "2m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/bruteutils/internal/vncprobe", "timeout": "20s", "race": true},
+                {"package": "./common/utils/bruteutils/internal/oracleprobe", "timeout": "30s", "race": true},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
