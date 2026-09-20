@@ -2,7 +2,6 @@ package sfdb
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -18,9 +17,6 @@ type RuleInfo struct {
 	Hash     string `json:"hash"`
 	Version  string `json:"version"`
 }
-
-//go:embed rule_versions.json
-var ruleVersions []byte
 
 var ruleVersionMap map[string]*RuleInfo
 
