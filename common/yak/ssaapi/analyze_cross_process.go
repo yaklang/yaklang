@@ -80,6 +80,12 @@ func (c *processAnalysisManager) tryCrossProcess(v *Value) (shouldExit bool, rec
 }
 
 func (c *processAnalysisManager) rollbackCrossProcess() func() {
+	// The sentinel represents analysis in the root caller, not a cross-call
+	// frame. There is no outer context to roll back to. Removing it makes
+	// every visit during the rollback window fail getCurrentIntraProcess.
+	if c.crossProcessStack.Len() == 1 && c.crossProcessStack.Peek() == emptyStackHash {
+		return func() {}
+	}
 	cause := c.popCause()
 	node := c.popNode()
 	if c.crossProcessStack.Len() == 0 {
