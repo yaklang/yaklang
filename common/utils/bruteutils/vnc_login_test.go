@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -129,7 +130,7 @@ func serveVNCAuth(c net.Conn, cfg mockRFBConfig) {
 	var rb [4]byte
 	binary.BigEndian.PutUint32(rb[:], result)
 	_, _ = c.Write(rb[:])
-	if result != 0 && (cfg.version == "RFB 003.008\n" || cfg.version == "") {
+	if result != 0 && cfg.version != "RFB 003.003\n" && cfg.version != "RFB 003.007\n" {
 		reason := []byte("Authentication failed")
 		var n [4]byte
 		binary.BigEndian.PutUint32(n[:], uint32(len(reason)))
@@ -269,4 +270,217 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 			t.Fatal("cancel did not bound the probe")
 		}
 	})
+	t.Run("rfb37-vnauth", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{version: "RFB 003.007\n", password: "p37"})
+		assertProbe(t, "37-ok", mockProbe(t, "vnc", addr, "", "p37"), true, false)
+		assertProbe(t, "37-bad", mockProbe(t, "vnc", addr, "", "nope"), false, false)
+	})
+	t.Run("rfb3889-treated-as-38", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{version: "RFB 003.889\n", password: "realvnc"})
+		assertProbe(t, "889-ok", mockProbe(t, "vnc", addr, "", "realvnc"), true, false)
+		assertProbe(t, "889-bad", mockProbe(t, "vnc", addr, "", "nope"), false, false)
+	})
+	t.Run("tight-none", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16}, tightAuth: []uint32{}})
+		assertProbe(t, "tight-none", mockProbe(t, "vnc", addr, "", "ignored"), true, false)
+	})
+	t.Run("tight-nested-none-code", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16}, tightAuth: []uint32{1}})
+		assertProbe(t, "tight-auth1", mockProbe(t, "vnc", addr, "", "x"), true, false)
+	})
+	t.Run("prefer-vnauth-over-tight", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16, 2}, password: "secret"})
+		assertProbe(t, "picks-2", mockProbe(t, "vnc", addr, "", "secret"), true, false)
+	})
+	t.Run("eight-byte-password", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{password: "12345678"})
+		assertProbe(t, "exact8", mockProbe(t, "vnc", addr, "", "12345678"), true, false)
+	})
+	t.Run("special-chars", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{password: `P@ss!#`})
+		assertProbe(t, "ok", mockProbe(t, "vnc", addr, "", `P@ss!#`), true, false)
+		assertProbe(t, "bad", mockProbe(t, "vnc", addr, "", `P@ss!`), false, false)
+	})
+	t.Run("username-ignored", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{password: "onlypass"})
+		res := mockProbe(t, "vnc", addr, "administrator", "onlypass")
+		assertProbe(t, "any-user", res, true, false)
+		if !res.OnlyNeedPassword {
+			t.Fatal("VNC must be password-only")
+		}
+	})
+	t.Run("unsupported-vencrypt", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{19}})
+		res := mockProbe(t, "vnc", addr, "", "x")
+		if res.Ok || !res.Finished {
+			t.Fatalf("VeNCrypt-only must finish the target, got ok=%v finished=%v", res.Ok, res.Finished)
+		}
+	})
+	t.Run("unsupported-ra2", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{5, 6}})
+		res := mockProbe(t, "vnc", addr, "", "x")
+		if res.Ok || !res.Finished {
+			t.Fatalf("RA2-only must finish the target, got ok=%v finished=%v", res.Ok, res.Finished)
+		}
+	})
+	t.Run("drop-after-version", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{dropAfter: "version", password: "x"})
+		res := mockProbe(t, "vnc", addr, "", "x")
+		if res.Ok {
+			t.Fatal("truncated handshake must not authenticate")
+		}
+	})
+	t.Run("drop-after-challenge", func(t *testing.T) {
+		addr := startMockRFB(t, mockRFBConfig{dropAfter: "challenge", password: "x"})
+		res := mockProbe(t, "vnc", addr, "", "x")
+		if res.Ok {
+			t.Fatal("missing security result must not authenticate")
+		}
+	})
+	t.Run("password-not-leaked", func(t *testing.T) {
+		const secret = "LeakMeP@ss!"
+		addr := startMockRFB(t, mockRFBConfig{password: "other"})
+		res := mockProbe(t, "vnc", addr, "u", secret)
+		if strings.Contains(res.String(), secret) || strings.Contains(string(res.ExtraInfo), secret) {
+			t.Fatal("password leaked in result")
+		}
+	})
+}
+
+func TestVNCLoginProbeCrashAndGarbage(t *testing.T) {
+	// Malformed peers must not panic, must not report success, and must return fast.
+	cases := []struct {
+		name  string
+		write func(net.Conn)
+	}{
+		{"empty", func(net.Conn) {}},
+		{"one-byte", func(c net.Conn) { _, _ = c.Write([]byte{0}) }},
+		{"rfb-no-nl", func(c net.Conn) { _, _ = c.Write([]byte("RFB 003.008")) }},
+		{"rfb-crlf", func(c net.Conn) { _, _ = c.Write([]byte("RFB 003.008\r\n")) }},
+		{"http", func(c net.Conn) { _, _ = c.Write([]byte("HTTP/1.1 400\r\n\r\n")) }},
+		{"ssh", func(c net.Conn) { _, _ = c.Write([]byte("SSH-2.0-OpenSSH\r\n")) }},
+		{"nulls", func(c net.Conn) { _, _ = c.Write(make([]byte, 12)) }},
+		{"major-2", func(c net.Conn) { _, _ = c.Write([]byte("RFB 002.000\n")) }},
+		{"minor-0", func(c net.Conn) { _, _ = c.Write([]byte("RFB 003.000\n")) }},
+		{"not-ascii", func(c net.Conn) { _, _ = c.Write(bytes.Repeat([]byte{0xff}, 12)) }},
+		{"sec-count-zero", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write([]byte{0})
+			var n [4]byte
+			binary.BigEndian.PutUint32(n[:], 7)
+			_, _ = c.Write(n[:])
+			_, _ = c.Write([]byte("no auth"))
+		}},
+		{"sec-count-255", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write([]byte{255})
+			_, _ = c.Write(bytes.Repeat([]byte{19}, 255))
+		}},
+		{"type0-u32", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.003\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write(make([]byte, 4))
+		}},
+		{"huge-reason", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write([]byte{1, 2})
+			sel := make([]byte, 1)
+			_, _ = io.ReadFull(c, sel)
+			_, _ = c.Write(bytes.Repeat([]byte{0x22}, 16))
+			resp := make([]byte, 16)
+			_, _ = io.ReadFull(c, resp)
+			var fail [4]byte
+			binary.BigEndian.PutUint32(fail[:], 1)
+			_, _ = c.Write(fail[:])
+			var n [4]byte
+			binary.BigEndian.PutUint32(n[:], 0xffffffff)
+			_, _ = c.Write(n[:])
+		}},
+		{"tight-huge-tunnels", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write([]byte{1, 16})
+			sel := make([]byte, 1)
+			_, _ = io.ReadFull(c, sel)
+			var n [4]byte
+			binary.BigEndian.PutUint32(n[:], 0x100000)
+			_, _ = c.Write(n[:])
+		}},
+		{"short-challenge", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write([]byte{1, 2})
+			sel := make([]byte, 1)
+			_, _ = io.ReadFull(c, sel)
+			_, _ = c.Write([]byte{1, 2, 3, 4})
+		}},
+		{"tlsvnc-only", func(c net.Conn) {
+			_, _ = c.Write([]byte("RFB 003.008\n"))
+			_, _ = io.CopyN(io.Discard, c, 12)
+			_, _ = c.Write([]byte{1, 18})
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			addr := startRawRFB(t, tc.write)
+			start := time.Now()
+			res := mockProbe(t, "vnc", addr, "u", "p")
+			if time.Since(start) > 2*time.Second {
+				t.Fatal("malformed peer took too long")
+			}
+			if res.Ok {
+				t.Fatal("malformed peer must not authenticate")
+			}
+			if bytes.Contains(res.ExtraInfo, []byte("brute item failed")) {
+				t.Fatalf("handler panicked: %s", res.ExtraInfo)
+			}
+		})
+	}
+}
+
+func TestVNCLoginProbeConcurrent(t *testing.T) {
+	addr := startMockRFB(t, mockRFBConfig{password: "conc-pass"})
+	errCh := make(chan string, 16)
+	for i := 0; i < 8; i++ {
+		go func() {
+			ok := mockProbe(t, "vnc", addr, "", "conc-pass")
+			bad := mockProbe(t, "vnc", addr, "", "nope")
+			if !ok.Ok || ok.Finished {
+				errCh <- "correct failed"
+				return
+			}
+			if bad.Ok || bad.Finished {
+				errCh <- "wrong succeeded or finished"
+				return
+			}
+			errCh <- ""
+		}()
+	}
+	for i := 0; i < 8; i++ {
+		if msg := <-errCh; msg != "" {
+			t.Fatal(msg)
+		}
+	}
+}
+
+func startRawRFB(t *testing.T, write func(net.Conn)) string {
+	t.Helper()
+	ln := mockListen(t)
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+				write(c)
+			}(conn)
+		}
+	}()
+	return ln.Addr().String()
 }

@@ -1,6 +1,7 @@
 package vncprobe
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -154,6 +155,80 @@ func TestProbeDoesNotSendClientInit(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("mock hung")
+	}
+}
+
+func TestProbeOversizedListsDoNotAllocate(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+		_, _ = c.Write([]byte("RFB 003.008\n"))
+		ver := make([]byte, 12)
+		_, _ = io.ReadFull(c, ver)
+		_, _ = c.Write([]byte{255})
+		_, _ = c.Write(bytes.Repeat([]byte{19}, 32))
+	}()
+	start := time.Now()
+	err = Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: 500 * time.Millisecond})
+	if err == nil {
+		t.Fatal("oversized type list must not authenticate")
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("oversized type list must fail fast")
+	}
+}
+
+func TestProbeHugeFailureReason(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+		_, _ = c.Write([]byte("RFB 003.008\n"))
+		ver := make([]byte, 12)
+		if _, err := io.ReadFull(c, ver); err != nil {
+			return
+		}
+		_, _ = c.Write([]byte{1, 2})
+		sel := make([]byte, 1)
+		if _, err := io.ReadFull(c, sel); err != nil {
+			return
+		}
+		_, _ = c.Write(bytes.Repeat([]byte{0x33}, 16))
+		resp := make([]byte, 16)
+		if _, err := io.ReadFull(c, resp); err != nil {
+			return
+		}
+		var fail [4]byte
+		binary.BigEndian.PutUint32(fail[:], 1)
+		_, _ = c.Write(fail[:])
+		var n [4]byte
+		binary.BigEndian.PutUint32(n[:], 0xffffffff)
+		_, _ = c.Write(n[:])
+	}()
+	start := time.Now()
+	err = Probe(context.Background(), nil, Options{Address: ln.Addr().String(), Password: "x", Timeout: time.Second})
+	if !errors.Is(err, ErrAuthFailed) {
+		t.Fatalf("want auth failed, got %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("huge reason length must not block until the full timeout")
 	}
 }
 

@@ -11,5 +11,9 @@ while [ "$i" -lt 50 ]; do
   i=$((i + 1))
   sleep 0.1
 done
+extra=""
+if [ -n "${RFB_VERSION:-}" ]; then
+  extra="-rfbversion $RFB_VERSION"
+fi
 exec x11vnc -display :99 -rfbauth /tmp/vncpasswd -rfbport 5900 \
-  -forever -shared -listen 0.0.0.0 -noxdamage
+  -forever -shared -listen 0.0.0.0 -noxdamage $extra
