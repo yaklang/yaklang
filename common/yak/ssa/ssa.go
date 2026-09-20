@@ -412,6 +412,9 @@ type Function struct {
 	scopeId int
 	// builder
 	builder *FunctionBuilder
+	// Active private lexical view during a unit-owned lazy build. Same-function
+	// tasks are serialized by the unit scheduler, but may nest across files.
+	executionBuilder *FunctionBuilder
 	// this function is variadic parameter, for function type create
 	hasEllipsis bool
 
