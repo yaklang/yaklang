@@ -83,8 +83,27 @@ func (ssadbSQLLogger) Print(values ...interface{}) {
 	// Do not leak SQL/arguments at INFO/WARN/ERROR. Keep a visible indication
 	// of failures even when SQL diagnostics are disabled.
 	level, _ := values[0].(string)
-	if level == "error" {
-		log.Errorf("[ssadb] GORM operation failed; details in SQL debug log")
+	var failErr error
+	failed := level == "error"
+	// GORM v1 sends DB errors as Print("log", source, err), rather than
+	// Print("error", ...). Record-not-found is an ordinary lookup miss.
+	for _, value := range values[1:] {
+		err, ok := value.(error)
+		if !ok || err == nil || gorm.IsRecordNotFoundError(err) {
+			continue
+		}
+		if level == "error" || level == "log" {
+			failed = true
+			failErr = err
+			break
+		}
+	}
+	if failed {
+		if failErr != nil {
+			log.Errorf("[ssadb] GORM operation failed: %v", failErr)
+		} else {
+			log.Errorf("[ssadb] GORM operation failed")
+		}
 	}
 }
 
