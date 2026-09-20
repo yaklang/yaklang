@@ -79,8 +79,9 @@ func TestPasswordVerifiers(t *testing.T) {
 	for _, test := range []struct {
 		verifier int
 		modern   bool
-	}{{2361, false}, {2361, true}, {6949, false}, {6949, true}, {18453, true}} {
-		t.Run(fmt.Sprintf("%d/modern=%v", test.verifier, test.modern), func(t *testing.T) {
+		size     int
+	}{{2361, false, 32}, {2361, true, 32}, {6949, false, 48}, {6949, true, 48}, {6949, true, 32}, {18453, true, 48}} {
+		t.Run(fmt.Sprintf("%d/modern=%v/nonce=%d", test.verifier, test.modern, test.size), func(t *testing.T) {
 			password := "Probe_password!"
 			salt := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 			checkSalt := bytes.Repeat([]byte{0x62}, 16)
@@ -100,10 +101,7 @@ func TestPasswordVerifiers(t *testing.T) {
 				sum := sha512.Sum512(append(bytes.Clone(speedy), salt...))
 				passwordKey = sum[:32]
 			}
-			serverKey := bytes.Repeat([]byte{0x53}, 48)
-			if test.verifier == 2361 {
-				serverKey = serverKey[:32]
-			}
+			serverKey := bytes.Repeat([]byte{0x53}, test.size)
 			blk, _ := aes.NewCipher(passwordKey)
 			encrypted := make([]byte, len(serverKey))
 			cipher.NewCBCEncrypter(blk, make([]byte, 16)).CryptBlocks(encrypted, serverKey)
@@ -210,6 +208,16 @@ func TestMalformedCryptoInputs(t *testing.T) {
 			if _, e := c.Decrypt(b); e == nil {
 				t.Fatal("accepted malformed cipher padding")
 			}
+		}
+	}
+}
+
+func TestLegacyVerifierRejectsShortSessionKey(t *testing.T) {
+	// Unlike 12c's PBKDF2 path, the legacy 6949 path needs bytes 16 through 39.
+	for _, size := range []int{0, 23, 31, 32, 39} {
+		obj := &AuthObject{VerifierType: 6949, ServerSessKey: make([]byte, size), ClientSessKey: make([]byte, size), tcpNego: &TCPNego{ServerCompileTimeCaps: make([]byte, 8)}}
+		if _, err := obj.generatePasswordEncKey(); err == nil {
+			t.Fatalf("accepted legacy nonce length %d", size)
 		}
 	}
 }

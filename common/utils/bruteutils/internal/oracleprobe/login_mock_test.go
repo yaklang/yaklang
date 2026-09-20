@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
@@ -111,6 +112,10 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	if fault == "premature_success" {
 		return s.writeData([]byte{9})
 	}
+	verifier := 18453
+	if strings.HasPrefix(fault, "short_nonce_") {
+		verifier = 6949
+	}
 	password := "Mock_密码!123"
 	salt := []byte("0123456789")
 	checkSalt := bytes.Repeat([]byte{0x63}, 16)
@@ -118,6 +123,11 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	hash := sha512.Sum512(append(bytes.Clone(speedy), salt...))
 	passwordKey := hash[:32]
 	serverNonce := bytes.Repeat([]byte{0x53}, 48)
+	if verifier == 6949 {
+		sum := sha1.Sum(append([]byte(password), salt...))
+		passwordKey = append(sum[:], 0, 0, 0, 0)
+		serverNonce = serverNonce[:32]
+	}
 	challenge := &session{ClrChunkSize: 64}
 	challenge.PutBytes(8)
 	challenge.PutInt(5, 4, true, true)
@@ -126,7 +136,7 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	challenge.PutString("AUTH_VFR_DATA")
 	challenge.PutInt(len(salt)*2, 4, true, true)
 	challenge.PutString(hex.EncodeToString(salt))
-	challenge.PutInt(18453, 4, true, true)
+	challenge.PutInt(verifier, 4, true, true)
 	challenge.PutKeyValString("AUTH_PBKDF2_CSK_SALT", hex.EncodeToString(checkSalt), 0)
 	challenge.PutKeyValString("AUTH_PBKDF2_VGEN_COUNT", "4096", 0)
 	challenge.PutKeyValString("AUTH_PBKDF2_SDER_COUNT", "3", 0)
@@ -178,15 +188,21 @@ func mockLoginServer(conn net.Conn, fault string) error {
 	if e != nil {
 		return e
 	}
-	material := append(bytes.Clone(clientNonce), serverNonce...)
-	combined := pbkdf2.Key([]byte(strings.ToUpper(hex.EncodeToString(material))), checkSalt, 3, 32, sha512.New)
+	nonceSize, keySize := len(clientNonce), 32
+	if verifier == 6949 {
+		nonceSize, keySize = 24, 24
+	}
+	material := append(bytes.Clone(clientNonce[:nonceSize]), serverNonce[:nonceSize]...)
+	combined := pbkdf2.Key([]byte(strings.ToUpper(hex.EncodeToString(material))), checkSalt, 3, keySize, sha512.New)
 	candidate, e := mockDecrypt(combined, props["AUTH_PASSWORD"], true)
-	if e != nil || len(candidate) < 16 || string(candidate[16:]) != password {
+	if e != nil || len(candidate) < 16 || string(candidate[16:]) != password || fault == "short_nonce_rejected" {
 		return s.writeData(mockSummary(1017))
 	}
-	clearSpeedy, e := mockDecrypt(combined, props["AUTH_PBKDF2_SPEEDY_KEY"], false)
-	if e != nil || len(clearSpeedy) < 16 || !bytes.Equal(clearSpeedy[16:], speedy) {
-		return errors.New("invalid speedy response")
+	if verifier == 18453 {
+		clearSpeedy, e := mockDecrypt(combined, props["AUTH_PBKDF2_SPEEDY_KEY"], false)
+		if e != nil || len(clearSpeedy) < 16 || !bytes.Equal(clearSpeedy[16:], speedy) {
+			return errors.New("invalid speedy response")
+		}
 	}
 	proof := append(bytes.Repeat([]byte{0x71}, 16), []byte("SERVER_TO_CLIENT")...)
 	result := map[string]string{"AUTH_SESSION_ID": "42", "AUTH_SERIAL_NUM": "3", "AUTH_SVR_RESPONSE": mockEncrypt(combined, proof, true)}
@@ -273,7 +289,7 @@ func mockDecrypt(key []byte, text string, padding bool) ([]byte, error) {
 }
 
 func TestProbeCompleteHandshakeMock(t *testing.T) {
-	for _, fault := range []string{"success", "fragmented", "wrong_password", "missing_proof", "invalid_proof", "invalid_proof_padding", "missing_identity", "bare_success", "error_after_properties", "error_after_completion", "truncated_proof", "unexpected_message", "premature_success", "disconnect_connect", "disconnect_protocol", "disconnect_datatype", "disconnect_challenge", "disconnect_result"} {
+	for _, fault := range []string{"success", "fragmented", "short_nonce_success", "short_nonce_rejected", "wrong_password", "missing_proof", "invalid_proof", "invalid_proof_padding", "missing_identity", "bare_success", "error_after_properties", "error_after_completion", "truncated_proof", "unexpected_message", "premature_success", "disconnect_connect", "disconnect_protocol", "disconnect_datatype", "disconnect_challenge", "disconnect_result"} {
 		t.Run(fault, func(t *testing.T) {
 			client, server := net.Pipe()
 			serverResult := make(chan error, 1)
@@ -283,10 +299,10 @@ func TestProbeCompleteHandshakeMock(t *testing.T) {
 				password += "wrong"
 			}
 			err := Probe(context.Background(), dialFunc(func(context.Context, string, string) (net.Conn, error) { return client, nil }), Options{Address: "127.0.0.1:1521", Service: "MOCK", Username: "PROBE", Password: password, Timeout: 2 * time.Second})
-			if (err == nil) != (fault == "success" || fault == "fragmented") {
+			if (err == nil) != (fault == "success" || fault == "fragmented" || fault == "short_nonce_success") {
 				t.Fatalf("unexpected probe result: %v", err)
 			}
-			if fault == "wrong_password" || fault == "error_after_properties" {
+			if fault == "wrong_password" || fault == "error_after_properties" || fault == "short_nonce_rejected" {
 				var ora *Error
 				if !errors.As(err, &ora) {
 					t.Fatalf("missing server error: %v", err)

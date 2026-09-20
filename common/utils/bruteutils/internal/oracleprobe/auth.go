@@ -414,7 +414,7 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 	hash := md5.New()
 	key1 := obj.ServerSessKey
 	key2 := obj.ClientSessKey
-	if len(key1) < 32 || len(key1) != len(key2) || (obj.VerifierType == 6949 && len(key1) < 40) {
+	if len(key1) < 32 || len(key1) != len(key2) {
 		return nil, errors.New("oracle: invalid session key size")
 	}
 	start := 16
@@ -461,6 +461,11 @@ func (obj *AuthObject) generatePasswordEncKey() ([]byte, error) {
 			}
 			return hash.Sum(nil), nil
 		case 6949:
+			// Only the legacy XOR derivation reads bytes 16..39. Oracle 12c
+			// can send a 32-byte nonce with the modern PBKDF2 derivation.
+			if len(key1) < 40 {
+				return nil, errors.New("oracle: truncated legacy session key")
+			}
 			buffer := make([]byte, 24)
 			for x := 0; x < 24; x++ {
 				buffer[x] = key1[x+start] ^ key2[x+start]
