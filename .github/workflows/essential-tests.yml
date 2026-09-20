@@ -27,6 +27,10 @@ on:
       # must exercise it; otherwise a broken edit merges without ever running.
       - "scripts/ci/**"
       - "scripts/generate-compressed-assets.sh"
+      - "scripts/build-gzip-embed.sh"
+      - "scripts/build_and_install_yak.sh"
+      - ".github/workflows/reuse-build.yml"
+      - ".github/workflows/exp-cross-build.yml"
       - "go.mod"
 
 concurrency:
@@ -501,6 +505,47 @@ jobs:
       - name: Vet ScanNode and Legion Node
         run: go vet ./scannode/... ./cmd/legion-smoke-node
 
+  embedded-resources:
+    # Resource checks do not need the prepared engine or its large cache artifact.
+    needs: check-wip
+    if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope != 'scannode'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Preserve source bytes on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
+      - name: Check out the selected revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test lazy cache and archive tooling
+        run: go test -race -timeout 3m ./common/utils/gzip_embed/... ./common/utils/resources_monitor
+      - name: Test development resource contents
+        run: go test -race -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb
+      - name: Generate release assets with the current native tool
+        run: |
+          GZIP_EMBED="$(bash scripts/build-gzip-embed.sh)"
+          export GZIP_EMBED
+          bash scripts/generate-compressed-assets.sh
+      - name: Test release resource contents and HTTP semantics
+        run: go test -race -tags gzip_embed -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb
+
   slim-gate:
     timeout-minutes: 15
     needs: [check-wip, prepare-yak]
@@ -543,18 +588,6 @@ jobs:
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
-
-      - name: Test development resource loading
-        run: go test -race -run 'TestCompressed|TestArchive' -timeout 3m ./embed ./common/crep ./common/syntaxflow/sfdb ./common/utils/gzip_embed/...
-
-      - name: Generate release assets with existing gzip-embed tool
-        shell: bash
-        run: |
-          go install ./common/utils/gzip_embed/gzip-embed
-          bash scripts/generate-compressed-assets.sh
-
-      - name: Test release resource loading
-        run: go test -race -tags gzip_embed -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/syntaxflow/sfdb
 
       - name: Slim gate test (irify_exclude)
         env:
@@ -1444,6 +1477,7 @@ jobs:
       - check-wip
       - scannode-focused
       - slim-gate
+      - embedded-resources
       - ipc-smoke
       - prepared-startup
       - test-local
@@ -1458,6 +1492,7 @@ jobs:
           TEST_SCOPE: ${{ needs.check-wip.outputs.test_scope }}
           SCANNODE_RESULT: ${{ needs.scannode-focused.result }}
           SLIM_RESULT: ${{ needs.slim-gate.result }}
+          RESOURCES_RESULT: ${{ needs.embedded-resources.result }}
           IPC_RESULT: ${{ needs.ipc-smoke.result }}
           STARTUP_RESULT: ${{ needs.prepared-startup.result }}
           LOCAL_RESULT: ${{ needs.test-local.result }}
@@ -1478,7 +1513,7 @@ jobs:
             exit 0
           fi
 
-          for result in "$SLIM_RESULT" "$IPC_RESULT" "$STARTUP_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
+          for result in "$RESOURCES_RESULT" "$SLIM_RESULT" "$IPC_RESULT" "$STARTUP_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Full test scope did not pass: $result" >&2
               exit 1

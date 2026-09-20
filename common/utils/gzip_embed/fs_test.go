@@ -146,7 +146,11 @@ func TestArchiveChecksum(t *testing.T) {
 	raw = bytes.Clone(raw)
 	raw[len(raw)-8] ^= 1
 	for _, raw := range [][]byte{raw, []byte("bad gzip")} {
-		_, err := NewPreprocessingEmbedWithDecode(&testArchive, "test/static.tar.gz", true, func([]byte) ([]byte, error) { return raw, nil })
+		f, err := NewPreprocessingEmbedWithDecode(&testArchive, "test/static.tar.gz", true, func([]byte) ([]byte, error) { return raw, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.ReadDir(".")
 		if err == nil {
 			t.Fatal("corrupt archive accepted")
 		}

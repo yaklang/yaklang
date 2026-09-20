@@ -11,12 +11,12 @@ import (
 //go:embed rule_versions.tar.gz
 var ruleVersionFSArchive embed.FS
 
-// Match development resource paths without retaining a global decompressed copy.
+// Decode and decompress on first access, then reuse resident contents.
 var ruleVersionFS *gzip_embed.PreprocessingEmbed
 
 func init() {
 	var err error
-	ruleVersionFS, err = gzip_embed.NewPreprocessingEmbed(&ruleVersionFSArchive, "rule_versions.tar.gz", false)
+	ruleVersionFS, err = gzip_embed.NewPreprocessingEmbed(&ruleVersionFSArchive, "rule_versions.tar.gz")
 	if err != nil {
 		panic(err)
 	}

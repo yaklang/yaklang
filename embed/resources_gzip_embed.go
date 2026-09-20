@@ -11,12 +11,12 @@ import (
 //go:embed resources.tar.gz
 var FSArchive embed.FS
 
-// Match development resource paths without retaining a global decompressed copy.
+// Decode and decompress on first access, then reuse resident contents.
 var FS *gzip_embed.PreprocessingEmbed
 
 func init() {
 	var err error
-	FS, err = gzip_embed.NewPreprocessingEmbed(&FSArchive, "resources.tar.gz", false)
+	FS, err = gzip_embed.NewPreprocessingEmbed(&FSArchive, "resources.tar.gz")
 	if err != nil {
 		panic(err)
 	}

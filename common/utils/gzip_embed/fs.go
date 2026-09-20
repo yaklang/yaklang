@@ -12,6 +12,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,12 +20,18 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-// PreprocessingEmbed reads a tar.gz embedded by the release build. Uncached
-// readers decompress on demand; development builds can keep using embed.FS.
+// PreprocessingEmbed lazily loads release resources on first access and retains
+// immutable contents and metadata. Set cache=false explicitly to stream each read.
+// Configure EnableCache before first use; do not mutate it concurrently.
 type PreprocessingEmbed struct {
 	*embed.FS
 	EnableCache    bool
 	cacheFile      map[string][]byte
+	cacheInfo      map[string]fs.FileInfo
+	cacheDirs      map[string][]fs.DirEntry
+	cacheOnce      sync.Once
+	cacheErr       error
+	hashMu         sync.Mutex
 	sourceFileName string
 	cachedHash     string // 缓存的哈希值
 	decode         DecodeFunc
@@ -33,64 +40,127 @@ type PreprocessingEmbed struct {
 // DecodeFunc 在读取嵌入式 tar.gz 原始字节后、解压前执行，用于支持 XOR/自定义编码。
 type DecodeFunc func([]byte) ([]byte, error)
 
+// DefaultXORKey is the shared resource obfuscation key used by gzip-embed.
+// Existing unencoded gzip archives remain readable by the default constructor.
+const DefaultXORKey = "yaklang-gzip-embed-v1"
+
 func NewEmptyPreprocessingEmbed() *PreprocessingEmbed {
-	return &PreprocessingEmbed{
-		cacheFile: map[string][]byte{},
+	c := &PreprocessingEmbed{EnableCache: true, cacheFile: map[string][]byte{},
+		cacheInfo: map[string]fs.FileInfo{".": &virtualFileInfo{name: ".", isDir: true}},
+		cacheDirs: map[string][]fs.DirEntry{".": {}},
+	}
+	c.cacheOnce.Do(func() {})
+	return c
+}
+
+// NewPreprocessingEmbed defaults to lazy, resident caching and the shared XOR key.
+// Construction never reads or decodes the archive. An optional false preserves
+// streaming mode; existing calls passing an explicit bool remain valid.
+func NewPreprocessingEmbed(source *embed.FS, fileName string, cache ...bool) (*PreprocessingEmbed, error) {
+	enabled := true
+	if len(cache) > 0 {
+		enabled = cache[0]
+	}
+	return NewPreprocessingEmbedWithDecode(source, fileName, enabled, decodeDefaultArchive)
+}
+
+// NewPreprocessingEmbedWithDecode defers decoding until first access. Cached
+// instances publish contents only after the entire archive has been validated.
+func NewPreprocessingEmbedWithDecode(source *embed.FS, fileName string, cache bool, decode DecodeFunc) (*PreprocessingEmbed, error) {
+	return &PreprocessingEmbed{FS: source, sourceFileName: fileName, EnableCache: cache, decode: decode}, nil
+}
+
+func decodeDefaultArchive(raw []byte) ([]byte, error) {
+	if len(raw) >= 3 && raw[0] == 0x1f && raw[1] == 0x8b && raw[2] == 8 {
+		return raw, nil
+	}
+	xorInPlace(raw, []byte(DefaultXORKey))
+	return raw, nil
+}
+
+// raw is an owned buffer read by openSource, never the underlying embed bytes.
+func xorInPlace(raw, key []byte) {
+	if len(key) == 0 {
+		return
+	}
+	for i, j := 0, 0; i < len(raw); i++ {
+		raw[i] ^= key[j]
+		j++
+		if j == len(key) {
+			j = 0
+		}
 	}
 }
 
-// NewPreprocessingEmbed create a CompressFS instance
-// fs is embed.FS instance, compressDirs is a map, key is virtual dir, value is compress file name
-func NewPreprocessingEmbed(fs *embed.FS, fileName string, cache bool) (*PreprocessingEmbed, error) {
-	return NewPreprocessingEmbedWithDecode(fs, fileName, cache, nil)
+// NewPreprocessingEmbedWithXORKey preserves explicit keys (including an empty key).
+func NewPreprocessingEmbedWithXORKey(source *embed.FS, fileName string, cache bool, key []byte) (*PreprocessingEmbed, error) {
+	key = bytes.Clone(key)
+	return NewPreprocessingEmbedWithDecode(source, fileName, cache, func(raw []byte) ([]byte, error) {
+		xorInPlace(raw, key)
+		return raw, nil
+	})
 }
 
-// NewPreprocessingEmbedWithDecode 允许对嵌入的压缩资源做自定义解码（例如 XOR）。
-func NewPreprocessingEmbedWithDecode(fs *embed.FS, fileName string, cache bool, decode DecodeFunc) (*PreprocessingEmbed, error) {
-	cfs := &PreprocessingEmbed{
-		FS:             fs,
-		cacheFile:      map[string][]byte{},
-		sourceFileName: fileName,
-		EnableCache:    cache,
-		decode:         decode,
-	}
-	if cache {
-		err := cfs.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
-			if header.Typeflag == tar.TypeDir {
-				return nil, true
+func (c *PreprocessingEmbed) ensureCache() error {
+	c.cacheOnce.Do(func() {
+		files := map[string][]byte{}
+		infos := map[string]fs.FileInfo{".": &virtualFileInfo{name: ".", isDir: true}}
+		err := c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
+			name := strings.TrimSuffix(header.Name, "/")
+			if !fs.ValidPath(name) {
+				return &fs.PathError{Op: "load", Path: name, Err: fs.ErrInvalid}, false
 			}
-			buf := &bytes.Buffer{}
-			if _, err := io.Copy(buf, reader); err != nil {
-				return err, true
+			infos[name] = archiveFileInfo(header)
+			if header.Typeflag == tar.TypeReg {
+				data, err := io.ReadAll(reader)
+				if err != nil {
+					return err, false
+				}
+				files[name] = data
 			}
-			cfs.cacheFile[header.Name] = buf.Bytes()
 			return nil, true
 		})
 		if err != nil {
-			return nil, err
+			c.cacheErr = err
+			return
 		}
-	}
-	return cfs, nil
-}
-
-// NewPreprocessingEmbedWithXORKey 使用固定 XOR key 解码嵌入的压缩资源。
-func NewPreprocessingEmbedWithXORKey(fs *embed.FS, fileName string, cache bool, key []byte) (*PreprocessingEmbed, error) {
-	return NewPreprocessingEmbedWithDecode(fs, fileName, cache, func(raw []byte) ([]byte, error) {
-		if len(key) == 0 {
-			return raw, nil
+		// Older archives may omit explicit directory entries.
+		for name := range infos {
+			for parent := path.Dir(name); parent != "."; parent = path.Dir(parent) {
+				if info, exists := infos[parent]; exists {
+					if !info.IsDir() {
+						c.cacheErr = &fs.PathError{Op: "load", Path: parent, Err: fs.ErrInvalid}
+						return
+					}
+				} else {
+					infos[parent] = &virtualFileInfo{name: path.Base(parent), isDir: true}
+				}
+			}
 		}
-		out := make([]byte, len(raw))
-		for i, b := range raw {
-			out[i] = b ^ key[i%len(key)]
+		dirs := map[string][]fs.DirEntry{}
+		for name, info := range infos {
+			if info.IsDir() {
+				dirs[name] = []fs.DirEntry{}
+			}
 		}
-		return out, nil
+		for name, info := range infos {
+			if name != "." {
+				parent := path.Dir(name)
+				dirs[parent] = append(dirs[parent], fs.FileInfoToDirEntry(info))
+			}
+		}
+		for _, entries := range dirs {
+			sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		}
+		c.cacheFile, c.cacheInfo, c.cacheDirs = files, infos, dirs
 	})
+	return c.cacheErr
 }
 
 func (c *PreprocessingEmbed) scanFile(h func(header *tar.Header, reader io.Reader) (error, bool)) error {
 	fp, err := c.openSource()
 	if err != nil {
-		return utils.Errorf("open file %s failed: %v", c.sourceFileName, err)
+		return utils.Errorf("open file %s failed: %w", c.sourceFileName, err)
 	}
 	defer fp.Close()
 	gzReader, err := gzip.NewReader(fp)
@@ -126,15 +196,12 @@ func (c *PreprocessingEmbed) openSource() (io.ReadCloser, error) {
 	if c.FS == nil {
 		return nil, fs.ErrNotExist
 	}
-	fp, err := c.FS.Open(c.sourceFileName)
-	if err != nil {
-		return nil, err
-	}
 	if c.decode == nil {
-		return fp, nil
+		return c.FS.Open(c.sourceFileName)
 	}
-	defer fp.Close()
-	raw, err := io.ReadAll(fp)
+	// embed.ReadFile returns an owned, exactly sized copy. Avoid growing an
+	// io.ReadAll buffer repeatedly before decoding the compressed bytes in place.
+	raw, err := c.FS.ReadFile(c.sourceFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +220,8 @@ func (c *PreprocessingEmbed) ReadFile(name string) ([]byte, error) {
 	var successful bool
 	var content []byte
 	if c.EnableCache {
-		if c.cacheFile == nil {
-			return nil, utils.Errorf("cacheFile is nil")
+		if err := c.ensureCache(); err != nil {
+			return nil, err
 		}
 		if data, ok := c.cacheFile[name]; ok {
 			successful = true
@@ -191,6 +258,20 @@ func (c *PreprocessingEmbed) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
+	if c.EnableCache {
+		if err := c.ensureCache(); err != nil {
+			return nil, err
+		}
+		info, ok := c.cacheInfo[name]
+		if !ok {
+			return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+		}
+		if info.IsDir() {
+			return &virtualDir{info: info, entries: append([]fs.DirEntry{}, c.cacheDirs[name]...)}, nil
+		}
+		data := c.cacheFile[name]
+		return &virtualFile{name: path.Base(name), data: data, reader: bytes.NewReader(data)}, nil
+	}
 	data, err := c.ReadFile(name)
 	if err == nil {
 		return &virtualFile{name: path.Base(name), data: data, reader: bytes.NewReader(data)}, nil
@@ -225,6 +306,19 @@ func (c *PreprocessingEmbed) Stat(name string) (fs.FileInfo, error) {
 
 	if name != "" && !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrInvalid}
+	}
+
+	if c.EnableCache {
+		if err := c.ensureCache(); err != nil {
+			return nil, err
+		}
+		if name == "" {
+			name = "."
+		}
+		if info, ok := c.cacheInfo[name]; ok {
+			return info, nil
+		}
+		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
 	}
 
 	// 特殊处理根目录
@@ -295,6 +389,12 @@ func (c *PreprocessingEmbed) ReadDir(dirname string) ([]fs.DirEntry, error) {
 	dirname = strings.TrimSuffix(strings.TrimPrefix(dirname, "./"), "/")
 	if dirname == "." {
 		dirname = ""
+	}
+	if c.EnableCache {
+		if dirname == "" {
+			dirname = "."
+		}
+		return append([]fs.DirEntry{}, c.cacheDirs[dirname]...), nil
 	}
 	prefix := dirname
 	if prefix != "" {
@@ -485,26 +585,35 @@ func (i *virtualFileInfo) Sys() any           { return nil }
 // GetHash 计算所有文件内容的哈希值，用于检测文件是否有变动
 // 返回一个 SHA256 哈希字符串
 func (c *PreprocessingEmbed) GetHash() (string, error) {
+	c.hashMu.Lock()
+	defer c.hashMu.Unlock()
 	// 如果已经缓存了哈希值，直接返回
 	if c.cachedHash != "" {
 		return c.cachedHash, nil
 	}
 
 	var hashes []string
-	// 扫描所有文件并计算每个文件的哈希值
-	err := c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
-		if header.Typeflag == tar.TypeReg {
-			buf := &bytes.Buffer{}
-			if _, err := io.Copy(buf, reader); err != nil {
-				return err, true
-			}
-			hash := codec.Sha256(buf.Bytes())
-			hashes = append(hashes, hash)
+	if c.EnableCache {
+		if err := c.ensureCache(); err != nil {
+			return "", err
 		}
-		return nil, true
-	})
-	if err != nil {
-		return "", err
+		for _, data := range c.cacheFile {
+			hashes = append(hashes, codec.Sha256(data))
+		}
+	} else {
+		err := c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
+			if header.Typeflag == tar.TypeReg {
+				data, err := io.ReadAll(reader)
+				if err != nil {
+					return err, false
+				}
+				hashes = append(hashes, codec.Sha256(data))
+			}
+			return nil, true
+		})
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if len(hashes) <= 0 {
@@ -525,5 +634,7 @@ func (c *PreprocessingEmbed) GetHash() (string, error) {
 
 // InvalidateHash 清除缓存的哈希值，在文件可能发生变化后调用
 func (c *PreprocessingEmbed) InvalidateHash() {
+	c.hashMu.Lock()
+	defer c.hashMu.Unlock()
 	c.cachedHash = ""
 }

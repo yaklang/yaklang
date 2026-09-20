@@ -4,11 +4,18 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"go/parser"
+	"go/token"
 	"io"
+	"strconv"
+	"strings"
+
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 func TestArchiveGeneration(t *testing.T) {
@@ -98,5 +105,76 @@ func TestArchiveGeneration(t *testing.T) {
 	}
 	if err := targz([]string{filepath.Join(root, "missing")}, root, archive, false, false); err == nil {
 		t.Fatal("missing source accepted")
+	}
+}
+
+func TestArchiveCLIDefaultsAndOverrides(t *testing.T) {
+	for _, tc := range []struct {
+		name, key string
+		args      []string
+		cache     bool
+	}{
+		{"default", gzip_embed.DefaultXORKey, nil, true},
+		{"plain", "", []string{"--xor-key=", "--cache=false"}, false},
+		{"custom", "key-with-quotes-\"-and-backslash-\\", []string{"--xor-key=key-with-quotes-\"-and-backslash-\\"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "fixture")
+			if err := os.Mkdir(root, 0755); err != nil {
+				t.Fatal(err)
+			}
+			old, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.Chdir(root); err != nil {
+				t.Fatal(err)
+			}
+			defer os.Chdir(old)
+			if err = os.WriteFile("file with spaces.txt", []byte("original content"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			args := append([]string{"gzip-embed", "--source", "file with spaces.txt", "--gz", "resources.tar.gz"}, tc.args...)
+			if err = newApp().Run(args); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile("resources.tar.gz")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.key != "" {
+				if bytes.HasPrefix(raw, []byte{0x1f, 0x8b}) {
+					t.Fatal("archive was not encoded")
+				}
+				raw = XORKeyStream(raw, []byte(tc.key))
+			}
+			r, err := gzip.NewReader(bytes.NewReader(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Close()
+			tr := tar.NewReader(r)
+			h, err := tr.Next()
+			if err != nil || h.Name != "file with spaces.txt" {
+				t.Fatalf("path mismatch: %v %v", h, err)
+			}
+			content, err := io.ReadAll(tr)
+			if err != nil || string(content) != "original content" {
+				t.Fatal("content changed")
+			}
+			code, err := os.ReadFile("embed.go")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = parser.ParseFile(token.NewFileSet(), "embed.go", code, parser.AllErrors); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(code), strconv.FormatBool(tc.cache)) {
+				t.Fatal("cache flag lost")
+			}
+			if tc.key != "" && tc.key != gzip_embed.DefaultXORKey && !strings.Contains(string(code), strconv.Quote(tc.key)) {
+				t.Fatal("custom decoder key lost")
+			}
+		})
 	}
 }
