@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/bruteutils/internal/oracleprobe"
 )
@@ -63,5 +64,23 @@ func TestOracleBruteCancellationStopsServices(t *testing.T) {
 	})
 	if calls != 1 || r.Ok || !r.Finished || r.UserEliminated {
 		t.Fatalf("cancellation: calls=%d result=%#v", calls, r)
+	}
+}
+
+func TestOracleBruteServicesShareBudget(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	deadline, _ := ctx.Deadline()
+	calls := 0
+	r := oracleBrutePass(&BruteItem{Context: ctx, Target: "127.0.0.1", Username: "probe"}, func(ctx context.Context, _ oracleprobe.Options) error {
+		got, ok := ctx.Deadline()
+		if !ok || !got.Equal(deadline) {
+			t.Fatal("service retry changed the shared deadline")
+		}
+		calls++
+		return &oracleprobe.Error{Code: 1017}
+	})
+	if calls != len(oracleServiceNames) || r.Ok || r.Finished {
+		t.Fatalf("calls=%d result=%#v", calls, r)
 	}
 }
