@@ -41,9 +41,19 @@ func (a goBinaryAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, erro
 		if errors.Is(err, binary.ErrUnrecognizedExe) || errors.Is(err, binary.ErrNonGoBinary) {
 			return nil, nil
 		} else if err != nil {
-			err = fmt.Errorf("go binary parse error: %s", err)
+			err = fmt.Errorf("go binary parse error: %w", err)
+			return pkgs, err
 		}
-		return pkgs, err
+		for _, pkg := range pkgs {
+			pkg.EnsureDetails()
+			if pkg.Ecosystem == "" {
+				pkg.Ecosystem = "golang"
+			}
+			if pkg.DeclaredVersion != "" && pkg.DeclaredVersion != pkg.Version {
+				pkg.ReplacementVersion = pkg.Version
+			}
+		}
+		return pkgs, nil
 	}
 
 	return nil, nil

@@ -64,7 +64,7 @@
       "case": "TestParse",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go:TestParse"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -75,7 +75,7 @@
       "case": "ELF",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go:TestParse/ELF"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -86,7 +86,7 @@
       "case": "PE",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go:TestParse/PE"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -97,7 +97,7 @@
       "case": "Mach-O",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go:TestParse/Mach-O"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -108,7 +108,7 @@
       "case": "with replace directive",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go:TestParse/with replace directive"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },
@@ -119,7 +119,7 @@
       "case": "sad path",
       "disposition": "ADAPTED",
       "local_tests": [
-        "analyzer/dep-parser/golang/binary/upstream_parse_test.go"
+        "analyzer/dep-parser/golang/binary/upstream_parse_test.go:TestParse/sad path"
       ],
       "reason": "Same pinned fixtures and expected fields; own standard-library assertion harness and filesystem. New metadata is independently tested."
     },

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
@@ -35,33 +36,46 @@ func NewParser() types.Parser {
 	return &Parser{}
 }
 
-// Parse scans file to try to report the Go and module versions.
+// Parse reads debug/buildinfo. It does not invent licenses or source lines;
+// those fields are not present in Go buildinfo. Main (devel) is the binary
+// identity, not a dependency, and is not listed as a component.
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	st := budget.From(types.ContextOf(r))
 	info, err := buildinfo.Read(r)
 	if err != nil {
 		return nil, nil, convertError(err)
 	}
-
-	libs := make([]types.Library, 0, len(info.Deps))
-
+	if err := st.Result(budget.SizeSlice); err != nil {
+		return nil, nil, err
+	}
+	var libs []types.Library
 	for _, dep := range info.Deps {
-		// binaries with old go version may incorrectly add module in Deps
-		// In this case Path == "", Version == "Devel"
-		// we need to skip this
 		if dep.Path == "" {
 			continue
 		}
-
 		mod := dep
 		if dep.Replace != nil {
 			mod = dep.Replace
+			if mod.Path == "" {
+				continue
+			}
 		}
-
-		libs = append(libs, types.Library{
-			Name:    mod.Path,
-			Version: mod.Version,
-		})
+		if err := st.Result(budget.SizeOfPackage(mod.Path, mod.Version, mod.Sum)); err != nil {
+			return nil, nil, err
+		}
+		lib := types.Library{
+			Name:            mod.Path,
+			Version:         mod.Version,
+			Verification:    mod.Sum,
+			DeclaredName:    dep.Path,
+			DeclaredVersion: dep.Version,
+			Evidence:        "binary",
+			ID:              dep.Path,
+		}
+		if dep.Replace != nil {
+			lib.Source = dep.Path
+		}
+		libs = append(libs, lib)
 	}
-
 	return libs, nil, nil
 }

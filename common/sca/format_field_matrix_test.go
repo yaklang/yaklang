@@ -187,6 +187,43 @@ func TestFormatFieldMatrix(t *testing.T) {
 				t.Fatalf("rpm md5 dropped: %q", c.Key.Verification)
 			}
 		}},
+		{"gobinary", files{"app": "testdata/go_binary/go-binary"}, func(t *testing.T, r *model.Report) {
+			c := mustNamed(t, r, "github.com/aquasecurity/go-pep440-version", "v0.0.0-20210121094942-22b2f8951d46")
+			if c.Key.Ecosystem != "golang" {
+				t.Fatalf("gobinary ecosystem: %q", c.Key.Ecosystem)
+			}
+			if c.Key.Verification != "h1:vmXNl+HDfqqXgr0uY1UgK1GAhps8nbAAtqHNBcgyf+4=" {
+				t.Fatalf("gobinary module sum from buildinfo: %q", c.Key.Verification)
+			}
+			mustNamed(t, r, "golang.org/x/xerrors", "v0.0.0-20200804184101-5ec99f83aff1")
+			for _, c := range r.Components {
+				if len(c.Licenses) != 0 {
+					t.Fatalf("buildinfo has no license field: %+v", c.Licenses)
+				}
+			}
+			for _, o := range r.Observations {
+				if o.StartLine != 0 || o.EndLine != 0 {
+					t.Fatalf("buildinfo has no source lines: %+v", o)
+				}
+			}
+		}},
+		{"gobinary_nongo", files{"app": "testdata/go_binary/negative-go-binary-bash"}, func(t *testing.T, r *model.Report) {
+			if hasName(r, "github.com/aquasecurity/go-pep440-version") {
+				t.Fatal("non-Go executable produced Go modules")
+			}
+		}},
+		{"gobinary_broken", files{"app": "testdata/go_binary/negative-go-binary-broken_elf"}, func(t *testing.T, r *model.Report) {
+			if hasName(r, "github.com/aquasecurity/go-pep440-version") {
+				t.Fatal("broken ELF produced Go modules")
+			}
+		}},
+		{"gobinary_replace", files{"app": "analyzer/dep-parser/golang/binary/testdata/replace.elf"}, func(t *testing.T, r *model.Report) {
+			c := mustNamed(t, r, "github.com/go-sql-driver/mysql", "v1.5.0")
+			if c.Key.Source != "github.com/go-sql-driver/mysql" {
+				t.Fatalf("replace original path: %q", c.Key.Source)
+			}
+			mustNamed(t, r, "github.com/davecgh/go-spew", "v1.1.1")
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

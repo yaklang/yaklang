@@ -329,23 +329,23 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/golang/binary/parse.go",
-      "sha256": "5696dff1538dd8ebba6e050dd00dc590a3973fdf2d38037665c2b986424e3051",
+      "sha256": "6f1c158665ac55fa8d312cee5b6db667adf730214fde1d7785e632ec588a601b",
       "symbols": [
         {
           "name": "convertError",
-          "line": 20
+          "line": 21
         },
         {
           "name": "Parser",
-          "line": 32
+          "line": 33
         },
         {
           "name": "NewParser",
-          "line": 34
+          "line": 35
         },
         {
           "name": "Parser.Parse",
-          "line": 39
+          "line": 42
         }
       ],
       "decision": "TRIM_AND_REWRITE",
@@ -1626,7 +1626,7 @@
     },
     {
       "local_file": "common/sca/analyzer/go_binary.go",
-      "sha256": "ff4f3e044dba787b2675618e7a487f42177cc3b67159ab6fdf155bf25d6675d8",
+      "sha256": "a8ed18a381b0fe6d635e1ccd63a59da903407f3bf9f200779075f5e543840b21",
       "symbols": [
         {
           "name": "init",
