@@ -201,3 +201,22 @@ class Top { void run() { println(Left.value()); println(Right.value()); } }`)
 		require.NotNil(t, value.GetRange(), "persisted parallel IR must retain source locations")
 	}
 }
+
+func TestCompileUnitApplicationDoesNotDrainReadyLibraries(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, filesys.NewVirtualFs(), ".", 0)
+	library := prog.NewLibrary("child", []string{"child"})
+	var calls atomic.Int32
+	library.NewFunction("work").AddLazyBuilder(func() { calls.Add(1) })
+	built := make(map[*ssa.Program]bool)
+	_, err = buildCompileUnitWaveWithOwners(context.Background(), prog, [][]string{{"resource:one"}, {"dir:two"}}, 2, built)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, calls.Load(), "application metadata must not consume a library's scheduled work")
+	peak, err := buildCompileUnitWaveWithOwners(context.Background(), prog, [][]string{{"resource:one"}}, 2, built)
+	require.NoError(t, err)
+	require.Zero(t, peak, "the same owner must not be drained again in a later wave")
+	_, err = buildCompileUnitWaveWithOwners(context.Background(), prog, [][]string{{"java:child"}}, 2, built)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, calls.Load())
+}
