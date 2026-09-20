@@ -210,6 +210,10 @@ func (d *DAPDebugger) Init() func(g *yakvm.Debugger) {
 
 		d.debugger = g
 
+		// WaitInit callers may immediately continue. Publish the initial paused
+		// state before waking them so Continue queues its signal even if the
+		// callback has not reached the channel receive yet.
+		d.InCallbackState()
 		// 表示初始化完成
 		d.initWG.Done()
 
