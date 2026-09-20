@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/internal/fsio"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
@@ -50,7 +51,7 @@ func (m *materials) Open(name string) (fs.File, error) {
 			return
 		}
 		if v.info.Size() < 0 || v.info.Size() > m.limits.MaxFileBytes {
-			v.err = fmt.Errorf("resource_limit: file bytes %s", name)
+			v.err = scanerr.New(scanerr.ResourceLimit, "file bytes %s", name)
 			return
 		}
 		f, err := m.source.Open(name)
@@ -65,7 +66,7 @@ func (m *materials) Open(name string) (fs.File, error) {
 			return
 		}
 		if !sameMaterial(v.info, before) {
-			v.err = fmt.Errorf("input_changed: %s", name)
+			v.err = scanerr.New(scanerr.InputChanged, "%s", name)
 			return
 		}
 		// Charge actual bytes in chunks, including repeated material names only once.
@@ -83,7 +84,7 @@ func (m *materials) Open(name string) (fs.File, error) {
 				over := budget.From(m.ctx).Read(int64(n)) != nil
 				m.mu.Unlock()
 				if over || int64(len(data)+n) > m.limits.MaxFileBytes {
-					v.err = fmt.Errorf("resource_limit: snapshot reads")
+					v.err = scanerr.New(scanerr.ResourceLimit, "snapshot reads")
 					return
 				}
 				data = append(data, buf[:n]...)
@@ -106,7 +107,7 @@ func (m *materials) Open(name string) (fs.File, error) {
 			return
 		}
 		if !sameMaterial(before, after) || int64(len(data)) != before.Size() {
-			v.err = fmt.Errorf("input_changed: %s", name)
+			v.err = scanerr.New(scanerr.InputChanged, "%s", name)
 			return
 		}
 		v.data = data
@@ -225,10 +226,10 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		}
 		count++
 		if count > limits.MaxFiles {
-			return fmt.Errorf("resource_limit: discovered files")
+			return scanerr.New(scanerr.ResourceLimit, "discovered files")
 		}
 		if !fs.ValidPath(name) || strings.ContainsAny(name, `\:`) {
-			return fmt.Errorf("invalid_path: %s", name)
+			return scanerr.New(scanerr.InvalidPath, "%s", name)
 		}
 		info, err := d.Info()
 		if err != nil {
@@ -246,7 +247,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		return nil
 	})
 	if err != nil {
-		fail("input_error", "", err)
+		fail(scanerr.CodeOf(err), "", err)
 		report.Normalize()
 		return nil, report, err
 	}
@@ -271,7 +272,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		var header []byte
 		f, e := input.Open(name)
 		if e != nil {
-			fail("input_error", name, e)
+			fail(scanerr.CodeOf(e), name, e)
 			continue
 		}
 		actual, e := f.Stat()
@@ -292,7 +293,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 		}
 		f.Close()
 		if e != nil {
-			fail("input_error", name, e)
+			fail(scanerr.CodeOf(e), name, e)
 			continue
 		}
 		if m.total > limits.MaxTotalReadBytes {
@@ -326,7 +327,7 @@ func scanPipeline(ctx context.Context, input fs.FS, c *ScanConfig) ([]*dxtypes.P
 			}
 			file, e := m.Open(name)
 			if e != nil {
-				fail("input_error", name, e)
+				fail(scanerr.CodeOf(e), name, e)
 				break
 			}
 			lf := file.(*lazyfile.LazyFile)
@@ -450,18 +451,7 @@ func safeAnalyze(ctx context.Context, j scanJob, matched map[string]*analyzer.Fi
 	return
 }
 func errorCode(e error) string {
-	if strings.Contains(e.Error(), "resource limit") {
-		return "resource_limit"
-	}
-	for _, s := range []string{"internal_error", "resource_limit", "unsupported_syntax", "evidence_insufficient", "input_changed"} {
-		if strings.Contains(e.Error(), s) {
-			return s
-		}
-	}
-	if errors.Is(e, context.Canceled) || errors.Is(e, context.DeadlineExceeded) {
-		return "cancelled"
-	}
-	return "malformed_input"
+	return scanerr.CodeOf(e)
 }
 func ecosystem(name string) string {
 	switch {
