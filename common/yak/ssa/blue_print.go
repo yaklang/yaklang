@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
@@ -92,6 +94,7 @@ type Blueprint struct {
 	InterfaceBlueprints []*Blueprint
 	// full Type Name
 	fullTypeName []string
+	typeNameMu   sync.Mutex
 
 	// lazy
 	*LazyBuilder
