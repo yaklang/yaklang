@@ -414,8 +414,8 @@ func (c *Config) GetFileHandler(
 		// the heap grows unchecked to 20GB+ on 32GB machines.
 		// Use sync.Once to avoid setting/logging 98 times (once per concurrent worker).
 		gomeMemLimitOnce.Do(func() {
-			if totalMem := systemMemoryTotalBytes(); totalMem > 0 {
-				memLimit := totalMem * 80 / 100
+			totalMem := systemMemoryTotalBytes()
+			if memLimit, enabled := automaticSSACompileMemoryLimit(totalMem); enabled {
 				debug.SetMemoryLimit(memLimit)
 				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (80%% of %s system memory)",
 					formatFileSize(int(memLimit)), formatFileSize(int(totalMem)))
