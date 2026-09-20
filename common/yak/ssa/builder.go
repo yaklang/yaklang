@@ -66,6 +66,11 @@ type FunctionBuilder struct {
 	CurrentRange *memedit.Range // current position in source code
 	CurrentFile  string         // current file name
 
+	// The entry state of a private stored execution view. A method build may
+	// trigger another initializer in this function without advancing this view.
+	executionInitialBlock  *BasicBlock
+	executionInitialReturn bool
+
 	parentScope *ParentScope
 
 	DefineFunc map[string]any
