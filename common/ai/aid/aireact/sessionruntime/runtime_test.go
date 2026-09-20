@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -375,4 +376,29 @@ func TestReActSessionRuntimeCreatesOnceAttachesAndGatesReservedInput(t *testing.
 		_, ok := aireact.GetRunningSession(sessionID)
 		return !ok
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestResolveReActSessionIDGeneratesUniqueSessionIDs(t *testing.T) {
+	firstParams := &ypb.AIStartParams{}
+	firstSessionID := resolveReActSessionID(firstParams)
+	secondParams := &ypb.AIStartParams{}
+	secondSessionID := resolveReActSessionID(secondParams)
+
+	require.True(t, strings.HasPrefix(firstSessionID, reActGeneratedSessionIDPrefix))
+	require.True(t, strings.HasPrefix(secondSessionID, reActGeneratedSessionIDPrefix))
+	require.NotEqual(t, firstSessionID, secondSessionID)
+	require.NotEqual(t, "default", firstSessionID)
+	require.Equal(t, firstSessionID, firstParams.GetTimelineSessionID())
+	require.Equal(t, secondSessionID, secondParams.GetTimelineSessionID())
+}
+
+func TestReserveSessionGeneratesSessionIDWhenMissing(t *testing.T) {
+	runtime := New(nil).(*reActSessionRuntime)
+	reservation, err := runtime.ReserveSession(context.Background(), "", "test-owner")
+	require.NoError(t, err)
+	t.Cleanup(reservation.Release)
+
+	require.True(t, strings.HasPrefix(reservation.SessionID(), reActGeneratedSessionIDPrefix))
+	require.NotEqual(t, "default", reservation.SessionID())
+	require.True(t, runtime.IsSessionBusy(reservation.SessionID()))
 }
