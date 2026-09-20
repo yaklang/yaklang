@@ -1,0 +1,275 @@
+// Derived from go-ora master 360b4b7 (includes post-v3.0.1 integrity fixes); see LICENSE.
+package oracleprobe
+
+import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rc4"
+	"crypto/subtle"
+	"errors"
+	"hash"
+)
+
+type OracleNetworkEncryption interface {
+	Reset() error
+	Encrypt(input []byte) ([]byte, error)
+	Decrypt(input []byte) ([]byte, error)
+}
+
+type OracleNetworkDataIntegrity interface {
+	Init() error
+	Compute(input []byte) []byte
+	Validate(input []byte) ([]byte, error)
+}
+type baseHash struct {
+	useNew bool
+	Hash   hash.Hash
+}
+
+func (bh *baseHash) getKeySize() int {
+	if bh.useNew {
+		return 15
+	}
+	return 5
+}
+
+type OracleNetworkHash struct {
+	keyGen    *rc4.Cipher
+	encryptor *rc4.Cipher
+	decryptor *rc4.Cipher
+	baseHash
+}
+
+type OracleNetworkHash2 struct {
+	buffer    []byte
+	output    []byte
+	input     []byte
+	keyGen    cipher.BlockMode
+	encryptor cipher.BlockMode
+	decryptor cipher.BlockMode
+	baseHash
+}
+
+func NewOracleNetworkHash(hash hash.Hash, key, iv []byte, useNew bool) (*OracleNetworkHash, error) {
+	output := &OracleNetworkHash{
+		baseHash: baseHash{
+			useNew: useNew,
+			Hash:   hash,
+		},
+	}
+	var err error
+	keySize := output.getKeySize()
+	if len(key) < keySize {
+		return nil, errors.New("oracle: short integrity key")
+	}
+	key1 := make([]byte, keySize)
+	if output.useNew {
+		copy(key1, key)
+	} else {
+		copy(key1, key[len(key)-keySize:])
+	}
+
+	key1 = append(key1, 0xFF)
+	key1 = append(key1, iv...)
+	output.keyGen, err = rc4.NewCipher(key1)
+	if err != nil {
+		return nil, err
+	}
+	err = output.Init()
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
+}
+
+func NewOracleNetworkHash2(hash hash.Hash, key, iv []byte, useNew bool) (*OracleNetworkHash2, error) {
+	output := &OracleNetworkHash2{
+		buffer: make([]byte, 32),
+		output: make([]byte, hash.Size()),
+		input:  make([]byte, hash.Size()),
+		baseHash: baseHash{
+			Hash:   hash,
+			useNew: useNew,
+		},
+	}
+	aesKey := make([]byte, 16)
+	keySize := output.getKeySize()
+	if len(key) < keySize || len(iv) < 16 {
+		return nil, errors.New("oracle: short integrity key or IV")
+	}
+	copy(aesKey[:keySize], key[:keySize])
+	aesKey[keySize] = 0xFF
+	blk, err := aes.NewCipher(aesKey)
+	if err != nil {
+		return nil, err
+	}
+	output.keyGen = cipher.NewCBCEncrypter(blk, iv[:16])
+	err = output.Init()
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
+}
+
+func (onh *OracleNetworkHash2) Init() error {
+	onh.keyGen.CryptBlocks(onh.buffer, onh.buffer)
+	key := make([]byte, 16)
+	copy(key, onh.buffer[:16])
+	iv := onh.buffer[16:]
+	blk, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	onh.keyGen = cipher.NewCBCEncrypter(blk, iv)
+	keySize := onh.getKeySize()
+	key[keySize] = 90
+	blk, err = aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	onh.encryptor = cipher.NewCBCEncrypter(blk, iv)
+	key[keySize] = 180
+	blk, err = aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	onh.decryptor = cipher.NewCBCEncrypter(blk, iv)
+	return nil
+}
+
+func (onh *OracleNetworkHash) Init() error {
+	keySize := onh.getKeySize()
+	// Modern SHA1 advances the generator by a full 16-byte block, using
+	// only its first 15 bytes. Consuming 15 desynchronizes marker resets.
+	n := keySize
+	if onh.useNew {
+		n = 16
+	}
+	key2 := make([]byte, n)
+	onh.keyGen.XORKeyStream(key2, key2)
+	key2 = key2[:keySize]
+	var err error
+	onh.encryptor, err = rc4.NewCipher(append(key2, 90))
+	if err != nil {
+		return err
+	}
+	onh.decryptor, err = rc4.NewCipher(append(key2, 180))
+	return err
+}
+
+func (onh *OracleNetworkHash) Compute(input []byte) []byte {
+	dst := make([]byte, onh.Hash.Size())
+	onh.encryptor.XORKeyStream(dst, make([]byte, onh.Hash.Size()))
+	onh.Hash.Reset()
+	onh.Hash.Write(input)
+	onh.Hash.Write(dst)
+	return onh.Hash.Sum(nil)
+}
+
+func (onh *OracleNetworkHash2) Compute(input []byte) []byte {
+	onh.encryptor.CryptBlocks(onh.output, onh.output)
+	onh.Hash.Reset()
+	onh.Hash.Write(input)
+	onh.Hash.Write(onh.output)
+	return onh.Hash.Sum(nil)
+}
+
+func (onh *OracleNetworkHash) Validate(input []byte) ([]byte, error) {
+	size := onh.Hash.Size()
+	if len(input) <= size {
+		return nil, errors.New("data integrity check failed: size of the input lesser than hash size")
+	}
+	originalSize := len(input) - size
+	originalInput := input[:originalSize]
+	receivedHash := input[originalSize:]
+	decZeros := make([]byte, size)
+	onh.decryptor.XORKeyStream(decZeros, make([]byte, size))
+	onh.Hash.Reset()
+	onh.Hash.Write(originalInput)
+	onh.Hash.Write(decZeros)
+	calcHash := onh.Hash.Sum(nil)
+	if subtle.ConstantTimeCompare(receivedHash, calcHash) == 1 {
+		return originalInput, nil
+	}
+	return nil, errors.New("data integrity check failed")
+}
+
+func (onh *OracleNetworkHash2) Validate(input []byte) ([]byte, error) {
+	size := onh.Hash.Size()
+	if len(input) <= size {
+		return nil, errors.New("data integrity check failed: size of the input lesser than hash size")
+	}
+	originalSize := len(input) - size
+	originalInput := input[:originalSize]
+	receivedHash := input[originalSize:]
+	onh.decryptor.CryptBlocks(onh.input, onh.input)
+	onh.Hash.Reset()
+	onh.Hash.Write(originalInput)
+	onh.Hash.Write(onh.input)
+	calcHash := onh.Hash.Sum(nil)
+	if subtle.ConstantTimeCompare(receivedHash, calcHash) == 1 {
+		return originalInput, nil
+	}
+	return nil, errors.New("data integrity check failed")
+}
+
+type OracleNetworkCBCCryptor struct {
+	blk cipher.Block
+	iv  []byte
+}
+
+func NewOracleNetworkCBCEncrypter(key, iv []byte) (*OracleNetworkCBCCryptor, error) {
+	blk, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	if iv == nil {
+		iv = make([]byte, 16)
+	}
+	if len(iv) != aes.BlockSize {
+		return nil, errors.New("oracle: invalid AES IV length")
+	}
+	output := &OracleNetworkCBCCryptor{blk: blk, iv: iv}
+	return output, nil
+}
+
+func (sec *OracleNetworkCBCCryptor) Encrypt(input []byte) ([]byte, error) {
+	length := len(input)
+	num := 0
+	if length%16 > 0 {
+		num = 16 - (length % 16)
+	}
+	if num > 0 {
+		input = append(input, make([]byte, num)...)
+	}
+	output := make([]byte, length+num)
+	enc := cipher.NewCBCEncrypter(sec.blk, sec.iv)
+	enc.CryptBlocks(output, input)
+	return append(output, uint8(num+1)), nil
+}
+
+func (sec *OracleNetworkCBCCryptor) Decrypt(input []byte) ([]byte, error) {
+	length := len(input)
+	if length < 1 || (length-1)%16 != 0 {
+		return nil, errors.New("invalid padding from cipher text")
+	}
+	num := int(input[length-1])
+	if num < 1 || num > 16 || num > length {
+		return nil, errors.New("invalid padding from cipher text")
+	}
+	output := make([]byte, length-1)
+	dec := cipher.NewCBCDecrypter(sec.blk, sec.iv)
+	dec.CryptBlocks(output, input[:length-1])
+	return output[:length-num], nil
+}
+
+func (set *OracleNetworkCBCCryptor) Reset() error {
+	return nil
+}
+
+func PKCS5Padding(cipherText []byte, blockSize int) []byte {
+	padding := blockSize - len(cipherText)%blockSize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(cipherText, padtext...)
+}
