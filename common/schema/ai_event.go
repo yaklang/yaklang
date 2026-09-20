@@ -667,5 +667,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		TaskUUID:           e.TaskUUID,
 		AIModelName:        e.AIModelName,
 		AIModelVerboseName: e.AIModelVerboseName,
+		SessionId:          e.SessionId,
 	}
 }

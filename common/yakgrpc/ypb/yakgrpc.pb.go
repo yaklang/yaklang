@@ -10233,6 +10233,7 @@ type AIOutputEvent struct {
 	AIModelName        string `protobuf:"bytes,22,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`               // AI 模型名称
 	AIModelVerboseName string `protobuf:"bytes,23,opt,name=AIModelVerboseName,proto3" json:"AIModelVerboseName,omitempty"` // AI 模型展示名称（美化后的模型名）
 	TaskUUID           string `protobuf:"bytes,21,opt,name=TaskUUID,proto3" json:"TaskUUID,omitempty"`                     // 任务的唯一ID
+	SessionId          string `protobuf:"bytes,26,opt,name=SessionId,proto3" json:"SessionId,omitempty"`                   // AI 会话的唯一ID
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -10438,6 +10439,13 @@ func (x *AIOutputEvent) GetAIModelVerboseName() string {
 func (x *AIOutputEvent) GetTaskUUID() string {
 	if x != nil {
 		return x.TaskUUID
+	}
+	return ""
+}
+
+func (x *AIOutputEvent) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
 	}
 	return ""
 }
@@ -79028,7 +79036,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tInputPath\x18\x01 \x01(\tR\tInputPath\x12\x1c\n" +
 	"\tOverwrite\x18\x02 \x01(\bR\tOverwrite\x12 \n" +
 	"\vNewToolName\x18\x03 \x01(\tR\vNewToolName\x12\x1a\n" +
-	"\bPassword\x18\x04 \x01(\tR\bPassword\"\x80\x06\n" +
+	"\bPassword\x18\x04 \x01(\tR\bPassword\"\x9e\x06\n" +
 	"\rAIOutputEvent\x12\x0e\n" +
 	"\x02ID\x18\x18 \x01(\x03R\x02ID\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
@@ -79057,7 +79065,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAIService\x18\x14 \x01(\tR\tAIService\x12 \n" +
 	"\vAIModelName\x18\x16 \x01(\tR\vAIModelName\x12.\n" +
 	"\x12AIModelVerboseName\x18\x17 \x01(\tR\x12AIModelVerboseName\x12\x1a\n" +
-	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\"&\n" +
+	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\x12\x1c\n" +
+	"\tSessionId\x18\x1a \x01(\tR\tSessionId\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
 	"\x02En\x18\x02 \x01(\tR\x02En\"\xab\x05\n" +
