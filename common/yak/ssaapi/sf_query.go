@@ -140,16 +140,6 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	for _, o := range opt {
 		o(config)
 	}
-	parent := config.ctx
-	if parent == nil {
-		parent = context.Background()
-	}
-	queryCtx, cancelQuery := context.WithCancelCause(parent)
-	defer cancelQuery(nil)
-	config.ctx = ssadb.WithQueryErrorHandler(queryCtx, func(err error) {
-		cancelQuery(utils.Wrap(err, "SSA database search failed"))
-	})
-	config.opts = append(config.opts, sfvm.WithContext(config.ctx))
 	process := func(f float64, msg string) {
 		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
 			callBack(f, msg)
@@ -203,6 +193,21 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Nested dataflow queries may share a VM config with the parent. Restore
+	// its context before returning so cancelling this query cannot poison it.
+	parent := config.ctx
+	if parent == nil {
+		parent = frame.GetContext()
+	}
+	previousContext := frame.GetContext()
+	defer func() { sfvm.WithContext(previousContext)(frame.GetConfig()) }()
+	queryCtx, cancelQuery := context.WithCancelCause(parent)
+	defer cancelQuery(nil)
+	config.ctx = ssadb.WithQueryErrorHandler(queryCtx, func(err error) {
+		cancelQuery(utils.Wrap(err, "SSA database search failed"))
+	})
+	config.opts = append(config.opts, sfvm.WithContext(config.ctx))
 
 	// Overlay incremental scan uses dual-source IR routing (base exclude + owner
 	// include). Do NOT skip base IR or merge audit_results cache — effective
