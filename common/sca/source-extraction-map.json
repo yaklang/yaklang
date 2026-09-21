@@ -2609,7 +2609,7 @@
     },
     {
       "local_file": "common/sca/core/budget/estimate.go",
-      "sha256": "e334f1cb95bceae564bf122ebcfff7579dba35d5929fa7d4bd011d1d015f2538",
+      "sha256": "9e368721c67ed79e1913633e4c8b140d487071df41f18670e2fb5cf83e5f2ece",
       "symbols": [
         {
           "name": "SizeOfString",
@@ -2656,8 +2656,16 @@
           "line": 62
         },
         {
-          "name": "SizeMul",
+          "name": "SizeAdd",
           "line": 75
+        },
+        {
+          "name": "SizeOfJSONString",
+          "line": 92
+        },
+        {
+          "name": "SizeMul",
+          "line": 102
         }
       ],
       "decision": "REWRITE",
@@ -4794,19 +4802,19 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "db61ee7ca5173cba606ed48dc71469b757659677b7335c09e47c35cc2dc414ca",
+      "sha256": "f704f78b46a710f0eba804d801aff95383abe7fbc2609f5e6b25be8353985684",
       "symbols": [
         {
           "name": "chargeAndSortPackages",
-          "line": 76
+          "line": 100
         },
         {
           "name": "fillReport",
-          "line": 118
+          "line": 280
         },
         {
           "name": "manifestEvidence",
-          "line": 408
+          "line": 570
         }
       ],
       "decision": "REWRITE",

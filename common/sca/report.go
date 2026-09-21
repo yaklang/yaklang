@@ -1,6 +1,7 @@
 package sca
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/sca/core/budget"
@@ -43,75 +44,236 @@ func requirementKey(p *dxtypes.Package) string {
 	return string(raw)
 }
 
-type reportSortKey struct {
-	id, loc, req string
-}
-
-func locationKeyCharge(p *dxtypes.Package) int64 {
+func locationWorkingBytes(p *dxtypes.Package) (int64, error) {
 	n := 1 + len(p.Locations)
-	c, err := budget.SizeMul(n, budget.SizeObject+24)
+	pair, err := budget.SizeMul(n, 24)
 	if err != nil {
-		return -1
+		return 0, err
 	}
-	return budget.SizeSlice + c
+	copyCh, err := budget.SizeMul(n, budget.SizeObject)
+	if err != nil {
+		return 0, err
+	}
+	return budget.SizeAdd(budget.SizeSlice, budget.SizeString, pair, copyCh)
 }
 
-func requirementKeyCharge(p *dxtypes.Package) int64 {
-	n := budget.SizeSlice
-	for _, q := range p.Requirements {
-		n += budget.SizeObject
-		n += budget.SizeOfString(q.Target)
-		n += budget.SizeOfString(q.Constraint)
-		n += budget.SizeOfString(q.Scope)
-		n += budget.SizeOfString(q.From)
-		n += budget.SizeOfString(q.Group)
-		n += budget.SizeOfString(q.Operator)
-		n += budget.SizeOfString(q.Condition)
-		n += budget.SizeOfStrings(q.Candidates)
-		n += budget.SizeOfStrings(q.Resolved)
+func requirementWorkingBytes(p *dxtypes.Package) (int64, error) {
+	n, err := budget.SizeAdd(budget.SizeSlice, budget.SizeString)
+	if err != nil {
+		return 0, err
 	}
-	return n
+	for _, q := range p.Requirements {
+		parts := []int64{budget.SizeObject}
+		for _, s := range []string{q.Target, q.Constraint, q.Scope, q.From, q.Group, q.Operator, q.Condition} {
+			js, e := budget.SizeOfJSONString(s)
+			if e != nil {
+				return 0, e
+			}
+			parts = append(parts, js)
+		}
+		for _, s := range q.Candidates {
+			js, e := budget.SizeOfJSONString(s)
+			if e != nil {
+				return 0, e
+			}
+			parts = append(parts, js)
+		}
+		for _, s := range q.Resolved {
+			js, e := budget.SizeOfJSONString(s)
+			if e != nil {
+				return 0, e
+			}
+			parts = append(parts, js)
+		}
+		obj, e := budget.SizeAdd(parts...)
+		if e != nil {
+			return 0, e
+		}
+		n, err = budget.SizeAdd(n, obj)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return n, nil
 }
 
 func chargeAndSortPackages(st *budget.State, pkgs []*dxtypes.Package) error {
-	n, err := budget.SizeMul(3, budget.SizeOfSortIndex(len(pkgs)))
+	n := len(pkgs)
+	if n == 0 {
+		return nil
+	}
+	digestCh, err := budget.SizeMul(n, 32)
 	if err != nil {
 		return err
 	}
-	if err := st.Result(n); err != nil {
+	orderCh, err := budget.SizeMul(n, budget.SizePtr)
+	if err != nil {
 		return err
 	}
-	keys := make([]reportSortKey, len(pkgs))
+	sortedCh, err := budget.SizeMul(n, budget.SizePtr)
+	if err != nil {
+		return err
+	}
+	total, err := budget.SizeAdd(digestCh, orderCh, sortedCh)
+	if err != nil {
+		return err
+	}
+	if err := st.Result(total); err != nil {
+		return err
+	}
+	digests := make([][32]byte, n)
 	for i, p := range pkgs {
 		p.EnsureDetails()
-		need := budget.SizeOfBytes(64) + locationKeyCharge(p) + requirementKeyCharge(p)
-		if need < 0 {
-			return scanerr.New(scanerr.ResourceLimit, "result memory estimate")
-		}
-		if err := st.Result(need); err != nil {
-			return err
-		}
-		keys[i] = reportSortKey{p.Identifier(), locationKey(p), requirementKey(p)}
+		digests[i] = p.IdentityDigest()
 	}
-	order := make([]int, len(pkgs))
+	order := make([]int, n)
 	for i := range order {
 		order[i] = i
 	}
 	sort.SliceStable(order, func(i, j int) bool {
-		a, b := keys[order[i]], keys[order[j]]
-		if a.id != b.id {
-			return a.id < b.id
-		}
-		if a.loc != b.loc {
-			return a.loc < b.loc
-		}
-		return a.req < b.req
+		return bytes.Compare(digests[order[i]][:], digests[order[j]][:]) < 0
 	})
-	sorted := make([]*dxtypes.Package, len(pkgs))
+	for lo := 0; lo < n; {
+		hi := lo + 1
+		for hi < n && digests[order[hi]] == digests[order[lo]] {
+			hi++
+		}
+		if hi-lo > 1 {
+			if err := sortCollisionGroup(st, pkgs, order[lo:hi]); err != nil {
+				return err
+			}
+		}
+		lo = hi
+	}
+	sorted := make([]*dxtypes.Package, n)
 	for i, j := range order {
 		sorted[i] = pkgs[j]
 	}
 	copy(pkgs, sorted)
+	return nil
+}
+
+func sortCollisionGroup(st *budget.State, pkgs []*dxtypes.Package, group []int) error {
+	g := len(group)
+	headers, err := budget.SizeMul(g, budget.SizeString)
+	if err != nil {
+		return err
+	}
+	var locNeed int64
+	for _, pi := range group {
+		w, e := locationWorkingBytes(pkgs[pi])
+		if e != nil {
+			return e
+		}
+		locNeed, err = budget.SizeAdd(locNeed, w)
+		if err != nil {
+			return err
+		}
+	}
+	need, err := budget.SizeAdd(headers, locNeed)
+	if err != nil {
+		return err
+	}
+	if err := st.Result(need); err != nil {
+		return err
+	}
+	locs := make([]string, g)
+	for i, pi := range group {
+		locs[i] = locationKey(pkgs[pi])
+	}
+	perm, err := budget.SizeMul(g, budget.SizePtr)
+	if err != nil {
+		return err
+	}
+	perm2, err := budget.SizeMul(g, budget.SizePtr)
+	if err != nil {
+		return err
+	}
+	copyHeaders, err := budget.SizeMul(g, budget.SizeString)
+	if err != nil {
+		return err
+	}
+	extra, err := budget.SizeAdd(perm, perm2, copyHeaders)
+	if err != nil {
+		return err
+	}
+	if err := st.Result(extra); err != nil {
+		return err
+	}
+	idx := make([]int, g)
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool { return locs[idx[i]] < locs[idx[j]] })
+	newGroup := make([]int, g)
+	newLocs := make([]string, g)
+	for i, p := range idx {
+		newGroup[i] = group[p]
+		newLocs[i] = locs[p]
+	}
+	copy(group, newGroup)
+	locs = newLocs
+	for lo := 0; lo < g; {
+		hi := lo + 1
+		for hi < g && locs[hi] == locs[lo] {
+			hi++
+		}
+		if hi-lo > 1 {
+			if err := sortRequirementGroup(st, pkgs, group[lo:hi]); err != nil {
+				return err
+			}
+		}
+		lo = hi
+	}
+	return nil
+}
+
+func sortRequirementGroup(st *budget.State, pkgs []*dxtypes.Package, group []int) error {
+	g := len(group)
+	headers, err := budget.SizeMul(g, budget.SizeString)
+	if err != nil {
+		return err
+	}
+	idxCh, err := budget.SizeMul(g, budget.SizePtr)
+	if err != nil {
+		return err
+	}
+	outCh, err := budget.SizeMul(g, budget.SizePtr)
+	if err != nil {
+		return err
+	}
+	var jsonNeed int64
+	for _, pi := range group {
+		w, e := requirementWorkingBytes(pkgs[pi])
+		if e != nil {
+			return e
+		}
+		jsonNeed, err = budget.SizeAdd(jsonNeed, w)
+		if err != nil {
+			return err
+		}
+	}
+	need, err := budget.SizeAdd(headers, jsonNeed, idxCh, outCh)
+	if err != nil {
+		return err
+	}
+	if err := st.Result(need); err != nil {
+		return err
+	}
+	reqs := make([]string, g)
+	for i, pi := range group {
+		reqs[i] = requirementKey(pkgs[pi])
+	}
+	idx := make([]int, g)
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool { return reqs[idx[i]] < reqs[idx[j]] })
+	out := make([]int, g)
+	for i, p := range idx {
+		out[i] = group[p]
+	}
+	copy(group, out)
 	return nil
 }
 

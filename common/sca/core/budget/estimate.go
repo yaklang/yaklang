@@ -70,6 +70,33 @@ func SizeOfSortIndex(n int) int64 {
 	return v
 }
 
+// SizeAdd sums working-set charges. A negative part is a failed prior
+// multiply/overflow, not a value that may cancel into a positive total.
+func SizeAdd(parts ...int64) (int64, error) {
+	var sum int64
+	max := int64(^uint64(0) >> 1)
+	for _, p := range parts {
+		if p < 0 {
+			return 0, scanerr.New(scanerr.ResourceLimit, "negative size add")
+		}
+		if p > 0 && sum > max-p {
+			return 0, scanerr.New(scanerr.ResourceLimit, "size add overflow")
+		}
+		sum += p
+	}
+	return sum, nil
+}
+
+// SizeOfJSONString is a conservative escaped JSON string working copy:
+// quotes plus six bytes per source byte (\u00XX), not a measured encoder.
+func SizeOfJSONString(s string) (int64, error) {
+	esc, err := SizeMul(len(s), 6)
+	if err != nil {
+		return 0, err
+	}
+	return SizeAdd(2, esc)
+}
+
 // SizeMul is a saturating-safe product for capacity charges. Overflow is a
 // resource_limit, not a wrapped integer.
 func SizeMul(n int, unit int64) (int64, error) {
