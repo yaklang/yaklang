@@ -199,21 +199,23 @@ func TestMregePackagesVersionRangeFirst(t *testing.T) {
 	assertExactGraph(t, pkgs, 3)
 }
 func TestSemverRange(t *testing.T) {
-	check := func(semver, want string) {
-		got := handlerSemverVersionRange(semver)
-		if got != want {
-			t.Fatalf("error: %s(org): %s(got) vs %s(want)", semver, got, want)
-		}
+	for _, tc := range []struct{ semver, want string }{
+		{"~3.4.1", ">= 3.4.1 && < 3.5.0"},
+		{"^0.2.3", ">= 0.2.3 && < 0.3.0"},
+		{"^0.0.3", ">= 0.0.3 && < 0.0.4"},
+		{"^3.4.1", ">= 3.4.1 && < 4.0.0"},
+		{"3.4.1", "3.4.1"},
+		{"~3.41", "~3.41"},
+		{"^3.41", "^3.41"},
+		{"~3.4.1a", "~3.4.1a"},
+	} {
+		t.Run(tc.semver, func(t *testing.T) {
+			got := handlerSemverVersionRange(tc.semver)
+			if got != tc.want {
+				t.Fatalf("error: %s(org): %s(got) vs %s(want)", tc.semver, got, tc.want)
+			}
+		})
 	}
-
-	check("~3.4.1", ">= 3.4.1 && < 3.5.0")
-	check("^0.2.3", ">= 0.2.3 && < 0.3.0")
-	check("^0.0.3", ">= 0.0.3 && < 0.0.4")
-	check("^3.4.1", ">= 3.4.1 && < 4.0.0")
-	check("3.4.1", "3.4.1")
-	check("~3.41", "~3.41")
-	check("^3.41", "^3.41")
-	check("~3.4.1a", "~3.4.1a")
 }
 
 func graphEvidence(pkgs []*dxtypes.Package) map[string]map[string]bool {

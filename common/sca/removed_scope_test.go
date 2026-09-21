@@ -9,14 +9,18 @@ import (
 // archive. These entry points have no implementation or runtime fallback.
 func TestRemovedAcquisitionExports(t *testing.T) {
 	for _, key := range []string{"ScanImageFromContext", "ScanContainerFromContext", "ScanImageFromFile", "ScanGitRepo", "endpoint"} {
-		if _, ok := Exports[key]; ok {
-			t.Errorf("removed export remains: %s", key)
-		}
+		t.Run(key, func(t *testing.T) {
+			if _, ok := Exports[key]; ok {
+				t.Errorf("removed export remains: %s", key)
+			}
+		})
 	}
 	for _, key := range []string{"ScanLocalFilesystem", "ScanFilesystem", "customAnalyzer"} {
-		if _, ok := Exports[key]; !ok {
-			t.Errorf("retained export missing: %s", key)
-		}
+		t.Run("retain-"+key, func(t *testing.T) {
+			if _, ok := Exports[key]; !ok {
+				t.Errorf("retained export missing: %s", key)
+			}
+		})
 	}
 }
 func TestInvalidWorkerCount(t *testing.T) {

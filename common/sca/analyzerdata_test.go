@@ -3338,34 +3338,41 @@ func check(t *testing.T, tag string, target []*dxtypes.Package) {
 }
 
 func TestData(t *testing.T) {
-	check(t, "apk", APKWantPkgs)
-	check(t, "apk-negative", APKNegativePkgs)
-	check(t, "dpkg", DPKGWantPkgs)
-	check(t, "rpm", RPMWantPkgs)
-	check(t, "conan", ConanWantPkgs)
-	check(t, "go-bianary", GOBianryWantPkgs)
-	check(t, "go-mod", GoModWantPkgs)
-	check(t, "go-modless", GoModLess117Pkgs)
-	check(t, "php-composer", PHPComposerPkgs)
-	check(t, "php-composer-wrong-json", PHPComposerWrongJsonPkgs)
-	check(t, "php-composer-no-json", PHPComposerNoJsonPkgs)
-	check(t, "python-packaging", PythonPackagingPkgs)
-	check(t, "python-packaging-egg", PythonPackagingEggPkg)
-	check(t, "python-packageing-whell", PythonPackagingWheel)
-	check(t, "python-pip", PythonPIPPkgs)
-	check(t, "python-pip-env", PythonPIPEnvPkgs)
-	check(t, "python-poetry", PythonPoetryPkgs)
-	check(t, "python-poetry-no-project", PythonPoetryNoProjectPkgs)
-	check(t, "python-poetry-wrong-project", PythonPoetryWrongProjectPkgs)
-	check(t, "java-gradle", JavaGradlePkgs)
-	check(t, "java-pom", JavaPomPkgs)
-	check(t, "java-pom-requirement", JavaPomRequirementPkgs)
-	check(t, "node-npm", NodeNpmPkgs)
-	check(t, "node-npm-folder", NodeNpmPkgsFolder)
-	check(t, "node-pnpm", NodePnpmPkgs)
-	check(t, "node-yarn", NodeYarnPkgs)
-	check(t, "node-yarn-monorepo", NodeYarnProtocolPkgs)
-	check(t, "ruby-bundler", RubyBundlerPkgs)
-	check(t, "ruby-gemspec", RubyGemspecPkgs)
-	check(t, "rust-cargo", RustCargoPkgs)
+	for _, tc := range []struct {
+		tag string
+		pkg []*dxtypes.Package
+	}{
+		{"apk", APKWantPkgs},
+		{"apk-negative", APKNegativePkgs},
+		{"dpkg", DPKGWantPkgs},
+		{"rpm", RPMWantPkgs},
+		{"conan", ConanWantPkgs},
+		{"go-bianary", GOBianryWantPkgs},
+		{"go-mod", GoModWantPkgs},
+		{"go-modless", GoModLess117Pkgs},
+		{"php-composer", PHPComposerPkgs},
+		{"php-composer-wrong-json", PHPComposerWrongJsonPkgs},
+		{"php-composer-no-json", PHPComposerNoJsonPkgs},
+		{"python-packaging", PythonPackagingPkgs},
+		{"python-packaging-egg", PythonPackagingEggPkg},
+		{"python-packageing-whell", PythonPackagingWheel},
+		{"python-pip", PythonPIPPkgs},
+		{"python-pip-env", PythonPIPEnvPkgs},
+		{"python-poetry", PythonPoetryPkgs},
+		{"python-poetry-no-project", PythonPoetryNoProjectPkgs},
+		{"python-poetry-wrong-project", PythonPoetryWrongProjectPkgs},
+		{"java-gradle", JavaGradlePkgs},
+		{"java-pom", JavaPomPkgs},
+		{"java-pom-requirement", JavaPomRequirementPkgs},
+		{"node-npm", NodeNpmPkgs},
+		{"node-npm-folder", NodeNpmPkgsFolder},
+		{"node-pnpm", NodePnpmPkgs},
+		{"node-yarn", NodeYarnPkgs},
+		{"node-yarn-monorepo", NodeYarnProtocolPkgs},
+		{"ruby-bundler", RubyBundlerPkgs},
+		{"ruby-gemspec", RubyGemspecPkgs},
+		{"rust-cargo", RustCargoPkgs},
+	} {
+		t.Run(tc.tag, func(t *testing.T) { check(t, tc.tag, tc.pkg) })
+	}
 }
