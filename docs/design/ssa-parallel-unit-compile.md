@@ -38,7 +38,9 @@ Shared dependency values can acquire users and member relations even when the
 consumer packages are independent. Their ID lists use per-value locks. Published
 slice prefixes are immutable: removals and replacements allocate a new slice,
 and readers resolve IDs after releasing the lock. Resident indexes use atomic
-read/append/write operations to avoid lost entries.
+read/append/write operations to avoid lost entries. Application diagnostic
+errors are appended and snapshotted under the same lock so concurrent units
+cannot drop records.
 
 Private builder scopes commit their resulting basic block back to the owning
 declaration after execution. This preserves control flow between consecutive

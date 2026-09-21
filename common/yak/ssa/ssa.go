@@ -331,7 +331,8 @@ type Program struct {
 	Build       Build
 	_preHandler bool
 
-	errors SSAErrors
+	errorsMu sync.Mutex
+	errors   SSAErrors
 
 	// process
 	ProcessInfof func(string, ...any)
