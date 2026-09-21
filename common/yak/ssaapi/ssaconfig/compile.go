@@ -308,8 +308,12 @@ func WithProjectLanguage(language Language) Option {
 // SSACompileConfig controls project-wide SSA compilation (JSON field `SSACompile` on the root config).
 //
 // Large-project notes:
-//   - compile_concurrency: AST parse workers, independent compile-unit groups,
-//     and opted-in Java library/method-body drains share this cap.
+//   - compile_concurrency: one cap for AST parse workers, declaration
+//     PreHandler, independent compile-unit groups, and opted-in Java
+//     library/method-body drains. Default is machine CPU (GOMAXPROCS-1)
+//     further capped so each worker has at least 256MiB of usable RAM.
+//   - compile_memory_limit: Go soft heap limit. Default is 80% of
+//     cgroup/host RAM. 0 in JSON means that auto value.
 //   - exclude_files / entry_files: primary levers to shrink work.
 //   - peephole_size: splits the virtual FS into multiple compile chunks (multiple programs).
 //   - enable_incremental_compile + base_program_name: incremental / diff workflows.
@@ -331,6 +335,7 @@ type SSACompileConfig struct {
 	ReCompile                bool            `json:"re_compile"`
 	MemoryCompile            bool            `json:"memory_compile"`
 	Concurrency              int             `json:"compile_concurrency"`
+	MemoryLimit              int64           `json:"compile_memory_limit,omitempty"`
 	ASTSequence              ASTSequenceType `json:"ast_sequence"`
 	CompileIrCacheTTL        time.Duration   `json:"compile_ir_cache_ttl"`
 	CompileIrCacheMax        int             `json:"compile_ir_cache_max"`
@@ -482,6 +487,23 @@ func (c *Config) SetCompileConcurrency(concurrency int) {
 		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.Concurrency = concurrency
+}
+
+func (c *Config) GetCompileMemoryLimit() int64 {
+	if c != nil && c.SSACompile != nil && c.SSACompile.MemoryLimit > 0 {
+		return c.SSACompile.MemoryLimit
+	}
+	return DefaultCompileMemoryLimit()
+}
+
+func (c *Config) SetCompileMemoryLimit(limit int64) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.MemoryLimit = limit
 }
 
 func (c *Config) GetCompileASTSequence() ASTSequenceType {
@@ -765,24 +787,28 @@ func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 	}
 }
 
-// WithCompileConcurrency 设置编译并发数（导出名为 ssa.withConcurrency）
-// 参数:
-//   - concurrency: 并发数（仅并行化预处理阶段的读取与 AST 解析）
-//
-// 返回值:
-//   - 编译配置可选项
-//
-// Example:
-// ```
-// opt = ssa.withConcurrency(5)
-// println(opt)
-// ```
+// WithCompileConcurrency sets the compile worker cap (ssa.withConcurrency).
+// AST parse, declaration PreHandler, independent unit groups, and opted-in
+// Java library body drains all share this value. 0 or unset uses the
+// machine default from CompileConcurrencyFor.
 func WithCompileConcurrency(concurrency int) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Concurrency"); err != nil {
 			return err
 		}
 		c.SSACompile.Concurrency = concurrency
+		return nil
+	}
+}
+
+// WithCompileMemoryLimit sets the compile soft heap limit in bytes.
+// 0 restores the machine default (80% of cgroup/host RAM).
+func WithCompileMemoryLimit(limit int64) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile Memory Limit"); err != nil {
+			return err
+		}
+		c.SSACompile.MemoryLimit = limit
 		return nil
 	}
 }

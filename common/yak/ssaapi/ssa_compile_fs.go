@@ -372,8 +372,8 @@ func (c *Config) parseProjectWithFSUnits(
 	if prog.Cache != nil {
 		cacheMode = prog.Cache.InstructionCacheMode()
 	}
-	prog.ProcessInfof("compile unit execution batches built batches=%d min_files=%d min_bytes=%d writer_requested=%v writer_enabled=%v cache=%s",
-		len(batches), batchMinFiles, batchMinBytes, writerCacheRequested, writerCacheEnabled, cacheMode)
+	prog.ProcessInfof("compile unit execution batches built batches=%d min_files=%d min_bytes=%d writer_requested=%v writer_enabled=%v cache=%s concurrency=%d memory_limit=%d",
+		len(batches), batchMinFiles, batchMinBytes, writerCacheRequested, writerCacheEnabled, cacheMode, c.GetCompileConcurrency(), c.GetCompileMemoryLimit())
 	logCompileUnitPlan(prog, fmt.Sprintf("%v", c.GetLanguage()), plan, batches, batchMinFiles, batchMinBytes, spillMode, cacheMode, writerCacheRequested, writerCacheEnabled)
 
 	var astErr error

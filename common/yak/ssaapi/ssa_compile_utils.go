@@ -408,9 +408,9 @@ func (c *Config) getFileHandlerWithOrder(
 		// Use sync.Once to avoid setting/logging 98 times (once per concurrent worker).
 		gomeMemLimitOnce.Do(func() {
 			totalMem := systemMemoryTotalBytes()
-			if memLimit, enabled := automaticSSACompileMemoryLimit(totalMem); enabled {
+			if memLimit, enabled := c.resolveCompileMemoryLimit(totalMem); enabled {
 				debug.SetMemoryLimit(memLimit)
-				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (80%% of %s system memory)",
+				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (usable of %s system memory, compile_memory_limit)",
 					formatFileSize(int(memLimit)), formatFileSize(int(totalMem)))
 			}
 		})
