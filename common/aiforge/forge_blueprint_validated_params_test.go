@@ -4,8 +4,36 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestValidatedInvocationResultRetainsInputAndEvidence(t *testing.T) {
+	blueprint := &ForgeBlueprint{ResultPrompt: "Return a Markdown analysis."}
+	memory := aid.GetDefaultContextProvider()
+	memory.StoreQuery("email-content: billing@example.test; expires in one hour")
+	memory.PushText(1, "Observed credential request; no network request was performed")
+	prompt, err := blueprint.renderValidatedResultPrompt(memory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"Return a Markdown analysis", "billing@example.test", "expires in one hour", "Observed credential request", "no network request was performed", "Do not invent"} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("final result prompt lost %q", expected)
+		}
+	}
+	legacy, err := blueprint.renderResultPrompt(memory)
+	if err != nil || legacy != blueprint.ResultPrompt {
+		t.Fatalf("legacy rendering changed: %q, %v", legacy, err)
+	}
+}
+
+func TestValidatedInvocationResultRejectsMissingContext(t *testing.T) {
+	blueprint := &ForgeBlueprint{ResultPrompt: "Return a Markdown analysis."}
+	if _, err := blueprint.renderValidatedResultPrompt(nil); err == nil {
+		t.Fatal("missing context must not generate an ungrounded report")
+	}
+}
 
 func TestValidatedInvocationRetainsInputWithoutTemplatePlaceholders(t *testing.T) {
 	blueprint := &ForgeBlueprint{

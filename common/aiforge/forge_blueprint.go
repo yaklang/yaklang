@@ -336,7 +336,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
 		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
-			prompt, renderErr := f.renderResultPrompt(cod.ContextProvider)
+			prompt, renderErr := f.renderValidatedResultPrompt(cod.ContextProvider)
 			if renderErr != nil {
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", renderErr))
 				return
