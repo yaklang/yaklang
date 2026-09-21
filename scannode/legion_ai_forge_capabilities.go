@@ -15,11 +15,15 @@ import (
 	"github.com/yaklang/yaklang/scannode/inputresolver"
 )
 
+type legionForgeMaterialRuntime interface {
+	applicationHTTPMaterialReferences() []aiApplicationMaterialReference
+}
+
 func legionForgeCapabilityOptions(
 	ctx context.Context,
 	release *aiv1.ContextForgeRelease,
 	binding aiSessionBinding,
-) ([]aicommon.ConfigOption, *legionServerFocusRuntime, error) {
+) ([]aicommon.ConfigOption, legionForgeMaterialRuntime, error) {
 	switch release.GetCapabilityProfile() {
 	case legionForgeAdvisoryProfile:
 		return append(restrictedLegionForgeToolOptions(nil),
@@ -28,11 +32,13 @@ func legionForgeCapabilityOptions(
 				return action == "directly_answer" || action == "finish"
 			}),
 		), nil, nil
-	case legionForgeReportProfile:
+	case legionForgeReportProfile, legionForgeEvidenceProfile:
 		options, err := legionForgeReportOptions(ctx, release, binding.InputWorkspace)
 		return options, nil, err
 	case legionForgeHTTPProfile:
 		return legionForgeHTTPOptions(ctx, release)
+	case legionForgeDiscoveryProfile:
+		return legionForgeDiscoveryOptions(ctx, release)
 	default:
 		return nil, nil, fmt.Errorf("unsupported Forge capability profile %q", release.GetCapabilityProfile())
 	}
@@ -61,8 +67,12 @@ func legionForgeReportOptions(
 			}
 		}
 	}
-	tools := make([]*aitool.Tool, 0, len(legionForgeReportTools))
-	for _, name := range legionForgeReportTools {
+	names := legionForgeReportTools
+	if release.GetCapabilityProfile() == legionForgeEvidenceProfile {
+		names = legionForgeEvidenceTools
+	}
+	tools := make([]*aitool.Tool, 0, len(names))
+	for _, name := range names {
 		name := name
 		tool, err := aitool.New(name,
 			aitool.WithDescription(legionForgeReportToolDescription(name)),
@@ -88,6 +98,10 @@ func legionForgeReportOptions(
 					return workspace.ReadLines(callCtx, path, utils.InterfaceToInt(params["start_line"]), utils.InterfaceToInt(params["end_line"]))
 				case "parse_office_to_text":
 					return workspace.ExtractOfficeText(callCtx, path)
+				case "parse_packet_capture":
+					return workspace.ParsePacketCapture(callCtx, path)
+				case "parse_android_package":
+					return workspace.ParseAndroidPackage(callCtx, path)
 				default:
 					return nil, fmt.Errorf("unsupported managed report tool")
 				}
@@ -199,6 +213,10 @@ func legionForgeResourcePaths(release *aiv1.ContextForgeRelease) ([]string, erro
 
 func legionForgeReportToolDescription(name string) string {
 	switch name {
+	case "parse_packet_capture":
+		return "Parse bounded packet observations from an authorized managed packet capture without sending packets."
+	case "parse_android_package":
+		return "Inspect bounded Android package manifest and archive metadata without executing or installing code."
 	case "query_file_meta":
 		return "List only the authorized run-local input metadata and logical paths."
 	case "read_file", "read_file_lines":
