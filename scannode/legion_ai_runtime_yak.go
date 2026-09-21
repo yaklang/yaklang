@@ -668,7 +668,7 @@ func aiApplicationMaterialReferences(
 	if release.GetCapabilityProfile() == legionForgeHTTPProfile && len(requestRefs) == 0 {
 		return nil, fmt.Errorf("HTTP Forge release produced no bounded request evidence")
 	}
-	if release.GetCapabilityProfile() == legionForgeDiscoveryProfile {
+	if release.GetCapabilityProfile() == legionForgeDiscoveryProfile || release.GetCapabilityProfile() == legionForgeDiscoveryProfileV2 {
 		dns, tcp, labels := false, false, false
 		requiredLabels := map[string]bool{}
 		for _, parameter := range release.GetParameters() {

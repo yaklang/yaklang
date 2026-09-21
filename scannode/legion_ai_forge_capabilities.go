@@ -35,9 +35,9 @@ func legionForgeCapabilityOptions(
 	case legionForgeReportProfile, legionForgeEvidenceProfile:
 		options, err := legionForgeReportOptions(ctx, release, binding.InputWorkspace)
 		return options, nil, err
-	case legionForgeHTTPProfile:
+	case legionForgeHTTPProfile, legionForgeHTTPProfileV2:
 		return legionForgeHTTPOptions(ctx, release)
-	case legionForgeDiscoveryProfile:
+	case legionForgeDiscoveryProfile, legionForgeDiscoveryProfileV2:
 		return legionForgeDiscoveryOptions(ctx, release)
 	default:
 		return nil, nil, fmt.Errorf("unsupported Forge capability profile %q", release.GetCapabilityProfile())
@@ -140,6 +140,9 @@ func legionForgeHTTPOptions(ctx context.Context, release *aiv1.ContextForgeRelea
 				request := map[string]any(params)
 				if request["url"] == nil || strings.TrimSpace(utils.InterfaceToString(request["url"])) == "" {
 					request["url"] = target
+				}
+				if release.GetCapabilityProfile() == legionForgeHTTPProfileV2 {
+					return legionForgeNativeHTTPCall(callCtx, ctx, runtime, name, request)
 				}
 				result, err := runtime.executeHTTPRequestContext(callCtx, request)
 				if err != nil {

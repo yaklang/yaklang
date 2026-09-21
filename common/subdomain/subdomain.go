@@ -92,6 +92,16 @@ func (s *SubdomainScanner) GetConfig() *SubdomainScannerConfig {
 	return s.config
 }
 
+// SetARecordQuerier binds a caller-owned resolver before RunWithContext.
+// This lets managed runtimes enforce DNS scope, cancellation and query budgets
+// while reusing the native brute-force and wildcard algorithms. Never mutate
+// the binding while a scan is running; nil restores the default resolver.
+func (s *SubdomainScanner) SetARecordQuerier(querier interface {
+	QueryA(context.Context, string) (string, string, error)
+}) {
+	s.querierOverride = querier
+}
+
 func NewSubdomainScannerWithLogger(config *SubdomainScannerConfig, logger *log.Logger, targets ...string) (*SubdomainScanner, error) {
 	if config.WorkerCount <= 0 {
 		config.WorkerCount = 50

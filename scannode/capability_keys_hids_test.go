@@ -22,6 +22,8 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 		capabilityKeyAIForgeReleaseV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyAIForgeDiscoveryV1,
+		capabilityKeyAIForgeDiscoveryV2,
+		capabilityKeyAIForgeHTTPAssessmentV2,
 		capabilityKeyPluginBundleV1,
 	}
 	if inputresolver.Supported() {
@@ -90,9 +92,11 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 	}
 	for i, key := range want {
 		if key == capabilityKeyPluginBundleV1 {
-			want = append(want, "")
-			copy(want[i+1:], want[i:])
+			want = append(want, "", "", "")
+			copy(want[i+3:], want[i:])
 			want[i] = capabilityKeyAIForgeDiscoveryV1
+			want[i+1] = capabilityKeyAIForgeDiscoveryV2
+			want[i+2] = capabilityKeyAIForgeHTTPAssessmentV2
 			break
 		}
 	}

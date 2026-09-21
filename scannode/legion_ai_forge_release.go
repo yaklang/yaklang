@@ -17,16 +17,18 @@ import (
 )
 
 const (
-	legionForgeReleaseSchemaV1  = "legion.ai-forge-release/v1"
-	legionForgeExecutorConfigV1 = "config_forge_v1"
-	legionForgeAdvisoryProfile  = "advisory.v1"
-	legionForgeReportProfile    = "report.v1"
-	legionForgeHTTPProfile      = "http_assessment.v1"
-	legionForgeDiscoveryProfile = "discovery.v1"
-	legionForgeEvidenceProfile  = "evidence.v1"
-	maxLegionForgeParameters    = 64
-	maxLegionForgeTools         = 32
-	maxLegionForgeReleaseBytes  = 512 << 10
+	legionForgeReleaseSchemaV1    = "legion.ai-forge-release/v1"
+	legionForgeExecutorConfigV1   = "config_forge_v1"
+	legionForgeAdvisoryProfile    = "advisory.v1"
+	legionForgeReportProfile      = "report.v1"
+	legionForgeHTTPProfile        = "http_assessment.v1"
+	legionForgeDiscoveryProfile   = "discovery.v1"
+	legionForgeDiscoveryProfileV2 = "discovery.v2"
+	legionForgeHTTPProfileV2      = "http_assessment.v2"
+	legionForgeEvidenceProfile    = "evidence.v1"
+	maxLegionForgeParameters      = 64
+	maxLegionForgeTools           = 32
+	maxLegionForgeReleaseBytes    = 512 << 10
 )
 
 var (
@@ -57,14 +59,14 @@ func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
 		return fmt.Errorf("Forge release has unsupported executor %q", release.GetExecutorKind())
 	}
 	profile := strings.TrimSpace(release.GetCapabilityProfile())
-	if profile != legionForgeAdvisoryProfile && profile != legionForgeReportProfile && profile != legionForgeHTTPProfile && profile != legionForgeDiscoveryProfile && profile != legionForgeEvidenceProfile {
+	if profile != legionForgeAdvisoryProfile && profile != legionForgeReportProfile && profile != legionForgeHTTPProfile && profile != legionForgeDiscoveryProfile && profile != legionForgeEvidenceProfile && profile != legionForgeDiscoveryProfileV2 && profile != legionForgeHTTPProfileV2 {
 		return fmt.Errorf("Forge release capability profile %q is not supported by this node", release.GetCapabilityProfile())
 	}
 	if len(release.GetParameters()) > maxLegionForgeParameters || len(release.GetDeclaredToolNames()) > maxLegionForgeTools {
 		return fmt.Errorf("Forge release exceeds bounded input limits")
 	}
 	switch profile {
-	case legionForgeDiscoveryProfile:
+	case legionForgeDiscoveryProfile, legionForgeDiscoveryProfileV2:
 		if !equalContextForgeStrings(release.GetDeclaredToolNames(), legionForgeDiscoveryTools) {
 			return fmt.Errorf("discovery Forge release must declare exact discovery tools")
 		}
@@ -83,7 +85,7 @@ func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
 		if !equalContextForgeStrings(release.GetDeclaredToolNames(), legionForgeReportTools) {
 			return fmt.Errorf("report Forge release must declare the exact managed report tools")
 		}
-	case legionForgeHTTPProfile:
+	case legionForgeHTTPProfile, legionForgeHTTPProfileV2:
 		if !equalContextForgeStrings(release.GetDeclaredToolNames(), legionForgeHTTPTools) {
 			return fmt.Errorf("HTTP Forge release must declare the exact bounded HTTP tools")
 		}
