@@ -44,11 +44,10 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch || header == latch {
 			ReplaceAllValue(phiValue, header)
-			DeleteInst(phiValue)
-
 			for name, v := range ReplaceMemberCall(phiValue, header) {
 				ret[name] = v
 			}
+			DeleteInst(phiValue)
 
 			var CreatePhi func(Value)
 			pass := make(map[Value]struct{})

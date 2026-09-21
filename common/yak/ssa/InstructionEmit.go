@@ -83,8 +83,10 @@ func detachDeletedInstruction(i Instruction) {
 	if av == nil {
 		return
 	}
+	// Keep memberPairs on the deleted value. Loop spin still calls
+	// ReplaceMemberCall after the empty phi is removed, and that walk
+	// reads the object's own member list.
 	members := append([]memberPairRecord(nil), av.memberPairs...)
-	av.memberPairs = nil
 	for _, pair := range members {
 		member, ok := deleted.GetValueById(pair.member)
 		if !ok || member == nil || utils.IsNil(member) {
