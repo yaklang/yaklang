@@ -29,8 +29,10 @@ barrier.
    Application-owned units execute exclusively. Each actual Program owner is
    drained once per batch, without recursively draining its upstream libraries;
    the scheduler controls when those library bodies run. Independent libraries
-   in the same SCC drain concurrently after skeletons exist. Method bodies that
-   share a declaration builder stay serial inside one library. Frontends that
+   in the same SCC drain concurrently after skeletons exist. A type or function
+   lookup does not start another library's lazy body; the scheduler drains each
+   owner. Method bodies that share a declaration builder stay serial inside one
+   library. Frontends that
    have not opted in retain the original single serial batch drain.
 4. All active body builders join before semantic scanning, persistence and
    release. Cancellation also joins active builders before returning and does
