@@ -8,8 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/rpa/character"
 	"github.com/yaklang/yaklang/common/utils"
+	"os"
 
-	"github.com/fxsjy/RF.go/RF"
+	RF "github.com/yaklang/yaklang/common/rpa/randomforest/internal/rf"
 )
 
 // rf.model.gz 是 rf.model 的 gzip 副本（2.4MB -> 76KB），随二进制一起发布。
@@ -84,13 +85,28 @@ func (sys *UrlDetectSys) DumpModel(path string) error {
 	if sys.model == nil {
 		return utils.Errorf("Empty Model")
 	}
-	RF.DumpForest(sys.model, path)
-	return nil
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if err := json.NewEncoder(f).Encode(sys.model); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // LoadModel 从磁盘路径加载模型，仅供本地调试/训练使用。
 func (sys *UrlDetectSys) LoadModel(path string) error {
-	forest := RF.LoadForest(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	forest := &RF.Forest{}
+	if err := json.NewDecoder(f).Decode(forest); err != nil {
+		return err
+	}
 	sys.model = forest
 	return nil
 }

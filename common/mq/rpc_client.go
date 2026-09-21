@@ -7,9 +7,9 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 	"sync"
 	"time"
 )
@@ -88,7 +88,7 @@ type rpcRequest struct {
 	RoutingKey string
 
 	// request sent
-	haveRequestSent         *abool.AtomicBool
+	haveRequestSent         *atomicbool.AtomicBool
 	haveRequestSentCtx      context.Context
 	haveRequestSentFinished context.CancelFunc
 
@@ -134,7 +134,7 @@ func (r *RPCClient) request(rootCtx context.Context, f, node string, req interfa
 		Msg: &msg, RoutingKey: r.getRoutingKey(f, node),
 
 		// 用来标注 rpc 状态
-		haveRequestSent:         abool.NewBool(false),
+		haveRequestSent:         atomicbool.NewBool(false),
 		haveRequestSentCtx:      ReqCtx,
 		haveRequestSentFinished: ReqCancel,
 
