@@ -4,30 +4,36 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
+// A burst must invoke only its last callback. Receive the result instead of
+// sleeping through hundreds of calls and then reading unsynchronized state.
+func assertDebounceBurst(t *testing.T, debounce func(func()), count int) {
+	t.Helper()
+	called := make(chan int, count)
+	for i := 0; i < count; i++ {
+		index := i
+		debounce(func() { called <- index })
+	}
+	select {
+	case index := <-called:
+		if index != count-1 {
+			t.Fatalf("executed callback %d, want the last callback %d", index, count-1)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("debounced callback did not execute")
+	}
+	// Observe two further debounce intervals to catch duplicate/uncancelled
+	// timers; this wait tests absence, rather than guessing when work is done.
+	select {
+	case index := <-called:
+		t.Fatalf("extra debounced callback: %d", index)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
 func TestNewDebounce(t *testing.T) {
-	var count int
-	debounceCaller := NewDebounce(1)
-	lastIndex := 0
-	for i := 0; i < 240; i++ {
-		time.Sleep(10 * time.Millisecond)
-		debounceCaller(func() {
-			count++
-			lastIndex = i
-			t.Log("debounce")
-		})
-	}
-	time.Sleep(FloatSecondDuration(1.1))
-	if count != 1 {
-		t.Fatal("debounce failed")
-	}
-	if lastIndex != 239 { // i 从 0 到 239，最后一次调用时 i=239
-		spew.Dump(lastIndex)
-		t.Fatal("debounce failed")
-	}
+	assertDebounceBurst(t, NewDebounce(0.1), 240)
 }
 
 //	func TestNewThrottle(t *testing.T) {
@@ -259,26 +265,32 @@ func TestNewDebounceEx(t *testing.T) {
 }
 
 func TestNewDebounceExtended(t *testing.T) {
-	var count int
-	debounceCaller := NewDebounce(1)
-	lastIndex := 0
+	debounce := NewDebounce(0.1)
+	assertDebounceBurst(t, debounce, 10)
+	// The same debouncer must accept a new burst after the first one completes.
+	assertDebounceBurst(t, debounce, 10)
+}
 
-	// 模拟快速连续调用
-	for i := 0; i < 10; i++ {
-		time.Sleep(50 * time.Millisecond)
-		debounceCaller(func() {
-			count++
-			lastIndex = i
-		})
-	}
-
-	// 等待足够时间让防抖执行
-	time.Sleep(FloatSecondDuration(1.2))
-	if count != 1 {
-		t.Fatalf("Expected 1 call, got %d", count)
-	}
-	if lastIndex != 9 {
-		t.Fatalf("Expected lastIndex=9, got %d", lastIndex)
+func TestNewDebounceResetsDeadline(t *testing.T) {
+	const interval = 200 * time.Millisecond
+	debounce := NewDebounce(interval.Seconds())
+	called := make(chan int, 2)
+	debounce(func() { called <- 0 })
+	// A real gap is necessary here: a tight burst alone cannot distinguish
+	// resetting the deadline from only replacing the pending callback.
+	time.Sleep(50 * time.Millisecond)
+	lastCall := time.Now()
+	debounce(func() { called <- 1 })
+	select {
+	case index := <-called:
+		if index != 1 {
+			t.Fatalf("callback %d fired instead of the replacement", index)
+		}
+		if elapsed := time.Since(lastCall); elapsed < interval*9/10 {
+			t.Fatalf("replacement fired before its debounce interval: %s", elapsed)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("replacement callback did not execute")
 	}
 }
 

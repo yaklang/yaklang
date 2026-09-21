@@ -20,7 +20,7 @@ func TestResolveYaklangDeliveryTarget(t *testing.T) {
 	path, op, err := resolveYaklangDeliveryTarget(loop)
 	require.NoError(t, err)
 	assert.NotEmpty(t, path)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.Equal(t, loopinfra.CodeEventOpCreate, op)
 	assert.True(t, isYaklangGenCodePath(path))
 
 	genPath := filepath.Join(t.TempDir(), "gen_code_20260616_1451.yak")
@@ -30,13 +30,13 @@ func TestResolveYaklangDeliveryTarget(t *testing.T) {
 	path, op, err = resolveYaklangDeliveryTarget(loop)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Clean(editorPath), path)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, op)
+	assert.Equal(t, loopinfra.CodeEventOpReplace, op)
 
 	loop.Set("editor_file_path", "")
 	path, op, err = resolveYaklangDeliveryTarget(loop)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Clean(genPath), path)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.Equal(t, loopinfra.CodeEventOpCreate, op)
 }
 
 func TestResolveYaklangDeliveryTarget_AspaceStagingMapsToGenCode(t *testing.T) {
@@ -49,7 +49,7 @@ func TestResolveYaklangDeliveryTarget_AspaceStagingMapsToGenCode(t *testing.T) {
 	loop.Set("filename", filepath.Join(base, "aispace", "yaklang_code_staging_abc.yak"))
 	path, op, err := resolveYaklangDeliveryTarget(loop)
 	require.NoError(t, err)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.Equal(t, loopinfra.CodeEventOpCreate, op)
 	assert.True(t, isYaklangGenCodePath(path))
 	assert.Contains(t, path, filepath.Join(base, "code"))
 }
@@ -77,7 +77,7 @@ func TestResolveYaklangDeliveryTarget_NonYakFallsBackToCreate(t *testing.T) {
 	loop.Set("editor_file_path", refMD)
 	path, op, err := resolveYaklangDeliveryTarget(loop)
 	require.NoError(t, err)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.Equal(t, loopinfra.CodeEventOpCreate, op)
 	assert.True(t, isYaklangGenCodePath(path))
 	assert.NotContains(t, strings.ToLower(path), ".md")
 
@@ -85,7 +85,7 @@ func TestResolveYaklangDeliveryTarget_NonYakFallsBackToCreate(t *testing.T) {
 	loop.Set("filename", refMD)
 	path, op, err = resolveYaklangDeliveryTarget(loop)
 	require.NoError(t, err)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.Equal(t, loopinfra.CodeEventOpCreate, op)
 	assert.True(t, isYaklangGenCodePath(path))
 	assert.NotContains(t, strings.ToLower(path), ".md")
 }

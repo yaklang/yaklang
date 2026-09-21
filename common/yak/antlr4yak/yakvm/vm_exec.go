@@ -32,11 +32,8 @@ func (v *Frame) nextCode() {
 }
 
 func (v *Frame) setCodeIndex(i int) {
-	if v.vm.debugMode && v.vm.debugger.jmpState == nil {
-		v.vm.debugger.jmpState = &DebuggerState{
-			codeIndex: i,
-			frame:     v,
-		}
+	if v.vm.debugMode && !v.indebuggerEval {
+		v.vm.debugger.recordJump(v, i)
 	}
 
 	v.codePointer = i
@@ -358,7 +355,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 	if v.vm.debugMode && !v.indebuggerEval {
 		debugger := v.vm.debugger
-		debugger.Wait()
+		// ShouldCallback holds the debugger lock through a stopped callback.
+		// A separate WaitGroup gate races with the next callback's Add at zero.
 		debugger.ShouldCallback(v)
 	}
 

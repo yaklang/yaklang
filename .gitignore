@@ -101,3 +101,11 @@ CLAUDE.md
 
 # Go workspace local checksum cache (should not be tracked)
 /go.work.sum
+
+# gzip_embed assets generated before release builds
+/embed/resources.tar.gz
+/common/crep/static.tar.gz
+/common/thirdparty_bin/config.tar.gz
+/common/syntaxflow/sfbuildin/standards/mappings.tar.gz
+/common/syntaxflow/sfdb/rule_versions.tar.gz
+/common/ai/aid/aireact/skills.tar.gz

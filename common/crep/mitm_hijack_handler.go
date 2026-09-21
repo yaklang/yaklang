@@ -481,6 +481,10 @@ func handleBuildInMITMDefaultPageResponse(rsp *http.Response) error {
 		return nil
 	}
 
+	htmlContent, err := staticFS.ReadFile("static/navtab.html")
+	if err != nil {
+		return err
+	}
 	rsp.Body = io.NopCloser(bytes.NewReader(htmlContent))
 	rsp.ContentLength = int64(len(htmlContent))
 	rsp.Header.Set("Content-Type", "text/html; charset=utf-8")

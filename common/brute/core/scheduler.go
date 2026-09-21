@@ -263,7 +263,7 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 
 		t := getTarget(comb.Target)
 
-		skip, markPassword := t.shouldSkip(comb.Username, comb.Password)
+		skip, _ := t.shouldSkip(comb.Username, comb.Password)
 		if skip {
 			statsMu.Lock()
 			stats.Skipped++
@@ -273,9 +273,6 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 				dispatching = false
 			}
 			continue
-		}
-		if markPassword {
-			t.markPasswordUsed(comb.Password)
 		}
 
 		// 目标预检（每个目标一次，失败则短路该目标）。
@@ -298,6 +295,23 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 				dispatching = false
 			}
 			continue
+		}
+		// Re-check after the previous in-flight probe has released the
+		// gate, so OnlyNeedPassword recorded on that result can skip
+		// the same password for the next username.
+		if skip, mark := t.shouldSkip(comb.Username, comb.Password); skip {
+			t.gate.release()
+			globalGate.release()
+			statsMu.Lock()
+			stats.Skipped++
+			statsMu.Unlock()
+			if allStopped() {
+				cancel()
+				dispatching = false
+			}
+			continue
+		} else if mark {
+			t.markPasswordUsed(comb.Password)
 		}
 
 		wg.Add(1)

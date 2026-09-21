@@ -1,8 +1,13 @@
 package yakvm
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type handlesMap struct {
+	// Scope registration also runs outside Debugger.lock, in VM goroutines.
+	mu          sync.RWMutex
 	start       int
 	nextHandle  int
 	handleToVal map[int]interface{}
@@ -10,21 +15,47 @@ type handlesMap struct {
 }
 
 func newHandlesMap(start int) *handlesMap {
-	return &handlesMap{start, start, make(map[int]interface{}), make(map[interface{}]int)}
+	return &handlesMap{
+		start: start, nextHandle: start,
+		handleToVal: make(map[int]interface{}),
+		ValToHandle: make(map[interface{}]int),
+	}
 }
 
 func (hs *handlesMap) reset() {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
 	hs.nextHandle = hs.start
 	hs.handleToVal = make(map[int]interface{})
+	hs.ValToHandle = make(map[interface{}]int)
 }
 
 func (hs *handlesMap) forceSet(handle int, value interface{}) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
 	hs.handleToVal[handle] = value
 	addr := fmt.Sprintf("%p", value)
 	hs.ValToHandle[addr] = handle
 }
 
 func (hs *handlesMap) create(value interface{}) int {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	return hs.createLocked(value)
+}
+
+// getOrCreate keeps reverse lookup and allocation in one critical section so
+// concurrent registrations of the same object always return the same handle.
+func (hs *handlesMap) getOrCreate(value interface{}) int {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	if handle, ok := hs.ValToHandle[fmt.Sprintf("%p", value)]; ok {
+		return handle
+	}
+	return hs.createLocked(value)
+}
+
+func (hs *handlesMap) createLocked(value interface{}) int {
 	next := hs.nextHandle
 	hs.nextHandle++
 	hs.handleToVal[next] = value
@@ -34,11 +65,15 @@ func (hs *handlesMap) create(value interface{}) int {
 }
 
 func (hs *handlesMap) get(handle int) (interface{}, bool) {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
 	v, ok := hs.handleToVal[handle]
 	return v, ok
 }
 
 func (hs *handlesMap) getReverse(v interface{}) (int, bool) {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
 	addr := fmt.Sprintf("%p", v)
 	i, ok := hs.ValToHandle[addr]
 	return i, ok

@@ -129,3 +129,13 @@ Reference schemas: [Kafka MetadataRequest 3.9.0](https://github.com/apache/kafka
 [QUIC permitted encryption levels](https://www.rfc-editor.org/rfc/rfc9000.html#section-12.4),
 [DNS size limits](https://www.rfc-editor.org/rfc/rfc1035.html#section-2.3.4),
 [RESP specification](https://redis.io/docs/latest/develop/reference/protocol-spec/).
+
+## Main synchronization
+
+The first M0 CI run (`35613910699`, head `8e6e923f17`) exposed a workflow/source
+mismatch: main's embedded-resource job invoked `scripts/build-gzip-embed.sh`,
+which did not exist in the older PR checkout. Main
+`e16ff21238c60c02a1a363d05c9132d8f5830ee3` was merged normally, preserving the
+protocol corrections and concurrent work, with no force push or test bypass.
+The performance table above describes the M0 change before this main sync;
+merged integration/resource checks and final-head CI are verified separately.

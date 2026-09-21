@@ -35,6 +35,10 @@ desc(
    - 敏感数据（如密码、API密钥）可能被窃取。
    - 数据可能被篡改而不被检测。
    - 可能导致认证绕过或权限提升。
+
+4. **检测范围**
+   仅当 CBC 的分组密码来自 `crypto/aes.NewCipher` 时告警，避免把 DES-CBC 等其它算法误报成 AES-CBC。
+   实现既有协议、必须使用对端指定的 CBC 套件时，应人工确认为协议兼容。
 DESC
 	rule_id: "c0a39d53-a8ab-4c1f-be60-ab20e0f19f34"
 	solution: <<<SOLUTION
@@ -93,13 +97,16 @@ REFERENCE
 cipher?{<fullTypeName>?{have: 'crypto/cipher'}} as $cipher
 aes?{<fullTypeName>?{have: 'crypto/aes'}} as $aes
 
-$cipher.NewCBCEncrypter(* #-> as $block, * #-> as $iv) as $cbc_encrypter;
-$cipher.NewCBCDecrypter(* #-> as $block, * #-> as $iv) as $cbc_decrypter;
+$aes.NewCipher(*) as $aes_new
+check $aes_new
 
-$cbc_encrypter as $weak_cbc;
-$cbc_decrypter as $weak_cbc;
+$cipher.NewCBCEncrypter(*) as $cbc_encrypter
+$cipher.NewCBCDecrypter(*) as $cbc_decrypter
 
-$weak_cbc as $mid;
+$cbc_encrypter as $weak_cbc
+$cbc_decrypter as $weak_cbc
+
+$weak_cbc as $mid
 
 alert $mid for {
 	type: "vuln",
@@ -107,7 +114,7 @@ alert $mid for {
 	title_zh: "检测到Golang使用AES-CBC弱加密模式",
 	level: "mid",
 	name: "mid",
-	message: "检测到使用 AES-CBC 弱加密模式，可能遭受填充预言攻击或数据篡改，建议立即替换为认证加密模式。",
+	message: "检测到 AES 分组经 CBC 加解密。CBC 无完整性，自有数据应改用 AES-GCM 等 AEAD；协议强制 CBC 需人工确认。",
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -176,7 +183,7 @@ DESC
 
 desc(
 	lang: golang
-	alert_min: 0
+	alert_min: 1
 	'file://unsafe_aes_cbc.go': <<<UNSAFE
 package main
 
@@ -544,6 +551,37 @@ func main() {
 	}
 	
 	log.Printf("Decrypted: %s\n", decrypted)
+}
+SAFE
+)
+
+desc(
+	lang: golang
+	alert_min: 0
+	'safefile://safe_des_cbc.go': <<<SAFE
+package main
+
+import (
+	"crypto/cipher"
+	"crypto/des"
+)
+
+func encryptDESCBC(plaintext, key, iv []byte) {
+	desBlk, err := des.NewCipher(key)
+	if err != nil {
+		return
+	}
+	mode := cipher.NewCBCEncrypter(desBlk, iv)
+	mode.CryptBlocks(plaintext, plaintext)
+}
+
+func decryptDESCBC(ciphertext, key, iv []byte) {
+	desBlk, err := des.NewCipher(key)
+	if err != nil {
+		return
+	}
+	mode := cipher.NewCBCDecrypter(desBlk, iv)
+	mode.CryptBlocks(ciphertext, ciphertext)
 }
 SAFE
 )

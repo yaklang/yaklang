@@ -130,11 +130,11 @@ jobs:
         run: |
           echo "::group::Finding latest Yak version"
           
-          # 使用脚本获取合适的版本（匹配 alpha-diff-check / alpha-code-scan / beta，排除 -yakit- 和 -irify-）
-          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+$')
+          # 使用脚本获取合适的版本（匹配所有 alpha / beta 版本，排除 -yakit- 和 -irify-）
+          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern 'alpha|beta')
           
           if [ -z "$SELECTED_VERSION" ]; then
-            echo "::error::No suitable version found (alpha-diff-check / alpha-code-scan / beta)"
+            echo "::error::No suitable version found (alpha / beta)"
             exit 1
           fi
           
@@ -206,6 +206,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Generate Prog
+        id: generate_prog
         if: steps.validate.outputs.should_skip != 'true'
         run: |
           echo "::group::Checking out target commit"
@@ -260,6 +261,18 @@ jobs:
             echo "::error::fs.zip was not created"
             exit 1
           fi
+
+          GO_FILE_COUNT=$(unzip -Z1 ./fs.zip | awk '/\.go$/ { count++ } END { print count + 0 }')
+          echo "Go files in diff: $GO_FILE_COUNT"
+          if [ "$GO_FILE_COUNT" -eq 0 ]; then
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=no_go_files" >> "$GITHUB_OUTPUT"
+            echo "::endgroup::"
+            echo "::notice::No .go files found in diff; skipping compilation and security scan"
+            exit 0
+          fi
+          echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          echo "skip_reason=none" >> "$GITHUB_OUTPUT"
           echo "::endgroup::" 
 
       - name: Upload fs.zip
@@ -294,7 +307,7 @@ jobs:
           echo "SCAN_ROOT=$SCAN_ROOT" >> "$GITHUB_ENV"
 
       - name: Check With SyntaxFlow
-        if: steps.validate.outputs.should_skip != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.generate_prog.outputs.should_skip != 'true'
         id: scan
         run: |
           echo "::group::Running security scan"

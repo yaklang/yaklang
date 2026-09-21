@@ -116,7 +116,11 @@ func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.Vect
 	}
 	if call, ok := gm.loading[cacheKey]; ok {
 		gm.lock.Unlock()
+		started := time.Now()
 		<-call.done
+		if elapsed := time.Since(started); elapsed > time.Second {
+			log.Warnf("RAG graph %q waited %s for concurrent collection load", collection.Name, elapsed)
+		}
 		return call.wrapper, call.err
 	}
 	call := &graphLoadCall{

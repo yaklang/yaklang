@@ -4,14 +4,18 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )
 
 var template = `
@@ -28,7 +32,7 @@ var FS *gzip_embed.PreprocessingEmbed
 
 func init() {
 	var err error
-	FS, err = gzip_embed.NewPreprocessingEmbed(&resourceFS, "$gz", $cache)
+	FS, err = $constructor
 	if err != nil {
 		log.Errorf("init embed failed: %v", err)
 		FS = gzip_embed.NewEmptyPreprocessingEmbed()
@@ -36,14 +40,15 @@ func init() {
 }
 `
 
-func main() {
+func newApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = "gzip-embed"
 	app.Usage = `help you generate compress file and embed file reader`
 	app.Version = "v1.1"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name: "cache,c",
+		cli.BoolTFlag{
+			Name:  "cache,c",
+			Usage: "load once on first access and retain resources; use --cache=false for streaming",
 		},
 		cli.BoolFlag{
 			Name: "no-embed",
@@ -69,10 +74,11 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "xor-key",
-			Usage: "if set, XOR-encode the output tar.gz with this key",
+			Value: gzip_embed.DefaultXORKey,
+			Usage: "XOR resource key (shared default); an empty key disables encoding",
 		},
 	}
-	app.Action = func(c *cli.Context) {
+	app.Action = func(c *cli.Context) error {
 		sources := c.StringSlice("source")
 		if len(sources) == 0 {
 			sources = []string{"static"}
@@ -87,25 +93,31 @@ func main() {
 		}
 		err := targz(sources, baseDir, gzName, withRootPath, includeTarGz)
 		if err != nil {
-			log.Error(err)
-			return
+			return err
 		}
 		if xorKey != "" {
 			if err := xorEncodeFile(gzName, []byte(xorKey)); err != nil {
-				log.Error(err)
-				return
+				return err
 			}
 		}
 		if !c.Bool("no-embed") {
-			writeEmbedFile(c.IsSet("cache"), strings.Join(sources, " "), gzName)
+			if err := writeEmbedFile(c.Bool("cache"), strings.Join(sources, " "), gzName, xorKey); err != nil {
+				return err
+			}
 			log.Infof("generate embed file and compress file success, compress file name: %s", gzName)
 		} else {
 			log.Infof("generate compress file success (skip embed file), compress file name: %s", gzName)
 		}
+		return nil
 	}
-	err := app.Run(os.Args)
+	return app
+}
+
+func main() {
+	err := newApp().Run(os.Args)
 	if err != nil {
 		log.Error(err)
+		os.Exit(1)
 	}
 }
 
@@ -114,33 +126,44 @@ func xorEncodeFile(path string, key []byte) error {
 	if err != nil {
 		return err
 	}
-	encoded := make([]byte, len(raw))
-	for i, b := range raw {
-		encoded[i] = b ^ key[i%len(key)]
+	if len(key) > 0 {
+		for i, j := 0, 0; i < len(raw); i++ {
+			raw[i] ^= key[j]
+			j++
+			if j == len(key) {
+				j = 0
+			}
+		}
 	}
-	return os.WriteFile(path, encoded, 0o644)
+	return os.WriteFile(path, raw, 0644)
 }
-func writeEmbedFile(cache bool, sourceDir string, gzName string) {
-	dir, _ := os.Getwd()
-	cacheStr := "false"
-	if cache {
-		cacheStr = "true"
+
+func writeEmbedFile(cache bool, sourceDir string, gzName string, xorKey string) error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	constructor := fmt.Sprintf("gzip_embed.NewPreprocessingEmbed(&resourceFS, %s, %t)", strconv.Quote(filepath.ToSlash(gzName)), cache)
+	if xorKey != "" && xorKey != gzip_embed.DefaultXORKey {
+		constructor = fmt.Sprintf("gzip_embed.NewPreprocessingEmbedWithXORKey(&resourceFS, %s, %t, []byte(%s))", strconv.Quote(filepath.ToSlash(gzName)), cache, strconv.Quote(xorKey))
 	}
 	code := fmt.Sprintf("package %s\n%s", filepath.Base(dir), utils.Format(template, map[string]string{
-		"source": sourceDir,
-		"gz":     gzName,
-		"cache":  cacheStr,
+		"source": sourceDir, "gz": strconv.Quote(filepath.ToSlash(gzName)), "constructor": constructor,
 	}))
-	os.WriteFile("embed.go", []byte(code), 0644)
+	formatted, err := format.Source([]byte(code))
+	if err != nil {
+		return err
+	}
+	return os.WriteFile("embed.go", formatted, 0644)
 }
 
 // targz 把若干个源目录合并打包成一个 tar.gz。
 // baseDir 为空时沿用单目录语义：withRootPath 决定条目是否包含源目录名；
 // baseDir 非空时（多源打包），条目路径相对 baseDir 计算，例如
 // --base . --source ./behinder/static 会得到 behinder/static/CmdGo.php。
-func targz(sources []string, baseDir string, gzName string, withRootPath bool, includeTarGz bool) error {
+func targz(sources []string, baseDir string, gzName string, withRootPath bool, includeTarGz bool) (err error) {
 	for _, source := range sources {
-		if _, err := os.Stat(source); os.IsNotExist(err) {
+		if _, err := os.Stat(source); err != nil {
 			return err
 		}
 	}
@@ -150,15 +173,30 @@ func targz(sources []string, baseDir string, gzName string, withRootPath bool, i
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
+	defer func() {
+		if closeErr := outFile.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
 	// 创建 gzip 压缩器
-	gzWriter := gzip.NewWriter(outFile)
-	defer gzWriter.Close()
+	gzWriter, err := gzip.NewWriterLevel(outFile, gzip.BestCompression)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := gzWriter.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
 	// 创建 tar 归档器
 	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
+	defer func() {
+		if closeErr := tarWriter.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
 	// 如果开启 withRootPath，使用父目录作为基准，这样相对路径会包含根目录名称
 	// 例如：path="static", withRootPath=true -> relBase=filepath.Dir("static")="."
@@ -167,7 +205,8 @@ func targz(sources []string, baseDir string, gzName string, withRootPath bool, i
 		if baseDir != "" {
 			return baseDir
 		}
-		if withRootPath {
+		info, err := os.Stat(path)
+		if withRootPath || (err == nil && !info.IsDir()) {
 			return filepath.Dir(path)
 		}
 		return path
@@ -249,6 +288,10 @@ func addFileToTarWriter(path string, info os.FileInfo, rootDir string, tarWriter
 	// 在 PAX 格式下，这些信息会被保存在扩展属性中
 	header.Uname = ""
 	header.Gname = ""
+	header.Uid, header.Gid = 0, 0
+	header.ModTime = time.Time{}
+	header.AccessTime = time.Time{}
+	header.ChangeTime = time.Time{}
 
 	// 使用 PAX 格式支持长文件名和路径
 	header.Format = tar.FormatPAX

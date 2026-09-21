@@ -1,6 +1,9 @@
+//go:build !irify_exclude
+
 package yakcmds_test
 
 import (
+	"archive/zip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +16,47 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
+
+// writeCodeScanZip builds the same kind of archive CI passes via `-t ./fs.zip`.
+func writeCodeScanZip(t *testing.T, files map[string]string) string {
+	t.Helper()
+	zipPath := filepath.Join(t.TempDir(), "fs.zip")
+	f, err := os.Create(zipPath)
+	require.NoError(t, err)
+	w := zip.NewWriter(f)
+	for name, content := range files {
+		entry, err := w.Create(name)
+		require.NoError(t, err)
+		_, err = entry.Write([]byte(content))
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	require.NoError(t, f.Close())
+	return zipPath
+}
+
+// code-scan -t <zip> must accept an archive target instead of failing with
+// "root path is not a directory: .". This is the exact CI invocation.
+func TestCodeScanAcceptsZipTarget(t *testing.T) {
+	zipPath := writeCodeScanZip(t, map[string]string{
+		"main.go": "package main\n\nvar key = \"AKIAIOSFODNN7EXAMPLE\"\n",
+	})
+	outputPath := filepath.Join(t.TempDir(), "risk")
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "code-scan",
+		"-t", zipPath,
+		"-l", "golang",
+		"--format", "irify-full",
+		"-o", outputPath,
+		"--memory",
+		"--rule-keyword", "golang",
+	})
+	require.NoError(t, err)
+	require.FileExists(t, outputPath+".json")
+}
 
 func addCommands(app *cli.App, cmds ...*cli.Command) {
 	for _, i := range cmds {

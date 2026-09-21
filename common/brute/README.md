@@ -96,7 +96,7 @@ common/consts 的 gorm 存储层引用，与爆破无关。
 | `brute/probes/mongodb` | 无（最小 BSON + SCRAM 自实现） |
 | `brute/probes/mssql` | 无（TDS + 内嵌 TLS stdlib） |
 | `brute/probes/...` 全部 | 仅 `golang.org/x/text/secure/precis`（SCRAM SASLprep） |
-| `bruteutils` 兼容层 | 每库单一协议归属：`x/crypto/ssh`(SSH)、`jlaffaye/ftp`(FTP)、`go-ldap/ldap`(LDAP)、`gosnmp`(SNMP)、`mitchellh/go-vnc`(VNC)、`xdg-go/scram+stringprep`(SASL 邮件认证)、`sijms/go-ora`(Oracle，见下) |
+| `bruteutils` 兼容层 | 每库单一协议归属：`x/crypto/ssh`(SSH)、`jlaffaye/ftp`(FTP)、`go-ldap/ldap`(LDAP)、`gosnmp`(SNMP)、`xdg-go/scram+stringprep`(SASL 邮件认证)、`sijms/go-ora`(Oracle，见下)。VNC 使用仓库内 RFB login probe（`internal/vncprobe`，stdlib `net`+`crypto/des`） |
 
 RDP（grdp，仓库自带实现）、Redis、Telnet、RTSP、Memcached、
 HTTP/SOCKS 代理、PPTP、Tomcat 均为仓库内最小自研实现，零外部依赖。
@@ -157,7 +157,7 @@ O5LOGON/PBKDF2 verifier 涉及多版本密码学交互，任务明确要求
 | Telnet | 自研（流式提示符匹配） | ✅ 登录流正反+未知用户 | — | ✅ 5/5 |
 | Redis | 自研（RESP） | ✅ AUTH/SET-GET 回环+无密码模式 | — | ✅ 5/5 |
 | LDAP | go-ldap | ✅ BER bindResponse 0/49 正反 | — | — |
-| VNC | mitchellh/go-vnc | ✅ RFB3.8 VNC-Auth DES 挑战正反 | — | ✅ 5/5 |
+| VNC | 最小 RFB login probe（零外部依赖） | ✅ RFB 3.3/3.7/3.8、None、VNC-Auth DES、Tight 包装、畸形 banner | ✅ TigerVNC / x11vnc（`YAK_VNC_DOCKER=1`） | ✅ 5/5 |
 | SNMPv2 | gosnmp | ✅ UDP community 正反（错误静默丢弃） | — | — |
 | SNMPv3 | gosnmp | ✅（sasl 单测 + 差分） | — | — |
 | Memcached | 自研 | ✅ stats 未授权路径 | — | ✅ 5/5 |

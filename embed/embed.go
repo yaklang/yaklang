@@ -1,17 +1,16 @@
 package embed
 
 import (
-	"embed"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed data dataex
-var FS embed.FS
-
 func Asset(name string) ([]byte, error) {
 	buf, err := FS.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
 	if strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".gzip") {
 		buf, err = utils.GzipDeCompress(buf)
 	}

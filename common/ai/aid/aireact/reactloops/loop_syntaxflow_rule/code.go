@@ -110,6 +110,7 @@ func init() {
 				loopinfra.WithLoopVarsPrefix("sf"),
 				loopinfra.WithActionSuffix("rule"), // write_rule, modify_rule, insert_rule, delete_rule
 				loopinfra.WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", "text/syntaxflow"),
+				loopinfra.WithEditorChange(schema.EVENT_TYPE_SYNTAXFLOW_RULE_CHANGE),
 				loopinfra.WithFileExtension(".sf"),
 				loopinfra.WithFileChanged(func(loop *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 					// Rule just changed: invalidate prior positive-sample self-test result.

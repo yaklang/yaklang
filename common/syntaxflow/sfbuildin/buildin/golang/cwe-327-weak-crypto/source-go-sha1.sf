@@ -9,20 +9,20 @@ desc(
 	risk: "weak-hash"
 	desc: <<<DESC
 ### 规则说明
-检测到 crypto/sha1。SHA-1 不抗碰撞。
+检测到 sha1.New / sha1.Sum 调用。仅匹配实际哈希 API，不匹配 import "crypto/sha1"。
 
 ### 风险类型
 weak-hash
 
 ### 影响
-该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+SHA-1 不抗碰撞，不应用于口令、签名或安全完整性校验。实现既有协议、必须协商服务端算法时，应人工确认为协议兼容而非本项目可替换的漏洞。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配 sha1.New( 或 sha1.Sum( 调用。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-改用 crypto/sha256。
+安全场景改用 crypto/sha256。协议兼容实现不要强行替换，以免无法互通。
 SOLUTION
 	alert_min: 1
 	"file://h.go": <<<POS
@@ -37,9 +37,15 @@ import "crypto/sha256"
 func d(b []byte) [32]byte { return sha256.Sum256(b) }
 
 NEG
+	"safefile://import-only.go": <<<NEG
+package main
+import _ "crypto/sha1"
+func d() {}
+
+NEG
 )
 
-${*.go}.pattern_regex(/crypto\/sha1|sha1\.(Sum|New)\s*\(/) as $hit
+${*.go}.pattern_regex(/\bsha1\.(Sum|New)\s*\(/) as $hit
 alert $hit for {
 	level: "medium",
 	title: "检测 Go crypto/sha1",

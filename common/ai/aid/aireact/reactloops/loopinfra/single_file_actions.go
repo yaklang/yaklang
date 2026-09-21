@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
@@ -125,15 +124,15 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 					msg)
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
-			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+			_, _ = f.applyLoopCodeChange(loop, &loopCodeChange{
 				Content:       code,
 				Path:          filename,
 				SourceAction:  actionName,
-				EventOp:       loopYaklangCodeEventOpCreate,
+				EventOp:       CodeEventOpCreate,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchFull(code),
+				DeliveryPatch: BuildCodePatchFull(code),
 			})
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
+			f.emitEditorStreamJSON(loop, "write_code", code)
 		},
 	)
 }
@@ -385,16 +384,16 @@ GEN_CODE 解析行号：[%d-%d]
 					msg)
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
-			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+			_, _ = f.applyLoopCodeChange(loop, &loopCodeChange{
 				Content:       fullCode,
 				Path:          filename,
 				SourceAction:  actionName,
 				ChangeReason:  reason,
-				EventOp:       loopYaklangCodeEventOpReplace,
+				EventOp:       CodeEventOpReplace,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchLineRange(partialCode, modifyStartLine, modifyEndLine, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
+				DeliveryPatch: BuildCodePatchLineRange(partialCode, modifyStartLine, modifyEndLine, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
 			})
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
+			f.emitEditorStreamJSON(loop, "modify_code", partialCode)
 
 			if errMsg != "" {
 				invoker.AddToTimeline("advice", "use search tools to find more syntax samples or docs")
@@ -547,15 +546,15 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 					msg)
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
-			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+			_, _ = f.applyLoopCodeChange(loop, &loopCodeChange{
 				Content:       fullCode,
 				Path:          filename,
 				SourceAction:  actionName,
-				EventOp:       loopYaklangCodeEventOpReplace,
+				EventOp:       CodeEventOpReplace,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchInsert(partialCode, insertLine, loop.GetInt(LoopVarCodeLineBase)),
+				DeliveryPatch: BuildCodePatchInsert(partialCode, insertLine, loop.GetInt(LoopVarCodeLineBase)),
 			})
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_lines", partialCode)
+			f.emitEditorStreamJSON(loop, "insert_lines", partialCode)
 
 			if errMsg != "" {
 				invoker.AddToTimeline("advice", "use search tools to find more syntax samples or docs")
@@ -701,13 +700,13 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 					msg)
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
-			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+			_, _ = f.applyLoopCodeChange(loop, &loopCodeChange{
 				Content:       fullCode,
 				Path:          filename,
 				SourceAction:  actionName,
-				EventOp:       loopYaklangCodeEventOpReplace,
+				EventOp:       CodeEventOpReplace,
 				EmitEvent:     true,
-				DeliveryPatch: BuildYaklangPatchDelete(deletedStart, deletedEnd, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
+				DeliveryPatch: BuildCodePatchDelete(deletedStart, deletedEnd, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
 			})
 
 			// Emit event with deletion info
@@ -717,7 +716,7 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			if deleteEndLine > 0 {
 				deletionInfo["end_line"] = deleteEndLine
 			}
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "delete_lines", deletionInfo)
+			f.emitEditorStreamJSON(loop, "delete_lines", deletionInfo)
 
 			if errMsg != "" {
 				invoker.AddToTimeline("advice", "use search tools to find more syntax samples or docs")

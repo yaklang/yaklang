@@ -63,11 +63,32 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	// start pprof
 	_ "net/http/pprof"
 )
+
+// Keep command helpers in this file: release/CI builds also compile yak.go directly.
+func newGRPCSecretAuth(secret string) grpc_auth.AuthFunc {
+	return func(ctx context.Context) (context.Context, error) {
+		method, _ := grpc.Method(ctx)
+		userSecret, err := grpc_auth.AuthFromMD(ctx, "bearer")
+		if err != nil {
+			// A rejected request is not a server startup failure. Include the RPC
+			// so callers can identify premature/unauthenticated connection probes.
+			log.Warnf("gRPC authentication rejected: method=%s reason=missing or malformed Bearer authorization", method)
+			return nil, err
+		}
+		if userSecret != secret {
+			log.Warnf("gRPC authentication rejected: method=%s reason=invalid credentials", method)
+			return nil, status.Error(codes.Unauthenticated, "secret verify failed")
+		}
+		return ctx, nil
+	}
+}
 
 var (
 	yakVersion string
@@ -788,17 +809,7 @@ var startGRPCServerCommand = cli.Command{
 		streamInterceptors := []grpc.StreamServerInterceptor{grpc_recovery.StreamServerInterceptor()}
 		unaryInterceptors := []grpc.UnaryServerInterceptor{grpc_recovery.UnaryServerInterceptor()}
 		if secret != "" {
-			auth := func(ctx context.Context) (context.Context, error) {
-				userSecret, err := grpc_auth.AuthFromMD(ctx, "bearer")
-				if err != nil {
-					log.Errorf("secret schema[%v] missed", "bearer")
-					return nil, err
-				}
-				if userSecret != secret {
-					return nil, utils.Errorf("secret verify failed...")
-				}
-				return ctx, nil
-			}
+			auth := newGRPCSecretAuth(secret)
 			streamInterceptors = append(streamInterceptors, grpc_auth.StreamServerInterceptor(auth))
 			unaryInterceptors = append(unaryInterceptors, grpc_auth.UnaryServerInterceptor(auth))
 		}
@@ -1517,17 +1528,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		log.Info("generated random secret for testing: ***")
 
 		// 创建 GRPC 服务器
-		auth := func(authCtx context.Context) (context.Context, error) {
-			userSecret, err := grpc_auth.AuthFromMD(authCtx, "bearer")
-			if err != nil {
-				log.Errorf("secret schema[%v] missed", "bearer")
-				return nil, err
-			}
-			if userSecret != secret {
-				return nil, utils.Errorf("secret verify failed...")
-			}
-			return authCtx, nil
-		}
+		auth := newGRPCSecretAuth(secret)
 
 		streamInterceptors := []grpc.StreamServerInterceptor{
 			grpc_recovery.StreamServerInterceptor(),

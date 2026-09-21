@@ -20,11 +20,17 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "common/**"
+      - "embed/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
       # The suite/runner scripts below drive this workflow, so a change to them
       # must exercise it; otherwise a broken edit merges without ever running.
       - "scripts/ci/**"
+      - "scripts/generate-compressed-assets.sh"
+      - "scripts/build-gzip-embed.sh"
+      - "scripts/build_and_install_yak.sh"
+      - ".github/workflows/reuse-build.yml"
+      - ".github/workflows/exp-cross-build.yml"
       - "go.mod"
 
 concurrency:
@@ -499,6 +505,47 @@ jobs:
       - name: Vet ScanNode and Legion Node
         run: go vet ./scannode/... ./cmd/legion-smoke-node
 
+  embedded-resources:
+    # Resource checks do not need the prepared engine or its large cache artifact.
+    needs: check-wip
+    if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope != 'scannode'
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Preserve source bytes on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
+      - name: Check out the selected revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test lazy cache and archive tooling
+        run: go test -race -timeout 3m ./common/utils/gzip_embed/... ./common/utils/resources_monitor
+      - name: Test development resource contents
+        run: go test -race -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb
+      - name: Generate release assets with the current native tool
+        run: |
+          GZIP_EMBED="$(bash scripts/build-gzip-embed.sh)"
+          export GZIP_EMBED
+          bash scripts/generate-compressed-assets.sh
+      - name: Test release resource contents and HTTP semantics
+        run: go test -race -tags gzip_embed -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb
+
   slim-gate:
     timeout-minutes: 15
     needs: [check-wip, prepare-yak]
@@ -545,7 +592,7 @@ jobs:
       - name: Slim gate test (irify_exclude)
         env:
           MOCKEY_CHECK_GCFLAGS: "false"
-        run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc
+        run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc ./common/yak/cmd/yakcmds ./common/syntaxflow/sfdb
 
   prepare-yakgrpc:
     timeout-minutes: 25
@@ -782,16 +829,12 @@ jobs:
                 {"package": "./scannode/...", "timeout": "30s"}
               ]
 
-          - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
-            # Stays serial. This suite gates the run, so parallelism was worth
-            # trying, but bruteutils defeats it: it decides RDP brute-force
-            # success from an internal wall-clock handshake deadline, and with
-            # two packages sharing the runner the v2 CredSSP case took 15.3s
-            # instead of 0.15s and reported a correct password as ok=false
-            # (run 35064637684). Widening the package timeout does not help,
-            # because the failing deadline lives in the test; serial runs hold
-            # that case at ~57s total. The suite's own timeout stays raised to
-            # 2m because 57s against the old 60s cap left only 4% headroom.
+          - name: "Test Utils Common / Yak Tooling USE gRPC"
+            # Keep packages serial: competing builds made the RDP mock's
+            # CredSSP handshake hit its internal deadline in run 35064637684.
+            # Widening go test's timeout does not fix that resource contention.
+            # Only the independent Telnet banner cases overlap within their
+            # parent test, so they finish before any other package test runs.
             test_configs: |
               [
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
@@ -805,21 +848,24 @@ jobs:
                 {"package": "./common/utils/tlsutils/...", "timeout": "20s"},
                 {"package": "./common/utils/linktable/...", "timeout": "10s"},
                 {"package": "./common/yak/yaklib", "timeout": "20s", "run": "^TestMUSTPASS_.*$"},
-                {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^TestMUSTPASS_Fp.*$"},
+                {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^(TestMUSTPASS_Fp.*|TestOracle.*)$"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
                 {"package": "./common/utils/bruteutils/.", "timeout": "2m", "retry": 1, "retry_delay": 5},
+                {"package": "./common/utils/bruteutils/internal/vncprobe", "timeout": "20s", "race": true},
+                {"package": "./common/utils/bruteutils/internal/oracleprobe", "timeout": "20s", "race": true},
+                {"package": "./common/netx", "timeout": "30s", "run": "^TestDialContext.*$"},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
                 {"package": "./common/utils/zipx/...", "timeout": "30s"},
                 {"package": "./common/thirdparty_bin", "timeout": "1m", "skip": "^(TestFetchAllMD5|TestSingleURL|TestInstallMemoryUsage|TestMemoryUsageBaseline)$"},
-                {"package": "./common/utils/yakgit/..."},
+                {"package": "./common/utils/yakgit/...", "exclude_packages": ["./common/utils/yakgit/yakdiff/..."]},
                 {"package": "./common/utils/suspect"},
                 {"package": "./common/yak/antlr4nasl/tests/...", "timeout": "1m"},
                 {"package": "./common/utils/gzip_embed/test/...", "timeout": "30s"},
                 {"package": "./common/utils/resources_monitor/...", "timeout": "30s"},
-                {"package": "./common/yak/cmd/...", "timeout": "30s"},
+                {"package": "./common/yak/cmd/...", "timeout": "30s", "exclude_packages": ["./common/yak/cmd/yakcmds/..."]},
                 {"package": "./common/utils/pingutil", "timeout": "20s", "run": "TestPingAutoConfig"},
                 {"package": "./common/mutate_tests", "timeout": "20s"},
                 {"package": "./common/fuzztag", "timeout": "20s"},
@@ -1434,6 +1480,7 @@ jobs:
       - check-wip
       - scannode-focused
       - slim-gate
+      - embedded-resources
       - ipc-smoke
       - prepared-startup
       - test-local
@@ -1448,6 +1495,7 @@ jobs:
           TEST_SCOPE: ${{ needs.check-wip.outputs.test_scope }}
           SCANNODE_RESULT: ${{ needs.scannode-focused.result }}
           SLIM_RESULT: ${{ needs.slim-gate.result }}
+          RESOURCES_RESULT: ${{ needs.embedded-resources.result }}
           IPC_RESULT: ${{ needs.ipc-smoke.result }}
           STARTUP_RESULT: ${{ needs.prepared-startup.result }}
           LOCAL_RESULT: ${{ needs.test-local.result }}
@@ -1468,7 +1516,7 @@ jobs:
             exit 0
           fi
 
-          for result in "$SLIM_RESULT" "$IPC_RESULT" "$STARTUP_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
+          for result in "$RESOURCES_RESULT" "$SLIM_RESULT" "$IPC_RESULT" "$STARTUP_RESULT" "$LOCAL_RESULT" "$YAKGRPC_RESULT" "$COREPLUGIN_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "Full test scope did not pass: $result" >&2
               exit 1

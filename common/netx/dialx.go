@@ -1,6 +1,7 @@
 package netx
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -38,6 +39,24 @@ func init() {
 // dialPlainTCPConnWithRetry just handle plain tcp connection
 // no tls here, but proxy here
 func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.Conn, err error) {
+	ctx := config.Context
+	if ctx == nil {
+		ctx = context.Background()
+	} else {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
+		defer cancel()
+	}
+	waitRetry := func(delay time.Duration) error {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return nil
+		}
+	}
 	defer func() {
 		if retConn != nil {
 			currentCPS.Add(1)
@@ -74,6 +93,9 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 
 	var lastError error
 RETRY:
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if timeoutRetryCount > retryMax || refuseErrorRetryCount > retryMax {
 		if retryMax > 0 {
 			// 保留底层错误（connection refused / no route 等）：
@@ -127,7 +149,10 @@ RETRY:
 		ip := host
 		if net.ParseIP(utils.FixForParseIP(host)) == nil {
 			// not valid ip
-			ip = LookupFirst(host, config.DNSOpts...)
+			ip = lookupFirstWithContext(ctx, host, config.DNSOpts...)
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 		if ip == "" {
 			return nil, utils.Errorf("cannot resolve %v", target)
@@ -177,9 +202,9 @@ RETRY:
 				Timeout:   config.Timeout,
 				LocalAddr: localAddr,
 			}
-			conn, err = dialer.Dial("tcp", dialTarget)
+			conn, err = dialer.DialContext(ctx, "tcp", dialTarget)
 		} else {
-			conn, err = net.DialTimeout("tcp", dialTarget, config.Timeout)
+			conn, err = (&net.Dialer{Timeout: config.Timeout}).DialContext(ctx, "tcp", dialTarget)
 		}
 		if err != nil {
 			if config.Debug {
@@ -195,12 +220,16 @@ RETRY:
 			switch {
 			case errors.As(err, &opError):
 				if opError.Timeout() && config.EnableTimeoutRetry {
-					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
+					if err := waitRetry(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))); err != nil {
+						return nil, err
+					}
 					addTimeoutRetry()
 					goto RETRY
 				}
 				if strings.Contains(opError.Error(), "refused") {
-					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
+					if err := waitRetry(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))); err != nil {
+						return nil, err
+					}
 					addRefuseErrorRetry()
 					goto RETRY
 				}

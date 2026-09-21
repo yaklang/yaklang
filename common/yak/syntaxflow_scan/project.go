@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -78,6 +79,8 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	// programName is published through ProjectResult so compile-only runs can
 	// hand the persisted IR name back to the platform.
 	programName := strings.TrimSpace(cfg.GetProgramName())
+	maxStage := ProductStage("")
+	maxOverall := 0.0
 
 	emit := func(stage ProductStage, progress float64, info *RuleProcessInfoList) {
 		// Every product signal flows through here, so this is the one place
@@ -95,7 +98,17 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		if progress > 1 {
 			progress = 1
 		}
-		cfg.stageCallback(stage, stage.OverallProgress(progress), progress, info)
+		if ProductStageRank(stage) < ProductStageRank(maxStage) {
+			return
+		}
+		maxStage = stage
+		overall := stage.OverallProgress(progress)
+		if overall < maxOverall {
+			overall = maxOverall
+		} else {
+			maxOverall = overall
+		}
+		cfg.stageCallback(stage, overall, progress, info)
 	}
 
 	mode := resolveProductModes(cfg)
@@ -272,32 +285,25 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		emit(StageReview, 1, mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfoAll(cfg.Programs)))
 	}
 
-	// -p / reloaded -t: one StartScan. Source attaches via IrSource; SSA runs
-	// on the program. After a live inspect, only SSA remains.
+	// After a live inspect, only SSA remains. Inspect and analyze run as
+	// separate StartScan calls so each stage keeps its own rule/risk counts.
 	if hasProgram && (wantAnalyze || (wantSource && !inspectedLive)) {
 		runSource := wantSource && !inspectedLive
 		if runSource {
 			emit(StageInspect, 0, nil)
+			err := StartScan(ctx, inspectCompiledSourceOptions(cfg, emit)...)
+			report(StageInspect, err)
+			if err == nil {
+				emit(StageInspect, 1, nil)
+			}
 		}
 		if wantAnalyze {
 			emit(StageAnalyze, 0, nil)
-		}
-		// One StartScan serves both remaining stages; a failure marks them all
-		// failed because the engine cannot attribute it to a single stage.
-		err := StartScan(ctx, compiledProgramScanOptions(cfg, emit, runSource, wantAnalyze)...)
-		if runSource {
-			report(StageInspect, err)
-		}
-		if wantAnalyze {
+			err := StartScan(ctx, analyzeOptions(cfg, emit)...)
 			report(StageAnalyze, err)
-		}
-		if err != nil {
-			return finishScanProject(cfg, recorder, programName, err)
-		}
-		if runSource {
-			emit(StageInspect, 1, nil)
-		}
-		if wantAnalyze {
+			if err != nil {
+				return finishScanProject(cfg, recorder, programName, err)
+			}
 			emit(StageAnalyze, 1, nil)
 		}
 	}
@@ -493,7 +499,19 @@ func localSourceDir(cfg *Config) string {
 	if cfg.GetCodeSourceKind() != ssaconfig.CodeSourceLocal {
 		return ""
 	}
-	return strings.TrimSpace(cfg.GetCodeSourceLocalFile())
+	dir := strings.TrimSpace(cfg.GetCodeSourceLocalFile())
+	if dir == "" {
+		return ""
+	}
+	// Live source inspection walks the path as a directory. Archives and plain
+	// files must fall through to the compile pipeline, which knows how to open
+	// zip/jar code sources; walking them here fails with
+	// "root path is not a directory".
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	return dir
 }
 
 func emitStructResults(cfg *Config, prog *ssaapi.Program) {

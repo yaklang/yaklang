@@ -51,17 +51,21 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 
 	ragCheckingStart := time.Now()
 	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragCheckingOpts...)
+	if du := time.Since(ragCheckingStart); du > 500*time.Millisecond {
+		log.Warnf("[AI-Memory(%v)] checking embedding availability took %v", name, du)
+	}
 	//  检查是否有默认的嵌入模型可用
 	if embeddingAvailable {
+		collectionStart := time.Now()
 		system, err = rag.GetRagSystem(name, ragCheckingOpts...)
+		if du := time.Since(collectionStart); du > 500*time.Millisecond {
+			log.Warnf("[AI-Memory(%v)] loading RAG system took %v", name, du)
+		}
 		if err != nil {
 			log.Warnf("failed to create RAG collection, semantic search will be unavailable: %v", err)
 			system = nil
 			embeddingAvailable = false
 		}
-	}
-	if du := time.Since(ragCheckingStart); du > 500*time.Millisecond {
-		log.Warnf("[AI-Memory(%v)] checking RAG system embedding availability took %v, it's abnormal case.", name, du)
 	}
 
 	// 创建HNSW后端

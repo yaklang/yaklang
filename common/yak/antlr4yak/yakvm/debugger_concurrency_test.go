@@ -370,3 +370,38 @@ func TestDebuggerStepOutWithoutFrameReturnsError(t *testing.T) {
 		t.Fatal("StepOut without a current frame unexpectedly succeeded")
 	}
 }
+
+func TestDebuggerConcurrentJumps(t *testing.T) {
+	vm := New()
+	source, path := "for {}", "debugger-jumps.yak"
+	codes := []*Code{testCode(source, path, OpJMP, 1)}
+	debugger := testDebuggerForCodes(t, vm, source, codes, nil)
+	var wg sync.WaitGroup
+	for range 16 {
+		frame := NewFrame(vm)
+		frame.ThreadID = vm.nextThreadID()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 100 {
+				frame.setCodeIndex(0)
+				debugger.ShouldCallback(frame)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestDebuggerEvaluationJumpDoesNotChangeStepState(t *testing.T) {
+	vm := New()
+	debugger := testDebuggerForCodes(t, vm, "", nil, nil)
+	frame := NewFrame(vm)
+	frame.EnableDebuggerEval()
+	// Evaluation runs from callbacks while the execution lock is already held.
+	debugger.lock.Lock()
+	defer debugger.lock.Unlock()
+	frame.setCodeIndex(7)
+	if frame.codePointer != 7 || debugger.jmpState != nil {
+		t.Fatal("evaluation jump must update only the evaluation frame")
+	}
+}

@@ -25,6 +25,7 @@ var snmp_v2Auth = &DefaultServiceAuthInfo{
 		}
 
 		snmpConfig := &gosnmp.GoSNMP{
+			Context:            item.Context,
 			Target:             host,
 			Port:               uint16(port),
 			Transport:          "udp",
@@ -42,6 +43,7 @@ var snmp_v2Auth = &DefaultServiceAuthInfo{
 			result.Finished = true
 			return result
 		}
+		defer snmpConfig.Conn.Close()
 
 		oid := []string{"1.3.6.1.2.1.1.1.0"}
 		res, err := snmpConfig.Get(oid)

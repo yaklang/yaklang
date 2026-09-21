@@ -78,6 +78,23 @@ func (s ProductStage) overallRange() (start, end float64) {
 	}
 }
 
+// ProductStageRank is the product order: collect < inspect < review < analyze.
+// Compile sits with review. Unknown stages do not move the live cursor.
+func ProductStageRank(stage ProductStage) int {
+	switch stage {
+	case StageCollect:
+		return 1
+	case StageInspect:
+		return 2
+	case StageReview, StageCompile:
+		return 3
+	case StageAnalyze:
+		return 4
+	default:
+		return 0
+	}
+}
+
 // OverallProgress maps a 0-1 stage fraction onto the full product bar.
 func (s ProductStage) OverallProgress(stageProgress float64) float64 {
 	if stageProgress < 0 {
@@ -130,8 +147,9 @@ type StageOutcome struct {
 	DurationMs int64 `json:"duration_ms,omitempty"`
 	// RuleCount / RiskCount come from the stage's own process and result
 	// callbacks, so a reader gets one authoritative per-stage summary.
-	RuleCount int64 `json:"rule_count,omitempty"`
-	RiskCount int64 `json:"risk_count,omitempty"`
+	// Zero is still a real count for a detection stage that ran.
+	RuleCount int64 `json:"rule_count"`
+	RiskCount int64 `json:"risk_count"`
 }
 
 func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded }
@@ -189,10 +207,12 @@ func (r *stageOutcomeRecorder) observe(stage ProductStage, info *RuleProcessInfo
 		return
 	}
 	metrics := r.metrics[stage]
-	if info.TotalQuery > 0 {
+	if info.TotalQuery > metrics.ruleCount {
 		metrics.ruleCount = info.TotalQuery
+	} else if info.FinishedQuery > metrics.ruleCount {
+		metrics.ruleCount = info.FinishedQuery
 	}
-	if info.RiskCount > 0 {
+	if info.RiskCount > metrics.riskCount {
 		metrics.riskCount = info.RiskCount
 	}
 	r.metrics[stage] = metrics
@@ -257,15 +277,15 @@ func (r *stageOutcomeRecorder) observeStruct(prog interface{ StructScanCounts() 
 	if r == nil || prog == nil {
 		return
 	}
-	rules, _ := prog.StructScanCounts()
-	if rules <= 0 {
-		return
-	}
+	rules, results := prog.StructScanCounts()
 	metrics := r.metrics[StageReview]
-	if metrics.ruleCount < int64(rules) {
+	if int64(rules) > metrics.ruleCount {
 		metrics.ruleCount = int64(rules)
-		r.metrics[StageReview] = metrics
 	}
+	if int64(results) > metrics.riskCount {
+		metrics.riskCount = int64(results)
+	}
+	r.metrics[StageReview] = metrics
 }
 
 func (r *stageOutcomeRecorder) setSourceStatistics(stats any) {

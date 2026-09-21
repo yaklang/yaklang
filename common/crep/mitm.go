@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"embed"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -751,11 +750,6 @@ var (
 		// 某些手机浏览器没办法访问非域名格式的地址，比如 mitm
 		"mitm.cert",
 	}
-	//go:embed static/navtab.html
-	// 返回HTML页面内容
-	htmlContent []byte
-	//go:embed static/*
-	staticFS embed.FS
 )
 
 func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {

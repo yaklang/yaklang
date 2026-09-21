@@ -461,46 +461,23 @@ func (g *Debugger) SetVMPanic(p *VMPanic) {
 }
 
 func (g *Debugger) AddFrameRef(frame *Frame) int {
-	ref := g.Reference
-
-	if i, ok := ref.FrameHM.getReverse(frame); !ok {
-		return ref.FrameHM.create(frame)
-	} else {
-		return i
-	}
+	return g.Reference.FrameHM.m.getOrCreate(frame)
 }
 
 func (g *Debugger) AddBreakPointRef(b *Breakpoint) int {
-	ref := g.Reference
-
-	if i, ok := ref.BreakPointHM.getReverse(b); !ok {
-		return ref.BreakPointHM.create(b)
-	} else {
-		return i
-	}
+	return g.Reference.BreakPointHM.m.getOrCreate(b)
 }
+
 func (g *Debugger) ForceSetVariableRef(id int, v interface{}) {
-	ref := g.Reference
-	ref.VarHM.forceSet(id, v)
+	g.Reference.VarHM.forceSet(id, v)
 }
 
 func (g *Debugger) AddVariableRef(v interface{}) int {
-	ref := g.Reference
-	if i, ok := ref.VarHM.getReverse(v); !ok {
-		return ref.VarHM.create(v)
-	} else {
-		return i
-	}
+	return g.Reference.VarHM.getOrCreate(v)
 }
 
 func (g *Debugger) AddScopeRef(scope *Scope) int {
-	ref := g.Reference
-	if i, ok := ref.VarHM.getReverse(scope); !ok {
-		return ref.VarHM.create(scope)
-
-	} else {
-		return i
-	}
+	return g.Reference.VarHM.getOrCreate(scope)
 }
 
 func (g *Debugger) Pause() {
@@ -949,6 +926,14 @@ func debuggerTracksCallInCurrentVM(frame *Frame, callable *Value) bool {
 		return true
 	}
 	return function.defineFrame.vm == frame.vm
+}
+
+func (g *Debugger) recordJump(frame *Frame, codeIndex int) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if g.jmpState == nil {
+		g.jmpState = &DebuggerState{codeIndex: codeIndex, frame: frame}
+	}
 }
 
 func (g *Debugger) ShouldCallback(frame *Frame) {

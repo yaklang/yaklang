@@ -4,7 +4,7 @@ package bruteutils_test
 // 验证 BrutePass 判定链路（正确凭证→Ok，错误凭证→!Ok，不可达→Finished）。
 //
 // 覆盖：FTP / SMTP(AUTH LOGIN) / Redis(RESP) / Memcached(stats) /
-// Telnet(交互流) / LDAP(BER bindResponse) / VNC(RFB 3.8 VNC-Auth DES) /
+// Telnet(交互流) / LDAP(BER bindResponse) / VNC(RFB login probe) /
 // SNMPv2(UDP community)。
 //
 // 数据库协议（MySQL/PG/Mongo/MSSQL）的模拟器见 common/brute/probes/*，
@@ -13,6 +13,7 @@ package bruteutils_test
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/des"
 	"encoding/base64"
 	"encoding/binary"
@@ -41,6 +42,11 @@ func mockListen(t *testing.T) net.Listener {
 
 func mockProbe(t *testing.T, proto, target, user, pass string) *bruteutils.BruteItemResult {
 	t.Helper()
+	return mockProbeContext(t, nil, proto, target, user, pass)
+}
+
+func mockProbeContext(t *testing.T, ctx context.Context, proto, target, user, pass string) *bruteutils.BruteItemResult {
+	t.Helper()
 	handler, err := bruteutils.GetBruteFuncByType(proto)
 	if err != nil {
 		t.Fatalf("no handler %s: %v", proto, err)
@@ -50,7 +56,7 @@ func mockProbe(t *testing.T, proto, target, user, pass string) *bruteutils.Brute
 		Target:   target,
 		Username: user,
 		Password: pass,
-		Context:  nil,
+		Context:  ctx,
 	})
 }
 
@@ -589,6 +595,7 @@ func TestMockSNMPv2(t *testing.T) {
 	// mock：community 正确的 GET(sysDescr.0) 返回完整合法的 GetResponse；
 	// community 错误不响应（真实设备行为）→ 客户端超时失败。
 	const community = "publ1c-mock"
+	wrongReceived := make(chan struct{}, 1)
 	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -603,6 +610,10 @@ func TestMockSNMPv2(t *testing.T) {
 			}
 			req := append([]byte{}, buf[:n]...)
 			if !bytes.Contains(req, []byte(community)) {
+				select {
+				case wrongReceived <- struct{}{}:
+				default:
+				}
 				continue // 错误 community：静默丢弃（真实设备行为）
 			}
 			resp := snmpGetResponse(req, community)
@@ -617,9 +628,27 @@ func TestMockSNMPv2(t *testing.T) {
 	if !res.Ok {
 		t.Errorf("[snmpv2-correct] ok=%v finished=%v", res.Ok, res.Finished)
 	}
-	res2 := mockProbe(t, "snmpv2", addr, "", "wrong-community")
+	// Exercise a real unanswered request, bounded by the caller's deadline
+	// instead of waiting for the production 2+4+8+16 second retry policy.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	start := time.Now()
+	res2 := mockProbeContext(t, ctx, "snmpv2", addr, "", "wrong-community")
 	if res2.Ok {
 		t.Errorf("[snmpv2-wrong] must not be ok")
+	}
+	if res2.Finished {
+		t.Error("an unanswered community must not mark the target unavailable")
+	}
+	select {
+	case <-wrongReceived:
+	default:
+		t.Fatal("wrong community was never sent to the mock server")
+	}
+	// Socket and context timers may become ready in either order. Check the
+	// elapsed interval instead of racing the context's timer notification.
+	if elapsed := time.Since(start); elapsed < 750*time.Millisecond || elapsed > 5*time.Second {
+		t.Fatalf("SNMP did not respect the caller's one-second deadline: %s", elapsed)
 	}
 }
 

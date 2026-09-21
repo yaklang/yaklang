@@ -8,7 +8,7 @@
 #
 # 用法:
 #   SELECTED_VERSION=$(scripts/get-yak-version.sh)
-#   SELECTED_VERSION=$(scripts/get-yak-version.sh --pattern '.*-alpha.*-diff-check|.*-beta[0-9]+$')
+#   SELECTED_VERSION=$(scripts/get-yak-version.sh --pattern 'alpha|beta')
 #   SELECTED_VERSION=$(scripts/get-yak-version.sh --url "https://custom-url.com/versions.txt")
 #   SELECTED_VERSION=$(scripts/get-yak-version.sh --file ./versions.txt)
 #   SELECTED_VERSION=$(scripts/get-yak-version.sh --quiet)
@@ -36,9 +36,9 @@
 #
 #   3. 模式匹配模式（--pattern）:
 #      - .github/workflows/diff-code-check.yml
-#        位置: 第 120 行
-#        模式: '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+$'
-#        用途: 在代码差异检查中，优先选择 alpha-diff-check、alpha-code-scan 或 beta 版本
+#        位置: 第 134 行
+#        模式: 'alpha|beta'
+#        用途: 在代码差异检查中，选择最新的 alpha 或 beta 版本
 #
 #   4. 本地文件模式（--file）:
 #      - 主要用于测试和本地开发场景
@@ -98,8 +98,8 @@ while [[ $# -gt 0 ]]; do
   # 基础用法：只排除 -yakit- 和 -irify- 版本
   VERSION=\$($0)
 
-  # 带模式匹配：匹配 alpha-diff-check 或 beta 版本
-  VERSION=\$($0 --pattern '.*-alpha.*-diff-check|.*-beta[0-9]+\$')
+  # 带模式匹配：匹配 alpha 或 beta 版本
+  VERSION=\$($0 --pattern 'alpha|beta')
 
   # 从本地文件读取
   VERSION=\$($0 --file ./versions.txt)
@@ -117,9 +117,9 @@ while [[ $# -gt 0 ]]; do
        用途: 在交叉构建流程中静默获取版本
 
   3. 模式匹配模式（--pattern）:
-     - .github/workflows/diff-code-check.yml (第 120 行)
-       模式: '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+\$'
-       用途: 在代码差异检查中，优先选择特定类型的版本
+     - .github/workflows/diff-code-check.yml (第 134 行)
+       模式: 'alpha|beta'
+       用途: 在代码差异检查中，选择最新的 alpha 或 beta 版本
 
   4. 本地文件模式（--file）:
      - 主要用于测试和本地开发场景

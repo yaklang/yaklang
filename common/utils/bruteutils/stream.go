@@ -21,6 +21,10 @@ func (b *BruteUtil) StreamBruteContext(
 	ctx context.Context, typeStr string, target, users, pass []string,
 	resultCallback BruteItemResultCallback,
 ) error {
+	if err := b.oracleConfig.Validate(); err != nil {
+		return err
+	}
+	ctx = withOracleServiceCache(ctx)
 	if len(target) == 0 || len(users) == 0 || len(pass) == 0 {
 		return nil
 	}
@@ -58,6 +62,7 @@ func (b *BruteUtil) StreamBruteContext(
 
 	sink := func(res core.Result) {
 		legacy := &BruteItemResult{
+			ProbeResult:      &res,
 			Type:             typeStr,
 			Ok:               res.Outcome == core.OutcomeAuthSuccess,
 			Finished:         res.Outcome.IsFinalForTarget(),
@@ -66,8 +71,8 @@ func (b *BruteUtil) StreamBruteContext(
 			Target:           res.TargetID,
 		}
 		// 未授权命中（Attempts==1）：handler 已清空凭证，保持未授权语义不回填
-		if res.Attempts != 1 {
-			if cred, ok := credHandoff.LoadAndDelete(res.RawCredentialIndex); ok {
+		if cred, ok := credHandoff.LoadAndDelete(res.RawCredentialIndex); ok {
+			if res.Attempts != 1 {
 				c := cred.(core.Credential)
 				legacy.Username = c.Username
 				legacy.Password = c.Password
@@ -96,11 +101,12 @@ func (b *BruteUtil) StreamBruteContext(
 		Prober: core.ProberFunc(func(pctx context.Context, ptarget core.Target, cred core.Credential, opts core.Options) core.Result {
 			credHandoff.Store(cred.Index, cred)
 			item := &BruteItem{
-				Type:     typeStr,
-				Target:   ptarget.Raw,
-				Username: cred.Username,
-				Password: cred.Password,
-				Context:  pctx,
+				Type:         typeStr,
+				Target:       ptarget.Raw,
+				Username:     cred.Username,
+				Password:     cred.Password,
+				Context:      pctx,
+				OracleConfig: b.oracleConfig,
 			}
 			return coreResultFromLegacy(pctx, item, handler(item))
 		}),
@@ -158,7 +164,7 @@ func coreResultFromLegacy(ctx context.Context, item *BruteItem, legacy *BruteIte
 	if ctx.Err() != nil {
 		outcome = core.OutcomeCancelled
 	}
-	return core.Result{
+	result := core.Result{
 		Outcome:  outcome,
 		Protocol: item.Type,
 		TargetID: item.Target,
@@ -169,6 +175,18 @@ func coreResultFromLegacy(ctx context.Context, item *BruteItem, legacy *BruteIte
 		// （handler 在未授权成功时清空 Username/Password）。
 		Attempts: unauthAttemptMark(legacy),
 	}
+	if legacy.ProbeResult != nil {
+		result = *legacy.ProbeResult
+		result.Protocol, result.TargetID = item.Type, item.Target
+		result.CredID = core.Credential{Username: legacy.Username, Password: legacy.Password}.ID()
+		result.Extra, result.Attempts = legacy.ExtraInfo, unauthAttemptMark(legacy)
+		if ctx.Err() != nil {
+			result.Outcome, result.Err = core.OutcomeCancelled, core.ErrCancelled
+		}
+	}
+	result.UserEliminated = legacy.UserEliminated
+	result.OnlyNeedPassword = legacy.OnlyNeedPassword
+	return result
 }
 
 // unauthAttemptMark：handler 未授权命中时返回 1（Ok 且凭证为空），否则 0。
