@@ -211,17 +211,17 @@ func TestValidateAISessionBindAttachmentBoundaries(t *testing.T) {
 		}},
 		{"too_many", func(c *aiv1.BindAISessionCommand, _ *yakRuntimeOptions) {
 			for i := 1; i < 6; i++ {
-				a := *c.Attachments[0]
+				a := proto.Clone(c.Attachments[0]).(*aiv1.AISessionAttachmentRef)
 				a.AttachmentId = fmt.Sprintf("attachment-%d", i)
-				c.Attachments = append(c.Attachments, &a)
+				c.Attachments = append(c.Attachments, a)
 			}
 		}},
 		{"total_size", func(c *aiv1.BindAISessionCommand, _ *yakRuntimeOptions) {
 			c.Attachments[0].SizeBytes = maxAISessionAttachmentBytes
 			for i := 1; i < 5; i++ {
-				a := *c.Attachments[0]
+				a := proto.Clone(c.Attachments[0]).(*aiv1.AISessionAttachmentRef)
 				a.AttachmentId = fmt.Sprintf("attachment-%d", i)
-				c.Attachments = append(c.Attachments, &a)
+				c.Attachments = append(c.Attachments, a)
 			}
 		}},
 	}
