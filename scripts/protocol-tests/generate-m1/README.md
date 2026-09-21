@@ -3,8 +3,10 @@
 Run from the repository root with Go 1.22.12. The generator binds only
 127.0.0.1:19440–19442. It uses actual Go TLS/HTTP2 and gorilla WebSocket
 connections, with generated traffic assertions independent of the parser.
-TLS certificate verification is disabled **only in this loopback test client**;
-the static httptest certificate is not a production identity.
+The TLS client explicitly trusts the local httptest certificate and verifies
+`m1.example.com` against its test DNS names. The static certificate is not a
+production identity. Earlier committed captures used `m1.example` as SNI; their
+original bytes and oracles remain unchanged.
 
 ```sh
 go build -o /tmp/generate-m1 ./scripts/protocol-tests/generate-m1
