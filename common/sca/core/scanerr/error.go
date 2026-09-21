@@ -110,10 +110,11 @@ func (e *Error) Is(target error) bool {
 }
 
 var (
-	ErrResourceLimit = &Error{Code: ResourceLimit}
-	ErrInputChanged  = &Error{Code: InputChanged}
-	ErrInvalidPath   = &Error{Code: InvalidPath}
-	ErrCancelled     = &Error{Code: Cancelled}
+	ErrResourceLimit  = &Error{Code: ResourceLimit}
+	ErrInputChanged   = &Error{Code: InputChanged}
+	ErrInvalidPath    = &Error{Code: InvalidPath}
+	ErrCancelled      = &Error{Code: Cancelled}
+	ErrMalformedInput = &Error{Code: MalformedInput}
 )
 
 // CodeOf returns the stable diagnostic code for err across scan stages.

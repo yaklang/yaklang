@@ -2,9 +2,9 @@ package sca
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
-	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -46,9 +46,56 @@ func TestRPMFrozenRequireConstraint(t *testing.T) {
 	if !found {
 		t.Fatalf("missing config(mariner-release): %s", extra5149JSON(t, r.Requirements))
 	}
-	body := extra5149JSON(t, r)
-	if !strings.Contains(body, "config(mariner-release)") || !strings.Contains(body, "2.0-4.cm2") {
-		t.Fatal("SBOM/report dump lost original qualifier")
+	bom := dxtypes.CreateCycloneDXSBOMFromReport(r)
+	if bom == nil {
+		t.Fatal("nil SBOM")
+	}
+	var observations []model.Observation
+	var requirements []model.Requirement
+	for _, p := range bom.Properties {
+		switch p.Name {
+		case "sca:observations":
+			if err := json.Unmarshal([]byte(p.Value), &observations); err != nil {
+				t.Fatalf("sca:observations: %v", err)
+			}
+		case "sca:requirements":
+			if err := json.Unmarshal([]byte(p.Value), &requirements); err != nil {
+				t.Fatalf("sca:requirements: %v", err)
+			}
+		}
+	}
+	if len(observations) == 0 || len(requirements) == 0 {
+		t.Fatal("SBOM omitted observations or requirements properties")
+	}
+	provideOK := false
+	for _, o := range observations {
+		for _, p := range o.Provides {
+			if p == "config(mariner-release) = 2.0-4.cm2" {
+				provideOK = true
+			}
+		}
+	}
+	if !provideOK {
+		t.Fatalf("SBOM observations lost associated provide constraint: %s", extra5149JSON(t, observations))
+	}
+	reqOK := false
+	for _, q := range requirements {
+		if q.Target != "config(mariner-release)" {
+			continue
+		}
+		reqOK = true
+		if q.Constraint != "= 2.0-4.cm2" {
+			t.Fatalf("SBOM requirement constraint %q", q.Constraint)
+		}
+		if q.Condition != "rpmflags=268435464" {
+			t.Fatalf("SBOM requirement flags %q", q.Condition)
+		}
+		if q.From == "" {
+			t.Fatalf("SBOM requirement missing From observation: %+v", q)
+		}
+	}
+	if !reqOK {
+		t.Fatalf("SBOM requirements lost associated constraint: %s", extra5149JSON(t, requirements))
 	}
 }
 
@@ -109,13 +156,26 @@ func TestRPMCancelAndMalformedStayClassified(t *testing.T) {
 		if r == nil {
 			t.Fatal("nil report")
 		}
-		if err != nil && errors.Is(err, scanerr.ErrResourceLimit) {
+		if r.Complete || err == nil {
+			t.Fatalf("malformed must be incomplete: complete=%v err=%v", r.Complete, err)
+		}
+		if !errors.Is(err, scanerr.ErrMalformedInput) {
+			t.Fatalf("want malformed_input, got %v code=%s", err, scanerr.CodeOf(err))
+		}
+		if errors.Is(err, scanerr.ErrResourceLimit) || scanerr.CodeOf(err) == scanerr.ResourceLimit {
 			t.Fatalf("malformed became resource_limit: %v", err)
 		}
+		seen := false
 		for _, d := range r.Diagnostics {
 			if d.Code == scanerr.ResourceLimit {
 				t.Fatalf("malformed diagnostic resource_limit: %s", extra5149JSON(t, r.Diagnostics))
 			}
+			if d.Code == scanerr.MalformedInput && d.Incomplete {
+				seen = true
+			}
+		}
+		if !seen {
+			t.Fatalf("missing malformed diagnostic: %s", extra5149JSON(t, r.Diagnostics))
 		}
 	})
 }
@@ -139,19 +199,43 @@ func TestRPMMultiProviderCandidatesAreNotChosen(t *testing.T) {
 		if errs := fillReport(r, append([]*dxtypes.Package(nil), order...), ResourceLimits{MaxComponents: 100, MaxObservations: 100, MaxEdges: 1000}, nil); len(errs) != 0 {
 			t.Fatal(errs)
 		}
-		var got []string
-		for _, q := range r.Requirements {
-			if q.Target == "foo" {
-				got = append(got, q.Candidates...)
+		want := map[string]struct{}{}
+		for _, o := range r.Observations {
+			if o.NativeID == "a" || o.NativeID == "b" {
+				want[o.ID()] = struct{}{}
 			}
 		}
-		sort.Strings(got)
-		if len(got) < 2 {
-			t.Fatalf("expected both providers as candidates, got %v report=%s", got, extra5149JSON(t, r.Requirements))
+		if len(want) != 2 {
+			t.Fatalf("want two provider observations, got %s", extra5149JSON(t, r.Observations))
 		}
+		got := map[string]struct{}{}
+		nFoo := 0
 		for _, q := range r.Requirements {
-			if q.Target == "foo" && len(q.Resolved) != 0 {
+			if q.Target != "foo" {
+				continue
+			}
+			nFoo++
+			if len(q.Resolved) != 0 {
 				t.Fatalf("chose a provider: %+v", q)
+			}
+			for _, id := range q.Candidates {
+				got[id] = struct{}{}
+			}
+		}
+		if nFoo != 1 {
+			t.Fatalf("foo requirements=%d report=%s", nFoo, extra5149JSON(t, r.Requirements))
+		}
+		if len(got) != len(want) {
+			t.Fatalf("candidates %v want %v report=%s", got, want, extra5149JSON(t, r.Requirements))
+		}
+		for id := range want {
+			if _, ok := got[id]; !ok {
+				t.Fatalf("missing provider candidate %s got=%v report=%s", id, got, extra5149JSON(t, r.Requirements))
+			}
+		}
+		for id := range got {
+			if _, ok := want[id]; !ok {
+				t.Fatalf("extra candidate %s got=%v want=%v", id, got, want)
 			}
 		}
 	}

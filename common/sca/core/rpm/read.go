@@ -151,9 +151,50 @@ var le = binary.LittleEndian
 
 // header reads only the tags used by SCA. It validates every entry's bounds,
 // type, and count first; irrelevant tags cannot hide malformed lengths.
-// Dribble entries override earlier values of the same tag, as RPM specifies.
+// Identity tags keep RPM dribble last-wins. Supported dependency tags
+// (1047/1048/1049/1050/1112/1113) must occur at most once.
 func header(b []byte) (*PackageInfo, error) {
 	return headerWithContext(context.Background(), b, budget.From(context.Background()).Limits)
+}
+
+func rpmDepTag(tag uint32) bool {
+	switch tag {
+	case 1047, 1048, 1049, 1050, 1112, 1113:
+		return true
+	}
+	return false
+}
+
+func chargeRPMSlice(ctx context.Context, n int, elem int64) error {
+	bytes, err := budget.SizeMul(n, elem)
+	if err != nil {
+		return err
+	}
+	need, err := budget.SizeAdd(budget.SizeSlice, bytes)
+	if err != nil {
+		return err
+	}
+	return budget.From(ctx).Result(need)
+}
+
+func decodeRPMUint32s(ctx context.Context, data []byte, off, count uint64) ([]uint32, error) {
+	if count == 0 {
+		return nil, nil
+	}
+	if err := chargeRPMSlice(ctx, int(count), 4); err != nil {
+		return nil, err
+	}
+	out := make([]uint32, count)
+	raw := data[off:]
+	for i := range out {
+		if i&255 == 0 {
+			if err := ctx.Err(); err != nil {
+				return nil, scanerr.Wrap(scanerr.Cancelled, err)
+			}
+		}
+		out[i] = be.Uint32(raw[4*i:])
+	}
+	return out, nil
 }
 
 func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*PackageInfo, error) {
@@ -168,11 +209,28 @@ func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*Pa
 	data := b[start : start+dl]
 	p := &PackageInfo{}
 	valuesRead := 0
-	seen := map[uint32]bool{}
-	strTag := map[uint32][]string{}
-	intTag := map[uint32][]uint32{}
+	var provideNames, provideVersions, requireNames, requireVersions []string
+	var havePN, havePV, havePF, haveRN, haveRV, haveRF bool
+	var pFlagOff, pFlagCount, rFlagOff, rFlagCount uint64
 	storeString := func(tag uint32) bool {
 		return tag == 1000 || tag == 1001 || tag == 1002 || tag == 1014 || tag == 1022 || tag == 1047 || tag == 1049 || tag == 1050 || tag == 1113
+	}
+	haveDep := func(tag uint32) bool {
+		switch tag {
+		case 1047:
+			return havePN
+		case 1113:
+			return havePV
+		case 1112:
+			return havePF
+		case 1049:
+			return haveRN
+		case 1050:
+			return haveRV
+		case 1048:
+			return haveRF
+		}
+		return false
 	}
 	for i := uint64(0); i < ni; i++ {
 		if err := ctx.Err(); err != nil {
@@ -182,6 +240,21 @@ func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*Pa
 		tag, typ, off, count := be.Uint32(e), be.Uint32(e[4:]), uint64(be.Uint32(e[8:])), uint64(be.Uint32(e[12:]))
 		if typ > 9 || off > dl || count > 1000000 {
 			return nil, scanerr.New(scanerr.MalformedInput, "RPM tag dimensions")
+		}
+		if rpmDepTag(tag) {
+			if haveDep(tag) {
+				return nil, scanerr.New(scanerr.MalformedInput, "duplicate RPM tag %d", tag)
+			}
+			switch tag {
+			case 1047, 1049, 1050, 1113:
+				if typ != 8 {
+					return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency type")
+				}
+			case 1048, 1112:
+				if typ != 4 {
+					return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency flags")
+				}
+			}
 		}
 		var values []string
 		var raw []byte
@@ -225,9 +298,10 @@ func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*Pa
 			if n > dl-off {
 				return nil, scanerr.New(scanerr.MalformedInput, "RPM tag out of bounds")
 			}
-			raw = data[off : off+n]
+			if tag != 1048 && tag != 1112 {
+				raw = data[off : off+n]
+			}
 		}
-		seen[tag] = true
 		switch tag {
 		case 1000, 1001, 1002, 1014, 1022:
 			if typ != 6 || len(values) != 1 {
@@ -255,34 +329,34 @@ func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*Pa
 				return nil, scanerr.New(scanerr.MalformedInput, "RPM MD5")
 			}
 			p.SigMD5 = hex.EncodeToString(raw)
-		case 1047, 1049, 1050, 1113:
-			if typ != 8 {
-				return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency type")
-			}
-			strTag[tag] = values
-			if tag == 1047 {
-				p.Provides = values
-			}
-			if tag == 1049 {
-				p.Requires = values
-			}
-		case 1048, 1112:
-			if typ != 4 {
-				return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency flags")
-			}
-			ints := make([]uint32, count)
-			for i := range ints {
-				ints[i] = be.Uint32(raw[4*i:])
-			}
-			intTag[tag] = ints
+		case 1047:
+			havePN = true
+			provideNames = values
+			p.Provides = values
+		case 1049:
+			haveRN = true
+			requireNames = values
+			p.Requires = values
+		case 1050:
+			haveRV = true
+			requireVersions = values
+		case 1113:
+			havePV = true
+			provideVersions = values
+		case 1048:
+			haveRF = true
+			rFlagOff, rFlagCount = off, count
+		case 1112:
+			havePF = true
+			pFlagOff, pFlagCount = off, count
 		}
 	}
 	var err error
-	p.ProvideDeps, err = alignRPMDeps(strTag[1047], strTag[1113], intTag[1112], seen[1047], seen[1113], seen[1112])
+	p.ProvideDeps, err = finishRPMDeps(ctx, provideNames, provideVersions, data, pFlagOff, pFlagCount, havePN, havePV, havePF)
 	if err != nil {
 		return nil, err
 	}
-	p.RequireDeps, err = alignRPMDeps(strTag[1049], strTag[1050], intTag[1048], seen[1049], seen[1050], seen[1048])
+	p.RequireDeps, err = finishRPMDeps(ctx, requireNames, requireVersions, data, rFlagOff, rFlagCount, haveRN, haveRV, haveRF)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +366,7 @@ func headerWithContext(ctx context.Context, b []byte, limits budget.Limits) (*Pa
 	return p, nil
 }
 
-func alignRPMDeps(names, versions []string, flags []uint32, haveNames, haveVersions, haveFlags bool) ([]Dependency, error) {
+func finishRPMDeps(ctx context.Context, names, versions []string, data []byte, flagOff, flagCount uint64, haveNames, haveVersions, haveFlags bool) ([]Dependency, error) {
 	if !haveNames {
 		if haveVersions || haveFlags {
 			return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency arrays without names")
@@ -302,21 +376,59 @@ func alignRPMDeps(names, versions []string, flags []uint32, haveNames, haveVersi
 	if haveVersions && len(versions) != len(names) {
 		return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency name/version length")
 	}
-	if haveFlags && len(flags) != len(names) {
+	if haveFlags && flagCount != uint64(len(names)) {
 		return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency name/flag length")
 	}
-	if !haveVersions {
-		versions = make([]string, len(names))
+	var flags []uint32
+	if haveFlags {
+		var err error
+		flags, err = decodeRPMUint32s(ctx, data, flagOff, flagCount)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if !haveFlags {
-		flags = make([]uint32, len(names))
+	return alignRPMDeps(budget.From(ctx), names, versions, flags, haveVersions, haveFlags)
+}
+
+func alignRPMDeps(st *budget.State, names, versions []string, flags []uint32, haveVersions, haveFlags bool) ([]Dependency, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	for i := range names {
+		var ver string
+		var fl uint32
+		if haveVersions {
+			ver = versions[i]
+		}
+		if haveFlags {
+			fl = flags[i]
+		}
+		if fl&(rpmSenseLess|rpmSenseGreater|rpmSenseEqual) != 0 && ver == "" {
+			return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency comparison without version")
+		}
+	}
+	need, err := budget.SizeMul(len(names), budget.SizeObject)
+	if err != nil {
+		return nil, err
+	}
+	need, err = budget.SizeAdd(budget.SizeSlice, need)
+	if err != nil {
+		return nil, err
+	}
+	if err := st.Result(need); err != nil {
+		return nil, err
 	}
 	out := make([]Dependency, len(names))
 	for i, name := range names {
-		if (flags[i]&(rpmSenseLess|rpmSenseGreater|rpmSenseEqual) != 0) && versions[i] == "" {
-			return nil, scanerr.New(scanerr.MalformedInput, "RPM dependency comparison without version")
+		var ver string
+		var fl uint32
+		if haveVersions {
+			ver = versions[i]
 		}
-		out[i] = Dependency{Name: name, Version: versions[i], Flags: flags[i]}
+		if haveFlags {
+			fl = flags[i]
+		}
+		out[i] = Dependency{Name: name, Version: ver, Flags: fl}
 	}
 	return out, nil
 }

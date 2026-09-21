@@ -2,11 +2,13 @@ package sca
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/model"
 )
 
@@ -258,6 +260,128 @@ func TestFormatFieldMatrix(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFullFieldOldOracleAPKAndCargo compares ScanReport fields for two
+// projection-PASS formats against frozen old analyzer WantPkgs, not name@version
+// projection equality. Remaining formats are still not full-field accepted.
+func TestFullFieldOldOracleAPKAndCargo(t *testing.T) {
+	scan := func(t *testing.T, files map[string]string) *model.Report {
+		t.Helper()
+		in := fstest.MapFS{}
+		for path, file := range files {
+			raw, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			in[path] = &fstest.MapFile{Data: raw}
+		}
+		r, err := ScanReport(context.Background(), in, WithSnapshotID("full-field-"+t.Name()))
+		if r == nil || err != nil || !r.Complete {
+			t.Fatalf("complete=%v err=%v", r != nil && r.Complete, err)
+		}
+		return r
+	}
+	sbomComponents := func(t *testing.T, r *model.Report) []dxtypes.BOMComponent {
+		t.Helper()
+		bom := dxtypes.CreateCycloneDXSBOMFromReport(r)
+		if bom == nil || len(bom.Components) == 0 {
+			t.Fatal("SBOM export produced no components")
+		}
+		return bom.Components
+	}
+
+	t.Run("apk", func(t *testing.T) {
+		r := scan(t, map[string]string{"lib/apk/db/installed": "testdata/apk/apk"})
+		for _, want := range APKWantPkgs {
+			c := mustNamed(t, r, want.Name, want.Version)
+			if want.Verification != "" && c.Key.Verification != want.Verification {
+				t.Fatalf("%s verification got %q want %q", want.Name, c.Key.Verification, want.Verification)
+			}
+			if c.Key.Architecture != "x86_64" {
+				t.Fatalf("%s architecture got %q want x86_64 (old A: field)", want.Name, c.Key.Architecture)
+			}
+			if c.Key.Source != "" {
+				t.Fatalf("%s source was empty in old output, got %q", want.Name, c.Key.Source)
+			}
+			joined := strings.Join(c.Licenses, " ")
+			for _, lic := range want.License {
+				token := strings.TrimSuffix(lic, "-only")
+				if !strings.Contains(joined, token) {
+					t.Fatalf("%s license evidence lost: got %q want token %q", want.Name, joined, lic)
+				}
+			}
+		}
+		if !hasConstraint(r, "alpine-baselayout-data", "3.4.3-r1") {
+			t.Fatalf("apk D: constraint dropped: %+v", r.Requirements)
+		}
+		found := false
+		for _, c := range sbomComponents(t, r) {
+			if c.Name != "alpine-baselayout" || c.Version != "3.4.3-r1" {
+				continue
+			}
+			found = true
+			if len(c.Hashes) == 0 || c.Hashes[0].Algorithm != "SHA-1" || c.Hashes[0].Value != "cf0bca32762cd5be9974f4c127467b0f93f78f20" {
+				t.Fatalf("SBOM lost old apk checksum: %+v", c.Hashes)
+			}
+			arch := false
+			for _, p := range c.Properties {
+				if p.Name == "sca:architecture" && p.Value == "x86_64" {
+					arch = true
+				}
+			}
+			if !arch {
+				t.Fatalf("SBOM lost architecture: %+v", c.Properties)
+			}
+		}
+		if !found {
+			t.Fatal("SBOM missing alpine-baselayout")
+		}
+		var reqs []model.Requirement
+		bom := dxtypes.CreateCycloneDXSBOMFromReport(r)
+		for _, p := range bom.Properties {
+			if p.Name == "sca:requirements" {
+				if err := json.Unmarshal([]byte(p.Value), &reqs); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		ok := false
+		for _, q := range reqs {
+			if q.Target == "alpine-baselayout-data" && (q.Constraint == "=3.4.3-r1" || q.Constraint == "3.4.3-r1") {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Fatalf("SBOM requirements lost apk depend: %s", extra5149JSON(t, reqs))
+		}
+	})
+
+	t.Run("cargo", func(t *testing.T) {
+		r := scan(t, map[string]string{"Cargo.lock": "testdata/rust_cargo/positive/Cargo.lock"})
+		for _, want := range RustCargoPkgs {
+			c := mustNamed(t, r, want.Name, want.Version)
+			if c.Key.Verification != want.Verification {
+				t.Fatalf("%s@%s verification got %q want %q", want.Name, want.Version, c.Key.Verification, want.Verification)
+			}
+			if c.Key.Architecture != "" {
+				t.Fatalf("%s architecture was empty in old cargo output, got %q", want.Name, c.Key.Architecture)
+			}
+		}
+		found := false
+		for _, c := range sbomComponents(t, r) {
+			if c.Name != "aho-corasick" || c.Version != "0.7.20" {
+				continue
+			}
+			found = true
+			if len(c.Hashes) == 0 || c.Hashes[0].Algorithm != "SHA-256" || c.Hashes[0].Value != "cc936419f96fa211c1b9166887b38e5e40b19958e5b895be7c1f93adec7071ac" {
+				t.Fatalf("SBOM lost old cargo checksum: %+v", c.Hashes)
+			}
+		}
+		if !found {
+			t.Fatal("SBOM missing aho-corasick")
+		}
+	})
 }
 
 func mustNamed(t *testing.T, r *model.Report, name, version string) model.Component {

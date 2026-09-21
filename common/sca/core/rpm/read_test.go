@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"runtime"
 	"sort"
 	"testing"
 
@@ -382,5 +383,187 @@ func TestHeaderTypedResourceLimit(t *testing.T) {
 	_, err = headerWithContext(context.Background(), b, l)
 	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
 		t.Fatalf("header traversal: %v", err)
+	}
+}
+
+func TestHeaderNamesOnlyRequireNoZeroFill(t *testing.T) {
+	b := packHeader(append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"/bin/sh"}}))
+	p, err := header(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.RequireDeps) != 1 || p.RequireDeps[0].Name != "/bin/sh" || p.RequireDeps[0].Version != "" || p.RequireDeps[0].Flags != 0 {
+		t.Fatalf("missing arrays must not invent values: %+v", p.RequireDeps)
+	}
+}
+
+func TestHeaderDuplicateSemanticTags(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		tags []hdrTag
+	}{
+		{"require-version-1-then-2", append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1050, typ: 8, strs: []string{"1"}}, hdrTag{tag: 1050, typ: 8, strs: []string{"2"}}, hdrTag{tag: 1048, u32s: []uint32{8}})},
+		{"require-version-2-then-1", append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1050, typ: 8, strs: []string{"2"}}, hdrTag{tag: 1050, typ: 8, strs: []string{"1"}}, hdrTag{tag: 1048, u32s: []uint32{8}})},
+		{"require-names", append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1049, typ: 8, strs: []string{"bar"}})},
+		{"require-flags", append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1048, u32s: []uint32{8}}, hdrTag{tag: 1048, u32s: []uint32{4}})},
+		{"provide-names", append(identityTags("x", "1"), hdrTag{tag: 1047, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1047, typ: 8, strs: []string{"bar"}})},
+		{"provide-versions", append(identityTags("x", "1"), hdrTag{tag: 1047, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1113, typ: 8, strs: []string{"1"}}, hdrTag{tag: 1113, typ: 8, strs: []string{"2"}})},
+		{"provide-flags", append(identityTags("x", "1"), hdrTag{tag: 1047, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1112, u32s: []uint32{8}}, hdrTag{tag: 1112, u32s: []uint32{4}})},
+		{"identical-require-version", append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1050, typ: 8, strs: []string{"1"}}, hdrTag{tag: 1050, typ: 8, strs: []string{"1"}})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := header(packHeader(tc.tags))
+			if err == nil {
+				t.Fatalf("accepted duplicate semantic tag: %+v", p)
+			}
+			if errors.Is(err, scanerr.ErrResourceLimit) || scanerr.CodeOf(err) == scanerr.ResourceLimit {
+				t.Fatalf("duplicate classified as resource_limit: %v", err)
+			}
+			if scanerr.CodeOf(err) != scanerr.MalformedInput && !errors.Is(err, scanerr.ErrMalformedInput) {
+				t.Fatalf("want malformed_input, got %v", err)
+			}
+		})
+	}
+}
+
+func TestHeaderLegalTagPermutation(t *testing.T) {
+	base := []hdrTag{
+		{tag: 1000, strs: []string{"pkg"}},
+		{tag: 1001, strs: []string{"1"}},
+		{tag: 1049, typ: 8, strs: []string{"foo"}},
+		{tag: 1050, typ: 8, strs: []string{"2.0"}},
+		{tag: 1048, u32s: []uint32{rpmSenseEqual}},
+		{tag: 1047, typ: 8, strs: []string{"foo"}},
+		{tag: 1113, typ: 8, strs: []string{"2.0"}},
+		{tag: 1112, u32s: []uint32{rpmSenseEqual}},
+	}
+	check := func(t *testing.T, tags []hdrTag) {
+		t.Helper()
+		p, err := header(packHeader(tags))
+		if err != nil {
+			t.Fatalf("legal permutation rejected: %v tags=%+v", err, tags)
+		}
+		if p.Name != "pkg" || p.Version != "1" {
+			t.Fatalf("identity: %+v", p)
+		}
+		if len(p.RequireDeps) != 1 || p.RequireDeps[0].Name != "foo" || p.RequireDeps[0].Constraint() != "= 2.0" || p.RequireDeps[0].Flags != rpmSenseEqual {
+			t.Fatalf("require: %+v", p.RequireDeps)
+		}
+		if len(p.ProvideDeps) != 1 || p.ProvideDeps[0].Name != "foo" || p.ProvideDeps[0].Constraint() != "= 2.0" {
+			t.Fatalf("provide: %+v", p.ProvideDeps)
+		}
+	}
+	check(t, base)
+	rev := append([]hdrTag(nil), base...)
+	for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
+		rev[i], rev[j] = rev[j], rev[i]
+	}
+	check(t, rev)
+	for seed := 0; seed < 24; seed++ {
+		tags := append([]hdrTag(nil), base...)
+		for i := len(tags) - 1; i > 0; i-- {
+			j := (seed*17 + i*31) % (i + 1)
+			tags[i], tags[j] = tags[j], tags[i]
+		}
+		check(t, tags)
+	}
+}
+
+func headerAllocDelta(fn func()) uint64 {
+	runtime.GC()
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	fn()
+	runtime.ReadMemStats(&after)
+	if after.TotalAlloc >= before.TotalAlloc {
+		return after.TotalAlloc - before.TotalAlloc
+	}
+	return 0
+}
+
+func TestHeaderDependencyArrayBudget(t *testing.T) {
+	for _, n := range []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 4096} {
+		names := make([]string, n)
+		flags := make([]uint32, n)
+		for i := range names {
+			names[i] = "a"
+		}
+		b := packHeader(append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: names}, hdrTag{tag: 1048, u32s: flags}))
+		p, err := header(b)
+		if err != nil {
+			t.Fatalf("n=%d: %v", n, err)
+		}
+		if len(p.RequireDeps) != n {
+			t.Fatalf("n=%d deps %d", n, len(p.RequireDeps))
+		}
+	}
+
+	small := packHeader(append(identityTags("x", "1"),
+		hdrTag{tag: 1049, typ: 8, strs: []string{"a", "b", "c", "d"}},
+		hdrTag{tag: 1050, typ: 8, strs: []string{"1", "2", "3", "4"}},
+		hdrTag{tag: 1048, u32s: []uint32{0, 0, 0, 0}},
+	))
+	wide, err := (budget.Limits{MaxResultBytes: 256 << 20}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wideCtx := budget.Bind(context.Background(), wide)
+	if _, err = headerWithContext(wideCtx, small, wide); err != nil {
+		t.Fatal(err)
+	}
+	used := budget.From(wideCtx).ResultBytes()
+	if used <= 0 {
+		t.Fatal("aligned deps were not charged")
+	}
+	tight, err := (budget.Limits{MaxResultBytes: used - 1}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tightErr error
+	alloc := headerAllocDelta(func() {
+		ctx := budget.Bind(context.Background(), tight)
+		_, tightErr = headerWithContext(ctx, small, tight)
+	})
+	if tightErr == nil || !errors.Is(tightErr, scanerr.ErrResourceLimit) {
+		t.Fatalf("low budget must be resource_limit before success, got %v alloc=%d", tightErr, alloc)
+	}
+
+	orphan := packHeader(append(identityTags("x", "1"), hdrTag{tag: 1048, u32s: make([]uint32, 1000000)}))
+	lim, err := (budget.Limits{MaxResultBytes: 1024}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var orphanErr error
+	var charged int64
+	alloc = headerAllocDelta(func() {
+		ctx := budget.Bind(context.Background(), lim)
+		_, orphanErr = headerWithContext(ctx, orphan, lim)
+		charged = budget.From(ctx).ResultBytes()
+	})
+	if orphanErr == nil || errors.Is(orphanErr, scanerr.ErrResourceLimit) {
+		t.Fatalf("orphan flags must be malformed without allocating the array: err=%v alloc=%d charged=%d", orphanErr, alloc, charged)
+	}
+	if scanerr.CodeOf(orphanErr) != scanerr.MalformedInput && !errors.Is(orphanErr, scanerr.ErrMalformedInput) {
+		t.Fatalf("orphan flags class: %v", orphanErr)
+	}
+	if alloc > 1<<20 {
+		t.Fatalf("orphan 1048 still allocated %d bytes (charged %d) before %v", alloc, charged, orphanErr)
+	}
+	if charged > 1024 {
+		t.Fatalf("orphan flags charged %d over the 1024 bound", charged)
+	}
+
+	mismatch := packHeader(append(identityTags("x", "1"), hdrTag{tag: 1049, typ: 8, strs: []string{"foo"}}, hdrTag{tag: 1048, u32s: make([]uint32, 1000000)}))
+	var mismatchErr error
+	alloc = headerAllocDelta(func() {
+		ctx := budget.Bind(context.Background(), lim)
+		_, mismatchErr = headerWithContext(ctx, mismatch, lim)
+	})
+	if mismatchErr == nil || errors.Is(mismatchErr, scanerr.ErrResourceLimit) {
+		t.Fatalf("mismatched flags must be malformed without the uint32 array: err=%v alloc=%d", mismatchErr, alloc)
+	}
+	if alloc > 1<<20 {
+		t.Fatalf("mismatched 1048 still allocated %d bytes before %v", alloc, mismatchErr)
 	}
 }

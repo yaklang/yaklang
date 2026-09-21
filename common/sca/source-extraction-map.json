@@ -3889,7 +3889,7 @@
     },
     {
       "local_file": "common/sca/core/rpm/read.go",
-      "sha256": "a7aee13a4fb6768546f6b5d626353fc4b7039029b8332bf405e3037036094041",
+      "sha256": "1047ed2e8e749f8303ed13d79fbe9b7be4a2004149e9139330fe6a103c8574e8",
       "symbols": [
         {
           "name": "Dependency",
@@ -3921,15 +3921,31 @@
         },
         {
           "name": "header",
-          "line": 155
+          "line": 156
+        },
+        {
+          "name": "rpmDepTag",
+          "line": 160
+        },
+        {
+          "name": "chargeRPMSlice",
+          "line": 168
+        },
+        {
+          "name": "decodeRPMUint32s",
+          "line": 180
         },
         {
           "name": "headerWithContext",
-          "line": 159
+          "line": 200
+        },
+        {
+          "name": "finishRPMDeps",
+          "line": 369
         },
         {
           "name": "alignRPMDeps",
-          "line": 295
+          "line": 393
         }
       ],
       "decision": "REWRITE",
@@ -4017,7 +4033,7 @@
     },
     {
       "local_file": "common/sca/core/scanerr/error.go",
-      "sha256": "479691eb3071431e888f091a36058af0108f19574545ef935e5b45b67ef68a9d",
+      "sha256": "5423059b5956d966001f1c01cde9cf1d4cdc820a5e626d4e2d9bc3c00ead77d7",
       "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
